@@ -1,0 +1,8 @@
+[package]
+name = "qnc-shell-desktop-api"
+version = "0.1.0"
+edition = "2021"
+description = "QNC shell desktop public adapter API"
+
+[dependencies]
+eframe = { workspace = true }

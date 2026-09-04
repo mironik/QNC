@@ -1,0 +1,56 @@
+{
+  "application_id": "qnc.project",
+  "application_name": "Project",
+  "application_version": "0.1.0",
+  "application_kind": "interactive_form",
+  "lifecycle": "interactive_form",
+  "owned_database_contracts": [
+    "qnc://local/db/project_registry",
+    "qnc://local/db/project_workspace/{project_id}"
+  ],
+  "read_database_contracts": [],
+  "owned_artifacts": [],
+  "module_dependencies": [
+    "qnc.module.manifest-capability",
+    "qnc.module.db-contract-validation",
+    "qnc.module.transport-resolver",
+    "qnc.module.dir-browser",
+    "qnc.module.keyboard-shortcut"
+  ],
+  "capabilities": ["project.registry", "project.settings", "project.open"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "keyboard_shortcut_contract": "contracts/qnc-keyboard-shortcuts.json",
+  "ui_layout_reference_contract": "docs/07-ui-layout-reference.md",
+  "ui_layout_contracts": [
+    "contracts/ui/shell.layout.json",
+    "contracts/ui/project.layout.json"
+  ],
+  "workflow_forbidden_operations": [
+    "media.scan",
+    "media.probe",
+    "filmstrip.generate",
+    "wave.generate",
+    "player.decode",
+    "export.render",
+    "story.workflow",
+    "media_assist.workflow"
+  ],
+  "workflow_forbidden_capabilities": [
+    "source.scan.roles",
+    "media.probe.full",
+    "filmstrip.generate14",
+    "wave.generate",
+    "playback.open",
+    "export.render"
+  ],
+  "status_contract": "qnc.status.basic.v1",
+  "error_contract": "qnc.error.basic.v1",
+  "qnc_v4_ui_reference": [
+    "seed/tabs/project/plugin.json",
+    "qnc-app/src/project",
+    "qnc-app/src/components/project_catalog.rs",
+    "qnc-app/src/components/project_command.rs"
+  ]
+}

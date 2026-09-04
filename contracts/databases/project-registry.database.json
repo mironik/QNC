@@ -1,0 +1,40 @@
+{
+  "database_id": "qnc.db.project_registry",
+  "owner_application": "qnc.project",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/project_registry",
+  "tables": [
+    "projects",
+    "app_settings",
+    "users",
+    "sessions",
+    "project_templates",
+    "source_templates",
+    "module_state",
+    "local_runtime_settings",
+    "project_storage_locations",
+    "project_template_kv",
+    "project_template_sources",
+    "source_template_kv"
+  ],
+  "public_read_views": [
+    "public_projects",
+    "public_app_settings",
+    "public_project_templates",
+    "public_source_templates",
+    "public_module_state"
+  ],
+  "implementation_private_files": ["data/project_store.db"],
+  "schema_source_reference": [
+    "qnc-host/src/project/db.rs:init_global_schema",
+    "qnc-host/src/project/store.rs",
+    "qnc-host/src/project/templates.rs",
+    "qnc-host/src/project/ui_state.rs",
+    "qnc-host/src/project/keyboard_settings.rs"
+  ],
+  "write_owner": "qnc.project",
+  "public_read_policy": "public_read_views",
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-09-04T00:00:00Z",
+  "updated_at": "2026-09-04T00:00:00Z"
+}

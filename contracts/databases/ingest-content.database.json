@@ -1,0 +1,28 @@
+{
+  "database_id": "qnc.db.ingest_content",
+  "owner_application": "qnc.ingest",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/ingest_content",
+  "tables": [
+    "clips",
+    "clip_sources",
+    "clip_proxy",
+    "probe_records",
+    "filmstrip_artifacts",
+    "wave_artifacts"
+  ],
+  "public_read_views": [
+    "public_clips",
+    "public_clip_sources",
+    "public_clip_proxy",
+    "public_probe_records",
+    "public_filmstrip_artifacts",
+    "public_wave_artifacts"
+  ],
+  "write_owner": "qnc.ingest",
+  "public_read_policy": "public_read_views",
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-09-04T00:00:00Z",
+  "updated_at": "2026-09-04T00:00:00Z"
+}
+

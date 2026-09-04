@@ -1,0 +1,24 @@
+{
+  "module_id": "qnc.module.scanner",
+  "module_name": "scanner",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["source.scan.roles"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.probe.full",
+    "filmstrip.generate14",
+    "wave.generate",
+    "story.workflow",
+    "proxy.as_standalone_clip"
+  ],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.filmstrip", "qnc.module.wave"],
+  "state_policy": "stateless",
+  "database_write_policy": "returns_result_to_owner_application"
+}
+

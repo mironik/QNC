@@ -1,0 +1,14 @@
+[package]
+name = "qnc-project-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "QNC Project public desktop surface"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-contracts = { workspace = true }
+qnc-dir-browser = { workspace = true }
+qnc-keyboard-shortcut = { workspace = true }
+qnc-project-store = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

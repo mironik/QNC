@@ -1,0 +1,8 @@
+[package]
+name = "qnc-transport-resolver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-contracts = { workspace = true }
+

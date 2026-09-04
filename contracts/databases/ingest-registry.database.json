@@ -1,0 +1,22 @@
+{
+  "database_id": "qnc.db.ingest_registry",
+  "owner_application": "qnc.ingest",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/ingest_registry",
+  "tables": [
+    "source_cards",
+    "source_locations",
+    "source_sessions"
+  ],
+  "public_read_views": [
+    "public_source_cards",
+    "public_source_locations",
+    "public_source_sessions"
+  ],
+  "write_owner": "qnc.ingest",
+  "public_read_policy": "public_read_views",
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-09-04T00:00:00Z",
+  "updated_at": "2026-09-04T00:00:00Z"
+}
+

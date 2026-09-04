@@ -1,0 +1,9 @@
+[package]
+name = "qnc-db-contract"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-contracts = { workspace = true }
+serde_json = { workspace = true }
+

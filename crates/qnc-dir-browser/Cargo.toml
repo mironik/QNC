@@ -1,0 +1,8 @@
+[package]
+name = "qnc-dir-browser"
+version = "0.1.0"
+edition = "2021"
+description = "QNC directory browser module"
+
+[dependencies]
+rfd = { workspace = true }

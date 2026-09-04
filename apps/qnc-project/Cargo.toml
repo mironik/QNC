@@ -1,0 +1,13 @@
+[package]
+name = "qnc-project"
+version = "0.1.0"
+edition = "2021"
+description = "QNC Project native application skeleton"
+
+[[bin]]
+name = "qnc-project"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-project-desktop = { workspace = true }

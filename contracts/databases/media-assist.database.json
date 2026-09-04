@@ -1,0 +1,21 @@
+{
+  "database_id": "qnc.db.media_assist",
+  "owner_application": "qnc.media-assist",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/media_assist",
+  "tables": [
+    "assist_sessions",
+    "assist_decisions",
+    "assist_references"
+  ],
+  "public_read_views": [
+    "public_assist_sessions",
+    "public_assist_decisions"
+  ],
+  "write_owner": "qnc.media-assist",
+  "public_read_policy": "public_read_views",
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-09-04T00:00:00Z",
+  "updated_at": "2026-09-04T00:00:00Z"
+}
+

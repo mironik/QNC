@@ -1,0 +1,101 @@
+{
+  "layout_id": "qnc.ui.project",
+  "layout_version": "0.1.0",
+  "application_id": "qnc.project",
+  "mirror_policy": "literal_qnc_v4",
+  "font_policy": "single_qnc_font_system",
+  "allowed_deviation_policy": "explicit_approval_required",
+  "qnc_v4_reference": [
+    "seed/tabs/project/plugin.json",
+    "qnc-app/src/project/mod.rs",
+    "qnc-app/src/project/screen.rs",
+    "qnc-app/src/project/empty_story_layout.rs",
+    "qnc-app/src/project/layout.rs",
+    "qnc-app/src/project/project_list.rs",
+    "qnc-app/src/project/settings.rs",
+    "qnc-app/src/project/create.rs",
+    "qnc-app/src/project/template_picker.rs",
+    "qnc-app/src/project/ai.rs",
+    "qnc-app/src/qnc_ui.rs",
+    "qnc-app/src/qnc_form.rs",
+    "qnc-app/src/qnc_theme.rs"
+  ],
+  "audit_note": "Active qnc_v4 Project board is project/empty_story_layout.rs -> qnc_ui::column_shell. qnc_ui::project_workspace is a compatibility/dead-code reference and is not the active Project path.",
+  "board": {
+    "left_ratio": 0.31,
+    "divider_width": 5.0,
+    "left_min_width": 280.0,
+    "right_min_width": 200.0,
+    "outer_padding": 0.0,
+    "body_face": "theme.bg"
+  },
+  "left_project_list": {
+    "panel_pad": 20.0,
+    "title": "Projekti",
+    "title_row_height": 28.0,
+    "below_title_pad": 40.0,
+    "row_height": 60.0,
+    "row_gap": 10.0,
+    "delete_column_width": 28.0,
+    "column_gap": 8.0,
+    "confirm_button_width": 28.0,
+    "confirm_button_height": 22.0,
+    "empty_text": "Nema projekata.",
+    "ready_text": "Spreman."
+  },
+  "right_settings_panel": {
+    "panel_pad": 20.0,
+    "title": "Postavke",
+    "subtitle": "Odaberi radni tok i pregledaj postavke projekta.",
+    "inner_pad_x": 8.0,
+    "inner_pad_y": 8.0,
+    "section_gap": 8.0,
+    "inline_label_width": 168.0,
+    "inline_button_width": 120.0,
+    "inline_column_gap": 8.0,
+    "field_min_width": 160.0,
+    "label_font_size": 12.0,
+    "group_title_font_size": 12.0,
+    "row_height": 24.0
+  },
+  "pts_slots": {
+    "head": ["Postavke", "subtitle"],
+    "fixed_order": [
+      "TemplatePicker",
+      "ProjectCreate",
+      "AiSettings",
+      "ProjectsRoot",
+      "ExportDirectory",
+      "TemplateActions"
+    ],
+    "scroll_order": ["Advanced", "CustomTemplate"]
+  },
+  "labels": [
+    "Project",
+    "Projekti",
+    "Postavke",
+    "RADNI TOK",
+    "Naziv projekta:",
+    "Novi projekt",
+    "AI",
+    "Lokacija projekata:",
+    "Export direktorij:",
+    "Novi template",
+    "Odustani",
+    "Advanced postavke",
+    "Novi template",
+    "Spremi novi template",
+    "×",
+    "Želite ukloniti projekt?",
+    "DA",
+    "NE"
+  ],
+  "forbidden_changes_without_approval": [
+    "redesign",
+    "moving_project_list_to_right",
+    "changing_pts_slot_order",
+    "changing_labels",
+    "changing_font_system",
+    "adding_business_logic_to_ui"
+  ]
+}

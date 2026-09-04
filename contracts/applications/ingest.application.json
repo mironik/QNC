@@ -1,0 +1,55 @@
+{
+  "application_id": "qnc.ingest",
+  "application_name": "Ingest",
+  "application_version": "0.1.0",
+  "application_kind": "interactive_batch_form",
+  "lifecycle": "batch_exit_after_completion",
+  "owned_database_contracts": ["qnc://local/db/ingest_registry", "qnc://local/db/ingest_content"],
+  "read_database_contracts": ["qnc://local/db/project_registry"],
+  "owned_artifacts": ["ingest.probe_records", "ingest.filmstrip_records", "ingest.wave_records"],
+  "module_dependencies": [
+    "qnc.module.manifest-capability",
+    "qnc.module.transport-resolver",
+    "qnc.module.db-contract-validation",
+    "qnc.module.dir-browser",
+    "qnc.module.media-browser",
+    "qnc.module.scanner",
+    "qnc.module.camera-detector",
+    "qnc.module.media-probe",
+    "qnc.module.filmstrip",
+    "qnc.module.wave",
+    "qnc.module.keyboard-shortcut"
+  ],
+  "capabilities": ["source.discover", "source.select", "media.probe.ingest_once", "ingest.write_db"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "keyboard_shortcut_contract": "contracts/qnc-keyboard-shortcuts.json",
+  "ui_layout_reference_contract": "docs/07-ui-layout-reference.md",
+  "ui_layout_contracts": [
+    "contracts/ui/shell.layout.json",
+    "contracts/ui/ingest.layout.json"
+  ],
+  "workflow_forbidden_operations": [
+    "project.db.write",
+    "story.db.write",
+    "media_assist.db.write",
+    "story.workflow",
+    "media_assist.workflow",
+    "proxy.as_standalone_clip",
+    "probe.after_ingest_pass"
+  ],
+  "workflow_forbidden_capabilities": [
+    "story.workflow.run",
+    "media_assist.workflow.run"
+  ],
+  "status_contract": "qnc.status.basic.v1",
+  "error_contract": "qnc.error.basic.v1",
+  "qnc_v4_ui_reference": [
+    "seed/tabs/ingest/plugin.json",
+    "qnc-app/src/ingest/mod.rs",
+    "qnc-app/src/qnc_location_browser.rs",
+    "qnc-app/src/media_assets.rs",
+    "qnc-app/src/components/source_import_command.rs"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "database_id": "qnc.db.story",
+  "owner_application": "qnc.story",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/story/{story_instance}",
+  "tables": [
+    "story_state",
+    "story_parts",
+    "story_markers",
+    "story_marker_slots",
+    "story_covers",
+    "virtual_shots",
+    "story_edl",
+    "story_playlist"
+  ],
+  "public_read_views": [
+    "public_story_state",
+    "public_story_parts",
+    "public_story_markers",
+    "public_story_edl"
+  ],
+  "write_owner": "qnc.story",
+  "public_read_policy": "public_read_views",
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-09-04T00:00:00Z",
+  "updated_at": "2026-09-04T00:00:00Z"
+}
+

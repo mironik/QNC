@@ -1,0 +1,17 @@
+{
+  "module_id": "qnc.module.media-browser",
+  "module_name": "Media Browser",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": ["media.list", "media.select"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "clip.catalog.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes"
+}
+

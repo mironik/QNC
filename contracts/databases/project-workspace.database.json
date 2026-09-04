@@ -1,0 +1,36 @@
+{
+  "database_id": "qnc.db.project_workspace",
+  "owner_application": "qnc.project",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/project_workspace/{project_id}",
+  "tables": [
+    "project_settings",
+    "project_members",
+    "project_template_snapshot",
+    "project_workflow_steps",
+    "project_workflow_state",
+    "project_data_revisions",
+    "project_settings_kv",
+    "project_snapshot_kv",
+    "project_workflow_step_kv"
+  ],
+  "public_read_views": [
+    "public_project_settings",
+    "public_project_members",
+    "public_project_template_snapshot",
+    "public_project_workflow_steps",
+    "public_project_workflow_state",
+    "public_project_data_revisions"
+  ],
+  "implementation_private_files": ["projects/{project_id}/qnc_project.db"],
+  "schema_source_reference": [
+    "qnc-host/src/project/db.rs:init_project_schema",
+    "qnc-host/src/project/templates.rs",
+    "qnc-host/src/project/db_broker.rs"
+  ],
+  "write_owner": "qnc.project",
+  "public_read_policy": "public_read_views",
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-09-04T00:00:00Z",
+  "updated_at": "2026-09-04T00:00:00Z"
+}

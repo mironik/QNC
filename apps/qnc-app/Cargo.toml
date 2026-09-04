@@ -1,0 +1,17 @@
+[package]
+name = "qnc-app"
+version = "0.1.0"
+edition = "2021"
+description = "QNC shell launcher"
+
+[[bin]]
+name = "qnc-app"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-contracts = { workspace = true }
+qnc-project-desktop-adapter = { workspace = true }
+qnc-shell-desktop-api = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

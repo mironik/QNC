@@ -1,0 +1,30 @@
+{
+  "module_id": "qnc.module.media-probe",
+  "module_name": "Media Probe",
+  "module_version": "0.1.0",
+  "module_kind": "out_of_process_helper",
+  "capabilities": ["media.probe.full"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "filmstrip.generate14",
+    "wave.generate",
+    "playback.open",
+    "export.render",
+    "story.workflow",
+    "media_assist.workflow",
+    "proxy.as_standalone_clip"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.filmstrip",
+    "qnc.module.wave",
+    "qnc.module.broadcast-player",
+    "qnc.module.export"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "returns_result_to_owner_application"
+}
+

@@ -1,0 +1,12 @@
+{
+  "application_id": "qnc.project",
+  "tab_id": "project",
+  "label": "Project",
+  "enabled": true,
+  "system": true,
+  "removable": false,
+  "order": 10,
+  "host_mode": "embedded_public_api",
+  "desktop_entry": "qnc_project",
+  "standalone_executable": "qnc-project"
+}

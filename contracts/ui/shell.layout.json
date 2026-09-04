@@ -1,0 +1,51 @@
+{
+  "layout_id": "qnc.ui.shell",
+  "layout_version": "0.1.0",
+  "mirror_policy": "literal_qnc_v4",
+  "font_policy": "single_qnc_font_system",
+  "allowed_deviation_policy": "explicit_approval_required",
+  "qnc_v4_reference": [
+    "qnc-app/src/app.rs",
+    "qnc-app/src/qnc_ui.rs",
+    "qnc-app/src/qnc_theme.rs",
+    "seed/tabs/project/plugin.json",
+    "seed/tabs/ingest/plugin.json",
+    "seed/tabs/media_assist/plugin.json",
+    "seed/tabs/story/plugin.json"
+  ],
+  "application_tabs": ["project", "ingest", "media_assist", "storyboard"],
+  "shell_metrics": {
+    "footer_height": 36.0,
+    "workspace_status_height": 22.0,
+    "host_gate_top_chrome_only": true,
+    "workspace_footer_columns": 3,
+    "footer_tab_alignment": "center",
+    "theme_picker_alignment": "footer_left",
+    "close_project_alignment": "footer_right"
+  },
+  "theme_metrics": {
+    "font_ui": 14.0,
+    "font_timecode": 13.0,
+    "chrome_row_height": 28.0,
+    "chrome_pad_x": 8,
+    "chrome_pad_y": 2,
+    "chrome_control_height": 24.0
+  },
+  "colors": {
+    "bg": [11, 15, 25],
+    "surface": [17, 24, 39],
+    "raised": [31, 41, 55],
+    "border": [55, 65, 81],
+    "text": [229, 231, 235],
+    "muted": [156, 163, 175],
+    "accent": [16, 185, 129],
+    "focus": [255, 180, 60]
+  },
+  "forbidden_changes_without_approval": [
+    "redesign",
+    "different_font_system",
+    "new_tab_order",
+    "moving_tabs_out_of_footer",
+    "replacing_qnc_v4_spacing_with_new_spacing"
+  ]
+}

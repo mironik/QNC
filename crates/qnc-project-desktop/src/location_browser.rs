@@ -1,0 +1,534 @@
+use eframe::egui::{self, RichText, Sense, Vec2};
+
+use crate::{
+    layout_contract::ShellLayoutContract,
+    project_component::DirectoryBrowserEntry,
+    theme::{self, Theme},
+    widgets,
+};
+
+const UP_COL_W: f32 = 42.0;
+const DISKS_COL_W: f32 = 58.0;
+const NAV_GAP_W: f32 = 12.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LocationSourceKind {
+    #[default]
+    Local,
+    Lan,
+    Internet,
+}
+
+impl LocationSourceKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Local => "Računalo",
+            Self::Lan => "LAN",
+            Self::Internet => "Internet",
+        }
+    }
+}
+
+pub struct LocationBrowserInput<'a> {
+    pub id_salt: &'a str,
+    pub kind: LocationSourceKind,
+    pub roots: bool,
+    pub path: &'a str,
+    pub parent: Option<&'a str>,
+    pub entries: &'a [DirectoryBrowserEntry],
+    pub error: Option<&'a str>,
+    pub busy: bool,
+    pub confirm_label: &'a str,
+    pub max_tree_height: Option<f32>,
+    pub shell: &'a ShellLayoutContract,
+}
+
+pub enum LocationBrowserAction {
+    None,
+    SelectKind(LocationSourceKind),
+    OpenPath(String),
+    Confirm,
+    Cancel,
+}
+
+pub fn show(ui: &mut egui::Ui, input: LocationBrowserInput<'_>) -> LocationBrowserAction {
+    let mut action = LocationBrowserAction::None;
+    let t = Theme::from_contract(&input.shell.colors);
+    let font_ui = input.shell.theme_metrics.font_ui;
+
+    ui.horizontal(|ui| {
+        theme::label(ui, "Izvori", font_ui, t.muted);
+        ui.add_space(12.0);
+        for kind in [
+            LocationSourceKind::Local,
+            LocationSourceKind::Lan,
+            LocationSourceKind::Internet,
+        ] {
+            let selected = input.kind == kind;
+            if link_tab(ui, kind.label(), selected, input.shell).clicked() && !selected {
+                action = LocationBrowserAction::SelectKind(kind);
+            }
+            ui.add_space(10.0);
+        }
+    });
+
+    ui.add_space(8.0);
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+        let can_up = matches!(input.kind, LocationSourceKind::Local)
+            && !input.roots
+            && input.parent.is_some();
+        if fixed_text_link(ui, "Gore", can_up, UP_COL_W, input.shell).clicked() {
+            action = LocationBrowserAction::OpenPath(input.parent.unwrap_or("").to_string());
+        }
+        ui.add_space(NAV_GAP_W);
+        let can_disks = matches!(input.kind, LocationSourceKind::Local);
+        if fixed_text_link(ui, "Diskovi", can_disks, DISKS_COL_W, input.shell).clicked() {
+            action = LocationBrowserAction::OpenPath(String::new());
+        }
+        ui.add_space(NAV_GAP_W);
+        show_location_breadcrumb(ui, &input, &mut action);
+    });
+
+    if let Some(error) = input.error {
+        ui.add_space(4.0);
+        ui.colored_label(egui::Color32::from_rgb(220, 100, 80), error);
+    }
+
+    ui.add_space(6.0);
+    let footer_h = input.shell.theme_metrics.chrome_control_height + 8.0;
+    let available_tree_h = (ui.available_height() - footer_h).max(40.0);
+    let tree_h = input
+        .max_tree_height
+        .map(|max_h| available_tree_h.min(max_h).max(40.0))
+        .unwrap_or(available_tree_h);
+    egui::ScrollArea::vertical()
+        .id_salt(format!("{}_location_browser", input.id_salt))
+        .max_height(tree_h)
+        .min_scrolled_height(tree_h)
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            match input.kind {
+                LocationSourceKind::Local => {
+                    show_local_tree(ui, &input, &mut action);
+                }
+                LocationSourceKind::Lan => {
+                    theme::label(ui, "Nema konfiguriranih LAN izvora.", font_ui, t.muted);
+                }
+                LocationSourceKind::Internet => {
+                    theme::label(ui, "Nema konfiguriranih Internet izvora.", font_ui, t.muted);
+                }
+            }
+        });
+
+    ui.add_space(8.0);
+    let can_confirm = matches!(input.kind, LocationSourceKind::Local)
+        && !input.roots
+        && !input.path.trim().is_empty()
+        && !input.busy;
+    ui.allocate_ui_with_layout(
+        Vec2::new(
+            ui.available_width(),
+            input.shell.theme_metrics.chrome_control_height,
+        ),
+        egui::Layout::right_to_left(egui::Align::Center),
+        |ui| {
+            ui.spacing_mut().item_spacing.x = 8.0;
+            if widgets::action_btn(ui, "Odustani", input.shell).clicked() {
+                action = LocationBrowserAction::Cancel;
+            }
+            ui.add_enabled_ui(can_confirm, |ui| {
+                if widgets::primary_btn(ui, input.confirm_label, true, input.shell).clicked() {
+                    action = LocationBrowserAction::Confirm;
+                }
+            });
+        },
+    );
+
+    action
+}
+
+pub fn clean_location_path(path: &str) -> String {
+    let p = path.trim();
+    if let Some(rest) = p.strip_prefix("\\\\?\\UNC\\") {
+        format!("\\\\{rest}")
+    } else if let Some(rest) = p.strip_prefix("\\\\?\\") {
+        rest.to_string()
+    } else if let Some(rest) = p.strip_prefix("//?/UNC/") {
+        format!("//{rest}")
+    } else if let Some(rest) = p.strip_prefix("//?/") {
+        rest.to_string()
+    } else {
+        p.to_string()
+    }
+}
+
+fn fixed_text_link(
+    ui: &mut egui::Ui,
+    label: &str,
+    enabled: bool,
+    width: f32,
+    shell: &ShellLayoutContract,
+) -> egui::Response {
+    ui.allocate_ui_with_layout(
+        Vec2::new(width, shell.theme_metrics.chrome_control_height),
+        egui::Layout::left_to_right(egui::Align::Center),
+        |ui| text_link(ui, label, enabled, shell),
+    )
+    .inner
+}
+
+fn link_tab(
+    ui: &mut egui::Ui,
+    label: &str,
+    selected: bool,
+    shell: &ShellLayoutContract,
+) -> egui::Response {
+    let t = Theme::from_contract(&shell.colors);
+    let color = if selected { t.text } else { t.muted };
+    let response = ui.add(
+        egui::Label::new(
+            RichText::new(label)
+                .size(shell.theme_metrics.font_ui)
+                .color(color),
+        )
+        .sense(Sense::click()),
+    );
+    if selected {
+        let y = response.rect.bottom() + 2.0;
+        ui.painter()
+            .hline(response.rect.x_range(), y, egui::Stroke::new(2.0, t.accent));
+    }
+    response
+}
+
+fn text_link(
+    ui: &mut egui::Ui,
+    label: &str,
+    enabled: bool,
+    shell: &ShellLayoutContract,
+) -> egui::Response {
+    let t = Theme::from_contract(&shell.colors);
+    let color = if !enabled {
+        t.muted.linear_multiply(0.55)
+    } else {
+        t.text
+    };
+    ui.add_enabled(
+        enabled,
+        egui::Label::new(
+            RichText::new(label)
+                .size(shell.theme_metrics.font_ui)
+                .color(color),
+        )
+        .sense(Sense::click()),
+    )
+}
+
+fn show_local_tree(
+    ui: &mut egui::Ui,
+    input: &LocationBrowserInput<'_>,
+    action: &mut LocationBrowserAction,
+) {
+    let t = Theme::from_contract(&input.shell.colors);
+    if input.roots {
+        return;
+    }
+
+    if input.entries.is_empty() {
+        ui.horizontal(|ui| {
+            ui.add_space(path_tree_offset());
+            theme::label(
+                ui,
+                "Nema podmapa.",
+                input.shell.theme_metrics.font_ui,
+                t.muted,
+            );
+        });
+        return;
+    }
+
+    for entry in input.entries {
+        if location_tree_row(
+            ui,
+            path_tree_offset(),
+            &entry_display_name(entry, false),
+            input.shell,
+        ) {
+            *action = LocationBrowserAction::OpenPath(clean_location_path(&entry.path));
+        }
+    }
+}
+
+fn path_tree_offset() -> f32 {
+    UP_COL_W + NAV_GAP_W + DISKS_COL_W + NAV_GAP_W
+}
+
+fn location_tree_row(
+    ui: &mut egui::Ui,
+    offset: f32,
+    label: &str,
+    shell: &ShellLayoutContract,
+) -> bool {
+    ui.horizontal(|ui| {
+        ui.add_space(offset);
+        text_link(ui, label, true, shell).clicked()
+    })
+    .inner
+}
+
+fn entry_display_name(entry: &DirectoryBrowserEntry, roots: bool) -> String {
+    if !entry.name.trim().is_empty() {
+        return clean_location_path(&entry.name);
+    }
+    if roots {
+        clean_location_path(&entry.path)
+    } else {
+        path_leaf(&entry.path)
+    }
+}
+
+fn path_leaf(path: &str) -> String {
+    let clean = clean_location_path(path);
+    let trimmed = clean.trim_end_matches(['\\', '/']);
+    trimmed
+        .rsplit(['\\', '/'])
+        .next()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(trimmed)
+        .to_string()
+}
+
+fn show_location_breadcrumb(
+    ui: &mut egui::Ui,
+    input: &LocationBrowserInput<'_>,
+    action: &mut LocationBrowserAction,
+) {
+    let t = Theme::from_contract(&input.shell.colors);
+    if matches!(input.kind, LocationSourceKind::Local) && input.roots {
+        show_root_disks_inline(ui, input, action);
+        return;
+    }
+
+    if !matches!(input.kind, LocationSourceKind::Local) {
+        theme::label(
+            ui,
+            location_label(input),
+            input.shell.theme_metrics.font_ui,
+            t.text,
+        );
+        return;
+    }
+
+    let parts = breadcrumb_parts(input.path);
+    if parts.is_empty() {
+        theme::label(
+            ui,
+            short_path(input.path),
+            input.shell.theme_metrics.font_ui,
+            t.text,
+        );
+        return;
+    }
+
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        for (index, (label, path)) in parts.iter().enumerate() {
+            if index > 0 {
+                theme::label(ui, "\\", input.shell.theme_metrics.font_ui, t.muted);
+            }
+            if text_link(ui, label, true, input.shell).clicked() {
+                *action = LocationBrowserAction::OpenPath(path.clone());
+            }
+        }
+    });
+}
+
+fn show_root_disks_inline(
+    ui: &mut egui::Ui,
+    input: &LocationBrowserInput<'_>,
+    action: &mut LocationBrowserAction,
+) {
+    let t = Theme::from_contract(&input.shell.colors);
+    if input.entries.is_empty() {
+        theme::label(
+            ui,
+            "Nema diskova.",
+            input.shell.theme_metrics.font_ui,
+            t.muted,
+        );
+        return;
+    }
+
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 12.0;
+        for entry in input.entries {
+            let label = root_disk_label(entry);
+            if text_link(ui, &label, true, input.shell).clicked() {
+                *action = LocationBrowserAction::OpenPath(clean_location_path(&entry.path));
+            }
+        }
+    });
+}
+
+fn root_disk_label(entry: &DirectoryBrowserEntry) -> String {
+    let path = clean_location_path(&entry.path);
+    let name = clean_location_path(&entry.name);
+    if path.is_empty() {
+        return name;
+    }
+    if name.is_empty() || name.eq_ignore_ascii_case(&path) {
+        return path;
+    }
+    if name.contains(&path) || path.contains(&name) {
+        return name;
+    }
+    format!("{path} {name}")
+}
+
+fn location_label(input: &LocationBrowserInput<'_>) -> String {
+    match input.kind {
+        LocationSourceKind::Local if input.roots => "Diskovi".to_string(),
+        LocationSourceKind::Local if !input.path.trim().is_empty() => short_path(input.path),
+        LocationSourceKind::Lan => "LAN".to_string(),
+        LocationSourceKind::Internet => "Internet".to_string(),
+        _ => "—".to_string(),
+    }
+}
+
+fn breadcrumb_parts(path: &str) -> Vec<(String, String)> {
+    let clean = clean_location_path(path);
+    if clean.is_empty() {
+        return Vec::new();
+    }
+
+    if is_windows_drive_rooted(&clean) {
+        let drive = clean[..2].to_string();
+        let mut out = vec![(drive.clone(), format!("{drive}\\"))];
+        let rest = clean[3..].trim_matches(['\\', '/']);
+        let mut current = format!("{drive}\\");
+        for part in rest.split(['\\', '/']).filter(|p| !p.is_empty()) {
+            if !current.ends_with('\\') {
+                current.push('\\');
+            }
+            current.push_str(part);
+            out.push((part.to_string(), current.clone()));
+        }
+        return out;
+    }
+
+    if clean.starts_with("\\\\") {
+        let mut out = Vec::new();
+        let mut current = String::from("\\\\");
+        for part in clean
+            .trim_start_matches('\\')
+            .split('\\')
+            .filter(|p| !p.is_empty())
+        {
+            if current != "\\\\" {
+                current.push('\\');
+            }
+            current.push_str(part);
+            out.push((part.to_string(), current.clone()));
+        }
+        return out;
+    }
+
+    if clean.starts_with('/') {
+        let mut out = vec![("/".to_string(), "/".to_string())];
+        let mut current = String::from("/");
+        for part in clean
+            .trim_start_matches('/')
+            .split('/')
+            .filter(|p| !p.is_empty())
+        {
+            if !current.ends_with('/') {
+                current.push('/');
+            }
+            current.push_str(part);
+            out.push((part.to_string(), current.clone()));
+        }
+        return out;
+    }
+
+    let mut out = Vec::new();
+    let mut current = String::new();
+    for part in clean.split(['\\', '/']).filter(|p| !p.is_empty()) {
+        if !current.is_empty() {
+            current.push('\\');
+        }
+        current.push_str(part);
+        out.push((part.to_string(), current.clone()));
+    }
+    out
+}
+
+fn is_windows_drive_rooted(path: &str) -> bool {
+    let b = path.as_bytes();
+    b.len() >= 3 && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/')
+}
+
+fn short_path(path: &str) -> String {
+    let p = clean_location_path(path);
+    if p.chars().count() <= 42 {
+        return p;
+    }
+    let tail: String = p
+        .chars()
+        .rev()
+        .take(36)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
+    format!("…{tail}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clean_location_path_removes_windows_extended_prefix() {
+        assert_eq!(
+            clean_location_path(r"\\?\C:\Users\miron\Media"),
+            r"C:\Users\miron\Media"
+        );
+        assert_eq!(
+            clean_location_path(r"\\?\UNC\server\share\Media"),
+            r"\\server\share\Media"
+        );
+    }
+
+    #[test]
+    fn breadcrumb_parts_keep_clickable_windows_drive_chain() {
+        let parts = breadcrumb_parts(r"C:\News\Today");
+        assert_eq!(
+            parts,
+            vec![
+                ("C:".to_string(), r"C:\".to_string()),
+                ("News".to_string(), r"C:\News".to_string()),
+                ("Today".to_string(), r"C:\News\Today".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn opened_folder_rows_share_breadcrumb_column() {
+        assert_eq!(
+            path_tree_offset(),
+            UP_COL_W + NAV_GAP_W + DISKS_COL_W + NAV_GAP_W
+        );
+    }
+
+    #[test]
+    fn root_disk_label_does_not_duplicate_drive_letter() {
+        let entry = DirectoryBrowserEntry {
+            name: r"C:\".to_string(),
+            path: r"C:\".to_string(),
+        };
+        assert_eq!(root_disk_label(&entry), r"C:\");
+    }
+}
