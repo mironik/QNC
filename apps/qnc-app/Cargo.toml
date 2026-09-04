@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 eframe = { workspace = true }
 qnc-contracts = { workspace = true }
+qnc-ingest-desktop-adapter = { workspace = true }
 qnc-project-desktop-adapter = { workspace = true }
 qnc-shell-desktop-api = { workspace = true }
 serde = { workspace = true }

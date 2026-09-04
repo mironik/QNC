@@ -281,7 +281,11 @@ impl AppRegistry {
 
 fn embedded_app_factories() -> HashMap<String, EmbeddedAppFactory> {
     let project = qnc_project_desktop_adapter::factory();
-    HashMap::from([(project.desktop_entry.to_string(), project)])
+    let ingest = qnc_ingest_desktop_adapter::factory();
+    HashMap::from([
+        (project.desktop_entry.to_string(), project),
+        (ingest.desktop_entry.to_string(), ingest),
+    ])
 }
 
 struct QncShell {

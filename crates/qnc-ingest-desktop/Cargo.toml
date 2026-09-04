@@ -1,0 +1,13 @@
+[package]
+name = "qnc-ingest-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-contracts = { workspace = true }
+qnc-ingest-components = { workspace = true }
+qnc-keyboard-shortcut = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+

@@ -2479,6 +2479,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-contracts",
+ "qnc-ingest-desktop-adapter",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
  "serde",
@@ -2520,6 +2521,42 @@ dependencies = [
 [[package]]
 name = "qnc-frame-timebase"
 version = "0.1.0"
+
+[[package]]
+name = "qnc-ingest"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-ingest-desktop",
+]
+
+[[package]]
+name = "qnc-ingest-components"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "qnc-ingest-desktop"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-contracts",
+ "qnc-ingest-components",
+ "qnc-keyboard-shortcut",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-ingest-desktop-adapter"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-ingest-desktop",
+ "qnc-shell-desktop-api",
+]
 
 [[package]]
 name = "qnc-keyboard-shortcut"

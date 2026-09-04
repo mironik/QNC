@@ -2,11 +2,15 @@
 resolver = "2"
 members = [
     "apps/qnc-app",
+    "apps/qnc-ingest",
     "apps/qnc-project",
     "crates/qnc-contracts",
     "crates/qnc-db-contract",
     "crates/qnc-dir-browser",
     "crates/qnc-frame-timebase",
+    "crates/qnc-ingest-components",
+    "crates/qnc-ingest-desktop",
+    "crates/qnc-ingest-desktop-adapter",
     "crates/qnc-keyboard-shortcut",
     "crates/qnc-project-desktop",
     "crates/qnc-project-desktop-adapter",
@@ -20,6 +24,9 @@ members = [
 qnc-contracts = { path = "crates/qnc-contracts" }
 qnc-db-contract = { path = "crates/qnc-db-contract" }
 qnc-dir-browser = { path = "crates/qnc-dir-browser" }
+qnc-ingest-components = { path = "crates/qnc-ingest-components" }
+qnc-ingest-desktop = { path = "crates/qnc-ingest-desktop" }
+qnc-ingest-desktop-adapter = { path = "crates/qnc-ingest-desktop-adapter" }
 qnc-keyboard-shortcut = { path = "crates/qnc-keyboard-shortcut" }
 qnc-project-desktop = { path = "crates/qnc-project-desktop" }
 qnc-project-desktop-adapter = { path = "crates/qnc-project-desktop-adapter" }

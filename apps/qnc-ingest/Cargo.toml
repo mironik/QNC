@@ -1,0 +1,9 @@
+[package]
+name = "qnc-ingest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-ingest-desktop = { workspace = true }
+

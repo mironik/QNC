@@ -1,0 +1,12 @@
+{
+  "application_id": "qnc.ingest",
+  "tab_id": "ingest",
+  "label": "Ingest",
+  "enabled": true,
+  "system": true,
+  "removable": false,
+  "order": 20,
+  "host_mode": "embedded_public_api",
+  "desktop_entry": "qnc_ingest",
+  "standalone_executable": "qnc-ingest"
+}
