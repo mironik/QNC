@@ -995,6 +995,7 @@ fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
         "qnc.module.keyboard-shortcut" => Some("qnc-keyboard-shortcut"),
         "qnc.module.frame-timebase" => Some("qnc-frame-timebase"),
         "qnc.module.ui-widget" => Some("qnc-ui-kit"),
+        "qnc.module.workstation-identity" => Some("qnc-workstation-identity"),
         _ => None,
     }
 }

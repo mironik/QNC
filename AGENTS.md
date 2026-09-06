@@ -509,6 +509,14 @@ odmrzavanje za popravke i katalog je zatvoreno. Nema aktivnog odobrenja za
 promjene Projecta. Razvoj Ingesta nije dozvola za njegovo otkljucavanje.
 Detalji su u `docs/11-project-freeze.md`.
 
+Zatvoreno ograniceno odobrenje 2026-09-06: korisnik je izricito otkljucao Project za
+integraciju javnog modula identiteta radne stanice/korisnika i zapis metapodataka
+porijekla novog projekta. Ocitavanje OS podataka mora ostati u javnom modulu.
+Na popisu projekata prikazuju se samo naziv i datum; ostali podaci su samo u
+bazi. Ovo nije odobrenje za session routing, LAN sinkronizaciju ili druge
+promjene Projecta. Zahvat je verificiran (docs/20), odobrenje je zatvoreno i
+Project je ponovno zamrznut. Nova promjena zahtijeva novu izricitu dozvolu.
+
 - Project aplikacija je zavrsena za trenutni razvojni korak i ne smije se
   mijenjati bez izricite korisnicke dozvole.
 - Opci zahtjevi poput "nastavi", "idemo dalje", "sredi QNC", "dodaj Ingest",

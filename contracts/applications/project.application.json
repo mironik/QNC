@@ -16,7 +16,8 @@
     "qnc.module.db-contract-validation",
     "qnc.module.transport-resolver",
     "qnc.module.dir-browser",
-    "qnc.module.keyboard-shortcut"
+    "qnc.module.keyboard-shortcut",
+    "qnc.module.workstation-identity"
   ],
   "capabilities": ["project.registry", "project.settings", "project.open"],
   "supported_os": ["windows", "linux", "macos"],

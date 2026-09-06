@@ -1,0 +1,23 @@
+{
+  "module_id": "qnc.module.workstation-identity",
+  "module_name": "Workstation Identity",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["workstation.identity.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["db.write", "app.workflow", "network.discover", "identity.remote_collect", "privilege.elevate"],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "returns_result_to_owner_application",
+  "runtime_crate": "qnc-workstation-identity",
+  "helper_executable": "qnc-workstation-identity",
+  "execution_scope": "calling_workstation_only",
+  "input": "No arguments or --json; collect current workstation, never the DB server on behalf of a client.",
+  "output": "Versioned IdentitySnapshot JSON: workstation_name, user_name, hardware_serial and explicit read issues. Missing values are null. No filesystem paths or project state.",
+  "serial_policy": "Prefer device serial; use genuine processor serial only if device serial is unavailable. Never substitute ProcessorId, UUID, MAC address, disk serial or generated data.",
+  "identity_policy": "Provenance metadata, not authentication or a globally unique project/session identifier. Local OS account name is not an authenticated network user ID."
+}

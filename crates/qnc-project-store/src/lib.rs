@@ -17,6 +17,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+mod project_origin;
+use project_origin::ProjectOrigin;
+
 const PROJECT_REGISTRY_DB_CONTRACT: &str =
     include_str!("../../../contracts/databases/project-registry.database.json");
 const PROJECT_WORKSPACE_DB_CONTRACT: &str =
@@ -41,6 +44,7 @@ const PROJECT_DIRECTORIES: &[&str] = &[
 pub struct ProjectRow {
     pub project_id: String,
     pub name: String,
+    pub created_date: String,
     pub project_uri: String,
     pub active: bool,
 }
@@ -142,9 +146,10 @@ impl ProjectStore {
         let active_project_id = get_setting(&conn, "active_project_id", "")?;
         let mut statement = conn
             .prepare(
-                "SELECT project_id, name, project_uri
+                "SELECT project_id, name, project_uri,
+                    COALESCE(strftime('%d.%m.%Y.', substr(created_at, 7), 'unixepoch', 'localtime'), '')
                  FROM projects
-                 ORDER BY project_id",
+                 ORDER BY created_at, name, project_id",
             )
             .map_err(|error| error.to_string())?;
         let rows = statement
@@ -155,6 +160,7 @@ impl ProjectStore {
                     project_id,
                     name: row.get(1)?,
                     project_uri: row.get(2)?,
+                    created_date: row.get(3)?,
                 })
             })
             .map_err(|error| error.to_string())?;
@@ -345,10 +351,17 @@ impl ProjectStore {
             template.settings = settings.clone();
         }
         apply_application_selection(&mut template.settings, selection)?;
-        let project_id = slug_id(name);
+        let project_id = format!("{}_{}", slug_base(name), uuid::Uuid::new_v4().simple());
         let project_uri = format!("qnc://local/project/{project_id}");
         parse_qnc_uri(&project_uri)?;
         let now = now_str();
+        let created_date = project_origin::display_date(&conn, &now)?;
+        // The public reader runs on the originating workstation, outside DB transactions.
+        let origin = ProjectOrigin {
+            name: name.to_string(),
+            created_at: now.clone(),
+            identity: qnc_workstation_identity::read_local_identity(),
+        };
         let projects_root = self.create_projects_root(&conn, &template.settings)?;
         let project_dir = projects_root.join(safe_dir_name(&project_id));
         let export_path = project_export_directory(&project_dir, &mut template.settings)?;
@@ -370,7 +383,7 @@ impl ProjectStore {
                     )
                 })?;
             }
-            self.ensure_workspace_db(&project_id, &project_dir, Some(&template))?;
+            self.ensure_workspace_db(&project_id, &project_dir, Some(&template), &origin)?;
             lock_project_dir(&project_dir)?;
             lock_projects_root_dir(&projects_root)?;
 
@@ -383,6 +396,7 @@ impl ProjectStore {
                 params![project_id, name, project_uri, now],
             )
             .map_err(|error| error.to_string())?;
+            project_origin::insert(&tx, &project_id, &origin)?;
             tx.execute(
                 "INSERT INTO project_storage_locations
                     (project_id, local_path, created_at, updated_at)
@@ -396,6 +410,7 @@ impl ProjectStore {
             Ok(ProjectRow {
                 project_id,
                 name: name.to_string(),
+                created_date,
                 project_uri,
                 active: true,
             })
@@ -542,7 +557,8 @@ impl ProjectStore {
         init_registry_schema(&conn)?;
         let project = conn
             .query_row(
-                "SELECT project_id, name, project_uri
+                "SELECT project_id, name, project_uri,
+                    COALESCE(strftime('%d.%m.%Y.', substr(created_at, 7), 'unixepoch', 'localtime'), '')
                  FROM projects
                  WHERE project_id = ?1",
                 params![project_id],
@@ -552,6 +568,7 @@ impl ProjectStore {
                         project_id: row.get(0)?,
                         name: row.get(1)?,
                         project_uri: row.get(2)?,
+                        created_date: row.get(3)?,
                     })
                 },
             )
@@ -583,6 +600,11 @@ impl ProjectStore {
         };
 
         let tx = conn.transaction().map_err(|error| error.to_string())?;
+        tx.execute(
+            "DELETE FROM project_origin WHERE project_id = ?1",
+            params![project_id],
+        )
+        .map_err(|error| error.to_string())?;
         tx.execute(
             "DELETE FROM project_storage_locations WHERE project_id = ?1",
             params![project_id],
@@ -646,6 +668,7 @@ impl ProjectStore {
         project_id: &str,
         dir: &Path,
         template: Option<&StoredTemplate>,
+        origin: &ProjectOrigin,
     ) -> Result<(), String> {
         ensure_project_dirs_at(dir)?;
         let db_path = self.project_workspace_db_path(project_id, dir)?;
@@ -653,6 +676,7 @@ impl ProjectStore {
         configure_connection(&conn)?;
         let tx = conn.transaction().map_err(|error| error.to_string())?;
         init_workspace_schema(&tx)?;
+        project_origin::insert(&tx, project_id, origin)?;
         let template_id = template
             .map(|template| template.template_id.as_str())
             .unwrap_or("");
@@ -665,7 +689,7 @@ impl ProjectStore {
                 (project_id, template_id, settings_json, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?4)
              ON CONFLICT(project_id) DO NOTHING",
-            params![project_id, template_id, settings_json, now_str()],
+            params![project_id, template_id, settings_json, origin.created_at],
         )
         .map_err(|error| error.to_string())?;
         if let Some(template) = template {
@@ -1167,6 +1191,7 @@ fn configure_connection(conn: &Connection) -> Result<(), String> {
 }
 
 fn init_registry_schema(conn: &Connection) -> Result<(), String> {
+    project_origin::init_schema(conn)?;
     conn.execute_batch(
         "
         CREATE TABLE IF NOT EXISTS projects (
@@ -1276,6 +1301,7 @@ fn init_registry_schema(conn: &Connection) -> Result<(), String> {
 }
 
 fn init_workspace_schema(conn: &Connection) -> Result<(), String> {
+    project_origin::init_schema(conn)?;
     conn.execute_batch(
         "
         CREATE TABLE IF NOT EXISTS project_settings (
@@ -1750,7 +1776,7 @@ fn now_str() -> String {
     format!("epoch_{secs}")
 }
 
-fn slug_id(name: &str) -> String {
+fn slug_base(name: &str) -> String {
     let mut base: String = name
         .trim()
         .to_lowercase()
@@ -1770,6 +1796,11 @@ fn slug_id(name: &str) -> String {
     if base.is_empty() {
         base = "projekt".to_string();
     }
+    base
+}
+
+fn slug_id(name: &str) -> String {
+    let base = slug_base(name);
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis())
@@ -2043,6 +2074,130 @@ mod tests {
         let rows = store.list_projects().expect("rows");
         assert_eq!(rows.len(), 1);
         assert!(rows[0].active);
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn project_origin_is_identical_in_both_databases_and_immutable_on_open() {
+        let root = temp_root("origin");
+        let store = ProjectStore::open(&root).unwrap();
+        let row = store
+            .create_project(
+                "Origin Test",
+                "tpl_breaking_news",
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
+            .unwrap();
+        let registry = store.open_registry().unwrap();
+        let workspace_path = root
+            .join("projects")
+            .join(safe_dir_name(&row.project_id))
+            .join("qnc_project.db");
+        let workspace = Connection::open_with_flags(
+            &workspace_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let read = |db: &Connection| -> (String, String, String, String) {
+            db.query_row("SELECT project_id, project_name, created_at, identity_json FROM public_project_origin", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))).unwrap()
+        };
+        let before = read(&registry);
+        assert_eq!(before, read(&workspace));
+        assert_eq!(before.0, row.project_id);
+        assert_eq!(before.1, "Origin Test");
+        let identity: qnc_workstation_identity::IdentitySnapshot =
+            serde_json::from_str(&before.3).unwrap();
+        assert_eq!(
+            identity.contract_version,
+            qnc_workstation_identity::CONTRACT_VERSION
+        );
+        let creation: String = registry
+            .query_row(
+                "SELECT created_at FROM projects WHERE project_id = ?1",
+                params![row.project_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(creation, before.2);
+        assert_eq!(row.created_date.len(), 11);
+        assert_eq!(
+            row.created_date,
+            store.list_projects().unwrap()[0].created_date
+        );
+        store.open_project(&row.project_id).unwrap();
+        assert_eq!(before, read(&registry));
+        assert_eq!(before, read(&workspace));
+        drop(workspace);
+        drop(registry);
+        // The public snapshot remains readable without registry/store files beside it.
+        let portable = root.join("portable.db");
+        fs::copy(&workspace_path, &portable).unwrap();
+        let copied =
+            Connection::open_with_flags(portable, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .unwrap();
+        assert_eq!(before, read(&copied));
+        drop(copied);
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn same_name_projects_have_distinct_random_ids_and_separate_origins() {
+        let root = temp_root("unique_origins");
+        let store = ProjectStore::open(&root).unwrap();
+        let selection = test_selection(&["project", "ingest"]);
+        let first = store
+            .create_project("Same name", "tpl_breaking_news", None, &selection)
+            .unwrap();
+        let second = store
+            .create_project("Same name", "tpl_breaking_news", None, &selection)
+            .unwrap();
+        assert_ne!(first.project_id, second.project_id);
+        for row in [&first, &second] {
+            let suffix = row.project_id.rsplit('_').next().unwrap();
+            assert_eq!(uuid::Uuid::parse_str(suffix).unwrap().get_version_num(), 4);
+        }
+        let registry = store.open_registry().unwrap();
+        let count: i64 = registry
+            .query_row("SELECT count(*) FROM project_origin", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 2);
+        store.delete_project(&first.project_id).unwrap();
+        let remaining: String = registry
+            .query_row("SELECT project_id FROM public_project_origin", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(remaining, second.project_id);
+        drop(registry);
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn missing_origin_is_not_backfilled_when_project_is_opened() {
+        let root = temp_root("no_origin_backfill");
+        let store = ProjectStore::open(&root).unwrap();
+        let row = store
+            .create_project(
+                "No Backfill",
+                "tpl_breaking_news",
+                None,
+                &test_selection(&["project"]),
+            )
+            .unwrap();
+        let registry = store.open_registry().unwrap();
+        registry
+            .execute(
+                "DELETE FROM project_origin WHERE project_id=?1",
+                params![row.project_id],
+            )
+            .unwrap();
+        store.open_project(&row.project_id).unwrap();
+        let count: i64 = registry
+            .query_row("SELECT count(*) FROM project_origin", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+        drop(registry);
         cleanup_temp_root(&root);
     }
 

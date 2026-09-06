@@ -700,11 +700,31 @@ impl ProjectApp {
             egui::pos2(row_rect.left() + 20.0, row_rect.top()),
             select_rect.right_bottom(),
         );
+        let date = format!("- {}", project.created_date);
+        let date_galley = ui.painter().layout_no_wrap(
+            date,
+            egui::FontId::proportional(self.contracts.shell.theme_metrics.font_ui),
+            t.muted,
+        );
+        let date_x = (label_rect.right() - date_galley.size().x).max(label_rect.left());
+        let name_rect = egui::Rect::from_min_max(
+            label_rect.min,
+            egui::pos2(
+                (date_x - metrics.column_gap).max(label_rect.left()),
+                label_rect.bottom(),
+            ),
+        );
+        ui.painter().with_clip_rect(label_rect).galley(
+            egui::pos2(date_x, label_rect.center().y - date_galley.size().y * 0.5),
+            date_galley,
+            t.muted,
+        );
         ui.allocate_new_ui(
             egui::UiBuilder::new()
-                .max_rect(label_rect)
+                .max_rect(name_rect)
                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
             |ui| {
+                ui.set_clip_rect(name_rect.intersect(ui.clip_rect()));
                 let mut label = RichText::new(&project.name)
                     .size(self.contracts.shell.theme_metrics.font_ui)
                     .color(t.text);

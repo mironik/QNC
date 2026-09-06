@@ -1,0 +1,21 @@
+[package]
+name = "qnc-workstation-identity"
+version = "0.1.0"
+edition = "2021"
+description = "Stateless local workstation provenance reader with a JSON process interface"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+hostname = "0.4"
+whoami = "1.6"
+
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+smbios-lib = "0.9.4"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9"
+io-kit-sys = "0.4"
+
+[dev-dependencies]
+qnc-contracts = { workspace = true }

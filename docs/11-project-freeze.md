@@ -9,10 +9,28 @@ Razlog: korisnik je zatrazio da se Project vise ne mijenja bez izricite dozvole.
 
 Korisnik je 2026-09-06 nakon live potvrde navigacije izricito zatrazio:
 "sada zakljucaj project aplikaciju". Prethodno odobrenje je zatvoreno.
-Nema aktivnog odobrenja za promjene Projecta. Nastavak razvoja Ingesta ne
-otkljucava Project ni njegove ugovore.
+Naknadno odobrenje 2026-09-06: "otkljucaj projekt da bi dodao te mogucnosti,
+ali ne u projekt, nego u javni modul"; zatim implementacija uz prikaz samo
+naziva projekta i datuma. Opce zakljucavanje i dalje vrijedi izvan tog opsega.
 
-## Prethodno odobrenje
+Odobreni opseg: javni modul identiteta, njegova Cargo/manifest integracija u
+Project owner store, nove tablice/javni prikazi porijekla u obje baze, pouzdan
+jedinstveni ID novih projekata i datum u postojecem retku popisa. OS ocitavanje
+nije dio forme ili Projecta. Nema migracija/backfilla starih projekata,
+session routinga niti LAN prijenosa. Podaci starih projekata vec su uklonjeni
+iz globalne baze na korisnikov zahtjev; njihovi direktoriji se ne diraju.
+
+## Zatvoreno odobrenje za metapodatke
+
+Korisnik je izricito potvrdio: otkljucavanje radi javnog modula identiteta i
+zapisivanja metapodataka, uz prikaz samo naziva i datuma projekta.
+Odobrenje se odnosi na gore navedeni ograniceni opseg i docs/20.
+Izvan gore navedenog odobrenja Project ostaje zamrznut.
+Verifikacija je zavrsena: 164 testa, conformance, Windows standalone/shell live
+prikaz i provjera stvarnih zapisa u obje baze. Detalji i granice provjere su u
+docs/20. Status je vracen na zamrznuto; ovo odobrenje vise nije aktivno.
+
+## Prethodni zahvat
 
 Korisnik je 2026-09-06 izricito potvrdio: "da odmrzni projects".
 Odobrenje se odnosi na prethodno dogovorene popravke iz Projects audita i
