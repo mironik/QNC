@@ -90,6 +90,7 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
         require_file(root, "crates/qnc-project-desktop/src/lib.rs"),
         require_file(root, "crates/qnc-project-store/src/lib.rs"),
         require_file(root, "crates/qnc-project-desktop-adapter/src/lib.rs"),
+        require_file(root, "crates/qnc-ui-kit/src/lib.rs"),
         require_file(root, "seed/system_seed.json"),
         require_file(root, "contracts/qnc-keyboard-shortcuts.json"),
         require_file(root, "docs/07-ui-layout-reference.md"),
@@ -98,6 +99,7 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
         validate_project_seed(root),
         validate_keyboard_catalog(root),
         validate_keyboard_matches_qnc_v4(root),
+        validate_ingest_keyboard_actions(root),
         validate_ui_layout_contract(root),
         validate_app_registry(root),
     ];
@@ -124,8 +126,10 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
     checks.push(validate_manifest_graph(root));
     checks.push(validate_sample_qnc_uris());
     checks.push(scan_rust_for_hardcoded_shortcuts(root));
+    checks.push(scan_business_app_isolation(root));
     checks.push(scan_shell_app_boundary(root));
     checks.push(scan_project_app_boundary(root));
+    checks.push(scan_shared_ui_patterns(root));
 
     checks
 }
@@ -348,6 +352,68 @@ fn validate_keyboard_matches_qnc_v4(root: &Path) -> CheckResult {
 
     require_reference_keyboard_subset(&mut report, &local, &reference);
     CheckResult::from_report("keyboard catalog qnc_v4 extension", report)
+}
+
+fn validate_ingest_keyboard_actions(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let keyboard_path = root.join("contracts").join("qnc-keyboard-shortcuts.json");
+    let component_path = root
+        .join("crates")
+        .join("qnc-ingest-components")
+        .join("src")
+        .join("lib.rs");
+
+    let actions = match fs::read_to_string(&keyboard_path)
+        .ok()
+        .and_then(|contents| serde_json::from_str::<serde_json::Value>(&contents).ok())
+        .and_then(|value| {
+            value
+                .get("actions")
+                .and_then(serde_json::Value::as_object)
+                .cloned()
+        }) {
+        Some(actions) => actions,
+        None => {
+            report.error(format!(
+                "{}: cannot read keyboard actions object",
+                display_relative(root, &keyboard_path)
+            ));
+            return CheckResult::from_report("Ingest keyboard action catalog", report);
+        }
+    };
+
+    let Ok(component_source) = fs::read_to_string(&component_path) else {
+        report.error(format!(
+            "{}: cannot read Ingest component source",
+            display_relative(root, &component_path)
+        ));
+        return CheckResult::from_report("Ingest keyboard action catalog", report);
+    };
+
+    let action_ids = extract_string_constants(&component_source);
+    for action_id in action_ids {
+        if !actions.contains_key(&action_id) {
+            report.error(format!(
+                "{}: Ingest action_id '{action_id}' is missing from contracts/qnc-keyboard-shortcuts.json",
+                display_relative(root, &component_path)
+            ));
+        }
+    }
+
+    CheckResult::from_report("Ingest keyboard action catalog", report)
+}
+
+fn extract_string_constants(source: &str) -> BTreeSet<String> {
+    source
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if !trimmed.starts_with("pub const ") || !trimmed.contains("&str") {
+                return None;
+            }
+            trimmed.split('"').nth(1).map(str::to_string)
+        })
+        .collect()
 }
 
 fn require_reference_keyboard_subset(
@@ -850,17 +916,24 @@ fn validate_application_module_dependencies(
     report: &mut ValidationReport,
     modules: &BTreeMap<String, PathBuf>,
 ) {
+    let cargo_packages = cargo_package_index(root);
     for (path, value) in read_json_documents(root, "contracts/applications", report) {
         let name = display_relative(root, &path);
         let Some(object) = value.as_object() else {
             continue;
         };
+        let application_id = object
+            .get("application_id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
         let Some(dependencies) = object
             .get("module_dependencies")
             .and_then(serde_json::Value::as_array)
         else {
             continue;
         };
+        let runtime_crates =
+            application_runtime_crates(root, application_id, &cargo_packages, report);
 
         for dependency in dependencies {
             let Some(module_id) = dependency.as_str() else {
@@ -880,8 +953,145 @@ fn validate_application_module_dependencies(
                     "{name}: dependency '{module_id}' has no module manifest"
                 ));
             }
+            if let Some(runtime_crates) = runtime_crates.as_ref() {
+                let Some(required_crate) = runtime_crate_for_module(module_id) else {
+                    report.error(format!(
+                        "{name}: dependency '{module_id}' has no implemented runtime crate for {application_id}"
+                    ));
+                    continue;
+                };
+                if !runtime_crates.contains(required_crate) {
+                    report.error(format!(
+                        "{name}: dependency '{module_id}' requires runtime crate '{required_crate}', but {application_id} does not depend on it transitively"
+                    ));
+                }
+            }
         }
     }
+}
+
+fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
+    match module_id {
+        "qnc.module.manifest-capability" => Some("qnc-contracts"),
+        "qnc.module.transport-resolver" => Some("qnc-transport-resolver"),
+        "qnc.module.db-contract-validation" => Some("qnc-db-contract"),
+        "qnc.module.dir-browser" => Some("qnc-dir-browser"),
+        "qnc.module.keyboard-shortcut" => Some("qnc-keyboard-shortcut"),
+        "qnc.module.frame-timebase" => Some("qnc-frame-timebase"),
+        "qnc.module.ui-widget" => Some("qnc-ui-kit"),
+        _ => None,
+    }
+}
+
+fn application_runtime_crates(
+    _root: &Path,
+    application_id: &str,
+    cargo_packages: &BTreeMap<String, PathBuf>,
+    report: &mut ValidationReport,
+) -> Option<BTreeSet<String>> {
+    let crate_name = match application_id {
+        "qnc.project" => "qnc-project",
+        "qnc.ingest" => "qnc-ingest",
+        _ => return None,
+    };
+    if !cargo_packages.contains_key(crate_name) {
+        report.error(format!(
+            "{application_id}: missing runtime Cargo package '{crate_name}'"
+        ));
+        return Some(BTreeSet::new());
+    }
+    Some(collect_transitive_cargo_dependencies(
+        crate_name,
+        cargo_packages,
+    ))
+}
+
+fn cargo_package_index(root: &Path) -> BTreeMap<String, PathBuf> {
+    let mut cargo_files = Vec::new();
+    collect_named_files(root, "Cargo.toml", &mut cargo_files);
+    let mut packages = BTreeMap::new();
+    for cargo_toml in cargo_files {
+        let Ok(contents) = fs::read_to_string(&cargo_toml) else {
+            continue;
+        };
+        if let Some(package_name) = parse_cargo_package_name(&contents) {
+            packages.insert(package_name, cargo_toml);
+        }
+    }
+    packages
+}
+
+fn collect_transitive_cargo_dependencies(
+    root_crate: &str,
+    cargo_packages: &BTreeMap<String, PathBuf>,
+) -> BTreeSet<String> {
+    let mut visited = BTreeSet::new();
+    let mut stack = vec![root_crate.to_string()];
+    while let Some(crate_name) = stack.pop() {
+        if !visited.insert(crate_name.clone()) {
+            continue;
+        }
+        let Some(cargo_toml) = cargo_packages.get(&crate_name) else {
+            continue;
+        };
+        let Ok(contents) = fs::read_to_string(cargo_toml) else {
+            continue;
+        };
+        for dependency in cargo_dependency_names(&contents, cargo_packages) {
+            if !visited.contains(&dependency) {
+                stack.push(dependency);
+            }
+        }
+    }
+    visited
+}
+
+fn parse_cargo_package_name(contents: &str) -> Option<String> {
+    let mut in_package = false;
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[package]" {
+            in_package = true;
+            continue;
+        }
+        if in_package && trimmed.starts_with('[') {
+            return None;
+        }
+        if in_package && trimmed.starts_with("name") {
+            let (_, value) = trimmed.split_once('=')?;
+            return Some(value.trim().trim_matches('"').to_string());
+        }
+    }
+    None
+}
+
+fn cargo_dependency_names(
+    contents: &str,
+    cargo_packages: &BTreeMap<String, PathBuf>,
+) -> Vec<String> {
+    let mut dependencies = Vec::new();
+    let mut in_dependencies = false;
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[dependencies]" || trimmed == "[dev-dependencies]" {
+            in_dependencies = true;
+            continue;
+        }
+        if in_dependencies && trimmed.starts_with('[') {
+            in_dependencies = false;
+        }
+        if !in_dependencies || trimmed.starts_with('#') {
+            continue;
+        }
+        let Some((name, _)) = trimmed.split_once('=') else {
+            continue;
+        };
+        let name = name.trim();
+        if cargo_packages.contains_key(name) {
+            dependencies.push(name.to_string());
+        }
+    }
+    dependencies
 }
 
 fn validate_module_forbidden_dependencies(
@@ -1040,6 +1250,92 @@ fn scan_rust_for_hardcoded_shortcuts(root: &Path) -> CheckResult {
     }
 
     CheckResult::from_report("hardcoded shortcut scanner", report)
+}
+
+fn scan_business_app_isolation(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let cargo_packages = cargo_package_index(root);
+    for (crate_name, cargo_toml) in &cargo_packages {
+        let Some(family) = business_app_family(crate_name) else {
+            continue;
+        };
+        for dependency in collect_transitive_cargo_dependencies(crate_name, &cargo_packages) {
+            if dependency == *crate_name {
+                continue;
+            }
+            let Some(dependency_family) = business_app_family(&dependency) else {
+                continue;
+            };
+            if dependency_family != family {
+                report.error(format!(
+                    "{}: business application crate '{crate_name}' must not depend on '{dependency}'; DB records are the only business link between applications",
+                    display_relative(root, cargo_toml)
+                ));
+            }
+        }
+
+        let Some(crate_root) = cargo_toml.parent() else {
+            continue;
+        };
+        let mut files = Vec::new();
+        collect_rs_files(&crate_root.join("src"), &mut files);
+        for file in files {
+            let Ok(contents) = fs::read_to_string(&file) else {
+                continue;
+            };
+            for forbidden in forbidden_business_app_imports(family) {
+                if contains_business_app_import(&contents, forbidden) {
+                    report.error(format!(
+                        "{}: business application family '{family}' must not import '{forbidden}'; use DB contract records only",
+                        display_relative(root, &file)
+                    ));
+                }
+            }
+        }
+    }
+
+    CheckResult::from_report("business app DB-only isolation", report)
+}
+
+fn business_app_family(crate_name: &str) -> Option<&'static str> {
+    if crate_name.starts_with("qnc-project") {
+        Some("project")
+    } else if crate_name.starts_with("qnc-ingest") {
+        Some("ingest")
+    } else if crate_name.starts_with("qnc-media-assist") {
+        Some("media_assist")
+    } else if crate_name.starts_with("qnc-story") {
+        Some("story")
+    } else {
+        None
+    }
+}
+
+fn forbidden_business_app_imports(family: &str) -> &'static [&'static str] {
+    match family {
+        "project" => &["qnc_ingest", "qnc_media_assist", "qnc_story"],
+        "ingest" => &["qnc_project", "qnc_media_assist", "qnc_story"],
+        "media_assist" => &["qnc_project", "qnc_ingest", "qnc_story"],
+        "story" => &["qnc_project", "qnc_ingest", "qnc_media_assist"],
+        _ => &[],
+    }
+}
+
+fn contains_business_app_import(contents: &str, crate_prefix: &str) -> bool {
+    for line in contents.lines() {
+        let line = line.split_once("//").map(|(code, _)| code).unwrap_or(line);
+        let trimmed = line.trim();
+        if trimmed.starts_with("use ") && trimmed.contains(crate_prefix) {
+            return true;
+        }
+        if trimmed.starts_with("extern crate ") && trimmed.contains(crate_prefix) {
+            return true;
+        }
+        if trimmed.contains(&format!("{crate_prefix}::")) {
+            return true;
+        }
+    }
+    false
 }
 
 fn scan_project_app_boundary(root: &Path) -> CheckResult {
@@ -1217,10 +1513,45 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
             && contents.contains("Računalo")
             && contents.contains("LAN")
             && contents.contains("Internet")
-            && contents.contains("confirm_label")
-            && contents.contains("Odustani")
+            && contents.contains("BrowserState")
         {
             has_project_location_browser = true;
+        }
+        if relative == "crates/qnc-project-desktop/src/location_browser.rs" {
+            for forbidden in ["confirm_label", "\"Odustani\"", "\"U redu\""] {
+                if contents.contains(forbidden) {
+                    report.error(format!(
+                        "crates/qnc-project-desktop/src/location_browser.rs: confirm/cancel action bar must stay outside browser component, found '{forbidden}'"
+                    ));
+                }
+            }
+        }
+        if relative == "crates/qnc-project-desktop/src/location_browser.rs"
+            && contents.contains("clean_location_path")
+        {
+            report.error(
+                "crates/qnc-project-desktop/src/location_browser.rs: Project UI must use qnc-dir-browser display state instead of private path cleanup"
+                    .to_string(),
+            );
+        }
+        if relative == "crates/qnc-project-desktop/src/project_component.rs" {
+            for forbidden in [
+                "struct DirectoryBrowserEntry",
+                "struct DirectoryBrowserListing",
+                "DirectoryListRequest",
+            ] {
+                if contents.contains(forbidden) {
+                    report.error(format!(
+                        "crates/qnc-project-desktop/src/project_component.rs: Project must use qnc-dir-browser DirectoryBrowserSession instead of private browser type '{forbidden}'"
+                    ));
+                }
+            }
+            if !contents.contains("DirectoryBrowserSession") {
+                report.error(
+                    "crates/qnc-project-desktop/src/project_component.rs: Project component must use the shared qnc-dir-browser session"
+                        .to_string(),
+                );
+            }
         }
         if contents.contains("qnc_transport_resolver::") || contents.contains("ResolverConfig") {
             uses_transport_resolver = true;
@@ -1302,6 +1633,140 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
     validate_project_location_browser_shortcuts(root, &mut report);
 
     CheckResult::from_report("qnc-project app boundary", report)
+}
+
+fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let ui_kit = root
+        .join("crates")
+        .join("qnc-ui-kit")
+        .join("src")
+        .join("lib.rs");
+    match fs::read_to_string(&ui_kit) {
+        Ok(contents) => {
+            for required in [
+                "show_form_action_bar",
+                "FormActionBarStyle",
+                "FormActionBarResponse",
+                "STANDARD_ACTION_BUTTON_WIDTH",
+                "toggle_exclusive_panel",
+            ] {
+                if !contents.contains(required) {
+                    report.error(format!(
+                        "{}: missing shared UI action bar symbol '{required}'",
+                        display_relative(root, &ui_kit)
+                    ));
+                }
+            }
+        }
+        Err(error) => report.error(format!(
+            "{}: cannot read shared UI kit: {error}",
+            display_relative(root, &ui_kit)
+        )),
+    }
+
+    for crate_name in ["qnc-project-desktop", "qnc-ingest-desktop"] {
+        let cargo = root.join("crates").join(crate_name).join("Cargo.toml");
+        match fs::read_to_string(&cargo) {
+            Ok(contents) => {
+                if !contents.contains("qnc-ui-kit") {
+                    report.error(format!(
+                        "{}: {crate_name} must use shared qnc-ui-kit for standard UI patterns",
+                        display_relative(root, &cargo)
+                    ));
+                }
+            }
+            Err(error) => report.error(format!(
+                "{}: cannot read Cargo.toml: {error}",
+                display_relative(root, &cargo)
+            )),
+        }
+
+        let src = root.join("crates").join(crate_name).join("src");
+        let mut files = Vec::new();
+        collect_rs_files(&src, &mut files);
+        for file in files {
+            let Ok(contents) = fs::read_to_string(&file) else {
+                continue;
+            };
+            let relative = display_relative(root, &file);
+            for forbidden in [
+                "FORM_ACTION_BUTTON_W",
+                "FORM_ACTION_BUTTON_GAP",
+                "fn form_primary_button",
+                "fn form_action_button",
+                "fn browser_primary_btn",
+                "fn browser_action_btn",
+            ] {
+                if contents.contains(forbidden) {
+                    report.error(format!(
+                        "{relative}: standard confirm/cancel action bar must come from qnc-ui-kit, found '{forbidden}'"
+                    ));
+                }
+            }
+        }
+    }
+
+    validate_ingest_browser_uses_shared_action_bar(root, &mut report);
+
+    CheckResult::from_report("shared UI patterns", report)
+}
+
+fn validate_ingest_browser_uses_shared_action_bar(root: &Path, report: &mut ValidationReport) {
+    let widgets = root
+        .join("crates")
+        .join("qnc-ingest-desktop")
+        .join("src")
+        .join("widgets.rs");
+    let Ok(contents) = fs::read_to_string(&widgets) else {
+        report.error(format!(
+            "{}: cannot read Ingest desktop widgets",
+            display_relative(root, &widgets)
+        ));
+        return;
+    };
+
+    if !contents.contains("fn render_location_action_bar")
+        || !contents.contains("qnc_ui_kit::show_form_action_bar")
+    {
+        report.error(format!(
+            "{}: Ingest browser confirm/cancel bar must use qnc-ui-kit",
+            display_relative(root, &widgets)
+        ));
+    }
+
+    if let Some(browser_body) = source_between(
+        &contents,
+        "fn render_location_browser",
+        "fn render_location_action_bar",
+    ) {
+        for forbidden in [
+            "qnc_ui_kit::show_form_action_bar",
+            "INGEST_DIR_CONFIRM",
+            "INGEST_DIR_CANCEL",
+            "confirm_label",
+            "cancel_label",
+        ] {
+            if browser_body.contains(forbidden) {
+                report.error(format!(
+                    "{}: Ingest browser view must not own action bar marker '{forbidden}'",
+                    display_relative(root, &widgets)
+                ));
+            }
+        }
+    } else {
+        report.error(format!(
+            "{}: cannot locate Ingest location browser/action bar boundary",
+            display_relative(root, &widgets)
+        ));
+    }
+}
+
+fn source_between<'a>(contents: &'a str, start: &str, end: &str) -> Option<&'a str> {
+    let start_index = contents.find(start)?;
+    let after_start = &contents[start_index..];
+    let end_index = after_start.find(end)?;
+    Some(&after_start[..end_index])
 }
 
 fn validate_project_location_browser_shortcuts(root: &Path, report: &mut ValidationReport) {
@@ -1441,6 +1906,21 @@ fn collect_json_files(dir: &Path, out: &mut Vec<PathBuf>) {
         if path.is_dir() {
             collect_json_files(&path, out);
         } else if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+            out.push(path);
+        }
+    }
+}
+
+fn collect_named_files(dir: &Path, file_name: &str, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_named_files(&path, file_name, out);
+        } else if path.file_name().and_then(|name| name.to_str()) == Some(file_name) {
             out.push(path);
         }
     }

@@ -1,0 +1,229 @@
+{
+  "dataset_version": "2026.09.06.1",
+  "reviewed_on": "2026-09-06",
+  "sources": [
+    {"id":"sony-fx6-v6","kind":"manufacturer_document","publisher":"Sony","title":"ILME-FX6 operating instructions v6.0","locator":"https://pro.sony/support/res/manuals/5024/c3bfbc891ee0f149e46d142754fd6aa7/50244581M.pdf","section":"Proxy Recording, p60; chunk destination diagrams","reviewed_on":"2026-09-06"},
+    {"id":"sony-a7iv","kind":"manufacturer_document","publisher":"Sony","title":"ILCE-7M4 Help Guide","locator":"https://helpguide.sony.net/ilc/2110/v1/en/print.pdf","section":"Transferring images to a computer; memory card folder structure, p514","reviewed_on":"2026-09-06"},
+    {"id":"sony-xdcam","kind":"manufacturer_document","publisher":"Sony","title":"XDCAM EX Clip Browsing Software operating instructions","locator":"https://pro.sony/s3/cms-static-content/operation-manual/3280782151.pdf","section":"Media folder/file structure; XDCAM EX and XDCAM HD/HD422","reviewed_on":"2026-09-06"},
+    {"id":"sony-pxroot","kind":"manufacturer_document","publisher":"Sony","title":"CBK-WA100/CBK-WA101 operating instructions","locator":"https://pro.sony/s3/2019/01/23004928/4593598151.pdf","section":"Recording proxy files; Root/PRIVATE/PXROOT/Clip","reviewed_on":"2026-09-06"},
+    {"id":"sony-sd-observation","kind":"card_observation","publisher":"QNC read-only audit","title":"Mixed Sony SD card directory and XML inventory","locator":"docs/15-camera-recording-catalog.md#sony-card-observation","section":"103 ILME-FX6V v6.00 manifest originals and explicit proxy references. ILME-FX3A sidecars and M4ROOT layout also observed; no fixed FX3A clip count asserted. No media decode/probe.","reviewed_on":"2026-09-06"},
+    {"id":"panasonic-cx10","kind":"manufacturer_document","publisher":"Panasonic","title":"AG-CX10 operating instructions DVQP2245WA","locator":"https://eww.pavc.panasonic.co.jp/hdw/oi/CX10/AG-CX10EN%28DVQP2245WA%29_E.pdf","section":"Folder structure of the memory card data, p40 (indexed manufacturer manual section)","reviewed_on":"2026-09-06"},
+    {"id":"panasonic-p2","kind":"manufacturer_document","publisher":"Panasonic","title":"P2 data handling","locator":"https://eww.pass.panasonic.co.jp/pro-av/support/content/news/JP/p2data_handling.htm","section":"CONTENTS directory and linked P2 files","reviewed_on":"2026-09-06"},
+    {"id":"panasonic-cx10-import","kind":"manufacturer_document","publisher":"Panasonic","title":"AG-CX10 clip import guide for DaVinci Resolve 16","locator":"https://pro-av.panasonic.net/en/support/nle/ag-cx10/v1_0/pdf/cx10_clip_import_guide_en_07.pdf","section":"AVCHD directory tree, CLIPINF/PLAYLIST/STREAM and 00000.MTS example, p3","reviewed_on":"2026-09-06"},
+    {"id":"canon-legacy","kind":"manufacturer_document","publisher":"Canon","title":"Software Guide for Windows","locator":"https://gdlp01.c-wss.com/gds/1/0300005741/01/software-guide-w-c-en-scr.pdf","section":"Memory Card Folder Structure, p58","reviewed_on":"2026-09-06"},
+    {"id":"canon-xf-utility","kind":"manufacturer_document","publisher":"Canon","title":"Canon XF Utility supported formats and cameras","locator":"https://app.ssw.imaging-saas.canon/app/en/xfu.html","section":"Supported formats/models; does not specify full directory relationships","reviewed_on":"2026-09-06"},
+    {"id":"canon-c70","kind":"manufacturer_document","publisher":"Canon","title":"EOS C70 instruction manual","locator":"https://gdlp01.c-wss.com/gds/7/0300040137/04/eosc70-im5-zh.pdf","section":"MP4/photo numbering and DCIM folder diagram (indexed manufacturer manual section)","reviewed_on":"2026-09-06"},
+    {"id":"red-komodo-x","kind":"manufacturer_document","publisher":"RED","title":"KOMODO-X operation guide v1.0, File Format","locator":"https://docs.red.com/955-0219/955-0219_V1.0%20Rev-A%20RED%20PS%2C%20KOMODO-X%20Operation%20Guide/Content/4_Menus/02_ProjSet/FileFormat.htm","section":"File Structure of Recorded Apple ProRes Files","reviewed_on":"2026-09-06"},
+    {"id":"red-r3d","kind":"manufacturer_document","publisher":"RED","title":"REDCINE-X PRO v42 operation guide","locator":"https://docs.red.com/955-0004_v42/REV-A/HTML/955-0004_V42%20Rev-A%20%20%20RED%20PS%2C%20REDCINE-X%20PRO%20Operation%20Guide/Content/4_LoadOrganize/R3D_Structure.htm","section":"R3D File Structure","reviewed_on":"2026-09-06"},
+    {"id":"arri-alexa","kind":"manufacturer_document","publisher":"ARRI","title":"ALEXA MXF/DNxHD white paper SUP9.0","locator":"https://www.arri.com/resource/blob/31906/5041b6a03f1200b16e8815d1c7384f89/arri-mxf-dnxhd-white-paper-for-alexa-sup9-0-data.pdf","section":"File naming / folder structure examples, p7","reviewed_on":"2026-09-06"},
+    {"id":"arri-hde","kind":"manufacturer_document","publisher":"ARRI","title":"ARRIRAW HDE Transcoder quick guide 1.6.4","locator":"https://www.arri.com/resource/blob/401788/bf76cfa57682372ff82336ce13088d40/arriraw-hde-transcoder-quick-guide-1-6-4-data.pdf","section":"Source structure and filename examples, p5","reviewed_on":"2026-09-06"},
+    {"id":"blackmagic-cinema","kind":"manufacturer_document","publisher":"Blackmagic Design","title":"Blackmagic Cinema Camera manual, October 2023","locator":"https://documents.blackmagicdesign.com/UserManuals/BlackmagicCinemaCameraManual.pdf?_v=1694761213000","section":"Recording Blackmagic RAW and proxy files, p15 (indexed manufacturer manual section)","reviewed_on":"2026-09-06"},
+    {"id":"blackmagic-ursa","kind":"manufacturer_document","publisher":"Blackmagic Design","title":"Blackmagic URSA Cine manual","locator":"https://documents.blackmagicdesign.com/UserManuals/BlackmagicURSACineManual.pdf?_v=1725260410000","section":"File naming / proxy and companion files, p110 (indexed manufacturer manual section; full PDF not downloaded)","reviewed_on":"2026-09-06"},
+    {"id":"nikon-z9","kind":"manufacturer_document","publisher":"Nikon","title":"Z9 reference guide: File Naming","locator":"https://onlinemanual.nikonimglib.com/z9/en/15_menu_guide_02_04.html","section":"RAW video and same-name MP4 proxy files","reviewed_on":"2026-09-06"},
+    {"id":"gopro-labs","kind":"manufacturer_document","publisher":"GoPro","title":"GoPro Labs: Proxy File Support","locator":"https://gopro.github.io/labs/control/proxies/","section":"Standard LRV layout and Premiere/DaVinci proxy directory examples; updated May 22, 2026","reviewed_on":"2026-09-06"},
+    {"id":"gopro-names","kind":"manufacturer_document","publisher":"GoPro","title":"GoPro Labs: File Naming","locator":"https://gopro.github.io/labs/control/basename/","section":"Default and configurable filename prefixes","reviewed_on":"2026-09-06"},
+    {"id":"dji-lrf","kind":"manufacturer_document","publisher":"DJI","title":"About .LRF files generated by Osmo Action/Osmo Pocket","locator":"https://repair.dji.com/help/content?customId=01700006938&lang=en&paperDocType=ARTICLE&re=US&spaceId=17","section":"Applicable products and purpose of LRF; directory/pairing schema not supplied","reviewed_on":"2026-09-06"},
+    {"id":"jvc-bpav","kind":"manufacturer_document","publisher":"JVC","title":"ProHD Clip Manager manual LST0858-001A","locator":"https://pro.jvc.com/pro/attributes/HDTV/manual/LST0858-001A.pdf","section":"Media folder structure (indexed manufacturer manual section)","reviewed_on":"2026-09-06"},
+    {"id":"jvc-hm790","kind":"manufacturer_document","publisher":"JVC","title":"GY-HM790 operating instructions LST1190-001A","locator":"https://pro.jvc.com/pro/attributes/CAMERA/manual/HM790_LST1190-001A.pdf","section":"Recorded clips and folders, p35 (indexed manufacturer manual section)","reviewed_on":"2026-09-06"},
+    {"id":"fuji-xh2s","kind":"manufacturer_document","publisher":"Fujifilm","title":"X-H2S manual: Movie Setting","locator":"https://fujifilm-dsc.com/en-int/manual/x-h2s/menu_shooting/movie_setting/","section":"Media recording and ProRes proxy options; full on-card relationships not supplied","reviewed_on":"2026-09-06"}
+  ],
+  "patterns": [
+    {
+      "id":"sony-xdroot-sd","manufacturer":"Sony","family":"XDROOT / XAVC MXF on SD",
+      "applicability":"Observed ILME-FX6V firmware 6.00, ordinary proxy recording; not chunk mode.",
+      "naming_rule":"Clip/{name}.MXF; Clip/{name}M01.XML; Sub/{name}S03.MP4; Thmbnl/{name}T01.JPG. Names may contain spaces. Manifest URIs override suffix hints.",
+      "evidence_level":"observed","status":"enabled","status_reason":"Factory family plus read-only XML relationships on available SD sample.",
+      "root_scope":"card_relative","roots":["PRIVATE/XDROOT"],
+      "grouping_method":"manifest_references","grouping_notes":"MEDIAPRO.XML Contents/Material gives original URI and nested Proxy/RelevantInfo URIs; scope UMID to the source and recording root.",
+      "limitations":"Missing proxy is permitted. Root-level Sub and unrelated test folders are not part of this pattern. Device serial is not card serial.",
+      "files":[
+        {"path":"Clip/*.MXF","role":"original_candidate","condition":"Referenced Material or compatible sidecar identity."},
+        {"path":"Sub/*S03.MP4","role":"proxy_candidate","condition":"Attach only to referenced original."},
+        {"path":"Clip/*M01.XML","role":"metadata","condition":"Non-real-time metadata."},
+        {"path":"Thmbnl/*T01.JPG","role":"thumbnail","condition":"RelevantInfo reference."},
+        {"path":"MEDIAPRO.XML","role":"index","condition":"Camera media manifest."}
+      ],
+      "metadata":[
+        {"document":"MEDIAPRO.XML","namespace":"http://xmlns.sony.net/pro/metadata/mediaprofile","selector":"Contents/Material/@uri","meaning":"Original relative URI; never an OS absolute path."},
+        {"document":"MEDIAPRO.XML","namespace":"http://xmlns.sony.net/pro/metadata/mediaprofile","selector":"Contents/Material/Proxy/@uri","meaning":"Proxy associated with parent Material."},
+        {"document":"MEDIAPRO.XML","namespace":"http://xmlns.sony.net/pro/metadata/mediaprofile","selector":"Contents/Material/RelevantInfo/@uri","meaning":"Related metadata or thumbnail, with type attribute."},
+        {"document":"MEDIAPRO.XML","namespace":"http://xmlns.sony.net/pro/metadata/mediaprofile","selector":"Properties/Attached/@mediaId","meaning":"Camera media identifier, not physical card or volume serial."},
+        {"document":"Clip/*M01.XML","namespace":"urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20","selector":"TargetMaterial/@umidRef","meaning":"Original identity link."},
+        {"document":"Clip/*M01.XML","namespace":"urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20","selector":"Device/@modelName","meaning":"Camera model; Device/@serialNo identifies camera only."},
+        {"document":"Clip/*M01.XML","namespace":"urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20","selector":"CreationDate/@value","meaning":"Camera clip creation time including recorded timezone offset."}
+      ],
+      "evidence":[{"source":"sony-fx6-v6","supports":"FX6 proxy naming, SD PRIVATE prefix; chunk mode documented separately."},{"source":"sony-sd-observation","supports":"Actual directories, all 103 original/proxy references, sidecar namespace and selectors."}]
+    },
+    {
+      "id":"sony-m4root-sd","manufacturer":"Sony","family":"M4ROOT / XAVC MP4 on SD",
+      "applicability":"Documented ILCE-7M4; observed ILME-FX3A sidecars on mixed SD card.",
+      "naming_rule":"CLIP/{name}.MP4 and {name}M01.XML; SUB/{name}S03.MP4 on observed FX3A sample.",
+      "evidence_level":"observed","status":"enabled","status_reason":"Documented directory layout and sampled sidecar/proxy pairing.",
+      "root_scope":"card_relative","roots":["PRIVATE/M4ROOT"],
+      "grouping_method":"metadata_identity","grouping_notes":"CLIP is original group; SUB is optional related proxy, never another original group. Confirm identity from camera metadata.",
+      "limitations":"Do not assume every Sony MP4 is a proxy; filename suffix observation is limited to the sampled mode.",
+      "files":[{"path":"CLIP/*.MP4","role":"original_candidate","condition":"Camera recording group."},{"path":"CLIP/*M01.XML","role":"metadata","condition":"Original sidecar."},{"path":"SUB/*.MP4","role":"proxy_candidate","condition":"Require original association."},{"path":"THMBNL/*.JPG","role":"thumbnail","condition":"Observed thumbnail directory."}],
+      "metadata":[],"evidence":[{"source":"sony-a7iv","supports":"SD PRIVATE/M4ROOT/CLIP and SUB."},{"source":"sony-sd-observation","supports":"FX3A sidecar model, original/proxy layout and THMBNL directory; sample-specific naming."}]
+    },
+    {
+      "id":"sony-m4root-cfexpress","manufacturer":"Sony","family":"M4ROOT / CFexpress Type A",
+      "applicability":"ILCE-7M4 documented CFexpress layout, not SD prefix.",
+      "naming_rule":"M4ROOT/CLIP contains originals; M4ROOT/SUB contains proxies; actual clip prefix is camera configurable.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Manufacturer folder diagram; no physical CFexpress sample required.",
+      "root_scope":"card_relative","roots":["M4ROOT"],"grouping_method":"metadata_identity","grouping_notes":"Associate optional SUB media with original CLIP metadata.","limitations":"No claim of identical metadata namespace across Sony firmware.",
+      "files":[{"path":"CLIP/*.MP4","role":"original_candidate","condition":"M4ROOT structure required."},{"path":"SUB/*.MP4","role":"proxy_candidate","condition":"Require original identity."}],"metadata":[],"evidence":[{"source":"sony-a7iv","supports":"CFexpress root M4ROOT, CLIP and SUB."}]
+    },
+    {
+      "id":"sony-fx6-proxy-chunks","manufacturer":"Sony","family":"FX6 proxy chunk recording",
+      "applicability":"FX6 v6 chunk transfer mode; original and chunks can reside on different cards.",
+      "naming_rule":"Proxy filenames add chunk numbering and S03; destination differs for SD and CFexpress.",
+      "evidence_level":"partial","status":"disabled","status_reason":"Full cross-card chunk association contract still required.",
+      "root_scope":"card_relative","roots":["PRIVATE/XDROOT/GENERAL/PXTMP","XDROOT/GENERAL/PXTMP"],"grouping_method":"unresolved","grouping_notes":"Chunks refer to one original recording, not standalone clips.","limitations":"A proxy-only source is incomplete until the original source is available.",
+      "files":[{"path":"*.mp4","role":"proxy_candidate","condition":"Chunk mode, explicit original/chunk association required."}],"metadata":[],"evidence":[{"source":"sony-fx6-v6","supports":"Chunk destination and numbering; separate from ordinary Sub layout."}]
+    },
+    {
+      "id":"sony-xdcam-ex-bpav","manufacturer":"Sony","family":"XDCAM EX BPAV",
+      "applicability":"XDCAM EX layout documented by Clip Browsing Software.",
+      "naming_rule":"BPAV/CLPR/{clip directory}/{clip files}; index at BPAV/MEDIAPRO.XML, CUEUP.XML; take data in TAKR.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Manufacturer media structure.","root_scope":"card_relative","roots":["BPAV"],
+      "grouping_method":"metadata_identity","grouping_notes":"CLPR members and TAKR/index relationships describe clip/take grouping.","limitations":"Preserve spanning relationships; a file count is not a logical clip count.",
+      "files":[{"path":"CLPR/*/*.MP4","role":"original_candidate","condition":"Compatible XDCAM EX metadata."},{"path":"CLPR/*/*.AVI","role":"original_candidate","condition":"Documented AVI recording mode."},{"path":"CLPR/*/*.XML","role":"metadata","condition":"Clip sidecars."},{"path":"MEDIAPRO.XML","role":"index","condition":"Media index."},{"path":"CUEUP.XML","role":"index","condition":"Cue metadata."}],"metadata":[],"evidence":[{"source":"sony-xdcam","supports":"BPAV, CLPR, TAKR and file/index layout."}]
+    },
+    {
+      "id":"sony-xdcam-mxf","manufacturer":"Sony","family":"XDCAM HD/HD422 MXF",
+      "applicability":"XDCAM media layout in Clip Browsing Software manual, not all MXF media.",
+      "naming_rule":"Clip/{clip}.MXF with {clip}M01.XML; media/disc index alongside Clip, Edit, Sub.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Manufacturer structure diagram.","root_scope":"card_relative","roots":["."],
+      "grouping_method":"manifest_references","grouping_notes":"Use MEDIAPRO.XML identity and related media references.","limitations":"Root dot is only a candidate when the camera index and expected directories exist.",
+      "files":[{"path":"Clip/*.MXF","role":"original_candidate","condition":"XDCAM index required."},{"path":"Clip/*M01.XML","role":"metadata","condition":"Related original."},{"path":"MEDIAPRO.XML","role":"index","condition":"Mandatory structural evidence."},{"path":"DISCMETA.XML","role":"index","condition":"Disc metadata."}],"metadata":[],"evidence":[{"source":"sony-xdcam","supports":"XDCAM MXF directory diagram, MXF/sidecar naming and indexes."}]
+    },
+    {
+      "id":"panasonic-p2-separate","manufacturer":"Panasonic","family":"P2 separate video/audio MXF",
+      "applicability":"P2 AVC-Intra layout documented for AG-CX10.","naming_rule":"CONTENTS/VIDEO, AUDIO, CLIP, ICON, PROXY, VOICE; LASTCLIP.TXT beside CONTENTS.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Factory P2 specification.","root_scope":"card_relative","roots":["CONTENTS"],
+      "grouping_method":"metadata_identity","grouping_notes":"CLIP XML links video, audio and spanned parts.","limitations":"Audio MXF is a component, not another video clip.",
+      "files":[{"path":"VIDEO/*.MXF","role":"original_candidate","condition":"P2 CLIP metadata."},{"path":"AUDIO/*.MXF","role":"audio_component","condition":"Linked audio track."},{"path":"CLIP/*.XML","role":"metadata","condition":"Logical clip identity."},{"path":"ICON/*.BMP","role":"thumbnail","condition":"Clip icon."},{"path":"PROXY/*.MOV","role":"proxy_candidate","condition":"Linked original required."},{"path":"PROXY/*.BIN","role":"metadata","condition":"Proxy metadata."}],"metadata":[],"evidence":[{"source":"panasonic-cx10","supports":"P2 folders and file roles."},{"source":"panasonic-p2","supports":"Linked-file handling and LASTCLIP.TXT."}]
+    },
+    {
+      "id":"panasonic-p2-avclip","manufacturer":"Panasonic","family":"P2 AVCLIP multiplexed MXF",
+      "applicability":"AG-CX10 AVC-G50/G25/G12 modes.","naming_rule":"CONTENTS/AVCLIP/*.MXF plus CLIP/*.XML.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Manufacturer mode-specific diagram.","root_scope":"card_relative","roots":["CONTENTS"],
+      "grouping_method":"metadata_identity","grouping_notes":"Logical clip from P2 metadata.","limitations":"Do not force separate AUDIO/VIDEO layout on AVCLIP mode.",
+      "files":[{"path":"AVCLIP/*.MXF","role":"original_candidate","condition":"AVCLIP mode with P2 metadata."},{"path":"CLIP/*.XML","role":"metadata","condition":"P2 clip descriptor."}],"metadata":[],"evidence":[{"source":"panasonic-cx10","supports":"Multiplexed AVCLIP variant."}]
+    },
+    {
+      "id":"panasonic-pana-grp","manufacturer":"Panasonic","family":"PANA_GRP MOV/MP4",
+      "applicability":"AG-CX10 MOV/MP4 recording.","naming_rule":"PRIVATE/PANA_GRP/{format directory}/{recording}; numbered mode-specific directory, not one fixed name.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Factory directory diagram.","root_scope":"card_relative","roots":["PRIVATE/PANA_GRP"],
+      "grouping_method":"metadata_identity","grouping_notes":"Retain INDEX.DAT and BACKUP.TMP associations.","limitations":"Format-folder mapping needs explicit mode evidence.",
+      "files":[{"path":"*/*.MOV","role":"original_candidate","condition":"Documented format folder."},{"path":"*/*.MP4","role":"original_candidate","condition":"Documented format folder."},{"path":"**/INDEX.DAT","role":"index","condition":"Recording index."}],"metadata":[],"evidence":[{"source":"panasonic-cx10","supports":"MOV/MP4 directory family."}]
+    },
+    {
+      "id":"avchd-panasonic","manufacturer":"Panasonic","family":"AVCHD BDMV",
+      "applicability":"AG-CX10 AVCHD; shared standard does not identify manufacturer by itself.","naming_rule":"PRIVATE/AVCHD/BDMV/STREAM/00000.MTS numbering example; CLIPINF and PLAYLIST describe recordings.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Factory AVCHD directory diagram.","root_scope":"card_relative","roots":["PRIVATE/AVCHD"],
+      "grouping_method":"metadata_identity","grouping_notes":"Use playlist/clip information for split recordings.","limitations":"Do not count transport-stream pieces as independent takes.",
+      "files":[{"path":"BDMV/STREAM/*.MTS","role":"original_candidate","condition":"AVCHD structure."},{"path":"BDMV/CLIPINF/*","role":"metadata","condition":"Clip information."},{"path":"BDMV/PLAYLIST/*","role":"index","condition":"Playlist."}],"metadata":[],"evidence":[{"source":"panasonic-cx10-import","supports":"AVCHD directory tree and numbered MTS recording; actual binary relationship parser remains to be validated."}]
+    },
+    {
+      "id":"canon-dcim-legacy","manufacturer":"Canon","family":"Legacy DCIM movies",
+      "applicability":"Models covered by Canon Software Guide; not a general Cinema EOS/XF profile.","naming_rule":"DCIM/{xxx___mm or xxx_mmdd}/MVI_nnnn.MOV or .AVI; optional same-stem .THM; xxx=100..999, mm/month, dd/day, nnnn=4 digits.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Manufacturer naming and directory specification.","root_scope":"card_relative","roots":["DCIM"],
+      "grouping_method":"paired_names","grouping_notes":"THM belongs to same-stem movie; no proxy assumption for MOV.","limitations":"DCF alone does not identify Canon. Respect the documented folder shape and model scope.",
+      "files":[{"path":"???___??/MVI_????.MOV","role":"original_candidate","condition":"Numeric folder/name fields per naming rule."},{"path":"???_????/MVI_????.MOV","role":"original_candidate","condition":"Numeric date folder and clip number."},{"path":"???___??/MVI_????.AVI","role":"original_candidate","condition":"AVI mode."},{"path":"???_????/MVI_????.AVI","role":"original_candidate","condition":"AVI mode."},{"path":"*/MVI_????.THM","role":"thumbnail","condition":"Same-stem movie in valid folder."}],"metadata":[],"evidence":[{"source":"canon-legacy","supports":"Exact folder/filename shapes and thumbnail role."}]
+    },
+    {
+      "id":"canon-c70-mp4","manufacturer":"Canon","family":"Cinema EOS C70 DCIM MP4",
+      "applicability":"C70 MP4 mode; XF-AVC and newer firmware naming need separate records.","naming_rule":"DCIM/xxx_mmdd; original MVI_nnnn.MP4, sub-recording MVISnnnn.MP4, continuous MVICnnnn.MP4.",
+      "evidence_level":"partial","status":"disabled","status_reason":"Full original/sub/continuous pairing and firmware variants still need manufacturer section validation.","root_scope":"card_relative","roots":["DCIM"],
+      "grouping_method":"unresolved","grouping_notes":"Sub-recording is not automatically an editing proxy; require mode and identity.","limitations":"Do not promote every MP4 to an original or label every MVIS as proxy.",
+      "files":[{"path":"???_????/MVI_????.MP4","role":"original_candidate","condition":"C70 numeric date/sequence format."}],"metadata":[],"evidence":[{"source":"canon-c70","supports":"DCIM and numbered movie naming; complete pairing remains pending."}]
+    },
+    {
+      "id":"red-r3d-prores","manufacturer":"RED","family":"RDM/RDC R3D with optional ProRes proxy",
+      "applicability":"KOMODO-X v1.0 R3D + ProRes Proxy mode; REDCINE structure reference.","naming_rule":"{reel}.RDM/{clip}.RDC contains .R3D segments, .mov proxy segments and .rtn thumbnail.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Factory format/mode and directory specification.","root_scope":"card_relative","roots":["*.RDM"],
+      "grouping_method":"directory_segments","grouping_notes":"One RDC groups a logical recording. Resolve segment order and original/proxy relation from recording metadata.","limitations":"Multiple segments are not multiple clips. MOV is proxy only in the documented R3D+proxy mode.",
+      "files":[{"path":"*.RDC/*.R3D","role":"original_candidate","condition":"Original segments."},{"path":"*.RDC/*.mov","role":"proxy_candidate","condition":"R3D+ProRes Proxy mode and original group."},{"path":"*.RDC/*.rtn","role":"thumbnail","condition":"RED thumbnail."},{"path":"*.RDC/*.RMD","role":"metadata","condition":"Optional REDCINE edit sidecar, not necessarily camera-created."}],"metadata":[],"evidence":[{"source":"red-komodo-x","supports":"RDM/RDC hierarchy, R3D/MOV/RTN roles and multiple MOV segments."},{"source":"red-r3d","supports":"RMD semantics and legacy R3D segmentation."}]
+    },
+    {
+      "id":"red-prores-original","manufacturer":"RED","family":"RDM/RDC ProRes-only",
+      "applicability":"KOMODO-X v1.0 ProRes mode.","naming_rule":"{reel}.RDM/{clip}.RDC/*.mov.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Factory ProRes-only directory specification.","root_scope":"card_relative","roots":["*.RDM"],
+      "grouping_method":"directory_segments","grouping_notes":"MOV is original in this mode, with segments grouped under RDC.","limitations":"Missing R3D alone cannot prove ProRes-only mode; it could be an incomplete copy.",
+      "files":[{"path":"*.RDC/*.mov","role":"original_candidate","condition":"Confirmed ProRes-only recording mode."}],"metadata":[],"evidence":[{"source":"red-komodo-x","supports":"ProRes-only hierarchy and MOV originals."}]
+    },
+    {
+      "id":"arri-alexa-reel","manufacturer":"ARRI","family":"ALEXA reel / MXF / ProRes",
+      "applicability":"ALEXA SUP9.0 and separately cited modern ARRIRAW examples, not one universal ARRI schema.","naming_rule":"Reel directories with reel/clip/time/camera fields in media names; A001R33F and A_0001_12NR are documented examples, not fixed folder names.",
+      "evidence_level":"partial","status":"disabled","status_reason":"Split older SxS/modern Codex and ARRIRAW/HDE/ProRes modes before enabling analysis.","root_scope":"reel_relative","roots":["."],
+      "grouping_method":"metadata_identity","grouping_notes":"Use reel+clip identity and ARRI metadata; companion XML/ALE are not media.","limitations":"MXF container does not determine ARRIRAW, HDE or DNxHD. HDE may be generated after recording.",
+      "files":[{"path":"*.mxf","role":"original_candidate","condition":"Confirmed ARRI mode and reel."},{"path":"*.mov","role":"original_candidate","condition":"Confirmed ProRes recording."},{"path":"*.xml","role":"metadata","condition":"Reel/clip metadata."},{"path":"*.ale","role":"metadata","condition":"Log exchange metadata."}],"metadata":[],"evidence":[{"source":"arri-alexa","supports":"SUP9 directory/file examples and companion metadata."},{"source":"arri-hde","supports":"Modern reel, filename and codec-marker distinctions."}]
+    },
+    {
+      "id":"blackmagic-cinema-braw","manufacturer":"Blackmagic Design","family":"Cinema Camera 6K BRAW + proxy",
+      "applicability":"Cinema Camera 6K, October 2023 manual; CFexpress/USB recording.","naming_rule":"Original BRAW recordings and a proxy subdirectory on the same medium.",
+      "evidence_level":"partial","status":"disabled","status_reason":"Exact filename association and recording-root placement need further factory specification.","root_scope":"recording_relative","roots":["."],
+      "grouping_method":"unresolved","grouping_notes":"Optional H.264 proxy belongs to BRAW original; not an independent clip.","limitations":"Do not generalize URSA Cine naming to this model without evidence.",
+      "files":[{"path":"*.braw","role":"original_candidate","condition":"Confirmed camera recording root."},{"path":"proxy/*.mp4","role":"proxy_candidate","condition":"Association not yet fully specified."}],"metadata":[],"evidence":[{"source":"blackmagic-cinema","supports":"BRAW original, proxy directory, H.264 proxy recording."}]
+    },
+    {
+      "id":"blackmagic-ursa-cine","manufacturer":"Blackmagic Design","family":"URSA Cine BRAW / Proxy",
+      "applicability":"URSA Cine documented recording-directory layout.","naming_rule":"Example A001_08151512_C001.braw; Proxy/{same basename}.mp4. Preserve companion BRAW2 when present.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Manufacturer file naming and same-basename proxy description.","root_scope":"recording_relative","roots":["."],
+      "grouping_method":"paired_names","grouping_notes":"Same basename within recording root links Proxy to BRAW; BRAW2 is companion data.","limitations":"Physical media mount/reel container is separate from this recording-relative pattern.",
+      "files":[{"path":"*.braw","role":"original_candidate","condition":"URSA Cine recording root."},{"path":"Proxy/*.mp4","role":"proxy_candidate","condition":"Same-basename BRAW exists."},{"path":"*.braw2","role":"companion_data","condition":"Associated split sensor data, not another clip."}],"metadata":[],"evidence":[{"source":"blackmagic-ursa","supports":"Naming, Proxy pairing and companion recording files."}]
+    },
+    {
+      "id":"nikon-z9-raw","manufacturer":"Nikon","family":"Z9 RAW video + MP4 proxy",
+      "applicability":"Z9 NEV or ProRes RAW MOV with MP4 proxy.","naming_rule":"Configurable three-character prefix, underscore, four-digit number; same-name MP4 proxy for RAW video.",
+      "evidence_level":"partial","status":"disabled","status_reason":"Naming verified; full recording-folder variants still need factory documentation.","root_scope":"unknown","roots":[],
+      "grouping_method":"paired_names","grouping_notes":"NEV/MOV RAW original and MP4 same-stem proxy; MOV RAW requires recorded mode.","limitations":"MOV and MP4 can be original recordings in other modes. No extension-only inference.",
+      "files":[{"path":"*.NEV","role":"original_candidate","condition":"RAW recording group."},{"path":"*.MOV","role":"original_candidate","condition":"Confirmed RAW video mode."},{"path":"*.MP4","role":"proxy_candidate","condition":"Same-name RAW original and mode required."}],"metadata":[],"evidence":[{"source":"nikon-z9","supports":"Naming and RAW/proxy relationship, not complete directory tree."}]
+    },
+    {
+      "id":"gopro-standard-lrv","manufacturer":"GoPro","family":"DCIM MP4 + LRV",
+      "applicability":"Standard layout illustrated by GoPro Labs; filenames may be customized by Labs.","naming_rule":"DCIM/100GOPRO example GX013784.MP4 with GL013784.LRV; chapter/name mapping requires camera mode.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Factory layout example and naming controls.","root_scope":"card_relative","roots":["DCIM/???GOPRO"],
+      "grouping_method":"metadata_identity","grouping_notes":"LRV is low-resolution related video; resolve chapter identity before grouping.","limitations":"Do not assume identical stems or one MP4 per logical recording.",
+      "files":[{"path":"*.MP4","role":"original_candidate","condition":"Known GoPro recording directory."},{"path":"*.LRV","role":"preview","condition":"Associate with original chapter."}],"metadata":[],"evidence":[{"source":"gopro-labs","supports":"Standard directory and differing MP4/LRV prefixes."},{"source":"gopro-names","supports":"Default and configurable filenames."}]
+    },
+    {
+      "id":"gopro-labs-proxies","manufacturer":"GoPro","family":"Labs NLE proxy folders",
+      "applicability":"Labs HERO10 Premiere; HERO11-13 Premiere/DaVinci per factory page.","naming_rule":"DCIM/100GOPRO example: original GX013784.MP4; Proxies/GX013784_Proxy.MP4 or Proxy/GX013784.MP4.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Manufacturer proxy directory and naming specification.","root_scope":"card_relative","roots":["DCIM/???GOPRO"],
+      "grouping_method":"paired_names","grouping_notes":"Match suffix-adjusted or identical basename in the specified proxy subfolder.","limitations":"Labs option changes layout; a nested proxy MP4 is never another original.",
+      "files":[{"path":"*.MP4","role":"original_candidate","condition":"Top-level recording file."},{"path":"Proxies/*_Proxy.MP4","role":"proxy_candidate","condition":"Original with suffix removed exists."},{"path":"Proxy/*.MP4","role":"proxy_candidate","condition":"Same-basename original exists."}],"metadata":[],"evidence":[{"source":"gopro-labs","supports":"Two optional NLE proxy layouts and model scope."}]
+    },
+    {
+      "id":"dji-osmo-lrf","manufacturer":"DJI","family":"Osmo Action/Pocket LRF preview",
+      "applicability":"Models listed by DJI LRF support article; not a generic DJI drone profile.","naming_rule":"LRF is camera-generated preview media; directory and original naming are not specified by the cited article.",
+      "evidence_level":"partial","status":"disabled","status_reason":"Need full factory directory and original/preview association rules, not extensions only.","root_scope":"unknown","roots":[],
+      "grouping_method":"unresolved","grouping_notes":"LRF belongs to a recording and supports playback/trim download.","limitations":"LRF alone does not identify a model or prove edit-proxy compatibility.",
+      "files":[{"path":"*.LRF","role":"preview","condition":"Only after directory/model/recording confirmation."}],"metadata":[],"evidence":[{"source":"dji-lrf","supports":"Preview role and applicable product family only."}]
+    },
+    {
+      "id":"jvc-prohd-bpav","manufacturer":"JVC","family":"ProHD MP4 / BPAV",
+      "applicability":"ProHD Clip Manager documented SD and SxS layouts.","naming_rule":"SD PRIVATE/JVC/BPAV; SxS BPAV; CLPR holds per-clip directories.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Factory media folder structure.","root_scope":"card_relative","roots":["PRIVATE/JVC/BPAV","BPAV"],
+      "grouping_method":"metadata_identity","grouping_notes":"Use index and per-clip metadata, including spanned recordings.","limitations":"BPAV alone cannot distinguish JVC from Sony.",
+      "files":[{"path":"CLPR/*/*.MP4","role":"original_candidate","condition":"ProHD compatible clip metadata."},{"path":"MEDIAPRO.XML","role":"index","condition":"Camera media index."}],"metadata":[],"evidence":[{"source":"jvc-bpav","supports":"SD/SxS root alternatives and CLPR hierarchy."}]
+    },
+    {
+      "id":"jvc-hm790-cqav","manufacturer":"JVC","family":"GY-HM790 QuickTime CQAV",
+      "applicability":"GY-HM790 HD MPEG-2 MOV mode.","naming_rule":"PRIVATE/JVC/CQAV recordings; configurable clip prefix and sequence number.",
+      "evidence_level":"documented","status":"enabled","status_reason":"Manufacturer recording-folder/naming specification.","root_scope":"card_relative","roots":["PRIVATE/JVC/CQAV"],
+      "grouping_method":"metadata_identity","grouping_notes":"Preserve linked parts across files/cards.","limitations":"MOV mode is distinct from BPAV MP4; verify split ordering in the future parser.",
+      "files":[{"path":"*.MOV","role":"original_candidate","condition":"CQAV recording with compatible metadata."}],"metadata":[],"evidence":[{"source":"jvc-hm790","supports":"CQAV mode-specific directory, configurable clip names and splitting."}]
+    }
+  ],
+  "gaps": [
+    {"id":"canon-xf-cinema","manufacturer":"Canon","family":"XF-AVC / XF-HEVC / Cinema RAW Light","missing_evidence":"Manufacturer directory trees and split/sidecar/proxy identities for each mode; do not turn XF Utility compatibility lists into structural rules.","source":"canon-xf-utility"},
+    {"id":"fujifilm-xh2s","manufacturer":"Fujifilm","family":"X-H2S ProRes / H.264 proxy","missing_evidence":"Factory recording folder, naming and original/proxy association. Known proxy menu options alone are insufficient.","source":"fuji-xh2s"},
+    {"id":"sony-pxroot","manufacturer":"Sony","family":"CBK-WA100/101 PXROOT proxy recorder","missing_evidence":"PRIVATE/PXROOT/Clip is documented proxy destination; original lives on another recorder/media. Need full cross-media identity, not a new original rule.","source":"sony-pxroot"},
+    {"id":"sony-xocn-cineroot","manufacturer":"Sony","family":"VENICE / BURANO / X-OCN variants","missing_evidence":"Separate factory folder/naming/metadata specifications by camera, firmware and recording media; do not assume XDROOT.","source":null},
+    {"id":"dji-drone","manufacturer":"DJI","family":"Mavic / Inspire / Zenmuse camera recording","missing_evidence":"Mode-specific factory directory, numbered/chapter identities and optional low-resolution media relationships.","source":null},
+    {"id":"panasonic-lumix","manufacturer":"Panasonic","family":"LUMIX / AVCCAM variants beyond AG-CX10","missing_evidence":"Factory folder/naming details by recording mode and proxy feature; not inferred from P2.","source":null},
+    {"id":"other-manufacturers","manufacturer":"Multiple","family":"OM System, Leica, Sigma, Insta360, Canon/Sony/Nikon still-image variants, external recorders","missing_evidence":"Open coverage backlog, not a support claim. Obtain manufacturer recording specifications before adding enabled patterns.","source":null}
+  ]
+}

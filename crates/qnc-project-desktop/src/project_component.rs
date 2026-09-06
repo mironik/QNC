@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use qnc_dir_browser::DirectoryListRequest;
+use qnc_dir_browser::{BrowserState, DirectoryBrowserSession};
 use serde_json::Value;
 
 use qnc_project_store::{ProjectRow, ProjectStore, ProjectTemplateRow};
@@ -36,27 +36,25 @@ pub struct UserTemplateCreated {
     pub templates: TemplatesState,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DirectoryBrowserEntry {
-    pub name: String,
-    pub path: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DirectoryBrowserListing {
-    pub roots: bool,
-    pub path: String,
-    pub parent: Option<String>,
-    pub entries: Vec<DirectoryBrowserEntry>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectBrowserTarget {
+    ProjectsRoot,
+    ExportDir,
 }
 
 pub struct ProjectComponent {
     store: ProjectStore,
+    projects_root_browser: DirectoryBrowserSession,
+    export_dir_browser: DirectoryBrowserSession,
 }
 
 impl ProjectComponent {
     pub fn new(store: ProjectStore) -> Self {
-        Self { store }
+        Self {
+            store,
+            projects_root_browser: DirectoryBrowserSession::default(),
+            export_dir_browser: DirectoryBrowserSession::default(),
+        }
     }
 
     pub fn projects_root_display(&self) -> String {
@@ -152,29 +150,58 @@ impl ProjectComponent {
         Ok(self.store.projects_root_display())
     }
 
-    pub fn list_directory(&self, path: &str) -> Result<DirectoryBrowserListing, String> {
-        let directory = if path.trim().is_empty() {
-            PathBuf::new()
-        } else {
-            PathBuf::from(path.trim())
-        };
-        let listing = qnc_dir_browser::list_directory(&DirectoryListRequest { directory })?;
-        Ok(DirectoryBrowserListing {
-            roots: listing.roots,
-            path: display_path(&listing.directory),
-            parent: listing.parent.as_deref().map(display_path),
-            entries: listing
-                .entries
-                .into_iter()
-                .map(|entry| DirectoryBrowserEntry {
-                    name: entry.name,
-                    path: display_path(&entry.local_path),
-                })
-                .collect(),
-        })
+    pub fn load_browser_roots(
+        &mut self,
+        target: ProjectBrowserTarget,
+    ) -> Result<BrowserState, String> {
+        self.browser_session_mut(target).load_roots()
     }
-}
 
-fn display_path(path: &Path) -> String {
-    path.to_string_lossy().to_string()
+    pub fn open_browser_private_path(
+        &mut self,
+        target: ProjectBrowserTarget,
+        path: impl AsRef<Path>,
+    ) -> Result<BrowserState, String> {
+        self.browser_session_mut(target).open_private_path(path)
+    }
+
+    pub fn open_browser_uri(
+        &mut self,
+        target: ProjectBrowserTarget,
+        uri: &str,
+    ) -> Result<BrowserState, String> {
+        self.browser_session_mut(target).open_uri(uri)
+    }
+
+    pub fn open_browser_parent(
+        &mut self,
+        target: ProjectBrowserTarget,
+    ) -> Result<BrowserState, String> {
+        self.browser_session_mut(target).open_parent()
+    }
+
+    pub fn browser_private_path_for_uri(
+        &self,
+        target: ProjectBrowserTarget,
+        uri: &str,
+    ) -> Option<PathBuf> {
+        self.browser_session(target).path_for_uri(uri)
+    }
+
+    fn browser_session_mut(
+        &mut self,
+        target: ProjectBrowserTarget,
+    ) -> &mut DirectoryBrowserSession {
+        match target {
+            ProjectBrowserTarget::ProjectsRoot => &mut self.projects_root_browser,
+            ProjectBrowserTarget::ExportDir => &mut self.export_dir_browser,
+        }
+    }
+
+    fn browser_session(&self, target: ProjectBrowserTarget) -> &DirectoryBrowserSession {
+        match target {
+            ProjectBrowserTarget::ProjectsRoot => &self.projects_root_browser,
+            ProjectBrowserTarget::ExportDir => &self.export_dir_browser,
+        }
+    }
 }

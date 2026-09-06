@@ -3,6 +3,12 @@
   "owner_application": "qnc.ingest",
   "schema_version": "0.1.0",
   "qnc_uri": "qnc://local/db/ingest_content",
+  "transport_uri_templates": [
+    "qnc://local/db/ingest_content",
+    "qnc://lan/{authority}/db/ingest_content",
+    "qnc://intranet/{authority}/db/ingest_content"
+  ],
+  "transport_scope": ["local", "lan", "intranet"],
   "tables": [
     "clips",
     "clip_sources",
@@ -25,4 +31,3 @@
   "created_at": "2026-09-04T00:00:00Z",
   "updated_at": "2026-09-04T00:00:00Z"
 }
-

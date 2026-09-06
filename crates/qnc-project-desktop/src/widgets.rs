@@ -1,4 +1,5 @@
 use eframe::egui::{self, Color32, RichText, Vec2};
+use qnc_ui_kit::{FormActionBarResponse, FormActionBarStyle};
 
 use crate::{
     layout_contract::{SettingsPanelMetrics, ShellLayoutContract},
@@ -37,6 +38,24 @@ pub fn action_btn(ui: &mut egui::Ui, label: &str, shell: &ShellLayoutContract) -
         .fill(Color32::TRANSPARENT)
         .stroke(egui::Stroke::new(1.0, t.border)),
     )
+}
+
+pub fn form_action_bar(
+    ui: &mut egui::Ui,
+    shell: &ShellLayoutContract,
+    confirm_label: &str,
+    confirm_enabled: bool,
+    cancel_label: &str,
+) -> FormActionBarResponse {
+    let t = Theme::from_contract(&shell.colors);
+    let style = FormActionBarStyle::new(
+        t.text,
+        t.accent,
+        t.border,
+        shell.theme_metrics.font_ui,
+        shell.theme_metrics.chrome_control_height,
+    );
+    qnc_ui_kit::show_form_action_bar(ui, &style, confirm_label, confirm_enabled, cancel_label)
 }
 
 pub fn panel_title_row(

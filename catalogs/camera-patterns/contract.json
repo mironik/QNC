@@ -1,0 +1,37 @@
+{
+  "catalog_id": "qnc.catalog.camera-patterns",
+  "contract_version": "0.1.0",
+  "schema_version": 1,
+  "kind": "reference_data_not_application_database",
+  "uri_example": "qnc://local/catalog/camera-patterns",
+  "authority_policy": "Configured by the resolver binding, never fixed by a form or a pattern.",
+  "publication_owner": "QNC reference-catalog maintenance",
+  "write_policy": "Offline publisher creates a new database release; runtime consumers read only.",
+  "reader_policy": "Public to every module/application; no caller allowlist.",
+  "transport_policy": "Runtime access must use QNC URI -> resolver -> read-only endpoint in local/LAN/intranet. This release contains the portable dataset and offline publisher, not a network reader.",
+  "lifecycle": "Immutable published artifact; no server, auto-updater, workflow or shared application state.",
+  "public_views": ["public_catalog", "public_sources", "public_patterns", "public_analysis_patterns", "public_roots", "public_file_rules", "public_metadata_fields", "public_evidence", "public_coverage_gaps", "public_changes"],
+  "maintenance": {
+    "operations": ["add", "replace", "delete", "mark_incorrect", "enable", "disable"],
+    "policy": "Explicit offline edits create a new release. Every change records a reason and before/after data; previous releases are not overwritten. Delete removes a pattern, not any card or media file.",
+    "incorrect": "Retained for inspection with reason, excluded from public_analysis_patterns until explicitly corrected and enabled.",
+    "documented_patterns": "Factory specifications plus synthetic contract fixtures are the normal verification basis. Owning a physical card for every camera is not required. Real cards provide additional evidence.",
+    "partial_patterns": "Incomplete factory specifications stay outside analysis candidates until the missing directory/naming/relationship evidence is supplied."
+  },
+  "pattern_semantics": {
+    "runtime_status": "research_only",
+    "root_scope": ["card_relative", "recording_relative", "reel_relative", "unknown"],
+    "paths": "Relative slash-separated expressions. * and ? operate within one segment; ** denotes zero or more directories. No absolute paths, parent segments, URLs, commands or scripts. A period alone means the selected root.",
+    "case_policy": "Preserve spelling. Filesystem case semantics belong to the transport endpoint; do not lowercase stored paths.",
+    "root_variants": "Alternatives, not mandatory simultaneous roots. Evaluate all roots on mixed cards. Missing roots for an unknown scope mean unknown, never match everything.",
+    "roles": ["original_candidate", "proxy_candidate", "preview", "thumbnail", "metadata", "index", "audio_component", "companion_data"],
+    "role_policy": "File rules produce candidates, not a final clip list. Resolve documented relationships and mode before assigning original/proxy roles. Extensions do not prove codecs or camera models.",
+    "grouping": "Prefer explicit camera manifest references, then verified metadata identities. Same-name hints alone are insufficient for ambiguous media, multiple roots, chunks or spanned clips.",
+    "unknown_policy": "Keep unknown, ambiguous and incomplete groups visible as unresolved. Never silently discard, guess a camera, promote a proxy to original or run a probe fallback.",
+    "proof": "Documentation and observed samples are evidence, not runtime support. Observed status is limited to the cited sample, model, mode and media; it does not certify all firmware or media variants.",
+    "metadata": "XML namespace plus element/attribute selectors describe camera-written metadata. IDs for camera, volume, physical card and camera media index are distinct. XML readers must disable external entities and reject references escaping the source root.",
+    "probe_boundary": "No ffprobe/media decoding in the catalog or recognition. Full media probe remains the single Select/Ingest pass. File extension and camera XML never replace measured media fields without provenance."
+  },
+  "version_policy": "Data revisions add evidence and profiles without changing app/UI code. New semantics or schema require a new contract version and compatible module, never embedded executable rules.",
+  "release_gate": "A future detector must validate catalog identity/schema/version, reject unsupported semantics, resolve conflicts and pass fixtures derived from the cited factory specifications before declaring runtime support. Real-card tests are additional, not a requirement for every model."
+}

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -45,6 +46,8 @@ pub struct DirectoryEntry {
     pub name: String,
     pub local_path: PathBuf,
     pub is_dir: bool,
+    pub serial_number: Option<String>,
+    pub volume_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,6 +56,145 @@ pub struct DirectoryListing {
     pub parent: Option<PathBuf>,
     pub roots: bool,
     pub entries: Vec<DirectoryEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct BrowserEntry {
+    pub name: String,
+    pub qnc_uri: String,
+    pub serial_number: String,
+    pub volume_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct BrowserCrumb {
+    pub label: String,
+    pub qnc_uri: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct BrowserState {
+    pub roots: bool,
+    pub path_label: String,
+    pub current_uri: Option<String>,
+    pub parent_available: bool,
+    pub breadcrumbs: Vec<BrowserCrumb>,
+    pub entries: Vec<BrowserEntry>,
+}
+
+#[derive(Debug, Default)]
+pub struct DirectoryBrowserSession {
+    current_directory: Option<PathBuf>,
+    current_uri: Option<String>,
+    parent_directory: Option<PathBuf>,
+    bindings: HashMap<String, PathBuf>,
+}
+
+impl DirectoryBrowserSession {
+    pub fn load_roots(&mut self) -> Result<BrowserState, String> {
+        self.current_directory = None;
+        self.current_uri = None;
+        self.parent_directory = None;
+        let listing = list_directory(&DirectoryListRequest {
+            directory: PathBuf::new(),
+        })?;
+        self.map_listing(listing)
+    }
+
+    pub fn open_uri(&mut self, uri: &str) -> Result<BrowserState, String> {
+        let path = self
+            .bindings
+            .get(uri)
+            .cloned()
+            .ok_or_else(|| format!("unknown QNC location URI: {uri}"))?;
+        let listing = list_directory(&DirectoryListRequest { directory: path })?;
+        self.map_listing(listing)
+    }
+
+    pub fn open_private_path(&mut self, path: impl AsRef<Path>) -> Result<BrowserState, String> {
+        let path = path.as_ref();
+        if path.as_os_str().is_empty() {
+            return self.load_roots();
+        }
+        let listing = list_directory(&DirectoryListRequest {
+            directory: path.to_path_buf(),
+        })?;
+        self.map_listing(listing)
+    }
+
+    pub fn open_parent(&mut self) -> Result<BrowserState, String> {
+        let Some(parent) = self.parent_directory.clone() else {
+            return self.load_roots();
+        };
+        let listing = list_directory(&DirectoryListRequest { directory: parent })?;
+        self.map_listing(listing)
+    }
+
+    pub fn path_for_uri(&self, uri: &str) -> Option<PathBuf> {
+        self.bindings.get(uri).cloned()
+    }
+
+    fn map_listing(&mut self, listing: DirectoryListing) -> Result<BrowserState, String> {
+        if listing.roots {
+            self.current_directory = None;
+            self.current_uri = None;
+            self.parent_directory = None;
+        } else {
+            self.current_directory = Some(listing.directory.clone());
+            self.current_uri = Some(self.bind_path(&listing.directory));
+            self.parent_directory = listing.parent.clone();
+        }
+
+        let entries = listing
+            .entries
+            .iter()
+            .map(|entry| BrowserEntry {
+                name: display_entry_name(&entry.name),
+                qnc_uri: self.bind_path(&entry.local_path),
+                serial_number: entry.serial_number.clone().unwrap_or_default(),
+                volume_name: entry.volume_name.clone().unwrap_or_default(),
+            })
+            .collect::<Vec<_>>();
+
+        let path_label = if listing.roots {
+            String::new()
+        } else {
+            display_path_label(&listing.directory)
+        };
+        let breadcrumbs = if listing.roots {
+            Vec::new()
+        } else {
+            self.breadcrumbs_for_path(&listing.directory)
+        };
+
+        Ok(BrowserState {
+            roots: listing.roots,
+            path_label,
+            current_uri: self.current_uri.clone(),
+            parent_available: self.parent_directory.is_some(),
+            breadcrumbs,
+            entries,
+        })
+    }
+
+    fn breadcrumbs_for_path(&mut self, path: &Path) -> Vec<BrowserCrumb> {
+        browser_crumb_paths(path)
+            .into_iter()
+            .map(|(label, path)| BrowserCrumb {
+                label,
+                qnc_uri: self.bind_path(&path),
+            })
+            .collect()
+    }
+
+    fn bind_path(&mut self, path: &Path) -> String {
+        let normalized = normalize_path_for_identity(path);
+        let uri = format!("qnc://local/source/{:016x}", fnv1a64(&normalized));
+        self.bindings
+            .entry(uri.clone())
+            .or_insert_with(|| path.to_path_buf());
+        uri
+    }
 }
 
 pub fn pick_directory(request: &DirectoryPickRequest) -> Option<DirectorySelection> {
@@ -96,6 +238,8 @@ pub fn list_directory(request: &DirectoryListRequest) -> Result<DirectoryListing
             name,
             local_path: path,
             is_dir: true,
+            serial_number: None,
+            volume_name: None,
         });
     }
     entries.sort_by(|a, b| {
@@ -121,10 +265,13 @@ pub fn list_roots() -> Vec<DirectoryEntry> {
             let root = format!("{}:\\", letter as char);
             let path = PathBuf::from(&root);
             if path.is_dir() {
+                let identity = volume_identity(&path);
                 roots.push(DirectoryEntry {
                     name: root,
                     local_path: path,
                     is_dir: true,
+                    serial_number: identity.serial_number,
+                    volume_name: identity.volume_name,
                 });
             }
         }
@@ -136,8 +283,65 @@ pub fn list_roots() -> Vec<DirectoryEntry> {
             name: "/".to_string(),
             local_path: PathBuf::from("/"),
             is_dir: true,
+            serial_number: None,
+            volume_name: None,
         }]
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct VolumeIdentity {
+    serial_number: Option<String>,
+    volume_name: Option<String>,
+}
+
+#[cfg(windows)]
+fn volume_identity(root: &Path) -> VolumeIdentity {
+    use std::{os::windows::ffi::OsStrExt, ptr::null_mut};
+    use windows_sys::Win32::Storage::FileSystem::GetVolumeInformationW;
+
+    let root_wide = root
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+    let mut name = vec![0u16; 260];
+    let mut serial = 0u32;
+    let ok = unsafe {
+        GetVolumeInformationW(
+            root_wide.as_ptr(),
+            name.as_mut_ptr(),
+            name.len() as u32,
+            &mut serial,
+            null_mut(),
+            null_mut(),
+            null_mut(),
+            0,
+        )
+    };
+
+    if ok == 0 {
+        return VolumeIdentity::default();
+    }
+
+    let end = name
+        .iter()
+        .position(|value| *value == 0)
+        .unwrap_or(name.len());
+    let volume_name = String::from_utf16_lossy(&name[..end]);
+    VolumeIdentity {
+        serial_number: Some(format!("{serial:08x}")),
+        volume_name: if volume_name.trim().is_empty() {
+            None
+        } else {
+            Some(volume_name)
+        },
+    }
+}
+
+#[cfg(not(windows))]
+fn volume_identity(_root: &Path) -> VolumeIdentity {
+    VolumeIdentity::default()
 }
 
 fn normalize_list_path(path: &Path) -> Result<PathBuf, String> {
@@ -188,6 +392,143 @@ fn is_hidden_or_system(name: &str, metadata: &fs::Metadata) -> bool {
     }
 }
 
+pub fn display_path_label(path: &Path) -> String {
+    trim_path_suffix_for_display(&clean_os_path_display(&path.to_string_lossy()))
+}
+
+pub fn display_private_path(path: &Path) -> String {
+    clean_os_path_display(&path.to_string_lossy())
+}
+
+pub fn display_entry_name(name: &str) -> String {
+    trim_path_suffix_for_display(&clean_os_path_display(name))
+}
+
+fn clean_os_path_display(value: &str) -> String {
+    let trimmed = value.trim();
+    if let Some(rest) = trimmed.strip_prefix("\\\\?\\UNC\\") {
+        format!("\\\\{rest}")
+    } else if let Some(rest) = trimmed.strip_prefix("\\\\?\\") {
+        rest.to_string()
+    } else if let Some(rest) = trimmed.strip_prefix("//?/UNC/") {
+        format!("//{rest}")
+    } else if let Some(rest) = trimmed.strip_prefix("//?/") {
+        rest.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn trim_path_suffix_for_display(value: &str) -> String {
+    if value == "/" || value == "\\" {
+        return value.to_string();
+    }
+    if is_windows_drive_root(value) {
+        return value[..2].to_string();
+    }
+    value.trim_end_matches(['\\', '/']).to_string()
+}
+
+fn is_windows_drive_root(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'\\' || bytes[2] == b'/')
+}
+
+fn browser_crumb_paths(path: &Path) -> Vec<(String, PathBuf)> {
+    let clean = clean_os_path_display(&path.to_string_lossy());
+    if clean.is_empty() {
+        return Vec::new();
+    }
+
+    if is_windows_drive_rooted(&clean) {
+        let drive = clean[..2].to_string();
+        let mut out = vec![(drive.clone(), PathBuf::from(format!("{drive}\\")))];
+        let rest = clean[3..].trim_matches(['\\', '/']);
+        let mut current = format!("{drive}\\");
+        for part in rest.split(['\\', '/']).filter(|part| !part.is_empty()) {
+            if !current.ends_with('\\') {
+                current.push('\\');
+            }
+            current.push_str(part);
+            out.push((part.to_string(), PathBuf::from(current.clone())));
+        }
+        return out;
+    }
+
+    if clean.starts_with("\\\\") {
+        let mut out = Vec::new();
+        let mut current = String::from("\\\\");
+        for part in clean
+            .trim_start_matches('\\')
+            .split('\\')
+            .filter(|part| !part.is_empty())
+        {
+            if current != "\\\\" {
+                current.push('\\');
+            }
+            current.push_str(part);
+            out.push((part.to_string(), PathBuf::from(current.clone())));
+        }
+        return out;
+    }
+
+    if clean.starts_with('/') {
+        let mut out = vec![("/".to_string(), PathBuf::from("/"))];
+        let mut current = String::from("/");
+        for part in clean
+            .trim_start_matches('/')
+            .split('/')
+            .filter(|part| !part.is_empty())
+        {
+            if !current.ends_with('/') {
+                current.push('/');
+            }
+            current.push_str(part);
+            out.push((part.to_string(), PathBuf::from(current.clone())));
+        }
+        return out;
+    }
+
+    let mut out = Vec::new();
+    let mut current = String::new();
+    for part in clean.split(['\\', '/']).filter(|part| !part.is_empty()) {
+        if !current.is_empty() {
+            current.push(std::path::MAIN_SEPARATOR);
+        }
+        current.push_str(part);
+        out.push((part.to_string(), PathBuf::from(current.clone())));
+    }
+    out
+}
+
+fn is_windows_drive_rooted(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'\\' || bytes[2] == b'/')
+}
+
+fn normalize_path_for_identity(path: &Path) -> String {
+    clean_os_path_display(&path.to_string_lossy())
+        .replace('\\', "/")
+        .to_lowercase()
+}
+
+fn fnv1a64(value: &str) -> u64 {
+    const OFFSET: u64 = 0xcbf29ce484222325;
+    const PRIME: u64 = 0x100000001b3;
+    let mut hash = OFFSET;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(PRIME);
+    }
+    hash
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,6 +568,67 @@ mod tests {
         assert!(listing.roots);
         assert!(listing.parent.is_none());
         assert!(!listing.entries.is_empty());
+    }
+
+    #[test]
+    fn browser_session_exposes_qnc_uri_state() {
+        let mut session = DirectoryBrowserSession::default();
+        let state = session.load_roots().expect("roots");
+
+        assert!(state.roots);
+        assert!(state
+            .entries
+            .iter()
+            .all(|entry| entry.qnc_uri.starts_with("qnc://local/source/")));
+        assert!(state
+            .entries
+            .iter()
+            .all(|entry| !entry.name.contains("\\\\?\\")));
+    }
+
+    #[test]
+    fn private_start_path_returns_browser_state_with_current_uri() {
+        let root = temp_root("session");
+        fs::create_dir_all(root.join("Child")).expect("child dir");
+
+        let mut session = DirectoryBrowserSession::default();
+        let state = session.open_private_path(&root).expect("state");
+
+        assert!(!state.roots);
+        assert!(state.current_uri.is_some());
+        assert!(
+            state
+                .entries
+                .iter()
+                .any(|entry| entry.name == "Child"
+                    && entry.qnc_uri.starts_with("qnc://local/source/"))
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn browser_breadcrumbs_use_qnc_uri_not_raw_path() {
+        let root = temp_root("crumbs");
+        let nested = root.join("A").join("B");
+        fs::create_dir_all(&nested).expect("nested dir");
+
+        let mut session = DirectoryBrowserSession::default();
+        let state = session.open_private_path(&nested).expect("state");
+
+        assert!(!state.breadcrumbs.is_empty());
+        assert!(state
+            .breadcrumbs
+            .iter()
+            .all(|crumb| crumb.qnc_uri.starts_with("qnc://local/source/")));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn display_labels_hide_windows_extended_prefix() {
+        assert_eq!(display_entry_name("\\\\?\\G:\\"), "G:");
+        assert_eq!(display_path_label(Path::new("\\\\?\\G:\\")), "G:");
+        assert_eq!(display_private_path(Path::new("\\\\?\\G:\\")), "G:\\");
+        assert_eq!(display_entry_name("/"), "/");
     }
 
     #[test]

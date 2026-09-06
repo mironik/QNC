@@ -191,6 +191,63 @@
     "project_export_dir_browser_cancel": {
       "label": "Odustani od export direktorija"
     },
+    "ingest_source_kind_local": {
+      "label": "Ingest izvor Računalo"
+    },
+    "ingest_source_kind_lan": {
+      "label": "Ingest izvor LAN"
+    },
+    "ingest_source_kind_internet": {
+      "label": "Ingest izvor Internet"
+    },
+    "ingest_dir_up": {
+      "label": "Ingest browser Gore"
+    },
+    "ingest_dir_roots": {
+      "label": "Ingest browser Diskovi"
+    },
+    "ingest_dir_open": {
+      "label": "Otvori mapu u Ingest browseru"
+    },
+    "ingest_dir_confirm": {
+      "label": "Odaberi Ingest izvor"
+    },
+    "ingest_dir_cancel": {
+      "label": "Odustani od Ingest izvora"
+    },
+    "ingest_preview_focus": {
+      "label": "Fokusiraj Ingest klip"
+    },
+    "ingest_clip_toggle": {
+      "label": "Uključi/isključi Ingest klip"
+    },
+    "ingest_select_all": {
+      "label": "Odaberi sve Ingest klipove"
+    },
+    "ingest_clear_selection": {
+      "label": "Očisti Ingest izbor"
+    },
+    "ingest_import_selected": {
+      "label": "Uvezi odabrane Ingest klipove"
+    },
+    "ingest_reload": {
+      "label": "Osvježi Ingest prikaz"
+    },
+    "ingest_set_archive": {
+      "label": "Postavi kopiranje originala"
+    },
+    "ingest_set_ai_mining": {
+      "label": "Postavi Ingest AI mining"
+    },
+    "ingest_approve_proxy_posters": {
+      "label": "Odobri Ingest postere iz proxya"
+    },
+    "ingest_cue_frame": {
+      "label": "Postavi Ingest cue frame"
+    },
+    "ingest_toggle_audio_lane": {
+      "label": "Promijeni Ingest audio lane"
+    },
     "activate_focused_item": {
       "label": "Aktiviraj fokusirani element"
     },
@@ -208,6 +265,18 @@
             "key": "Enter"
           }
         ]
+      },
+      "ingest": {
+        "play_pause": [
+          {
+            "code": "Space"
+          },
+          {
+            "key": " "
+          }
+        ],
+        "step_back_frame": [ { "code": "ArrowLeft", "key": "ArrowLeft" } ],
+        "step_forward_frame": [ { "code": "ArrowRight", "key": "ArrowRight" } ]
       },
       "storyboard": {
         "play_pause": [

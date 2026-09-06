@@ -4,4 +4,4 @@
 **/*.db
 **/*.db-shm
 **/*.db-wal
-
+!/catalogs/camera-patterns/camera-patterns-v1.sqlite

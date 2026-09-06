@@ -14,9 +14,9 @@ fn main() -> eframe::Result<()> {
         }
     }
 
-    let project_root = locate_qnc_root()
+    let qnc_root = locate_qnc_root()
         .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-    let app = qnc_ingest_desktop::create_ingest_app(project_root)
+    let app = qnc_ingest_desktop::create_ingest_app(qnc_root)
         .unwrap_or_else(|error| panic!("failed to create Ingest app: {error}"));
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()

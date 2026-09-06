@@ -1,0 +1,8 @@
+[package]
+name = "qnc-ui-kit"
+version = "0.1.0"
+edition = "2021"
+description = "Shared passive QNC egui UI patterns"
+
+[dependencies]
+eframe = { workspace = true }

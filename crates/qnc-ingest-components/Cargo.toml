@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-contracts = { workspace = true }
+qnc-dir-browser = { workspace = true }
+qnc-ingest-store = { workspace = true }
 serde = { workspace = true }
-

@@ -2,7 +2,7 @@
   "module_id": "qnc.module.dir-browser",
   "module_name": "Dir Browser",
   "module_version": "0.1.0",
-  "module_kind": "ui_widget",
+  "module_kind": "library",
   "capabilities": ["dir.list", "dir.select"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
@@ -11,7 +11,6 @@
   "transport_protocol_version": "0.1.0",
   "forbidden_calls": ["media.scan", "ffprobe", "media.probe.full", "clip.catalog.write"],
   "forbidden_dependencies": ["qnc.module.media-probe"],
-  "state_policy": "owned_by_calling_application",
+  "state_policy": "session_local",
   "database_write_policy": "no_db_writes"
 }
-

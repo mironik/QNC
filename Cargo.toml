@@ -11,13 +11,16 @@ members = [
     "crates/qnc-ingest-components",
     "crates/qnc-ingest-desktop",
     "crates/qnc-ingest-desktop-adapter",
+    "crates/qnc-ingest-store",
     "crates/qnc-keyboard-shortcut",
     "crates/qnc-project-desktop",
     "crates/qnc-project-desktop-adapter",
     "crates/qnc-project-store",
     "crates/qnc-shell-desktop-api",
     "crates/qnc-transport-resolver",
+    "crates/qnc-ui-kit",
     "tools/qnc-conformance",
+    "tools/qnc-camera-catalog",
 ]
 
 [workspace.dependencies]
@@ -27,12 +30,14 @@ qnc-dir-browser = { path = "crates/qnc-dir-browser" }
 qnc-ingest-components = { path = "crates/qnc-ingest-components" }
 qnc-ingest-desktop = { path = "crates/qnc-ingest-desktop" }
 qnc-ingest-desktop-adapter = { path = "crates/qnc-ingest-desktop-adapter" }
+qnc-ingest-store = { path = "crates/qnc-ingest-store" }
 qnc-keyboard-shortcut = { path = "crates/qnc-keyboard-shortcut" }
 qnc-project-desktop = { path = "crates/qnc-project-desktop" }
 qnc-project-desktop-adapter = { path = "crates/qnc-project-desktop-adapter" }
 qnc-project-store = { path = "crates/qnc-project-store" }
 qnc-shell-desktop-api = { path = "crates/qnc-shell-desktop-api" }
 qnc-transport-resolver = { path = "crates/qnc-transport-resolver" }
+qnc-ui-kit = { path = "crates/qnc-ui-kit" }
 eframe = { version = "0.31", default-features = false, features = ["accesskit", "default_fonts", "wayland", "wgpu", "x11"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

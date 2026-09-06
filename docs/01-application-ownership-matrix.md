@@ -13,15 +13,28 @@ aplikacija.
 | Aplikacija/forma | Posjeduje | Pise | Cita | Tipicni moduli u workflowu | Workflow zabrane |
 | --- | --- | --- | --- | --- | --- |
 | Project | project registry, project settings, DB/location registry | Project DB | vlastitu bazu i javne status DB-ove po potrebi | manifest/capability, DB validation, transport/resolver, Dir Browser za izbor lokacija | scan/probe, filmstrip/wave, player decode, export/render, Story workflow, Media Assist workflow |
-| Ingest | source/card identity, source scan, original/proxy grouping, jedini media probe rezultat | Ingest DB | Project DB, vlastitu bazu | Dir Browser, Media Browser, Media Probe, Filmstrip, Wave, transport/resolver, scanner, camera detector | pisanje u Project/Story/Media Assist DB, pozivanje Story/Media Assist workflowa, proxy kao zaseban clip, naknadni probe |
-| Media Assist | analysis/assist rezultate, korisnicke assist odluke, vlastite reference | Media Assist DB | Project DB, Ingest DB, vlastitu bazu, javne artefakt reference | Timeline, Media Browser, Broadcast Player, analysis moduli, transcript/AI adapteri, UI widgeti | scan/probe, ingest workflow, pisanje u Story DB, pisanje u Ingest DB, direktno pozivanje Story aplikacije |
-| Story varijanta | story odluke, virtualne kadrove ako ih koristi, markere, frame rangove, EDL/playlist odluke | Story DB te varijante | Project DB, Ingest DB, vlastitu bazu, javne artefakt reference | Timeline, Media Browser, Broadcast Player, Export, UI widgeti, frame/timebase, EDL modul | scan/probe, ingest workflow, pisanje u Media Assist DB, pisanje u Ingest DB, sve Story potrebe u jednoj aplikaciji |
+| Ingest | source/card identity, source scan, original/proxy grouping, jedini media probe rezultat | Ingest DB | oznaku aktivnog projekta i postavke za rad iz baze, vlastitu bazu | Dir Browser, Media Browser, Media Probe, Filmstrip, Wave, transport/resolver, scanner, camera detector | Project app/API/crate/workflow, pisanje u Project/Story/Media Assist DB, pozivanje Story/Media Assist workflowa, proxy kao zaseban clip, naknadni probe |
+| Media Assist | analysis/assist rezultate, korisnicke assist odluke, vlastite reference | Media Assist DB | oznaku aktivnog projekta i postavke za rad iz baze, Ingest DB, vlastitu bazu, javne artefakt reference | Timeline, Media Browser, Broadcast Player, analysis moduli, transcript/AI adapteri, UI widgeti | scan/probe, ingest workflow, pisanje u Story DB, pisanje u Ingest DB, direktno pozivanje Story aplikacije |
+| Story varijanta | story odluke, virtualne kadrove ako ih koristi, markere, frame rangove, EDL/playlist odluke | Story DB te varijante | oznaku aktivnog projekta i postavke za rad iz baze, Ingest DB, vlastitu bazu, javne artefakt reference | Timeline, Media Browser, Broadcast Player, Export, UI widgeti, frame/timebase, EDL modul | scan/probe, ingest workflow, pisanje u Media Assist DB, pisanje u Ingest DB, sve Story potrebe u jednoj aplikaciji |
 
 ## Modulna ownership pravila
 
 Moduli su javni QNC resursi. Modul ne smije imati hardkodirani popis aplikacija
 koje ga smiju koristiti. Modul smije imati dependency boundary: sto on sam ne
 smije pozvati, ucitati ili pokrenuti.
+
+Aplikacije ne poznaju druge aplikacije kao runtime dependency. Kada aplikacija
+treba raditi po postavkama projekta, iz baze cita oznaku aktivnog projekta i
+postavke za rad read-only. Aplikacija ne poziva Project aplikaciju, Project
+store ili Project workflow.
+
+Ne smije postojati alat za suradnju, nasljedivanje, shared runtime context ili
+aplikacijski bridge koji prenosi poslovno stanje izmedu aplikacija. Jedina
+poslovna veza je zapis u bazi kroz DB contract. Ingest zato nema rucno
+postavljanje projektnih radnih postavki; cita ih iz baze aktivnog projekta.
+QNC baza mora biti prenosivi poslovni artefakt: ako se valjana baza prenese na
+drugi racunar, Ingest mora moci raditi bez Project aplikacije, QNC.app shella i
+drugih QNC aplikacijskih procesa.
 
 | Modul | Public capability | Input | Output | State/write policy | Dependency boundary |
 | --- | --- | --- | --- | --- | --- |

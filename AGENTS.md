@@ -58,6 +58,9 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
   bazama i ne dijeli aktivno stanje izmedu aplikacija.
 - Ako vise aplikacija koristi isti modul, svaka aplikacija ga koristi unutar
   vlastite granice i zapisuje samo vlastite rezultate u vlastitu bazu.
+- Izmedu aplikacija ne smije postojati alat za suradnju, nasljedivanje,
+  dijeljeni runtime context, shared workflow service, aplikacijski bridge ili
+  slican posrednik. Zapis u bazi kroz DB contract je jedina poslovna veza.
 - Aktivni kod iz stare aplikacije ne smije se kopirati bez jasnog razdvajanja
   odgovornosti i korisnickog odobrenja.
 
@@ -125,6 +128,21 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 - Project aplikacija je vlasnik `project_registry` i `project_workspace`
   baza. Globalna baza i baza po projektu moraju biti odvojene kroz DB
   contract, iako implementacija fizicki koristi SQLite datoteke.
+- Project aplikacija kreira projektnu bazu za svaki projekt posebno i u tu
+  projektnu bazu zapisuje postavke projekta.
+- Druge aplikacije ne smiju znati za Project aplikaciju, Project crateove,
+  Project komponente, Project store ili Project workflow. Ako trebaju raditi po
+  postavkama projekta, smiju citati samo dogovorene postavke za rad iz baze
+  aktivnog projekta.
+- Oznaka aktivnog projekta mora biti podatak u bazi, ne UI stanje i ne argument
+  koji aplikacija izmisli. Ingest cita bazu, pronalazi koja projektna baza ima
+  oznaku aktivnog projekta i iz nje cita samo postavke za rad.
+- QNC baza mora biti prenosivi poslovni artefakt. Na bilo kojem racunalu kojem
+  korisnik da valjanu QNC bazu, Ingest mora moci raditi bez Project aplikacije,
+  bez QNC.app shella i bez bilo kojeg drugog QNC aplikacijskog procesa.
+- Aplikacija koja cita postavke za rad aktivnog projekta smije ih citati samo
+  read-only. Ne smije pisati, migrirati, popravljati ni otvarati Project
+  workflow.
 - Project system template seed je obvezni lokalni QNC artefakt:
   `C:\Users\miron\Projects\QNC\seed\system_seed.json`, preuzet iz
   `C:\Users\miron\Projects\qnc_v4\seed\system_seed.json`.
@@ -161,8 +179,16 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 - UI je pasivna forma.
 - Jedina poslovna veza izmedu QNC aplikacija/formi je baza kroz javni DB
   contract.
-- Aplikacija smije citati javne podatke druge aplikacije kroz DB/transport
-  ugovor.
+- Sama baza mora biti dovoljna poslovna veza. Ako je baza kopirana na drugi
+  racunar, aplikacija koja zna taj DB contract mora moci citati sto joj treba
+  bez prisutnosti aplikacije koja je bazu prvotno stvorila.
+- Aplikacije se ne smiju medusobno poznavati kao aplikacije. Ne smije postojati
+  poslovna veza Ingest -> Project, Story -> Ingest ili slicno preko API-ja,
+  cratea, procesa, klase ili privatne funkcije.
+- Ne smije postojati poseban alat za suradnju, nasljedivanje ili shared runtime
+  context koji aplikacijama prenosi poslovno stanje mimo baze.
+- Aplikacija smije citati javne ili dogovorene podatke iz baze kroz DB/transport
+  ugovor. Ona time poznaje ugovor baze, ne aplikaciju koja je tu bazu stvorila.
 - Aplikacija smije pisati samo u vlastitu bazu ili vlastitu shemu.
 - Nema direktnih privatnih SQLite zaobilaznica kao javnog komunikacijskog
   modela.
@@ -182,6 +208,22 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 - Ingest je samostalna zatvorena aplikacija.
 - Korisnik mora moci pokrenuti Ingest bez QNC.app i bez drugih QNC aplikacija.
 - QNC.app ne mora postojati na istom racunalu i ne mora biti pokrenut.
+- Ingest ne zna i ne smije znati za Project aplikaciju. Ingest ne smije imati
+  dependency na Project app crate, Project desktop adapter, Project component,
+  Project store, Project action_id ili Project workflow.
+- Ako Ingest radi nad aktivnim projektom, mora iz baze procitati koja projektna
+  baza ima oznaku aktivnog projekta i iz te baze procitati samo postavke za rad.
+- Ingest mora moci raditi na racunalu na kojem ne postoji Project aplikacija,
+  ako mu je dostupna valjana baza s oznakom aktivnog projekta i postavkama za
+  rad.
+- Ingest ne smije imati rucno postavljanje projektnih radnih postavki. Ne smije
+  imati svoj projektni settings editor, lokalni override za project workflow,
+  niti default koji zamjenjuje nepostojece projektne postavke.
+- Postavke po kojima Ingest radi dolaze iz baze aktivnog projekta. Ingest ih
+  samo cita i primjenjuje kao ulazni ugovor.
+- Ako ne postoji aktivni projekt ili postavke za rad nisu citljive, Ingest mora
+  stati u kontrolirano stanje greske. Ne smije kreirati projekt, traziti Project
+  aplikaciju, popravljati Project bazu niti izmisljati default projekt.
 - Ingest nakon zavrsetka ingest procesa prestaje raditi.
 - Produkt Ingest aplikacije je baza i pripadajuci artefakti zapisani kroz
   ugovor.
@@ -244,6 +286,31 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 - LAN/Intranet authority dolazi iz owner registry/runtime konfiguracije, ne iz
   hardkodiranog URL-a u UI-ju.
 - Dir Browser javni output mora biti QNC URI odabrane lokacije, ne raw OS path.
+- Dir Browser mora biti samostalni javni modul, ne dio Project/Ingest/Story
+  forme.
+- Aplikacijska forma ne smije imati vlastiti browser state koji zna za OS
+  filesystem. Forma smije samo prikazati browser view/state koji je dosao iz
+  Dir Browser modula i poslati `action_id` natrag komponenti.
+- Potvrdna/odustajna dugmad oko browsera, npr. `Odaberi`, `U redu` i
+  `Odustani`, nisu dio javnog `qnc-dir-browser` modula i nisu dio browser
+  session statea. Ta dugmad pripadaju aplikacijskoj UI akcijskoj traci ili
+  zajednickom UI paint modulu.
+- Standardna potvrdna akcijska traka za forme mora ici kroz javni UI modul
+  `qnc-ui-kit`, ne kroz lokalno duplicirane helper funkcije u pojedinim
+  aplikacijama.
+- Ako jedna forma koristi isti javni browser vise puta, npr. za lokaciju
+  projekta i export lokaciju, forma/komponenta mora upravljati vlastitim
+  panelima tako da je otvoren samo jedan browser prikaz odjednom. Otvaranje
+  jednog browser panela automatski zatvara drugi.
+- To ekskluzivno otvaranje nije odgovornost `qnc-dir-browser` modula.
+  `qnc-dir-browser` ne smije znati koliko browser instanci neka aplikacija
+  prikazuje.
+- Browser navigacija, npr. source tabovi, `Gore`, `Diskovi`, breadcrumb i rows,
+  smije biti UI paint komponenta, ali stvarni state/listing/URI mora doci iz
+  Dir Browser modula.
+- OS-specific display detalji, npr. Windows extended path prefix `\\?\`, ne
+  smiju izlaziti u UI. Dir Browser modul mora vratiti OS-neutralan prikaz i
+  QNC URI kao javni identitet.
 - Raw path smije postojati samo unutar Dir Browser/resolver procesa ili u
   privatnim runtime tablicama owner aplikacije.
 - `rfd` i OS dialog smiju zivjeti samo unutar Dir Browser modula ili jednakog
@@ -342,6 +409,17 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
   aplikacija.
 - Modul ne smije biti tajna veza izmedu aplikacija. Ako aplikacije razmjenjuju
   poslovne podatke, to ide kroz bazu.
+- Sve sto se ponavlja u vise aplikacija i moze imati uski contract treba
+  izdvojiti kao javni modul ili javnu komponentu, npr. `qnc-ui-kit`,
+  `qnc-dir-browser`, keyboard, resolver, media browser ili timeline paint.
+- Javni UI modul, ukljucujuci `qnc-ui-kit`, smije sadrzavati samo pasivne
+  paint/layout/intent obrasce i genericke UI-state pomocnike, npr.
+  ekskluzivno otvaranje panela. Ne smije imati aplikacijski workflow, DB ownera,
+  filesystem ownership, browser session ownership, media scan/probe/player/
+  render/export logiku niti centralni registry poslovnog stanja.
+- Javni modul ili komponenta ne smije se siriti dodavanjem posebnih pravila za
+  Project, Ingest, Story ili Media Assist. Ako mu treba takvo znanje, modul je
+  postao monolit i mora se razbiti na uzi contract.
 
 ## 13. Razvojni redoslijed
 
@@ -435,21 +513,41 @@ Zamrznuto na korisnikov zahtjev 2026-09-04.
 
 ## 16. Trenutna odobrena odstupanja
 
-Zapisano 2026-09-04. Vrijedi samo dok se odstupanja ne zatvore.
+Zapisano 2026-09-04, azurirano 2026-09-05. Vrijedi samo dok se odstupanja ne
+zatvore.
 
 - Shell runtime footer prikazuje samo aplikacije s `apps/*/qnc-app.json`.
   Layout contract i dalje nabraja `project`, `ingest`, `media_assist` i
   `storyboard`.
 - Close project nije u footeru dok ne postoji workspace close contract.
-- Project embedded factory trenutno ima samo `qnc_project`. To nije uzor za
-  sljedecu aplikaciju.
+- Shell embedded factory trenutno ima `qnc_project` i `qnc_ingest` javne
+  adaptere. To nije dozvola za uvodenje privatnih app/store ovisnosti u shell i
+  nije uzor za monolit.
+- In-process shell adapter smije tranzitivno povuci desktop/component/store
+  sloj iste aplikacije samo dok je to javni adapter te iste aplikacije.
+  Adapter ne smije povuci privatni workflow druge aplikacije.
+- Project je bio odmrznut samo za odobreni shared Dir Browser / `qnc-ui-kit`
+  zahvat i bug popravak ekskluzivnog browser panela. Bez novog izricitog
+  odobrenja Project se opet smatra zamrznutim.
 - Project `Odaberi...` ne smije koristiti OS folder dialog; mora koristiti
   ugradeni Dir Browser prikaz s `Racunalo / LAN / Internet`, `Gore`, `Diskovi`,
   `U redu` i `Odustani` akcijama.
-- Dir Browser prvi rez za Project smije privremeno vracati lokalni path kao
-  izbor. Javni output mora prije Ingesta postati QNC URI.
+- Dir Browser prvi rez za Project smije privremeno potvrditi privatni lokalni
+  path u owner Project postavke. Javni identitet lokacije mora ostati QNC URI.
+- Ingest trenutni runtime rez je samo source browser + `source.select` +
+  registry/session DB zapis. `Odaberi` jos nije puni Ingest dok ne pokrene
+  source scan, original/proxy grouping, jedini probe prolaz i clip/probe DB
+  upis kroz odobrene module.
+- Ingest application manifest smije deklarirati samo module i capabilityje koji
+  imaju stvarnu runtime ovisnost ili implementirani javni adapter u trenutnom
+  rezu. Scanner, camera detector, Media Probe, Media Browser, Filmstrip i Wave
+  ne smiju biti u Ingest runtime manifestu dok ne postoje kao stvarni moduli u
+  runtimeu.
 - Project keyboard dispatch smije krenuti od `project_open_selected`. Nove tipke
   ne smiju ici mimo kataloga.
+- Ingest klik akcije moraju imati action_id u
+  `contracts/qnc-keyboard-shortcuts.json` prije nego ih forma posalje. Tipke za
+  Ingest smiju se dodati samo kroz taj katalog.
 - Soft/HighContrast theme varijante smiju ostati samo dok se ne prebace u UI
   contract.
 

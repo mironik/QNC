@@ -17,6 +17,11 @@ modul -> public capabilities -> input -> output -> state/write policy -> forbidd
 Modul je javni QNC resurs. Modul ne smije imati hardkodirani popis aplikacija
 koje ga smiju koristiti.
 
+Sve sto se ponavlja u vise aplikacija i moze imati uski contract treba biti
+javni modul ili javna komponenta. To smanjuje dupliciranje, ali ne smije
+stvoriti novi monolit: javni modul ne smije znati Project/Ingest/Story/Media
+Assist workflow niti smije postati centralni host poslovnog stanja.
+
 Zabrana na modulu znaci samo ovo: sto modul sam ne smije pozvati, ucitati ili
 pokrenuti. Primjer: Filmstrip je javan modul, ali Filmstrip ne smije pozvati
 `ffprobe`, Media Probe, scanner ili Ingest workflow.
@@ -33,7 +38,7 @@ korisnika modula.
 | transport/resolver | qnc.uri.resolve, qnc.uri.validate | QNC URI, environment, access policy | resolved handle/endpoint za trenutni proces | nema poslovnih writeova | workflow routing, ownership odluke, spremanje raw OS patha kao javnog ID-a |
 | DB contract/validation | db.schema.validate, db.owner.check | DB URI, schema manifest, owner policy | schema validation, migration check, read/write check | samo schema/status ako owner dopusti | poslovni DB write umjesto aplikacije, preskakanje owner checka |
 | frame/timebase | frame.convert, timecode.format | fps_num/fps_den, frame, seconds, timecode | frame/timecode/seconds konverzije | nema writeova | `ffprobe`, Media Probe, hardcoded FPS |
-| Dir Browser | dir.list, dir.select | root/location QNC URI, browse policy | directory listing, selected location URI | nema; caller pise izbor | media scan, probe, clip katalog |
+| Dir Browser | dir.list, dir.select | root/location QNC URI, owner-private start path kroz resolver/session | OS-neutral browser state, breadcrumb URI, selected location URI | session-local; caller pise izbor | egui dugmad, media scan, probe, clip katalog |
 | Media Browser | media.list, media.select | DB query/read view, filters, selection state | media rows/cards/select intent | nema; caller pise izbor | probe, clip kreiranje, mijenjanje tudeg kataloga |
 | scanner | source.scan.roles | source location URI, camera/source rules | source file role map, original/proxy/support grouping | return result ili owner aplikacija pise | Media Probe, Filmstrip, Wave, Story workflow, proxy kao zaseban clip |
 | camera detector | source.camera.detect | source tree facts, filenames, metadata sidecars | camera layout classification, role hints | nema writeova | probe, clip import, poslovne odluke aplikacije |
@@ -44,8 +49,13 @@ korisnika modula.
 | Broadcast Player | playback.open, playback.seek, playback.status | media refs, playlist/EDL, probe/timebase iz DB | playback status, current frame, errors | caller-owned status ili return status | `ffprobe`, Media Probe, scanner, Export, app-to-app state sharing |
 | Export | export.render, export.report | EDL/playlist/output request, DB refs | exported files, report, status | caller-owned export/status ili return result | `ffprobe`, Media Probe, scanner, privatni UI state |
 | Monitor | monitor.status | output target URI/config | output/health/status events | caller-owned status ili return status | centralni workflow host, workflow routing |
-| UI widget | ui.render, ui.intent | view model, theme/font policy | rendered UI, UI intent | nema poslovnih writeova | scan, probe, media obrada, DB write, poslovni workflow |
+| UI widget / `qnc-ui-kit` | ui.render, ui.intent, ui.form_action_bar, ui.exclusive_panel | view model, theme/font policy, action labels, pasivni UI open/close state | rendered UI, UI intent, genericki UI-state rezultat | nema poslovnih writeova | scan, probe, media obrada, DB write, poslovni workflow, browser session ownership |
 | test adapter | conformance.run | manifest, source tree, DB files, fake transport | conformance result | test output samo | produkcijski DB write, skrivanje pravila u test helperu |
+
+Napomena za forme s vise browser polja: `qnc-dir-browser` daje session/listing
+state po instanci, ali ne zna koliko ih aplikacija prikazuje. Aplikacijska
+komponenta ili forma mora osigurati da otvaranje jednog browser panela zatvori
+drugi panel u istoj formi.
 
 ## Workflow i dependency zabrane
 

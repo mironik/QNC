@@ -1,0 +1,11 @@
+[package]
+name = "qnc-ingest-store"
+version = "0.1.0"
+edition = "2021"
+description = "IngestQNC owned registry/content database store"
+
+[dependencies]
+qnc-contracts = { workspace = true }
+qnc-db-contract = { workspace = true }
+qnc-transport-resolver = { workspace = true }
+rusqlite = { workspace = true }

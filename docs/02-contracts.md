@@ -114,6 +114,21 @@ Pravila:
 - Druge aplikacije citaju samo public read views ili dogovorene tablice.
 - Raw OS path nije javni identitet baze.
 - DB contract mora raditi lokalno, na LAN-u i u intranetu.
+- Project aplikacija kreira globalnu registry bazu i posebnu projektnu bazu za
+  svaki projekt. Postavke po kojima rade Ingest, Media Assist, Story i druge
+  aplikacije zapisuju se u projektnu bazu tog projekta.
+- Aplikacije ne dobivaju workspace, runtime context za poslovno stanje,
+  nasljedivanje ili alat za suradnju, i ne pozivaju Project aplikaciju. One
+  citaju oznaku aktivnog projekta i postavke za rad iz baze read-only, kroz
+  javni ili dogovoreni DB contract.
+- Ingest nema rucno postavljanje projektnih radnih postavki. Postavke po kojima
+  Ingest radi dolaze iz baze aktivnog projekta.
+- QNC baza je prenosivi poslovni artefakt. Ingest mora moci raditi na racunalu
+  na kojem ne postoje Project aplikacija ni QNC.app shell, ako je dostupna
+  valjana baza s oznakom aktivnog projekta i postavkama za rad.
+- Ako aplikacija ne moze procitati aktivni projekt ili njegove postavke za rad,
+  mora stati u kontrolirano stanje greske. Ne smije kreirati projekt,
+  popravljati Project bazu niti izmisliti default postavke.
 
 Project registry smije imati privatne runtime tablice za lokalnu storage
 konfiguraciju i mapiranje projekta na fizicku mapu. Te vrijednosti nisu javni

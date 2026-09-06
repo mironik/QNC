@@ -1,16 +1,14 @@
 use eframe::egui::{self, RichText, Sense, Vec2};
+use qnc_dir_browser::BrowserState;
 
 use crate::{
     layout_contract::ShellLayoutContract,
-    project_component::DirectoryBrowserEntry,
     theme::{self, Theme},
-    widgets,
 };
 
 const UP_COL_W: f32 = 42.0;
 const DISKS_COL_W: f32 = 58.0;
 const NAV_GAP_W: f32 = 12.0;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LocationSourceKind {
     #[default]
@@ -32,13 +30,8 @@ impl LocationSourceKind {
 pub struct LocationBrowserInput<'a> {
     pub id_salt: &'a str,
     pub kind: LocationSourceKind,
-    pub roots: bool,
-    pub path: &'a str,
-    pub parent: Option<&'a str>,
-    pub entries: &'a [DirectoryBrowserEntry],
+    pub browser: &'a BrowserState,
     pub error: Option<&'a str>,
-    pub busy: bool,
-    pub confirm_label: &'a str,
     pub max_tree_height: Option<f32>,
     pub shell: &'a ShellLayoutContract,
 }
@@ -46,9 +39,9 @@ pub struct LocationBrowserInput<'a> {
 pub enum LocationBrowserAction {
     None,
     SelectKind(LocationSourceKind),
-    OpenPath(String),
-    Confirm,
-    Cancel,
+    OpenUri(String),
+    OpenParent,
+    OpenRoots,
 }
 
 pub fn show(ui: &mut egui::Ui, input: LocationBrowserInput<'_>) -> LocationBrowserAction {
@@ -77,15 +70,15 @@ pub fn show(ui: &mut egui::Ui, input: LocationBrowserInput<'_>) -> LocationBrows
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
         let can_up = matches!(input.kind, LocationSourceKind::Local)
-            && !input.roots
-            && input.parent.is_some();
+            && !input.browser.roots
+            && input.browser.parent_available;
         if fixed_text_link(ui, "Gore", can_up, UP_COL_W, input.shell).clicked() {
-            action = LocationBrowserAction::OpenPath(input.parent.unwrap_or("").to_string());
+            action = LocationBrowserAction::OpenParent;
         }
         ui.add_space(NAV_GAP_W);
         let can_disks = matches!(input.kind, LocationSourceKind::Local);
         if fixed_text_link(ui, "Diskovi", can_disks, DISKS_COL_W, input.shell).clicked() {
-            action = LocationBrowserAction::OpenPath(String::new());
+            action = LocationBrowserAction::OpenRoots;
         }
         ui.add_space(NAV_GAP_W);
         show_location_breadcrumb(ui, &input, &mut action);
@@ -97,8 +90,7 @@ pub fn show(ui: &mut egui::Ui, input: LocationBrowserInput<'_>) -> LocationBrows
     }
 
     ui.add_space(6.0);
-    let footer_h = input.shell.theme_metrics.chrome_control_height + 8.0;
-    let available_tree_h = (ui.available_height() - footer_h).max(40.0);
+    let available_tree_h = ui.available_height().max(40.0);
     let tree_h = input
         .max_tree_height
         .map(|max_h| available_tree_h.min(max_h).max(40.0))
@@ -123,46 +115,7 @@ pub fn show(ui: &mut egui::Ui, input: LocationBrowserInput<'_>) -> LocationBrows
             }
         });
 
-    ui.add_space(8.0);
-    let can_confirm = matches!(input.kind, LocationSourceKind::Local)
-        && !input.roots
-        && !input.path.trim().is_empty()
-        && !input.busy;
-    ui.allocate_ui_with_layout(
-        Vec2::new(
-            ui.available_width(),
-            input.shell.theme_metrics.chrome_control_height,
-        ),
-        egui::Layout::right_to_left(egui::Align::Center),
-        |ui| {
-            ui.spacing_mut().item_spacing.x = 8.0;
-            if widgets::action_btn(ui, "Odustani", input.shell).clicked() {
-                action = LocationBrowserAction::Cancel;
-            }
-            ui.add_enabled_ui(can_confirm, |ui| {
-                if widgets::primary_btn(ui, input.confirm_label, true, input.shell).clicked() {
-                    action = LocationBrowserAction::Confirm;
-                }
-            });
-        },
-    );
-
     action
-}
-
-pub fn clean_location_path(path: &str) -> String {
-    let p = path.trim();
-    if let Some(rest) = p.strip_prefix("\\\\?\\UNC\\") {
-        format!("\\\\{rest}")
-    } else if let Some(rest) = p.strip_prefix("\\\\?\\") {
-        rest.to_string()
-    } else if let Some(rest) = p.strip_prefix("//?/UNC/") {
-        format!("//{rest}")
-    } else if let Some(rest) = p.strip_prefix("//?/") {
-        rest.to_string()
-    } else {
-        p.to_string()
-    }
 }
 
 fn fixed_text_link(
@@ -233,11 +186,11 @@ fn show_local_tree(
     action: &mut LocationBrowserAction,
 ) {
     let t = Theme::from_contract(&input.shell.colors);
-    if input.roots {
+    if input.browser.roots {
         return;
     }
 
-    if input.entries.is_empty() {
+    if input.browser.entries.is_empty() {
         ui.horizontal(|ui| {
             ui.add_space(path_tree_offset());
             theme::label(
@@ -250,14 +203,9 @@ fn show_local_tree(
         return;
     }
 
-    for entry in input.entries {
-        if location_tree_row(
-            ui,
-            path_tree_offset(),
-            &entry_display_name(entry, false),
-            input.shell,
-        ) {
-            *action = LocationBrowserAction::OpenPath(clean_location_path(&entry.path));
+    for entry in &input.browser.entries {
+        if location_tree_row(ui, path_tree_offset(), &entry.name, input.shell) {
+            *action = LocationBrowserAction::OpenUri(entry.qnc_uri.clone());
         }
     }
 }
@@ -279,36 +227,14 @@ fn location_tree_row(
     .inner
 }
 
-fn entry_display_name(entry: &DirectoryBrowserEntry, roots: bool) -> String {
-    if !entry.name.trim().is_empty() {
-        return clean_location_path(&entry.name);
-    }
-    if roots {
-        clean_location_path(&entry.path)
-    } else {
-        path_leaf(&entry.path)
-    }
-}
-
-fn path_leaf(path: &str) -> String {
-    let clean = clean_location_path(path);
-    let trimmed = clean.trim_end_matches(['\\', '/']);
-    trimmed
-        .rsplit(['\\', '/'])
-        .next()
-        .filter(|s| !s.is_empty())
-        .unwrap_or(trimmed)
-        .to_string()
-}
-
 fn show_location_breadcrumb(
     ui: &mut egui::Ui,
     input: &LocationBrowserInput<'_>,
     action: &mut LocationBrowserAction,
 ) {
     let t = Theme::from_contract(&input.shell.colors);
-    if matches!(input.kind, LocationSourceKind::Local) && input.roots {
-        show_root_disks_inline(ui, input, action);
+    if matches!(input.kind, LocationSourceKind::Local) && input.browser.roots {
+        show_root_disks_table(ui, input, action);
         return;
     }
 
@@ -322,11 +248,10 @@ fn show_location_breadcrumb(
         return;
     }
 
-    let parts = breadcrumb_parts(input.path);
-    if parts.is_empty() {
+    if input.browser.breadcrumbs.is_empty() {
         theme::label(
             ui,
-            short_path(input.path),
+            &short_path(&input.browser.path_label),
             input.shell.theme_metrics.font_ui,
             t.text,
         );
@@ -335,24 +260,24 @@ fn show_location_breadcrumb(
 
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
-        for (index, (label, path)) in parts.iter().enumerate() {
+        for (index, crumb) in input.browser.breadcrumbs.iter().enumerate() {
             if index > 0 {
                 theme::label(ui, "\\", input.shell.theme_metrics.font_ui, t.muted);
             }
-            if text_link(ui, label, true, input.shell).clicked() {
-                *action = LocationBrowserAction::OpenPath(path.clone());
+            if text_link(ui, &crumb.label, true, input.shell).clicked() {
+                *action = LocationBrowserAction::OpenUri(crumb.qnc_uri.clone());
             }
         }
     });
 }
 
-fn show_root_disks_inline(
+fn show_root_disks_table(
     ui: &mut egui::Ui,
     input: &LocationBrowserInput<'_>,
     action: &mut LocationBrowserAction,
 ) {
     let t = Theme::from_contract(&input.shell.colors);
-    if input.entries.is_empty() {
+    if input.browser.entries.is_empty() {
         theme::label(
             ui,
             "Nema diskova.",
@@ -362,120 +287,54 @@ fn show_root_disks_inline(
         return;
     }
 
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing.x = 12.0;
-        for entry in input.entries {
-            let label = root_disk_label(entry);
-            if text_link(ui, &label, true, input.shell).clicked() {
-                *action = LocationBrowserAction::OpenPath(clean_location_path(&entry.path));
+    egui::Grid::new(format!("{}_root_disk_table", input.id_salt))
+        .num_columns(3)
+        .spacing(Vec2::new(14.0, 4.0))
+        .striped(false)
+        .show(ui, |ui| {
+            for entry in &input.browser.entries {
+                let mut clicked = false;
+                clicked |= root_disk_cell(ui, &entry.name, input.shell).clicked();
+                clicked |= root_disk_cell(ui, &entry.serial_number, input.shell).clicked();
+                clicked |= root_disk_cell(ui, &entry.volume_name, input.shell).clicked();
+                ui.end_row();
+
+                if clicked {
+                    *action = LocationBrowserAction::OpenUri(entry.qnc_uri.clone());
+                }
             }
-        }
-    });
+        });
 }
 
-fn root_disk_label(entry: &DirectoryBrowserEntry) -> String {
-    let path = clean_location_path(&entry.path);
-    let name = clean_location_path(&entry.name);
-    if path.is_empty() {
-        return name;
-    }
-    if name.is_empty() || name.eq_ignore_ascii_case(&path) {
-        return path;
-    }
-    if name.contains(&path) || path.contains(&name) {
-        return name;
-    }
-    format!("{path} {name}")
+fn root_disk_cell(ui: &mut egui::Ui, text: &str, shell: &ShellLayoutContract) -> egui::Response {
+    ui.add(
+        egui::Label::new(
+            RichText::new(text)
+                .size(shell.theme_metrics.font_ui)
+                .color(Theme::from_contract(&shell.colors).text),
+        )
+        .sense(Sense::click())
+        .selectable(false),
+    )
 }
 
 fn location_label(input: &LocationBrowserInput<'_>) -> String {
     match input.kind {
-        LocationSourceKind::Local if input.roots => "Diskovi".to_string(),
-        LocationSourceKind::Local if !input.path.trim().is_empty() => short_path(input.path),
+        LocationSourceKind::Local if input.browser.roots => "Diskovi".to_string(),
+        LocationSourceKind::Local if !input.browser.path_label.trim().is_empty() => {
+            short_path(&input.browser.path_label)
+        }
         LocationSourceKind::Lan => "LAN".to_string(),
         LocationSourceKind::Internet => "Internet".to_string(),
-        _ => "—".to_string(),
+        _ => "-".to_string(),
     }
-}
-
-fn breadcrumb_parts(path: &str) -> Vec<(String, String)> {
-    let clean = clean_location_path(path);
-    if clean.is_empty() {
-        return Vec::new();
-    }
-
-    if is_windows_drive_rooted(&clean) {
-        let drive = clean[..2].to_string();
-        let mut out = vec![(drive.clone(), format!("{drive}\\"))];
-        let rest = clean[3..].trim_matches(['\\', '/']);
-        let mut current = format!("{drive}\\");
-        for part in rest.split(['\\', '/']).filter(|p| !p.is_empty()) {
-            if !current.ends_with('\\') {
-                current.push('\\');
-            }
-            current.push_str(part);
-            out.push((part.to_string(), current.clone()));
-        }
-        return out;
-    }
-
-    if clean.starts_with("\\\\") {
-        let mut out = Vec::new();
-        let mut current = String::from("\\\\");
-        for part in clean
-            .trim_start_matches('\\')
-            .split('\\')
-            .filter(|p| !p.is_empty())
-        {
-            if current != "\\\\" {
-                current.push('\\');
-            }
-            current.push_str(part);
-            out.push((part.to_string(), current.clone()));
-        }
-        return out;
-    }
-
-    if clean.starts_with('/') {
-        let mut out = vec![("/".to_string(), "/".to_string())];
-        let mut current = String::from("/");
-        for part in clean
-            .trim_start_matches('/')
-            .split('/')
-            .filter(|p| !p.is_empty())
-        {
-            if !current.ends_with('/') {
-                current.push('/');
-            }
-            current.push_str(part);
-            out.push((part.to_string(), current.clone()));
-        }
-        return out;
-    }
-
-    let mut out = Vec::new();
-    let mut current = String::new();
-    for part in clean.split(['\\', '/']).filter(|p| !p.is_empty()) {
-        if !current.is_empty() {
-            current.push('\\');
-        }
-        current.push_str(part);
-        out.push((part.to_string(), current.clone()));
-    }
-    out
-}
-
-fn is_windows_drive_rooted(path: &str) -> bool {
-    let b = path.as_bytes();
-    b.len() >= 3 && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/')
 }
 
 fn short_path(path: &str) -> String {
-    let p = clean_location_path(path);
-    if p.chars().count() <= 42 {
-        return p;
+    if path.chars().count() <= 42 {
+        return path.to_string();
     }
-    let tail: String = p
+    let tail: String = path
         .chars()
         .rev()
         .take(36)
@@ -483,37 +342,13 @@ fn short_path(path: &str) -> String {
         .chars()
         .rev()
         .collect();
-    format!("…{tail}")
+    format!("...{tail}")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn clean_location_path_removes_windows_extended_prefix() {
-        assert_eq!(
-            clean_location_path(r"\\?\C:\Users\miron\Media"),
-            r"C:\Users\miron\Media"
-        );
-        assert_eq!(
-            clean_location_path(r"\\?\UNC\server\share\Media"),
-            r"\\server\share\Media"
-        );
-    }
-
-    #[test]
-    fn breadcrumb_parts_keep_clickable_windows_drive_chain() {
-        let parts = breadcrumb_parts(r"C:\News\Today");
-        assert_eq!(
-            parts,
-            vec![
-                ("C:".to_string(), r"C:\".to_string()),
-                ("News".to_string(), r"C:\News".to_string()),
-                ("Today".to_string(), r"C:\News\Today".to_string()),
-            ]
-        );
-    }
+    use qnc_dir_browser::BrowserEntry;
 
     #[test]
     fn opened_folder_rows_share_breadcrumb_column() {
@@ -524,11 +359,23 @@ mod tests {
     }
 
     #[test]
-    fn root_disk_label_does_not_duplicate_drive_letter() {
-        let entry = DirectoryBrowserEntry {
-            name: r"C:\".to_string(),
-            path: r"C:\".to_string(),
+    fn short_path_keeps_short_values() {
+        assert_eq!(
+            short_path("qnc://local/source/test"),
+            "qnc://local/source/test"
+        );
+    }
+
+    #[test]
+    fn root_disk_entries_are_public_browser_entries() {
+        let entry = BrowserEntry {
+            name: "G:".to_string(),
+            qnc_uri: "qnc://local/source/1".to_string(),
+            serial_number: "de666c9f".to_string(),
+            volume_name: String::new(),
         };
-        assert_eq!(root_disk_label(&entry), r"C:\");
+
+        assert_eq!(entry.name, "G:");
+        assert!(entry.qnc_uri.starts_with("qnc://local/source/"));
     }
 }

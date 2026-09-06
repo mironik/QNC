@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{self, Color32, RichText, Sense, Vec2};
+use qnc_dir_browser::BrowserState;
 use qnc_keyboard_shortcut::ShortcutEvent;
 use serde_json::Value;
 
@@ -8,10 +9,7 @@ use crate::{
     layout_contract::{AppContracts, ProjectListMetrics, SettingsPanelMetrics},
     location_browser::{self, LocationBrowserAction, LocationBrowserInput, LocationSourceKind},
     project_advanced,
-    project_component::{
-        DirectoryBrowserEntry, DirectoryBrowserListing, ProjectComponent, ProjectsState,
-        TemplatesState,
-    },
+    project_component::{ProjectBrowserTarget, ProjectComponent, ProjectsState, TemplatesState},
     theme::{self, Theme},
     widgets,
 };
@@ -62,12 +60,16 @@ enum ProjectAction {
     ConfirmDeleteTemplate,
     PickProjectsRoot,
     SelectProjectsRootKind { kind: LocationSourceKind },
-    OpenProjectsRootPath { path: String },
+    OpenProjectsRootUri { uri: String },
+    OpenProjectsRootParent,
+    OpenProjectsRootRoots,
     ConfirmProjectsRootBrowser,
     CancelProjectsRootBrowser,
     PickExportDir,
     SelectExportDirKind { kind: LocationSourceKind },
-    OpenExportDirPath { path: String },
+    OpenExportDirUri { uri: String },
+    OpenExportDirParent,
+    OpenExportDirRoots,
     ConfirmExportDirBrowser,
     CancelExportDirBrowser,
 }
@@ -90,12 +92,16 @@ impl ProjectAction {
             Self::ConfirmDeleteTemplate => "project_template_delete_confirm",
             Self::PickProjectsRoot => "project_pick_projects_root",
             Self::SelectProjectsRootKind { .. } => "project_projects_root_browser_select_source",
-            Self::OpenProjectsRootPath { .. } => "project_projects_root_browser_open_path",
+            Self::OpenProjectsRootUri { .. }
+            | Self::OpenProjectsRootParent
+            | Self::OpenProjectsRootRoots => "project_projects_root_browser_open_path",
             Self::ConfirmProjectsRootBrowser => "project_projects_root_browser_confirm",
             Self::CancelProjectsRootBrowser => "project_projects_root_browser_cancel",
             Self::PickExportDir => "project_pick_export_dir",
             Self::SelectExportDirKind { .. } => "project_export_dir_browser_select_source",
-            Self::OpenExportDirPath { .. } => "project_export_dir_browser_open_path",
+            Self::OpenExportDirUri { .. }
+            | Self::OpenExportDirParent
+            | Self::OpenExportDirRoots => "project_export_dir_browser_open_path",
             Self::ConfirmExportDirBrowser => "project_export_dir_browser_confirm",
             Self::CancelExportDirBrowser => "project_export_dir_browser_cancel",
         }
@@ -105,10 +111,7 @@ impl ProjectAction {
 #[derive(Debug, Clone)]
 struct LocationBrowserState {
     kind: LocationSourceKind,
-    roots: bool,
-    path: String,
-    parent: Option<String>,
-    entries: Vec<DirectoryBrowserEntry>,
+    browser: BrowserState,
     error: Option<String>,
     busy: bool,
 }
@@ -117,10 +120,10 @@ impl Default for LocationBrowserState {
     fn default() -> Self {
         Self {
             kind: LocationSourceKind::Local,
-            roots: true,
-            path: String::new(),
-            parent: None,
-            entries: Vec::new(),
+            browser: BrowserState {
+                roots: true,
+                ..BrowserState::default()
+            },
             error: None,
             busy: false,
         }
@@ -273,8 +276,14 @@ impl ProjectApp {
             ProjectAction::SelectProjectsRootKind { kind } => {
                 self.select_projects_root_kind(kind);
             }
-            ProjectAction::OpenProjectsRootPath { path } => {
-                self.open_projects_root_path(&path);
+            ProjectAction::OpenProjectsRootUri { uri } => {
+                self.open_projects_root_uri(&uri);
+            }
+            ProjectAction::OpenProjectsRootParent => {
+                self.open_projects_root_parent();
+            }
+            ProjectAction::OpenProjectsRootRoots => {
+                self.open_projects_root_roots();
             }
             ProjectAction::ConfirmProjectsRootBrowser => {
                 self.confirm_projects_root_browser();
@@ -288,8 +297,14 @@ impl ProjectApp {
             ProjectAction::SelectExportDirKind { kind } => {
                 self.select_export_dir_kind(kind);
             }
-            ProjectAction::OpenExportDirPath { path } => {
-                self.open_export_dir_path(&path);
+            ProjectAction::OpenExportDirUri { uri } => {
+                self.open_export_dir_uri(&uri);
+            }
+            ProjectAction::OpenExportDirParent => {
+                self.open_export_dir_parent();
+            }
+            ProjectAction::OpenExportDirRoots => {
+                self.open_export_dir_roots();
             }
             ProjectAction::ConfirmExportDirBrowser => {
                 self.confirm_export_dir_browser();
@@ -1181,7 +1196,7 @@ impl ProjectApp {
 
     fn location_browser(&mut self, ui: &mut egui::Ui, project_root: bool) {
         let shell = self.contracts.shell.clone();
-        let action = {
+        let browser_action = {
             let browser = if project_root {
                 &self.projects_root_browser
             } else {
@@ -1197,53 +1212,70 @@ impl ProjectApp {
                         "export_dir"
                     },
                     kind: browser.kind,
-                    roots: browser.roots,
-                    path: &browser.path,
-                    parent: browser.parent.as_deref(),
-                    entries: &browser.entries,
+                    browser: &browser.browser,
                     error: browser.error.as_deref(),
-                    busy: browser.busy,
-                    confirm_label: "U redu",
                     max_tree_height: Some(if project_root { 170.0 } else { 150.0 }),
                     shell: &shell,
                 },
             )
         };
 
-        match action {
-            LocationBrowserAction::None => {}
-            LocationBrowserAction::SelectKind(kind) => {
-                let action = if project_root {
-                    ProjectAction::SelectProjectsRootKind { kind }
-                } else {
-                    ProjectAction::SelectExportDirKind { kind }
-                };
-                self.dispatch_project_action(action);
-            }
-            LocationBrowserAction::OpenPath(path) => {
-                let action = if project_root {
-                    ProjectAction::OpenProjectsRootPath { path }
-                } else {
-                    ProjectAction::OpenExportDirPath { path }
-                };
-                self.dispatch_project_action(action);
-            }
-            LocationBrowserAction::Confirm => {
-                let action = if project_root {
-                    ProjectAction::ConfirmProjectsRootBrowser
-                } else {
-                    ProjectAction::ConfirmExportDirBrowser
-                };
-                self.dispatch_project_action(action);
-            }
-            LocationBrowserAction::Cancel => {
-                let action = if project_root {
+        ui.add_space(8.0);
+        let can_confirm = {
+            let browser = if project_root {
+                &self.projects_root_browser
+            } else {
+                &self.export_dir_browser
+            };
+            browser.kind == LocationSourceKind::Local
+                && !browser.browser.roots
+                && browser.browser.current_uri.is_some()
+                && !browser.busy
+        };
+        let form_actions = widgets::form_action_bar(ui, &shell, "U redu", can_confirm, "Odustani");
+
+        let mut action = match browser_action {
+            LocationBrowserAction::None => None,
+            LocationBrowserAction::SelectKind(kind) => Some(if project_root {
+                ProjectAction::SelectProjectsRootKind { kind }
+            } else {
+                ProjectAction::SelectExportDirKind { kind }
+            }),
+            LocationBrowserAction::OpenUri(uri) => Some(if project_root {
+                ProjectAction::OpenProjectsRootUri { uri }
+            } else {
+                ProjectAction::OpenExportDirUri { uri }
+            }),
+            LocationBrowserAction::OpenParent => Some(if project_root {
+                ProjectAction::OpenProjectsRootParent
+            } else {
+                ProjectAction::OpenExportDirParent
+            }),
+            LocationBrowserAction::OpenRoots => Some(if project_root {
+                ProjectAction::OpenProjectsRootRoots
+            } else {
+                ProjectAction::OpenExportDirRoots
+            }),
+        };
+
+        if action.is_none() {
+            if form_actions.cancel_clicked {
+                action = Some(if project_root {
                     ProjectAction::CancelProjectsRootBrowser
                 } else {
                     ProjectAction::CancelExportDirBrowser
-                };
-                self.dispatch_project_action(action);
+                });
+            } else if form_actions.confirm_clicked {
+                action = Some(if project_root {
+                    ProjectAction::ConfirmProjectsRootBrowser
+                } else {
+                    ProjectAction::ConfirmExportDirBrowser
+                });
             }
+        }
+
+        if let Some(action) = action {
+            self.dispatch_project_action(action);
         }
     }
 
@@ -1494,49 +1526,98 @@ impl ProjectApp {
         }
     }
 
-    fn browser_start_path(path: &str) -> String {
-        let clean = location_browser::clean_location_path(path);
-        if Path::new(&clean).is_absolute() {
-            clean
+    fn browser_start_path(path: &str) -> Option<PathBuf> {
+        let trimmed = path.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let path = PathBuf::from(trimmed);
+        if path.is_absolute() {
+            Some(path)
         } else {
-            String::new()
+            None
         }
     }
 
     fn toggle_projects_root_browser(&mut self) {
-        self.projects_root_browser_open = !self.projects_root_browser_open;
-        if self.projects_root_browser_open
-            && self.projects_root_browser.kind == LocationSourceKind::Local
-        {
+        let opened = qnc_ui_kit::toggle_exclusive_panel(
+            &mut self.projects_root_browser_open,
+            &mut self.export_dir_browser_open,
+        );
+        if opened && self.projects_root_browser.kind == LocationSourceKind::Local {
             let start = Self::browser_start_path(&self.projects_root);
-            self.load_projects_root_browser(&start);
+            self.load_projects_root_browser(start);
         }
     }
 
     fn select_projects_root_kind(&mut self, kind: LocationSourceKind) {
         self.projects_root_browser.kind = kind;
         if kind == LocationSourceKind::Local
-            && self.projects_root_browser.entries.is_empty()
-            && self.projects_root_browser.path.trim().is_empty()
+            && self.projects_root_browser.browser.entries.is_empty()
+            && self
+                .projects_root_browser
+                .browser
+                .path_label
+                .trim()
+                .is_empty()
         {
-            self.load_projects_root_browser("");
+            self.load_projects_root_browser(None);
         }
     }
 
-    fn open_projects_root_path(&mut self, path: &str) {
+    fn open_projects_root_uri(&mut self, uri: &str) {
         if self.projects_root_browser.kind == LocationSourceKind::Local {
-            self.load_projects_root_browser(path);
+            self.projects_root_browser.busy = true;
+            self.projects_root_browser.error = None;
+            match self
+                .component
+                .open_browser_uri(ProjectBrowserTarget::ProjectsRoot, uri)
+            {
+                Ok(browser) => self.apply_projects_root_listing(browser),
+                Err(error) => self.set_projects_root_browser_error(error),
+            }
+        }
+    }
+
+    fn open_projects_root_parent(&mut self) {
+        if self.projects_root_browser.kind == LocationSourceKind::Local {
+            self.projects_root_browser.busy = true;
+            self.projects_root_browser.error = None;
+            match self
+                .component
+                .open_browser_parent(ProjectBrowserTarget::ProjectsRoot)
+            {
+                Ok(browser) => self.apply_projects_root_listing(browser),
+                Err(error) => self.set_projects_root_browser_error(error),
+            }
+        }
+    }
+
+    fn open_projects_root_roots(&mut self) {
+        if self.projects_root_browser.kind == LocationSourceKind::Local {
+            self.load_projects_root_browser(None);
         }
     }
 
     fn confirm_projects_root_browser(&mut self) {
-        let path = location_browser::clean_location_path(&self.projects_root_browser.path);
-        if path.trim().is_empty() {
+        let Some(uri) = self.projects_root_browser.browser.current_uri.clone() else {
+            return;
+        };
+        let Some(path) = self
+            .component
+            .browser_private_path_for_uri(ProjectBrowserTarget::ProjectsRoot, &uri)
+        else {
+            self.status = "Browser URI nema privatni Project path.".to_string();
+            return;
+        };
+        let display_path = qnc_dir_browser::display_private_path(&path);
+        if display_path.trim().is_empty() {
             return;
         }
-        match self.component.set_projects_root(PathBuf::from(&path)) {
+        match self.component.set_projects_root(path.clone()) {
             Ok(projects_root) => {
-                self.projects_root = location_browser::clean_location_path(&projects_root);
+                self.projects_root =
+                    qnc_dir_browser::display_private_path(Path::new(&projects_root));
                 self.projects_root_dirty = true;
                 self.projects_root_browser_open = false;
                 project_advanced::set_string_path(
@@ -1553,32 +1634,72 @@ impl ProjectApp {
     }
 
     fn toggle_export_dir_browser(&mut self) {
-        self.export_dir_browser_open = !self.export_dir_browser_open;
-        if self.export_dir_browser_open && self.export_dir_browser.kind == LocationSourceKind::Local
-        {
+        let opened = qnc_ui_kit::toggle_exclusive_panel(
+            &mut self.export_dir_browser_open,
+            &mut self.projects_root_browser_open,
+        );
+        if opened && self.export_dir_browser.kind == LocationSourceKind::Local {
             let start = Self::browser_start_path(&self.export_dir);
-            self.load_export_dir_browser(&start);
+            self.load_export_dir_browser(start);
         }
     }
 
     fn select_export_dir_kind(&mut self, kind: LocationSourceKind) {
         self.export_dir_browser.kind = kind;
         if kind == LocationSourceKind::Local
-            && self.export_dir_browser.entries.is_empty()
-            && self.export_dir_browser.path.trim().is_empty()
+            && self.export_dir_browser.browser.entries.is_empty()
+            && self.export_dir_browser.browser.path_label.trim().is_empty()
         {
-            self.load_export_dir_browser("");
+            self.load_export_dir_browser(None);
         }
     }
 
-    fn open_export_dir_path(&mut self, path: &str) {
+    fn open_export_dir_uri(&mut self, uri: &str) {
         if self.export_dir_browser.kind == LocationSourceKind::Local {
-            self.load_export_dir_browser(path);
+            self.export_dir_browser.busy = true;
+            self.export_dir_browser.error = None;
+            match self
+                .component
+                .open_browser_uri(ProjectBrowserTarget::ExportDir, uri)
+            {
+                Ok(browser) => self.apply_export_dir_listing(browser),
+                Err(error) => self.set_export_dir_browser_error(error),
+            }
+        }
+    }
+
+    fn open_export_dir_parent(&mut self) {
+        if self.export_dir_browser.kind == LocationSourceKind::Local {
+            self.export_dir_browser.busy = true;
+            self.export_dir_browser.error = None;
+            match self
+                .component
+                .open_browser_parent(ProjectBrowserTarget::ExportDir)
+            {
+                Ok(browser) => self.apply_export_dir_listing(browser),
+                Err(error) => self.set_export_dir_browser_error(error),
+            }
+        }
+    }
+
+    fn open_export_dir_roots(&mut self) {
+        if self.export_dir_browser.kind == LocationSourceKind::Local {
+            self.load_export_dir_browser(None);
         }
     }
 
     fn confirm_export_dir_browser(&mut self) {
-        let path = location_browser::clean_location_path(&self.export_dir_browser.path);
+        let Some(uri) = self.export_dir_browser.browser.current_uri.clone() else {
+            return;
+        };
+        let Some(path) = self
+            .component
+            .browser_private_path_for_uri(ProjectBrowserTarget::ExportDir, &uri)
+        else {
+            self.status = "Browser URI nema privatni export path.".to_string();
+            return;
+        };
+        let path = qnc_dir_browser::display_private_path(&path);
         if path.trim().is_empty() {
             return;
         }
@@ -1593,62 +1714,61 @@ impl ProjectApp {
         self.status = "Export direktorij postavljen.".to_string();
     }
 
-    fn load_projects_root_browser(&mut self, path: &str) {
+    fn load_projects_root_browser(&mut self, start: Option<PathBuf>) {
         self.projects_root_browser.busy = true;
         self.projects_root_browser.error = None;
-        match self.component.list_directory(path) {
-            Ok(listing) => self.apply_projects_root_listing(listing),
+        let result = if let Some(path) = start {
+            self.component
+                .open_browser_private_path(ProjectBrowserTarget::ProjectsRoot, path)
+        } else {
+            self.component
+                .load_browser_roots(ProjectBrowserTarget::ProjectsRoot)
+        };
+        match result {
+            Ok(browser) => self.apply_projects_root_listing(browser),
             Err(error) => self.set_projects_root_browser_error(error),
         }
     }
 
-    fn load_export_dir_browser(&mut self, path: &str) {
+    fn load_export_dir_browser(&mut self, start: Option<PathBuf>) {
         self.export_dir_browser.busy = true;
         self.export_dir_browser.error = None;
-        match self.component.list_directory(path) {
-            Ok(listing) => self.apply_export_dir_listing(listing),
+        let result = if let Some(path) = start {
+            self.component
+                .open_browser_private_path(ProjectBrowserTarget::ExportDir, path)
+        } else {
+            self.component
+                .load_browser_roots(ProjectBrowserTarget::ExportDir)
+        };
+        match result {
+            Ok(browser) => self.apply_export_dir_listing(browser),
             Err(error) => self.set_export_dir_browser_error(error),
         }
     }
 
-    fn apply_projects_root_listing(&mut self, listing: DirectoryBrowserListing) {
-        Self::apply_location_listing(&mut self.projects_root_browser, listing);
+    fn apply_projects_root_listing(&mut self, browser: BrowserState) {
+        Self::apply_location_listing(&mut self.projects_root_browser, browser);
     }
 
-    fn apply_export_dir_listing(&mut self, listing: DirectoryBrowserListing) {
-        Self::apply_location_listing(&mut self.export_dir_browser, listing);
+    fn apply_export_dir_listing(&mut self, browser: BrowserState) {
+        Self::apply_location_listing(&mut self.export_dir_browser, browser);
     }
 
-    fn apply_location_listing(
-        browser: &mut LocationBrowserState,
-        listing: DirectoryBrowserListing,
-    ) {
-        browser.roots = listing.roots;
-        browser.path = location_browser::clean_location_path(&listing.path);
-        browser.parent = listing
-            .parent
-            .map(|parent| location_browser::clean_location_path(&parent));
-        browser.entries = listing
-            .entries
-            .into_iter()
-            .map(|entry| DirectoryBrowserEntry {
-                name: location_browser::clean_location_path(&entry.name),
-                path: location_browser::clean_location_path(&entry.path),
-            })
-            .collect();
-        browser.error = None;
-        browser.busy = false;
+    fn apply_location_listing(browser_state: &mut LocationBrowserState, browser: BrowserState) {
+        browser_state.browser = browser;
+        browser_state.error = None;
+        browser_state.busy = false;
     }
 
     fn set_projects_root_browser_error(&mut self, error: String) {
         self.projects_root_browser.error = Some(error);
-        self.projects_root_browser.entries.clear();
+        self.projects_root_browser.browser.entries.clear();
         self.projects_root_browser.busy = false;
     }
 
     fn set_export_dir_browser_error(&mut self, error: String) {
         self.export_dir_browser.error = Some(error);
-        self.export_dir_browser.entries.clear();
+        self.export_dir_browser.browser.entries.clear();
         self.export_dir_browser.busy = false;
     }
 

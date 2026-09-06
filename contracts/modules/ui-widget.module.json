@@ -3,7 +3,7 @@
   "module_name": "UI widget",
   "module_version": "0.1.0",
   "module_kind": "ui_widget",
-  "capabilities": ["ui.render", "ui.intent"],
+  "capabilities": ["ui.render", "ui.intent", "ui.form_action_bar", "ui.exclusive_panel"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -14,4 +14,3 @@
   "state_policy": "owned_by_calling_application",
   "database_write_policy": "no_db_writes"
 }
-

@@ -2487,6 +2487,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-camera-catalog"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-conformance"
 version = "0.1.0"
 dependencies = [
@@ -2516,6 +2526,7 @@ name = "qnc-dir-browser"
 version = "0.1.0"
 dependencies = [
  "rfd",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2534,6 +2545,9 @@ dependencies = [
 name = "qnc-ingest-components"
 version = "0.1.0"
 dependencies = [
+ "qnc-contracts",
+ "qnc-dir-browser",
+ "qnc-ingest-store",
  "serde",
 ]
 
@@ -2545,6 +2559,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-ingest-components",
  "qnc-keyboard-shortcut",
+ "qnc-ui-kit",
  "serde",
  "serde_json",
 ]
@@ -2556,6 +2571,16 @@ dependencies = [
  "eframe",
  "qnc-ingest-desktop",
  "qnc-shell-desktop-api",
+]
+
+[[package]]
+name = "qnc-ingest-store"
+version = "0.1.0"
+dependencies = [
+ "qnc-contracts",
+ "qnc-db-contract",
+ "qnc-transport-resolver",
+ "rusqlite",
 ]
 
 [[package]]
@@ -2582,6 +2607,7 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-keyboard-shortcut",
  "qnc-project-store",
+ "qnc-ui-kit",
  "serde",
  "serde_json",
 ]
@@ -2619,6 +2645,13 @@ name = "qnc-transport-resolver"
 version = "0.1.0"
 dependencies = [
  "qnc-contracts",
+]
+
+[[package]]
+name = "qnc-ui-kit"
+version = "0.1.0"
+dependencies = [
+ "eframe",
 ]
 
 [[package]]

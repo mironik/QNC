@@ -1,6 +1,6 @@
 # Ingest public modules and components
 
-Status: ugovorni popis prije implementacije  
+Status: trenutni runtime rez + ugovorni popis sljedecih modula  
 Datum: 2026-09-05  
 Root: `C:\Users\miron\Projects\QNC`  
 Referenca: `C:\Users\miron\Projects\qnc_v4`
@@ -37,15 +37,42 @@ UI smije imati samo lokalno prezentacijsko stanje koje ne mijenja workflow:
 hover, focus, scroll poziciju, velicinu panela i trenutni tekst inputa prije
 slanja intenta. Sve ostalo pripada komponenti ili modulu.
 
+Ingest ne zna za Project aplikaciju i ne smije imati dependency na Project app,
+desktop adapter, component, store, action_id ili workflow. Ingest ne dobiva
+workspace, runtime context za poslovno stanje, alat za suradnju ni nasljedeni
+state. Ingest cita bazu, pronalazi koja projektna baza ima oznaku aktivnog
+projekta i iz te baze cita samo postavke za rad read-only. Ingest nema rucno
+postavljanje projektnih radnih postavki. Ne pise, ne migrira, ne popravlja i ne
+kreira projekt.
+
+QNC baza mora biti prenosiva. Ingest mora moci raditi na racunalu na kojem ne
+postoje Project aplikacija, QNC.app shell ni drugi QNC aplikacijski procesi, ako
+mu je dostupna valjana baza s oznakom aktivnog projekta i postavkama za rad.
+
+## Trenutni runtime rez
+
+Trenutno postoji standalone `qnc-ingest` aplikacija i shell-hosted Ingest
+adapter. Ovaj rez je samo source browser + `source.select` +
+registry/session DB zapis.
+
+`Odaberi` jos nije puni Ingest. Puni Ingest pocinje tek kad postoje i budu
+spojeni javni moduli za scan, camera detect, original/proxy grouping, jedini
+probe prolaz i clip/probe DB upis.
+
+Zbog toga trenutni `contracts/applications/ingest.application.json` ne smije
+deklarirati scanner, camera detector, Media Probe, Media Browser, Filmstrip ili
+Wave kao runtime dependency dok ti moduli ne postoje kao stvarni runtime crate
+ili out-of-process adapter.
+
 ## Javni moduli iz Ingesta
 
 | Modul | Izvor iz v4 / QNC | Capability | Ulaz | Izlaz | Boundary |
 | --- | --- | --- | --- | --- | --- |
-| `qnc-ui-kit` | `qnc_theme`, `qnc_ui` | `ui.paint.primitives` | layout contract + view data | nacrtani chrome/widgeti | nema DB, nema filesystem, nema workflow |
+| `qnc-ui-kit` | `qnc_theme`, `qnc_ui` | `ui.paint.primitives`, `ui.form_action_bar`, `ui.exclusive_panel` | layout contract + view data + akcijski labeli + pasivni UI open/close state | nacrtani chrome/widgeti, standardna potvrdna akcijska traka, genericki UI-state rezultat | nema DB, nema filesystem, nema workflow, nema browser session state |
 | `qnc-editorial-shell` | `qnc_ui::editorial_shell`, `composition` | `ui.editorial_shell.paint` | split/layout model | lijevi/desni shell + dock prostor | ne zna Ingest/Story/MA workflow |
 | `qnc-preview-panel` | `qnc_ui::preview`, monitor placeholder | `ui.preview.paint` | texture/status label | preview surface | ne decode, ne probe, ne player owner |
-| `qnc-location-browser-ui` | `qnc_location_browser` | `ui.location_browser.paint` | listing snapshot | browser action intent | ne lista filesystem sam |
-| `qnc-dir-browser` | v4 `FilesystemListComponent`, novi crate | `dir.list`, `dir.select` | QNC location URI | listing + selected QNC URI | nema media scan, nema probe |
+| `qnc-location-browser-ui` | `qnc_location_browser` | `ui.location_browser.paint` | browser state snapshot | source/gore/diskovi/breadcrumb/row intent | ne lista filesystem, ne zna OS path, ne posjeduje potvrdu/odustajanje |
+| `qnc-dir-browser` | v4 `FilesystemListComponent`, novi crate | `dir.list`, `dir.select` | QNC location URI / session request | OS-neutral listing + selected QNC URI | samostalni javni modul; nema egui dugmad, nema media scan, nema probe |
 | `qnc-media-browser-ui` | `editorial/media_pool`, `qnc_media_card` | `ui.media_grid.paint` | clip view rows + textures | focus/select intent | ne cita DB, ne probe |
 | `qnc-media-card` | `qnc_media_card` | `ui.media_card.paint` | media card row | card paint + hit zones | status se samo prikazuje |
 | `qnc-source-dock-ui` | `qnc_source_dock` | `ui.source_dock.paint` | timeline/view model | dock intents | nema import/probe/generator rada |
@@ -81,6 +108,7 @@ aplikacije.
 | `IngestDesktopAdapter` | shell-hosted ulaz: `create` + `show_desktop` | `IngestApplicationComponent` | nista direktno |
 | `IngestApplicationComponent` | lifecycle standalone/shell, batch exit | session/status komponente | nista direktno osim preko store ownera |
 | `IngestActionDispatcher` | mapira `action_id` + payload u komponentnu naredbu | sve Ingest komponente | nista direktno |
+| `IngestWorkSettingsReader` | cita oznaku aktivnog projekta i postavke za rad iz baze read-only | DB contract/resolver | nista |
 | `IngestViewModelComponent` | gradi pasivni view model iz Ingest DB public viewova | `qnc-ingest-store` read API | nista |
 | `IngestStatusComponent` | status, progress, pending/imported count, errors | store read API | privatni status ako treba |
 | `IngestSourceBrowserComponent` | source kind, list/open/confirm/cancel | `qnc-dir-browser`, resolver | `ingest_registry.source_locations`, `source_sessions` |
@@ -96,6 +124,16 @@ aplikacije.
 | `IngestReadApiComponent` | stabilni read model za druge aplikacije | Ingest DB public views | nista |
 
 ## Ingest action_id katalog
+
+Dir Browser nije Ingest forma i ne nosi potvrdna/odustajna dugmad. Ingest
+komponenta koristi javni `qnc-dir-browser` session/state, browser UI komponenta
+prikazuje snapshot i navigacijske hit-zone, a aplikacijska akcijska traka
+prikazuje `Odaberi`/`Odustani` kroz `qnc-ui-kit` i salje odgovarajuci
+`action_id`. Ingest u ovom rezu ima jedan source browser, ali mora koristiti
+isti standardni obrazac kao Project: browser view nema confirm/cancel dugmad,
+a standardna potvrdna traka je javni UI-kit obrazac. Ako se isti browser koristi
+u drugoj aplikaciji, ne smije se kopirati Ingest workflow niti hardkodirati
+korisnik modula.
 
 Svaka korisnicka akcija iz forme mora izaci kao `action_id`. Klik i shortcut
 koriste isti action_id; shortcut akordi dolaze iz

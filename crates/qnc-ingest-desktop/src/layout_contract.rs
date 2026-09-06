@@ -1,3 +1,4 @@
+use qnc_keyboard_shortcut::ShortcutCatalog;
 use serde::Deserialize;
 
 const SHELL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/shell.layout.json");
@@ -11,6 +12,7 @@ const KEYBOARD_SHORTCUTS_JSON: &str =
 pub struct IngestContracts {
     pub shell: ShellLayoutContract,
     pub ingest: IngestLayoutContract,
+    pub shortcuts: ShortcutCatalog,
     pub shortcuts_loaded: bool,
 }
 
@@ -36,10 +38,9 @@ impl IngestContracts {
         let app: ApplicationManifest = serde_json::from_str(INGEST_APP_JSON)
             .map_err(|error| format!("ingest application parse error: {error}"))?;
 
-        let shortcuts_loaded =
-            qnc_keyboard_shortcut::ShortcutCatalog::from_json_str(KEYBOARD_SHORTCUTS_JSON)
-                .map(|catalog| !catalog.actions.is_empty())
-                .map_err(|error| format!("keyboard shortcut catalog parse error: {error}"))?;
+        let shortcuts = ShortcutCatalog::from_json_str(KEYBOARD_SHORTCUTS_JSON)
+            .map_err(|error| format!("keyboard shortcut catalog parse error: {error}"))?;
+        let shortcuts_loaded = !shortcuts.actions.is_empty();
 
         if shell.layout_id != "qnc.ui.shell" {
             return Err(format!("unexpected shell layout_id {}", shell.layout_id));
@@ -53,6 +54,9 @@ impl IngestContracts {
         if ingest.board.left_ratio <= 0.0 || ingest.board.left_ratio >= 1.0 {
             return Err("ingest board left_ratio must split the desktop".to_string());
         }
+        if ingest.board.shell_margin_x < 0.0 {
+            return Err("ingest shell_margin_x must not be negative".to_string());
+        }
         if ingest.source_dock.actions_rtl.is_empty() {
             return Err("ingest source dock must declare actions".to_string());
         }
@@ -60,14 +64,16 @@ impl IngestContracts {
         Ok(Self {
             shell,
             ingest,
+            shortcuts,
             shortcuts_loaded,
         })
     }
 
     pub fn dock_height(&self) -> f32 {
+        let timeline_height = 15.0 + 3.0 + 64.0 + 3.0 + 15.0 + 2.0;
         self.shell.theme_metrics.chrome_row_height
             + self.ingest.source_dock.header_timeline_gap
-            + 96.0
+            + timeline_height
     }
 }
 
@@ -141,6 +147,7 @@ pub struct IngestBoard {
     pub right_min_width: f32,
     pub shell_margin_x: f32,
     pub block_pad: f32,
+    #[allow(dead_code)]
     pub gap: f32,
 }
 

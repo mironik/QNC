@@ -1,3 +1,7 @@
+use std::path::Path;
+
+use qnc_dir_browser::{BrowserState, DirectoryBrowserSession};
+use qnc_ingest_store::{IngestStore, SourceSelectionRecord};
 use serde::{Deserialize, Serialize};
 
 pub mod action_ids {
@@ -127,10 +131,15 @@ pub struct IngestViewModel {
     pub source_kind: SourceKind,
     pub browser_roots: bool,
     pub browser_path_label: String,
+    pub browser_current_uri: Option<String>,
     pub browser_parent_available: bool,
     pub browser_entries: Vec<LocationEntry>,
     pub browser_busy: bool,
     pub browser_error: Option<String>,
+    pub selected_source_uri: Option<String>,
+    pub selected_source_name: String,
+    pub selected_source_serial_number: String,
+    pub selected_source_volume_name: String,
     pub clips: Vec<ClipView>,
     pub preview_clip_id: Option<String>,
     pub archive_original: bool,
@@ -148,10 +157,15 @@ impl Default for IngestViewModel {
             source_kind: SourceKind::Local,
             browser_roots: true,
             browser_path_label: String::new(),
+            browser_current_uri: None,
             browser_parent_available: false,
             browser_entries: Vec::new(),
             browser_busy: false,
             browser_error: None,
+            selected_source_uri: None,
+            selected_source_name: String::new(),
+            selected_source_serial_number: String::new(),
+            selected_source_volume_name: String::new(),
             clips: Vec::new(),
             preview_clip_id: None,
             archive_original: false,
@@ -195,12 +209,22 @@ impl IngestViewModel {
     }
 
     pub fn status_label(&self) -> String {
-        format!(
-            "{} odabrano · {} uvezeno · {} ukupno",
-            self.selected_count(),
-            self.imported_count(),
-            self.total_count()
-        )
+        let imported = self.imported_count();
+        let pending = self.pending_count();
+        let selected = self.selected_count();
+        let total = self.total_count();
+        if pending > 0 {
+            format!("{imported} uvezeno · {pending} nije uvezeno · {selected}/{total}")
+        } else {
+            format!("{imported} uvezeno · {selected}/{total}")
+        }
+    }
+
+    pub fn proxy_poster_approval_count(&self) -> usize {
+        self.clips
+            .iter()
+            .filter(|clip| clip.selected && matches!(clip.thumb_status, ThumbStatus::Missing))
+            .count()
     }
 }
 
@@ -269,11 +293,22 @@ impl IngestDispatchResult {
 pub struct IngestComponent {
     view: IngestViewModel,
     dispatch_log: Vec<String>,
+    source_browser: DirectoryBrowserSession,
+    store: Option<IngestStore>,
 }
 
 impl IngestComponent {
     pub fn new() -> Self {
-        Self::default()
+        let mut component = Self::default();
+        let result = component.source_browser.load_roots();
+        component.apply_source_browser_result(result);
+        component
+    }
+
+    pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
+        let mut component = Self::new();
+        component.store = Some(IngestStore::open(root)?);
+        Ok(component)
     }
 
     pub fn view(&self) -> &IngestViewModel {
@@ -290,26 +325,51 @@ impl IngestComponent {
         match intent.action_id.as_str() {
             action_ids::INGEST_SOURCE_KIND_LOCAL => {
                 self.view.source_kind = SourceKind::Local;
-                self.view.browser_roots = true;
-                self.view.message = "Odaberi lokalni izvor.".to_string();
-                IngestDispatchResult::accepted(None, true)
+                let result = self.source_browser.load_roots();
+                self.apply_source_browser_result(result)
             }
             action_ids::INGEST_SOURCE_KIND_LAN => {
                 self.view.source_kind = SourceKind::Lan;
-                self.view.browser_roots = true;
+                self.clear_source_browser_state();
                 self.view.message = "LAN izvor nije povezan u ovom rezu.".to_string();
                 IngestDispatchResult::accepted(None, true)
             }
             action_ids::INGEST_SOURCE_KIND_INTERNET => {
                 self.view.source_kind = SourceKind::Internet;
-                self.view.browser_roots = true;
+                self.clear_source_browser_state();
                 self.view.message = "Internet izvor nije povezan u ovom rezu.".to_string();
                 IngestDispatchResult::accepted(None, true)
             }
-            action_ids::INGEST_DIR_CANCEL => {
-                self.view.message = "Odabir izvora je otkazan.".to_string();
-                IngestDispatchResult::accepted(None, true)
+            action_ids::INGEST_DIR_ROOTS => {
+                if self.view.source_kind == SourceKind::Local {
+                    let result = self.source_browser.load_roots();
+                    self.apply_source_browser_result(result)
+                } else {
+                    IngestDispatchResult::accepted(None, true)
+                }
             }
+            action_ids::INGEST_DIR_UP => {
+                if self.view.source_kind == SourceKind::Local {
+                    let result = self.source_browser.open_parent();
+                    self.apply_source_browser_result(result)
+                } else {
+                    IngestDispatchResult::accepted(None, true)
+                }
+            }
+            action_ids::INGEST_DIR_OPEN => match intent.payload {
+                IngestPayload::LocationUri(uri) if self.view.source_kind == SourceKind::Local => {
+                    self.capture_selected_source_metadata(&uri);
+                    let result = self.source_browser.open_uri(&uri);
+                    self.apply_source_browser_result(result)
+                }
+                IngestPayload::LocationUri(_) => IngestDispatchResult::accepted(None, true),
+                _ => IngestDispatchResult::rejected("Nedostaje QNC lokacijski URI."),
+            },
+            action_ids::INGEST_DIR_CONFIRM => match intent.payload {
+                IngestPayload::LocationUri(uri) => self.confirm_source_selection(uri),
+                _ => IngestDispatchResult::rejected("Nedostaje QNC lokacijski URI."),
+            },
+            action_ids::INGEST_DIR_CANCEL => self.cancel_source_browser(),
             action_ids::INGEST_SELECT_ALL => {
                 for clip in &mut self.view.clips {
                     clip.selected = true;
@@ -387,6 +447,129 @@ impl IngestComponent {
             ),
         }
     }
+
+    fn clear_source_browser_state(&mut self) {
+        self.view.browser_roots = true;
+        self.view.browser_path_label.clear();
+        self.view.browser_current_uri = None;
+        self.view.browser_parent_available = false;
+        self.view.browser_entries.clear();
+        self.view.browser_busy = false;
+        self.view.browser_error = None;
+        self.view.selected_source_uri = None;
+        self.view.selected_source_name.clear();
+        self.view.selected_source_serial_number.clear();
+        self.view.selected_source_volume_name.clear();
+    }
+
+    fn cancel_source_browser(&mut self) -> IngestDispatchResult {
+        self.view.source_kind = SourceKind::Local;
+        self.clear_source_browser_state();
+        let result = self.source_browser.load_roots();
+        let mut dispatch = self.apply_source_browser_result(result);
+        self.view.message = "Odabir izvora je otkazan.".to_string();
+        dispatch.message = None;
+        dispatch
+    }
+
+    fn apply_source_browser_result(
+        &mut self,
+        result: Result<BrowserState, String>,
+    ) -> IngestDispatchResult {
+        match result {
+            Ok(state) => {
+                self.view.browser_roots = state.roots;
+                self.view.browser_path_label = state.path_label;
+                self.view.browser_current_uri = state.current_uri;
+                self.view.browser_parent_available = state.parent_available;
+                self.view.browser_entries = state
+                    .entries
+                    .into_iter()
+                    .map(|entry| LocationEntry {
+                        name: entry.name,
+                        qnc_uri: entry.qnc_uri,
+                        serial_number: entry.serial_number,
+                        volume_name: entry.volume_name,
+                    })
+                    .collect();
+                self.view.browser_busy = false;
+                self.view.browser_error = None;
+                self.view.message = "Odaberi lokalni izvor.".to_string();
+                IngestDispatchResult::accepted(None, true)
+            }
+            Err(error) => {
+                self.view.browser_busy = false;
+                self.view.browser_error = Some(error.clone());
+                self.view.message = error.clone();
+                IngestDispatchResult::rejected(error)
+            }
+        }
+    }
+
+    fn capture_selected_source_metadata(&mut self, uri: &str) {
+        if let Some(entry) = self
+            .view
+            .browser_entries
+            .iter()
+            .find(|entry| entry.qnc_uri == uri)
+        {
+            if !entry.serial_number.trim().is_empty() || !entry.volume_name.trim().is_empty() {
+                self.view.selected_source_name = entry.name.clone();
+                self.view.selected_source_serial_number = entry.serial_number.clone();
+                self.view.selected_source_volume_name = entry.volume_name.clone();
+            } else if self.view.selected_source_name.trim().is_empty() {
+                self.view.selected_source_name = entry.name.clone();
+            }
+        }
+    }
+
+    fn confirm_source_selection(&mut self, uri: String) -> IngestDispatchResult {
+        if qnc_contracts::parse_qnc_uri(&uri).is_err() {
+            return IngestDispatchResult::rejected("Odabir izvora nije QNC URI.");
+        }
+        let display_name = if !self.view.selected_source_name.trim().is_empty() {
+            self.view.selected_source_name.clone()
+        } else if !self.view.browser_path_label.trim().is_empty() {
+            self.view.browser_path_label.clone()
+        } else {
+            uri.clone()
+        };
+        let private_local_path = self.source_browser.path_for_uri(&uri);
+        let record = SourceSelectionRecord {
+            source_uri: uri.clone(),
+            source_kind: source_kind_id(self.view.source_kind).to_string(),
+            display_name,
+            serial_number: self.view.selected_source_serial_number.clone(),
+            volume_name: self.view.selected_source_volume_name.clone(),
+            private_local_path,
+        };
+
+        if let Some(store) = self.store.as_mut() {
+            match store.record_source_selection(&record) {
+                Ok(session) => {
+                    self.view.selected_source_uri = Some(uri);
+                    self.view.message = format!("Izvor je odabran: {}", session.selected_at_utc);
+                    IngestDispatchResult::accepted(None, true)
+                }
+                Err(error) => {
+                    self.view.message = error.clone();
+                    IngestDispatchResult::rejected(error)
+                }
+            }
+        } else {
+            self.view.selected_source_uri = Some(uri);
+            self.view.message = "Izvor je odabran.".to_string();
+            IngestDispatchResult::accepted(None, true)
+        }
+    }
+}
+
+fn source_kind_id(kind: SourceKind) -> &'static str {
+    match kind {
+        SourceKind::Local => "local",
+        SourceKind::Lan => "lan",
+        SourceKind::Internet => "internet",
+    }
 }
 
 #[cfg(test)]
@@ -405,8 +588,79 @@ mod tests {
         let component = IngestComponent::new();
         assert_eq!(component.view().source_kind, SourceKind::Local);
         assert!(component.view().browser_roots);
+        assert!(component
+            .view()
+            .browser_entries
+            .iter()
+            .all(|entry| qnc_contracts::parse_qnc_uri(&entry.qnc_uri).is_ok()));
         assert!(component.view().clips.is_empty());
         assert_eq!(component.dispatch_log().len(), 0);
+    }
+
+    #[test]
+    fn local_browser_exposes_qnc_uri_not_raw_path() {
+        let component = IngestComponent::new();
+        for entry in &component.view().browser_entries {
+            assert!(entry.qnc_uri.starts_with("qnc://local/source/"));
+            assert!(!qnc_contracts::looks_like_raw_os_path(&entry.qnc_uri));
+        }
+    }
+
+    #[test]
+    fn switching_source_kind_clears_stale_local_browser_state() {
+        let mut component = IngestComponent::new();
+        let first_uri = component
+            .view()
+            .browser_entries
+            .first()
+            .map(|entry| entry.qnc_uri.clone())
+            .expect("local root");
+
+        component.dispatch(IngestIntent::new(
+            action_ids::INGEST_DIR_OPEN,
+            IngestPayload::LocationUri(first_uri),
+        ));
+        assert!(!component.view().browser_path_label.is_empty());
+
+        component.dispatch(IngestIntent::empty(action_ids::INGEST_SOURCE_KIND_LAN));
+
+        assert_eq!(component.view().source_kind, SourceKind::Lan);
+        assert!(component.view().browser_path_label.is_empty());
+        assert!(component.view().browser_current_uri.is_none());
+        assert!(component.view().browser_entries.is_empty());
+        assert!(component.view().selected_source_name.is_empty());
+        assert!(component.view().selected_source_serial_number.is_empty());
+        assert!(component.view().selected_source_volume_name.is_empty());
+    }
+
+    #[test]
+    fn cancel_source_browser_returns_to_local_roots() {
+        let mut component = IngestComponent::new();
+        let first_uri = component
+            .view()
+            .browser_entries
+            .first()
+            .map(|entry| entry.qnc_uri.clone())
+            .expect("local root");
+
+        component.dispatch(IngestIntent::new(
+            action_ids::INGEST_DIR_OPEN,
+            IngestPayload::LocationUri(first_uri),
+        ));
+        component.view.selected_source_name = "stale".to_string();
+        component.view.selected_source_serial_number = "serial".to_string();
+        component.view.selected_source_volume_name = "volume".to_string();
+
+        component.dispatch(IngestIntent::empty(action_ids::INGEST_DIR_CANCEL));
+
+        assert_eq!(component.view().source_kind, SourceKind::Local);
+        assert!(component.view().browser_roots);
+        assert!(component.view().browser_current_uri.is_none());
+        assert!(!component.view().browser_entries.is_empty());
+        assert!(component.view().selected_source_name.is_empty());
+        assert!(component.view().selected_source_serial_number.is_empty());
+        assert!(component.view().selected_source_volume_name.is_empty());
+        assert_eq!(component.view().message, "Odabir izvora je otkazan.");
     }
 
     #[test]
