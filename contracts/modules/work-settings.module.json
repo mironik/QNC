@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.work-settings",
+  "module_name": "Work Settings Reader",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["work.settings.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["db.write", "db.migrate", "project.activate", "app.workflow", "ffprobe", "ffmpeg"],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-work-settings",
+  "helper_executable": "qnc-work-settings",
+  "input": "Configured registry QNC URI and private transport binding; no project selection or settings override.",
+  "output": "Versioned snapshot of the existing active project, output root QNC URI and stored work policies; no raw OS paths, ownership changes or app calls."
+}

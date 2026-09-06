@@ -5,6 +5,25 @@ Status: zamrznuto
 Datum: 2026-09-06
 Razlog: korisnik je zatrazio da se Project vise ne mijenja bez izricite dozvole.
 
+## Zatvorena odobrenja za postavke i footer
+
+Naknadno izricito odobrenje 2026-09-06: "isto treba biti i na Project .. treba
+pisati naziv selektiranog projekta". Uski opseg: Project desktop povrsina i
+javni adapter iznose samo prikazni naziv postojece selekcije u shell footeru.
+Nema novog DB citanja/upisa, promjene selekcije, aktivacije ili workflowa.
+Zatvoreno nakon ciljane i live provjere: Project u novom `qnc-app.exe`
+prikazuje `novi-novi--x5` desno u shell baru. 23 ciljana testa prolaze,
+conformance prolazi. UI naziv je samo prikaz postojece selekcije.
+
+Korisnik je 2026-09-06 izricito potvrdio: "da" na dopunu javnog prikaza
+postojecim postavkama. Odobrenje se odnosi samo na `settings_json` u
+`public_project_settings`, verziju tog read ugovora i ciljani test.
+Nema novih poslovnih podataka, promjene aktivacije, UI-ja niti workflowa.
+Izvan gore navedenog odobrenja Project ostaje zamrznut.
+Odobrenje za javni settings prikaz takoder je zatvoreno: test javnog payloada
+prolazi, a reader je procitao novi stvarni projekt bez izmjene njegove baze.
+Project je ponovno zamrznut; nema aktivnog odobrenja. Detalji: docs/21.
+
 ## Zakljucavanje
 
 Korisnik je 2026-09-06 nakon live potvrde navigacije izricito zatrazio:

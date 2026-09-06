@@ -27,6 +27,12 @@ impl IngestApp {
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+        if self.component.poll() {
+            ctx.request_repaint();
+        }
+        if self.component.view().work_settings_loading {
+            ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        }
         self.dispatch_keyboard_shortcuts(ctx);
         let theme = Theme::from_contract(&self.contracts.shell);
         theme::apply(ctx, &theme);
@@ -35,6 +41,15 @@ impl IngestApp {
         if let Some(intent) = widgets::render_desktop(ui, &self.contracts, &theme, &view) {
             self.dispatch(ctx, intent);
         }
+    }
+
+    pub fn footer_status(&self) -> &str {
+        self.component.footer_status()
+    }
+
+    pub fn on_activated(&mut self) {
+        self.component
+            .dispatch(IngestIntent::empty(action_ids::INGEST_RELOAD));
     }
 
     fn dispatch(&mut self, ctx: &egui::Context, intent: IngestIntent) {

@@ -21,6 +21,7 @@ members = [
     "crates/qnc-transport-resolver",
     "crates/qnc-ui-kit",
     "crates/qnc-workstation-identity",
+    "crates/qnc-work-settings",
     "tools/qnc-conformance",
     "tools/qnc-camera-catalog",
     "tools/qnc-app-catalog",
@@ -43,6 +44,7 @@ qnc-shell-desktop-api = { path = "crates/qnc-shell-desktop-api" }
 qnc-transport-resolver = { path = "crates/qnc-transport-resolver" }
 qnc-ui-kit = { path = "crates/qnc-ui-kit" }
 qnc-workstation-identity = { path = "crates/qnc-workstation-identity" }
+qnc-work-settings = { path = "crates/qnc-work-settings" }
 eframe = { version = "0.31", default-features = false, features = ["accesskit", "default_fonts", "wayland", "wgpu", "x11"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

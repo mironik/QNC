@@ -24,4 +24,12 @@ impl ShellDesktopApp for IngestDesktopAdapter {
     fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         self.app.show_desktop(ctx, ui);
     }
+
+    fn footer_status(&self) -> Option<&str> {
+        Some(self.app.footer_status())
+    }
+
+    fn on_activated(&mut self) {
+        self.app.on_activated();
+    }
 }

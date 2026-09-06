@@ -1,8 +1,17 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::mpsc::{self, Receiver, TryRecvError},
+};
 
 use qnc_dir_browser::{BrowserState, DirectoryBrowserSession};
 use qnc_ingest_store::{IngestStore, SourceSelectionRecord};
+use qnc_work_settings::SettingsReader;
 use serde::{Deserialize, Serialize};
+
+mod work_plan;
+#[cfg(test)]
+mod work_settings_tests;
+pub use work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
 
 pub mod action_ids {
     pub const INGEST_SOURCE_KIND_LOCAL: &str = "ingest_source_kind_local";
@@ -148,6 +157,9 @@ pub struct IngestViewModel {
     pub playing: bool,
     pub cue_frame: i64,
     pub command_busy: bool,
+    pub work_settings_loading: bool,
+    pub work_settings_ready: bool,
+    pub work_settings_error: Option<String>,
     pub message: String,
 }
 
@@ -174,6 +186,9 @@ impl Default for IngestViewModel {
             playing: false,
             cue_frame: 0,
             command_busy: false,
+            work_settings_loading: false,
+            work_settings_ready: false,
+            work_settings_error: None,
             message: "Odaberi izvor.".to_string(),
         }
     }
@@ -295,6 +310,10 @@ pub struct IngestComponent {
     dispatch_log: Vec<String>,
     source_browser: DirectoryBrowserSession,
     store: Option<IngestStore>,
+    settings_reader: Option<SettingsReader>,
+    settings_result: Option<Receiver<Result<IngestWorkPlan, String>>>,
+    work_plan: Option<IngestWorkPlan>,
+    pending_source: Option<String>,
 }
 
 impl IngestComponent {
@@ -307,8 +326,108 @@ impl IngestComponent {
 
     pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
         let mut component = Self::new();
-        component.store = Some(IngestStore::open(root)?);
+        component.store = Some(IngestStore::open(root.as_ref())?);
+        match SettingsReader::from_root(root.as_ref()) {
+            Ok(reader) => {
+                component.settings_reader = Some(reader);
+                component.load_work_settings(None);
+            }
+            Err(error) => component.settings_failed(error.to_string()),
+        }
         Ok(component)
+    }
+
+    pub fn work_plan(&self) -> Option<&IngestWorkPlan> {
+        self.work_plan
+            .as_ref()
+            .filter(|_| self.view.work_settings_ready)
+    }
+
+    pub fn footer_status(&self) -> &str {
+        if self.view.work_settings_loading {
+            "Ucitavanje projekta..."
+        } else if let Some(error) = self.view.work_settings_error.as_deref() {
+            error
+        } else if let Some(plan) = self.work_plan() {
+            &plan.settings.project_name
+        } else {
+            "Projekt nije ucitan."
+        }
+    }
+
+    fn settings_failed(&mut self, error: String) {
+        self.work_plan = None;
+        self.pending_source = None;
+        self.settings_result = None;
+        self.view.work_settings_loading = false;
+        self.view.work_settings_ready = false;
+        self.view.work_settings_error = Some(error);
+        self.view.ai_mining = false;
+    }
+
+    fn load_work_settings(&mut self, pending_source: Option<String>) -> IngestDispatchResult {
+        if self.settings_result.is_some() {
+            return IngestDispatchResult::rejected("Citanje radnih postavki je u tijeku.");
+        }
+        let Some(reader) = self.settings_reader.clone() else {
+            self.settings_failed("Nema konfiguriranog citaca radnih postavki.".into());
+            return IngestDispatchResult::rejected("Nema konfiguriranog citaca radnih postavki.");
+        };
+        self.pending_source = pending_source;
+        self.view.work_settings_loading = true;
+        self.view.work_settings_ready = false;
+        self.view.work_settings_error = None;
+        let (send, receive) = mpsc::sync_channel(1);
+        match std::thread::Builder::new()
+            .name("ingest-work-settings".into())
+            .spawn(move || {
+                let result = reader
+                    .read()
+                    .map_err(|e| e.to_string())
+                    .and_then(IngestWorkPlan::from_settings);
+                let _ = send.send(result);
+            }) {
+            Ok(_) => self.settings_result = Some(receive),
+            Err(_) => self.settings_failed("Nije moguce pokrenuti citanje radnih postavki.".into()),
+        }
+        IngestDispatchResult::accepted(None, true)
+    }
+
+    pub fn poll(&mut self) -> bool {
+        let Some(receiver) = self.settings_result.as_ref() else {
+            return false;
+        };
+        let result = match receiver.try_recv() {
+            Ok(result) => result,
+            Err(TryRecvError::Empty) => return false,
+            Err(TryRecvError::Disconnected) => Err("Citanje radnih postavki je prekinuto.".into()),
+        };
+        self.settings_result = None;
+        self.view.work_settings_loading = false;
+        match result {
+            Ok(plan) => {
+                // A new project must never inherit the preceding project's selection/preview.
+                if self.work_plan.as_ref().map(|p| &p.settings.project_id)
+                    != Some(&plan.settings.project_id)
+                {
+                    self.view.clips.clear();
+                    self.view.preview_clip_id = None;
+                    self.view.selected_source_uri = None;
+                    self.view.playing = false;
+                    self.view.cue_frame = 0;
+                }
+                self.view.ai_mining = plan.settings.ai_enabled();
+                self.view.archive_original_available = false;
+                self.view.archive_original = false;
+                self.view.work_settings_ready = true;
+                self.work_plan = Some(plan);
+                if let Some(uri) = self.pending_source.take() {
+                    self.confirm_source_selection(uri);
+                }
+            }
+            Err(error) => self.settings_failed(error),
+        }
+        true
     }
 
     pub fn view(&self) -> &IngestViewModel {
@@ -323,6 +442,7 @@ impl IngestComponent {
         self.dispatch_log.push(intent.action_id.clone());
 
         match intent.action_id.as_str() {
+            action_ids::INGEST_RELOAD => return self.load_work_settings(None),
             action_ids::INGEST_SOURCE_KIND_LOCAL => {
                 self.view.source_kind = SourceKind::Local;
                 let result = self.source_browser.load_roots();
@@ -358,6 +478,7 @@ impl IngestComponent {
             }
             action_ids::INGEST_DIR_OPEN => match intent.payload {
                 IngestPayload::LocationUri(uri) if self.view.source_kind == SourceKind::Local => {
+                    self.pending_source = None;
                     self.capture_selected_source_metadata(&uri);
                     let result = self.source_browser.open_uri(&uri);
                     self.apply_source_browser_result(result)
@@ -366,7 +487,7 @@ impl IngestComponent {
                 _ => IngestDispatchResult::rejected("Nedostaje QNC lokacijski URI."),
             },
             action_ids::INGEST_DIR_CONFIRM => match intent.payload {
-                IngestPayload::LocationUri(uri) => self.confirm_source_selection(uri),
+                IngestPayload::LocationUri(uri) => self.load_work_settings(Some(uri)),
                 _ => IngestDispatchResult::rejected("Nedostaje QNC lokacijski URI."),
             },
             action_ids::INGEST_DIR_CANCEL => self.cancel_source_browser(),
@@ -415,13 +536,16 @@ impl IngestComponent {
                 }
                 _ => IngestDispatchResult::rejected("Nedostaje bool vrijednost."),
             },
-            action_ids::INGEST_SET_AI_MINING => match intent.payload {
-                IngestPayload::Bool(value) => {
-                    self.view.ai_mining = value;
-                    IngestDispatchResult::accepted(None, true)
-                }
-                _ => IngestDispatchResult::rejected("Nedostaje bool vrijednost."),
-            },
+            action_ids::INGEST_SET_AI_MINING => IngestDispatchResult::rejected(
+                "AI postavka dolazi iz baze; nema lokalnog overridea.",
+            ),
+            action_ids::INGEST_IMPORT_SELECTED => {
+                IngestDispatchResult::rejected(if self.work_plan.is_none() {
+                    "Radne postavke nisu dostupne."
+                } else {
+                    "Media import jos nije implementiran."
+                })
+            }
             action_ids::PLAY_PAUSE => {
                 self.view.playing = !self.view.playing;
                 IngestDispatchResult::accepted(None, true)
@@ -449,6 +573,7 @@ impl IngestComponent {
     }
 
     fn clear_source_browser_state(&mut self) {
+        self.pending_source = None;
         self.view.browser_roots = true;
         self.view.browser_path_label.clear();
         self.view.browser_current_uri = None;
@@ -524,6 +649,9 @@ impl IngestComponent {
     }
 
     fn confirm_source_selection(&mut self, uri: String) -> IngestDispatchResult {
+        if self.work_plan.is_none() {
+            return IngestDispatchResult::rejected("Radne postavke nisu dostupne.");
+        }
         if qnc_contracts::parse_qnc_uri(&uri).is_err() {
             return IngestDispatchResult::rejected("Odabir izvora nije QNC URI.");
         }

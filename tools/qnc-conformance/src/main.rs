@@ -996,6 +996,7 @@ fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
         "qnc.module.frame-timebase" => Some("qnc-frame-timebase"),
         "qnc.module.ui-widget" => Some("qnc-ui-kit"),
         "qnc.module.workstation-identity" => Some("qnc-workstation-identity"),
+        "qnc.module.work-settings" => Some("qnc-work-settings"),
         _ => None,
     }
 }

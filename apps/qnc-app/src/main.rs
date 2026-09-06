@@ -106,6 +106,7 @@ struct ShellMetrics {
 #[derive(Debug, Clone, Deserialize)]
 struct ThemeMetrics {
     font_ui: f32,
+    chrome_pad_x: i8,
     chrome_control_height: f32,
 }
 
@@ -333,6 +334,9 @@ impl QncShell {
         if app.host_mode == "embedded_public_api" {
             if self.ensure_embedded_component(&app) {
                 self.active_tab = tab_id.to_string();
+                if let Some(component) = self.embedded_apps.get_mut(tab_id) {
+                    component.on_activated();
+                }
                 self.status = format!("{} aktivan.", app.label);
             }
         } else {
@@ -451,11 +455,25 @@ impl QncShell {
         );
     }
 
+    fn footer_status(&self) -> &str {
+        self.embedded_apps
+            .get(&self.active_tab)
+            .and_then(|component| component.footer_status())
+            .unwrap_or(&self.status)
+    }
+
     fn footer(&mut self, ctx: &egui::Context) {
         let theme = self.theme();
         egui::TopBottomPanel::bottom("footer")
             .exact_height(self.layout.shell_metrics.footer_height)
-            .frame(egui::Frame::NONE.fill(theme.bg))
+            .frame(
+                egui::Frame::NONE
+                    .fill(theme.bg)
+                    .inner_margin(egui::Margin::symmetric(
+                        self.layout.theme_metrics.chrome_pad_x,
+                        0,
+                    )),
+            )
             .show(ctx, |ui| {
                 let h = ui.available_height();
                 let columns = self.layout.shell_metrics.workspace_footer_columns.max(3);
@@ -482,11 +500,16 @@ impl QncShell {
 
                     cols[2].with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.set_min_height(h);
-                        ui.label(
-                            RichText::new(&self.status)
-                                .size(self.layout.theme_metrics.font_ui)
-                                .color(theme.muted),
-                        );
+                        let status = self.footer_status();
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(status)
+                                    .size(self.layout.theme_metrics.font_ui)
+                                    .color(theme.muted),
+                            )
+                            .truncate(),
+                        )
+                        .on_hover_text(status);
                     });
                 });
 
@@ -1066,6 +1089,50 @@ mod tests {
         assert_eq!(shell.active_tab, "project");
         assert!(shell.status.contains("nije dostupna"));
         assert!(!shell.embedded_apps.contains_key("variant"));
+        fs::remove_dir_all(shell.qnc_root).unwrap();
+    }
+
+    struct StatusSurface {
+        status: String,
+        activations: usize,
+    }
+
+    impl ShellDesktopApp for StatusSurface {
+        fn show_desktop(&mut self, _: &egui::Context, _: &mut egui::Ui) {}
+
+        fn footer_status(&self) -> Option<&str> {
+            Some(&self.status)
+        }
+
+        fn on_activated(&mut self) {
+            self.activations += 1;
+            self.status = format!("Activation {}", self.activations);
+        }
+    }
+
+    #[test]
+    fn footer_uses_only_active_surface_status_without_application_name_switch() {
+        let mut shell = navigation_shell();
+        shell.embedded_apps.insert(
+            "variant".into(),
+            Box::new(StatusSurface {
+                status: "DB project name".into(),
+                activations: 0,
+            }),
+        );
+        shell.status = "Host status".into();
+        assert_eq!(shell.footer_status(), "Host status");
+        shell.active_tab = "variant".into();
+        assert_eq!(shell.footer_status(), "DB project name");
+        shell.status = "Theme changed".into();
+        assert_eq!(shell.footer_status(), "DB project name");
+        shell.activate_tab("project");
+        assert_ne!(shell.footer_status(), "DB project name");
+        shell.activate_tab("variant");
+        assert_eq!(shell.footer_status(), "Activation 1");
+        shell.activate_tab("project");
+        shell.activate_tab("variant");
+        assert_eq!(shell.footer_status(), "Activation 2");
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 

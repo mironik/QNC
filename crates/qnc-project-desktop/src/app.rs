@@ -152,6 +152,10 @@ impl Default for LocationBrowserState {
 }
 
 impl ProjectApp {
+    pub fn footer_status(&self) -> &str {
+        selected_project_label(&self.projects, self.selected_project)
+    }
+
     pub fn take_navigation_trigger(&mut self) -> bool {
         self.component.take_navigation_trigger()
     }
@@ -195,6 +199,46 @@ impl ProjectApp {
         app.refresh_projects();
         app.refresh_templates();
         app
+    }
+}
+
+fn selected_project_label(projects: &[ProjectRow], selected: Option<usize>) -> &str {
+    selected
+        .and_then(|index| projects.get(index))
+        .map(|project| project.name.as_str())
+        .unwrap_or("Projekt nije odabran.")
+}
+
+#[cfg(test)]
+mod footer_tests {
+    use super::*;
+
+    #[test]
+    fn status_follows_selection_not_active_flag_and_never_keeps_removed_name() {
+        let mut rows = vec![
+            ProjectRow {
+                project_id: "p1".into(),
+                name: "First project".into(),
+                created_date: String::new(),
+                project_uri: "qnc://local/project/p1".into(),
+                active: true,
+            },
+            ProjectRow {
+                project_id: "p2".into(),
+                name: "Selected project".into(),
+                created_date: String::new(),
+                project_uri: "qnc://local/project/p2".into(),
+                active: false,
+            },
+        ];
+        assert_eq!(selected_project_label(&rows, Some(0)), "First project");
+        assert_eq!(selected_project_label(&rows, Some(1)), "Selected project");
+        assert_eq!(selected_project_label(&rows, None), "Projekt nije odabran.");
+        rows.clear();
+        assert_eq!(
+            selected_project_label(&rows, Some(1)),
+            "Projekt nije odabran."
+        );
     }
 }
 

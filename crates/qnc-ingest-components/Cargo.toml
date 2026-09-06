@@ -7,4 +7,10 @@ edition = "2021"
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
 qnc-ingest-store = { workspace = true }
+qnc-work-settings = { workspace = true }
 serde = { workspace = true }
+
+[dev-dependencies]
+rusqlite = { workspace = true }
+serde_json = { workspace = true }
+tempfile = "3"

@@ -25,6 +25,13 @@ pub struct DesktopApplicationRef {
 pub trait ShellDesktopApp {
     fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui);
 
+    /// Display-only text from the active surface, never a workflow payload.
+    fn footer_status(&self) -> Option<&str> {
+        None
+    }
+
+    fn on_activated(&mut self) {}
+
     fn take_navigation_request(&mut self) -> Option<DesktopNavigation> {
         None
     }

@@ -370,7 +370,9 @@ fn render_location_action_bar(
             .max_rect(rect)
             .layout(Layout::right_to_left(Align::Center)),
         |ui| {
-            let can_confirm = !view.browser_roots && !view.browser_path_label.is_empty();
+            let can_confirm = !view.browser_roots
+                && !view.browser_path_label.is_empty()
+                && !view.work_settings_loading;
             let response = qnc_ui_kit::show_form_action_bar(
                 ui,
                 &form_action_bar_style(theme),
@@ -536,7 +538,14 @@ fn render_clip_grid(
         ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             ui.vertical_centered(|ui| {
                 ui.add_space(24.0);
-                ui.label(muted(&contracts.ingest.clip_grid.empty_message, theme));
+                let message = view.work_settings_error.as_deref().unwrap_or_else(|| {
+                    if view.work_settings_loading {
+                        "Citanje radnih postavki..."
+                    } else {
+                        &contracts.ingest.clip_grid.empty_message
+                    }
+                });
+                ui.label(muted(message, theme));
             });
         });
         return None;
@@ -739,11 +748,14 @@ fn render_source_dock(
             }
             let mut ai = view.ai_mining;
             if ui
-                .checkbox(
-                    &mut ai,
-                    RichText::new("AI mining")
-                        .color(theme.text)
-                        .size(theme.font_ui),
+                .add_enabled(
+                    false,
+                    egui::Checkbox::new(
+                        &mut ai,
+                        RichText::new("AI mining")
+                            .color(theme.text)
+                            .size(theme.font_ui),
+                    ),
                 )
                 .changed()
             {

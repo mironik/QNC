@@ -27,6 +27,10 @@ impl ShellDesktopApp for ProjectDesktopAdapter {
         self.app.show_desktop(ctx, ui);
     }
 
+    fn footer_status(&self) -> Option<&str> {
+        Some(self.app.footer_status())
+    }
+
     fn take_navigation_request(&mut self) -> Option<DesktopNavigation> {
         self.app
             .take_navigation_trigger()

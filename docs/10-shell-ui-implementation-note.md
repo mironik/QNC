@@ -26,6 +26,14 @@ C:\Users\miron\Projects\qnc_v4\seed\tabs\story\plugin.json
 
 ## changed_behavior
 
+- Odobreno 2026-09-06: jednak unutarnji razmak lijevo/desno u shell baru,
+  prema postojecem `theme_metrics.chrome_pad_x` (8 egui tocaka) iz shell
+  layout contracta. V4 footer s tri zone ostaje referenca. Mijenja se samo
+  horizontalni unutarnji okvir; visina, font, tabovi i okomiti razmaci ostaju.
+  Razmak vrijedi jednako za sve aplikacije hostane u shellu.
+  Provjereno: 11 shell testova prolazi; nova Windows izgradnja i live prikaz
+  potvrduju odmak teksta `Tema` i naziva `projekt 6` od oba vanjska ruba.
+
 - Novi `qnc-app` otvara aplikacije unutar svojeg QNC desktop prostora.
 - Shell vise ne hardkodira runtime popis aplikacija iz layouta.
 - Runtime popis aplikacija cita se iz `apps/*/qnc-app.json`.

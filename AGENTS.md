@@ -546,6 +546,16 @@ Project je ponovno zamrznut. Nova promjena zahtijeva novu izricitu dozvolu.
 
 ## 15. Verifikacija
 
+Zatvoreno ograniceno odobrenje 2026-09-06: korisnik je potvrdio dopunu
+`public_project_settings` postojecim `settings_json` radi read-only citanja
+radnih postavki. Nema novih Project podataka, aktivacije ni UI promjena.
+Opseg i zatvaranje odobrenja vode se u docs/11 i docs/21.
+
+Zatvoreno naknadno ograniceno odobrenje 2026-09-06: Project u shell baru prikazuje naziv
+selektiranog projekta kroz isti javni desktop status kao Ingest. Samo prikaz
+postojece selekcije, bez promjene DB-a, aktivacije ili workflowa; docs/11 i docs/21.
+Ciljani testovi i Windows live prikaz potvrdjeni. Project je ponovno zamrznut.
+
 - Nakon svakog implementacijskog koraka ide ciljani test.
 - Za vidljivo ponasanje ide live test prije nastavka.
 - Za UI/layout promjene obavezna je usporedba s relevantnim postojecim UI-jem

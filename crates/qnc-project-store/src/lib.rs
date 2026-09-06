@@ -1370,7 +1370,7 @@ fn init_workspace_schema(conn: &Connection) -> Result<(), String> {
             PRIMARY KEY (step_id, setting_key)
         );
         CREATE VIEW IF NOT EXISTS public_project_settings AS
-            SELECT project_id, template_id, created_at, updated_at FROM project_settings;
+            SELECT project_id, template_id, created_at, updated_at, settings_json FROM project_settings;
         CREATE VIEW IF NOT EXISTS public_project_members AS
             SELECT project_id, user_id, role, joined_at, last_seen_at FROM project_members;
         CREATE VIEW IF NOT EXISTS public_project_template_snapshot AS
@@ -1833,6 +1833,26 @@ fn safe_dir_name(project_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn public_settings_exposes_exact_saved_payload_without_changing_it() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_workspace_schema(&conn).unwrap();
+        let saved = r#"{"storage":{"ingest_media":"link"},"input":{"mode":"auto"}}"#;
+        conn.execute(
+            "INSERT INTO project_settings(project_id, settings_json) VALUES ('p1', ?1)",
+            [saved],
+        )
+        .unwrap();
+        let public: String = conn
+            .query_row(
+                "SELECT settings_json FROM public_project_settings WHERE project_id='p1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(public, saved);
+    }
 
     fn test_selection(tabs: &[&str]) -> SelectionSnapshot {
         SelectionSnapshot {
