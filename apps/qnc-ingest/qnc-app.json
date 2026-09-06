@@ -5,7 +5,7 @@
   "enabled": true,
   "system": true,
   "removable": false,
-  "order": 20,
+  "priority_group": "b",
   "host_mode": "embedded_public_api",
   "desktop_entry": "qnc_ingest",
   "standalone_executable": "qnc-ingest"

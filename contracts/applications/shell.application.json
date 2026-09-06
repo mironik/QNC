@@ -5,7 +5,7 @@
   "application_kind": "desktop_host",
   "lifecycle": "interactive_desktop_host",
   "owned_database_contracts": [],
-  "read_database_contracts": [],
+  "read_database_contracts": ["qnc://local/db/project_workspace/{project_id}"],
   "owned_artifacts": [],
   "module_dependencies": [
     "qnc.module.manifest-capability",
@@ -16,7 +16,8 @@
     "shell.desktop",
     "shell.app_registry",
     "shell.host_application_surface",
-    "shell.footer_tabs"
+    "shell.footer_tabs",
+    "shell.next_group"
   ],
   "supported_os": ["windows", "linux", "macos"],
   "supported_cpu": ["x86_64", "aarch64"],

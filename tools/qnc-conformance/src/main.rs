@@ -188,8 +188,8 @@ fn validate_project_freeze_policy(root: &Path) -> CheckResult {
         );
     }
 
+    report.merge(validate_project_freeze_status(&freeze));
     for required in [
-        "Status: zamrznuto",
         "apps/qnc-project/**",
         "crates/qnc-project-desktop/**",
         "crates/qnc-project-store/**",
@@ -210,6 +210,33 @@ fn validate_project_freeze_policy(root: &Path) -> CheckResult {
     }
 
     CheckResult::from_report("Project freeze policy", report)
+}
+
+fn validate_project_freeze_status(freeze: &str) -> ValidationReport {
+    let mut report = ValidationReport::new();
+    let statuses: Vec<_> = freeze
+        .lines()
+        .filter_map(|line| line.strip_prefix("Status:"))
+        .map(str::trim)
+        .collect();
+    match statuses.as_slice() {
+        ["zamrznuto"] => {}
+        ["odmrznuto samo za odobreni zahvat"] => {
+            for required in [
+                "## Aktivno odobrenje",
+                "izricito potvrdio:",
+                "Odobrenje se odnosi",
+                "Izvan gore navedenog odobrenja",
+                "vratiti status na zamrznuto",
+            ] {
+                if !freeze.contains(required) {
+                    report.error(format!("Scoped Project thaw missing approval/scope record: {required}"));
+                }
+            }
+        }
+        _ => report.error("Project freeze status must be frozen or explicitly scoped; unrestricted thaw is not allowed"),
+    }
+    report
 }
 
 fn validate_project_seed(root: &Path) -> CheckResult {
@@ -612,7 +639,7 @@ fn validate_app_registry(root: &Path) -> CheckResult {
         let enabled = required_app_registry_bool(&name, object, "enabled", &mut report);
         let system = required_app_registry_bool(&name, object, "system", &mut report);
         let removable = required_app_registry_bool(&name, object, "removable", &mut report);
-        let order = required_app_registry_i64(&name, object, "order", &mut report);
+        let group = required_app_registry_string(&name, object, "priority_group", &mut report);
 
         if enabled == Some(true) {
             enabled_count += 1;
@@ -664,8 +691,11 @@ fn validate_app_registry(root: &Path) -> CheckResult {
             )),
         }
 
-        if order.is_some_and(|order| order < 0) {
-            report.error(format!("{name}: order must be zero or positive"));
+        if group.is_some_and(|group| group.len() != 1 || !group.as_bytes()[0].is_ascii_lowercase())
+        {
+            report.error(format!(
+                "{name}: priority_group must be a single letter a-z"
+            ));
         }
 
         let _ = (label, desktop_entry);
@@ -707,21 +737,6 @@ fn required_app_registry_bool(
         Some(value) => Some(value),
         None => {
             report.error(format!("{name}: missing bool field {field}"));
-            None
-        }
-    }
-}
-
-fn required_app_registry_i64(
-    name: &str,
-    object: &serde_json::Map<String, serde_json::Value>,
-    field: &str,
-    report: &mut ValidationReport,
-) -> Option<i64> {
-    match object.get(field).and_then(serde_json::Value::as_i64) {
-        Some(value) => Some(value),
-        None => {
-            report.error(format!("{name}: missing integer field {field}"));
             None
         }
     }
@@ -972,6 +987,7 @@ fn validate_application_module_dependencies(
 
 fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
     match module_id {
+        "qnc.module.application-catalog-reader" => Some("qnc-application-catalog"),
         "qnc.module.manifest-capability" => Some("qnc-contracts"),
         "qnc.module.transport-resolver" => Some("qnc-transport-resolver"),
         "qnc.module.db-contract-validation" => Some("qnc-db-contract"),
@@ -1946,4 +1962,42 @@ fn display_relative(root: &Path, path: &Path) -> String {
         .unwrap_or(path)
         .to_string_lossy()
         .replace('\\', "/")
+}
+
+#[cfg(test)]
+mod freeze_status_tests {
+    use super::*;
+
+    #[test]
+    fn frozen_policy_remains_valid() {
+        assert!(validate_project_freeze_status("Status: zamrznuto\n").is_ok());
+    }
+
+    #[test]
+    fn scoped_thaw_requires_approval_scope_and_relock_record() {
+        let current = "Status: odmrznuto samo za odobreni zahvat\n\
+            ## Aktivno odobrenje\nKorisnik je izricito potvrdio: odobreni zahvat.\n\
+            Odobrenje se odnosi na navedeni opseg.\n\
+            Izvan gore navedenog odobrenja vrijedi zamrzavanje.\n\
+            Nakon zahvata vratiti status na zamrznuto.";
+        assert!(validate_project_freeze_status(current).is_ok());
+        for required in [
+            "izricito potvrdio:",
+            "Odobrenje se odnosi",
+            "vratiti status na zamrznuto",
+        ] {
+            assert!(!validate_project_freeze_status(&current.replace(required, "")).is_ok());
+        }
+    }
+
+    #[test]
+    fn unrestricted_or_ambiguous_thaw_is_rejected() {
+        for text in [
+            "Status: odmrznuto",
+            "Status: odmrznuto samo za odobreni zahvat",
+            "Status: zamrznuto\nStatus: odmrznuto",
+        ] {
+            assert!(!validate_project_freeze_status(text).is_ok());
+        }
+    }
 }

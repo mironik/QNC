@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/qnc-application-catalog",
     "apps/qnc-app",
     "apps/qnc-ingest",
     "apps/qnc-project",
@@ -21,9 +22,11 @@ members = [
     "crates/qnc-ui-kit",
     "tools/qnc-conformance",
     "tools/qnc-camera-catalog",
+    "tools/qnc-app-catalog",
 ]
 
 [workspace.dependencies]
+qnc-application-catalog = { path = "crates/qnc-application-catalog" }
 qnc-contracts = { path = "crates/qnc-contracts" }
 qnc-db-contract = { path = "crates/qnc-db-contract" }
 qnc-dir-browser = { path = "crates/qnc-dir-browser" }

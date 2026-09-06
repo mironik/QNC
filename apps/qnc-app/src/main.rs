@@ -7,7 +7,9 @@ use std::{
 
 use eframe::egui::{self, Color32, FontFamily, FontId, RichText, Sense, TextStyle, Vec2};
 use qnc_contracts::validate_ui_layout_contract_json;
-use qnc_shell_desktop_api::{EmbeddedAppFactory, ShellDesktopApp};
+use qnc_shell_desktop_api::{
+    next_group_tab, DesktopApplicationRef, DesktopNavigation, EmbeddedAppFactory, ShellDesktopApp,
+};
 use serde::Deserialize;
 
 const SHELL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/shell.layout.json");
@@ -127,7 +129,7 @@ struct AppManifest {
     enabled: bool,
     system: bool,
     removable: bool,
-    order: i64,
+    priority_group: String,
     host_mode: String,
     desktop_entry: String,
     standalone_executable: Option<String>,
@@ -179,8 +181,9 @@ impl AppManifest {
                 "standalone_executable is required because every QNC application must run outside the shell desktop".to_string(),
             ),
         }
-        if self.order < 0 {
-            errors.push("order must be zero or positive".to_string());
+        if self.priority_group.len() != 1 || !self.priority_group.as_bytes()[0].is_ascii_lowercase()
+        {
+            errors.push("priority_group must be a single letter a-z".to_string());
         }
 
         if errors.is_empty() {
@@ -237,8 +240,8 @@ impl AppRegistry {
         }
 
         manifests.sort_by(|a, b| {
-            a.order
-                .cmp(&b.order)
+            a.priority_group
+                .cmp(&b.priority_group)
                 .then_with(|| a.label.cmp(&b.label))
                 .then_with(|| a.application_id.cmp(&b.application_id))
         });
@@ -291,6 +294,7 @@ fn embedded_app_factories() -> HashMap<String, EmbeddedAppFactory> {
 struct QncShell {
     layout: ShellLayoutContract,
     qnc_root: PathBuf,
+    executable_dir: PathBuf,
     app_registry: AppRegistry,
     embedded_factories: HashMap<String, EmbeddedAppFactory>,
     embedded_apps: HashMap<String, Box<dyn ShellDesktopApp>>,
@@ -306,6 +310,10 @@ impl QncShell {
             .unwrap_or_else(|| "project".to_string());
         Self {
             layout,
+            executable_dir: env::current_exe()
+                .ok()
+                .and_then(|path| path.parent().map(Path::to_path_buf))
+                .unwrap_or_default(),
             qnc_root,
             app_registry,
             embedded_factories: embedded_app_factories(),
@@ -322,9 +330,11 @@ impl QncShell {
             return;
         };
 
-        self.active_tab = tab_id.to_string();
         if app.host_mode == "embedded_public_api" {
-            self.ensure_embedded_component(&app);
+            if self.ensure_embedded_component(&app) {
+                self.active_tab = tab_id.to_string();
+                self.status = format!("{} aktivan.", app.label);
+            }
         } else {
             self.status = format!(
                 "{} nema aktivan shell desktop ulaz ({})",
@@ -333,10 +343,9 @@ impl QncShell {
         }
     }
 
-    fn ensure_embedded_component(&mut self, app: &AppManifest) {
+    fn ensure_embedded_component(&mut self, app: &AppManifest) -> bool {
         if self.embedded_apps.contains_key(&app.tab_id) {
-            self.status = format!("{} aktivan.", app.label);
-            return;
+            return true;
         }
 
         let Some(factory) = self.embedded_factories.get(&app.desktop_entry).copied() else {
@@ -344,18 +353,59 @@ impl QncShell {
                 "{} nema registriran embedded adapter ({})",
                 app.label, app.desktop_entry
             );
-            return;
+            return false;
         };
 
         match (factory.create)(self.qnc_root.clone()) {
             Ok(component) => {
                 self.embedded_apps.insert(app.tab_id.clone(), component);
                 self.status = format!("{} otvoren u QNC desktopu.", app.label);
+                true
             }
             Err(error) => {
                 self.status = format!("{} nije otvoren: {error}", app.label);
+                false
             }
         }
+    }
+
+    fn consume_navigation(&mut self, source: &AppManifest) -> bool {
+        let Some(component) = self.embedded_apps.get_mut(&source.tab_id) else {
+            return false;
+        };
+        let Some(request) = component.take_navigation_request() else {
+            return false;
+        };
+        let sequence = component.navigation_sequence();
+        let available = self
+            .app_registry
+            .entries()
+            .iter()
+            .filter(|app| {
+                app.standalone_executable.as_ref().is_some_and(|name| {
+                    !name.contains(['/', '\\'])
+                        && self
+                            .executable_dir
+                            .join(format!("{name}{}", env::consts::EXE_SUFFIX))
+                            .is_file()
+                })
+            })
+            .map(|app| DesktopApplicationRef {
+                application_id: app.application_id.clone(),
+                tab_id: app.tab_id.clone(),
+                priority_group: app.priority_group.clone(),
+            })
+            .collect::<Vec<_>>();
+        let result = match request {
+            DesktopNavigation::NextGroup => sequence
+                .and_then(|sequence| next_group_tab(&source.application_id, &sequence, &available)),
+        };
+        match result {
+            Ok(Some(tab)) => self.activate_tab(&tab),
+            Ok(None) => self.status = "Nema sljedece odabrane grupe.".into(),
+            Err(error) => self.status = format!("{}: {error}", request.action_id()),
+        }
+        true
     }
 
     fn body(&mut self, ui: &mut egui::Ui) {
@@ -366,6 +416,9 @@ impl QncShell {
                 if let Some(component) = self.embedded_apps.get_mut(&app.tab_id) {
                     let ctx = ui.ctx().clone();
                     component.show_desktop(&ctx, ui);
+                    if self.consume_navigation(&app) {
+                        ui.ctx().request_repaint();
+                    }
                     return;
                 }
             }
@@ -779,7 +832,7 @@ mod tests {
                 "enabled": true,
                 "system": true,
                 "removable": false,
-                "order": 10,
+                "priority_group": "a",
                 "host_mode": "embedded_public_api",
                 "desktop_entry": "qnc_project"
             }"#,
@@ -803,7 +856,7 @@ mod tests {
                 "enabled": true,
                 "system": true,
                 "removable": false,
-                "order": 30,
+                "priority_group": "c",
                 "host_mode": "external_component",
                 "desktop_entry": "qnc_story",
                 "standalone_executable": "qnc-story"
@@ -819,7 +872,7 @@ mod tests {
                 "enabled": true,
                 "system": true,
                 "removable": false,
-                "order": 10,
+                "priority_group": "a",
                 "host_mode": "embedded_public_api",
                 "desktop_entry": "qnc_project",
                 "standalone_executable": "qnc-project"
@@ -852,7 +905,7 @@ mod tests {
                 "enabled": true,
                 "system": true,
                 "removable": false,
-                "order": 10,
+                "priority_group": "a",
                 "host_mode": "embedded_public_api",
                 "desktop_entry": "qnc_project",
                 "standalone_executable": "qnc-project"
@@ -868,7 +921,7 @@ mod tests {
                 "enabled": false,
                 "system": true,
                 "removable": false,
-                "order": 20,
+                "priority_group": "b",
                 "host_mode": "external_component",
                 "desktop_entry": "qnc_ingest",
                 "standalone_executable": "qnc-ingest"
@@ -890,12 +943,130 @@ mod tests {
                 enabled: true,
                 system: true,
                 removable: false,
-                order: 10,
+                priority_group: "a".into(),
                 host_mode: "embedded_public_api".to_string(),
                 desktop_entry: "qnc_project".to_string(),
                 standalone_executable: Some("qnc-project".to_string()),
             }],
         }
+    }
+
+    struct NavigationSurface {
+        pending: bool,
+        sequence: Result<Vec<DesktopApplicationRef>, String>,
+    }
+
+    impl ShellDesktopApp for NavigationSurface {
+        fn show_desktop(&mut self, _: &egui::Context, _: &mut egui::Ui) {}
+        fn take_navigation_request(&mut self) -> Option<DesktopNavigation> {
+            std::mem::take(&mut self.pending).then_some(DesktopNavigation::NextGroup)
+        }
+        fn navigation_sequence(&self) -> Result<Vec<DesktopApplicationRef>, String> {
+            self.sequence.clone()
+        }
+    }
+
+    fn navigation_shell() -> QncShell {
+        let root = temp_root("qnc_shell_navigation");
+        fs::create_dir_all(&root).unwrap();
+        let mut registry = test_registry();
+        let mut target = registry.entries[0].clone();
+        target.application_id = "qnc.variant".into();
+        target.tab_id = "variant".into();
+        target.priority_group = "c".into();
+        target.desktop_entry = "variant_adapter".into();
+        target.standalone_executable = Some("qnc-variant".into());
+        registry.entries.push(target);
+        let sequence = registry
+            .entries
+            .iter()
+            .map(|app| {
+                fs::write(
+                    root.join(format!(
+                        "{}{}",
+                        app.standalone_executable.as_ref().unwrap(),
+                        env::consts::EXE_SUFFIX
+                    )),
+                    [],
+                )
+                .unwrap();
+                DesktopApplicationRef {
+                    application_id: app.application_id.clone(),
+                    tab_id: app.tab_id.clone(),
+                    priority_group: app.priority_group.clone(),
+                }
+            })
+            .collect();
+        let mut shell = QncShell::new(
+            ShellLayoutContract::load_embedded().unwrap(),
+            root.clone(),
+            registry,
+        );
+        shell.executable_dir = root;
+        shell.embedded_apps.insert(
+            "project".into(),
+            Box::new(NavigationSurface {
+                pending: true,
+                sequence: Ok(sequence),
+            }),
+        );
+        shell.embedded_factories.insert(
+            "variant_adapter".into(),
+            EmbeddedAppFactory {
+                desktop_entry: "variant_adapter",
+                create: |_| {
+                    Ok(Box::new(NavigationSurface {
+                        pending: false,
+                        sequence: Ok(vec![]),
+                    }))
+                },
+            },
+        );
+        shell
+    }
+
+    #[test]
+    fn navigation_trigger_activates_adapter_once_without_business_payload() {
+        let mut shell = navigation_shell();
+        let source = shell.app_registry.find("project").unwrap().clone();
+        assert!(shell.consume_navigation(&source));
+        assert_eq!(shell.active_tab, "variant");
+        assert!(shell.embedded_apps.contains_key("variant"));
+        shell.activate_tab("project");
+        assert!(!shell.consume_navigation(&source));
+        assert_eq!(shell.active_tab, "project");
+        fs::remove_dir_all(shell.qnc_root).unwrap();
+    }
+
+    #[test]
+    fn failed_target_creation_preserves_source_surface_and_error() {
+        let mut shell = navigation_shell();
+        shell.embedded_factories.clear();
+        let source = shell.app_registry.find("project").unwrap().clone();
+        assert!(shell.consume_navigation(&source));
+        assert_eq!(shell.active_tab, "project");
+        let error = shell.status.clone();
+        assert!(error.contains("nema registriran embedded adapter"));
+        assert!(shell.ensure_embedded_component(&source));
+        assert_eq!(shell.status, error);
+        fs::remove_dir_all(shell.qnc_root).unwrap();
+    }
+
+    #[test]
+    fn removed_executable_prevents_automatic_navigation() {
+        let mut shell = navigation_shell();
+        fs::remove_file(
+            shell
+                .executable_dir
+                .join(format!("qnc-variant{}", env::consts::EXE_SUFFIX)),
+        )
+        .unwrap();
+        let source = shell.app_registry.find("project").unwrap().clone();
+        shell.consume_navigation(&source);
+        assert_eq!(shell.active_tab, "project");
+        assert!(shell.status.contains("nije dostupna"));
+        assert!(!shell.embedded_apps.contains_key("variant"));
+        fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 
     fn temp_root(prefix: &str) -> PathBuf {

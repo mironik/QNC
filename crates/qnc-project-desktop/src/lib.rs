@@ -1,4 +1,5 @@
 mod app;
+mod application_selection;
 mod layout_contract;
 mod location_browser;
 mod project_advanced;
@@ -30,8 +31,12 @@ pub fn check_contracts_message() -> Result<String, String> {
 
 pub fn create_project_app(project_root: impl Into<PathBuf>) -> Result<ProjectApp, String> {
     let contracts = AppContracts::load_embedded()?;
-    let store = ProjectStore::open(project_root)?;
-    Ok(ProjectApp::new(contracts, ProjectComponent::new(store)))
+    let root = project_root.into();
+    let store = ProjectStore::open(&root)?;
+    Ok(ProjectApp::new(
+        contracts,
+        ProjectComponent::new(store, &root),
+    ))
 }
 
 pub fn apply_project_style(ctx: &egui::Context) -> Result<(), String> {

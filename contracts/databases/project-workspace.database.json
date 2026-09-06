@@ -15,6 +15,7 @@
     "project_workflow_step_kv"
   ],
   "public_read_views": [
+    "public_project_application_sequence",
     "public_project_settings",
     "public_project_members",
     "public_project_template_snapshot",

@@ -45,29 +45,49 @@ pub struct ProjectApp {
 
 #[derive(Debug, Clone)]
 enum ProjectAction {
+    SelectWorkflowGroup {
+        priority_group: String,
+        application_id: Option<String>,
+    },
     OpenSelectedProject,
-    OpenProjectRow { index: usize },
+    OpenProjectRow {
+        index: usize,
+    },
     CreateProject,
-    RequestDeleteProject { index: usize },
+    RequestDeleteProject {
+        index: usize,
+    },
     CancelDeleteProject,
     ConfirmDeleteProject,
-    SelectTemplate { template_id: String },
+    SelectTemplate {
+        template_id: String,
+    },
     BeginTemplateCreate,
     CancelTemplateCreate,
     SaveUserTemplate,
-    RequestDeleteTemplate { template_id: String },
+    RequestDeleteTemplate {
+        template_id: String,
+    },
     CancelDeleteTemplate,
     ConfirmDeleteTemplate,
     PickProjectsRoot,
-    SelectProjectsRootKind { kind: LocationSourceKind },
-    OpenProjectsRootUri { uri: String },
+    SelectProjectsRootKind {
+        kind: LocationSourceKind,
+    },
+    OpenProjectsRootUri {
+        uri: String,
+    },
     OpenProjectsRootParent,
     OpenProjectsRootRoots,
     ConfirmProjectsRootBrowser,
     CancelProjectsRootBrowser,
     PickExportDir,
-    SelectExportDirKind { kind: LocationSourceKind },
-    OpenExportDirUri { uri: String },
+    SelectExportDirKind {
+        kind: LocationSourceKind,
+    },
+    OpenExportDirUri {
+        uri: String,
+    },
     OpenExportDirParent,
     OpenExportDirRoots,
     ConfirmExportDirBrowser,
@@ -77,6 +97,7 @@ enum ProjectAction {
 impl ProjectAction {
     fn action_id(&self) -> &'static str {
         match self {
+            Self::SelectWorkflowGroup { .. } => "project_workflow_group_select",
             Self::OpenSelectedProject => "project_open_selected",
             Self::OpenProjectRow { .. } => "project_open_row",
             Self::CreateProject => "project_create",
@@ -131,6 +152,16 @@ impl Default for LocationBrowserState {
 }
 
 impl ProjectApp {
+    pub fn take_navigation_trigger(&mut self) -> bool {
+        self.component.take_navigation_trigger()
+    }
+
+    pub fn navigation_sequence(
+        &self,
+    ) -> Result<Vec<qnc_project_store::ProjectNavigationStep>, String> {
+        self.component.navigation_sequence()
+    }
+
     pub(crate) fn new(contracts: AppContracts, component: ProjectComponent) -> Self {
         let status = contracts.project.left_project_list.ready_text.clone();
         let projects_root = component.projects_root_display();
@@ -180,6 +211,9 @@ impl eframe::App for ProjectApp {
 
 impl ProjectApp {
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+        if self.component.applications.poll() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        }
         self.dispatch_keyboard_shortcuts(ctx);
         self.project_board(ui);
         self.delete_project_overlay(ctx);
@@ -216,6 +250,19 @@ impl ProjectApp {
         }
 
         match action {
+            ProjectAction::SelectWorkflowGroup {
+                priority_group,
+                application_id,
+            } => {
+                self.status = match self
+                    .component
+                    .applications
+                    .choose(&priority_group, application_id.as_deref())
+                {
+                    Ok(()) => "Postavke promijenjene.".into(),
+                    Err(error) => error,
+                };
+            }
             ProjectAction::OpenSelectedProject => {
                 if let Some(index) = self.selected_project {
                     self.perform_open_project(index);
@@ -1298,16 +1345,34 @@ impl ProjectApp {
     }
 
     fn advanced(&mut self, ui: &mut egui::Ui, content_w: f32, settings: &SettingsPanelMetrics) {
+        let applications = self.component.applications.view();
+        let mut application_action = None;
         if project_advanced::show(
             ui,
             content_w,
             settings,
             &self.contracts.shell,
             &mut self.advanced_open,
-            &mut self.draft_settings,
-            &mut self.export_preset_draft_name,
+            project_advanced::AdvancedDraft {
+                draft_settings: &mut self.draft_settings,
+                export_preset_draft_name: &mut self.export_preset_draft_name,
+                applications: &applications,
+            },
+            &mut application_action,
         ) {
             self.status = "Postavke promijenjene.".to_string();
+        }
+        if let Some(action) = application_action {
+            use project_advanced::ApplicationSelectionAction;
+            self.dispatch_project_action(match action {
+                ApplicationSelectionAction::Choose {
+                    priority_group,
+                    application_id,
+                } => ProjectAction::SelectWorkflowGroup {
+                    priority_group,
+                    application_id,
+                },
+            });
         }
     }
 
@@ -1940,6 +2005,9 @@ impl ProjectApp {
     }
 
     fn apply_templates_state(&mut self, state: TemplatesState) {
+        self.component
+            .applications
+            .set_settings(&state.draft_settings);
         self.selected_template_id = state.selected_template_id;
         self.templates = state.templates;
         self.draft_settings = state.draft_settings;
@@ -1949,13 +2017,11 @@ impl ProjectApp {
 
     fn settings_draft_for_save(&self) -> Value {
         let mut settings = self.draft_settings.clone();
-        if self.projects_root_dirty && !self.projects_root.trim().is_empty() {
-            project_advanced::set_string_path(
-                &mut settings,
-                "storage.projects_root",
-                self.projects_root.clone(),
-            );
-        }
+        project_advanced::set_string_path(
+            &mut settings,
+            "storage.projects_root",
+            self.projects_root.clone(),
+        );
         if self.export_dir_dirty && !self.export_dir.trim().is_empty() {
             project_advanced::set_string_path(
                 &mut settings,

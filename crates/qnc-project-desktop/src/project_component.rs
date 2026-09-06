@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::application_selection::ApplicationSelection;
 use qnc_dir_browser::{BrowserState, DirectoryBrowserSession};
 use serde_json::Value;
 
@@ -43,17 +44,23 @@ pub enum ProjectBrowserTarget {
 }
 
 pub struct ProjectComponent {
+    pub applications: ApplicationSelection,
     store: ProjectStore,
     projects_root_browser: DirectoryBrowserSession,
     export_dir_browser: DirectoryBrowserSession,
+    navigation_project_id: Option<String>,
+    navigation_pending: bool,
 }
 
 impl ProjectComponent {
-    pub fn new(store: ProjectStore) -> Self {
+    pub fn new(store: ProjectStore, root: &Path) -> Self {
         Self {
+            applications: ApplicationSelection::new(root),
             store,
             projects_root_browser: DirectoryBrowserSession::default(),
             export_dir_browser: DirectoryBrowserSession::default(),
+            navigation_project_id: None,
+            navigation_pending: false,
         }
     }
 
@@ -95,21 +102,45 @@ impl ProjectComponent {
     }
 
     pub fn create_project(
-        &self,
+        &mut self,
         name: &str,
         template_id: &str,
         settings: &Value,
     ) -> Result<ProjectCreated, String> {
-        let project = self
-            .store
-            .create_project(name, template_id, Some(settings))?;
+        self.navigation_pending = false;
+        let project = self.store.create_project(
+            name,
+            template_id,
+            Some(settings),
+            &self.applications.snapshot()?,
+        )?;
         let projects = self.load_projects()?;
+        self.navigation_project_id = Some(project.project_id.clone());
+        self.navigation_pending = true;
         Ok(ProjectCreated { project, projects })
     }
 
-    pub fn open_project(&self, project_id: &str) -> Result<ProjectsState, String> {
+    pub fn open_project(&mut self, project_id: &str) -> Result<ProjectsState, String> {
+        self.navigation_pending = false;
         self.store.open_project(project_id)?;
-        self.load_projects()
+        let projects = self.load_projects()?;
+        self.navigation_project_id = Some(project_id.to_string());
+        self.navigation_pending = true;
+        Ok(projects)
+    }
+
+    pub fn take_navigation_trigger(&mut self) -> bool {
+        std::mem::take(&mut self.navigation_pending)
+    }
+
+    pub fn navigation_sequence(
+        &self,
+    ) -> Result<Vec<qnc_project_store::ProjectNavigationStep>, String> {
+        let id = self
+            .navigation_project_id
+            .as_deref()
+            .ok_or("Nema otvorenog projekta za navigaciju.")?;
+        self.store.navigation_sequence(id)
     }
 
     pub fn delete_project(&self, project_id: &str) -> Result<ProjectDeleted, String> {
@@ -130,9 +161,13 @@ impl ProjectComponent {
         base_template_id: &str,
         settings: &Value,
     ) -> Result<UserTemplateCreated, String> {
-        let template =
-            self.store
-                .create_user_template(name, description, base_template_id, Some(settings))?;
+        let template = self.store.create_user_template(
+            name,
+            description,
+            base_template_id,
+            Some(settings),
+            &self.applications.snapshot()?,
+        )?;
         let templates = self.load_templates()?;
         Ok(UserTemplateCreated {
             template,

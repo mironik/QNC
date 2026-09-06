@@ -9,6 +9,7 @@ use std::env;
 #[cfg(any(windows, target_os = "macos"))]
 use std::process::{Command, Stdio};
 
+use qnc_application_catalog::SelectionSnapshot;
 use qnc_contracts::parse_qnc_uri;
 use qnc_db_contract::DatabaseContract;
 use qnc_transport_resolver::{ResolvedEndpoint, ResolverConfig};
@@ -42,6 +43,13 @@ pub struct ProjectRow {
     pub name: String,
     pub project_uri: String,
     pub active: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectNavigationStep {
+    pub application_id: String,
+    pub tab_id: String,
+    pub priority_group: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -217,6 +225,7 @@ impl ProjectStore {
         description: &str,
         base_template_id: &str,
         settings: Option<&Value>,
+        selection: &SelectionSnapshot,
     ) -> Result<ProjectTemplateRow, String> {
         let name = name.trim();
         if name.is_empty() {
@@ -232,7 +241,8 @@ impl ProjectStore {
         };
         let base = get_template(&conn, &base_template_id)?
             .ok_or_else(|| format!("Template '{base_template_id}' ne postoji."))?;
-        let settings = settings.cloned().unwrap_or_else(|| base.settings.clone());
+        let mut settings = settings.cloned().unwrap_or_else(|| base.settings.clone());
+        apply_application_selection(&mut settings, selection)?;
         let template_id = format!("tpl_user_{}", slug_id(name));
         let now = now_str();
         let settings_json = json_string(&settings)?;
@@ -314,13 +324,14 @@ impl ProjectStore {
         name: &str,
         template_id: &str,
         settings: Option<&Value>,
+        selection: &SelectionSnapshot,
     ) -> Result<ProjectRow, String> {
         let name = name.trim();
         if name.is_empty() {
             return Err("Naziv projekta je prazan.".to_string());
         }
 
-        let conn = self.open_registry()?;
+        let mut conn = self.open_registry()?;
         init_registry_schema(&conn)?;
         ensure_templates_seeded(&conn)?;
         let template_id = if template_id.trim().is_empty() {
@@ -333,35 +344,55 @@ impl ProjectStore {
         if let Some(settings) = settings {
             template.settings = settings.clone();
         }
+        apply_application_selection(&mut template.settings, selection)?;
         let project_id = slug_id(name);
         let project_uri = format!("qnc://local/project/{project_id}");
         parse_qnc_uri(&project_uri)?;
         let now = now_str();
-        let project_dir = self.projects_root.join(safe_dir_name(&project_id));
-
-        conn.execute(
-            "INSERT INTO projects
-                (project_id, name, project_uri, created_at, updated_at, last_opened_at)
-             VALUES (?1, ?2, ?3, ?4, ?4, ?4)",
-            params![project_id, name, project_uri, now],
-        )
-        .map_err(|error| error.to_string())?;
-        conn.execute(
-            "INSERT INTO project_storage_locations
-                (project_id, local_path, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?3)
-             ON CONFLICT(project_id) DO UPDATE SET
-                local_path = excluded.local_path,
-                updated_at = excluded.updated_at",
-            params![project_id, project_dir.to_string_lossy().to_string(), now],
-        )
-        .map_err(|error| error.to_string())?;
-        unlock_projects_root_dir(&self.projects_root)?;
-        let result = (|| {
-            prepare_project_export_directory(&project_dir, &mut template.settings)?;
-            self.ensure_workspace_db(&project_id, Some(&template))?;
+        let projects_root = self.create_projects_root(&conn, &template.settings)?;
+        let project_dir = projects_root.join(safe_dir_name(&project_id));
+        let export_path = project_export_directory(&project_dir, &mut template.settings)?;
+        fs::create_dir_all(&projects_root).map_err(|error| error.to_string())?;
+        let confirmed_root = projects_root
+            .canonicalize()
+            .map_err(|error| error.to_string())?;
+        unlock_projects_root_dir(&projects_root)?;
+        let mut created_directory = false;
+        let result: Result<ProjectRow, String> = (|| {
+            // Claim a new directory before writing; never reuse or clean an existing one.
+            fs::create_dir(&project_dir).map_err(|error| error.to_string())?;
+            created_directory = true;
+            if let Some(export_path) = &export_path {
+                fs::create_dir_all(export_path).map_err(|error| {
+                    format!(
+                        "Ne mogu kreirati export direktorij '{}': {error}",
+                        export_path.display()
+                    )
+                })?;
+            }
+            self.ensure_workspace_db(&project_id, &project_dir, Some(&template))?;
             lock_project_dir(&project_dir)?;
-            set_setting(&conn, "active_project_id", &project_id)?;
+            lock_projects_root_dir(&projects_root)?;
+
+            // Publish only a prepared workspace, in one short registry transaction.
+            let tx = conn.transaction().map_err(|error| error.to_string())?;
+            tx.execute(
+                "INSERT INTO projects
+                    (project_id, name, project_uri, created_at, updated_at, last_opened_at)
+                 VALUES (?1, ?2, ?3, ?4, ?4, ?4)",
+                params![project_id, name, project_uri, now],
+            )
+            .map_err(|error| error.to_string())?;
+            tx.execute(
+                "INSERT INTO project_storage_locations
+                    (project_id, local_path, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?3)",
+                params![project_id, project_dir.to_string_lossy().to_string(), now],
+            )
+            .map_err(|error| error.to_string())?;
+            set_local_setting(&tx, PROJECTS_ROOT_KEY, &projects_root.to_string_lossy())?;
+            set_setting(&tx, "active_project_id", &project_id)?;
+            tx.commit().map_err(|error| error.to_string())?;
             Ok(ProjectRow {
                 project_id,
                 name: name.to_string(),
@@ -369,13 +400,96 @@ impl ProjectStore {
                 active: true,
             })
         })();
-        let lock_result = lock_projects_root_dir(&self.projects_root);
-        match (result, lock_result) {
-            (Ok(row), Ok(())) => Ok(row),
-            (Err(error), Ok(())) => Err(error),
-            (Ok(_), Err(error)) => Err(error),
-            (Err(error), Err(lock_error)) => Err(format!("{error}; {lock_error}")),
+        match result {
+            Ok(row) => Ok(row),
+            Err(mut error) => {
+                if created_directory {
+                    if let Err(cleanup_error) =
+                        remove_unpublished_project(&confirmed_root, &project_dir)
+                    {
+                        error.push_str(&format!(
+                            "; uklanjanje nedovrsenog projekta: {cleanup_error}"
+                        ));
+                    }
+                }
+                if let Err(lock_error) = lock_projects_root_dir(&projects_root) {
+                    error.push_str(&format!("; {lock_error}"));
+                }
+                Err(error)
+            }
         }
+    }
+
+    fn create_projects_root(&self, conn: &Connection, settings: &Value) -> Result<PathBuf, String> {
+        let requested = settings_path_string(settings, &["storage", "projects_root"]);
+        let location = if requested.is_empty() || requested == "$QNC_STANDARD_PROJECTS_ROOT" {
+            get_local_setting(conn, PROJECTS_ROOT_KEY)?
+                .map(PathBuf::from)
+                .unwrap_or_else(|| self.projects_root.clone())
+        } else {
+            if requested.starts_with("qnc://") {
+                return Err("Lokacija projekta zahtijeva konfiguriran transport binding; nema lokalnog fallbacka.".to_string());
+            }
+            if requested.starts_with('$') {
+                return Err(format!("Nepoznata lokacija projekta: {requested}"));
+            }
+            PathBuf::from(requested)
+        };
+        if location.is_absolute() {
+            Ok(location)
+        } else if location
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_) | Component::CurDir))
+        {
+            Err("Relativna lokacija projekta ne smije izlaziti iz QNC direktorija.".to_string())
+        } else {
+            Ok(self.root.join(location))
+        }
+    }
+
+    pub fn navigation_sequence(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<ProjectNavigationStep>, String> {
+        let registry = Connection::open_with_flags(
+            self.project_registry_db_path()?,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .map_err(|error| error.to_string())?;
+        let dir = project_dir_from_conn(&registry, &self.projects_root, project_id)?;
+        let db = Connection::open_with_flags(
+            self.project_workspace_db_path(project_id, &dir)?,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .map_err(|error| error.to_string())?;
+        let sql = "SELECT application_id, tab_id, priority_group FROM public_project_application_sequence WHERE project_id=?1 ORDER BY position";
+        let mut stmt = db.prepare(sql).map_err(|error| error.to_string())?;
+        let rows = stmt
+            .query_map([project_id], |row| {
+                Ok(ProjectNavigationStep {
+                    application_id: row.get(0)?,
+                    tab_id: row.get(1)?,
+                    priority_group: row.get(2)?,
+                })
+            })
+            .map_err(|error| error.to_string())?;
+        let steps = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| error.to_string())?;
+        if steps.first().is_none_or(|step| step.priority_group != "a")
+            || steps.iter().any(|step| {
+                step.priority_group.len() != 1
+                    || !step.priority_group.as_bytes()[0].is_ascii_lowercase()
+                    || !step.application_id.starts_with("qnc.")
+                    || step.tab_id.is_empty()
+            })
+            || steps
+                .windows(2)
+                .any(|pair| pair[0].priority_group >= pair[1].priority_group)
+        {
+            return Err("Projekt nema valjan novi slijed prioritetnih grupa.".into());
+        }
+        Ok(steps)
     }
 
     pub fn open_project(&self, project_id: &str) -> Result<(), String> {
@@ -395,6 +509,7 @@ impl ProjectStore {
         if exists == 0 {
             return Err(format!("Projekt '{project_id}' ne postoji."));
         }
+        self.navigation_sequence(project_id)?;
         let project_dir = project_dir_from_conn(&conn, &self.projects_root, project_id)?;
         let workspace_db = self.project_workspace_db_path(project_id, &project_dir)?;
         if !workspace_db.is_file() {
@@ -446,6 +561,9 @@ impl ProjectStore {
         let project_dir = project_dir_from_conn(&conn, &self.projects_root, project_id)?;
         let workspace_db = self.project_workspace_db_path(project_id, &project_dir)?;
         validate_project_delete_dir(project_id, &project_dir, &workspace_db)?;
+        let projects_root = project_dir
+            .parent()
+            .ok_or("Projekt nema parent direktorij.")?;
 
         let active_project_id = get_setting(&conn, "active_project_id", "")?;
         let next_active_project_id = if active_project_id == project_id {
@@ -486,9 +604,9 @@ impl ProjectStore {
             .map_err(|error| error.to_string())?;
         }
         if project_dir.exists() {
-            unlock_projects_root_dir(&self.projects_root)?;
+            unlock_projects_root_dir(projects_root)?;
             if let Err(error) = unlock_project_dir(&project_dir) {
-                let _ = lock_projects_root_dir(&self.projects_root);
+                let _ = lock_projects_root_dir(projects_root);
                 return Err(error);
             }
             let remove_result = fs::remove_dir_all(&project_dir).map_err(|error| {
@@ -497,7 +615,7 @@ impl ProjectStore {
                     project_dir.display()
                 )
             });
-            let lock_result = lock_projects_root_dir(&self.projects_root);
+            let lock_result = lock_projects_root_dir(projects_root);
             remove_result?;
             lock_result?;
         }
@@ -526,14 +644,15 @@ impl ProjectStore {
     fn ensure_workspace_db(
         &self,
         project_id: &str,
+        dir: &Path,
         template: Option<&StoredTemplate>,
     ) -> Result<(), String> {
-        let dir = self.project_dir(project_id);
-        ensure_project_dirs_at(&dir)?;
-        let db_path = self.project_workspace_db_path(project_id, &dir)?;
-        let conn = Connection::open(db_path).map_err(|error| error.to_string())?;
+        ensure_project_dirs_at(dir)?;
+        let db_path = self.project_workspace_db_path(project_id, dir)?;
+        let mut conn = Connection::open(db_path).map_err(|error| error.to_string())?;
         configure_connection(&conn)?;
-        init_workspace_schema(&conn)?;
+        let tx = conn.transaction().map_err(|error| error.to_string())?;
+        init_workspace_schema(&tx)?;
         let template_id = template
             .map(|template| template.template_id.as_str())
             .unwrap_or("");
@@ -541,7 +660,7 @@ impl ProjectStore {
             .map(|template| template.settings.clone())
             .unwrap_or(Value::Object(Default::default()));
         let settings_json = json_string(&settings)?;
-        conn.execute(
+        tx.execute(
             "INSERT INTO project_settings
                 (project_id, template_id, settings_json, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?4)
@@ -550,19 +669,11 @@ impl ProjectStore {
         )
         .map_err(|error| error.to_string())?;
         if let Some(template) = template {
-            save_template_snapshot(&conn, project_id, template)?;
-            write_project_workflow(&conn, project_id, &template.settings)?;
+            save_template_snapshot(&tx, project_id, template)?;
+            write_project_workflow(&tx, project_id, &template.settings)?;
         }
+        tx.commit().map_err(|error| error.to_string())?;
         Ok(())
-    }
-
-    fn project_dir(&self, project_id: &str) -> PathBuf {
-        if let Ok(conn) = self.open_registry() {
-            if let Ok(project_dir) = project_dir_from_conn(&conn, &self.projects_root, project_id) {
-                return project_dir;
-            }
-        }
-        self.projects_root.join(safe_dir_name(project_id))
     }
 
     fn project_registry_db_path(&self) -> Result<PathBuf, String> {
@@ -598,10 +709,10 @@ fn ensure_project_dirs_at(base: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn prepare_project_export_directory(
+fn project_export_directory(
     project_dir: &Path,
     settings: &mut Value,
-) -> Result<(), String> {
+) -> Result<Option<PathBuf>, String> {
     let mut export_directory = settings_path_string(settings, &["export", "directory"]);
     if export_directory.trim().is_empty() {
         export_directory = settings_path_string(settings, &["export", "output_directory"]);
@@ -614,16 +725,25 @@ fn prepare_project_export_directory(
     let export_directory = export_directory.trim();
     if export_directory.starts_with("qnc://") {
         parse_qnc_uri(export_directory)?;
-        return Ok(());
+        return Ok(None);
     }
 
-    let export_path = export_directory_path(project_dir, export_directory)?;
-    fs::create_dir_all(&export_path).map_err(|error| {
-        format!(
-            "Ne mogu kreirati export direktorij '{}': {error}",
-            export_path.display()
-        )
-    })
+    export_directory_path(project_dir, export_directory).map(Some)
+}
+
+fn remove_unpublished_project(projects_root: &Path, project_dir: &Path) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(project_dir).map_err(|error| error.to_string())?;
+    let resolved = project_dir
+        .canonicalize()
+        .map_err(|error| error.to_string())?;
+    if metadata.file_type().is_symlink() || resolved.parent() != Some(projects_root) {
+        return Err(
+            "Direktorij za uklanjanje nije unutar potvrdene lokacije projekta.".to_string(),
+        );
+    }
+    unlock_projects_root_dir(projects_root)?;
+    unlock_project_dir(project_dir)?;
+    fs::remove_dir_all(project_dir).map_err(|error| error.to_string())
 }
 
 fn export_directory_path(project_dir: &Path, export_directory: &str) -> Result<PathBuf, String> {
@@ -1236,6 +1356,11 @@ fn init_workspace_schema(conn: &Connection) -> Result<(), String> {
         CREATE VIEW IF NOT EXISTS public_project_workflow_state AS
             SELECT project_id, active_step_id, entry_step_id, updated_at
             FROM project_workflow_state;
+        CREATE VIEW IF NOT EXISTS public_project_application_sequence AS
+            SELECT project_id, step_id, plugin_id AS application_id, tab_id, label, position,
+                json_extract(settings_json, '$.priority_group') AS priority_group,
+                status, next_step_id
+            FROM project_workflow_steps;
         CREATE VIEW IF NOT EXISTS public_project_data_revisions AS
             SELECT scope, revision, updated_at FROM project_data_revisions;
         ",
@@ -1404,12 +1529,73 @@ fn save_template_snapshot(
     Ok(())
 }
 
+fn apply_application_selection(
+    settings: &mut Value,
+    selection: &SelectionSnapshot,
+) -> Result<(), String> {
+    selection.validate().map_err(|error| error.to_string())?;
+    if !selection
+        .applications
+        .iter()
+        .any(|app| app.priority_group == "a")
+    {
+        return Err("Odaberite aplikaciju iz grupe a.".into());
+    }
+    if selection.applications.is_empty() {
+        return Err("Odaberite barem jednu aplikaciju.".into());
+    }
+    let root = settings
+        .as_object_mut()
+        .ok_or("Postavke moraju biti objekt.")?;
+    let workspace = root.entry("workspace").or_insert_with(|| json!({}));
+    let workspace = workspace
+        .as_object_mut()
+        .ok_or("Workspace postavke moraju biti objekt.")?;
+    workspace.insert(
+        "application_selection".into(),
+        serde_json::to_value(selection).map_err(|e| e.to_string())?,
+    );
+    workspace.insert(
+        "tabs".into(),
+        json!(selection
+            .applications
+            .iter()
+            .map(|app| &app.tab_id)
+            .collect::<Vec<_>>()),
+    );
+    workspace.insert(
+        "tab_labels".into(),
+        Value::Object(
+            selection
+                .applications
+                .iter()
+                .map(|app| (app.tab_id.clone(), json!(app.label)))
+                .collect(),
+        ),
+    );
+    Ok(())
+}
+
 fn write_project_workflow(
     conn: &Connection,
     project_id: &str,
     settings: &Value,
 ) -> Result<(), String> {
-    let (tabs, labels) = workflow_tabs_from_settings(settings);
+    let selection: SelectionSnapshot = settings
+        .pointer("/workspace/application_selection")
+        .ok_or("Nedostaje odabrani slijed aplikacija.")
+        .and_then(|value| {
+            serde_json::from_value(value.clone()).map_err(|_| "Neispravan slijed aplikacija.")
+        })
+        .map_err(|e| e.to_string())?;
+    selection.validate().map_err(|e| e.to_string())?;
+    if selection
+        .applications
+        .first()
+        .is_none_or(|app| app.priority_group != "a")
+    {
+        return Err("Slijed mora poceti odabranom grupom a.".into());
+    }
     conn.execute(
         "DELETE FROM project_workflow_steps WHERE project_id = ?1",
         params![project_id],
@@ -1418,9 +1604,12 @@ fn write_project_workflow(
 
     let mut entry_step_id = String::new();
     let mut previous_step_id = String::new();
-    for (index, tab_id) in tabs.iter().enumerate() {
+    for (index, application) in selection.applications.iter().enumerate() {
+        let tab_id = &application.tab_id;
+        let metadata = serde_json::to_value(application).map_err(|e| e.to_string())?;
         let step_id = step_id_for_tab(tab_id);
-        if tab_id != "project" && entry_step_id.is_empty() {
+        let initial_group = application.priority_group == "a";
+        if !initial_group && entry_step_id.is_empty() {
             entry_step_id = step_id.clone();
         }
         if !previous_step_id.is_empty() {
@@ -1432,7 +1621,7 @@ fn write_project_workflow(
             )
             .map_err(|error| error.to_string())?;
         }
-        let status = if tab_id == "project" {
+        let status = if initial_group {
             "complete"
         } else if step_id == entry_step_id {
             "active"
@@ -1442,15 +1631,16 @@ fn write_project_workflow(
         conn.execute(
             "INSERT INTO project_workflow_steps
                 (step_id, project_id, plugin_id, tab_id, label, position, status, next_step_id, settings_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, '{}')",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8)",
             params![
                 step_id,
                 project_id,
-                plugin_id_for_tab(tab_id),
+                application.application_id,
                 tab_id,
-                label_for_tab(tab_id, &labels),
+                application.label,
                 index as i64,
                 status,
+                json_string(&metadata)?,
             ],
         )
         .map_err(|error| error.to_string())?;
@@ -1458,7 +1648,7 @@ fn write_project_workflow(
     }
 
     let active_step_id = if entry_step_id.is_empty() {
-        step_id_for_tab("project")
+        step_id_for_tab(&selection.applications[0].tab_id)
     } else {
         entry_step_id.clone()
     };
@@ -1474,78 +1664,6 @@ fn write_project_workflow(
     )
     .map_err(|error| error.to_string())?;
     Ok(())
-}
-
-fn workflow_tabs_from_settings(settings: &Value) -> (Vec<String>, Value) {
-    let workspace = settings.get("workspace").unwrap_or(&Value::Null);
-    let mut tabs = workspace
-        .get("tabs")
-        .and_then(Value::as_array)
-        .map(|values| {
-            values
-                .iter()
-                .filter_map(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(normalize_tab_id)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    if !tabs.iter().any(|tab| tab == "project") {
-        tabs.insert(0, "project".to_string());
-    }
-    dedupe_keep_order(&mut tabs);
-    let labels = workspace
-        .get("tab_labels")
-        .cloned()
-        .unwrap_or_else(|| json!({}));
-    (tabs, labels)
-}
-
-fn normalize_tab_id(value: &str) -> String {
-    match value {
-        "storyboard" => "story".to_string(),
-        other => other.to_string(),
-    }
-}
-
-fn dedupe_keep_order(values: &mut Vec<String>) {
-    let mut seen = Vec::<String>::new();
-    values.retain(|value| {
-        if seen.iter().any(|item| item == value) {
-            false
-        } else {
-            seen.push(value.clone());
-            true
-        }
-    });
-}
-
-fn label_for_tab(tab_id: &str, labels: &Value) -> String {
-    labels
-        .get(tab_id)
-        .or_else(|| {
-            if tab_id == "story" {
-                labels.get("storyboard")
-            } else {
-                None
-            }
-        })
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .unwrap_or_else(|| match tab_id {
-            "project" => "Project".to_string(),
-            "story" => "Story".to_string(),
-            other => other.replace('_', " "),
-        })
-}
-
-fn plugin_id_for_tab(tab_id: &str) -> String {
-    match tab_id {
-        "pool" => "media_pool".to_string(),
-        "storyboard" => "story".to_string(),
-        other => other.to_string(),
-    }
 }
 
 fn step_id_for_tab(tab_id: &str) -> String {
@@ -1685,6 +1803,157 @@ fn safe_dir_name(project_id: &str) -> String {
 mod tests {
     use super::*;
 
+    fn test_selection(tabs: &[&str]) -> SelectionSnapshot {
+        SelectionSnapshot {
+            schema_version: 1,
+            catalog_uri: qnc_application_catalog::DEFAULT_URI.into(),
+            observed_at_unix_ms: 1,
+            applications: tabs
+                .iter()
+                .enumerate()
+                .map(|(i, tab)| qnc_application_catalog::SelectedApplication {
+                    application_id: format!("qnc.{tab}"),
+                    tab_id: (*tab).into(),
+                    label: (*tab).into(),
+                    priority_group: char::from(b'a' + i as u8).to_string(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn navigation_reads_only_new_public_sequence_without_modifying_database() {
+        let root = temp_root("navigation_readonly");
+        let store = ProjectStore::open(&root).unwrap();
+        let project = store
+            .create_project(
+                "Navigation",
+                "tpl_breaking_news",
+                None,
+                &test_selection(&["alternative", "next"]),
+            )
+            .unwrap();
+        let path = root
+            .join("projects")
+            .join(&project.project_id)
+            .join("qnc_project.db");
+        let before = fs::read(&path).unwrap();
+        let steps = store.navigation_sequence(&project.project_id).unwrap();
+        assert_eq!(steps[0].application_id, "qnc.alternative");
+        assert_eq!(steps[1].priority_group, "b");
+        assert_eq!(before, fs::read(&path).unwrap());
+        unlock_project_dir(path.parent().unwrap()).unwrap();
+        let db = Connection::open(&path).unwrap();
+        let entry: String = db
+            .query_row(
+                "SELECT entry_step_id FROM project_workflow_state",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(entry, "step_next");
+        db.execute("UPDATE project_workflow_steps SET settings_json = '{}'", [])
+            .unwrap();
+        drop(db);
+        let before_invalid_read = fs::read(&path).unwrap();
+        assert!(store.navigation_sequence(&project.project_id).is_err());
+        assert!(store.open_project(&project.project_id).is_err());
+        assert_eq!(before_invalid_read, fs::read(&path).unwrap());
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn workflow_writer_rejects_legacy_tabs_without_selection() {
+        let db = Connection::open_in_memory().unwrap();
+        init_workspace_schema(&db).unwrap();
+        assert!(write_project_workflow(
+            &db,
+            "legacy",
+            &json!({"workspace":{"tabs":["project","ingest"]}})
+        )
+        .is_err());
+        let count: i64 = db
+            .query_row("SELECT count(*) FROM project_workflow_steps", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn application_sequence_round_trips_through_template_and_public_project_db() {
+        let root = temp_root("application_sequence");
+        let store = ProjectStore::open(&root).unwrap();
+        let mut selection = test_selection(&["first", "variant", "last"]);
+        selection.applications[1].priority_group = "c".into();
+        selection.applications[2].priority_group = "d".into();
+        let template = store
+            .create_user_template("Grouped", "", "tpl_breaking_news", None, &selection)
+            .unwrap();
+        let saved = store.selected_template_settings().unwrap();
+        assert_eq!(
+            saved.settings["workspace"]["application_selection"],
+            serde_json::to_value(&selection).unwrap()
+        );
+        let project = store
+            .create_project("Grouped", &template.template_id, None, &selection)
+            .unwrap();
+        let dir = root
+            .join("projects")
+            .join(safe_dir_name(&project.project_id));
+        unlock_project_dir(&dir).unwrap();
+        let db = Connection::open(dir.join("qnc_project.db")).unwrap();
+        let mut statement = db.prepare("SELECT application_id, priority_group FROM public_project_application_sequence ORDER BY position").unwrap();
+        let rows: Vec<(String, String)> = statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            rows,
+            vec![
+                ("qnc.first".into(), "a".into()),
+                ("qnc.variant".into(), "c".into()),
+                ("qnc.last".into(), "d".into())
+            ]
+        );
+        let settings: String = db
+            .query_row("SELECT settings_json FROM project_settings", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&settings).unwrap()["workspace"]["application_selection"],
+            serde_json::to_value(&selection).unwrap()
+        );
+        drop(statement);
+        drop(db);
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn owner_rejects_duplicate_groups_before_creating_project_or_template() {
+        let root = temp_root("reject_group");
+        let store = ProjectStore::open(&root).unwrap();
+        let before = store.list_project_templates().unwrap().len();
+        let mut selection = test_selection(&["first", "variant"]);
+        selection.applications[1].priority_group = "a".into();
+        assert!(store
+            .create_project("Invalid", "tpl_breaking_news", None, &selection)
+            .is_err());
+        assert!(store
+            .create_user_template("Invalid", "", "tpl_breaking_news", None, &selection)
+            .is_err());
+        assert!(store.list_projects().unwrap().is_empty());
+        assert_eq!(store.list_project_templates().unwrap().len(), before);
+        selection.applications.remove(1);
+        selection.applications[0].priority_group = "b".into();
+        assert!(store
+            .create_project("Without A", "tpl_breaking_news", None, &selection)
+            .is_err());
+        cleanup_temp_root(&root);
+    }
+
     fn temp_root(label: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
             "qnc_project_store_{label}_{}_{}",
@@ -1748,7 +2017,12 @@ mod tests {
         let templates = store.list_project_templates().expect("templates");
         assert!(templates.len() >= 4);
         let row = store
-            .create_project("Test Projekt", &templates[0].template_id, None)
+            .create_project(
+                "Test Projekt",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("project");
         assert!(row.project_id.starts_with("test_projekt_"));
         assert!(row.project_uri.starts_with("qnc://local/project/"));
@@ -1777,7 +2051,12 @@ mod tests {
         let root = temp_root("default_export_dir");
         let store = ProjectStore::open(&root).expect("store");
         let row = store
-            .create_project("Default Export", "tpl_breaking_news", None)
+            .create_project(
+                "Default Export",
+                "tpl_breaking_news",
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         assert!(
@@ -1800,6 +2079,222 @@ mod tests {
     }
 
     #[test]
+    fn failed_create_keeps_registry_and_active_project_unchanged() {
+        let root = temp_root("failed_create");
+        let store = ProjectStore::open(&root).unwrap();
+        let selection = test_selection(&["project", "ingest"]);
+        let first = store
+            .create_project("Existing", "tpl_breaking_news", None, &selection)
+            .unwrap();
+        let error = store
+            .create_project(
+                "Invalid",
+                "tpl_breaking_news",
+                Some(&json!({"export": {"directory": "../invalid"}})),
+                &selection,
+            )
+            .unwrap_err();
+        assert!(error.contains("Export direktorij"));
+        assert_eq!(store.list_projects().unwrap(), vec![first]);
+        let conn = store.open_registry().unwrap();
+        assert_eq!(
+            conn.query_row("SELECT COUNT(*) FROM project_storage_locations", [], |r| {
+                r.get::<_, i64>(0)
+            })
+            .unwrap(),
+            1
+        );
+        assert_eq!(fs::read_dir(root.join("projects")).unwrap().count(), 1);
+        drop(conn);
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn workspace_failure_removes_only_the_unpublished_directory() {
+        let root = temp_root("workspace_failure");
+        let store = ProjectStore::open(&root).unwrap();
+        let error = store
+            .create_project(
+                "Failed workspace",
+                "tpl_breaking_news",
+                Some(&json!({"export": {"directory": "qnc_project.db"}})),
+                &test_selection(&["project", "ingest"]),
+            )
+            .unwrap_err();
+        assert!(!error.is_empty());
+        assert!(store.list_projects().unwrap().is_empty());
+        assert_eq!(fs::read_dir(root.join("projects")).unwrap().count(), 0);
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn publication_failure_rolls_back_registry_and_preserves_external_export() {
+        let root = temp_root("publication_failure");
+        let store = ProjectStore::open(&root).unwrap();
+        let selection = test_selection(&["project", "ingest"]);
+        let first = store
+            .create_project("Existing", "tpl_breaking_news", None, &selection)
+            .unwrap();
+        let export = root.join("shared-export");
+        fs::create_dir(&export).unwrap();
+        fs::write(export.join("keep.txt"), "existing export").unwrap();
+        let conn = store.open_registry().unwrap();
+        conn.execute_batch(
+            "CREATE TRIGGER reject_new_location BEFORE INSERT ON project_storage_locations
+            BEGIN SELECT RAISE(ABORT, 'test publication failure'); END;",
+        )
+        .unwrap();
+        let settings = json!({"export": {"directory": export}});
+        let error = store
+            .create_project(
+                "Unpublished",
+                "tpl_breaking_news",
+                Some(&settings),
+                &selection,
+            )
+            .unwrap_err();
+        assert!(error.contains("test publication failure"));
+        assert!(!error.contains("uklanjanje nedovrsenog"), "{error}");
+        assert_eq!(store.list_projects().unwrap(), vec![first]);
+        assert_eq!(
+            conn.query_row("SELECT COUNT(*) FROM project_storage_locations", [], |r| {
+                r.get::<_, i64>(0)
+            })
+            .unwrap(),
+            1
+        );
+        assert_eq!(fs::read_dir(root.join("projects")).unwrap().count(), 1);
+        assert_eq!(
+            fs::read_to_string(export.join("keep.txt")).unwrap(),
+            "existing export"
+        );
+        drop(conn);
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn typed_projects_root_controls_workspace_and_persisted_location() {
+        let root = temp_root("typed_projects_root");
+        let store = ProjectStore::open(&root).unwrap();
+        let requested = root.join("typed location");
+        let settings = json!({"storage": {"projects_root": requested}});
+        let project = store
+            .create_project(
+                "Typed location",
+                "tpl_breaking_news",
+                Some(&settings),
+                &test_selection(&["project", "ingest"]),
+            )
+            .unwrap();
+        let dir = requested.join(&project.project_id);
+        assert!(dir.join("qnc_project.db").is_file());
+        assert!(dir.join(DEFAULT_EXPORT_DIRECTORY).is_dir());
+        assert!(!root.join("projects").join(&project.project_id).exists());
+        let conn = store.open_registry().unwrap();
+        assert_eq!(
+            project_dir_from_conn(&conn, &store.projects_root, &project.project_id)
+                .unwrap()
+                .canonicalize()
+                .unwrap(),
+            dir.canonicalize().unwrap()
+        );
+        assert_eq!(
+            PathBuf::from(
+                get_local_setting(&conn, PROJECTS_ROOT_KEY)
+                    .unwrap()
+                    .unwrap()
+            )
+            .canonicalize()
+            .unwrap(),
+            requested.canonicalize().unwrap()
+        );
+        let db = Connection::open_with_flags(
+            dir.join("qnc_project.db"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let saved: String = db
+            .query_row("SELECT settings_json FROM project_settings", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&saved).unwrap()["storage"]["projects_root"],
+            settings["storage"]["projects_root"]
+        );
+        drop(db);
+        drop(conn);
+        store.delete_project(&project.project_id).unwrap();
+        unlock_projects_root_dir(&requested).unwrap();
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn create_without_override_reads_the_latest_root_from_registry() {
+        let root = temp_root("latest_root");
+        let first = ProjectStore::open(&root).unwrap();
+        let mut second = ProjectStore::open(&root).unwrap();
+        let requested = root.join("selected_by_other_instance");
+        second.set_projects_root(&requested).unwrap();
+        let project = first
+            .create_project(
+                "Current root",
+                "tpl_breaking_news",
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
+            .unwrap();
+        assert!(requested
+            .join(&project.project_id)
+            .join("qnc_project.db")
+            .is_file());
+        assert!(!root.join("projects").join(&project.project_id).exists());
+        first.delete_project(&project.project_id).unwrap();
+        unlock_projects_root_dir(&requested).unwrap();
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn unconfigured_transport_root_is_rejected_without_local_fallback() {
+        let root = temp_root("unconfigured_transport_root");
+        let store = ProjectStore::open(&root).unwrap();
+        for requested in [
+            "qnc://local/source/unknown",
+            "qnc://lan/server/source/projects",
+            "qnc://intranet/server/source/projects",
+        ] {
+            let error = store
+                .create_project(
+                    "Remote",
+                    "tpl_breaking_news",
+                    Some(&json!({"storage": {"projects_root": requested}})),
+                    &test_selection(&["project", "ingest"]),
+                )
+                .unwrap_err();
+            assert!(error.contains("transport binding"));
+        }
+        assert!(store.list_projects().unwrap().is_empty());
+        assert!(!root.join("projects").exists());
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn unpublished_cleanup_refuses_a_directory_outside_the_confirmed_root() {
+        let root = temp_root("cleanup_boundary");
+        let projects = root.join("projects");
+        let unrelated = root.join("unrelated");
+        fs::create_dir_all(&projects).unwrap();
+        fs::create_dir(&unrelated).unwrap();
+        fs::write(unrelated.join("keep.txt"), "keep").unwrap();
+        assert!(remove_unpublished_project(&projects.canonicalize().unwrap(), &unrelated).is_err());
+        assert_eq!(
+            fs::read_to_string(unrelated.join("keep.txt")).unwrap(),
+            "keep"
+        );
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
     fn create_project_uses_custom_export_directory_when_set() {
         let root = temp_root("custom_export_dir");
         let store = ProjectStore::open(&root).expect("store");
@@ -1810,7 +2305,12 @@ mod tests {
             }
         });
         let row = store
-            .create_project("Custom Export", "tpl_breaking_news", Some(&settings))
+            .create_project(
+                "Custom Export",
+                "tpl_breaking_news",
+                Some(&settings),
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         assert!(
@@ -1845,7 +2345,12 @@ mod tests {
         let store = ProjectStore::open(&root).expect("store");
         let templates = store.list_project_templates().expect("templates");
         let row = store
-            .create_project("No Repair Dirs", &templates[0].template_id, None)
+            .create_project(
+                "No Repair Dirs",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         unlock_project_dir(&project_dir).expect("unlock for external test delete");
@@ -1866,7 +2371,12 @@ mod tests {
         let store = ProjectStore::open(&root).expect("store");
         let templates = store.list_project_templates().expect("templates");
         let row = store
-            .create_project("Locked Project", &templates[0].template_id, None)
+            .create_project(
+                "Locked Project",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         assert!(project_dir
@@ -1887,7 +2397,12 @@ mod tests {
         let store = ProjectStore::open(&root).expect("store");
         let templates = store.list_project_templates().expect("templates");
         let row = store
-            .create_project("Windows Delete Lock", &templates[0].template_id, None)
+            .create_project(
+                "Windows Delete Lock",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
 
@@ -1907,10 +2422,20 @@ mod tests {
         let store = ProjectStore::open(&root).expect("store");
         let templates = store.list_project_templates().expect("templates");
         let first = store
-            .create_project("Prvi", &templates[0].template_id, None)
+            .create_project(
+                "Prvi",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("first");
         let second = store
-            .create_project("Drugi", &templates[0].template_id, None)
+            .create_project(
+                "Drugi",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("second");
         store.open_project(&first.project_id).expect("open first");
         let rows = store.list_projects().expect("rows");
@@ -1945,7 +2470,12 @@ mod tests {
             .expect("set projects root");
         let templates = store.list_project_templates().expect("templates");
         let row = store
-            .create_project("Root Test", &templates[0].template_id, None)
+            .create_project(
+                "Root Test",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("project");
         assert!(selected_root
             .join(safe_dir_name(&row.project_id))
@@ -1964,7 +2494,13 @@ mod tests {
         let root = temp_root("user_template");
         let store = ProjectStore::open(&root).expect("store");
         let created = store
-            .create_user_template("Moj template", "Opis", "tpl_breaking_news", None)
+            .create_user_template(
+                "Moj template",
+                "Opis",
+                "tpl_breaking_news",
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("custom template");
         assert!(!created.system);
         assert!(created.template_id.starts_with("tpl_user_moj_template_"));
@@ -1980,7 +2516,13 @@ mod tests {
         let root = temp_root("delete_user_template");
         let store = ProjectStore::open(&root).expect("store");
         let created = store
-            .create_user_template("Moj template", "Opis", "tpl_breaking_news", None)
+            .create_user_template(
+                "Moj template",
+                "Opis",
+                "tpl_breaking_news",
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("custom template");
         store
             .delete_user_template(&created.template_id)
@@ -2013,7 +2555,12 @@ mod tests {
         let root = temp_root("workflow");
         let store = ProjectStore::open(&root).expect("store");
         let row = store
-            .create_project("Workflow Test", "tpl_breaking_news", None)
+            .create_project(
+                "Workflow Test",
+                "tpl_breaking_news",
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         unlock_project_dir(&project_dir).expect("unlock for DB inspection");
@@ -2050,7 +2597,12 @@ mod tests {
             }
         });
         let row = store
-            .create_project("Draft Test", "tpl_breaking_news", Some(&settings))
+            .create_project(
+                "Draft Test",
+                "tpl_breaking_news",
+                Some(&settings),
+                &test_selection(&["project", "media_assist"]),
+            )
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         unlock_project_dir(&project_dir).expect("unlock for DB inspection");
@@ -2081,10 +2633,20 @@ mod tests {
         let store = ProjectStore::open(&root).expect("store");
         let templates = store.list_project_templates().expect("templates");
         let first = store
-            .create_project("Prvi", &templates[0].template_id, None)
+            .create_project(
+                "Prvi",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("first");
         let second = store
-            .create_project("Drugi", &templates[0].template_id, None)
+            .create_project(
+                "Drugi",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("second");
         let second_dir = root
             .join("projects")
@@ -2108,7 +2670,12 @@ mod tests {
         let store = ProjectStore::open(&root).expect("store");
         let templates = store.list_project_templates().expect("templates");
         let project = store
-            .create_project("Guard", &templates[0].template_id, None)
+            .create_project(
+                "Guard",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
             .expect("project");
         let bad_dir = root.join("unexpected_project_path");
         fs::create_dir_all(&bad_dir).expect("bad dir");

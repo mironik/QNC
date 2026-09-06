@@ -1,0 +1,14 @@
+[package]
+name = "qnc-app-catalog"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Standalone QNC installed application catalog publisher"
+
+[dependencies]
+qnc-application-catalog = { workspace = true }
+qnc-contracts.workspace = true
+qnc-transport-resolver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile = "3"

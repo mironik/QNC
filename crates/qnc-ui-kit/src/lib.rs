@@ -1,5 +1,8 @@
 use eframe::egui::{self, Button, Color32, CornerRadius, RichText, Stroke, Vec2};
 
+mod option_columns;
+pub use option_columns::*;
+
 pub const STANDARD_ACTION_BUTTON_WIDTH: f32 = 96.0;
 pub const STANDARD_ACTION_BUTTON_GAP: f32 = 8.0;
 

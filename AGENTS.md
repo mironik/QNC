@@ -89,6 +89,40 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
   poslovnu logiku.
 - `apps/*/qnc-app.json` registrira tab, redoslijed, `host_mode` i
   `desktop_entry`.
+- Katalog dostupnih aplikacija generira samostalan alat iz postojecih
+  registracija i prisutnih izvrsnih datoteka. Katalog smije biti JSON ili
+  baza; nije poslovna baza niti alat za suradnju izmedu aplikacija.
+- Forma ne generira katalog i ne otkriva instalirane aplikacije. Izbornik
+  dostupnih aplikacija cita samo provjereni popis iz kataloga, bez
+  hardkodiranih zamjenskih aplikacija. Katalog se osvjezava nakon dodavanja,
+  uklanjanja ili promjene registracije/instalacije.
+- Svaka aplikacija pripada prioritetnoj grupi (`priority_group`) oznacenoj
+  slovom a-z u registraciji. Vise aplikacija smije pripadati istoj grupi:
+  to su alternativne izvedbe iste faze (skracena, standardna, prosirena itd.).
+- U jednom templateu smije biti odabrana najvise jedna aplikacija iz svake
+  grupe. Izbor jedne onemogucuje druge iz te grupe; uklanjanje izbora ponovno
+  oslobada grupu. Zauzetost nije globalna niti zajednicko runtime stanje.
+- Izbornik koristi option/radio dugmad po grupama. Odabir druge varijante
+  zamjenjuje prethodnu, nikad ne dodaje drugu u istu grupu. `Bez odabira`
+  preskace neobaveznu grupu. Grupa a mora imati jednu odabranu aplikaciju;
+  ako postoji samo Project, ne moze se iskljuciti. Alternativa iz grupe a
+  moze zamijeniti Project. Nepostojece aplikacije ne prikazuju se ni kao disabled stavke.
+- Project ucitava katalog pri pokretanju. U formi nema dugmeta za rucno
+  osvjezavanje niti generiranja kataloga.
+- Odabrane grupe uvijek slijede abecedni prioritet, npr. a-c-d, nikad a-d-c.
+  Neodabrane grupe se smiju preskociti. Grupe dolaze iz registracija, ne iz
+  hardkodiranog popisa imena aplikacija. Numericki `order` nije podrzan;
+  registracija, template i shell koriste samo `priority_group`.
+- Izbor aplikacija iz templatea i njihov grupno sortiran slijed zapisuju
+  se u projektnu bazu. Shell smije automatizirati navigaciju prema tom zapisu,
+  ne poslovni rad aplikacija. Katalog ne sadrzi aktivni projekt ili njegovo
+  poslovno stanje.
+- U razvoju nema migracija ni kompatibilnog starog nacina. Nevaljani razvojni
+  zapisi uklanjaju se, ne popravljaju niti pretvaraju u novi format.
+- Uspjesno kreiranje ili otvaranje projekta salje shellu jednokratni
+  `shell_next_group` UI okidac bez poslovnog payloada. Okidac se ne zapisuje.
+  Shell cita navigacijski slijed iz javnog DB prikaza kroz desktop adapter;
+  ne predaje radne postavke drugoj aplikaciji i ne pokrece njezin workflow.
 - App registry manifest nije dovoljan za embedded hostanje. Shell ne smije imati
   hardkodirani `if desktop_entry == "qnc_project"` niti slican switch po imenu
   aplikacije u render/activate putu.
@@ -469,6 +503,12 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 
 Zamrznuto na korisnikov zahtjev 2026-09-04.
 
+Ponovno zamrznuto na izriciti korisnikov zahtjev 2026-09-06, nakon live
+potvrde navigacije na sljedecu odabranu grupu. Prethodno ograniceno
+odmrzavanje za popravke i katalog je zatvoreno. Nema aktivnog odobrenja za
+promjene Projecta. Razvoj Ingesta nije dozvola za njegovo otkljucavanje.
+Detalji su u `docs/11-project-freeze.md`.
+
 - Project aplikacija je zavrsena za trenutni razvojni korak i ne smije se
   mijenjati bez izricite korisnicke dozvole.
 - Opci zahtjevi poput "nastavi", "idemo dalje", "sredi QNC", "dodaj Ingest",
@@ -526,9 +566,8 @@ zatvore.
 - In-process shell adapter smije tranzitivno povuci desktop/component/store
   sloj iste aplikacije samo dok je to javni adapter te iste aplikacije.
   Adapter ne smije povuci privatni workflow druge aplikacije.
-- Project je bio odmrznut samo za odobreni shared Dir Browser / `qnc-ui-kit`
-  zahvat i bug popravak ekskluzivnog browser panela. Bez novog izricitog
-  odobrenja Project se opet smatra zamrznutim.
+- Project je 2026-09-06 ponovno zamrznut nakon odobrenog zahvata.
+  Prethodno odmrzavanje vise ne daje dozvolu za izmjene; vrijedi odjeljak 14.
 - Project `Odaberi...` ne smije koristiti OS folder dialog; mora koristiti
   ugradeni Dir Browser prikaz s `Racunalo / LAN / Internet`, `Gore`, `Diskovi`,
   `U redu` i `Odustani` akcijama.

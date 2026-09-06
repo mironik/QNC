@@ -2,6 +2,8 @@
   "version": 1,
   "active_preset": "default",
   "actions": {
+    "shell_next_group": { "label": "Otvori sljedecu odabranu grupu" },
+    "project_workflow_group_select": { "label": "Odaberi jednu aplikaciju u grupi radnog toka" },
     "play_pause": {
       "label": "Play / Pauza"
     },

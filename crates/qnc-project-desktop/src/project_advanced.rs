@@ -55,11 +55,6 @@ const ORIGINAL_POLICIES: &[(&str, &str)] = &[
 ];
 const AUDIO_RATES: &[&str] = &["48000", "44100"];
 const AUDIO_CHANNELS: &[&str] = &["2", "4", "6", "8"];
-const WORKFLOW_TABS: &[(&str, &str)] = &[
-    ("ingest", "Ingest"),
-    ("media_assist", "Media Assist"),
-    ("storyboard", "Story"),
-];
 
 #[derive(Debug, Clone, Deserialize)]
 struct ExportProfileCatalog {
@@ -75,15 +70,33 @@ struct ExportProfilePreset {
     values: Value,
 }
 
+pub enum ApplicationSelectionAction {
+    Choose {
+        priority_group: String,
+        application_id: Option<String>,
+    },
+}
+
+pub struct AdvancedDraft<'a> {
+    pub draft_settings: &'a mut Value,
+    pub export_preset_draft_name: &'a mut String,
+    pub applications: &'a crate::application_selection::ApplicationSelectionView,
+}
+
 pub fn show(
     ui: &mut egui::Ui,
     content_w: f32,
     settings: &SettingsPanelMetrics,
     shell: &ShellLayoutContract,
     open: &mut bool,
-    draft_settings: &mut Value,
-    export_preset_draft_name: &mut String,
+    draft: AdvancedDraft<'_>,
+    application_action: &mut Option<ApplicationSelectionAction>,
 ) -> bool {
+    let AdvancedDraft {
+        draft_settings,
+        export_preset_draft_name,
+        applications,
+    } = draft;
     let t = Theme::from_contract(&shell.colors);
     ui.set_max_width(content_w);
     let summary = egui::Frame::NONE
@@ -322,21 +335,53 @@ pub fn show(
         shell,
         |ui| {
             ui.spacing_mut().item_spacing.y = 6.0;
-            ensure_workflow_tabs(draft_settings);
-            for (tab_id, label) in WORKFLOW_TABS {
-                let mut on = workflow_has_tab(draft_settings, tab_id);
-                if ui
-                    .checkbox(
-                        &mut on,
-                        RichText::new(*label)
-                            .size(shell.theme_metrics.font_ui)
-                            .color(t.text),
-                    )
-                    .changed()
-                {
-                    set_workflow_tab(draft_settings, tab_id, on);
-                    changed = true;
-                }
+            let columns: Vec<_> = applications
+                .groups
+                .iter()
+                .map(|group| {
+                    let mut options: Vec<_> = group
+                        .choices
+                        .iter()
+                        .map(|choice| qnc_ui_kit::OptionItem {
+                            id: Some(choice.application_id.clone()),
+                            label: choice.label.clone(),
+                            selected: choice.selected,
+                        })
+                        .collect();
+                    if !applications.required_groups.contains(&group.priority_group) {
+                        options.push(qnc_ui_kit::OptionItem {
+                            id: None,
+                            label: "Bez odabira".into(),
+                            selected: group.no_selection,
+                        });
+                    }
+                    qnc_ui_kit::OptionColumn {
+                        id: group.priority_group.clone(),
+                        label: format!("Grupa {}", group.priority_group),
+                        options,
+                    }
+                })
+                .collect();
+            let style = qnc_ui_kit::OptionColumnsStyle {
+                font_size: shell.theme_metrics.font_ui,
+                text: t.text,
+                min_column_width: 160.0,
+                column_gap: 12.0,
+                row_gap: 6.0,
+            };
+            if let Some(selected) =
+                qnc_ui_kit::show_option_columns(ui, "project_workflow_groups", &columns, &style)
+            {
+                *application_action = Some(ApplicationSelectionAction::Choose {
+                    priority_group: selected.column_id,
+                    application_id: selected.option_id,
+                });
+            }
+            if applications.loading {
+                ui.label("Ucitavanje kataloga...");
+            }
+            if let Some(error) = &applications.error {
+                ui.label(error);
             }
         },
     );
@@ -758,65 +803,6 @@ fn set_path(settings: &mut Value, path: &str, value: Value) {
     }
 }
 
-fn ensure_workflow_tabs(settings: &mut Value) {
-    let tabs = path_value(settings, "workspace.tabs")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_else(|| {
-            vec![
-                json!("project"),
-                json!("ingest"),
-                json!("media_assist"),
-                json!("storyboard"),
-            ]
-        });
-    set_path(
-        settings,
-        "workspace.tabs",
-        Value::Array(normalize_tabs(tabs)),
-    );
-}
-
-fn workflow_has_tab(settings: &Value, tab_id: &str) -> bool {
-    path_value(settings, "workspace.tabs")
-        .and_then(Value::as_array)
-        .is_some_and(|tabs| tabs.iter().any(|tab| tab.as_str() == Some(tab_id)))
-}
-
-fn set_workflow_tab(settings: &mut Value, tab_id: &str, on: bool) {
-    let mut tabs = path_value(settings, "workspace.tabs")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    if on && !tabs.iter().any(|tab| tab.as_str() == Some(tab_id)) {
-        tabs.push(json!(tab_id));
-    }
-    if !on {
-        tabs.retain(|tab| tab.as_str() != Some(tab_id));
-    }
-    set_path(
-        settings,
-        "workspace.tabs",
-        Value::Array(normalize_tabs(tabs)),
-    );
-}
-
-fn normalize_tabs(tabs: Vec<Value>) -> Vec<Value> {
-    let mut out = Vec::<String>::new();
-    if !tabs.iter().any(|tab| tab.as_str() == Some("project")) {
-        out.push("project".to_string());
-    }
-    for tab in tabs {
-        let Some(tab) = tab.as_str().map(str::trim).filter(|tab| !tab.is_empty()) else {
-            continue;
-        };
-        if !out.iter().any(|existing| existing == tab) {
-            out.push(tab.to_string());
-        }
-    }
-    out.into_iter().map(Value::String).collect()
-}
-
 fn parse_decimal(raw: &str) -> Option<f64> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -908,22 +894,6 @@ mod tests {
         assert_eq!(settings["export"]["preset"], "h264_1080p50");
         assert_eq!(settings["export"]["container"], "mp4");
         assert_eq!(settings["export"]["video_codec"], "h264");
-    }
-
-    #[test]
-    fn workflow_tabs_are_normalized_and_keep_project_first() {
-        let mut settings = json!({
-            "workspace": { "tabs": ["ingest", "storyboard", "ingest"] }
-        });
-        ensure_workflow_tabs(&mut settings);
-        assert_eq!(
-            settings["workspace"]["tabs"],
-            json!(["project", "ingest", "storyboard"])
-        );
-        set_workflow_tab(&mut settings, "media_assist", true);
-        assert!(workflow_has_tab(&settings, "media_assist"));
-        set_workflow_tab(&mut settings, "ingest", false);
-        assert!(!workflow_has_tab(&settings, "ingest"));
     }
 
     #[test]
