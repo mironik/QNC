@@ -1,0 +1,16 @@
+[package]
+name = "qnc-sony-metadata"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-contracts = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-source-contract.workspace = true
+qnc-source-groups.workspace = true
+serde = { workspace = true }
+xml-rs = "0.8.29"
+percent-encoding = "2"
+
+[dev-dependencies]
+serde_json = { workspace = true }

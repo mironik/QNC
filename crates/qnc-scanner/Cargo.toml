@@ -1,0 +1,19 @@
+[package]
+name = "qnc-scanner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-camera-patterns.workspace = true
+qnc-camera-detector.workspace = true
+qnc-source-reader.workspace = true
+qnc-source-groups.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+qnc-contracts.workspace = true
+qnc-sony-metadata.workspace = true
+qnc-transport-resolver.workspace = true
+serde_json.workspace = true
+tempfile = "3"
+tiny_http = "0.12"

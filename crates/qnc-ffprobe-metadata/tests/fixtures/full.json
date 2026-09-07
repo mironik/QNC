@@ -1,0 +1,10 @@
+{
+  "streams": [
+    {"index":0,"codec_type":"video","codec_name":"h264","profile":"High","width":1920,"height":1080,"time_base":"1/12800","start_pts":-512,"duration_ts":51200,"duration":"4.000000","avg_frame_rate":"25/1","r_frame_rate":"25/1","nb_frames":"100","field_order":"progressive","pix_fmt":"yuv420p","sample_aspect_ratio":"1:1","color_primaries":"bt709","color_transfer":"bt709","color_space":"bt709","color_range":"tv","side_data_list":[{"side_data_type":"Display Matrix","rotation":0}],"tags":{"timecode":"01:00:00:00"}},
+    {"index":1,"codec_type":"audio","codec_name":"aac","profile":"LC","time_base":"1/48000","start_pts":0,"duration_ts":192000,"sample_rate":"48000","channels":1,"sample_fmt":"fltp","channel_layout":"mono","bits_per_sample":0},
+    {"index":2,"codec_type":"audio","codec_name":"aac","profile":"LC","time_base":"1/48000","start_pts":1024,"duration_ts":191000,"sample_rate":"48000","channels":1,"sample_fmt":"fltp","channel_layout":"mono","bits_per_sample":0},
+    {"index":3,"codec_type":"data","codec_name":"bin_data","time_base":"1/12800","start_pts":0}
+  ],
+  "programs":[],"chapters":[],
+  "format":{"filename":"qnc://local/source/card/Clip/a.MP4","format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"4.000000","tags":{"creation_time":"2025-01-01T12:00:00Z","empty":""}}
+}

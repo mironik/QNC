@@ -1,0 +1,12 @@
+[package]
+name = "qnc-source-contract"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-contracts.workspace = true
+serde.workspace = true
+percent-encoding = "2"
+
+[dev-dependencies]
+serde_json.workspace = true

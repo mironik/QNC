@@ -1,0 +1,11 @@
+[package]
+name = "qnc-media-records"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-contracts.workspace = true
+qnc-media-metadata.workspace = true
+qnc-source-index-contract.workspace = true
+serde.workspace = true
+serde_json.workspace = true

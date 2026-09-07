@@ -1,0 +1,10 @@
+[package]
+name = "qnc-ffprobe-metadata"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-media-metadata.workspace = true
+qnc-media-records.workspace = true
+serde_json.workspace = true
+

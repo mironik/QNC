@@ -1,0 +1,18 @@
+{
+  "module_id": "qnc.module.media-metadata-compose",
+  "module_name": "Media Metadata Composition",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["media.metadata.missing", "media.metadata.compose"],
+  "input_contract_version": "0.2.0",
+  "output_contract_version": "0.2.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "forbidden_calls": ["ffprobe", "filesystem.read", "network.request", "db.write", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "runtime_crate": "qnc-media-metadata-compose",
+  "specification": "docs/32-single-pass-media-probe.md"
+}

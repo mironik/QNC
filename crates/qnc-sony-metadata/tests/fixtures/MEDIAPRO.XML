@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MediaProfile xmlns="http://xmlns.sony.net/pro/metadata/mediaprofile">
+  <Properties><System systemKind="ILME-FX6V ver.6.000"/><Attached mediaId="TEST-CAMERA-MEDIA"/></Properties>
+  <Contents>
+    <Material uri="./Clip/TEST A.MXF" type="MXF" offset="0" dur="500" fps="50p" aspectRatio="16:9" ch="4" videoType="AVC50_1920_1080_H422P@L42" audioType="LPCM24" umid="ORIGINAL-A">
+      <Proxy uri="./Sub/TEST AS03.MP4" type="MP4" dur="500" fps="50p" ch="2" videoType="AVC_Proxy_1920_1080_HP@L42" audioType="AAC-LC" umid="PROXY-A"/>
+      <RelevantInfo uri="./Clip/TEST AM01.XML" type="XML"/>
+      <RelevantInfo uri="./Thmbnl/TEST AT01.JPG" type="JPG"/>
+    </Material>
+    <Material uri="./Clip/TEST B.MXF" type="MXF" offset="0" dur="100" fps="50p" ch="4" videoType="AVC50_1920_1080_H422P@L42" audioType="LPCM24" umid="ORIGINAL-B">
+      <Proxy uri="./Sub/TEST BS03.MP4" type="MP4" videoType="AVC_Proxy_1920_1080_HP@L42" audioType="AAC-LC" umid="PROXY-B"/>
+      <RelevantInfo uri="./Clip/TEST BM01.XML" type="XML"/>
+    </Material>
+  </Contents>
+</MediaProfile>

@@ -1,0 +1,24 @@
+[package]
+name = "qnc-source-index-db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-source-index-contract.workspace = true
+qnc-transport-resolver.workspace = true
+qnc-json-transport.workspace = true
+serde_json.workspace = true
+rusqlite = { workspace = true, features = ["limits"] }
+uuid = { version = "1", features = ["v4"] }
+tiny_http = "0.12"
+
+[dev-dependencies]
+ureq = { version = "2.12", features = ["json", "native-certs"] }
+tempfile = "3"
+qnc-source-groups.workspace = true
+qnc-db-contract.workspace = true
+qnc-scanner.workspace = true
+qnc-camera-patterns.workspace = true
+qnc-camera-detector.workspace = true
+qnc-sony-metadata.workspace = true
+qnc-source-reader.workspace = true

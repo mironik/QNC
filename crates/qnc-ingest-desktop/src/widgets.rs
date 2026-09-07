@@ -312,7 +312,7 @@ fn render_location_browser(
                 if fixed_text_link(
                     ui,
                     &contracts.ingest.dir_browser.disks_label,
-                    view.source_kind == SourceKind::Local,
+                    !view.browser_busy && !view.command_busy,
                     58.0,
                     theme,
                 )
@@ -372,7 +372,9 @@ fn render_location_action_bar(
         |ui| {
             let can_confirm = !view.browser_roots
                 && !view.browser_path_label.is_empty()
-                && !view.work_settings_loading;
+                && !view.work_settings_loading
+                && !view.browser_busy
+                && !view.command_busy;
             let response = qnc_ui_kit::show_form_action_bar(
                 ui,
                 &form_action_bar_style(theme),
@@ -404,28 +406,27 @@ fn render_browser_head_entries(
     intent: &mut Option<IngestIntent>,
 ) {
     match view.source_kind {
-        SourceKind::Local if view.browser_roots => {
+        _ if view.browser_roots => {
             if view.browser_entries.is_empty() {
-                ui.label(muted("Nema diskova.", theme));
+                let empty = match view.source_kind {
+                    SourceKind::Local => "Nema diskova.",
+                    SourceKind::Lan => &labels.empty_lan,
+                    SourceKind::Internet => &labels.empty_internet,
+                };
+                ui.label(muted(empty, theme));
             } else {
                 render_root_disk_grid(ui, view, theme, intent);
             }
         }
-        SourceKind::Local => {
+        _ => {
             ui.label(RichText::new(&view.browser_path_label).color(theme.text));
-        }
-        SourceKind::Lan => {
-            ui.label(muted(&labels.empty_lan, theme));
-        }
-        SourceKind::Internet => {
-            ui.label(muted(&labels.empty_internet, theme));
         }
     }
 }
 
 fn render_browser_body(
     ui: &mut Ui,
-    labels: &IngestDirBrowser,
+    _labels: &IngestDirBrowser,
     theme: &Theme,
     view: &IngestViewModel,
     intent: &mut Option<IngestIntent>,
@@ -439,8 +440,8 @@ fn render_browser_body(
         return;
     }
     match view.source_kind {
-        SourceKind::Local if view.browser_roots => {}
-        SourceKind::Local => {
+        _ if view.browser_roots => {}
+        _ => {
             if view.browser_entries.is_empty() {
                 ui.horizontal(|ui| {
                     ui.add_space(path_tree_offset());
@@ -462,12 +463,6 @@ fn render_browser_body(
                 });
             }
         }
-        SourceKind::Lan => {
-            ui.label(muted(&labels.empty_lan, theme));
-        }
-        SourceKind::Internet => {
-            ui.label(muted(&labels.empty_internet, theme));
-        }
     }
 }
 
@@ -476,7 +471,7 @@ fn browser_entry_button(ui: &mut Ui, entry: &LocationEntry, theme: &Theme) -> eg
 }
 
 fn browser_nav_height(view: &IngestViewModel, theme: &Theme) -> f32 {
-    if view.source_kind == SourceKind::Local && view.browser_roots {
+    if view.browser_roots {
         let rows = view.browser_entries.len().max(1) as f32;
         (theme.chrome_control_height * rows) + (4.0 * (rows - 1.0))
     } else {
@@ -541,6 +536,8 @@ fn render_clip_grid(
                 let message = view.work_settings_error.as_deref().unwrap_or_else(|| {
                     if view.work_settings_loading {
                         "Citanje radnih postavki..."
+                    } else if view.command_busy || view.selected_source_uri.is_some() {
+                        &view.message
                     } else {
                         &contracts.ingest.clip_grid.empty_message
                     }
@@ -604,13 +601,24 @@ fn render_clip_card(ui: &mut Ui, clip: &ClipView, size: Vec2, theme: &Theme) -> 
     );
     ui.painter()
         .rect_filled(image_rect.shrink(1.0), 0.0, theme.surface);
-    ui.painter().text(
-        image_rect.center(),
-        Align2::CENTER_CENTER,
-        "...",
-        FontId::proportional(theme.font_ui),
-        theme.text_muted,
-    );
+    if let (Some(uri), Some(image)) = (&clip.thumb_uri, &clip.thumb_image) {
+        qnc_ui_kit::paint_rgba_image(
+            ui,
+            image_rect.shrink(1.0),
+            uri,
+            image.content_key,
+            image.size,
+            &image.pixels,
+        );
+    } else {
+        ui.painter().text(
+            image_rect.center(),
+            Align2::CENTER_CENTER,
+            "...",
+            FontId::proportional(theme.font_ui),
+            theme.text_muted,
+        );
+    }
     paint_selection_check(ui, image_rect, clip.selected, theme);
     let marker = if clip.imported {
         Color32::from_rgb(55, 210, 145)
@@ -693,7 +701,7 @@ fn render_source_dock(
             if contracts.ingest.source_dock.show_import_actions {
                 let status = view.status_label();
                 if !status.is_empty() {
-                    ui.label(muted(&status, theme));
+                    ui.label(muted(&status, theme)).on_hover_text(&view.message);
                 }
                 if action_button(ui, "Osvježi", !view.command_busy, theme).clicked() {
                     intent = Some(IngestIntent::empty(action_ids::INGEST_RELOAD));

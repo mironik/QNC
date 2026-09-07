@@ -6,6 +6,11 @@ description = "QNC directory browser module"
 
 [dependencies]
 rfd = { workspace = true }
+qnc-source-reader = { workspace = true }
+qnc-contracts = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Storage_FileSystem"] }

@@ -1,0 +1,250 @@
+{
+  "base_version": "2026.09.06.1",
+  "dataset_version": "2026.09.07.1",
+  "changed_on": "2026-09-07",
+  "sources": [
+    {
+      "id": "sony-xml-reader-observation",
+      "kind": "card_observation",
+      "publisher": "QNC read-only verification",
+      "title": "FX6 XML metadata reader verification",
+      "locator": "docs/26-sony-metadata-reader.md",
+      "section": "MEDIAPRO and NonRealTimeMeta 2.20 fields on available ordinary-recording FX6 sample; no probe/decode or camera-wide certification.",
+      "reviewed_on": "2026-09-07"
+    }
+  ],
+  "changes": [
+    {
+      "operation": "replace",
+      "pattern": {
+        "id": "sony-xdroot-sd",
+        "manufacturer": "Sony",
+        "family": "XDROOT / XAVC MXF on SD",
+        "applicability": "Observed ILME-FX6V firmware 6.00, ordinary proxy recording; not chunk mode.",
+        "naming_rule": "Clip/{name}.MXF; Clip/{name}M01.XML; Sub/{name}S03.MP4; Thmbnl/{name}T01.JPG. Names may contain spaces. Manifest URIs override suffix hints.",
+        "evidence_level": "observed",
+        "status": "enabled",
+        "status_reason": "Factory family plus read-only XML relationships on available SD sample.",
+        "root_scope": "card_relative",
+        "roots": [
+          "PRIVATE/XDROOT"
+        ],
+        "grouping_method": "manifest_references",
+        "grouping_notes": "MEDIAPRO.XML Contents/Material gives original URI and nested Proxy/RelevantInfo URIs; scope UMID to the source and recording root.",
+        "limitations": "Missing proxy is permitted. Root-level Sub and unrelated test folders are not part of this pattern. Device serial is not card serial.",
+        "files": [
+          {
+            "path": "Clip/*.MXF",
+            "role": "original_candidate",
+            "condition": "Referenced Material or compatible sidecar identity."
+          },
+          {
+            "path": "Sub/*S03.MP4",
+            "role": "proxy_candidate",
+            "condition": "Attach only to referenced original."
+          },
+          {
+            "path": "Clip/*M01.XML",
+            "role": "metadata",
+            "condition": "Non-real-time metadata."
+          },
+          {
+            "path": "Thmbnl/*T01.JPG",
+            "role": "thumbnail",
+            "condition": "RelevantInfo reference."
+          },
+          {
+            "path": "MEDIAPRO.XML",
+            "role": "index",
+            "condition": "Camera media manifest."
+          }
+        ],
+        "metadata": [
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/@uri",
+            "meaning": "Original relative URI; never an OS absolute path."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/Proxy/@uri",
+            "meaning": "Proxy associated with parent Material."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/RelevantInfo/@uri",
+            "meaning": "Related metadata or thumbnail, with type attribute."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Properties/Attached/@mediaId",
+            "meaning": "Camera media identifier, not physical card or volume serial."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "TargetMaterial/@umidRef",
+            "meaning": "Original identity link."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "Device/@modelName",
+            "meaning": "Camera model; Device/@serialNo identifies camera only."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "CreationDate/@value",
+            "meaning": "Camera clip creation time including recorded timezone offset."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/@umid",
+            "meaning": "Original identity within recording root; not proxy identity."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/@dur",
+            "meaning": "Declared duration units; exact frames only with verified mode/FPS semantics."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/@fps",
+            "meaning": "Declared format FPS, not LTC timecode rate."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/@videoType",
+            "meaning": "Camera video codec declaration, not filename extension."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/@audioType",
+            "meaning": "Camera audio codec description; not complete per-stream format."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/@ch",
+            "meaning": "Camera audio channel count, not container stream count/index."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/Proxy/@dur",
+            "meaning": "Own proxy duration; missing value must not inherit original dur."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/Proxy/@fps",
+            "meaning": "Own proxy FPS; missing value is unresolved."
+          },
+          {
+            "document": "MEDIAPRO.XML",
+            "namespace": "http://xmlns.sony.net/pro/metadata/mediaprofile",
+            "selector": "Contents/Material/Proxy/@audioType",
+            "meaning": "Own proxy audio codec, may differ from original."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "Duration/@value",
+            "meaning": "Duration units, interpreted with verified format FPS and recording mode."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "VideoFormat/VideoFrame/@formatFps",
+            "meaning": "Recorded video format FPS; captureFps and tcFps are distinct."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "VideoFormat/VideoFrame/@captureFps",
+            "meaning": "Capture rate; may differ in slow/quick recording."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "VideoFormat/VideoFrame/@videoCodec",
+            "meaning": "Sidecar video codec declaration; preserve conflicts with index."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "VideoFormat/VideoLayout/@pixel",
+            "meaning": "Explicit video width."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "VideoFormat/VideoLayout/@numOfVerticalLine",
+            "meaning": "Explicit video height."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "AudioFormat/@numOfChannel",
+            "meaning": "Camera channel count, not evidence of container stream mapping."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "AudioFormat/AudioRecPort/@trackDst",
+            "meaning": "Camera CH port label; do not invent container stream index."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "AudioFormat/AudioRecPort/@audioCodec",
+            "meaning": "Codec declaration per camera recording port."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "LtcChangeTable/@tcFps",
+            "meaning": "Timecode base only, not video format FPS."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "RecordingMode/@type",
+            "meaning": "Gate for interpreting normal/slow/quick duration semantics."
+          },
+          {
+            "document": "Clip/*M01.XML",
+            "namespace": "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20",
+            "selector": "AcquisitionRecord/Group/Item/@value",
+            "meaning": "Named camera acquisition values; capture settings are not automatically coded stream color metadata."
+          }
+        ],
+        "evidence": [
+          {
+            "source": "sony-fx6-v6",
+            "supports": "FX6 proxy naming, SD PRIVATE prefix; chunk mode documented separately."
+          },
+          {
+            "source": "sony-sd-observation",
+            "supports": "Actual directories, all 103 original/proxy references, sidecar namespace and selectors."
+          },
+          {
+            "source": "sony-xml-reader-observation",
+            "supports": "Added explicit index/sidecar metadata selectors; reader limits and missing fields remain documented."
+          }
+        ]
+      },
+      "reason": "Add verified Sony index/sidecar metadata selectors for the isolated XML reader; preserve missing proxy fields and explicit source evidence. No change to roots, original/proxy ownership or probe policy."
+    }
+  ]
+}

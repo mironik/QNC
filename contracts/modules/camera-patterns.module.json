@@ -1,0 +1,18 @@
+{
+  "module_id": "qnc.module.camera-patterns",
+  "module_name": "Camera Pattern Catalog Reader",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["camera.patterns.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "source.camera.detect", "db.write", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "runtime_crate": "qnc-camera-patterns",
+  "specification": "docs/28-camera-pattern-runtime.md"
+}

@@ -389,3 +389,36 @@ fn packaged_database_matches_seed_and_public_contract() {
             .unwrap());
     }
 }
+
+#[test]
+fn packaged_sony_metadata_revision_preserves_the_original_release() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../catalogs/camera-patterns");
+    let base_path = root.join("camera-patterns-v1.sqlite");
+    let before = fs::read(&base_path).unwrap();
+    let base = open_read_only(&base_path).unwrap();
+    let revision: Revision = serde_json::from_str(include_str!(
+        "../../../catalogs/camera-patterns/revisions/2026.09.07.1.json"
+    ))
+    .unwrap();
+    let expected = revise(&base, &revision).unwrap();
+    let actual = open_read_only(&root.join("camera-patterns-2026.09.07.1.sqlite")).unwrap();
+    assert!(
+        *actual.serialize(DatabaseName::Main).unwrap()
+            == *expected.serialize(DatabaseName::Main).unwrap(),
+        "published Sony revision differs from declared changes"
+    );
+    assert!(
+        fs::read(&base_path).unwrap() == before,
+        "base release was changed"
+    );
+    let added: i64 = actual
+        .query_row(
+            "SELECT COUNT(*) FROM public_metadata_fields WHERE pattern_id='sony-xdroot-sd'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(added, 28);
+    let changes: i64 = actual.query_row("SELECT COUNT(*) FROM public_changes WHERE dataset_version=?1 AND operation='replace' AND before_json IS NOT NULL AND after_json IS NOT NULL", [&revision.dataset_version], |r| r.get(0)).unwrap();
+    assert_eq!(changes, 1);
+}

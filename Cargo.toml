@@ -6,18 +6,35 @@ members = [
     "apps/qnc-ingest",
     "apps/qnc-project",
     "crates/qnc-contracts",
+    "crates/qnc-camera-patterns",
+    "crates/qnc-camera-detector",
     "crates/qnc-db-contract",
     "crates/qnc-dir-browser",
     "crates/qnc-frame-timebase",
     "crates/qnc-ingest-components",
+    "crates/qnc-image-assets",
     "crates/qnc-ingest-desktop",
     "crates/qnc-ingest-desktop-adapter",
     "crates/qnc-ingest-store",
     "crates/qnc-keyboard-shortcut",
+    "crates/qnc-json-transport",
+    "crates/qnc-media-records",
+    "crates/qnc-media-record-db",
+    "crates/qnc-media-metadata",
+    "crates/qnc-media-probe",
+    "crates/qnc-ffprobe-metadata",
+    "crates/qnc-media-metadata-compose",
     "crates/qnc-project-desktop",
     "crates/qnc-project-desktop-adapter",
     "crates/qnc-project-store",
     "crates/qnc-shell-desktop-api",
+    "crates/qnc-sony-metadata",
+    "crates/qnc-source-reader",
+    "crates/qnc-source-contract",
+    "crates/qnc-source-groups",
+    "crates/qnc-source-index-contract",
+    "crates/qnc-source-index-db",
+    "crates/qnc-scanner",
     "crates/qnc-transport-resolver",
     "crates/qnc-ui-kit",
     "crates/qnc-workstation-identity",
@@ -30,17 +47,35 @@ members = [
 [workspace.dependencies]
 qnc-application-catalog = { path = "crates/qnc-application-catalog" }
 qnc-contracts = { path = "crates/qnc-contracts" }
+qnc-camera-patterns = { path = "crates/qnc-camera-patterns" }
+qnc-camera-detector = { path = "crates/qnc-camera-detector" }
 qnc-db-contract = { path = "crates/qnc-db-contract" }
 qnc-dir-browser = { path = "crates/qnc-dir-browser" }
+qnc-frame-timebase = { path = "crates/qnc-frame-timebase" }
 qnc-ingest-components = { path = "crates/qnc-ingest-components" }
+qnc-image-assets = { path = "crates/qnc-image-assets" }
 qnc-ingest-desktop = { path = "crates/qnc-ingest-desktop" }
 qnc-ingest-desktop-adapter = { path = "crates/qnc-ingest-desktop-adapter" }
 qnc-ingest-store = { path = "crates/qnc-ingest-store" }
 qnc-keyboard-shortcut = { path = "crates/qnc-keyboard-shortcut" }
+qnc-json-transport = { path = "crates/qnc-json-transport" }
+qnc-media-records = { path = "crates/qnc-media-records" }
+qnc-media-record-db = { path = "crates/qnc-media-record-db" }
+qnc-media-metadata = { path = "crates/qnc-media-metadata" }
+qnc-media-probe = { path = "crates/qnc-media-probe" }
+qnc-ffprobe-metadata = { path = "crates/qnc-ffprobe-metadata" }
+qnc-media-metadata-compose = { path = "crates/qnc-media-metadata-compose" }
 qnc-project-desktop = { path = "crates/qnc-project-desktop" }
 qnc-project-desktop-adapter = { path = "crates/qnc-project-desktop-adapter" }
 qnc-project-store = { path = "crates/qnc-project-store" }
 qnc-shell-desktop-api = { path = "crates/qnc-shell-desktop-api" }
+qnc-sony-metadata = { path = "crates/qnc-sony-metadata" }
+qnc-source-reader = { path = "crates/qnc-source-reader" }
+qnc-source-contract = { path = "crates/qnc-source-contract" }
+qnc-source-groups = { path = "crates/qnc-source-groups" }
+qnc-source-index-contract = { path = "crates/qnc-source-index-contract" }
+qnc-source-index-db = { path = "crates/qnc-source-index-db" }
+qnc-scanner = { path = "crates/qnc-scanner" }
 qnc-transport-resolver = { path = "crates/qnc-transport-resolver" }
 qnc-ui-kit = { path = "crates/qnc-ui-kit" }
 qnc-workstation-identity = { path = "crates/qnc-workstation-identity" }

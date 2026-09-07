@@ -4,6 +4,31 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod transport;
+pub use transport::{BrowserSource, TransportBrowserSession};
+
+/// Private owner guard against binding a replacement volume to an old media identity.
+/// OSes without an exposed volume serial require an explicitly registered source.
+pub fn verify_local_volume_serial(path: &Path, expected: &str) -> Result<(), String> {
+    if expected.trim().is_empty() {
+        return Ok(());
+    }
+    let path = path
+        .canonicalize()
+        .map_err(|_| "source volume unavailable")?;
+    let volume = list_roots().into_iter().find(|r| {
+        r.local_path
+            .canonicalize()
+            .is_ok_and(|root| path.starts_with(root))
+    });
+    if let Some(actual) = volume.and_then(|v| v.serial_number) {
+        if !actual.eq_ignore_ascii_case(expected) {
+            return Err("source volume serial changed; owner binding must be corrected".into());
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirectoryPickRequest {
     pub start_dir: Option<PathBuf>,

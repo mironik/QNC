@@ -591,10 +591,12 @@ zatvore.
   `U redu` i `Odustani` akcijama.
 - Dir Browser prvi rez za Project smije privremeno potvrditi privatni lokalni
   path u owner Project postavke. Javni identitet lokacije mora ostati QNC URI.
-- Ingest trenutni runtime rez je samo source browser + `source.select` +
-  registry/session DB zapis. `Odaberi` jos nije puni Ingest dok ne pokrene
-  source scan, original/proxy grouping, jedini probe prolaz i clip/probe DB
-  upis kroz odobrene module.
+- Ingest `Odaberi` za konfigurirane izvore pokrece source scan, potvrdeno
+  original/proxy grupiranje, citanje camera zapisa, jedini potrebni probe prolaz
+  i source/media DB upis kroz javne module (docs/34). Postojeci zavrseni zapisi
+  citaju se bez novog probea. Prikaz karticnih slicica koristi eksplicitne DB
+  veze i read-only transport (docs/35). To ne znaci da su kopiranje medija,
+  filmstrip, waveform, playback ili sve camera sheme implementirani.
 - Ingest application manifest smije deklarirati samo module i capabilityje koji
   imaju stvarnu runtime ovisnost ili implementirani javni adapter u trenutnom
   rezu. Scanner, camera detector, Media Probe, Media Browser, Filmstrip i Wave

@@ -1,0 +1,12 @@
+[package]
+name = "qnc-source-groups"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-source-contract.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+qnc-contracts.workspace = true
+serde_json.workspace = true

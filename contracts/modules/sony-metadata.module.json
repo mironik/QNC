@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.sony-metadata",
+  "module_name": "Sony Camera Metadata Reader",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["camera.sony.index.read", "camera.sony.metadata.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.2.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "ffmpeg", "media.probe.full", "source.scan.roles", "db.write", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-sony-metadata",
+  "input": "In-memory Sony XML, document QNC URI and caller-resolved original/proxy QNC bindings. No OS paths or I/O.",
+  "output": "Explicit relative references, original/proxy metadata facts and unresolved/conflict notices; missing fields remain missing. metadata_references and read_group_metadata interpret only documents linked by a verified GroupProposal, without I/O.",
+  "specification": "docs/26-sony-metadata-reader.md",
+  "index_reader_adapter": "SonyIndexReader implements the public qnc-source-groups IndexReader trait without I/O; docs/29-source-grouping-modules.md"
+}

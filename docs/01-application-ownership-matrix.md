@@ -19,6 +19,16 @@ aplikacija.
 
 ## Modulna ownership pravila
 
+Modularni DB proizvod Ingesta ukljucuje `qnc.db.source_index` za potvrdene
+original/proxy/support odnose (docs/30). Javnom DB adapteru owner daje
+privatni binding i write ovlast; drugi korisnici citaju public viewove.
+To nije novi aplikacijski workflow niti baza projektnih postavki.
+Modul jos nije povezan s Ingest `Odaberi` runtimeom.
+
+`qnc.db.media_records` cuva media snapshote i izvorne XML/JSON dokaze (docs/31).
+Phase i potpunost su odvojeni podaci; DB adapter ne izvrsava probe. Ovaj
+modul takoder jos nije povezan s Ingest `Odaberi` runtimeom.
+
 Moduli su javni QNC resursi. Modul ne smije imati hardkodirani popis aplikacija
 koje ga smiju koristiti. Modul smije imati dependency boundary: sto on sam ne
 smije pozvati, ucitati ili pokrenuti.

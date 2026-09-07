@@ -1,0 +1,37 @@
+{
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "specification": "docs/29-source-grouping-modules.md",
+  "module_id": "qnc.module.source-groups",
+  "module_name": "Source Grouping",
+  "capabilities": [
+    "source.groups.assemble"
+  ],
+  "forbidden_calls": [
+    "filesystem.read",
+    "network.request",
+    "ffprobe",
+    "media.probe.full",
+    "db.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner"
+  ],
+  "runtime_crate": "qnc-source-groups"
+}

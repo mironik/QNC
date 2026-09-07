@@ -19,6 +19,8 @@
   ],
   "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.filmstrip", "qnc.module.wave"],
   "state_policy": "stateless",
-  "database_write_policy": "returns_result_to_owner_application"
+  "database_write_policy": "returns_result_to_owner_application",
+  "runtime_crate": "qnc-scanner",
+  "specification": "docs/29-source-grouping-modules.md",
+  "reader_policy": "Caller supplies public index-reader adapters. No built-in brand or application switch."
 }
-

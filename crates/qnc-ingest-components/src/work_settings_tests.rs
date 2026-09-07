@@ -127,6 +127,20 @@ fn select_rereads_current_active_project_and_cancel_prevents_source_write() {
     let root = fixture();
     let mut component = IngestComponent::with_store_root(root.path()).unwrap();
     wait(&mut component);
+    let uri = "qnc://local/source/test";
+    let mut browser =
+        qnc_dir_browser::TransportBrowserSession::new(vec![qnc_dir_browser::BrowserSource {
+            entry: qnc_dir_browser::BrowserEntry {
+                name: "Test".into(),
+                qnc_uri: uri.into(),
+                ..Default::default()
+            },
+            reader: qnc_source_reader::SourceReader::local(uri, root.path()).unwrap(),
+        }])
+        .unwrap();
+    browser.roots("local").unwrap();
+    component.apply_source_browser_result(browser.open(uri));
+    component.transport_browser = Some(browser);
     Connection::open(root.path().join("data/project_store.db"))
         .unwrap()
         .execute("UPDATE app_settings SET value='p2'", [])

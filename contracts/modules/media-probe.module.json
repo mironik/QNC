@@ -25,6 +25,7 @@
     "qnc.module.export"
   ],
   "state_policy": "stateless",
-  "database_write_policy": "returns_result_to_owner_application"
+  "database_write_policy": "returns_result_to_owner_application",
+  "runtime_crate": "qnc-media-probe",
+  "specification": "docs/32-single-pass-media-probe.md"
 }
-

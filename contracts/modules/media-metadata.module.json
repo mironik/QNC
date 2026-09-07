@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.media-metadata",
+  "module_name": "Media Metadata Contract",
+  "module_version": "0.2.0",
+  "module_kind": "library",
+  "capabilities": ["media.metadata.validate"],
+  "input_contract_version": "0.2.0",
+  "output_contract_version": "0.2.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "ffmpeg", "media.probe.full", "source.scan.roles", "db.write", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-media-metadata",
+  "record_contract": "qnc.media.metadata",
+  "input": "Versioned clip record with separate original/proxy descriptions and field evidence; QNC URIs only.",
+  "output": "Field-level missing/invalid metadata report. No media access, acquisition decision, application state or process execution."
+}

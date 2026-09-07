@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NonRealTimeMeta xmlns="urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20">
+  <TargetMaterial umidRef="ORIGINAL-A"/>
+  <Duration value="500"/>
+  <LtcChangeTable tcFps="25" halfStep="true">
+    <LtcChange frameCount="0" value="00000000" status="increment"/>
+    <LtcChange frameCount="499" value="00000949" status="end"/>
+  </LtcChangeTable>
+  <CreationDate value="2026-09-03T15:28:19+02:00"/>
+  <VideoFormat>
+    <VideoFrame videoCodec="AVC50_1920_1080_H422P@L42" captureFps="50.00p" formatFps="50p"/>
+    <VideoLayout pixel="1920" numOfVerticalLine="1080" aspectRatio="16:9" flip="none"/>
+  </VideoFormat>
+  <AudioFormat numOfChannel="4">
+    <AudioRecPort audioCodec="LPCM24" trackDst="CH1"/>
+    <AudioRecPort audioCodec="LPCM24" trackDst="CH2"/>
+    <AudioRecPort audioCodec="LPCM24" trackDst="CH3"/>
+    <AudioRecPort audioCodec="LPCM24" trackDst="CH4"/>
+  </AudioFormat>
+  <SubStream codec="AVC_Proxy_1920_1080_HP@L42"/>
+  <Device manufacturer="Sony" modelName="ILME-FX6V" serialNo="TEST-CAMERA-SERIAL"><Element software="6.00"/></Device>
+  <RecordingMode type="normal"/>
+  <AcquisitionRecord><Group name="CameraUnitMetadataSet">
+    <Item name="CaptureGammaEquation" value="rec709"/>
+    <Item name="CaptureColorPrimaries" value="rec709"/>
+    <Item name="CodingEquations" value="rec709"/>
+  </Group></AcquisitionRecord>
+</NonRealTimeMeta>

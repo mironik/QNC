@@ -12,6 +12,8 @@
   "forbidden_calls": ["ffprobe", "media.probe.full", "clip.import", "business.workflow"],
   "forbidden_dependencies": ["qnc.module.media-probe"],
   "state_policy": "stateless",
-  "database_write_policy": "no_db_writes"
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-camera-detector",
+  "specification": "docs/28-camera-pattern-runtime.md",
+  "result_policy": "Pattern/role candidates only; ambiguous relationships are unresolved. No clip identity or import."
 }
-

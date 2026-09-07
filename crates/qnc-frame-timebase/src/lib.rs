@@ -9,7 +9,8 @@ pub struct DualFpsSnapshot {
     pub timeline_duration_frames: i64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FrameTimebase {
     pub fps_num: i64,
     pub fps_den: i64,

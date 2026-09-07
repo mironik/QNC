@@ -1,0 +1,18 @@
+{
+  "module_id": "qnc.module.source-index-contract",
+  "module_name": "Source Index Contract",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "capabilities": ["source.index.validate"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "forbidden_calls": ["filesystem.read", "network.request", "db.write", "ffprobe", "source.scan.roles", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.scanner", "qnc.module.media-probe"],
+  "runtime_crate": "qnc-source-index-contract",
+  "specification": "docs/30-source-index-database.md"
+}

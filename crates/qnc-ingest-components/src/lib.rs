@@ -8,6 +8,8 @@ use qnc_ingest_store::{IngestStore, SourceSelectionRecord};
 use qnc_work_settings::SettingsReader;
 use serde::{Deserialize, Serialize};
 
+mod selection;
+mod selection_config;
 mod work_plan;
 #[cfg(test)]
 mod work_settings_tests;
@@ -63,17 +65,12 @@ pub mod action_ids {
     ];
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SourceKind {
+    #[default]
     Local,
     Lan,
     Internet,
-}
-
-impl Default for SourceKind {
-    fn default() -> Self {
-        Self::Local
-    }
 }
 
 impl SourceKind {
@@ -111,6 +108,8 @@ pub struct ClipView {
     pub imported: bool,
     pub thumb_uri: Option<String>,
     pub thumb_status: ThumbStatus,
+    #[serde(skip)]
+    pub thumb_image: Option<std::sync::Arc<qnc_image_assets::RgbaImage>>,
 }
 
 impl Default for ClipView {
@@ -123,6 +122,7 @@ impl Default for ClipView {
             imported: false,
             thumb_uri: None,
             thumb_status: ThumbStatus::Missing,
+            thumb_image: None,
         }
     }
 }
@@ -157,6 +157,7 @@ pub struct IngestViewModel {
     pub playing: bool,
     pub cue_frame: i64,
     pub command_busy: bool,
+    pub select_warning_count: usize,
     pub work_settings_loading: bool,
     pub work_settings_ready: bool,
     pub work_settings_error: Option<String>,
@@ -186,6 +187,7 @@ impl Default for IngestViewModel {
             playing: false,
             cue_frame: 0,
             command_busy: false,
+            select_warning_count: 0,
             work_settings_loading: false,
             work_settings_ready: false,
             work_settings_error: None,
@@ -224,6 +226,16 @@ impl IngestViewModel {
     }
 
     pub fn status_label(&self) -> String {
+        if self.select_warning_count > 0 && !self.command_busy {
+            return format!(
+                "{} klipova; {} upozorenja",
+                self.clips.len(),
+                self.select_warning_count
+            );
+        }
+        if self.command_busy {
+            return format!("Select: {} klipova", self.clips.len());
+        }
         let imported = self.imported_count();
         let pending = self.pending_count();
         let selected = self.selected_count();
@@ -243,8 +255,9 @@ impl IngestViewModel {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub enum IngestPayload {
+    #[default]
     None,
     SourceKind(SourceKind),
     LocationUri(String),
@@ -252,12 +265,6 @@ pub enum IngestPayload {
     Bool(bool),
     Frame(i64),
     AudioLane(String),
-}
-
-impl Default for IngestPayload {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -314,6 +321,20 @@ pub struct IngestComponent {
     settings_result: Option<Receiver<Result<IngestWorkPlan, String>>>,
     work_plan: Option<IngestWorkPlan>,
     pending_source: Option<String>,
+    selection_config: Option<selection_config::SelectionConfig>,
+    selection_config_error: Option<String>,
+    transport_browser: Option<qnc_dir_browser::TransportBrowserSession>,
+    browser_result: Option<
+        Receiver<(
+            qnc_dir_browser::TransportBrowserSession,
+            Result<BrowserState, String>,
+        )>,
+    >,
+    selection_result: Option<Receiver<selection::Event>>,
+    selection_cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    selection_thread: Option<std::thread::JoinHandle<()>>,
+    selection_warnings: usize,
+    selection_last_warning: Option<String>,
 }
 
 impl IngestComponent {
@@ -327,6 +348,18 @@ impl IngestComponent {
     pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
         let mut component = Self::new();
         component.store = Some(IngestStore::open(root.as_ref())?);
+        match selection_config::SelectionConfig::load(root.as_ref()).and_then(|config| {
+            let browser = config.browser()?;
+            Ok((config, browser))
+        }) {
+            Ok((config, mut browser)) => {
+                let state = browser.roots("local");
+                component.selection_config = Some(config);
+                component.transport_browser = Some(browser);
+                component.apply_source_browser_result(state);
+            }
+            Err(error) => component.selection_config_error = Some(error.to_string()),
+        }
         match SettingsReader::from_root(root.as_ref()) {
             Ok(reader) => {
                 component.settings_reader = Some(reader);
@@ -394,6 +427,87 @@ impl IngestComponent {
     }
 
     pub fn poll(&mut self) -> bool {
+        let mut changed = self.poll_settings();
+        if let Some(receiver) = &self.browser_result {
+            match receiver.try_recv() {
+                Ok((browser, result)) => {
+                    self.browser_result = None;
+                    self.transport_browser = Some(browser);
+                    self.apply_source_browser_result(result);
+                    changed = true;
+                }
+                Err(TryRecvError::Disconnected) => {
+                    self.browser_result = None;
+                    self.apply_source_browser_result(Err("Citanje izvora je prekinuto.".into()));
+                    changed = true;
+                }
+                Err(TryRecvError::Empty) => {}
+            }
+        }
+        for _ in 0..64 {
+            let Some(receiver) = &self.selection_result else {
+                break;
+            };
+            let event = match receiver.try_recv() {
+                Ok(event) => event,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    selection::Event::Finished(Err("Select proces je prekinut.".into()))
+                }
+            };
+            changed = true;
+            match event {
+                selection::Event::Status(message) => self.view.message = message,
+                selection::Event::Warning(message) => {
+                    self.selection_warnings += 1;
+                    self.view.select_warning_count = self.selection_warnings;
+                    self.selection_last_warning = Some(message.clone());
+                    self.view.message = message;
+                }
+                selection::Event::Clip(mut clip) => {
+                    if let Some(existing) = self
+                        .view
+                        .clips
+                        .iter_mut()
+                        .find(|c| c.clip_id == clip.clip_id)
+                    {
+                        clip.selected = existing.selected;
+                        *existing = clip;
+                    } else {
+                        self.view.clips.push(clip);
+                    }
+                    self.view.clips.sort_by(|a, b| a.name.cmp(&b.name));
+                }
+                selection::Event::Finished(result) => {
+                    self.selection_result = None;
+                    self.selection_cancel = None;
+                    if let Some(thread) = self.selection_thread.take() {
+                        let _ = thread.join();
+                    }
+                    self.view.command_busy = false;
+                    self.view.message = match result {
+                        Ok(()) if self.selection_warnings == 0 => format!(
+                            "Select zavrsen: {} klipova zapisano u bazu.",
+                            self.view.clips.len()
+                        ),
+                        Ok(()) => format!(
+                            "Select: {} klipova; {} upozorenja. {}",
+                            self.view.clips.len(),
+                            self.selection_warnings,
+                            self.selection_last_warning.as_deref().unwrap_or_default()
+                        ),
+                        Err(error) => {
+                            self.view.select_warning_count += 1;
+                            error
+                        }
+                    };
+                }
+            }
+        }
+        changed
+    }
+
+    fn poll_settings(&mut self) -> bool {
         let Some(receiver) = self.settings_result.as_ref() else {
             return false;
         };
@@ -441,8 +555,56 @@ impl IngestComponent {
     pub fn dispatch(&mut self, intent: IngestIntent) -> IngestDispatchResult {
         self.dispatch_log.push(intent.action_id.clone());
 
+        let source_action = matches!(
+            intent.action_id.as_str(),
+            action_ids::INGEST_RELOAD
+                | action_ids::INGEST_SOURCE_KIND_LOCAL
+                | action_ids::INGEST_SOURCE_KIND_LAN
+                | action_ids::INGEST_SOURCE_KIND_INTERNET
+                | action_ids::INGEST_DIR_ROOTS
+                | action_ids::INGEST_DIR_UP
+                | action_ids::INGEST_DIR_OPEN
+                | action_ids::INGEST_DIR_CONFIRM
+                | action_ids::INGEST_DIR_CANCEL
+        );
+        if source_action
+            && (self.view.command_busy
+                || self.view.browser_busy
+                || (self.pending_source.is_some()
+                    && intent.action_id != action_ids::INGEST_DIR_CANCEL))
+        {
+            return IngestDispatchResult::rejected("Obrada odabranog izvora je u tijeku.");
+        }
+        if self.transport_browser.is_some() {
+            match intent.action_id.as_str() {
+                action_ids::INGEST_SOURCE_KIND_LOCAL => {
+                    return self.browse_registered(SourceKind::Local, None)
+                }
+                action_ids::INGEST_SOURCE_KIND_LAN => {
+                    return self.browse_registered(SourceKind::Lan, None)
+                }
+                action_ids::INGEST_SOURCE_KIND_INTERNET => {
+                    return self.browse_registered(SourceKind::Internet, None)
+                }
+                action_ids::INGEST_DIR_ROOTS | action_ids::INGEST_DIR_CANCEL => {
+                    return self.browse_registered(self.view.source_kind, None)
+                }
+                action_ids::INGEST_DIR_UP => {
+                    return self.browse_registered(self.view.source_kind, Some(None))
+                }
+                action_ids::INGEST_DIR_OPEN => {
+                    if let IngestPayload::LocationUri(uri) = &intent.payload {
+                        self.capture_selected_source_metadata(uri);
+                        return self
+                            .browse_registered(self.view.source_kind, Some(Some(uri.clone())));
+                    }
+                }
+                _ => {}
+            }
+        }
+
         match intent.action_id.as_str() {
-            action_ids::INGEST_RELOAD => return self.load_work_settings(None),
+            action_ids::INGEST_RELOAD => self.load_work_settings(None),
             action_ids::INGEST_SOURCE_KIND_LOCAL => {
                 self.view.source_kind = SourceKind::Local;
                 let result = self.source_browser.load_roots();
@@ -487,7 +649,22 @@ impl IngestComponent {
                 _ => IngestDispatchResult::rejected("Nedostaje QNC lokacijski URI."),
             },
             action_ids::INGEST_DIR_CONFIRM => match intent.payload {
-                IngestPayload::LocationUri(uri) => self.load_work_settings(Some(uri)),
+                IngestPayload::LocationUri(uri) => {
+                    if self
+                        .transport_browser
+                        .as_ref()
+                        .and_then(|b| b.selected(&uri))
+                        .is_none()
+                    {
+                        let error = self
+                            .selection_config_error
+                            .clone()
+                            .unwrap_or_else(|| "Odaberi disk ili mapu u browseru.".into());
+                        self.view.message = error.clone();
+                        return IngestDispatchResult::rejected(error);
+                    }
+                    self.load_work_settings(Some(uri))
+                }
                 _ => IngestDispatchResult::rejected("Nedostaje QNC lokacijski URI."),
             },
             action_ids::INGEST_DIR_CANCEL => self.cancel_source_browser(),
@@ -587,6 +764,77 @@ impl IngestComponent {
         self.view.selected_source_volume_name.clear();
     }
 
+    fn browse_registered(
+        &mut self,
+        kind: SourceKind,
+        target: Option<Option<String>>,
+    ) -> IngestDispatchResult {
+        let Some(mut browser) = self.transport_browser.clone() else {
+            return IngestDispatchResult::rejected("Izvor nije povezan.");
+        };
+        self.view.source_kind = kind;
+        if target.is_none() {
+            self.clear_source_browser_state();
+        }
+        self.view.browser_busy = true;
+        let (send, receive) = mpsc::sync_channel(1);
+        match std::thread::Builder::new()
+            .name("ingest-browser".into())
+            .spawn(move || {
+                let result = match target {
+                    None => browser.roots(source_kind_id(kind)),
+                    Some(None) => browser.parent(),
+                    Some(Some(uri)) => browser.open(&uri),
+                };
+                let _ = send.send((browser, result));
+            }) {
+            Ok(_) => self.browser_result = Some(receive),
+            Err(error) => {
+                self.view.browser_busy = false;
+                return IngestDispatchResult::rejected(error.to_string());
+            }
+        }
+        IngestDispatchResult::accepted(None, true)
+    }
+
+    fn start_selection(&mut self, uri: &str) -> IngestDispatchResult {
+        let Some(selected) = self
+            .transport_browser
+            .as_ref()
+            .and_then(|b| b.selected(uri))
+        else {
+            return IngestDispatchResult::rejected("Odabrani izvor vise nije dostupan.");
+        };
+        let Some(config) = self.selection_config.clone() else {
+            return IngestDispatchResult::rejected("Nema Select konfiguracije.");
+        };
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        let (send, receive) = mpsc::sync_channel(32);
+        match std::thread::Builder::new()
+            .name("ingest-select".into())
+            .spawn(move || selection::run(config, selected, send, worker_cancel))
+        {
+            Ok(thread) => {
+                self.selection_thread = Some(thread);
+                self.selection_cancel = Some(cancel);
+                self.selection_result = Some(receive);
+                self.selection_warnings = 0;
+                self.view.select_warning_count = 0;
+                self.selection_last_warning = None;
+                self.view.clips.clear();
+                self.view.preview_clip_id = None;
+                self.view.command_busy = true;
+                self.view.message = "Select je pokrenut.".into();
+                IngestDispatchResult::accepted(None, true)
+            }
+            Err(error) => {
+                self.view.message = error.to_string();
+                IngestDispatchResult::rejected(error.to_string())
+            }
+        }
+    }
+
     fn cancel_source_browser(&mut self) -> IngestDispatchResult {
         self.view.source_kind = SourceKind::Local;
         self.clear_source_browser_state();
@@ -675,9 +923,9 @@ impl IngestComponent {
         if let Some(store) = self.store.as_mut() {
             match store.record_source_selection(&record) {
                 Ok(session) => {
-                    self.view.selected_source_uri = Some(uri);
+                    self.view.selected_source_uri = Some(uri.clone());
                     self.view.message = format!("Izvor je odabran: {}", session.selected_at_utc);
-                    IngestDispatchResult::accepted(None, true)
+                    self.start_selection(&uri)
                 }
                 Err(error) => {
                     self.view.message = error.clone();
@@ -685,9 +933,21 @@ impl IngestComponent {
                 }
             }
         } else {
-            self.view.selected_source_uri = Some(uri);
+            self.view.selected_source_uri = Some(uri.clone());
             self.view.message = "Izvor je odabran.".to_string();
-            IngestDispatchResult::accepted(None, true)
+            self.start_selection(&uri)
+        }
+    }
+}
+
+impl Drop for IngestComponent {
+    fn drop(&mut self) {
+        if let Some(cancel) = self.selection_cancel.take() {
+            cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        self.selection_result = None;
+        if let Some(thread) = self.selection_thread.take() {
+            let _ = thread.join();
         }
     }
 }

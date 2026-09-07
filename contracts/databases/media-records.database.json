@@ -1,0 +1,49 @@
+{
+  "database_id": "qnc.db.media_records",
+  "owner_application": "qnc.ingest",
+  "write_owner": "qnc.ingest",
+  "schema_version": "0.2.0",
+  "qnc_uri": "qnc://local/db/media_records",
+  "transport_uri_templates": [
+    "qnc://local/db/media_records",
+    "qnc://lan/{authority}/db/media_records",
+    "qnc://intranet/{authority}/db/media_records"
+  ],
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "tables": [
+    "media_heads",
+    "media_snapshots",
+    "evidence_documents",
+    "snapshot_documents",
+    "write_receipts",
+    "media_acquisitions"
+  ],
+  "public_read_views": [
+    "public_media_heads",
+    "public_media_snapshots",
+    "public_media_documents",
+    "public_media_snapshot_documents",
+    "public_media_acquisitions"
+  ],
+  "public_read_policy": "public_read_views",
+  "record_contracts": {
+    "public_media_snapshots.snapshot_json": {
+      "contract_id": "qnc.media.records",
+      "contract_version": "0.2.0",
+      "record_type": "Snapshot"
+    },
+    "public_media_acquisitions.acquisition_json": {
+      "contract_id": "qnc.media.records",
+      "contract_version": "0.2.0",
+      "record_type": "Acquisition"
+    }
+  },
+  "migration_policy": "reject_incompatible_no_migration",
+  "specification": "docs/31-media-record-database.md",
+  "created_at": "2026-09-07T00:00:00Z",
+  "updated_at": "2026-09-07T00:00:00Z"
+}

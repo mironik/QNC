@@ -12,5 +12,7 @@
   "forbidden_calls": ["media.scan", "ffprobe", "media.probe.full", "clip.catalog.write"],
   "forbidden_dependencies": ["qnc.module.media-probe"],
   "state_policy": "session_local",
-  "database_write_policy": "no_db_writes"
+  "database_write_policy": "no_db_writes",
+  "registered_source_api": "TransportBrowserSession uses owner-supplied SourceReader roots for local/LAN/intranet listing; selection returns a stable SourceReference. No confirmation buttons or application workflow.",
+  "specification": "docs/34-select-runtime.md"
 }

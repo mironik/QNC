@@ -1,0 +1,36 @@
+{
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "specification": "docs/29-source-grouping-modules.md",
+  "module_id": "qnc.module.source-contract",
+  "module_name": "Source Reference Contract",
+  "capabilities": [
+    "source.reference.validate",
+    "source.reference.resolve"
+  ],
+  "forbidden_calls": [
+    "filesystem.read",
+    "network.request",
+    "db.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner"
+  ],
+  "runtime_crate": "qnc-source-contract"
+}

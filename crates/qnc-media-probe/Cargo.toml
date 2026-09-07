@@ -1,0 +1,25 @@
+[package]
+name = "qnc-media-probe"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-contracts.workspace = true
+qnc-media-records.workspace = true
+qnc-json-transport.workspace = true
+qnc-transport-resolver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tiny_http = "0.12"
+
+[dev-dependencies]
+tempfile = "3"
+qnc-ffprobe-metadata.workspace = true
+qnc-media-metadata-compose.workspace = true
+qnc-media-metadata.workspace = true
+qnc-media-record-db.workspace = true
+qnc-source-index-db.workspace = true
+qnc-source-index-contract.workspace = true
+qnc-source-reader.workspace = true
+qnc-source-groups.workspace = true
+qnc-sony-metadata.workspace = true

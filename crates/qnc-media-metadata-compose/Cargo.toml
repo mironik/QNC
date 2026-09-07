@@ -1,0 +1,12 @@
+[package]
+name = "qnc-media-metadata-compose"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-media-metadata.workspace = true
+qnc-media-records.workspace = true
+qnc-ffprobe-metadata.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+

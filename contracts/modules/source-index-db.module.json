@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.source-index-db",
+  "module_name": "Source Index Database Adapter",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "database_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "capabilities": ["source.index.write", "source.index.read"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "owner_application_only",
+  "database_contract": "qnc.db.source_index",
+  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "camera.sony.index.read", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.scanner", "qnc.module.media-probe", "qnc.module.sony-metadata"],
+  "runtime_crate": "qnc-source-index-db",
+  "specification": "docs/30-source-index-database.md"
+}

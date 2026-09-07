@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.json-transport",
+  "module_name": "JSON Transport",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "capabilities": [
+    "transport.json.request",
+    "transport.json.respond"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "forbidden_calls": [
+    "db.write",
+    "source.scan.roles",
+    "media.probe.full",
+    "ffprobe",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.scanner",
+    "qnc.module.media-probe"
+  ],
+  "runtime_crate": "qnc-json-transport",
+  "specification": "docs/31-media-record-database.md"
+}

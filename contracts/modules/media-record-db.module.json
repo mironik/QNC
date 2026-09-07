@@ -1,0 +1,41 @@
+{
+  "module_id": "qnc.module.media-record-db",
+  "module_name": "Media Record Database Adapter",
+  "module_version": "0.2.0",
+  "module_kind": "library",
+  "input_contract_version": "0.2.0",
+  "output_contract_version": "0.2.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "capabilities": [
+    "media.records.write",
+    "media.records.read",
+    "media.evidence.read",
+    "media.acquisition.begin",
+    "media.acquisition.finish",
+    "media.acquisition.read"
+  ],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "owner_application_only",
+  "forbidden_calls": [
+    "source.scan.roles",
+    "camera.sony.metadata.read",
+    "media.probe.full",
+    "ffprobe",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.scanner",
+    "qnc.module.media-probe"
+  ],
+  "runtime_crate": "qnc-media-record-db",
+  "specification": "docs/31-media-record-database.md"
+}

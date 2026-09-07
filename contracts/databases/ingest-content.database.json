@@ -27,6 +27,14 @@
   ],
   "write_owner": "qnc.ingest",
   "public_read_policy": "public_read_views",
+  "record_contracts": {
+    "public_probe_records.probe_json": {
+      "contract_id": "qnc.media.metadata",
+      "contract_version": "0.2.0",
+      "module_id": "qnc.module.media-metadata",
+      "specification": "docs/25-media-metadata-contract.md"
+    }
+  },
   "migration_policy": "owner_application_only",
   "created_at": "2026-09-04T00:00:00Z",
   "updated_at": "2026-09-04T00:00:00Z"
