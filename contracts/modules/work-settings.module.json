@@ -3,7 +3,7 @@
   "module_name": "Work Settings Reader",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["work.settings.read"],
+  "capabilities": ["work.settings.read", "work.storage.resolve"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -16,5 +16,5 @@
   "runtime_crate": "qnc-work-settings",
   "helper_executable": "qnc-work-settings",
   "input": "Configured registry QNC URI and private transport binding; no project selection or settings override.",
-  "output": "Versioned snapshot of the existing active project, output root QNC URI and stored work policies; no raw OS paths, ownership changes or app calls."
+  "output": "Versioned snapshot of the existing active project, output root QNC URI and stored work policies. Public DB adapters may resolve the existing workspace URI through a private owner binding; no raw paths in forms or wire payloads, no ownership changes or app calls."
 }

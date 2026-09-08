@@ -60,7 +60,10 @@
     "contracts/ui/ingest.layout.json"
   ],
   "workflow_forbidden_operations": [
-    "project.db.write",
+    "project.settings.write",
+    "project.registry.write",
+    "project.identity.write",
+    "project.activate",
     "story.db.write",
     "media_assist.db.write",
     "story.workflow",

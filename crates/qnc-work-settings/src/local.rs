@@ -8,6 +8,38 @@ use std::{
 
 pub const LOCAL_REGISTRY_URI: &str = "qnc://local/db/project_registry";
 
+pub(crate) fn workspace_file(registry_file: &Path, id: &str) -> Result<PathBuf, ReadError> {
+    if id.is_empty() || id.contains(['/', '\\', ':']) || matches!(id, "." | "..") {
+        return Err(db_error());
+    }
+    let registry = open_read_only(registry_file)?;
+    let path: String = registry
+        .query_row(
+            "SELECT s.local_path FROM project_storage_locations s
+         JOIN public_projects p ON p.project_id=s.project_id WHERE p.project_id=?1",
+            [id],
+            |r| r.get(0),
+        )
+        .map_err(|_| db_error())?;
+    let directory = PathBuf::from(path);
+    if !directory.is_absolute() {
+        return Err(db_error());
+    }
+    let file = directory.join("qnc_project.db");
+    let db = open_read_only(&file)?;
+    let matches: bool = db
+        .query_row(
+            "SELECT count(*)=1 AND min(project_id)=?1 FROM public_project_settings",
+            [id],
+            |r| r.get(0),
+        )
+        .map_err(|_| db_error())?;
+    if !matches {
+        return Err(db_error());
+    }
+    Ok(file)
+}
+
 fn open_read_only(path: &Path) -> Result<Connection, ReadError> {
     let conn = Connection::open_with_flags(
         path,

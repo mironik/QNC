@@ -235,6 +235,9 @@
     "ingest_reload": {
       "label": "Osvježi Ingest prikaz"
     },
+    "ingest_set_clip_filter": {
+      "label": "Novi / Sve (New / All)"
+    },
     "ingest_set_archive": {
       "label": "Postavi kopiranje originala"
     },

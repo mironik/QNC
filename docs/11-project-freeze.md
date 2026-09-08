@@ -5,6 +5,19 @@ Status: zamrznuto
 Datum: 2026-09-06
 Razlog: korisnik je zatrazio da se Project vise ne mijenja bez izricite dozvole.
 
+## Opseg: kod, ne radni podaci
+
+Korisnik je 2026-09-08 izricito pojasnio: "projektni kod je zamrznut ne
+projekt direktoriji". Freeze se odnosi na dolje navedene izvorne datoteke i
+ugovore, ne na radne projektne direktorije niti rezultate rada aplikacija.
+
+Ingest i drugi owneri smiju kroz javne DB/storage module pisati svoje tablice
+i artefakte u predvidjena projektna odredista. Projektne postavke citaju
+read-only. Vlastite tablice mogu biti u istoj fizickoj projektnoj bazi;
+zajednicka datoteka ne daje pravo na upis Project postavki ili aktivacije.
+Zastita od slucajnog brisanja i read-only izvorna kartica odvojene su granice,
+ne zabrana zapisivanja radnih rezultata. Ovo ne odmrzava Project kod.
+
 ## Zatvorena odobrenja za postavke i footer
 
 Naknadno izricito odobrenje 2026-09-06: "isto treba biti i na Project .. treba

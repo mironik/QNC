@@ -7,6 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod acquisition;
 pub use acquisition::*;
+mod camera_documents;
+pub use camera_documents::{camera_document_uri, freeze_camera_documents};
 
 pub const VERSION: &str = "0.2.0";
 pub const CONTRACT_ID: &str = "qnc.media.records";
@@ -157,7 +159,11 @@ impl Write {
             used.insert(evidence.document_uri.as_str());
             match evidence.kind {
                 EvidenceKind::CameraMetadata
-                    if !camera_documents.contains(&evidence.document_uri) =>
+                    if !camera_documents.contains(&evidence.document_uri)
+                        && !camera_documents.iter().any(|uri| {
+                            camera_document_uri(uri, &doc.text).as_ref()
+                                == Ok(&evidence.document_uri)
+                        }) =>
                 {
                     return Err(Error::InvalidMetadata)
                 }

@@ -16,7 +16,7 @@ fn local(uri: &str, file: &Path) -> Binding {
     }
 }
 
-fn fixture() -> (tempfile::TempDir, SelectionConfig) {
+pub(crate) fn fixture() -> (tempfile::TempDir, SelectionConfig) {
     let dir = tempfile::tempdir().unwrap();
     let card = dir.path().join("card");
     let recording = card.join("PRIVATE/XDROOT");
@@ -103,7 +103,7 @@ impl ProbeBackend for Backend {
         })
     }
 }
-fn execute(
+pub(crate) fn execute(
     config: &SelectionConfig,
     calls: &Arc<AtomicUsize>,
     fail: bool,
@@ -122,6 +122,19 @@ fn execute(
                 fail,
                 partial,
             }))
+        },
+        || {
+            ContentClient::from_owner_binding(
+                &config
+                    .source_index
+                    .file
+                    .as_ref()
+                    .unwrap()
+                    .with_file_name("content.db"),
+                "qnc://local/db/ingest_content/p1",
+                Access::ReadWrite,
+            )
+            .map_err(Into::into)
         },
     )
     .unwrap();
@@ -179,14 +192,188 @@ fn select_persists_two_original_proxy_groups_and_reselect_reads_db() {
             .iter()
             .filter(|e| matches!(e, Event::Clip(_)))
             .count(),
-        2
+        0
     );
     assert!(
         second
             .iter()
-            .any(|e| matches!(e, Event::Clip(c) if c.thumb_image.is_some())),
-        "thumbnail reload from persisted source links"
+            .any(|e| matches!(e, Event::Existing(ids) if ids.len() == 2)),
+        "reselect preserves existing thumbnails without decoding them again"
     );
+}
+
+#[test]
+fn reselect_adds_only_new_clips_removes_confirmed_missing_and_keeps_selection() {
+    let (dir, config) = fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    execute(&config, &calls, false, false, ".");
+    let mut content = ContentClient::from_owner_binding(
+        &dir.path().join("content.db"),
+        "qnc://local/db/ingest_content/p1",
+        Access::ReadWrite,
+    )
+    .unwrap();
+    let clips = content.list(None).unwrap();
+    let a = clips.iter().find(|c| c.clip.name == "TEST A.MXF").unwrap();
+    let a_id = a.clip.id().to_string();
+    let b_id = clips
+        .iter()
+        .find(|c| c.clip.name == "TEST B.MXF")
+        .unwrap()
+        .clip
+        .id()
+        .to_string();
+    content.select(vec![a_id.clone()], true).unwrap();
+    let recording = dir.path().join("card/PRIVATE/XDROOT");
+    // A fixture camera adds one recording and removes B; the real card is never changed.
+    let xml = INDEX
+        .replace("TEST B", "TEST C")
+        .replace("ORIGINAL-B", "ORIGINAL-C")
+        .replace("PROXY-B", "PROXY-C");
+    std::fs::write(recording.join("MEDIAPRO.XML"), xml).unwrap();
+    std::fs::write(recording.join("Clip/TEST C.MXF"), "fixture only").unwrap();
+    std::fs::write(recording.join("Sub/TEST CS03.MP4"), "fixture only").unwrap();
+    std::fs::write(
+        recording.join("Clip/TEST CM01.XML"),
+        SIDE.replace("ORIGINAL-A", "ORIGINAL-C")
+            .replace("500", "100"),
+    )
+    .unwrap();
+    std::fs::remove_file(recording.join("Clip/TEST B.MXF")).unwrap();
+    let events = execute(&config, &calls, false, false, ".");
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        6,
+        "only C original/proxy acquired: {events:?}"
+    );
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::Removed(ids) if ids.contains(&b_id))));
+    assert!(events
+        .iter()
+        .filter_map(|e| if let Event::Clip(c) = e {
+            Some(c)
+        } else {
+            None
+        })
+        .all(|c| c.name == "TEST C.MXF" && !c.previously_seen));
+    let clips = content.list(None).unwrap();
+    assert_eq!(clips.len(), 2);
+    assert!(clips.iter().find(|c| c.clip.id() == a_id).unwrap().selected);
+    assert!(
+        recording.join("Sub/TEST BS03.MP4").exists(),
+        "no media deletion"
+    );
+    assert!(
+        config
+            .media_records
+            .media_db()
+            .unwrap()
+            .read(&b_id, None)
+            .unwrap()
+            .is_some(),
+        "acquisition evidence retained"
+    );
+    let next = execute(&config, &calls, false, false, ".");
+    assert!(!next
+        .iter()
+        .any(|e| matches!(e, Event::Clip(_) | Event::Saved { .. })));
+    assert_eq!(calls.load(Ordering::SeqCst), 6);
+}
+
+#[test]
+fn preview_arrives_while_publication_is_blocked() {
+    let (dir, config) = fixture();
+    let path = dir.path().join("content.db");
+    drop(
+        ContentClient::from_owner_binding(
+            &path,
+            "qnc://local/db/ingest_content/p1",
+            Access::ReadWrite,
+        )
+        .unwrap(),
+    );
+    let calls = Arc::new(AtomicUsize::new(0));
+    let (send, receive) = mpsc::sync_channel(128);
+    let gate = std::sync::Barrier::new(2);
+    let opens = AtomicUsize::new(0);
+    std::thread::scope(|scope| {
+        let worker = scope.spawn(|| {
+            run_inner(
+                &config,
+                &SourceReference::new(SOURCE, ".").unwrap(),
+                &send,
+                &AtomicBool::new(false),
+                |_, _| {
+                    Ok(Box::new(Backend {
+                        calls: calls.clone(),
+                        fail: false,
+                        partial: false,
+                    }))
+                },
+                || {
+                    if opens.fetch_add(1, Ordering::SeqCst) == 1 {
+                        gate.wait();
+                    }
+                    ContentClient::from_owner_binding(
+                        &path,
+                        "qnc://local/db/ingest_content/p1",
+                        Access::ReadWrite,
+                    )
+                    .map_err(Into::into)
+                },
+            )
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        let mut preview = false;
+        while std::time::Instant::now() < deadline && !preview {
+            if let Ok(event) = receive.recv_timeout(std::time::Duration::from_millis(50)) {
+                assert!(!matches!(event, Event::Saved { .. }));
+                preview =
+                    matches!(event, Event::Clip(c) if c.save_state == crate::SaveState::Pending);
+            }
+        }
+        let mut db = ContentClient::from_owner_binding(
+            &path,
+            "qnc://local/db/ingest_content/p1",
+            Access::ReadOnly,
+        )
+        .unwrap();
+        let empty = db.list(None).unwrap().is_empty();
+        gate.wait();
+        worker.join().unwrap().unwrap();
+        assert!(
+            preview && empty,
+            "UI sees the clip before its catalog write"
+        );
+    });
+}
+
+#[test]
+fn incomplete_scan_and_outside_scope_never_remove_existing_clips() {
+    let (dir, config) = fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    execute(&config, &calls, false, false, ".");
+    let recording = dir.path().join("card/PRIVATE/XDROOT");
+    std::fs::remove_file(recording.join("Clip/TEST B.MXF")).unwrap();
+    let outside = execute(&config, &calls, false, false, "PRIVATE/XDROOT/Thmbnl");
+    assert!(!outside
+        .iter()
+        .any(|e| matches!(e, Event::Removed(ids) if !ids.is_empty())));
+    std::fs::write(recording.join("MEDIAPRO.XML"), "<broken").unwrap();
+    let incomplete = execute(&config, &calls, false, false, ".");
+    assert!(incomplete.iter().any(|e| matches!(e, Event::Warning(_))));
+    assert!(!incomplete
+        .iter()
+        .any(|e| matches!(e, Event::Removed(ids) if !ids.is_empty())));
+    let mut content = ContentClient::from_owner_binding(
+        &dir.path().join("content.db"),
+        "qnc://local/db/ingest_content/p1",
+        Access::ReadOnly,
+    )
+    .unwrap();
+    assert_eq!(content.list(None).unwrap().len(), 2);
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
 }
 
 #[test]
@@ -243,6 +430,14 @@ fn concurrent_select_jobs_do_not_duplicate_probe_calls() {
 fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
     for environment in ["lan", "intranet"] {
         let (dir, mut config) = fixture();
+        let content_uri = format!("qnc://{environment}/fixture/db/ingest_content/p1");
+        let mut content = qnc_ingest_store::content::ContentStore::open_owner_binding(
+            &dir.path().join("content.db"),
+            &content_uri,
+            Access::ReadWrite,
+        )
+        .unwrap();
+        let published_content = content_uri.clone();
         let source_uri = format!("qnc://{environment}/fixture/source/card-test");
         let index_uri = format!("qnc://{environment}/fixture/db/source_index");
         let media_uri = format!("qnc://{environment}/fixture/db/media_records");
@@ -276,6 +471,12 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
                     continue;
                 };
                 match request.url() {
+                    qnc_ingest_store::content::ENDPOINT => qnc_ingest_store::content::respond(
+                        request,
+                        &mut content,
+                        &published_content,
+                        &credentials,
+                    ),
                     qnc_source_reader::ENDPOINT => {
                         qnc_source_reader::server::respond(request, &local_source, "fixture-write")
                     }
@@ -326,6 +527,22 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
                             fail: false,
                             partial: false,
                         }))
+                    },
+                    || {
+                        let resolver = if environment == "lan" {
+                            qnc_transport_resolver::ResolverConfig::new(dir.path())
+                                .with_lan_authority("fixture", &endpoint)
+                        } else {
+                            qnc_transport_resolver::ResolverConfig::new(dir.path())
+                                .with_intranet_authority("fixture", &endpoint)
+                        };
+                        ContentClient::from_remote(
+                            &resolver,
+                            &content_uri,
+                            Access::ReadWrite,
+                            "fixture-write",
+                        )
+                        .map_err(Into::into)
                     },
                 )
                 .unwrap();

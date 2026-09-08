@@ -8,6 +8,9 @@ use qnc_ingest_store::{IngestStore, SourceSelectionRecord};
 use qnc_work_settings::SettingsReader;
 use serde::{Deserialize, Serialize};
 
+mod catalog;
+#[cfg(test)]
+mod clip_filter_tests;
 mod selection;
 mod selection_config;
 mod work_plan;
@@ -30,6 +33,7 @@ pub mod action_ids {
     pub const INGEST_CLEAR_SELECTION: &str = "ingest_clear_selection";
     pub const INGEST_IMPORT_SELECTED: &str = "ingest_import_selected";
     pub const INGEST_RELOAD: &str = "ingest_reload";
+    pub const INGEST_SET_CLIP_FILTER: &str = "ingest_set_clip_filter";
     pub const INGEST_SET_ARCHIVE: &str = "ingest_set_archive";
     pub const INGEST_SET_AI_MINING: &str = "ingest_set_ai_mining";
     pub const INGEST_APPROVE_PROXY_POSTERS: &str = "ingest_approve_proxy_posters";
@@ -54,6 +58,7 @@ pub mod action_ids {
         INGEST_CLEAR_SELECTION,
         INGEST_IMPORT_SELECTED,
         INGEST_RELOAD,
+        INGEST_SET_CLIP_FILTER,
         INGEST_SET_ARCHIVE,
         INGEST_SET_AI_MINING,
         INGEST_APPROVE_PROXY_POSTERS,
@@ -106,6 +111,9 @@ pub struct ClipView {
     pub duration_seconds: f64,
     pub selected: bool,
     pub imported: bool,
+    pub previously_seen: bool,
+    pub metadata_revision: u32,
+    pub save_state: SaveState,
     pub thumb_uri: Option<String>,
     pub thumb_status: ThumbStatus,
     #[serde(skip)]
@@ -120,6 +128,9 @@ impl Default for ClipView {
             duration_seconds: 0.0,
             selected: false,
             imported: false,
+            previously_seen: false,
+            metadata_revision: 0,
+            save_state: SaveState::Saved,
             thumb_uri: None,
             thumb_status: ThumbStatus::Missing,
             thumb_image: None,
@@ -128,11 +139,26 @@ impl Default for ClipView {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum SaveState {
+    Pending,
+    Failed,
+    #[default]
+    Saved,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ThumbStatus {
     Ready,
     Pending,
     #[default]
     Missing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum ClipFilter {
+    New,
+    #[default]
+    All,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -150,6 +176,7 @@ pub struct IngestViewModel {
     pub selected_source_serial_number: String,
     pub selected_source_volume_name: String,
     pub clips: Vec<ClipView>,
+    pub clip_filter: ClipFilter,
     pub preview_clip_id: Option<String>,
     pub archive_original: bool,
     pub archive_original_available: bool,
@@ -180,6 +207,7 @@ impl Default for IngestViewModel {
             selected_source_serial_number: String::new(),
             selected_source_volume_name: String::new(),
             clips: Vec::new(),
+            clip_filter: ClipFilter::All,
             preview_clip_id: None,
             archive_original: false,
             archive_original_available: false,
@@ -197,6 +225,12 @@ impl Default for IngestViewModel {
 }
 
 impl IngestViewModel {
+    pub fn visible_clips(&self) -> impl Iterator<Item = &ClipView> {
+        self.clips
+            .iter()
+            .filter(|clip| self.clip_filter == ClipFilter::All || !clip.previously_seen)
+    }
+
     pub fn total_count(&self) -> usize {
         self.clips.len()
     }
@@ -265,6 +299,7 @@ pub enum IngestPayload {
     Bool(bool),
     Frame(i64),
     AudioLane(String),
+    ClipFilter(ClipFilter),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -318,7 +353,10 @@ pub struct IngestComponent {
     source_browser: DirectoryBrowserSession,
     store: Option<IngestStore>,
     settings_reader: Option<SettingsReader>,
-    settings_result: Option<Receiver<Result<IngestWorkPlan, String>>>,
+    settings_result: Option<Receiver<Result<catalog::Loaded, String>>>,
+    catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
+    catalog_result: Option<Receiver<Result<(Vec<String>, bool), String>>>,
+    catalog_thread: Option<std::thread::JoinHandle<()>>,
     work_plan: Option<IngestWorkPlan>,
     pending_source: Option<String>,
     selection_config: Option<selection_config::SelectionConfig>,
@@ -390,6 +428,10 @@ impl IngestComponent {
 
     fn settings_failed(&mut self, error: String) {
         self.work_plan = None;
+        self.catalog_target = None;
+        self.view.clips.clear();
+        self.view.clip_filter = ClipFilter::All;
+        self.view.preview_clip_id = None;
         self.pending_source = None;
         self.settings_result = None;
         self.view.work_settings_loading = false;
@@ -399,7 +441,10 @@ impl IngestComponent {
     }
 
     fn load_work_settings(&mut self, pending_source: Option<String>) -> IngestDispatchResult {
-        if self.settings_result.is_some() {
+        if self.settings_result.is_some()
+            || self.catalog_result.is_some()
+            || self.selection_result.is_some()
+        {
             return IngestDispatchResult::rejected("Citanje radnih postavki je u tijeku.");
         }
         let Some(reader) = self.settings_reader.clone() else {
@@ -411,13 +456,16 @@ impl IngestComponent {
         self.view.work_settings_ready = false;
         self.view.work_settings_error = None;
         let (send, receive) = mpsc::sync_channel(1);
+        let config = self.selection_config.clone();
+        let retained_workspace = self
+            .pending_source
+            .as_ref()
+            .and_then(|_| self.work_plan.as_ref())
+            .map(|p| p.settings.workspace_db_uri.clone());
         match std::thread::Builder::new()
             .name("ingest-work-settings".into())
             .spawn(move || {
-                let result = reader
-                    .read()
-                    .map_err(|e| e.to_string())
-                    .and_then(IngestWorkPlan::from_settings);
+                let result = catalog::load(&reader, config.as_ref(), retained_workspace.as_deref());
                 let _ = send.send(result);
             }) {
             Ok(_) => self.settings_result = Some(receive),
@@ -428,6 +476,31 @@ impl IngestComponent {
 
     pub fn poll(&mut self) -> bool {
         let mut changed = self.poll_settings();
+        if let Some(receiver) = &self.catalog_result {
+            let result = match receiver.try_recv() {
+                Ok(result) => Some(result),
+                Err(TryRecvError::Disconnected) => Some(Err("DB odabir je prekinut.".into())),
+                Err(TryRecvError::Empty) => None,
+            };
+            if let Some(result) = result {
+                self.catalog_result = None;
+                if let Some(thread) = self.catalog_thread.take() {
+                    let _ = thread.join();
+                }
+                match result {
+                    Ok((ids, selected)) => {
+                        for clip in &mut self.view.clips {
+                            if ids.contains(&clip.clip_id) {
+                                clip.selected = selected;
+                            }
+                        }
+                        self.view.message = self.view.status_label();
+                    }
+                    Err(error) => self.view.message = error,
+                }
+                changed = true;
+            }
+        }
         if let Some(receiver) = &self.browser_result {
             match receiver.try_recv() {
                 Ok((browser, result)) => {
@@ -474,9 +547,46 @@ impl IngestComponent {
                         clip.selected = existing.selected;
                         *existing = clip;
                     } else {
-                        self.view.clips.push(clip);
+                        let index = self.view.clips.partition_point(|c| c.name < clip.name);
+                        self.view.clips.insert(index, clip);
                     }
-                    self.view.clips.sort_by(|a, b| a.name.cmp(&b.name));
+                }
+                selection::Event::Existing(ids) => {
+                    for clip in &mut self.view.clips {
+                        if ids.contains(&clip.clip_id) {
+                            clip.previously_seen = true;
+                        }
+                    }
+                }
+                selection::Event::Saved { revisions, error } => {
+                    for clip in &mut self.view.clips {
+                        if revisions.iter().any(|(id, revision)| {
+                            id == &clip.clip_id && *revision == clip.metadata_revision
+                        }) {
+                            clip.save_state = if error.is_some() {
+                                SaveState::Failed
+                            } else {
+                                SaveState::Saved
+                            };
+                        }
+                    }
+                    if let Some(error) = error {
+                        self.selection_warnings += 1;
+                        self.view.select_warning_count = self.selection_warnings;
+                        self.selection_last_warning = Some(error.clone());
+                        self.view.message = error;
+                    }
+                }
+                selection::Event::Removed(ids) => {
+                    self.view.clips.retain(|c| !ids.contains(&c.clip_id));
+                    if self
+                        .view
+                        .preview_clip_id
+                        .as_ref()
+                        .is_some_and(|id| ids.contains(id))
+                    {
+                        self.view.preview_clip_id = None;
+                    }
                 }
                 selection::Event::Finished(result) => {
                     self.selection_result = None;
@@ -486,11 +596,14 @@ impl IngestComponent {
                     }
                     self.view.command_busy = false;
                     self.view.message = match result {
-                        Ok(()) if self.selection_warnings == 0 => format!(
-                            "Select zavrsen: {} klipova zapisano u bazu.",
-                            self.view.clips.len()
+                        Ok(summary) if self.selection_warnings == 0 => format!(
+                            "Select: {} postojećih; {} obrađenih; {} uklonjenih ({:.1} s).",
+                            summary.unchanged,
+                            summary.processed,
+                            summary.removed,
+                            summary.elapsed_ms as f64 / 1000.0
                         ),
-                        Ok(()) => format!(
+                        Ok(_) => format!(
                             "Select: {} klipova; {} upozorenja. {}",
                             self.view.clips.len(),
                             self.selection_warnings,
@@ -519,12 +632,14 @@ impl IngestComponent {
         self.settings_result = None;
         self.view.work_settings_loading = false;
         match result {
-            Ok(plan) => {
+            Ok(loaded) => {
+                let plan = loaded.plan;
                 // A new project must never inherit the preceding project's selection/preview.
                 if self.work_plan.as_ref().map(|p| &p.settings.project_id)
                     != Some(&plan.settings.project_id)
                 {
                     self.view.clips.clear();
+                    self.view.clip_filter = ClipFilter::All;
                     self.view.preview_clip_id = None;
                     self.view.selected_source_uri = None;
                     self.view.playing = false;
@@ -534,6 +649,23 @@ impl IngestComponent {
                 self.view.archive_original_available = false;
                 self.view.archive_original = false;
                 self.view.work_settings_ready = true;
+                self.catalog_target = Some(loaded.target);
+                if let Some(clips) = loaded.clips {
+                    self.view.clips = clips;
+                }
+                if self.pending_source.is_none() {
+                    if let Some((uri, name, serial, volume)) = loaded.source {
+                        self.view.selected_source_uri = Some(uri);
+                        self.view.selected_source_name = name;
+                        self.view.selected_source_serial_number = serial;
+                        self.view.selected_source_volume_name = volume;
+                    } else {
+                        self.view.selected_source_uri = None;
+                        self.view.selected_source_name.clear();
+                        self.view.selected_source_serial_number.clear();
+                        self.view.selected_source_volume_name.clear();
+                    }
+                }
                 self.work_plan = Some(plan);
                 if let Some(uri) = self.pending_source.take() {
                     self.confirm_source_selection(uri);
@@ -546,6 +678,47 @@ impl IngestComponent {
 
     pub fn view(&self) -> &IngestViewModel {
         &self.view
+    }
+
+    pub fn has_pending_work(&self) -> bool {
+        self.view.work_settings_loading
+            || self.view.command_busy
+            || self.view.browser_busy
+            || self.catalog_result.is_some()
+    }
+
+    fn select_clips(&mut self, ids: Vec<String>, selected: bool) -> IngestDispatchResult {
+        if self
+            .view
+            .clips
+            .iter()
+            .any(|c| ids.contains(&c.clip_id) && c.save_state != SaveState::Saved)
+        {
+            return IngestDispatchResult::rejected("Klip jos nije spremljen u bazu.");
+        }
+        if self.catalog_result.is_some() || self.view.work_settings_loading {
+            return IngestDispatchResult::rejected("DB odabir je u tijeku.");
+        }
+        let Some(target) = self.catalog_target.clone() else {
+            return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
+        };
+        let (send, receive) = mpsc::sync_channel(1);
+        match std::thread::Builder::new()
+            .name("ingest-db-selection".into())
+            .spawn(move || {
+                let result = target
+                    .open(qnc_ingest_store::content::Access::ReadWrite)
+                    .and_then(|mut db| db.select(ids.clone(), selected))
+                    .map(|()| (ids, selected));
+                let _ = send.send(result);
+            }) {
+            Ok(thread) => {
+                self.catalog_result = Some(receive);
+                self.catalog_thread = Some(thread);
+                IngestDispatchResult::accepted(None, true)
+            }
+            Err(error) => IngestDispatchResult::rejected(error.to_string()),
+        }
     }
 
     pub fn dispatch_log(&self) -> &[String] {
@@ -568,7 +741,8 @@ impl IngestComponent {
                 | action_ids::INGEST_DIR_CANCEL
         );
         if source_action
-            && (self.view.command_busy
+            && (self.catalog_result.is_some()
+                || self.view.command_busy
                 || self.view.browser_busy
                 || (self.pending_source.is_some()
                     && intent.action_id != action_ids::INGEST_DIR_CANCEL))
@@ -605,6 +779,13 @@ impl IngestComponent {
 
         match intent.action_id.as_str() {
             action_ids::INGEST_RELOAD => self.load_work_settings(None),
+            action_ids::INGEST_SET_CLIP_FILTER => match intent.payload {
+                IngestPayload::ClipFilter(filter) => {
+                    self.view.clip_filter = filter;
+                    IngestDispatchResult::accepted(None, true)
+                }
+                _ => IngestDispatchResult::rejected("Nedostaje filter klipova."),
+            },
             action_ids::INGEST_SOURCE_KIND_LOCAL => {
                 self.view.source_kind = SourceKind::Local;
                 let result = self.source_browser.load_roots();
@@ -668,20 +849,20 @@ impl IngestComponent {
                 _ => IngestDispatchResult::rejected("Nedostaje QNC lokacijski URI."),
             },
             action_ids::INGEST_DIR_CANCEL => self.cancel_source_browser(),
-            action_ids::INGEST_SELECT_ALL => {
-                for clip in &mut self.view.clips {
-                    clip.selected = true;
-                }
-                self.view.message = self.view.status_label();
-                IngestDispatchResult::accepted(None, true)
-            }
-            action_ids::INGEST_CLEAR_SELECTION => {
-                for clip in &mut self.view.clips {
-                    clip.selected = false;
-                }
-                self.view.message = self.view.status_label();
-                IngestDispatchResult::accepted(None, true)
-            }
+            action_ids::INGEST_SELECT_ALL => self.select_clips(
+                self.view
+                    .visible_clips()
+                    .map(|c| c.clip_id.clone())
+                    .collect(),
+                true,
+            ),
+            action_ids::INGEST_CLEAR_SELECTION => self.select_clips(
+                self.view
+                    .visible_clips()
+                    .map(|c| c.clip_id.clone())
+                    .collect(),
+                false,
+            ),
             action_ids::INGEST_CLIP_TOGGLE => match intent.payload {
                 IngestPayload::ClipId(clip_id) => {
                     if let Some(clip) = self
@@ -690,9 +871,8 @@ impl IngestComponent {
                         .iter_mut()
                         .find(|clip| clip.clip_id == clip_id)
                     {
-                        clip.selected = !clip.selected;
-                        self.view.message = self.view.status_label();
-                        IngestDispatchResult::accepted(None, true)
+                        let selected = !clip.selected;
+                        self.select_clips(vec![clip_id], selected)
                     } else {
                         IngestDispatchResult::rejected("Clip nije pronađen.")
                     }
@@ -808,12 +988,15 @@ impl IngestComponent {
         let Some(config) = self.selection_config.clone() else {
             return IngestDispatchResult::rejected("Nema Select konfiguracije.");
         };
+        let Some(target) = self.catalog_target.clone() else {
+            return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
+        };
         let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let worker_cancel = cancel.clone();
         let (send, receive) = mpsc::sync_channel(32);
         match std::thread::Builder::new()
             .name("ingest-select".into())
-            .spawn(move || selection::run(config, selected, send, worker_cancel))
+            .spawn(move || selection::run(config, selected, target, send, worker_cancel))
         {
             Ok(thread) => {
                 self.selection_thread = Some(thread);
@@ -822,8 +1005,6 @@ impl IngestComponent {
                 self.selection_warnings = 0;
                 self.view.select_warning_count = 0;
                 self.selection_last_warning = None;
-                self.view.clips.clear();
-                self.view.preview_clip_id = None;
                 self.view.command_busy = true;
                 self.view.message = "Select je pokrenut.".into();
                 IngestDispatchResult::accepted(None, true)
@@ -942,6 +1123,10 @@ impl IngestComponent {
 
 impl Drop for IngestComponent {
     fn drop(&mut self) {
+        self.catalog_result = None;
+        if let Some(thread) = self.catalog_thread.take() {
+            let _ = thread.join();
+        }
         if let Some(cancel) = self.selection_cancel.take() {
             cancel.store(true, std::sync::atomic::Ordering::Relaxed);
         }

@@ -2,8 +2,10 @@ use eframe::egui::{self, Button, Color32, CornerRadius, RichText, Stroke, Vec2};
 
 mod option_columns;
 mod raster;
+mod two_way_switch;
 pub use option_columns::*;
 pub use raster::paint_rgba_image;
+pub use two_way_switch::show_two_way_switch;
 
 pub const STANDARD_ACTION_BUTTON_WIDTH: f32 = 96.0;
 pub const STANDARD_ACTION_BUTTON_GAP: f32 = 8.0;

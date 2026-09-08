@@ -8,6 +8,17 @@ Stari referentni projekt: `C:\Users\miron\Projects\qnc_v4`
 Ako pojedina aplikacija kasnije dobije svoj `AGENTS.override.md`, taj override
 smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 
+**Temeljna odrednica razvoja: sve QNC poslovne aplikacije rade u okviru
+projekta i moraju poznavati njegove postavke kroz bazu. Projects ih zapisuje
+u bazu svakog projekta; sve ostale aplikacije ih citaju i primjenjuju.**
+To ukljucuje odredista direktorija i baza te pravila rada i pohrane potrebna
+pojedinoj aplikaciji. Pravilo vrijedi za sve postojece i buduce aplikacije,
+ne samo za Ingest.
+Jedina poslovna veza je DB zapis, ne Projects aplikacija, shell ni zajednicko
+runtime stanje. Citanje je read-only kroz javni DB/transport ugovor, jednako
+za Local/LAN/Intranet. Potrosaci ne uvode vlastite zamjenske projektne postavke.
+Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
+
 ## 1. Tocne putanje
 
 - Novi root je tocno: `C:\Users\miron\Projects\QNC`.
@@ -165,15 +176,16 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 - Project aplikacija kreira projektnu bazu za svaki projekt posebno i u tu
   projektnu bazu zapisuje postavke projekta.
 - Druge aplikacije ne smiju znati za Project aplikaciju, Project crateove,
-  Project komponente, Project store ili Project workflow. Ako trebaju raditi po
-  postavkama projekta, smiju citati samo dogovorene postavke za rad iz baze
-  aktivnog projekta.
+  Project komponente, Project store ili Project workflow. Za rad nad projektom
+  moraju iz baze aktivnog projekta procitati i primijeniti dogovorene postavke
+  potrebne za svoj rad. To nije opcionalno niti pravilo samo za Ingest.
 - Oznaka aktivnog projekta mora biti podatak u bazi, ne UI stanje i ne argument
-  koji aplikacija izmisli. Ingest cita bazu, pronalazi koja projektna baza ima
-  oznaku aktivnog projekta i iz nje cita samo postavke za rad.
+  koji aplikacija izmisli. Svaka aplikacija koja radi nad projektom iz baze
+  utvrdjuje aktivni projekt i iz njegove baze cita postavke za rad.
 - QNC baza mora biti prenosivi poslovni artefakt. Na bilo kojem racunalu kojem
-  korisnik da valjanu QNC bazu, Ingest mora moci raditi bez Project aplikacije,
-  bez QNC.app shella i bez bilo kojeg drugog QNC aplikacijskog procesa.
+  korisnik da valjanu QNC bazu, svaka aplikacija koja koristi njezin javni
+  ugovor mora moci raditi bez Project aplikacije, bez QNC.app shella i bez
+  bilo kojeg drugog QNC aplikacijskog procesa.
 - Aplikacija koja cita postavke za rad aktivnog projekta smije ih citati samo
   read-only. Ne smije pisati, migrirati, popravljati ni otvarati Project
   workflow.
@@ -196,8 +208,10 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
   direktorija kontrolira write permission na parent direktoriju.
 - Hidden je samo dodatna zastita od slucajnog korisnickog diranja, nije glavna
   lock zastita.
-- Samo Project aplikacija smije privremeno otkljucati projektni direktorij, i
-  to samo za vlastito pisanje ili za potvrdeno brisanje iz Project aplikacije.
+- Potvrdeno brisanje cijelog projekta pripada Project workflowu. Zastita od
+  slucajnog brisanja ne smije zabraniti drugim aplikacijama zapis vlastitih
+  rezultata u projektne radne direktorije i vlastite DB tablice kroz javne
+  storage/DB module. Za takav zapis nije potrebno pokretati Project aplikaciju.
 - Za ovu zastitu ne uvoditi dodatni DB lease/storage-state model bez posebnog
   odobrenja.
 - Batch aplikacija nakon zavrsetka posla prestaje raditi, osim ako je drukciji
@@ -224,6 +238,10 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 - Aplikacija smije citati javne ili dogovorene podatke iz baze kroz DB/transport
   ugovor. Ona time poznaje ugovor baze, ne aplikaciju koja je tu bazu stvorila.
 - Aplikacija smije pisati samo u vlastitu bazu ili vlastitu shemu.
+- Vlastita shema moze biti skup tablica u istoj fizickoj projektnoj SQLite
+  datoteci. Read-only citanje projektnih postavki ne znaci read-only za sve
+  tablice te datoteke. Upis vlastitih rezultata ne daje pravo na izmjenu
+  Project postavki, registra, identiteta ili aktivacije.
 - Nema direktnih privatnih SQLite zaobilaznica kao javnog komunikacijskog
   modela.
 - Nema pozivanja privatnih funkcija, klasa, skripti, workera ili procesa druge
@@ -237,7 +255,48 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 - Dugotrajni rad ne smije drzati write lock nad javnom bazom. Dugotrajni rad
   ide u modul/komponentu i pise kratkim batch transakcijama.
 
+### 4.1. Projektne postavke za sve aplikacije
+
+- Sve postojece i buduce poslovne aplikacije, ukljucujuci Ingest, Media Assist
+  i sve Story varijante, primjenjuju postavke projekta iz baze. Samostalno
+  pokretanje znaci neovisnost o drugim aplikacijama i shellu, ne neovisnost
+  o zapisanim projektnim postavkama.
+- Projects je vlasnik zapisa projektnih postavki. Ostale aplikacije citaju
+  potrebne postavke read-only kroz javni DB/transport ugovor; ne prepisuju ih,
+  ne nasljedjuju ih od druge aplikacije i ne zamjenjuju ih lokalnim defaultima.
+  Poslovne rezultate i dalje zapisuju samo u vlastitu bazu ili shemu.
+- Citanje i primjena postavki pripadaju komponentama/modulima, ne formi.
+  Shell ne dostavlja poslovne postavke niti postaje njihov vlasnik.
+  Isti ugovor vrijedi za standalone i shell-hosted rad, Local/LAN/Intranet
+  te Windows/Linux/macOS.
+- Prije audita, plana ili implementacije bilo koje aplikacije obavezno pratiti
+  cijeli put: postojeci zapis u bazi aktivnog projekta -> javni read-only
+  ugovor -> ucitane radne postavke -> njihova primjena u komponenti/modulu.
+  Provjeriti stvarni zapis i kod koji ga cita; nedostatak u modelu potrosaca
+  nije dokaz da podatak ne postoji u projektnoj bazi.
+- Prvo utvrditi prekida li se postojeca veza citanja ili primjene postavki.
+  Ne predlagati nove projektne postavke, nove izlazne baze ni izmjene Projectsa
+  prije te provjere. Potvrdjeni nedostatak prijaviti s tocno navedenim zapisom
+  ili ugovorom; ne zaobilaziti ga lokalnim defaultom. Ako obvezne postavke nisu
+  dostupne, posao koji ih zahtijeva ne pokrece se; prijavljuje se kontrolirana
+  greska. Project ostaje zamrznut prema odjeljku 14.
+
 ## 5. Ingest kao prvi konkretni primjer
+
+- Ponovni Select istog izvora uskladjuje razlike, ne prazni i ponovo puni cijeli
+  prikaz. Postojeci klipovi i selekcija ostaju; novi se dodaju. Nedostajuci se
+  uklanjaju iz detektiranog kataloga samo nakon potvrdenog nedostatka na izvoru,
+  nikad zbog prekida ili greske transporta. Izvorne datoteke se ne brisu.
+- Klip se smije prikazati cim je ucitan u memoriju, dok javna DB komponenta
+  sprema u pozadini. Prikaz jasno razlikuje nepotvrdjen/neuspjesan upis od
+  spremljenog rezultata; kasnije radnje ne koriste nepotvrdjen zapis.
+  To ne odgadja obvezne trajne probe claim/evidence zapise prije probea.
+- Filter `Novi / Sve` (`New / All`) zamjenjuje oznaku `Postojeci` i dugme
+  `Osvjezi`. Novi su klipovi koji nisu postojali u bazi prije tekuceg Selecta;
+  to nije oznaka dovrsenog importa. Usporedbu radi komponenta kroz javni DB
+  ugovor, ne forma. Filter mijenja samo prikaz, bez scana, probea ili DB upisa.
+  Skrivena selekcija ostaje sacuvana; skupne akcije odabira vrijede za vidljive
+  klipove. Pocetni prikaz je Sve.
 
 - Ingest je samostalna zatvorena aplikacija.
 - Korisnik mora moci pokrenuti Ingest bez QNC.app i bez drugih QNC aplikacija.
@@ -267,6 +326,56 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
   probe.
 - Druge aplikacije smiju samo citati rezultate koje je Ingest zapisao u bazu.
 
+### 5.1. Primjena projektnih odredista u Ingestu i media modulima
+
+- Ovo je konkretna primjena opceg pravila iz odjeljka 4.1, ne ogranicenje tog
+  pravila na Ingest. Sve druge aplikacije i njihovi moduli jednako su obvezni
+  koristiti zapisane projektne postavke relevantne za svoj rad.
+- Projects (Project aplikacija) zapisuje lokaciju konkretnog projekta i njegove
+  radne postavke te kreira standardni projektni raspored. Ingest, Filmstrip,
+  Wave i drugi potrosaci te odluke NE MIJENJAJU.
+- Ingest iz baze cita aktivni projekt i njegove zapisane radne postavke.
+  Ne dobiva ih pozivom Project aplikacije ni iz shell/UI memorije. Project
+  aplikacija ne mora biti prisutna ni pokrenuta; dovoljan je zapis dostupan
+  kroz javni DB/transport ugovor.
+- Standardna relativna odredista razrjesava javni storage modul unutar
+  lokacije konkretnog projekta procitane iz baze. Kao u v4, svaka podmapa i
+  naziv DB datoteke ne moraju biti zasebno polje projektnih postavki.
+  Primjena postojeceg rasporeda nije izmisljanje novih postavki. Nije dopusteno
+  samostalno izabrati drugi projektni korijen, novu bazu ili zamjensko odrediste
+  kada stvarni projektni zapis nedostaje. Forma i generator ne sastavljaju
+  privatne putanje; koriste javni DB/storage ugovor.
+- V4 raspored (`original`, `proxy`, `audio`, `incoming/card`, `incoming/ftp`,
+  `ingest/thumbnails`, `filmstrip`) jest standardni referentni raspored koji
+  javni storage modul primjenjuje, ne mijenja prema pojedinoj aplikaciji.
+  Koji medij treba kopirati ili samo povezati odredjuju Projectove zapisane
+  radne postavke; postojanje podmape samo po sebi nije naredba za kopiranje.
+- Izbor kartice u browseru odredjuje IZVOR, ne izlaznu lokaciju. Izvorna kartica
+  ostaje read-only. Direktorij aplikacije, `target`, cache i temp nisu zamjenska
+  odredista za trajne projektne rezultate.
+- Filmstrip slicice spremaju se kao JPEG datoteke na odrediste koje je zadao
+  Projects (v4 referenca: `filmstrip/<clip_id>/`); baza cuva vezu s klipom,
+  redoslijed, vremenske polozaje, status i reference na artefakte. Ne zamjenjivati
+  ovaj raspored JPEG BLOB-ovima u novoj `filmstrip.db` bez izricitog odobrenja.
+- Wave se sprema kao niz amplituda/peaks po kanalu u bazu koju je zadao Projects.
+  Ne zahtijeva posebnu wave mapu, PNG datoteke niti novu `wave.db` samo zato sto
+  je generator zaseban modul. U v4 su to `a1_peaks` i `a2_peaks` u tablici
+  `audio_waveforms`.
+- Referentni v4 `qnc_project.db` sadrzi tablice `filmstrips`,
+  `filmstrip_frames` i `audio_waveforms`. To je dokaz nacina pohrane, ne dozvola
+  za vracanje monolita ili pisanje u tudju shemu: u novom QNC-u upis mora ici
+  kroz javni DB/transport ugovor i ownera rezultata, uz postovanje odjeljka 4.
+- Javni resolver/storage modul samo tehnicki razrjesava zadano odrediste;
+  ne odlucuje gdje rezultat pripada. Potrosaci koriste QNC URI -> resolver ->
+  endpoint. Privatne fizicke putanje ostaju u storage adapteru; ista pravila
+  vrijede Local/LAN/Intranet i na Windows/Linux/macOS, bez ovisnosti o
+  prisutnosti Project aplikacije.
+- Prije implementacije provjeriti referentni kod u `qnc_v4`:
+  `qnc-host/src/project/db.rs` (`project_dir_from_conn`, `ensure_project_dirs_at`),
+  `qnc-host/src/filmstrip/store.rs`, `qnc-host/src/waveform/store.rs` i
+  `qnc-host/src/ingest/db.rs`. Ne prenositi njihove privatne Project pozive,
+  migracije ili fallbacke u nove module. Ova uputa ne odmrzava Project.
+
 ## 6. Probe zakon
 
 - `ffprobe` i svaki drugi media probe smiju se izvrsiti samo jednom: tijekom
@@ -294,8 +403,17 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 
 ## 8. Filmstrip zakon
 
-- Filmstrip je modul za generiranje artefakta, ne aplikacija, ne scanner i ne
-  probe.
+- Filmstrip u UI-ju je pasivna pozadina za vizualni pregled. Nije izvor playera,
+  vremenski sat, osnova za seek ni dio playback/timeline racunanja.
+  Referenca je `qnc_v4/qnc-app/src/qnc_filmstrip_background.rs` i njezina
+  upotreba kao `video_background` u `qnc_source_dock.rs`.
+- Wave prikaz je takodjer pasivan: crta vec pripremljene amplitude. Ni jedan
+  prikaz ne generira artefakte, ne radi probe, ne odredjuje pohranu i ne pise DB.
+- Generator filmstripa i generator wavea odvojeni su javni moduli; pohrana ide
+  kroz javnu DB/storage komponentu. Prikaz, generator i pohrana nisu jedna
+  komponenta niti poslovna logika forme.
+- Sljedeca pravila odnose se na GENERIRANJE filmstripa. Generator je modul za
+  izradu artefakta, ne aplikacija, ne scanner i ne probe.
 - Filmstrip cita samo podatke iz baze.
 - Filmstrip koristi proxy ako postoji, a original ako proxy ne postoji.
 - Filmstrip mora generirati stvarne frameove, ne ponavljati poster.
@@ -304,6 +422,9 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
   ponasanja.
 - Za clipove duze od 10 sekundi trajanje se dijeli na 14 pozicija.
 - Filmstrip ne smije raditi `ffprobe` niti drugi probe fallback.
+- Ponavljanje postera u starom Ingest UI-ju nije generirani filmstrip i ne moze
+  zamijeniti zahtjev za 14 stvarnih frameova. Pasivni UI obrazac i stvarni
+  generirani sadrzaj moraju se promatrati odvojeno.
 
 ## 9. Local/LAN/Intranet
 
@@ -502,6 +623,13 @@ smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 ## 14. Project freeze
 
 Zamrznuto na korisnikov zahtjev 2026-09-04.
+
+Pojasnjenje korisnika 2026-09-08: zamrznut je Project programski kod i dolje
+navedeni razvojni ugovori, NE projektni radni direktoriji i podaci. Ingest i
+drugi owneri smiju zapisivati vlastite rezultate u njih kroz javne module.
+To ne dopusta promjenu Project postavki niti ukida zastitu od slucajnog
+brisanja. Izvorna kartica i dalje ostaje read-only. Ne traziti odmrzavanje
+Project koda samo zato sto se posao zapisuje u direktorij ili bazu projekta.
 
 Ponovno zamrznuto na izriciti korisnikov zahtjev 2026-09-06, nakon live
 potvrde navigacije na sljedecu odabranu grupu. Prethodno ograniceno

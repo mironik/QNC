@@ -8,4 +8,14 @@ description = "IngestQNC owned registry/content database store"
 qnc-contracts = { workspace = true }
 qnc-db-contract = { workspace = true }
 qnc-transport-resolver = { workspace = true }
-rusqlite = { workspace = true }
+qnc-json-transport = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-work-settings = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks"] }
+tiny_http = "0.12"
+
+[dev-dependencies]
+tempfile = "3"

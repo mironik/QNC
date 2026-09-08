@@ -81,8 +81,10 @@
     "card_text_height": 34.0,
     "grid_gap": 10.0,
     "selection_check": true,
+    "outline": "preview_focus_only",
     "status_dots": "imported_only",
-    "empty_message": "Nema klipova — lijevo odaberi mapu → U redu."
+    "empty_message": "Nema klipova — lijevo odaberi mapu → U redu.",
+    "empty_new_message": "Nema novih klipova."
   },
   "source_dock": {
     "show_header": true,
@@ -93,6 +95,7 @@
     "font_ui": 14.0,
     "header_item_gap": 8.0,
     "clip_label_fallback": "—",
+    "header_left": ["clip_label", "ingest_status"],
     "actions_rtl": [
       "AI mining",
       "Kopiraj original",
@@ -100,9 +103,11 @@
       "Odaberi sve",
       "Uvezi",
       "Generiraj postere",
-      "Osvježi",
-      "ingest_status"
+      "Novi / Sve"
     ],
+    "clip_filter_labels": ["Novi", "Sve"],
+    "clip_filter_colors": [[16, 185, 129], [37, 99, 235]],
+    "clip_filter_width": 96.0,
     "status_idle": "{imported} uvezeno · {selected}/{total}",
     "status_pending": "{imported} uvezeno · {pending} u tijeku · {selected}/{total}",
     "no_card_thumb_hint": "Nema postera na kartici",
@@ -130,7 +135,8 @@
     "Očisti",
     "Odaberi sve",
     "Uvezi",
-    "Osvježi",
+    "Novi",
+    "Sve",
     "Nema postera na kartici",
     "Generiraj postere"
   ],

@@ -1,12 +1,12 @@
 {
   "database_id": "qnc.db.ingest_content",
   "owner_application": "qnc.ingest",
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "qnc_uri": "qnc://local/db/ingest_content",
   "transport_uri_templates": [
-    "qnc://local/db/ingest_content",
-    "qnc://lan/{authority}/db/ingest_content",
-    "qnc://intranet/{authority}/db/ingest_content"
+    "qnc://local/db/ingest_content/{project_id}",
+    "qnc://lan/{authority}/db/ingest_content/{project_id}",
+    "qnc://intranet/{authority}/db/ingest_content/{project_id}"
   ],
   "transport_scope": ["local", "lan", "intranet"],
   "tables": [
@@ -27,6 +27,18 @@
   ],
   "write_owner": "qnc.ingest",
   "public_read_policy": "public_read_views",
+  "project_scope": "The existing workspace DB URI resolves through its owner-provided binding. Ingest owns only its tables inside that project database; Project settings, registry, identity and activation are never writable through this adapter. No fallback project or second global clip catalog.",
+  "implementation_private_files": ["{registered_project_directory}/qnc_project.db"],
+  "implementation_status": "Select publication, persisted selection and startup/reload are connected through the public content adapter. Import execution and artifact generation are not implemented in this step.",
+  "storage_policy": "Validate project identity before writes. Preserve existing WAL mode; otherwise use PERSIST rollback journals with short transactions and busy_timeout. Restore only required owner write permissions on validated output DB/journal directory, never remove delete ACLs or touch source card permissions.",
+  "public_record_policy": "Accept a persisted metadata revision without running a new probe. Selection and import state are durable; media_records retains acquisition evidence.",
+  "transport_endpoint": "/v1/ingest-content",
+  "select_reconciliation": {
+    "inventory": "Paged clip_id/source_uri/original_uri/revision/final facts, without probe JSON",
+    "publish_batch": "At most 16 records in one transaction; previews may precede commit, success may not",
+    "remove_missing": "Explicit confirmed source absence only, scoped by identity and revision; retain queued, processing and imported records; never delete media or acquisition evidence",
+    "existing_marker": "Transient view projection of membership in the DB before the current Select, not import status"
+  },
   "record_contracts": {
     "public_probe_records.probe_json": {
       "contract_id": "qnc.media.metadata",

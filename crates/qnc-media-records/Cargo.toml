@@ -9,3 +9,4 @@ qnc-media-metadata.workspace = true
 qnc-source-index-contract.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2 = "0.10"

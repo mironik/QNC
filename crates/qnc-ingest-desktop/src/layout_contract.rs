@@ -194,12 +194,16 @@ pub struct IngestClipGrid {
     pub card_text_height: f32,
     pub grid_gap: f32,
     pub empty_message: String,
+    pub empty_new_message: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct IngestSourceDock {
     pub clip_label_fallback: String,
     pub actions_rtl: Vec<String>,
+    pub clip_filter_labels: [String; 2],
+    pub clip_filter_colors: [[u8; 3]; 2],
+    pub clip_filter_width: f32,
     pub header_timeline_gap: f32,
     pub show_edit_actions: bool,
     pub show_import_actions: bool,

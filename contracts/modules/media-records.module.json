@@ -16,8 +16,10 @@
     "aarch64"
   ],
   "capabilities": [
-    "media.records.validate"
+    "media.records.validate",
+    "media.documents.snapshot"
   ],
+  "camera_document_policy": "Pure content-addressed XML evidence: SHA-256 body version under the original QNC authority and source identity/path. Validate against the confirmed recording documents. No source I/O, mutation or second probe.",
   "state_policy": "stateless",
   "database_write_policy": "no_db_writes",
   "forbidden_calls": [

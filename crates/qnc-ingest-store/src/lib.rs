@@ -7,6 +7,8 @@ use qnc_db_contract::DatabaseContract;
 use qnc_transport_resolver::{ResolvedEndpoint, ResolverConfig};
 use rusqlite::{params, Connection};
 
+pub mod content;
+
 pub const INGEST_REGISTRY_DB_ID: &str = "qnc.db.ingest_registry";
 pub const INGEST_CONTENT_DB_ID: &str = "qnc.db.ingest_content";
 pub const INGEST_REGISTRY_DB_LOCAL_URI: &str = "qnc://local/db/ingest_registry";
@@ -20,14 +22,12 @@ const APPLICATION_ID: &str = "qnc.ingest";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IngestDbTransport {
     pub registry_uri: String,
-    pub content_uri: String,
 }
 
 impl IngestDbTransport {
     pub fn local_default() -> Self {
         Self {
             registry_uri: INGEST_REGISTRY_DB_LOCAL_URI.to_string(),
-            content_uri: INGEST_CONTENT_DB_LOCAL_URI.to_string(),
         }
     }
 }
@@ -52,7 +52,6 @@ pub struct SourceSessionRecord {
 
 pub struct IngestStore {
     registry: Connection,
-    content: Connection,
 }
 
 impl std::fmt::Debug for IngestStore {
@@ -80,17 +79,13 @@ impl IngestStore {
             .map_err(|error| format!("create ingest data directory failed: {error}"))?;
 
         let resolver = ResolverConfig::new(data_dir.clone())
-            .with_local_binding(&transport.registry_uri, data_dir.join("ingest_registry.db"))
-            .with_local_binding(&transport.content_uri, data_dir.join("ingest_content.db"));
+            .with_local_binding(&transport.registry_uri, data_dir.join("ingest_registry.db"));
 
         let registry_path = sqlite_db_path(&resolver, &transport.registry_uri)?;
-        let content_path = sqlite_db_path(&resolver, &transport.content_uri)?;
         let registry = open_connection(&registry_path)?;
-        let content = open_connection(&content_path)?;
 
-        let store = Self { registry, content };
+        let store = Self { registry };
         store.create_registry_schema()?;
-        store.create_content_schema()?;
         Ok(store)
     }
 
@@ -195,10 +190,6 @@ impl IngestStore {
         &self.registry
     }
 
-    pub fn content_connection(&self) -> &Connection {
-        &self.content
-    }
-
     fn create_registry_schema(&self) -> Result<(), String> {
         self.registry
             .execute_batch(
@@ -256,89 +247,6 @@ impl IngestStore {
             )
             .map_err(|error| format!("create ingest registry schema failed: {error}"))
     }
-
-    fn create_content_schema(&self) -> Result<(), String> {
-        self.content
-            .execute_batch(
-                "
-                CREATE TABLE IF NOT EXISTS clips (
-                    clip_id TEXT PRIMARY KEY,
-                    source_uri TEXT NOT NULL,
-                    original_uri TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    created_at_utc TEXT,
-                    duration_seconds REAL,
-                    duration_frames INTEGER,
-                    fps_num INTEGER,
-                    fps_den INTEGER
-                );
-
-                CREATE TABLE IF NOT EXISTS clip_sources (
-                    clip_id TEXT PRIMARY KEY,
-                    source_uri TEXT NOT NULL,
-                    original_uri TEXT NOT NULL,
-                    original_container TEXT,
-                    original_codec TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS clip_proxy (
-                    clip_id TEXT PRIMARY KEY,
-                    proxy_uri TEXT,
-                    proxy_container TEXT,
-                    proxy_codec TEXT,
-                    FOREIGN KEY(clip_id) REFERENCES clips(clip_id)
-                );
-
-                CREATE TABLE IF NOT EXISTS probe_records (
-                    clip_id TEXT PRIMARY KEY,
-                    probe_json TEXT NOT NULL,
-                    probed_at_utc TEXT NOT NULL,
-                    FOREIGN KEY(clip_id) REFERENCES clips(clip_id)
-                );
-
-                CREATE TABLE IF NOT EXISTS filmstrip_artifacts (
-                    clip_id TEXT PRIMARY KEY,
-                    frame_count INTEGER NOT NULL,
-                    artifact_uri TEXT NOT NULL,
-                    created_at_utc TEXT NOT NULL,
-                    FOREIGN KEY(clip_id) REFERENCES clips(clip_id)
-                );
-
-                CREATE TABLE IF NOT EXISTS wave_artifacts (
-                    clip_id TEXT PRIMARY KEY,
-                    artifact_uri TEXT NOT NULL,
-                    created_at_utc TEXT NOT NULL,
-                    FOREIGN KEY(clip_id) REFERENCES clips(clip_id)
-                );
-
-                CREATE VIEW IF NOT EXISTS public_clips AS
-                    SELECT clip_id, source_uri, original_uri, name, created_at_utc,
-                           duration_seconds, duration_frames, fps_num, fps_den
-                    FROM clips;
-
-                CREATE VIEW IF NOT EXISTS public_clip_sources AS
-                    SELECT clip_id, source_uri, original_uri, original_container, original_codec
-                    FROM clip_sources;
-
-                CREATE VIEW IF NOT EXISTS public_clip_proxy AS
-                    SELECT clip_id, proxy_uri, proxy_container, proxy_codec
-                    FROM clip_proxy;
-
-                CREATE VIEW IF NOT EXISTS public_probe_records AS
-                    SELECT clip_id, probe_json, probed_at_utc
-                    FROM probe_records;
-
-                CREATE VIEW IF NOT EXISTS public_filmstrip_artifacts AS
-                    SELECT clip_id, frame_count, artifact_uri, created_at_utc
-                    FROM filmstrip_artifacts;
-
-                CREATE VIEW IF NOT EXISTS public_wave_artifacts AS
-                    SELECT clip_id, artifact_uri, created_at_utc
-                    FROM wave_artifacts;
-                ",
-            )
-            .map_err(|error| format!("create ingest content schema failed: {error}"))
-    }
 }
 
 fn open_connection(path: &Path) -> Result<Connection, String> {
@@ -369,7 +277,6 @@ fn sqlite_db_path(resolver: &ResolverConfig, uri: &str) -> Result<PathBuf, Strin
 
 fn validate_ingest_db_transport(transport: &IngestDbTransport) -> Result<(), String> {
     validate_db_uri(&transport.registry_uri, INGEST_REGISTRY_DB_ID)?;
-    validate_db_uri(&transport.content_uri, INGEST_CONTENT_DB_ID)?;
     Ok(())
 }
 
@@ -487,14 +394,13 @@ mod tests {
     };
 
     #[test]
-    fn opens_both_ingest_databases_from_qnc_uri_bindings() {
+    fn opens_registry_without_creating_a_second_global_clip_catalog() {
         let root = temp_root("open");
         {
             let store = IngestStore::open(&root).expect("open ingest store");
             let registry_tables = count_tables(store.registry_connection(), "source_%");
-            let content_tables = count_tables(store.content_connection(), "clip%");
             assert!(registry_tables >= 4);
-            assert!(content_tables >= 3);
+            assert!(!root.join("data/ingest_content.db").exists());
         }
         let _ = fs::remove_dir_all(root);
     }

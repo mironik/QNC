@@ -58,11 +58,45 @@ fn fixture() -> tempfile::TempDir {
 
 fn wait(component: &mut IngestComponent) {
     let deadline = Instant::now() + Duration::from_secs(5);
-    while component.view.work_settings_loading {
+    while component.has_pending_work() {
         component.poll();
         assert!(Instant::now() < deadline);
         std::thread::sleep(Duration::from_millis(5));
     }
+}
+
+#[test]
+fn uncommitted_preview_cannot_be_selected_and_stale_ack_does_not_mark_it_saved() {
+    let mut component = IngestComponent::default();
+    let (send, receive) = mpsc::sync_channel(8);
+    component.selection_result = Some(receive);
+    send.send(selection::Event::Clip(ClipView {
+        clip_id: "clip-pending".into(),
+        metadata_revision: 2,
+        save_state: SaveState::Pending,
+        ..Default::default()
+    }))
+    .unwrap();
+    send.send(selection::Event::Saved {
+        revisions: vec![("clip-pending".into(), 1)],
+        error: None,
+    })
+    .unwrap();
+    component.poll();
+    assert_eq!(component.view.clips[0].save_state, SaveState::Pending);
+    assert!(
+        !component
+            .select_clips(vec!["clip-pending".into()], true)
+            .accepted
+    );
+    send.send(selection::Event::Saved {
+        revisions: vec![("clip-pending".into(), 2)],
+        error: Some("write failed".into()),
+    })
+    .unwrap();
+    component.poll();
+    assert_eq!(component.view.clips[0].save_state, SaveState::Failed);
+    assert!(!component.view.clips[0].selected);
 }
 
 #[test]
@@ -85,7 +119,7 @@ fn reads_existing_active_settings_and_v4_directory_roles_without_ui_payload() {
 }
 
 #[test]
-fn reload_changes_plan_from_db_and_clears_only_other_projects_selection() {
+fn reload_changes_plan_from_db_and_discards_unpersisted_ui_state() {
     let root = fixture();
     let mut component = IngestComponent::with_store_root(root.path()).unwrap();
     wait(&mut component);
@@ -96,7 +130,11 @@ fn reload_changes_plan_from_db_and_clears_only_other_projects_selection() {
     });
     component.dispatch(IngestIntent::empty(action_ids::INGEST_RELOAD));
     wait(&mut component);
-    assert_eq!(component.view.selected_count(), 1);
+    assert_eq!(
+        component.view.selected_count(),
+        0,
+        "UI is not the selection authority"
+    );
     Connection::open(root.path().join("data/project_store.db"))
         .unwrap()
         .execute("UPDATE app_settings SET value='p2'", [])
@@ -120,6 +158,203 @@ fn reload_changes_plan_from_db_and_clears_only_other_projects_selection() {
             .accepted
     );
     assert!(component.view.ai_mining);
+}
+
+#[test]
+fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_without_probe() {
+    use qnc_ingest_store::content::{Access, ContentClient, ContentTarget};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    let root = fixture();
+    let (source_fixture, config) = selection::tests::fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    selection::tests::execute(&config, &calls, false, false, ".");
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
+    let reader = SettingsReader::local(root.path().join("data/project_store.db"));
+    let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();
+    let mut db = target.open(Access::ReadWrite).unwrap();
+    let mut source = ContentClient::from_owner_binding(
+        &source_fixture.path().join("content.db"),
+        "qnc://local/db/ingest_content/p1",
+        Access::ReadOnly,
+    )
+    .unwrap();
+    let mut seeded = Vec::new();
+    for stored in source.list(None).unwrap() {
+        let mut clip = stored.clip;
+        clip.serial_number = "card-serial".into();
+        clip.volume_name = "camera-volume".into();
+        seeded.push(db.publish(clip).unwrap());
+    }
+    drop(db);
+    let id = seeded[0].clip.id().to_string();
+    let project = Connection::open(root.path().join("p1/qnc_project.db")).unwrap();
+    let before: String = project
+        .query_row("SELECT settings_json FROM project_settings", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    wait(&mut component);
+    assert_eq!(component.view.clips.len(), 2);
+    assert_eq!(component.view.selected_source_serial_number, "card-serial");
+    assert_eq!(component.view.selected_source_volume_name, "camera-volume");
+    let preview_id = component
+        .view
+        .clips
+        .iter()
+        .find(|c| c.clip_id != id)
+        .unwrap()
+        .clip_id
+        .clone();
+    assert!(
+        component
+            .dispatch(IngestIntent::new(
+                action_ids::INGEST_PREVIEW_FOCUS,
+                IngestPayload::ClipId(preview_id.clone()),
+            ))
+            .accepted
+    );
+    assert_eq!(
+        component.view.selected_count(),
+        0,
+        "preview does not check the clip"
+    );
+    assert!(
+        !component.has_pending_work(),
+        "preview does not start a DB selection write"
+    );
+    assert!(
+        component
+            .dispatch(IngestIntent::new(
+                action_ids::INGEST_CLIP_TOGGLE,
+                IngestPayload::ClipId(id.clone())
+            ))
+            .accepted
+    );
+    assert_eq!(
+        component.view.selected_count(),
+        0,
+        "no optimistic selection before DB acknowledgement"
+    );
+    wait(&mut component);
+    assert_eq!(component.view.selected_count(), 1);
+    assert_eq!(
+        component.view.preview_clip_id.as_deref(),
+        Some(preview_id.as_str()),
+        "checkbox does not change preview focus"
+    );
+    drop(component);
+    let mut restarted = IngestComponent::with_store_root(root.path()).unwrap();
+    wait(&mut restarted);
+    assert_eq!(restarted.view.clips.len(), 2);
+    assert!(
+        restarted
+            .view
+            .clips
+            .iter()
+            .find(|c| c.clip_id == id)
+            .unwrap()
+            .selected
+    );
+    assert!(
+        restarted.view.clips.iter().any(|c| c.thumb_uri.is_some()),
+        "poster URI survives offline reload"
+    );
+    // Keep the selected old clip hidden while batch selection targets only the new clip.
+    restarted
+        .view
+        .clips
+        .iter_mut()
+        .find(|c| c.clip_id != id)
+        .unwrap()
+        .previously_seen = false;
+    restarted.dispatch(IngestIntent::new(
+        action_ids::INGEST_SET_CLIP_FILTER,
+        IngestPayload::ClipFilter(ClipFilter::New),
+    ));
+    assert_eq!(restarted.view.visible_clips().count(), 1);
+    assert!(
+        restarted
+            .dispatch(IngestIntent::empty(action_ids::INGEST_SELECT_ALL))
+            .accepted
+    );
+    wait(&mut restarted);
+    assert_eq!(restarted.view.selected_count(), 2);
+    assert!(
+        restarted
+            .dispatch(IngestIntent::empty(action_ids::INGEST_CLEAR_SELECTION))
+            .accepted
+    );
+    wait(&mut restarted);
+    assert_eq!(
+        restarted.view.selected_count(),
+        1,
+        "hidden old selection survives clear"
+    );
+    assert!(
+        restarted
+            .view
+            .clips
+            .iter()
+            .find(|c| c.clip_id == id)
+            .unwrap()
+            .selected
+    );
+    let selected_in_db = target.open(Access::ReadOnly).unwrap().list(None).unwrap();
+    assert_eq!(selected_in_db.iter().filter(|c| c.selected).count(), 1);
+    assert!(
+        selected_in_db
+            .iter()
+            .find(|c| c.clip.id() == id)
+            .unwrap()
+            .selected
+    );
+    let registry = Connection::open(root.path().join("data/project_store.db")).unwrap();
+    registry
+        .execute("UPDATE app_settings SET value='p2'", [])
+        .unwrap();
+    restarted.dispatch(IngestIntent::empty(action_ids::INGEST_RELOAD));
+    wait(&mut restarted);
+    assert!(restarted.view.clips.is_empty());
+    assert_eq!(restarted.view.clip_filter, ClipFilter::All);
+    assert!(restarted.view.selected_source_serial_number.is_empty());
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        4,
+        "reload never invokes probe"
+    );
+    assert_eq!(
+        project
+            .query_row::<String, _, _>("SELECT settings_json FROM project_settings", [], |r| r
+                .get(0))
+            .unwrap(),
+        before
+    );
+    assert!(!root.path().join("data/ingest_content.db").exists());
+}
+
+#[test]
+fn missing_project_db_is_not_recreated_and_rejected_selection_never_changes_ui() {
+    use qnc_ingest_store::content::{Access, ContentTarget};
+    let root = fixture();
+    let reader = SettingsReader::local(root.path().join("data/project_store.db"));
+    let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();
+    let file = root.path().join("p1/qnc_project.db");
+    std::fs::remove_file(&file).unwrap();
+    assert!(target.open(Access::ReadWrite).is_err());
+    assert!(!file.exists());
+    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    wait(&mut component);
+    assert!(!component.view.work_settings_ready);
+    assert!(
+        !component
+            .dispatch(IngestIntent::empty(action_ids::INGEST_SELECT_ALL))
+            .accepted
+    );
+    assert!(component.view.clips.is_empty());
 }
 
 #[test]

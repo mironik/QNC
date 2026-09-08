@@ -28,6 +28,12 @@ pub struct SettingsReader {
     config: ReaderConfig,
 }
 
+/// Private transport bindings for public DB adapters, never form state or wire data.
+pub struct WorkspaceBinding {
+    pub resolver: ResolverConfig,
+    pub token: Option<String>,
+}
+
 impl std::fmt::Debug for SettingsReader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SettingsReader").finish_non_exhaustive()
@@ -35,6 +41,50 @@ impl std::fmt::Debug for SettingsReader {
 }
 
 impl SettingsReader {
+    pub fn workspace_binding(
+        &self,
+        settings: &WorkSettings,
+    ) -> Result<WorkspaceBinding, ReadError> {
+        settings.validate()?;
+        let context = registry_context(&self.config.registry_uri)?;
+        if settings.workspace_db_uri
+            != format!("{context}/db/project_workspace/{}", settings.project_id)
+        {
+            return Err(config_error());
+        }
+        let parsed =
+            qnc_contracts::parse_qnc_uri(&self.config.registry_uri).map_err(|_| config_error())?;
+        let resolver = ResolverConfig::new(PathBuf::new());
+        if parsed.environment == "local" {
+            let file = local::workspace_file(
+                self.config
+                    .registry_file
+                    .as_deref()
+                    .ok_or_else(config_error)?,
+                &settings.project_id,
+            )?;
+            return Ok(WorkspaceBinding {
+                resolver: resolver.with_local_binding(&settings.workspace_db_uri, file),
+                token: None,
+            });
+        }
+        let authority = parsed.authority.ok_or_else(config_error)?;
+        let endpoint = self.config.endpoint.as_deref().ok_or_else(config_error)?;
+        let resolver = if parsed.environment == "lan" {
+            resolver.with_lan_authority(authority, endpoint)
+        } else {
+            resolver.with_intranet_authority(authority, endpoint)
+        };
+        let token = std::env::var(self.config.token_env.as_deref().ok_or_else(config_error)?)
+            .ok()
+            .filter(|s| !s.is_empty())
+            .ok_or_else(config_error)?;
+        Ok(WorkspaceBinding {
+            resolver,
+            token: Some(token),
+        })
+    }
+
     pub fn local(registry_file: impl Into<PathBuf>) -> Self {
         Self {
             config: ReaderConfig {

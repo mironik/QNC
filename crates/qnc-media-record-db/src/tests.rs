@@ -144,6 +144,41 @@ fn local(path: &Path, create: bool, access: Access) -> Client {
         Client::open(&resolver, URI, access, None).unwrap()
     }
 }
+
+#[test]
+fn changing_camera_index_keeps_both_immutable_versions_and_rejects_forgery() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("media.db");
+    let mut db = local(&path, true, Access::ReadWrite);
+    let mut first = input("first");
+    freeze_camera_documents(&mut first.metadata, &mut first.documents).unwrap();
+    db.write(first.clone()).unwrap();
+    let mut second = input("second");
+    second.documents[0].text = "<camera><new-recording/></camera>".into();
+    freeze_camera_documents(&mut second.metadata, &mut second.documents).unwrap();
+    assert_ne!(
+        first.documents[0].document_uri,
+        second.documents[0].document_uri
+    );
+    db.write(second.clone()).unwrap();
+    for write in [&first, &second] {
+        assert_eq!(
+            db.document(&write.documents[0].document_uri).unwrap(),
+            Some(write.documents[0].clone())
+        );
+    }
+    let mut forged = input("forged");
+    freeze_camera_documents(&mut forged.metadata, &mut forged.documents).unwrap();
+    forged.documents[0].text = "<changed-after-hashing/>".into();
+    assert!(db.write(forged).is_err());
+    let mut unrelated = input("unrelated");
+    unrelated.documents[0].document_uri = "qnc://local/source/another/index.xml".into();
+    for evidence in &mut unrelated.metadata.evidence {
+        evidence.document_uri = unrelated.documents[0].document_uri.clone();
+    }
+    freeze_camera_documents(&mut unrelated.metadata, &mut unrelated.documents).unwrap();
+    assert!(db.write(unrelated).is_err());
+}
 fn count(path: &Path, table: &str) -> usize {
     let conn =
         rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)

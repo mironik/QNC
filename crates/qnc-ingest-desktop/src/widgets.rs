@@ -4,7 +4,8 @@ use eframe::egui::{
 };
 
 use qnc_ingest_components::{
-    action_ids, ClipView, IngestIntent, IngestPayload, IngestViewModel, LocationEntry, SourceKind,
+    action_ids, ClipFilter, ClipView, IngestIntent, IngestPayload, IngestViewModel, LocationEntry,
+    SourceKind,
 };
 use qnc_ui_kit::FormActionBarStyle;
 
@@ -12,6 +13,10 @@ use crate::{
     layout_contract::{IngestContracts, IngestDirBrowser},
     theme::Theme,
 };
+
+#[cfg(test)]
+#[path = "card_tests.rs"]
+mod card_tests;
 
 pub fn render_desktop(
     ui: &mut Ui,
@@ -529,13 +534,16 @@ fn render_clip_grid(
     ui.painter().rect_filled(outer, 0.0, theme.bg);
     let rect = outer.shrink(contracts.ingest.board.block_pad);
 
-    if view.clips.is_empty() {
+    let clips = view.visible_clips().collect::<Vec<_>>();
+    if clips.is_empty() {
         ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             ui.vertical_centered(|ui| {
                 ui.add_space(24.0);
                 let message = view.work_settings_error.as_deref().unwrap_or_else(|| {
                     if view.work_settings_loading {
                         "Citanje radnih postavki..."
+                    } else if view.clip_filter == ClipFilter::New {
+                        &contracts.ingest.clip_grid.empty_new_message
                     } else if view.command_busy || view.selected_source_uri.is_some() {
                         &view.message
                     } else {
@@ -548,46 +556,59 @@ fn render_clip_grid(
         return None;
     }
 
-    let metrics = grid_metrics(rect.width(), view.clips.len(), contracts);
+    let metrics = grid_metrics(rect.width(), clips.len(), contracts);
     let card_width = metrics.card_width;
     let card_height = metrics.card_height;
     let gap = metrics.gap;
     let columns = metrics.columns;
     let mut intent = None;
 
-    ScrollArea::vertical().show_viewport(ui, |ui, _| {
-        for row in view.clips.chunks(columns) {
-            ui.horizontal(|ui| {
-                for clip in row {
-                    let card =
-                        render_clip_card(ui, clip, Vec2::new(card_width, card_height), theme);
-                    if card.clicked() {
-                        let checkbox_click = card
-                            .interact_pointer_pos()
-                            .is_some_and(|pos| selection_check_hit_rect(card.rect).contains(pos));
-                        let action_id = if checkbox_click {
-                            action_ids::INGEST_CLIP_TOGGLE
-                        } else {
-                            action_ids::INGEST_PREVIEW_FOCUS
-                        };
-                        intent = Some(IngestIntent::new(
-                            action_id,
-                            IngestPayload::ClipId(clip.clip_id.clone()),
-                        ));
+    ScrollArea::vertical()
+        .id_salt(("ingest_grid", view.clip_filter))
+        .show_viewport(ui, |ui, _| {
+            for row in clips.chunks(columns) {
+                ui.horizontal(|ui| {
+                    for clip in row {
+                        let card = render_clip_card(
+                            ui,
+                            clip,
+                            view.preview_clip_id.as_deref() == Some(clip.clip_id.as_str()),
+                            Vec2::new(card_width, card_height),
+                            theme,
+                        );
+                        if card.clicked() {
+                            let checkbox_click = card.interact_pointer_pos().is_some_and(|pos| {
+                                selection_check_hit_rect(card.rect).contains(pos)
+                            });
+                            let action_id = if checkbox_click {
+                                action_ids::INGEST_CLIP_TOGGLE
+                            } else {
+                                action_ids::INGEST_PREVIEW_FOCUS
+                            };
+                            intent = Some(IngestIntent::new(
+                                action_id,
+                                IngestPayload::ClipId(clip.clip_id.clone()),
+                            ));
+                        }
+                        ui.add_space(gap);
                     }
-                    ui.add_space(gap);
-                }
-            });
-            ui.add_space(gap);
-        }
-    });
+                });
+                ui.add_space(gap);
+            }
+        });
 
     intent
 }
 
-fn render_clip_card(ui: &mut Ui, clip: &ClipView, size: Vec2, theme: &Theme) -> egui::Response {
+fn render_clip_card(
+    ui: &mut Ui,
+    clip: &ClipView,
+    focused: bool,
+    size: Vec2,
+    theme: &Theme,
+) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
-    let stroke = if clip.selected {
+    let stroke = if focused {
         Stroke::new(2.0, theme.danger)
     } else {
         Stroke::new(1.0, theme.border)
@@ -620,6 +641,25 @@ fn render_clip_card(ui: &mut Ui, clip: &ClipView, size: Vec2, theme: &Theme) -> 
         );
     }
     paint_selection_check(ui, image_rect, clip.selected, theme);
+    let label = match clip.save_state {
+        qnc_ingest_components::SaveState::Pending => Some("Spremanje..."),
+        qnc_ingest_components::SaveState::Failed => Some("Upis nije uspio"),
+        _ => None,
+    };
+    if let Some(label) = label {
+        let galley = ui.painter().layout_no_wrap(
+            label.into(),
+            FontId::proportional(theme.font_ui - 2.0),
+            theme.text,
+        );
+        let position = egui::pos2(image_rect.left() + 6.0, image_rect.top() + 4.0);
+        ui.painter().rect_filled(
+            Rect::from_min_size(position, galley.size()).expand(2.0),
+            0.0,
+            theme.surface,
+        );
+        ui.painter().galley(position, galley, theme.text);
+    }
     let marker = if clip.imported {
         Color32::from_rgb(55, 210, 145)
     } else {
@@ -696,15 +736,40 @@ fn render_source_dock(
                 .size(theme.font_ui),
         );
         ui.add_space(10.0);
+        if contracts.ingest.source_dock.show_import_actions {
+            let status = view.status_label();
+            if !status.is_empty() {
+                ui.label(muted(&status, theme)).on_hover_text(&view.message);
+            }
+        }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
             if contracts.ingest.source_dock.show_import_actions {
-                let status = view.status_label();
-                if !status.is_empty() {
-                    ui.label(muted(&status, theme)).on_hover_text(&view.message);
-                }
-                if action_button(ui, "Osvježi", !view.command_busy, theme).clicked() {
-                    intent = Some(IngestIntent::empty(action_ids::INGEST_RELOAD));
+                let mut style = FormActionBarStyle::new(
+                    theme.text,
+                    theme.accent,
+                    theme.border,
+                    theme.font_ui,
+                    theme.chrome_control_height,
+                );
+                style.button_width = contracts.ingest.source_dock.clip_filter_width / 2.0;
+                let labels = &contracts.ingest.source_dock.clip_filter_labels;
+                let modes = [ClipFilter::New, ClipFilter::All];
+                if let Some(index) = qnc_ui_kit::show_two_way_switch(
+                    ui,
+                    [&labels[0], &labels[1]],
+                    usize::from(view.clip_filter == ClipFilter::All),
+                    contracts
+                        .ingest
+                        .source_dock
+                        .clip_filter_colors
+                        .map(|[r, g, b]| Color32::from_rgb(r, g, b)),
+                    &style,
+                ) {
+                    intent = Some(IngestIntent::new(
+                        action_ids::INGEST_SET_CLIP_FILTER,
+                        IngestPayload::ClipFilter(modes[index]),
+                    ));
                 }
                 let poster_count = view.proxy_poster_approval_count();
                 if poster_count > 0 {
@@ -823,10 +888,151 @@ fn show_chrome_row(
 fn action_enabled(action: &str, view: &IngestViewModel) -> bool {
     match action {
         "Uvezi" => view.selected_count() > 0 && !view.command_busy,
-        "Očisti" => view.selected_count() > 0,
-        "Odaberi sve" => view.total_count() > 0,
+        "Očisti" => view.visible_clips().any(|clip| clip.selected),
+        "Odaberi sve" => view.visible_clips().next().is_some(),
         "Generiraj postere" => view.total_count() > 0,
         _ => !view.command_busy,
+    }
+}
+
+#[cfg(test)]
+mod filter_tests {
+    use super::*;
+
+    #[test]
+    fn dock_count_is_left_aligned_and_filter_has_contract_colors() {
+        let contracts = IngestContracts::load().unwrap();
+        let theme = Theme::from_contract(&contracts.shell);
+        let mut view = IngestViewModel::default();
+        view.clips = (0..98)
+            .map(|id| ClipView {
+                clip_id: id.to_string(),
+                name: format!("clip-{id}.mxf"),
+                selected: id == 0,
+                previously_seen: true,
+                thumb_status: qnc_ingest_components::ThumbStatus::Ready,
+                ..Default::default()
+            })
+            .collect();
+        view.preview_clip_id = Some("0".into());
+        let status = view.status_label();
+        for width in [960.0, 1280.0, 1920.0] {
+            let ctx = egui::Context::default();
+            for filter in [ClipFilter::New, ClipFilter::All] {
+                view.clip_filter = filter;
+                let output = ctx.run(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            Vec2::new(width, 160.0),
+                        )),
+                        ..Default::default()
+                    },
+                    |ctx| {
+                        egui::CentralPanel::default().show(ctx, |ui| {
+                            assert!(render_source_dock(ui, &contracts, &theme, &view).is_none());
+                        });
+                    },
+                );
+                let text_rect = |label: &str| {
+                    output
+                        .shapes
+                        .iter()
+                        .find_map(|shape| match &shape.shape {
+                            egui::Shape::Text(text) if text.galley.text() == label => {
+                                Some(Rect::from_min_size(text.pos, text.galley.size()))
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| panic!("missing label: {label}"))
+                };
+                let name = text_rect("clip-0.mxf");
+                let count = text_rect(&status);
+                assert!(count.left() > name.right());
+                assert!(
+                    count.left() - name.right() < 40.0,
+                    "status must follow clip name on the left"
+                );
+                assert!(count.right() < width / 2.0);
+                assert!(
+                    count.right() < text_rect("AI mining").left(),
+                    "count overlaps actions"
+                );
+                assert!(text_rect("Novi").right() < text_rect("Sve").left());
+                assert!(
+                    width - text_rect("Sve").right() < 50.0,
+                    "filter must remain right aligned"
+                );
+                for (index, mode) in [ClipFilter::New, ClipFilter::All].into_iter().enumerate() {
+                    let [r, g, b] = contracts.ingest.source_dock.clip_filter_colors[index];
+                    if mode == ClipFilter::New {
+                        assert!(g > r && g > b);
+                    } else {
+                        assert!(b > r && b > g);
+                    }
+                    let color = Color32::from_rgb(r, g, b);
+                    let expected = if mode == filter {
+                        color
+                    } else {
+                        Color32::TRANSPARENT
+                    };
+                    let center =
+                        text_rect(&contracts.ingest.source_dock.clip_filter_labels[index]).center();
+                    assert!(output.shapes.iter().any(|shape| matches!(&shape.shape,
+                        egui::Shape::Rect(rect) if rect.fill == expected && rect.rect.contains(center)
+                    )));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn grid_uses_component_projection_and_no_existing_badges() {
+        let contracts = IngestContracts::load().unwrap();
+        assert_eq!(
+            contracts.ingest.source_dock.clip_filter_labels,
+            ["Novi", "Sve"]
+        );
+        let theme = Theme::from_contract(&contracts.shell);
+        let ctx = egui::Context::default();
+        let mut view = IngestViewModel::default();
+        view.clips = vec![ClipView {
+            name: "old.mxf".into(),
+            previously_seen: true,
+            selected: true,
+            ..Default::default()
+        }];
+        for filter in [ClipFilter::All, ClipFilter::New] {
+            view.clip_filter = filter;
+            let output = ctx.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    assert!(render_clip_grid(ui, &contracts, &theme, &view).is_none());
+                });
+            });
+            let texts = output
+                .shapes
+                .iter()
+                .filter_map(|shape| match &shape.shape {
+                    egui::Shape::Text(text) => Some(text.galley.text()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            assert!(!texts.contains(&"Postojeći"));
+            assert_eq!(texts.contains(&"old.mxf"), filter == ClipFilter::All);
+            assert_eq!(
+                texts.contains(&contracts.ingest.clip_grid.empty_new_message.as_str()),
+                filter == ClipFilter::New
+            );
+            assert_eq!(
+                action_enabled("Odaberi sve", &view),
+                filter == ClipFilter::All
+            );
+            assert_eq!(action_enabled("Očisti", &view), filter == ClipFilter::All);
+            assert!(
+                action_enabled("Uvezi", &view),
+                "hidden selection is still selected"
+            );
+        }
     }
 }
 

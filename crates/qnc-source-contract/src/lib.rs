@@ -50,6 +50,22 @@ pub struct SourceReference {
 }
 
 impl SourceReference {
+    /// Parse a canonical persisted source URI without touching the source.
+    pub fn from_uri(uri: &str) -> Result<Self, ReadError> {
+        let reference = if let Some((source, path)) = uri.split_once("/file/") {
+            let path = percent_encoding::percent_decode_str(path)
+                .decode_utf8()
+                .map_err(|_| ReadError::InvalidReference)?;
+            Self::new(source, &path)?
+        } else {
+            Self::new(uri, ".")?
+        };
+        if reference.uri() != uri {
+            return Err(ReadError::InvalidReference);
+        }
+        Ok(reference)
+    }
+
     pub fn new(source_uri: &str, relative_path: &str) -> Result<Self, ReadError> {
         let reference = Self {
             source_uri: source_uri.into(),
@@ -247,6 +263,30 @@ pub struct BinaryDocument {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn persisted_source_uri_roundtrip_rejects_traversal_and_noncanonical_encoding() {
+        use super::SourceReference;
+        let source = "qnc://lan/server/source/card";
+        let reference = SourceReference::new(source, "PRIVATE/XDROOT/Clip/TEST A.MXF").unwrap();
+        assert_eq!(
+            SourceReference::from_uri(&reference.uri()).unwrap(),
+            reference
+        );
+        assert_eq!(
+            SourceReference::from_uri(source).unwrap().relative_path(),
+            "."
+        );
+        for bad in [
+            "../clip",
+            "%2E%2E/clip",
+            "Clip%2Ffile",
+            "A%2520B",
+            "C%3A/file",
+        ] {
+            assert!(SourceReference::from_uri(&format!("{source}/file/{bad}")).is_err());
+        }
+    }
+
     use super::*;
 
     #[test]
