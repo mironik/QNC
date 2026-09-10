@@ -114,6 +114,40 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
+    pub fn list_summary(&mut self, after: Option<String>) -> Result<Vec<StoredClipSummary>> {
+        match self.execute(Operation::ListSummary { after })? {
+            Data::ClipSummaries(clips) => {
+                for clip in &clips {
+                    clip.validate()?;
+                }
+                Ok(clips)
+            }
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
+    pub fn stats(&mut self) -> Result<CatalogStats> {
+        match self.execute(Operation::Stats)? {
+            Data::CatalogStats(stats) => Ok(stats),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
+    pub fn read(&mut self, clip_id: &str) -> Result<Option<StoredClip>> {
+        qnc_media_records::valid_id(clip_id).map_err(err)?;
+        match self.execute(Operation::Read {
+            clip_id: clip_id.into(),
+        })? {
+            Data::Clip(clip) => {
+                if let Some(stored) = &clip {
+                    stored.clip.validate()?;
+                    if stored.clip.id() != clip_id {
+                        return Err("Odgovor ne pripada trazenom klipu.".into());
+                    }
+                }
+                Ok(clip.map(|c| *c))
+            }
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     pub fn publish_batch(&mut self, clips: Vec<CatalogClip>) -> Result<()> {
         match self.execute(Operation::PublishBatch(clips))? {
             Data::Changed => Ok(()),

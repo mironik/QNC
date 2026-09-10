@@ -1,0 +1,22 @@
+{
+  "module_id": "qnc.module.media-decode",
+  "module_name": "Streaming Media Decode",
+  "module_version": "0.2.0",
+  "module_kind": "library",
+  "capabilities": ["media.decode.video", "media.decode.audio", "media.decode.cancel", "media.decode.external-process"],
+  "input_contract_version": "0.2.0",
+  "output_contract_version": "0.2.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "db.read", "db.write", "playback.clock", "playback.present"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.player-input", "qnc.module.broadcast-player-core"],
+  "input_policy": "Saved chosen media facts plus an opened QNC MediaStream. No discovery fallback, no original/proxy decision. One explicit native stream per instance.",
+  "output_policy": "Bounded native video or PCM f32le packets with real integer PTS and rational timebase. No presentation acknowledgement, application workflow or clock.",
+  "buffer_policy": "Decoder output queue is bounded to at most 8 packets and 512 MiB per decoder instance. This is transport smoothing, not a media cache or probe fallback.",
+  "adapter_policy": "Injected DecoderAdapter or independently installed qnc-packets-v1 process. No FFmpeg command construction or technology selection in this module.",
+  "specification": "docs/70-replaceable-decoders.md"
+}

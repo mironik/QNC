@@ -1,0 +1,10 @@
+[package]
+name = "qnc-player-frame-transport"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+memmap2 = { workspace = true }
+qnc-player-contract = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

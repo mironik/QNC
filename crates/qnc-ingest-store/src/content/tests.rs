@@ -7,6 +7,158 @@ use std::collections::BTreeMap;
 const URI: &str = "qnc://local/db/ingest_content/p1";
 
 #[test]
+fn read_one_clip_is_read_only_and_schema_version_is_unchanged() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("content.db");
+    let expected = {
+        let mut writer = ContentClient::from_owner_binding(&file, URI, Access::ReadWrite).unwrap();
+        writer.publish(clip("c1")).unwrap()
+    };
+    let before = std::fs::read(&file).unwrap();
+    let mut reader = ContentClient::from_owner_binding(&file, URI, Access::ReadOnly).unwrap();
+    assert_eq!(reader.read("c1").unwrap(), Some(expected));
+    assert_eq!(reader.read("missing").unwrap(), None);
+    assert!(reader.read("c1' OR 1=1").is_err());
+    assert!(reader.read("../c1").is_err());
+    assert!(reader.select(vec!["c1".into()], true).is_err());
+    drop(reader);
+    assert_eq!(before, std::fs::read(&file).unwrap());
+    let db = Connection::open_with_flags(file, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+    let schema: String = db
+        .query_row("SELECT version FROM ingest_content_schema", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(schema, SCHEMA_VERSION);
+    assert_ne!(
+        schema, VERSION,
+        "transport extension does not change stored schema"
+    );
+}
+
+#[test]
+fn list_summary_reads_catalog_columns_without_loading_snapshot_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("content.db");
+    let mut source = clip("c1");
+    source.thumbnail_uri = Some("qnc://local/source/card/thumbs/c1.jpg".into());
+    {
+        let mut writer = ContentClient::from_owner_binding(&file, URI, Access::ReadWrite).unwrap();
+        writer.publish(source).unwrap();
+    }
+    let db = Connection::open(&file).unwrap();
+    db.execute(
+        "UPDATE clips SET catalog_json='not valid json' WHERE clip_id='c1'",
+        [],
+    )
+    .unwrap();
+    drop(db);
+
+    let before = std::fs::read(&file).unwrap();
+    let mut reader = ContentClient::from_owner_binding(&file, URI, Access::ReadOnly).unwrap();
+    let rows = reader.list_summary(None).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].clip_id, "c1");
+    assert_eq!(rows[0].name, "c1");
+    assert_eq!(rows[0].source_name, "Card");
+    assert_eq!(rows[0].serial_number, "serial-123");
+    assert_eq!(rows[0].duration_seconds, 10.0);
+    assert_eq!(
+        rows[0].thumbnail_uri.as_deref(),
+        Some("qnc://local/source/card/thumbs/c1.jpg")
+    );
+    assert!(reader.list(None).is_err());
+    drop(reader);
+    assert_eq!(before, std::fs::read(&file).unwrap());
+}
+
+#[test]
+fn stats_detects_catalog_changes_without_loading_snapshot_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("content.db");
+    {
+        let mut writer = ContentClient::from_owner_binding(&file, URI, Access::ReadWrite).unwrap();
+        writer.publish(clip("c1")).unwrap();
+    }
+    let db = Connection::open(&file).unwrap();
+    db.execute(
+        "UPDATE clips SET catalog_json='not valid json' WHERE clip_id='c1'",
+        [],
+    )
+    .unwrap();
+    drop(db);
+
+    let before = std::fs::read(&file).unwrap();
+    let mut reader = ContentClient::from_owner_binding(&file, URI, Access::ReadOnly).unwrap();
+    let initial = reader.stats().unwrap();
+    assert_eq!(initial.clip_count, 1);
+    assert_eq!(initial.selected_count, 0);
+    assert_eq!(initial.max_revision, 1);
+    assert!(reader.list(None).is_err());
+    drop(reader);
+    assert_eq!(before, std::fs::read(&file).unwrap());
+
+    let mut writer = ContentClient::from_owner_binding(&file, URI, Access::ReadWrite).unwrap();
+    writer.select(vec!["c1".into()], true).unwrap();
+    let selected = writer.stats().unwrap();
+    assert_eq!(selected.clip_count, 1);
+    assert_eq!(selected.selected_count, 1);
+    assert_ne!(selected.fingerprint, initial.fingerprint);
+    writer.publish(clip("c2")).unwrap();
+    let added = writer.stats().unwrap();
+    assert_eq!(added.clip_count, 2);
+    assert_ne!(added.fingerprint, selected.fingerprint);
+}
+
+#[test]
+fn read_rejects_wrong_remote_clip_version_and_database_without_fallback() {
+    for case in 0..4 {
+        let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", server.server_addr());
+        let uri = "qnc://lan/test/db/ingest_content/p1";
+        let thread = std::thread::spawn(move || {
+            let mut request = server
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap()
+                .unwrap();
+            let body: Request = serde_json::from_reader(request.as_reader()).unwrap();
+            assert!(matches!(body.operation, Operation::Read { .. }));
+            let reply = Reply {
+                version: if case == 0 { "old" } else { VERSION }.into(),
+                db_uri: if case == 1 {
+                    "qnc://lan/test/db/ingest_content/p2"
+                } else {
+                    uri
+                }
+                .into(),
+                result: Ok(if case == 3 {
+                    Data::Clips(vec![])
+                } else {
+                    Data::Clip(Some(Box::new(StoredClip {
+                        clip: clip(if case == 2 { "wrong-clip" } else { "c1" }),
+                        selected: false,
+                        import_status: ImportStatus::Detected,
+                        import_error: None,
+                        imported_media_uri: None,
+                    })))
+                }),
+            };
+            request
+                .respond(tiny_http::Response::from_string(
+                    serde_json::to_string(&reply).unwrap(),
+                ))
+                .unwrap();
+        });
+        let resolver = qnc_transport_resolver::ResolverConfig::new(std::path::PathBuf::new())
+            .with_lan_authority("test", &endpoint);
+        let mut client =
+            ContentClient::from_remote(&resolver, uri, Access::ReadOnly, "test-read").unwrap();
+        assert!(client.read("c1").is_err());
+        thread.join().unwrap();
+    }
+}
+
+#[test]
 fn batch_publication_is_atomic_and_inventory_removal_is_guarded() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("content.db");
@@ -65,39 +217,51 @@ fn windows_delete_denied_directory_supports_durable_content_writes() {
             assert!(status.status.success());
         }
     }
-    let fixture = LockedFixture {
-        directory: tempfile::tempdir().unwrap(),
-        user: format!(
-            "{}\\{}",
-            std::env::var("USERDOMAIN").unwrap(),
-            std::env::var("USERNAME").unwrap()
-        ),
-    };
-    let path = fixture.directory.path().canonicalize().unwrap();
-    assert!(path.starts_with(std::env::temp_dir().canonicalize().unwrap()));
-    let file = path.join("content.db");
-    database(&file);
-    let mut permissions = std::fs::metadata(&file).unwrap().permissions();
-    permissions.set_readonly(true);
-    std::fs::set_permissions(&file, permissions).unwrap();
-    assert!(Command::new("icacls")
-        .arg(&path)
-        .arg("/deny")
-        .arg(format!("{}:(OI)(CI)(DE,DC)", fixture.user))
-        .output()
-        .unwrap()
-        .status
-        .success());
-    let mut store = ContentStore::open_owner_binding(&file, URI, Access::ReadWrite).unwrap();
-    run(&mut store, Operation::Publish(Box::new(clip("c1")))).unwrap();
-    drop(store);
-    assert!(std::fs::remove_file(&file).is_err());
-    let mut store = ContentStore::open_owner_binding(&file, URI, Access::ReadWrite).unwrap();
-    run(&mut store, Operation::Publish(Box::new(clip("c2")))).unwrap();
-    let Data::Clips(rows) = run(&mut store, Operation::List { after: None }).unwrap() else {
-        panic!()
-    };
-    assert_eq!(rows.len(), 2);
+    for journal_mode in ["PERSIST", "WAL"] {
+        let fixture = LockedFixture {
+            directory: tempfile::tempdir().unwrap(),
+            user: format!(
+                "{}\\{}",
+                std::env::var("USERDOMAIN").unwrap(),
+                std::env::var("USERNAME").unwrap()
+            ),
+        };
+        let path = fixture.directory.path().canonicalize().unwrap();
+        assert!(path.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        let file = path.join("content.db");
+        database(&file);
+        let project = Connection::open(&file).unwrap();
+        project
+            .pragma_update(None, "journal_mode", journal_mode)
+            .unwrap();
+        project
+            .execute_batch("CREATE TABLE unrelated(value TEXT);")
+            .unwrap();
+        for entry in std::fs::read_dir(&path).unwrap() {
+            let entry = entry.unwrap();
+            let mut permissions = entry.metadata().unwrap().permissions();
+            permissions.set_readonly(true);
+            std::fs::set_permissions(entry.path(), permissions).unwrap();
+        }
+        assert!(Command::new("icacls")
+            .arg(&path)
+            .arg("/deny")
+            .arg(format!("{}:(OI)(CI)(DE,DC)", fixture.user))
+            .output()
+            .unwrap()
+            .status
+            .success());
+        let mut store = ContentStore::open_owner_binding(&file, URI, Access::ReadWrite).unwrap();
+        run(&mut store, Operation::Publish(Box::new(clip("c1")))).unwrap();
+        drop(store);
+        assert!(std::fs::remove_file(&file).is_err());
+        let mut store = ContentStore::open_owner_binding(&file, URI, Access::ReadWrite).unwrap();
+        run(&mut store, Operation::Publish(Box::new(clip("c2")))).unwrap();
+        let Data::Clips(rows) = run(&mut store, Operation::List { after: None }).unwrap() else {
+            panic!()
+        };
+        assert_eq!(rows.len(), 2);
+    }
 }
 
 fn database(path: &std::path::Path) {
@@ -397,6 +561,56 @@ fn existing_project_wal_mode_survives_ingest_writer_and_read_only_settings_reade
     let mut reader = ContentStore::open_owner_binding(&path, URI, Access::ReadOnly).unwrap();
     assert!(
         matches!(run(&mut reader, Operation::List { after: None }).unwrap(), Data::Clips(rows) if rows.len()==1)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn readonly_wal_companions_do_not_block_owned_schema_writes() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("qnc_project.db");
+    database(&path);
+    let project = Connection::open(&path).unwrap();
+    project.pragma_update(None, "journal_mode", "WAL").unwrap();
+    project
+        .execute_batch("CREATE TABLE unrelated(value TEXT);")
+        .unwrap();
+    let files = ["qnc_project.db", "qnc_project.db-wal", "qnc_project.db-shm"];
+    for name in files {
+        let file = dir.path().join(name);
+        let mut permissions = std::fs::metadata(&file).unwrap().permissions();
+        permissions.set_readonly(true);
+        std::fs::set_permissions(file, permissions).unwrap();
+    }
+    let result = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite)
+        .and_then(|mut store| run(&mut store, Operation::Publish(Box::new(clip("c1")))));
+    let restored = files.map(|name| {
+        !std::fs::metadata(dir.path().join(name))
+            .unwrap()
+            .permissions()
+            .readonly()
+    });
+    // Always release the fixture, including on a regression failure.
+    for name in files {
+        let file = dir.path().join(name);
+        let mut permissions = std::fs::metadata(&file).unwrap().permissions();
+        permissions.set_readonly(false);
+        std::fs::set_permissions(file, permissions).unwrap();
+    }
+    assert!(result.is_ok(), "{result:?}");
+    assert!(restored.into_iter().all(|writable| writable));
+    assert_eq!(
+        project
+            .pragma_query_value::<String, _>(None, "journal_mode", |r| r.get(0))
+            .unwrap(),
+        "wal"
+    );
+    assert_eq!(
+        project
+            .query_row::<String, _, _>("SELECT settings_json FROM project_settings", [], |r| r
+                .get(0))
+            .unwrap(),
+        "{\"storage\":{\"ingest_media\":\"link\"}}"
     );
 }
 

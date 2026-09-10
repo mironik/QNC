@@ -183,6 +183,60 @@ fn render_preview(
         Stroke::new(1.0, theme.border),
         StrokeKind::Inside,
     );
+    if let Some(picture) = view
+        .playback
+        .picture
+        .as_ref()
+        .filter(|_| view.playback.video_visible)
+    {
+        let header = &picture.header;
+        if qnc_ui_kit::paint_stream_frame(
+            ui,
+            rect.shrink(1.0),
+            egui::Id::new("ingest-monitor"),
+            (
+                &header.session_id,
+                header.output_generation,
+                header.sequence,
+            ),
+            [header.width as usize, header.height as usize],
+            &picture.rgba,
+        ) {
+            return;
+        }
+    }
+    if let Some(error) = &view.playback.error {
+        let galley = ui.painter().layout(
+            error.clone(),
+            FontId::proportional(theme.font_ui),
+            theme.text_muted,
+            (rect.width() - 24.0).max(1.0),
+        );
+        ui.painter().galley(
+            rect.center() - galley.size() * 0.5,
+            galley,
+            theme.text_muted,
+        );
+        return;
+    }
+    if let Some(clip) = view
+        .clips
+        .iter()
+        .find(|c| Some(&c.clip_id) == view.preview_clip_id.as_ref())
+    {
+        if let (Some(uri), Some(image)) = (&clip.thumb_uri, &clip.thumb_image) {
+            if qnc_ui_kit::paint_rgba_image(
+                ui,
+                rect.shrink(1.0),
+                uri,
+                image.content_key,
+                image.size,
+                &image.pixels,
+            ) {
+                return;
+            }
+        }
+    }
     let label = if view.preview_clip_id.is_some() {
         view.current_clip_label()
     } else {

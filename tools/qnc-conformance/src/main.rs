@@ -12,6 +12,8 @@ use qnc_contracts::{
 };
 use qnc_db_contract::validate_db_contract_json;
 
+mod player_boundary;
+
 struct CheckResult {
     name: String,
     report: ValidationReport,
@@ -130,6 +132,10 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
     checks.push(scan_shell_app_boundary(root));
     checks.push(scan_project_app_boundary(root));
     checks.push(scan_shared_ui_patterns(root));
+    checks.push(CheckResult::from_report(
+        "public player boundary",
+        player_boundary::check(root),
+    ));
 
     checks
 }
@@ -994,6 +1000,13 @@ fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
         "qnc.module.dir-browser" => Some("qnc-dir-browser"),
         "qnc.module.keyboard-shortcut" => Some("qnc-keyboard-shortcut"),
         "qnc.module.frame-timebase" => Some("qnc-frame-timebase"),
+        "qnc.module.player-contract" => Some("qnc-player-contract"),
+        "qnc.module.player-input" => Some("qnc-player-input"),
+        "qnc.module.player-client" => Some("qnc-player-client"),
+        "qnc.module.media-stream" => Some("qnc-media-stream"),
+        "qnc.module.media-decode" => Some("qnc-media-decode"),
+        "qnc.module.ffmpeg-decode" => Some("qnc-ffmpeg-decode"),
+        "qnc.module.decoder-catalog" => Some("qnc-decoder-catalog"),
         "qnc.module.ui-widget" => Some("qnc-ui-kit"),
         "qnc.module.workstation-identity" => Some("qnc-workstation-identity"),
         "qnc.module.work-settings" => Some("qnc-work-settings"),

@@ -1,0 +1,17 @@
+{
+  "version": "1",
+  "selected": "qnc.ffmpeg",
+  "adapters": [
+    {
+      "id": "qnc.ffmpeg",
+      "version": "0.1.0",
+      "driver": { "protocol": "ffmpeg_cli_v1" },
+      "executable": { "kind": "command", "name": "ffmpeg" },
+      "supported_os": ["windows", "linux", "macos"],
+      "supported_cpu": ["x86_64", "aarch64"],
+      "containers": ["mxf", "mov,mp4,m4a,3gp,3g2,mj2", "mov", "mp4", "matroska,webm", "matroska", "wav"],
+      "codecs": ["h264", "hevc", "mpeg2video", "prores", "dnxhd", "dvvideo", "mjpeg", "ffv1", "aac", "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_s16be", "pcm_s24be"],
+      "pixel_formats": ["yuv420p", "nv12", "yuv422p", "yuv444p", "rgb24", "bgr24", "yuv420p10le", "p010le", "yuv422p10le", "yuv444p10le", "rgba", "bgra", "gray"]
+    }
+  ]
+}

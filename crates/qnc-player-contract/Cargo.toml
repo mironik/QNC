@@ -1,0 +1,11 @@
+[package]
+name = "qnc-player-contract"
+version = "0.3.0"
+edition = "2024"
+
+[dependencies]
+qnc-frame-timebase.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

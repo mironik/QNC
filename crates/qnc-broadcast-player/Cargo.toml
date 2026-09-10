@@ -1,0 +1,16 @@
+[package]
+name = "qnc-broadcast-player"
+version = "0.3.0"
+edition = "2024"
+
+[dependencies]
+qnc-player-contract.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+qnc-audio-output.workspace = true
+qnc-video-output.workspace = true
+wgpu = "=24.0.5"
+winit = "=0.30.13"
+pollster = "=0.4.0"

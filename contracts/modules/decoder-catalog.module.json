@@ -1,0 +1,49 @@
+{
+  "module_id": "qnc.module.decoder-catalog",
+  "module_name": "Decoder Deployment Catalog",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "decoder.catalog.read",
+    "decoder.catalog.available",
+    "decoder.catalog.select"
+  ],
+  "input_contract_version": "0.2.0",
+  "output_contract_version": "0.2.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "module_dependencies": [
+    "qnc.module.media-decode",
+    "qnc.module.ffmpeg-decode"
+  ],
+  "forbidden_calls": [
+    "db.read",
+    "db.write",
+    "media.probe.full",
+    "playback.clock",
+    "playback.present",
+    "media.decode.execute"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-player-core"
+  ],
+  "adapter_policy": "Read-only host deployment configuration. Explicit selection by registration id, no fallback. Paths are private installation locations, never project or media identities.",
+  "specification": "docs/70-replaceable-decoders.md"
+}

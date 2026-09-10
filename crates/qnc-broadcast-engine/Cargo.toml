@@ -1,0 +1,24 @@
+[package]
+name = "qnc-broadcast-engine"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+qnc-broadcast-player.workspace = true
+qnc-player-input.workspace = true
+qnc-media-metadata.workspace = true
+qnc-media-decode.workspace = true
+qnc-media-stream.workspace = true
+qnc-pixel-convert.workspace = true
+qnc-gpu-raster.workspace = true
+qnc-video-output.workspace = true
+qnc-audio-output.workspace = true
+
+[dev-dependencies]
+qnc-ffmpeg-decode.workspace = true
+qnc-work-settings.workspace = true
+serde_json.workspace = true
+wgpu = "24.0.5"
+winit = "0.30.13"
+pollster = "0.4.0"
+sha2 = "0.10"

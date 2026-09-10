@@ -3,7 +3,7 @@
   "module_name": "Source Read Transport",
   "module_version": "0.3.0",
   "module_kind": "library",
-  "capabilities": ["source.file.stat", "source.text.read", "source.bytes.read", "source.directory.list"],
+  "capabilities": ["source.file.stat", "source.text.read", "source.bytes.read", "source.directory.list", "source.file.open_read_only"],
   "input_contract_version": "0.3.0",
   "output_contract_version": "0.3.0",
   "supported_os": ["windows", "linux", "macos"],

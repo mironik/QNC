@@ -1,0 +1,17 @@
+{
+  "module_id": "qnc.module.video-output",
+  "module_name": "Video Output",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "implementation_stage": "device_adapter_rgba8_srgb",
+  "capabilities": ["video.output.prepare", "video.output.submit", "video.output.gpu_completion", "video.output.reset"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "media.decode", "application.db.read", "application.db.write", "app_to_app.state_share"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.media-decode", "qnc.module.ui-widget", "qnc.module.player-input"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes"
+}

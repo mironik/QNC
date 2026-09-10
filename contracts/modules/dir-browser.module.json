@@ -13,6 +13,6 @@
   "forbidden_dependencies": ["qnc.module.media-probe"],
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
-  "registered_source_api": "TransportBrowserSession uses owner-supplied SourceReader roots for local/LAN/intranet listing; selection returns a stable SourceReference. No confirmation buttons or application workflow.",
+  "registered_source_api": "TransportBrowserSession lists registered roots without opening them. An owner-supplied connector opens and validates only the requested SourceReader on each local/LAN/intranet navigation. No retained volume handles, background retries, confirmation buttons or application workflow. Selection returns a stable SourceReference.",
   "specification": "docs/34-select-runtime.md"
 }

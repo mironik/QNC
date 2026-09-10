@@ -541,8 +541,6 @@ impl ProjectStore {
             params![project_id, now],
         )
         .map_err(|error| error.to_string())?;
-        lock_project_dir(&project_dir)?;
-        self.lock_registered_project_dirs(&conn)?;
         set_setting(&conn, "active_project_id", project_id)?;
         Ok(())
     }
@@ -962,60 +960,16 @@ fn unlock_projects_root_dir(path: &Path) -> Result<(), String> {
 
 fn lock_project_dir(path: &Path) -> Result<(), String> {
     set_project_delete_lock(path, false)?;
-    set_project_tree_read_only(path, true)?;
     set_project_hidden(path, true)?;
     set_project_delete_lock(path, true)
 }
 
 fn unlock_project_dir(path: &Path) -> Result<(), String> {
     set_project_delete_lock(path, false)?;
-    set_project_hidden(path, false)?;
-    set_project_tree_read_only(path, false)
+    set_project_hidden(path, false)
 }
 
-fn set_project_tree_read_only(path: &Path, read_only: bool) -> Result<(), String> {
-    if !path.exists() {
-        return Ok(());
-    }
-    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
-    let file_type = metadata.file_type();
-    if file_type.is_symlink() {
-        return Ok(());
-    }
-    if file_type.is_dir() {
-        if !read_only {
-            set_path_read_only(path, false)?;
-        }
-        for entry in fs::read_dir(path).map_err(|error| error.to_string())? {
-            let entry = entry.map_err(|error| error.to_string())?;
-            set_project_tree_read_only(&entry.path(), read_only)?;
-        }
-        if read_only {
-            set_path_read_only(path, true)?;
-        }
-    } else {
-        set_path_read_only(path, read_only)?;
-    }
-    Ok(())
-}
-
-#[cfg(windows)]
-fn set_path_read_only(path: &Path, read_only: bool) -> Result<(), String> {
-    let metadata = fs::metadata(path).map_err(|error| error.to_string())?;
-    let mut permissions = metadata.permissions();
-    if permissions.readonly() == read_only {
-        return Ok(());
-    }
-    permissions.set_readonly(read_only);
-    fs::set_permissions(path, permissions).map_err(|error| {
-        format!(
-            "Ne mogu promijeniti read-only stanje za '{}': {error}",
-            path.display()
-        )
-    })
-}
-
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn set_path_read_only(path: &Path, read_only: bool) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
 
@@ -2541,7 +2495,7 @@ mod tests {
     }
 
     #[test]
-    fn created_project_directory_is_locked_after_create() {
+    fn created_project_directory_has_delete_lock_without_readonly_tree() {
         let root = temp_root("locked_project");
         let store = ProjectStore::open(&root).expect("store");
         let templates = store.list_project_templates().expect("templates");
@@ -2554,9 +2508,15 @@ mod tests {
             )
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
-        assert!(project_dir
+        assert!(!project_dir
             .metadata()
             .expect("project dir metadata")
+            .permissions()
+            .readonly());
+        assert!(!project_dir
+            .join("qnc_project.db")
+            .metadata()
+            .expect("project DB metadata")
             .permissions()
             .readonly());
         #[cfg(windows)]

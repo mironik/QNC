@@ -7,6 +7,8 @@ pub struct ContentStore {
     conn: Connection,
     uri: String,
     access: Access,
+    schema_ready: bool,
+    has_thumbnail_uri: bool,
 }
 
 impl ContentStore {
@@ -53,7 +55,7 @@ impl ContentStore {
         validate_container(&conn, &id)?;
         conn.pragma_update(None, "foreign_keys", true)
             .map_err(err)?;
-        let schema: bool = conn
+        let mut schema: bool = conn
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='ingest_content_schema')",
                 [],
@@ -64,14 +66,14 @@ impl ContentStore {
             let tx = conn
                 .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
                 .map_err(err)?;
-            let schema: bool = tx
+            let schema_exists: bool = tx
                 .query_row(
                     "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='ingest_content_schema')",
                     [],
                     |r| r.get(0),
                 )
                 .map_err(err)?;
-            if !schema {
+            if !schema_exists {
                 let tables: u32 = tx.query_row(
                     "SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
                     [], |row| row.get(0),
@@ -86,26 +88,33 @@ impl ContentStore {
                     .map_err(|e| format!("Ingest schema: {e:?}"))?;
                 tx.execute(
                     "INSERT INTO ingest_content_schema VALUES (?1,?2)",
-                    params![VERSION, id],
+                    params![SCHEMA_VERSION, id],
                 )
                 .map_err(err)?;
             }
             tx.commit()
                 .map_err(|e| format!("Ingest schema commit: {e:?}"))?;
+            schema = true;
         }
-        let (version, stored_project): (String, String) = conn
-            .query_row(
-                "SELECT version,project_id FROM ingest_content_schema",
-                [],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .map_err(err)?;
-        if version != VERSION {
-            return Err("Nepodrzana Ingest shema; migracije nisu dopustene.".into());
+        if schema {
+            let (version, stored_project): (String, String) = conn
+                .query_row(
+                    "SELECT version,project_id FROM ingest_content_schema",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .map_err(err)?;
+            if version != SCHEMA_VERSION {
+                return Err("Nepodrzana Ingest shema; migracije nisu dopustene.".into());
+            }
+            if stored_project != id {
+                return Err("Ingest baza pripada drugom projektu.".into());
+            }
         }
-        if stored_project != id {
-            return Err("Ingest baza pripada drugom projektu.".into());
+        if access == Access::ReadWrite {
+            ensure_summary_columns(&conn)?;
         }
+        let has_thumbnail_uri = schema && has_column(&conn, "clips", "thumbnail_uri")?;
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
@@ -132,6 +141,8 @@ impl ContentStore {
             conn,
             uri: uri.into(),
             access,
+            schema_ready: schema,
+            has_thumbnail_uri,
         })
     }
 
@@ -141,6 +152,25 @@ impl ContentStore {
         }
         if request.operation.is_write() && self.access == Access::ReadOnly {
             return Err("Pristup je read-only.".into());
+        }
+        if !self.schema_ready {
+            return match &request.operation {
+                Operation::List { .. } => Ok(Data::Clips(Vec::new())),
+                Operation::ListSummary { .. } => Ok(Data::ClipSummaries(Vec::new())),
+                Operation::Stats => Ok(Data::CatalogStats(CatalogStats::default())),
+                Operation::Inventory { source_uri, .. } => {
+                    let source = qnc_contracts::parse_qnc_uri(source_uri).map_err(err)?;
+                    if source.resource_kind != "source" {
+                        return Err("Neispravan izvor.".into());
+                    }
+                    Ok(Data::Inventory(Vec::new()))
+                }
+                Operation::Read { clip_id } => {
+                    qnc_media_records::valid_id(clip_id).map_err(err)?;
+                    Ok(Data::Clip(None))
+                }
+                _ => Err("Ingest shema nije inicijalizirana.".into()),
+            };
         }
         match &request.operation {
             Operation::Publish(clip) => self.publish(clip),
@@ -221,6 +251,14 @@ impl ContentStore {
                 tx.commit().map_err(err)?;
                 Ok(Data::Removed(removed))
             }
+            Operation::Read { clip_id } => {
+                qnc_media_records::valid_id(clip_id).map_err(err)?;
+                let clip = self.conn.query_row(
+                    "SELECT catalog_json,selected,import_status,import_error,imported_media_uri FROM clips WHERE clip_id=?1",
+                    [clip_id], row,
+                ).optional().map_err(err)?;
+                Ok(Data::Clip(clip.map(Box::new)))
+            }
             Operation::List { after } => {
                 let mut statement = self
                     .conn
@@ -236,6 +274,34 @@ impl ContentStore {
                     rows.collect::<rusqlite::Result<Vec<_>>>().map_err(err)?,
                 ))
             }
+            Operation::ListSummary { after } => {
+                let thumbnail_expr = if self.has_thumbnail_uri {
+                    "c.thumbnail_uri"
+                } else {
+                    "NULL"
+                };
+                let sql = format!(
+                    "SELECT c.clip_id,c.name,c.source_uri,s.source_name,s.serial_number,
+                        s.volume_name,{thumbnail_expr},c.duration_seconds,c.selected,
+                        c.import_status,c.import_error,c.imported_media_uri,c.revision,c.final
+                     FROM clips c
+                     JOIN clip_sources s ON s.clip_id=c.clip_id
+                     WHERE c.clip_id > ?1
+                     ORDER BY c.clip_id
+                     LIMIT ?2"
+                );
+                let mut statement = self.conn.prepare(&sql).map_err(err)?;
+                let rows = statement
+                    .query_map(
+                        params![after.as_deref().unwrap_or(""), PAGE_SIZE],
+                        summary_row,
+                    )
+                    .map_err(err)?;
+                Ok(Data::ClipSummaries(
+                    rows.collect::<rusqlite::Result<Vec<_>>>().map_err(err)?,
+                ))
+            }
+            Operation::Stats => self.catalog_stats().map(Data::CatalogStats),
             Operation::Select { clip_ids, selected } => {
                 if clip_ids.len() > 4096 {
                     return Err("Previse klipova u naredbi.".into());
@@ -330,6 +396,56 @@ impl ContentStore {
         }
     }
 
+    fn catalog_stats(&self) -> Result<CatalogStats> {
+        let thumbnail_expr = if self.has_thumbnail_uri {
+            "thumbnail_uri"
+        } else {
+            "NULL"
+        };
+        let sql = format!(
+            "SELECT clip_id,revision,selected,import_status,import_error,
+                imported_media_uri,{thumbnail_expr},source_uri,original_uri
+             FROM clips
+             ORDER BY clip_id"
+        );
+        let mut statement = self.conn.prepare(&sql).map_err(err)?;
+        let mut rows = statement.query([]).map_err(err)?;
+        let mut stats = CatalogStats {
+            fingerprint: CATALOG_FINGERPRINT_OFFSET,
+            ..Default::default()
+        };
+        while let Some(row) = rows.next().map_err(err)? {
+            let clip_id: String = row.get(0).map_err(err)?;
+            let revision_raw: i64 = row.get(1).map_err(err)?;
+            let revision = u32::try_from(revision_raw)
+                .map_err(|_| "Neispravna revizija klipa u Ingest bazi.")?;
+            let selected: bool = row.get(2).map_err(err)?;
+            let import_status: String = row.get(3).map_err(err)?;
+            let import_error: Option<String> = row.get(4).map_err(err)?;
+            let imported_media_uri: Option<String> = row.get(5).map_err(err)?;
+            let thumbnail_uri: Option<String> = row.get(6).map_err(err)?;
+            let source_uri: String = row.get(7).map_err(err)?;
+            let original_uri: String = row.get(8).map_err(err)?;
+
+            stats.clip_count += 1;
+            if selected {
+                stats.selected_count += 1;
+            }
+            stats.revision_sum = stats.revision_sum.wrapping_add(revision as u64);
+            stats.max_revision = stats.max_revision.max(revision);
+            fingerprint_str(&mut stats.fingerprint, &clip_id);
+            fingerprint_u64(&mut stats.fingerprint, revision as u64);
+            fingerprint_u64(&mut stats.fingerprint, if selected { 1 } else { 0 });
+            fingerprint_str(&mut stats.fingerprint, &import_status);
+            fingerprint_opt_str(&mut stats.fingerprint, import_error.as_deref());
+            fingerprint_opt_str(&mut stats.fingerprint, imported_media_uri.as_deref());
+            fingerprint_opt_str(&mut stats.fingerprint, thumbnail_uri.as_deref());
+            fingerprint_str(&mut stats.fingerprint, &source_uri);
+            fingerprint_str(&mut stats.fingerprint, &original_uri);
+        }
+        Ok(stats)
+    }
+
     fn publish(&mut self, clip: &CatalogClip) -> Result<Data> {
         let tx = self
             .conn
@@ -379,12 +495,14 @@ impl ContentStore {
             .as_ref()
             .map(|d| d.value.numerator as f64 / d.value.denominator as f64);
         let fps = video.and_then(|v| v.frame_rate.as_ref()).map(|f| &f.value);
-        tx.execute("INSERT INTO clips(clip_id,source_uri,original_uri,name,created_at_utc,duration_seconds,duration_frames,fps_num,fps_den,catalog_json,revision,final)
-            VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
+        tx.execute("INSERT INTO clips(clip_id,source_uri,original_uri,name,created_at_utc,duration_seconds,duration_frames,fps_num,fps_den,thumbnail_uri,catalog_json,revision,final)
+            VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)
             ON CONFLICT(clip_id) DO UPDATE SET name=excluded.name,catalog_json=excluded.catalog_json,revision=excluded.revision,final=excluded.final,
-            duration_seconds=excluded.duration_seconds,duration_frames=excluded.duration_frames,fps_num=excluded.fps_num,fps_den=excluded.fps_den,created_at_utc=excluded.created_at_utc",
+            duration_seconds=excluded.duration_seconds,duration_frames=excluded.duration_frames,fps_num=excluded.fps_num,fps_den=excluded.fps_den,
+            created_at_utc=excluded.created_at_utc,thumbnail_uri=excluded.thumbnail_uri",
             params![clip.id(),clip.source_uri,original.media_uri,clip.name,original.tags.get("creation_time").map(|f| &f.value),duration,
-                video.and_then(|v|v.exact_frame_count()),fps.map(|f|f.fps_num),fps.map(|f|f.fps_den),json,clip.snapshot.revision,clip.snapshot.phase == Phase::Final]).map_err(err)?;
+                video.and_then(|v|v.exact_frame_count()),fps.map(|f|f.fps_num),fps.map(|f|f.fps_den),clip.thumbnail_uri.as_deref(),json,
+                clip.snapshot.revision,clip.snapshot.phase == Phase::Final]).map_err(err)?;
         tx.execute("INSERT INTO clip_sources VALUES(?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT(clip_id) DO UPDATE SET original_container=excluded.original_container,original_codec=excluded.original_codec,serial_number=excluded.serial_number,volume_name=excluded.volume_name,source_name=excluded.source_name",
             params![clip.id(),clip.source_uri,original.media_uri,original.container.as_ref().map(|v| &v.value),codec(original),clip.serial_number,clip.volume_name,clip.source_name]).map_err(err)?;
         if let Some(proxy) = &clip.snapshot.metadata.proxy {
@@ -445,7 +563,7 @@ fn validate_container_snapshot(conn: &Connection, id: &str) -> Result<()> {
     if has_content {
         let matches: bool = conn.query_row(
             "SELECT count(*)=1 AND min(project_id)=?1 AND min(version)=?2 FROM ingest_content_schema",
-            params![id, VERSION], |r| r.get(0),
+            params![id, SCHEMA_VERSION], |r| r.get(0),
         ).map_err(err)?;
         if !matches {
             return Err("Pogresan projekt ili verzija Ingest baze; nema migracije.".into());
@@ -468,21 +586,39 @@ fn validate_container_snapshot(conn: &Connection, id: &str) -> Result<()> {
 // Only the validated output DB and its journal directory need owner write access.
 // Never recurse or remove delete ACLs; card/source paths are not accepted here.
 fn enable_owner_write(file: &Path) -> Result<()> {
-    #[cfg(windows)]
-    {
-        let mut permissions = std::fs::metadata(file).map_err(err)?.permissions();
+    // SQLite companions belong to this validated binding, not separate databases.
+    for suffix in ["", "-wal", "-shm", "-journal"] {
+        let mut name = file.as_os_str().to_os_string();
+        name.push(suffix);
+        let path = std::path::PathBuf::from(name);
+        let metadata = match std::fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.file_type().is_file() => metadata,
+            Ok(_) => return Err("DB write target must be a regular file.".into()),
+            Err(error) if !suffix.is_empty() && error.kind() == std::io::ErrorKind::NotFound => {
+                continue
+            }
+            Err(error) => return Err(err(error)),
+        };
+        let mut permissions = metadata.permissions();
+        #[cfg(windows)]
         if permissions.readonly() {
             permissions.set_readonly(false);
-            std::fs::set_permissions(file, permissions).map_err(err)?;
+            std::fs::set_permissions(&path, permissions).map_err(err)?;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = permissions.mode();
+            if mode & 0o200 == 0 {
+                permissions.set_mode(mode | 0o200);
+                std::fs::set_permissions(&path, permissions).map_err(err)?;
+            }
         }
     }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        for (path, bits) in [
-            (file, 0o200),
-            (file.parent().ok_or("DB parent missing")?, 0o300),
-        ] {
+        for (path, bits) in [(file.parent().ok_or("DB parent missing")?, 0o300)] {
             let permissions = std::fs::metadata(path).map_err(err)?.permissions();
             let mode = permissions.mode();
             if mode & bits != bits {
@@ -503,20 +639,53 @@ fn codec(media: &MediaRepresentation) -> Option<&str> {
             _ => None,
         })
 }
+fn ensure_summary_columns(conn: &Connection) -> Result<()> {
+    if !has_column(conn, "clips", "thumbnail_uri")? {
+        conn.execute("ALTER TABLE clips ADD COLUMN thumbnail_uri TEXT", [])
+            .map_err(err)?;
+    }
+    conn.execute_batch(
+        "DROP VIEW IF EXISTS public_clips;
+        CREATE VIEW public_clips AS SELECT clip_id,source_uri,original_uri,name,created_at_utc,
+            duration_seconds,duration_frames,fps_num,fps_den,selected,import_status,
+            imported_media_uri,import_error,thumbnail_uri FROM clips;",
+    )
+    .map_err(err)?;
+    Ok(())
+}
+
+fn has_column(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+    let mut statement = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(err)?;
+    let rows = statement
+        .query_map([], |r| r.get::<_, String>(1))
+        .map_err(err)?;
+    for row in rows {
+        if row.map_err(err)? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn import_status(value: String) -> rusqlite::Result<ImportStatus> {
+    match value.as_str() {
+        "detected" => Ok(ImportStatus::Detected),
+        "queued" => Ok(ImportStatus::Queued),
+        "processing" => Ok(ImportStatus::Processing),
+        "imported" => Ok(ImportStatus::Imported),
+        "failed" => Ok(ImportStatus::Failed),
+        _ => Err(rusqlite::Error::InvalidQuery),
+    }
+}
+
 fn row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredClip> {
     let json: String = row.get(0)?;
     let clip = serde_json::from_str(&json).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
     })?;
-    let status: String = row.get(2)?;
-    let import_status = match status.as_str() {
-        "detected" => ImportStatus::Detected,
-        "queued" => ImportStatus::Queued,
-        "processing" => ImportStatus::Processing,
-        "imported" => ImportStatus::Imported,
-        "failed" => ImportStatus::Failed,
-        _ => return Err(rusqlite::Error::InvalidQuery),
-    };
+    let import_status = import_status(row.get(2)?)?;
     Ok(StoredClip {
         clip,
         selected: row.get(1)?,
@@ -524,6 +693,52 @@ fn row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredClip> {
         import_error: row.get(3)?,
         imported_media_uri: row.get(4)?,
     })
+}
+fn summary_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredClipSummary> {
+    Ok(StoredClipSummary {
+        clip_id: row.get(0)?,
+        name: row.get(1)?,
+        source_uri: row.get(2)?,
+        source_name: row.get(3)?,
+        serial_number: row.get(4)?,
+        volume_name: row.get(5)?,
+        thumbnail_uri: row.get(6)?,
+        duration_seconds: row.get::<_, Option<f64>>(7)?.unwrap_or(0.0),
+        selected: row.get(8)?,
+        import_status: import_status(row.get(9)?)?,
+        import_error: row.get(10)?,
+        imported_media_uri: row.get(11)?,
+        revision: row.get(12)?,
+        final_record: row.get(13)?,
+    })
+}
+
+const CATALOG_FINGERPRINT_OFFSET: u64 = 14_695_981_039_346_656_037;
+const CATALOG_FINGERPRINT_PRIME: u64 = 1_099_511_628_211;
+
+fn fingerprint_str(hash: &mut u64, value: &str) {
+    fingerprint_u64(hash, value.len() as u64);
+    for byte in value.as_bytes() {
+        *hash ^= u64::from(*byte);
+        *hash = hash.wrapping_mul(CATALOG_FINGERPRINT_PRIME);
+    }
+}
+
+fn fingerprint_opt_str(hash: &mut u64, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            fingerprint_u64(hash, 1);
+            fingerprint_str(hash, value);
+        }
+        None => fingerprint_u64(hash, 0),
+    }
+}
+
+fn fingerprint_u64(hash: &mut u64, value: u64) {
+    for byte in value.to_le_bytes() {
+        *hash ^= u64::from(byte);
+        *hash = hash.wrapping_mul(CATALOG_FINGERPRINT_PRIME);
+    }
 }
 fn err(error: impl std::fmt::Display) -> String {
     error.to_string()

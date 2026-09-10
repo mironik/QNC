@@ -1,75 +1,80 @@
 use super::{selection_config::SelectionConfig, ClipView, IngestWorkPlan, ThumbStatus};
-use qnc_ingest_store::content::{Access, ContentTarget, ImportStatus, StoredClip};
+use qnc_ingest_store::content::{
+    Access, CatalogStats, ContentTarget, ImportStatus, StoredClip, StoredClipSummary,
+};
 use qnc_work_settings::SettingsReader;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    mpsc::SyncSender,
+    Arc,
+};
 
 #[derive(Debug)]
 pub(super) struct Loaded {
     pub plan: IngestWorkPlan,
     pub target: ContentTarget,
+    pub stats: CatalogStats,
     pub clips: Option<Vec<ClipView>>,
     pub source: Option<(String, String, String, String)>,
 }
 
+#[derive(Debug)]
+pub(super) enum ThumbnailEvent {
+    Ready {
+        clip_id: String,
+        uri: String,
+        image: Arc<qnc_image_assets::RgbaImage>,
+    },
+    Finished,
+}
+
 pub(super) fn load(
     reader: &SettingsReader,
-    config: Option<&SelectionConfig>,
+    _config: Option<&SelectionConfig>,
     retained_workspace: Option<&str>,
+    retained_stats: Option<&CatalogStats>,
 ) -> Result<Loaded, String> {
     let plan = reader
         .read()
         .map_err(|e| e.to_string())
         .and_then(IngestWorkPlan::from_settings)?;
     let target = ContentTarget::for_project(reader, &plan.settings)?;
-    if retained_workspace == Some(plan.settings.workspace_db_uri.as_str()) {
+    let mut db = target.open(Access::ReadOnly)?;
+    let stats = db.stats()?;
+    if retained_workspace == Some(plan.settings.workspace_db_uri.as_str())
+        && retained_stats == Some(&stats)
+    {
         return Ok(Loaded {
             plan,
             target,
+            stats,
             clips: None,
             source: None,
         });
     }
-    let mut db = target.open(Access::ReadWrite)?;
     let mut clips = Vec::new();
     let mut after = None;
     let mut sources = std::collections::BTreeMap::new();
-    let readers: std::collections::BTreeMap<_, _> = config
-        .into_iter()
-        .flat_map(|c| &c.sources)
-        .filter_map(|s| {
-            s.reader()
-                .ok()
-                .map(|reader| (s.location.uri.clone(), reader))
-        })
-        .collect();
     loop {
-        let page = db.list(after.clone())?;
+        let page = db.list_summary(after.clone())?;
         if page.is_empty() {
             break;
         }
-        let next = page.last().unwrap().clip.id().to_string();
+        let next = page.last().unwrap().clip_id.clone();
         if after.as_ref().is_some_and(|last| last >= &next) {
             return Err("Neispravno stranicenje Ingest baze.".into());
         }
         after = Some(next);
         for stored in page {
             sources.insert(
-                stored.clip.source_uri.clone(),
+                stored.source_uri.clone(),
                 (
-                    stored.clip.source_name.clone(),
-                    stored.clip.serial_number.clone(),
-                    stored.clip.volume_name.clone(),
+                    stored.source_name.clone(),
+                    stored.serial_number.clone(),
+                    stored.volume_name.clone(),
                 ),
             );
-            let mut clip = view(&stored);
-            if let Some(uri) = &stored.clip.thumbnail_uri {
-                // Offline media must not hide already committed catalog/selection data.
-                if let Ok(image) = thumbnail(&readers, uri) {
-                    clip.thumb_status = ThumbStatus::Ready;
-                    clip.thumb_image = Some(image);
-                }
-            }
-            clips.push(clip);
+            clips.push(view_summary(&stored));
         }
     }
     clips.sort_by(|a, b| a.name.cmp(&b.name));
@@ -84,9 +89,46 @@ pub(super) fn load(
     Ok(Loaded {
         plan,
         target,
+        stats,
         clips: Some(clips),
         source,
     })
+}
+
+pub(super) fn load_thumbnails(
+    config: SelectionConfig,
+    clips: Vec<(String, String)>,
+    send: SyncSender<ThumbnailEvent>,
+    cancel: Arc<AtomicBool>,
+) {
+    let readers: std::collections::BTreeMap<_, _> = config
+        .sources
+        .iter()
+        .filter_map(|s| {
+            s.reader()
+                .ok()
+                .map(|reader| (s.location.uri.clone(), reader))
+        })
+        .collect();
+    for (clip_id, uri) in clips {
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        let Ok(image) = thumbnail(&readers, &uri) else {
+            continue;
+        };
+        if send
+            .send(ThumbnailEvent::Ready {
+                clip_id,
+                uri,
+                image,
+            })
+            .is_err()
+        {
+            return;
+        }
+    }
+    let _ = send.send(ThumbnailEvent::Finished);
 }
 
 pub(super) fn view(stored: &StoredClip) -> ClipView {
@@ -108,6 +150,30 @@ pub(super) fn view(stored: &StoredClip) -> ClipView {
         previously_seen: true,
         metadata_revision: stored.clip.snapshot.revision,
         thumb_uri: stored.clip.thumbnail_uri.clone(),
+        thumb_status: if stored.clip.thumbnail_uri.is_some() {
+            ThumbStatus::Pending
+        } else {
+            ThumbStatus::Missing
+        },
+        ..Default::default()
+    }
+}
+
+pub(super) fn view_summary(stored: &StoredClipSummary) -> ClipView {
+    ClipView {
+        clip_id: stored.clip_id.clone(),
+        name: stored.name.clone(),
+        duration_seconds: stored.duration_seconds,
+        selected: stored.selected,
+        imported: stored.import_status == ImportStatus::Imported,
+        previously_seen: true,
+        metadata_revision: stored.revision,
+        thumb_uri: stored.thumbnail_uri.clone(),
+        thumb_status: if stored.thumbnail_uri.is_some() {
+            ThumbStatus::Pending
+        } else {
+            ThumbStatus::Missing
+        },
         ..Default::default()
     }
 }

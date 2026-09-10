@@ -27,10 +27,15 @@ impl IngestApp {
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+        let repaint = ctx.clone();
+        self.component
+            .notify_on_player_change(move || repaint.request_repaint());
         if self.component.poll() {
             ctx.request_repaint();
         }
-        if self.component.has_pending_work() {
+        if self.component.needs_player_poll() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(10));
+        } else if self.component.has_pending_work() {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
         }
         self.dispatch_keyboard_shortcuts(ctx);
@@ -48,8 +53,7 @@ impl IngestApp {
     }
 
     pub fn on_activated(&mut self) {
-        self.component
-            .dispatch(IngestIntent::empty(action_ids::INGEST_RELOAD));
+        self.component.refresh_active_project();
     }
 
     fn dispatch(&mut self, ctx: &egui::Context, intent: IngestIntent) {
@@ -60,6 +64,7 @@ impl IngestApp {
     }
 
     fn dispatch_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
+        self.dispatch_consumed_playback_space(ctx);
         for event in Self::shortcut_events(ctx) {
             let actions = self
                 .contracts
@@ -77,6 +82,54 @@ impl IngestApp {
                     }
                     _ => {}
                 }
+            }
+        }
+    }
+
+    fn dispatch_consumed_playback_space(&mut self, ctx: &egui::Context) {
+        let event = ShortcutEvent {
+            code: Some("Space".to_string()),
+            key: Some(" ".to_string()),
+            shift: false,
+            ctrl: false,
+            alt: false,
+            text_input_reserved: false,
+        };
+        let actions = self
+            .contracts
+            .shortcuts
+            .action_ids_for_event("ingest", &event)
+            .into_iter()
+            .filter(|action_id| *action_id == action_ids::PLAY_PAUSE)
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        if actions.is_empty() {
+            return;
+        }
+        let presses = ctx.input_mut(|input| {
+            let mut presses = 0usize;
+            input.events.retain(|event| {
+                let consume = matches!(
+                    event,
+                    egui::Event::Key {
+                        key,
+                        pressed: true,
+                        repeat: false,
+                        modifiers,
+                        ..
+                    } if modifiers.is_none()
+                        && Self::catalog_key_code(key).as_deref() == Some("Space")
+                );
+                if consume {
+                    presses += 1;
+                }
+                !consume
+            });
+            presses
+        });
+        for _ in 0..presses {
+            for action_id in &actions {
+                self.dispatch(ctx, IngestIntent::empty(action_id.clone()));
             }
         }
     }

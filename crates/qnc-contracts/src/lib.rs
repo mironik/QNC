@@ -231,6 +231,38 @@ pub fn validate_module_manifest_json(name: &str, contents: &str) -> ValidationRe
     );
     require_supported_targets(&mut report, name, object);
 
+    if object.get("module_id").and_then(Value::as_str) == Some("qnc.module.timeline") {
+        for (field, expected) in [
+            ("module_kind", "ui_widget"),
+            ("state_policy", "stateless"),
+            ("playback_state_source", "broadcast_player"),
+            ("intent_policy", "emit_only"),
+            ("database_write_policy", "no_db_writes"),
+        ] {
+            require_enum(&mut report, name, object, field, &[expected]);
+        }
+        for call in [
+            "playback.clock.own",
+            "playback.state.own",
+            "playback.position.fallback",
+            "playback.execute",
+            "application.db.read",
+            "application.db.write",
+            "filmstrip.generate14",
+            "wave.generate",
+            "ffprobe",
+            "media.probe.full",
+        ] {
+            if !object
+                .get("forbidden_calls")
+                .and_then(Value::as_array)
+                .is_some_and(|calls| calls.iter().any(|value| value.as_str() == Some(call)))
+            {
+                report.error(format!("{name}: passive timeline must forbid '{call}'"));
+            }
+        }
+    }
+
     report
 }
 
@@ -755,6 +787,59 @@ mod tests {
             .errors
             .iter()
             .any(|error| error.contains("allowed_applications")));
+    }
+
+    #[test]
+    fn validates_passive_timeline_contract() {
+        let report = validate_module_manifest_json(
+            "timeline.module.json",
+            include_str!("../../../contracts/modules/timeline.module.json"),
+        );
+        assert!(report.is_ok(), "{:?}", report.errors);
+    }
+
+    #[test]
+    fn rejects_timeline_playback_ownership_and_execution() {
+        let original: Value = serde_json::from_str(include_str!(
+            "../../../contracts/modules/timeline.module.json"
+        ))
+        .unwrap();
+        for (field, invalid) in [
+            ("module_kind", "network_service"),
+            ("state_policy", "owned_by_calling_application"),
+            ("state_policy", "session_local"),
+            ("playback_state_source", "local_fallback"),
+            ("intent_policy", "execute"),
+            ("database_write_policy", "owner_application_only"),
+        ] {
+            let mut value = original.clone();
+            value[field] = Value::String(invalid.into());
+            let report = validate_module_manifest_json("timeline", &value.to_string());
+            assert!(!report.is_ok(), "accepted {field}={invalid}");
+            assert!(report.errors.iter().any(|error| error.contains(field)));
+        }
+        for field in ["playback_state_source", "intent_policy"] {
+            let mut value = original.clone();
+            value.as_object_mut().unwrap().remove(field);
+            assert!(!validate_module_manifest_json("timeline", &value.to_string()).is_ok());
+        }
+    }
+
+    #[test]
+    fn rejects_removed_timeline_dependency_boundaries() {
+        let original: Value = serde_json::from_str(include_str!(
+            "../../../contracts/modules/timeline.module.json"
+        ))
+        .unwrap();
+        for call in original["forbidden_calls"].as_array().unwrap() {
+            let mut value = original.clone();
+            value["forbidden_calls"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|item| item != call);
+            let report = validate_module_manifest_json("timeline", &value.to_string());
+            assert!(!report.is_ok(), "accepted removal of {call}");
+        }
     }
 
     #[test]

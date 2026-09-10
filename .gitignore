@@ -1,4 +1,5 @@
 /target/
+**/__pycache__/
 **/*.sqlite
 **/*.sqlite3
 **/*.db

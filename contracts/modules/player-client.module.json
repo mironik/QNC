@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.player-client",
+  "module_name": "Player Client",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["playback.session.prepare", "playback.command.send", "playback.monitor.read", "playback.monitor.first_frame"],
+  "output_policy": "The client does not read or override project audio settings. Its prepared input comes from the public DB reader. No host channel configuration or default route.",
+  "timing_policy": "The client has no playback clock. It accepts monitor frames only when their source timebase matches the prepared source clip; UI repaint is a passive wake-up, not cadence.",
+  "input_contract_version": "0.3.0",
+  "output_contract_version": "0.3.0",
+  "transport_protocol_version": "0.3.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_scope": ["local", "lan", "intranet"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "playback.decode", "application.db.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.broadcast-player-core", "qnc.module.broadcast-engine"],
+  "process_policy": "One player child on the client workstation, prepared off the UI thread. Commands and state use authenticated qnc-player+tcp socket transport. RGBA monitor frames use qnc-player-frame-map latest-frame transport so slow UI paint drops stale pictures instead of blocking playback. Source media keeps its Local/LAN/Intranet binding. Latest selection wins; no user command replay or local playback clock. After source preparation the client may request one local Cue(0) to publish the first decoded monitor frame; this is a passive monitor presentation, not probe, scan, playback clock, or UI timing. Audio belongs to the player host device, not a remote client device."
+}

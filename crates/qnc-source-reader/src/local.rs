@@ -51,6 +51,33 @@ impl LocalSource {
         &self.source_uri
     }
 
+    /// Owner-side byte-stream adapter. The handle is read-only and reveals no private path.
+    pub fn open_read_only_file(
+        &self,
+        reference: &SourceReference,
+    ) -> Result<std::fs::File, ReadError> {
+        reference.validate()?;
+        if reference.source_uri() != self.source_uri {
+            return Err(ReadError::UnboundSource);
+        }
+        if !self
+            .directory
+            .metadata(reference.relative_path())
+            .map_err(io_error)?
+            .is_file()
+        {
+            return Err(ReadError::NotFile);
+        }
+        let file = self
+            .directory
+            .open(reference.relative_path())
+            .map_err(io_error)?;
+        if !file.metadata().map_err(io_error)?.is_file() {
+            return Err(ReadError::NotFile);
+        }
+        Ok(file.into_std())
+    }
+
     pub fn with_match_case(mut self, match_case: MatchCase) -> Self {
         self.match_case = match_case;
         self

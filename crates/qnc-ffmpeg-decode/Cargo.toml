@@ -1,0 +1,16 @@
+[package]
+name = "qnc-ffmpeg-decode"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+qnc-media-decode.workspace = true
+qnc-media-metadata.workspace = true
+qnc-media-stream.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+qnc-player-input.workspace = true
+qnc-work-settings.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"

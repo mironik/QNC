@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.player-input",
+  "module_name": "Player Input",
+  "module_version": "0.3.0",
+  "module_kind": "library",
+  "capabilities": ["playback.input.read", "playback.input.validate"],
+  "input_contract_version": "0.3.0",
+  "output_contract_version": "0.3.0",
+  "database_contract_version": "0.2.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_scope": ["local", "lan", "intranet"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "playback.execute", "application.db.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.broadcast-player-core", "qnc.module.filmstrip", "qnc.module.wave"],
+  "input_policy": "Read existing work-settings and one published clip through public read-only DB/transport adapters. Require the caller's DB-derived workspace URI; reject changed settings, missing records or incomplete chosen media. No application dependency or caller allowlist.",
+  "output_policy": "Versioned DB-read snapshot. project_audio requires audio.channels and audio.sample_rate from public_project_settings; no host JSON or source-count default replaces these output settings. playback.input selects video; audio_media and the full native audio inventory always refer to the original, never reduced proxy audio. Source preview preserves channel numbering up to the project output count, without mixing or inferring editorial roles. Proxy video requires matching saved frame rate/count with original. QNC media URI only; descriptor is not presentation confirmation.",
+  "implementation_stage": "read_only_source_descriptor"
+}

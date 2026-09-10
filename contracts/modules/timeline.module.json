@@ -9,9 +9,21 @@
   "supported_os": ["windows", "linux", "macos"],
   "supported_cpu": ["x86_64", "aarch64"],
   "transport_protocol_version": "0.1.0",
-  "forbidden_calls": ["ffprobe", "media.probe.full", "playback.clock.own", "application.db.write"],
-  "forbidden_dependencies": ["qnc.module.media-probe"],
-  "state_policy": "owned_by_calling_application",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.probe.full",
+    "playback.clock.own",
+    "playback.state.own",
+    "playback.position.fallback",
+    "playback.execute",
+    "application.db.read",
+    "application.db.write",
+    "filmstrip.generate14",
+    "wave.generate"
+  ],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.filmstrip", "qnc.module.wave"],
+  "state_policy": "stateless",
+  "playback_state_source": "broadcast_player",
+  "intent_policy": "emit_only",
   "database_write_policy": "no_db_writes"
 }
-

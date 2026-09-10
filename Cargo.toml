@@ -11,6 +11,20 @@ members = [
     "crates/qnc-db-contract",
     "crates/qnc-dir-browser",
     "crates/qnc-frame-timebase",
+    "crates/qnc-player-contract",
+    "crates/qnc-player-frame-transport",
+    "crates/qnc-player-input",
+    "crates/qnc-player-client",
+    "crates/qnc-media-stream",
+    "crates/qnc-media-decode",
+    "crates/qnc-ffmpeg-decode",
+    "crates/qnc-decoder-catalog",
+    "crates/qnc-audio-output",
+    "crates/qnc-video-output",
+    "crates/qnc-pixel-convert",
+    "crates/qnc-gpu-raster",
+    "crates/qnc-broadcast-player",
+    "crates/qnc-broadcast-engine",
     "crates/qnc-ingest-components",
     "crates/qnc-image-assets",
     "crates/qnc-ingest-desktop",
@@ -40,6 +54,7 @@ members = [
     "crates/qnc-workstation-identity",
     "crates/qnc-work-settings",
     "tools/qnc-conformance",
+    "tools/qnc-player-runner",
     "tools/qnc-camera-catalog",
     "tools/qnc-app-catalog",
 ]
@@ -52,6 +67,20 @@ qnc-camera-detector = { path = "crates/qnc-camera-detector" }
 qnc-db-contract = { path = "crates/qnc-db-contract" }
 qnc-dir-browser = { path = "crates/qnc-dir-browser" }
 qnc-frame-timebase = { path = "crates/qnc-frame-timebase" }
+qnc-player-contract = { path = "crates/qnc-player-contract" }
+qnc-player-frame-transport = { path = "crates/qnc-player-frame-transport" }
+qnc-player-input = { path = "crates/qnc-player-input" }
+qnc-player-client = { path = "crates/qnc-player-client" }
+qnc-media-stream = { path = "crates/qnc-media-stream" }
+qnc-media-decode = { path = "crates/qnc-media-decode" }
+qnc-ffmpeg-decode = { path = "crates/qnc-ffmpeg-decode" }
+qnc-decoder-catalog = { path = "crates/qnc-decoder-catalog" }
+qnc-audio-output = { path = "crates/qnc-audio-output" }
+qnc-video-output = { path = "crates/qnc-video-output" }
+qnc-pixel-convert = { path = "crates/qnc-pixel-convert" }
+qnc-gpu-raster = { path = "crates/qnc-gpu-raster" }
+qnc-broadcast-player = { path = "crates/qnc-broadcast-player" }
+qnc-broadcast-engine = { path = "crates/qnc-broadcast-engine" }
 qnc-ingest-components = { path = "crates/qnc-ingest-components" }
 qnc-image-assets = { path = "crates/qnc-image-assets" }
 qnc-ingest-desktop = { path = "crates/qnc-ingest-desktop" }
@@ -83,5 +112,16 @@ qnc-work-settings = { path = "crates/qnc-work-settings" }
 eframe = { version = "0.31", default-features = false, features = ["accesskit", "default_fonts", "wayland", "wgpu", "x11"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+memmap2 = "0.9"
 rusqlite = { version = "0.32", features = ["bundled"] }
 rfd = "0.15"
+
+# Real-time pixel processing must also meet the frame budget in development builds.
+[profile.dev.package.qnc-pixel-convert]
+opt-level = 3
+
+[profile.dev.package.yuv]
+opt-level = 3
+
+[profile.dev.package.fast_image_resize]
+opt-level = 3

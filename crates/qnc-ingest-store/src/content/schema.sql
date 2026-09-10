@@ -3,7 +3,7 @@ CREATE TABLE clips (
     clip_id TEXT PRIMARY KEY, source_uri TEXT NOT NULL, original_uri TEXT NOT NULL,
     name TEXT NOT NULL, created_at_utc TEXT, duration_seconds REAL,
     duration_frames INTEGER, fps_num INTEGER, fps_den INTEGER,
-    catalog_json TEXT NOT NULL, revision INTEGER NOT NULL, final INTEGER NOT NULL,
+    thumbnail_uri TEXT, catalog_json TEXT NOT NULL, revision INTEGER NOT NULL, final INTEGER NOT NULL,
     selected INTEGER NOT NULL DEFAULT 0, import_status TEXT NOT NULL DEFAULT 'detected',
     import_error TEXT, imported_media_uri TEXT
 );
@@ -30,7 +30,7 @@ CREATE TABLE wave_artifacts (
 );
 CREATE VIEW public_clips AS SELECT clip_id,source_uri,original_uri,name,created_at_utc,
     duration_seconds,duration_frames,fps_num,fps_den,selected,import_status,
-    imported_media_uri,import_error FROM clips;
+    imported_media_uri,import_error,thumbnail_uri FROM clips;
 CREATE VIEW public_clip_sources AS SELECT * FROM clip_sources;
 CREATE VIEW public_clip_proxy AS SELECT * FROM clip_proxy;
 CREATE VIEW public_probe_records AS SELECT * FROM probe_records;

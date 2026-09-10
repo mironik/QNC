@@ -381,25 +381,7 @@ impl QncShell {
             return false;
         };
         let sequence = component.navigation_sequence();
-        let available = self
-            .app_registry
-            .entries()
-            .iter()
-            .filter(|app| {
-                app.standalone_executable.as_ref().is_some_and(|name| {
-                    !name.contains(['/', '\\'])
-                        && self
-                            .executable_dir
-                            .join(format!("{name}{}", env::consts::EXE_SUFFIX))
-                            .is_file()
-                })
-            })
-            .map(|app| DesktopApplicationRef {
-                application_id: app.application_id.clone(),
-                tab_id: app.tab_id.clone(),
-                priority_group: app.priority_group.clone(),
-            })
-            .collect::<Vec<_>>();
+        let available = self.shell_available_apps();
         let result = match request {
             DesktopNavigation::NextGroup => sequence
                 .and_then(|sequence| next_group_tab(&source.application_id, &sequence, &available)),
@@ -410,6 +392,40 @@ impl QncShell {
             Err(error) => self.status = format!("{}: {error}", request.action_id()),
         }
         true
+    }
+
+    fn shell_available_apps(&self) -> Vec<DesktopApplicationRef> {
+        self.app_registry
+            .entries()
+            .iter()
+            .filter(|app| self.can_activate_in_shell(app))
+            .map(|app| DesktopApplicationRef {
+                application_id: app.application_id.clone(),
+                tab_id: app.tab_id.clone(),
+                priority_group: app.priority_group.clone(),
+            })
+            .collect()
+    }
+
+    fn can_activate_in_shell(&self, app: &AppManifest) -> bool {
+        match app.host_mode.as_str() {
+            "embedded_public_api" => {
+                self.embedded_factories.contains_key(&app.desktop_entry)
+                    || self.embedded_apps.contains_key(&app.tab_id)
+            }
+            "external_component" => self.standalone_executable_exists(app),
+            _ => false,
+        }
+    }
+
+    fn standalone_executable_exists(&self, app: &AppManifest) -> bool {
+        app.standalone_executable.as_ref().is_some_and(|name| {
+            !name.contains(['/', '\\'])
+                && self
+                    .executable_dir
+                    .join(format!("{name}{}", env::consts::EXE_SUFFIX))
+                    .is_file()
+        })
     }
 
     fn body(&mut self, ui: &mut egui::Ui) {
@@ -1062,33 +1078,32 @@ mod tests {
     }
 
     #[test]
-    fn failed_target_creation_preserves_source_surface_and_error() {
+    fn unavailable_target_preserves_source_surface_and_error() {
         let mut shell = navigation_shell();
         shell.embedded_factories.clear();
         let source = shell.app_registry.find("project").unwrap().clone();
         assert!(shell.consume_navigation(&source));
         assert_eq!(shell.active_tab, "project");
         let error = shell.status.clone();
-        assert!(error.contains("nema registriran embedded adapter"));
+        assert!(error.contains("nije dostupna"));
         assert!(shell.ensure_embedded_component(&source));
         assert_eq!(shell.status, error);
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 
     #[test]
-    fn removed_executable_prevents_automatic_navigation() {
+    fn missing_current_standalone_executable_does_not_block_embedded_navigation() {
         let mut shell = navigation_shell();
         fs::remove_file(
             shell
                 .executable_dir
-                .join(format!("qnc-variant{}", env::consts::EXE_SUFFIX)),
+                .join(format!("qnc-project{}", env::consts::EXE_SUFFIX)),
         )
         .unwrap();
         let source = shell.app_registry.find("project").unwrap().clone();
         shell.consume_navigation(&source);
-        assert_eq!(shell.active_tab, "project");
-        assert!(shell.status.contains("nije dostupna"));
-        assert!(!shell.embedded_apps.contains_key("variant"));
+        assert_eq!(shell.active_tab, "variant");
+        assert!(shell.embedded_apps.contains_key("variant"));
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 

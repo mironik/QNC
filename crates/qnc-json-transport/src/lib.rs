@@ -39,7 +39,8 @@ impl Credentials {
             write: format!("Bearer {write_token}"),
         })
     }
-    fn access(&self, header: &str) -> Option<Access> {
+    /// Shared header authorization for JSON and binary storage endpoints.
+    pub fn access(&self, header: &str) -> Option<Access> {
         if equal_token(header, &self.write) {
             Some(Access::ReadWrite)
         } else if equal_token(header, &self.read) {
@@ -136,6 +137,14 @@ impl JsonClient {
         })
     }
     pub fn post<Q: Serialize, R: DeserializeOwned>(&self, request: &Q) -> Result<R> {
+        let bytes = self.post_body(request, "application/json")?;
+        serde_json::from_slice(&bytes).map_err(|_| Error::Protocol)
+    }
+    /// Bounded binary reply to a typed JSON request; same resolver/auth/deadline rules.
+    pub fn post_binary<Q: Serialize>(&self, request: &Q) -> Result<Vec<u8>> {
+        self.post_body(request, "application/octet-stream")
+    }
+    fn post_body<Q: Serialize>(&self, request: &Q, content_type: &str) -> Result<Vec<u8>> {
         let bytes = serde_json::to_vec(request).map_err(|_| Error::Protocol)?;
         if bytes.len() > self.max_bytes {
             return Err(Error::TooLarge);
@@ -155,7 +164,7 @@ impl JsonClient {
                 .header("Content-Type")
                 .and_then(|s| s.split(';').next())
                 .map(str::trim)
-                != Some("application/json")
+                != Some(content_type)
         {
             return Err(Error::Protocol);
         }
@@ -168,7 +177,7 @@ impl JsonClient {
         if bytes.len() > self.max_bytes {
             return Err(Error::TooLarge);
         }
-        serde_json::from_slice(&bytes).map_err(|_| Error::Protocol)
+        Ok(bytes)
     }
 }
 

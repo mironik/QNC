@@ -1,0 +1,13 @@
+[package]
+name = "qnc-gpu-raster"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+qnc-pixel-convert.workspace = true
+wgpu = "=24.0.5"
+pollster = "=0.4.0"
+
+[dev-dependencies]
+qnc-media-metadata.workspace = true

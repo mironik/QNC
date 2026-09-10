@@ -4,13 +4,14 @@ use std::{
 };
 
 use qnc_dir_browser::{BrowserState, DirectoryBrowserSession};
-use qnc_ingest_store::{IngestStore, SourceSelectionRecord};
+use qnc_ingest_store::{content::CatalogStats, IngestStore, SourceSelectionRecord};
 use qnc_work_settings::SettingsReader;
 use serde::{Deserialize, Serialize};
 
 mod catalog;
 #[cfg(test)]
 mod clip_filter_tests;
+mod playback;
 mod selection;
 mod selection_config;
 mod work_plan;
@@ -163,6 +164,8 @@ pub enum ClipFilter {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IngestViewModel {
+    #[serde(skip)]
+    pub playback: qnc_player_client::View,
     pub source_kind: SourceKind,
     pub browser_roots: bool,
     pub browser_path_label: String,
@@ -181,8 +184,6 @@ pub struct IngestViewModel {
     pub archive_original: bool,
     pub archive_original_available: bool,
     pub ai_mining: bool,
-    pub playing: bool,
-    pub cue_frame: i64,
     pub command_busy: bool,
     pub select_warning_count: usize,
     pub work_settings_loading: bool,
@@ -195,6 +196,7 @@ impl Default for IngestViewModel {
     fn default() -> Self {
         Self {
             source_kind: SourceKind::Local,
+            playback: Default::default(),
             browser_roots: true,
             browser_path_label: String::new(),
             browser_current_uri: None,
@@ -212,8 +214,6 @@ impl Default for IngestViewModel {
             archive_original: false,
             archive_original_available: false,
             ai_mining: false,
-            playing: false,
-            cue_frame: 0,
             command_busy: false,
             select_warning_count: 0,
             work_settings_loading: false,
@@ -348,6 +348,7 @@ impl IngestDispatchResult {
 
 #[derive(Debug, Default)]
 pub struct IngestComponent {
+    player: Option<qnc_player_client::Player>,
     view: IngestViewModel,
     dispatch_log: Vec<String>,
     source_browser: DirectoryBrowserSession,
@@ -357,6 +358,10 @@ pub struct IngestComponent {
     catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
     catalog_result: Option<Receiver<Result<(Vec<String>, bool), String>>>,
     catalog_thread: Option<std::thread::JoinHandle<()>>,
+    thumbnail_result: Option<Receiver<catalog::ThumbnailEvent>>,
+    thumbnail_cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    catalog_stats: Option<CatalogStats>,
+    play_when_ready: bool,
     work_plan: Option<IngestWorkPlan>,
     pending_source: Option<String>,
     selection_config: Option<selection_config::SelectionConfig>,
@@ -427,8 +432,11 @@ impl IngestComponent {
     }
 
     fn settings_failed(&mut self, error: String) {
+        self.stop_player();
+        self.cancel_thumbnail_load();
         self.work_plan = None;
         self.catalog_target = None;
+        self.catalog_stats = None;
         self.view.clips.clear();
         self.view.clip_filter = ClipFilter::All;
         self.view.preview_clip_id = None;
@@ -440,7 +448,19 @@ impl IngestComponent {
         self.view.ai_mining = false;
     }
 
+    pub fn refresh_active_project(&mut self) -> IngestDispatchResult {
+        self.load_work_settings_inner(None, true)
+    }
+
     fn load_work_settings(&mut self, pending_source: Option<String>) -> IngestDispatchResult {
+        self.load_work_settings_inner(pending_source, false)
+    }
+
+    fn load_work_settings_inner(
+        &mut self,
+        pending_source: Option<String>,
+        retain_loaded_workspace: bool,
+    ) -> IngestDispatchResult {
         if self.settings_result.is_some()
             || self.catalog_result.is_some()
             || self.selection_result.is_some()
@@ -451,21 +471,37 @@ impl IngestComponent {
             self.settings_failed("Nema konfiguriranog citaca radnih postavki.".into());
             return IngestDispatchResult::rejected("Nema konfiguriranog citaca radnih postavki.");
         };
+        let keep_current_view =
+            retain_loaded_workspace && pending_source.is_none() && self.work_plan.is_some();
+        let retained_workspace = keep_current_view
+            .then(|| {
+                self.work_plan
+                    .as_ref()
+                    .map(|p| p.settings.workspace_db_uri.clone())
+            })
+            .flatten();
+        let retained_stats = keep_current_view
+            .then(|| self.catalog_stats.clone())
+            .flatten();
         self.pending_source = pending_source;
-        self.view.work_settings_loading = true;
-        self.view.work_settings_ready = false;
+        if !keep_current_view {
+            self.stop_player();
+            self.cancel_thumbnail_load();
+            self.view.work_settings_loading = true;
+            self.view.work_settings_ready = false;
+        }
         self.view.work_settings_error = None;
         let (send, receive) = mpsc::sync_channel(1);
         let config = self.selection_config.clone();
-        let retained_workspace = self
-            .pending_source
-            .as_ref()
-            .and_then(|_| self.work_plan.as_ref())
-            .map(|p| p.settings.workspace_db_uri.clone());
         match std::thread::Builder::new()
             .name("ingest-work-settings".into())
             .spawn(move || {
-                let result = catalog::load(&reader, config.as_ref(), retained_workspace.as_deref());
+                let result = catalog::load(
+                    &reader,
+                    config.as_ref(),
+                    retained_workspace.as_deref(),
+                    retained_stats.as_ref(),
+                );
                 let _ = send.send(result);
             }) {
             Ok(_) => self.settings_result = Some(receive),
@@ -476,6 +512,37 @@ impl IngestComponent {
 
     pub fn poll(&mut self) -> bool {
         let mut changed = self.poll_settings();
+        changed |= self.poll_thumbnails();
+        if let Some(player) = &self.player {
+            let playback = player.view();
+            if self.view.playback != playback {
+                if let Some(error) = &playback.error {
+                    self.view.message = error.clone();
+                    self.play_when_ready = false;
+                }
+                self.view.playback = playback;
+                changed = true;
+            }
+        }
+        if self.play_when_ready {
+            if self.view.playback.error.is_some() {
+                self.play_when_ready = false;
+            } else if self.view.playback.can_start_playback() && !self.view.playback.playing() {
+                if let Some(player) = &self.player {
+                    match player.send(qnc_player_client::Action::TogglePlayPause) {
+                        Ok(()) => self.play_when_ready = false,
+                        Err(error) if error == "Player se priprema." => {}
+                        Err(error) => {
+                            self.play_when_ready = false;
+                            self.view.message = error;
+                        }
+                    }
+                    changed = true;
+                }
+            } else if self.view.playback.playing() {
+                self.play_when_ready = false;
+            }
+        }
         if let Some(receiver) = &self.catalog_result {
             let result = match receiver.try_recv() {
                 Ok(result) => Some(result),
@@ -586,6 +653,7 @@ impl IngestComponent {
                         .is_some_and(|id| ids.contains(id))
                     {
                         self.view.preview_clip_id = None;
+                        self.stop_player();
                     }
                 }
                 selection::Event::Finished(result) => {
@@ -634,26 +702,41 @@ impl IngestComponent {
         match result {
             Ok(loaded) => {
                 let plan = loaded.plan;
+                let catalog_was_loaded = loaded.clips.is_some();
                 // A new project must never inherit the preceding project's selection/preview.
                 if self.work_plan.as_ref().map(|p| &p.settings.project_id)
                     != Some(&plan.settings.project_id)
                 {
+                    self.cancel_thumbnail_load();
                     self.view.clips.clear();
                     self.view.clip_filter = ClipFilter::All;
                     self.view.preview_clip_id = None;
+                    self.stop_player();
                     self.view.selected_source_uri = None;
-                    self.view.playing = false;
-                    self.view.cue_frame = 0;
+                    self.view.selected_source_name.clear();
+                    self.view.selected_source_serial_number.clear();
+                    self.view.selected_source_volume_name.clear();
+                    self.catalog_stats = None;
                 }
                 self.view.ai_mining = plan.settings.ai_enabled();
                 self.view.archive_original_available = false;
                 self.view.archive_original = false;
                 self.view.work_settings_ready = true;
                 self.catalog_target = Some(loaded.target);
+                self.catalog_stats = Some(loaded.stats);
                 if let Some(clips) = loaded.clips {
+                    let thumbnails = clips
+                        .iter()
+                        .filter_map(|clip| {
+                            clip.thumb_uri
+                                .as_ref()
+                                .map(|uri| (clip.clip_id.clone(), uri.clone()))
+                        })
+                        .collect::<Vec<_>>();
                     self.view.clips = clips;
+                    self.start_thumbnail_load(thumbnails);
                 }
-                if self.pending_source.is_none() {
+                if self.pending_source.is_none() && catalog_was_loaded {
                     if let Some((uri, name, serial, volume)) = loaded.source {
                         self.view.selected_source_uri = Some(uri);
                         self.view.selected_source_name = name;
@@ -684,7 +767,17 @@ impl IngestComponent {
         self.view.work_settings_loading
             || self.view.command_busy
             || self.view.browser_busy
+            || self.settings_result.is_some()
             || self.catalog_result.is_some()
+            || self.thumbnail_result.is_some()
+            || self.play_when_ready
+    }
+    pub fn has_player(&self) -> bool {
+        self.view.playback.preparing || self.view.playback.reply.is_some()
+    }
+
+    pub fn needs_player_poll(&self) -> bool {
+        self.play_when_ready || self.view.playback.preparing || self.view.playback.playing()
     }
 
     fn select_clips(&mut self, ids: Vec<String>, selected: bool) -> IngestDispatchResult {
@@ -752,19 +845,19 @@ impl IngestComponent {
         if self.transport_browser.is_some() {
             match intent.action_id.as_str() {
                 action_ids::INGEST_SOURCE_KIND_LOCAL => {
-                    return self.browse_registered(SourceKind::Local, None)
+                    return self.browse_registered(SourceKind::Local, None);
                 }
                 action_ids::INGEST_SOURCE_KIND_LAN => {
-                    return self.browse_registered(SourceKind::Lan, None)
+                    return self.browse_registered(SourceKind::Lan, None);
                 }
                 action_ids::INGEST_SOURCE_KIND_INTERNET => {
-                    return self.browse_registered(SourceKind::Internet, None)
+                    return self.browse_registered(SourceKind::Internet, None);
                 }
                 action_ids::INGEST_DIR_ROOTS | action_ids::INGEST_DIR_CANCEL => {
-                    return self.browse_registered(self.view.source_kind, None)
+                    return self.browse_registered(self.view.source_kind, None);
                 }
                 action_ids::INGEST_DIR_UP => {
-                    return self.browse_registered(self.view.source_kind, Some(None))
+                    return self.browse_registered(self.view.source_kind, Some(None));
                 }
                 action_ids::INGEST_DIR_OPEN => {
                     if let IngestPayload::LocationUri(uri) = &intent.payload {
@@ -880,10 +973,7 @@ impl IngestComponent {
                 _ => IngestDispatchResult::rejected("Nedostaje clip_id."),
             },
             action_ids::INGEST_PREVIEW_FOCUS => match intent.payload {
-                IngestPayload::ClipId(clip_id) => {
-                    self.view.preview_clip_id = Some(clip_id);
-                    IngestDispatchResult::accepted(None, true)
-                }
+                IngestPayload::ClipId(clip_id) => self.prepare_preview(clip_id),
                 _ => IngestDispatchResult::rejected("Nedostaje clip_id."),
             },
             action_ids::INGEST_SET_ARCHIVE => match intent.payload {
@@ -903,25 +993,10 @@ impl IngestComponent {
                     "Media import jos nije implementiran."
                 })
             }
-            action_ids::PLAY_PAUSE => {
-                self.view.playing = !self.view.playing;
-                IngestDispatchResult::accepted(None, true)
-            }
-            action_ids::STEP_BACK_FRAME => {
-                self.view.cue_frame = self.view.cue_frame.saturating_sub(1);
-                IngestDispatchResult::accepted(None, true)
-            }
-            action_ids::STEP_FORWARD_FRAME => {
-                self.view.cue_frame = self.view.cue_frame.saturating_add(1);
-                IngestDispatchResult::accepted(None, true)
-            }
-            action_ids::INGEST_CUE_FRAME => match intent.payload {
-                IngestPayload::Frame(frame) => {
-                    self.view.cue_frame = frame.max(0);
-                    IngestDispatchResult::accepted(None, true)
-                }
-                _ => IngestDispatchResult::rejected("Nedostaje frame."),
-            },
+            action_ids::PLAY_PAUSE
+            | action_ids::STEP_BACK_FRAME
+            | action_ids::STEP_FORWARD_FRAME
+            | action_ids::INGEST_CUE_FRAME => self.player_action(intent),
             _ => IngestDispatchResult::accepted(
                 Some("Akcija je zapisana, komponenta za izvršenje još nije spojena.".to_string()),
                 true,
@@ -962,7 +1037,10 @@ impl IngestComponent {
             .name("ingest-browser".into())
             .spawn(move || {
                 let result = match target {
-                    None => browser.roots(source_kind_id(kind)),
+                    None => browser.roots(match kind {
+                        SourceKind::Internet => "intranet",
+                        _ => source_kind_id(kind),
+                    }),
                     Some(None) => browser.parent(),
                     Some(Some(uri)) => browser.open(&uri),
                 };
@@ -1077,6 +1155,69 @@ impl IngestComponent {
         }
     }
 
+    fn start_thumbnail_load(&mut self, clips: Vec<(String, String)>) {
+        self.cancel_thumbnail_load();
+        if clips.is_empty() {
+            return;
+        }
+        let Some(config) = self.selection_config.clone() else {
+            return;
+        };
+        let (send, receive) = mpsc::sync_channel(32);
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        if std::thread::Builder::new()
+            .name("ingest-thumbnail-load".into())
+            .spawn(move || catalog::load_thumbnails(config, clips, send, worker_cancel))
+            .is_ok()
+        {
+            self.thumbnail_result = Some(receive);
+            self.thumbnail_cancel = Some(cancel);
+        }
+    }
+
+    fn cancel_thumbnail_load(&mut self) {
+        if let Some(cancel) = self.thumbnail_cancel.take() {
+            cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        self.thumbnail_result = None;
+    }
+
+    fn poll_thumbnails(&mut self) -> bool {
+        let mut changed = false;
+        for _ in 0..16 {
+            let Some(receiver) = self.thumbnail_result.as_ref() else {
+                break;
+            };
+            let event = match receiver.try_recv() {
+                Ok(event) => event,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => catalog::ThumbnailEvent::Finished,
+            };
+            match event {
+                catalog::ThumbnailEvent::Ready {
+                    clip_id,
+                    uri,
+                    image,
+                } => {
+                    if let Some(clip) = self.view.clips.iter_mut().find(|clip| {
+                        clip.clip_id == clip_id && clip.thumb_uri.as_deref() == Some(uri.as_str())
+                    }) {
+                        clip.thumb_image = Some(image);
+                        clip.thumb_status = ThumbStatus::Ready;
+                        changed = true;
+                    }
+                }
+                catalog::ThumbnailEvent::Finished => {
+                    self.thumbnail_result = None;
+                    self.thumbnail_cancel = None;
+                    break;
+                }
+            }
+        }
+        changed
+    }
+
     fn confirm_source_selection(&mut self, uri: String) -> IngestDispatchResult {
         if self.work_plan.is_none() {
             return IngestDispatchResult::rejected("Radne postavke nisu dostupne.");
@@ -1123,6 +1264,7 @@ impl IngestComponent {
 
 impl Drop for IngestComponent {
     fn drop(&mut self) {
+        self.cancel_thumbnail_load();
         self.catalog_result = None;
         if let Some(thread) = self.catalog_thread.take() {
             let _ = thread.join();
@@ -1168,6 +1310,38 @@ mod tests {
             .all(|entry| qnc_contracts::parse_qnc_uri(&entry.qnc_uri).is_ok()));
         assert!(component.view().clips.is_empty());
         assert_eq!(component.dispatch_log().len(), 0);
+    }
+
+    #[test]
+    fn playback_requests_without_player_do_not_create_local_state() {
+        let mut component = IngestComponent::default();
+        component.view.preview_clip_id = Some("existing-preview".into());
+        component.view.clip_filter = ClipFilter::New;
+        let mut expected = component.view().clone();
+        expected.message = "Broadcast Player nije povezan.".into();
+        let mut requests = vec![
+            IngestIntent::empty(action_ids::PLAY_PAUSE),
+            IngestIntent::empty(action_ids::PLAY_PAUSE),
+            IngestIntent::empty(action_ids::STEP_BACK_FRAME),
+            IngestIntent::empty(action_ids::STEP_FORWARD_FRAME),
+        ];
+        for frame in [i64::MIN, 0, 25, i64::MAX] {
+            requests.push(IngestIntent::new(
+                action_ids::INGEST_CUE_FRAME,
+                IngestPayload::Frame(frame),
+            ));
+        }
+        for intent in requests {
+            let result = component.dispatch(intent);
+            assert!(!result.accepted);
+            assert_eq!(result.message.as_deref(), Some(expected.message.as_str()));
+            assert!(result.request_repaint);
+            assert_eq!(component.view(), &expected);
+            assert!(!component.has_pending_work());
+        }
+        let view = serde_json::to_value(component.view()).unwrap();
+        assert!(view.get("playing").is_none());
+        assert!(view.get("cue_frame").is_none());
     }
 
     #[test]

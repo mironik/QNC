@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.media-stream",
+  "module_name": "Read-only Media Byte Stream",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["media.bytes.open", "media.bytes.read", "media.bytes.seek", "media.bytes.serve", "media.bytes.loopback_bridge"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "forbidden_calls": ["ffprobe", "ffmpeg", "media.probe.full", "source.scan.roles", "source.camera.detect", "db.read", "db.write", "playback.execute"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.camera-detector", "qnc.module.broadcast-player-core", "qnc.module.player-input"],
+  "transport_endpoint": "/v1/media/bytes",
+  "transport_policy": "GET/HEAD with canonical QNC URI, authorization, single HTTP byte ranges and explicit version/identity/stamp headers. HTTPS required outside loopback. No redirect, retry, local fallback or full-file staging.",
+  "read_policy": "Byte access only. Media format and project policy come from separate saved-input modules. File length/mtime checks are storage integrity checks, never media probing. Per-read memory is bounded; runtime hosting, TLS and connection limits belong to the storage host.",
+  "specification": "docs/47-player-media-stream.md"
+}

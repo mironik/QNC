@@ -1,0 +1,13 @@
+[package]
+name = "qnc-audio-output"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+cpal = "=0.17.1"
+rtrb = "=0.3.2"
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

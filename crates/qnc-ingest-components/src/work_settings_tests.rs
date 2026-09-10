@@ -66,6 +66,69 @@ fn wait(component: &mut IngestComponent) {
 }
 
 #[test]
+fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
+    let root = fixture();
+    let source = |id: &str, file: &str| {
+        json!({
+            "location": {"uri": format!("qnc://local/source/{id}"), "file": file},
+            "name": id, "serial_number": "", "volume_name": "", "scope": "card_relative",
+            "probe": {"kind": "local", "executable": "never-executed", "probe_size_bytes": 8388608, "analyze_duration_us": 1000000}
+        })
+    };
+    let mut intranet = source("remote", "unused");
+    intranet["location"] = json!({"uri": "qnc://intranet/test/source/remote", "endpoint": "http://127.0.0.1:1", "token_env": "QNC_TEST_UNAVAILABLE_CREDENTIAL"});
+    let config = json!({
+        "version": "0.1.0", "parallelism": 1,
+        "catalog": {"uri":"qnc://local/catalog/camera-patterns", "file":"catalog.db"},
+        "source_index": {"uri":"qnc://local/db/source_index", "file":"source.db"},
+        "media_records": {"uri":"qnc://local/db/media_records", "file":"media.db"},
+        "sources": [source("offline", "../not-connected"), source("online", "../p1"), intranet]
+    });
+    fs::write(
+        root.path().join("data/ingest-transport.json"),
+        serde_json::to_vec(&config).unwrap(),
+    )
+    .unwrap();
+    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    wait(&mut component);
+    assert!(component.selection_config_error.is_none());
+    assert!(component.selection_config.is_some());
+    assert!(component.view.work_settings_ready);
+    assert_eq!(component.view.browser_entries.len(), 2);
+    component.dispatch(IngestIntent::new(
+        action_ids::INGEST_DIR_OPEN,
+        IngestPayload::LocationUri("qnc://local/source/offline".into()),
+    ));
+    wait(&mut component);
+    assert!(component
+        .view
+        .browser_error
+        .as_ref()
+        .unwrap()
+        .contains("qnc://local/source/offline"));
+    component.dispatch(IngestIntent::new(
+        action_ids::INGEST_DIR_OPEN,
+        IngestPayload::LocationUri("qnc://local/source/online".into()),
+    ));
+    wait(&mut component);
+    assert!(component.view.browser_error.is_none());
+    assert_eq!(
+        component.view.browser_current_uri.as_deref(),
+        Some("qnc://local/source/online")
+    );
+    component.dispatch(IngestIntent::empty(action_ids::INGEST_SOURCE_KIND_INTERNET));
+    wait(&mut component);
+    assert!(component.view.browser_error.is_none());
+    assert_eq!(
+        component.view.browser_entries[0].qnc_uri,
+        "qnc://intranet/test/source/remote"
+    );
+    assert!(component.player.is_none());
+    assert!(component.selection_thread.is_none());
+    assert!(component.work_plan().is_some());
+}
+
+#[test]
 fn uncommitted_preview_cannot_be_selected_and_stale_ack_does_not_mark_it_saved() {
     let mut component = IngestComponent::default();
     let (send, receive) = mpsc::sync_channel(8);
@@ -158,6 +221,71 @@ fn reload_changes_plan_from_db_and_discards_unpersisted_ui_state() {
             .accepted
     );
     assert!(component.view.ai_mining);
+}
+
+#[test]
+fn activation_checks_catalog_signature_and_reloads_only_when_db_changed() {
+    use qnc_ingest_store::content::{Access, ContentClient, ContentTarget};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    let root = fixture();
+    let (source_fixture, config) = selection::tests::fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    selection::tests::execute(&config, &calls, false, false, ".");
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
+
+    let reader = SettingsReader::local(root.path().join("data/project_store.db"));
+    let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();
+    let mut source = ContentClient::from_owner_binding(
+        &source_fixture.path().join("content.db"),
+        "qnc://local/db/ingest_content/p1",
+        Access::ReadOnly,
+    )
+    .unwrap();
+    let source_clips = source.list(None).unwrap();
+    let mut db = target.open(Access::ReadWrite).unwrap();
+    db.publish(source_clips[0].clip.clone()).unwrap();
+    drop(db);
+
+    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    wait(&mut component);
+    assert_eq!(component.view.clips.len(), 1);
+    let preview_id = component.view.clips[0].clip_id.clone();
+    assert!(
+        component
+            .dispatch(IngestIntent::new(
+                action_ids::INGEST_PREVIEW_FOCUS,
+                IngestPayload::ClipId(preview_id.clone())
+            ))
+            .accepted
+    );
+
+    assert!(component.refresh_active_project().accepted);
+    assert!(
+        component.work_plan().is_some(),
+        "tab activation must not blank the current project while checking DB"
+    );
+    wait(&mut component);
+    assert_eq!(component.view.clips.len(), 1);
+    assert_eq!(
+        component.view.preview_clip_id.as_deref(),
+        Some(preview_id.as_str())
+    );
+
+    let mut db = target.open(Access::ReadWrite).unwrap();
+    db.publish(source_clips[1].clip.clone()).unwrap();
+    drop(db);
+    assert!(component.refresh_active_project().accepted);
+    wait(&mut component);
+    assert_eq!(component.view.clips.len(), 2);
+    assert_eq!(
+        component.view.preview_clip_id.as_deref(),
+        Some(preview_id.as_str()),
+        "same project refresh keeps focused clip if it still exists"
+    );
 }
 
 #[test]
@@ -363,15 +491,18 @@ fn select_rereads_current_active_project_and_cancel_prevents_source_write() {
     let mut component = IngestComponent::with_store_root(root.path()).unwrap();
     wait(&mut component);
     let uri = "qnc://local/source/test";
+    let source_path = root.path().to_path_buf();
     let mut browser =
-        qnc_dir_browser::TransportBrowserSession::new(vec![qnc_dir_browser::BrowserSource {
-            entry: qnc_dir_browser::BrowserEntry {
+        qnc_dir_browser::TransportBrowserSession::new(vec![qnc_dir_browser::BrowserSource::new(
+            qnc_dir_browser::BrowserEntry {
                 name: "Test".into(),
                 qnc_uri: uri.into(),
                 ..Default::default()
             },
-            reader: qnc_source_reader::SourceReader::local(uri, root.path()).unwrap(),
-        }])
+            move || {
+                qnc_source_reader::SourceReader::local(uri, &source_path).map_err(|e| e.to_string())
+            },
+        )])
         .unwrap();
     browser.roots("local").unwrap();
     component.apply_source_browser_result(browser.open(uri));

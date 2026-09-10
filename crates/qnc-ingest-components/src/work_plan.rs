@@ -1,3 +1,4 @@
+pub use qnc_work_settings::PlaybackInput;
 use qnc_work_settings::WorkSettings;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -5,13 +6,6 @@ pub enum IngestMedia {
     Link,
     Proxy,
     Original,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PlaybackInput {
-    Proxy,
-    Original,
-    ProxyIfAvailable,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,12 +30,7 @@ impl IngestWorkPlan {
             "original" => IngestMedia::Original,
             _ => return Err("Baza sadrzi nepodrzani storage.ingest_media.".into()),
         };
-        let playback_input = match settings.playback["input"].as_str() {
-            Some("proxy") => PlaybackInput::Proxy,
-            Some("original") => PlaybackInput::Original,
-            Some("proxy_if_available") => PlaybackInput::ProxyIfAvailable,
-            _ => return Err("Baza sadrzi nepodrzani playback.input.".into()),
-        };
+        let playback_input = settings.playback_input().map_err(|e| e.to_string())?;
         // v4 directory roles, expressed as transport resources, not OS path joins.
         let root = &settings.output_root_uri;
         Ok(Self {

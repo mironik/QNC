@@ -202,6 +202,12 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   identitet projekta; javni identitet ostaje QNC URI.
 - Project direktoriji moraju biti zasticeni od slucajnog korisnickog brisanja
   OS-level delete lockom. Sam read-only atribut nije dovoljan na svim OS-ovima.
+- Delete lock se odnosi na root direktorij projekta kao OS-level zastitu od
+  brisanja. Ne smije se rekurzivno postavljati read-only na sadrzaj projekta,
+  jer Ingest i ostale aplikacije moraju moci pisati vlastite baze i artefakte.
+- Otvaranje postojeceg projekta ne smije ponovno prolaziti kroz projektno
+  stablo niti pokretati masovni filesystem/ACL posao. Otvaranje projekta je
+  kratki DB update aktivnog projekta i navigacijski okidac.
 - Windows adapter koristi ACL deny delete/delete-child za trenutnog korisnika.
 - macOS adapter koristi file flags gdje je dostupno.
 - Linux/POSIX adapter mora zakljucati parent `projects_root`, jer POSIX delete
@@ -297,6 +303,35 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   ugovor, ne forma. Filter mijenja samo prikaz, bez scana, probea ili DB upisa.
   Skrivena selekcija ostaje sacuvana; skupne akcije odabira vrijede za vidljive
   klipove. Pocetni prikaz je Sve.
+- Podaci o klipovima tijekom Select/Ingest faze primarno se citaju iz
+  proizvodjackih metadata/index datoteka na kartici kada postoje, npr. camera
+  XML/JSON/binary katalozi i povezani sidecar zapisi. To citanje ide kroz
+  javne source-reader/camera-reader module i transport, ne kroz formu.
+- Skeniranje ekstenzija i stablo direktorija sluze za pronalazak kandidata i
+  potvrdu fizicke prisutnosti datoteka, ali nisu zamjena za camera metadata
+  zapis kada ga kartica ima.
+- `ffprobe` u Ingestu smije samo nadopuniti ili potvrditi obvezne podatke koje
+  camera metadata ne daje ili daje nepotpuno. I dalje vrijedi jedan probe
+  prolaz u Select/Ingest fazi; kasnije aplikacije i moduli citaju finalni DB
+  zapis, ne karticu, camera datoteke ili novi probe.
+- Ucitavanje postojeceg Ingest kataloga iz baze aktivnog projekta ne smije
+  cekati thumbnail/poster decode, citanje kartice ili mrezu. Lista klipova i
+  statusi dolaze odmah iz DB zapisa; slike se ucitavaju naknadno u pozadinskoj
+  komponenti kao pasivni prikaz. Nedostupan izvor ne smije sakriti vec
+  spremljeni katalog.
+- Pocetni prikaz Ingest kataloga smije koristiti samo lagani public DB sazetak
+  iz materijaliziranih kolona (`clip_id`, `name`, trajanje, status, source/card
+  podaci, thumbnail URI ako postoji). Ne smije deserijalizirati puni
+  `catalog_json`, `probe_json`, media snapshot ili thumbnail payload za obican
+  prikaz liste. Puni zapis cita se tek preko `read(clip_id)` kada ga aktivni
+  modul stvarno treba, npr. Broadcast Player ili import worker.
+- Pri prelasku izmedu aplikacija ili povratku na Ingest ne smije se preskociti
+  provjera stanja kataloga. Komponenta mora kroz javni DB/transport ugovor
+  procitati lagani signature kataloga (minimalno broj klipova i revizijski
+  fingerprint) i usporediti ga s prikazanim stanjem. Ako je signature isti,
+  prikaz ostaje u memoriji; ako se razlikuje, ucitava se novi lagani sazetak.
+  Ova provjera ne smije skenirati karticu, citati thumbnaile, otvarati media
+  datoteke niti pokretati probe.
 
 - Ingest je samostalna zatvorena aplikacija.
 - Korisnik mora moci pokrenuti Ingest bez QNC.app i bez drugih QNC aplikacija.
@@ -425,6 +460,217 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Ponavljanje postera u starom Ingest UI-ju nije generirani filmstrip i ne moze
   zamijeniti zahtjev za 14 stvarnih frameova. Pasivni UI obrazac i stvarni
   generirani sadrzaj moraju se promatrati odvojeno.
+
+### 8.1. Timeline je pasivni prikaz i UI remote
+
+- Timeline je samostalna javna pasivna UI komponenta. Prikazuje stanje
+  Broadcast Playera i sluzi kao njegov UI daljinski upravljac; nije player,
+  playback engine, vlasnik vremena niti vlasnik prikazanog stanja.
+- Timeline nema nista svoje u smislu poslovnog ili playback stanja: nema
+  vlastiti playhead, tekuci frame, FPS/timebase, play/pause status, IN/OUT,
+  trajanje, playlistu ni odabrani izvor kao neovisnu ili zamjensku istinu.
+  Dobiva pripremljene read-only prikazne podatke; ne stvara niti odrzava
+  paralelno stanje u formi ili timeline adapteru.
+- Runtime frame, pozicija i transport status dolaze iskljucivo od Broadcast
+  Playera kroz javni ugovor. Trajni rangeovi i ostali projektni podaci ostaju
+  u nadleznosti svojih DB/modula; timeline ih samo prikazuje kroz zadani model.
+- Timeline nema vlastiti sat, timer, playback tick, napredovanje frameova,
+  interpolaciju vremena, FPS fallback ni lokalnu fallback poziciju. Ako
+  valjano player stanje nije dostupno, prikazuje nespremno/prazno stanje;
+  ne izmislja vrijeme niti preuzima upravljanje od playera.
+- Klik, povlacenje, scrub i keyboard unos proizvode samo neutralni intent s
+  vanjskim `action_id`. Javni command/transport modul predaje zahtjev
+  Broadcast Playeru ili nadleznom modulu; timeline ne izvrsava naredbu.
+  Slanje seek zahtjeva nije potvrda da je player stigao na trazeni frame:
+  prikaz stvarnog playheada mijenja se prema povratnom player stanju.
+- Geometrija frame -> piksel i pokazivac -> trazeni frame sluzi iskljucivo
+  crtanju i korisnickom zahtjevu. Ne smije postati playback matematika,
+  source/program vremenska istina ili odluka o sljedecem klipu/segmentu.
+- Timeline ne radi decode, probe, scan, generiranje filmstripa/wavea, DB/FS
+  pristup ni izbor medija ili odredista. Aktivni kod pripada zasebnim javnim
+  modulima/komponentama, ne timelineu niti formi koja ga prikazuje.
+- Filmstrip je samo pasivna pozadina V trake, a Wave samo pasivni prikaz
+  pripremljenih amplituda audio traka. Ne upravljaju timelineom ili playerom.
+  Generatori i pohrana ostaju odvojeni od tih UI prikaza.
+- Source, Segment i Program koriste isti javni timeline paint/intent ugovor
+  s pripremljenim slojevima, ne zasebne playback modele. Timeline ne smije
+  poznavati aplikaciju, aktivni shell tab ili workflow koji ga koristi.
+- Ista granica vrijedi standalone i u shellu, Local/LAN/Intranet te na
+  Windows/Linux/macOS. Modulni command/event ugovor nije veza za poslovnu
+  suradnju izmedu aplikacija; njihova jedina poslovna veza ostaje baza.
+- Obvezna v4 referenca: `C:\Users\miron\Projects\qnc_v4\AGENTS.md`
+  (posebno odjeljak `Jedinstveni model`), `docs/qnc-timeline.md`,
+  `qnc-app/src/qnc_timeline.rs`, `qnc_timeline_progress.rs`,
+  `qnc_segment_timeline.rs`, `carrier_sync.rs` i `playback_stack.rs`.
+  Zateceni pending/fallback prikaz ili app-specific routing u starom kodu
+  nije dozvola za odstupanje od ovih pravila u novom QNC-u.
+- Testovi granice moraju potvrditi da crtanje ne mijenja player/DB stanje,
+  korisnicki unos samo emitira intent, a bez novih player podataka timeline
+  samostalno ne pomice vrijeme ni playhead.
+
+### 8.2. Broadcast Player je prvi playback modul
+
+- Korisnicki redoslijed 2026-09-08: sljedeci razvojni korak je Broadcast
+  Player kao samostalni javni out-of-process modul. Njegov stvarni runtime
+  i javni command/event ugovor prethode integraciji timelinea, monitora,
+  filmstripa i wave prikaza. Ne graditi playback pocevsi od UI komponente.
+- Player posjeduje playback sat, ritam, play/pause lifecycle, frame-precizni
+  seek, decode i sinkronizaciju video/audio izlaza kroz odvojene neutralne
+  adaptere. Potvrdjeni runtime status i prezentirani frame dolaze od playera,
+  ne iz forme, timelinea, monitora, client adaptera ili shella.
+- Broadcast Player se gradi po profesionalnom NLE obrascu kakav koriste
+  Premiere, Final Cut i Resolve: jedan playback engine je vlasnik sata,
+  dekodiranja, frame redoslijeda i A/V sinkronizacije; Source/Program monitor,
+  timeline, tipkovnica i UI dugmad su samo pasivni prikaz ili daljinski
+  upravljac. Ne smiju brojati frameove, drzati vlastiti sat ni popravljati
+  ritam reprodukcije.
+- UI monitor nije broadcast signal. QNC mora razlikovati UI preview,
+  clean/program output i buduce vanjske izlaze kao SDI/HDMI/NDI. Svi izlazi
+  slusaju isti engine clock i isti source timebase; nijedan izlaz ne smije
+  postati drugi player ili drugi vlasnik playback stanja.
+- Glavni playback put ne smije ovisiti o tome da se svaki frame salje kroz UI
+  kao CPU RGBA tekstura. To je samo preview adapter. Profesionalni cilj je
+  engine -> video output/GPU surface/clean output adapter, uz pasivni UI
+  monitor koji prikazuje potvrdjeno stanje bez upravljanja satom.
+- Korisnicki kriterij 2026-09-08: Play mora odmah pokrenuti vec pripremljenu
+  reprodukciju. Odabir/ucitavanje klipa pokrece pripremu unutar player modula,
+  izvan UI threada: otvaranje medija, dekodera i izlaza te ograniceni pocetni
+  video/audio buffer. `Ready` se ne objavljuje prije dovrsene pripreme.
+- Play nad spremnim klipom ne smije pokretati proces, otvarati medij ili audio
+  uredaj, citati DB niti cekati pocetni decode/preroll. Pokrece postojeci sat
+  i spremni izlaz. Pause cuva pripremljene resurse za nastavak. Promjena klipa
+  ili seek koji ponisti buffer zahtijeva novu pripremu, ne lazni `Ready`.
+- Mjeri se Play naredba -> prvi stvarni video/audio izlaz, odvojeno od vremena
+  pripreme. Brzo otvaranje dekodera ili test s laznim izlazom nije dokaz
+  trenutnog Playa. Isti kriterij vrijedi Local/LAN/Intranet; ako medij ili
+  izlaz nije spreman, player to jasno prijavljuje umjesto laznog `Playing`.
+- Javni player modul moze koristiti svaka aplikacija, bez caller allowliste
+  i bez poznavanja njezina workflowa. Svaka sesija ima izolirano playback
+  stanje; zajednicki modul ne smije postati shared workflow svih aplikacija.
+- Ulaz se priprema kroz javne read-only DB module iz postojecih projektnih
+  postavki i spremljenog opisa konkretnog original/proxy medija. Player ne
+  poznaje Projects ili Ingest aplikaciju i ne odredjuje aktivni projekt.
+  QNC media URI razrjesava javni resolver/transport adapter, ne forma.
+- `playback.input` iz baze odredjuje original/proxy izbor. Source frame rate,
+  timebase, trajanje, scan/field mode, color opis i mapa video/audio streamova
+  dolaze iz spremljenih media podataka. Project/export FPS, field order, color
+  ili format nisu zamjena za source podatke tijekom play/montaze. Nedostajuci
+  ili nepodrzani source podaci daju kontroliranu gresku, nikad novi probe,
+  izmisljeni format ili hardkodirani default.
+- Zabranjeno je uvoditi fiksni `60 Hz`, `16 ms`, monitor refresh ili OS repaint
+  kao playback pravilo. Player cadence mora dolaziti iz spremljenog source
+  timebasea konkretnog klipa i player/audio clocka. Podrska za source koji je
+  stvarno 60 fps je dopustena samo kao source timebase, ne kao globalna
+  pretpostavka aplikacije.
+- Svaki javni player/monitor frame zapis mora nositi source timebase uz frame
+  broj i identitet sourcea. Monitor, timeline i UI remote smiju prikazivati ili
+  preskakati stale slike, ali ne smiju mijenjati cadence, izmisljati FPS niti
+  zamijeniti source timebase postavkom ekrana, prozora ili projekta.
+- Ingest sam cita postavke iz baze aktivnog projekta kroz javni read-only
+  modul. Projects ni shell mu ih ne salju. DB-first vrijedi za cijelu
+  aplikaciju i njene module, ne samo za katalog medija.
+- Broj audio izlaza i zadana frekvencija uzorkovanja citaju se iz postojecih
+  projektnih audio postavki. Player ih primjenjuje, ne zamjenjuje lokalnim
+  JSON-om, UI izborom, brojem kanala snimke ili izmisljenim defaultom.
+- Izvorni media zapis zadrzava sve odvojene kanale. Source preview cuva
+  numeraciju kanala do broja zadanog projektom, bez automatskog stereo miksa.
+  To ne odredjuje uloge montaze: u zadanom broadcast postupku A1 je OFF i
+  izjava, A2 ambijent B-rolla. Te uloge nisu stereo par kamere.
+- Izbor proxy SLIKE ne smije zamijeniti originalni audio reduciranim proxy
+  audiom. Izvorni identiteti, sample rate i timing ostaju iz spremljenog
+  originala; nema novog probea. Razlicit projektni sample rate zahtijeva
+  stvarnu pretvorbu ili jasnu gresku nepodrzanog formata, nikad preimenovanje
+  izvornih uzoraka. Nepodrzan fizicki izlaz nije dozvola za tihi fallback.
+  Docs/66 ispravlja prethodnu interpretaciju docs/64 i docs/65.
+- Player nema scanner, Media Probe, filmstrip/wave generator, export, Project
+  workflow niti vlasnistvo nad poslovnim DB zapisima. Generatori artefakata
+  ostaju zasebni moduli; ovaj redoslijed nije naredba da ovise o playeru.
+- Isti verzionirani ugovor mora vrijediti Local/LAN/Intranet. Lokalni pipe
+  ili shared-memory adapter nije sam po sebi implementacija mreznog rada.
+  Stanje, media pristup i prijenos video/audio izlaza moraju imati definirane
+  transportne granice; fizicke putanje ostaju privatne adapteru.
+- Monitor prikaz ne smije vuci velike RGBA frameove request/response pollingom
+  preko istog kanala koji nosi player komande. Komande, state i frame transport
+  moraju biti odvojeni.
+- Za stvarni playback lokalni monitor handoff mora biti ogranicen, sekvenciran
+  i oznacen session/source/frame generacijom. Latest-only prikaz smije postojati
+  samo kao eksplicitno degradirani preview ili thumbnail put; ne smije biti
+  dokaz stabilnog broadcast playa jer skriva preskocene frameove i narusava
+  1-frame preciznost.
+- Spori UI ne smije blokirati playback sat, audio punjenje, decode ni player
+  proces, ali ne smije ni silently gutati gubitak frameova bez dijagnostike.
+  Lokalni mmap je samo lokalni adapter; LAN/Intranet izlaz mora imati svoj
+  jednako pasivan transportni adapter s istim command/state/timebase ugovorom.
+- V4 referenca je aktivni player model; u novom QNC-u taj sloj se zove
+  `qnc-broadcast-engine` i koristi ga proces `qnc-broadcast-player`.
+  Ne vracati
+  arhivirani app player niti cijeli `qnc-media-ffmpeg` paket s probeom i
+  generatorima kao player ovisnost. Prijenos aktivnog koda zahtijeva unaprijed
+  naveden opseg i korisnicku potvrdu prema odjeljcima 2 i 10.
+- Player nije zavrsen kada samo prihvaca naredbe ili pomice brojac. Potrebna
+  je provjera stvarnog videa i audija, seek/pause/granica, izolacije sesija i
+  rada bez probea. UI se spaja tek na provjereni javni playback put.
+- Klik na drugi klip obvezno prekida reprodukciju prethodnog klipa.
+  Prethodna player sesija mora biti ugasena prije pripreme nove, cak i ako
+  novi klip nije spreman ili njegov zapis nije valjan. Nova selekcija ne
+  nasljedjuje Play; stara slika, zvuk i zakasnjeli odgovori ne prelaze u nju.
+- Dekoder je zamjenjiva implementacija javnog verzioniranog QNC ugovora.
+  FFmpeg naredbe i njegovi interni formati ostaju u zasebnom adapteru, ne u
+  engineu, formi ili neutralnom ugovoru. Engine ostaje jedini vlasnik sata.
+- Instalirani dekoderi i eksplicitni odabir dolaze iz konfiguracije hosta
+  na kojem se dekodiranje izvrsava. To nisu nove projektne postavke niti
+  poslovna veza aplikacija. Nema automatskog fallbacka na drugi dekoder.
+- Vanjski dekoderski adapter mora potvrditi verziju procesnog ugovora,
+  identitet i format izlaza te postovati spremljene podatke, ogranicenu
+  memoriju i otkazivanje. Instalacija drugog adaptera ne dopusta novi probe.
+  Isti media URI/transport ugovor vrijedi Local/LAN/Intranet; lokalni
+  procesni kanal sam po sebi nije udaljeni decode servis.
+- Klik na thumbnail odmah bira novi klip i monitor smije prikazati thumbnail
+  samo dok Broadcast Player ne pripremi stvarni prvi frame. Kad javni player
+  isporuci prvi frame, taj frame je kvalitetniji preview i smije zamijeniti
+  thumbnail bez pokretanja Playa. Play je i dalje jedina naredba koja pokrece
+  reprodukciju; Pause zadrzava video frame.
+- Kad Play dodje do kraja aktivnog rangea ili klipa, player ne ostaje na
+  zadnjem frameu. Mora prekinuti kretanje, vratiti carrier na pocetak rangea
+  i pripremiti prvi frame kao preview za sljedeci Play.
+
+### 8.3. Plan dovrsetka Broadcast Playera
+
+Ovaj plan je obvezni redoslijed za dovrsetak stvarnog Broadcast Playera.
+Ne preskakati ga zbog Filmstripa, Wavea, Timelinea, Monitora, Storyja ili
+drugih aplikacija.
+
+1. Live acceptance single-source Playa kroz stvarni Ingest:
+   Mironik 2002 do kraja, Mironik 2679 do kraja, vise puta Pause/Play,
+   bez zastoja, bez vidljivog trzaja i bez neprihvatljivog A/V pomaka.
+2. Frame-precizne komande:
+   step jedan frame natrag/naprijed, cue/seek na zadani frame, IN/OUT granice
+   i kraj klipa s povratkom na start. Player smije potvrditi novu poziciju
+   samo iz vlastitog javnog stanja, ne iz UI pretpostavke.
+3. Promjena klipa:
+   klik na drugi klip obvezno prekida staru sesiju i stari zvuk 100%.
+   Novi thumbnail se prikazuje odmah samo dok prvi stvarni frame novog klipa
+   nije spreman. Zakasnjeli frame, stanje ili odgovor stare sesije ne smije
+   se prikazati u novoj selekciji.
+4. Output ugovor:
+   razdvojiti UI preview, buduci clean/program output i buduce SDI/HDMI/NDI
+   adaptere. Svi izlazi slusaju isti player clock/source timebase ugovor;
+   nijedan izlaz ne smije postati drugi player.
+5. Audio ugovor:
+   broj kanala i sample rate dolaze iz projektne baze, a source kanali ostaju
+   odvojeni. Broadcast A1/A2 nisu stereo fallback. Svaki nepodrzani format
+   mora dati jasnu gresku ili stvarnu dogovorenu konverziju u javnom adapteru.
+6. Diagnostics i mjerenje:
+   acceptance mora mjeriti Play naredbu do prvog stvarnog outputa, razmak
+   prezentiranih frameova, queue/buffer stanje, A/V offset u vise tocaka klipa
+   i razlog svakog prekida. Test s pomocnim fake rutinama nije dovoljan.
+7. Local/LAN/Intranet:
+   lokalni mmap/latest-frame adapter nije dokaz mreznog rada. Isti command,
+   state, timebase i output ugovor mora dobiti LAN/Intranet transport adapter
+   prije tvrdnje da je Broadcast Player gotov za sve QNC okoline.
+8. Tek nakon ovoga smiju ici Timeline, Filmstrip i Wave integracije koje ovise
+   o stabilnom player stanju. Timeline ostaje pasivni UI remote, Filmstrip i
+   Wave ostaju pasivni artefakti/prikazi iz baze.
 
 ## 9. Local/LAN/Intranet
 
@@ -610,6 +856,9 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Tek kada postoji baza koju moduli mogu citati, razvijaju se media moduli:
   Media Browser, Media Probe, Filmstrip, Wave, Broadcast Player, Export,
   Timeline, Monitor i drugi potrebni moduli.
+- Gornji popis nije redoslijed implementacije. Nakon postojeceg Ingest DB
+  puta korisnik je odredio Broadcast Player kao prvi sljedeci runtime modul;
+  daljnji playback/UI razvoj slijedi odjeljak 8.2.
 - Story aplikacije/varijante i Media Assist razvijaju se tek nakon sto postoje
   stabilni Project/Ingest DB contracti i potrebni media moduli.
 - Modul bez ugovora se ne razvija.

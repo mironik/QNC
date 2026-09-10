@@ -1,0 +1,16 @@
+[package]
+name = "qnc-player-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+qnc-player-contract = { workspace = true }
+qnc-player-frame-transport = { workspace = true }
+qnc-player-input = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+qnc-work-settings = { workspace = true }
+qnc-source-reader = { workspace = true }

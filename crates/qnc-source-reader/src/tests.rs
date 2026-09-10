@@ -488,7 +488,8 @@ fn manifest_has_no_app_consumers_and_no_write_capabilities() {
             "source.file.stat",
             "source.text.read",
             "source.bytes.read",
-            "source.directory.list"
+            "source.directory.list",
+            "source.file.open_read_only"
         ])
     );
 }
@@ -640,4 +641,8 @@ fn junction_cannot_escape_capability_root() {
         fs::read(outside.path().join("secret.xml")).unwrap(),
         b"secret"
     );
+    assert!(LocalSource::new(LOCAL, root.path())
+        .unwrap()
+        .open_read_only_file(&reference)
+        .is_err());
 }

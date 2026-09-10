@@ -1,0 +1,46 @@
+{
+  "module_id": "qnc.module.ffmpeg-decode",
+  "module_name": "FFmpeg Decode Adapter",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "media.decode.ffmpeg"
+  ],
+  "input_contract_version": "0.2.0",
+  "output_contract_version": "0.2.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "module_dependencies": [
+    "qnc.module.media-decode",
+    "qnc.module.media-stream"
+  ],
+  "forbidden_calls": [
+    "db.read",
+    "db.write",
+    "media.probe.full",
+    "playback.clock",
+    "playback.present"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-player-core"
+  ],
+  "adapter_policy": "FFmpeg CLI construction and native packet record parsing only. No scanner, discovery fallback, output clock or application identity.",
+  "specification": "docs/70-replaceable-decoders.md"
+}

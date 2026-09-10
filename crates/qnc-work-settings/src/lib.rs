@@ -2,7 +2,7 @@ mod local;
 mod model;
 pub mod server;
 
-pub use model::{ReadError, StoragePolicy, WorkSettings, VERSION};
+pub use model::{PlaybackInput, ReadError, StoragePolicy, WorkSettings, VERSION};
 use qnc_transport_resolver::{ResolvedEndpoint, ResolverConfig};
 use serde::{Deserialize, Serialize};
 use std::{

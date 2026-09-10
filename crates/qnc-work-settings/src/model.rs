@@ -3,6 +3,14 @@ use serde_json::Value;
 
 pub const VERSION: &str = "0.1.0";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlaybackInput {
+    Original,
+    Proxy,
+    ProxyIfAvailable,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReadError {
     pub code: String,
@@ -51,6 +59,19 @@ pub struct StoragePolicy {
 }
 
 impl WorkSettings {
+    /// Interpret the existing saved policy; never substitute storage policy or a default.
+    pub fn playback_input(&self) -> Result<PlaybackInput, ReadError> {
+        match self.playback.get("input").and_then(Value::as_str) {
+            Some("original") => Ok(PlaybackInput::Original),
+            Some("proxy") => Ok(PlaybackInput::Proxy),
+            Some("proxy_if_available") => Ok(PlaybackInput::ProxyIfAvailable),
+            _ => Err(ReadError::new(
+                "playback_input",
+                "Baza sadrzi nepodrzani playback.input.",
+            )),
+        }
+    }
+
     pub(crate) fn from_saved(
         project_id: String,
         project_name: String,

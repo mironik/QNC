@@ -233,18 +233,19 @@ impl SelectionConfig {
         let sources = self
             .sources
             .iter()
-            .map(|s| -> Result<BrowserSource> {
-                Ok(BrowserSource {
-                    entry: BrowserEntry {
+            .map(|s| {
+                let source = s.clone();
+                BrowserSource::new(
+                    BrowserEntry {
                         name: s.name.clone(),
                         qnc_uri: s.location.uri.clone(),
                         serial_number: s.serial_number.clone(),
                         volume_name: s.volume_name.clone(),
                     },
-                    reader: s.reader()?,
-                })
+                    move || source.reader().map_err(|e| e.to_string()),
+                )
             })
-            .collect::<Result<_>>()?;
+            .collect();
         Ok(TransportBrowserSession::new(sources)?)
     }
 }

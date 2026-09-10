@@ -1,0 +1,18 @@
+{
+  "module_id": "qnc.module.gpu-raster",
+  "module_name": "GPU Raster",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "implementation_stage": "prepared_sdr_gpu_raster_with_rgba_readback",
+  "capabilities": ["pixels.gpu.prepare", "pixels.gpu.convert.rgba8_srgb"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "media.decode", "source.scan.roles", "application.db.read", "application.db.write", "app_to_app.state_share"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.media-decode", "qnc.module.ui-widget", "qnc.module.player-input", "qnc.module.broadcast-player"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "specification": "docs/74-player-gpu-preparation.md"
+}

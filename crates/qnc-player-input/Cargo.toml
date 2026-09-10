@@ -1,0 +1,20 @@
+[package]
+name = "qnc-player-input"
+version = "0.3.0"
+edition = "2024"
+description = "Public read-only player input from saved work settings and media records"
+
+[dependencies]
+qnc-contracts = { workspace = true }
+qnc-frame-timebase = { workspace = true }
+qnc-ingest-store = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-work-settings = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+rusqlite = { workspace = true }
+tempfile = "3"
+tiny_http = "0.12"

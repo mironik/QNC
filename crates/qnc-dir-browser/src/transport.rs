@@ -1,11 +1,33 @@
 use crate::{BrowserEntry, BrowserState};
 use qnc_source_reader::{EntryKind, SourceReader, SourceReference, MAX_DIRECTORY_ENTRIES};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt, sync::Arc};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct BrowserSource {
     pub entry: BrowserEntry,
-    pub reader: SourceReader,
+    connect: Arc<dyn Fn() -> Result<SourceReader, String> + Send + Sync>,
+}
+
+impl fmt::Debug for BrowserSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BrowserSource")
+            .field("entry", &self.entry)
+            .finish_non_exhaustive()
+    }
+}
+
+impl BrowserSource {
+    /// The owner opens and validates only the requested source, on each navigation.
+    /// No volume handles or network connections are retained by the browser.
+    pub fn new(
+        entry: BrowserEntry,
+        connect: impl Fn() -> Result<SourceReader, String> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            entry,
+            connect: Arc::new(connect),
+        }
+    }
 }
 
 /// Registered source bindings, independent of any application or confirmation UI.
@@ -21,9 +43,8 @@ impl TransportBrowserSession {
     pub fn new(sources: Vec<BrowserSource>) -> Result<Self, String> {
         let mut ids = std::collections::BTreeSet::new();
         for source in &sources {
-            if source.entry.qnc_uri != source.reader.source_uri()
-                || !ids.insert(&source.entry.qnc_uri)
-            {
+            SourceReference::new(&source.entry.qnc_uri, ".").map_err(|e| e.to_string())?;
+            if !ids.insert(&source.entry.qnc_uri) {
                 return Err("invalid or duplicate browser source".into());
             }
         }
@@ -46,7 +67,7 @@ impl TransportBrowserSession {
             if qnc_contracts::parse_qnc_uri(uri)?.environment == environment {
                 self.visible.insert(
                     uri.clone(),
-                    source.reader.reference(".").map_err(|e| e.to_string())?,
+                    SourceReference::new(uri, ".").map_err(|e| e.to_string())?,
                 );
                 entries.push(source.entry.clone());
             }
@@ -90,12 +111,15 @@ impl TransportBrowserSession {
         let source = self
             .sources
             .iter()
-            .find(|s| s.reader.source_uri() == reference.source_uri())
+            .find(|s| s.entry.qnc_uri == reference.source_uri())
             .ok_or("unbound browser source")?;
-        let listing = source
-            .reader
+        let reader = (source.connect)().map_err(|e| format!("{}: {e}", reference.source_uri()))?;
+        if reader.source_uri() != reference.source_uri() {
+            return Err("browser source binding mismatch".into());
+        }
+        let listing = reader
             .list(&reference, MAX_DIRECTORY_ENTRIES)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("{}: {e}", reference.uri()))?;
         let mut entries = Vec::new();
         let mut visible = BTreeMap::new();
         for entry in listing
@@ -139,20 +163,96 @@ impl TransportBrowserSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn disconnected_source_is_isolated_and_reconnected_on_next_navigation() {
+        for environment in ["local", "lan/test", "intranet/test"] {
+            let fixture = tempfile::tempdir().unwrap();
+            let path = fixture.path().join("card");
+            let uri = format!("qnc://{environment}/source/card");
+            let other_uri = format!("qnc://{environment}/source/offline");
+            let opened = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let count = opened.clone();
+            let root = path.clone();
+            let source_uri = uri.clone();
+            let mut browser = TransportBrowserSession::new(vec![
+                BrowserSource::new(
+                    BrowserEntry {
+                        name: "Card".into(),
+                        qnc_uri: uri.clone(),
+                        ..Default::default()
+                    },
+                    move || {
+                        count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        SourceReader::local(&source_uri, &root).map_err(|e| e.to_string())
+                    },
+                ),
+                BrowserSource::new(
+                    BrowserEntry {
+                        name: "Offline".into(),
+                        qnc_uri: other_uri.clone(),
+                        ..Default::default()
+                    },
+                    || Err("offline".into()),
+                ),
+            ])
+            .unwrap();
+            let environment = environment.split('/').next().unwrap();
+            assert_eq!(browser.roots(environment).unwrap().entries.len(), 2);
+            assert_eq!(opened.load(std::sync::atomic::Ordering::SeqCst), 0);
+            assert!(browser.open(&other_uri).unwrap_err().contains(&other_uri));
+            assert!(browser.open(&uri).is_err());
+            std::fs::create_dir(&path).unwrap();
+            assert!(browser.open(&uri).unwrap().entries.is_empty());
+            // A disconnected root does not remain pinned in a cached reader.
+            std::fs::remove_dir(&path).unwrap();
+            assert!(browser.parent().unwrap().roots);
+            assert!(browser.open(&uri).is_err());
+            std::fs::create_dir(&path).unwrap();
+            std::fs::create_dir(path.join("PRIVATE")).unwrap();
+            assert_eq!(browser.open(&uri).unwrap().entries[0].name, "PRIVATE");
+            assert_eq!(opened.load(std::sync::atomic::Ordering::SeqCst), 4);
+        }
+    }
+
+    #[test]
+    fn connector_cannot_replace_registered_source_identity() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().to_path_buf();
+        let uri = "qnc://local/source/expected";
+        let mut browser = TransportBrowserSession::new(vec![BrowserSource::new(
+            BrowserEntry {
+                qnc_uri: uri.into(),
+                ..Default::default()
+            },
+            move || {
+                SourceReader::local("qnc://local/source/wrong", &path).map_err(|e| e.to_string())
+            },
+        )])
+        .unwrap();
+        browser.roots("local").unwrap();
+        assert_eq!(
+            browser.open(uri).unwrap_err(),
+            "browser source binding mismatch"
+        );
+        assert!(browser.selected(uri).is_none());
+    }
+
     #[test]
     fn navigation_keeps_registered_identity_and_rejects_unlisted_locations() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("PRIVATE")).unwrap();
         let uri = "qnc://local/source/card-serial";
-        let mut browser = TransportBrowserSession::new(vec![BrowserSource {
-            entry: BrowserEntry {
+        let path = dir.path().to_path_buf();
+        let mut browser = TransportBrowserSession::new(vec![BrowserSource::new(
+            BrowserEntry {
                 name: "Card".into(),
                 qnc_uri: uri.into(),
                 serial_number: "serial".into(),
                 volume_name: "Camera".into(),
             },
-            reader: SourceReader::local(uri, dir.path()).unwrap(),
-        }])
+            move || SourceReader::local(uri, &path).map_err(|e| e.to_string()),
+        )])
         .unwrap();
         assert_eq!(
             browser.roots("local").unwrap().entries[0].serial_number,

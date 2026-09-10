@@ -7,7 +7,8 @@ use qnc_media_records::{Phase, Snapshot};
 use serde::{Deserialize, Serialize};
 pub use transport::{respond, ContentClient, ContentTarget, ENDPOINT};
 
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = "0.2.3";
+pub const SCHEMA_VERSION: &str = "0.2.0";
 pub const MAX_BYTES: usize = 16 * 1024 * 1024;
 pub const PAGE_SIZE: usize = 64;
 pub type Result<T> = std::result::Result<T, String>;
@@ -70,6 +71,54 @@ pub struct StoredClip {
     pub imported_media_uri: Option<String>,
 }
 
+/// Lightweight UI/catalog row. This is intentionally not enough for playback.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StoredClipSummary {
+    pub clip_id: String,
+    pub name: String,
+    pub source_uri: String,
+    pub source_name: String,
+    pub serial_number: String,
+    pub volume_name: String,
+    pub thumbnail_uri: Option<String>,
+    pub duration_seconds: f64,
+    pub selected: bool,
+    pub import_status: ImportStatus,
+    pub import_error: Option<String>,
+    pub imported_media_uri: Option<String>,
+    pub revision: u32,
+    pub final_record: bool,
+}
+
+/// Lightweight catalog signature for deciding whether a visible catalog is stale.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogStats {
+    pub clip_count: u64,
+    pub selected_count: u64,
+    pub revision_sum: u64,
+    pub max_revision: u32,
+    pub fingerprint: u64,
+}
+
+impl StoredClipSummary {
+    pub fn validate(&self) -> Result<()> {
+        qnc_media_records::valid_id(&self.clip_id).map_err(|e| e.to_string())?;
+        let source = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e.to_string())?;
+        if source.resource_kind != "source" || self.name.trim().is_empty() {
+            return Err("Neispravan sazetak klipa.".into());
+        }
+        if let Some(uri) = &self.thumbnail_uri {
+            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+        }
+        if let Some(uri) = &self.imported_media_uri {
+            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
+
 /// Lightweight reconciliation facts, without reloading probe JSON or thumbnails.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -101,6 +150,13 @@ pub enum Operation {
     List {
         after: Option<String>,
     },
+    ListSummary {
+        after: Option<String>,
+    },
+    Stats,
+    Read {
+        clip_id: String,
+    },
     Select {
         clip_ids: Vec<String>,
         selected: bool,
@@ -115,7 +171,14 @@ pub enum Operation {
 }
 impl Operation {
     pub fn is_write(&self) -> bool {
-        !matches!(self, Self::List { .. } | Self::Inventory { .. })
+        !matches!(
+            self,
+            Self::List { .. }
+                | Self::ListSummary { .. }
+                | Self::Stats
+                | Self::Inventory { .. }
+                | Self::Read { .. }
+        )
     }
 }
 
@@ -133,6 +196,9 @@ pub enum Data {
     Saved(Box<StoredClip>),
     Claimed(Option<Box<StoredClip>>),
     Clips(Vec<StoredClip>),
+    ClipSummaries(Vec<StoredClipSummary>),
+    CatalogStats(CatalogStats),
+    Clip(Option<Box<StoredClip>>),
     Inventory(Vec<InventoryClip>),
     Removed(Vec<String>),
     Changed,
