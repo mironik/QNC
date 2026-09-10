@@ -5,11 +5,11 @@ use qnc_transport_resolver::ResolverConfig;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-pub(super) type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Binding {
+pub struct Binding {
     pub uri: String,
     pub file: Option<PathBuf>,
     pub endpoint: Option<String>,
@@ -91,7 +91,7 @@ impl Binding {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub(super) enum ProbeConfig {
+pub enum ProbeConfig {
     Local {
         executable: PathBuf,
         probe_size_bytes: u64,
@@ -104,7 +104,7 @@ pub(super) enum ProbeConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct SourceConfig {
+pub struct SourceConfig {
     pub location: Binding,
     pub name: String,
     pub serial_number: String,
@@ -173,7 +173,7 @@ impl SourceConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct SelectionConfig {
+pub struct SelectionConfig {
     pub version: String,
     pub catalog: Binding,
     pub source_index: Binding,
@@ -219,7 +219,8 @@ impl SelectionConfig {
             match &mut source.probe {
                 ProbeConfig::Local { executable, .. } => {
                     if executable.is_relative() {
-                        *executable = base.join(&*executable);
+                        let resolved = base.join(executable.as_path());
+                        *executable = resolved;
                     }
                 }
                 ProbeConfig::Remote { binding } => {

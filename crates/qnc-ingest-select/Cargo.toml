@@ -1,0 +1,36 @@
+[package]
+name = "qnc-ingest-select"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+test-support = ["dep:image", "dep:tempfile"]
+
+[dependencies]
+qnc-camera-detector = { workspace = true }
+qnc-camera-patterns = { workspace = true }
+qnc-contracts = { workspace = true }
+qnc-dir-browser = { workspace = true }
+qnc-ffprobe-metadata = { workspace = true }
+qnc-image-assets = { workspace = true }
+qnc-ingest-store = { workspace = true }
+qnc-media-metadata-compose = { workspace = true }
+qnc-media-probe = { workspace = true }
+qnc-media-record-db = { workspace = true }
+qnc-scanner = { workspace = true }
+qnc-sony-metadata = { workspace = true }
+qnc-source-groups = { workspace = true }
+qnc-source-index-db = { workspace = true }
+qnc-source-reader = { workspace = true }
+qnc-transport-resolver = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { version = "1", features = ["v4"] }
+
+image = { version = "0.25.10", default-features = false, features = ["jpeg"], optional = true }
+tempfile = { version = "3", optional = true }
+
+[dev-dependencies]
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
+tempfile = "3"
+tiny_http = "0.12"

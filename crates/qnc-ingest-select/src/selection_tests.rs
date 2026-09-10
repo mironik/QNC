@@ -170,7 +170,7 @@ fn select_persists_two_original_proxy_groups_and_reselect_reads_db() {
         })
         .collect();
     assert_eq!(clips.len(), 2);
-    assert!(events.iter().any(|e| matches!(e, Event::Clip(c) if c.thumb_status == crate::ThumbStatus::Ready && c.thumb_image.is_some())));
+    assert!(events.iter().any(|e| matches!(e, Event::Clip(c) if c.thumb_status == crate::SelectThumbStatus::Ready && c.thumb_image.is_some())));
     let mut db = config.media_records.media_db().unwrap();
     for id in clips {
         let saved = db.read(id, None).unwrap().unwrap();
@@ -329,8 +329,7 @@ fn preview_arrives_while_publication_is_blocked() {
         while std::time::Instant::now() < deadline && !preview {
             if let Ok(event) = receive.recv_timeout(std::time::Duration::from_millis(50)) {
                 assert!(!matches!(event, Event::Saved { .. }));
-                preview =
-                    matches!(event, Event::Clip(c) if c.save_state == crate::SaveState::Pending);
+                preview = matches!(event, Event::Clip(c) if c.save_state == crate::SelectSaveState::Pending);
             }
         }
         let mut db = ContentClient::from_owner_binding(

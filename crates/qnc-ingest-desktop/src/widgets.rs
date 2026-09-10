@@ -4,13 +4,10 @@ use eframe::egui::{
 };
 
 use qnc_ingest_components::{
-    action_ids, ClipFilter, ClipView, IngestIntent, IngestPayload, IngestViewModel, LocationEntry,
-    SourceKind,
+    action_ids, timeline_intent_to_ingest_intent, ClipFilter, ClipView, IngestIntent,
+    IngestPayload, IngestViewModel, LocationEntry, SourceKind,
 };
-use qnc_timeline::{
-    AudioLane, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMetrics,
-    TimelinePlayerState, TimelineTheme,
-};
+use qnc_timeline::TimelineTheme;
 use qnc_ui_kit::FormActionBarStyle;
 
 use crate::{
@@ -1148,7 +1145,7 @@ fn source_dock_clip_label<'a>(
 }
 
 fn timeline_placeholder_height() -> f32 {
-    qnc_timeline::source_timeline_height(AudioLane::None)
+    qnc_timeline::source_player_timeline_height()
 }
 
 fn render_player_timeline(
@@ -1157,49 +1154,9 @@ fn render_player_timeline(
     theme: &Theme,
     view: &IngestViewModel,
 ) -> Option<IngestIntent> {
-    let player_state = TimelinePlayerState::from_envelope(view.playback.reply.as_ref());
-    let duration = player_state.duration_frames();
-    let mut out = None;
-    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-        let intent = qnc_timeline::show(
-            ui,
-            TimelineInput {
-                state: &player_state,
-                layers: TimelineLayerFlags::source(),
-                metrics: TimelineMetrics::default(),
-                theme: timeline_theme(theme),
-                expanded_audio: AudioLane::None,
-                shot_in_frame: 0,
-                shot_out_frame: duration,
-                draft_in_frame: 0,
-                draft_out_frame: duration,
-                a1_peaks: &[],
-                a2_peaks: &[],
-                virtual_spans: &[],
-                covers: &[],
-                marker_slots: &[],
-                markers: &[],
-                video_background: None,
-            },
-        );
-        out = ingest_intent_from_timeline(intent);
-    });
-    out
-}
-
-fn ingest_intent_from_timeline(intent: TimelineIntent) -> Option<IngestIntent> {
-    match intent {
-        TimelineIntent::CueFrame(frame) => Some(IngestIntent::new(
-            action_ids::INGEST_CUE_FRAME,
-            IngestPayload::Frame(frame.min(i64::MAX as u64) as i64),
-        )),
-        TimelineIntent::ToggleAudioExpand(_) => None,
-        TimelineIntent::SelectVirtual { .. }
-        | TimelineIntent::SelectCover { .. }
-        | TimelineIntent::SelectMarkerSlot { .. }
-        | TimelineIntent::SelectMarker { .. } => None,
-        TimelineIntent::None => None,
-    }
+    let intent =
+        qnc_timeline::show_source_player_timeline(ui, rect, &view.timeline, timeline_theme(theme));
+    timeline_intent_to_ingest_intent(intent)
 }
 
 fn timeline_theme(theme: &Theme) -> TimelineTheme {

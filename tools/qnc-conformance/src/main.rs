@@ -132,12 +132,82 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
     checks.push(scan_shell_app_boundary(root));
     checks.push(scan_project_app_boundary(root));
     checks.push(scan_shared_ui_patterns(root));
+    checks.push(scan_timeline_engine_boundary(root));
     checks.push(CheckResult::from_report(
         "public player boundary",
         player_boundary::check(root),
     ));
 
     checks
+}
+
+fn scan_timeline_engine_boundary(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let cargo_path = root.join("crates").join("qnc-timeline").join("Cargo.toml");
+    let source_path = root
+        .join("crates")
+        .join("qnc-timeline")
+        .join("src")
+        .join("lib.rs");
+
+    let cargo = match fs::read_to_string(&cargo_path) {
+        Ok(contents) => contents,
+        Err(error) => {
+            return CheckResult::error(
+                "timeline engine boundary",
+                format!("cannot read {}: {error}", cargo_path.display()),
+            );
+        }
+    };
+    let source = match fs::read_to_string(&source_path) {
+        Ok(contents) => contents,
+        Err(error) => {
+            return CheckResult::error(
+                "timeline engine boundary",
+                format!("cannot read {}: {error}", source_path.display()),
+            );
+        }
+    };
+
+    for forbidden in [
+        "qnc-player-contract",
+        "qnc-player-client",
+        "qnc-broadcast-engine",
+        "qnc-broadcast-player",
+        "qnc-media-probe",
+        "qnc-ffprobe-metadata",
+        "qnc-scanner",
+        "qnc-source-reader",
+        "qnc-filmstrip",
+        "qnc-wave",
+        "rusqlite",
+    ] {
+        if cargo.contains(forbidden) {
+            report.error(format!(
+                "qnc-timeline must be a passive layered UI engine and must not depend on {forbidden}"
+            ));
+        }
+    }
+    for forbidden in [
+        "qnc_player_contract",
+        "qnc_player_client",
+        "qnc_broadcast_engine",
+        "qnc_broadcast_player",
+        "qnc_media_probe",
+        "qnc_ffprobe_metadata",
+        "qnc_scanner",
+        "qnc_source_reader",
+        "rusqlite",
+        "ffprobe",
+    ] {
+        if source.contains(forbidden) {
+            report.error(format!(
+                "qnc-timeline source must not contain active playback/probe/DB reference '{forbidden}'"
+            ));
+        }
+    }
+
+    CheckResult::from_report("timeline engine boundary", report)
 }
 
 fn require_file(root: &Path, relative: &str) -> CheckResult {
@@ -1002,7 +1072,9 @@ fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
         "qnc.module.frame-timebase" => Some("qnc-frame-timebase"),
         "qnc.module.player-contract" => Some("qnc-player-contract"),
         "qnc.module.player-input" => Some("qnc-player-input"),
+        "qnc.module.player-launcher" => Some("qnc-player-launcher"),
         "qnc.module.player-client" => Some("qnc-player-client"),
+        "qnc.module.player-timeline" => Some("qnc-player-timeline"),
         "qnc.module.timeline" => Some("qnc-timeline"),
         "qnc.module.media-stream" => Some("qnc-media-stream"),
         "qnc.module.media-decode" => Some("qnc-media-decode"),
@@ -1011,6 +1083,9 @@ fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
         "qnc.module.ui-widget" => Some("qnc-ui-kit"),
         "qnc.module.workstation-identity" => Some("qnc-workstation-identity"),
         "qnc.module.work-settings" => Some("qnc-work-settings"),
+        "qnc.module.ingest-work-plan" => Some("qnc-ingest-work-plan"),
+        "qnc.module.ingest-catalog" => Some("qnc-ingest-catalog"),
+        "qnc.module.ingest-select" => Some("qnc-ingest-select"),
         "qnc.module.camera-patterns" => Some("qnc-camera-patterns"),
         "qnc.module.camera-detector" => Some("qnc-camera-detector"),
         "qnc.module.scanner" => Some("qnc-scanner"),
@@ -1020,6 +1095,7 @@ fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
         "qnc.module.sony-metadata" => Some("qnc-sony-metadata"),
         "qnc.module.media-record-db" => Some("qnc-media-record-db"),
         "qnc.module.media-metadata" => Some("qnc-media-metadata"),
+        "qnc.module.media-thumbnail" => Some("qnc-media-thumbnail"),
         "qnc.module.image-assets" => Some("qnc-image-assets"),
         "qnc.module.media-probe" => Some("qnc-media-probe"),
         "qnc.module.ffprobe-metadata" => Some("qnc-ffprobe-metadata"),

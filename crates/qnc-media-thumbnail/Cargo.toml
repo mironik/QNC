@@ -1,0 +1,8 @@
+[package]
+name = "qnc-media-thumbnail"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-image-assets = { workspace = true }
+qnc-source-reader = { workspace = true }

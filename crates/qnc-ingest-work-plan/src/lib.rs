@@ -1,6 +1,9 @@
 pub use qnc_work_settings::PlaybackInput;
 use qnc_work_settings::WorkSettings;
 
+pub const MODULE_ID: &str = "qnc.module.ingest-work-plan";
+pub const VERSION: &str = "0.1.0";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IngestMedia {
     Link,
@@ -31,7 +34,6 @@ impl IngestWorkPlan {
             _ => return Err("Baza sadrzi nepodrzani storage.ingest_media.".into()),
         };
         let playback_input = settings.playback_input().map_err(|e| e.to_string())?;
-        // v4 directory roles, expressed as transport resources, not OS path joins.
         let root = &settings.output_root_uri;
         Ok(Self {
             media,

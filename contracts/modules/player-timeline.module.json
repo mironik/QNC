@@ -1,0 +1,41 @@
+{
+  "module_id": "qnc.module.player-timeline",
+  "module_name": "Broadcast Player Timeline Adapter",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "runtime_crate": "qnc-player-timeline",
+  "capabilities": [
+    "player.timeline.project",
+    "player.timeline.cue_state"
+  ],
+  "input_contract_version": "0.3.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.3.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.probe.full",
+    "source.scan.roles",
+    "media.decode",
+    "playback.execute",
+    "application.db.read",
+    "application.db.write",
+    "app_to_app.state_share"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.player-client",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-player-core",
+    "qnc.module.broadcast-engine",
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.source-reader",
+    "qnc.module.work-settings"
+  ],
+  "state_policy": "stateless",
+  "state_owner": "qnc.module.broadcast-player",
+  "input": "Broadcast Player public event envelope",
+  "output": "qnc.module.timeline passive frame projection",
+  "database_write_policy": "no_db_writes"
+}

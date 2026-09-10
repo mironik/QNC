@@ -1,11 +1,13 @@
 {
   "module_id": "qnc.module.timeline",
-  "module_name": "Timeline",
+  "module_name": "Timeline Engine",
   "module_version": "0.1.0",
   "module_kind": "ui_widget",
   "capabilities": [
     "timeline.passive_projection",
+    "timeline.frame_projection",
     "timeline.paint",
+    "timeline.source_player.paint",
     "timeline.hit_test",
     "timeline.intent.emit"
   ],
@@ -26,15 +28,30 @@
     "filmstrip.generate14",
     "wave.generate"
   ],
-  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.filmstrip", "qnc.module.wave"],
+  "forbidden_dependencies": [
+    "qnc.module.player-contract",
+    "qnc.module.player-client",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-player-core",
+    "qnc.module.broadcast-engine",
+    "qnc.module.media-probe",
+    "qnc.module.ffprobe-metadata",
+    "qnc.module.scanner",
+    "qnc.module.source-reader",
+    "qnc.module.filmstrip",
+    "qnc.module.wave"
+  ],
   "state_policy": "stateless",
+  "engine_policy": "single_public_layered_ui_component",
   "playback_state_source": "broadcast_player",
+  "state_input_policy": "caller_supplied_projection_only",
   "intent_policy": "emit_only",
   "database_write_policy": "no_db_writes",
   "state_owner": "qnc.module.broadcast-player",
   "ui_layers": [
+    "carrier",
     "audio_a1",
-    "video",
+    "base_video",
     "audio_a2",
     "audio_a3",
     "audio_a4",

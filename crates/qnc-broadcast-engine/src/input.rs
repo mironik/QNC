@@ -6,7 +6,7 @@ use qnc_media_metadata::{
     FrameRateMode, MediaRepresentation, Rational, ScanMode, Signal, StreamDetails,
 };
 use qnc_pixel_convert::{ConversionSpec, Transfer};
-use qnc_player_input::PreparedInput;
+use qnc_player_input::{AudioChannel, PreparedInput};
 use qnc_video_output::{OutputConfig, PixelFormat};
 
 pub(crate) const PREBUFFER_FRAMES: usize = 8;
@@ -70,8 +70,15 @@ pub struct InputPlan {
     pub(crate) audio_media: MediaRepresentation,
     pub(crate) audio_origin: (i64, Rational),
     pub(crate) spec: ConversionSpec,
-    pub(crate) audio_streams: Vec<(u32, u16)>,
+    pub(crate) audio_streams: Vec<AudioStreamPlan>,
     pub(crate) audio_channels: Option<qnc_audio_output::ChannelMap>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AudioStreamPlan {
+    pub stream_index: u32,
+    pub source_channels: u16,
+    pub selected_channels: Vec<u16>,
 }
 impl InputPlan {
     pub fn new(input: &PreparedInput, workspace_uri: &str, clip_id: &str) -> Result<Self> {
@@ -134,6 +141,7 @@ impl InputPlan {
         let (audio_streams, audio_format, audio_channels) = project_audio_layout(
             &native_audio_streams,
             native_audio_format.as_ref(),
+            &input.layout.audio_channels,
             &input.project_audio,
         )?;
         let audio_video = audio_media
@@ -191,7 +199,7 @@ impl InputPlan {
 }
 
 type ProjectAudioLayout = (
-    Vec<(u32, u16)>,
+    Vec<AudioStreamPlan>,
     Option<AudioFormat>,
     Option<qnc_audio_output::ChannelMap>,
 );
@@ -215,6 +223,7 @@ fn color_space_from_saved(spec: &ConversionSpec) -> Result<ColorSpace> {
 fn project_audio_layout(
     native_streams: &[(u32, u16)],
     native: Option<&AudioFormat>,
+    saved_channels: &[AudioChannel],
     project: &qnc_player_input::ProjectAudio,
 ) -> Result<ProjectAudioLayout> {
     project.validate().map_err(error)?;
@@ -226,32 +235,53 @@ fn project_audio_layout(
             "Project audio sample rate requires conversion not supported by this playback adapter.",
         ));
     }
-    if project.channels > native.channel_count {
+    if project.channels > native.channel_count
+        || usize::from(project.channels) > saved_channels.len()
+    {
         return Err(error(
             "Project audio channel count exceeds saved native channel inventory.",
         ));
     }
-    // Source preview preserves channel numbering. Editorial A1/A2 roles are not inferred here.
+    // A1/A2 are mono source lanes. Preserve saved channel identity; never collapse them as stereo.
     let mut selected_streams = Vec::new();
-    let mut selected_channels = 0u16;
-    for (stream, channels) in native_streams {
-        if selected_channels >= project.channels {
-            break;
+    for channel in saved_channels.iter().take(usize::from(project.channels)) {
+        let Some((_, source_channels)) = native_streams
+            .iter()
+            .find(|(stream_index, _)| *stream_index == channel.stream_index)
+        else {
+            return Err(error("saved audio channel references a missing stream"));
+        };
+        if channel.channel_index >= u32::from(*source_channels) {
+            return Err(error("saved audio channel is outside its native stream"));
         }
-        selected_streams.push((*stream, *channels));
-        selected_channels = selected_channels
-            .checked_add(*channels)
-            .filter(|n| *n <= native.channel_count)
-            .ok_or_else(|| error("selected audio channel inventory overflow"))?;
+        let channel_index = u16::try_from(channel.channel_index).map_err(error)?;
+        if let Some(plan) = selected_streams
+            .iter_mut()
+            .find(|plan: &&mut AudioStreamPlan| plan.stream_index == channel.stream_index)
+        {
+            plan.selected_channels.push(channel_index);
+        } else {
+            selected_streams.push(AudioStreamPlan {
+                stream_index: channel.stream_index,
+                source_channels: *source_channels,
+                selected_channels: vec![channel_index],
+            });
+        }
     }
-    if selected_channels < project.channels {
+    let selected_channels: u16 = selected_streams
+        .iter()
+        .try_fold(0u16, |sum, plan| {
+            let count = u16::try_from(plan.selected_channels.len()).ok()?;
+            sum.checked_add(count)
+        })
+        .ok_or_else(|| error("selected audio channel inventory overflow"))?;
+    if selected_channels != project.channels {
         return Err(error(
             "Saved native audio stream inventory cannot satisfy project audio channels.",
         ));
     }
-    let format = AudioFormat::new(native.sample_rate_hz, selected_channels).map_err(error)?;
-    let map = qnc_audio_output::ChannelMap::new(selected_channels, (0..project.channels).collect())
-        .map_err(error)?;
+    let format = AudioFormat::new(native.sample_rate_hz, project.channels).map_err(error)?;
+    let map = qnc_audio_output::ChannelMap::identity(project.channels).map_err(error)?;
     Ok((selected_streams, Some(format), Some(map)))
 }
 
@@ -373,6 +403,26 @@ pub(crate) fn relative_position(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn saved_channels(streams: &[(u32, u16)]) -> Vec<AudioChannel> {
+        streams
+            .iter()
+            .flat_map(|(stream_index, channel_count)| {
+                (0..u32::from(*channel_count)).map(|channel_index| AudioChannel {
+                    stream_index: *stream_index,
+                    channel_index,
+                })
+            })
+            .collect()
+    }
+
+    fn audio_plan(stream_index: u32, source_channels: u16, selected: &[u16]) -> AudioStreamPlan {
+        AudioStreamPlan {
+            stream_index,
+            source_channels,
+            selected_channels: selected.to_vec(),
+        }
+    }
+
     #[test]
     fn source_video_format_is_derived_from_saved_media_facts() {
         assert_eq!(
@@ -415,10 +465,16 @@ mod tests {
                 sample_rate_hz: 48000,
             };
             let (selected, format, map) =
-                project_audio_layout(&streams, Some(&native), &project).unwrap();
+                project_audio_layout(&streams, Some(&native), &saved_channels(&streams), &project)
+                    .unwrap();
             let format = format.unwrap();
             let map = map.unwrap();
-            assert_eq!(selected.as_slice(), &streams[..usize::from(count)]);
+            let expected: Vec<_> = streams
+                .iter()
+                .take(usize::from(count))
+                .map(|(stream_index, channels)| audio_plan(*stream_index, *channels, &[0]))
+                .collect();
+            assert_eq!(selected, expected);
             assert_eq!(format.channel_count, count);
             assert_eq!(map.source_channels(), count);
             let source = [0.1, 0.2, 0.3, 0.4][..usize::from(count)].to_vec();
@@ -438,6 +494,7 @@ mod tests {
             project_audio_layout(
                 &[(1, 1), (2, 1)],
                 Some(&AudioFormat::new(48000, 2).unwrap()),
+                &saved_channels(&[(1, 1), (2, 1)]),
                 &project,
             )
             .is_err()
@@ -447,16 +504,17 @@ mod tests {
             project_audio_layout(
                 &[(1, 1), (2, 1)],
                 Some(&AudioFormat::new(44100, 2).unwrap()),
+                &saved_channels(&[(1, 1), (2, 1)]),
                 &project,
             )
             .is_err()
         );
-        let (streams, format, map) = project_audio_layout(&[], None, &project).unwrap();
+        let (streams, format, map) = project_audio_layout(&[], None, &[], &project).unwrap();
         assert!(streams.is_empty());
         assert_eq!(format, None);
         assert_eq!(map, None);
         project.channels = 0;
-        assert!(project_audio_layout(&[], None, &project).is_err());
+        assert!(project_audio_layout(&[], None, &[], &project).is_err());
     }
     fn fact<T>(value: T) -> Option<qnc_media_metadata::Fact<T>> {
         Some(qnc_media_metadata::Fact {
@@ -512,13 +570,33 @@ mod tests {
             channels: 2,
             sample_rate_hz: 48000,
         };
-        let (streams, format, map) =
-            project_audio_layout(&native_streams, native_format.as_ref(), &project).unwrap();
+        let (streams, format, map) = project_audio_layout(
+            &native_streams,
+            native_format.as_ref(),
+            &saved_channels(&native_streams),
+            &project,
+        )
+        .unwrap();
         let format = format.unwrap();
         let map = map.unwrap();
-        assert_eq!(streams, [(1, 1), (2, 1)]);
+        assert_eq!(streams, [audio_plan(1, 1, &[0]), audio_plan(2, 1, &[0])]);
         assert_eq!(format, AudioFormat::new(48000, 2).unwrap());
         assert_eq!(map.output_channels(), &[0, 1]);
+    }
+    #[test]
+    fn one_multichannel_stream_still_exports_a1_a2_as_two_mono_lanes() {
+        let native = AudioFormat::new(48000, 4).unwrap();
+        let streams = [(1, 4)];
+        let project = qnc_player_input::ProjectAudio {
+            channels: 2,
+            sample_rate_hz: 48000,
+        };
+        let (plans, format, map) =
+            project_audio_layout(&streams, Some(&native), &saved_channels(&streams), &project)
+                .unwrap();
+        assert_eq!(plans, [audio_plan(1, 4, &[0, 1])]);
+        assert_eq!(format.unwrap(), AudioFormat::new(48000, 2).unwrap());
+        assert_eq!(map.unwrap().output_channels(), &[0, 1]);
     }
     #[test]
     fn mismatched_rates_and_duplicate_streams_are_not_silently_mixed() {

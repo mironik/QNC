@@ -6,29 +6,23 @@ edition = "2021"
 [dependencies]
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
+qnc-ingest-catalog = { workspace = true }
+qnc-ingest-work-plan = { workspace = true }
+qnc-ingest-select = { workspace = true }
 qnc-ingest-store = { workspace = true }
+qnc-media-thumbnail = { workspace = true }
 qnc-work-settings = { workspace = true }
 qnc-player-client = { workspace = true }
-qnc-player-input = { workspace = true }
+qnc-player-launcher = { workspace = true }
+qnc-player-timeline = { workspace = true }
+qnc-timeline = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-qnc-camera-patterns = { workspace = true }
-qnc-camera-detector = { workspace = true }
-qnc-scanner = { workspace = true }
-qnc-source-reader = { workspace = true }
-qnc-source-groups = { workspace = true }
-qnc-source-index-db = { workspace = true }
-qnc-media-record-db = { workspace = true }
-qnc-media-metadata = { workspace = true }
 qnc-image-assets = { workspace = true }
-qnc-media-probe = { workspace = true }
-qnc-ffprobe-metadata = { workspace = true }
-qnc-media-metadata-compose = { workspace = true }
-qnc-sony-metadata = { workspace = true }
-qnc-transport-resolver = { workspace = true }
-uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
+qnc-ingest-select = { workspace = true, features = ["test-support"] }
+qnc-source-reader = { workspace = true }
 rusqlite = { workspace = true }
 serde_json = { workspace = true }
 tempfile = "3"

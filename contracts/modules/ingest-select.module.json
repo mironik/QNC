@@ -1,0 +1,44 @@
+{
+  "module_id": "qnc.module.ingest-select",
+  "module_name": "Ingest Select",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "runtime_crate": "qnc-ingest-select",
+  "capabilities": [
+    "source.select",
+    "source.scan.roles",
+    "camera.metadata.read",
+    "media.probe.once",
+    "ingest.content.publish",
+    "ingest.source_index.publish",
+    "ingest.media_records.publish"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "project.workflow",
+    "project.settings.write",
+    "story.workflow",
+    "media_assist.workflow",
+    "filmstrip.generate14",
+    "wave.generate",
+    "player.playback"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-player-core",
+    "qnc.module.broadcast-engine",
+    "qnc.module.timeline",
+    "qnc.module.filmstrip",
+    "qnc.module.wave",
+    "qnc.module.export",
+    "qnc.module.ui-widget"
+  ],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "owner_application_only",
+  "project_settings_policy": "read_only_via_work_settings_before_start",
+  "ui_policy": "no_form_or_paint_code"
+}

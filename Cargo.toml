@@ -14,7 +14,9 @@ members = [
     "crates/qnc-player-contract",
     "crates/qnc-player-frame-transport",
     "crates/qnc-player-input",
+    "crates/qnc-player-launcher",
     "crates/qnc-player-client",
+    "crates/qnc-player-timeline",
     "crates/qnc-timeline",
     "crates/qnc-media-stream",
     "crates/qnc-media-decode",
@@ -26,6 +28,10 @@ members = [
     "crates/qnc-gpu-raster",
     "crates/qnc-broadcast-player",
     "crates/qnc-broadcast-engine",
+    "crates/qnc-ingest-work-plan",
+    "crates/qnc-ingest-catalog",
+    "crates/qnc-ingest-select",
+    "crates/qnc-media-thumbnail",
     "crates/qnc-ingest-components",
     "crates/qnc-image-assets",
     "crates/qnc-ingest-desktop",
@@ -71,7 +77,9 @@ qnc-frame-timebase = { path = "crates/qnc-frame-timebase" }
 qnc-player-contract = { path = "crates/qnc-player-contract" }
 qnc-player-frame-transport = { path = "crates/qnc-player-frame-transport" }
 qnc-player-input = { path = "crates/qnc-player-input" }
+qnc-player-launcher = { path = "crates/qnc-player-launcher" }
 qnc-player-client = { path = "crates/qnc-player-client" }
+qnc-player-timeline = { path = "crates/qnc-player-timeline" }
 qnc-timeline = { path = "crates/qnc-timeline" }
 qnc-media-stream = { path = "crates/qnc-media-stream" }
 qnc-media-decode = { path = "crates/qnc-media-decode" }
@@ -83,6 +91,10 @@ qnc-pixel-convert = { path = "crates/qnc-pixel-convert" }
 qnc-gpu-raster = { path = "crates/qnc-gpu-raster" }
 qnc-broadcast-player = { path = "crates/qnc-broadcast-player" }
 qnc-broadcast-engine = { path = "crates/qnc-broadcast-engine" }
+qnc-ingest-work-plan = { path = "crates/qnc-ingest-work-plan" }
+qnc-ingest-catalog = { path = "crates/qnc-ingest-catalog" }
+qnc-ingest-select = { path = "crates/qnc-ingest-select" }
+qnc-media-thumbnail = { path = "crates/qnc-media-thumbnail" }
 qnc-ingest-components = { path = "crates/qnc-ingest-components" }
 qnc-image-assets = { path = "crates/qnc-image-assets" }
 qnc-ingest-desktop = { path = "crates/qnc-ingest-desktop" }

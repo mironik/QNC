@@ -3123,36 +3123,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ingest-catalog"
+version = "0.1.0"
+dependencies = [
+ "qnc-ingest-store",
+ "qnc-ingest-work-plan",
+ "qnc-work-settings",
+]
+
+[[package]]
 name = "qnc-ingest-components"
 version = "0.1.0"
 dependencies = [
  "image",
- "qnc-camera-detector",
- "qnc-camera-patterns",
  "qnc-contracts",
  "qnc-dir-browser",
- "qnc-ffprobe-metadata",
  "qnc-image-assets",
+ "qnc-ingest-catalog",
+ "qnc-ingest-select",
  "qnc-ingest-store",
- "qnc-media-metadata",
- "qnc-media-metadata-compose",
- "qnc-media-probe",
- "qnc-media-record-db",
+ "qnc-ingest-work-plan",
+ "qnc-media-thumbnail",
  "qnc-player-client",
- "qnc-player-input",
- "qnc-scanner",
- "qnc-sony-metadata",
- "qnc-source-groups",
- "qnc-source-index-db",
+ "qnc-player-launcher",
+ "qnc-player-timeline",
  "qnc-source-reader",
- "qnc-transport-resolver",
+ "qnc-timeline",
  "qnc-work-settings",
  "rusqlite",
  "serde",
  "serde_json",
  "tempfile",
  "tiny_http",
- "uuid",
 ]
 
 [[package]]
@@ -3179,6 +3181,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ingest-select"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "qnc-camera-detector",
+ "qnc-camera-patterns",
+ "qnc-contracts",
+ "qnc-dir-browser",
+ "qnc-ffprobe-metadata",
+ "qnc-image-assets",
+ "qnc-ingest-store",
+ "qnc-media-metadata-compose",
+ "qnc-media-probe",
+ "qnc-media-record-db",
+ "qnc-scanner",
+ "qnc-sony-metadata",
+ "qnc-source-groups",
+ "qnc-source-index-db",
+ "qnc-source-reader",
+ "qnc-transport-resolver",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tiny_http",
+ "uuid",
+]
+
+[[package]]
 name = "qnc-ingest-store"
 version = "0.1.0"
 dependencies = [
@@ -3194,6 +3224,13 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tiny_http",
+]
+
+[[package]]
+name = "qnc-ingest-work-plan"
+version = "0.1.0"
+dependencies = [
+ "qnc-work-settings",
 ]
 
 [[package]]
@@ -3325,6 +3362,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-media-thumbnail"
+version = "0.1.0"
+dependencies = [
+ "qnc-image-assets",
+ "qnc-source-reader",
+]
+
+[[package]]
 name = "qnc-pixel-convert"
 version = "0.1.0"
 dependencies = [
@@ -3396,6 +3441,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-player-launcher"
+version = "0.1.0"
+dependencies = [
+ "qnc-contracts",
+ "qnc-player-client",
+ "qnc-player-input",
+ "qnc-source-reader",
+ "qnc-work-settings",
+]
+
+[[package]]
 name = "qnc-player-runner"
 version = "0.1.0"
 dependencies = [
@@ -3418,6 +3474,14 @@ dependencies = [
  "uuid",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "qnc-player-timeline"
+version = "0.1.0"
+dependencies = [
+ "qnc-player-contract",
+ "qnc-timeline",
 ]
 
 [[package]]
@@ -3582,8 +3646,6 @@ name = "qnc-timeline"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "qnc-player-contract",
- "serde_json",
 ]
 
 [[package]]

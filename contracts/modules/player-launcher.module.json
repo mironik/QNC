@@ -1,0 +1,40 @@
+{
+  "module_id": "qnc.module.player-launcher",
+  "module_name": "Broadcast Player Launcher",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "runtime_crate": "qnc-player-launcher",
+  "capabilities": [
+    "player.launch.prepare",
+    "player.source_binding.resolve"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.3.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.3.0",
+  "forbidden_calls": [
+    "project.workflow",
+    "project.settings.write",
+    "source.scan.roles",
+    "media.probe.full",
+    "ffprobe",
+    "timeline.paint",
+    "filmstrip.generate14",
+    "wave.generate",
+    "application.db.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.dir-browser",
+    "qnc.module.scanner",
+    "qnc.module.media-probe",
+    "qnc.module.ffprobe-metadata",
+    "qnc.module.broadcast-engine",
+    "qnc.module.timeline",
+    "qnc.module.ui-widget"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "project_settings_policy": "read_only_via_work_settings",
+  "ui_policy": "no_form_or_paint_code"
+}

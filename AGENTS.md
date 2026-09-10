@@ -67,6 +67,12 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   korisnika modula.
 - Isti modul smije se koristiti u vise aplikacija ako nema vlasnistvo nad tudim
   bazama i ne dijeli aktivno stanje izmedu aplikacija.
+- Aktivni kod ne smije se gomilati u jednu opcu aplikacijsku komponentu.
+  Svaka aktivna odgovornost mora imati uski javni modul ili javnu komponentu:
+  browser, source select, probe, DB publish, player client, player-timeline
+  projekcija, filmstrip, wave, export i slicno. Aplikacijska komponenta smije
+  orkestrirati vlastiti workflow kroz te javne ugovore, ali ne smije postati
+  novi monolit.
 - Ako vise aplikacija koristi isti modul, svaka aplikacija ga koristi unutar
   vlastite granice i zapisuje samo vlastite rezultate u vlastitu bazu.
 - Izmedu aplikacija ne smije postojati alat za suradnju, nasljedivanje,
@@ -159,6 +165,11 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Forma ne smije nositi aktivni kod. Forma smije prikazati stanje, skupljati
   korisnicki input i poslati intent/naredbu, ali stvarni rad mora biti u
   komponenti aplikacije ili u javnom modulu.
+- Razgovor izmedu javnih komponenti i modula ne smije ici preko forme. Forma
+  ne smije prevoditi player stanje u timeline, browser state u transport,
+  probe rezultate u katalog ili bilo koji drugi aktivni medukomponentni tok.
+  Takav prijevod pripada specijaliziranom javnom modulu ili aplikacijskoj
+  komponenti koja ne crta UI.
 - Forma ne smije direktno pozivati store, filesystem, scanner, probe, player,
   render, export ili druge workflow operacije ako za to postoji komponenta ili
   modul.
@@ -466,6 +477,16 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Timeline je samostalna javna pasivna UI komponenta. Prikazuje stanje
   Broadcast Playera i sluzi kao njegov UI daljinski upravljac; nije player,
   playback engine, vlasnik vremena niti vlasnik prikazanog stanja.
+- Timeline-engine je jedna jedinstvena javna komponenta s vise UI layera, po
+  obrascu `qnc_v4/qnc-app/src/qnc_timeline.rs`. Ne rade se zasebni timeline
+  enginei za Ingest, Story, Program ili buduce aplikacije.
+- Aplikacija ili njezina komponenta samo priprema neutralni frame/range/layer
+  model i ukljucuje/iskljucuje layer flagove koji su joj potrebni. Timeline ne
+  smije znati za aplikaciju koja ga koristi niti imati app-specific grane.
+- Timeline smije imati javne projection helpere za mapiranje program/source
+  frame osi u lokalne UI redove, po uzoru na v4 segment timeline. To je samo
+  geometrija prikaza i povratni UI intent; nije playlist owner, player client,
+  DB citac niti aktivni workflow kod.
 - Timeline nema nista svoje u smislu poslovnog ili playback stanja: nema
   vlastiti playhead, tekuci frame, FPS/timebase, play/pause status, IN/OUT,
   trajanje, playlistu ni odabrani izvor kao neovisnu ili zamjensku istinu.
@@ -575,7 +596,9 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Izvorni media zapis zadrzava sve odvojene kanale. Source preview cuva
   numeraciju kanala do broja zadanog projektom, bez automatskog stereo miksa.
   To ne odredjuje uloge montaze: u zadanom broadcast postupku A1 je OFF i
-  izjava, A2 ambijent B-rolla. Te uloge nisu stereo par kamere.
+  izjava, A2 ambijent B-rolla. Te uloge nisu stereo par kamere. A1/A2 se u
+  playeru moraju tretirati kao dva odvojena mono lanea iz spremljenog source
+  inventara, i kad fizicki dolaze iz istog visekanalnog streama.
 - Izbor proxy SLIKE ne smije zamijeniti originalni audio reduciranim proxy
   audiom. Izvorni identiteti, sample rate i timing ostaju iz spremljenog
   originala; nema novog probea. Razlicit projektni sample rate zahtijeva
@@ -658,8 +681,9 @@ drugih aplikacija.
    nijedan izlaz ne smije postati drugi player.
 5. Audio ugovor:
    broj kanala i sample rate dolaze iz projektne baze, a source kanali ostaju
-   odvojeni. Broadcast A1/A2 nisu stereo fallback. Svaki nepodrzani format
-   mora dati jasnu gresku ili stvarnu dogovorenu konverziju u javnom adapteru.
+   odvojeni. Broadcast A1/A2 nisu stereo fallback nego dva mono lanea po
+   spremljenom source inventaru. Svaki nepodrzani format mora dati jasnu
+   gresku ili stvarnu dogovorenu konverziju u javnom adapteru.
 6. Diagnostics i mjerenje:
    acceptance mora mjeriti Play naredbu do prvog stvarnog outputa, razmak
    prezentiranih frameova, queue/buffer stanje, A/V offset u vise tocaka klipa
@@ -821,6 +845,9 @@ drugih aplikacija.
 - Javni modul ili komponenta ne smije se siriti dodavanjem posebnih pravila za
   Project, Ingest, Story ili Media Assist. Ako mu treba takvo znanje, modul je
   postao monolit i mora se razbiti na uzi contract.
+- Aplikacijska komponenta koja pocne sadrzavati vise nepovezanih aktivnih
+  odgovornosti mora se razbiti. Nije dozvoljeno sakriti monolit pod nazivom
+  `components`.
 
 ## 13. Razvojni redoslijed
 
@@ -970,10 +997,11 @@ zatvore.
   path u owner Project postavke. Javni identitet lokacije mora ostati QNC URI.
 - Ingest `Odaberi` za konfigurirane izvore pokrece source scan, potvrdeno
   original/proxy grupiranje, citanje camera zapisa, jedini potrebni probe prolaz
-  i source/media DB upis kroz javne module (docs/34). Postojeci zavrseni zapisi
-  citaju se bez novog probea. Prikaz karticnih slicica koristi eksplicitne DB
-  veze i read-only transport (docs/35). To ne znaci da su kopiranje medija,
-  filmstrip, waveform, playback ili sve camera sheme implementirani.
+  i source/media DB upis kroz javni `qnc-ingest-select` modul i njegove javne
+  dependency module (docs/34). Postojeci zavrseni zapisi citaju se bez novog
+  probea. Prikaz karticnih slicica koristi eksplicitne DB veze i read-only
+  transport (docs/35). To ne znaci da su kopiranje medija, filmstrip, waveform,
+  playback ili sve camera sheme implementirani.
 - Ingest application manifest smije deklarirati samo module i capabilityje koji
   imaju stvarnu runtime ovisnost ili implementirani javni adapter u trenutnom
   rezu. Scanner, camera detector, Media Probe, Media Browser, Filmstrip i Wave

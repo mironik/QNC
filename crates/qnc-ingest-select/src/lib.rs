@@ -1,7 +1,9 @@
-use super::{
-    selection_config::{Result, SelectionConfig},
-    ClipView,
-};
+pub mod selection_config;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;
+
+pub use selection_config::{Binding, ProbeConfig, SelectionConfig, SourceConfig};
+
 use qnc_ingest_store::content::{
     Access, CatalogClip, ContentClient, ContentTarget, ImportStatus, StoredClip,
 };
@@ -9,6 +11,7 @@ use qnc_media_probe::{ProbeBackend, Request as ProbeRequest};
 use qnc_media_record_db::{contract::*, Client};
 use qnc_source_groups::{GroupProposal, IndexDocument, IndexReader};
 use qnc_source_reader::{SourceReader, SourceReference, MAX_TEXT_BYTES};
+use selection_config::Result;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{
@@ -19,9 +22,9 @@ use std::{
 };
 
 #[derive(Debug)]
-pub(super) enum Event {
+pub enum Event {
     Status(String),
-    Clip(ClipView),
+    Clip(SelectedClip),
     Existing(BTreeSet<String>),
     Saved {
         revisions: Vec<(String, u32)>,
@@ -33,11 +36,60 @@ pub(super) enum Event {
 }
 
 #[derive(Debug)]
-pub(super) struct Summary {
+pub struct Summary {
     pub unchanged: usize,
     pub processed: usize,
     pub removed: usize,
     pub elapsed_ms: u128,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SelectSaveState {
+    Pending,
+    Failed,
+    #[default]
+    Saved,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SelectThumbStatus {
+    Ready,
+    Pending,
+    #[default]
+    Missing,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectedClip {
+    pub clip_id: String,
+    pub name: String,
+    pub duration_seconds: f64,
+    pub selected: bool,
+    pub imported: bool,
+    pub previously_seen: bool,
+    pub metadata_revision: u32,
+    pub save_state: SelectSaveState,
+    pub thumb_uri: Option<String>,
+    pub thumb_status: SelectThumbStatus,
+    pub thumb_image: Option<Arc<qnc_image_assets::RgbaImage>>,
+}
+
+impl Default for SelectedClip {
+    fn default() -> Self {
+        Self {
+            clip_id: String::new(),
+            name: String::new(),
+            duration_seconds: 0.0,
+            selected: false,
+            imported: false,
+            previously_seen: false,
+            metadata_revision: 0,
+            save_state: SelectSaveState::Saved,
+            thumb_uri: None,
+            thumb_status: SelectThumbStatus::Missing,
+            thumb_image: None,
+        }
+    }
 }
 
 struct CameraAdapter {
@@ -56,7 +108,7 @@ fn adapters() -> Vec<CameraAdapter> {
     }]
 }
 
-pub(super) fn run(
+pub fn run(
     config: SelectionConfig,
     selected: SourceReference,
     target: ContentTarget,
@@ -81,7 +133,7 @@ fn run_inner(
     send: &SyncSender<Event>,
     cancel: &AtomicBool,
     make_backend: impl FnOnce(
-        &super::selection_config::SourceConfig,
+        &selection_config::SourceConfig,
         &[SourceReference],
     ) -> Result<Box<dyn ProbeBackend + Send>>,
     open_content: impl Fn() -> Result<ContentClient> + Sync,
@@ -270,17 +322,17 @@ fn run_inner(
                     }
                     let thumbnail = thumbnail.ok().flatten();
                     let clip_id = format!("clip-{}", record.record_id);
-                    let mut preview = ClipView {
+                    let mut preview = SelectedClip {
                         clip_id: clip_id.clone(),
                         name: name.into(),
                         previously_seen: existing.contains_key(&clip_id),
-                        save_state: crate::SaveState::Pending,
+                        save_state: SelectSaveState::Pending,
                         thumb_uri: thumbnail_reference(record).map(|r| r.uri()),
                         ..Default::default()
                     };
                     if let Some((_, image)) = &thumbnail {
                         preview.thumb_image = Some(image.clone());
-                        preview.thumb_status = crate::ThumbStatus::Ready;
+                        preview.thumb_status = SelectThumbStatus::Ready;
                     }
                     send.send(Event::Clip(preview))?;
                     let result = process_record(
@@ -301,7 +353,7 @@ fn run_inner(
                                 media_records_uri: config.media_records.uri.clone(),
                                 snapshot: snapshot.clone(),
                             };
-                            let mut clip = super::catalog::view(&StoredClip {
+                            let mut clip = view(&StoredClip {
                                 clip: catalog_clip.clone(),
                                 selected: false,
                                 import_status: ImportStatus::Detected,
@@ -309,11 +361,11 @@ fn run_inner(
                                 imported_media_uri: None,
                             });
                             clip.previously_seen = existing.contains_key(&clip.clip_id);
-                            clip.save_state = crate::SaveState::Pending;
+                            clip.save_state = SelectSaveState::Pending;
                             if let Some((uri, image)) = &thumbnail {
                                 clip.thumb_uri = Some(uri.clone());
                                 clip.thumb_image = Some(image.clone());
-                                clip.thumb_status = crate::ThumbStatus::Ready;
+                                clip.thumb_status = SelectThumbStatus::Ready;
                             }
                             send.send(Event::Clip(clip))?;
                             publish.send(catalog_clip)?;
@@ -390,9 +442,37 @@ fn thumbnail_reference(record: &SourceRecord) -> Option<SourceReference> {
     (reader.thumbnail)(p)
 }
 
+fn view(stored: &StoredClip) -> SelectedClip {
+    let duration = stored
+        .clip
+        .snapshot
+        .metadata
+        .original
+        .duration_seconds
+        .as_ref()
+        .map(|d| d.value.numerator as f64 / d.value.denominator as f64)
+        .unwrap_or(0.0);
+    SelectedClip {
+        clip_id: stored.clip.id().into(),
+        name: stored.clip.name.clone(),
+        duration_seconds: duration,
+        selected: stored.selected,
+        imported: stored.import_status == ImportStatus::Imported,
+        previously_seen: true,
+        metadata_revision: stored.clip.snapshot.revision,
+        thumb_uri: stored.clip.thumbnail_uri.clone(),
+        thumb_status: if stored.clip.thumbnail_uri.is_some() {
+            SelectThumbStatus::Pending
+        } else {
+            SelectThumbStatus::Missing
+        },
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 #[path = "selection_tests.rs"]
-pub(crate) mod tests;
+mod tests;
 
 fn process_record(
     db: &mut Client,
@@ -550,7 +630,7 @@ fn complete_record(
                 _ => {
                     return Err(
                         "Probe je vec pokusan ili je u tijeku. Nema ponovnog pokretanja.".into(),
-                    )
+                    );
                 }
             }
         };

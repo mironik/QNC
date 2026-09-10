@@ -1,3 +1,4 @@
+use crate::input::AudioStreamPlan;
 use crate::*;
 use qnc_audio_output::{AudioOutput, ChannelMap, Config, Format};
 use qnc_media_metadata::Rational;
@@ -162,18 +163,14 @@ impl Audio {
         let decoders = plan
             .audio_streams
             .iter()
-            .map(|(index, _)| input.open(*index, None))
+            .map(|stream| input.open(stream.stream_index, None))
             .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             device,
             decoders,
             input,
             pending_seek: None,
-            tracks: plan
-                .audio_streams
-                .iter()
-                .map(|(index, channels)| PcmTrack::new(*index, *channels))
-                .collect(),
+            tracks: plan.audio_streams.iter().map(PcmTrack::new).collect(),
             source: plan.source.clone(),
             origin: plan.audio_origin,
             media_uri: plan.audio_media.media_uri.clone(),
@@ -242,7 +239,7 @@ impl AudioOutputAdapter for Audio {
         let sample_frames = usize::try_from(end - start).map_err(error)?;
         // Poll each existing decoder fairly; drain nothing until all channels are ready.
         for (track, decoder) in self.tracks.iter_mut().zip(&mut self.decoders) {
-            let needed = sample_frames * usize::from(track.channels);
+            let needed = sample_frames * track.output_channels();
             for _ in 0..2 {
                 if track.samples.len() >= needed {
                     break;
@@ -363,20 +360,31 @@ pub(crate) fn validate_channel_map(
 
 struct PcmTrack {
     stream_index: u32,
-    channels: u16,
+    source_channels: u16,
+    selected_channels: Vec<u16>,
     samples: VecDeque<f32>,
     decoded_through: Option<u64>,
     discard_before: u64,
 }
 impl PcmTrack {
-    fn new(stream_index: u32, channels: u16) -> Self {
+    fn new(plan: &AudioStreamPlan) -> Self {
+        debug_assert!(!plan.selected_channels.is_empty());
+        debug_assert!(
+            plan.selected_channels
+                .iter()
+                .all(|channel| *channel < plan.source_channels)
+        );
         Self {
-            stream_index,
-            channels,
+            stream_index: plan.stream_index,
+            source_channels: plan.source_channels,
+            selected_channels: plan.selected_channels.clone(),
             samples: VecDeque::new(),
             decoded_through: Some(0),
             discard_before: 0,
         }
+    }
+    fn output_channels(&self) -> usize {
+        self.selected_channels.len()
     }
     fn push(
         &mut self,
@@ -385,7 +393,7 @@ impl PcmTrack {
         origin: (i64, Rational),
         rate: u32,
     ) -> Result<()> {
-        let channels = usize::from(self.channels);
+        let source_channels = usize::from(self.source_channels);
         let position = relative_position(packet.pts, packet.time_base, origin, rate.into(), 1)?;
         if self
             .decoded_through
@@ -395,17 +403,21 @@ impl PcmTrack {
             || packet.format
                 != (DecodedFormat::Audio {
                     sample_rate_hz: rate,
-                    channels: self.channels.into(),
+                    channels: self.source_channels.into(),
                     sample_format: "f32le".into(),
                 })
             || packet.bytes.is_empty()
-            || !packet.bytes.len().is_multiple_of(channels * 4)
+            || !packet.bytes.len().is_multiple_of(source_channels * 4)
         {
             return Err(error("PCM timestamp or layout differs from saved input"));
         }
-        let count = (packet.bytes.len() / (channels * 4)) as u64;
-        let skip = self.discard_before.saturating_sub(position).min(count) as usize * channels * 4;
-        if self.samples.len() + (packet.bytes.len() - skip) / 4 > rate as usize * channels * 2 {
+        let count = (packet.bytes.len() / (source_channels * 4)) as u64;
+        let skip =
+            self.discard_before.saturating_sub(position).min(count) as usize * source_channels * 4;
+        let sample_frames_after_skip = (packet.bytes.len() - skip) / (source_channels * 4);
+        if self.samples.len() + sample_frames_after_skip * self.output_channels()
+            > rate as usize * self.output_channels() * 2
+        {
             return Err(error("PCM slice buffer limit exceeded"));
         }
         self.decoded_through = Some(
@@ -413,11 +425,14 @@ impl PcmTrack {
                 .checked_add(count)
                 .ok_or_else(|| error("PCM position overflow"))?,
         );
-        self.samples.extend(
-            packet.bytes[skip..]
-                .chunks_exact(4)
-                .map(|v| f32::from_le_bytes(v.try_into().expect("sample"))),
-        );
+        for frame in packet.bytes[skip..].chunks_exact(source_channels * 4) {
+            for channel in &self.selected_channels {
+                let offset = usize::from(*channel) * 4;
+                self.samples.extend([f32::from_le_bytes(
+                    frame[offset..offset + 4].try_into().expect("sample"),
+                )]);
+            }
+        }
         Ok(())
     }
 }
@@ -425,15 +440,15 @@ impl PcmTrack {
 fn interleave_tracks(tracks: &mut [PcmTrack], frames: usize) -> Result<Vec<f32>> {
     if tracks
         .iter()
-        .any(|track| track.samples.len() < frames * usize::from(track.channels))
+        .any(|track| track.samples.len() < frames * track.output_channels())
     {
         return Err(pending());
     }
-    let channels: usize = tracks.iter().map(|t| usize::from(t.channels)).sum();
+    let channels: usize = tracks.iter().map(PcmTrack::output_channels).sum();
     let mut samples = Vec::with_capacity(frames * channels);
     for _ in 0..frames {
         for track in tracks.iter_mut() {
-            samples.extend(track.samples.drain(..usize::from(track.channels)));
+            samples.extend(track.samples.drain(..track.output_channels()));
         }
     }
     Ok(samples)
@@ -446,7 +461,23 @@ mod audio_live_test;
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn track_plan(
+        stream_index: u32,
+        source_channels: u16,
+        selected_channels: &[u16],
+    ) -> AudioStreamPlan {
+        AudioStreamPlan {
+            stream_index,
+            source_channels,
+            selected_channels: selected_channels.to_vec(),
+        }
+    }
+
     fn pcm(pts: i64, values: &[f32]) -> qnc_media_decode::DecodedPacket {
+        pcm_channels(pts, 1, values)
+    }
+
+    fn pcm_channels(pts: i64, channels: u16, values: &[f32]) -> qnc_media_decode::DecodedPacket {
         qnc_media_decode::DecodedPacket {
             version: qnc_media_decode::VERSION.into(),
             media_uri: "saved".into(),
@@ -459,7 +490,7 @@ mod tests {
             },
             format: DecodedFormat::Audio {
                 sample_rate_hz: 48000,
-                channels: 1,
+                channels: channels.into(),
                 sample_format: "f32le".into(),
             },
             bytes: values.iter().flat_map(|v| v.to_le_bytes()).collect(),
@@ -467,7 +498,7 @@ mod tests {
     }
     #[test]
     fn seek_trims_pcm_by_sample_position_without_rounding_or_relabelling() {
-        let mut track = PcmTrack::new(1, 1);
+        let mut track = PcmTrack::new(&track_plan(1, 1, &[0]));
         track.decoded_through = None;
         track.discard_before = 5;
         let origin = (
@@ -487,14 +518,53 @@ mod tests {
         assert_eq!(track.samples, [5., 6.]);
         assert_eq!(track.decoded_through, Some(7));
         assert!(track.push(pcm(8, &[8.]), "saved", origin, 48000).is_err());
-        let mut missing = PcmTrack::new(1, 1);
+        let mut missing = PcmTrack::new(&track_plan(1, 1, &[0]));
         missing.decoded_through = None;
         missing.discard_before = 5;
         assert!(missing.push(pcm(6, &[6.]), "saved", origin, 48000).is_err());
     }
+
+    #[test]
+    fn selected_channels_from_one_stream_become_separate_mono_lanes() {
+        let origin = (
+            0,
+            Rational {
+                numerator: 1,
+                denominator: 48000,
+            },
+        );
+        let mut a1_a2 = PcmTrack::new(&track_plan(1, 4, &[0, 1]));
+        a1_a2
+            .push(
+                pcm_channels(0, 4, &[1.0, 2.0, 3.0, 4.0, 10.0, 20.0, 30.0, 40.0]),
+                "saved",
+                origin,
+                48000,
+            )
+            .unwrap();
+        assert_eq!(a1_a2.samples, [1.0, 2.0, 10.0, 20.0]);
+        assert_eq!(
+            interleave_tracks(&mut [a1_a2], 2).unwrap(),
+            [1.0, 2.0, 10.0, 20.0]
+        );
+
+        let mut a2_only = PcmTrack::new(&track_plan(1, 4, &[1]));
+        a2_only
+            .push(
+                pcm_channels(0, 4, &[1.0, 2.0, 3.0, 4.0, 10.0, 20.0, 30.0, 40.0]),
+                "saved",
+                origin,
+                48000,
+            )
+            .unwrap();
+        assert_eq!(a2_only.samples, [2.0, 20.0]);
+    }
+
     #[test]
     fn pending_track_does_not_consume_other_channels() {
-        let mut tracks: Vec<_> = (1..=4).map(|i| PcmTrack::new(i, 1)).collect();
+        let mut tracks: Vec<_> = (1..=4)
+            .map(|i| PcmTrack::new(&track_plan(i, 1, &[0])))
+            .collect();
         for (i, track) in tracks.iter_mut().enumerate().take(3) {
             track.samples.extend([i as f32, i as f32 + 10.0]);
         }

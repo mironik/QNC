@@ -6,7 +6,3 @@ description = "Shared passive QNC timeline UI component"
 
 [dependencies]
 eframe = { workspace = true }
-qnc-player-contract = { workspace = true }
-
-[dev-dependencies]
-serde_json = { workspace = true }

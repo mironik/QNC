@@ -109,8 +109,8 @@ impl Runtime {
             plan.source.audio_format.as_ref(),
             plan.audio_channels.as_ref(),
         )?;
-        for (index, _) in &plan.audio_streams {
-            request(&plan.audio_media, *index)
+        for stream in &plan.audio_streams {
+            request(&plan.audio_media, stream.stream_index)
                 .validate(&decoder_config)
                 .map_err(error)?;
         }

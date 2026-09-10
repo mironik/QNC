@@ -6,7 +6,7 @@
   "capabilities": ["playback.prepare.native", "playback.play.native", "playback.pause.native", "playback.cue.native"],
   "timing_policy": "Playback cadence and source video runtime format are derived only from the saved source clip facts and the player/audio clock. Do not use display Hz, UI repaint rate, project/export FPS, project field order, project color or hardcoded defaults as source playback cadence/format.",
   "input_contract_version": "0.3.0",
-  "audio_policy": "Apply DB-read project_audio to source preview output without changing native media metadata. Keep channels separate in source order; no stereo mix or caller routing override. Reject unavailable source channels, unsupported device formats or sample-rate conversion before opening the output. Current decoder uses native sample rate; differing project rate is an explicit unsupported-format error, not a fallback.",
+  "audio_policy": "Apply DB-read project_audio to source preview output without changing native media metadata. Keep channels separate in saved source order; A1/A2 are two mono lanes, not a stereo fallback, even when they come from the same multichannel stream. No caller routing override. Reject unavailable source channels, unsupported device formats or sample-rate conversion before opening the output. Current decoder uses native sample rate; differing project rate is an explicit unsupported-format error, not a fallback.",
   "output_contract_version": "0.3.0",
   "transport_protocol_version": "0.3.0",
   "supported_os": ["windows", "linux", "macos"],

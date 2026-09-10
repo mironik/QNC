@@ -54,6 +54,14 @@ fn real_saved_original_mono_tracks() {
     );
     assert!(audio_streams.iter().all(|(_, count)| *count == 1));
     let format = format.unwrap();
+    let audio_stream_plans: Vec<_> = audio_streams
+        .iter()
+        .map(|(stream_index, source_channels)| input::AudioStreamPlan {
+            stream_index: *stream_index,
+            source_channels: *source_channels,
+            selected_channels: (0..*source_channels).collect(),
+        })
+        .collect();
     let stream = media
         .streams
         .iter()
@@ -76,7 +84,7 @@ fn real_saved_original_mono_tracks() {
             stream.time_base.as_ref().unwrap().value,
         ),
         spec: qnc_pixel_convert::ConversionSpec::from_saved(video).unwrap(),
-        audio_streams,
+        audio_streams: audio_stream_plans,
         audio_channels: Some(ChannelMap::new(format.channel_count, vec![2, 3]).unwrap()),
         audio_origin: (
             stream.start_pts.as_ref().unwrap().value,

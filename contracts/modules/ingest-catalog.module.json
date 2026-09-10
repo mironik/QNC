@@ -1,0 +1,46 @@
+{
+  "module_id": "qnc.module.ingest-catalog",
+  "module_name": "Ingest Catalog Reader",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "runtime_crate": "qnc-ingest-catalog",
+  "capabilities": [
+    "ingest.catalog.read_summary",
+    "ingest.catalog.read_stats",
+    "ingest.catalog.active_project_load"
+  ],
+  "input_contract_version": "0.2.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "project.workflow",
+    "project.settings.write",
+    "source.scan.roles",
+    "source.bytes.read",
+    "camera.metadata.read",
+    "media.probe.full",
+    "ffprobe",
+    "player.playback",
+    "timeline.paint",
+    "filmstrip.generate14",
+    "wave.generate",
+    "application.db.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.dir-browser",
+    "qnc.module.scanner",
+    "qnc.module.source-reader",
+    "qnc.module.media-probe",
+    "qnc.module.ffprobe-metadata",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.timeline",
+    "qnc.module.ui-widget"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "project_settings_policy": "read_only_via_work_settings",
+  "ui_policy": "no_form_or_paint_code"
+}

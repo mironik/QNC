@@ -1,5 +1,6 @@
 use super::*;
-use qnc_player_client::{Action, Launch, MediaBinding, Player};
+use qnc_player_client::{Action, Player};
+use qnc_player_launcher::SourceTransportBinding;
 
 impl IngestComponent {
     pub fn notify_on_player_change(&self, notify: impl Fn() + Send + Sync + 'static) {
@@ -52,49 +53,36 @@ impl IngestComponent {
             }
         }
         self.player.as_ref().unwrap().prepare(move || {
-            let input = qnc_player_input::InputReader::new(reader)
-                .load(&workspace, &clip_id)
-                .map_err(|e| e.to_string())?;
-            let media_uri = &input.media().map_err(|e| e.to_string())?.media_uri;
-            let reference = qnc_source_reader::SourceReference::from_uri(media_uri)
-                .map_err(|e| e.to_string())?;
-            let binding = &config
+            let sources = config
                 .sources
                 .iter()
-                .find(|s| s.location.uri == reference.source_uri())
-                .ok_or("Player source has no transport binding.")?
-                .location;
-            let media_binding = if let Some(root) = &binding.file {
-                MediaBinding::Local {
-                    source_uri: binding.uri.clone(),
-                    root: root.clone(),
-                }
-            } else {
-                let parsed =
-                    qnc_contracts::parse_qnc_uri(&binding.uri).map_err(|e| e.to_string())?;
-                MediaBinding::Network {
-                    environment: parsed.environment,
-                    authority: parsed.authority.ok_or("Source authority missing.")?,
-                    base_url: binding.endpoint.clone().ok_or("Source endpoint missing.")?,
-                    token: binding
-                        .token()
-                        .map_err(|e| e.to_string())?
-                        .ok_or("Source credential missing.")?,
-                }
-            };
-            let executable = std::env::current_exe()
-                .map_err(|e| e.to_string())?
-                .with_file_name(format!(
-                    "qnc-broadcast-player{}",
-                    std::env::consts::EXE_SUFFIX
-                ));
-            Ok(Launch {
-                executable,
-                input,
-                media_binding,
-            })
+                .map(|source| {
+                    if let Some(root) = &source.location.file {
+                        return Ok(SourceTransportBinding::local(
+                            source.location.uri.clone(),
+                            root.clone(),
+                        ));
+                    }
+                    SourceTransportBinding::network(
+                        source.location.uri.clone(),
+                        source
+                            .location
+                            .endpoint
+                            .clone()
+                            .ok_or("Source endpoint missing.")?,
+                        source
+                            .location
+                            .token()
+                            .map_err(|e| e.to_string())?
+                            .ok_or("Source credential missing.")?,
+                    )
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            let executable = qnc_player_launcher::sibling_executable("qnc-broadcast-player")?;
+            qnc_player_launcher::prepare_launch(reader, &workspace, &clip_id, &sources, executable)
         });
         self.view.playback = self.player.as_ref().unwrap().view();
+        self.view.timeline = playback_timeline_projection(&self.view.playback);
         IngestDispatchResult::accepted(None, true)
     }
     pub(super) fn stop_player(&mut self) {
@@ -103,6 +91,7 @@ impl IngestComponent {
             player.close();
         }
         self.view.playback = Default::default();
+        self.view.timeline = Default::default();
     }
     pub(super) fn player_action(&mut self, intent: IngestIntent) -> IngestDispatchResult {
         if self.player.is_none() {

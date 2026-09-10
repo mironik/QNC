@@ -33,10 +33,8 @@ impl IngestApp {
         if self.component.poll() {
             ctx.request_repaint();
         }
-        if self.component.needs_player_poll() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(10));
-        } else if self.component.has_pending_work() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        if let Some(delay) = self.component.next_repaint_delay() {
+            ctx.request_repaint_after(delay);
         }
         self.dispatch_keyboard_shortcuts(ctx);
         let theme = Theme::from_contract(&self.contracts.shell);

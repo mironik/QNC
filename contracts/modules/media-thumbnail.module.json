@@ -1,0 +1,44 @@
+{
+  "module_id": "qnc.module.media-thumbnail",
+  "module_name": "Media Thumbnail Loader",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "runtime_crate": "qnc-media-thumbnail",
+  "capabilities": [
+    "media.thumbnail.read",
+    "media.thumbnail.decode"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.3.0",
+  "forbidden_calls": [
+    "project.workflow",
+    "project.settings.write",
+    "source.scan.roles",
+    "camera.metadata.read",
+    "media.probe.full",
+    "ffprobe",
+    "ffmpeg",
+    "player.playback",
+    "timeline.paint",
+    "filmstrip.generate14",
+    "wave.generate",
+    "application.db.read",
+    "application.db.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.dir-browser",
+    "qnc.module.scanner",
+    "qnc.module.media-probe",
+    "qnc.module.ffprobe-metadata",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.timeline",
+    "qnc.module.ui-widget"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "ui_policy": "no_form_or_paint_code"
+}

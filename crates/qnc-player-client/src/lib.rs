@@ -1,7 +1,7 @@
 //! Public process client. No decoder, playback clock, database owner or application identity.
 mod connection;
 use qnc_player_contract::{
-    BroadcastPlayerProtocolEvent as Event, TransportStatus, envelope::EventEnvelope,
+    BroadcastPlayerProtocolEvent as Event, Timebase, TransportStatus, envelope::EventEnvelope,
     session::MonitorHeader,
 };
 use qnc_player_input::PreparedInput;
@@ -90,6 +90,36 @@ impl View {
     pub fn can_start_playback(&self) -> bool {
         self.ready() && self.has_confirmed_position()
     }
+
+    pub fn source_timebase(&self) -> Option<Timebase> {
+        if let Some(picture) = &self.picture {
+            return Some(picture.header.timebase);
+        }
+        self.reply.as_ref().and_then(|reply| {
+            reply.events.iter().rev().find_map(|event| match event {
+                Event::CarrierPositionChanged {
+                    timebase: Some(timebase),
+                    ..
+                } => Some(*timebase),
+                _ => None,
+            })
+        })
+    }
+
+    pub fn source_frame_interval(&self) -> Option<Duration> {
+        let timebase = self.source_timebase()?;
+        frame_interval(timebase)
+    }
+}
+
+fn frame_interval(timebase: Timebase) -> Option<Duration> {
+    if timebase.fps_num <= 0 || timebase.fps_den <= 0 {
+        return None;
+    }
+    let nanos = 1_000_000_000u128
+        .checked_mul(u128::try_from(timebase.fps_den).ok()?)?
+        .div_ceil(u128::try_from(timebase.fps_num).ok()?);
+    Some(Duration::from_nanos(u64::try_from(nanos).ok()?))
 }
 #[derive(Clone, Copy, Debug)]
 pub enum Action {
@@ -339,6 +369,40 @@ mod tests {
             },
         ]));
         assert!(view.can_start_playback());
+    }
+
+    #[test]
+    fn repaint_interval_comes_from_confirmed_source_timebase() {
+        let view = View {
+            reply: Some(reply(vec![Event::CarrierPositionChanged {
+                source_id: Some("clip".into()),
+                frame: 12,
+                range: Some(FrameRange::new(0, 100).unwrap()),
+                timebase: Some(Timebase::new(50, 1).unwrap()),
+                status: TransportStatus::Playing,
+            }])),
+            ..View::default()
+        };
+
+        assert_eq!(
+            view.source_frame_interval(),
+            Some(Duration::from_millis(20))
+        );
+    }
+
+    #[test]
+    fn unconfirmed_player_view_has_no_repaint_clock() {
+        let view = View {
+            reply: Some(reply(vec![Event::PlaybackReadinessChanged {
+                source_id: Some("clip".into()),
+                frame: 0,
+                ready: true,
+            }])),
+            ..View::default()
+        };
+
+        assert_eq!(view.source_timebase(), None);
+        assert_eq!(view.source_frame_interval(), None);
     }
 
     #[test]

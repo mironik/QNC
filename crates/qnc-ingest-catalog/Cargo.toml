@@ -1,0 +1,9 @@
+[package]
+name = "qnc-ingest-catalog"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-ingest-store = { workspace = true }
+qnc-ingest-work-plan = { workspace = true }
+qnc-work-settings = { workspace = true }

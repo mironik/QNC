@@ -1,14 +1,10 @@
 //! Passive public QNC timeline UI component.
 //!
-//! The timeline paints a frame-space projection of Broadcast Player state and
-//! emits user intents. It owns no playback clock, no database, no scanner, no
-//! probe, and no media processing path.
+//! The timeline-engine paints a supplied frame-space UI projection and emits
+//! user intents. It owns no playback clock, no database, no scanner, no probe,
+//! no media processing path, and no Broadcast Player event interpretation.
 
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
-use qnc_player_contract::{
-    BroadcastPlayerProtocolEvent as PlayerEvent, FrameRange, Timebase, TransportStatus,
-    envelope::EventEnvelope,
-};
 
 pub const MODULE_ID: &str = "qnc.module.timeline";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -47,8 +43,9 @@ impl AudioLane {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimelineLayerFlags {
+    pub carrier: bool,
     pub audio_a1: bool,
-    pub video: bool,
+    pub base_video: bool,
     pub audio_a2: bool,
     pub audio_a3: bool,
     pub audio_a4: bool,
@@ -62,10 +59,11 @@ pub struct TimelineLayerFlags {
 }
 
 impl TimelineLayerFlags {
-    pub fn source() -> Self {
+    pub fn a1_v_a2() -> Self {
         Self {
+            carrier: true,
             audio_a1: true,
-            video: true,
+            base_video: true,
             audio_a2: true,
             audio_a3: false,
             audio_a4: false,
@@ -73,33 +71,52 @@ impl TimelineLayerFlags {
             covers: false,
             markers: false,
             marker_slots: false,
-            shot_range: true,
-            in_out: true,
-            playhead: true,
-        }
-    }
-
-    pub fn passive_overlay_projection() -> Self {
-        Self {
-            audio_a1: true,
-            video: true,
-            audio_a2: true,
-            audio_a3: false,
-            audio_a4: false,
-            virtual_spans: true,
-            covers: true,
-            markers: true,
-            marker_slots: true,
             shot_range: false,
             in_out: false,
             playhead: true,
         }
     }
+
+    pub fn source() -> Self {
+        let mut layers = Self::a1_v_a2().with_source_marks();
+        layers.base_video = false;
+        layers
+    }
+
+    pub fn with_source_marks(mut self) -> Self {
+        self.shot_range = true;
+        self.in_out = true;
+        self
+    }
+
+    pub fn with_overlays(mut self) -> Self {
+        self.virtual_spans = true;
+        self.covers = true;
+        self.markers = true;
+        self.marker_slots = true;
+        self
+    }
+
+    pub fn passive_overlay_projection() -> Self {
+        Self::a1_v_a2().with_overlays()
+    }
+
+    pub fn video_stack_on(self) -> bool {
+        self.carrier
+            || self.base_video
+            || self.virtual_spans
+            || self.covers
+            || self.markers
+            || self.marker_slots
+            || self.shot_range
+            || self.in_out
+            || self.playhead
+    }
 }
 
 impl Default for TimelineLayerFlags {
     fn default() -> Self {
-        Self::source()
+        Self::a1_v_a2()
     }
 }
 
@@ -140,7 +157,7 @@ impl TimelineMetrics {
         if layers.audio_a1 {
             rows.push(self.lane_height(AudioLane::A1, expanded_audio));
         }
-        if layers.video {
+        if layers.video_stack_on() {
             rows.push(self.video_height);
         }
         if layers.audio_a2 {
@@ -176,6 +193,8 @@ pub struct TimelineTheme {
     pub in_out_dim: Color32,
     pub wave_a1: Color32,
     pub wave_a2: Color32,
+    pub wave_a3: Color32,
+    pub wave_a4: Color32,
 }
 
 impl TimelineTheme {
@@ -203,140 +222,65 @@ impl TimelineTheme {
             in_out_dim: Color32::from_black_alpha(133),
             wave_a1: Color32::from_rgb(16, 185, 129),
             wave_a2: Color32::from_rgb(107, 114, 128),
+            wave_a3: Color32::from_rgb(75, 85, 99),
+            wave_a4: Color32::from_rgb(55, 65, 81),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TimelinePlayerState {
-    pub source_id: Option<String>,
-    pub status: TransportStatus,
-    pub carrier_frame: Option<u64>,
-    pub range: Option<FrameRange>,
-    pub timebase: Option<Timebase>,
-    pub ready: bool,
-    pub presented_frame: Option<u64>,
-    pub submitted_frame: Option<u64>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimelineProjection {
+    pub range_start_frame: u64,
+    pub duration_frames: u64,
+    pub playhead_frame: Option<u64>,
+    pub cue_enabled: bool,
 }
 
-impl Default for TimelinePlayerState {
+impl Default for TimelineProjection {
     fn default() -> Self {
         Self {
-            source_id: None,
-            status: TransportStatus::Empty,
-            carrier_frame: None,
-            range: None,
-            timebase: None,
-            ready: false,
-            presented_frame: None,
-            submitted_frame: None,
+            range_start_frame: 0,
+            duration_frames: 1,
+            playhead_frame: None,
+            cue_enabled: false,
         }
     }
 }
 
-impl TimelinePlayerState {
-    pub fn from_envelope(envelope: Option<&EventEnvelope>) -> Self {
-        let mut state = Self::default();
-        if let Some(envelope) = envelope {
-            for event in &envelope.events {
-                state.apply_player_event(event);
-            }
-        }
-        state
-    }
-
-    pub fn apply_player_event(&mut self, event: &PlayerEvent) {
-        match event {
-            PlayerEvent::SourceReady { source_id }
-            | PlayerEvent::SourcePreloaded { source_id }
-            | PlayerEvent::SourceSnapshotReloaded { source_id, .. } => {
-                if self.source_id.is_none() {
-                    self.source_id = Some(source_id.clone());
-                }
-            }
-            PlayerEvent::ActiveSourceChanged { source_id } => {
-                self.source_id = source_id.clone();
-                if source_id.is_none() {
-                    self.ready = false;
-                    self.carrier_frame = None;
-                    self.range = None;
-                    self.timebase = None;
-                }
-            }
-            PlayerEvent::PlaybackReadinessChanged {
-                source_id, ready, ..
-            } => {
-                if let Some(source_id) = source_id {
-                    self.source_id = Some(source_id.clone());
-                }
-                self.ready = *ready;
-            }
-            PlayerEvent::CarrierPositionChanged {
-                source_id,
-                frame,
-                range,
-                timebase,
-                status,
-            } => {
-                if let Some(source_id) = source_id {
-                    self.source_id = Some(source_id.clone());
-                }
-                self.carrier_frame = Some(*frame);
-                self.range = *range;
-                self.timebase = *timebase;
-                self.status = *status;
-            }
-            PlayerEvent::TransportStatusChanged { status } => {
-                self.status = *status;
-            }
-            PlayerEvent::ExecutionRangeChanged { range } => {
-                self.range = *range;
-            }
-            PlayerEvent::PlaybackBoundaryReached { frame } => {
-                self.carrier_frame = Some(*frame);
-            }
-            PlayerEvent::VideoFrameSubmitted { frame } => {
-                self.submitted_frame = Some(*frame);
-            }
-            PlayerEvent::FramePresented { frame } => {
-                self.presented_frame = Some(*frame);
-            }
-            PlayerEvent::SourceFailed { source_id, .. } => {
-                self.source_id = Some(source_id.clone());
-                self.ready = false;
-            }
-            PlayerEvent::PlaybackError { .. } => {
-                self.ready = false;
-            }
-            PlayerEvent::CommandAccepted { .. }
-            | PlayerEvent::CommandRejected { .. }
-            | PlayerEvent::VideoRuntimeChanged { .. }
-            | PlayerEvent::DroppedFrame { .. }
-            | PlayerEvent::AudioLevelChanged { .. }
-            | PlayerEvent::AudioRuntimeChanged { .. }
-            | PlayerEvent::AVSyncWarning { .. }
-            | PlayerEvent::BufferStateChanged { .. }
-            | PlayerEvent::DecodeWarning { .. } => {}
+impl TimelineProjection {
+    pub fn new(range_start_frame: u64, duration_frames: u64) -> Self {
+        Self {
+            range_start_frame,
+            duration_frames: duration_frames.max(1),
+            playhead_frame: None,
+            cue_enabled: false,
         }
     }
 
-    pub fn confirmed_frame(&self) -> Option<u64> {
-        self.carrier_frame
+    pub fn with_playhead(mut self, playhead_frame: u64) -> Self {
+        self.playhead_frame = Some(playhead_frame);
+        self
     }
 
-    pub fn duration_frames(&self) -> u64 {
-        self.range
-            .map(FrameRange::duration_frames)
-            .unwrap_or(1)
-            .max(1)
+    pub fn with_cue_enabled(mut self, cue_enabled: bool) -> Self {
+        self.cue_enabled = cue_enabled;
+        self
     }
 
     pub fn range_start(&self) -> u64 {
-        self.range.map(|range| range.start_frame).unwrap_or(0)
+        self.range_start_frame
+    }
+
+    pub fn confirmed_frame(&self) -> Option<u64> {
+        self.playhead_frame
+    }
+
+    pub fn duration_frames(&self) -> u64 {
+        self.duration_frames.max(1)
     }
 
     pub fn can_cue(&self) -> bool {
-        self.range.is_some() && self.timebase.is_some()
+        self.cue_enabled
     }
 }
 
@@ -374,23 +318,125 @@ pub struct TimelineMarkerPin<'a> {
     pub frame: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimelineProgramRow {
+    pub index: usize,
+    pub count: usize,
+    pub start_frame: u64,
+    pub end_frame: u64,
+}
+
+impl TimelineProgramRow {
+    pub fn new(index: usize, count: usize, start_frame: u64, end_frame: u64) -> Self {
+        Self {
+            index,
+            count,
+            start_frame,
+            end_frame: end_frame.max(start_frame.saturating_add(1)),
+        }
+    }
+
+    pub fn overview(duration_frames: u64) -> Self {
+        Self::new(0, 1, 0, duration_frames.max(1))
+    }
+
+    pub fn start_frame(self) -> u64 {
+        self.start_frame
+    }
+
+    pub fn end_frame(self) -> u64 {
+        self.end_frame.max(self.start_frame.saturating_add(1))
+    }
+
+    pub fn duration_frames(self) -> u64 {
+        self.end_frame().saturating_sub(self.start_frame()).max(1)
+    }
+
+    pub fn is_last(self) -> bool {
+        self.count > 0 && self.index.saturating_add(1) == self.count
+    }
+
+    pub fn program_frame_from_local(self, local_frame: u64) -> u64 {
+        self.start_frame()
+            .saturating_add(local_frame.min(self.duration_frames()))
+    }
+
+    pub fn local_playhead_frame(self, program_frame: u64) -> Option<u64> {
+        let start = self.start_frame();
+        let end = self.end_frame();
+        let in_row = program_frame >= start
+            && (program_frame < end || self.is_last() && program_frame == end);
+        in_row.then(|| {
+            program_frame
+                .saturating_sub(start)
+                .min(self.duration_frames())
+        })
+    }
+
+    pub fn local_range(
+        self,
+        program_start_frame: u64,
+        program_end_frame: u64,
+    ) -> Option<(u64, u64)> {
+        if program_end_frame <= program_start_frame {
+            return None;
+        }
+        let start = program_start_frame.max(self.start_frame());
+        let end = program_end_frame.min(self.end_frame());
+        (end > start).then(|| {
+            (
+                start.saturating_sub(self.start_frame()),
+                end.saturating_sub(self.start_frame()),
+            )
+        })
+    }
+
+    pub fn local_marker_frame(self, program_frame: u64) -> Option<u64> {
+        let start = self.start_frame();
+        let end = self.end_frame();
+        if program_frame < start || program_frame > end {
+            return None;
+        }
+        if program_frame == start && self.index != 0 {
+            return None;
+        }
+        if program_frame == end && !self.is_last() {
+            return Some(self.duration_frames());
+        }
+        Some(program_frame.saturating_sub(start))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TimelineFocusPaint {
+    #[default]
+    Playhead,
+    In,
+    Out,
+}
+
 #[derive(Clone, Copy)]
 pub struct TimelineInput<'a> {
-    pub state: &'a TimelinePlayerState,
+    pub state: &'a TimelineProjection,
     pub layers: TimelineLayerFlags,
     pub metrics: TimelineMetrics,
     pub theme: TimelineTheme,
     pub expanded_audio: AudioLane,
+    pub focus: TimelineFocusPaint,
+    pub show_lane_labels: bool,
     pub shot_in_frame: u64,
     pub shot_out_frame: u64,
     pub draft_in_frame: u64,
     pub draft_out_frame: u64,
     pub a1_peaks: &'a [f32],
     pub a2_peaks: &'a [f32],
+    pub a3_peaks: &'a [f32],
+    pub a4_peaks: &'a [f32],
     pub virtual_spans: &'a [TimelineVirtualSpan<'a>],
     pub covers: &'a [TimelineCoverSpan<'a>],
     pub marker_slots: &'a [TimelineSlotSpan<'a>],
     pub markers: &'a [TimelineMarkerPin<'a>],
+    pub base_video_blank: bool,
     pub video_background: Option<&'a dyn Fn(&mut egui::Ui, Rect)>,
 }
 
@@ -411,8 +457,51 @@ impl Default for TimelineIntent {
     }
 }
 
-pub fn source_timeline_height(expanded_audio: AudioLane) -> f32 {
-    TimelineMetrics::default().outer_height(TimelineLayerFlags::source(), expanded_audio)
+pub fn height_for_layers(layers: TimelineLayerFlags, expanded_audio: AudioLane) -> f32 {
+    TimelineMetrics::default().outer_height(layers, expanded_audio)
+}
+
+pub fn source_player_timeline_height() -> f32 {
+    height_for_layers(TimelineLayerFlags::source(), AudioLane::None)
+}
+
+pub fn show_source_player_timeline(
+    ui: &mut egui::Ui,
+    rect: Rect,
+    state: &TimelineProjection,
+    theme: TimelineTheme,
+) -> TimelineIntent {
+    let duration = state.duration_frames();
+    let mut out = TimelineIntent::None;
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+        out = show(
+            ui,
+            TimelineInput {
+                state,
+                layers: TimelineLayerFlags::source(),
+                metrics: TimelineMetrics::default(),
+                theme,
+                expanded_audio: AudioLane::None,
+                focus: TimelineFocusPaint::Playhead,
+                show_lane_labels: true,
+                shot_in_frame: 0,
+                shot_out_frame: duration,
+                draft_in_frame: 0,
+                draft_out_frame: duration,
+                a1_peaks: &[],
+                a2_peaks: &[],
+                a3_peaks: &[],
+                a4_peaks: &[],
+                virtual_spans: &[],
+                covers: &[],
+                marker_slots: &[],
+                markers: &[],
+                base_video_blank: true,
+                video_background: None,
+            },
+        );
+    });
+    out
 }
 
 pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
@@ -458,7 +547,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
             ),
         );
     }
-    if input.layers.video {
+    if input.layers.video_stack_on() {
         let row = next_row(
             &mut next_top,
             left,
@@ -507,9 +596,9 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 ui,
                 row,
                 AudioLane::A3,
-                &[],
+                input.a3_peaks,
                 input.theme.audio_secondary_background,
-                input.theme.muted,
+                input.theme.wave_a3,
                 &input,
             ),
         );
@@ -530,9 +619,9 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 ui,
                 row,
                 AudioLane::A4,
-                &[],
+                input.a4_peaks,
                 input.theme.audio_secondary_background,
-                input.theme.muted,
+                input.theme.wave_a4,
                 &input,
             ),
         );
@@ -566,7 +655,12 @@ fn paint_audio_row(
     input: &TimelineInput<'_>,
 ) -> TimelineIntent {
     let (label_rect, track_rect) = split_label_track(row, input.metrics.label_width);
-    paint_lane_label(ui, label_rect, lane.label(), input);
+    let label = if input.show_lane_labels {
+        lane.label()
+    } else {
+        ""
+    };
+    paint_lane_label(ui, label_rect, label, input);
     let response = ui.interact(
         track_rect,
         ui.make_persistent_id(("qnc_timeline_audio", lane.label())),
@@ -577,7 +671,7 @@ fn paint_audio_row(
         ui.make_persistent_id(("qnc_timeline_audio_label", lane.label())),
         Sense::click(),
     );
-    if label_response.clicked() {
+    if input.show_lane_labels && label_response.clicked() {
         return TimelineIntent::ToggleAudioExpand(lane);
     }
     ui.painter().rect_filled(track_rect, 0.0, fill);
@@ -594,7 +688,8 @@ fn paint_audio_row(
 
 fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> TimelineIntent {
     let (label_rect, track_rect) = split_label_track(row, input.metrics.label_width);
-    paint_lane_label(ui, label_rect, "V", input);
+    let label = if input.show_lane_labels { "V" } else { "" };
+    paint_lane_label(ui, label_rect, label, input);
     let response = ui.interact(
         track_rect,
         ui.make_persistent_id("qnc_timeline_video"),
@@ -648,6 +743,14 @@ fn paint_ranges_and_playhead(ui: &mut egui::Ui, track: Rect, input: &TimelineInp
             input.draft_out_frame,
             input.theme.in_out_dim,
         );
+        paint_in_out_handles(
+            ui,
+            track,
+            duration,
+            input.draft_in_frame,
+            input.draft_out_frame,
+            input,
+        );
     }
     if input.layers.playhead {
         if let Some(frame) = input.state.confirmed_frame() {
@@ -671,8 +774,28 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
             false,
         );
     }
-    if input.layers.virtual_spans {
-        paint_virtual_spans(ui, track, range_start, duration, input.virtual_spans, input);
+    if input.layers.base_video {
+        if input.virtual_spans.is_empty() {
+            if !input.base_video_blank {
+                ui.painter().rect_filled(
+                    track.shrink2(Vec2::new(0.0, 10.0)),
+                    1.0,
+                    input.theme.wave_a1.linear_multiply(0.20),
+                );
+            }
+        } else if input.layers.virtual_spans {
+            paint_virtual_spans(ui, track, range_start, duration, input.virtual_spans, input);
+        }
+    } else if input.layers.virtual_spans {
+        if input.virtual_spans.is_empty() && !input.base_video_blank {
+            ui.painter().rect_filled(
+                track.shrink2(Vec2::new(0.0, 10.0)),
+                1.0,
+                input.theme.wave_a1.linear_multiply(0.20),
+            );
+        } else {
+            paint_virtual_spans(ui, track, range_start, duration, input.virtual_spans, input);
+        }
     }
     if input.layers.shot_range {
         paint_range_outline(
@@ -710,6 +833,14 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
             input.draft_out_frame,
             input.theme.in_out_dim,
         );
+        paint_in_out_handles(
+            ui,
+            track,
+            duration,
+            input.draft_in_frame,
+            input.draft_out_frame,
+            input,
+        );
     }
     if input.layers.playhead {
         if let Some(frame) = input.state.confirmed_frame() {
@@ -727,9 +858,55 @@ fn paint_playhead(
     input: &TimelineInput<'_>,
 ) {
     let x = x_for_frame(track, range_start, duration, frame);
+    let color = if input.focus == TimelineFocusPaint::Playhead {
+        input.theme.focus
+    } else {
+        input.theme.playhead
+    };
+    let width = if input.focus == TimelineFocusPaint::Playhead {
+        2.5
+    } else {
+        1.5
+    };
     ui.painter().line_segment(
         [egui::pos2(x, track.top()), egui::pos2(x, track.bottom())],
-        Stroke::new(2.0, input.theme.playhead),
+        Stroke::new(width, color),
+    );
+}
+
+fn paint_in_out_handles(
+    ui: &mut egui::Ui,
+    track: Rect,
+    duration: u64,
+    in_frame: u64,
+    out_frame: u64,
+    input: &TimelineInput<'_>,
+) {
+    let in_x = x_for_local_frame(track, duration, in_frame);
+    let out_x = x_for_local_frame(track, duration, out_frame);
+    let in_stroke = if input.focus == TimelineFocusPaint::In {
+        Stroke::new(3.0, input.theme.focus)
+    } else {
+        Stroke::new(2.0, input.theme.text)
+    };
+    let out_stroke = if input.focus == TimelineFocusPaint::Out {
+        Stroke::new(3.0, input.theme.focus)
+    } else {
+        Stroke::new(2.0, input.theme.text)
+    };
+    ui.painter().line_segment(
+        [
+            egui::pos2(in_x, track.top()),
+            egui::pos2(in_x, track.bottom()),
+        ],
+        in_stroke,
+    );
+    ui.painter().line_segment(
+        [
+            egui::pos2(out_x, track.top()),
+            egui::pos2(out_x, track.bottom()),
+        ],
+        out_stroke,
     );
 }
 
@@ -1179,54 +1356,23 @@ pub fn frame_for_x(track: Rect, range_start: u64, duration_frames: u64, x: f32) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use qnc_player_contract::VERSION as PLAYER_CONTRACT_VERSION;
-
-    fn envelope(events: Vec<PlayerEvent>) -> EventEnvelope {
-        EventEnvelope {
-            contract_version: PLAYER_CONTRACT_VERSION.into(),
-            session_id: "session".into(),
-            source_generation: 3,
-            sequence: 9,
-            events,
-        }
-    }
 
     #[test]
-    fn player_state_uses_carrier_as_playhead_authority() {
-        let state = TimelinePlayerState::from_envelope(Some(&envelope(vec![
-            PlayerEvent::PlaybackReadinessChanged {
-                source_id: Some("clip".into()),
-                frame: 77,
-                ready: true,
-            },
-            PlayerEvent::CarrierPositionChanged {
-                source_id: Some("clip".into()),
-                frame: 12,
-                range: Some(FrameRange::new(10, 60).unwrap()),
-                timebase: Some(Timebase::new(50, 1).unwrap()),
-                status: TransportStatus::Playing,
-            },
-            PlayerEvent::FramePresented { frame: 13 },
-        ])));
+    fn projection_uses_supplied_playhead_as_only_authority() {
+        let state = TimelineProjection::new(10, 50)
+            .with_playhead(12)
+            .with_cue_enabled(true);
 
-        assert_eq!(state.source_id.as_deref(), Some("clip"));
+        assert_eq!(state.range_start(), 10);
         assert_eq!(state.confirmed_frame(), Some(12));
-        assert_eq!(state.presented_frame, Some(13));
         assert_eq!(state.duration_frames(), 50);
         assert!(state.can_cue());
     }
 
     #[test]
-    fn readiness_without_carrier_does_not_create_fallback_position() {
-        let state = TimelinePlayerState::from_envelope(Some(&envelope(vec![
-            PlayerEvent::PlaybackReadinessChanged {
-                source_id: Some("clip".into()),
-                frame: 77,
-                ready: true,
-            },
-        ])));
+    fn missing_projection_does_not_create_fallback_position() {
+        let state = TimelineProjection::new(0, 300);
 
-        assert!(state.ready);
         assert_eq!(state.confirmed_frame(), None);
         assert!(!state.can_cue());
     }
@@ -1244,7 +1390,24 @@ mod tests {
 
     #[test]
     fn source_height_matches_v4_lane_stack() {
-        assert_eq!(source_timeline_height(AudioLane::None), 102.0);
+        assert_eq!(
+            height_for_layers(TimelineLayerFlags::source(), AudioLane::None),
+            102.0
+        );
+    }
+
+    #[test]
+    fn source_preset_keeps_video_row_without_base_video_layer() {
+        let layers = TimelineLayerFlags::source();
+
+        assert!(layers.carrier);
+        assert!(layers.audio_a1);
+        assert!(layers.audio_a2);
+        assert!(!layers.base_video);
+        assert!(layers.shot_range);
+        assert!(layers.in_out);
+        assert!(layers.playhead);
+        assert!(layers.video_stack_on());
     }
 
     #[test]
@@ -1259,7 +1422,8 @@ mod tests {
         let layers = TimelineLayerFlags::passive_overlay_projection();
 
         assert!(layers.audio_a1);
-        assert!(layers.video);
+        assert!(layers.carrier);
+        assert!(layers.base_video);
         assert!(layers.audio_a2);
         assert!(layers.virtual_spans);
         assert!(layers.covers);
@@ -1267,6 +1431,22 @@ mod tests {
         assert!(layers.marker_slots);
         assert!(!layers.shot_range);
         assert!(!layers.in_out);
+    }
+
+    #[test]
+    fn layer_presets_do_not_create_separate_timeline_engines() {
+        let plain = TimelineLayerFlags::a1_v_a2();
+        let source = TimelineLayerFlags::source();
+
+        assert!(plain.audio_a1);
+        assert!(plain.carrier);
+        assert!(plain.base_video);
+        assert!(plain.audio_a2);
+        assert!(!plain.shot_range);
+        assert!(!plain.in_out);
+        assert!(!source.base_video);
+        assert!(source.shot_range);
+        assert!(source.in_out);
     }
 
     #[test]
@@ -1326,5 +1506,46 @@ mod tests {
             Some("virtual_b")
         );
         assert_eq!(frame_for_x(track, 50, 100, 150.0), 75);
+    }
+
+    #[test]
+    fn program_row_projects_continuous_player_frame_to_local_row() {
+        let first = TimelineProgramRow::new(0, 3, 0, 50);
+        let second = TimelineProgramRow::new(1, 3, 50, 100);
+        let last = TimelineProgramRow::new(2, 3, 100, 125);
+
+        assert_eq!(first.local_playhead_frame(0), Some(0));
+        assert_eq!(first.local_playhead_frame(49), Some(49));
+        assert_eq!(first.local_playhead_frame(50), None);
+        assert_eq!(second.local_playhead_frame(50), Some(0));
+        assert_eq!(second.local_playhead_frame(75), Some(25));
+        assert_eq!(second.local_playhead_frame(100), None);
+        assert_eq!(last.local_playhead_frame(125), Some(25));
+    }
+
+    #[test]
+    fn program_row_maps_local_ui_request_back_to_program_frame() {
+        let row = TimelineProgramRow::new(1, 3, 50, 100);
+
+        assert_eq!(row.program_frame_from_local(0), 50);
+        assert_eq!(row.program_frame_from_local(12), 62);
+        assert_eq!(row.program_frame_from_local(200), 100);
+    }
+
+    #[test]
+    fn program_row_projects_ranges_and_boundary_markers_like_v4() {
+        let first = TimelineProgramRow::new(0, 3, 0, 50);
+        let middle = TimelineProgramRow::new(1, 3, 50, 100);
+        let last = TimelineProgramRow::new(2, 3, 100, 125);
+
+        assert_eq!(middle.local_range(40, 70), Some((0, 20)));
+        assert_eq!(middle.local_range(70, 130), Some((20, 50)));
+        assert_eq!(middle.local_range(0, 20), None);
+        assert_eq!(first.local_marker_frame(0), Some(0));
+        assert_eq!(first.local_marker_frame(50), Some(50));
+        assert_eq!(middle.local_marker_frame(50), None);
+        assert_eq!(middle.local_marker_frame(100), Some(50));
+        assert_eq!(last.local_marker_frame(100), None);
+        assert_eq!(last.local_marker_frame(125), Some(25));
     }
 }

@@ -1,23 +1,24 @@
 use std::{
     path::Path,
     sync::mpsc::{self, Receiver, TryRecvError},
+    time::Duration,
 };
 
 use qnc_dir_browser::{BrowserState, DirectoryBrowserSession};
+use qnc_ingest_catalog as catalog;
+use qnc_ingest_select as selection;
+use qnc_ingest_select::selection_config;
 use qnc_ingest_store::{content::CatalogStats, IngestStore, SourceSelectionRecord};
+pub use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
+use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_work_settings::SettingsReader;
 use serde::{Deserialize, Serialize};
 
-mod catalog;
 #[cfg(test)]
 mod clip_filter_tests;
 mod playback;
-mod selection;
-mod selection_config;
-mod work_plan;
 #[cfg(test)]
 mod work_settings_tests;
-pub use work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
 
 pub mod action_ids {
     pub const INGEST_SOURCE_KIND_LOCAL: &str = "ingest_source_kind_local";
@@ -139,6 +140,53 @@ impl Default for ClipView {
     }
 }
 
+impl From<selection::SelectedClip> for ClipView {
+    fn from(clip: selection::SelectedClip) -> Self {
+        Self {
+            clip_id: clip.clip_id,
+            name: clip.name,
+            duration_seconds: clip.duration_seconds,
+            selected: clip.selected,
+            imported: clip.imported,
+            previously_seen: clip.previously_seen,
+            metadata_revision: clip.metadata_revision,
+            save_state: match clip.save_state {
+                selection::SelectSaveState::Pending => SaveState::Pending,
+                selection::SelectSaveState::Failed => SaveState::Failed,
+                selection::SelectSaveState::Saved => SaveState::Saved,
+            },
+            thumb_uri: clip.thumb_uri,
+            thumb_status: match clip.thumb_status {
+                selection::SelectThumbStatus::Ready => ThumbStatus::Ready,
+                selection::SelectThumbStatus::Pending => ThumbStatus::Pending,
+                selection::SelectThumbStatus::Missing => ThumbStatus::Missing,
+            },
+            thumb_image: clip.thumb_image,
+        }
+    }
+}
+
+impl From<catalog::CatalogClipRow> for ClipView {
+    fn from(clip: catalog::CatalogClipRow) -> Self {
+        Self {
+            clip_id: clip.clip_id,
+            name: clip.name,
+            duration_seconds: clip.duration_seconds,
+            selected: clip.selected,
+            imported: clip.imported,
+            previously_seen: clip.previously_seen,
+            metadata_revision: clip.metadata_revision,
+            save_state: SaveState::Saved,
+            thumb_uri: clip.thumb_uri,
+            thumb_status: match clip.thumb_status {
+                catalog::CatalogThumbStatus::Pending => ThumbStatus::Pending,
+                catalog::CatalogThumbStatus::Missing => ThumbStatus::Missing,
+            },
+            thumb_image: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum SaveState {
     Pending,
@@ -166,6 +214,8 @@ pub enum ClipFilter {
 pub struct IngestViewModel {
     #[serde(skip)]
     pub playback: qnc_player_client::View,
+    #[serde(skip)]
+    pub timeline: TimelineProjection,
     pub source_kind: SourceKind,
     pub browser_roots: bool,
     pub browser_path_label: String,
@@ -197,6 +247,7 @@ impl Default for IngestViewModel {
         Self {
             source_kind: SourceKind::Local,
             playback: Default::default(),
+            timeline: Default::default(),
             browser_roots: true,
             browser_path_label: String::new(),
             browser_current_uri: None,
@@ -222,6 +273,25 @@ impl Default for IngestViewModel {
             message: "Odaberi izvor.".to_string(),
         }
     }
+}
+
+pub fn timeline_intent_to_ingest_intent(intent: TimelineIntent) -> Option<IngestIntent> {
+    match intent {
+        TimelineIntent::CueFrame(frame) => Some(IngestIntent::new(
+            action_ids::INGEST_CUE_FRAME,
+            IngestPayload::Frame(frame.min(i64::MAX as u64) as i64),
+        )),
+        TimelineIntent::ToggleAudioExpand(_) => None,
+        TimelineIntent::SelectVirtual { .. }
+        | TimelineIntent::SelectCover { .. }
+        | TimelineIntent::SelectMarkerSlot { .. }
+        | TimelineIntent::SelectMarker { .. } => None,
+        TimelineIntent::None => None,
+    }
+}
+
+fn playback_timeline_projection(playback: &qnc_player_client::View) -> TimelineProjection {
+    qnc_player_timeline::projection_from_player_reply(playback.reply.as_ref())
 }
 
 impl IngestViewModel {
@@ -354,11 +424,11 @@ pub struct IngestComponent {
     source_browser: DirectoryBrowserSession,
     store: Option<IngestStore>,
     settings_reader: Option<SettingsReader>,
-    settings_result: Option<Receiver<Result<catalog::Loaded, String>>>,
+    settings_result: Option<Receiver<Result<catalog::LoadedCatalog, String>>>,
     catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
     catalog_result: Option<Receiver<Result<(Vec<String>, bool), String>>>,
     catalog_thread: Option<std::thread::JoinHandle<()>>,
-    thumbnail_result: Option<Receiver<catalog::ThumbnailEvent>>,
+    thumbnail_result: Option<Receiver<qnc_media_thumbnail::ThumbnailEvent>>,
     thumbnail_cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     catalog_stats: Option<CatalogStats>,
     play_when_ready: bool,
@@ -438,6 +508,7 @@ impl IngestComponent {
         self.catalog_target = None;
         self.catalog_stats = None;
         self.view.clips.clear();
+        self.view.timeline = Default::default();
         self.view.clip_filter = ClipFilter::All;
         self.view.preview_clip_id = None;
         self.pending_source = None;
@@ -492,13 +563,11 @@ impl IngestComponent {
         }
         self.view.work_settings_error = None;
         let (send, receive) = mpsc::sync_channel(1);
-        let config = self.selection_config.clone();
         match std::thread::Builder::new()
             .name("ingest-work-settings".into())
             .spawn(move || {
                 let result = catalog::load(
                     &reader,
-                    config.as_ref(),
                     retained_workspace.as_deref(),
                     retained_stats.as_ref(),
                 );
@@ -521,6 +590,7 @@ impl IngestComponent {
                     self.play_when_ready = false;
                 }
                 self.view.playback = playback;
+                self.view.timeline = playback_timeline_projection(&self.view.playback);
                 changed = true;
             }
         }
@@ -604,7 +674,8 @@ impl IngestComponent {
                     self.selection_last_warning = Some(message.clone());
                     self.view.message = message;
                 }
-                selection::Event::Clip(mut clip) => {
+                selection::Event::Clip(clip) => {
+                    let mut clip = ClipView::from(clip);
                     if let Some(existing) = self
                         .view
                         .clips
@@ -725,6 +796,7 @@ impl IngestComponent {
                 self.catalog_target = Some(loaded.target);
                 self.catalog_stats = Some(loaded.stats);
                 if let Some(clips) = loaded.clips {
+                    let clips = clips.into_iter().map(ClipView::from).collect::<Vec<_>>();
                     let thumbnails = clips
                         .iter()
                         .filter_map(|clip| {
@@ -737,11 +809,11 @@ impl IngestComponent {
                     self.start_thumbnail_load(thumbnails);
                 }
                 if self.pending_source.is_none() && catalog_was_loaded {
-                    if let Some((uri, name, serial, volume)) = loaded.source {
-                        self.view.selected_source_uri = Some(uri);
-                        self.view.selected_source_name = name;
-                        self.view.selected_source_serial_number = serial;
-                        self.view.selected_source_volume_name = volume;
+                    if let Some(source) = loaded.source {
+                        self.view.selected_source_uri = Some(source.uri);
+                        self.view.selected_source_name = source.name;
+                        self.view.selected_source_serial_number = source.serial_number;
+                        self.view.selected_source_volume_name = source.volume_name;
                     } else {
                         self.view.selected_source_uri = None;
                         self.view.selected_source_name.clear();
@@ -778,6 +850,16 @@ impl IngestComponent {
 
     pub fn needs_player_poll(&self) -> bool {
         self.play_when_ready || self.view.playback.preparing || self.view.playback.playing()
+    }
+
+    pub fn next_repaint_delay(&self) -> Option<Duration> {
+        if self.needs_player_poll() {
+            return self.view.playback.source_frame_interval();
+        }
+        if self.has_pending_work() {
+            return Some(Duration::from_millis(100));
+        }
+        None
     }
 
     fn select_clips(&mut self, ids: Vec<String>, selected: bool) -> IngestDispatchResult {
@@ -1163,12 +1245,29 @@ impl IngestComponent {
         let Some(config) = self.selection_config.clone() else {
             return;
         };
+        let sources = config
+            .sources
+            .iter()
+            .filter_map(|source| source.reader().ok())
+            .collect::<Vec<_>>();
+        if sources.is_empty() {
+            return;
+        }
+        let requests = clips
+            .into_iter()
+            .map(|(clip_id, uri)| qnc_media_thumbnail::ThumbnailRequest {
+                item_id: clip_id,
+                uri,
+            })
+            .collect::<Vec<_>>();
         let (send, receive) = mpsc::sync_channel(32);
         let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let worker_cancel = cancel.clone();
         if std::thread::Builder::new()
             .name("ingest-thumbnail-load".into())
-            .spawn(move || catalog::load_thumbnails(config, clips, send, worker_cancel))
+            .spawn(move || {
+                qnc_media_thumbnail::load_from_sources(sources, requests, send, worker_cancel)
+            })
             .is_ok()
         {
             self.thumbnail_result = Some(receive);
@@ -1192,23 +1291,23 @@ impl IngestComponent {
             let event = match receiver.try_recv() {
                 Ok(event) => event,
                 Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => catalog::ThumbnailEvent::Finished,
+                Err(TryRecvError::Disconnected) => qnc_media_thumbnail::ThumbnailEvent::Finished,
             };
             match event {
-                catalog::ThumbnailEvent::Ready {
-                    clip_id,
+                qnc_media_thumbnail::ThumbnailEvent::Ready {
+                    item_id,
                     uri,
                     image,
                 } => {
                     if let Some(clip) = self.view.clips.iter_mut().find(|clip| {
-                        clip.clip_id == clip_id && clip.thumb_uri.as_deref() == Some(uri.as_str())
+                        clip.clip_id == item_id && clip.thumb_uri.as_deref() == Some(uri.as_str())
                     }) {
                         clip.thumb_image = Some(image);
                         clip.thumb_status = ThumbStatus::Ready;
                         changed = true;
                     }
                 }
-                catalog::ThumbnailEvent::Finished => {
+                qnc_media_thumbnail::ThumbnailEvent::Finished => {
                     self.thumbnail_result = None;
                     self.thumbnail_cancel = None;
                     break;

@@ -133,10 +133,10 @@ fn uncommitted_preview_cannot_be_selected_and_stale_ack_does_not_mark_it_saved()
     let mut component = IngestComponent::default();
     let (send, receive) = mpsc::sync_channel(8);
     component.selection_result = Some(receive);
-    send.send(selection::Event::Clip(ClipView {
+    send.send(selection::Event::Clip(selection::SelectedClip {
         clip_id: "clip-pending".into(),
         metadata_revision: 2,
-        save_state: SaveState::Pending,
+        save_state: selection::SelectSaveState::Pending,
         ..Default::default()
     }))
     .unwrap();
@@ -232,9 +232,9 @@ fn activation_checks_catalog_signature_and_reloads_only_when_db_changed() {
     };
 
     let root = fixture();
-    let (source_fixture, config) = selection::tests::fixture();
+    let (source_fixture, config) = selection::test_support::fixture();
     let calls = Arc::new(AtomicUsize::new(0));
-    selection::tests::execute(&config, &calls, false, false, ".");
+    selection::test_support::execute(&config, &calls, false, false, ".");
     assert_eq!(calls.load(Ordering::SeqCst), 4);
 
     let reader = SettingsReader::local(root.path().join("data/project_store.db"));
@@ -296,9 +296,9 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
         Arc,
     };
     let root = fixture();
-    let (source_fixture, config) = selection::tests::fixture();
+    let (source_fixture, config) = selection::test_support::fixture();
     let calls = Arc::new(AtomicUsize::new(0));
-    selection::tests::execute(&config, &calls, false, false, ".");
+    selection::test_support::execute(&config, &calls, false, false, ".");
     assert_eq!(calls.load(Ordering::SeqCst), 4);
     let reader = SettingsReader::local(root.path().join("data/project_store.db"));
     let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();

@@ -10,6 +10,16 @@ fn clip(id: &str, previously_seen: bool, selected: bool) -> ClipView {
     }
 }
 
+fn selected_clip(id: &str, previously_seen: bool, selected: bool) -> selection::SelectedClip {
+    selection::SelectedClip {
+        clip_id: id.into(),
+        name: id.into(),
+        previously_seen,
+        selected,
+        ..Default::default()
+    }
+}
+
 #[test]
 fn filter_projects_existing_catalog_without_changing_selection_or_preview() {
     for source_kind in [SourceKind::Local, SourceKind::Lan, SourceKind::Internet] {
@@ -59,7 +69,7 @@ fn new_filter_accepts_incoming_clips_during_select_without_losing_existing_ones(
     assert_eq!(component.view.visible_clips().count(), 0);
     let (send, receive) = mpsc::channel();
     component.selection_result = Some(receive);
-    send.send(selection::Event::Clip(clip("new", false, false)))
+    send.send(selection::Event::Clip(selected_clip("new", false, false)))
         .unwrap();
     component.poll();
     assert_eq!(
