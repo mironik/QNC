@@ -3163,6 +3163,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-ingest-components",
  "qnc-keyboard-shortcut",
+ "qnc-timeline",
  "qnc-ui-kit",
  "serde",
  "serde_json",
@@ -3574,6 +3575,15 @@ dependencies = [
  "tiny_http",
  "ureq",
  "url",
+]
+
+[[package]]
+name = "qnc-timeline"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-player-contract",
+ "serde_json",
 ]
 
 [[package]]

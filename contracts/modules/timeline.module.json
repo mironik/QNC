@@ -3,7 +3,12 @@
   "module_name": "Timeline",
   "module_version": "0.1.0",
   "module_kind": "ui_widget",
-  "capabilities": ["timeline.model", "timeline.paint", "timeline.hit_test"],
+  "capabilities": [
+    "timeline.passive_projection",
+    "timeline.paint",
+    "timeline.hit_test",
+    "timeline.intent.emit"
+  ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -25,5 +30,20 @@
   "state_policy": "stateless",
   "playback_state_source": "broadcast_player",
   "intent_policy": "emit_only",
-  "database_write_policy": "no_db_writes"
+  "database_write_policy": "no_db_writes",
+  "state_owner": "qnc.module.broadcast-player",
+  "ui_layers": [
+    "audio_a1",
+    "video",
+    "audio_a2",
+    "audio_a3",
+    "audio_a4",
+    "virtual_spans",
+    "covers",
+    "markers",
+    "marker_slots",
+    "shot_range",
+    "in_out",
+    "playhead"
+  ]
 }

@@ -1,0 +1,12 @@
+[package]
+name = "qnc-timeline"
+version = "0.1.0"
+edition = "2024"
+description = "Shared passive QNC timeline UI component"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-player-contract = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

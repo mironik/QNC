@@ -37,6 +37,7 @@
     "qnc.module.work-settings",
     "qnc.module.player-input",
     "qnc.module.player-client",
+    "qnc.module.timeline",
     "qnc.module.camera-patterns",
     "qnc.module.camera-detector",
     "qnc.module.scanner",

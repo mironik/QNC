@@ -1003,6 +1003,7 @@ fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
         "qnc.module.player-contract" => Some("qnc-player-contract"),
         "qnc.module.player-input" => Some("qnc-player-input"),
         "qnc.module.player-client" => Some("qnc-player-client"),
+        "qnc.module.timeline" => Some("qnc-timeline"),
         "qnc.module.media-stream" => Some("qnc-media-stream"),
         "qnc.module.media-decode" => Some("qnc-media-decode"),
         "qnc.module.ffmpeg-decode" => Some("qnc-ffmpeg-decode"),

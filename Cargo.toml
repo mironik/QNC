@@ -15,6 +15,7 @@ members = [
     "crates/qnc-player-frame-transport",
     "crates/qnc-player-input",
     "crates/qnc-player-client",
+    "crates/qnc-timeline",
     "crates/qnc-media-stream",
     "crates/qnc-media-decode",
     "crates/qnc-ffmpeg-decode",
@@ -71,6 +72,7 @@ qnc-player-contract = { path = "crates/qnc-player-contract" }
 qnc-player-frame-transport = { path = "crates/qnc-player-frame-transport" }
 qnc-player-input = { path = "crates/qnc-player-input" }
 qnc-player-client = { path = "crates/qnc-player-client" }
+qnc-timeline = { path = "crates/qnc-timeline" }
 qnc-media-stream = { path = "crates/qnc-media-stream" }
 qnc-media-decode = { path = "crates/qnc-media-decode" }
 qnc-ffmpeg-decode = { path = "crates/qnc-ffmpeg-decode" }

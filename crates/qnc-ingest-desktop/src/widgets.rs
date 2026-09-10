@@ -7,6 +7,10 @@ use qnc_ingest_components::{
     action_ids, ClipFilter, ClipView, IngestIntent, IngestPayload, IngestViewModel, LocationEntry,
     SourceKind,
 };
+use qnc_timeline::{
+    AudioLane, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMetrics,
+    TimelinePlayerState, TimelineTheme,
+};
 use qnc_ui_kit::FormActionBarStyle;
 
 use crate::{
@@ -894,7 +898,11 @@ fn render_source_dock(
         });
     });
 
-    render_timeline_placeholder(ui, timeline_rect, theme, view);
+    if intent.is_none() {
+        intent = render_player_timeline(ui, timeline_rect, theme, view);
+    } else {
+        render_player_timeline(ui, timeline_rect, theme, view);
+    }
 
     intent
 }
@@ -1140,55 +1148,70 @@ fn source_dock_clip_label<'a>(
 }
 
 fn timeline_placeholder_height() -> f32 {
-    15.0 + 3.0 + 64.0 + 3.0 + 15.0 + 2.0
+    qnc_timeline::source_timeline_height(AudioLane::None)
 }
 
-fn render_timeline_placeholder(ui: &mut Ui, rect: Rect, theme: &Theme, view: &IngestViewModel) {
-    let response = ui.interact(
-        rect,
-        ui.make_persistent_id("qnc_ingest_timeline_placeholder"),
-        Sense::click_and_drag(),
-    );
-    ui.painter().rect_filled(rect, 0.0, theme.bg);
-    ui.painter().rect_stroke(
-        rect,
-        0.0,
-        Stroke::new(1.0, theme.border_soft),
-        StrokeKind::Inside,
-    );
+fn render_player_timeline(
+    ui: &mut Ui,
+    rect: Rect,
+    theme: &Theme,
+    view: &IngestViewModel,
+) -> Option<IngestIntent> {
+    let player_state = TimelinePlayerState::from_envelope(view.playback.reply.as_ref());
+    let duration = player_state.duration_frames();
+    let mut out = None;
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+        let intent = qnc_timeline::show(
+            ui,
+            TimelineInput {
+                state: &player_state,
+                layers: TimelineLayerFlags::source(),
+                metrics: TimelineMetrics::default(),
+                theme: timeline_theme(theme),
+                expanded_audio: AudioLane::None,
+                shot_in_frame: 0,
+                shot_out_frame: duration,
+                draft_in_frame: 0,
+                draft_out_frame: duration,
+                a1_peaks: &[],
+                a2_peaks: &[],
+                virtual_spans: &[],
+                covers: &[],
+                marker_slots: &[],
+                markers: &[],
+                video_background: None,
+            },
+        );
+        out = ingest_intent_from_timeline(intent);
+    });
+    out
+}
 
-    let lanes = [
-        ("A1", rect.top() + 1.0, 15.0, theme.surface),
-        ("V", rect.top() + 19.0, 64.0, theme.surface),
-        ("A2", rect.top() + 86.0, 15.0, theme.bg),
-    ];
-    for (label, top, lane_h, fill) in lanes {
-        let lane = Rect::from_min_size(
-            egui::pos2(rect.left() + 28.0, top),
-            Vec2::new((rect.width() - 28.0).max(10.0), lane_h),
-        );
-        let label_rect = Rect::from_min_size(egui::pos2(rect.left(), top), Vec2::new(28.0, lane_h));
-        ui.painter().rect_filled(label_rect, 0.0, theme.surface_alt);
-        ui.painter().text(
-            label_rect.center(),
-            Align2::CENTER_CENTER,
-            label,
-            FontId::proportional(theme.font_ui - 1.0),
-            theme.text_muted,
-        );
-        ui.painter().rect_filled(lane, 0.0, fill);
-        ui.painter().rect_stroke(
-            lane,
-            0.0,
-            Stroke::new(1.0, theme.border_soft),
-            StrokeKind::Inside,
-        );
+fn ingest_intent_from_timeline(intent: TimelineIntent) -> Option<IngestIntent> {
+    match intent {
+        TimelineIntent::CueFrame(frame) => Some(IngestIntent::new(
+            action_ids::INGEST_CUE_FRAME,
+            IngestPayload::Frame(frame.min(i64::MAX as u64) as i64),
+        )),
+        TimelineIntent::ToggleAudioExpand(_) => None,
+        TimelineIntent::SelectVirtual { .. }
+        | TimelineIntent::SelectCover { .. }
+        | TimelineIntent::SelectMarkerSlot { .. }
+        | TimelineIntent::SelectMarker { .. } => None,
+        TimelineIntent::None => None,
     }
-    let _ = view;
+}
 
-    if response.clicked() {
-        ui.ctx().request_repaint();
-    }
+fn timeline_theme(theme: &Theme) -> TimelineTheme {
+    TimelineTheme::from_qnc_theme(
+        theme.bg,
+        theme.surface,
+        theme.surface_alt,
+        theme.border_soft,
+        theme.text,
+        theme.text_muted,
+        theme.accent,
+    )
 }
 
 fn text_tab(ui: &mut Ui, text: &str, selected: bool, theme: &Theme) -> egui::Response {

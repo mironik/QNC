@@ -8,6 +8,7 @@ eframe = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-ingest-components = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
+qnc-timeline = { workspace = true }
 qnc-ui-kit = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
