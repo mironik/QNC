@@ -2,16 +2,33 @@
   "module_id": "qnc.module.monitor",
   "module_name": "Monitor",
   "module_version": "0.1.0",
-  "module_kind": "out_of_process_helper",
-  "capabilities": ["monitor.status"],
+  "module_kind": "ui_widget",
+  "capabilities": ["monitor.preview.paint"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
   "supported_cpu": ["x86_64", "aarch64"],
   "transport_protocol_version": "0.1.0",
-  "forbidden_calls": ["workflow.routing", "central_host.run"],
-  "forbidden_dependencies": [],
-  "state_policy": "session_local",
-  "database_write_policy": "returns_result_to_owner_application"
+  "forbidden_calls": [
+    "ffprobe",
+    "media.probe.full",
+    "source.scan.roles",
+    "application.db.read",
+    "application.db.write",
+    "playback.clock.own",
+    "playback.open",
+    "playback.seek"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.player-launcher",
+    "qnc.module.ingest-select",
+    "qnc.module.player-client"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "boundary": "Paints a caller-supplied preview picture or message. Any application may embed it. It does not own the player clock, fetch pixels, decode media, read a database, or know the host application."
 }
-

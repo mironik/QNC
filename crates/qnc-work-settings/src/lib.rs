@@ -85,6 +85,26 @@ impl SettingsReader {
         })
     }
 
+    pub fn local_workspace_dir(
+        &self,
+        settings: &WorkSettings,
+    ) -> Result<Option<PathBuf>, ReadError> {
+        settings.validate()?;
+        let parsed =
+            qnc_contracts::parse_qnc_uri(&self.config.registry_uri).map_err(|_| config_error())?;
+        if parsed.environment != "local" {
+            return Ok(None);
+        }
+        let file = local::workspace_file(
+            self.config
+                .registry_file
+                .as_deref()
+                .ok_or_else(config_error)?,
+            &settings.project_id,
+        )?;
+        Ok(file.parent().map(Path::to_path_buf))
+    }
+
     pub fn local(registry_file: impl Into<PathBuf>) -> Self {
         Self {
             config: ReaderConfig {

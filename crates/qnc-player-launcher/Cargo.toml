@@ -8,4 +8,3 @@ qnc-contracts = { workspace = true }
 qnc-player-client = { workspace = true }
 qnc-player-input = { workspace = true }
 qnc-source-reader = { workspace = true }
-qnc-work-settings = { workspace = true }

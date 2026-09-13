@@ -2,12 +2,14 @@
 name = "qnc-ingest-desktop"
 version = "0.1.0"
 edition = "2021"
+description = "QNC Ingest public desktop surface"
 
 [dependencies]
 eframe = { workspace = true }
 qnc-contracts = { workspace = true }
-qnc-ingest-components = { workspace = true }
+qnc-ingest-application = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
+qnc-monitor = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-ui-kit = { workspace = true }
 serde = { workspace = true }

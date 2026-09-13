@@ -102,8 +102,13 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
         validate_keyboard_catalog(root),
         validate_keyboard_matches_qnc_v4(root),
         validate_ingest_keyboard_actions(root),
+        validate_no_ingest_components_layer(root),
+        validate_ingest_form_has_no_tests(root),
         validate_ui_layout_contract(root),
         validate_app_registry(root),
+        scan_decoder_selection_boundary(root),
+        scan_public_db_write_boundary(root),
+        scan_module_database_write_policy(root),
     ];
     checks.extend(validate_json_manifests(
         root,
@@ -139,6 +144,71 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
     ));
 
     checks
+}
+
+fn validate_no_ingest_components_layer(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let forbidden_dir = root.join("crates").join("qnc-ingest-components");
+    if forbidden_dir.exists() {
+        report.error(format!(
+            "{} must not exist; Ingest has no application components layer",
+            display_relative(root, &forbidden_dir)
+        ));
+    }
+
+    let mut cargo_files = Vec::new();
+    collect_named_files(root, "Cargo.toml", &mut cargo_files);
+    for path in cargo_files {
+        let Ok(contents) = fs::read_to_string(&path) else {
+            continue;
+        };
+        if contents.contains("qnc-ingest-components") {
+            report.error(format!(
+                "{} must not reference qnc-ingest-components",
+                display_relative(root, &path)
+            ));
+        }
+    }
+
+    let mut rust_files = Vec::new();
+    collect_rs_files(&root.join("apps"), &mut rust_files);
+    collect_rs_files(&root.join("crates"), &mut rust_files);
+    for path in rust_files {
+        let Ok(contents) = fs::read_to_string(&path) else {
+            continue;
+        };
+        for forbidden in ["qnc_ingest_components", "IngestComponent"] {
+            if contents.contains(forbidden) {
+                report.error(format!(
+                    "{} must not use removed Ingest components symbol {forbidden}",
+                    display_relative(root, &path)
+                ));
+            }
+        }
+    }
+
+    CheckResult::from_report("Ingest has no components layer", report)
+}
+
+fn validate_ingest_form_has_no_tests(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let src = root.join("crates").join("qnc-ingest-desktop").join("src");
+    let mut files = Vec::new();
+    collect_rs_files(&src, &mut files);
+    for path in files {
+        let Ok(contents) = fs::read_to_string(&path) else {
+            continue;
+        };
+        for forbidden in ["#[cfg(test)]", "#[test]"] {
+            if contents.contains(forbidden) {
+                report.error(format!(
+                    "{}: Ingest form must not contain tests; use qnc-dev-diagnostics logs",
+                    display_relative(root, &path)
+                ));
+            }
+        }
+    }
+    CheckResult::from_report("Ingest form has no tests", report)
 }
 
 fn scan_timeline_engine_boundary(root: &Path) -> CheckResult {
@@ -178,8 +248,8 @@ fn scan_timeline_engine_boundary(root: &Path) -> CheckResult {
         "qnc-ffprobe-metadata",
         "qnc-scanner",
         "qnc-source-reader",
-        "qnc-filmstrip",
-        "qnc-wave",
+        "qnc-filmstrip-worker",
+        "qnc-wave-worker",
         "rusqlite",
     ] {
         if cargo.contains(forbidden) {
@@ -197,6 +267,9 @@ fn scan_timeline_engine_boundary(root: &Path) -> CheckResult {
         "qnc_ffprobe_metadata",
         "qnc_scanner",
         "qnc_source_reader",
+        "qnc_filmstrip_worker",
+        "qnc_wave_worker",
+        "CommandFilmstripGenerator",
         "rusqlite",
         "ffprobe",
     ] {
@@ -462,7 +535,7 @@ fn validate_ingest_keyboard_actions(root: &Path) -> CheckResult {
     let keyboard_path = root.join("contracts").join("qnc-keyboard-shortcuts.json");
     let component_path = root
         .join("crates")
-        .join("qnc-ingest-components")
+        .join("qnc-ingest-application")
         .join("src")
         .join("lib.rs");
 
@@ -487,7 +560,7 @@ fn validate_ingest_keyboard_actions(root: &Path) -> CheckResult {
 
     let Ok(component_source) = fs::read_to_string(&component_path) else {
         report.error(format!(
-            "{}: cannot read Ingest component source",
+            "{}: cannot read Ingest application source",
             display_relative(root, &component_path)
         ));
         return CheckResult::from_report("Ingest keyboard action catalog", report);
@@ -912,6 +985,7 @@ fn validate_manifest_graph(root: &Path) -> CheckResult {
     validate_application_module_dependencies(root, &mut report, &modules);
     validate_application_ui_layout_contracts(root, &mut report, &ui_contracts);
     validate_shell_manifest_host(root, &mut report, &applications);
+    validate_single_desktop_host(root, &mut report);
     validate_module_forbidden_dependencies(root, &mut report, &modules);
     validate_database_owner_applications(root, &mut report, &applications, databases);
 
@@ -960,6 +1034,44 @@ fn validate_shell_manifest_host(
             "{}: qnc.shell must not own business databases",
             display_relative(root, path)
         ));
+    }
+}
+
+fn validate_single_desktop_host(root: &Path, report: &mut ValidationReport) {
+    for (path, value) in read_json_documents(root, "contracts/applications", report) {
+        let name = display_relative(root, &path);
+        let application_id = value
+            .get("application_id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("");
+        let application_kind = value
+            .get("application_kind")
+            .and_then(serde_json::Value::as_str);
+        let lifecycle = value.get("lifecycle").and_then(serde_json::Value::as_str);
+        let capabilities = value
+            .get("capabilities")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(serde_json::Value::as_str)
+            .collect::<BTreeSet<_>>();
+
+        let is_shell = application_id == "qnc.shell";
+        if !is_shell && application_kind == Some("desktop_host") {
+            report.error(format!(
+                "{name}: only qnc.shell/qnc-app.exe may be a desktop_host"
+            ));
+        }
+        if !is_shell && lifecycle == Some("interactive_desktop_host") {
+            report.error(format!(
+                "{name}: only qnc.shell/qnc-app.exe may use interactive_desktop_host"
+            ));
+        }
+        if !is_shell && capabilities.contains("shell.desktop") {
+            report.error(format!(
+                "{name}: business applications must not declare shell.desktop"
+            ));
+        }
     }
 }
 
@@ -1067,6 +1179,7 @@ fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
         "qnc.module.manifest-capability" => Some("qnc-contracts"),
         "qnc.module.transport-resolver" => Some("qnc-transport-resolver"),
         "qnc.module.db-contract-validation" => Some("qnc-db-contract"),
+        "qnc.module.dev-diagnostics" => Some("qnc-dev-diagnostics"),
         "qnc.module.dir-browser" => Some("qnc-dir-browser"),
         "qnc.module.keyboard-shortcut" => Some("qnc-keyboard-shortcut"),
         "qnc.module.frame-timebase" => Some("qnc-frame-timebase"),
@@ -1075,6 +1188,14 @@ fn runtime_crate_for_module(module_id: &str) -> Option<&'static str> {
         "qnc.module.player-launcher" => Some("qnc-player-launcher"),
         "qnc.module.player-client" => Some("qnc-player-client"),
         "qnc.module.player-timeline" => Some("qnc-player-timeline"),
+        "qnc.module.monitor" => Some("qnc-monitor"),
+        "qnc.module.project-close" => Some("qnc-project-close"),
+        "qnc.module.filmstrip" => Some("qnc-filmstrip"),
+        "qnc.module.filmstrip-worker" => Some("qnc-filmstrip-worker"),
+        "qnc.module.wave" => Some("qnc-wave"),
+        "qnc.module.wave-view" => Some("qnc-wave-view"),
+        "qnc.module.wave-worker" => Some("qnc-wave-worker"),
+        "qnc.module.timeline-assets" => Some("qnc-timeline-assets"),
         "qnc.module.timeline" => Some("qnc-timeline"),
         "qnc.module.media-stream" => Some("qnc-media-stream"),
         "qnc.module.media-decode" => Some("qnc-media-decode"),
@@ -1356,6 +1477,10 @@ fn scan_rust_for_hardcoded_shortcuts(root: &Path) -> CheckResult {
     collect_rs_files(&root.join("tools"), &mut files);
 
     for file in files {
+        let relative = display_relative(root, &file);
+        if relative.starts_with("crates/qnc-keyboard-shortcut/") {
+            continue;
+        }
         let Ok(contents) = fs::read_to_string(&file) else {
             continue;
         };
@@ -1363,7 +1488,7 @@ fn scan_rust_for_hardcoded_shortcuts(root: &Path) -> CheckResult {
             if contains_hardcoded_shortcut_pattern(line) {
                 report.error(format!(
                     "{}:{} contains a hardcoded shortcut pattern",
-                    display_relative(root, &file),
+                    relative,
                     index + 1
                 ));
             }
@@ -1371,6 +1496,149 @@ fn scan_rust_for_hardcoded_shortcuts(root: &Path) -> CheckResult {
     }
 
     CheckResult::from_report("hardcoded shortcut scanner", report)
+}
+
+fn scan_decoder_selection_boundary(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let mut files = Vec::new();
+    collect_rs_files(&root.join("crates"), &mut files);
+    collect_rs_files(&root.join("apps"), &mut files);
+    collect_rs_files(&root.join("tools"), &mut files);
+
+    for file in files {
+        let relative = display_relative(root, &file);
+        if is_test_or_example_path(&relative)
+            || relative.starts_with("crates/qnc-ffmpeg-decode/")
+            || relative.starts_with("crates/qnc-decoder-catalog/")
+            || relative.starts_with("tools/qnc-conformance/")
+        {
+            continue;
+        }
+        let Ok(contents) = fs::read_to_string(&file) else {
+            continue;
+        };
+        let active = runtime_source(&contents);
+        for forbidden in [
+            "FfmpegAdapter::new(",
+            "qnc_ffmpeg_decode::",
+            "Command::new(\"ffmpeg\")",
+            "Path::new(\"ffmpeg\")",
+        ] {
+            if active.contains(forbidden) {
+                report.error(format!(
+                    "{relative}: runtime must select decoders through qnc-decoder-catalog, not '{forbidden}'"
+                ));
+            }
+        }
+    }
+
+    CheckResult::from_report("decoder selection boundary", report)
+}
+
+fn scan_public_db_write_boundary(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let mut files = Vec::new();
+    collect_rs_files(&root.join("crates"), &mut files);
+    collect_rs_files(&root.join("apps"), &mut files);
+
+    for file in files {
+        let relative = display_relative(root, &file);
+        if is_test_or_example_path(&relative) || is_public_db_owner_path(&relative) {
+            continue;
+        }
+        let Ok(contents) = fs::read_to_string(&file) else {
+            continue;
+        };
+        let active = runtime_source(&contents);
+        for forbidden in [
+            "ContentClient::from_owner_binding(",
+            "ContentStore::open_owner_binding(",
+            ".open(qnc_ingest_store::content::Access::ReadWrite)",
+            ".open(Access::ReadWrite)",
+            "rusqlite::Connection::open(",
+            "Connection::open(",
+            "transaction_with_behavior(",
+            ".execute_batch(",
+        ] {
+            if active.contains(forbidden) {
+                report.error(format!(
+                    "{relative}: runtime must write through a public DB owner/write transport, not '{forbidden}'"
+                ));
+            }
+        }
+    }
+
+    CheckResult::from_report("public DB write boundary", report)
+}
+
+fn scan_module_database_write_policy(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let module_dir = root.join("contracts").join("modules");
+    let Ok(entries) = fs::read_dir(&module_dir) else {
+        return CheckResult::error(
+            "module DB write policy boundary",
+            "contracts/modules directory is missing",
+        );
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        let relative = display_relative(root, &path);
+        let Ok(contents) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&contents) else {
+            continue;
+        };
+        let Some(policy) = value
+            .get("database_write_policy")
+            .and_then(serde_json::Value::as_str)
+        else {
+            continue;
+        };
+        if matches!(
+            policy,
+            "owner_application_only" | "returns_result_to_owner_application"
+        ) {
+            report.error(format!(
+                "{relative}: database_write_policy '{policy}' bypasses the public DB owner/write transport law"
+            ));
+        }
+    }
+
+    CheckResult::from_report("module DB write policy boundary", report)
+}
+
+fn runtime_source(contents: &str) -> &str {
+    if contents.trim_start().starts_with("#![cfg(test)]") {
+        return "";
+    }
+    contents.split("#[cfg(test)]").next().unwrap_or(contents)
+}
+
+fn is_test_or_example_path(relative: &str) -> bool {
+    relative.contains("/examples/")
+        || relative.contains("/tests/")
+        || relative.ends_with("_tests.rs")
+        || relative.ends_with("/test_support.rs")
+        || relative.ends_with("/tests.rs")
+}
+
+fn is_public_db_owner_path(relative: &str) -> bool {
+    [
+        "crates/qnc-ingest-store/",
+        "crates/qnc-media-record-db/",
+        "crates/qnc-source-index-db/",
+        "crates/qnc-project-store/",
+        "crates/qnc-project-close/",
+        "crates/qnc-camera-patterns/",
+        "crates/qnc-work-settings/",
+    ]
+    .iter()
+    .any(|prefix| relative.starts_with(prefix))
 }
 
 fn scan_business_app_isolation(root: &Path) -> CheckResult {
@@ -1841,7 +2109,7 @@ fn validate_ingest_browser_uses_shared_action_bar(root: &Path, report: &mut Vali
         .join("widgets.rs");
     let Ok(contents) = fs::read_to_string(&widgets) else {
         report.error(format!(
-            "{}: cannot read Ingest desktop widgets",
+            "{}: cannot read Ingest surface widgets",
             display_relative(root, &widgets)
         ));
         return;

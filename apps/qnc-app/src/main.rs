@@ -7,6 +7,7 @@ use std::{
 
 use eframe::egui::{self, Color32, FontFamily, FontId, RichText, Sense, TextStyle, Vec2};
 use qnc_contracts::validate_ui_layout_contract_json;
+use qnc_project_close::CloseProjectComponent;
 use qnc_shell_desktop_api::{
     next_group_tab, DesktopApplicationRef, DesktopNavigation, EmbeddedAppFactory, ShellDesktopApp,
 };
@@ -478,6 +479,22 @@ impl QncShell {
             .unwrap_or(&self.status)
     }
 
+    fn close_active_project(&mut self) {
+        let result = CloseProjectComponent::from_root(&self.qnc_root).close_active_project();
+        match result {
+            Ok(outcome) => {
+                self.status = if outcome.closed {
+                    "Aktivni projekt zatvoren.".into()
+                } else {
+                    "Nema aktivnog projekta.".into()
+                };
+            }
+            Err(error) => {
+                self.status = format!("Close project: {error}");
+            }
+        }
+    }
+
     fn footer(&mut self, ctx: &egui::Context) {
         let theme = self.theme();
         egui::TopBottomPanel::bottom("footer")
@@ -495,6 +512,8 @@ impl QncShell {
                 let columns = self.layout.shell_metrics.workspace_footer_columns.max(3);
                 let apps = self.app_registry.entries().to_vec();
                 let mut tab_to_activate = None;
+                let mut close_project = false;
+                let status = self.footer_status().to_string();
                 ui.columns(columns, |cols| {
                     cols[0].with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         ui.set_min_height(h);
@@ -516,21 +535,36 @@ impl QncShell {
 
                     cols[2].with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.set_min_height(h);
-                        let status = self.footer_status();
+                        let close_button = egui::Button::new(
+                            RichText::new("Close project")
+                                .size(self.layout.theme_metrics.font_ui)
+                                .color(theme.text),
+                        )
+                        .min_size(Vec2::new(118.0, 24.0));
+                        if ui
+                            .add(close_button)
+                            .on_hover_text("Zatvori aktivni projekt")
+                            .clicked()
+                        {
+                            close_project = true;
+                        }
                         ui.add(
                             egui::Label::new(
-                                RichText::new(status)
+                                RichText::new(&status)
                                     .size(self.layout.theme_metrics.font_ui)
                                     .color(theme.muted),
                             )
                             .truncate(),
                         )
-                        .on_hover_text(status);
+                        .on_hover_text(status.clone());
                     });
                 });
 
                 if let Some(tab_id) = tab_to_activate {
                     self.activate_tab(&tab_id);
+                }
+                if close_project {
+                    self.close_active_project();
                 }
             });
     }
@@ -1148,6 +1182,51 @@ mod tests {
         shell.activate_tab("project");
         shell.activate_tab("variant");
         assert_eq!(shell.footer_status(), "Activation 2");
+        fs::remove_dir_all(shell.qnc_root).unwrap();
+    }
+
+    #[test]
+    fn close_active_project_only_calls_public_module_without_changing_shell_surfaces() {
+        let mut shell = navigation_shell();
+        let data = shell.qnc_root.join("data");
+        fs::create_dir_all(&data).unwrap();
+        let db = data.join("project_store.db");
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE VIEW public_app_settings AS SELECT key, value FROM app_settings;
+            INSERT INTO app_settings VALUES('active_project_id', 'p1');
+            ",
+        )
+        .unwrap();
+        let project_dir = shell.qnc_root.join("projects").join("p1");
+        fs::create_dir_all(&project_dir).unwrap();
+        fs::write(project_dir.join("qnc_project.db"), []).unwrap();
+        shell.embedded_apps.insert(
+            "variant".into(),
+            Box::new(StatusSurface {
+                status: "Ingest runtime".into(),
+                activations: 0,
+            }),
+        );
+        shell.active_tab = "variant".into();
+
+        shell.close_active_project();
+
+        let active: String = conn
+            .query_row(
+                "SELECT value FROM app_settings WHERE key='active_project_id'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(active.is_empty());
+        assert!(project_dir.join("qnc_project.db").is_file());
+        assert_eq!(shell.active_tab, "variant");
+        assert!(shell.embedded_apps.contains_key("variant"));
+        assert_eq!(shell.status, "Aktivni projekt zatvoren.");
+        drop(conn);
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 

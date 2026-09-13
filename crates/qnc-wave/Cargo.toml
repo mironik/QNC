@@ -1,0 +1,11 @@
+[package]
+name = "qnc-wave"
+version = "0.1.0"
+edition = "2021"
+description = "Shared QNC waveform planning and peak model"
+
+[dependencies]
+qnc-media-metadata = { workspace = true }
+qnc-media-records = { workspace = true }
+serde = { workspace = true }
+

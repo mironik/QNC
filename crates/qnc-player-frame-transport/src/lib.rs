@@ -1,9 +1,10 @@
-//! Local ordered-frame transport for passive QNC monitors.
+//! Local mailbox for passive QNC monitors.
 //!
 //! This module does not decode, probe, read databases, or own playback time.
-//! A player process publishes submitted monitor frames; a UI process reads the
-//! next complete generation when it can. Frames are skipped only when the
-//! bounded ring is overwritten.
+//! The player posts the current picture and signals. The monitor receives that
+//! mailbox. It does not drain history and does not own a display clock.
+
+mod wake;
 
 use memmap2::{Mmap, MmapMut, MmapOptions};
 use qnc_player_contract::session::{MonitorHeader, SessionQuery};
@@ -12,7 +13,10 @@ use std::{
     fs::{File, OpenOptions},
     path::Path,
     sync::Arc,
+    thread,
+    time::{Duration, Instant},
 };
+use wake::Wake;
 
 pub const MAGIC: &[u8; 8] = b"QNCFRM03";
 pub const VERSION: u8 = 1;
@@ -50,6 +54,7 @@ pub struct LatestFrameWriter {
     mmap: MmapMut,
     capacity: usize,
     published: u64,
+    wake: Wake,
 }
 
 impl LatestFrameWriter {
@@ -79,6 +84,7 @@ impl LatestFrameWriter {
             mmap,
             capacity,
             published: 0,
+            wake: Wake::create(path.as_ref())?,
         })
     }
 
@@ -94,6 +100,7 @@ impl LatestFrameWriter {
             published: read_u64(&mmap[PUBLISHED_OFFSET..PUBLISHED_OFFSET + 8]),
             mmap,
             capacity,
+            wake: Wake::open(path.as_ref())?,
         })
     }
 
@@ -153,6 +160,7 @@ impl LatestFrameWriter {
         // Flushing every monitor frame turns IPC into storage work and causes
         // avoidable playback stalls on Windows.
         self.published = generation;
+        self.wake.signal()?;
         Ok(generation)
     }
 }
@@ -161,6 +169,7 @@ pub struct LatestFrameReader {
     mmap: Mmap,
     capacity: usize,
     observed: u64,
+    wake: Wake,
 }
 
 impl LatestFrameReader {
@@ -172,7 +181,37 @@ impl LatestFrameReader {
             mmap,
             capacity,
             observed: 0,
+            wake: Wake::open(path.as_ref())?,
         })
+    }
+
+    /// Block until the player posts a mailbox, then receive that picture.
+    /// Does not walk unpublished history.
+    pub fn recv(&mut self, timeout: Duration) -> Result<Option<LatestFrameUpdate>, String> {
+        if let Some(update) = self.read_newest()? {
+            return Ok(Some(update));
+        }
+        let deadline = Instant::now() + timeout;
+        loop {
+            let remain = deadline.saturating_duration_since(Instant::now());
+            if remain.is_zero() {
+                return self.read_newest();
+            }
+            // A wake can arrive while the writer is still filling the slot.
+            // Retry the newest present immediately so the picture does not
+            // sit behind the audio clock.
+            let signaled = self.wake.wait(remain.min(Duration::from_millis(2)))?;
+            for _ in 0..8 {
+                if let Some(update) = self.read_newest()? {
+                    return Ok(Some(update));
+                }
+                if signaled {
+                    thread::yield_now();
+                } else {
+                    break;
+                }
+            }
+        }
     }
 
     pub fn read_latest(&mut self) -> Result<Option<LatestFrameUpdate>, String> {
@@ -201,6 +240,51 @@ impl LatestFrameReader {
             if generation < published {
                 self.observed = generation;
             }
+            return Ok(None);
+        }
+        if metadata_len == 0 || metadata_len > METADATA_BYTES || payload_len > self.capacity {
+            return Err("latest-frame slot is invalid".into());
+        }
+        let metadata_offset = offset + SLOT_PREFIX_BYTES;
+        let payload_offset = metadata_offset + METADATA_BYTES;
+        let metadata: FrameMetadata =
+            serde_json::from_slice(&self.mmap[metadata_offset..metadata_offset + metadata_len])
+                .map_err(|e| e.to_string())?;
+        self.observed = generation;
+        let Some(header) = metadata.header else {
+            return Ok(Some(LatestFrameUpdate::Clear));
+        };
+        let rgba: Arc<[u8]> = self.mmap[payload_offset..payload_offset + payload_len]
+            .to_vec()
+            .into();
+        let query = SessionQuery {
+            contract_version: header.contract_version.clone(),
+            session_id: header.session_id.clone(),
+            source_generation: header.source_generation,
+        };
+        header.validate(&query, &header.source_id, rgba.len())?;
+        Ok(Some(LatestFrameUpdate::Picture(LatestFrame {
+            header,
+            rgba,
+        })))
+    }
+
+    pub fn read_newest(&mut self) -> Result<Option<LatestFrameUpdate>, String> {
+        let published = read_u64(&self.mmap[PUBLISHED_OFFSET..PUBLISHED_OFFSET + 8]);
+        if published == 0 || published <= self.observed {
+            return Ok(None);
+        }
+        self.read_generation(published)
+    }
+
+    fn read_generation(&mut self, generation: u64) -> Result<Option<LatestFrameUpdate>, String> {
+        let slot = (generation as usize) % SLOT_COUNT;
+        let offset = slot_offset(self.capacity, slot);
+        let begin = read_u64(&self.mmap[offset..offset + 8]);
+        let metadata_len = read_u32(&self.mmap[offset + 8..offset + 12]) as usize;
+        let payload_len = read_u32(&self.mmap[offset + 12..offset + 16]) as usize;
+        let end = read_u64(&self.mmap[offset + 16..offset + 24]);
+        if begin != generation || end != generation {
             return Ok(None);
         }
         if metadata_len == 0 || metadata_len > METADATA_BYTES || payload_len > self.capacity {
@@ -414,6 +498,50 @@ mod tests {
             panic!("expected picture");
         };
         assert_eq!(picture.header.frame, 11);
+        drop(reader);
+        drop(writer);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reader_receives_posted_mailbox_without_draining_history() {
+        let path = path("mailbox");
+        let mut writer = LatestFrameWriter::create(&path, 128).unwrap();
+        let mut reader = LatestFrameReader::open(&path).unwrap();
+        writer.publish(&header(1, 10), &[1; 8]).unwrap();
+        writer.publish(&header(2, 11), &[2; 8]).unwrap();
+        writer.publish(&header(3, 12), &[3; 8]).unwrap();
+        let LatestFrameUpdate::Picture(posted) = reader
+            .recv(Duration::from_millis(50))
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("expected posted mailbox");
+        };
+        assert_eq!(posted.header.sequence, 3);
+        assert_eq!(posted.header.frame, 12);
+        assert!(reader.recv(Duration::from_millis(5)).unwrap().is_none());
+        drop(reader);
+        drop(writer);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reader_can_coalesce_preview_to_newest_complete_frame() {
+        let path = path("newest");
+        let mut writer = LatestFrameWriter::create(&path, 128).unwrap();
+        let mut reader = LatestFrameReader::open(&path).unwrap();
+        writer.publish(&header(1, 10), &[1; 8]).unwrap();
+        writer.publish(&header(2, 11), &[2; 8]).unwrap();
+        writer.publish(&header(3, 12), &[3; 8]).unwrap();
+
+        let LatestFrameUpdate::Picture(newest) = reader.read_newest().unwrap().unwrap() else {
+            panic!("expected picture");
+        };
+        assert_eq!(newest.header.sequence, 3);
+        assert_eq!(newest.header.frame, 12);
+        assert!(reader.read_latest().unwrap().is_none());
+
         drop(reader);
         drop(writer);
         let _ = std::fs::remove_file(path);

@@ -1,17 +1,16 @@
-use qnc_broadcast_engine::InputPlan;
+use qnc_broadcast_engine::{DecodeMediaAccess, InputPlan};
 use qnc_json_transport::Credentials;
-use qnc_media_stream::{LocalSource, MediaStream, SourceReference};
+use qnc_media_stream::{CodecEndpoint, LocalSource, MediaStream, SourceReference};
 use qnc_player_contract::VERSION;
 use qnc_player_input::PreparedInput;
-use qnc_transport_resolver::ResolverConfig;
 use serde::Deserialize;
 use std::{
     io::{self, Read},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 const MAX_BOOT_BYTES: u64 = 4 * 1024 * 1024;
-type MediaOpener = Box<dyn FnMut(&str) -> io::Result<MediaStream>>;
+type MediaOpener = Box<dyn FnMut(&str) -> io::Result<DecodeMediaAccess>>;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,8 +49,17 @@ impl Binding {
                 if SourceReference::from_uri(media_uri)?.source_uri() != source_uri {
                     return Err("source binding differs from saved media".into());
                 }
-                let source = LocalSource::new(&source_uri, root)?;
-                Ok(Box::new(move |uri| MediaStream::local(&source, uri)))
+                let root = root.canonicalize()?;
+                let source = LocalSource::new(&source_uri, &root)?;
+                Ok(Box::new(move |uri| {
+                    let media = MediaStream::local(&source, uri)?;
+                    let storage_stamp = media.info().storage_stamp.clone();
+                    let path = local_codec_path(&source_uri, &root, uri)?;
+                    Ok(DecodeMediaAccess::Endpoint {
+                        endpoint: CodecEndpoint::for_local_file(path, uri)?,
+                        storage_stamp,
+                    })
+                }))
             }
             Self::Network {
                 environment,
@@ -59,20 +67,43 @@ impl Binding {
                 base_url,
                 token,
             } => {
-                let resolver = ResolverConfig::new(PathBuf::new());
-                let resolver = match environment.as_str() {
-                    "lan" => resolver.with_lan_authority(authority, base_url),
-                    "intranet" => resolver.with_intranet_authority(authority, base_url),
-                    _ => return Err("invalid media transport environment".into()),
-                };
-                qnc_media_stream::HttpEndpoint::resolve(&resolver, media_uri, &token)?;
-                Ok(Box::new(move |uri| {
-                    MediaStream::remote(&resolver, uri, &token)
+                if !matches!(environment.as_str(), "lan" | "intranet")
+                    || authority.trim().is_empty()
+                    || base_url.trim().is_empty()
+                    || token.trim().is_empty()
+                {
+                    return Err("invalid media transport environment".into());
+                }
+                Ok(Box::new(move |_uri| {
+                    Err(io::Error::new(
+                        io::ErrorKind::Unsupported,
+                        "network playback requires a seekable QNC decoder endpoint; HTTP/raw TCP decoder input is disabled",
+                    ))
                 }))
             }
         }
     }
 }
+
+fn local_codec_path(source_uri: &str, root: &Path, media_uri: &str) -> io::Result<PathBuf> {
+    let reference = SourceReference::from_uri(media_uri)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+    if reference.source_uri() != source_uri {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "media source mismatch",
+        ));
+    }
+    let path = root.join(reference.relative_path()).canonicalize()?;
+    if !path.starts_with(root) || !path.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "media escapes source binding",
+        ));
+    }
+    Ok(path)
+}
+
 impl Boot {
     pub fn read(input: impl Read) -> crate::Result<Self> {
         let mut bytes = Vec::new();

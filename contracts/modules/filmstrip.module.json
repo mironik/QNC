@@ -2,8 +2,14 @@
   "module_id": "qnc.module.filmstrip",
   "module_name": "Filmstrip",
   "module_version": "0.1.0",
-  "module_kind": "out_of_process_helper",
-  "capabilities": ["filmstrip.generate14"],
+  "module_kind": "library",
+  "capabilities": [
+    "filmstrip.plan",
+    "filmstrip.keyframe_seek",
+    "filmstrip.frame_uri_contract",
+    "filmstrip.passive_background_model",
+    "filmstrip.local_artifact_resolution"
+  ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -14,10 +20,18 @@
     "media.probe.full",
     "source.scan.roles",
     "ingest.workflow",
+    "timeline.intent.emit",
+    "playback.clock.own",
     "poster.repeat_as_filmstrip"
   ],
-  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.player-client",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine"
+  ],
   "state_policy": "stateless",
-  "database_write_policy": "returns_result_to_owner_application"
+  "database_write_policy": "no_db_writes"
 }
 

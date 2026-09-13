@@ -24,7 +24,7 @@
     "media.acquisition.read"
   ],
   "state_policy": "owned_by_calling_application",
-  "database_write_policy": "owner_application_only",
+  "database_write_policy": "public_db_owner_write_adapter_only",
   "forbidden_calls": [
     "source.scan.roles",
     "camera.sony.metadata.read",

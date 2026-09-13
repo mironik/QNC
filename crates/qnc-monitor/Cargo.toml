@@ -1,0 +1,9 @@
+[package]
+name = "qnc-monitor"
+version = "0.1.0"
+edition = "2021"
+description = "Passive public player preview surface for any QNC application"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-ui-kit = { workspace = true }

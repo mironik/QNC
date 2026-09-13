@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 qnc-broadcast-player.workspace = true
+qnc-dev-diagnostics.workspace = true
 qnc-player-input.workspace = true
 qnc-media-metadata.workspace = true
 qnc-media-decode.workspace = true
@@ -15,7 +16,7 @@ qnc-video-output.workspace = true
 qnc-audio-output.workspace = true
 
 [dev-dependencies]
-qnc-ffmpeg-decode.workspace = true
+qnc-decoder-catalog.workspace = true
 qnc-work-settings.workspace = true
 serde_json.workspace = true
 wgpu = "24.0.5"

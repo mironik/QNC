@@ -4,7 +4,9 @@
   "module_version": "0.1.0",
   "module_kind": "library",
   "capabilities": [
-    "media.decode.ffmpeg"
+    "media.decode.ffmpeg",
+    "filmstrip.extract_jpeg.ffmpeg",
+    "filmstrip.extract_jpeg.keyframe_seek.ffmpeg"
   ],
   "input_contract_version": "0.2.0",
   "output_contract_version": "0.2.0",
@@ -41,6 +43,6 @@
     "qnc.module.scanner",
     "qnc.module.broadcast-player-core"
   ],
-  "adapter_policy": "FFmpeg CLI construction and native packet record parsing only. No scanner, discovery fallback, output clock or application identity.",
+  "adapter_policy": "FFmpeg CLI construction and native packet record parsing only. FFmpeg is the approved interim external/software adapter inside the replaceable decoder chain, not the final architecture. The adapter consumes only a seekable file CodecEndpoint produced by the storage owner/resolver and must reject session-private raw TCP endpoints. It must not build HTTP headers, range requests, reconnect options or storage credentials into the command. It may let FFmpeg initialize its demuxer for the already selected saved stream, but it must not run ffprobe, publish media facts, scan, select original/proxy, own output clock or know application identity.",
   "specification": "docs/70-replaceable-decoders.md"
 }

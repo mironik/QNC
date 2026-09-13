@@ -20,7 +20,9 @@ impl Binding {
         let p = qnc_contracts::parse_qnc_uri(&self.uri)?;
         let r = ResolverConfig::new(PathBuf::new());
         match (p.environment.as_str(), &self.file, &self.endpoint) {
-            ("local", Some(file), None) if file.is_absolute() && self.token_env.is_none() => {
+            ("local" | "lan" | "intranet", Some(file), None)
+                if file.is_absolute() && self.token_env.is_none() =>
+            {
                 Ok(r.with_local_binding(&self.uri, file))
             }
             ("lan", None, Some(url)) => {
@@ -119,6 +121,24 @@ impl SourceConfig {
         }
         self.location.source()
     }
+
+    pub fn local_media_path(&self, media_uri: &str) -> Result<Option<PathBuf>> {
+        let Some(root) = &self.location.file else {
+            return Ok(None);
+        };
+        qnc_dir_browser::verify_local_volume_serial(root, &self.serial_number)?;
+        let reference = SourceReference::from_uri(media_uri)?;
+        if reference.source_uri() != self.location.uri {
+            return Err("media source mismatch".into());
+        }
+        let root = root.canonicalize()?;
+        let path = root.join(reference.relative_path()).canonicalize()?;
+        if !path.starts_with(&root) || !path.is_file() {
+            return Err("media escapes source binding".into());
+        }
+        Ok(Some(path))
+    }
+
     pub fn backend(&self, media: &[SourceReference]) -> Result<Box<dyn ProbeBackend + Send>> {
         match &self.probe {
             ProbeConfig::Remote { binding } => Ok(Box::new(qnc_media_probe::Client::connect(

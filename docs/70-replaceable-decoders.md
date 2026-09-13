@@ -1,7 +1,17 @@
 # Replaceable decoder adapters
 
-Approved scope: 2026-09-09. No Project, form, source selection, DB, clock,
-audio routing or media processing policy changes. No MLT/VLC integration.
+Approved scope: 2026-09-09. Updated target: 2026-09-11. No Project, form,
+source selection, DB, clock, audio routing or media processing policy changes.
+No MLT/VLC integration.
+
+Final target: QNC decode is a replaceable capability chain. A host may provide
+hardware/GPU adapters first, system decoder adapters second and external
+software adapters last. NVIDIA NVDEC/CUVID, Intel QSV/oneVPL, AMD AMF/VCN/VAAPI
+and Apple VideoToolbox are future public adapters, not hardcoded player paths.
+Until the application is functional and stable, FFmpeg remains the approved
+external/software adapter inside this same chain. It is not the architecture.
+Adding GPU/system adapters later must not change player, filmstrip or DB
+contracts.
 
 ## Boundaries
 
@@ -13,13 +23,19 @@ audio routing or media processing policy changes. No MLT/VLC integration.
 - qnc-decoder-catalog reads an explicit deployment catalog, resolves the
   selected installed adapter and injects it at the player process entry.
   The player runtime does not load configuration or select a technology.
+- qnc-decoder-catalog is the only place that ranks future hardware, system
+  and external adapters against saved source facts. The current catalog may
+  select `qnc.ffmpeg` as the only installed adapter while the product is being
+  made functional.
 - Additional processes implement the QNC packet protocol, not an FFmpeg CLI.
   Adding one requires a catalog entry, not a player/GUI source change.
 
 The catalog is private deployment configuration, never project/workflow
 truth. Project and saved media facts still determine input, timing, channels
 and policy. Adapter capabilities only accept or reject that request. No
-silent replacement, media discovery, format conversion or new probe.
+silent replacement, media discovery, format conversion or new probe. A decoder
+may perform its own demux/decode initialization for the already selected saved
+stream; it may not publish or reinterpret media facts.
 
 ## Verification gate
 

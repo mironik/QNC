@@ -13,7 +13,8 @@ use std::{
 use wgpu::util::DeviceExt;
 
 /// Prepared SDR raster adapter. Owns no media source, clock or display state.
-/// GPU readback is deliberately explicit while the consumer accepts packed RGBA.
+/// GPU work stays on the GPU until an explicit collect; the consumer still
+/// accepts packed RGBA until a shared surface adapter exists.
 pub struct GpuRasterConverter {
     spec: ConversionSpec,
     size: [u32; 2],
@@ -21,12 +22,21 @@ pub struct GpuRasterConverter {
     queue: wgpu::Queue,
     source: wgpu::Buffer,
     target: wgpu::Buffer,
-    readback: wgpu::Buffer,
+    readback: [wgpu::Buffer; 2],
+    next_readback: usize,
     bindings: wgpu::BindGroup,
     pipeline: wgpu::ComputePipeline,
     adapter_name: String,
     failed: Arc<AtomicBool>,
     timing: [u128; 3],
+}
+
+/// In-flight GPU raster. Collect copies out; enqueue of the next frame can overlap.
+pub struct GpuReadback {
+    index: usize,
+    mapped: mpsc::Receiver<Result<(), wgpu::BufferAsyncError>>,
+    upload_us: u128,
+    wait_start: Instant,
 }
 
 #[cfg(test)]
@@ -181,7 +191,7 @@ impl GpuRasterConverter {
         let size = fit([spec.width, spec.height], bounds)?;
         let input_bytes = spec.input_bytes()?.next_multiple_of(4) as u64;
         let output_bytes = u64::from(size[0]) * u64::from(size[1]) * 4;
-        if input_bytes + output_bytes * 2 > MAX_BYTES as u64 {
+        if input_bytes + output_bytes * 3 > MAX_BYTES as u64 {
             return Err(ConversionError::Budget);
         }
         let instance = wgpu::Instance::default();
@@ -241,11 +251,18 @@ impl GpuRasterConverter {
             output_bytes,
             wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
         );
-        let readback = buffer(
-            "srgb-readback",
-            output_bytes,
-            wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-        );
+        let readback = [
+            buffer(
+                "srgb-readback-0",
+                output_bytes,
+                wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            ),
+            buffer(
+                "srgb-readback-1",
+                output_bytes,
+                wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            ),
+        ];
         let (cw, ch) = spec.layout.chroma_size(spec.width, spec.height);
         let y_len = spec.width * spec.height;
         let params: Vec<u8> = [
@@ -311,6 +328,7 @@ impl GpuRasterConverter {
             source,
             target,
             readback,
+            next_readback: 0,
             bindings,
             pipeline,
             adapter_name,
@@ -337,13 +355,16 @@ impl GpuRasterConverter {
 
     /// Called only on a preparation worker. All payload storage is reused.
     pub fn convert(&mut self, input: &[u8], rgba: &mut [u8]) -> Result<(), ConversionError> {
+        let pending = self.enqueue(input)?;
+        self.collect(pending, rgba)
+    }
+
+    /// Submit GPU raster. Does not wait for CPU readback.
+    pub fn enqueue(&mut self, input: &[u8]) -> Result<GpuReadback, ConversionError> {
         if self.failed.load(Ordering::Acquire) {
             return Err(gpu_error("device failed"));
         }
         self.spec.validate_payload(input)?;
-        if rgba.len() != self.output_bytes() {
-            return Err(ConversionError::Payload);
-        }
         let upload_start = Instant::now();
         let aligned = input.len() / 4 * 4;
         if aligned != 0 {
@@ -354,6 +375,7 @@ impl GpuRasterConverter {
             tail[..input.len() - aligned].copy_from_slice(&input[aligned..]);
             self.queue.write_buffer(&self.source, aligned as u64, &tail);
         }
+        let index = self.next_readback;
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -367,27 +389,42 @@ impl GpuRasterConverter {
         encoder.copy_buffer_to_buffer(
             &self.target,
             0,
-            &self.readback,
+            &self.readback[index],
             0,
             self.output_bytes() as u64,
         );
         self.queue.submit(Some(encoder.finish()));
-        let upload_us = upload_start.elapsed().as_micros();
-        let wait_start = Instant::now();
         let (send, receive) = mpsc::sync_channel(1);
-        self.readback
+        self.readback[index]
             .slice(..)
             .map_async(wgpu::MapMode::Read, move |result| {
                 let _ = send.send(result);
             });
+        self.next_readback ^= 1;
+        Ok(GpuReadback {
+            index,
+            mapped: receive,
+            upload_us: upload_start.elapsed().as_micros(),
+            wait_start: Instant::now(),
+        })
+    }
+
+    pub fn collect(
+        &mut self,
+        pending: GpuReadback,
+        rgba: &mut [u8],
+    ) -> Result<(), ConversionError> {
+        if rgba.len() != self.output_bytes() {
+            return Err(ConversionError::Payload);
+        }
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
             self.device.poll(wgpu::Maintain::Poll);
             if self.failed.load(Ordering::Acquire) {
-                self.readback.unmap();
+                self.readback[pending.index].unmap();
                 return Err(gpu_error("device failed during conversion"));
             }
-            match receive.try_recv() {
+            match pending.mapped.try_recv() {
                 Ok(result) => {
                     result.map_err(gpu_error)?;
                     break;
@@ -395,20 +432,24 @@ impl GpuRasterConverter {
                 Err(mpsc::TryRecvError::Disconnected) => return Err(gpu_error("readback closed")),
                 Err(mpsc::TryRecvError::Empty) if Instant::now() >= deadline => {
                     self.failed.store(true, Ordering::Release);
-                    self.readback.unmap();
+                    self.readback[pending.index].unmap();
                     return Err(gpu_error("readback timed out"));
                 }
                 Err(mpsc::TryRecvError::Empty) => std::thread::yield_now(),
             }
         }
-        let wait_us = wait_start.elapsed().as_micros();
+        let wait_us = pending.wait_start.elapsed().as_micros();
         let copy_start = Instant::now();
         {
-            let mapped = self.readback.slice(..).get_mapped_range();
+            let mapped = self.readback[pending.index].slice(..).get_mapped_range();
             rgba.copy_from_slice(&mapped);
         }
-        self.readback.unmap();
-        self.timing = [upload_us, wait_us, copy_start.elapsed().as_micros()];
+        self.readback[pending.index].unmap();
+        self.timing = [
+            pending.upload_us,
+            wait_us,
+            copy_start.elapsed().as_micros(),
+        ];
         Ok(())
     }
 }

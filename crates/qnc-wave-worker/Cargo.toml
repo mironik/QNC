@@ -1,0 +1,17 @@
+[package]
+name = "qnc-wave-worker"
+version = "0.1.0"
+edition = "2021"
+description = "Background waveform peak generator for QNC"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-decoder-catalog = { workspace = true }
+qnc-contracts = { workspace = true }
+qnc-dir-browser = { workspace = true }
+qnc-media-decode = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-media-stream = { workspace = true }
+qnc-transport-resolver = { workspace = true }
+qnc-wave = { workspace = true }

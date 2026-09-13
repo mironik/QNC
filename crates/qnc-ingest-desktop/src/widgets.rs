@@ -3,10 +3,11 @@ use eframe::egui::{
     ScrollArea, Sense, Stroke, StrokeKind, Ui, Vec2,
 };
 
-use qnc_ingest_components::{
+use qnc_ingest_application::{
     action_ids, timeline_intent_to_ingest_intent, ClipFilter, ClipView, IngestIntent,
     IngestPayload, IngestViewModel, LocationEntry, SourceKind,
 };
+use qnc_monitor::{MonitorChrome, MonitorPaint, MonitorPicture, MonitorSurface};
 use qnc_timeline::TimelineTheme;
 use qnc_ui_kit::FormActionBarStyle;
 
@@ -14,10 +15,6 @@ use crate::{
     layout_contract::{IngestContracts, IngestDirBrowser},
     theme::Theme,
 };
-
-#[cfg(test)]
-#[path = "card_tests.rs"]
-mod card_tests;
 
 pub fn render_desktop(
     ui: &mut Ui,
@@ -176,49 +173,39 @@ fn render_preview(
     theme: &Theme,
     view: &IngestViewModel,
 ) {
-    ui.allocate_rect(rect, Sense::hover());
-    ui.painter().rect_filled(rect, 0.0, theme.black);
-    ui.painter().rect_stroke(
-        rect,
-        0.0,
-        Stroke::new(1.0, theme.border),
-        StrokeKind::Inside,
-    );
-    if let Some(picture) = view
+    let chrome = MonitorChrome {
+        fill: theme.black,
+        border: theme.border,
+        muted: theme.text_muted,
+        font_size: theme.font_ui,
+    };
+    let picture = view
         .playback
         .picture
         .as_ref()
         .filter(|_| view.playback.video_visible)
-    {
-        let header = &picture.header;
-        if qnc_ui_kit::paint_stream_frame(
-            ui,
-            rect.shrink(1.0),
-            egui::Id::new("ingest-monitor"),
-            (
-                &header.session_id,
-                header.output_generation,
-                header.sequence,
-            ),
-            [header.width as usize, header.height as usize],
-            &picture.rgba,
-        ) {
-            return;
-        }
-    }
-    if let Some(error) = &view.playback.error {
-        let galley = ui.painter().layout(
-            error.clone(),
-            FontId::proportional(theme.font_ui),
-            theme.text_muted,
-            (rect.width() - 24.0).max(1.0),
-        );
-        ui.painter().galley(
-            rect.center() - galley.size() * 0.5,
-            galley,
-            theme.text_muted,
-        );
-        return;
+        .map(|picture| MonitorPicture {
+            session_id: &picture.header.session_id,
+            generation: picture.header.output_generation,
+            sequence: picture.header.sequence,
+            size: [
+                picture.header.width as usize,
+                picture.header.height as usize,
+            ],
+            rgba: &picture.rgba,
+        });
+    match qnc_monitor::paint_monitor(
+        ui,
+        rect,
+        MonitorSurface {
+            id: egui::Id::new(("qnc-monitor", "ingest-source")),
+            chrome,
+            picture,
+            message: view.playback.error.as_deref(),
+        },
+    ) {
+        MonitorPaint::Picture | MonitorPaint::Message => return,
+        MonitorPaint::Empty => {}
     }
     if let Some(clip) = view
         .clips
@@ -243,13 +230,7 @@ fn render_preview(
     } else {
         contracts.ingest.preview.empty_label.as_str()
     };
-    ui.painter().text(
-        rect.center(),
-        Align2::CENTER_CENTER,
-        label,
-        FontId::proportional(theme.font_ui),
-        theme.text_muted,
-    );
+    qnc_monitor::paint_placeholder(ui, rect, chrome, label);
 }
 
 fn render_pool_head(
@@ -697,8 +678,8 @@ fn render_clip_card(
     }
     paint_selection_check(ui, image_rect, clip.selected, theme);
     let label = match clip.save_state {
-        qnc_ingest_components::SaveState::Pending => Some("Spremanje..."),
-        qnc_ingest_components::SaveState::Failed => Some("Upis nije uspio"),
+        qnc_ingest_application::SaveState::Pending => Some("Spremanje..."),
+        qnc_ingest_application::SaveState::Failed => Some("Upis nije uspio"),
         _ => None,
     };
     if let Some(label) = label {
@@ -954,147 +935,6 @@ fn action_enabled(action: &str, view: &IngestViewModel) -> bool {
     }
 }
 
-#[cfg(test)]
-mod filter_tests {
-    use super::*;
-
-    #[test]
-    fn dock_count_is_left_aligned_and_filter_has_contract_colors() {
-        let contracts = IngestContracts::load().unwrap();
-        let theme = Theme::from_contract(&contracts.shell);
-        let mut view = IngestViewModel::default();
-        view.clips = (0..98)
-            .map(|id| ClipView {
-                clip_id: id.to_string(),
-                name: format!("clip-{id}.mxf"),
-                selected: id == 0,
-                previously_seen: true,
-                thumb_status: qnc_ingest_components::ThumbStatus::Ready,
-                ..Default::default()
-            })
-            .collect();
-        view.preview_clip_id = Some("0".into());
-        let status = view.status_label();
-        for width in [960.0, 1280.0, 1920.0] {
-            let ctx = egui::Context::default();
-            for filter in [ClipFilter::New, ClipFilter::All] {
-                view.clip_filter = filter;
-                let output = ctx.run(
-                    egui::RawInput {
-                        screen_rect: Some(Rect::from_min_size(
-                            egui::Pos2::ZERO,
-                            Vec2::new(width, 160.0),
-                        )),
-                        ..Default::default()
-                    },
-                    |ctx| {
-                        egui::CentralPanel::default().show(ctx, |ui| {
-                            assert!(render_source_dock(ui, &contracts, &theme, &view).is_none());
-                        });
-                    },
-                );
-                let text_rect = |label: &str| {
-                    output
-                        .shapes
-                        .iter()
-                        .find_map(|shape| match &shape.shape {
-                            egui::Shape::Text(text) if text.galley.text() == label => {
-                                Some(Rect::from_min_size(text.pos, text.galley.size()))
-                            }
-                            _ => None,
-                        })
-                        .unwrap_or_else(|| panic!("missing label: {label}"))
-                };
-                let name = text_rect("clip-0.mxf");
-                let count = text_rect(&status);
-                assert!(count.left() > name.right());
-                assert!(
-                    count.left() - name.right() < 40.0,
-                    "status must follow clip name on the left"
-                );
-                assert!(count.right() < width / 2.0);
-                assert!(
-                    count.right() < text_rect("AI mining").left(),
-                    "count overlaps actions"
-                );
-                assert!(text_rect("Novi").right() < text_rect("Sve").left());
-                assert!(
-                    width - text_rect("Sve").right() < 50.0,
-                    "filter must remain right aligned"
-                );
-                for (index, mode) in [ClipFilter::New, ClipFilter::All].into_iter().enumerate() {
-                    let [r, g, b] = contracts.ingest.source_dock.clip_filter_colors[index];
-                    if mode == ClipFilter::New {
-                        assert!(g > r && g > b);
-                    } else {
-                        assert!(b > r && b > g);
-                    }
-                    let color = Color32::from_rgb(r, g, b);
-                    let expected = if mode == filter {
-                        color
-                    } else {
-                        Color32::TRANSPARENT
-                    };
-                    let center =
-                        text_rect(&contracts.ingest.source_dock.clip_filter_labels[index]).center();
-                    assert!(output.shapes.iter().any(|shape| matches!(&shape.shape,
-                        egui::Shape::Rect(rect) if rect.fill == expected && rect.rect.contains(center)
-                    )));
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn grid_uses_component_projection_and_no_existing_badges() {
-        let contracts = IngestContracts::load().unwrap();
-        assert_eq!(
-            contracts.ingest.source_dock.clip_filter_labels,
-            ["Novi", "Sve"]
-        );
-        let theme = Theme::from_contract(&contracts.shell);
-        let ctx = egui::Context::default();
-        let mut view = IngestViewModel::default();
-        view.clips = vec![ClipView {
-            name: "old.mxf".into(),
-            previously_seen: true,
-            selected: true,
-            ..Default::default()
-        }];
-        for filter in [ClipFilter::All, ClipFilter::New] {
-            view.clip_filter = filter;
-            let output = ctx.run(egui::RawInput::default(), |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| {
-                    assert!(render_clip_grid(ui, &contracts, &theme, &view).is_none());
-                });
-            });
-            let texts = output
-                .shapes
-                .iter()
-                .filter_map(|shape| match &shape.shape {
-                    egui::Shape::Text(text) => Some(text.galley.text()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
-            assert!(!texts.contains(&"Postojeći"));
-            assert_eq!(texts.contains(&"old.mxf"), filter == ClipFilter::All);
-            assert_eq!(
-                texts.contains(&contracts.ingest.clip_grid.empty_new_message.as_str()),
-                filter == ClipFilter::New
-            );
-            assert_eq!(
-                action_enabled("Odaberi sve", &view),
-                filter == ClipFilter::All
-            );
-            assert_eq!(action_enabled("Očisti", &view), filter == ClipFilter::All);
-            assert!(
-                action_enabled("Uvezi", &view),
-                "hidden selection is still selected"
-            );
-        }
-    }
-}
-
 fn source_kind_label(labels: &IngestDirBrowser, kind: SourceKind) -> &str {
     let index = match kind {
         SourceKind::Local => 0,
@@ -1154,8 +994,17 @@ fn render_player_timeline(
     theme: &Theme,
     view: &IngestViewModel,
 ) -> Option<IngestIntent> {
-    let intent =
-        qnc_timeline::show_source_player_timeline(ui, rect, &view.timeline, timeline_theme(theme));
+    let intent = qnc_timeline::show_source_player_timeline_with_artifacts(
+        ui,
+        rect,
+        &view.timeline,
+        timeline_theme(theme),
+        view.timeline_filmstrip_background(),
+        view.timeline_a1_peaks(),
+        view.timeline_a2_peaks(),
+        view.timeline_a3_peaks(),
+        view.timeline_a4_peaks(),
+    );
     timeline_intent_to_ingest_intent(intent)
 }
 

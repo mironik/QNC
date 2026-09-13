@@ -1,6 +1,7 @@
 use super::*;
 use qnc_media_metadata::{MediaRepresentation, Signal, StreamDetails};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
+use serde_json::Value;
 use std::{path::Path, time::Duration};
 
 pub struct ContentStore {
@@ -113,6 +114,8 @@ impl ContentStore {
         }
         if access == Access::ReadWrite {
             ensure_summary_columns(&conn)?;
+            ensure_filmstrip_schema(&conn)?;
+            ensure_wave_schema(&conn)?;
         }
         let has_thumbnail_uri = schema && has_column(&conn, "clips", "thumbnail_uri")?;
         if access == Access::ReadOnly {
@@ -168,6 +171,14 @@ impl ContentStore {
                 Operation::Read { clip_id } => {
                     qnc_media_records::valid_id(clip_id).map_err(err)?;
                     Ok(Data::Clip(None))
+                }
+                Operation::ReadFilmstrip { clip_id } => {
+                    qnc_media_records::valid_id(clip_id).map_err(err)?;
+                    Ok(Data::Filmstrip(None))
+                }
+                Operation::ReadWave { clip_id } => {
+                    qnc_media_records::valid_id(clip_id).map_err(err)?;
+                    Ok(Data::Wave(None))
                 }
                 _ => Err("Ingest shema nije inicijalizirana.".into()),
             };
@@ -232,6 +243,7 @@ impl ContentStore {
                         continue;
                     }
                     for table in [
+                        "filmstrip_frames",
                         "clip_sources",
                         "clip_proxy",
                         "probe_records",
@@ -259,6 +271,10 @@ impl ContentStore {
                 ).optional().map_err(err)?;
                 Ok(Data::Clip(clip.map(Box::new)))
             }
+            Operation::ReadFilmstrip { clip_id } => self.read_filmstrip(clip_id),
+            Operation::PublishFilmstrip(artifact) => self.publish_filmstrip(artifact),
+            Operation::ReadWave { clip_id } => self.read_wave(clip_id),
+            Operation::PublishWave(artifact) => self.publish_wave(artifact),
             Operation::List { after } => {
                 let mut statement = self
                     .conn
@@ -457,12 +473,181 @@ impl ContentStore {
         Ok(Data::Saved(Box::new(saved)))
     }
 
+    fn publish_filmstrip(&mut self, artifact: &FilmstripArtifactRecord) -> Result<Data> {
+        validate_filmstrip_artifact(artifact)?;
+        let clip_exists: bool = self
+            .conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM clips WHERE clip_id=?1)",
+                [&artifact.clip_id],
+                |r| r.get(0),
+            )
+            .map_err(err)?;
+        if !clip_exists {
+            return Err("Clip nije pronadjen u projektnoj bazi.".into());
+        }
+        let json = serde_json::to_string(artifact).map_err(err)?;
+        if json.len() > MAX_BYTES / PAGE_SIZE {
+            return Err("Prevelik filmstrip zapis.".into());
+        }
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let now = utc_stamp();
+        tx.execute(
+            "INSERT INTO filmstrip_artifacts
+                (clip_id, frame_count, artifact_uri, created_at_utc, frames_json)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(clip_id) DO UPDATE SET
+                frame_count=excluded.frame_count,
+                artifact_uri=excluded.artifact_uri,
+                created_at_utc=excluded.created_at_utc,
+                frames_json=excluded.frames_json",
+            params![
+                artifact.clip_id,
+                artifact.frame_count as i64,
+                artifact.artifact_uri,
+                now,
+                json,
+            ],
+        )
+        .map_err(err)?;
+        tx.execute(
+            "DELETE FROM filmstrip_frames WHERE clip_id=?1",
+            [&artifact.clip_id],
+        )
+        .map_err(err)?;
+        for frame in &artifact.frames {
+            tx.execute(
+                "INSERT INTO filmstrip_frames
+                    (clip_id, frame_index, seek_sec, artifact_uri, updated_at_utc)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    artifact.clip_id,
+                    frame.index as i64,
+                    parse_seconds(&frame.seek_sec)?,
+                    frame.artifact_uri,
+                    now,
+                ],
+            )
+            .map_err(err)?;
+        }
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    fn read_filmstrip(&self, clip_id: &str) -> Result<Data> {
+        qnc_media_records::valid_id(clip_id).map_err(err)?;
+        let Some(mut artifact) = self
+            .conn
+            .query_row(
+                "SELECT frames_json FROM filmstrip_artifacts WHERE clip_id=?1",
+                [clip_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(err)?
+            .map(|json| serde_json::from_str::<FilmstripArtifactRecord>(&json).map_err(err))
+            .transpose()?
+        else {
+            return Ok(Data::Filmstrip(None));
+        };
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT frame_index, seek_sec, artifact_uri
+                 FROM filmstrip_frames
+                 WHERE clip_id=?1
+                 ORDER BY frame_index",
+            )
+            .map_err(err)?;
+        let frames = statement
+            .query_map([clip_id], |row| {
+                Ok(FilmstripFrameRecord {
+                    index: row.get::<_, i64>(0)? as usize,
+                    seek_sec: format!("{:.2}", row.get::<_, f64>(1)?),
+                    artifact_uri: row.get(2)?,
+                })
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        if !frames.is_empty() {
+            artifact.frames = frames;
+            artifact.frame_count = artifact.frames.len();
+        }
+        validate_filmstrip_artifact(&artifact)?;
+        Ok(Data::Filmstrip(Some(Box::new(artifact))))
+    }
+
+    fn publish_wave(&mut self, artifact: &WaveArtifactRecord) -> Result<Data> {
+        validate_wave_artifact(artifact)?;
+        let stored_source: Option<(String, Option<String>)> = self
+            .conn
+            .query_row(
+                "SELECT c.original_uri, p.proxy_uri
+                 FROM clips c
+                 LEFT JOIN clip_proxy p ON p.clip_id=c.clip_id
+                 WHERE c.clip_id=?1",
+                [&artifact.clip_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(err)?;
+        let Some((original_uri, proxy_uri)) = stored_source else {
+            return Err("Clip nije pronadjen u projektnoj bazi.".into());
+        };
+        if artifact.source_uri != original_uri
+            && proxy_uri.as_deref() != Some(artifact.source_uri.as_str())
+        {
+            return Err("Wave zapis ne pripada spremljenom originalu ili proxyju klipa.".into());
+        }
+        let json = serde_json::to_string(artifact).map_err(err)?;
+        if json.len() > MAX_BYTES / PAGE_SIZE {
+            return Err("Prevelik wave zapis.".into());
+        }
+        let now = utc_stamp();
+        self.conn
+            .execute(
+                "INSERT INTO wave_artifacts
+                    (clip_id, artifact_uri, created_at_utc, peaks_json)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(clip_id) DO UPDATE SET
+                    artifact_uri=excluded.artifact_uri,
+                    created_at_utc=excluded.created_at_utc,
+                    peaks_json=excluded.peaks_json",
+                params![artifact.clip_id, artifact.artifact_uri, now, json],
+            )
+            .map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    fn read_wave(&self, clip_id: &str) -> Result<Data> {
+        qnc_media_records::valid_id(clip_id).map_err(err)?;
+        let row = self
+            .conn
+            .query_row(
+                "SELECT artifact_uri,peaks_json FROM wave_artifacts WHERE clip_id=?1",
+                [clip_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()
+            .map_err(err)?;
+        let Some((artifact_uri, json)) = row else {
+            return Ok(Data::Wave(None));
+        };
+        let artifact = serde_json::from_str::<WaveArtifactRecord>(&json).map_err(err)?;
+        if artifact.clip_id != clip_id || artifact.artifact_uri != artifact_uri {
+            return Err("Wave zapis ne odgovara trazenom klipu.".into());
+        }
+        validate_wave_artifact(&artifact)?;
+        Ok(Data::Wave(Some(Box::new(artifact))))
+    }
+
     fn write_clip(tx: &rusqlite::Transaction<'_>, clip: &CatalogClip) -> Result<()> {
         clip.validate()?;
-        let json = serde_json::to_string(clip).map_err(err)?;
-        if json.len() > MAX_BYTES / PAGE_SIZE {
-            return Err("Prevelik zapis klipa.".into());
-        }
+        let mut stored = clip.clone();
         let old: Option<(i64, bool, String)> = tx
             .query_row(
                 "SELECT revision,final,catalog_json FROM clips WHERE clip_id=?1",
@@ -472,19 +657,36 @@ impl ContentStore {
             .optional()
             .map_err(err)?;
         if let Some((revision, final_record, old_json)) = old {
+            let json = serde_json::to_string(&stored).map_err(err)?;
             if old_json == json {
                 return Ok(());
             }
             let old: CatalogClip = serde_json::from_str(&old_json).map_err(err)?;
-            if old.source_uri != clip.source_uri || old.snapshot.binding != clip.snapshot.binding {
+            if old.source_uri != stored.source_uri
+                || old.snapshot.binding != stored.snapshot.binding
+            {
                 return Err("Postojeci clip_id ne smije preuzeti drugi izvor ili medij.".into());
             }
-            if revision > clip.snapshot.revision as i64
-                || (final_record && old.snapshot != clip.snapshot)
-            {
+            if final_record {
+                if stored.snapshot.phase != Phase::Final {
+                    return Ok(());
+                }
+                if same_final_clip(&old, &stored) {
+                    stored.media_records_uri = old.media_records_uri;
+                    stored.snapshot = old.snapshot;
+                } else {
+                    return Err("Zavrseni probe zapis se ne smije zamijeniti.".into());
+                }
+            }
+            if revision > stored.snapshot.revision as i64 {
                 return Err("Zavrseni probe zapis se ne smije zamijeniti.".into());
             }
         }
+        let json = serde_json::to_string(&stored).map_err(err)?;
+        if json.len() > MAX_BYTES / PAGE_SIZE {
+            return Err("Prevelik zapis klipa.".into());
+        }
+        let clip = &stored;
         let original = &clip.snapshot.metadata.original;
         let video = original.streams.iter().find_map(|s| match &s.details {
             StreamDetails::Video(v) => Some(v.as_ref()),
@@ -515,6 +717,46 @@ impl ContentStore {
     }
 }
 
+fn same_final_clip(old: &CatalogClip, new: &CatalogClip) -> bool {
+    old.source_uri == new.source_uri
+        && old.media_records_uri == new.media_records_uri
+        && old.snapshot.binding == new.snapshot.binding
+        && old.snapshot.phase == new.snapshot.phase
+        && old.snapshot.completeness == new.snapshot.completeness
+        && same_metadata_values(&old.snapshot.metadata, &new.snapshot.metadata)
+}
+
+fn same_metadata_values(
+    old: &qnc_media_metadata::ClipMetadata,
+    new: &qnc_media_metadata::ClipMetadata,
+) -> bool {
+    let (Ok(mut old), Ok(mut new)) = (serde_json::to_value(old), serde_json::to_value(new)) else {
+        return false;
+    };
+    strip_metadata_provenance(&mut old);
+    strip_metadata_provenance(&mut new);
+    old == new
+}
+
+fn strip_metadata_provenance(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            map.remove("evidence");
+            map.remove("evidence_id");
+            map.remove("locator");
+            for child in map.values_mut() {
+                strip_metadata_provenance(child);
+            }
+        }
+        Value::Array(items) => {
+            for child in items {
+                strip_metadata_provenance(child);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn owned_table(name: &str) -> bool {
     matches!(
         name,
@@ -523,6 +765,7 @@ fn owned_table(name: &str) -> bool {
             | "clip_proxy"
             | "probe_records"
             | "filmstrip_artifacts"
+            | "filmstrip_frames"
             | "wave_artifacts"
     )
 }
@@ -640,18 +883,124 @@ fn codec(media: &MediaRepresentation) -> Option<&str> {
         })
 }
 fn ensure_summary_columns(conn: &Connection) -> Result<()> {
-    if !has_column(conn, "clips", "thumbnail_uri")? {
+    let added_thumbnail = if !has_column(conn, "clips", "thumbnail_uri")? {
         conn.execute("ALTER TABLE clips ADD COLUMN thumbnail_uri TEXT", [])
             .map_err(err)?;
+        true
+    } else {
+        false
+    };
+    if added_thumbnail || !has_column(conn, "public_clips", "thumbnail_uri")? {
+        conn.execute_batch(
+            "DROP VIEW IF EXISTS public_clips;
+            CREATE VIEW public_clips AS SELECT clip_id,source_uri,original_uri,name,created_at_utc,
+                duration_seconds,duration_frames,fps_num,fps_den,selected,import_status,
+                imported_media_uri,import_error,thumbnail_uri FROM clips;",
+        )
+        .map_err(err)?;
     }
-    conn.execute_batch(
-        "DROP VIEW IF EXISTS public_clips;
-        CREATE VIEW public_clips AS SELECT clip_id,source_uri,original_uri,name,created_at_utc,
-            duration_seconds,duration_frames,fps_num,fps_den,selected,import_status,
-            imported_media_uri,import_error,thumbnail_uri FROM clips;",
-    )
-    .map_err(err)?;
     Ok(())
+}
+
+fn ensure_filmstrip_schema(conn: &Connection) -> Result<()> {
+    if !object_exists(conn, "table", "filmstrip_frames")? {
+        conn.execute_batch(
+            "CREATE TABLE filmstrip_frames (
+            clip_id TEXT NOT NULL REFERENCES clips(clip_id),
+            frame_index INTEGER NOT NULL,
+            seek_sec REAL NOT NULL,
+            artifact_uri TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            PRIMARY KEY (clip_id, frame_index)
+        );",
+        )
+        .map_err(err)?;
+    }
+    if !object_exists(conn, "view", "public_filmstrip_frames")? {
+        conn.execute_batch(
+            "CREATE VIEW public_filmstrip_frames AS
+            SELECT * FROM filmstrip_frames;",
+        )
+        .map_err(err)?;
+    }
+    Ok(())
+}
+
+fn ensure_wave_schema(conn: &Connection) -> Result<()> {
+    if !object_exists(conn, "table", "wave_artifacts")? {
+        conn.execute_batch(
+            "CREATE TABLE wave_artifacts (
+            clip_id TEXT PRIMARY KEY REFERENCES clips(clip_id),
+            artifact_uri TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            peaks_json TEXT NOT NULL
+        );",
+        )
+        .map_err(err)?;
+    }
+    if !object_exists(conn, "view", "public_wave_artifacts")? {
+        conn.execute_batch(
+            "CREATE VIEW public_wave_artifacts AS
+            SELECT * FROM wave_artifacts;",
+        )
+        .map_err(err)?;
+    }
+    Ok(())
+}
+
+fn validate_filmstrip_artifact(artifact: &FilmstripArtifactRecord) -> Result<()> {
+    qnc_media_records::valid_id(&artifact.clip_id).map_err(err)?;
+    qnc_media_records::validate_resource_uri(&artifact.artifact_uri).map_err(err)?;
+    if !matches!(
+        artifact.status.as_str(),
+        "missing" | "building" | "ready" | "error"
+    ) {
+        return Err("Neispravan filmstrip status.".into());
+    }
+    parse_seconds(&artifact.duration_sec)?;
+    if artifact.frame_count == 0
+        || artifact.frame_count > 64
+        || artifact.frames.len() != artifact.frame_count
+    {
+        return Err("Neispravan broj filmstrip slicica.".into());
+    }
+    for (expected, frame) in artifact.frames.iter().enumerate() {
+        if frame.index != expected {
+            return Err("Filmstrip slicice nisu u pravilnom redoslijedu.".into());
+        }
+        parse_seconds(&frame.seek_sec)?;
+        qnc_media_records::validate_resource_uri(&frame.artifact_uri).map_err(err)?;
+        if !frame
+            .artifact_uri
+            .starts_with(&format!("{}/", artifact.artifact_uri.trim_end_matches('/')))
+        {
+            return Err("Filmstrip slicica ne pripada artifact rootu.".into());
+        }
+    }
+    Ok(())
+}
+
+fn validate_wave_artifact(artifact: &WaveArtifactRecord) -> Result<()> {
+    qnc_wave::validate_artifact(artifact)
+}
+
+fn parse_seconds(raw: &str) -> Result<f64> {
+    let value = raw
+        .parse::<f64>()
+        .map_err(|_| "Neispravan filmstrip seek.")?;
+    if value.is_finite() && value >= 0.0 {
+        Ok(value)
+    } else {
+        Err("Neispravan filmstrip seek.".into())
+    }
+}
+
+fn utc_stamp() -> String {
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    format!("unix_ms:{millis}")
 }
 
 fn has_column(conn: &Connection, table: &str, column: &str) -> Result<bool> {
@@ -667,6 +1016,15 @@ fn has_column(conn: &Connection, table: &str, column: &str) -> Result<bool> {
         }
     }
     Ok(false)
+}
+
+fn object_exists(conn: &Connection, kind: &str, name: &str) -> Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type=?1 AND name=?2)",
+        params![kind, name],
+        |r| r.get(0),
+    )
+    .map_err(err)
 }
 
 fn import_status(value: String) -> rusqlite::Result<ImportStatus> {

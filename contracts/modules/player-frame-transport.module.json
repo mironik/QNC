@@ -5,7 +5,7 @@
   "module_kind": "library",
   "implementation_stage": "local_ordered_frame_transport",
   "capabilities": ["playback.monitor.frame.write_ordered", "playback.monitor.frame.read_ordered", "playback.monitor.clear"],
-  "timing_policy": "Ordered monitor frame records carry source timebase, session, source generation and frame identity. The transport does not own playback time, display refresh or a 60 Hz fallback. It may skip only overwritten history in the bounded local ring; latest-only mode is not the main playback proof.",
+  "timing_policy": "The player posts each presented source frame to the monitor mailbox and wakes the receiver. Cadence is the saved clip timebase. Records carry source timebase, session, source generation and frame identity. The transport does not own playback time, display refresh or any refresh-rate fallback. The monitor receives the posted mailbox; it does not drain history as a second clock and does not resample to another fps. Latest-only mailbox is UI preview, not SDI/HDMI playout proof.",
   "input_contract_version": "0.3.0",
   "output_contract_version": "0.3.0",
   "supported_os": ["windows", "linux", "macos"],

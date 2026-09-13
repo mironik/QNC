@@ -14,9 +14,9 @@
   "database_write_policy": "no_db_writes",
   "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "db.read", "db.write", "playback.clock", "playback.present"],
   "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.player-input", "qnc.module.broadcast-player-core"],
-  "input_policy": "Saved chosen media facts plus an opened QNC MediaStream. No discovery fallback, no original/proxy decision. One explicit native stream per instance.",
+  "input_policy": "Saved chosen media facts plus an opened QNC MediaStream or owner-produced seekable CodecEndpoint. No discovery fallback, no original/proxy decision. One explicit native stream per instance. External decoder processes receive only a session-private codec endpoint derived by the storage adapter, never a storage HTTP URL, LAN/Intranet URL or credentials.",
   "output_policy": "Bounded native video or PCM f32le packets with real integer PTS and rational timebase. No presentation acknowledgement, application workflow or clock.",
   "buffer_policy": "Decoder output queue is bounded to at most 8 packets and 512 MiB per decoder instance. This is transport smoothing, not a media cache or probe fallback.",
-  "adapter_policy": "Injected DecoderAdapter or independently installed qnc-packets-v1 process. No FFmpeg command construction or technology selection in this module.",
+  "adapter_policy": "Injected DecoderAdapter or independently installed qnc-packets-v1 process. No FFmpeg command construction or technology selection in this module. Command/state stays separate from media bytes; decoder byte input is not monitor transport.",
   "specification": "docs/70-replaceable-decoders.md"
 }

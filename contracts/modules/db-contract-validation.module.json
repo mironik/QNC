@@ -12,6 +12,5 @@
   "forbidden_calls": ["business.db.write", "owner_check.skip"],
   "forbidden_dependencies": [],
   "state_policy": "stateless",
-  "database_write_policy": "returns_result_to_owner_application"
+  "database_write_policy": "no_db_writes"
 }
-

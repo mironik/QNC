@@ -10,6 +10,7 @@
   "module_dependencies": [
     "qnc.module.manifest-capability",
     "qnc.module.keyboard-shortcut",
+    "qnc.module.project-close",
     "qnc.module.ui-widget"
   ],
   "capabilities": [
@@ -17,6 +18,7 @@
     "shell.app_registry",
     "shell.host_application_surface",
     "shell.footer_tabs",
+    "shell.close_active_project",
     "shell.next_group"
   ],
   "supported_os": ["windows", "linux", "macos"],
@@ -40,7 +42,7 @@
   "workflow_forbidden_capabilities": [
     "source.scan.roles",
     "media.probe.full",
-    "filmstrip.generate14",
+    "filmstrip.generate",
     "wave.generate",
     "playback.open",
     "export.render"

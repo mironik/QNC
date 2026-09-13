@@ -43,7 +43,7 @@ fn fixture() -> tempfile::TempDir {
             "storage": {"ingest_profile":"field", "ingest_media": if id=="p1" {"link"} else {"original"},
                 "proxy_policy":"link_when_available", "original_policy":"link_when_available"},
             "input":{"mode":"auto"}, "playback":{"input":"proxy_if_available"},
-            "video":{"fps":50}, "audio":{"sample_rate":48000},
+            "video":{"fps":50}, "audio":{"sample_rate":48000, "channels":2},
             "ai":{"enabled":id=="p2"}, "keyboard_shortcuts":{"active_preset":"default"}
         });
         workspace
@@ -56,7 +56,7 @@ fn fixture() -> tempfile::TempDir {
     root
 }
 
-fn wait(component: &mut IngestComponent) {
+fn wait(component: &mut IngestApplication) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while component.has_pending_work() {
         component.poll();
@@ -89,7 +89,7 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
         serde_json::to_vec(&config).unwrap(),
     )
     .unwrap();
-    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut component);
     assert!(component.selection_config_error.is_none());
     assert!(component.selection_config.is_some());
@@ -124,15 +124,15 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
         "qnc://intranet/test/source/remote"
     );
     assert!(component.player.is_none());
-    assert!(component.selection_thread.is_none());
+    assert!(!component.selection_session.has_pending_work());
     assert!(component.work_plan().is_some());
 }
 
 #[test]
 fn uncommitted_preview_cannot_be_selected_and_stale_ack_does_not_mark_it_saved() {
-    let mut component = IngestComponent::default();
+    let mut component = IngestApplication::default();
     let (send, receive) = mpsc::sync_channel(8);
-    component.selection_result = Some(receive);
+    component.selection_session = selection::SelectSession::from_receiver_for_test(receive);
     send.send(selection::Event::Clip(selection::SelectedClip {
         clip_id: "clip-pending".into(),
         metadata_revision: 2,
@@ -165,7 +165,7 @@ fn uncommitted_preview_cannot_be_selected_and_stale_ack_does_not_mark_it_saved()
 #[test]
 fn reads_existing_active_settings_and_v4_directory_roles_without_ui_payload() {
     let root = fixture();
-    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     assert!(component.view.work_settings_loading);
     wait(&mut component);
     let plan = component.work_plan().unwrap();
@@ -184,7 +184,7 @@ fn reads_existing_active_settings_and_v4_directory_roles_without_ui_payload() {
 #[test]
 fn reload_changes_plan_from_db_and_discards_unpersisted_ui_state() {
     let root = fixture();
-    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut component);
     component.view.clips.push(ClipView {
         clip_id: "clip".into(),
@@ -250,7 +250,7 @@ fn activation_checks_catalog_signature_and_reloads_only_when_db_changed() {
     db.publish(source_clips[0].clip.clone()).unwrap();
     drop(db);
 
-    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut component);
     assert_eq!(component.view.clips.len(), 1);
     let preview_id = component.view.clips[0].clip_id.clone();
@@ -324,7 +324,7 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
             r.get(0)
         })
         .unwrap();
-    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut component);
     assert_eq!(component.view.clips.len(), 2);
     assert_eq!(component.view.selected_source_serial_number, "card-serial");
@@ -375,7 +375,7 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
         "checkbox does not change preview focus"
     );
     drop(component);
-    let mut restarted = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut restarted = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut restarted);
     assert_eq!(restarted.view.clips.len(), 2);
     assert!(
@@ -474,7 +474,7 @@ fn missing_project_db_is_not_recreated_and_rejected_selection_never_changes_ui()
     std::fs::remove_file(&file).unwrap();
     assert!(target.open(Access::ReadWrite).is_err());
     assert!(!file.exists());
-    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut component);
     assert!(!component.view.work_settings_ready);
     assert!(
@@ -488,7 +488,7 @@ fn missing_project_db_is_not_recreated_and_rejected_selection_never_changes_ui()
 #[test]
 fn select_rereads_current_active_project_and_cancel_prevents_source_write() {
     let root = fixture();
-    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut component);
     let uri = "qnc://local/source/test";
     let source_path = root.path().to_path_buf();
@@ -542,7 +542,7 @@ fn missing_settings_gate_selection_and_import_without_default_project() {
         .unwrap()
         .execute("UPDATE project_settings SET settings_json='{}'", [])
         .unwrap();
-    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut component);
     assert!(component.work_plan().is_none());
     assert!(component.view.work_settings_error.is_some());
@@ -593,7 +593,7 @@ fn footer_reports_only_the_project_loaded_by_ingest_not_stale_or_guessed_names()
         [],
     )
     .unwrap();
-    let mut component = IngestComponent::with_store_root(root.path()).unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     assert_eq!(component.footer_status(), "Ucitavanje projekta...");
     wait(&mut component);
     assert_eq!(component.footer_status(), "Loaded project");
@@ -616,7 +616,7 @@ fn footer_reports_only_the_project_loaded_by_ingest_not_stale_or_guessed_names()
     );
     assert_ne!(component.footer_status(), "p2");
     assert_eq!(
-        IngestComponent::default().footer_status(),
+        IngestApplication::default().footer_status(),
         "Projekt nije ucitan."
     );
 }

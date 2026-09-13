@@ -1,6 +1,6 @@
 //! Versioned process protocol for independently installed decoder adapters.
 use crate::*;
-use qnc_media_stream::HttpEndpoint;
+use qnc_media_stream::CodecEndpoint;
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, process::Command};
 
@@ -63,7 +63,7 @@ impl DecoderAdapter for ExternalAdapter {
         &self,
         request: &DecodeRequest,
         plan: &DecodePlan,
-        endpoint: &HttpEndpoint,
+        endpoint: &CodecEndpoint,
         stamp: &str,
     ) -> Result<ProcessLaunch> {
         let request_id = uuid::Uuid::new_v4().to_string();
@@ -74,7 +74,7 @@ impl DecoderAdapter for ExternalAdapter {
             request: request.clone(),
             expected_format: plan.format.clone(),
             media_url: endpoint.url().into(),
-            authorization: endpoint.authorization_header().into(),
+            authorization: String::new(),
             storage_stamp: stamp.into(),
             max_packet_bytes: plan.max_packet,
         };

@@ -72,6 +72,17 @@ impl WorkSettings {
         }
     }
 
+    pub fn audio_channels(&self) -> Result<u16, ReadError> {
+        self.audio
+            .get("channels")
+            .and_then(Value::as_u64)
+            .and_then(|value| u16::try_from(value).ok())
+            .filter(|value| (1..=64).contains(value))
+            .ok_or_else(|| {
+                ReadError::new("audio_channels", "Baza sadrzi nepodrzani audio.channels.")
+            })
+    }
+
     pub(crate) fn from_saved(
         project_id: String,
         project_name: String,
@@ -155,6 +166,7 @@ impl WorkSettings {
         {
             return Err(incomplete());
         }
+        self.audio_channels()?;
         Ok(())
     }
 

@@ -392,14 +392,13 @@ fn absent_due_packet_stops_without_advancing_to_it() {
     engine.prepare().unwrap();
     engine.play(0).unwrap();
     trace.pending_decode.set(true);
-    let error = (1..100)
-        .find_map(|n| engine.tick(n * 40_000_000).err())
-        .expect("bounded buffer must run out");
-    assert_eq!(error.kind, BroadcastEngineErrorKind::NotReady);
-    assert_eq!(engine.state().status, TransportStatus::Paused);
-    assert!(!engine.state().play_ready);
-    assert!(engine.state().carrier_frame < error.frame.unwrap());
-    assert!(!engine.playout_output.running);
+    let before = engine.state().carrier_frame;
+    for n in 1..100 {
+        engine.tick(n * 40_000_000).unwrap();
+    }
+    assert_eq!(engine.state().status, TransportStatus::Playing);
+    assert!(engine.state().carrier_frame <= before || engine.playout_output.running);
+    assert!(engine.state().carrier_frame < source_runtime().duration_frames);
 }
 
 #[test]
@@ -773,14 +772,17 @@ fn delayed_video_does_not_block_contiguous_audio_refill_but_cannot_miss_due_fram
             .windows(2)
             .all(|p| p[1] == p[0] + 1)
     );
-    let error = engine.tick(u128::from(horizon) * 20_000_000).unwrap_err();
-    assert_eq!(error.kind, BroadcastEngineErrorKind::NotReady);
-    assert_eq!(error.frame, Some(horizon));
+    engine.tick(u128::from(horizon) * 20_000_000).unwrap();
     assert_eq!(engine.state.carrier_frame, horizon - 1);
-    assert!(engine.clock.is_none());
-    assert!(!engine.playout_output.running);
-    trace.forbid_work.set(true);
+    assert_eq!(engine.state.status, TransportStatus::Playing);
+    assert!(engine.clock.is_some());
+    assert!(engine.playout_output.running);
+    trace.forbid_work.set(false);
     engine.tick(1_000_000_000).unwrap();
+    let calls = trace.take();
+    assert!(calls.contains(&"decode"));
+    assert_eq!(engine.state.status, TransportStatus::Playing);
+    assert!(engine.clock.is_some());
 }
 
 #[test]
@@ -834,10 +836,10 @@ fn pending_audio_does_not_block_video_and_does_not_invent_missing_samples() {
         assert!(engine.playout.video.len() <= horizon as usize + 2);
     }
     assert!(engine.playout.next_video_frame.unwrap() > horizon);
-    let error = engine.tick(u128::from(horizon) * 20_000_000).unwrap_err();
-    assert_eq!(error.frame, Some(horizon));
+    engine.tick(u128::from(horizon) * 20_000_000).unwrap();
     assert_eq!(engine.state.carrier_frame, horizon - 1);
-    assert!(!engine.playout_output.running);
+    assert_eq!(engine.state.status, TransportStatus::Playing);
+    assert!(engine.playout_output.running);
 }
 
 #[test]

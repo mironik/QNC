@@ -1,0 +1,47 @@
+{
+  "module_id": "qnc.module.filmstrip-worker",
+  "module_name": "Filmstrip Worker",
+  "module_version": "0.1.0",
+  "module_kind": "out_of_process_helper",
+  "capabilities": [
+    "filmstrip.sync_content_db",
+    "filmstrip.generate",
+    "filmstrip.write_jpeg_files",
+    "filmstrip.publish_artifact_uri"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "module_dependencies": [
+    "qnc.module.filmstrip",
+    "qnc.module.decoder-catalog",
+    "qnc.module.ingest-work-plan",
+    "qnc.module.media-decode",
+    "qnc.module.media-stream",
+    "qnc.module.pixel-convert",
+    "qnc.module.work-settings"
+  ],
+  "forbidden_calls": [
+    "ffprobe",
+    "media.probe.full",
+    "source.scan.roles",
+    "ingest.workflow",
+    "timeline.intent.emit",
+    "playback.clock.own",
+    "poster.repeat_as_filmstrip",
+    "decoder.hardcoded"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.timeline",
+    "qnc.module.player-client",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine"
+  ],
+  "state_policy": "session_local",
+  "decoder_policy": "decoder_catalog_required",
+  "database_write_policy": "public_ingest_content_write_transport_only"
+}

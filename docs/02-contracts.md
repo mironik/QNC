@@ -87,8 +87,17 @@ smije pozvati.
 `database_write_policy` mora biti jedno od:
 
 - `no_db_writes`
-- `owner_application_only`
-- `returns_result_to_owner_application`
+- `public_db_owner_write_adapter_only`
+- `public_db_write_transports_only`
+- `public_ingest_content_write_transport_only`
+- `narrow_project_close_write_adapter_only`
+- `returns_artifact_to_public_write_transport`
+
+Stare module politike `owner_application_only` i
+`returns_result_to_owner_application` nisu dozvoljene za module. Modul koji
+treba trajni zapis vraca rezultat ili write naredbu javnom DB owner/write
+adapteru ili javnom DB/transport writeru; ne pise bazu direktno i ne predaje
+odgovornost aplikacijskoj formi.
 
 ## DB contract
 

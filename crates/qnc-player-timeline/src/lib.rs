@@ -15,7 +15,6 @@ pub fn projection_from_player_reply(reply: Option<&EventEnvelope>) -> TimelinePr
         return projection;
     };
     let mut has_timebase = false;
-    let mut playback_failed = false;
     for event in &reply.events {
         match event {
             PlayerEvent::CarrierPositionChanged {
@@ -43,16 +42,11 @@ pub fn projection_from_player_reply(reply: Option<&EventEnvelope>) -> TimelinePr
             PlayerEvent::ActiveSourceChanged { source_id: None } => {
                 projection = TimelineProjection::default();
                 has_timebase = false;
-                playback_failed = false;
-            }
-            PlayerEvent::PlaybackError { .. } | PlayerEvent::SourceFailed { .. } => {
-                playback_failed = true;
             }
             _ => {}
         }
     }
-    projection.cue_enabled =
-        !playback_failed && projection.playhead_frame.is_some() && has_timebase;
+    projection.cue_enabled = projection.playhead_frame.is_some() && has_timebase;
     projection
 }
 
@@ -112,7 +106,7 @@ mod tests {
     }
 
     #[test]
-    fn player_error_keeps_timeline_cue_disabled() {
+    fn player_error_keeps_timeline_cue_enabled_for_recovery() {
         let projection = projection_from_player_reply(Some(&envelope(vec![
             PlayerEvent::CarrierPositionChanged {
                 source_id: Some("clip".into()),
@@ -127,6 +121,6 @@ mod tests {
         ])));
 
         assert_eq!(projection.confirmed_frame(), Some(12));
-        assert!(!projection.can_cue());
+        assert!(projection.can_cue());
     }
 }

@@ -1,11 +1,11 @@
 use crate::*;
 use crossbeam_channel::{Receiver, RecvTimeoutError, SendTimeoutError, Sender, TryRecvError};
-use qnc_media_stream::{LoopbackBridge, MediaStream};
+use qnc_media_stream::{CodecEndpoint, LoopbackBridge, MediaStream};
 use std::{
     io::{BufRead, BufReader, Read, Write},
     process::{Child, Stdio},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     thread,
@@ -22,6 +22,8 @@ enum State {
     Finished,
     Failed(DecodeError),
 }
+type StderrCapture = Arc<Mutex<Vec<u8>>>;
+const MAX_CAPTURED_STDERR_BYTES: usize = 8192;
 
 pub struct Decoder {
     request: DecodeRequest,
@@ -48,13 +50,49 @@ impl Decoder {
         let stamp = media.info().storage_stamp.clone();
         let bridge = LoopbackBridge::new(media)
             .map_err(|_| DecodeError::new(ErrorKind::Stream, "cannot open codec byte bridge"))?;
+        Self::open_endpoint_inner(
+            request,
+            bridge.endpoint().clone(),
+            stamp,
+            config,
+            Some(bridge),
+        )
+    }
+
+    /// Open a decoder on a transport endpoint already validated by the storage owner.
+    /// This is for local seekable owner bindings; callers must not pass public raw paths.
+    pub fn open_endpoint(
+        request: DecodeRequest,
+        endpoint: CodecEndpoint,
+        storage_stamp: String,
+        config: DecoderConfig,
+    ) -> Result<Self> {
+        let plan = DecodePlan::new(&request, &config)?;
+        config.adapter.validate(&request, &plan)?;
+        if endpoint.media_uri() != request.media.media_uri {
+            return Err(DecodeError::new(
+                ErrorKind::Contract,
+                "codec endpoint differs from saved request",
+            ));
+        }
+        Self::open_endpoint_inner(request, endpoint, storage_stamp, config, None)
+    }
+
+    fn open_endpoint_inner(
+        request: DecodeRequest,
+        endpoint: CodecEndpoint,
+        storage_stamp: String,
+        config: DecoderConfig,
+        bridge: Option<LoopbackBridge>,
+    ) -> Result<Self> {
+        let plan = DecodePlan::new(&request, &config)?;
         let ProcessLaunch {
             command: mut cmd,
             input,
             records,
         } = config
             .adapter
-            .launch(&request, &plan, bridge.endpoint(), &stamp)?;
+            .launch(&request, &plan, &endpoint, &storage_stamp)?;
         if input.len() > MAX_OPEN_BYTES {
             return Err(DecodeError::new(
                 ErrorKind::Contract,
@@ -85,6 +123,7 @@ impl Decoder {
         let cancelled = Arc::new(AtomicBool::new(false));
         let (events_tx, events_rx) = crossbeam_channel::bounded(config.queued_packets);
         let (headers_tx, headers_rx) = crossbeam_channel::bounded(4);
+        let stderr_capture = Arc::new(Mutex::new(Vec::new()));
         let mut decoder = Self {
             request,
             config,
@@ -93,7 +132,7 @@ impl Decoder {
             cancelled: cancelled.clone(),
             events: Some(events_rx),
             workers: vec![],
-            bridge: Some(bridge),
+            bridge,
             poll_deadline: None,
             eof_deadline: None,
         };
@@ -108,9 +147,10 @@ impl Decoder {
             })?);
         }
         let stop = cancelled.clone();
+        let captured = stderr_capture.clone();
         let header_worker = thread::Builder::new()
             .name("qnc-decode-records".into())
-            .spawn(move || read_headers(stderr, headers_tx, stop, records));
+            .spawn(move || read_headers(stderr, headers_tx, stop, records, captured));
         match header_worker {
             Ok(worker) => decoder.workers.push(worker),
             Err(_) => {
@@ -121,9 +161,14 @@ impl Decoder {
             }
         };
         let request = decoder.request.clone();
+        let captured = stderr_capture.clone();
         let data_worker = thread::Builder::new()
             .name("qnc-decode-packets".into())
-            .spawn(move || read_packets(stdout, headers_rx, events_tx, cancelled, request, plan));
+            .spawn(move || {
+                read_packets(
+                    stdout, headers_rx, events_tx, cancelled, request, plan, captured,
+                )
+            });
         match data_worker {
             Ok(worker) => decoder.workers.push(worker),
             Err(_) => {
@@ -307,11 +352,46 @@ fn stream_error(message: &str) -> DecodeError {
     DecodeError::new(ErrorKind::Stream, message)
 }
 
+fn no_packets_error(stderr: &StderrCapture) -> DecodeError {
+    let captured = captured_stderr(stderr);
+    if captured.is_empty() {
+        stream_error("decoder returned no packets")
+    } else {
+        stream_error(&format!(
+            "decoder returned no packets; decoder stderr: {captured}"
+        ))
+    }
+}
+
+fn captured_stderr(stderr: &StderrCapture) -> String {
+    String::from_utf8_lossy(&stderr.lock().unwrap())
+        .trim()
+        .to_string()
+}
+
+fn capture_decoder_stderr(stderr: &StderrCapture, line: &str) {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with("QNC_PACKET ") {
+        return;
+    }
+    let mut captured = stderr.lock().unwrap();
+    if captured.len() >= MAX_CAPTURED_STDERR_BYTES {
+        return;
+    }
+    let remaining = MAX_CAPTURED_STDERR_BYTES - captured.len();
+    let bytes = trimmed.as_bytes();
+    if !captured.is_empty() {
+        captured.push(b'\n');
+    }
+    captured.extend_from_slice(&bytes[..bytes.len().min(remaining)]);
+}
+
 fn read_headers(
     reader: impl Read,
     tx: Sender<Result<PacketHeader>>,
     stop: Arc<AtomicBool>,
     mut records: Box<dyn PacketRecordReader>,
+    stderr_capture: StderrCapture,
 ) {
     let mut reader = BufReader::new(reader);
     while !stop.load(Ordering::Acquire) {
@@ -338,7 +418,10 @@ fn read_headers(
         }
         let parsed = std::str::from_utf8(&line)
             .map_err(|_| stream_error("invalid decoder record encoding"))
-            .and_then(|line| records.parse(line));
+            .and_then(|line| {
+                capture_decoder_stderr(&stderr_capture, line);
+                records.parse(line)
+            });
         match parsed {
             Ok(None) => (),
             Ok(Some(header)) => {
@@ -365,6 +448,7 @@ fn read_packets(
     stop: Arc<AtomicBool>,
     request: DecodeRequest,
     plan: DecodePlan,
+    stderr_capture: StderrCapture,
 ) {
     let result = (|| -> Result<()> {
         let mut ordinal = 0;
@@ -432,7 +516,7 @@ fn read_packets(
             return Err(stream_error("decoded bytes without packet record"));
         }
         if ordinal == 0 {
-            return Err(stream_error("decoder returned no packets"));
+            return Err(no_packets_error(&stderr_capture));
         }
         if request.start.is_none() && matches!(plan.format, DecodedFormat::Video { .. }) {
             let expected = request
@@ -449,9 +533,9 @@ fn read_packets(
                     _ => None,
                 });
             if expected != Some(ordinal) {
-                return Err(stream_error(
-                    "decoded frame count differs from saved record",
-                ));
+                return Err(stream_error(&format!(
+                    "decoded frame count {ordinal} differs from saved record {expected:?}"
+                )));
             }
         }
         Ok(())
@@ -465,5 +549,27 @@ fn read_packets(
             },
             &stop,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_packets_error_includes_decoder_stderr_without_packet_records() {
+        let capture = Arc::new(Mutex::new(Vec::new()));
+        capture_decoder_stderr(&capture, "QNC_PACKET 0 0 1/50 16\n");
+        capture_decoder_stderr(&capture, "Input/output error while seeking\n");
+
+        let error = no_packets_error(&capture);
+        assert_eq!(error.kind, ErrorKind::Stream);
+        assert!(error.to_string().contains("decoder returned no packets"));
+        assert!(
+            error
+                .to_string()
+                .contains("Input/output error while seeking")
+        );
+        assert!(!error.to_string().contains("QNC_PACKET"));
     }
 }

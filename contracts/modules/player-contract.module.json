@@ -4,7 +4,7 @@
   "module_version": "0.3.0",
   "module_kind": "library",
   "capabilities": ["playback.contract.validate", "playback.envelope.validate"],
-  "timing_policy": "Player and monitor frame contracts carry the saved source clip timebase. Display refresh rate, 60 Hz assumptions, 16 ms repaint loops and project/export FPS are not playback cadence.",
+  "timing_policy": "Player and monitor frame contracts carry the saved source clip timebase. Display refresh assumptions, repaint loops and project/export FPS are not playback cadence.",
   "input_contract_version": "0.3.0",
   "output_contract_version": "0.3.0",
   "supported_os": ["windows", "linux", "macos"],

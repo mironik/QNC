@@ -80,7 +80,7 @@ fn exercise(
         plan,
         output,
         config,
-        qnc_media_decode::DecoderConfig::new(qnc_ffmpeg_decode::FfmpegAdapter::new("ffmpeg")),
+        qnc_decoder_catalog::installed_config()?,
         None,
         move |uri| MediaStream::local(&source, uri),
     )?;

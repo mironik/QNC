@@ -1,4 +1,4 @@
-use qnc_broadcast_engine::Runtime;
+use qnc_broadcast_engine::{BroadcastEngineErrorKind, Runtime};
 use qnc_player_contract::{
     BroadcastPlayerProtocolCommand as Command, BroadcastPlayerProtocolEvent as Event, VERSION,
     envelope::EventEnvelope,
@@ -14,6 +14,7 @@ pub struct Session {
     command_sequence: u64,
     event_sequence: u64,
     failure: Option<String>,
+    failure_reported: bool,
     last_tick: std::time::Instant,
     max_tick_gap_us: u128,
 }
@@ -27,10 +28,19 @@ impl Session {
             command_sequence: 0,
             event_sequence: 0,
             failure: None,
+            failure_reported: false,
             last_tick: std::time::Instant::now(),
             max_tick_gap_us: 0,
         }
     }
+    pub fn keeps_process_alive(&self) -> bool {
+        matches!(
+            self.player.state().status,
+            qnc_player_contract::TransportStatus::Preparing
+                | qnc_player_contract::TransportStatus::Playing
+        )
+    }
+
     pub fn tick(&mut self) {
         let now = std::time::Instant::now();
         self.max_tick_gap_us = self
@@ -47,8 +57,24 @@ impl Session {
                 now.elapsed().as_micros(),
                 self.max_tick_gap_us
             );
+            if error.kind == BroadcastEngineErrorKind::NotReady {
+                if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                    qnc_dev_diagnostics::log_line(
+                        qnc_dev_diagnostics::DiagnosticsStream::Player,
+                        format!("player-rebuffer-pending {message}"),
+                    );
+                }
+                return;
+            }
+            if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                qnc_dev_diagnostics::log_line(
+                    qnc_dev_diagnostics::DiagnosticsStream::Player,
+                    format!("player-failure {message}"),
+                );
+            }
             let _ = self.player.pause();
             self.failure = Some(message);
+            self.failure_reported = false;
         }
     }
     pub fn handle(&mut self, request: SessionRequest) -> SessionReply {
@@ -94,6 +120,7 @@ impl Session {
                     Ok(produced) => {
                         if cue {
                             self.failure = None;
+                            self.failure_reported = false;
                         }
                         self.closed = shutdown;
                         events.push(Event::CommandAccepted {
@@ -172,10 +199,13 @@ impl Session {
                 frame: range.end_frame,
             });
         }
-        if let Some(message) = &self.failure {
+        if let Some(message) = &self.failure
+            && !self.failure_reported
+        {
             events.push(Event::PlaybackError {
                 message: message.clone(),
             });
+            self.failure_reported = true;
         }
         self.event_sequence = sequence;
         Ok(EventEnvelope {

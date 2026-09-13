@@ -1,0 +1,40 @@
+{
+  "module_id": "qnc.module.dev-diagnostics",
+  "module_name": "Development Diagnostics",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "diagnostics.read_flags",
+    "diagnostics.write_flags",
+    "diagnostics.env_override",
+    "diagnostics.stream.player",
+    "diagnostics.stream.filmstrip",
+    "diagnostics.stream.wave",
+    "diagnostics.list_checks",
+    "diagnostics.run_checks",
+    "diagnostics.write_log_line",
+    "diagnostics.read_log_tail",
+    "diagnostics.clear_log"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "forbidden_calls": [
+    "application.workflow",
+    "project.settings.write",
+    "media.probe.full",
+    "source.scan.roles",
+    "playback.decode",
+    "timeline.intent.emit"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-engine",
+    "qnc.module.broadcast-player"
+  ]
+}

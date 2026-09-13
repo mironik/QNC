@@ -1,13 +1,45 @@
 #![cfg(test)]
 use super::*;
 use qnc_ingest_store::content::{
-    self, CatalogClip, ContentClient, ContentStore, Credentials, ImportStatus,
+    self, Access, CatalogClip, ContentClient, ContentStore, ContentTarget, Credentials,
+    ImportStatus, StoredClip, content_uri,
 };
 use qnc_media_metadata as m;
 use qnc_media_records::{Binding, Completeness};
+use qnc_transport_resolver::ResolverConfig;
 use qnc_work_settings::{ReaderConfig, StoragePolicy};
 use rusqlite::Connection;
-use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
+
+impl PlayerClipSource for StoredClip {
+    fn snapshot(&self) -> &Snapshot {
+        &self.clip.snapshot
+    }
+
+    fn imported_media_uri(&self) -> Option<&String> {
+        self.imported_media_uri.as_ref()
+    }
+
+    fn validate_clip(&self) -> Result<()> {
+        self.clip.validate().map_err(InputError::InvalidRecord)
+    }
+}
+
+#[derive(Clone)]
+struct StorePlayerContentReader {
+    target: ContentTarget,
+}
+
+impl PlayerContentRead for StorePlayerContentReader {
+    fn read_clip(&self, clip_id: &str) -> std::result::Result<Option<PlayerClipRecord>, String> {
+        let stored = self.target.open(Access::ReadOnly)?.read(clip_id)?;
+        Ok(stored.map(|stored| PlayerClipRecord {
+            name: stored.clip.name,
+            snapshot: stored.clip.snapshot,
+            imported_media_uri: stored.imported_media_uri,
+        }))
+    }
+}
 
 fn fact<T>(value: T, id: &str) -> Option<m::Fact<T>> {
     Some(m::Fact {
@@ -422,7 +454,7 @@ fn project_audio_is_required_and_does_not_rewrite_native_inventory() {
 #[test]
 fn reader_applies_audio_changes_from_database_without_project_process_or_json() {
     let f = Fixture::new("qnc://local");
-    let reader = InputReader::new(SettingsReader::local(&f.registry));
+    let reader = f.local_reader();
     let uri = "qnc://local/db/project_workspace/p1";
     assert_eq!(reader.load(uri, "c1").unwrap().project_audio.channels, 2);
     // Emulate an owner's saved settings change, not a consumer write.
@@ -574,6 +606,7 @@ struct Fixture {
     _dir: tempfile::TempDir,
     registry: PathBuf,
     db: PathBuf,
+    content_uri: String,
 }
 impl Fixture {
     fn new(context: &str) -> Self {
@@ -581,6 +614,7 @@ impl Fixture {
         let registry = dir.path().join("registry.db");
         let db = dir.path().join("qnc_project.db");
         let s = settings(context, "proxy_if_available");
+        let content_uri = content_uri(&s.workspace_db_uri).unwrap();
         let saved = serde_json::json!({"storage":s.storage,"input":s.input,"playback":s.playback,"video":s.video,"audio":s.audio,"ai":s.ai,"keyboard_shortcuts":s.keyboard_shortcuts});
         let c = Connection::open(&db).unwrap();
         c.execute_batch("CREATE TABLE project_settings(project_id TEXT,settings_json TEXT); CREATE VIEW public_project_settings AS SELECT * FROM project_settings;").unwrap();
@@ -605,19 +639,24 @@ impl Fixture {
         )
         .unwrap();
         drop(c);
-        let mut writer = ContentClient::from_owner_binding(
-            &db,
-            &content_uri(&s.workspace_db_uri).unwrap(),
-            Access::ReadWrite,
-        )
-        .unwrap();
+        let mut writer =
+            ContentClient::from_owner_binding(&db, &content_uri, Access::ReadWrite).unwrap();
         writer.publish(stored(context).clip).unwrap();
         drop(writer);
         Self {
             _dir: dir,
             registry,
             db,
+            content_uri,
         }
+    }
+
+    fn local_reader(&self) -> InputReader {
+        let target = ContentTarget::from_owner_binding(&self.db, &self.content_uri).unwrap();
+        InputReader::with_content_reader(
+            SettingsReader::local(&self.registry),
+            Arc::new(StorePlayerContentReader { target }),
+        )
     }
 }
 #[test]
@@ -627,7 +666,7 @@ fn real_public_local_reader_does_not_change_database_or_selection() {
         std::fs::read(&f.registry).unwrap(),
         std::fs::read(&f.db).unwrap(),
     );
-    let reader = InputReader::new(SettingsReader::local(&f.registry));
+    let reader = f.local_reader();
     let uri = "qnc://local/db/project_workspace/p1";
     assert_eq!(
         reader.load(uri, "c1").unwrap().representation,
@@ -674,6 +713,17 @@ fn network(environment: &str, changed: bool) {
         token_env: Some(key.into()),
     };
     let db_uri = format!("{context}/db/ingest_content/p1");
+    let authority = "test-storage";
+    let resolver = if environment == "lan" {
+        ResolverConfig::new(PathBuf::new())
+            .with_lan_authority(authority, config.endpoint.clone().unwrap())
+    } else {
+        ResolverConfig::new(PathBuf::new())
+            .with_intranet_authority(authority, config.endpoint.clone().unwrap())
+    };
+    let content_reader = Arc::new(StorePlayerContentReader {
+        target: ContentTarget::from_remote_binding(resolver, &db_uri, token.clone()).unwrap(),
+    });
     let db_file = f.db.clone();
     let registry_file = f.registry.clone();
     let handle = std::thread::spawn(move || {
@@ -702,8 +752,11 @@ fn network(environment: &str, changed: bool) {
             }
         }
     });
-    let result = InputReader::new(SettingsReader::from_config(config).unwrap())
-        .load(&format!("{context}/db/project_workspace/p1"), "c1");
+    let result = InputReader::with_content_reader(
+        SettingsReader::from_config(config).unwrap(),
+        content_reader,
+    )
+    .load(&format!("{context}/db/project_workspace/p1"), "c1");
     handle.join().unwrap();
     if changed {
         assert_eq!(result, Err(InputError::ChangedSettings));

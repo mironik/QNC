@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use eframe::egui;
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -392,6 +393,87 @@ fn code_to_label(code: &str) -> &str {
     }
 }
 
+pub fn egui_shortcut_events(ctx: &egui::Context) -> Vec<ShortcutEvent> {
+    let text_input_reserved = ctx.memory(|memory| memory.focused().is_some());
+    ctx.input(|input| {
+        input
+            .events
+            .iter()
+            .filter_map(|event| egui_event_to_shortcut(event, text_input_reserved))
+            .collect()
+    })
+}
+
+pub fn consume_egui_action_presses(
+    ctx: &egui::Context,
+    catalog: &ShortcutCatalog,
+    scope: &str,
+    action_id: &str,
+) -> usize {
+    let text_input_reserved = ctx.memory(|memory| memory.focused().is_some());
+    ctx.input_mut(|input| {
+        let mut consumed = 0usize;
+        input.events.retain(|event| {
+            let consume = egui_event_to_shortcut(event, text_input_reserved).is_some_and(|event| {
+                catalog
+                    .action_ids_for_event(scope, &event)
+                    .into_iter()
+                    .any(|candidate| candidate == action_id)
+            });
+            if consume {
+                consumed += 1;
+            }
+            !consume
+        });
+        consumed
+    })
+}
+
+fn egui_event_to_shortcut(event: &egui::Event, text_input_reserved: bool) -> Option<ShortcutEvent> {
+    match event {
+        egui::Event::Key {
+            key,
+            physical_key,
+            pressed,
+            repeat,
+            modifiers,
+            ..
+        } if *pressed && !*repeat => Some(ShortcutEvent {
+            code: physical_key.as_ref().and_then(egui_catalog_key_code),
+            key: egui_catalog_key_name(key),
+            shift: modifiers.shift,
+            ctrl: modifiers.ctrl || modifiers.command,
+            alt: modifiers.alt,
+            text_input_reserved,
+        }),
+        _ => None,
+    }
+}
+
+fn egui_catalog_key_name(key: &egui::Key) -> Option<String> {
+    use egui::Key;
+
+    let name = match key {
+        Key::ArrowLeft => "ArrowLeft",
+        Key::ArrowRight => "ArrowRight",
+        Key::Space => " ",
+        _ => return None,
+    };
+    Some(name.to_string())
+}
+
+fn egui_catalog_key_code(key: &egui::Key) -> Option<String> {
+    use egui::Key;
+
+    let code = match key {
+        Key::ArrowLeft => "ArrowLeft",
+        Key::ArrowRight => "ArrowRight",
+        Key::Space => "Space",
+        _ => return None,
+    };
+    Some(code.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -459,5 +541,26 @@ mod tests {
         assert!(catalog
             .action_ids_for_event("storyboard", &ShortcutEvent::code("Space"))
             .is_empty());
+    }
+
+    #[test]
+    fn egui_adapter_resolves_and_consumes_catalog_action() {
+        let catalog = catalog();
+        let ctx = egui::Context::default();
+        ctx.input_mut(|input| {
+            input.events.push(egui::Event::Key {
+                key: egui::Key::Space,
+                physical_key: Some(egui::Key::Space),
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            });
+        });
+
+        assert_eq!(
+            consume_egui_action_presses(&ctx, &catalog, "ingest", "play_pause"),
+            1
+        );
+        assert!(egui_shortcut_events(&ctx).is_empty());
     }
 }

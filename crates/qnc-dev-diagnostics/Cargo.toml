@@ -1,0 +1,9 @@
+[package]
+name = "qnc-dev-diagnostics"
+version = "0.1.0"
+edition = "2021"
+description = "Shared QNC development diagnostics switches"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

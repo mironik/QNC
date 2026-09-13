@@ -196,6 +196,161 @@ fn batch_publication_is_atomic_and_inventory_removal_is_guarded() {
     assert!(rows[0].selected);
 }
 
+#[test]
+fn filmstrip_publication_writes_public_frame_uris_without_touching_media() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("content.db");
+    database(&path);
+    let mut writer = ContentClient::from_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+    writer.publish(clip("c1")).unwrap();
+    let artifact = FilmstripArtifactRecord {
+        clip_id: "c1".into(),
+        status: "ready".into(),
+        duration_sec: "10.00".into(),
+        frame_count: 2,
+        artifact_uri: "qnc://local/project/p1/filmstrip/c1".into(),
+        frames: vec![
+            FilmstripFrameRecord {
+                index: 0,
+                seek_sec: "0.00".into(),
+                artifact_uri: "qnc://local/project/p1/filmstrip/c1/000_0_00.jpg".into(),
+            },
+            FilmstripFrameRecord {
+                index: 1,
+                seek_sec: "5.00".into(),
+                artifact_uri: "qnc://local/project/p1/filmstrip/c1/001_5_00.jpg".into(),
+            },
+        ],
+    };
+    writer.publish_filmstrip(artifact.clone()).unwrap();
+
+    let mut reader = ContentClient::from_owner_binding(&path, URI, Access::ReadOnly).unwrap();
+    assert_eq!(reader.read_filmstrip("c1").unwrap(), Some(artifact));
+    assert!(reader.read_filmstrip("missing").unwrap().is_none());
+    drop(reader);
+
+    let db = Connection::open(&path).unwrap();
+    assert_eq!(
+        db.query_row::<u32, _, _>("SELECT count(*) FROM public_filmstrip_frames", [], |r| r
+            .get(0))
+            .unwrap(),
+        2
+    );
+    assert_eq!(
+        db.query_row::<String, _, _>(
+            "SELECT artifact_uri FROM public_filmstrip_frames WHERE frame_index=1",
+            [],
+            |r| r.get(0)
+        )
+        .unwrap(),
+        "qnc://local/project/p1/filmstrip/c1/001_5_00.jpg"
+    );
+}
+
+#[test]
+fn content_write_transport_serializes_filmstrip_publication() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("content.db");
+    database(&path);
+    {
+        let mut writer = ContentClient::from_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+        writer.publish(clip("c1")).unwrap();
+        writer.publish(clip("c2")).unwrap();
+    }
+    let mut transport =
+        ContentWriteTransport::start(ContentTarget::for_test_owner_binding(&path, URI)).unwrap();
+    transport
+        .publish_filmstrip("p1::c1".into(), filmstrip("c1"))
+        .unwrap();
+    transport
+        .publish_filmstrip("p1::c2".into(), filmstrip("c2"))
+        .unwrap();
+    let mut completions = Vec::new();
+    for _ in 0..100 {
+        completions.extend(transport.poll());
+        if completions.len() == 2 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert_eq!(completions.len(), 2, "{completions:?}");
+    assert!(completions
+        .iter()
+        .all(|completion| completion.result.is_ok()));
+    assert!(!transport.has_pending());
+
+    let mut reader = ContentClient::from_owner_binding(&path, URI, Access::ReadOnly).unwrap();
+    assert_eq!(reader.read_filmstrip("c1").unwrap().unwrap().frame_count, 2);
+    assert_eq!(reader.read_filmstrip("c2").unwrap().unwrap().frame_count, 2);
+}
+
+#[test]
+fn wave_publication_writes_public_peak_json_without_sidecar_database() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("content.db");
+    database(&path);
+    let mut writer = ContentClient::from_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+    writer.publish(clip("c1")).unwrap();
+    let artifact = wave("c1");
+    writer.publish_wave(artifact.clone()).unwrap();
+
+    let mut reader = ContentClient::from_owner_binding(&path, URI, Access::ReadOnly).unwrap();
+    assert_eq!(reader.read_wave("c1").unwrap(), Some(artifact));
+    assert!(reader.read_wave("missing").unwrap().is_none());
+    assert!(reader.publish_wave(wave("c1")).is_err());
+    drop(reader);
+
+    let db = Connection::open(&path).unwrap();
+    assert_eq!(
+        db.query_row::<u32, _, _>("SELECT count(*) FROM public_wave_artifacts", [], |r| r
+            .get(0))
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        db.query_row::<String, _, _>(
+            "SELECT artifact_uri FROM public_wave_artifacts WHERE clip_id='c1'",
+            [],
+            |r| r.get(0)
+        )
+        .unwrap(),
+        "qnc://local/db/ingest_content/p1/wave/c1"
+    );
+}
+
+#[test]
+fn content_write_transport_serializes_wave_publication() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("content.db");
+    database(&path);
+    {
+        let mut writer = ContentClient::from_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+        writer.publish(clip("c1")).unwrap();
+        writer.publish(clip("c2")).unwrap();
+    }
+    let mut transport =
+        ContentWriteTransport::start(ContentTarget::for_test_owner_binding(&path, URI)).unwrap();
+    transport.publish_wave("p1::c1".into(), wave("c1")).unwrap();
+    transport.publish_wave("p1::c2".into(), wave("c2")).unwrap();
+    let mut completions = Vec::new();
+    for _ in 0..100 {
+        completions.extend(transport.poll());
+        if completions.len() == 2 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert_eq!(completions.len(), 2, "{completions:?}");
+    assert!(completions
+        .iter()
+        .all(|completion| completion.result.is_ok()));
+    assert!(!transport.has_pending());
+
+    let mut reader = ContentClient::from_owner_binding(&path, URI, Access::ReadOnly).unwrap();
+    assert_eq!(reader.read_wave("c1").unwrap().unwrap().a1_peaks.len(), 3);
+    assert_eq!(reader.read_wave("c2").unwrap().unwrap().a2_peaks.len(), 3);
+}
+
 #[cfg(windows)]
 #[test]
 fn windows_delete_denied_directory_supports_durable_content_writes() {
@@ -351,6 +506,43 @@ fn clip(id: &str) -> CatalogClip {
         },
     }
 }
+fn filmstrip(id: &str) -> FilmstripArtifactRecord {
+    FilmstripArtifactRecord {
+        clip_id: id.into(),
+        status: "ready".into(),
+        duration_sec: "10.00".into(),
+        frame_count: 2,
+        artifact_uri: format!("qnc://local/project/p1/filmstrip/{id}"),
+        frames: vec![
+            FilmstripFrameRecord {
+                index: 0,
+                seek_sec: "0.00".into(),
+                artifact_uri: format!("qnc://local/project/p1/filmstrip/{id}/000_0_00.jpg"),
+            },
+            FilmstripFrameRecord {
+                index: 1,
+                seek_sec: "5.00".into(),
+                artifact_uri: format!("qnc://local/project/p1/filmstrip/{id}/001_5_00.jpg"),
+            },
+        ],
+    }
+}
+fn wave(id: &str) -> WaveArtifactRecord {
+    WaveArtifactRecord {
+        clip_id: id.into(),
+        status: "ready".into(),
+        artifact_uri: format!("qnc://local/db/ingest_content/p1/wave/{id}"),
+        source_uri: format!("qnc://local/source/card/media/{id}.wav"),
+        source_sample_rate_hz: 48_000,
+        peak_count: 3,
+        a1_peaks: vec![0.0, 0.5, 1.0],
+        a2_peaks: vec![0.1, 0.4, 0.8],
+        a3_peaks: Vec::new(),
+        a4_peaks: Vec::new(),
+        warning: None,
+        render_version: qnc_wave::WAVE_RENDER_VERSION,
+    }
+}
 fn run(store: &mut ContentStore, op: Operation) -> Result<Data> {
     store.execute(&Request {
         version: VERSION.into(),
@@ -473,7 +665,11 @@ fn reselection_preserves_import_and_never_replaces_final_metadata() {
     assert_eq!(saved.import_status, ImportStatus::Imported);
     assert!(saved.selected);
     let mut changed = clip("c1");
-    changed.snapshot.recorded_at_unix_ms += 1;
+    changed.snapshot.metadata.original.duration_seconds = fact(m::Rational {
+        numerator: 11,
+        denominator: 1,
+    });
+    changed.snapshot.report = m::inspect(&changed.snapshot.metadata);
     assert!(run(&mut store, Operation::Publish(Box::new(changed))).is_err());
     let mut relabeled = clip("c1");
     relabeled.name = "renamed label".into();

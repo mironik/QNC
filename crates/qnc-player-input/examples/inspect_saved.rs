@@ -1,8 +1,24 @@
 //! Read-only diagnostic. Does not open any source media or start playback.
 use qnc_ingest_store::content::{Access, ContentTarget, PAGE_SIZE};
-use qnc_player_input::InputReader;
+use qnc_player_input::{InputReader, PlayerClipRecord, PlayerContentRead};
 use qnc_work_settings::SettingsReader;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
+
+#[derive(Clone)]
+struct StorePlayerContentReader {
+    target: ContentTarget,
+}
+
+impl PlayerContentRead for StorePlayerContentReader {
+    fn read_clip(&self, clip_id: &str) -> Result<Option<PlayerClipRecord>, String> {
+        let stored = self.target.open(Access::ReadOnly)?.read(clip_id)?;
+        Ok(stored.map(|stored| PlayerClipRecord {
+            name: stored.clip.name,
+            snapshot: stored.clip.snapshot,
+            imported_media_uri: stored.imported_media_uri,
+        }))
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args_os().skip(1);
@@ -16,12 +32,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let reader = SettingsReader::from_root(&root)?;
     let settings = reader.read()?;
-    let inputs = InputReader::new(reader.clone());
+    let content_target = ContentTarget::for_project(&reader, &settings)?;
+    let inputs = InputReader::with_content_reader(
+        reader.clone(),
+        Arc::new(StorePlayerContentReader {
+            target: content_target.clone(),
+        }),
+    );
     let mut ids = Vec::new();
     if let Some(id) = clip_id {
         ids.push(id);
     } else {
-        let mut content = ContentTarget::for_project(&reader, &settings)?.open(Access::ReadOnly)?;
+        let mut content = content_target.open(Access::ReadOnly)?;
         let mut after = None;
         loop {
             let rows = content.list(after.clone())?;

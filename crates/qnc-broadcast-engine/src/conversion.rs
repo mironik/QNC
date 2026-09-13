@@ -55,103 +55,242 @@ impl Raster {
     }
 }
 
-/// One in-flight conversion using a borrowed pool slot, never the playback thread.
+/// Bounded conversion pipeline using borrowed pool slots, never the playback thread.
 pub(super) struct ConversionWorker {
     requests: Option<SyncSender<(Instant, Job)>>,
     results: Receiver<Completed>,
     worker: Option<JoinHandle<()>>,
-    busy: bool,
+    pending: usize,
+    capacity: usize,
 }
 
 impl ConversionWorker {
-    pub fn new(mut converter: Raster) -> std::io::Result<Self> {
-        let (requests, jobs) = mpsc::sync_channel::<(Instant, Job)>(1);
-        let (completed, results) = mpsc::sync_channel(1);
+    #[cfg(test)]
+    pub fn new(converter: Raster) -> std::io::Result<Self> {
+        Self::with_capacity(converter, 1)
+    }
+
+    pub fn with_capacity(mut converter: Raster, capacity: usize) -> std::io::Result<Self> {
+        let capacity = capacity.max(1);
+        let (requests, jobs) = mpsc::sync_channel::<(Instant, Job)>(capacity);
+        let (completed, results) = mpsc::sync_channel(capacity);
         let worker = thread::Builder::new()
             .name("player-convert".into())
             .spawn(move || {
-                let diagnostics = std::env::var_os("QNC_PLAYER_DIAGNOSTICS").is_some();
                 let backend = match &converter {
                     Raster::Cpu(_) => "cpu",
                     Raster::Gpu(gpu) => {
-                        if diagnostics { eprintln!("player-converter backend=gpu adapter={}", gpu.adapter_name()); }
+                        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                            qnc_dev_diagnostics::log_line(
+                                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                                format!("player-converter backend=gpu adapter={}", gpu.adapter_name()),
+                            );
+                        }
                         "gpu"
                     }
                 };
                 let mut samples = 0u128;
                 let mut sums = [0u128; 4];
                 let mut maxima = [0u128; 4];
-                let mut gpu_sums = [0u128; 3];
-                while let Ok((queued, mut job)) = jobs.recv() {
+                let mut inflight: Option<(Job, qnc_gpu_raster::GpuReadback, Instant)> = None;
+                let mut leftover: Option<(Instant, Job)> = None;
+                loop {
+                    let (queued, mut job) = match leftover.take() {
+                        Some(next) => next,
+                        None => match jobs.recv() {
+                            Ok(next) => next,
+                            Err(_) => break,
+                        },
+                    };
                     let start = Instant::now();
                     let wait_us = queued.elapsed().as_micros();
+                    if let Raster::Gpu(gpu) = &mut converter {
+                        match gpu.enqueue(&job.input) {
+                            Ok(pending) => {
+                                if let Some((mut previous, previous_wait, previous_start)) =
+                                    inflight.take()
+                                {
+                                    let previous_result = Arc::get_mut(&mut previous.rgba)
+                                        .ok_or(ConversionError::Payload)
+                                        .and_then(|rgba| gpu.collect(previous_wait, rgba));
+                                    let previous_elapsed = previous_start.elapsed().as_micros();
+                                    if completed
+                                        .try_send(Completed {
+                                            generation: previous.generation,
+                                            frame: previous.frame,
+                                            slot: previous.slot,
+                                            rgba: previous.rgba,
+                                            elapsed_us: previous_elapsed,
+                                            result: previous_result.map(|_| ()),
+                                        })
+                                        .is_err()
+                                    {
+                                        inflight = None;
+                                        break;
+                                    }
+                                }
+                                inflight = Some((job, pending, start));
+                                match jobs.try_recv() {
+                                    Ok(next) => leftover = Some(next),
+                                    Err(TryRecvError::Empty) => {
+                                        if let Some((
+                                            mut previous,
+                                            previous_wait,
+                                            previous_start,
+                                        )) = inflight.take()
+                                        {
+                                            let previous_result =
+                                                Arc::get_mut(&mut previous.rgba)
+                                                    .ok_or(ConversionError::Payload)
+                                                    .and_then(|rgba| {
+                                                        gpu.collect(previous_wait, rgba)
+                                                    });
+                                            if completed
+                                                .try_send(Completed {
+                                                    generation: previous.generation,
+                                                    frame: previous.frame,
+                                                    slot: previous.slot,
+                                                    rgba: previous.rgba,
+                                                    elapsed_us: previous_start
+                                                        .elapsed()
+                                                        .as_micros(),
+                                                    result: previous_result.map(|_| ()),
+                                                })
+                                                .is_err()
+                                            {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    Err(TryRecvError::Disconnected) => break,
+                                }
+                                continue;
+                            }
+                            Err(error) => {
+                                if completed
+                                    .try_send(Completed {
+                                        generation: job.generation,
+                                        frame: job.frame,
+                                        slot: job.slot,
+                                        rgba: job.rgba,
+                                        elapsed_us: start.elapsed().as_micros(),
+                                        result: Err(error),
+                                    })
+                                    .is_err()
+                                {
+                                    break;
+                                }
+                                continue;
+                            }
+                        }
+                    }
                     let result = Arc::get_mut(&mut job.rgba)
                         .ok_or(ConversionError::Payload)
                         .and_then(|rgba| converter.convert(&job.input, rgba));
                     let elapsed_us = start.elapsed().as_micros();
-                    if diagnostics && let Ok(timing) = &result {
-                        if let Raster::Gpu(gpu) = &converter {
-                            for (sum, value) in gpu_sums.iter_mut().zip(gpu.timing_us()) { *sum += value; }
-                        }
+                    if qnc_dev_diagnostics::player_diagnostics_enabled()
+                        && let Ok(timing) = &result
+                    {
                         samples += 1;
-                        for (i, value) in [timing.resize_us, timing.color_us, wait_us, elapsed_us].into_iter().enumerate() {
+                        for (i, value) in [timing.resize_us, timing.color_us, wait_us, elapsed_us]
+                            .into_iter()
+                            .enumerate()
+                        {
                             sums[i] += value;
                             maxima[i] = maxima[i].max(value);
                         }
                         if samples == 100 {
-                            if backend == "gpu" {
-                                eprintln!("player-gpu frame={} samples={} upload_avg_us={} execute_readback_avg_us={} copy_avg_us={}", job.frame, samples, gpu_sums[0]/samples, gpu_sums[1]/samples, gpu_sums[2]/samples);
-                            }
-                            eprintln!("player-conversion backend={} frame={} samples={} resize_avg_us={} color_avg_us={} queue_avg_us={} total_avg_us={} resize_max_us={} color_max_us={} queue_max_us={} total_max_us={}",
-                                backend, job.frame, samples, sums[0]/samples, sums[1]/samples, sums[2]/samples, sums[3]/samples, maxima[0], maxima[1], maxima[2], maxima[3]);
+                            qnc_dev_diagnostics::log_line(
+                                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                                format!(
+                                    "player-conversion backend={} frame={} samples={} resize_avg_us={} color_avg_us={} queue_avg_us={} total_avg_us={} resize_max_us={} color_max_us={} queue_max_us={} total_max_us={}",
+                                    backend,
+                                    job.frame,
+                                    samples,
+                                    sums[0] / samples,
+                                    sums[1] / samples,
+                                    sums[2] / samples,
+                                    sums[3] / samples,
+                                    maxima[0],
+                                    maxima[1],
+                                    maxima[2],
+                                    maxima[3]
+                                ),
+                            );
                             samples = 0;
                             sums = [0; 4];
                             maxima = [0; 4];
-                            gpu_sums = [0; 3];
                         }
                     }
-                    let result = Completed {
-                        generation: job.generation,
-                        frame: job.frame,
-                        slot: job.slot,
-                        rgba: job.rgba,
-                        elapsed_us,
-                        result: result.map(|_| ()),
-                    };
-                    if completed.try_send(result).is_err() {
+                    if completed
+                        .try_send(Completed {
+                            generation: job.generation,
+                            frame: job.frame,
+                            slot: job.slot,
+                            rgba: job.rgba,
+                            elapsed_us,
+                            result: result.map(|_| ()),
+                        })
+                        .is_err()
+                    {
                         break;
                     }
+                }
+                if let Some((mut previous, previous_wait, previous_start)) = inflight.take()
+                    && let Raster::Gpu(gpu) = &mut converter
+                {
+                    let previous_result = Arc::get_mut(&mut previous.rgba)
+                        .ok_or(ConversionError::Payload)
+                        .and_then(|rgba| gpu.collect(previous_wait, rgba));
+                    let _ = completed.try_send(Completed {
+                        generation: previous.generation,
+                        frame: previous.frame,
+                        slot: previous.slot,
+                        rgba: previous.rgba,
+                        elapsed_us: previous_start.elapsed().as_micros(),
+                        result: previous_result.map(|_| ()),
+                    });
                 }
             })?;
         Ok(Self {
             requests: Some(requests),
             results,
             worker: Some(worker),
-            busy: false,
+            pending: 0,
+            capacity,
         })
     }
 
     pub fn busy(&self) -> bool {
-        self.busy
+        self.pending > 0
+    }
+
+    pub fn can_accept(&self) -> bool {
+        self.pending < self.capacity
+    }
+
+    #[cfg(test)]
+    pub fn pending(&self) -> usize {
+        self.pending
     }
 
     pub fn submit(&mut self, job: Job) -> Result<(), &'static str> {
-        if self.busy {
-            return Err("conversion already pending");
+        if !self.can_accept() {
+            return Err("conversion queue full");
         }
         self.requests
             .as_ref()
             .ok_or("conversion closed")?
             .try_send((Instant::now(), job))
             .map_err(|_| "conversion queue unavailable")?;
-        self.busy = true;
+        self.pending += 1;
         Ok(())
     }
 
     pub fn poll(&mut self) -> Result<Poll<Completed>, &'static str> {
         match self.results.try_recv() {
             Ok(result) => {
-                self.busy = false;
+                self.pending = self.pending.saturating_sub(1);
                 Ok(Poll::Ready(result))
             }
             Err(TryRecvError::Empty) => Ok(Poll::Pending),
@@ -175,6 +314,10 @@ mod tests {
     use qnc_pixel_convert::{ConversionSpec, Converter, PixelLayout, Range, Transfer, VERSION};
 
     fn worker() -> ConversionWorker {
+        ConversionWorker::new(cpu_raster()).unwrap()
+    }
+
+    fn cpu_raster() -> Raster {
         let spec = ConversionSpec {
             version: VERSION.into(),
             width: 2,
@@ -186,14 +329,13 @@ mod tests {
             range: Range::Limited,
             transfer: Transfer::Bt709,
         };
-        ConversionWorker::new(Raster::Cpu(
+        Raster::Cpu(
             RasterConverter::prepare(
                 Converter::prepare(spec.clone(), spec.scratch_bytes().unwrap()).unwrap(),
                 None,
             )
             .unwrap(),
-        ))
-        .unwrap()
+        )
     }
 
     fn job(generation: u64, frame: u64) -> Job {
@@ -224,6 +366,7 @@ mod tests {
                     &[0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255]
                 );
                 assert!(!worker.busy());
+                assert_eq!(worker.pending(), 0);
                 break;
             }
             assert!(Instant::now() < deadline);
@@ -236,5 +379,25 @@ mod tests {
         let mut worker = worker();
         worker.submit(job(1, 0)).unwrap();
         drop(worker);
+    }
+
+    #[test]
+    fn bounded_pipeline_accepts_more_than_one_pending_conversion() {
+        let mut worker = ConversionWorker::with_capacity(cpu_raster(), 2).unwrap();
+        worker.submit(job(1, 0)).unwrap();
+        worker.submit(job(1, 1)).unwrap();
+        assert!(worker.submit(job(1, 2)).is_err());
+        let deadline = Instant::now() + std::time::Duration::from_secs(2);
+        let mut frames = Vec::new();
+        while frames.len() < 2 {
+            if let Poll::Ready(done) = worker.poll().unwrap() {
+                done.result.unwrap();
+                frames.push(done.frame);
+            }
+            assert!(Instant::now() < deadline);
+            thread::yield_now();
+        }
+        assert_eq!(frames, [0, 1]);
+        assert_eq!(worker.pending(), 0);
     }
 }

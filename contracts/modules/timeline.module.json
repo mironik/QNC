@@ -8,6 +8,8 @@
     "timeline.frame_projection",
     "timeline.paint",
     "timeline.source_player.paint",
+    "timeline.filmstrip_background.paint",
+    "timeline.wave_peaks.paint",
     "timeline.hit_test",
     "timeline.intent.emit"
   ],
@@ -25,7 +27,7 @@
     "playback.execute",
     "application.db.read",
     "application.db.write",
-    "filmstrip.generate14",
+    "filmstrip.generate",
     "wave.generate"
   ],
   "forbidden_dependencies": [
@@ -38,8 +40,8 @@
     "qnc.module.ffprobe-metadata",
     "qnc.module.scanner",
     "qnc.module.source-reader",
-    "qnc.module.filmstrip",
-    "qnc.module.wave"
+    "qnc.module.filmstrip-worker",
+    "qnc.module.wave-worker"
   ],
   "state_policy": "stateless",
   "engine_policy": "single_public_layered_ui_component",

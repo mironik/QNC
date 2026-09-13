@@ -2901,8 +2901,10 @@ dependencies = [
  "eframe",
  "qnc-contracts",
  "qnc-ingest-desktop-adapter",
+ "qnc-project-close",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
+ "rusqlite",
  "serde",
  "serde_json",
 ]
@@ -2948,7 +2950,8 @@ dependencies = [
  "pollster",
  "qnc-audio-output",
  "qnc-broadcast-player",
- "qnc-ffmpeg-decode",
+ "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
  "qnc-gpu-raster",
  "qnc-media-decode",
  "qnc-media-metadata",
@@ -3049,11 +3052,32 @@ name = "qnc-decoder-catalog"
 version = "0.1.0"
 dependencies = [
  "qnc-ffmpeg-decode",
+ "qnc-frame-timebase",
  "qnc-media-decode",
  "qnc-media-stream",
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-dev-diagnostics"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-dev-diagnostics-app"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-dev-diagnostics",
+ "qnc-ingest-store",
+ "qnc-ingest-work-plan",
+ "qnc-media-metadata",
+ "qnc-work-settings",
 ]
 
 [[package]]
@@ -3091,6 +3115,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-filmstrip"
+version = "0.1.0"
+dependencies = [
+ "qnc-contracts",
+ "qnc-frame-timebase",
+ "qnc-image-assets",
+ "qnc-media-metadata",
+ "qnc-media-records",
+ "serde",
+]
+
+[[package]]
+name = "qnc-filmstrip-worker"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "qnc-contracts",
+ "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
+ "qnc-dir-browser",
+ "qnc-filmstrip",
+ "qnc-frame-timebase",
+ "qnc-image-assets",
+ "qnc-media-decode",
+ "qnc-media-metadata",
+ "qnc-media-records",
+ "qnc-media-stream",
+ "qnc-pixel-convert",
+ "qnc-transport-resolver",
+]
+
+[[package]]
 name = "qnc-frame-timebase"
 version = "0.1.0"
 dependencies = [
@@ -3123,21 +3179,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "qnc-ingest-catalog"
-version = "0.1.0"
-dependencies = [
- "qnc-ingest-store",
- "qnc-ingest-work-plan",
- "qnc-work-settings",
-]
-
-[[package]]
-name = "qnc-ingest-components"
+name = "qnc-ingest-application"
 version = "0.1.0"
 dependencies = [
  "image",
  "qnc-contracts",
  "qnc-dir-browser",
+ "qnc-filmstrip",
+ "qnc-filmstrip-worker",
  "qnc-image-assets",
  "qnc-ingest-catalog",
  "qnc-ingest-select",
@@ -3145,10 +3194,14 @@ dependencies = [
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
  "qnc-player-client",
+ "qnc-player-input",
  "qnc-player-launcher",
  "qnc-player-timeline",
  "qnc-source-reader",
  "qnc-timeline",
+ "qnc-timeline-assets",
+ "qnc-wave",
+ "qnc-wave-worker",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3158,13 +3211,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ingest-catalog"
+version = "0.1.0"
+dependencies = [
+ "qnc-ingest-store",
+ "qnc-ingest-work-plan",
+ "qnc-work-settings",
+]
+
+[[package]]
 name = "qnc-ingest-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-contracts",
- "qnc-ingest-components",
+ "qnc-ingest-application",
  "qnc-keyboard-shortcut",
+ "qnc-monitor",
  "qnc-timeline",
  "qnc-ui-kit",
  "serde",
@@ -3218,6 +3281,7 @@ dependencies = [
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-transport-resolver",
+ "qnc-wave",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3249,6 +3313,7 @@ dependencies = [
 name = "qnc-keyboard-shortcut"
 version = "0.1.0"
 dependencies = [
+ "eframe",
  "serde_json",
 ]
 
@@ -3370,12 +3435,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-monitor"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-ui-kit",
+]
+
+[[package]]
 name = "qnc-pixel-convert"
 version = "0.1.0"
 dependencies = [
  "fast_image_resize",
  "pollster",
- "qnc-ffmpeg-decode",
+ "qnc-decoder-catalog",
  "qnc-media-decode",
  "qnc-media-metadata",
  "qnc-media-stream",
@@ -3394,6 +3467,7 @@ dependencies = [
 name = "qnc-player-client"
 version = "0.1.0"
 dependencies = [
+ "qnc-dev-diagnostics",
  "qnc-player-contract",
  "qnc-player-frame-transport",
  "qnc-player-input",
@@ -3417,10 +3491,12 @@ dependencies = [
 name = "qnc-player-frame-transport"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "memmap2",
  "qnc-player-contract",
  "serde",
  "serde_json",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3432,6 +3508,7 @@ dependencies = [
  "qnc-ingest-store",
  "qnc-media-metadata",
  "qnc-media-records",
+ "qnc-transport-resolver",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3448,7 +3525,6 @@ dependencies = [
  "qnc-player-client",
  "qnc-player-input",
  "qnc-source-reader",
- "qnc-work-settings",
 ]
 
 [[package]]
@@ -3459,6 +3535,7 @@ dependencies = [
  "qnc-audio-output",
  "qnc-broadcast-engine",
  "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
  "qnc-json-transport",
  "qnc-media-decode",
  "qnc-media-stream",
@@ -3490,6 +3567,19 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-project-desktop",
+]
+
+[[package]]
+name = "qnc-project-close"
+version = "0.1.0"
+dependencies = [
+ "qnc-contracts",
+ "qnc-json-transport",
+ "qnc-transport-resolver",
+ "rusqlite",
+ "serde",
+ "tempfile",
+ "tiny_http",
 ]
 
 [[package]]
@@ -3646,6 +3736,19 @@ name = "qnc-timeline"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-filmstrip",
+ "qnc-ui-kit",
+ "qnc-wave-view",
+]
+
+[[package]]
+name = "qnc-timeline-assets"
+version = "0.1.0"
+dependencies = [
+ "qnc-filmstrip",
+ "qnc-image-assets",
+ "qnc-media-records",
+ "qnc-wave",
 ]
 
 [[package]]
@@ -3660,6 +3763,9 @@ name = "qnc-ui-kit"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "egui-wgpu",
+ "qnc-dev-diagnostics",
+ "wgpu",
 ]
 
 [[package]]
@@ -3671,6 +3777,38 @@ dependencies = [
  "serde_json",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "qnc-wave"
+version = "0.1.0"
+dependencies = [
+ "qnc-media-metadata",
+ "qnc-media-records",
+ "serde",
+]
+
+[[package]]
+name = "qnc-wave-view"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
+name = "qnc-wave-worker"
+version = "0.1.0"
+dependencies = [
+ "qnc-contracts",
+ "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
+ "qnc-dir-browser",
+ "qnc-media-decode",
+ "qnc-media-metadata",
+ "qnc-media-records",
+ "qnc-media-stream",
+ "qnc-transport-resolver",
+ "qnc-wave",
 ]
 
 [[package]]

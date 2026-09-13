@@ -2,9 +2,9 @@
 name = "qnc-ingest-desktop-adapter"
 version = "0.1.0"
 edition = "2021"
+description = "QNC Ingest public desktop adapter"
 
 [dependencies]
 eframe = { workspace = true }
 qnc-ingest-desktop = { workspace = true }
 qnc-shell-desktop-api = { workspace = true }
-

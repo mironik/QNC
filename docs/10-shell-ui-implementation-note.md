@@ -18,7 +18,8 @@ C:\Users\miron\Projects\qnc_v4\seed\tabs\story\plugin.json
 ## kept_behavior
 
 - Shell footer ostaje na dnu.
-- Footer ima tri zone: lijevo tema, sredina aplikacijski tabovi, desno status.
+- Footer ima tri zone: lijevo tema, sredina aplikacijski tabovi, desno status
+  i `Close project`.
 - Footer tabovi dolaze iz QNC app registryja, ali zadrzavaju qnc_v4 stil taba i
   underline ponasanje.
 - Aktivni tab ima QNC underline.
@@ -44,8 +45,14 @@ C:\Users\miron\Projects\qnc_v4\seed\tabs\story\plugin.json
   prikazuje samo Project. Ingest, Media Assist i Story dodaju se tek kada budu
   stvarne aplikacije s vlastitim manifestom.
 - `qnc-project` vise ne crta vlastiti shell footer.
-- `Close project` nije prikazan dok ne postoji ispravan workspace/DB close
-  contract.
+- `Close project` je poziv samostalne javne komponente/modula
+  `qnc-project-close`. Shell gumb samo poziva taj API i prikazuje rezultat.
+  Komponenta prazni `active_project_id` u Project registryju. Shell ne zatvara
+  hostane aplikacijske povrsine, ne prebacuje tab, ne brise temp direktorije i
+  ne radi dodatni workflow. Ne brise projekt i ne poziva Project delete
+  workflow; brisanje ostaje iskljucivo postojece `X` dugme u Project popisu.
+  LAN/Intranet varijanta koristi isti uski `qnc-project-close` write adapter;
+  ne postoji genericki SQL write endpoint.
 - Workspace status visine 22 px iz `shell.layout.json` jos nije prikazan kao
   zaseban red u ovom prvom shell koraku. Desni status u footeru je privremeno
   odstupanje dok se ne definira workspace status contract.

@@ -1,6 +1,6 @@
 use crate::*;
 use qnc_media_metadata::Rational;
-use qnc_media_stream::HttpEndpoint;
+use qnc_media_stream::CodecEndpoint;
 use std::process::Command;
 
 pub const MAX_RECORD_BYTES: usize = 4096;
@@ -49,7 +49,7 @@ pub trait DecoderAdapter: std::fmt::Debug + Send + Sync {
         &self,
         request: &DecodeRequest,
         plan: &DecodePlan,
-        endpoint: &HttpEndpoint,
+        endpoint: &CodecEndpoint,
         storage_stamp: &str,
     ) -> Result<ProcessLaunch>;
 }

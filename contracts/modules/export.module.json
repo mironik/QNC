@@ -12,6 +12,5 @@
   "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "private_ui_state.read"],
   "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
   "state_policy": "stateless",
-  "database_write_policy": "returns_result_to_owner_application"
+  "database_write_policy": "returns_artifact_to_public_write_transport"
 }
-

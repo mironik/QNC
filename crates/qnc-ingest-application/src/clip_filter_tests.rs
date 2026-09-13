@@ -23,7 +23,7 @@ fn selected_clip(id: &str, previously_seen: bool, selected: bool) -> selection::
 #[test]
 fn filter_projects_existing_catalog_without_changing_selection_or_preview() {
     for source_kind in [SourceKind::Local, SourceKind::Lan, SourceKind::Internet] {
-        let mut component = IngestComponent::default();
+        let mut component = IngestApplication::default();
         component.view.source_kind = source_kind;
         component.view.clips = vec![clip("old", true, true), clip("new", false, false)];
         component.view.preview_clip_id = Some("old".into());
@@ -47,7 +47,7 @@ fn filter_projects_existing_catalog_without_changing_selection_or_preview() {
             assert!(!component.has_pending_work());
             assert!(component.settings_result.is_none());
             assert!(component.catalog_result.is_none());
-            assert!(component.selection_result.is_none());
+            assert!(!component.selection_session.has_pending_work());
             assert!(component.browser_result.is_none());
         }
     }
@@ -55,7 +55,7 @@ fn filter_projects_existing_catalog_without_changing_selection_or_preview() {
 
 #[test]
 fn new_filter_accepts_incoming_clips_during_select_without_losing_existing_ones() {
-    let mut component = IngestComponent::default();
+    let mut component = IngestApplication::default();
     component.view.command_busy = true;
     component.view.clips = vec![clip("old", true, true)];
     assert!(
@@ -68,7 +68,7 @@ fn new_filter_accepts_incoming_clips_during_select_without_losing_existing_ones(
     );
     assert_eq!(component.view.visible_clips().count(), 0);
     let (send, receive) = mpsc::channel();
-    component.selection_result = Some(receive);
+    component.selection_session = selection::SelectSession::from_receiver_for_test(receive);
     send.send(selection::Event::Clip(selected_clip("new", false, false)))
         .unwrap();
     component.poll();
@@ -92,7 +92,7 @@ fn new_filter_accepts_incoming_clips_during_select_without_losing_existing_ones(
 
 #[test]
 fn malformed_filter_intent_does_not_change_view() {
-    let mut component = IngestComponent::default();
+    let mut component = IngestApplication::default();
     let before = component.view.clone();
     assert!(
         !component

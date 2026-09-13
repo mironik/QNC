@@ -10,7 +10,7 @@
   "supported_cpu": ["x86_64", "aarch64"],
   "transport_protocol_version": "0.1.0",
   "forbidden_calls": [
-    "filmstrip.generate14",
+    "filmstrip.generate",
     "wave.generate",
     "playback.open",
     "export.render",
@@ -25,7 +25,7 @@
     "qnc.module.export"
   ],
   "state_policy": "stateless",
-  "database_write_policy": "returns_result_to_owner_application",
+  "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-media-probe",
   "specification": "docs/32-single-pass-media-probe.md"
 }

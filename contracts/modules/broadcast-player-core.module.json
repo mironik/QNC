@@ -10,7 +10,7 @@
   "supported_os": ["windows", "linux", "macos"],
   "supported_cpu": ["x86_64", "aarch64"],
   "transport_protocol_version": "0.3.0",
-  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "filmstrip.generate14", "wave.generate", "application.db.read", "application.db.write", "app_to_app.state_share"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "filmstrip.generate", "wave.generate", "application.db.read", "application.db.write", "app_to_app.state_share"],
   "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.filmstrip", "qnc.module.wave", "qnc.module.export", "qnc.module.ui-widget"],
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes"

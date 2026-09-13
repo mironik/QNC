@@ -21,7 +21,7 @@
     "ffprobe",
     "player.playback",
     "timeline.paint",
-    "filmstrip.generate14",
+    "filmstrip.generate",
     "wave.generate",
     "application.db.write"
   ],

@@ -1,11 +1,11 @@
 //! Saved media -> player input. No decoder, source I/O, probe, UI or database writes.
 use qnc_frame_timebase::FrameTimebase;
-use qnc_ingest_store::content::{Access, ContentTarget, StoredClip, content_uri};
 use qnc_media_metadata::{FrameRateMode, MediaRepresentation, StreamDetails};
 use qnc_media_records::{Phase, Snapshot};
 pub use qnc_work_settings::PlaybackInput;
 use qnc_work_settings::{SettingsReader, WorkSettings};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub type Result<T> = std::result::Result<T, InputError>;
@@ -61,6 +61,51 @@ fn choose(mode: PlaybackInput, snapshot: &Snapshot) -> Result<Representation> {
 pub enum Representation {
     Original,
     Proxy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlayerClipRecord {
+    pub name: String,
+    pub snapshot: Snapshot,
+    pub imported_media_uri: Option<String>,
+}
+
+impl PlayerClipRecord {
+    pub fn validate(&self) -> Result<()> {
+        if self.name.trim().is_empty() || self.name.len() > 1024 {
+            return Err(InputError::InvalidRecord(
+                "Neispravan naziv klipa u player ulazu.".into(),
+            ));
+        }
+        self.snapshot
+            .validate()
+            .map_err(|e| InputError::InvalidRecord(e.to_string()))
+    }
+}
+
+pub trait PlayerContentRead: Send + Sync {
+    fn read_clip(&self, clip_id: &str) -> std::result::Result<Option<PlayerClipRecord>, String>;
+}
+
+trait PlayerClipSource {
+    fn snapshot(&self) -> &Snapshot;
+    fn imported_media_uri(&self) -> Option<&String>;
+    fn validate_clip(&self) -> Result<()>;
+}
+
+impl PlayerClipSource for PlayerClipRecord {
+    fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    fn imported_media_uri(&self) -> Option<&String> {
+        self.imported_media_uri.as_ref()
+    }
+
+    fn validate_clip(&self) -> Result<()> {
+        self.validate()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,10 +230,24 @@ impl PreparedInput {
 /// No retained active project, catalog or playback state. Every load reads the public DB contract.
 pub struct InputReader {
     settings: SettingsReader,
+    content_reader: Option<Arc<dyn PlayerContentRead>>,
 }
 impl InputReader {
     pub fn new(settings: SettingsReader) -> Self {
-        Self { settings }
+        Self {
+            settings,
+            content_reader: None,
+        }
+    }
+
+    pub fn with_content_reader(
+        settings: SettingsReader,
+        content_reader: Arc<dyn PlayerContentRead>,
+    ) -> Self {
+        Self {
+            settings,
+            content_reader: Some(content_reader),
+        }
     }
 
     /// `workspace_uri` comes from the caller's existing read-only work-settings snapshot,
@@ -205,13 +264,11 @@ impl InputReader {
             return Err(InputError::WrongWorkspace);
         }
         playback_input(&settings)?;
-        let target =
-            ContentTarget::for_project(&self.settings, &settings).map_err(InputError::Database)?;
-        let mut db = target
-            .open(Access::ReadOnly)
-            .map_err(InputError::Database)?;
-        let stored = db
-            .read(clip_id)
+        let stored = self
+            .content_reader
+            .as_ref()
+            .ok_or_else(|| InputError::Database("Nedostaje player content read port.".into()))?
+            .read_clip(clip_id)
             .map_err(InputError::Database)?
             .ok_or(InputError::MissingClip)?;
         let prepared = prepare(&settings, &stored)?;
@@ -227,36 +284,38 @@ impl InputReader {
     }
 }
 
-fn prepare(settings: &WorkSettings, stored: &StoredClip) -> Result<PreparedInput> {
+fn prepare(settings: &WorkSettings, stored: &impl PlayerClipSource) -> Result<PreparedInput> {
     let mode = playback_input(settings)?;
-    stored.clip.validate().map_err(InputError::InvalidRecord)?;
-    validate_snapshot(&stored.clip.snapshot)?;
-    if stored.imported_media_uri.as_ref().is_some_and(|uri| {
-        uri != &stored.clip.snapshot.binding.original_uri
-            && Some(uri) != stored.clip.snapshot.binding.proxy_uri.as_ref()
+    stored.validate_clip()?;
+    let snapshot = stored.snapshot();
+    validate_snapshot(snapshot)?;
+    if stored.imported_media_uri().is_some_and(|uri| {
+        uri != &snapshot.binding.original_uri && Some(uri) != snapshot.binding.proxy_uri.as_ref()
     }) {
         return Err(InputError::UnsupportedMedia(
             "Imported media URI has no saved original/proxy representation binding.".into(),
         ));
     }
-    let representation = choose(mode, &stored.clip.snapshot)?;
+    let representation = choose(mode, snapshot)?;
     Ok(PreparedInput {
         contract_version: VERSION.into(),
         workspace_db_uri: settings.workspace_db_uri.clone(),
         playback_input: mode,
         project_audio: ProjectAudio::read(settings)?,
         representation,
-        layout: layout(&stored.clip.snapshot, representation)?,
-        snapshot: stored.clip.snapshot.clone(),
+        layout: layout(snapshot, representation)?,
+        snapshot: snapshot.clone(),
     })
 }
 
 fn validate_workspace(uri: &str) -> Result<()> {
-    let content = content_uri(uri).map_err(|_| InputError::WrongWorkspace)?;
-    let parsed = qnc_contracts::parse_qnc_uri(&content).map_err(|_| InputError::WrongWorkspace)?;
+    let parsed = qnc_contracts::parse_qnc_uri(uri).map_err(|_| InputError::WrongWorkspace)?;
+    if parsed.resource_kind != "db" {
+        return Err(InputError::WrongWorkspace);
+    }
     let id = parsed
         .resource_id
-        .strip_prefix("ingest_content/")
+        .strip_prefix("project_workspace/")
         .ok_or(InputError::WrongWorkspace)?;
     qnc_media_records::valid_id(id).map_err(|_| InputError::WrongWorkspace)
 }

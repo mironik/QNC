@@ -254,6 +254,27 @@ where
         &self.state
     }
 
+    /// Explicit audio re-preroll after a device underrun. Does not invent PCM
+    /// and does not Pause Play. The audio crate forbids a silent restart.
+    pub fn rearm_audio_after_underrun(&mut self) -> Result<(), BroadcastEngineError> {
+        if self.state.status != TransportStatus::Playing {
+            return Ok(());
+        }
+        if self.require_source()?.audio_format.is_none() {
+            return Ok(());
+        }
+        let carrier = self.state.carrier_frame;
+        let end = carrier
+            .saturating_add(u64::try_from(self.healthy_buffer_frames()).unwrap_or(u64::MAX) + 1)
+            .min(self.current_range()?.end_frame);
+        self.playout.primed_audio.retain(|frame| *frame < carrier);
+        self.playout_output.begin_playout_preroll()?;
+        self.refill_playout_buffer(carrier, end)?;
+        self.playout_output.commit_playout_preroll()?;
+        self.playout_output.start_playout()?;
+        Ok(())
+    }
+
     /// Reserve AV before Ready without increasing per-tick work.
     pub fn with_min_prebuffer_frames(mut self, frames: usize) -> Self {
         self.min_prebuffer_frames = frames.clamp(MIN_PLAYOUT_BUFFER_FRAMES, 64);
@@ -538,8 +559,9 @@ where
         match self.tick_playing(now_tick) {
             Ok(events) => Ok(events),
             Err(error) => {
+                let recoverable = error.kind == BroadcastEngineErrorKind::NotReady;
                 let _ = self.suspend_motion();
-                self.idle_prebuffer_failed = true;
+                self.idle_prebuffer_failed = !recoverable;
                 self.state.status = TransportStatus::Paused;
                 Err(error)
             }
@@ -556,9 +578,10 @@ where
             .saturating_add(self.healthy_buffer_frames() as u64 + 1)
             .min(self.current_range()?.end_frame);
         let mut events = self.refill_playout_buffer(self.state.carrier_frame, end)?;
-        let max_due = self.state.decode_burst_frames.max(1);
-        for _ in 0..max_due {
-            let Some((scheduled, advanced_clock)) = self.peek_next_due_frame(now_tick) else {
+        // On time: deliver each source frame. A one-interval late tick still
+        // presents both. Only a larger gap jumps to the audio-clock frame.
+        for _ in 0..2 {
+            let Some((scheduled, advanced_clock, skipped)) = self.peek_due_frame(now_tick) else {
                 break;
             };
 
@@ -566,31 +589,46 @@ where
             // OUT is an exclusive time boundary, never a decode request. Hold
             // the final presented frame for its full interval before pausing.
             if scheduled.frame >= range.end_frame {
+                let last = range.end_frame.saturating_sub(1);
+                if self.state.carrier_frame < last {
+                    if self.playout_ready(last)? {
+                        events.extend(self.present_buffered_frame(last, true)?);
+                        events.extend(self.apply_playback_boundary()?);
+                    }
+                    return Ok(events);
+                }
                 events.extend(self.apply_playback_boundary()?);
                 return Ok(events);
             }
             let frame = scheduled.frame;
             if !self.playout_ready(frame)? {
-                return Err(BroadcastEngineError::new(
-                    BroadcastEngineErrorKind::NotReady,
-                    "due AV frame is not prepared; output paused",
-                )
-                .with_frame(frame));
+                // Hold the last presented frame. Do not Pause, invent, or show an
+                // older due frame while the audio clock has already moved on.
+                break;
             }
 
             events.extend(self.present_buffered_frame(frame, true)?);
             self.clock = Some(advanced_clock);
+            if skipped {
+                break;
+            }
         }
         Ok(events)
     }
 
-    fn peek_next_due_frame(
+    fn peek_due_frame(
         &self,
         now_tick: ClockTick,
-    ) -> Option<(crate::ScheduledFrame, FrameClock)> {
-        let mut clock = self.clock.clone()?;
-        let scheduled = clock.next_due_frame(now_tick)?;
-        Some((scheduled, clock))
+    ) -> Option<(crate::ScheduledFrame, FrameClock, bool)> {
+        let mut next_clock = self.clock.clone()?;
+        let next = next_clock.next_due_frame(now_tick)?;
+        let mut latest_clock = self.clock.clone()?;
+        let latest = latest_clock.latest_due_frame(now_tick)?;
+        if latest.due_slot > next.due_slot + 1 {
+            Some((latest, latest_clock, true))
+        } else {
+            Some((next, next_clock, false))
+        }
     }
 
     fn apply_playback_boundary(&mut self) -> Result<Vec<BroadcastEvent>, BroadcastEngineError> {
@@ -1014,7 +1052,12 @@ where
                 .next_audio_frame
                 .unwrap_or(anchor_frame)
                 .max(anchor_frame);
-            for _ in 0..self.state.decode_burst_frames {
+            let audio_burst = if matches!(self.state.status, TransportStatus::Playing) {
+                self.healthy_buffer_frames()
+            } else {
+                self.state.decode_burst_frames
+            };
+            for _ in 0..audio_burst {
                 if frame >= end_frame {
                     break;
                 }
@@ -1167,6 +1210,34 @@ impl<V, A> PlayoutBuffer<V, A> {
         self.video.retain(|candidate, _| *candidate >= frame);
         self.audio.retain(|candidate, _| *candidate >= frame);
         self.primed_audio.retain(|candidate| *candidate >= frame);
+    }
+
+    #[allow(dead_code)]
+    fn ready_video_ahead(&self, source: &EngineSourceHandle, frame: FrameNumber) -> usize {
+        if source.video_format.is_none() {
+            return usize::MAX;
+        }
+        let mut count = 0;
+        let mut candidate = frame;
+        while self.video.contains_key(&candidate) {
+            count += 1;
+            candidate = candidate.saturating_add(1);
+        }
+        count
+    }
+
+    #[allow(dead_code)]
+    fn ready_audio_ahead(&self, source: &EngineSourceHandle, frame: FrameNumber) -> usize {
+        if source.audio_format.is_none() {
+            return usize::MAX;
+        }
+        let mut count = 0;
+        let mut candidate = frame;
+        while self.audio.contains_key(&candidate) || self.primed_audio.contains(&candidate) {
+            count += 1;
+            candidate = candidate.saturating_add(1);
+        }
+        count
     }
 }
 
@@ -1640,7 +1711,24 @@ mod tests {
     }
 
     #[test]
-    fn delayed_tick_catches_up_without_skipping_frames_after_preroll() {
+    fn slightly_late_tick_still_presents_each_source_frame() {
+        let mut engine = fake_engine();
+        engine.load_source(&source_runtime(), Some(1)).unwrap();
+        engine.play_prepared(0).unwrap();
+
+        let events = engine.tick(40_000_000).unwrap();
+
+        assert_eq!(engine.state().carrier_frame, 2);
+        assert!(events.iter().any(|event| {
+            matches!(event, BroadcastEvent::FramePresented { frame } if *frame == 1)
+        }));
+        assert!(events.iter().any(|event| {
+            matches!(event, BroadcastEvent::FramePresented { frame } if *frame == 2)
+        }));
+    }
+
+    #[test]
+    fn delayed_tick_presents_the_audio_clock_frame_not_the_backlog() {
         let mut engine = fake_engine();
         engine.load_source(&source_runtime(), Some(1)).unwrap();
         engine.play_prepared(0).unwrap();
@@ -1649,14 +1737,12 @@ mod tests {
 
         let events = engine.tick(100_000_000).unwrap();
 
-        assert_eq!(engine.state().carrier_frame, 4);
-        for expected in 1..=4 {
-            assert!(events.iter().any(|event| {
-                matches!(event, BroadcastEvent::FramePresented { frame } if *frame == expected)
-            }));
-        }
+        assert_eq!(engine.state().carrier_frame, 5);
+        assert!(events.iter().any(|event| {
+            matches!(event, BroadcastEvent::FramePresented { frame } if *frame == 5)
+        }));
         assert!(events.iter().all(|event| {
-            !matches!(event, BroadcastEvent::FramePresented { frame } if *frame > 4)
+            !matches!(event, BroadcastEvent::FramePresented { frame } if *frame < 5)
         }));
     }
 
@@ -1848,7 +1934,7 @@ mod tests {
         let next = engine.tick(20_000_000).unwrap();
 
         assert_event_frame(&first, 0);
-        assert_event_frame(&next, 1);
+        assert_event_frame(&next, 2);
         assert_eq!(engine.state().playback_rate_num, 2);
         assert_eq!(engine.state().playback_rate_den, 1);
     }

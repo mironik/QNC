@@ -6,7 +6,9 @@
   "capabilities": [
     "decoder.catalog.read",
     "decoder.catalog.available",
-    "decoder.catalog.select"
+    "decoder.catalog.select",
+    "decoder.catalog.local_filmstrip_extractor",
+    "decoder.catalog.local_filmstrip_keyframe_extractor"
   ],
   "input_contract_version": "0.2.0",
   "output_contract_version": "0.2.0",
@@ -37,7 +39,7 @@
     "media.probe.full",
     "playback.clock",
     "playback.present",
-    "media.decode.execute"
+    "media.decode.execute_without_selected_adapter"
   ],
   "forbidden_dependencies": [
     "qnc.module.media-probe",
@@ -45,5 +47,6 @@
     "qnc.module.broadcast-player-core"
   ],
   "adapter_policy": "Read-only host deployment configuration. Explicit selection by registration id, no fallback. Paths are private installation locations, never project or media identities.",
+  "decoder_goal": "Final target is a replaceable capability chain: hardware/GPU adapters first when saved source facts are explicitly supported, then system decoder adapters, then external/software adapters. FFmpeg is the approved interim external adapter until QNC is functional and stable; it must remain replaceable and must not be hardcoded in player, filmstrip, UI or shell.",
   "specification": "docs/70-replaceable-decoders.md"
 }

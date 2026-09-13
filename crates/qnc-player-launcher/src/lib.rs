@@ -1,5 +1,4 @@
 use qnc_player_client::{Launch, MediaBinding};
-use qnc_work_settings::SettingsReader;
 use std::path::PathBuf;
 
 pub const MODULE_ID: &str = "qnc.module.player-launcher";
@@ -74,21 +73,25 @@ impl SourceTransportBinding {
 
 pub fn sibling_executable(name: &str) -> Result<PathBuf, String> {
     let executable = format!("{name}{}", std::env::consts::EXE_SUFFIX);
-    std::env::current_exe()
-        .map_err(|e| e.to_string())
-        .map(|path| path.with_file_name(executable))
+    let path = std::env::current_exe()
+        .map_err(|e| e.to_string())?
+        .with_file_name(&executable);
+    if !path.is_file() {
+        return Err(format!(
+            "Nedostaje {executable} pored {}. Izgradi -p qnc-player-runner istim profilom.",
+            path.parent()
+                .map(|parent| parent.display().to_string())
+                .unwrap_or_else(|| ".".into())
+        ));
+    }
+    Ok(path)
 }
 
 pub fn prepare_launch(
-    settings: SettingsReader,
-    workspace_db_uri: &str,
-    clip_id: &str,
+    input: qnc_player_input::PreparedInput,
     sources: &[SourceTransportBinding],
     executable: PathBuf,
 ) -> Result<Launch, String> {
-    let input = qnc_player_input::InputReader::new(settings)
-        .load(workspace_db_uri, clip_id)
-        .map_err(|e| e.to_string())?;
     let media_uri = &input.media().map_err(|e| e.to_string())?.media_uri;
     let reference =
         qnc_source_reader::SourceReference::from_uri(media_uri).map_err(|e| e.to_string())?;

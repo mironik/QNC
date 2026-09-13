@@ -7,13 +7,14 @@ description = "Public read-only player input from saved work settings and media 
 [dependencies]
 qnc-contracts = { workspace = true }
 qnc-frame-timebase = { workspace = true }
-qnc-ingest-store = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-media-records = { workspace = true }
 qnc-work-settings = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
+qnc-ingest-store = { workspace = true }
+qnc-transport-resolver = { workspace = true }
 serde_json = { workspace = true }
 rusqlite = { workspace = true }
 tempfile = "3"

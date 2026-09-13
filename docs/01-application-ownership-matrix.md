@@ -57,12 +57,12 @@ drugih QNC aplikacijskih procesa.
 | scanner | source.scan.roles | source location URI, camera/source rules | source file role map, original/proxy/support grouping | return result ili owner aplikacija pise | proxy nije clip, nema pisanja u tudje baze |
 | camera detector | source.camera.detect | source tree facts, filenames, metadata sidecars | camera layout classification, role hints | nema writeova | nema probe, nema clip import |
 | Media Probe | media.probe.full | original media URI i proxy URI ako postoji | puni probe record za original i proxy metadata | return result ili owner aplikacija pise | ne smije pozvati Filmstrip/Wave/Player/Export/Story workflow; proxy nije zaseban clip |
-| Filmstrip | filmstrip.generate14 | clip id, source/proxy izbor iz DB, probe podaci iz DB | 14 stvarnih frameova, artifact manifest/status | return result ili owner aplikacija pise artefakt | ne smije pozvati `ffprobe`, Media Probe, scanner ili Ingest workflow |
+| Filmstrip | filmstrip.generate | clip id, source/proxy izbor iz DB, probe podaci iz DB | stvarni frameovi, artifact manifest/status | return result ili owner aplikacija pise artefakt | ne smije pozvati `ffprobe`, Media Probe, scanner ili Ingest workflow |
 | Wave | wave.generate | clip id, audio stream/probe podaci iz DB | waveform/peaks, artifact manifest/status | return result ili owner aplikacija pise artefakt | ne smije pozvati `ffprobe`, Media Probe, scanner ili Ingest workflow |
-| Broadcast Player | playback.open, playback.seek, playback.status | media refs, playlist/EDL, probe/timebase iz DB | playback status, current frame, errors | caller-owned status ili return status | ne smije pozvati `ffprobe`, Media Probe, scanner, Export ili workflow druge aplikacije |
+| Broadcast Player | playback.open, playback.seek, playback.status | media refs, playlist/EDL, probe/timebase iz DB | playback status, current frame, errors | caller-owned status ili return status | radi samo playback; ne smije pozvati `ffprobe`, Media Probe, scanner, Export ili workflow druge aplikacije |
 | Export | export.render, export.report | EDL/playlist/output request, DB refs | exported files, report, status | caller-owned export/status ili return result | ne smije pozvati `ffprobe`, Media Probe, scanner ili citati privatni UI state |
 | Timeline | timeline.model, timeline.paint, timeline.hit_test | timeline model, frame ranges, markers, selection | painter model, navigation target, hit-test result | nema; caller pise state | nema playback clock ownership, nema probe, nema DB write |
-| Monitor | monitor.status | output target URI/config | output/health/status events | caller-owned status ili return status | nije centralni host, nema workflow routing |
+| Monitor | monitor.preview.paint | caller-owned surface id i potvrdjeni preview frame | painted surface | nema | nije player, nije Ingest forma, nema sat/decode/DB |
 
 ## Pravilo za vise Story varijanti
 

@@ -37,6 +37,7 @@ korisnika modula.
 | manifest/capability | manifest.validate, capability.list | manifest dokumenti aplikacija/modula | validation result, capability list | nema poslovnih writeova | workflow logika, media obrada |
 | transport/resolver | qnc.uri.resolve, qnc.uri.validate | QNC URI, environment, access policy | resolved handle/endpoint za trenutni proces | nema poslovnih writeova | workflow routing, ownership odluke, spremanje raw OS patha kao javnog ID-a |
 | DB contract/validation | db.schema.validate, db.owner.check | DB URI, schema manifest, owner policy | schema validation, migration check, read/write check | samo schema/status ako owner dopusti | poslovni DB write umjesto aplikacije, preskakanje owner checka |
+| Project Close | project.close_active, project.close_active.write_transport | project_registry QNC URI, owner binding i write ovlast | closed flag, prethodni active_project_id | uski write samo na active_project_id; isti local/LAN/intranet ugovor | genericki SQL, ProjectStore API, project delete, directory delete, temp cleanup, workflow routing |
 | frame/timebase | frame.convert, timecode.format | fps_num/fps_den, frame, seconds, timecode | frame/timecode/seconds konverzije | nema writeova | `ffprobe`, Media Probe, hardcoded FPS |
 | Dir Browser | dir.list, dir.select | root/location QNC URI, owner-private start path kroz resolver/session | OS-neutral browser state, breadcrumb URI, selected location URI | session-local; caller pise izbor | egui dugmad, media scan, probe, clip katalog |
 | Workstation Identity | workstation.identity.read | poziv na izvornoj radnoj stanici, bez poslovnog stanja | versioned JSON: naziv stanice, lokalni korisnik, device/CPU serial, razlog nedostupnosti | stateless; caller owner sprema snapshot | DB write, aplikacijski workflow, remote discovery, elevation; nije autentikacija |
@@ -55,12 +56,12 @@ korisnika modula.
 | Sony Camera Metadata Reader | camera.sony.index.read, camera.sony.metadata.read | XML u memoriji i QNC bindingi | index veze, metadata factovi, unresolved/conflict notices | stateless, no DB writes | scanner, probe, FS/network access, app workflow; docs/26 |
 | Source Read Transport | source.file.stat, source.text.read, source.directory.list | QNC source reference, caller limit, owner-private transport binding | file opis, URI, bounded UTF-8 tekst ili neposredne directory stavke s case policyjem | read-only, caller-owned transport | browser, camera detection, probe, DB writes, app workflow; docs/27 i docs/28 |
 | Media Probe | media.probe.full | original media URI i proxy URI ako postoji | puni probe record za original i proxy metadata | return result ili owner aplikacija pise | Filmstrip, Wave, Player, Export, Story workflow, Media Assist workflow, proxy kao zaseban clip |
-| Filmstrip | filmstrip.generate14 | clip id, source/proxy izbor iz DB, probe podaci iz DB | 14 stvarnih frameova, artifact manifest/status | return result ili owner aplikacija pise artefakt | `ffprobe`, Media Probe, scanner, Ingest workflow, poster repeat kao filmstrip |
+| Filmstrip | filmstrip.generate | clip id, source/proxy izbor iz DB, probe podaci iz DB | stvarni frameovi, artifact manifest/status | return result ili owner aplikacija pise artefakt | `ffprobe`, Media Probe, scanner, Ingest workflow, poster repeat kao filmstrip |
 | Wave | wave.generate | clip id, audio stream/probe podaci iz DB | waveform/peaks, artifact manifest/status | return result ili owner aplikacija pise artefakt | `ffprobe`, Media Probe, scanner, Ingest workflow |
 | Timeline | timeline.model, timeline.paint, timeline.hit_test | timeline model, frame ranges, markers, selection | painter model, navigation target, hit-test result | nema; caller pise state | playback clock ownership, probe, DB write, poslovni workflow aplikacije |
 | Broadcast Player | playback.open, playback.seek, playback.status | media refs, playlist/EDL, probe/timebase iz DB | playback status, current frame, errors | caller-owned status ili return status | `ffprobe`, Media Probe, scanner, Export, app-to-app state sharing |
 | Export | export.render, export.report | EDL/playlist/output request, DB refs | exported files, report, status | caller-owned export/status ili return result | `ffprobe`, Media Probe, scanner, privatni UI state |
-| Monitor | monitor.status | output target URI/config | output/health/status events | caller-owned status ili return status | centralni workflow host, workflow routing |
+| Monitor | monitor.preview.paint | caller-owned surface id, potvrdjeni preview frame ili poruka | painted surface | nema; caller predaje sliku | playback clock, decode, probe, DB, app workflow, znanje o host aplikaciji |
 | UI widget / `qnc-ui-kit` | ui.render, ui.intent, ui.form_action_bar, ui.exclusive_panel | view model, theme/font policy, action labels, pasivni UI open/close state | rendered UI, UI intent, genericki UI-state rezultat | nema poslovnih writeova | scan, probe, media obrada, DB write, poslovni workflow, browser session ownership |
 | test adapter | conformance.run | manifest, source tree, DB files, fake transport | conformance result | test output samo | produkcijski DB write, skrivanje pravila u test helperu |
 
@@ -95,9 +96,11 @@ Filmstrip modul:
   ne poziva Ingest workflow
 
 Broadcast Player modul:
+  radi samo playback
   ne poziva ffprobe
   ne poziva Media Probe
   ne pokrece Export
+  ne implementira Ingest/Story/Project workflow
 ```
 
 ## Kako dvije aplikacije koriste isti modul

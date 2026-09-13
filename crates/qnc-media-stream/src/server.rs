@@ -1,7 +1,6 @@
 //! Storage-side HTTP handler. Host owns TLS, bounded worker count and connection lifecycle.
 use crate::*;
 use qnc_json_transport::Credentials;
-use std::sync::{Arc, Mutex};
 use tiny_http::{Header, Method, Request, Response, StatusCode};
 
 fn header(name: &str, value: impl AsRef<str>) -> Header {
@@ -86,58 +85,6 @@ pub fn respond_opened(
         return rejected(request, 403);
     }
     serve(request, media.info().clone(), media)
-}
-
-pub(crate) fn respond_shared(
-    request: Request,
-    media: Arc<Mutex<MediaStream>>,
-    credentials: &Credentials,
-) -> io::Result<()> {
-    let uri = match authorized_uri(&request, credentials) {
-        Ok(uri) => uri,
-        Err(status) => return rejected(request, status),
-    };
-    let info = media
-        .lock()
-        .map_err(|_| io::Error::other("media reader lock"))?
-        .info()
-        .clone();
-    if uri != info.media_uri {
-        return rejected(request, 403);
-    }
-    serve(request, info, &mut SharedReader { media, position: 0 })
-}
-
-// A stalled socket must not hold the shared media cursor during a second seek request.
-struct SharedReader {
-    media: Arc<Mutex<MediaStream>>,
-    position: u64,
-}
-impl Read for SharedReader {
-    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        let mut media = self
-            .media
-            .lock()
-            .map_err(|_| io::Error::other("media reader lock"))?;
-        media.seek(SeekFrom::Start(self.position))?;
-        let count = media.read(bytes)?;
-        self.position += count as u64;
-        Ok(count)
-    }
-}
-impl Seek for SharedReader {
-    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
-        match position {
-            SeekFrom::Start(position) => self.position = position,
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "expected absolute range",
-                ));
-            }
-        }
-        Ok(self.position)
-    }
 }
 
 fn serve(

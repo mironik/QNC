@@ -629,6 +629,16 @@ impl ProjectStore {
                 let _ = lock_projects_root_dir(projects_root);
                 return Err(error);
             }
+            if let Err(error) = clear_project_tree_read_only_for_delete(&project_dir) {
+                let _ = lock_project_dir(&project_dir);
+                let _ = lock_projects_root_dir(projects_root);
+                return Err(error);
+            }
+            if let Err(error) = delete_project_database_files(&workspace_db) {
+                let _ = lock_project_dir(&project_dir);
+                let _ = lock_projects_root_dir(projects_root);
+                return Err(error);
+            }
             let remove_result = fs::remove_dir_all(&project_dir).map_err(|error| {
                 format!(
                     "Ne mogu obrisati direktorij projekta '{}': {error}",
@@ -636,7 +646,10 @@ impl ProjectStore {
                 )
             });
             let lock_result = lock_projects_root_dir(projects_root);
-            remove_result?;
+            if let Err(error) = remove_result {
+                let _ = lock_project_dir(&project_dir);
+                return Err(error);
+            }
             lock_result?;
         }
         tx.commit().map_err(|error| error.to_string())?;
@@ -967,6 +980,75 @@ fn lock_project_dir(path: &Path) -> Result<(), String> {
 fn unlock_project_dir(path: &Path) -> Result<(), String> {
     set_project_delete_lock(path, false)?;
     set_project_hidden(path, false)
+}
+
+fn clear_project_tree_read_only_for_delete(path: &Path) -> Result<(), String> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    if metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+    if metadata.is_dir() {
+        for entry in fs::read_dir(path).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            clear_project_tree_read_only_for_delete(&entry.path())?;
+        }
+    }
+    clear_path_read_only_for_delete(path)
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn clear_path_read_only_for_delete(path: &Path) -> Result<(), String> {
+    set_path_read_only(path, false)
+}
+
+#[cfg(not(all(unix, not(target_os = "macos"))))]
+fn clear_path_read_only_for_delete(path: &Path) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    let mut permissions = metadata.permissions();
+    if !permissions.readonly() {
+        return Ok(());
+    }
+    permissions.set_readonly(false);
+    fs::set_permissions(path, permissions).map_err(|error| {
+        format!(
+            "Ne mogu ukloniti read-only stanje za brisanje '{}': {error}",
+            path.display()
+        )
+    })
+}
+
+fn delete_project_database_files(workspace_db: &Path) -> Result<(), String> {
+    for file in sqlite_database_files(workspace_db) {
+        if !file.exists() {
+            continue;
+        }
+        clear_path_read_only_for_delete(&file)?;
+        fs::remove_file(&file).map_err(|error| {
+            format!(
+                "Ne mogu obrisati bazu projekta '{}': {error}",
+                file.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
+fn sqlite_database_files(workspace_db: &Path) -> [PathBuf; 4] {
+    [
+        workspace_db.to_path_buf(),
+        sqlite_sidecar_file(workspace_db, "-wal"),
+        sqlite_sidecar_file(workspace_db, "-shm"),
+        sqlite_sidecar_file(workspace_db, "-journal"),
+    ]
+}
+
+fn sqlite_sidecar_file(workspace_db: &Path, suffix: &str) -> PathBuf {
+    let mut value = workspace_db.as_os_str().to_os_string();
+    value.push(suffix);
+    PathBuf::from(value)
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -1978,9 +2060,11 @@ mod tests {
                 let path = entry.path();
                 if path.is_dir() {
                     let _ = unlock_project_dir(&path);
+                    let _ = clear_project_tree_read_only_for_delete(&path);
                 }
             }
         }
+        let _ = clear_project_tree_read_only_for_delete(root);
         let _ = fs::remove_dir_all(root);
     }
 
@@ -2800,6 +2884,72 @@ mod tests {
     }
 
     #[test]
+    fn delete_project_removes_readonly_workspace_files() {
+        let root = temp_root("delete_project_readonly_files");
+        let store = ProjectStore::open(&root).expect("store");
+        let templates = store.list_project_templates().expect("templates");
+        let project = store
+            .create_project(
+                "Readonly Files",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
+            .expect("project");
+        let project_dir = root
+            .join("projects")
+            .join(safe_dir_name(&project.project_id));
+        let files = [
+            project_dir.join("qnc_project.db"),
+            project_dir.join("qnc_project.db-wal"),
+            project_dir.join("qnc_project.db-shm"),
+            project_dir.join("filmstrip").join("clip").join("000.jpg"),
+        ];
+        for file in &files {
+            fs::create_dir_all(file.parent().unwrap()).expect("parent dir");
+            if !file.exists() {
+                fs::write(file, b"stale").expect("stale file");
+            }
+            set_test_read_only(file, true);
+            assert!(
+                file.metadata()
+                    .expect("readonly metadata")
+                    .permissions()
+                    .readonly(),
+                "test did not mark {} read-only",
+                file.display()
+            );
+        }
+
+        let deleted = store.delete_project(&project.project_id).expect("delete");
+
+        assert_eq!(deleted.project_id, project.project_id);
+        assert!(!project_dir.exists());
+        assert!(store.list_projects().expect("rows").is_empty());
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn project_database_files_are_deleted_before_project_directory() {
+        let root = temp_root("delete_database_first");
+        let project_dir = root.join("projects").join("p1");
+        fs::create_dir_all(&project_dir).expect("project dir");
+        let workspace_db = project_dir.join("qnc_project.db");
+        for file in sqlite_database_files(&workspace_db) {
+            fs::write(&file, b"stale").expect("sqlite file");
+            set_test_read_only(&file, true);
+        }
+
+        delete_project_database_files(&workspace_db).expect("delete sqlite files");
+
+        assert!(project_dir.is_dir());
+        for file in sqlite_database_files(&workspace_db) {
+            assert!(!file.exists(), "{} still exists", file.display());
+        }
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
     fn delete_project_refuses_unexpected_storage_directory() {
         let root = temp_root("delete_guard");
         let store = ProjectStore::open(&root).expect("store");
@@ -2845,5 +2995,11 @@ mod tests {
         path.metadata()
             .map(|metadata| metadata.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0)
             .unwrap_or(false)
+    }
+
+    fn set_test_read_only(path: &Path, read_only: bool) {
+        let mut permissions = path.metadata().expect("metadata").permissions();
+        permissions.set_readonly(read_only);
+        fs::set_permissions(path, permissions).expect("set readonly");
     }
 }

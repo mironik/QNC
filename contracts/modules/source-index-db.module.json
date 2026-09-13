@@ -11,7 +11,7 @@
   "supported_cpu": ["x86_64", "aarch64"],
   "capabilities": ["source.index.write", "source.index.read"],
   "state_policy": "owned_by_calling_application",
-  "database_write_policy": "owner_application_only",
+  "database_write_policy": "public_db_owner_write_adapter_only",
   "database_contract": "qnc.db.source_index",
   "forbidden_calls": ["ffprobe", "media.probe.full", "source.scan.roles", "camera.sony.index.read", "business.workflow"],
   "forbidden_dependencies": ["qnc.module.scanner", "qnc.module.media-probe", "qnc.module.sony-metadata"],

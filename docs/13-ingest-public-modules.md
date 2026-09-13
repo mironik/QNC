@@ -1,13 +1,12 @@
-# Ingest public modules and components
+# Ingest public modules
 
 Status: trenutni runtime rez + ugovorni popis sljedecih modula  
 Datum: 2026-09-05  
 Root: `C:\Users\miron\Projects\QNC`  
 Referenca: `C:\Users\miron\Projects\qnc_v4`
 
-Ovaj dokument razdvaja Ingest UI, javne module i javne komponente. Ingest je
-aplikacija/forma. Moduli i komponente su gradivni dijelovi. UI ne smije nositi
-aktivni kod.
+Ovaj dokument razdvaja Ingest UI i javne module. Ingest je aplikacija/forma.
+Moduli su gradivni dijelovi. UI ne smije nositi aktivni kod.
 
 ## Osnovno pravilo
 
@@ -19,12 +18,11 @@ UI forma
   -> emitira action_id + payload
   -> ne cita DB, ne pise DB, ne otvara filesystem, ne scan, ne probe
 
-Javne komponente Ingest aplikacije
-  -> primaju action_id
-  -> izvode Ingest workflow
-  -> zovu javne module
-  -> pisu samo Ingest DB
-  -> iz DB-a grade view model za UI
+Ingest aplikacijski sloj
+  -> composition/root za javne module
+  -> prima action_id i prosljedjuje ga uskom javnom modulu
+  -> ne smije postati `qnc-ingest-components`
+  -> ne smije u sebi skupljati browser, select, player, filmstrip, wave i DB
 
 Javni moduli
   -> imaju public capability contract
@@ -87,7 +85,7 @@ ili out-of-process adapter.
 | `qnc-camera-detector` | camera/source rules | `source.camera.detect` | source facts/sidecars | card/source identity + role hints | nema import, nema probe |
 | `qnc-media-probe` | `ingest_probe`, `record_media_probe_result` | `media.probe.full` | original URI + proxy URI ako postoji | puni probe record | ne zove filmstrip/wave/player/export |
 | `qnc-poster` | `thumb`, `ingest_posters` | `poster.copy_or_generate` | clip + card thumb/proxy policy | poster artifact result | ne smije biti filmstrip zamjena |
-| `qnc-filmstrip` | `filmstrip` | `filmstrip.generate14` | clip id + DB probe/source refs | 14 stvarnih frameova | ne ffprobe, ne scan, ne poster repeat |
+| `qnc-filmstrip` | `filmstrip` | `filmstrip.generate` | clip id + DB probe/source refs | stvarni filmstrip frameovi | ne ffprobe, ne scan, ne poster repeat |
 | `qnc-wave` | `waveform` | `wave.generate` | clip id + DB probe/audio refs | waveform peaks/artifact | ne ffprobe, ne scan |
 | `qnc-broadcast-player` | playback stack / player contract | `playback.open`, `playback.seek`, `playback.status` | media ref + DB probe/timebase | playback status/frame | ne ffprobe, ne Ingest workflow |
 | `qnc-import-transfer` | `import_pipeline`, transport prepare/link/copy | `media.transfer.prepare` | selected clip refs + policy | copied/linked artifacts/status | ne scan, ne probe |
@@ -97,36 +95,38 @@ Napomena: modul je javan po capabilityju. Ne smije imati hardkodiranu listu
 aplikacija koje ga smiju koristiti. Zabrane se upisuju kao dependency boundary
 modula i kao workflow zabrane aplikacija koje ga ne smiju koristiti.
 
-## Javne komponente Ingest aplikacije
+## Zabranjeni umbrella sloj
 
-Ovo su komponente koje nova Ingest aplikacija treba javno izloziti svojoj
-formi i shell adapteru. One nisu UI widgeti i nisu privatni pozivi druge
-aplikacije.
+`qnc-ingest-components` ne smije postojati kao javni runtime sloj. Ingest forma
+smije prikazivati layout i slati `action_id`, a Ingest aplikacijski sloj smije
+biti samo composition/root koji povezuje uske javne module. Svaka aktivna
+odgovornost mora imati vlastiti uski modul ili adapter.
 
-| Komponenta | Odgovornost | Smije zvati | Pise |
+| Javni modul/adapter | Odgovornost | Smije zvati | Pise |
 | --- | --- | --- | --- |
-| `IngestDesktopAdapter` | shell-hosted ulaz: `create` + `show_desktop` | `IngestApplicationComponent` | nista direktno |
-| `IngestApplicationComponent` | lifecycle standalone/shell, batch exit | session/status komponente | nista direktno osim preko store ownera |
-| `IngestActionDispatcher` | mapira `action_id` + payload u komponentnu naredbu | sve Ingest komponente | nista direktno |
-| `IngestWorkSettingsReader` | cita oznaku aktivnog projekta i postavke za rad iz baze read-only | DB contract/resolver | nista |
-| `IngestViewModelComponent` | gradi pasivni view model iz Ingest DB public viewova | `qnc-ingest-store` read API | nista |
-| `IngestStatusComponent` | status, progress, pending/imported count, errors | store read API | privatni status ako treba |
-| `IngestSourceBrowserComponent` | source kind, list/open/confirm/cancel | `qnc-dir-browser`, resolver | `ingest_registry.source_locations`, `source_sessions` |
-| `IngestSourceIdentityComponent` | serial number, volume/source name, first/last seen | `qnc-camera-detector` | `ingest_registry.source_cards` |
-| `IngestSourceDiscoveryComponent` | Odaberi -> scan roles + original/proxy grouping | scanner, camera detector | `ingest_content.clips`, `clip_sources`, `clip_proxy` |
-| `IngestProbeComponent` | jedini full probe prolaz | `qnc-media-probe` | `ingest_content.probe_records` |
-| `IngestSelectionComponent` | select/toggle/select all/clear + revision guard | store | Ingest selection fields |
-| `IngestOptionsComponent` | `Kopiraj original`, `AI mining`, dodatne checkbox opcije | store | Ingest options/status |
-| `IngestImportBatchComponent` | `Uvezi` selektirane, batch faze, batch finish | transfer/job runner | privatni job/batch store + javni status |
-| `IngestArtifactComponent` | opcionalni poster/filmstrip/wave artefakti | poster, filmstrip, wave | artifact tablice/status |
-| `IngestPreviewComponent` | preview focus, cue, play/pause intent | broadcast player, resolver | samo status/cache koji je Ingest-owned |
-| `IngestDbOwnerComponent` | schema, migrations, short transactions, public views | DB contract/resolver | samo Ingest DB |
-| `IngestReadApiComponent` | stabilni read model za druge aplikacije | Ingest DB public views | nista |
+| `qnc-ingest-desktop-adapter` | shell-hosted ulaz: `create` + `show_desktop` prema jedinom `qnc-app.exe` desktopu | Ingest aplikacijski root | nista direktno |
+| `qnc-ingest-application` | privremeni composition/root dok se ne izdvoje svi uski moduli | javne module po action_id-u | nista direktno osim kroz javne write adaptere |
+| `qnc-work-settings` | cita oznaku aktivnog projekta i postavke za rad iz baze read-only | DB contract/resolver | nista |
+| `qnc-ingest-catalog` | gradi pasivni view model iz Ingest DB public viewova | `qnc-ingest-store` read API | nista |
+| `qnc-ingest-store` | Ingest DB read/write transport i public views | DB contract/resolver | samo Ingest DB |
+| `qnc-dir-browser` | source kind, list/open/confirm/cancel state | resolver/source reader | `ingest_registry.source_locations`, `source_sessions` samo kroz owner ugovor |
+| `qnc-source-reader` | OS-neutral source listing | resolver | nista |
+| `qnc-camera-detector` | serial number, volume/source name, source identity | source facts/sidecars | nista |
+| `qnc-scanner` | source roles + original/proxy grouping | camera detector/source reader | nista |
+| `qnc-media-probe` | jedini full probe prolaz | decoder/probe adapter | nista direktno |
+| `qnc-ingest-select` | Odaberi -> katalog/probe/source zapis | scanner, camera detector, media probe, store transport | `ingest_content` kroz javni DB writer |
+| `qnc-media-thumbnail` | poster/thumbnail ucitavanje ili priprema | image assets/source refs | nista direktno |
+| `qnc-filmstrip-worker` | automatsko kreiranje filmstrip JPEG artefakata | filmstrip + decoder catalog + DB read | nista direktno, publish ide kroz transport |
+| `qnc-timeline-assets` | pasivno cita filmstrip/wave artefakte za timeline | Ingest DB read + artifact reader | nista |
+| `qnc-wave-worker` | kreiranje wave peak zapisa | wave + decoder catalog + DB read | nista direktno, publish ide kroz transport |
+| `qnc-wave-view` | pasivni wave paint podaci | wave peaks | nista |
+| `qnc-monitor` | pasivni player preview surface | potvrdjeni frame ili poruka | nista |
+| `qnc-player-launcher` / `qnc-player-client` | preview focus, cue, play/pause intent prema Broadcast Playeru | player contract/resolver | samo player session state |
 
 ## Ingest action_id katalog
 
 Dir Browser nije Ingest forma i ne nosi potvrdna/odustajna dugmad. Ingest
-komponenta koristi javni `qnc-dir-browser` session/state, browser UI komponenta
+aplikacijski root koristi javni `qnc-dir-browser` session/state, browser UI modul
 prikazuje snapshot i navigacijske hit-zone, a aplikacijska akcijska traka
 prikazuje `Odaberi`/`Odustani` kroz `qnc-ui-kit` i salje odgovarajuci
 `action_id`. Ingest u ovom rezu ima jedan source browser, ali mora koristiti
@@ -139,27 +139,27 @@ Svaka korisnicka akcija iz forme mora izaci kao `action_id`. Klik i shortcut
 koriste isti action_id; shortcut akordi dolaze iz
 `contracts/qnc-keyboard-shortcuts.json`.
 
-| UI akcija | action_id | Komponenta |
+| UI akcija | action_id | Javni modul |
 | --- | --- | --- |
-| Računalo / LAN / Internet | `ingest_source_kind_*` | `IngestSourceBrowserComponent` |
-| Gore | `ingest_dir_up` | `IngestSourceBrowserComponent` |
-| Diskovi | `ingest_dir_roots` | `IngestSourceBrowserComponent` |
-| Otvori mapu/stavku | `ingest_dir_open` | `IngestSourceBrowserComponent` |
-| Odaberi source | `ingest_dir_confirm` | `IngestSourceDiscoveryComponent` |
-| Odustani | `ingest_dir_cancel` | `IngestSourceBrowserComponent` |
-| Klik kartice | `ingest_preview_focus` | `IngestPreviewComponent` |
-| Check na kartici | `ingest_clip_toggle` | `IngestSelectionComponent` |
-| Odaberi sve | `ingest_select_all` | `IngestSelectionComponent` |
-| Očisti | `ingest_clear_selection` | `IngestSelectionComponent` |
-| Uvezi | `ingest_import_selected` | `IngestImportBatchComponent` |
-| Osvježi | `ingest_reload` | `IngestViewModelComponent` |
-| Kopiraj original | `ingest_set_archive` | `IngestOptionsComponent` |
-| AI mining | `ingest_set_ai_mining` | `IngestOptionsComponent` |
-| Generiraj postere | `ingest_approve_proxy_posters` | `IngestArtifactComponent` |
-| Play/Pause | `play_pause` | `IngestPreviewComponent` |
-| `[` / `]` | `step_back_frame` / `step_forward_frame` | `IngestPreviewComponent` |
-| Scrub timeline | `ingest_cue_frame` | `IngestPreviewComponent` |
-| Expand A1/A2 | `ingest_toggle_audio_lane` | `IngestPreviewComponent` |
+| Računalo / LAN / Internet | `ingest_source_kind_*` | `qnc-dir-browser` |
+| Gore | `ingest_dir_up` | `qnc-dir-browser` |
+| Diskovi | `ingest_dir_roots` | `qnc-dir-browser` |
+| Otvori mapu/stavku | `ingest_dir_open` | `qnc-dir-browser` |
+| Odaberi source | `ingest_dir_confirm` | `qnc-ingest-select` |
+| Odustani | `ingest_dir_cancel` | `qnc-dir-browser` |
+| Klik kartice | `ingest_preview_focus` | `qnc-player-client` / `qnc-timeline-assets` |
+| Check na kartici | `ingest_clip_toggle` | `qnc-ingest-store` |
+| Odaberi sve | `ingest_select_all` | `qnc-ingest-store` |
+| Očisti | `ingest_clear_selection` | `qnc-ingest-store` |
+| Uvezi | `ingest_import_selected` | `qnc-import-transfer` |
+| Osvježi | `ingest_reload` | `qnc-ingest-catalog` |
+| Kopiraj original | `ingest_set_archive` | `qnc-ingest-store` |
+| AI mining | `ingest_set_ai_mining` | `qnc-ingest-store` |
+| Generiraj postere | `ingest_approve_proxy_posters` | `qnc-media-thumbnail` |
+| Play/Pause | `play_pause` | `qnc-player-client` |
+| `[` / `]` | `step_back_frame` / `step_forward_frame` | `qnc-player-client` |
+| Scrub timeline | `ingest_cue_frame` | `qnc-player-client` preko `qnc-timeline` intenta |
+| Expand A1/A2 | `ingest_toggle_audio_lane` | `qnc-timeline` |
 
 Ako action_id ne postoji u shortcut/action contractu, ne smije se kodirati UI
 akcija koja ga koristi.
@@ -190,23 +190,23 @@ Ako se u UI crateu pojavi neka od ovih ovisnosti, to je conformance greska.
 ```text
 1. UI: korisnik klikne Odaberi
 2. UI: emitira action_id = ingest_dir_confirm
-3. IngestActionDispatcher: prima intent
-4. IngestSourceDiscoveryComponent:
-   - trazi QNC URI od IngestSourceBrowserComponent
+3. Ingest aplikacijski root: prima intent i prosljedjuje ga uskom modulu
+4. qnc-ingest-select:
+   - trazi QNC URI od qnc-dir-browser sessiona
    - poziva scanner + camera detector
    - pise source/card/clip/proxy u Ingest DB
-5. IngestProbeComponent:
+5. qnc-media-probe:
    - pokrece jedini media.probe.full prolaz
    - pise probe_records
-6. IngestViewModelComponent:
+6. qnc-ingest-catalog:
    - cita public views
    - vraca view model formi
 7. UI: samo prikazuje nove rows/status
 ```
 
 Filmstrip, wave, poster i copy original su dodatne radnje. Ako su ukljucene,
-Ingest ih pokrece preko komponenti i javnih modula. Ako nisu ukljucene, ne rade
-se. Nijedna od tih radnji ne smije ponovno pokrenuti probe.
+Ingest ih pokrece preko javnih modula. Ako nisu ukljucene, ne rade se. Nijedna
+od tih radnji ne smije ponovno pokrenuti probe.
 
 ## Sto je provjereno
 

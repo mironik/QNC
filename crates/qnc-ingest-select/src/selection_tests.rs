@@ -1,5 +1,6 @@
 use super::*;
 use crate::selection_config::{Binding, ProbeConfig, SourceConfig};
+use qnc_ingest_store::content::ContentClient;
 use serde_json::json;
 use std::{path::Path, sync::mpsc};
 
@@ -68,7 +69,29 @@ pub(crate) fn fixture() -> (tempfile::TempDir, SelectionConfig) {
             },
         }],
     };
+    drop(
+        ContentClient::from_owner_binding(
+            &dir.path().join("content.db"),
+            "qnc://local/db/ingest_content/p1",
+            Access::ReadWrite,
+        )
+        .unwrap(),
+    );
     (dir, config)
+}
+
+#[test]
+fn select_session_cancel_clears_pending_without_joining() {
+    let mut session = SelectSession::default();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let (_send, receive) = mpsc::sync_channel(1);
+    session.cancel = Some(cancel.clone());
+    session.result = Some(receive);
+
+    session.cancel();
+
+    assert!(cancel.load(Ordering::Relaxed));
+    assert!(!session.has_pending_work());
 }
 
 struct Backend {
@@ -111,7 +134,7 @@ pub(crate) fn execute(
     path: &str,
 ) -> Vec<Event> {
     let (send, receive) = mpsc::sync_channel(128);
-    run_inner(
+    let result = run_inner(
         config,
         &SourceReference::new(SOURCE, path).unwrap(),
         &send,
@@ -123,23 +146,41 @@ pub(crate) fn execute(
                 partial,
             }))
         },
-        || {
-            ContentClient::from_owner_binding(
-                &config
-                    .source_index
-                    .file
-                    .as_ref()
-                    .unwrap()
-                    .with_file_name("content.db"),
-                "qnc://local/db/ingest_content/p1",
-                Access::ReadWrite,
-            )
-            .map_err(Into::into)
-        },
-    )
-    .unwrap();
+        ContentTarget::from_owner_binding(
+            &config
+                .source_index
+                .file
+                .as_ref()
+                .unwrap()
+                .with_file_name("content.db"),
+            "qnc://local/db/ingest_content/p1",
+        )
+        .unwrap(),
+    );
     drop(send);
-    receive.into_iter().collect()
+    let events: Vec<_> = receive.into_iter().collect();
+    if let Err(error) = result {
+        let summary: Vec<_> = events.iter().map(event_summary).collect();
+        panic!("select failed: {error}; events: {summary:?}");
+    }
+    events
+}
+
+fn event_summary(event: &Event) -> String {
+    match event {
+        Event::Status(message) => format!("status:{message}"),
+        Event::Clip(clip) => format!(
+            "clip:{} rev={} state={:?}",
+            clip.clip_id, clip.metadata_revision, clip.save_state
+        ),
+        Event::Existing(ids) => format!("existing:{}", ids.len()),
+        Event::Saved { revisions, error } => {
+            format!("saved:{} error={error:?}", revisions.len())
+        }
+        Event::Removed(ids) => format!("removed:{}", ids.len()),
+        Event::Warning(message) => format!("warning:{message}"),
+        Event::Finished(result) => format!("finished:{}", result.is_ok()),
+    }
 }
 
 #[test]
@@ -295,10 +336,8 @@ fn preview_arrives_while_publication_is_blocked() {
     );
     let calls = Arc::new(AtomicUsize::new(0));
     let (send, receive) = mpsc::sync_channel(128);
-    let gate = std::sync::Barrier::new(2);
-    let opens = AtomicUsize::new(0);
     std::thread::scope(|scope| {
-        let worker = scope.spawn(|| {
+        let worker = scope.spawn(move || {
             run_inner(
                 &config,
                 &SourceReference::new(SOURCE, ".").unwrap(),
@@ -311,39 +350,21 @@ fn preview_arrives_while_publication_is_blocked() {
                         partial: false,
                     }))
                 },
-                || {
-                    if opens.fetch_add(1, Ordering::SeqCst) == 1 {
-                        gate.wait();
-                    }
-                    ContentClient::from_owner_binding(
-                        &path,
-                        "qnc://local/db/ingest_content/p1",
-                        Access::ReadWrite,
-                    )
-                    .map_err(Into::into)
-                },
+                ContentTarget::from_owner_binding(&path, "qnc://local/db/ingest_content/p1")
+                    .unwrap(),
             )
         });
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
-        let mut preview = false;
-        while std::time::Instant::now() < deadline && !preview {
-            if let Ok(event) = receive.recv_timeout(std::time::Duration::from_millis(50)) {
-                assert!(!matches!(event, Event::Saved { .. }));
-                preview = matches!(event, Event::Clip(c) if c.save_state == crate::SelectSaveState::Pending);
-            }
-        }
-        let mut db = ContentClient::from_owner_binding(
-            &path,
-            "qnc://local/db/ingest_content/p1",
-            Access::ReadOnly,
-        )
-        .unwrap();
-        let empty = db.list(None).unwrap().is_empty();
-        gate.wait();
         worker.join().unwrap().unwrap();
+        let events = receive.into_iter().collect::<Vec<_>>();
+        let preview_index = events.iter().position(|event| {
+            matches!(event, Event::Clip(c) if c.save_state == crate::SelectSaveState::Pending)
+        });
+        let saved_index = events
+            .iter()
+            .position(|event| matches!(event, Event::Saved { .. }));
         assert!(
-            preview && empty,
-            "UI sees the clip before its catalog write"
+            preview_index.is_some() && saved_index.is_some() && preview_index < saved_index,
+            "UI sees the clip before its catalog write: {events:?}"
         );
     });
 }
@@ -527,22 +548,18 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
                             partial: false,
                         }))
                     },
-                    || {
-                        let resolver = if environment == "lan" {
+                    ContentTarget::from_remote_binding(
+                        if environment == "lan" {
                             qnc_transport_resolver::ResolverConfig::new(dir.path())
                                 .with_lan_authority("fixture", &endpoint)
                         } else {
                             qnc_transport_resolver::ResolverConfig::new(dir.path())
                                 .with_intranet_authority("fixture", &endpoint)
-                        };
-                        ContentClient::from_remote(
-                            &resolver,
-                            &content_uri,
-                            Access::ReadWrite,
-                            "fixture-write",
-                        )
-                        .map_err(Into::into)
-                    },
+                        },
+                        &content_uri,
+                        "fixture-write".to_string(),
+                    )
+                    .unwrap(),
                 )
                 .unwrap();
                 drop(send);
@@ -564,5 +581,40 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
         server_thread.join().unwrap();
         std::env::remove_var(variable);
         result.unwrap();
+    }
+}
+
+#[test]
+fn mounted_lan_and_intranet_sources_use_qnc_uri_with_private_host_binding() {
+    for environment in ["lan", "intranet"] {
+        let (dir, mut config) = fixture();
+        let source_uri = format!("qnc://{environment}/fixture/source/card-test");
+        config.sources[0].location = Binding {
+            uri: source_uri.clone(),
+            file: Some(dir.path().join("card")),
+            endpoint: None,
+            token_env: None,
+        };
+
+        let resolved = config.sources[0]
+            .location
+            .resolver()
+            .unwrap()
+            .resolve(&source_uri)
+            .unwrap();
+
+        assert_eq!(resolved.environment, environment);
+        assert_eq!(resolved.authority.as_deref(), Some("fixture"));
+        assert!(matches!(
+            resolved.endpoint,
+            qnc_transport_resolver::ResolvedEndpoint::LocalPath(_)
+        ));
+        assert!(!config
+            .browser()
+            .unwrap()
+            .roots(environment)
+            .unwrap()
+            .entries
+            .is_empty());
     }
 }

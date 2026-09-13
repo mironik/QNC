@@ -225,8 +225,11 @@ pub fn validate_module_manifest_json(name: &str, contents: &str) -> ValidationRe
         "database_write_policy",
         &[
             "no_db_writes",
-            "owner_application_only",
-            "returns_result_to_owner_application",
+            "public_db_owner_write_adapter_only",
+            "public_db_write_transports_only",
+            "public_ingest_content_write_transport_only",
+            "narrow_project_close_write_adapter_only",
+            "returns_artifact_to_public_write_transport",
         ],
     );
     require_supported_targets(&mut report, name, object);
@@ -248,7 +251,7 @@ pub fn validate_module_manifest_json(name: &str, contents: &str) -> ValidationRe
             "playback.execute",
             "application.db.read",
             "application.db.write",
-            "filmstrip.generate14",
+            "filmstrip.generate",
             "wave.generate",
             "ffprobe",
             "media.probe.full",

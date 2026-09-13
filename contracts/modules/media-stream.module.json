@@ -15,7 +15,8 @@
   "forbidden_calls": ["ffprobe", "ffmpeg", "media.probe.full", "source.scan.roles", "source.camera.detect", "db.read", "db.write", "playback.execute"],
   "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.camera-detector", "qnc.module.broadcast-player-core", "qnc.module.player-input"],
   "transport_endpoint": "/v1/media/bytes",
-  "transport_policy": "GET/HEAD with canonical QNC URI, authorization, single HTTP byte ranges and explicit version/identity/stamp headers. HTTPS required outside loopback. No redirect, retry, local fallback or full-file staging.",
+  "transport_policy": "GET/HEAD with canonical QNC URI, authorization, single HTTP byte ranges and explicit version/identity/stamp headers for storage-side Local/LAN/Intranet byte access. HTTPS required outside loopback. No redirect, retry, local fallback or full-file staging.",
+  "codec_bridge_policy": "Decoder process input uses an owner-produced CodecEndpoint. For FFmpeg this must be a seekable file endpoint from a local or mounted Local/LAN/Intranet binding. A session-private loopback TCP byte stream is allowed only for decoder adapters that explicitly declare support for that process channel and its seek behavior. It is not a storage endpoint, carries no HTTP headers or credentials, and is never a public media identity.",
   "read_policy": "Byte access only. Media format and project policy come from separate saved-input modules. File length/mtime checks are storage integrity checks, never media probing. Per-read memory is bounded; runtime hosting, TLS and connection limits belong to the storage host.",
   "specification": "docs/47-player-media-stream.md"
 }

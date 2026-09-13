@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+qnc-dev-diagnostics = { workspace = true }
 qnc-player-contract = { workspace = true }
 qnc-player-frame-transport = { workspace = true }
 qnc-player-input = { workspace = true }

@@ -1,4 +1,5 @@
 use crate::*;
+use qnc_ingest_store::content::{Access, ContentClient};
 use qnc_media_probe::{ProbeBackend, Request as ProbeRequest};
 use serde_json::json;
 use std::{
@@ -74,6 +75,14 @@ pub fn fixture() -> (tempfile::TempDir, SelectionConfig) {
             },
         }],
     };
+    drop(
+        ContentClient::from_owner_binding(
+            &dir.path().join("content.db"),
+            "qnc://local/db/ingest_content/p1",
+            Access::ReadWrite,
+        )
+        .unwrap(),
+    );
     (dir, config)
 }
 
@@ -131,19 +140,16 @@ pub fn execute(
                 partial,
             }))
         },
-        || {
-            ContentClient::from_owner_binding(
-                &config
-                    .source_index
-                    .file
-                    .as_ref()
-                    .unwrap()
-                    .with_file_name("content.db"),
-                "qnc://local/db/ingest_content/p1",
-                Access::ReadWrite,
-            )
-            .map_err(Into::into)
-        },
+        ContentTarget::from_owner_binding(
+            &config
+                .source_index
+                .file
+                .as_ref()
+                .unwrap()
+                .with_file_name("content.db"),
+            "qnc://local/db/ingest_content/p1",
+        )
+        .unwrap(),
     )
     .unwrap();
     drop(send);

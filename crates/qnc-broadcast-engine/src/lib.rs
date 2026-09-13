@@ -3,11 +3,15 @@ mod conversion;
 mod decode_input;
 mod input;
 mod output;
+#[cfg(test)]
+mod av_sync;
+pub use decode_input::DecodeMediaAccess;
 use decode_input::{DecodeInput, seek_start};
 pub use input::InputPlan;
 use input::{relative_position, sample_boundary};
 use output::{Audio, Presenter, SharedVideo, VideoSink};
 use qnc_broadcast_player::*;
+pub use qnc_broadcast_player::{BroadcastEngineError, BroadcastEngineErrorKind};
 use qnc_media_decode::{DecodeRequest, DecodedFormat, Decoder, DecoderConfig};
 use qnc_media_stream::MediaStream;
 use qnc_pixel_convert::{Converter, RasterConverter};
@@ -46,7 +50,24 @@ impl Runtime {
         output_config: OutputConfig,
         decoder_config: DecoderConfig,
         audio_device_id: Option<String>,
-        open_media: impl FnMut(&str) -> std::io::Result<MediaStream> + 'static,
+        mut open_media: impl FnMut(&str) -> std::io::Result<MediaStream> + 'static,
+    ) -> Result<Self> {
+        Self::open_access(
+            plan,
+            video_output,
+            output_config,
+            decoder_config,
+            audio_device_id,
+            move |uri| open_media(uri).map(DecodeMediaAccess::Stream),
+        )
+    }
+    pub fn open_access(
+        plan: InputPlan,
+        video_output: VideoOutput,
+        output_config: OutputConfig,
+        decoder_config: DecoderConfig,
+        audio_device_id: Option<String>,
+        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
     ) -> Result<Self> {
         Self::open_output(
             plan,
@@ -63,7 +84,22 @@ impl Runtime {
         output_config: OutputConfig,
         decoder_config: DecoderConfig,
         audio_device_id: Option<String>,
-        open_media: impl FnMut(&str) -> std::io::Result<MediaStream> + 'static,
+        mut open_media: impl FnMut(&str) -> std::io::Result<MediaStream> + 'static,
+    ) -> Result<Self> {
+        Self::open_monitor_access(
+            plan,
+            output_config,
+            decoder_config,
+            audio_device_id,
+            move |uri| open_media(uri).map(DecodeMediaAccess::Stream),
+        )
+    }
+    pub fn open_monitor_access(
+        plan: InputPlan,
+        output_config: OutputConfig,
+        decoder_config: DecoderConfig,
+        audio_device_id: Option<String>,
+        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
     ) -> Result<Self> {
         Self::open_output(
             plan,
@@ -80,7 +116,7 @@ impl Runtime {
         output_config: OutputConfig,
         decoder_config: DecoderConfig,
         audio_device_id: Option<String>,
-        open_media: impl FnMut(&str) -> std::io::Result<MediaStream> + 'static,
+        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
     ) -> Result<Self> {
         output_config.validate().map_err(error)?;
         let prebuffer_frames = if video_output.is_none() {
@@ -88,6 +124,22 @@ impl Runtime {
         } else {
             input::PREBUFFER_FRAMES
         };
+        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!(
+                    "player-open source={} media={} codec={} pixel={} timebase={}/{} frames={} prebuffer={}",
+                    plan.source.source_id,
+                    plan.media.media_uri,
+                    saved_video_codec(&plan.media, plan.video_index),
+                    plan.spec.layout.name(),
+                    plan.source.timebase.fps_num,
+                    plan.source.timebase.fps_den,
+                    plan.source.duration_frames,
+                    prebuffer_frames,
+                ),
+            );
+        }
         if output_config.width != plan.spec.width
             || output_config.height != plan.spec.height
             || output_config.slots < input::OUTPUT_SLOTS
@@ -116,7 +168,10 @@ impl Runtime {
         }
         let converter = if video_output.is_none() {
             conversion::Raster::Gpu(
-                qnc_gpu_raster::GpuRasterConverter::prepare(plan.spec.clone(), [960, 540])
+                qnc_gpu_raster::GpuRasterConverter::prepare(
+                    plan.spec.clone(),
+                    input::preview_raster_bounds(plan.spec.width, plan.spec.height),
+                )
                     .map_err(error)?,
             )
         } else {
@@ -129,7 +184,7 @@ impl Runtime {
         let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4))
             .map(|_| Some(std::sync::Arc::from(vec![0; converter.output_bytes()])))
             .collect();
-        let decode_input = Rc::new(DecodeInput::new(
+        let decode_input = Rc::new(DecodeInput::new_access(
             plan.media.clone(),
             decoder_config,
             open_media,
@@ -166,16 +221,23 @@ impl Runtime {
                 input: decode_input,
                 pending_seek: None,
                 discard_before: None,
-                converter: conversion::ConversionWorker::new(converter).map_err(error)?,
+                converter: conversion::ConversionWorker::with_capacity(
+                    converter,
+                    input::CONVERT_IN_FLIGHT.min(prebuffer_frames),
+                )
+                    .map_err(error)?,
                 raster_size,
                 rgba,
+                ready: BTreeMap::new(),
+                next_decode_frame: 0,
+                prefetch_frames: prebuffer_frames,
                 gpu: gpu.clone(),
             },
             audio,
             Presenter(gpu.clone()),
         )
-        // Complete the pending conversion and launch its successor in the same tick.
-        .with_decode_burst_frames(2)
+        // Catch up bounded source-frame gaps while the converter stays queued ahead.
+        .with_decode_burst_frames(4)
         .with_min_prebuffer_frames(prebuffer_frames);
         engine.load_source(&source, None)?;
         Ok(Self {
@@ -225,20 +287,33 @@ impl Runtime {
     }
     pub fn cue_frame(&mut self, frame: u64, present: bool) -> Result<Vec<BroadcastEvent>> {
         let events = self.engine.cue_frame(frame, present)?;
-        self.gpu.borrow_mut().clear_monitor();
+        self.gpu.borrow_mut().clear_pending_monitor();
         Ok(events)
     }
     pub fn tick(&mut self) -> Result<Vec<BroadcastEvent>> {
         if let Some(device) = &self.audio
             && device.borrow().telemetry().status == qnc_audio_output::Status::Failed
         {
-            let _ = self.engine.pause();
-            let gpu = self.gpu.borrow();
-            return Err(error(format!(
-                "audio output failed or underrun; converted={}; conversion_avg_us={}",
-                gpu.converted,
-                gpu.conversion_us / u128::from(gpu.converted.max(1))
-            )));
+            if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                let gpu = self.gpu.borrow();
+                qnc_dev_diagnostics::log_line(
+                    qnc_dev_diagnostics::DiagnosticsStream::Player,
+                    format!(
+                        "player-rebuffer reason=audio_underrun frame={} converted={} conversion_avg_us={}",
+                        self.engine.state().carrier_frame,
+                        gpu.converted,
+                        gpu.conversion_us / u128::from(gpu.converted.max(1))
+                    ),
+                );
+            }
+            if let Err(e) = self.engine.rearm_audio_after_underrun() {
+                if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                    qnc_dev_diagnostics::log_line(
+                        qnc_dev_diagnostics::DiagnosticsStream::Player,
+                        format!("player-rebuffer audio_rearm_failed={e}"),
+                    );
+                }
+            }
         }
         self.gpu.borrow_mut().poll_and_collect()?;
         if self.engine.state().at_end {
@@ -247,15 +322,27 @@ impl Runtime {
         // Native video submission may still be pending. Continue bounded AV
         // preparation; an unavailable output at its deadline is an error, not a
         // reason to stop servicing the audio queue or advance a second clock.
-        let events = self.engine.tick(self.playback_tick()).map_err(|e| {
-            let gpu = self.gpu.borrow();
-            error(format!(
-                "{e}; converted={}; conversion_avg_us={}; upload_avg_us={}",
-                gpu.converted,
-                gpu.conversion_us / u128::from(gpu.converted.max(1)),
-                gpu.upload_us / u128::from(gpu.converted.max(1))
-            ))
-        })?;
+        let events = match self.engine.tick(self.playback_tick()) {
+            Ok(events) => events,
+            Err(e) if e.kind == BroadcastEngineErrorKind::NotReady => {
+                let frame = self.engine.state().carrier_frame;
+                if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                    let gpu = self.gpu.borrow();
+                    qnc_dev_diagnostics::log_line(
+                        qnc_dev_diagnostics::DiagnosticsStream::Player,
+                        format!(
+                            "player-rebuffer reason=not_ready frame={} converted={} conversion_avg_us={} upload_avg_us={}",
+                            frame,
+                            gpu.converted,
+                            gpu.conversion_us / u128::from(gpu.converted.max(1)),
+                            gpu.upload_us / u128::from(gpu.converted.max(1))
+                        ),
+                    );
+                }
+                return Ok(Vec::new());
+            }
+            Err(e) => return Err(self.enrich_tick_error(e)),
+        };
         if events.iter().any(|event| {
             matches!(
                 event,
@@ -266,11 +353,45 @@ impl Runtime {
         }
         Ok(events)
     }
+
+    fn enrich_tick_error(&self, e: BroadcastEngineError) -> BroadcastEngineError {
+        let gpu = self.gpu.borrow();
+        BroadcastEngineError::new(
+            e.kind,
+            format!(
+                "{e}; converted={}; conversion_avg_us={}; upload_avg_us={}",
+                gpu.converted,
+                gpu.conversion_us / u128::from(gpu.converted.max(1)),
+                gpu.upload_us / u128::from(gpu.converted.max(1))
+            ),
+        )
+        .with_frame(e.frame.unwrap_or(self.engine.state().carrier_frame))
+    }
 }
 impl Drop for Runtime {
     fn drop(&mut self) {
         let _ = self.engine.pause();
     }
+}
+
+fn saved_video_codec(media: &qnc_media_metadata::MediaRepresentation, stream_index: u32) -> String {
+    media
+        .streams
+        .iter()
+        .find_map(
+            |stream| match (&stream.details, &stream.codec, &stream.index) {
+                (qnc_media_metadata::StreamDetails::Video(_), Some(codec), Some(index))
+                    if index.value == stream_index =>
+                {
+                    match &codec.value {
+                        qnc_media_metadata::Signal::Known(value) => Some(value.clone()),
+                        qnc_media_metadata::Signal::Unspecified => Some("unspecified".into()),
+                    }
+                }
+                _ => None,
+            },
+        )
+        .unwrap_or_else(|| "missing".into())
 }
 
 struct Source(SourceRuntime);
@@ -298,6 +419,9 @@ struct Video {
     converter: conversion::ConversionWorker,
     raster_size: [u32; 2],
     rgba: Vec<Option<std::sync::Arc<[u8]>>>,
+    ready: BTreeMap<u64, DecodedVideoFrame<Picture>>,
+    next_decode_frame: u64,
+    prefetch_frames: usize,
     gpu: SharedVideo,
 }
 impl VideoDecodeAdapter for Video {
@@ -345,37 +469,71 @@ impl VideoDecodeAdapter for Video {
                 .input
                 .open(self.plan.video_index, seek_start(&self.plan.source, frame)?)?;
             self.discard_before = Some(frame);
+            self.ready.clear();
+            self.next_decode_frame = frame;
             self.pending_seek = None;
         }
-        let completed = if self.converter.busy() {
+        self.drain_conversions()?;
+        if let Some(frame) = self.ready.remove(&request.frame) {
+            return Ok(frame);
+        }
+        self.fill_conversion_queue(&request)?;
+        self.drain_conversions()?;
+        if let Some(frame) = self.ready.remove(&request.frame) {
+            return Ok(frame);
+        }
+        Err(pending())
+    }
+}
+
+impl Video {
+    fn drain_conversions(&mut self) -> Result<()> {
+        while self.converter.busy() {
             let completed = match self.converter.poll().map_err(error)? {
-                Poll::Pending => return Err(pending()),
+                Poll::Pending => break,
                 Poll::Ready(completed) => completed,
             };
             self.rgba[completed.slot] = Some(completed.rgba.clone());
             // A seek can supersede conversion already running; recycle, never present it.
             if completed.generation != self.gpu.borrow().config.generation {
-                return Err(pending());
-            }
-            if completed.frame != request.frame {
-                return Err(error("converted frame does not match request"));
+                continue;
             }
             completed.result.as_ref().map_err(error)?;
-            completed
-        } else {
-            // Moving the sole Arc into the worker keeps published frames immutable.
-            let slot = self
-                .rgba
-                .iter()
-                .position(|buffer| {
-                    buffer
-                        .as_ref()
-                        .is_some_and(|b| std::sync::Arc::strong_count(b) == 1)
-                })
-                .ok_or_else(pending)?;
+            self.store_completed(completed)?;
+        }
+        Ok(())
+    }
+
+    fn fill_conversion_queue(&mut self, request: &EngineFrameRequest) -> Result<()> {
+        if request.source_id != self.plan.source.source_id
+            || request.timebase != self.plan.source.timebase
+        {
+            return Err(error("video request differs from saved input"));
+        }
+        let target_end = request
+            .frame
+            .saturating_add(self.prefetch_frames as u64)
+            .min(self.plan.source.duration_frames);
+        while self.converter.can_accept() && self.next_decode_frame < target_end {
+            if self.ready.contains_key(&self.next_decode_frame) {
+                self.next_decode_frame += 1;
+                continue;
+            }
+            let Some(slot) = self.rgba.iter().position(|buffer| {
+                buffer
+                    .as_ref()
+                    .is_some_and(|b| std::sync::Arc::strong_count(b) == 1)
+            }) else {
+                break;
+            };
             let packet = match self.decoder.try_next_packet().map_err(error)? {
-                Poll::Pending => return Err(pending()),
-                Poll::Ready(None) => return Err(error("video ended before saved frame boundary")),
+                Poll::Pending => break,
+                Poll::Ready(None) => {
+                    if self.next_decode_frame >= self.plan.source.duration_frames {
+                        break;
+                    }
+                    return Err(error("video ended before saved frame boundary"));
+                }
                 Poll::Ready(Some(packet)) => packet,
             };
             let spec = &self.plan.spec;
@@ -386,8 +544,7 @@ impl VideoDecodeAdapter for Video {
                 request.timebase.fps_num,
                 request.timebase.fps_den,
             )?;
-            if request.source_id != self.plan.source.source_id
-                || packet.stream_index != self.plan.video_index
+            if packet.stream_index != self.plan.video_index
                 || packet.media_uri != self.plan.media.media_uri
                 || packet.format
                     != (DecodedFormat::Video {
@@ -398,13 +555,18 @@ impl VideoDecodeAdapter for Video {
             {
                 return Err(error("decoded frame does not match saved input/request"));
             }
-            if self.discard_before == Some(request.frame) && frame < request.frame {
-                return Err(pending());
-            }
-            if frame != request.frame {
-                return Err(error("decoder skipped requested source frame"));
+            if let Some(discard_before) = self.discard_before
+                && frame < discard_before
+            {
+                continue;
             }
             self.discard_before = None;
+            if frame < self.next_decode_frame {
+                continue;
+            }
+            if frame != self.next_decode_frame {
+                return Err(error("decoder skipped requested source frame"));
+            }
             self.converter
                 .submit(conversion::Job {
                     generation: self.gpu.borrow().config.generation,
@@ -414,8 +576,12 @@ impl VideoDecodeAdapter for Video {
                     rgba: self.rgba[slot].take().expect("exclusive frame buffer"),
                 })
                 .map_err(error)?;
-            return Err(pending());
-        };
+            self.next_decode_frame += 1;
+        }
+        Ok(())
+    }
+
+    fn store_completed(&mut self, completed: conversion::Completed) -> Result<()> {
         let frame = completed.frame;
         let mut gpu = self.gpu.borrow_mut();
         gpu.conversion_us += completed.elapsed_us;
@@ -423,9 +589,9 @@ impl VideoDecodeAdapter for Video {
         let header = FrameHeader {
             version: qnc_video_output::VERSION.into(),
             session_id: gpu.config.session_id.clone(),
-            generation: gpu.config.generation,
+            generation: completed.generation,
             sequence: gpu.sequence,
-            source_id: request.source_id.clone(),
+            source_id: self.plan.source.source_id.clone(),
             frame_number: frame,
             width: self.raster_size[0],
             height: self.raster_size[1],
@@ -448,11 +614,15 @@ impl VideoDecodeAdapter for Video {
         gpu.images.insert(frame, token.clone());
         gpu.upload_us += upload_start.elapsed().as_micros();
         gpu.converted += 1;
-        Ok(DecodedVideoFrame {
-            source_id: request.source_id,
+        self.ready.insert(
             frame,
-            video_format: self.plan.source.video_format.clone(),
-            payload: token,
-        })
+            DecodedVideoFrame {
+                source_id: self.plan.source.source_id.clone(),
+                frame,
+                video_format: self.plan.source.video_format.clone(),
+                payload: token,
+            },
+        );
+        Ok(())
     }
 }

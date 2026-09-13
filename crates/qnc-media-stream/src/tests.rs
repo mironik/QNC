@@ -3,6 +3,7 @@ use super::*;
 use qnc_json_transport::Credentials;
 use std::{
     fs,
+    net::TcpStream,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -89,6 +90,30 @@ fn exercise(mut reader: impl Read + Seek, bytes: &[u8]) {
     assert_eq!(all, bytes);
 }
 
+fn read_codec_bridge(bridge: &LoopbackBridge) -> std::io::Result<Vec<u8>> {
+    let mut stream = TcpStream::connect(bridge.endpoint().address())?;
+    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+    let mut bytes = Vec::new();
+    stream.read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
+fn read_codec_bridge_slowly(bridge: &LoopbackBridge) -> std::io::Result<Vec<u8>> {
+    let mut stream = TcpStream::connect(bridge.endpoint().address())?;
+    stream.set_read_timeout(Some(Duration::from_secs(10)))?;
+    let mut bytes = Vec::new();
+    let mut block = [0; 8192];
+    loop {
+        match stream.read(&mut block)? {
+            0 => return Ok(bytes),
+            n => {
+                bytes.extend_from_slice(&block[..n]);
+                thread::sleep(Duration::from_millis(1));
+            }
+        }
+    }
+}
+
 #[test]
 fn local_seek_and_read_are_bounded_and_leave_source_unchanged() {
     let (dir, source, uri, bytes) = fixture(SOURCE);
@@ -137,6 +162,21 @@ fn source_and_file_boundary_rejects_roots_directories_and_traversal() {
         .unwrap();
     assert!(std::io::Write::write_all(&mut handle, b"no write").is_err());
     assert!(MediaStream::local(&source, &uri(SOURCE, "missing.bin")).is_err());
+}
+
+#[test]
+fn codec_endpoint_can_expose_validated_local_file_for_seekable_decoders() {
+    let (dir, _source, file, _) = fixture(SOURCE);
+    let path = dir.path().join("clip.bin");
+    let endpoint = CodecEndpoint::for_local_file(&path, &file).unwrap();
+
+    assert_eq!(endpoint.media_uri(), file);
+    assert_eq!(endpoint.input_arg(), path.as_os_str());
+    assert_eq!(endpoint.protocol_whitelist(), "file");
+    assert!(endpoint.url().is_empty());
+
+    assert!(CodecEndpoint::for_local_file(dir.path(), &file).is_err());
+    assert!(CodecEndpoint::for_local_file(&path, SOURCE).is_err());
 }
 
 #[test]
@@ -324,19 +364,20 @@ fn uri_fn_wrong() -> String {
 fn codec_bridge_serves_local_and_validated_remote_streams() {
     let (_dir, source, file, bytes) = fixture(SOURCE);
     let bridge = LoopbackBridge::new(MediaStream::local(&source, &file).unwrap()).unwrap();
-    exercise(
-        remote::RemoteMedia::open(bridge.endpoint().clone()).unwrap(),
-        &bytes,
-    );
+    assert_eq!(read_codec_bridge(&bridge).unwrap(), bytes);
     let (dir, source, file, bytes) = fixture("qnc://lan/storage/source/card");
     let host = Host::source(source);
     let resolver = ResolverConfig::new(dir.path()).with_lan_authority("storage", &host.base);
     let bridge =
         LoopbackBridge::new(MediaStream::remote(&resolver, &file, TOKEN).unwrap()).unwrap();
-    exercise(
-        remote::RemoteMedia::open(bridge.endpoint().clone()).unwrap(),
-        &bytes,
-    );
+    assert_eq!(read_codec_bridge(&bridge).unwrap(), bytes);
+}
+
+#[test]
+fn codec_bridge_waits_for_slow_codec_reader_instead_of_truncating_stream() {
+    let (_dir, source, file, bytes) = fixture(SOURCE);
+    let bridge = LoopbackBridge::new(MediaStream::local(&source, &file).unwrap()).unwrap();
+    assert_eq!(read_codec_bridge_slowly(&bridge).unwrap(), bytes);
 }
 
 #[test]
@@ -346,9 +387,12 @@ fn codec_bridge_does_not_hide_changed_remote_source() {
     let resolver = ResolverConfig::new(dir.path()).with_intranet_authority("storage", &host.base);
     let bridge =
         LoopbackBridge::new(MediaStream::remote(&resolver, &file, TOKEN).unwrap()).unwrap();
-    let mut reader = remote::RemoteMedia::open(bridge.endpoint().clone()).unwrap();
     fs::write(dir.path().join("clip.bin"), b"changed").unwrap();
-    assert!(reader.read(&mut [0; 16]).is_err());
+    assert!(
+        read_codec_bridge(&bridge)
+            .map(|bytes| bytes != b"changed")
+            .unwrap_or(true)
+    );
 }
 
 #[test]

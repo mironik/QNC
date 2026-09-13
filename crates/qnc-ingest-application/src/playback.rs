@@ -1,8 +1,29 @@
 use super::*;
 use qnc_player_client::{Action, Player};
+use qnc_player_input::{InputReader, PlayerClipRecord, PlayerContentRead};
 use qnc_player_launcher::SourceTransportBinding;
+use std::sync::Arc;
 
-impl IngestComponent {
+#[derive(Clone)]
+struct IngestPlayerContentReader {
+    content_target: qnc_ingest_store::content::ContentTarget,
+}
+
+impl PlayerContentRead for IngestPlayerContentReader {
+    fn read_clip(&self, clip_id: &str) -> Result<Option<PlayerClipRecord>, String> {
+        let stored = self
+            .content_target
+            .open(qnc_ingest_store::content::Access::ReadOnly)?
+            .read(clip_id)?;
+        Ok(stored.map(|stored| PlayerClipRecord {
+            name: stored.clip.name,
+            snapshot: stored.clip.snapshot,
+            imported_media_uri: stored.imported_media_uri,
+        }))
+    }
+}
+
+impl IngestApplication {
     pub fn notify_on_player_change(&self, notify: impl Fn() + Send + Sync + 'static) {
         if let Some(player) = &self.player {
             player.notify_on_change(notify);
@@ -28,16 +49,19 @@ impl IngestComponent {
         // Cut the old session even when the new clip/settings cannot be prepared.
         self.stop_player();
         self.play_when_ready = false;
+        self.set_timeline_artifact_playback_priority(true);
         self.view.preview_clip_id = Some(clip_id.clone());
         if save_state != SaveState::Saved {
             let mut result = IngestDispatchResult::rejected("Klip jos nije spremljen u bazu.");
             result.request_repaint = true;
             return result;
         }
-        let (Some(reader), Some(plan), Some(config)) = (
+        self.focus_timeline_assets(&clip_id);
+        let (Some(reader), Some(plan), Some(config), Some(content_target)) = (
             self.settings_reader.clone(),
             self.work_plan(),
             self.selection_config.clone(),
+            self.catalog_target.clone(),
         ) else {
             return IngestDispatchResult::accepted(None, true);
         };
@@ -79,10 +103,17 @@ impl IngestComponent {
                 })
                 .collect::<Result<Vec<_>, String>>()?;
             let executable = qnc_player_launcher::sibling_executable("qnc-broadcast-player")?;
-            qnc_player_launcher::prepare_launch(reader, &workspace, &clip_id, &sources, executable)
+            let input = InputReader::with_content_reader(
+                reader,
+                Arc::new(IngestPlayerContentReader { content_target }),
+            )
+            .load(&workspace, &clip_id)
+            .map_err(|e| e.to_string())?;
+            qnc_player_launcher::prepare_launch(input, &sources, executable)
         });
         self.view.playback = self.player.as_ref().unwrap().view();
         self.view.timeline = playback_timeline_projection(&self.view.playback);
+        self.update_timeline_artifact_playback_priority();
         IngestDispatchResult::accepted(None, true)
     }
     pub(super) fn stop_player(&mut self) {
@@ -92,6 +123,7 @@ impl IngestComponent {
         }
         self.view.playback = Default::default();
         self.view.timeline = Default::default();
+        self.set_timeline_artifact_playback_priority(false);
     }
     pub(super) fn player_action(&mut self, intent: IngestIntent) -> IngestDispatchResult {
         if self.player.is_none() {
@@ -115,7 +147,11 @@ impl IngestComponent {
             let playback = self.player.as_ref().unwrap().view();
             if !playback.playing() && !playback.can_start_playback() && playback.error.is_none() {
                 self.play_when_ready = true;
+                self.apply_playback_guard();
                 return IngestDispatchResult::accepted(None, true);
+            }
+            if !playback.playing() {
+                self.apply_playback_guard();
             }
         }
         let result = self
@@ -143,7 +179,7 @@ mod tests {
     use super::*;
     #[test]
     fn selecting_pending_clip_cuts_old_session_and_keeps_thumbnail_selection() {
-        let mut component = IngestComponent::default();
+        let mut component = IngestApplication::default();
         component.player = Some(Player::new().unwrap());
         component.play_when_ready = true;
         component.view.preview_clip_id = Some("old".into());
@@ -166,7 +202,7 @@ mod tests {
 
     #[test]
     fn play_pause_during_prepare_is_queued_until_player_is_ready() {
-        let mut component = IngestComponent::default();
+        let mut component = IngestApplication::default();
         let player = Player::new().unwrap();
         let (resume, wait) = mpsc::sync_channel(1);
         player.prepare(move || {

@@ -24,6 +24,11 @@ CREATE TABLE filmstrip_artifacts (
     clip_id TEXT PRIMARY KEY REFERENCES clips(clip_id), frame_count INTEGER NOT NULL,
     artifact_uri TEXT NOT NULL, created_at_utc TEXT NOT NULL, frames_json TEXT NOT NULL
 );
+CREATE TABLE filmstrip_frames (
+    clip_id TEXT NOT NULL REFERENCES clips(clip_id), frame_index INTEGER NOT NULL,
+    seek_sec REAL NOT NULL, artifact_uri TEXT NOT NULL, updated_at_utc TEXT NOT NULL,
+    PRIMARY KEY (clip_id, frame_index)
+);
 CREATE TABLE wave_artifacts (
     clip_id TEXT PRIMARY KEY REFERENCES clips(clip_id), artifact_uri TEXT NOT NULL,
     created_at_utc TEXT NOT NULL, peaks_json TEXT NOT NULL
@@ -35,4 +40,5 @@ CREATE VIEW public_clip_sources AS SELECT * FROM clip_sources;
 CREATE VIEW public_clip_proxy AS SELECT * FROM clip_proxy;
 CREATE VIEW public_probe_records AS SELECT * FROM probe_records;
 CREATE VIEW public_filmstrip_artifacts AS SELECT * FROM filmstrip_artifacts;
+CREATE VIEW public_filmstrip_frames AS SELECT * FROM filmstrip_frames;
 CREATE VIEW public_wave_artifacts AS SELECT * FROM wave_artifacts;

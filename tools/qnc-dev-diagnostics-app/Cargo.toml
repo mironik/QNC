@@ -1,0 +1,18 @@
+[package]
+name = "qnc-dev-diagnostics-app"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Standalone QNC development diagnostics switchboard"
+
+[[bin]]
+name = "qnc-dev-diagnostics"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-ingest-store = { workspace = true }
+qnc-ingest-work-plan = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-work-settings = { workspace = true }

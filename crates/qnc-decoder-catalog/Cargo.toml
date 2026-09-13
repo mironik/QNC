@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+qnc-frame-timebase.workspace = true
 qnc-media-decode.workspace = true
 qnc-media-stream.workspace = true
 qnc-ffmpeg-decode.workspace = true

@@ -1,11 +1,13 @@
 [package]
-name = "qnc-ingest-components"
+name = "qnc-ingest-application"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
+qnc-filmstrip = { workspace = true }
+qnc-filmstrip-worker = { workspace = true }
 qnc-ingest-catalog = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-ingest-select = { workspace = true }
@@ -13,9 +15,14 @@ qnc-ingest-store = { workspace = true }
 qnc-media-thumbnail = { workspace = true }
 qnc-work-settings = { workspace = true }
 qnc-player-client = { workspace = true }
+qnc-player-input = { workspace = true }
 qnc-player-launcher = { workspace = true }
 qnc-player-timeline = { workspace = true }
+qnc-source-reader = { workspace = true }
 qnc-timeline = { workspace = true }
+qnc-timeline-assets = { workspace = true }
+qnc-wave = { workspace = true }
+qnc-wave-worker = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 qnc-image-assets = { workspace = true }

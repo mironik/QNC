@@ -1,6 +1,22 @@
-# QNC - root pravila
+# QNC - ROOT ZAKON
 
-Ovaj file je globalni pravilnik za novu QNC obitelj aplikacija.
+Ovaj file nije preporuka, podsjetnik ni audit. Ovo je obvezni projektni zakon
+za novu QNC obitelj aplikacija. Svaki audit, plan, implementacija, test i
+popravak mora prvo provjeriti i slijediti ovaj dokument.
+
+Ako kod, plan ili prethodna odluka nisu u skladu s ovim dokumentom, vrijedi
+`AGENTS.md`. Ne izmisljati zaobilazna rjesenja, ne uvoditi lokalne default
+tokove i ne graditi male monolite pod drugim nazivom. Ako je za rad potrebna
+promjena pravila, prije koda mora se traziti izricita korisnicka dozvola i
+promjenu zapisati ovdje.
+
+Forme su samo layout i UI. Kompletan aktivni kod mora biti u uskim javnim
+modulima ili generickim javnim UI komponentama, s jasnim ugovorom i granicom
+odgovornosti. Aplikacijski umbrella component crateovi nisu dozvoljeni.
+Posebno: `qnc-ingest-components` ne smije postojati ni kao runtime crate ni
+kao javni arhitekturni sloj. Naziv `components` ne smije biti izgovor za novi
+centralni kontroler koji u sebi skuplja browser, settings, katalog, select,
+player, filmstrip, wave ili druge workflowe.
 
 Root projekta: `C:\Users\miron\Projects\QNC`  
 Stari referentni projekt: `C:\Users\miron\Projects\qnc_v4`
@@ -9,8 +25,11 @@ Ako pojedina aplikacija kasnije dobije svoj `AGENTS.override.md`, taj override
 smije dodati stroza lokalna pravila, ali ne smije oslabiti ova root pravila.
 
 **Temeljna odrednica razvoja: sve QNC poslovne aplikacije rade u okviru
-projekta i moraju poznavati njegove postavke kroz bazu. Projects ih zapisuje
-u bazu svakog projekta; sve ostale aplikacije ih citaju i primjenjuju.**
+projekta i moraju poznavati njegove postavke kroz bazu. Project aplikacija
+zapisuje opce projektne podatke, template izbor, lokacije i postavke u bazu
+svakog projekta; ne zna za Ingest, Story, Media Assist, Filmstrip, Wave,
+Broadcast Player ili njihove workflowe. Sve ostale aplikacije i moduli te
+zapise citaju i primjenjuju kroz javni DB/transport ugovor.**
 To ukljucuje odredista direktorija i baza te pravila rada i pohrane potrebna
 pojedinoj aplikaciji. Pravilo vrijedi za sve postojece i buduce aplikacije,
 ne samo za Ingest.
@@ -93,6 +112,16 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   workflow.
 - Shell je QNC kvazi desktop: aplikacije se otvaraju u njegovom desktop
   prostoru kao aplikacijske povrsine, a ne kao novi monolitni tabovi.
+- Samo `qnc-app.exe` / `qnc.shell` smije biti QNC desktop host. Ne smije
+  postojati drugi QNC desktop, drugi desktop host manifest niti druga
+  aplikacija s `shell.desktop` capabilityjem.
+- Project, Ingest, Media Assist, Story i buduce aplikacije nisu desktopi.
+  One su aplikacijske forme/povrsine koje se mogu prikazati unutar jedinog
+  shell desktopa ili pokrenuti kao samostalni aplikacijski prozor.
+- Nazivi adaptera i registry polja tipa `desktop_entry` odnose se iskljucivo
+  na ulaz za jedini shell desktop. Takav adapter ne smije biti drugi desktop,
+  ne smije imati vlastiti app registry, footer, shell navigaciju ili hostati
+  druge aplikacije.
 - Svaka QNC aplikacija mora moci raditi i samostalno, bez shell desktopa.
 - Standalone executable je obvezan za svaku QNC aplikaciju. Shell desktop nije
   vlasnik aplikacije i ne smije biti jedini nacin pokretanja.
@@ -140,6 +169,20 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   `shell_next_group` UI okidac bez poslovnog payloada. Okidac se ne zapisuje.
   Shell cita navigacijski slijed iz javnog DB prikaza kroz desktop adapter;
   ne predaje radne postavke drugoj aplikaciji i ne pokrece njezin workflow.
+- Shell `Close project` je samo poziv samostalne javne komponente/modula
+  `qnc-project-close`. Shell smije poslati taj intent i prikazati rezultat.
+  Sav stvarni rad zatvaranja aktivnog projekta pripada toj komponenti. Ona smije
+  isprazniti `active_project_id` u Project registryju i vratiti rezultat. Shell
+  nakon toga ne smije zatvarati hostane aplikacijske povrsine, prebacivati tab,
+  pokretati Project workflow, brisati temp direktorije niti cistiti poslovno
+  stanje. Ni shell ni `qnc-project-close` ne smiju brisati projekt, direktorij,
+  bazu, media fileove ni artefakte. Brisanje projekta ostaje iskljucivo Project
+  workflow kroz `X` u Project popisu i potvrdu korisnika.
+- LAN/Intranet zatvaranje aktivnog projekta ide samo kroz uski javni
+  `qnc-project-close` write adapter. Taj adapter prima samo
+  `project.close_active`, provjerava `project_registry` URI i write ovlast, te
+  ne smije izlagati genericki SQL, ProjectStore API, delete workflow ili temp
+  cleanup.
 - App registry manifest nije dovoljan za embedded hostanje. Shell ne smije imati
   hardkodirani `if desktop_entry == "qnc_project"` niti slican switch po imenu
   aplikacije u render/activate putu.
@@ -185,7 +228,9 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   baza. Globalna baza i baza po projektu moraju biti odvojene kroz DB
   contract, iako implementacija fizicki koristi SQLite datoteke.
 - Project aplikacija kreira projektnu bazu za svaki projekt posebno i u tu
-  projektnu bazu zapisuje postavke projekta.
+  projektnu bazu zapisuje samo opce projektne podatke, template izbor, lokacije
+  i postavke. Ne zapisuje pravila specijalizirana za Ingest, Story, Media
+  Assist, Filmstrip, Wave, Broadcast Player ili buduce poslovne workflowe.
 - Druge aplikacije ne smiju znati za Project aplikaciju, Project crateove,
   Project komponente, Project store ili Project workflow. Za rad nad projektom
   moraju iz baze aktivnog projekta procitati i primijeniti dogovorene postavke
@@ -259,6 +304,21 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   datoteci. Read-only citanje projektnih postavki ne znaci read-only za sve
   tablice te datoteke. Upis vlastitih rezultata ne daje pravo na izmjenu
   Project postavki, registra, identiteta ili aktivacije.
+- Nijedna forma, aplikacijski UI sloj, worker, generator, scanner, probe,
+  player, timeline, filmstrip, wave, export ili drugi potrosacki modul ne smije
+  direktno pisati u bazu, direktno izvrsavati write SQL niti direktno otvarati
+  javnu projektnu bazu u `ReadWrite` modu.
+- Svaki DB write ide iskljucivo kroz javni DB owner/write adapter ili javni
+  DB/transport writer definiran ugovorom te baze. Taj writer serijalizira
+  kratke write operacije jednako za Local/LAN/Intranet i jedini smije imati
+  stvarnu write ovlast nad javnim DB endpointom.
+- Worker/generator/modul koji proizvodi rezultat smije vratiti gotov artefakt,
+  zapis ili write naredbu, ali ne smije sam raditi DB publish. Ako treba zapis
+  u bazu, predaje ga javnom write transportu.
+- Direktan DB write helper smije postojati samo unutar implementacije DB ownera
+  ili write transporta te u njegovim izoliranim testovima. Takav helper nije
+  javni komunikacijski model i ne smije se pozivati iz formi ili potrosackih
+  modula.
 - Nema direktnih privatnih SQLite zaobilaznica kao javnog komunikacijskog
   modela.
 - Nema pozivanja privatnih funkcija, klasa, skripti, workera ili procesa druge
@@ -278,10 +338,16 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   i sve Story varijante, primjenjuju postavke projekta iz baze. Samostalno
   pokretanje znaci neovisnost o drugim aplikacijama i shellu, ne neovisnost
   o zapisanim projektnim postavkama.
-- Projects je vlasnik zapisa projektnih postavki. Ostale aplikacije citaju
-  potrebne postavke read-only kroz javni DB/transport ugovor; ne prepisuju ih,
-  ne nasljedjuju ih od druge aplikacije i ne zamjenjuju ih lokalnim defaultima.
-  Poslovne rezultate i dalje zapisuju samo u vlastitu bazu ili shemu.
+- Project aplikacija je vlasnik zapisa opcih projektnih postavki. Te postavke
+  nisu opis Ingesta ili bilo koje druge aplikacije. Ostale aplikacije citaju
+  potrebne vrijednosti read-only kroz javni DB/transport ugovor; ne prepisuju
+  ih, ne nasljedjuju ih od druge aplikacije i ne zamjenjuju ih lokalnim
+  defaultima. Poslovne rezultate i dalje zapisuju samo u vlastitu bazu ili
+  shemu.
+- Vrijednosti zapisane u projektnom templateu ili projektnim postavkama nisu
+  hardkodiranje. One su korisnicka/projektna konfiguracija. Hardkodiranje je
+  kada aplikacija, modul ili adapter koristi fiksnu vrijednost mimo zapisa u
+  bazi, source zapisa ili eksplicitne host konfiguracije.
 - Citanje i primjena postavki pripadaju komponentama/modulima, ne formi.
   Shell ne dostavlja poslovne postavke niti postaje njihov vlasnik.
   Isti ugovor vrijedi za standalone i shell-hosted rad, Local/LAN/Intranet
@@ -297,6 +363,28 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   ili ugovorom; ne zaobilaziti ga lokalnim defaultom. Ako obvezne postavke nisu
   dostupne, posao koji ih zahtijeva ne pokrece se; prijavljuje se kontrolirana
   greska. Project ostaje zamrznut prema odjeljku 14.
+
+- Jedini put od projektne baze do potrosaca (Ingest, player, filmstrip, wave,
+  buduci Story). Ne smije se preskociti korak, zamijeniti lokalnim JSON-om
+  niti krenuti od forme, shella ili Project cratea. Detalj: `docs/83-project-db-to-module-path.md`.
+
+  1. `project_registry.public_app_settings.active_project_id`
+  2. javni identitet projekta (`public_projects.project_uri`), ne raw path
+  3. `public_project_settings.settings_json` aktivnog `project_id`
+  4. `qnc-work-settings` read-only (`SettingsReader`) -> `WorkSettings`
+  5. layout/odredista kroz javni work-plan/storage iz tog snapshota
+  6. clip/media snapshot kroz javni content read port (Ingest owner store)
+  7. `qnc-player-input::InputReader.load(workspace_db_uri, clip_id)`
+  8. launcher -> `qnc-broadcast-player` dobiva samo `PreparedInput`
+
+  Iz `settings_json` player slike bira samo `playback.input`. Izlazni audio
+  broj kanala i sample rate dolaze iz `audio.channels` / `audio.sample_rate`.
+  Source timebase, trajanje i inventar kanala dolaze iz spremljenog media
+  snapshota, ne iz `video.fps`. Nedostaje li korak 1–4, posao staje.
+
+  Zabranjeni precaci: `qnc-project*` crate, shell payload, `player-output.json`,
+  forma cita SQLite, path-join na `qnc_project.db` kao javni korak, novi probe,
+  izmisljeni default, HTTP/URL kao decoder ulaz, Project/export FPS kao sat.
 
 ## 5. Ingest kao prvi konkretni primjer
 
@@ -377,9 +465,10 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Ovo je konkretna primjena opceg pravila iz odjeljka 4.1, ne ogranicenje tog
   pravila na Ingest. Sve druge aplikacije i njihovi moduli jednako su obvezni
   koristiti zapisane projektne postavke relevantne za svoj rad.
-- Projects (Project aplikacija) zapisuje lokaciju konkretnog projekta i njegove
-  radne postavke te kreira standardni projektni raspored. Ingest, Filmstrip,
-  Wave i drugi potrosaci te odluke NE MIJENJAJU.
+- Project aplikacija zapisuje lokaciju konkretnog projekta, template izbor i
+  opce radne postavke te kreira standardni projektni raspored. Ona ne zna tko
+  ce te podatke koristiti. Ingest, Filmstrip, Wave i drugi potrosaci samo citaju
+  taj DB zapis i ne mijenjaju ga.
 - Ingest iz baze cita aktivni projekt i njegove zapisane radne postavke.
   Ne dobiva ih pozivom Project aplikacije ni iz shell/UI memorije. Project
   aplikacija ne mora biti prisutna ni pokrenuta; dovoljan je zapis dostupan
@@ -399,14 +488,19 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Izbor kartice u browseru odredjuje IZVOR, ne izlaznu lokaciju. Izvorna kartica
   ostaje read-only. Direktorij aplikacije, `target`, cache i temp nisu zamjenska
   odredista za trajne projektne rezultate.
-- Filmstrip slicice spremaju se kao JPEG datoteke na odrediste koje je zadao
-  Projects (v4 referenca: `filmstrip/<clip_id>/`); baza cuva vezu s klipom,
-  redoslijed, vremenske polozaje, status i reference na artefakte. Ne zamjenjivati
-  ovaj raspored JPEG BLOB-ovima u novoj `filmstrip.db` bez izricitog odobrenja.
-- Wave se sprema kao niz amplituda/peaks po kanalu u bazu koju je zadao Projects.
-  Ne zahtijeva posebnu wave mapu, PNG datoteke niti novu `wave.db` samo zato sto
-  je generator zaseban modul. U v4 su to `a1_peaks` i `a2_peaks` u tablici
-  `audio_waveforms`.
+- Filmstrip slicice spremaju se kao JPEG datoteke na odrediste izvedeno iz
+  opceg projektnog DB zapisa i standardnog rasporeda (v4 referenca:
+  `filmstrip/<clip_id>/`); baza cuva vezu s klipom, redoslijed, vremenske
+  polozaje, status i reference na artefakte. Ne zamjenjivati ovaj raspored JPEG
+  BLOB-ovima u novoj `filmstrip.db` bez izricitog odobrenja.
+- Filmstrip DB veza ostaje `project_id + clip_id`, ali javni direktorij
+  artefakta mora koristiti naziv klipa zapisan u `clips.name`, OS-neutralno
+  sanitiziran za QNC URI i filesystem. Interni `clip-*` smije biti samo fallback
+  kada naziv klipa nije dostupan ili nije valjan.
+- Wave se sprema kao niz amplituda/peaks po kanalu u projektnu bazu kroz javni
+  DB/transport ugovor. Ne zahtijeva posebnu wave mapu, PNG datoteke niti novu
+  `wave.db` samo zato sto je generator zaseban modul. U v4 su to `a1_peaks` i
+  `a2_peaks` u tablici `audio_waveforms`.
 - Referentni v4 `qnc_project.db` sadrzi tablice `filmstrips`,
   `filmstrip_frames` i `audio_waveforms`. To je dokaz nacina pohrane, ne dozvola
   za vracanje monolita ili pisanje u tudju shemu: u novom QNC-u upis mora ici
@@ -453,23 +547,77 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   vremenski sat, osnova za seek ni dio playback/timeline racunanja.
   Referenca je `qnc_v4/qnc-app/src/qnc_filmstrip_background.rs` i njezina
   upotreba kao `video_background` u `qnc_source_dock.rs`.
+- Filmstrip nema `cue` intent, `seek` intent, klik handler, selection handler ni
+  vlastitu playback akciju. Ako timeline dopusta cue/scrub, taj intent pripada
+  javnom timeline/video-row ugovoru, a filmstrip ostaje samo nacrtana pozadinska
+  raster slika ispod tog sloja.
 - Wave prikaz je takodjer pasivan: crta vec pripremljene amplitude. Ni jedan
   prikaz ne generira artefakte, ne radi probe, ne odredjuje pohranu i ne pise DB.
 - Generator filmstripa i generator wavea odvojeni su javni moduli; pohrana ide
   kroz javnu DB/storage komponentu. Prikaz, generator i pohrana nisu jedna
   komponenta niti poslovna logika forme.
+- Wave generator se pokrece automatski na temelju zapisa u projektnoj bazi,
+  istim lifecycle okidacem kao filmstrip: nakon sto je aktivni projekt ucitan
+  ili nakon sto je Select zavrsio zapis u bazu. Ne smije cekati klik na clip i
+  ne smije slati peakove formi kao paralelno UI stanje.
+- Wave izvor i broj laneova odredjuju samo projektne postavke zapisane u bazi
+  i spremljeni media/proxy snapshot klipa. Ako projektni `audio.channels` trazi
+  dvokanalni rad i clip ima proxy s audio streamom, wave se moze graditi iz tog
+  proxyja. Proxy ne mora imati tocno dva kanala; koristi se onoliko kanala
+  koliko proxy stvarno ima. Ako se wave gradi iz originala, koriste se stvarni
+  spremljeni kanali originala, redom u javne timeline laneove. Forma, lokalni
+  JSON ili hardkodirani fallback ne smiju izmisljati broj kanala.
+- Ingest forma i Ingest aplikacijski sloj smiju samo osvjeziti javni wave
+  worker/service i citati objavljeni artefakt kroz javni `timeline-assets`
+  reader. Wave worker sam odlucuje koji `wave_artifacts` zapisi nedostaju, a
+  write ide kroz javni DB/transport writer.
+- Wave generiranje smije biti rasporedjeno u vise pozadinskih worker slotova,
+  po istom obrascu kao filmstrip, ali samo izvan UI forme i bez dodatnog probea.
+  Worker smije citati/dekodirati spremljeni source/proxy prema javnom decoder
+  catalogu, izracunati lane peakove i vratiti gotov artefakt. Zapis u bazu
+  radi zaseban javni content write transport, ne pojedinacni generator worker.
+- Wave worker ne smije konkurirati Broadcast Playeru. Kada player ima prioritet,
+  aktivni wave poslovi se moraju zaustaviti ili vratiti u red; nastavak ide
+  automatski nakon sto player vise ne trazi prioritet.
+- Filmstrip worker smije generirati JPEG artefakte i vratiti opis gotovog
+  artefakta, ali ne smije sam otvarati content bazu u `ReadWrite` modu niti
+  direktno raditi DB publish. Zapis URI-ja, statusa, redoslijeda i vremenskih
+  polozaja u bazu radi javni DB/transport writer koji serijalizira write
+  operacije prema Local/LAN/Intranet endpointu.
 - Sljedeca pravila odnose se na GENERIRANJE filmstripa. Generator je modul za
   izradu artefakta, ne aplikacija, ne scanner i ne probe.
-- Filmstrip cita samo podatke iz baze.
+- Filmstrip generator se pokrece automatski na temelju zapisa u projektnoj bazi.
+  Ne smije cekati klik na clip, jer bi korisnik tada cekao generiranje pri
+  odabiru.
+- Ingest forma i Ingest aplikacijska komponenta ne smiju rasporedjivati
+  pojedinacne filmstrip poslove po UI dogadjajima. Smiju samo osvjeziti javni
+  filmstrip worker/service nakon sto je aktivni projekt ucitan ili nakon sto je
+  Select zavrsio zapis u bazu. Filmstrip worker tada sam cita `ingest_content`
+  i sam odlucuje koji artefakti nedostaju.
+- Filmstrip cita samo podatke iz baze i iz Projectom zadanog artifact
+  direktorija.
 - Filmstrip koristi proxy ako postoji, a original ako proxy ne postoji.
 - Filmstrip mora generirati stvarne frameove, ne ponavljati poster.
-- Filmstrip ima 14 slicica.
-- Za clipove do 10 sekundi koristi se brza stara strategija iz QNC ingest
-  ponasanja.
-- Za clipove duze od 10 sekundi trajanje se dijeli na 14 pozicija.
+- Filmstrip ima 13 sličica.
+- Filmstrip generator trazi 13 sličica i rasporedjuje ih ravnomjerno kroz
+  trajanje prikaza.
+- Za kratke i duge clipove koristi se keyframe/intra seek najblize ciljnoj
+  poziciji kroz javni decoder adapter. Ne smije se linearno citati cijeli klip
+  samo da bi se izvuklo 13 sličica.
+- Ako keyframe/intra adapter vrati manje stvarnih slika, filmstrip prikaz ih
+  ravnomjerno rasporedjuje kroz cijelu sirinu. Ne popunjavati praznine
+  ponavljanjem postera.
 - Filmstrip ne smije raditi `ffprobe` niti drugi probe fallback.
+- Filmstrip ne smije hardkodirati `ffmpeg` niti bilo koji drugi dekompresor.
+  Dekoder se bira iskljucivo preko javnog `qnc-decoder-catalog` ugovora ili
+  eksplicitnog adaptera. Ako katalog nije dostupan, to je kontrolirana greska,
+  ne povod za tihi fallback.
+- Izbor novog klipa ne smije resetirati, brisati ni zamijeniti filmstrip podatke
+  prethodnog klipa. Smije se promijeniti samo aktivni prikaz; artefakti i cache
+  moraju biti vezani uz `project_id + clip_id`, a zakasnjeli worker rezultat smije
+  se prikazati samo ako i dalje pripada trenutno aktivnom klipu.
 - Ponavljanje postera u starom Ingest UI-ju nije generirani filmstrip i ne moze
-  zamijeniti zahtjev za 14 stvarnih frameova. Pasivni UI obrazac i stvarni
+  zamijeniti zahtjev za stvarnim frameovima. Pasivni UI obrazac i stvarni
   generirani sadrzaj moraju se promatrati odvojeno.
 
 ### 8.1. Timeline je pasivni prikaz i UI remote
@@ -549,6 +697,9 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   clean/program output i buduce vanjske izlaze kao SDI/HDMI/NDI. Svi izlazi
   slusaju isti engine clock i isti source timebase; nijedan izlaz ne smije
   postati drugi player ili drugi vlasnik playback stanja.
+- Pasivni UI preview je javni modul `qnc-monitor`. Svaka aplikacija ga smije
+  ugraditi. Forma predaje samo potvrdjeni frame ili poruku; komponenta ne
+  poznaje host aplikaciju, ne drzi sat, ne dekodira i ne cita bazu.
 - Glavni playback put ne smije ovisiti o tome da se svaki frame salje kroz UI
   kao CPU RGBA tekstura. To je samo preview adapter. Profesionalni cilj je
   engine -> video output/GPU surface/clean output adapter, uz pasivni UI
@@ -568,6 +719,11 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Javni player modul moze koristiti svaka aplikacija, bez caller allowliste
   i bez poznavanja njezina workflowa. Svaka sesija ima izolirano playback
   stanje; zajednicki modul ne smije postati shared workflow svih aplikacija.
+- Broadcast Player radi samo playback. Nije QNC poslovna aplikacija i ne
+  implementira Select, katalog, filmstrip, wave, import, formu ni shell.
+  Okruzenje se prilagodava njegovom protokolu (`docs/84-broadcast-player-protocol.md`);
+  player se ne prilagodava aplikaciji. `NotReady` pauzira sat, ne gasi proces
+  ni command socket. Ingest `action_id` nije dio player protokola.
 - Ulaz se priprema kroz javne read-only DB module iz postojecih projektnih
   postavki i spremljenog opisa konkretnog original/proxy medija. Player ne
   poznaje Projects ili Ingest aplikaciju i ne odredjuje aktivni projekt.
@@ -578,11 +734,11 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   ili format nisu zamjena za source podatke tijekom play/montaze. Nedostajuci
   ili nepodrzani source podaci daju kontroliranu gresku, nikad novi probe,
   izmisljeni format ili hardkodirani default.
-- Zabranjeno je uvoditi fiksni `60 Hz`, `16 ms`, monitor refresh ili OS repaint
-  kao playback pravilo. Player cadence mora dolaziti iz spremljenog source
-  timebasea konkretnog klipa i player/audio clocka. Podrska za source koji je
-  stvarno 60 fps je dopustena samo kao source timebase, ne kao globalna
-  pretpostavka aplikacije.
+- Zabranjeno je uvoditi fiksni monitor refresh ili OS repaint kao playback
+  pravilo. Player cadence mora dolaziti iz spremljenog source timebasea
+  konkretnog klipa i player/audio clocka. Podrska za bilo koji stvarni source
+  fps dopustena je samo kao source timebase, ne kao globalna pretpostavka
+  aplikacije.
 - Svaki javni player/monitor frame zapis mora nositi source timebase uz frame
   broj i identitet sourcea. Monitor, timeline i UI remote smiju prikazivati ili
   preskakati stale slike, ali ne smiju mijenjati cadence, izmisljati FPS niti
@@ -615,6 +771,20 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Monitor prikaz ne smije vuci velike RGBA frameove request/response pollingom
   preko istog kanala koji nosi player komande. Komande, state i frame transport
   moraju biti odvojeni.
+- Lokalni monitor output Broadcast Playera koristi `qnc-player-frame-map`
+  shared-memory/mmap ring kao obvezni pixel handoff. Ako frame-map ne postoji
+  ili pukne, to je greska sesije; nije dopusten tihi fallback na socket slanje
+  RGBA frameova.
+- Player command/state socket smije nositi samo male kontrolne poruke i javno
+  stanje. Ne smije postati skriveni monitor pixel kanal.
+- Dekoder ne smije dobiti HTTP storage endpoint, credentials ili LAN/Intranet
+  URL kao svoj ulaz. Storage adapter otvara `MediaStream` ili ga, kada owner
+  ima privatni lokalni/montirani path, pretvara u seekable `CodecEndpoint`.
+  FFmpeg CLI adapter smije dobiti samo seekable file endpoint. Session-private
+  byte stream preko TCP/named-pipe/shared-memory adaptera smije koristiti samo
+  decoder adapter koji eksplicitno deklarira da podrzava takav ne-javni procesni
+  kanal i njegovu seek semantiku. Taj kanal nije poslovni media identitet, ne
+  radi probe i ne uvodi fallback dekoder.
 - Za stvarni playback lokalni monitor handoff mora biti ogranicen, sekvenciran
   i oznacen session/source/frame generacijom. Latest-only prikaz smije postojati
   samo kao eksplicitno degradirani preview ili thumbnail put; ne smije biti
@@ -640,6 +810,28 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Dekoder je zamjenjiva implementacija javnog verzioniranog QNC ugovora.
   FFmpeg naredbe i njegovi interni formati ostaju u zasebnom adapteru, ne u
   engineu, formi ili neutralnom ugovoru. Engine ostaje jedini vlasnik sata.
+- Konacni cilj decode sloja je capability lanac: prvo hardverski/GPU decode
+  adapter ako host i source zapis to stvarno podrzavaju, zatim system decoder
+  adapter, zatim external/software adapter. NVIDIA NVDEC/CUVID, Intel
+  Quick Sync/QSV/oneVPL, AMD AMF/VCN/VAAPI, Apple VideoToolbox i buduci
+  adapteri smiju se dodati samo kao javni adapteri preko kataloga. Ni jedan
+  od njih ne smije biti hardkodiran u Ingest, player engine, filmstrip,
+  timeline, formu ili shell.
+- Dok QNC ne dobije funkcionalnu stabilnu aplikaciju, FFmpeg ostaje odobreni
+  privremeni external/software adapter unutar istog zamjenjivog decode lanca.
+  To nije dozvola da FFmpeg postane monolit, da se vrati v4 media paket, da se
+  uvede novi probe ili da se zaobidje decoder catalog. Kasnije dodavanje GPU
+  i system adaptera ne smije mijenjati javni player/filmstrip ugovor.
+- Decoder capability odluka koristi spremljene source podatke iz baze:
+  container, codec, profile, pixel format, bit depth, chroma, scan/field
+  opis, timebase, trajanje i stream mapu. Ako adapter ne moze eksplicitno
+  podrzati taj zapis, odbija request prije playbacka ili filmstrip posla.
+  Nema tihog fallbacka koji pokusava drugi dekoder nakon djelomicnog playa.
+- Local/LAN/Intranet storage smije biti privatno montiran na hostu koji dekodira.
+  Javni zapis i dalje ostaje `qnc://...` URI; privatni path je samo resolver
+  binding hosta. Ako udaljeni storage nije montiran i nema QNC decoder service
+  adapter, player/filmstrip/wave moraju odbiti posao jasnom greskom, ne prelaziti
+  na HTTP ili raw TCP decoder ulaz.
 - Instalirani dekoderi i eksplicitni odabir dolaze iz konfiguracije hosta
   na kojem se dekodiranje izvrsava. To nisu nove projektne postavke niti
   poslovna veza aplikacija. Nema automatskog fallbacka na drugi dekoder.
@@ -796,6 +988,11 @@ drugih aplikacija.
   `docs/10-shell-ui-implementation-note.md` ili noviji UI note prije
   implementacije.
 - Forme ne sadrze poslovnu logiku.
+- Forma i njezin desktop/UI crate ne smiju sadrzavati unit/integration testove
+  niti dijagnosticki panel. Analiza runtime ponašanja ide kroz javni
+  `qnc-dev-diagnostics` i samostalnu diagnostic tool aplikaciju koja cita
+  logove. Ciljani testovi zive u modulima, conformance alatu ili diagnostic
+  checkovima, ne u formi.
 - UI smije prikazati stanje, korisnicki izbor, gresku i napredak.
 - UI smije poslati neutralnu naredbu.
 - UI ne smije raditi scan, probe, filmstrip, waveform, render, player decode ili
@@ -835,7 +1032,7 @@ drugih aplikacija.
 - Modul ne smije biti tajna veza izmedu aplikacija. Ako aplikacije razmjenjuju
   poslovne podatke, to ide kroz bazu.
 - Sve sto se ponavlja u vise aplikacija i moze imati uski contract treba
-  izdvojiti kao javni modul ili javnu komponentu, npr. `qnc-ui-kit`,
+  izdvojiti kao javni modul ili genericku javnu UI komponentu, npr. `qnc-ui-kit`,
   `qnc-dir-browser`, keyboard, resolver, media browser ili timeline paint.
 - Javni UI modul, ukljucujuci `qnc-ui-kit`, smije sadrzavati samo pasivne
   paint/layout/intent obrasce i genericke UI-state pomocnike, npr.
@@ -847,7 +1044,9 @@ drugih aplikacija.
   postao monolit i mora se razbiti na uzi contract.
 - Aplikacijska komponenta koja pocne sadrzavati vise nepovezanih aktivnih
   odgovornosti mora se razbiti. Nije dozvoljeno sakriti monolit pod nazivom
-  `components`.
+  `components`. Ingest nema svoj `components` sloj; Ingest aplikacijski sloj
+  smije biti samo composition/root za javne module i treba se dalje smanjivati
+  izdvajanjem svake aktivne odgovornosti u uski javni modul.
 
 ## 13. Razvojni redoslijed
 
@@ -947,6 +1146,8 @@ Project je ponovno zamrznut. Nova promjena zahtijeva novu izricitu dozvolu.
   zaustaviti i prvo traziti izricitu dozvolu za otkljucavanje Projecta.
 - Detaljni freeze zapis mora postojati u
   `C:\Users\miron\Projects\QNC\docs\11-project-freeze.md`.
+- Ingest i moduli koje koristi zamrznuti su odvojeno, odjeljak 17 i
+  `docs/85-ingest-freeze.md`. Razvoj Ingesta vise nije otvoren korak.
 
 ## 15. Verifikacija
 
@@ -975,13 +1176,18 @@ Ciljani testovi i Windows live prikaz potvrdjeni. Project je ponovno zamrznut.
 
 ## 16. Trenutna odobrena odstupanja
 
-Zapisano 2026-09-04, azurirano 2026-09-05. Vrijedi samo dok se odstupanja ne
-zatvore.
+Zapisano 2026-09-04, azurirano 2026-09-12. Vrijedi samo dok se odstupanja ne
+zatvore. Ovaj odjeljak ne smije proturjeciti strogim pravilima iznad. Ako se
+neka stavka u ovom odjeljku pokaze zastarjelom, ne koristiti je kao dozvolu za
+novi kod; prvo je ispraviti prema stvarnom stablu i ovom zakonu.
 
 - Shell runtime footer prikazuje samo aplikacije s `apps/*/qnc-app.json`.
   Layout contract i dalje nabraja `project`, `ingest`, `media_assist` i
   `storyboard`.
-- Close project nije u footeru dok ne postoji workspace close contract.
+- Close project postoji u shell footeru samo kao poziv javnog modula
+  `qnc-project-close`, prema odjeljku 3. To nije Project workflow i nije
+  dozvola shellu da brise, cisti, zatvara aplikacije ili preuzima poslovno
+  stanje.
 - Shell embedded factory trenutno ima `qnc_project` i `qnc_ingest` javne
   adaptere. To nije dozvola za uvodenje privatnih app/store ovisnosti u shell i
   nije uzor za monolit.
@@ -1004,9 +1210,19 @@ zatvore.
   playback ili sve camera sheme implementirani.
 - Ingest application manifest smije deklarirati samo module i capabilityje koji
   imaju stvarnu runtime ovisnost ili implementirani javni adapter u trenutnom
-  rezu. Scanner, camera detector, Media Probe, Media Browser, Filmstrip i Wave
-  ne smiju biti u Ingest runtime manifestu dok ne postoje kao stvarni moduli u
-  runtimeu.
+  rezu. Scanner, camera detector, Media Probe, Media Browser, Filmstrip, Wave,
+  Timeline, Broadcast Player i njihovi adapteri smiju biti u manifestu samo ako
+  stvarno postoje u runtimeu i koriste se kroz javni ugovor. Manifest ne smije
+  najaviti nepostojeci modul kao zavrsenu funkciju.
+- Broadcast Player nije zatvoren dok ne prodje prihvat iz odjeljka 8.3. Od
+  2026-09-13 taj nastavak je zamrznut zajedno s Ingestom (odjeljak 17). Vec
+  spojeni pasivni Timeline/Filmstrip/Wave prikazi smiju ostati kao razvojni
+  prikaz samo ako ne preuzimaju player sat, ne rade novi probe, ne pisu direktno
+  u bazu i ne konkuriraju playeru za vrijeme `Preparing` ili `Playing`. Ne
+  siriti Filmstrip/Wave/Timeline/player funkcije bez izricitog otkljucavanja.
+- Ingest player sloj (`prepare_preview`, lokalni Guard) se ne siri. Zamrznuto
+  odjeljkom 17. Convert-queue krpice nisu nova arhitektura. Daljnji spoj je
+  samo daljinski i samo nakon otkljucavanja.
 - Project keyboard dispatch smije krenuti od `project_open_selected`. Nove tipke
   ne smiju ici mimo kataloga.
 - Ingest klik akcije moraju imati action_id u
@@ -1017,3 +1233,124 @@ zatvore.
 
 Sve ostalo iz ovog filea ostaje na snazi. Ova lista nije dozvola za redizajn
 ili novi monolit.
+
+## 17. Ingest freeze
+
+Zamrznuto na izriciti korisnikov zahtjev 2026-09-13: kompletan `qnc-ingest` i
+javne komponente/moduli koje Ingest koristi. Detalj: `docs/85-ingest-freeze.md`.
+Zatvoreno 2026-09-13: uklonjeno host GPU vezanje. Monitor ostaje javni pasivni
+modul; shell i Ingest forma ne vežu GPU. Preview ide kroz egui adapter.
+Broadcast Player nije diran.
+
+- Ingest aplikacija/forma i njezini owner crateovi, ugovori i Ingest dijelovi
+  conformancea ne smiju se mijenjati bez izricite dozvole.
+- Isti freeze vrijedi za javne module koje Ingest stvarno koristi, ukljucujuci
+  Dir Browser, keyboard/shortcut, `qnc-ui-kit`, work-settings, Select/katalog/
+  work-plan, store, scanner/camera/probe lanac, thumbnail/image, Timeline,
+  Monitor, Filmstrip, Wave, Timeline-assets, player-input/launcher/client/
+  contract/frame-transport, Broadcast Player proces i `qnc-broadcast-engine`,
+  te decoder/media/audio/video/transport crateove na tom putu.
+- `qnc-ingest-components` i dalje ne smije postojati. Freeze nije dozvola za
+  novi umbrella.
+- Opci zahtjevi i otvoreni §8.3 ne daju dozvolu. Dozvola mora imenovati Ingest
+  ili tocno ime zamrznutog modula i vrstu promjene.
+- Bez takve dozvole zabranjeno je mijenjati:
+  `apps/qnc-ingest/**`,
+  `crates/qnc-ingest-desktop/**`,
+  `crates/qnc-ingest-desktop-adapter/**`,
+  `crates/qnc-ingest-application/**`,
+  `crates/qnc-ingest-store/**`,
+  `crates/qnc-ingest-select/**`,
+  `crates/qnc-ingest-catalog/**`,
+  `crates/qnc-ingest-work-plan/**`,
+  `contracts/applications/ingest.application.json`,
+  `contracts/databases/ingest-registry.database.json`,
+  `contracts/databases/ingest-content.database.json`,
+  `contracts/databases/source-index.database.json`,
+  `contracts/databases/media-records.database.json`,
+  `contracts/ui/ingest.layout.json`,
+  Ingest dijelove `contracts/qnc-keyboard-shortcuts.json`,
+  Ingest conformance u `tools/qnc-conformance/**`,
+  `crates/qnc-dir-browser/**`,
+  `crates/qnc-keyboard-shortcut/**`,
+  `crates/qnc-ui-kit/**`,
+  `crates/qnc-work-settings/**`,
+  `crates/qnc-monitor/**`,
+  `crates/qnc-timeline/**`,
+  `crates/qnc-timeline-assets/**`,
+  `crates/qnc-player-timeline/**`,
+  `crates/qnc-filmstrip/**`,
+  `crates/qnc-filmstrip-worker/**`,
+  `crates/qnc-wave/**`,
+  `crates/qnc-wave-worker/**`,
+  `crates/qnc-wave-view/**`,
+  `crates/qnc-player-client/**`,
+  `crates/qnc-player-input/**`,
+  `crates/qnc-player-launcher/**`,
+  `crates/qnc-player-contract/**`,
+  `crates/qnc-player-frame-transport/**`,
+  `crates/qnc-broadcast-player/**`,
+  `crates/qnc-broadcast-engine/**`,
+  `tools/qnc-player-runner/**`,
+  `crates/qnc-decoder-catalog/**`,
+  `crates/qnc-media-decode/**`,
+  `crates/qnc-media-stream/**`,
+  `crates/qnc-media-probe/**`,
+  `crates/qnc-media-thumbnail/**`,
+  `crates/qnc-media-metadata/**`,
+  `crates/qnc-media-metadata-compose/**`,
+  `crates/qnc-media-record-db/**`,
+  `crates/qnc-media-records/**`,
+  `crates/qnc-ffprobe-metadata/**`,
+  `crates/qnc-image-assets/**`,
+  `crates/qnc-source-reader/**`,
+  `crates/qnc-source-groups/**`,
+  `crates/qnc-source-index-db/**`,
+  `crates/qnc-scanner/**`,
+  `crates/qnc-camera-detector/**`,
+  `crates/qnc-camera-patterns/**`,
+  `crates/qnc-sony-metadata/**`,
+  `crates/qnc-audio-output/**`,
+  `crates/qnc-video-output/**`,
+  `crates/qnc-ffmpeg-decode/**`,
+  `crates/qnc-gpu-raster/**`,
+  `crates/qnc-pixel-convert/**`,
+  `crates/qnc-transport-resolver/**`,
+  `crates/qnc-json-transport/**`,
+  `crates/qnc-db-contract/**`,
+  `crates/qnc-dev-diagnostics/**`,
+  i odgovarajuce `contracts/modules/*.module.json` tih modula.
+- Shell host i svi preostali crateovi/alati spadaju u odjeljak 18.
+- Dopusteno je citati kod, auditirati, pokretati testove i live Ingest.
+- Ako Story ili druga aplikacija treba izmjenu zamrznutog javnog modula, rad
+  stati i traziti otkljucavanje tog modula. Ne praviti privatnu kopiju.
+
+## 18. Freeze cijele QNC obitelji
+
+Zamrznuto na izriciti korisnikov zahtjev 2026-09-13: cijeli QNC projekt,
+sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
+razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
+i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
+
+- Nema izmjena koda, ugovora, manifesta, seeda, conformancea ni razvojnih
+  dokumenata bez izricite dozvole koja imenuje tocnu putanju ili modul i
+  vrstu promjene.
+- Opci zahtjevi, otvoreni §8.3 i "sredi preview" ne daju dozvolu.
+- Zamrznuto ukljucuje, bez ogranicenja na ovaj popis:
+  `apps/**`, `crates/**`, `tools/**`, `contracts/**`, `seed/**`,
+  `docs/**` osim novog freeze zapisa kad korisnik trazi freeze/unlock,
+  root `Cargo.toml` / `Cargo.lock` / `AGENTS.md` (osim ovog freeze zapisa
+  kad korisnik trazi freeze/unlock).
+- Posebno su zamrznuti i prije otvoreni dijelovi: `apps/qnc-app/**`,
+  `crates/qnc-shell-desktop-api/**`, `crates/qnc-application-catalog/**`,
+  `crates/qnc-contracts/**`, `tools/qnc-conformance/**`,
+  `tools/qnc-app-catalog/**`, `tools/qnc-camera-catalog/**`,
+  `tools/qnc-dev-diagnostics-app/**`, te svi moduli koji nisu navedeni
+  u odjeljku 17.
+- `qnc-ingest-components` i dalje ne smije postojati.
+- Dopusteno bez otkljucavanja: citanje, audit, testovi, live pokretanje
+  vec sastavljenih programa, te zapis poslovnih rezultata kroz vec
+  zamrznute javne write putove. Radni projektni direktoriji i baze nisu
+  freeze koda.
+- Ako treba bilo kakva izmjena, prvo otkljucavanje. Ne granati privatnu
+  kopiju zamrznutog modula.

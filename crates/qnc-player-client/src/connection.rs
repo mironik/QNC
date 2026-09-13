@@ -18,7 +18,7 @@ use std::{
     net::TcpStream,
     path::PathBuf,
     process::{Child, Command as Process, Stdio},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 struct ChildGuard(Child);
@@ -72,7 +72,7 @@ impl PlayerWireClient {
     }
 
     fn open_stream(address: &str) -> Result<TcpStream> {
-        let stream = TcpStream::connect(address).map_err(|e| format!("Player socket: {e}"))?;
+        let stream = TcpStream::connect(address).map_err(|e| protocol_io_error("connect", e))?;
         stream.set_nodelay(true).map_err(|e| e.to_string())?;
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
@@ -138,14 +138,14 @@ impl PlayerWireClient {
         request.extend_from_slice(body);
         stream
             .write_all(&request)
-            .map_err(|e| format!("Player socket write request: {e}"))?;
+            .map_err(|e| protocol_io_error("write", e))?;
         stream
             .flush()
-            .map_err(|e| format!("Player socket flush: {e}"))?;
+            .map_err(|e| protocol_io_error("flush", e))?;
         let mut response = [0; WIRE_HEADER_BYTES];
         stream
             .read_exact(&mut response)
-            .map_err(|e| format!("Player socket read header: {e}"))?;
+            .map_err(|e| protocol_io_error("read header", e))?;
         if &response[..8] != WIRE_MAGIC || response[8] != WIRE_VERSION {
             return Err("Player wire protocol mismatch.".into());
         }
@@ -157,11 +157,23 @@ impl PlayerWireClient {
         let mut body = vec![0; body_len];
         stream
             .read_exact(&mut body)
-            .map_err(|e| format!("Player socket read body: {e}"))?;
+            .map_err(|e| protocol_io_error("read body", e))?;
         if status == WIRE_STATUS_OK {
             return Ok(body);
         }
         Err(wire_status_error(status, &body))
+    }
+}
+
+fn protocol_io_error(op: &str, error: std::io::Error) -> String {
+    match (error.kind(), error.raw_os_error()) {
+        (_, Some(10053 | 10054 | 104)) => {
+            format!("Player protocol: control connection closed ({op}).")
+        }
+        (std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock, _) => {
+            format!("Player protocol: control {op} timed out.")
+        }
+        _ => format!("Player protocol: control {op} failed."),
     }
 }
 
@@ -186,18 +198,28 @@ struct FramePumpState {
     picture: Option<Arc<MonitorFrame>>,
     clear_generation: u64,
 }
+
+#[derive(Clone, Copy)]
+struct FirstVideoMeasurement {
+    command_at: Instant,
+    previous_picture: Option<(u64, u64)>,
+}
+
 struct FramePump {
     stop: Arc<AtomicBool>,
     state: Arc<Mutex<FramePumpState>>,
     worker: Option<thread::JoinHandle<()>>,
 }
+
+pub(super) type PictureSink = Arc<dyn Fn(Option<Arc<MonitorFrame>>) + Send + Sync>;
+
 impl FramePump {
     fn start(
         mut reader: LatestFrameReader,
         query: SessionQuery,
         source: String,
         source_timebase: qnc_player_contract::Timebase,
-        diagnostics: bool,
+        sink: PictureSink,
     ) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let state = Arc::new(Mutex::new(FramePumpState::default()));
@@ -210,64 +232,95 @@ impl FramePump {
                 let mut last_key: Option<(u64, u64)> = None;
                 let mut last_error = Instant::now() - Duration::from_secs(10);
                 let mut last_frame_report = Instant::now() - Duration::from_secs(1);
+                let mut skipped_since_report = 0u64;
+                let mut last_skip_report = Instant::now() - Duration::from_secs(1);
                 while !worker_stop.load(Ordering::Acquire) {
                     {
                         let state = worker_state.lock().unwrap();
                         if state.clear_generation != observed_clear {
                             observed_clear = state.clear_generation;
                             last_key = None;
+                            skipped_since_report = 0;
                         }
                     }
                     let frame_start = Instant::now();
-                    let result = reader.read_latest();
-                    let mut idle = true;
-                    match result {
+                    match reader.recv(Duration::from_millis(50)) {
                         Ok(Some(LatestFrameUpdate::Picture(frame))) => {
-                            let result = (|| -> Result<Arc<MonitorFrame>> {
-                                frame.header.validate(&query, &source, frame.rgba.len())?;
-                                if frame.header.timebase != source_timebase {
-                                    return Err(
-                                        "Monitor frame timebase differs from saved source clip."
-                                            .into(),
-                                    );
-                                }
-                                let key = (frame.header.output_generation, frame.header.sequence);
-                                if last_key.is_some_and(|old| key < old) {
-                                    return Err("Stale monitor frame.".into());
-                                }
-                                last_key = Some(key);
-                                Ok(Arc::new(MonitorFrame {
-                                    header: frame.header,
-                                    rgba: frame.rgba,
-                                }))
-                            })();
-                            match result {
+                            match (|| -> Result<Arc<MonitorFrame>> {
+                                    frame.header.validate(&query, &source, frame.rgba.len())?;
+                                    if frame.header.timebase != source_timebase {
+                                        return Err(
+                                            "Monitor frame timebase differs from saved source clip."
+                                                .into(),
+                                        );
+                                    }
+                                    let key = (frame.header.output_generation, frame.header.sequence);
+                                    if last_key.is_some_and(|old| key < old) {
+                                        return Err("Stale monitor frame.".into());
+                                    }
+                                    if let Some(old) = last_key
+                                        && key.0 == old.0
+                                        && key.1 > old.1.saturating_add(1)
+                                    {
+                                        skipped_since_report = skipped_since_report
+                                            .saturating_add(key.1.saturating_sub(old.1 + 1));
+                                        if qnc_dev_diagnostics::player_diagnostics_enabled()
+                                            && last_skip_report.elapsed()
+                                                >= Duration::from_millis(250)
+                                        {
+                                            qnc_dev_diagnostics::log_line(
+                                                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                                                format!(
+                                                    "AV_F monitor_frame_skip generation={} from_sequence={} to_sequence={} skipped_since_report={}",
+                                                    key.0,
+                                                    old.1,
+                                                    key.1,
+                                                    skipped_since_report
+                                                ),
+                                            );
+                                            skipped_since_report = 0;
+                                            last_skip_report = Instant::now();
+                                        }
+                                    }
+                                    last_key = Some(key);
+                                    Ok(Arc::new(MonitorFrame {
+                                        header: frame.header,
+                                        rgba: frame.rgba,
+                                    }))
+                                })() {
                                 Ok(picture) => {
-                                    if diagnostics
-                                        && last_frame_report.elapsed()
-                                            >= Duration::from_millis(250)
+                                    if qnc_dev_diagnostics::player_diagnostics_enabled()
+                                        && last_frame_report.elapsed() >= Duration::from_millis(250)
                                     {
                                         let h = &picture.header;
-                                        eprintln!(
-                                            "AV_F session={} generation={} sequence={} frame={} frame_map_us={}",
-                                            h.session_id,
-                                            h.output_generation,
-                                            h.sequence,
-                                            h.frame,
-                                            frame_start.elapsed().as_micros()
+                                        qnc_dev_diagnostics::log_line(
+                                            qnc_dev_diagnostics::DiagnosticsStream::Player,
+                                            format!(
+                                                "AV_F session={} generation={} sequence={} frame={} frame_map_us={}",
+                                                h.session_id,
+                                                h.output_generation,
+                                                h.sequence,
+                                                h.frame,
+                                                frame_start.elapsed().as_micros()
+                                            ),
                                         );
                                         last_frame_report = Instant::now();
                                     }
                                     let mut state = worker_state.lock().unwrap();
                                     if state.clear_generation == observed_clear {
-                                        state.picture = Some(picture);
+                                        state.picture = Some(picture.clone());
+                                        drop(state);
+                                        sink(Some(picture));
                                     }
-                                    idle = false;
                                 }
                                 Err(error) => {
-                                    if diagnostics && last_error.elapsed() >= Duration::from_secs(1)
+                                    if qnc_dev_diagnostics::player_diagnostics_enabled()
+                                        && last_error.elapsed() >= Duration::from_secs(1)
                                     {
-                                        eprintln!("AV_F monitor_decode_error={error}");
+                                        qnc_dev_diagnostics::log_line(
+                                            qnc_dev_diagnostics::DiagnosticsStream::Player,
+                                            format!("AV_F monitor_decode_error={error}"),
+                                        );
                                         last_error = Instant::now();
                                     }
                                 }
@@ -278,21 +331,22 @@ impl FramePump {
                             let mut state = worker_state.lock().unwrap();
                             if state.clear_generation == observed_clear {
                                 state.picture = None;
+                                drop(state);
+                                sink(None);
                             }
-                            idle = false;
                         }
                         Ok(None) => {}
                         Err(error) => {
-                            if diagnostics && last_error.elapsed() >= Duration::from_secs(1) {
-                                eprintln!("AV_F monitor_transport_error={error}");
+                            if qnc_dev_diagnostics::player_diagnostics_enabled()
+                                && last_error.elapsed() >= Duration::from_secs(1)
+                            {
+                                qnc_dev_diagnostics::log_line(
+                                    qnc_dev_diagnostics::DiagnosticsStream::Player,
+                                    format!("AV_F monitor_transport_error={error}"),
+                                );
                                 last_error = Instant::now();
                             }
                         }
-                    }
-                    if idle {
-                        thread::sleep(Duration::from_millis(4));
-                    } else {
-                        thread::yield_now();
                     }
                 }
             })
@@ -302,12 +356,6 @@ impl FramePump {
             state,
             worker: Some(worker),
         }
-    }
-
-    fn clear(&self) {
-        let mut state = self.state.lock().unwrap();
-        state.picture = None;
-        state.clear_generation = state.clear_generation.saturating_add(1);
     }
 
     fn picture(&self) -> Option<Arc<MonitorFrame>> {
@@ -342,13 +390,14 @@ pub(super) struct Connection {
     sequence: u64,
     last_event: u64,
     video_visible: bool,
-    diagnostics: bool,
     last_report: Instant,
     cached_reply: Option<EventEnvelope>,
     last_state_poll: Instant,
+    pending_cue_frame: Option<u64>,
+    first_video_measurement: Option<FirstVideoMeasurement>,
 }
 impl Connection {
-    pub fn launch(launch: Launch, generation: u64) -> Result<Self> {
+    pub fn launch(launch: Launch, generation: u64, picture_sink: PictureSink) -> Result<Self> {
         let session = uuid::Uuid::new_v4().to_string();
         let read = uuid::Uuid::new_v4().to_string();
         let write = uuid::Uuid::new_v4().to_string();
@@ -373,7 +422,7 @@ impl Connection {
         let boot = serde_json::to_vec(&serde_json::json!({
             "contract_version": VERSION, "session_id": session, "source_generation": generation,
             "input": launch.input, "media_binding": launch.media_binding,
-            "read_token": read, "command_token": write, "idle_timeout_ms": 10000, "listen_port": 0,
+            "read_token": read, "command_token": write, "idle_timeout_ms": 300000, "listen_port": 0,
             "monitor_frame_map": frame_map_path
         }))
         .map_err(|e| e.to_string())?;
@@ -399,7 +448,6 @@ impl Connection {
         let stderr = child.0.stderr.take().ok_or("missing player error pipe")?;
         let errors = Arc::new(Mutex::new(Vec::new()));
         let log = errors.clone();
-        let diagnostics = std::env::var_os("QNC_PLAYER_DIAGNOSTICS").is_some();
         thread::spawn(move || {
             let mut reader = BufReader::new(stderr);
             let mut buffer = [0; 1024];
@@ -407,8 +455,11 @@ impl Connection {
                 if n == 0 {
                     break;
                 }
-                if diagnostics {
-                    eprint!("{}", String::from_utf8_lossy(&buffer[..n]));
+                if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                    qnc_dev_diagnostics::log_line(
+                        qnc_dev_diagnostics::DiagnosticsStream::Player,
+                        String::from_utf8_lossy(&buffer[..n]),
+                    );
                 }
                 let mut text = log.lock().unwrap();
                 let keep = n.min(8192usize.saturating_sub(text.len()));
@@ -468,17 +519,18 @@ impl Connection {
                 query.clone(),
                 source,
                 source_timebase,
-                diagnostics,
+                picture_sink,
             ),
             frame_map_path,
             query,
             sequence: 0,
             last_event: 0,
             video_visible: false,
-            diagnostics,
             last_report: Instant::now(),
             cached_reply: None,
             last_state_poll: Instant::now(),
+            pending_cue_frame: None,
+            first_video_measurement: None,
         })
     }
     fn request(&mut self, request: SessionRequest) -> Result<EventEnvelope> {
@@ -514,12 +566,13 @@ impl Connection {
             .map_err(|e| e.to_string())?
             .is_some()
         {
-            return Err("Broadcast Player process closed.".into());
+            return Err("Player protocol: process closed.".into());
         }
         let control_start = Instant::now();
-        let mut reply = if action.is_some()
-            || self.cached_reply.is_none()
-            || self.last_state_poll.elapsed() >= Duration::from_millis(50)
+        let mut reply = if self.cached_reply.is_none()
+            || action.is_some_and(action_requires_preflight_state)
+            || self.last_state_poll.elapsed()
+                >= state_poll_interval(self.pending_cue_frame, self.cached_reply.as_ref())
         {
             let reply = self.request(SessionRequest::State(self.query.clone()))?;
             self.last_state_poll = Instant::now();
@@ -529,11 +582,25 @@ impl Connection {
         };
         if let Some(action) = action {
             let command = action_command(&reply, action)?;
-            if matches!(command, Command::CueFrame { .. }) {
-                self.frames.clear();
+            let previous_picture = self
+                .frames
+                .picture()
+                .as_ref()
+                .map(|picture| (picture.header.output_generation, picture.header.sequence));
+            let measuring_play = matches!(command, Command::Play);
+            if let Command::CueFrame { frame, .. } = command {
+                self.pending_cue_frame = Some(frame);
             }
             reply = self.command(command)?;
+            if measuring_play {
+                self.first_video_measurement = Some(FirstVideoMeasurement {
+                    command_at: Instant::now(),
+                    previous_picture,
+                });
+            }
+            self.last_state_poll = Instant::now();
         }
+        update_pending_cue(&mut self.pending_cue_frame, &reply);
         self.cached_reply = Some(reply.clone());
         let control_us = control_start.elapsed().as_micros();
         let error = reply.events.iter().find_map(|e| match e {
@@ -544,17 +611,21 @@ impl Connection {
             _ => None,
         });
         let picture = self.frames.picture();
+        report_first_video_measurement(&mut self.first_video_measurement, picture.as_deref());
         self.video_visible =
             update_video_visible(self.video_visible, picture.is_some(), &reply.events);
-        if self.diagnostics
+        if qnc_dev_diagnostics::player_diagnostics_enabled()
             && (action.is_some() || self.last_report.elapsed() >= Duration::from_secs(2))
         {
-            eprintln!(
-                "player-client action={action:?} visible={} monitor_frame={:?} control_us={} events={:?}",
-                self.video_visible,
-                picture.as_ref().map(|p| p.header.frame),
-                control_us,
-                reply.events
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!(
+                    "player-client action={action:?} visible={} monitor_frame={:?} control_us={} events={:?}",
+                    self.video_visible,
+                    picture.as_ref().map(|p| p.header.frame),
+                    control_us,
+                    reply.events
+                ),
             );
             self.last_report = Instant::now();
         }
@@ -567,6 +638,36 @@ impl Connection {
         })
     }
 }
+
+fn report_first_video_measurement(
+    measurement: &mut Option<FirstVideoMeasurement>,
+    picture: Option<&MonitorFrame>,
+) {
+    let Some(active) = *measurement else {
+        return;
+    };
+    let Some(picture) = picture else {
+        return;
+    };
+    let key = (picture.header.output_generation, picture.header.sequence);
+    if Some(key) == active.previous_picture {
+        return;
+    }
+    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+        qnc_dev_diagnostics::log_line(
+            qnc_dev_diagnostics::DiagnosticsStream::Player,
+            format!(
+                "acceptance first_video_ms={} frame={} generation={} sequence={}",
+                active.command_at.elapsed().as_millis(),
+                picture.header.frame,
+                picture.header.output_generation,
+                picture.header.sequence
+            ),
+        );
+    }
+    *measurement = None;
+}
+
 impl Drop for Connection {
     fn drop(&mut self) {
         let _ = self.command(Command::Shutdown);
@@ -590,16 +691,13 @@ fn frame_map_path(session: &str) -> PathBuf {
 }
 
 fn update_video_visible(current: bool, has_picture: bool, events: &[Event]) -> bool {
-    current
-        || has_picture
-        || events.iter().any(|event| {
-            matches!(
-                event,
-                Event::TransportStatusChanged {
-                    status: TransportStatus::Playing
-                }
-            )
-        })
+    let source_cleared = events
+        .iter()
+        .any(|event| matches!(event, Event::ActiveSourceChanged { source_id: None }));
+    if source_cleared {
+        return false;
+    }
+    current || has_picture
 }
 
 fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
@@ -634,6 +732,57 @@ fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
         },
     })
 }
+
+fn action_requires_preflight_state(action: Action) -> bool {
+    !matches!(action, Action::Cue(_))
+}
+
+fn state_poll_interval(pending_cue_frame: Option<u64>, reply: Option<&EventEnvelope>) -> Duration {
+    if pending_cue_frame.is_some() {
+        return Duration::from_millis(1);
+    }
+    let Some(frame_interval) = reply_source_frame_interval(reply) else {
+        return Duration::from_millis(50);
+    };
+    if reply_transport_status(reply) == Some(TransportStatus::Playing) {
+        return frame_interval.saturating_mul(4);
+    }
+    frame_interval
+}
+
+fn reply_source_frame_interval(reply: Option<&EventEnvelope>) -> Option<Duration> {
+    let timebase = reply?.events.iter().rev().find_map(|event| match event {
+        Event::CarrierPositionChanged {
+            timebase: Some(timebase),
+            ..
+        } => Some(*timebase),
+        _ => None,
+    })?;
+    frame_interval(timebase)
+}
+
+fn reply_transport_status(reply: Option<&EventEnvelope>) -> Option<TransportStatus> {
+    reply?.events.iter().rev().find_map(|event| match event {
+        Event::TransportStatusChanged { status } => Some(*status),
+        Event::CarrierPositionChanged { status, .. } => Some(*status),
+        _ => None,
+    })
+}
+
+fn update_pending_cue(pending: &mut Option<u64>, reply: &EventEnvelope) {
+    let Some(target) = *pending else {
+        return;
+    };
+    if reply.events.iter().rev().any(|event| {
+        matches!(
+            event,
+            Event::CarrierPositionChanged { frame, .. } if *frame == target
+        )
+    }) {
+        *pending = None;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -647,8 +796,15 @@ mod tests {
                 status: TransportStatus::Ready
             }]
         ));
-        assert!(update_video_visible(
+        assert!(!update_video_visible(
             false,
+            false,
+            &[Event::TransportStatusChanged {
+                status: TransportStatus::Playing
+            }]
+        ));
+        assert!(update_video_visible(
+            true,
             false,
             &[Event::TransportStatusChanged {
                 status: TransportStatus::Playing
@@ -706,5 +862,108 @@ mod tests {
             status: TransportStatus::Paused,
         });
         assert!(action_command(&reply, Action::Step(1)).is_err());
+    }
+
+    #[test]
+    fn cue_command_uses_cached_confirmed_state_without_preflight_state() {
+        assert!(!action_requires_preflight_state(Action::Cue(25)));
+        assert!(action_requires_preflight_state(Action::Step(1)));
+        assert!(action_requires_preflight_state(Action::TogglePlayPause));
+    }
+
+    #[test]
+    fn state_poll_interval_comes_from_source_timebase_except_pending_cue() {
+        let reply = EventEnvelope {
+            contract_version: VERSION.into(),
+            session_id: "s".into(),
+            source_generation: 1,
+            sequence: 1,
+            events: vec![Event::CarrierPositionChanged {
+                source_id: Some("clip".into()),
+                frame: 5,
+                range: Some(qnc_player_contract::FrameRange::new(0, 100).unwrap()),
+                timebase: Some(qnc_player_contract::Timebase::new(50, 1).unwrap()),
+                status: TransportStatus::Playing,
+            }],
+        };
+
+        assert_eq!(
+            state_poll_interval(None, Some(&reply)),
+            Duration::from_millis(80)
+        );
+        assert_eq!(
+            state_poll_interval(Some(25), Some(&reply)),
+            Duration::from_millis(1)
+        );
+        let paused = EventEnvelope {
+            events: vec![Event::CarrierPositionChanged {
+                source_id: Some("clip".into()),
+                frame: 5,
+                range: Some(qnc_player_contract::FrameRange::new(0, 100).unwrap()),
+                timebase: Some(qnc_player_contract::Timebase::new(50, 1).unwrap()),
+                status: TransportStatus::Paused,
+            }],
+            ..reply
+        };
+        assert_eq!(
+            state_poll_interval(None, Some(&paused)),
+            Duration::from_millis(20)
+        );
+    }
+
+    #[test]
+    fn pending_cue_clears_only_after_confirmed_player_position() {
+        let mut pending = Some(25);
+        let old = EventEnvelope {
+            contract_version: VERSION.into(),
+            session_id: "s".into(),
+            source_generation: 1,
+            sequence: 1,
+            events: vec![Event::CarrierPositionChanged {
+                source_id: Some("clip".into()),
+                frame: 5,
+                range: Some(qnc_player_contract::FrameRange::new(0, 100).unwrap()),
+                timebase: Some(qnc_player_contract::Timebase::new(50, 1).unwrap()),
+                status: TransportStatus::Preparing,
+            }],
+        };
+        update_pending_cue(&mut pending, &old);
+        assert_eq!(pending, Some(25));
+
+        let confirmed = EventEnvelope {
+            events: vec![Event::CarrierPositionChanged {
+                source_id: Some("clip".into()),
+                frame: 25,
+                range: Some(qnc_player_contract::FrameRange::new(0, 100).unwrap()),
+                timebase: Some(qnc_player_contract::Timebase::new(50, 1).unwrap()),
+                status: TransportStatus::Paused,
+            }],
+            ..old
+        };
+        update_pending_cue(&mut pending, &confirmed);
+        assert_eq!(pending, None);
+    }
+
+    #[test]
+    fn control_client_uses_one_socket_per_request() {
+        let client = PlayerWireClient::connect_one_shot(
+            "qnc-player+tcp://127.0.0.1:9",
+            WIRE_KIND_CONTROL,
+            "token",
+            MAX_CONTROL_BYTES,
+        )
+        .unwrap();
+
+        assert!(!client.persistent);
+        assert!(client.stream.is_none());
+    }
+
+    #[test]
+    fn socket_abort_is_protocol_error_not_os_text() {
+        let error = std::io::Error::from_raw_os_error(10053);
+        assert_eq!(
+            protocol_io_error("read header", error),
+            "Player protocol: control connection closed (read header)."
+        );
     }
 }

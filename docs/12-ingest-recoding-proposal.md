@@ -36,7 +36,7 @@ Ingest owner + javne module.
 ```text
 apps/qnc-ingest                 standalone exe
 apps/qnc-ingest/qnc-app.json    shell registry (embedded + standalone)
-crates/qnc-ingest-desktop       pasivna forma (view + action_id)
+crates/qnc-ingest-desktop       pasivna forma/povrsina (view + action_id)
 crates/qnc-ingest-desktop-adapter
 crates/qnc-ingest-store         owner SQLite + javni read views
 
@@ -72,7 +72,7 @@ Ingest owner (qnc-ingest-store + workflow)
   -> cita Project public registry (koji je projekt aktivan)
   -> pise ingest_registry + ingest_content
   -> zove module: dir.list, source.scan.roles, source.camera.detect,
-     media.probe.full, filmstrip.generate14, wave.generate
+     media.probe.full, filmstrip.generate, wave.generate
   -> jedini tko smije pokrenuti probe
 
 Dir Browser
@@ -89,7 +89,7 @@ Media Probe
 
 Filmstrip / Wave
   -> citaju probe iz Ingest DB
-  -> 14 stvarnih frameova / peaks
+  -> stvarni filmstrip frameovi / peaks
   -> ne ffprobe
 
 Media Browser

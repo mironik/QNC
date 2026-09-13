@@ -12,6 +12,7 @@ qnc-player-contract.workspace = true
 qnc-player-frame-transport.workspace = true
 qnc-player-input.workspace = true
 qnc-broadcast-engine.workspace = true
+qnc-dev-diagnostics.workspace = true
 qnc-media-stream.workspace = true
 qnc-media-decode.workspace = true
 qnc-decoder-catalog.workspace = true

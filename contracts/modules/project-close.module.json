@@ -1,0 +1,19 @@
+{
+  "module_id": "qnc.module.project-close",
+  "module_name": "Project Close Component",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["project.close_active", "project.close_active.write_transport"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["project.delete", "project.create", "project.open", "media.scan", "media.probe", "ffprobe", "ffmpeg"],
+  "forbidden_dependencies": ["qnc.module.ingest-select", "qnc.module.broadcast-player", "qnc.module.filmstrip-worker"],
+  "state_policy": "stateless",
+  "database_write_policy": "narrow_project_close_write_adapter_only",
+  "runtime_crate": "qnc-project-close",
+  "input": "Project registry QNC URI and private transport binding. Local uses owner file binding; LAN/Intranet use the narrow /v1/project-close JSON write adapter with write credentials. Shell is only a caller.",
+  "output": "Closed flag and previous active project id. No files, project directories, workspace databases, media artifacts or project rows are deleted."
+}

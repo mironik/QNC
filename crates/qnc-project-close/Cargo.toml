@@ -1,0 +1,15 @@
+[package]
+name = "qnc-project-close"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-contracts = { workspace = true }
+qnc-json-transport = { workspace = true }
+qnc-transport-resolver = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+tiny_http = "0.12"
+
+[dev-dependencies]
+tempfile = "3"

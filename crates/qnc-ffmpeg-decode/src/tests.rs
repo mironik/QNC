@@ -1,6 +1,7 @@
 #![cfg(test)]
 use super::*;
 use qnc_media_metadata::*;
+use std::path::Path;
 fn fact<T>(value: T) -> Fact<T> {
     Fact {
         value,
@@ -152,17 +153,34 @@ fn packet_records_are_strict_and_preserve_signed_integer_pts() {
     }
     assert!(parse_record("decoder diagnostic").unwrap().is_none());
 }
+
 #[test]
-fn command_forces_saved_codec_and_disables_discovery_rate_and_pixel_fallbacks() {
+fn stats_reader_rebases_ffmpeg_packet_numbers_to_decode_session_ordinals() {
+    let mut reader = StatsReader::default();
+
+    let first = reader
+        .parse("QNC_PACKET 22 0 1/48000 384\n")
+        .unwrap()
+        .unwrap();
+    let second = reader
+        .parse("QNC_PACKET 40 1920 1/48000 384\n")
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(first.ordinal, 0);
+    assert_eq!(second.ordinal, 1);
+    assert_eq!(second.pts, 1920);
+}
+
+#[test]
+fn command_forces_saved_codec_and_disables_rate_pixel_and_network_fallbacks() {
     let r = fixture();
     let c = DecoderConfig::new(FfmpegAdapter::new("ffmpeg"));
     let plan = DecodePlan::new(&r, &c).unwrap();
-    let ep = qnc_media_stream::HttpEndpoint::for_owner_endpoint(
-        "http://127.0.0.1:1",
-        &r.media.media_uri,
-        "test-token",
-    )
-    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("clip.mkv");
+    std::fs::write(&path, b"fixture").unwrap();
+    let ep = qnc_media_stream::CodecEndpoint::for_local_file(&path, &r.media.media_uri).unwrap();
     let cmd = FfmpegAdapter::new("ffmpeg")
         .command(&r, &plan, &ep, "8-abc")
         .unwrap();
@@ -170,32 +188,42 @@ fn command_forces_saved_codec_and_disables_discovery_rate_and_pixel_fallbacks() 
         .get_args()
         .map(|s| s.to_string_lossy().into_owned())
         .collect();
-    assert!(args.contains(&"-nofind_stream_info".into()));
     assert!(!args.contains(&"-r".into()));
     for pair in [
         ["-c:0", "ffv1"],
+        ["-vf", "setfield=prog,format=yuv420p"],
         ["-pix_fmt", "+yuv420p"],
         ["-enc_time_base", "demux"],
         ["-stats_mux_pre", "pipe:2"],
-        ["-short_seek_size", "1"],
+        ["-protocol_whitelist", "file"],
         ["-flush_packets", "1"],
     ] {
         assert!(args.windows(2).any(|w| w[0] == pair[0] && w[1] == pair[1]));
     }
+    assert!(args.iter().any(|arg| arg == &path.to_string_lossy()));
+    for forbidden in [
+        "-xerror",
+        "-headers",
+        "-request_size",
+        "-initial_request_size",
+        "-short_seek_size",
+        "-multiple_requests",
+        "-reconnect",
+        "-nofind_stream_info",
+    ] {
+        assert!(!args.contains(&forbidden.into()), "{forbidden}");
+    }
 }
 
 #[test]
-fn mxf_small_interleaved_packets_reuse_the_bounded_http_read_window() {
-    let mut r = fixture();
-    r.media.container.as_mut().unwrap().value = "mxf".into();
+fn local_seekable_endpoint_uses_file_protocol_without_tcp_bridge() {
+    let r = fixture();
     let c = DecoderConfig::new(FfmpegAdapter::new("ffmpeg"));
     let plan = DecodePlan::new(&r, &c).unwrap();
-    let ep = qnc_media_stream::HttpEndpoint::for_owner_endpoint(
-        "http://127.0.0.1:1",
-        &r.media.media_uri,
-        "test-token",
-    )
-    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("clip.mkv");
+    std::fs::write(&path, b"fixture").unwrap();
+    let ep = qnc_media_stream::CodecEndpoint::for_local_file(&path, &r.media.media_uri).unwrap();
     let command = FfmpegAdapter::new("ffmpeg")
         .command(&r, &plan, &ep, "8-abc")
         .unwrap();
@@ -203,14 +231,135 @@ fn mxf_small_interleaved_packets_reuse_the_bounded_http_read_window() {
         .get_args()
         .map(|a| a.to_string_lossy().into_owned())
         .collect();
-    for key in ["-request_size", "-initial_request_size", "-short_seek_size"] {
-        assert!(args.windows(2).any(|w| w[0] == key && w[1] == "1048576"));
-    }
+    let path_arg = path.to_string_lossy().into_owned();
+
     assert!(
         args.windows(2)
-            .any(|w| w[0] == "-multiple_requests" && w[1] == "1")
+            .any(|w| w[0] == "-protocol_whitelist" && w[1] == "file")
     );
-    assert!(args.contains(&"-nofind_stream_info".into()));
+    assert!(args.iter().any(|arg| arg == &path_arg));
+    assert!(!args.iter().any(|arg| arg.starts_with("tcp://")));
+}
+
+#[test]
+fn ffmpeg_adapter_rejects_session_private_tcp_bridge() {
+    let r = fixture();
+    let c = DecoderConfig::new(FfmpegAdapter::new("ffmpeg"));
+    let plan = DecodePlan::new(&r, &c).unwrap();
+    let ep = qnc_media_stream::CodecEndpoint::for_loopback(
+        "127.0.0.1:1".parse().unwrap(),
+        &r.media.media_uri,
+    )
+    .unwrap();
+
+    let error = FfmpegAdapter::new("ffmpeg")
+        .command(&r, &plan, &ep, "8-abc")
+        .unwrap_err();
+
+    assert_eq!(error.kind, ErrorKind::Unsupported);
+    assert!(error.to_string().contains("seekable codec endpoint"));
+}
+
+#[test]
+fn mxf_uses_seekable_file_endpoint() {
+    let mut r = fixture();
+    r.media.container.as_mut().unwrap().value = "mxf".into();
+    let c = DecoderConfig::new(FfmpegAdapter::new("ffmpeg"));
+    let plan = DecodePlan::new(&r, &c).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("clip.mxf");
+    std::fs::write(&path, b"fixture").unwrap();
+    let ep = qnc_media_stream::CodecEndpoint::for_local_file(&path, &r.media.media_uri).unwrap();
+    let command = FfmpegAdapter::new("ffmpeg")
+        .command(&r, &plan, &ep, "8-abc")
+        .unwrap();
+    let args: Vec<_> = command
+        .get_args()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        args.windows(2)
+            .any(|w| w[0] == "-protocol_whitelist" && w[1] == "file")
+    );
+    assert!(args.iter().any(|arg| arg == &path.to_string_lossy()));
+    assert!(!args.contains(&"-headers".into()));
+    assert!(!args.contains(&"-nofind_stream_info".into()));
+}
+
+#[test]
+fn filmstrip_random_seek_is_one_ffmpeg_command_with_multiple_inputs() {
+    let frames = vec![
+        FfmpegFilmstripFrame { seek_sec: 0.0 },
+        FfmpegFilmstripFrame { seek_sec: 12.5 },
+    ];
+    let args = filmstrip_random_seek_args(
+        Path::new("source.mxf"),
+        &frames,
+        [112, 64],
+        Path::new("filmstrip-tmp"),
+    );
+    let rendered = args
+        .iter()
+        .map(|arg| arg.to_string_lossy())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        rendered.iter().filter(|arg| arg.as_ref() == "-ss").count(),
+        2
+    );
+    assert_eq!(
+        rendered.iter().filter(|arg| arg.as_ref() == "-i").count(),
+        2
+    );
+    assert_eq!(
+        rendered
+            .iter()
+            .filter(|arg| arg.as_ref() == "-noaccurate_seek")
+            .count(),
+        2
+    );
+    assert!(rendered.iter().any(|arg| arg.as_ref() == "12.500000"));
+    assert!(!rendered.iter().any(|arg| arg.contains("fps=")));
+    assert!(!rendered.iter().any(|arg| arg.as_ref() == "-skip_frame"));
+}
+
+#[test]
+fn filmstrip_keyframe_seek_targets_intra_frames_without_full_clip_scan() {
+    let frames = vec![
+        FfmpegFilmstripFrame { seek_sec: 0.0 },
+        FfmpegFilmstripFrame { seek_sec: 12.5 },
+    ];
+    let args = filmstrip_keyframe_seek_args(
+        Path::new("source.mxf"),
+        &frames,
+        [112, 64],
+        Path::new("filmstrip-tmp"),
+    );
+    let rendered = args
+        .iter()
+        .map(|arg| arg.to_string_lossy())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        rendered.iter().filter(|arg| arg.as_ref() == "-ss").count(),
+        2
+    );
+    assert_eq!(
+        rendered
+            .iter()
+            .filter(|arg| arg.as_ref() == "-skip_frame")
+            .count(),
+        2
+    );
+    assert_eq!(
+        rendered
+            .iter()
+            .filter(|arg| arg.as_ref() == "nokey")
+            .count(),
+        2
+    );
+    assert!(!rendered.iter().any(|arg| arg.contains("select=")));
+    assert!(!rendered.iter().any(|arg| arg.contains("60")));
 }
 
 fn synthetic() -> (tempfile::TempDir, DecodeRequest) {
@@ -240,9 +389,16 @@ fn synthetic() -> (tempfile::TempDir, DecodeRequest) {
 fn open(dir: &std::path::Path, request: DecodeRequest) -> Decoder {
     let source = qnc_media_stream::LocalSource::new("qnc://local/source/test", dir).unwrap();
     let media = qnc_media_stream::MediaStream::local(&source, &request.media.media_uri).unwrap();
-    Decoder::open(
+    let stamp = media.info().storage_stamp.clone();
+    let endpoint = qnc_media_stream::CodecEndpoint::for_local_file(
+        dir.join("clip.mkv"),
+        &request.media.media_uri,
+    )
+    .unwrap();
+    Decoder::open_endpoint(
         request,
-        media,
+        endpoint,
+        stamp,
         DecoderConfig::new(FfmpegAdapter::new("ffmpeg")),
     )
     .unwrap()

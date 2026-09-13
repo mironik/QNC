@@ -1,8 +1,16 @@
 //! FFmpeg CLI adapter only; no playback clock, database or application policy.
 use qnc_media_decode::*;
-use qnc_media_metadata::Rational;
-use qnc_media_stream::HttpEndpoint;
-use std::{path::PathBuf, process::Command};
+use qnc_media_metadata::{FrameTimebase, Rational};
+use qnc_media_stream::CodecEndpoint;
+use std::{
+    ffi::OsString,
+    io::Read,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    sync::atomic::{AtomicBool, Ordering},
+    thread,
+    time::Duration,
+};
 
 #[derive(Debug, Clone)]
 pub struct FfmpegAdapter {
@@ -18,53 +26,37 @@ impl FfmpegAdapter {
         &self,
         request: &DecodeRequest,
         plan: &DecodePlan,
-        ep: &HttpEndpoint,
-        stamp: &str,
+        ep: &CodecEndpoint,
+        _stamp: &str,
     ) -> Result<Command> {
+        if !ep.is_seekable_file() {
+            return Err(DecodeError::new(
+                ErrorKind::Unsupported,
+                "ffmpeg decoder requires a seekable codec endpoint",
+            ));
+        }
         let container = container_name(&plan.container)?;
         let mut cmd = Command::new(&self.executable);
-        // MXF interleaves large picture packets and small mono packets. Reuse the
-        // bounded HTTP read window; retain the MP4 soft-seek workaround elsewhere.
-        let short_seek_size = if container == "mxf" { "1048576" } else { "1" };
         cmd.args([
             "-hide_banner",
             "-loglevel",
             "error",
             "-nostdin",
-            "-xerror",
-            "-nofind_stream_info",
             "-noautorotate",
             "-copyts",
-            "-rw_timeout",
-            "5000000",
-            "-max_redirects",
-            "0",
-            "-reconnect",
-            "0",
-            "-request_size",
-            "1048576",
-            "-initial_request_size",
-            "1048576",
-            "-short_seek_size",
-            short_seek_size,
-            "-multiple_requests",
-            "1",
+        ]);
+        cmd.args([
             "-protocol_whitelist",
-            "http,tcp",
-            "-headers",
+            ep.protocol_whitelist(),
+            "-f",
+            &container,
         ])
-        .arg(format!(
-            "Authorization: {}\r\n{}: {stamp}\r\n",
-            ep.authorization_header(),
-            qnc_media_stream::EXPECTED_STAMP_HEADER
-        ))
-        .args(["-f", &container])
         .arg(format!("-c:{}", request.stream_index))
         .arg(&plan.codec);
         if let Some(start) = request.start {
             cmd.arg("-ss").arg(seconds(start)?);
         }
-        cmd.arg("-i").arg(ep.url()).args([
+        cmd.arg("-i").arg(ep.input_arg()).args([
             "-map",
             &format!("0:{}", request.stream_index),
             "-sn",
@@ -84,6 +76,8 @@ impl FfmpegAdapter {
             DecodedFormat::Video { pixel_format, .. } => {
                 cmd.args([
                     "-an",
+                    "-vf",
+                    &format!("setfield=prog,format={pixel_format}"),
                     "-c:v",
                     "rawvideo",
                     "-pix_fmt",
@@ -105,6 +99,208 @@ impl FfmpegAdapter {
         Ok(cmd)
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FfmpegFilmstripMode {
+    RandomSeek,
+    KeyframeSeek,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FfmpegFilmstripFrame {
+    pub seek_sec: f64,
+}
+
+pub fn extract_filmstrip_frames(
+    executable: &Path,
+    source: &Path,
+    frames: &[FfmpegFilmstripFrame],
+    source_timebase: FrameTimebase,
+    mode: FfmpegFilmstripMode,
+    thumb_size: [u32; 2],
+    temp_dir: &Path,
+) -> std::result::Result<(), String> {
+    let cancel = AtomicBool::new(false);
+    extract_filmstrip_frames_with_cancel(
+        executable,
+        source,
+        frames,
+        source_timebase,
+        mode,
+        thumb_size,
+        temp_dir,
+        &cancel,
+    )
+}
+
+pub fn extract_filmstrip_frames_with_cancel(
+    executable: &Path,
+    source: &Path,
+    frames: &[FfmpegFilmstripFrame],
+    _source_timebase: FrameTimebase,
+    mode: FfmpegFilmstripMode,
+    thumb_size: [u32; 2],
+    temp_dir: &Path,
+    cancel: &AtomicBool,
+) -> std::result::Result<(), String> {
+    if frames.len() < 2 {
+        return Err("filmstrip requires at least two frames".into());
+    }
+    if !source.is_file() {
+        return Err(format!(
+            "filmstrip media does not exist: {}",
+            source.display()
+        ));
+    }
+    let args = match mode {
+        FfmpegFilmstripMode::RandomSeek => {
+            filmstrip_random_seek_args(source, frames, thumb_size, temp_dir)
+        }
+        FfmpegFilmstripMode::KeyframeSeek => {
+            filmstrip_keyframe_seek_args(source, frames, thumb_size, temp_dir)
+        }
+    };
+    run_filmstrip_command(executable, args, cancel)
+}
+
+fn run_filmstrip_command(
+    executable: &Path,
+    args: Vec<OsString>,
+    cancel: &AtomicBool,
+) -> std::result::Result<(), String> {
+    let mut command = Command::new(executable);
+    command
+        .args(args)
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("filmstrip ffmpeg start: {error}"))?;
+    loop {
+        if cancel.load(Ordering::Acquire) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("filmstrip extraction cancelled".into());
+        }
+        let status = child
+            .try_wait()
+            .map_err(|error| format!("filmstrip ffmpeg wait: {error}"))?;
+        let Some(status) = status else {
+            thread::sleep(Duration::from_millis(10));
+            continue;
+        };
+        let mut stderr = Vec::new();
+        if let Some(mut pipe) = child.stderr.take() {
+            let _ = pipe.read_to_end(&mut stderr);
+        }
+        if status.success() {
+            return Ok(());
+        }
+        return Err(stderr_text_or_default(&stderr, "filmstrip ffmpeg failed"));
+    }
+}
+
+fn stderr_text_or_default(stderr: &[u8], fallback: &str) -> String {
+    let stderr = String::from_utf8_lossy(stderr);
+    if stderr.trim().is_empty() {
+        fallback.to_string()
+    } else {
+        stderr.trim().to_string()
+    }
+}
+
+fn filmstrip_random_seek_args(
+    source: &Path,
+    frames: &[FfmpegFilmstripFrame],
+    thumb_size: [u32; 2],
+    temp_dir: &Path,
+) -> Vec<OsString> {
+    filmstrip_seek_args(source, frames, thumb_size, temp_dir, false)
+}
+
+fn filmstrip_keyframe_seek_args(
+    source: &Path,
+    frames: &[FfmpegFilmstripFrame],
+    thumb_size: [u32; 2],
+    temp_dir: &Path,
+) -> Vec<OsString> {
+    filmstrip_seek_args(source, frames, thumb_size, temp_dir, true)
+}
+
+fn filmstrip_seek_args(
+    source: &Path,
+    frames: &[FfmpegFilmstripFrame],
+    thumb_size: [u32; 2],
+    temp_dir: &Path,
+    keyframes_only: bool,
+) -> Vec<OsString> {
+    let mut args = vec![
+        OsString::from("-hide_banner"),
+        OsString::from("-loglevel"),
+        OsString::from("error"),
+        OsString::from("-nostdin"),
+        OsString::from("-y"),
+        OsString::from("-noautorotate"),
+    ];
+    for frame in frames {
+        args.push(OsString::from("-ss"));
+        args.push(OsString::from(format_decimal(frame.seek_sec, 6)));
+        args.push(OsString::from("-noaccurate_seek"));
+        if keyframes_only {
+            args.push(OsString::from("-skip_frame"));
+            args.push(OsString::from("nokey"));
+        }
+        args.push(OsString::from("-i"));
+        args.push(source.as_os_str().to_owned());
+    }
+
+    let scale = filmstrip_scale_filter(thumb_size);
+    for (input_index, _) in frames.iter().enumerate() {
+        args.extend([
+            OsString::from("-map"),
+            OsString::from(format!("{input_index}:v:0")),
+            OsString::from("-an"),
+            OsString::from("-sn"),
+            OsString::from("-dn"),
+            OsString::from("-frames:v"),
+            OsString::from("1"),
+            OsString::from("-vf"),
+            OsString::from(&scale),
+            OsString::from("-q:v"),
+            OsString::from("2"),
+            OsString::from("-pix_fmt"),
+            OsString::from("yuvj420p"),
+            OsString::from("-strict"),
+            OsString::from("unofficial"),
+            temp_dir
+                .join(format!("{input_index:03}.jpg"))
+                .into_os_string(),
+        ]);
+    }
+    args
+}
+
+fn filmstrip_scale_filter(thumb_size: [u32; 2]) -> String {
+    let [width, height] = thumb_size;
+    format!(
+        "scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black"
+    )
+}
+
+fn format_decimal(value: f64, precision: usize) -> String {
+    let value = if value.is_finite() {
+        value.max(0.0)
+    } else {
+        0.0
+    };
+    format!("{value:.precision$}").replace(',', ".")
+}
+
 fn seconds(t: Rational) -> Result<String> {
     if t.numerator < 0 || t.denominator <= 0 {
         return Err(invalid("invalid timestamp"));
@@ -146,20 +342,30 @@ impl DecoderAdapter for FfmpegAdapter {
         &self,
         request: &DecodeRequest,
         plan: &DecodePlan,
-        endpoint: &HttpEndpoint,
+        endpoint: &CodecEndpoint,
         stamp: &str,
     ) -> Result<ProcessLaunch> {
         Ok(ProcessLaunch {
             command: self.command(request, plan, endpoint, stamp)?,
             input: vec![],
-            records: Box::new(StatsReader),
+            records: Box::new(StatsReader::default()),
         })
     }
 }
-struct StatsReader;
+
+#[derive(Default)]
+struct StatsReader {
+    next_ordinal: u64,
+}
+
 impl PacketRecordReader for StatsReader {
     fn parse(&mut self, line: &str) -> Result<Option<PacketHeader>> {
-        parse_record(line)
+        let Some(mut header) = parse_record(line)? else {
+            return Ok(None);
+        };
+        header.ordinal = self.next_ordinal;
+        self.next_ordinal += 1;
+        Ok(Some(header))
     }
 }
 fn parse_record(line: &str) -> Result<Option<PacketHeader>> {

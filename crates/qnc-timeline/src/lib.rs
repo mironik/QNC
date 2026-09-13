@@ -5,6 +5,7 @@
 //! no media processing path, and no Broadcast Player event interpretation.
 
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
+use qnc_filmstrip::FilmstripBackground;
 
 pub const MODULE_ID: &str = "qnc.module.timeline";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -437,6 +438,7 @@ pub struct TimelineInput<'a> {
     pub marker_slots: &'a [TimelineSlotSpan<'a>],
     pub markers: &'a [TimelineMarkerPin<'a>],
     pub base_video_blank: bool,
+    pub filmstrip_background: Option<&'a FilmstripBackground>,
     pub video_background: Option<&'a dyn Fn(&mut egui::Ui, Rect)>,
 }
 
@@ -471,6 +473,40 @@ pub fn show_source_player_timeline(
     state: &TimelineProjection,
     theme: TimelineTheme,
 ) -> TimelineIntent {
+    show_source_player_timeline_with_filmstrip(ui, rect, state, theme, None)
+}
+
+pub fn show_source_player_timeline_with_filmstrip(
+    ui: &mut egui::Ui,
+    rect: Rect,
+    state: &TimelineProjection,
+    theme: TimelineTheme,
+    filmstrip_background: Option<&FilmstripBackground>,
+) -> TimelineIntent {
+    show_source_player_timeline_with_artifacts(
+        ui,
+        rect,
+        state,
+        theme,
+        filmstrip_background,
+        &[],
+        &[],
+        &[],
+        &[],
+    )
+}
+
+pub fn show_source_player_timeline_with_artifacts(
+    ui: &mut egui::Ui,
+    rect: Rect,
+    state: &TimelineProjection,
+    theme: TimelineTheme,
+    filmstrip_background: Option<&FilmstripBackground>,
+    a1_peaks: &[f32],
+    a2_peaks: &[f32],
+    a3_peaks: &[f32],
+    a4_peaks: &[f32],
+) -> TimelineIntent {
     let duration = state.duration_frames();
     let mut out = TimelineIntent::None;
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
@@ -488,15 +524,16 @@ pub fn show_source_player_timeline(
                 shot_out_frame: duration,
                 draft_in_frame: 0,
                 draft_out_frame: duration,
-                a1_peaks: &[],
-                a2_peaks: &[],
-                a3_peaks: &[],
-                a4_peaks: &[],
+                a1_peaks,
+                a2_peaks,
+                a3_peaks,
+                a4_peaks,
                 virtual_spans: &[],
                 covers: &[],
                 marker_slots: &[],
                 markers: &[],
                 base_video_blank: true,
+                filmstrip_background,
                 video_background: None,
             },
         );
@@ -681,7 +718,7 @@ fn paint_audio_row(
         Stroke::new(1.0, input.theme.border),
         StrokeKind::Inside,
     );
-    paint_peaks(ui.painter(), track_rect, peaks, wave);
+    qnc_wave_view::paint_wave_peaks(ui.painter(), track_rect, peaks, wave);
     paint_ranges_and_playhead(ui, track_rect, input);
     cue_intent_from_response(&response, track_rect, input)
 }
@@ -703,11 +740,37 @@ fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> T
         Stroke::new(1.0, input.theme.border),
         StrokeKind::Inside,
     );
+    if let Some(background) = input.filmstrip_background {
+        paint_filmstrip_background(ui, track_rect, background);
+    }
     if let Some(paint_background) = input.video_background {
         paint_background(ui, track_rect);
     }
     paint_video_layers(ui, track_rect, input);
     video_intent_from_response(&response, track_rect, input)
+}
+
+fn paint_filmstrip_background(ui: &mut egui::Ui, track: Rect, background: &FilmstripBackground) {
+    if background.frames.is_empty() || track.width() <= 1.0 || track.height() <= 1.0 {
+        return;
+    }
+    let count = background.frames.len();
+    let slot_width = track.width() / count as f32;
+    for (slot_index, frame) in background.frames.iter().enumerate() {
+        let left = track.left() + slot_index as f32 * slot_width;
+        let slot = Rect::from_min_max(
+            egui::pos2(left, track.top()),
+            egui::pos2((left + slot_width).min(track.right()), track.bottom()),
+        );
+        let _ = qnc_ui_kit::paint_rgba_image(
+            ui,
+            slot,
+            &frame.uri,
+            frame.image.content_key,
+            frame.image.size,
+            &frame.image.pixels,
+        );
+    }
 }
 
 fn paint_lane_label(ui: &mut egui::Ui, rect: Rect, label: &str, input: &TimelineInput<'_>) {
@@ -1113,31 +1176,6 @@ fn paint_in_out_dim(
             Rect::from_min_max(egui::pos2(x_out, track.top()), track.right_bottom()),
             0.0,
             dim,
-        );
-    }
-}
-
-fn paint_peaks(painter: &egui::Painter, rect: Rect, peaks: &[f32], color: Color32) {
-    if peaks.is_empty() || rect.width() < 2.0 {
-        return;
-    }
-    let mid = rect.center().y;
-    let half = rect.height() * 0.48;
-    let n = peaks.len();
-    let bars = rect.width().floor().max(1.0) as usize;
-    for index in 0..bars {
-        let start = index * n / bars;
-        let end = ((index + 1) * n / bars).max(start + 1).min(n);
-        let max_peak = peaks[start..end]
-            .iter()
-            .map(|peak| peak.abs())
-            .fold(0.0_f32, f32::max)
-            .clamp(0.0, 1.0);
-        let x = rect.left() + index as f32 + 0.5;
-        let amp = max_peak * half;
-        painter.line_segment(
-            [egui::pos2(x, mid - amp), egui::pos2(x, mid + amp)],
-            Stroke::new(1.0, color),
         );
     }
 }

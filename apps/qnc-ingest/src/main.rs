@@ -19,6 +19,7 @@ fn main() -> eframe::Result<()> {
     let app = qnc_ingest_desktop::create_ingest_app(qnc_root)
         .unwrap_or_else(|error| panic!("failed to create Ingest app: {error}"));
     let options = eframe::NativeOptions {
+        renderer: eframe::Renderer::Wgpu,
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title("QNC Ingest")
             .with_inner_size([1280.0, 760.0])

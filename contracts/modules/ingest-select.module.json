@@ -23,7 +23,7 @@
     "project.settings.write",
     "story.workflow",
     "media_assist.workflow",
-    "filmstrip.generate14",
+    "filmstrip.generate",
     "wave.generate",
     "player.playback"
   ],
@@ -38,7 +38,7 @@
     "qnc.module.ui-widget"
   ],
   "state_policy": "owned_by_calling_application",
-  "database_write_policy": "owner_application_only",
+  "database_write_policy": "public_db_write_transports_only",
   "project_settings_policy": "read_only_via_work_settings_before_start",
   "ui_policy": "no_form_or_paint_code"
 }

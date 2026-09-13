@@ -5,20 +5,23 @@ pub mod test_support;
 pub use selection_config::{Binding, ProbeConfig, SelectionConfig, SourceConfig};
 
 use qnc_ingest_store::content::{
-    Access, CatalogClip, ContentClient, ContentTarget, ImportStatus, StoredClip,
+    Access, CatalogClip, ContentTarget, ContentWriteData, ContentWriteResult,
+    ContentWriteTransport, ImportStatus, StoredClip,
 };
 use qnc_media_probe::{ProbeBackend, Request as ProbeRequest};
 use qnc_media_record_db::{contract::*, Client};
 use qnc_source_groups::{GroupProposal, IndexDocument, IndexReader};
 use qnc_source_reader::{SourceReader, SourceReference, MAX_TEXT_BYTES};
 use selection_config::Result;
+use std::fmt;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        mpsc::SyncSender,
+        mpsc::{self, Receiver, SyncSender, TryRecvError},
         Arc,
     },
+    thread::JoinHandle,
 };
 
 #[derive(Debug)]
@@ -74,6 +77,104 @@ pub struct SelectedClip {
     pub thumb_image: Option<Arc<qnc_image_assets::RgbaImage>>,
 }
 
+#[derive(Default)]
+pub struct SelectSession {
+    result: Option<Receiver<Event>>,
+    cancel: Option<Arc<AtomicBool>>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl SelectSession {
+    pub fn start(
+        &mut self,
+        config: SelectionConfig,
+        selected: SourceReference,
+        target: ContentTarget,
+    ) -> std::result::Result<(), String> {
+        self.cancel();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        let (send, receive) = mpsc::sync_channel(32);
+        let thread = std::thread::Builder::new()
+            .name("qnc-ingest-select".into())
+            .spawn(move || run(config, selected, target, send, worker_cancel))
+            .map_err(|error| error.to_string())?;
+        self.cancel = Some(cancel);
+        self.result = Some(receive);
+        self.thread = Some(thread);
+        Ok(())
+    }
+
+    pub fn cancel(&mut self) {
+        if let Some(cancel) = self.cancel.take() {
+            cancel.store(true, Ordering::Relaxed);
+        }
+        self.result = None;
+        drop(self.thread.take());
+    }
+
+    pub fn poll(&mut self, limit: usize) -> Vec<Event> {
+        let mut events = Vec::new();
+        for _ in 0..limit {
+            let Some(receiver) = self.result.as_ref() else {
+                break;
+            };
+            let event = match receiver.try_recv() {
+                Ok(event) => event,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    Event::Finished(Err("Select proces je prekinut.".into()))
+                }
+            };
+            let finished = matches!(event, Event::Finished(_));
+            events.push(event);
+            if finished {
+                self.result = None;
+                self.cancel = None;
+                drop(self.thread.take());
+                break;
+            }
+        }
+        events
+    }
+
+    pub fn has_pending_work(&self) -> bool {
+        self.result.is_some()
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn from_receiver_for_test(receiver: Receiver<Event>) -> Self {
+        Self {
+            result: Some(receiver),
+            cancel: None,
+            thread: None,
+        }
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn with_cancel_for_test(receiver: Receiver<Event>, cancel: Arc<AtomicBool>) -> Self {
+        Self {
+            result: Some(receiver),
+            cancel: Some(cancel),
+            thread: None,
+        }
+    }
+}
+
+impl fmt::Debug for SelectSession {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SelectSession")
+            .field("pending", &self.has_pending_work())
+            .finish()
+    }
+}
+
+impl Drop for SelectSession {
+    fn drop(&mut self) {
+        self.cancel();
+    }
+}
+
 impl Default for SelectedClip {
     fn default() -> Self {
         Self {
@@ -121,7 +222,7 @@ pub fn run(
         &send,
         &cancel,
         |s, media| s.backend(media),
-        || target.open(Access::ReadWrite).map_err(Into::into),
+        target,
     )
     .map_err(|e| e.to_string());
     let _ = send.send(Event::Finished(result));
@@ -136,14 +237,14 @@ fn run_inner(
         &selection_config::SourceConfig,
         &[SourceReference],
     ) -> Result<Box<dyn ProbeBackend + Send>>,
-    open_content: impl Fn() -> Result<ContentClient> + Sync,
+    content_target: ContentTarget,
 ) -> Result<Summary> {
     let started = std::time::Instant::now();
     if cancel.load(Ordering::Relaxed) {
         return Err("Select je prekinut.".into());
     }
     selected.validate()?;
-    let mut content = open_content()?;
+    let mut content = content_target.open(Access::ReadOnly)?;
     let source_config = config
         .sources
         .iter()
@@ -269,10 +370,11 @@ fn run_inner(
     let next = AtomicUsize::new(0);
     std::thread::scope(|scope| {
         let (publish, publications) = std::sync::mpsc::sync_channel::<CatalogClip>(32);
-        let open_writer = &open_content;
+        let content_target = content_target.clone();
         let writer = scope.spawn(move || -> Result<()> {
-            let mut db = open_writer()?;
+            let mut writer = ContentWriteTransport::start(content_target)?;
             let mut failed = false;
+            let mut sequence = 0_u64;
             while let Ok(first) = publications.recv() {
                 let mut batch = vec![first];
                 while batch.len() < 16 {
@@ -285,7 +387,15 @@ fn run_inner(
                     .iter()
                     .map(|c| (c.id().to_string(), c.snapshot.revision))
                     .collect();
-                let error = db.publish_batch(batch).err();
+                sequence += 1;
+                let key = format!("select-batch-{sequence}");
+                let error: Option<String> = match writer.publish_batch(key.clone(), batch) {
+                    Ok(()) => wait_write_completion(&mut writer, &key)
+                        .and_then(expect_changed)
+                        .map_err(|err| err.to_string())
+                        .err(),
+                    Err(err) => Some(err),
+                };
                 failed |= error.is_some();
                 send.send(Event::Saved { revisions, error })?;
             }
@@ -403,8 +513,14 @@ fn run_inner(
         return Err("Select je prekinut.".into());
     }
     let mut removed_count = 0;
+    let mut remove_writer = ContentWriteTransport::start(content_target)?;
     for chunk in missing.chunks(4096) {
-        let removed = content.remove_missing(chunk.to_vec())?;
+        let key = format!("select-remove-missing-{removed_count}");
+        remove_writer.remove_missing(key.clone(), chunk.to_vec())?;
+        let removed = match wait_write_completion(&mut remove_writer, &key)?.data {
+            ContentWriteData::Removed(ids) => ids,
+            ContentWriteData::Changed => return Err("Neispravan remove-missing odgovor.".into()),
+        };
         removed_count += removed.len();
         send.send(Event::Removed(removed))?;
     }
@@ -414,6 +530,30 @@ fn run_inner(
         removed: removed_count,
         elapsed_ms: started.elapsed().as_millis(),
     })
+}
+
+fn wait_write_completion(
+    transport: &mut ContentWriteTransport,
+    key: &str,
+) -> Result<ContentWriteResult> {
+    loop {
+        for completion in transport.poll() {
+            if completion.key == key {
+                return completion.result.map_err(Into::into);
+            }
+        }
+        if !transport.has_pending() {
+            return Err("Content write transport nije vratio rezultat.".into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(2));
+    }
+}
+
+fn expect_changed(result: ContentWriteResult) -> Result<()> {
+    match result.data {
+        ContentWriteData::Changed => Ok(()),
+        ContentWriteData::Removed(_) => Err("Neispravan content write odgovor.".into()),
+    }
 }
 
 type Thumbnail = (String, Arc<qnc_image_assets::RgbaImage>);

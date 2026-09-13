@@ -11,6 +11,21 @@ use qnc_video_output::{OutputConfig, PixelFormat};
 
 pub(crate) const PREBUFFER_FRAMES: usize = 8;
 pub(crate) const OUTPUT_SLOTS: usize = PREBUFFER_FRAMES + 4;
+/// Keep several conversions ahead of the audio clock so the due picture is
+/// already ready at present. A short queue makes Play wait on convert and
+/// the monitor lags the sound.
+pub(crate) const CONVERT_IN_FLIGHT: usize = 4;
+
+/// UI preview raster only. Source remains the saved width/height; integer 2:1
+/// keeps even lines together so 1080p50 does not weave. Full-HD RGBA readback
+/// cannot hold 50 fps through the mmap preview path on current iGPU hosts.
+pub(crate) fn preview_raster_bounds(width: u32, height: u32) -> [u32; 2] {
+    if width >= 2 && height >= 2 && width % 2 == 0 && height % 2 == 0 {
+        [width / 2, height / 2]
+    } else {
+        [width, height]
+    }
+}
 
 // Prepared before Play. A bounded half-second read-ahead absorbs delivery jitter.
 pub(crate) fn monitor_prebuffer_frames(timebase: Timebase) -> Result<usize> {
@@ -25,6 +40,15 @@ pub(crate) fn monitor_prebuffer_frames(timebase: Timebase) -> Result<usize> {
 #[cfg(test)]
 mod monitor_buffer_tests {
     use super::*;
+
+    #[test]
+    fn preview_raster_is_integer_half_of_saved_even_size() {
+        assert_eq!(preview_raster_bounds(1920, 1080), [960, 540]);
+        assert_eq!(preview_raster_bounds(1280, 720), [640, 360]);
+        assert_eq!(preview_raster_bounds(720, 576), [360, 288]);
+        assert_eq!(preview_raster_bounds(1, 1), [1, 1]);
+    }
+
     #[test]
     fn half_second_is_bounded_and_uses_saved_rational_fps() {
         assert_eq!(
@@ -357,6 +381,28 @@ pub(crate) fn sample_boundary(frame: u64, timebase: Timebase, rate: u32) -> Resu
         return Err(error("invalid frame rate"));
     }
     u64::try_from(n / u128::try_from(timebase.fps_num).map_err(error)?).map_err(error)
+}
+
+/// Audio clock → source frame using the same saved clip timebase as Play.
+#[cfg(test)]
+pub(crate) fn frame_from_samples(sample: u64, timebase: Timebase, rate: u32) -> Result<u64> {
+    Timebase::new(timebase.fps_num, timebase.fps_den).map_err(error)?;
+    if rate == 0 || timebase.fps_num == 0 {
+        return Err(error("invalid audio clock or saved timebase"));
+    }
+    let n = u128::from(sample)
+        .checked_mul(u128::try_from(timebase.fps_num).map_err(error)?)
+        .ok_or_else(|| error("audio frame overflow"))?;
+    let den = u128::from(rate)
+        .checked_mul(u128::try_from(timebase.fps_den).map_err(error)?)
+        .ok_or_else(|| error("audio frame overflow"))?;
+    u64::try_from(n / den).map_err(error)
+}
+
+/// Picture minus audio, in source frames. Negative means the picture lags sound.
+#[cfg(test)]
+pub(crate) fn picture_audio_offset_frames(picture: u64, audio_frame: u64) -> i64 {
+    i64::try_from(picture).unwrap_or(i64::MAX) - i64::try_from(audio_frame).unwrap_or(i64::MAX)
 }
 
 /// Exact PTS-to-unit conversion. Never use decode ordinal as a source frame or round VFR.

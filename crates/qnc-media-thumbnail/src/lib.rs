@@ -1,11 +1,13 @@
 use qnc_source_reader::{SourceReader, SourceReference};
+use std::fmt;
 use std::{
     collections::BTreeMap,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::SyncSender,
+        mpsc::{self, Receiver, SyncSender, TryRecvError},
         Arc,
     },
+    thread::JoinHandle,
 };
 
 pub const MODULE_ID: &str = "qnc.module.media-thumbnail";
@@ -25,6 +27,86 @@ pub enum ThumbnailEvent {
         image: Arc<qnc_image_assets::RgbaImage>,
     },
     Finished,
+}
+
+#[derive(Default)]
+pub struct ThumbnailBatchService {
+    result: Option<Receiver<ThumbnailEvent>>,
+    cancel: Option<Arc<AtomicBool>>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl ThumbnailBatchService {
+    pub fn start(
+        &mut self,
+        sources: Vec<SourceReader>,
+        requests: Vec<ThumbnailRequest>,
+    ) -> Result<(), String> {
+        self.cancel();
+        if sources.is_empty() || requests.is_empty() {
+            return Ok(());
+        }
+        let (send, receive) = mpsc::sync_channel(32);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        let thread = std::thread::Builder::new()
+            .name("qnc-media-thumbnail".into())
+            .spawn(move || load_from_sources(sources, requests, send, worker_cancel))
+            .map_err(|error| format!("thumbnail worker start: {error}"))?;
+        self.result = Some(receive);
+        self.cancel = Some(cancel);
+        self.thread = Some(thread);
+        Ok(())
+    }
+
+    pub fn cancel(&mut self) {
+        if let Some(cancel) = self.cancel.take() {
+            cancel.store(true, Ordering::Relaxed);
+        }
+        self.result = None;
+        drop(self.thread.take());
+    }
+
+    pub fn poll(&mut self, limit: usize) -> Vec<ThumbnailEvent> {
+        let mut events = Vec::new();
+        for _ in 0..limit {
+            let Some(receiver) = self.result.as_ref() else {
+                break;
+            };
+            let event = match receiver.try_recv() {
+                Ok(event) => event,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => ThumbnailEvent::Finished,
+            };
+            let finished = matches!(event, ThumbnailEvent::Finished);
+            events.push(event);
+            if finished {
+                self.result = None;
+                self.cancel = None;
+                drop(self.thread.take());
+                break;
+            }
+        }
+        events
+    }
+
+    pub fn has_pending_work(&self) -> bool {
+        self.result.is_some()
+    }
+}
+
+impl fmt::Debug for ThumbnailBatchService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ThumbnailBatchService")
+            .field("pending", &self.has_pending_work())
+            .finish()
+    }
+}
+
+impl Drop for ThumbnailBatchService {
+    fn drop(&mut self) {
+        self.cancel();
+    }
 }
 
 pub fn load_from_sources(

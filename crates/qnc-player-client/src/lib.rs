@@ -138,6 +138,7 @@ struct Shared {
 pub struct Player {
     shared: Arc<Shared>,
     commands: SyncSender<(u64, Action)>,
+    worker: Option<thread::JoinHandle<()>>,
 }
 impl std::fmt::Debug for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -155,7 +156,7 @@ impl Player {
         });
         let (commands, receiver) = mpsc::sync_channel(16);
         let state = shared.clone();
-        thread::Builder::new()
+        let worker = thread::Builder::new()
             .name("player-client".into())
             .spawn(move || {
                 let mut active: Option<(u64, connection::Connection)> = None;
@@ -184,7 +185,16 @@ impl Player {
                             {
                                 return Err("superseded player selection".into());
                             }
-                            connection::Connection::launch(launch, generation)
+                            connection::Connection::launch(
+                                launch,
+                                generation,
+                                {
+                                    let state = state.clone();
+                                    Arc::new(move |picture| {
+                                        publish_picture(&state, generation, picture)
+                                    })
+                                },
+                            )
                         });
                         if state.generation.load(Ordering::Acquire) == generation {
                             match result {
@@ -234,7 +244,11 @@ impl Player {
                 drop(active);
             })
             .map_err(|e| e.to_string())?;
-        Ok(Self { shared, commands })
+        Ok(Self {
+            shared,
+            commands,
+            worker: Some(worker),
+        })
     }
     /// Latest selection wins; loading and process startup never run on the caller/UI thread.
     pub fn prepare(&self, load: impl FnOnce() -> Result<Launch> + Send + 'static) {
@@ -272,6 +286,23 @@ impl Player {
         let _ = self.shared.notify.set(Box::new(notify));
     }
 }
+fn publish_picture(state: &Shared, generation: u64, picture: Option<Arc<MonitorFrame>>) {
+    let mut current = state.view.lock().unwrap();
+    if state.generation.load(Ordering::Acquire) != generation {
+        return;
+    }
+    let same_picture = match (&current.picture, &picture) {
+        (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+        (None, None) => true,
+        _ => false,
+    };
+    current.picture = picture;
+    drop(current);
+    if !same_picture && let Some(notify) = state.notify.get() {
+        notify();
+    }
+}
+
 fn publish(state: &Shared, generation: u64, view: View) {
     let mut current = state.view.lock().unwrap();
     if state.generation.load(Ordering::Acquire) == generation {
@@ -313,6 +344,9 @@ fn initial_preview_action(
 impl Drop for Player {
     fn drop(&mut self) {
         self.shared.stop.store(true, Ordering::Release);
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
     }
 }
 
@@ -497,6 +531,46 @@ mod tests {
         publish(&player.shared, 0, view);
         assert_eq!(calls.load(Ordering::Relaxed), 1);
     }
+
+    #[test]
+    fn mailbox_picture_publishes_without_a_new_state_reply() {
+        let shared = Shared {
+            generation: AtomicU64::new(1),
+            stop: AtomicBool::new(false),
+            load: Mutex::new(None),
+            view: Mutex::new(View {
+                reply: Some(reply(Vec::new())),
+                ..View::default()
+            }),
+            notify: OnceLock::new(),
+        };
+        let calls = Arc::new(AtomicU64::new(0));
+        let count = calls.clone();
+        let _ = shared.notify.set(Box::new(move || {
+            count.fetch_add(1, Ordering::Relaxed);
+        }));
+        let picture = Arc::new(MonitorFrame {
+            header: MonitorHeader {
+                contract_version: qnc_player_contract::VERSION.into(),
+                session_id: "s".into(),
+                source_generation: 1,
+                output_generation: 4,
+                sequence: 9,
+                source_id: "clip".into(),
+                frame: 9,
+                timebase: Timebase::new(50, 1).unwrap(),
+                width: 2,
+                height: 2,
+            },
+            rgba: vec![0; 16].into(),
+        });
+        publish_picture(&shared, 1, Some(picture.clone()));
+        let view = shared.view.lock().unwrap();
+        assert!(view.reply.is_some());
+        assert!(Arc::ptr_eq(view.picture.as_ref().unwrap(), &picture));
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+    }
+
     #[test]
     fn stale_load_result_cannot_replace_new_selection_or_closed_view() {
         let player = Player::new().unwrap();

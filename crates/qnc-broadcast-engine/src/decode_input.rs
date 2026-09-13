@@ -1,7 +1,17 @@
 use crate::*;
 use qnc_media_metadata::{MediaRepresentation, Rational};
+use qnc_media_stream::{CodecEndpoint, MediaStream};
 
-type Opener = dyn FnMut(&str) -> std::io::Result<MediaStream>;
+type Opener = dyn FnMut(&str) -> std::io::Result<DecodeMediaAccess>;
+
+#[derive(Debug)]
+pub enum DecodeMediaAccess {
+    Stream(MediaStream),
+    Endpoint {
+        endpoint: CodecEndpoint,
+        storage_stamp: String,
+    },
+}
 
 /// One session's existing saved media binding, reused on explicit seek. No DB lookup.
 pub(crate) struct DecodeInput {
@@ -10,10 +20,10 @@ pub(crate) struct DecodeInput {
     opener: Rc<RefCell<Box<Opener>>>,
 }
 impl DecodeInput {
-    pub fn new(
+    pub fn new_access(
         media: MediaRepresentation,
         config: DecoderConfig,
-        opener: impl FnMut(&str) -> std::io::Result<MediaStream> + 'static,
+        opener: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
     ) -> Self {
         Self {
             media,
@@ -37,9 +47,30 @@ impl DecodeInput {
             start,
         };
         request.validate(&self.config).map_err(error)?;
-        let media = (self.opener.borrow_mut())(&self.media.media_uri).map_err(error)?;
-        Decoder::open(request, media, self.config.clone()).map_err(error)
+        let context = decode_open_context(&request);
+        match (self.opener.borrow_mut())(&self.media.media_uri)
+            .map_err(|err| error(format!("{context}: {err}")))?
+        {
+            DecodeMediaAccess::Stream(media) => Decoder::open(request, media, self.config.clone())
+                .map_err(|err| error(format!("{context}: {err}"))),
+            DecodeMediaAccess::Endpoint {
+                endpoint,
+                storage_stamp,
+            } => Decoder::open_endpoint(request, endpoint, storage_stamp, self.config.clone())
+                .map_err(|err| error(format!("{context}: {err}"))),
+        }
     }
+}
+
+fn decode_open_context(request: &DecodeRequest) -> String {
+    let start = request
+        .start
+        .map(|r| format!("{}/{}", r.numerator, r.denominator))
+        .unwrap_or_else(|| "0".into());
+    format!(
+        "decode open stream={} start={} media={}",
+        request.stream_index, start, request.media.media_uri
+    )
 }
 
 pub(crate) fn seek_start(source: &SourceRuntime, frame: u64) -> Result<Option<Rational>> {

@@ -1,12 +1,12 @@
 #![cfg(test)]
 //! Explicit adapter test of saved ORIGINAL audio, not an override of project playback.input.
 use super::*;
-use qnc_media_stream::{LocalSource, SourceReference};
+use qnc_media_stream::{CodecEndpoint, LocalSource, SourceReference};
 use qnc_player_input::InputReader;
 use qnc_work_settings::SettingsReader;
 use sha2::{Digest, Sha256};
 use std::{
-    io::{Read, Seek},
+    io::{self, Read, Seek},
     path::PathBuf,
     thread,
     time::Duration,
@@ -94,13 +94,30 @@ fn real_saved_original_mono_tracks() {
         media,
     };
     let reference = SourceReference::from_uri(&plan.media.media_uri).unwrap();
-    let source = LocalSource::new(reference.source_uri(), source_root).unwrap();
+    let codec_path = source_root
+        .join(reference.relative_path())
+        .canonicalize()
+        .unwrap();
+    let source = LocalSource::new(reference.source_uri(), &source_root).unwrap();
     let mut verify = MediaStream::local(&source, &plan.media.media_uri).unwrap();
     let before = hash(&mut verify);
-    let decode_input = Rc::new(DecodeInput::new(
+    let storage_stamp = verify.info().storage_stamp.clone();
+    let media_uri = plan.media.media_uri.clone();
+    let decode_input = Rc::new(DecodeInput::new_access(
         plan.media.clone(),
-        DecoderConfig::new(qnc_ffmpeg_decode::FfmpegAdapter::new("ffmpeg")),
-        move |uri| MediaStream::local(&source, uri),
+        qnc_decoder_catalog::installed_config().unwrap(),
+        move |uri| {
+            if uri != media_uri {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "media source mismatch",
+                ));
+            }
+            Ok(DecodeMediaAccess::Endpoint {
+                endpoint: CodecEndpoint::for_local_file(&codec_path, uri)?,
+                storage_stamp: storage_stamp.clone(),
+            })
+        },
     ));
     let map = ChannelMap::new(format.channel_count, vec![2, 3]).unwrap();
     let mut audio = Audio::open(

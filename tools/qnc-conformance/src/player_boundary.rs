@@ -188,7 +188,10 @@ fn forbidden_dependency(owner: &str, dependency: &str) -> bool {
     if owner == "qnc-player-client" {
         return !matches!(
             dependency,
-            "qnc-player-client" | "qnc-player-contract" | "qnc-player-frame-transport"
+            "qnc-player-client"
+                | "qnc-player-contract"
+                | "qnc-player-frame-transport"
+                | "qnc-dev-diagnostics"
         ) && forbidden_dependency("qnc-player-input", dependency);
     }
     if owner == "qnc-player-frame-transport" {
@@ -236,7 +239,10 @@ fn forbidden_dependency(owner: &str, dependency: &str) -> bool {
         return if dependency.starts_with("qnc-") {
             !matches!(
                 dependency,
-                "qnc-broadcast-engine" | "qnc-broadcast-player" | "qnc-player-contract"
+                "qnc-broadcast-engine"
+                    | "qnc-broadcast-player"
+                    | "qnc-player-contract"
+                    | "qnc-dev-diagnostics"
             ) && forbidden_dependency("qnc-player-input", dependency)
                 && forbidden_dependency("qnc-media-decode", dependency)
                 && forbidden_dependency("qnc-pixel-convert", dependency)
@@ -310,6 +316,7 @@ fn forbidden_dependency(owner: &str, dependency: &str) -> bool {
                 dependency,
                 "qnc-player-input"
                     | "qnc-ingest-store"
+                    | "qnc-wave"
                     | "qnc-work-settings"
                     | "qnc-media-records"
                     | "qnc-media-metadata"
@@ -398,7 +405,7 @@ mod tests {
         for owner in ["qnc-ffmpeg-decode", "qnc-decoder-catalog"] {
             assert!(forbidden_dependency(owner, "qnc-project-store"));
             assert!(forbidden_dependency(owner, "qnc-media-probe"));
-            assert!(forbidden_dependency(owner, "qnc-ingest-components"));
+            assert!(forbidden_dependency(owner, "qnc-ingest-application"));
         }
     }
 
@@ -408,7 +415,7 @@ mod tests {
             "qnc-broadcast-player",
             "qnc-broadcast-engine",
             "qnc-media-decode",
-            "qnc-ingest-components",
+            "qnc-ingest-application",
             "qnc-project-store",
             "qnc-media-probe",
             "qnc-scanner",
@@ -421,6 +428,7 @@ mod tests {
             "qnc-player-client",
             "qnc-player-contract",
             "qnc-player-frame-transport",
+            "qnc-dev-diagnostics",
             "qnc-player-input",
             "qnc-json-transport",
             "qnc-transport-resolver",
@@ -464,7 +472,7 @@ mod tests {
             "qnc-player-input",
             "qnc-ui-kit",
             "qnc-project-store",
-            "qnc-ingest-components",
+            "qnc-ingest-application",
             "reqwest",
             "winit",
         ] {
@@ -482,7 +490,7 @@ mod tests {
             "qnc-player-input",
             "qnc-broadcast-player",
             "qnc-media-decode",
-            "qnc-ingest-components",
+            "qnc-ingest-application",
             "eframe",
             "rusqlite",
             "reqwest",
@@ -504,7 +512,7 @@ mod tests {
             "qnc-media-probe",
             "qnc-ui-kit",
             "qnc-project-store",
-            "qnc-ingest-components",
+            "qnc-ingest-application",
         ] {
             assert!(forbidden_dependency("qnc-audio-output", dependency));
         }
@@ -517,7 +525,7 @@ mod tests {
     fn media_stream_cannot_acquire_app_db_or_playback_responsibilities() {
         for dependency in [
             "qnc-project-store",
-            "qnc-ingest-components",
+            "qnc-ingest-application",
             "qnc-player-input",
             "qnc-broadcast-player",
             "qnc-media-probe",
@@ -588,7 +596,7 @@ mod tests {
             "qnc-broadcast-engine",
             "qnc-media-decode",
             "qnc-player-input",
-            "qnc-ingest-components",
+            "qnc-ingest-application",
             "qnc-project-store",
             "qnc-media-probe",
             "qnc-scanner",
@@ -622,7 +630,7 @@ mod tests {
     fn native_process_does_not_pull_application_workflow_or_probe() {
         for name in [
             "qnc-project-store",
-            "qnc-ingest-components",
+            "qnc-ingest-application",
             "qnc-app",
             "qnc-media-probe",
             "qnc-scanner",
@@ -638,6 +646,7 @@ mod tests {
             "qnc-player-frame-transport",
             "qnc-media-stream",
             "qnc-json-transport",
+            "qnc-dev-diagnostics",
             "winit",
         ] {
             assert!(!forbidden_dependency("qnc-player-runner", name), "{name}");
@@ -658,7 +667,7 @@ mod tests {
             "qnc-media-probe",
             "qnc-scanner",
             "qnc-project-store",
-            "qnc-ingest-components",
+            "qnc-ingest-application",
             "qnc-broadcast-player",
             "qnc-source-reader",
             "qnc-ui-kit",

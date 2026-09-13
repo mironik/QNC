@@ -1,0 +1,32 @@
+{
+  "module_id": "qnc.module.wave-view",
+  "module_name": "Wave View",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": ["wave.peaks.paint"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.probe.full",
+    "source.scan.roles",
+    "wave.generate",
+    "application.db.read",
+    "application.db.write",
+    "playback.clock.own"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.wave-worker",
+    "qnc.module.player-client",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "boundary": "Paints caller-supplied peak arrays only. It does not read databases, decode media, generate wave artifacts, own timeline state, or know which application displays it."
+}

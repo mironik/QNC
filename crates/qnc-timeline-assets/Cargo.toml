@@ -1,0 +1,11 @@
+[package]
+name = "qnc-timeline-assets"
+version = "0.1.0"
+edition = "2021"
+description = "Read-only timeline asset loader for QNC"
+
+[dependencies]
+qnc-filmstrip = { workspace = true }
+qnc-image-assets = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-wave = { workspace = true }

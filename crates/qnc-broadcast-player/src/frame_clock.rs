@@ -181,6 +181,25 @@ impl FrameClock {
         })
     }
 
+    /// The frame that belongs to `now_tick`. Late ticks skip intermediates so
+    /// video stays on the audio/source clock instead of dumping a burst.
+    pub fn latest_due_frame(&mut self, now_tick: ClockTick) -> Option<ScheduledFrame> {
+        if !self.running || now_tick < self.anchor_tick {
+            return None;
+        }
+        let due_slots = self.config.due_slots_at(now_tick - self.anchor_tick);
+        if due_slots <= self.delivered_slots {
+            return None;
+        }
+        let frame = self.frame_for_slot(due_slots)?;
+        self.delivered_slots = due_slots;
+        Some(ScheduledFrame {
+            frame,
+            due_slot: due_slots,
+            direction: self.config.rate.direction(),
+        })
+    }
+
     pub fn drain_due_frames(
         &mut self,
         now_tick: ClockTick,
@@ -334,6 +353,17 @@ mod tests {
         assert_eq!(clock.next_due_frame(80_000_000).unwrap().frame, 1);
         assert_eq!(clock.next_due_frame(120_000_000).unwrap().frame, 0);
         assert_eq!(clock.next_due_frame(160_000_000), None);
+    }
+
+    #[test]
+    fn latest_due_frame_skips_late_intermediates_on_50p() {
+        let mut clock = FrameClock::start(normal_config(50), 10, 0);
+
+        assert_eq!(clock.next_due_frame(0).unwrap().frame, 10);
+        assert_eq!(clock.latest_due_frame(19_999_999), None);
+        assert_eq!(clock.latest_due_frame(100_000_000).unwrap().frame, 15);
+        assert_eq!(clock.latest_due_frame(100_000_000), None);
+        assert_eq!(clock.latest_due_frame(120_000_000).unwrap().frame, 16);
     }
 
     #[test]

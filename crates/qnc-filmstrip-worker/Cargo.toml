@@ -1,0 +1,21 @@
+[package]
+name = "qnc-filmstrip-worker"
+version = "0.1.0"
+edition = "2021"
+description = "Background filmstrip JPEG generator for QNC"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-decoder-catalog = { workspace = true }
+qnc-dir-browser = { workspace = true }
+qnc-filmstrip = { workspace = true }
+qnc-frame-timebase = { workspace = true }
+qnc-image-assets = { workspace = true }
+qnc-contracts = { workspace = true }
+qnc-media-decode = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-media-stream = { workspace = true }
+qnc-pixel-convert = { workspace = true }
+qnc-transport-resolver = { workspace = true }
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }

@@ -1,0 +1,41 @@
+{
+  "module_id": "qnc.module.timeline-assets",
+  "module_name": "Timeline Assets",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "timeline.assets.read",
+    "filmstrip.background.read",
+    "wave.peaks.read"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "database_read_policy": "read_only_public_ingest_content_contract",
+  "database_write_policy": "no_db_writes",
+  "state_policy": "session_local",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.probe.full",
+    "source.scan.roles",
+    "filmstrip.generate",
+    "wave.generate",
+    "playback.clock.own",
+    "playback.execute",
+    "application.db.write",
+    "app_to_app.state_share"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.source-reader",
+    "qnc.module.filmstrip-worker",
+    "qnc.module.wave-worker",
+    "qnc.module.player-client",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine"
+  ],
+  "boundary": "Reads only already published filmstrip and wave artifacts for passive timeline painting. It does not generate artifacts, probe media, scan sources, own playback state, own application workflow, or write any database."
+}

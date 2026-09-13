@@ -6,3 +6,6 @@ description = "Shared passive QNC egui UI patterns"
 
 [dependencies]
 eframe = { workspace = true }
+egui-wgpu = "0.31.1"
+qnc-dev-diagnostics = { workspace = true }
+wgpu = "24.0.5"

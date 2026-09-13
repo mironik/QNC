@@ -12,11 +12,11 @@ fast_image_resize = { version = "=6.1.0", default-features = false, features = [
 
 [dev-dependencies]
 serde_json.workspace = true
+qnc-decoder-catalog.workspace = true
 qnc-player-input.workspace = true
 qnc-work-settings.workspace = true
 qnc-media-stream.workspace = true
 qnc-media-decode.workspace = true
-qnc-ffmpeg-decode.workspace = true
 qnc-video-output.workspace = true
 sha2 = "0.10"
 wgpu = "=24.0.5"

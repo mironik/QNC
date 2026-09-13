@@ -12,7 +12,7 @@
   "forbidden_calls": ["db.write", "app.workflow", "network.discover", "identity.remote_collect", "privilege.elevate"],
   "forbidden_dependencies": [],
   "state_policy": "stateless",
-  "database_write_policy": "returns_result_to_owner_application",
+  "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-workstation-identity",
   "helper_executable": "qnc-workstation-identity",
   "execution_scope": "calling_workstation_only",

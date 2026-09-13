@@ -13,7 +13,7 @@
   "supported_cpu": ["x86_64", "aarch64"],
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
-  "forbidden_calls": ["ffprobe", "source.scan.roles", "media.probe.full", "db.write", "filmstrip.generate14", "wave.generate"],
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "media.probe.full", "db.write", "filmstrip.generate", "wave.generate"],
   "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.ui-widget"],
   "specification": "docs/54-player-real-media-composition.md"
 }

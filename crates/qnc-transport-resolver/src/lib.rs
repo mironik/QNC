@@ -107,6 +107,14 @@ impl ResolverConfig {
 
     pub fn resolve(&self, uri: &str) -> Result<ResolvedResource, ResolveError> {
         let parsed = parse_qnc_uri(uri).map_err(ResolveError::InvalidUri)?;
+        if let Some(path) = self.local_bindings.get(uri) {
+            return Ok(ResolvedResource {
+                uri: uri.to_string(),
+                environment: parsed.environment,
+                authority: parsed.authority,
+                endpoint: ResolvedEndpoint::LocalPath(path.clone()),
+            });
+        }
         match parsed.environment.as_str() {
             "local" => self.resolve_local(uri, parsed),
             "lan" => self.resolve_network(uri, parsed, &self.lan_authorities),
@@ -119,15 +127,6 @@ impl ResolverConfig {
     }
 
     fn resolve_local(&self, uri: &str, parsed: QncUri) -> Result<ResolvedResource, ResolveError> {
-        if let Some(path) = self.local_bindings.get(uri) {
-            return Ok(ResolvedResource {
-                uri: uri.to_string(),
-                environment: parsed.environment,
-                authority: None,
-                endpoint: ResolvedEndpoint::LocalPath(path.clone()),
-            });
-        }
-
         let relative = safe_relative_path(&parsed.resource_kind, &parsed.resource_id)?;
         Ok(ResolvedResource {
             uri: uri.to_string(),
@@ -238,6 +237,42 @@ mod tests {
         assert_eq!(
             resolved.endpoint,
             ResolvedEndpoint::LocalPath(PathBuf::from("data").join("project_store.db"))
+        );
+    }
+
+    #[test]
+    fn mounted_lan_uri_resolves_to_private_path_without_changing_public_identity() {
+        let config = ResolverConfig::new(PathBuf::from("qnc-data")).with_local_binding(
+            "qnc://lan/storage-a/source/card-a",
+            PathBuf::from(r"\\storage-a\card-a"),
+        );
+        let resolved = config
+            .resolve("qnc://lan/storage-a/source/card-a")
+            .expect("resolve mounted lan binding");
+
+        assert_eq!(resolved.environment, "lan");
+        assert_eq!(resolved.authority.as_deref(), Some("storage-a"));
+        assert_eq!(
+            resolved.endpoint,
+            ResolvedEndpoint::LocalPath(PathBuf::from(r"\\storage-a\card-a"))
+        );
+    }
+
+    #[test]
+    fn mounted_intranet_uri_resolves_to_private_path_without_http_decoder_input() {
+        let config = ResolverConfig::new(PathBuf::from("qnc-data")).with_local_binding(
+            "qnc://intranet/mam-a/source/card-a",
+            PathBuf::from("/mnt/mam-a/card-a"),
+        );
+        let resolved = config
+            .resolve("qnc://intranet/mam-a/source/card-a")
+            .expect("resolve mounted intranet binding");
+
+        assert_eq!(resolved.environment, "intranet");
+        assert_eq!(resolved.authority.as_deref(), Some("mam-a"));
+        assert_eq!(
+            resolved.endpoint,
+            ResolvedEndpoint::LocalPath(PathBuf::from("/mnt/mam-a/card-a"))
         );
     }
 

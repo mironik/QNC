@@ -4,8 +4,6 @@ use qnc_audio_output::{AudioOutput, ChannelMap, Config, Format};
 use qnc_media_metadata::Rational;
 use std::{collections::VecDeque, sync::Arc};
 
-const MAX_MONITOR_PENDING: usize = 8;
-
 pub(crate) struct VideoSink {
     pub output: Option<VideoOutput>,
     pub config: OutputConfig,
@@ -24,14 +22,11 @@ impl VideoSink {
     pub fn push_monitor(&mut self, header: FrameHeader, rgba: Arc<[u8]>) {
         let frame = (header, rgba);
         self.monitor = Some(frame.clone());
+        self.monitor_pending.clear();
         self.monitor_pending.push_back(frame);
-        while self.monitor_pending.len() > MAX_MONITOR_PENDING {
-            self.monitor_pending.pop_front();
-        }
     }
 
-    pub fn clear_monitor(&mut self) {
-        self.monitor = None;
+    pub fn clear_pending_monitor(&mut self) {
         self.monitor_pending.clear();
     }
 

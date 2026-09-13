@@ -5,7 +5,7 @@ mod range;
 mod remote;
 pub mod server;
 
-pub use bridge::LoopbackBridge;
+pub use bridge::{CodecEndpoint, LoopbackBridge};
 pub use qnc_source_reader::{LocalSource, SourceReference};
 use qnc_transport_resolver::ResolverConfig;
 pub use remote::HttpEndpoint;

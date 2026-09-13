@@ -1,12 +1,13 @@
 //! Host deployment selection. No media discovery, application identity or DB ownership.
+use qnc_frame_timebase::FrameTimebase;
 use qnc_media_decode::*;
-use qnc_media_stream::HttpEndpoint;
+use qnc_media_stream::CodecEndpoint;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
     io::Read,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, atomic::AtomicBool},
 };
 
 pub const VERSION: &str = "1";
@@ -32,7 +33,91 @@ pub struct Registration {
     pub codecs: Vec<String>,
     pub pixel_formats: Vec<String>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectedDeployment {
+    pub id: String,
+    pub driver: Driver,
+    pub executable: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FilmstripExtractFrame {
+    pub seek_sec: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilmstripExtractMode {
+    RandomSeek,
+    KeyframeSeek,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalFilmstripExtractor {
+    deployment: SelectedDeployment,
+}
+
+impl LocalFilmstripExtractor {
+    pub fn extract_frames(
+        &self,
+        source: &Path,
+        frames: &[FilmstripExtractFrame],
+        source_timebase: FrameTimebase,
+        mode: FilmstripExtractMode,
+        thumb_size: [u32; 2],
+        temp_dir: &Path,
+    ) -> std::result::Result<(), String> {
+        let cancel = AtomicBool::new(false);
+        self.extract_frames_with_cancel(
+            source,
+            frames,
+            source_timebase,
+            mode,
+            thumb_size,
+            temp_dir,
+            &cancel,
+        )
+    }
+
+    pub fn extract_frames_with_cancel(
+        &self,
+        source: &Path,
+        frames: &[FilmstripExtractFrame],
+        source_timebase: FrameTimebase,
+        mode: FilmstripExtractMode,
+        thumb_size: [u32; 2],
+        temp_dir: &Path,
+        cancel: &AtomicBool,
+    ) -> std::result::Result<(), String> {
+        match &self.deployment.driver {
+            Driver::FfmpegCliV1 => qnc_ffmpeg_decode::extract_filmstrip_frames_with_cancel(
+                &self.deployment.executable,
+                source,
+                &frames
+                    .iter()
+                    .map(|frame| qnc_ffmpeg_decode::FfmpegFilmstripFrame {
+                        seek_sec: frame.seek_sec,
+                    })
+                    .collect::<Vec<_>>(),
+                source_timebase,
+                match mode {
+                    FilmstripExtractMode::RandomSeek => {
+                        qnc_ffmpeg_decode::FfmpegFilmstripMode::RandomSeek
+                    }
+                    FilmstripExtractMode::KeyframeSeek => {
+                        qnc_ffmpeg_decode::FfmpegFilmstripMode::KeyframeSeek
+                    }
+                },
+                thumb_size,
+                temp_dir,
+                cancel,
+            ),
+            Driver::QncPacketsV1 { .. } => {
+                Err("selected decoder does not provide local filmstrip extraction".into())
+            }
+        }
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "protocol", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Driver {
     FfmpegCliV1,
@@ -117,18 +202,20 @@ impl Catalog {
             .collect()
     }
     pub fn selected_config(&self, directory: &Path) -> Result<DecoderConfig> {
-        self.validate()?;
+        let deployment = self.selected_deployment(directory)?;
         let registration = self
             .adapters
             .iter()
-            .find(|a| a.id == self.selected)
-            .ok_or_else(|| bad("missing decoder selection"))?;
-        let executable = registration.executable_path(directory)?;
+            .find(|a| a.id == deployment.id)
+            .ok_or_else(|| bad("missing decoder selection"))?
+            .clone();
         let adapter: Arc<dyn DecoderAdapter> = match &registration.driver {
-            Driver::FfmpegCliV1 => Arc::new(qnc_ffmpeg_decode::FfmpegAdapter::new(executable)),
+            Driver::FfmpegCliV1 => {
+                Arc::new(qnc_ffmpeg_decode::FfmpegAdapter::new(deployment.executable))
+            }
             Driver::QncPacketsV1 { args } => Arc::new(ExternalAdapter {
                 adapter_id: registration.id.clone(),
-                executable,
+                executable: deployment.executable,
                 args: args.clone(),
             }),
         };
@@ -136,6 +223,20 @@ impl Catalog {
             registration: registration.clone(),
             adapter,
         }))
+    }
+
+    pub fn selected_deployment(&self, directory: &Path) -> Result<SelectedDeployment> {
+        self.validate()?;
+        let registration = self
+            .adapters
+            .iter()
+            .find(|a| a.id == self.selected)
+            .ok_or_else(|| bad("missing decoder selection"))?;
+        Ok(SelectedDeployment {
+            id: registration.id.clone(),
+            driver: registration.driver.clone(),
+            executable: registration.executable_path(directory)?,
+        })
     }
 }
 impl Registration {
@@ -209,7 +310,7 @@ impl DecoderAdapter for SelectedAdapter {
         &self,
         request: &DecodeRequest,
         plan: &DecodePlan,
-        ep: &HttpEndpoint,
+        ep: &CodecEndpoint,
         stamp: &str,
     ) -> Result<ProcessLaunch> {
         self.adapter.launch(request, plan, ep, stamp)
@@ -218,6 +319,24 @@ impl DecoderAdapter for SelectedAdapter {
 
 /// An explicit override is authoritative: a bad override is never replaced by a default.
 pub fn installed_config() -> Result<DecoderConfig> {
+    let (catalog, directory) = installed_catalog()?;
+    catalog.selected_config(&directory)
+}
+
+pub fn installed_deployment() -> Result<SelectedDeployment> {
+    let (catalog, directory) = installed_catalog()?;
+    catalog.selected_deployment(&directory)
+}
+
+pub fn installed_filmstrip_extractor() -> Result<Option<LocalFilmstripExtractor>> {
+    let deployment = installed_deployment()?;
+    Ok(match deployment.driver {
+        Driver::FfmpegCliV1 => Some(LocalFilmstripExtractor { deployment }),
+        Driver::QncPacketsV1 { .. } => None,
+    })
+}
+
+fn installed_catalog() -> Result<(Catalog, PathBuf)> {
     let path = if let Some(path) = std::env::var_os("QNC_DECODER_CATALOG") {
         if path.is_empty() {
             return Err(bad("empty decoder catalog override"));
@@ -232,7 +351,11 @@ pub fn installed_config() -> Result<DecoderConfig> {
             .find(|p| p.is_file())
             .ok_or_else(|| bad("decoder catalog missing; configure QNC_DECODER_CATALOG"))?
     };
-    Catalog::read(&path)?.selected_config(path.parent().ok_or_else(|| bad("invalid catalog path"))?)
+    let directory = path
+        .parent()
+        .ok_or_else(|| bad("invalid catalog path"))?
+        .to_path_buf();
+    Ok((Catalog::read(&path)?, directory))
 }
 
 #[cfg(test)]

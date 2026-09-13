@@ -4,10 +4,14 @@ mod transport;
 pub use database::ContentStore;
 pub use qnc_json_transport::{Access, Credentials};
 use qnc_media_records::{Phase, Snapshot};
+pub use qnc_wave::WaveArtifactRecord;
 use serde::{Deserialize, Serialize};
-pub use transport::{respond, ContentClient, ContentTarget, ENDPOINT};
+pub use transport::{
+    respond, ContentClient, ContentTarget, ContentWriteCompletion, ContentWriteData,
+    ContentWriteResult, ContentWriteTransport, ENDPOINT,
+};
 
-pub const VERSION: &str = "0.2.3";
+pub const VERSION: &str = "0.2.4";
 pub const SCHEMA_VERSION: &str = "0.2.0";
 pub const MAX_BYTES: usize = 16 * 1024 * 1024;
 pub const PAGE_SIZE: usize = 64;
@@ -91,6 +95,25 @@ pub struct StoredClipSummary {
     pub final_record: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FilmstripFrameRecord {
+    pub index: usize,
+    pub seek_sec: String,
+    pub artifact_uri: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FilmstripArtifactRecord {
+    pub clip_id: String,
+    pub status: String,
+    pub duration_sec: String,
+    pub frame_count: usize,
+    pub artifact_uri: String,
+    pub frames: Vec<FilmstripFrameRecord>,
+}
+
 /// Lightweight catalog signature for deciding whether a visible catalog is stale.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -157,6 +180,14 @@ pub enum Operation {
     Read {
         clip_id: String,
     },
+    PublishFilmstrip(Box<FilmstripArtifactRecord>),
+    ReadFilmstrip {
+        clip_id: String,
+    },
+    PublishWave(Box<WaveArtifactRecord>),
+    ReadWave {
+        clip_id: String,
+    },
     Select {
         clip_ids: Vec<String>,
         selected: bool,
@@ -178,6 +209,8 @@ impl Operation {
                 | Self::Stats
                 | Self::Inventory { .. }
                 | Self::Read { .. }
+                | Self::ReadFilmstrip { .. }
+                | Self::ReadWave { .. }
         )
     }
 }
@@ -199,6 +232,8 @@ pub enum Data {
     ClipSummaries(Vec<StoredClipSummary>),
     CatalogStats(CatalogStats),
     Clip(Option<Box<StoredClip>>),
+    Filmstrip(Option<Box<FilmstripArtifactRecord>>),
+    Wave(Option<Box<WaveArtifactRecord>>),
     Inventory(Vec<InventoryClip>),
     Removed(Vec<String>),
     Changed,

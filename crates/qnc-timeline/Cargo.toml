@@ -6,3 +6,6 @@ description = "Shared passive QNC timeline UI component"
 
 [dependencies]
 eframe = { workspace = true }
+qnc-filmstrip = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-wave-view = { workspace = true }

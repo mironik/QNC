@@ -1,7 +1,12 @@
 use super::*;
 use qnc_json_transport::JsonClient;
 use qnc_transport_resolver::ResolverConfig;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::mpsc::{self, Receiver, Sender, TryRecvError},
+    thread::JoinHandle,
+    time::Instant,
+};
 
 #[derive(Clone)]
 pub struct ContentTarget {
@@ -24,6 +29,34 @@ impl std::fmt::Debug for ContentTarget {
     }
 }
 impl ContentTarget {
+    /// The DB owner supplies the private file binding. Public identity remains `uri`.
+    pub fn from_owner_binding(file: &Path, uri: &str) -> Result<Self> {
+        project_id(uri)?;
+        Ok(Self {
+            uri: uri.into(),
+            binding: TargetBinding::Local(file.to_path_buf()),
+        })
+    }
+
+    pub fn from_remote_binding(resolver: ResolverConfig, uri: &str, token: String) -> Result<Self> {
+        project_id(uri)?;
+        if token.is_empty() {
+            return Err("Nedostaje DB credential.".into());
+        }
+        Ok(Self {
+            uri: uri.into(),
+            binding: TargetBinding::Remote { resolver, token },
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test_owner_binding(file: &Path, uri: &str) -> Self {
+        Self {
+            uri: uri.into(),
+            binding: TargetBinding::Local(file.to_path_buf()),
+        }
+    }
+
     pub fn for_project(
         reader: &qnc_work_settings::SettingsReader,
         settings: &qnc_work_settings::WorkSettings,
@@ -58,6 +91,10 @@ impl ContentTarget {
                 ContentClient::from_remote(resolver, &self.uri, access, token)
             }
         }
+    }
+
+    pub fn uri(&self) -> &str {
+        &self.uri
     }
 }
 
@@ -148,6 +185,36 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
+    pub fn publish_filmstrip(&mut self, artifact: FilmstripArtifactRecord) -> Result<()> {
+        match self.execute(Operation::PublishFilmstrip(Box::new(artifact)))? {
+            Data::Changed => Ok(()),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
+    pub fn read_filmstrip(&mut self, clip_id: &str) -> Result<Option<FilmstripArtifactRecord>> {
+        qnc_media_records::valid_id(clip_id).map_err(err)?;
+        match self.execute(Operation::ReadFilmstrip {
+            clip_id: clip_id.into(),
+        })? {
+            Data::Filmstrip(artifact) => Ok(artifact.map(|record| *record)),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
+    pub fn publish_wave(&mut self, artifact: WaveArtifactRecord) -> Result<()> {
+        match self.execute(Operation::PublishWave(Box::new(artifact)))? {
+            Data::Changed => Ok(()),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
+    pub fn read_wave(&mut self, clip_id: &str) -> Result<Option<WaveArtifactRecord>> {
+        qnc_media_records::valid_id(clip_id).map_err(err)?;
+        match self.execute(Operation::ReadWave {
+            clip_id: clip_id.into(),
+        })? {
+            Data::Wave(artifact) => Ok(artifact.map(|record| *record)),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     pub fn publish_batch(&mut self, clips: Vec<CatalogClip>) -> Result<()> {
         match self.execute(Operation::PublishBatch(clips))? {
             Data::Changed => Ok(()),
@@ -219,6 +286,224 @@ impl ContentClient {
                 reply.result
             }
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentWriteResult {
+    pub elapsed_ms: u128,
+    pub data: ContentWriteData,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContentWriteData {
+    Changed,
+    Removed(Vec<String>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentWriteCompletion {
+    pub key: String,
+    pub result: Result<ContentWriteResult>,
+}
+
+#[derive(Debug)]
+struct ContentWriteCommand {
+    key: String,
+    operation: Operation,
+}
+
+#[derive(Debug)]
+pub struct ContentWriteTransport {
+    pending: usize,
+    send: Option<Sender<ContentWriteCommand>>,
+    receive: Receiver<ContentWriteCompletion>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl ContentWriteTransport {
+    pub fn start(target: ContentTarget) -> Result<Self> {
+        let (send, receive_commands) = mpsc::channel();
+        let (send_results, receive) = mpsc::channel();
+        let thread = std::thread::Builder::new()
+            .name("qnc-content-write-transport".into())
+            .spawn(move || run_content_write_transport(target, receive_commands, send_results))
+            .map_err(err)?;
+        Ok(Self {
+            pending: 0,
+            send: Some(send),
+            receive,
+            thread: Some(thread),
+        })
+    }
+
+    pub fn publish_filmstrip(
+        &mut self,
+        key: String,
+        artifact: FilmstripArtifactRecord,
+    ) -> Result<()> {
+        let command = ContentWriteCommand {
+            key,
+            operation: Operation::PublishFilmstrip(Box::new(artifact)),
+        };
+        self.send
+            .as_ref()
+            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .send(command)
+            .map_err(err)?;
+        self.pending += 1;
+        Ok(())
+    }
+
+    pub fn publish_batch(&mut self, key: String, clips: Vec<CatalogClip>) -> Result<()> {
+        let command = ContentWriteCommand {
+            key,
+            operation: Operation::PublishBatch(clips),
+        };
+        self.send
+            .as_ref()
+            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .send(command)
+            .map_err(err)?;
+        self.pending += 1;
+        Ok(())
+    }
+
+    pub fn remove_missing(&mut self, key: String, clips: Vec<InventoryClip>) -> Result<()> {
+        let command = ContentWriteCommand {
+            key,
+            operation: Operation::RemoveMissing { clips },
+        };
+        self.send
+            .as_ref()
+            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .send(command)
+            .map_err(err)?;
+        self.pending += 1;
+        Ok(())
+    }
+
+    pub fn select(&mut self, key: String, clip_ids: Vec<String>, selected: bool) -> Result<()> {
+        let command = ContentWriteCommand {
+            key,
+            operation: Operation::Select { clip_ids, selected },
+        };
+        self.send
+            .as_ref()
+            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .send(command)
+            .map_err(err)?;
+        self.pending += 1;
+        Ok(())
+    }
+
+    pub fn publish_wave(&mut self, key: String, artifact: WaveArtifactRecord) -> Result<()> {
+        let command = ContentWriteCommand {
+            key,
+            operation: Operation::PublishWave(Box::new(artifact)),
+        };
+        self.send
+            .as_ref()
+            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .send(command)
+            .map_err(err)?;
+        self.pending += 1;
+        Ok(())
+    }
+
+    pub fn poll(&mut self) -> Vec<ContentWriteCompletion> {
+        let mut completions = Vec::new();
+        loop {
+            match self.receive.try_recv() {
+                Ok(completion) => {
+                    self.pending = self.pending.saturating_sub(1);
+                    completions.push(completion);
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    self.pending = 0;
+                    break;
+                }
+            }
+        }
+        completions
+    }
+
+    pub fn has_pending(&self) -> bool {
+        self.pending > 0
+    }
+
+    pub fn close(&mut self) {
+        self.send.take();
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+impl Drop for ContentWriteTransport {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
+fn run_content_write_transport(
+    target: ContentTarget,
+    receive: Receiver<ContentWriteCommand>,
+    send: Sender<ContentWriteCompletion>,
+) {
+    let mut client = None;
+    while let Ok(command) = receive.recv() {
+        let started = Instant::now();
+        let result = execute_write_command(&target, &mut client, command.operation).map(|data| {
+            ContentWriteResult {
+                elapsed_ms: started.elapsed().as_millis(),
+                data,
+            }
+        });
+        if result.is_err() {
+            client = None;
+        }
+        let _ = send.send(ContentWriteCompletion {
+            key: command.key,
+            result,
+        });
+    }
+}
+
+fn execute_write_command(
+    target: &ContentTarget,
+    client: &mut Option<ContentClient>,
+    operation: Operation,
+) -> Result<ContentWriteData> {
+    if client.is_none() {
+        *client = Some(target.open(Access::ReadWrite)?);
+    }
+    let Some(client) = client.as_mut() else {
+        return Err("Content write transport nije otvorio bazu.".into());
+    };
+    match operation {
+        Operation::PublishBatch(clips) => {
+            client.publish_batch(clips)?;
+            Ok(ContentWriteData::Changed)
+        }
+        Operation::RemoveMissing { clips } => {
+            let removed = client.remove_missing(clips)?;
+            Ok(ContentWriteData::Removed(removed))
+        }
+        Operation::Select { clip_ids, selected } => {
+            client.select(clip_ids, selected)?;
+            Ok(ContentWriteData::Changed)
+        }
+        Operation::PublishFilmstrip(artifact) => {
+            client.publish_filmstrip(*artifact)?;
+            Ok(ContentWriteData::Changed)
+        }
+        Operation::PublishWave(artifact) => {
+            client.publish_wave(*artifact)?;
+            Ok(ContentWriteData::Changed)
+        }
+        _ => Err("Nepodrzana content write transport operacija.".into()),
     }
 }
 

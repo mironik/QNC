@@ -1,5 +1,5 @@
 //! Read-only native-pixel diagnostic, not an application workflow or player clock.
-use qnc_media_decode::{DecodeRequest, DecodedFormat, Decoder, DecoderConfig};
+use qnc_media_decode::{DecodeRequest, DecodedFormat, Decoder};
 use qnc_media_metadata::StreamDetails;
 use qnc_media_stream::{LocalSource, MediaStream, SourceReference};
 use qnc_pixel_convert::{ConversionSpec, Converter};
@@ -92,7 +92,7 @@ fn load(args: &[std::ffi::OsString]) -> Result<Sample> {
     let mut decoder = Decoder::open(
         request,
         MediaStream::local(&source, &media.media_uri)?,
-        DecoderConfig::new(qnc_ffmpeg_decode::FfmpegAdapter::new("ffmpeg")),
+        qnc_decoder_catalog::installed_config()?,
     )?;
     let pid = decoder.process_id();
     let mut images = Vec::new();
