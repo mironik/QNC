@@ -1242,6 +1242,9 @@ Zatvoreno 2026-09-13: uklonjeno host GPU vezanje. Monitor ostaje javni pasivni
 modul; shell i Ingest forma ne vežu GPU. Preview ide kroz egui adapter.
 Broadcast Player nije diran.
 
+Zatvoreno 2026-09-13: Ingest startup vise ne skenira diskove. Povrsina ide od
+`shell_next_group`; aktivni projekt se cita iz baze. Freeze ponovno vrijedi.
+
 - Ingest aplikacija/forma i njezini owner crateovi, ugovori i Ingest dijelovi
   conformancea ne smiju se mijenjati bez izricite dozvole.
 - Isti freeze vrijedi za javne module koje Ingest stvarno koristi, ukljucujuci

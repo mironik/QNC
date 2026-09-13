@@ -481,10 +481,7 @@ pub struct IngestApplication {
 
 impl IngestApplication {
     pub fn new() -> Self {
-        let mut component = Self::default();
-        let result = component.source_browser.load_roots();
-        component.apply_source_browser_result(result);
-        component
+        Self::default()
     }
 
     pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
@@ -505,6 +502,7 @@ impl IngestApplication {
         match SettingsReader::from_root(root.as_ref()) {
             Ok(reader) => {
                 component.settings_reader = Some(reader);
+                // Active project comes from the DB, not from a disk scan or Project call.
                 component.load_work_settings(None);
             }
             Err(error) => component.settings_failed(error.to_string()),
@@ -566,6 +564,9 @@ impl IngestApplication {
             || self.catalog_result.is_some()
             || self.selection_session.has_pending_work()
         {
+            if retain_loaded_workspace && pending_source.is_none() && self.settings_result.is_some() {
+                return IngestDispatchResult::accepted(None, true);
+            }
             return IngestDispatchResult::rejected("Citanje radnih postavki je u tijeku.");
         }
         let Some(reader) = self.settings_reader.clone() else {
@@ -1480,13 +1481,13 @@ mod tests {
         let component = IngestApplication::new();
         assert_eq!(component.view().source_kind, SourceKind::Local);
         assert!(component.view().browser_roots);
-        assert!(component
-            .view()
-            .browser_entries
-            .iter()
-            .all(|entry| qnc_contracts::parse_qnc_uri(&entry.qnc_uri).is_ok()));
+        assert!(component.view().browser_entries.is_empty());
         assert!(component.view().clips.is_empty());
         assert_eq!(component.dispatch_log().len(), 0);
+    }
+
+    fn load_local_roots(component: &mut IngestApplication) {
+        component.dispatch(IngestIntent::empty(action_ids::INGEST_DIR_ROOTS));
     }
 
     #[test]
@@ -1553,7 +1554,8 @@ mod tests {
 
     #[test]
     fn local_browser_exposes_qnc_uri_not_raw_path() {
-        let component = IngestApplication::new();
+        let mut component = IngestApplication::new();
+        load_local_roots(&mut component);
         for entry in &component.view().browser_entries {
             assert!(entry.qnc_uri.starts_with("qnc://local/source/"));
             assert!(!qnc_contracts::looks_like_raw_os_path(&entry.qnc_uri));
@@ -1563,6 +1565,7 @@ mod tests {
     #[test]
     fn switching_source_kind_clears_stale_local_browser_state() {
         let mut component = IngestApplication::new();
+        load_local_roots(&mut component);
         let first_uri = component
             .view()
             .browser_entries
@@ -1590,6 +1593,7 @@ mod tests {
     #[test]
     fn cancel_source_browser_returns_to_local_roots() {
         let mut component = IngestApplication::new();
+        load_local_roots(&mut component);
         let first_uri = component
             .view()
             .browser_entries

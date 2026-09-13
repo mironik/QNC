@@ -2,6 +2,9 @@
 
 Status: zamrznuto
 
+Zatvoreno ograniceno odobrenje 2026-09-13 uz docs/85: Ingest startup cita
+aktivni projekt iz baze, ne Dir Browser korijene.
+
 Datum: 2026-09-13
 
 Razlog: korisnik je izricito zatrazio da se zamrzne cijeli projekt sa svim

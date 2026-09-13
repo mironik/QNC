@@ -2,6 +2,9 @@
 
 Status: zamrznuto
 
+Zatvoreno ograniceno odobrenje 2026-09-13: Ingest ulaz ne skenira diskove.
+`shell_next_group` pokaze povrsinu; aktivni projekt se cita iz baze.
+
 Datum: 2026-09-13
 
 Zatvoreno ograniceno odobrenje 2026-09-13: prvi preview blit je crtao cijeli
