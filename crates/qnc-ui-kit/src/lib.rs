@@ -6,6 +6,7 @@ mod two_way_switch;
 pub use option_columns::*;
 pub use raster::paint_rgba_image;
 pub use raster::paint_stream_frame;
+pub use raster::paint_stream_frame_shared;
 pub use two_way_switch::show_two_way_switch;
 
 pub const STANDARD_ACTION_BUTTON_WIDTH: f32 = 96.0;

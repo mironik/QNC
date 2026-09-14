@@ -167,34 +167,30 @@ impl VideoOutput {
         Ok(output)
     }
 
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
+    }
+
+    pub fn queue(&self) -> &wgpu::Queue {
+        &self.queue
+    }
+
+    pub fn has_free_slot(&self) -> Result<bool, OutputError> {
+        self.healthy()?;
+        Ok(self.slots.iter().any(|slot| slot.frame.is_none()))
+    }
+
     /// Upload outside Play. At most `slots` uploads can exist until completion/release.
     pub fn prepare(
         &mut self,
         frame: FrameHeader,
         pixels: &[u8],
     ) -> Result<PreparedFrame, OutputError> {
-        self.healthy()?;
-        if self.size.0 == 0 || self.size.1 == 0 {
-            return Err(OutputError::Suspended);
-        }
         frame.validate(&self.config, pixels.len())?;
-        if self
-            .last_sequence
-            .is_some_and(|sequence| frame.sequence <= sequence)
-        {
-            return Err(OutputError::Sequence);
-        }
-        let index = self
-            .slots
-            .iter()
-            .position(|slot| slot.frame.is_none())
-            .ok_or(OutputError::Full)?;
-        let slot = &mut self.slots[index];
-        slot.revision = slot.revision.checked_add(1).ok_or(OutputError::Sequence)?;
-        slot.ready = Arc::new(AtomicBool::new(false));
+        let (index, revision, ready) = self.reserve_slot(&frame)?;
         self.queue.write_texture(
             wgpu::TexelCopyTextureInfo {
-                texture: &slot.texture,
+                texture: &self.slots[index].texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
@@ -212,16 +208,37 @@ impl VideoOutput {
             },
         );
         self.queue.submit([]);
-        let ready = slot.ready.clone();
         self.queue
             .on_submitted_work_done(move || ready.store(true, Ordering::Release));
-        self.last_sequence = Some(frame.sequence);
-        slot.frame = Some(frame);
+        self.publish_slot(index, frame);
         Ok(PreparedFrame {
             owner: self.owner.clone(),
             epoch: self.epoch,
             slot: index,
-            revision: slot.revision,
+            revision,
+        })
+    }
+
+    /// Fill a reserved slot on this output device without CPU RGBA upload.
+    pub fn prepare_external(
+        &mut self,
+        frame: FrameHeader,
+        fill: impl FnOnce(&wgpu::Texture) -> Result<(), String>,
+    ) -> Result<PreparedFrame, OutputError> {
+        let (index, revision, ready) = self.reserve_slot(&frame)?;
+        if let Err(error) = fill(&self.slots[index].texture) {
+            self.slots[index].frame = None;
+            return Err(OutputError::Device(format!("GPU texture fill: {error}")));
+        }
+        self.queue.submit([]);
+        self.queue
+            .on_submitted_work_done(move || ready.store(true, Ordering::Release));
+        self.publish_slot(index, frame);
+        Ok(PreparedFrame {
+            owner: self.owner.clone(),
+            epoch: self.epoch,
+            slot: index,
+            revision,
         })
     }
 
@@ -374,6 +391,37 @@ impl VideoOutput {
             slot.frame = None;
         }
         Ok(())
+    }
+
+    fn reserve_slot(
+        &mut self,
+        frame: &FrameHeader,
+    ) -> Result<(usize, u64, Arc<AtomicBool>), OutputError> {
+        self.healthy()?;
+        if self.size.0 == 0 || self.size.1 == 0 {
+            return Err(OutputError::Suspended);
+        }
+        frame.validate_geometry(&self.config)?;
+        if self
+            .last_sequence
+            .is_some_and(|sequence| frame.sequence <= sequence)
+        {
+            return Err(OutputError::Sequence);
+        }
+        let index = self
+            .slots
+            .iter()
+            .position(|slot| slot.frame.is_none())
+            .ok_or(OutputError::Full)?;
+        let slot = &mut self.slots[index];
+        slot.revision = slot.revision.checked_add(1).ok_or(OutputError::Sequence)?;
+        slot.ready = Arc::new(AtomicBool::new(false));
+        Ok((index, slot.revision, slot.ready.clone()))
+    }
+
+    fn publish_slot(&mut self, index: usize, frame: FrameHeader) {
+        self.last_sequence = Some(frame.sequence);
+        self.slots[index].frame = Some(frame);
     }
 
     fn slot(&self, token: &PreparedFrame) -> Result<&Slot, OutputError> {

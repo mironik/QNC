@@ -6,4 +6,7 @@ description = "Passive public player preview surface for any QNC application"
 
 [dependencies]
 eframe = { workspace = true }
-qnc-ui-kit = { workspace = true }
+egui-wgpu = "0.31.1"
+qnc-player-contract = { workspace = true }
+qnc-player-frame-transport = { workspace = true }
+wgpu = "24.0.5"

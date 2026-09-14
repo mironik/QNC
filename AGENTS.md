@@ -700,10 +700,24 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Pasivni UI preview je javni modul `qnc-monitor`. Svaka aplikacija ga smije
   ugraditi. Forma predaje samo potvrdjeni frame ili poruku; komponenta ne
   poznaje host aplikaciju, ne drzi sat, ne dekodira i ne cita bazu.
-- Glavni playback put ne smije ovisiti o tome da se svaki frame salje kroz UI
-  kao CPU RGBA tekstura. To je samo preview adapter. Profesionalni cilj je
-  engine -> video output/GPU surface/clean output adapter, uz pasivni UI
-  monitor koji prikazuje potvrdjeno stanje bez upravljanja satom.
+- GPU/DMA monitor backend mora biti implementiran unutar javnih player,
+  frame-transport i monitor modula. Forma, shell i aplikacijski UI sloj ne
+  smiju nositi, prevoditi, prosljedjivati ili spremati GPU context, renderer,
+  surface handle, DMA token, frame descriptor, player stanje ili monitor stanje.
+  Forma smije samo rezervirati pravokutnik i pozvati javnu monitor komponentu.
+- Glavni playback put i lokalni frame transport ne smiju ovisiti o tome da se
+  svaki frame salje kroz UI kao CPU RGBA tekstura. Frame transport ostaje
+  unutar DMA/GPU granice: engine predaje GPU/DMA surface descriptor javnom
+  `qnc-player-frame-transport` ugovoru, a monitor ga pasivno prikazuje bez
+  vlastitog sata. CPU RGBA ne smije biti aktivni preview fallback u ovom
+  stupnju razvoja: bolje je jasnom greskom potvrditi da GPU/DMA nije spojen
+  nego sakriti problem trzavim CPU putem. Eventualni fallback moze se vratiti
+  samo novom izricitom odlukom i mora ostati izvan acceptance dokaza.
+- Sve sto tehnicki moze ostati na DMA/GPU putu mora ostati na DMA/GPU putu:
+  decode surface, color/scale/convert, frame transport, preview monitor i
+  buduci clean/program output. Povratak na CPU kopiju nije dopusten kao aktivni
+  player/preview put; za sada smije postojati samo u izoliranim testovima ili
+  razvojnoj dijagnostici koja se ne koristi za live acceptance.
 - Korisnicki kriterij 2026-09-08: Play mora odmah pokrenuti vec pripremljenu
   reprodukciju. Odabir/ucitavanje klipa pokrece pripremu unutar player modula,
   izvan UI threada: otvaranje medija, dekodera i izlaza te ograniceni pocetni
@@ -771,10 +785,12 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 - Monitor prikaz ne smije vuci velike RGBA frameove request/response pollingom
   preko istog kanala koji nosi player komande. Komande, state i frame transport
   moraju biti odvojeni.
-- Lokalni monitor output Broadcast Playera koristi `qnc-player-frame-map`
-  shared-memory/mmap ring kao obvezni pixel handoff. Ako frame-map ne postoji
-  ili pukne, to je greska sesije; nije dopusten tihi fallback na socket slanje
-  RGBA frameova.
+- Lokalni monitor output Broadcast Playera koristi `qnc-player-frame-transport`
+  kao GPU/DMA handoff ugovor. Platformski backendi su Windows DXGI shared
+  texture, macOS IOSurface i Linux DMA-BUF, iza istog QNC descriptor/sync
+  ugovora. `qnc-player-frame-map` shared-memory/mmap RGBA nije aktivni preview
+  put dok korisnik ponovno ne odobri fallback. Ako DMA backend nije dostupan,
+  sesija mora pasti jasnom greskom.
 - Player command/state socket smije nositi samo male kontrolne poruke i javno
   stanje. Ne smije postati skriveni monitor pixel kanal.
 - Dekoder ne smije dobiti HTTP storage endpoint, credentials ili LAN/Intranet
@@ -792,8 +808,10 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   1-frame preciznost.
 - Spori UI ne smije blokirati playback sat, audio punjenje, decode ni player
   proces, ali ne smije ni silently gutati gubitak frameova bez dijagnostike.
-  Lokalni mmap je samo lokalni adapter; LAN/Intranet izlaz mora imati svoj
-  jednako pasivan transportni adapter s istim command/state/timebase ugovorom.
+  Lokalni DMA handle je samo lokalni adapter i ne prenosi se kao LAN/Intranet
+  media identitet. LAN/Intranet izlaz mora imati svoj jednako pasivan transportni
+  adapter s istim command/state/timebase ugovorom; ne smije gurati piksele kroz
+  command socket niti uvoditi HTTP pixel transport.
 - V4 referenca je aktivni player model; u novom QNC-u taj sloj se zove
   `qnc-broadcast-engine` i koristi ga proces `qnc-broadcast-player`.
   Ne vracati
@@ -1244,6 +1262,17 @@ Broadcast Player nije diran.
 
 Zatvoreno 2026-09-13: Ingest startup vise ne skenira diskove. Povrsina ide od
 `shell_next_group`; aktivni projekt se cita iz baze. Freeze ponovno vrijedi.
+
+Zatvoreno 2026-09-13: player conformance vise ne cita `player.log` iz engine
+izvora. Monitor mailbox predaje slike redom; kasni tick i dalje puni audio.
+§8.3 live prihvat ostaje otvoren. Freeze ponovno vrijedi.
+
+Zatvoreno 2026-09-13: ograniceno otkljucavanje za GPU/DMA Broadcast Player i
+preview monitor. `qnc-player-frame-transport` sada je GPU/DMA descriptor ugovor
+bez aktivnog CPU RGBA preview fallbacka. `qnc-monitor` samo javno razumije DMA
+payload bez vlastitog backenda, sata, decodea ili DB pristupa. Stvarni
+DXGI/IOSurface/DMA-BUF backend nije jos implementiran; do tada monitor output
+pada jasnom greskom. Freeze ponovno vrijedi.
 
 - Ingest aplikacija/forma i njezini owner crateovi, ugovori i Ingest dijelovi
   conformancea ne smiju se mijenjati bez izricite dozvole.

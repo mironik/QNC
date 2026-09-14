@@ -392,13 +392,28 @@ fn absent_due_packet_stops_without_advancing_to_it() {
     engine.prepare().unwrap();
     engine.play(0).unwrap();
     trace.pending_decode.set(true);
-    let before = engine.state().carrier_frame;
+    let mut failure = None;
     for n in 1..100 {
-        engine.tick(n * 40_000_000).unwrap();
+        if let Err(error) = engine.tick(n * 40_000_000) {
+            failure = Some(error);
+            break;
+        }
     }
-    assert_eq!(engine.state().status, TransportStatus::Playing);
-    assert!(engine.state().carrier_frame <= before || engine.playout_output.running);
+    let failure = failure.expect("missing due frame must stop the clock");
+    assert_eq!(failure.kind, BroadcastEngineErrorKind::NotReady);
+    assert!(failure.message.contains("due AV frame"));
+    assert_eq!(engine.state().status, TransportStatus::Paused);
+    assert!(engine.clock.is_none());
+    assert!(!engine.playout_output.running);
     assert!(engine.state().carrier_frame < source_runtime().duration_frames);
+    trace.pending_decode.set(false);
+    for n in 100..120 {
+        engine.tick(n * 40_000_000).unwrap();
+        if engine.state().play_ready {
+            break;
+        }
+    }
+    assert!(engine.state().play_ready);
 }
 
 #[test]
@@ -772,17 +787,18 @@ fn delayed_video_does_not_block_contiguous_audio_refill_but_cannot_miss_due_fram
             .windows(2)
             .all(|p| p[1] == p[0] + 1)
     );
-    engine.tick(u128::from(horizon) * 20_000_000).unwrap();
+    let error = engine.tick(u128::from(horizon) * 20_000_000).unwrap_err();
+    assert_eq!(error.kind, BroadcastEngineErrorKind::NotReady);
     assert_eq!(engine.state.carrier_frame, horizon - 1);
-    assert_eq!(engine.state.status, TransportStatus::Playing);
-    assert!(engine.clock.is_some());
-    assert!(engine.playout_output.running);
+    assert_eq!(engine.state.status, TransportStatus::Paused);
+    assert!(engine.clock.is_none());
+    assert!(!engine.playout_output.running);
     trace.forbid_work.set(false);
     engine.tick(1_000_000_000).unwrap();
     let calls = trace.take();
     assert!(calls.contains(&"decode"));
-    assert_eq!(engine.state.status, TransportStatus::Playing);
-    assert!(engine.clock.is_some());
+    assert_ne!(engine.state.status, TransportStatus::Playing);
+    assert!(engine.clock.is_none());
 }
 
 #[test]
@@ -836,10 +852,11 @@ fn pending_audio_does_not_block_video_and_does_not_invent_missing_samples() {
         assert!(engine.playout.video.len() <= horizon as usize + 2);
     }
     assert!(engine.playout.next_video_frame.unwrap() > horizon);
-    engine.tick(u128::from(horizon) * 20_000_000).unwrap();
+    let error = engine.tick(u128::from(horizon) * 20_000_000).unwrap_err();
+    assert_eq!(error.kind, BroadcastEngineErrorKind::NotReady);
     assert_eq!(engine.state.carrier_frame, horizon - 1);
-    assert_eq!(engine.state.status, TransportStatus::Playing);
-    assert!(engine.playout_output.running);
+    assert_eq!(engine.state.status, TransportStatus::Paused);
+    assert!(!engine.playout_output.running);
 }
 
 #[test]

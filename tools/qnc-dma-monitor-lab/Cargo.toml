@@ -1,0 +1,10 @@
+[package]
+name = "qnc-dma-monitor-lab"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+eframe = { workspace = true }
+qnc-monitor = { workspace = true }
+qnc-player-contract = { workspace = true }

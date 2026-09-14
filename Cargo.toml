@@ -71,6 +71,7 @@ members = [
     "crates/qnc-work-settings",
     "tools/qnc-conformance",
     "tools/qnc-dev-diagnostics-app",
+    "tools/qnc-dma-monitor-lab",
     "tools/qnc-player-runner",
     "tools/qnc-camera-catalog",
     "tools/qnc-app-catalog",

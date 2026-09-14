@@ -2,7 +2,6 @@
 mod connection;
 use qnc_player_contract::{
     BroadcastPlayerProtocolEvent as Event, Timebase, TransportStatus, envelope::EventEnvelope,
-    session::MonitorHeader,
 };
 use qnc_player_input::PreparedInput;
 use serde::Serialize;
@@ -40,17 +39,11 @@ pub struct Launch {
     pub media_binding: MediaBinding,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MonitorFrame {
-    pub header: MonitorHeader,
-    pub rgba: Arc<[u8]>,
-}
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct View {
     pub preparing: bool,
     pub video_visible: bool,
     pub reply: Option<EventEnvelope>,
-    pub picture: Option<Arc<MonitorFrame>>,
     pub error: Option<String>,
 }
 impl View {
@@ -92,9 +85,6 @@ impl View {
     }
 
     pub fn source_timebase(&self) -> Option<Timebase> {
-        if let Some(picture) = &self.picture {
-            return Some(picture.header.timebase);
-        }
         self.reply.as_ref().and_then(|reply| {
             reply.events.iter().rev().find_map(|event| match event {
                 Event::CarrierPositionChanged {
@@ -185,16 +175,7 @@ impl Player {
                             {
                                 return Err("superseded player selection".into());
                             }
-                            connection::Connection::launch(
-                                launch,
-                                generation,
-                                {
-                                    let state = state.clone();
-                                    Arc::new(move |picture| {
-                                        publish_picture(&state, generation, picture)
-                                    })
-                                },
-                            )
+                            connection::Connection::launch(launch, generation)
                         });
                         if state.generation.load(Ordering::Acquire) == generation {
                             match result {
@@ -286,33 +267,11 @@ impl Player {
         let _ = self.shared.notify.set(Box::new(notify));
     }
 }
-fn publish_picture(state: &Shared, generation: u64, picture: Option<Arc<MonitorFrame>>) {
-    let mut current = state.view.lock().unwrap();
-    if state.generation.load(Ordering::Acquire) != generation {
-        return;
-    }
-    let same_picture = match (&current.picture, &picture) {
-        (Some(a), Some(b)) => Arc::ptr_eq(a, b),
-        (None, None) => true,
-        _ => false,
-    };
-    current.picture = picture;
-    drop(current);
-    if !same_picture && let Some(notify) = state.notify.get() {
-        notify();
-    }
-}
 
 fn publish(state: &Shared, generation: u64, view: View) {
     let mut current = state.view.lock().unwrap();
     if state.generation.load(Ordering::Acquire) == generation {
-        let same_picture = match (&current.picture, &view.picture) {
-            (Some(a), Some(b)) => Arc::ptr_eq(a, b),
-            (None, None) => true,
-            _ => false,
-        };
-        let changed = !same_picture
-            || current.preparing != view.preparing
+        let changed = current.preparing != view.preparing
             || current.video_visible != view.video_visible
             || current.error != view.error
             || current.reply != view.reply;
@@ -529,45 +488,6 @@ mod tests {
         assert_eq!(calls.load(Ordering::Relaxed), 0);
         publish(&player.shared, 0, view.clone());
         publish(&player.shared, 0, view);
-        assert_eq!(calls.load(Ordering::Relaxed), 1);
-    }
-
-    #[test]
-    fn mailbox_picture_publishes_without_a_new_state_reply() {
-        let shared = Shared {
-            generation: AtomicU64::new(1),
-            stop: AtomicBool::new(false),
-            load: Mutex::new(None),
-            view: Mutex::new(View {
-                reply: Some(reply(Vec::new())),
-                ..View::default()
-            }),
-            notify: OnceLock::new(),
-        };
-        let calls = Arc::new(AtomicU64::new(0));
-        let count = calls.clone();
-        let _ = shared.notify.set(Box::new(move || {
-            count.fetch_add(1, Ordering::Relaxed);
-        }));
-        let picture = Arc::new(MonitorFrame {
-            header: MonitorHeader {
-                contract_version: qnc_player_contract::VERSION.into(),
-                session_id: "s".into(),
-                source_generation: 1,
-                output_generation: 4,
-                sequence: 9,
-                source_id: "clip".into(),
-                frame: 9,
-                timebase: Timebase::new(50, 1).unwrap(),
-                width: 2,
-                height: 2,
-            },
-            rgba: vec![0; 16].into(),
-        });
-        publish_picture(&shared, 1, Some(picture.clone()));
-        let view = shared.view.lock().unwrap();
-        assert!(view.reply.is_some());
-        assert!(Arc::ptr_eq(view.picture.as_ref().unwrap(), &picture));
         assert_eq!(calls.load(Ordering::Relaxed), 1);
     }
 

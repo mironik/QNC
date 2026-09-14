@@ -1,8 +1,11 @@
-//! Local mailbox for passive QNC monitors.
+//! Public frame handoff model for passive QNC monitors.
 //!
 //! This module does not decode, probe, read databases, or own playback time.
-//! The player posts the current picture and signals. The monitor receives that
-//! mailbox. It does not drain history and does not own a display clock.
+//! The active player/preview contract is GPU/DMA only: when a frame can stay
+//! on the GPU or cross a local process boundary as a DMA/shared-texture
+//! descriptor, it must. The legacy latest-frame mmap helpers are retained only
+//! for isolated tests until a separate fallback is explicitly approved; they
+//! are not an accepted Broadcast Player preview path.
 
 mod wake;
 
@@ -26,11 +29,140 @@ pub const SLOT_PREFIX_BYTES: usize = 32;
 pub const METADATA_BYTES: usize = 8192;
 pub const DEFAULT_FRAME_CAPACITY: usize = qnc_player_contract::session::MAX_FRAME_BYTES - 8192;
 pub const MONITOR_PREVIEW_FRAME_CAPACITY: usize = 8 * 1024 * 1024;
+pub const FRAME_TRANSPORT_CONTRACT_VERSION: &str = qnc_player_contract::VERSION;
+pub const MAX_DMA_TOKEN_BYTES: usize = qnc_player_contract::session::WIRE_MAX_TOKEN_BYTES;
 
 const VERSION_OFFSET: usize = 8;
 const SLOT_COUNT_OFFSET: usize = 9;
 const CAPACITY_OFFSET: usize = 16;
 const PUBLISHED_OFFSET: usize = 24;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FrameTransportBackend {
+    WindowsDxgiSharedTexture,
+    MacosIosurface,
+    LinuxDmabuf,
+}
+
+impl FrameTransportBackend {
+    pub const fn is_dma(self) -> bool {
+        true
+    }
+
+    pub const fn wire_name(self) -> &'static str {
+        match self {
+            Self::WindowsDxgiSharedTexture => "windows_dxgi_shared_texture",
+            Self::MacosIosurface => "macos_iosurface",
+            Self::LinuxDmabuf => "linux_dmabuf",
+        }
+    }
+}
+
+pub const fn preferred_dma_backend_for_current_os() -> Option<FrameTransportBackend> {
+    #[cfg(target_os = "windows")]
+    {
+        Some(FrameTransportBackend::WindowsDxgiSharedTexture)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Some(FrameTransportBackend::MacosIosurface)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Some(FrameTransportBackend::LinuxDmabuf)
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        None
+    }
+}
+
+pub fn active_gpu_dma_monitor_available() -> bool {
+    false
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FrameTransportPixelFormat {
+    Rgba8Srgb,
+    Bgra8Srgb,
+    Nv12,
+    P010,
+    Yuv422P10,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DmaFrameDescriptor {
+    pub contract_version: String,
+    pub backend: FrameTransportBackend,
+    pub handle_token: String,
+    pub sync_token: String,
+    pub width: u32,
+    pub height: u32,
+    pub pixel_format: FrameTransportPixelFormat,
+    pub modifier: Option<String>,
+}
+
+impl DmaFrameDescriptor {
+    pub fn validate(&self, header: &MonitorHeader) -> Result<(), String> {
+        if self.contract_version != FRAME_TRANSPORT_CONTRACT_VERSION {
+            return Err("frame transport version mismatch".into());
+        }
+        if !self.backend.is_dma() {
+            return Err("dma descriptor cannot use cpu fallback backend".into());
+        }
+        if self.width == 0
+            || self.height == 0
+            || self.width != header.width
+            || self.height != header.height
+        {
+            return Err("dma descriptor dimensions do not match frame header".into());
+        }
+        validate_token("dma handle", &self.handle_token)?;
+        validate_token("dma sync", &self.sync_token)?;
+        if let Some(modifier) = &self.modifier {
+            validate_optional_token("dma modifier", modifier)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "payload_kind", rename_all = "snake_case")]
+pub enum FramePayloadDescriptor {
+    GpuDma { descriptor: DmaFrameDescriptor },
+}
+
+impl FramePayloadDescriptor {
+    pub fn backend(&self) -> FrameTransportBackend {
+        match self {
+            Self::GpuDma { descriptor } => descriptor.backend,
+        }
+    }
+
+    pub fn validate(&self, header: &MonitorHeader) -> Result<(), String> {
+        match self {
+            Self::GpuDma { descriptor } => descriptor.validate(header),
+        }
+    }
+}
+
+fn validate_token(name: &str, token: &str) -> Result<(), String> {
+    if token.is_empty() || token.len() > MAX_DMA_TOKEN_BYTES || token.chars().any(char::is_control)
+    {
+        return Err(format!("{name} token is invalid"));
+    }
+    Ok(())
+}
+
+fn validate_optional_token(name: &str, token: &str) -> Result<(), String> {
+    if token.len() > MAX_DMA_TOKEN_BYTES || token.chars().any(char::is_control) {
+        return Err(format!("{name} token is invalid"));
+    }
+    Ok(())
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LatestFrame {
@@ -185,24 +317,23 @@ impl LatestFrameReader {
         })
     }
 
-    /// Block until the player posts a mailbox, then receive that picture.
-    /// Does not walk unpublished history.
+    /// Block until the next published picture is complete, then receive it
+    /// in mailbox order. Does not jump to the newest slot.
     pub fn recv(&mut self, timeout: Duration) -> Result<Option<LatestFrameUpdate>, String> {
-        if let Some(update) = self.read_newest()? {
+        if let Some(update) = self.read_latest()? {
             return Ok(Some(update));
         }
         let deadline = Instant::now() + timeout;
         loop {
             let remain = deadline.saturating_duration_since(Instant::now());
             if remain.is_zero() {
-                return self.read_newest();
+                return self.read_latest();
             }
             // A wake can arrive while the writer is still filling the slot.
-            // Retry the newest present immediately so the picture does not
-            // sit behind the audio clock.
+            // Retry that generation so a torn slot is not treated as a skip.
             let signaled = self.wake.wait(remain.min(Duration::from_millis(2)))?;
             for _ in 0..8 {
-                if let Some(update) = self.read_newest()? {
+                if let Some(update) = self.read_latest()? {
                     return Ok(Some(update));
                 }
                 if signaled {
@@ -406,6 +537,68 @@ mod tests {
         }
     }
 
+    fn dma_descriptor() -> DmaFrameDescriptor {
+        DmaFrameDescriptor {
+            contract_version: FRAME_TRANSPORT_CONTRACT_VERSION.into(),
+            backend: preferred_dma_backend_for_current_os()
+                .unwrap_or(FrameTransportBackend::LinuxDmabuf),
+            handle_token: "session-private-handle".into(),
+            sync_token: "session-private-sync".into(),
+            width: 2,
+            height: 1,
+            pixel_format: FrameTransportPixelFormat::Bgra8Srgb,
+            modifier: None,
+        }
+    }
+
+    #[test]
+    fn dma_descriptor_is_the_public_preferred_transport_shape() {
+        let header = header(1, 10);
+        let payload = FramePayloadDescriptor::GpuDma {
+            descriptor: dma_descriptor(),
+        };
+        assert!(payload.backend().is_dma());
+        assert!(payload.validate(&header).is_ok());
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(json.contains("gpu_dma"));
+        assert!(!json.contains("local_path"));
+        assert!(!json.contains("ingest"));
+    }
+
+    #[test]
+    fn dma_descriptor_rejects_bad_tokens_and_dimensions() {
+        let header = header(1, 10);
+        let mut descriptor = dma_descriptor();
+        descriptor.handle_token.clear();
+        assert!(descriptor.validate(&header).is_err());
+
+        descriptor = dma_descriptor();
+        descriptor.sync_token = "bad\nsync".into();
+        assert!(descriptor.validate(&header).is_err());
+
+        descriptor = dma_descriptor();
+        descriptor.width = header.width + 1;
+        assert!(descriptor.validate(&header).is_err());
+    }
+
+    #[test]
+    fn current_os_preferred_backend_is_never_cpu_fallback() {
+        if let Some(backend) = preferred_dma_backend_for_current_os() {
+            assert!(backend.is_dma());
+            #[cfg(target_os = "windows")]
+            assert_eq!(backend, FrameTransportBackend::WindowsDxgiSharedTexture);
+            #[cfg(target_os = "macos")]
+            assert_eq!(backend, FrameTransportBackend::MacosIosurface);
+            #[cfg(target_os = "linux")]
+            assert_eq!(backend, FrameTransportBackend::LinuxDmabuf);
+        }
+    }
+
+    #[test]
+    fn active_monitor_requires_real_dma_backend() {
+        assert!(!active_gpu_dma_monitor_available());
+    }
+
     #[test]
     fn reader_observes_only_new_complete_latest_frame() {
         let path = path("latest");
@@ -504,22 +697,22 @@ mod tests {
     }
 
     #[test]
-    fn reader_receives_posted_mailbox_without_draining_history() {
+    fn reader_receives_posted_mailbox_in_sequence() {
         let path = path("mailbox");
         let mut writer = LatestFrameWriter::create(&path, 128).unwrap();
         let mut reader = LatestFrameReader::open(&path).unwrap();
         writer.publish(&header(1, 10), &[1; 8]).unwrap();
         writer.publish(&header(2, 11), &[2; 8]).unwrap();
         writer.publish(&header(3, 12), &[3; 8]).unwrap();
-        let LatestFrameUpdate::Picture(posted) = reader
-            .recv(Duration::from_millis(50))
-            .unwrap()
-            .unwrap()
-        else {
-            panic!("expected posted mailbox");
-        };
-        assert_eq!(posted.header.sequence, 3);
-        assert_eq!(posted.header.frame, 12);
+        for (sequence, frame) in [(1, 10), (2, 11), (3, 12)] {
+            let LatestFrameUpdate::Picture(posted) =
+                reader.recv(Duration::from_millis(50)).unwrap().unwrap()
+            else {
+                panic!("expected posted mailbox");
+            };
+            assert_eq!(posted.header.sequence, sequence);
+            assert_eq!(posted.header.frame, frame);
+        }
         assert!(reader.recv(Duration::from_millis(5)).unwrap().is_none());
         drop(reader);
         drop(writer);

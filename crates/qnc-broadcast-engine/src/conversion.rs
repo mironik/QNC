@@ -28,6 +28,7 @@ pub(super) struct Completed {
 }
 
 pub(super) enum Raster {
+    #[cfg_attr(not(test), allow(dead_code))]
     Cpu(RasterConverter),
     Gpu(GpuRasterConverter),
 }

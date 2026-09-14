@@ -1,4 +1,6 @@
-use eframe::egui::{self, Color32, PaintCallbackInfo, Rect, TextureHandle, TextureOptions, Ui, Vec2};
+use eframe::egui::{
+    self, Color32, PaintCallbackInfo, Rect, TextureHandle, TextureOptions, Ui, Vec2,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -19,7 +21,22 @@ pub fn paint_stream_frame(
     size: [usize; 2],
     rgba: &[u8],
 ) -> bool {
-    if !ui.is_rect_visible(rect) || !stream_frame_valid(size, rgba) {
+    paint_stream_frame_shared(ui, rect, surface, key, size, Arc::<[u8]>::from(rgba))
+}
+
+/// Passive GPU-window paint of an already decoded shared frame.
+///
+/// This keeps the player-client frame payload alive for the WGPU callback
+/// without adding another UI-side copy before the texture upload.
+pub fn paint_stream_frame_shared(
+    ui: &mut Ui,
+    rect: Rect,
+    surface: egui::Id,
+    key: (&str, u64, u64),
+    size: [usize; 2],
+    rgba: Arc<[u8]>,
+) -> bool {
+    if !ui.is_rect_visible(rect) || !stream_frame_valid(size, rgba.as_ref()) {
         return false;
     }
     let aspect = size[0] as f32 / size[1] as f32;
@@ -31,7 +48,7 @@ pub fn paint_stream_frame(
         StreamFrameCallback {
             surface: surface.value(),
             size: [size[0] as u32, size[1] as u32],
-            rgba: Arc::<[u8]>::from(rgba),
+            rgba,
             fitted,
         },
     ));
@@ -242,7 +259,14 @@ impl MonitorBlit {
         }
         let slot = self.slots.get(&frame.surface).unwrap();
         let bytes_per_row = padded_bytes_per_row(width);
-        write_rgba_texture(queue, &slot.texture, width, height, bytes_per_row, &frame.rgba);
+        write_rgba_texture(
+            queue,
+            &slot.texture,
+            width,
+            height,
+            bytes_per_row,
+            &frame.rgba,
+        );
         let ppp = screen.pixels_per_point;
         let sw = screen.size_in_pixels[0] as f32;
         let sh = screen.size_in_pixels[1] as f32;
@@ -378,9 +402,8 @@ fn report_stream_frame(diagnostic_key: &(String, u64, u64)) {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    static LAST_REPORT: std::sync::OnceLock<
-        std::sync::Mutex<Option<((String, u64, u64), u64)>>,
-    > = std::sync::OnceLock::new();
+    static LAST_REPORT: std::sync::OnceLock<std::sync::Mutex<Option<((String, u64, u64), u64)>>> =
+        std::sync::OnceLock::new();
     let last_report = LAST_REPORT.get_or_init(|| std::sync::Mutex::new(None));
     let unix_ns_u64 = unix_ns.min(u128::from(u64::MAX)) as u64;
     let should_report = {
@@ -398,7 +421,7 @@ fn report_stream_frame(diagnostic_key: &(String, u64, u64)) {
         qnc_dev_diagnostics::log_line(
             qnc_dev_diagnostics::DiagnosticsStream::Player,
             format!(
-                "AV_V session={} generation={} sequence={} unix_ns={}",
+                "AV_V session={} generation={} sequence={} unix_ns={} preview_backend=wgpu_shared_rgba",
                 diagnostic_key.0, diagnostic_key.1, diagnostic_key.2, unix_ns
             ),
         );

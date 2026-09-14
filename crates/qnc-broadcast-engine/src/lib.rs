@@ -1,10 +1,10 @@
 //! One player owner composing public media/output adapters. No application workflow or DB writes.
+#[cfg(test)]
+mod av_sync;
 mod conversion;
 mod decode_input;
 mod input;
 mod output;
-#[cfg(test)]
-mod av_sync;
 pub use decode_input::DecodeMediaAccess;
 use decode_input::{DecodeInput, seek_start};
 pub use input::InputPlan;
@@ -14,7 +14,6 @@ use qnc_broadcast_player::*;
 pub use qnc_broadcast_player::{BroadcastEngineError, BroadcastEngineErrorKind};
 use qnc_media_decode::{DecodeRequest, DecodedFormat, Decoder, DecoderConfig};
 use qnc_media_stream::MediaStream;
-use qnc_pixel_convert::{Converter, RasterConverter};
 use qnc_video_output::{FrameHeader, OutputConfig, PixelFormat, PreparedFrame, VideoOutput};
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc, task::Poll, time::Instant};
 
@@ -30,11 +29,15 @@ fn pending() -> BroadcastEngineError {
 }
 struct PictureData {
     token: Option<PreparedFrame>,
-    header: FrameHeader,
-    rgba: std::sync::Arc<[u8]>,
+    _buffer: std::sync::Arc<[u8]>,
 }
 type Picture = Rc<PictureData>;
 type Engine = TransportEngine<Source, Video, SplitAvPlayoutOutput<Audio, Presenter>>;
+
+enum VideoRaster {
+    Worker(conversion::ConversionWorker),
+    Direct(qnc_gpu_raster::GpuTextureRasterizer),
+}
 
 /// Created and driven on the one player owner thread, never on an application form thread.
 pub struct Runtime {
@@ -119,11 +122,7 @@ impl Runtime {
         open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
     ) -> Result<Self> {
         output_config.validate().map_err(error)?;
-        let prebuffer_frames = if video_output.is_none() {
-            input::monitor_prebuffer_frames(plan.source.timebase)?
-        } else {
-            input::PREBUFFER_FRAMES
-        };
+        let prebuffer_frames = input::monitor_prebuffer_frames(plan.source.timebase)?;
         if qnc_dev_diagnostics::player_diagnostics_enabled() {
             qnc_dev_diagnostics::log_line(
                 qnc_dev_diagnostics::DiagnosticsStream::Player,
@@ -142,7 +141,7 @@ impl Runtime {
         }
         if output_config.width != plan.spec.width
             || output_config.height != plan.spec.height
-            || output_config.slots < input::OUTPUT_SLOTS
+            || output_config.slots < prebuffer_frames.saturating_add(4)
         {
             return Err(error(
                 "output configuration differs from saved input or required pool",
@@ -166,24 +165,48 @@ impl Runtime {
                 .validate(&decoder_config)
                 .map_err(error)?;
         }
-        let converter = if video_output.is_none() {
-            conversion::Raster::Gpu(
+        let (raster, raster_size, output_bytes) = if let Some(output) = video_output.as_ref() {
+            let direct = qnc_gpu_raster::GpuTextureRasterizer::prepare_on_device(
+                output.device(),
+                output.queue(),
+                plan.spec.clone(),
+                [plan.spec.width, plan.spec.height],
+            )
+            .map_err(error)?;
+            (
+                VideoRaster::Direct(direct),
+                [plan.spec.width, plan.spec.height],
+                0,
+            )
+        } else {
+            let converter = conversion::Raster::Gpu(
                 qnc_gpu_raster::GpuRasterConverter::prepare(
                     plan.spec.clone(),
                     input::preview_raster_bounds(plan.spec.width, plan.spec.height),
                 )
+                .map_err(error)?,
+            );
+            let raster_size = converter.size();
+            let output_bytes = converter.output_bytes();
+            (
+                VideoRaster::Worker(
+                    conversion::ConversionWorker::with_capacity(
+                        converter,
+                        input::CONVERT_IN_FLIGHT.min(prebuffer_frames),
+                    )
                     .map_err(error)?,
+                ),
+                raster_size,
+                output_bytes,
             )
-        } else {
-            let converter =
-                Converter::prepare(plan.spec.clone(), plan.spec.scratch_bytes().map_err(error)?)
-                    .map_err(error)?;
-            conversion::Raster::Cpu(RasterConverter::prepare(converter, None).map_err(error)?)
         };
-        let raster_size = converter.size();
-        let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4))
-            .map(|_| Some(std::sync::Arc::from(vec![0; converter.output_bytes()])))
-            .collect();
+        let rgba = if output_bytes == 0 {
+            Vec::new()
+        } else {
+            (0..output_config.slots.max(prebuffer_frames + 4))
+                .map(|_| Some(std::sync::Arc::from(vec![0; output_bytes])))
+                .collect()
+        };
         let decode_input = Rc::new(DecodeInput::new_access(
             plan.media.clone(),
             decoder_config,
@@ -209,8 +232,6 @@ impl Runtime {
             conversion_us: 0,
             upload_us: 0,
             converted: 0,
-            monitor: None,
-            monitor_pending: Default::default(),
         }));
         let source = plan.source.clone();
         let mut engine = TransportEngine::new(
@@ -221,11 +242,7 @@ impl Runtime {
                 input: decode_input,
                 pending_seek: None,
                 discard_before: None,
-                converter: conversion::ConversionWorker::with_capacity(
-                    converter,
-                    input::CONVERT_IN_FLIGHT.min(prebuffer_frames),
-                )
-                    .map_err(error)?,
+                raster,
                 raster_size,
                 rgba,
                 ready: BTreeMap::new(),
@@ -259,17 +276,6 @@ impl Runtime {
     pub fn last_submission_us(&self) -> u128 {
         self.gpu.borrow().submit_us
     }
-    /// Only a picture actually submitted by the player, never a predicted frame.
-    pub fn monitor_frame(&self) -> Option<(FrameHeader, std::sync::Arc<[u8]>)> {
-        self.gpu.borrow().monitor.clone()
-    }
-    /// Drain submitted monitor frames in order. `true` means the monitor was
-    /// explicitly cleared, usually after a cue or source switch.
-    pub fn take_monitor_frames(&mut self) -> (bool, Vec<(FrameHeader, std::sync::Arc<[u8]>)>) {
-        let mut gpu = self.gpu.borrow_mut();
-        let frames = gpu.take_monitor_pending();
-        (gpu.monitor.is_none(), frames)
-    }
     pub fn play(&mut self) -> Result<Vec<BroadcastEvent>> {
         self.engine.play(self.playback_tick())
     }
@@ -286,9 +292,7 @@ impl Runtime {
         self.engine.stop()
     }
     pub fn cue_frame(&mut self, frame: u64, present: bool) -> Result<Vec<BroadcastEvent>> {
-        let events = self.engine.cue_frame(frame, present)?;
-        self.gpu.borrow_mut().clear_pending_monitor();
-        Ok(events)
+        self.engine.cue_frame(frame, present)
     }
     pub fn tick(&mut self) -> Result<Vec<BroadcastEvent>> {
         if let Some(device) = &self.audio
@@ -416,7 +420,7 @@ struct Video {
     input: Rc<DecodeInput>,
     pending_seek: Option<u64>,
     discard_before: Option<u64>,
-    converter: conversion::ConversionWorker,
+    raster: VideoRaster,
     raster_size: [u32; 2],
     rgba: Vec<Option<std::sync::Arc<[u8]>>>,
     ready: BTreeMap<u64, DecodedVideoFrame<Picture>>,
@@ -488,10 +492,18 @@ impl VideoDecodeAdapter for Video {
 
 impl Video {
     fn drain_conversions(&mut self) -> Result<()> {
-        while self.converter.busy() {
-            let completed = match self.converter.poll().map_err(error)? {
-                Poll::Pending => break,
-                Poll::Ready(completed) => completed,
+        loop {
+            let completed = {
+                let VideoRaster::Worker(worker) = &mut self.raster else {
+                    return Ok(());
+                };
+                if !worker.busy() {
+                    break;
+                }
+                match worker.poll().map_err(error)? {
+                    Poll::Pending => break,
+                    Poll::Ready(completed) => completed,
+                }
             };
             self.rgba[completed.slot] = Some(completed.rgba.clone());
             // A seek can supersede conversion already running; recycle, never present it.
@@ -510,11 +522,20 @@ impl Video {
         {
             return Err(error("video request differs from saved input"));
         }
+        match &self.raster {
+            VideoRaster::Worker(_) => self.fill_worker_queue(request),
+            VideoRaster::Direct(_) => self.fill_direct_queue(request),
+        }
+    }
+
+    fn fill_worker_queue(&mut self, request: &EngineFrameRequest) -> Result<()> {
         let target_end = request
             .frame
             .saturating_add(self.prefetch_frames as u64)
             .min(self.plan.source.duration_frames);
-        while self.converter.can_accept() && self.next_decode_frame < target_end {
+        while matches!(&self.raster, VideoRaster::Worker(worker) if worker.can_accept())
+            && self.next_decode_frame < target_end
+        {
             if self.ready.contains_key(&self.next_decode_frame) {
                 self.next_decode_frame += 1;
                 continue;
@@ -526,11 +547,65 @@ impl Video {
             }) else {
                 break;
             };
+            let Some((frame, input)) = self.next_decoded_payload(request)? else {
+                break;
+            };
+            let generation = self.gpu.borrow().config.generation;
+            let VideoRaster::Worker(worker) = &mut self.raster else {
+                return Err(error("raster path changed while filling worker queue"));
+            };
+            worker
+                .submit(conversion::Job {
+                    generation,
+                    frame,
+                    slot,
+                    input,
+                    rgba: self.rgba[slot].take().expect("exclusive frame buffer"),
+                })
+                .map_err(error)?;
+        }
+        Ok(())
+    }
+
+    fn fill_direct_queue(&mut self, request: &EngineFrameRequest) -> Result<()> {
+        let target_end = request
+            .frame
+            .saturating_add(self.prefetch_frames as u64)
+            .min(self.plan.source.duration_frames);
+        while self.next_decode_frame < target_end {
+            if self.ready.contains_key(&self.next_decode_frame) {
+                self.next_decode_frame += 1;
+                continue;
+            }
+            let has_slot = self
+                .gpu
+                .borrow()
+                .output
+                .as_ref()
+                .ok_or_else(|| error("missing native video output"))?
+                .has_free_slot()
+                .map_err(error)?;
+            if !has_slot {
+                break;
+            }
+            let Some((frame, input)) = self.next_decoded_payload(request)? else {
+                break;
+            };
+            self.store_direct(frame, input)?;
+        }
+        Ok(())
+    }
+
+    fn next_decoded_payload(
+        &mut self,
+        request: &EngineFrameRequest,
+    ) -> Result<Option<(u64, Vec<u8>)>> {
+        loop {
             let packet = match self.decoder.try_next_packet().map_err(error)? {
-                Poll::Pending => break,
+                Poll::Pending => return Ok(None),
                 Poll::Ready(None) => {
                     if self.next_decode_frame >= self.plan.source.duration_frames {
-                        break;
+                        return Ok(None);
                     }
                     return Err(error("video ended before saved frame boundary"));
                 }
@@ -567,18 +642,9 @@ impl Video {
             if frame != self.next_decode_frame {
                 return Err(error("decoder skipped requested source frame"));
             }
-            self.converter
-                .submit(conversion::Job {
-                    generation: self.gpu.borrow().config.generation,
-                    frame,
-                    slot,
-                    input: packet.bytes,
-                    rgba: self.rgba[slot].take().expect("exclusive frame buffer"),
-                })
-                .map_err(error)?;
             self.next_decode_frame += 1;
+            return Ok(Some((frame, packet.bytes)));
         }
-        Ok(())
     }
 
     fn store_completed(&mut self, completed: conversion::Completed) -> Result<()> {
@@ -608,8 +674,63 @@ impl Video {
                 .map(|output| output.prepare(header.clone(), &completed.rgba))
                 .transpose()
                 .map_err(error)?,
-            header,
-            rgba: completed.rgba,
+            _buffer: completed.rgba,
+        });
+        gpu.images.insert(frame, token.clone());
+        gpu.upload_us += upload_start.elapsed().as_micros();
+        gpu.converted += 1;
+        self.ready.insert(
+            frame,
+            DecodedVideoFrame {
+                source_id: self.plan.source.source_id.clone(),
+                frame,
+                video_format: self.plan.source.video_format.clone(),
+                payload: token,
+            },
+        );
+        Ok(())
+    }
+
+    fn store_direct(&mut self, frame: u64, input: Vec<u8>) -> Result<()> {
+        let VideoRaster::Direct(raster) = &mut self.raster else {
+            return Err(error("direct raster path required"));
+        };
+        let mut gpu = self.gpu.borrow_mut();
+        let upload_start = Instant::now();
+        let header = FrameHeader {
+            version: qnc_video_output::VERSION.into(),
+            session_id: gpu.config.session_id.clone(),
+            generation: gpu.config.generation,
+            sequence: gpu.sequence,
+            source_id: self.plan.source.source_id.clone(),
+            frame_number: frame,
+            width: self.raster_size[0],
+            height: self.raster_size[1],
+            pixel_format: PixelFormat::Rgba8Srgb,
+        };
+        let token = match gpu
+            .output
+            .as_mut()
+            .ok_or_else(|| error("missing native video output"))?
+            .prepare_external(header.clone(), |texture| {
+                raster
+                    .convert_to_texture(&input, texture)
+                    .map_err(|e| e.to_string())
+            }) {
+            Ok(token) => token,
+            Err(qnc_video_output::OutputError::Full | qnc_video_output::OutputError::Busy) => {
+                return Err(pending());
+            }
+            Err(e) => return Err(error(e)),
+        };
+        gpu.sequence = gpu
+            .sequence
+            .checked_add(1)
+            .ok_or_else(|| error("frame sequence exhausted"))?;
+        gpu.conversion_us += raster.enqueue_us();
+        let token = Rc::new(PictureData {
+            token: Some(token),
+            _buffer: std::sync::Arc::<[u8]>::from(Vec::<u8>::new()),
         });
         gpu.images.insert(frame, token.clone());
         gpu.upload_us += upload_start.elapsed().as_micros();

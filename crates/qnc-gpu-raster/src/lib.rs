@@ -39,6 +39,22 @@ pub struct GpuReadback {
     wait_start: Instant,
 }
 
+/// GPU-to-GPU raster path for a player-owned output texture.
+/// It does not expose a window, form, media source, clock or CPU RGBA buffer.
+pub struct GpuTextureRasterizer {
+    spec: ConversionSpec,
+    size: [u32; 2],
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    source: wgpu::Buffer,
+    target: wgpu::Buffer,
+    padded_row_bytes: u32,
+    bindings: wgpu::BindGroup,
+    pipeline: wgpu::ComputePipeline,
+    failed: Arc<AtomicBool>,
+    enqueue_us: u128,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,6 +199,13 @@ mod tests {
 
 fn gpu_error(error: impl std::fmt::Display) -> ConversionError {
     ConversionError::Library(format!("GPU raster: {error}"))
+}
+
+fn padded_row_bytes(width: u32) -> Result<u32, ConversionError> {
+    width
+        .checked_mul(4)
+        .map(|bytes| wgpu::util::align_to(bytes, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT))
+        .ok_or(ConversionError::Budget)
 }
 
 impl GpuRasterConverter {
@@ -445,11 +468,186 @@ impl GpuRasterConverter {
             rgba.copy_from_slice(&mapped);
         }
         self.readback[pending.index].unmap();
-        self.timing = [
-            pending.upload_us,
-            wait_us,
-            copy_start.elapsed().as_micros(),
-        ];
+        self.timing = [pending.upload_us, wait_us, copy_start.elapsed().as_micros()];
+        Ok(())
+    }
+}
+
+impl GpuTextureRasterizer {
+    pub fn prepare_on_device(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        spec: ConversionSpec,
+        bounds: [u32; 2],
+    ) -> Result<Self, ConversionError> {
+        spec.validate()?;
+        let size = fit([spec.width, spec.height], bounds)?;
+        let input_bytes = spec.input_bytes()?.next_multiple_of(4) as u64;
+        let padded_row_bytes = padded_row_bytes(size[0])?;
+        let output_bytes = u64::from(padded_row_bytes) * u64::from(size[1]);
+        if input_bytes + output_bytes > MAX_BYTES as u64 {
+            return Err(ConversionError::Budget);
+        }
+        let limits = device.limits();
+        if input_bytes.max(output_bytes) > u64::from(limits.max_storage_buffer_binding_size)
+            || size[0].div_ceil(8).max(size[1].div_ceil(8))
+                > limits.max_compute_workgroups_per_dimension
+        {
+            return Err(ConversionError::Budget);
+        }
+        device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let buffer = |label, size, usage| {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(label),
+                size,
+                usage,
+                mapped_at_creation: false,
+            })
+        };
+        let source = buffer(
+            "saved-planar-input",
+            input_bytes,
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        );
+        let target = buffer(
+            "srgb-texture-copy-output",
+            output_bytes,
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+        );
+        let (cw, ch) = spec.layout.chroma_size(spec.width, spec.height);
+        let y_len = spec.width * spec.height;
+        let params: Vec<u8> = [
+            spec.width,
+            spec.height,
+            cw,
+            ch,
+            size[0],
+            size[1],
+            if spec.layout.ten_bit() { 16 } else { 8 },
+            u32::from(spec.range == Range::Limited),
+            u32::from(spec.transfer == Transfer::Bt709),
+            y_len,
+            y_len + cw * ch,
+            padded_row_bytes / 4,
+        ]
+        .into_iter()
+        .flat_map(u32::to_le_bytes)
+        .collect();
+        let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("saved-color-layout"),
+            contents: &params,
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("SDR-raster-texture-copy"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("gpu.wgsl").into()),
+        });
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("SDR-raster-texture-copy"),
+            layout: None,
+            module: &shader,
+            entry_point: Some("convert"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+        let bindings = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("raster-texture-copy-slots"),
+            layout: &pipeline.get_bind_group_layout(0),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: source.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: target.as_entire_binding(),
+                },
+            ],
+        });
+        if let Some(error) = pollster::block_on(device.pop_error_scope()) {
+            return Err(gpu_error(error));
+        }
+        Ok(Self {
+            spec,
+            size,
+            device: device.clone(),
+            queue: queue.clone(),
+            source,
+            target,
+            padded_row_bytes,
+            bindings,
+            pipeline,
+            failed: Arc::new(AtomicBool::new(false)),
+            enqueue_us: 0,
+        })
+    }
+
+    pub fn size(&self) -> [u32; 2] {
+        self.size
+    }
+
+    pub fn enqueue_us(&self) -> u128 {
+        self.enqueue_us
+    }
+
+    /// Queue saved-layout rasterization into an existing player-owned texture.
+    /// Completion is observed by the output module on the same GPU queue.
+    pub fn convert_to_texture(
+        &mut self,
+        input: &[u8],
+        texture: &wgpu::Texture,
+    ) -> Result<(), ConversionError> {
+        if self.failed.load(Ordering::Acquire) {
+            return Err(gpu_error("device failed"));
+        }
+        self.spec.validate_payload(input)?;
+        let upload_start = Instant::now();
+        let aligned = input.len() / 4 * 4;
+        if aligned != 0 {
+            self.queue.write_buffer(&self.source, 0, &input[..aligned]);
+        }
+        if aligned != input.len() {
+            let mut tail = [0; 4];
+            tail[..input.len() - aligned].copy_from_slice(&input[aligned..]);
+            self.queue.write_buffer(&self.source, aligned as u64, &tail);
+        }
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("raster-texture-copy"),
+                timestamp_writes: None,
+            });
+            pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(0, &self.bindings, &[]);
+            pass.dispatch_workgroups(self.size[0].div_ceil(8), self.size[1].div_ceil(8), 1);
+        }
+        encoder.copy_buffer_to_texture(
+            wgpu::TexelCopyBufferInfo {
+                buffer: &self.target,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(self.padded_row_bytes),
+                    rows_per_image: Some(self.size[1]),
+                },
+            },
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::Extent3d {
+                width: self.size[0],
+                height: self.size[1],
+                depth_or_array_layers: 1,
+            },
+        );
+        self.queue.submit(Some(encoder.finish()));
+        self.enqueue_us = upload_start.elapsed().as_micros();
         Ok(())
     }
 }

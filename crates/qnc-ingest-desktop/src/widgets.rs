@@ -7,7 +7,7 @@ use qnc_ingest_application::{
     action_ids, timeline_intent_to_ingest_intent, ClipFilter, ClipView, IngestIntent,
     IngestPayload, IngestViewModel, LocationEntry, SourceKind,
 };
-use qnc_monitor::{MonitorChrome, MonitorPaint, MonitorPicture, MonitorSurface};
+use qnc_monitor::{MonitorChrome, SourceMonitorSurface};
 use qnc_timeline::TimelineTheme;
 use qnc_ui_kit::FormActionBarStyle;
 
@@ -179,58 +179,22 @@ fn render_preview(
         muted: theme.text_muted,
         font_size: theme.font_ui,
     };
-    let picture = view
-        .playback
-        .picture
-        .as_ref()
-        .filter(|_| view.playback.video_visible)
-        .map(|picture| MonitorPicture {
-            session_id: &picture.header.session_id,
-            generation: picture.header.output_generation,
-            sequence: picture.header.sequence,
-            size: [
-                picture.header.width as usize,
-                picture.header.height as usize,
-            ],
-            rgba: &picture.rgba,
-        });
-    match qnc_monitor::paint_monitor(
-        ui,
-        rect,
-        MonitorSurface {
-            id: egui::Id::new(("qnc-monitor", "ingest-source")),
-            chrome,
-            picture,
-            message: view.playback.error.as_deref(),
-        },
-    ) {
-        MonitorPaint::Picture | MonitorPaint::Message => return,
-        MonitorPaint::Empty => {}
-    }
-    if let Some(clip) = view
-        .clips
-        .iter()
-        .find(|c| Some(&c.clip_id) == view.preview_clip_id.as_ref())
-    {
-        if let (Some(uri), Some(image)) = (&clip.thumb_uri, &clip.thumb_image) {
-            if qnc_ui_kit::paint_rgba_image(
-                ui,
-                rect.shrink(1.0),
-                uri,
-                image.content_key,
-                image.size,
-                &image.pixels,
-            ) {
-                return;
-            }
-        }
-    }
     let label = if view.preview_clip_id.is_some() {
         view.current_clip_label()
     } else {
         contracts.ingest.preview.empty_label.as_str()
     };
-    qnc_monitor::paint_placeholder(ui, rect, chrome, label);
+    qnc_monitor::paint_source_monitor(
+        ui,
+        rect,
+        SourceMonitorSurface {
+            id: egui::Id::new(("qnc-monitor", "ingest-source")),
+            chrome,
+            picture: None,
+            message: view.playback.error.as_deref(),
+            placeholder: label,
+        },
+    );
 }
 
 fn render_pool_head(

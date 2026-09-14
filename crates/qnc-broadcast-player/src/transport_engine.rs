@@ -578,8 +578,8 @@ where
             .saturating_add(self.healthy_buffer_frames() as u64 + 1)
             .min(self.current_range()?.end_frame);
         let mut events = self.refill_playout_buffer(self.state.carrier_frame, end)?;
-        // On time: deliver each source frame. A one-interval late tick still
-        // presents both. Only a larger gap jumps to the audio-clock frame.
+        // Deliver source frames in order. Late ticks may require rebuffering,
+        // but the broadcast path must not hide skipped frames as normal play.
         for _ in 0..2 {
             let Some((scheduled, advanced_clock, skipped)) = self.peek_due_frame(now_tick) else {
                 break;
@@ -602,9 +602,18 @@ where
             }
             let frame = scheduled.frame;
             if !self.playout_ready(frame)? {
-                // Hold the last presented frame. Do not Pause, invent, or show an
-                // older due frame while the audio clock has already moved on.
-                break;
+                return Err(BroadcastEngineError::new(
+                    BroadcastEngineErrorKind::NotReady,
+                    format!("due AV frame {frame} is not prepared"),
+                )
+                .with_source_id(
+                    self.state
+                        .source
+                        .as_ref()
+                        .map(|source| source.source_id.clone())
+                        .unwrap_or_else(|| "unknown".into()),
+                )
+                .with_frame(frame));
             }
 
             events.extend(self.present_buffered_frame(frame, true)?);
@@ -622,13 +631,7 @@ where
     ) -> Option<(crate::ScheduledFrame, FrameClock, bool)> {
         let mut next_clock = self.clock.clone()?;
         let next = next_clock.next_due_frame(now_tick)?;
-        let mut latest_clock = self.clock.clone()?;
-        let latest = latest_clock.latest_due_frame(now_tick)?;
-        if latest.due_slot > next.due_slot + 1 {
-            Some((latest, latest_clock, true))
-        } else {
-            Some((next, next_clock, false))
-        }
+        Some((next, next_clock, false))
     }
 
     fn apply_playback_boundary(&mut self) -> Result<Vec<BroadcastEvent>, BroadcastEngineError> {
@@ -923,8 +926,14 @@ where
             let Some(packet) = self.playout.audio.get(&frame).cloned() else {
                 continue;
             };
-            events.extend(self.playout_output.append_playout_audio(packet)?);
-            self.playout.primed_audio.insert(frame);
+            match self.playout_output.append_playout_audio(packet) {
+                Ok(produced) => {
+                    events.extend(produced);
+                    self.playout.primed_audio.insert(frame);
+                }
+                Err(error) if audio_output_is_full(&error) => break,
+                Err(error) => return Err(error),
+            }
         }
         Ok(events)
     }
@@ -1239,6 +1248,10 @@ impl<V, A> PlayoutBuffer<V, A> {
         }
         count
     }
+}
+
+fn audio_output_is_full(error: &BroadcastEngineError) -> bool {
+    error.message.contains("full")
 }
 
 fn source_range(source: &EngineSourceHandle) -> Option<FrameRange> {
@@ -1728,7 +1741,7 @@ mod tests {
     }
 
     #[test]
-    fn delayed_tick_presents_the_audio_clock_frame_not_the_backlog() {
+    fn delayed_tick_preserves_source_order_instead_of_jumping_to_latest() {
         let mut engine = fake_engine();
         engine.load_source(&source_runtime(), Some(1)).unwrap();
         engine.play_prepared(0).unwrap();
@@ -1737,13 +1750,20 @@ mod tests {
 
         let events = engine.tick(100_000_000).unwrap();
 
-        assert_eq!(engine.state().carrier_frame, 5);
+        assert_eq!(engine.state().carrier_frame, 2);
         assert!(events.iter().any(|event| {
-            matches!(event, BroadcastEvent::FramePresented { frame } if *frame == 5)
+            matches!(event, BroadcastEvent::FramePresented { frame } if *frame == 1)
+        }));
+        assert!(events.iter().any(|event| {
+            matches!(event, BroadcastEvent::FramePresented { frame } if *frame == 2)
         }));
         assert!(events.iter().all(|event| {
-            !matches!(event, BroadcastEvent::FramePresented { frame } if *frame < 5)
+            !matches!(event, BroadcastEvent::FramePresented { frame } if *frame > 2)
         }));
+        assert!(
+            !engine.state().play_ready || engine.playout.video.contains_key(&3),
+            "ordered playback must keep preparing the next source frame"
+        );
     }
 
     #[test]

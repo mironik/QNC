@@ -564,7 +564,8 @@ impl IngestApplication {
             || self.catalog_result.is_some()
             || self.selection_session.has_pending_work()
         {
-            if retain_loaded_workspace && pending_source.is_none() && self.settings_result.is_some() {
+            if retain_loaded_workspace && pending_source.is_none() && self.settings_result.is_some()
+            {
                 return IngestDispatchResult::accepted(None, true);
             }
             return IngestDispatchResult::rejected("Citanje radnih postavki je u tijeku.");

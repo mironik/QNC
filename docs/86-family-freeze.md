@@ -5,6 +5,16 @@ Status: zamrznuto
 Zatvoreno ograniceno odobrenje 2026-09-13 uz docs/85: Ingest startup cita
 aktivni projekt iz baze, ne Dir Browser korijene.
 
+Zatvoreno ograniceno odobrenje 2026-09-13 uz docs/85: player/conformance
+granica i sekvencirani monitor handoff. §8.3 live nije zatvoren.
+
+Zatvoreno ograniceno odobrenje 2026-09-13: GPU/DMA Broadcast Player i preview
+monitor contract/API. `qnc-player-frame-transport` je GPU/DMA descriptor ugovor
+bez aktivnog CPU RGBA preview fallbacka, a `qnc-monitor` nema aktivni backend,
+sat, decode ni DB pristup. Stvarni platformski DMA backend nije jos
+implementiran, pa monitor-output mora pasti jasnom greskom. Freeze ponovno
+vrijedi.
+
 Datum: 2026-09-13
 
 Razlog: korisnik je izricito zatrazio da se zamrzne cijeli projekt sa svim

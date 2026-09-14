@@ -53,5 +53,6 @@ fn convert(@builtin(global_invocation_id) id: vec3<u32>) {
     let r = y + 2.0 * (1.0 - kr) * v;
     let b = y + 2.0 * (1.0 - kb) * u;
     let g = y - 2.0 * kb * (1.0 - kb) / kg * u - 2.0 * kr * (1.0 - kr) / kg * v;
-    output_pixels[id.y * spec.dw + id.x] = pack4x8unorm(vec4<f32>(to_srgb(r), to_srgb(g), to_srgb(b), 1.0));
+    let out_stride = select(spec.dw, spec.reserved, spec.reserved != 0u);
+    output_pixels[id.y * out_stride + id.x] = pack4x8unorm(vec4<f32>(to_srgb(r), to_srgb(g), to_srgb(b), 1.0));
 }

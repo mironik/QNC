@@ -6,7 +6,7 @@ use qnc_player_input::PreparedInput;
 use serde::Deserialize;
 use std::{
     io::{self, Read},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 const MAX_BOOT_BYTES: u64 = 4 * 1024 * 1024;
@@ -24,7 +24,6 @@ pub struct Boot {
     pub command_token: String,
     pub idle_timeout_ms: u64,
     pub listen_port: u16,
-    pub monitor_frame_map: Option<PathBuf>,
 }
 
 // Private process launch bindings, never fields in public command/event messages.
@@ -85,7 +84,11 @@ impl Binding {
     }
 }
 
-fn local_codec_path(source_uri: &str, root: &Path, media_uri: &str) -> io::Result<PathBuf> {
+fn local_codec_path(
+    source_uri: &str,
+    root: &std::path::Path,
+    media_uri: &str,
+) -> io::Result<PathBuf> {
     let reference = SourceReference::from_uri(media_uri)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
     if reference.source_uri() != source_uri {

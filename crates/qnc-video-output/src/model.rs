@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub const VERSION: &str = "0.1.0";
 pub const MAX_POOL_BYTES: u64 = 512 * 1024 * 1024;
+pub const MAX_OUTPUT_SLOTS: usize = 64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -31,7 +32,7 @@ impl OutputConfig {
             return Err(OutputError::Identity);
         }
         let size = pixel_bytes(self.width, self.height)?;
-        if !(1..=16).contains(&self.slots)
+        if !(1..=MAX_OUTPUT_SLOTS).contains(&self.slots)
             || self.pool_budget_bytes > MAX_POOL_BYTES
             || size
                 .checked_mul(self.slots as u64)
@@ -60,7 +61,7 @@ pub struct FrameHeader {
 }
 
 impl FrameHeader {
-    pub(crate) fn validate(&self, config: &OutputConfig, bytes: usize) -> Result<(), OutputError> {
+    pub(crate) fn validate_geometry(&self, config: &OutputConfig) -> Result<(), OutputError> {
         if self.version != VERSION {
             return Err(OutputError::Version);
         }
@@ -73,8 +74,15 @@ impl FrameHeader {
         if self.width != config.width
             || self.height != config.height
             || self.pixel_format != config.pixel_format
-            || u64::try_from(bytes).ok() != Some(pixel_bytes(self.width, self.height)?)
         {
+            return Err(OutputError::Pixels);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate(&self, config: &OutputConfig, bytes: usize) -> Result<(), OutputError> {
+        self.validate_geometry(config)?;
+        if u64::try_from(bytes).ok() != Some(pixel_bytes(self.width, self.height)?) {
             return Err(OutputError::Pixels);
         }
         Ok(())

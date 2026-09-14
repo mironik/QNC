@@ -5,11 +5,10 @@ mod session;
 use config::Boot;
 use qnc_broadcast_engine::Runtime;
 use qnc_json_transport::Credentials;
-use qnc_player_frame_transport::LatestFrameWriter;
 use std::{
     io::{self, Write},
     sync::{
-        Arc, Condvar, Mutex,
+        Arc,
         atomic::{AtomicBool, Ordering},
     },
     thread::{self, JoinHandle},
@@ -30,18 +29,18 @@ fn run(
     stop: Arc<AtomicBool>,
 ) -> Result<()> {
     let monitor_output = native.is_none();
-    if monitor_output && boot.monitor_frame_map.is_none() {
-        return Err("monitor output requires qnc-player-frame-map transport".into());
+    let native_output = !monitor_output;
+    if monitor_output {
+        let backend = preferred_dma_backend_label().unwrap_or("none");
+        return Err(format!(
+            "GPU/DMA monitor output requires a platform surface backend ({backend}); CPU RGBA frame-map fallback is disabled"
+        )
+        .into());
     }
-    let mut monitor_post = boot
-        .monitor_frame_map
-        .as_ref()
-        .map(|path| -> std::result::Result<MonitorPost, String> {
-            let writer = LatestFrameWriter::open(path)?;
-            MonitorPost::start(writer).map_err(|e| e.to_string())
-        })
-        .transpose()?;
-    let output_scope = output_scope(native.is_some(), monitor_post.is_some())?;
+    let output_scope = output_scope(native_output)?;
+    let monitor_backend = monitor_backend(native_output)?;
+    let monitor_transport = monitor_transport(native_output);
+    let preferred_dma_backend = preferred_dma_backend_label();
     let plan = boot.plan()?;
     if qnc_dev_diagnostics::player_diagnostics_enabled() {
         qnc_dev_diagnostics::log_line(
@@ -90,7 +89,9 @@ fn run(
             "contract_version": qnc_player_contract::VERSION,
             "session_id": boot.session_id, "source_generation": boot.source_generation,
             "wire_url": control.address,
-            "monitor_transport": if monitor_post.is_some() { "qnc-player-frame-map" } else { "qnc-player+tcp" },
+            "monitor_transport": monitor_transport,
+            "monitor_backend": monitor_backend,
+            "preferred_dma_backend": preferred_dma_backend,
             "output": output_scope
         })
     );
@@ -115,62 +116,6 @@ fn run(
         }
         if !session.closed {
             session.tick();
-            let source_timebase = session
-                .player
-                .state()
-                .source
-                .as_ref()
-                .map(|source| source.timebase);
-            let (clear_monitor, frames) = session.player.take_monitor_frames();
-            if let Some(poster) = monitor_post.as_mut() {
-                if let Some(error) = poster.take_error() {
-                    if qnc_dev_diagnostics::player_diagnostics_enabled() {
-                        qnc_dev_diagnostics::log_line(
-                            qnc_dev_diagnostics::DiagnosticsStream::Player,
-                            format!("AV_F frame_map_error={error}"),
-                        );
-                    }
-                    return Err(format!("monitor frame-map transport failed: {error}").into());
-                }
-                if let Err(error) = queue_monitor_mail(
-                    poster,
-                    &boot.session_id,
-                    boot.source_generation,
-                    source_timebase,
-                    clear_monitor,
-                    &frames,
-                ) {
-                    if qnc_dev_diagnostics::player_diagnostics_enabled() {
-                        qnc_dev_diagnostics::log_line(
-                            qnc_dev_diagnostics::DiagnosticsStream::Player,
-                            format!("AV_F frame_map_error={error}"),
-                        );
-                    }
-                    return Err(format!("monitor frame-map transport failed: {error}").into());
-                }
-            }
-            if monitor_post.is_some() {
-                // Monitor-output uses the local frame map for pixels. The
-                // control socket remains command/state only, so a slow monitor
-                // cannot force large RGBA writes through the command channel.
-                if clear_monitor {
-                    control.publish_frames(
-                        &boot.session_id,
-                        boot.source_generation,
-                        source_timebase,
-                        true,
-                        Vec::new(),
-                    );
-                }
-            } else {
-                control.publish_frames(
-                    &boot.session_id,
-                    boot.source_generation,
-                    source_timebase,
-                    clear_monitor,
-                    frames,
-                );
-            }
             if qnc_dev_diagnostics::player_diagnostics_enabled()
                 && last_av_report.elapsed() >= Duration::from_millis(250)
             {
@@ -211,139 +156,41 @@ fn run(
         thread::sleep(Duration::from_millis(1));
     }
     drop(session);
-    drop(monitor_post);
     drop(control);
     Ok(())
 }
 
-enum MonitorMail {
-    Clear,
-    Picture {
-        header: qnc_player_contract::session::MonitorHeader,
-        rgba: Arc<[u8]>,
-    },
-}
-
-struct MonitorPost {
-    slot: Arc<Mutex<Option<MonitorMail>>>,
-    wake: Arc<Condvar>,
-    stop: Arc<AtomicBool>,
-    error: Arc<Mutex<Option<String>>>,
-    worker: Option<JoinHandle<()>>,
-}
-
-impl MonitorPost {
-    fn start(mut writer: LatestFrameWriter) -> Result<Self> {
-        let slot = Arc::new(Mutex::new(None));
-        let wake = Arc::new(Condvar::new());
-        let stop = Arc::new(AtomicBool::new(false));
-        let error = Arc::new(Mutex::new(None));
-        let worker = thread::Builder::new()
-            .name("player-monitor-post".into())
-            .spawn({
-                let slot = slot.clone();
-                let wake = wake.clone();
-                let stop = stop.clone();
-                let error = error.clone();
-                move || {
-                    while !stop.load(Ordering::Acquire) {
-                        let mail = {
-                            let mut guard = slot.lock().unwrap();
-                            if guard.is_none() && !stop.load(Ordering::Acquire) {
-                                let (next, _) = wake
-                                    .wait_timeout(guard, Duration::from_millis(50))
-                                    .expect("monitor post");
-                                guard = next;
-                            }
-                            guard.take()
-                        };
-                        let Some(mail) = mail else {
-                            continue;
-                        };
-                        let result = match mail {
-                            MonitorMail::Clear => writer.clear().map(|_| ()),
-                            MonitorMail::Picture { header, rgba } => {
-                                writer.publish(&header, &rgba).map(|_| ())
-                            }
-                        };
-                        if let Err(failed) = result {
-                            *error.lock().unwrap() = Some(failed);
-                            break;
-                        }
-                    }
-                }
-            })?;
-        Ok(Self {
-            slot,
-            wake,
-            stop,
-            error,
-            worker: Some(worker),
-        })
-    }
-
-    fn post(&self, mail: MonitorMail) {
-        *self.slot.lock().unwrap() = Some(mail);
-        self.wake.notify_one();
-    }
-
-    fn take_error(&self) -> Option<String> {
-        self.error.lock().unwrap().take()
+fn output_scope(native_output: bool) -> Result<&'static str> {
+    match native_output {
+        true => Ok("native_host_window_and_device"),
+        false => Err(
+            "GPU/DMA monitor output requires a platform surface backend; CPU RGBA frame-map fallback is disabled"
+                .into(),
+        ),
     }
 }
 
-impl Drop for MonitorPost {
-    fn drop(&mut self) {
-        self.stop.store(true, Ordering::Release);
-        self.wake.notify_one();
-        if let Some(worker) = self.worker.take() {
-            let _ = worker.join();
-        }
+fn monitor_transport(native_output: bool) -> &'static str {
+    if native_output {
+        "qnc-player-native-window"
+    } else {
+        "none"
     }
 }
 
-fn queue_monitor_mail(
-    poster: &MonitorPost,
-    session: &str,
-    source_generation: u64,
-    source_timebase: Option<qnc_player_contract::Timebase>,
-    clear: bool,
-    frames: &[(qnc_video_output::FrameHeader, Arc<[u8]>)],
-) -> Result<()> {
-    if clear {
-        poster.post(MonitorMail::Clear);
-        return Ok(());
+fn monitor_backend(native_output: bool) -> Result<&'static str> {
+    match native_output {
+        true => Ok("native_host_window"),
+        false => Err(
+            "GPU/DMA monitor output requires a platform surface backend; CPU RGBA frame-map fallback is disabled"
+                .into(),
+        ),
     }
-    // Clock thread only hands off the current picture. The post thread writes
-    // the mailbox so mmap copy cannot stall Play.
-    let Some((header, rgba)) = frames.last() else {
-        return Ok(());
-    };
-    let timebase = source_timebase.ok_or("monitor frame missing source timebase")?;
-    poster.post(MonitorMail::Picture {
-        header: qnc_player_contract::session::MonitorHeader {
-            contract_version: qnc_player_contract::VERSION.into(),
-            session_id: session.into(),
-            source_generation,
-            output_generation: header.generation,
-            sequence: header.sequence,
-            source_id: header.source_id.clone(),
-            frame: header.frame_number,
-            timebase,
-            width: header.width,
-            height: header.height,
-        },
-        rgba: Arc::clone(rgba),
-    });
-    Ok(())
 }
 
-fn output_scope(native_output: bool, has_frame_map: bool) -> Result<&'static str> {
-    match (native_output, has_frame_map) {
-        (true, _) => Ok("native_host_window_and_device"),
-        (false, true) => Ok("local_frame_map_monitor_and_host_audio_device"),
-        (false, false) => Err("monitor output requires qnc-player-frame-map transport".into()),
-    }
+fn preferred_dma_backend_label() -> Option<&'static str> {
+    qnc_player_frame_transport::preferred_dma_backend_for_current_os()
+        .map(qnc_player_frame_transport::FrameTransportBackend::wire_name)
 }
 
 struct NativeHost {
@@ -440,14 +287,9 @@ mod tests {
 
     #[test]
     fn monitor_output_has_no_socket_frame_fallback() {
-        assert_eq!(
-            output_scope(false, true).unwrap(),
-            "local_frame_map_monitor_and_host_audio_device"
-        );
-        assert!(output_scope(false, false).is_err());
-        assert_eq!(
-            output_scope(true, false).unwrap(),
-            "native_host_window_and_device"
-        );
+        assert!(output_scope(false).is_err());
+        assert_eq!(output_scope(true).unwrap(), "native_host_window_and_device");
+        assert_eq!(monitor_transport(false), "none");
+        assert!(monitor_backend(false).is_err());
     }
 }

@@ -160,7 +160,154 @@ pub fn check(root: &Path) -> ValidationReport {
             }
         }
     }
+    check_no_active_cpu_preview_fallback(root, &mut report);
     report
+}
+
+fn check_no_active_cpu_preview_fallback(root: &Path, report: &mut ValidationReport) {
+    for (relative, forbidden) in cpu_preview_fallback_checks() {
+        let path = root.join(relative);
+        let Ok(source) = std::fs::read_to_string(&path) else {
+            report.error(format!("missing {relative}"));
+            continue;
+        };
+        for token in forbidden {
+            if source.contains(token) {
+                report.error(format!(
+                    "{relative}: active Broadcast Player preview must not expose CPU/RGBA fallback token `{token}`"
+                ));
+            }
+        }
+    }
+}
+
+fn cpu_preview_fallback_checks() -> [(&'static str, &'static [&'static str]); 16] {
+    [
+        (
+            "contracts/modules/player-frame-transport.module.json",
+            &["CpuRgbaFallback", "cpu_rgba_fallback"],
+        ),
+        (
+            "contracts/modules/broadcast-player.module.json",
+            &["CpuRgbaFallback", "cpu_rgba_fallback", "local_cpu_fallback"],
+        ),
+        (
+            "contracts/modules/player-client.module.json",
+            &["CpuRgbaFallback", "cpu_rgba_fallback", "local_cpu_fallback"],
+        ),
+        (
+            "contracts/modules/monitor.module.json",
+            &[
+                "CpuRgbaFallback",
+                "cpu_rgba_fallback",
+                "paint_cpu_rgba_fallback",
+            ],
+        ),
+        (
+            "crates/qnc-player-frame-transport/src/lib.rs",
+            &["CpuRgbaFallback", "cpu_rgba_fallback"],
+        ),
+        (
+            "crates/qnc-monitor/src/lib.rs",
+            &[
+                "MonitorPicture",
+                "pub struct MonitorSurface",
+                "pub fn paint_monitor(",
+                "paint_stream_frame",
+                "paint_rgba_image",
+                "MonitorGpuHost",
+                "CreationContext",
+                "wgpu_render_state",
+                "from_creation_context",
+                "bind_monitor",
+            ],
+        ),
+        (
+            "crates/qnc-ingest-desktop/src/app.rs",
+            &[
+                "MonitorGpuHost",
+                "wgpu_render_state",
+                "from_creation_context",
+                "bind_monitor",
+            ],
+        ),
+        (
+            "crates/qnc-ingest-desktop/src/widgets.rs",
+            &[
+                "MonitorGpuHost",
+                "wgpu_render_state",
+                "from_creation_context",
+                "bind_monitor",
+            ],
+        ),
+        (
+            "apps/qnc-app/src/main.rs",
+            &[
+                "MonitorGpuHost",
+                "wgpu_render_state",
+                "from_creation_context",
+                "bind_monitor",
+            ],
+        ),
+        (
+            "crates/qnc-player-client/src/lib.rs",
+            &[
+                "MonitorFrame",
+                "View.picture",
+                "publish_picture",
+                "mailbox_picture",
+            ],
+        ),
+        (
+            "crates/qnc-player-client/src/connection.rs",
+            &[
+                "LatestFrameReader",
+                "LatestFrameWriter",
+                "MONITOR_PREVIEW_FRAME_CAPACITY",
+                "FramePump",
+                "monitor_frame_map",
+                "frame_map_path",
+                "WIRE_KIND_FRAME",
+                "MonitorFrame",
+                "frame_map_error",
+                "frame_map_us",
+            ],
+        ),
+        (
+            "tools/qnc-player-runner/src/main.rs",
+            &[
+                "LatestFrameWriter",
+                "MonitorPost",
+                "MonitorMail",
+                "queue_monitor_mail",
+                "publish_frames",
+                "monitor_frame_map",
+                "frame_map_error",
+            ],
+        ),
+        (
+            "tools/qnc-player-runner/src/control.rs",
+            &[
+                "WIRE_KIND_FRAME",
+                "MonitorQuery",
+                "MAX_FRAME_BYTES",
+                "publish_frames",
+                "respond_frame_packet",
+            ],
+        ),
+        (
+            "tools/qnc-player-runner/src/config.rs",
+            &["monitor_frame_map"],
+        ),
+        (
+            "crates/qnc-broadcast-engine/src/output.rs",
+            &["push_monitor", "monitor_pending", "clear_pending_monitor"],
+        ),
+        (
+            "crates/qnc-broadcast-engine/src/lib.rs",
+            &["take_monitor_frames", "monitor_frame("],
+        ),
+    ]
 }
 
 fn closure(name: &str, packages: &BTreeMap<String, &Value>) -> BTreeSet<String> {

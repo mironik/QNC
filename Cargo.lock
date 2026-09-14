@@ -3092,6 +3092,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-dma-monitor-lab"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-monitor",
+ "qnc-player-contract",
+]
+
+[[package]]
 name = "qnc-ffmpeg-decode"
 version = "0.1.0"
 dependencies = [
@@ -3439,7 +3448,10 @@ name = "qnc-monitor"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "qnc-ui-kit",
+ "egui-wgpu",
+ "qnc-player-contract",
+ "qnc-player-frame-transport",
+ "wgpu",
 ]
 
 [[package]]

@@ -10,7 +10,6 @@ use qnc_player_input::{AudioChannel, PreparedInput};
 use qnc_video_output::{OutputConfig, PixelFormat};
 
 pub(crate) const PREBUFFER_FRAMES: usize = 8;
-pub(crate) const OUTPUT_SLOTS: usize = PREBUFFER_FRAMES + 4;
 /// Keep several conversions ahead of the audio clock so the due picture is
 /// already ready at present. A short queue makes Play wait on convert and
 /// the monitor lags the sound.
@@ -206,6 +205,7 @@ impl InputPlan {
         self.audio_channels.as_ref()
     }
     pub fn output_config(&self, session_id: &str, generation: u64) -> Result<OutputConfig> {
+        let slots = monitor_prebuffer_frames(self.source.timebase)?.saturating_add(4);
         let config = OutputConfig {
             version: qnc_video_output::VERSION.into(),
             session_id: session_id.into(),
@@ -213,9 +213,8 @@ impl InputPlan {
             width: self.spec.width,
             height: self.spec.height,
             pixel_format: PixelFormat::Rgba8Srgb,
-            slots: OUTPUT_SLOTS,
-            pool_budget_bytes: self.spec.output_bytes().map_err(error)? as u64
-                * OUTPUT_SLOTS as u64,
+            slots,
+            pool_budget_bytes: self.spec.output_bytes().map_err(error)? as u64 * slots as u64,
         };
         config.validate().map_err(error)?;
         Ok(config)

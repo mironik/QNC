@@ -3,7 +3,7 @@
   "module_name": "Monitor",
   "module_version": "0.1.0",
   "module_kind": "ui_widget",
-  "capabilities": ["monitor.preview.paint"],
+  "capabilities": ["monitor.preview.paint", "monitor.preview.paint_gpu_dma_descriptor"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -30,5 +30,6 @@
   ],
   "state_policy": "stateless",
   "database_write_policy": "no_db_writes",
-  "boundary": "Paints a caller-supplied preview picture or message. Any application may embed it. It does not own the player clock, fetch pixels, decode media, read a database, or know the host application."
+  "gpu_dma_policy": "Monitor is a passive GPU/DMA preview consumer. Active Broadcast Player preview must use the caller-supplied DMA/GPU descriptor. CPU RGBA fallback and thumbnail-as-monitor fallback are disabled unless a later explicit decision re-enables them.",
+  "boundary": "Paints a caller-supplied GPU/DMA preview descriptor status, message, or placeholder. Any application may embed it. It does not own the player clock, fetch pixels, decode media, read a database, convert thumbnails, or know the host application."
 }

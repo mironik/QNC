@@ -46,11 +46,11 @@ fn pool_limits_count_all_source_slots() {
     assert_eq!(c.validate(), Err(OutputError::Budget));
     c.slots = 0;
     assert_eq!(c.validate(), Err(OutputError::Budget));
-    c.slots = 17;
+    c.slots = MAX_OUTPUT_SLOTS + 1;
     c.pool_budget_bytes = MAX_POOL_BYTES;
     assert_eq!(c.validate(), Err(OutputError::Budget));
-    c.slots = 16;
-    c.pool_budget_bytes = 16 * 128;
+    c.slots = MAX_OUTPUT_SLOTS;
+    c.pool_budget_bytes = MAX_OUTPUT_SLOTS as u64 * 128;
     assert!(c.validate().is_ok());
     c.slots = 1;
     c.pool_budget_bytes = MAX_POOL_BYTES + 1;

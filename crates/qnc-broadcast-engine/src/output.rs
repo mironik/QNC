@@ -14,26 +14,9 @@ pub(crate) struct VideoSink {
     pub conversion_us: u128,
     pub upload_us: u128,
     pub converted: u64,
-    pub monitor: Option<(FrameHeader, Arc<[u8]>)>,
-    pub(crate) monitor_pending: VecDeque<(FrameHeader, Arc<[u8]>)>,
 }
 pub(crate) type SharedVideo = Rc<RefCell<VideoSink>>;
 impl VideoSink {
-    pub fn push_monitor(&mut self, header: FrameHeader, rgba: Arc<[u8]>) {
-        let frame = (header, rgba);
-        self.monitor = Some(frame.clone());
-        self.monitor_pending.clear();
-        self.monitor_pending.push_back(frame);
-    }
-
-    pub fn clear_pending_monitor(&mut self) {
-        self.monitor_pending.clear();
-    }
-
-    pub fn take_monitor_pending(&mut self) -> Vec<(FrameHeader, Arc<[u8]>)> {
-        self.monitor_pending.drain(..).collect()
-    }
-
     pub fn poll_and_collect(&mut self) -> Result<()> {
         if let Some(output) = &mut self.output
             && output.poll().map_err(error)?.is_some()
@@ -97,7 +80,6 @@ impl FramePresenter for Presenter {
             _ => return Err(error("frame output mismatch")),
         }
         gpu.submit_us = start.elapsed().as_micros();
-        gpu.push_monitor(frame.payload.header.clone(), frame.payload.rgba.clone());
         Ok(vec![BroadcastEvent::VideoFrameSubmitted {
             frame: frame.frame,
         }])

@@ -1,19 +1,15 @@
 use qnc_json_transport::{Access, Credentials};
-use qnc_player_contract::{
-    Timebase,
-    session::{
-        MAX_CONTROL_BYTES, MAX_FRAME_BYTES, MonitorHeader, MonitorQuery, SessionReply,
-        SessionRequest, WIRE_HEADER_BYTES, WIRE_KIND_CONTROL, WIRE_KIND_FRAME, WIRE_MAGIC,
-        WIRE_MAX_TOKEN_BYTES, WIRE_SCHEME, WIRE_STATUS_ACCESS_DENIED, WIRE_STATUS_BAD_REQUEST,
-        WIRE_STATUS_OK, WIRE_STATUS_PROTOCOL, WIRE_STATUS_TOO_LARGE, WIRE_VERSION,
-    },
+use qnc_player_contract::session::{
+    MAX_CONTROL_BYTES, SessionReply, SessionRequest, WIRE_HEADER_BYTES, WIRE_KIND_CONTROL,
+    WIRE_MAGIC, WIRE_MAX_TOKEN_BYTES, WIRE_SCHEME, WIRE_STATUS_ACCESS_DENIED,
+    WIRE_STATUS_BAD_REQUEST, WIRE_STATUS_OK, WIRE_STATUS_PROTOCOL, WIRE_STATUS_TOO_LARGE,
+    WIRE_VERSION,
 };
 use std::{
-    collections::VecDeque,
     io::{ErrorKind, Read, Write},
     net::{Ipv4Addr, TcpListener, TcpStream},
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, SyncSender},
     },
@@ -21,84 +17,18 @@ use std::{
     time::{Duration, Instant},
 };
 
-const MAX_MONITOR_QUEUE: usize = 8;
-
 pub struct Pending {
     pub request: SessionRequest,
     pub response: SyncSender<SessionReply>,
     pub expires: Instant,
 }
-#[derive(Default)]
-struct FrameState {
-    current: Option<(MonitorHeader, Arc<[u8]>)>,
-    pending: VecDeque<(MonitorHeader, Arc<[u8]>)>,
-}
-type FrameSlot = Mutex<FrameState>;
 pub struct Control {
     pub requests: Receiver<Pending>,
     pub address: String,
     stop: Arc<AtomicBool>,
     io: Option<JoinHandle<()>>,
-    frame: Arc<FrameSlot>,
 }
 impl Control {
-    pub fn publish_frames(
-        &self,
-        session: &str,
-        generation: u64,
-        source_timebase: Option<Timebase>,
-        clear: bool,
-        pictures: Vec<(qnc_video_output::FrameHeader, Arc<[u8]>)>,
-    ) {
-        let mut frames = self.frame.lock().unwrap();
-        if clear {
-            frames.current = None;
-            frames.pending.clear();
-        }
-        for (h, bytes) in pictures {
-            let Some(timebase) = source_timebase else {
-                break;
-            };
-            let frame = (
-                MonitorHeader {
-                    contract_version: qnc_player_contract::VERSION.into(),
-                    session_id: session.into(),
-                    source_generation: generation,
-                    output_generation: h.generation,
-                    sequence: h.sequence,
-                    source_id: h.source_id,
-                    frame: h.frame_number,
-                    timebase,
-                    width: h.width,
-                    height: h.height,
-                },
-                bytes,
-            );
-            frames.pending.push_back(frame);
-            while frames.pending.len() > MAX_MONITOR_QUEUE {
-                frames.pending.pop_front();
-            }
-        }
-    }
-
-    #[cfg(test)]
-    pub fn set_frame(
-        &self,
-        session: &str,
-        generation: u64,
-        picture: Option<(qnc_video_output::FrameHeader, Arc<[u8]>)>,
-    ) {
-        match picture {
-            Some(picture) => self.publish_frames(
-                session,
-                generation,
-                Some(Timebase::new(50, 1).unwrap()),
-                true,
-                vec![picture],
-            ),
-            None => self.publish_frames(session, generation, None, true, Vec::new()),
-        }
-    }
     pub fn open(port: u16, credentials: Credentials) -> crate::Result<Self> {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).map_err(|e| e.to_string())?;
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
@@ -109,9 +39,7 @@ impl Control {
         let (sender, requests) = mpsc::sync_channel(8);
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
-        let frame = Arc::new(Mutex::new(FrameState::default()));
         let credentials = Arc::new(credentials);
-        let accept_frame = frame.clone();
         let accept_credentials = credentials.clone();
         let io = thread::spawn(move || {
             while !stopping.load(Ordering::Acquire) {
@@ -121,11 +49,8 @@ impl Control {
                         let _ = stream.set_write_timeout(Some(Duration::from_secs(10)));
                         let sender = sender.clone();
                         let credentials = accept_credentials.clone();
-                        let frame = accept_frame.clone();
                         let stop = stopping.clone();
-                        thread::spawn(move || {
-                            handle_socket(stream, sender, credentials, frame, stop)
-                        });
+                        thread::spawn(move || handle_socket(stream, sender, credentials, stop));
                     }
                     Err(error) if error.kind() == ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(2));
@@ -139,7 +64,6 @@ impl Control {
             address,
             stop,
             io: Some(io),
-            frame,
         })
     }
 }
@@ -154,7 +78,6 @@ fn handle_socket(
     mut stream: TcpStream,
     sender: SyncSender<Pending>,
     credentials: Arc<Credentials>,
-    frame: Arc<FrameSlot>,
     stop: Arc<AtomicBool>,
 ) {
     while !stop.load(Ordering::Acquire) {
@@ -174,7 +97,6 @@ fn handle_socket(
         };
         let response = match request.kind {
             WIRE_KIND_CONTROL => respond_control(request.body, access, &sender),
-            WIRE_KIND_FRAME => respond_frame_packet(request.body, &frame),
             _ => (WIRE_STATUS_BAD_REQUEST, Vec::new()),
         };
         if write_wire_response(&mut stream, response.0, &response.1).is_err() {
@@ -213,38 +135,6 @@ fn respond_control(body: Vec<u8>, access: Access, sender: &SyncSender<Pending>) 
     }
 }
 
-fn respond_frame_packet(body: Vec<u8>, frame: &FrameSlot) -> (u8, Vec<u8>) {
-    if body.len() > 8192 {
-        return (WIRE_STATUS_TOO_LARGE, Vec::new());
-    }
-    let Ok(query) = serde_json::from_slice::<MonitorQuery>(&body) else {
-        return (WIRE_STATUS_BAD_REQUEST, Vec::new());
-    };
-    let data = next_frame(frame, query.after);
-    let Some((header, rgba)) = data else {
-        return (WIRE_STATUS_OK, Vec::new());
-    };
-    if header
-        .validate(&query.session, &header.source_id, rgba.len())
-        .is_err()
-    {
-        return (WIRE_STATUS_PROTOCOL, Vec::new());
-    }
-    if query.after == Some((header.output_generation, header.sequence)) {
-        return (WIRE_STATUS_OK, vec![0; 4]);
-    }
-    let Ok(json) = serde_json::to_vec(&header) else {
-        return (WIRE_STATUS_PROTOCOL, Vec::new());
-    };
-    if json.len() > 8192 || json.len() + 4 + rgba.len() > MAX_FRAME_BYTES {
-        return (WIRE_STATUS_TOO_LARGE, Vec::new());
-    }
-    let mut bytes = (json.len() as u32).to_le_bytes().to_vec();
-    bytes.extend(json);
-    bytes.extend_from_slice(&rgba);
-    (WIRE_STATUS_OK, bytes)
-}
-
 fn read_wire_request(stream: &mut TcpStream) -> std::result::Result<WireRequest, u8> {
     let mut header = [0; WIRE_HEADER_BYTES];
     if let Err(error) = stream.read_exact(&mut header) {
@@ -265,7 +155,7 @@ fn read_wire_request(stream: &mut TcpStream) -> std::result::Result<WireRequest,
     if token_len == 0
         || token_len > WIRE_MAX_TOKEN_BYTES
         || body_len > MAX_CONTROL_BYTES
-        || !matches!(kind, WIRE_KIND_CONTROL | WIRE_KIND_FRAME)
+        || kind != WIRE_KIND_CONTROL
     {
         return Err(WIRE_STATUS_BAD_REQUEST);
     }
@@ -294,27 +184,6 @@ fn write_wire_response(stream: &mut TcpStream, status: u8, body: &[u8]) -> std::
     stream.flush()
 }
 
-fn next_frame(frame: &FrameSlot, after: Option<(u64, u64)>) -> Option<(MonitorHeader, Arc<[u8]>)> {
-    let mut frames = frame.lock().unwrap();
-    if let Some(cursor) = after {
-        while frames
-            .pending
-            .front()
-            .is_some_and(|(header, _)| frame_key(header) <= cursor)
-        {
-            frames.pending.pop_front();
-        }
-    }
-    if let Some(next) = frames.pending.pop_front() {
-        frames.current = Some(next.clone());
-        return Some(next);
-    }
-    frames.current.clone()
-}
-
-fn frame_key(header: &MonitorHeader) -> (u64, u64) {
-    (header.output_generation, header.sequence)
-}
 impl Drop for Control {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Release);
@@ -405,27 +274,6 @@ mod tests {
         }
     }
 
-    fn frame(
-        sequence: u64,
-        frame_number: u64,
-        value: u8,
-    ) -> (qnc_video_output::FrameHeader, Arc<[u8]>) {
-        (
-            qnc_video_output::FrameHeader {
-                version: qnc_video_output::VERSION.into(),
-                session_id: "s".into(),
-                generation: 2,
-                sequence,
-                source_id: "clip".into(),
-                frame_number,
-                width: 2,
-                height: 1,
-                pixel_format: qnc_video_output::PixelFormat::Rgba8Srgb,
-            },
-            vec![value; 8].into(),
-        )
-    }
-
     #[test]
     fn read_token_cannot_enqueue_commands_and_bad_token_cannot_read() {
         let control =
@@ -470,171 +318,23 @@ mod tests {
     }
 
     #[test]
-    fn monitor_is_authenticated_bounded_and_does_not_enqueue_player_work() {
+    fn frame_socket_is_disabled_until_gpu_dma_descriptor_backend_exists() {
         let control =
             Control::open(0, Credentials::new("read-test", "write-test").unwrap()).unwrap();
-        control.set_frame(
-            "s",
-            1,
-            Some((
-                qnc_video_output::FrameHeader {
-                    version: qnc_video_output::VERSION.into(),
-                    session_id: "s".into(),
-                    generation: 2,
-                    sequence: 7,
-                    source_id: "clip".into(),
-                    frame_number: 3,
-                    width: 2,
-                    height: 1,
-                    pixel_format: qnc_video_output::PixelFormat::Rgba8Srgb,
-                },
-                vec![255; 8].into(),
-            )),
-        );
-        let mut query = MonitorQuery {
-            session: SessionQuery {
-                contract_version: VERSION.into(),
-                session_id: "s".into(),
-                source_generation: 1,
-            },
-            after: None,
-        };
-        assert_eq!(
-            post(
-                &control,
-                WIRE_KIND_FRAME,
-                "bad-token",
-                &query,
-                MAX_FRAME_BYTES,
-            ),
-            Err(WIRE_STATUS_ACCESS_DENIED)
-        );
-        let bytes = post(
-            &control,
-            WIRE_KIND_FRAME,
-            "read-test",
-            &query,
-            MAX_FRAME_BYTES,
-        )
+        let body = serde_json::to_vec(&SessionRequest::State(SessionQuery {
+            contract_version: VERSION.into(),
+            session_id: "s".into(),
+            source_generation: 1,
+        }))
         .unwrap();
-        let length = u32::from_le_bytes(bytes[..4].try_into().unwrap()) as usize;
-        let header: MonitorHeader = serde_json::from_slice(&bytes[4..4 + length]).unwrap();
-        assert_eq!(header.frame, 3);
-        assert_eq!(&bytes[4 + length..], &[255; 8]);
-        query.after = Some((2, 7));
+        let mut stream =
+            TcpStream::connect(control.address.strip_prefix(WIRE_SCHEME).unwrap()).unwrap();
+        write_request(&mut stream, 2, "read-test", &body).unwrap();
         assert_eq!(
-            post(
-                &control,
-                WIRE_KIND_FRAME,
-                "read-test",
-                &query,
-                MAX_FRAME_BYTES,
-            )
-            .unwrap(),
-            [0; 4]
-        );
-        query.session.session_id = "wrong".into();
-        assert!(
-            post(
-                &control,
-                WIRE_KIND_FRAME,
-                "read-test",
-                &query,
-                MAX_FRAME_BYTES,
-            )
-            .is_err()
+            read_response(&mut stream, MAX_CONTROL_BYTES),
+            Err(WIRE_STATUS_BAD_REQUEST)
         );
         assert!(control.requests.try_recv().is_err());
-    }
-
-    #[test]
-    fn monitor_frame_uses_exact_socket_payload_without_http_headers() {
-        let control =
-            Control::open(0, Credentials::new("read-test", "write-test").unwrap()).unwrap();
-        let pixels = vec![123; 960 * 540 * 4];
-        control.set_frame(
-            "s",
-            1,
-            Some((
-                qnc_video_output::FrameHeader {
-                    version: qnc_video_output::VERSION.into(),
-                    session_id: "s".into(),
-                    generation: 2,
-                    sequence: 7,
-                    source_id: "clip".into(),
-                    frame_number: 3,
-                    width: 960,
-                    height: 540,
-                    pixel_format: qnc_video_output::PixelFormat::Rgba8Srgb,
-                },
-                pixels.clone().into(),
-            )),
-        );
-        let query = MonitorQuery {
-            session: SessionQuery {
-                contract_version: VERSION.into(),
-                session_id: "s".into(),
-                source_generation: 1,
-            },
-            after: None,
-        };
-        let body = post(
-            &control,
-            WIRE_KIND_FRAME,
-            "read-test",
-            &query,
-            MAX_FRAME_BYTES,
-        )
-        .unwrap();
-        let prefix = u32::from_le_bytes(body[..4].try_into().unwrap()) as usize;
-        let header: MonitorHeader = serde_json::from_slice(&body[4..4 + prefix]).unwrap();
-        assert_eq!(header.frame, 3);
-        assert_eq!(&body[4 + prefix..], pixels.as_slice());
-        assert_eq!(body.len(), 4 + prefix + pixels.len());
-        assert!(control.requests.try_recv().is_err());
-    }
-
-    #[test]
-    fn monitor_returns_next_queued_frame_instead_of_only_latest() {
-        let control =
-            Control::open(0, Credentials::new("read-test", "write-test").unwrap()).unwrap();
-        control.publish_frames(
-            "s",
-            1,
-            Some(Timebase::new(50, 1).unwrap()),
-            true,
-            vec![frame(7, 3, 7), frame(8, 4, 8)],
-        );
-        let query = |after| MonitorQuery {
-            session: SessionQuery {
-                contract_version: VERSION.into(),
-                session_id: "s".into(),
-                source_generation: 1,
-            },
-            after,
-        };
-        let first = post(
-            &control,
-            WIRE_KIND_FRAME,
-            "read-test",
-            &query(None),
-            MAX_FRAME_BYTES,
-        )
-        .unwrap();
-        let length = u32::from_le_bytes(first[..4].try_into().unwrap()) as usize;
-        let header: MonitorHeader = serde_json::from_slice(&first[4..4 + length]).unwrap();
-        assert_eq!((header.sequence, header.frame), (7, 3));
-        let next = post(
-            &control,
-            WIRE_KIND_FRAME,
-            "read-test",
-            &query(Some((2, 7))),
-            MAX_FRAME_BYTES,
-        )
-        .unwrap();
-        let length = u32::from_le_bytes(next[..4].try_into().unwrap()) as usize;
-        let header: MonitorHeader = serde_json::from_slice(&next[4..4 + length]).unwrap();
-        assert_eq!((header.sequence, header.frame), (8, 4));
     }
 
     #[test]

@@ -5,6 +5,16 @@ Status: zamrznuto
 Zatvoreno ograniceno odobrenje 2026-09-13: Ingest ulaz ne skenira diskove.
 `shell_next_group` pokaze povrsinu; aktivni projekt se cita iz baze.
 
+Zatvoreno ograniceno odobrenje 2026-09-13: engine ne cita diagnostics log;
+monitor mailbox je sekvenciran; skip slike ne prekida audio queue.
+
+Zatvoreno ograniceno odobrenje 2026-09-13: GPU/DMA Broadcast Player i preview
+monitor contract/API. `qnc-player-frame-transport` je GPU/DMA descriptor ugovor
+bez aktivnog CPU RGBA preview fallbacka. `qnc-monitor` razumije DMA payload, ali
+ga bez platformskog backenda ne slika kao stvarni frame. Stvarni
+DXGI/IOSurface/DMA-BUF backend nije implementiran, pa monitor-output mora pasti
+jasnom greskom. Freeze ponovno vrijedi.
+
 Datum: 2026-09-13
 
 Zatvoreno ograniceno odobrenje 2026-09-13: prvi preview blit je crtao cijeli
