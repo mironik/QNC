@@ -1,0 +1,16 @@
+{
+  "module_id": "qnc.module.media-pool-head",
+  "module_name": "Media pool head (library tabs and compact transport strip)",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": ["ui.pool_head.tabs", "ui.pool_head.transport"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["application.start", "business.db.write", "workflow.run", "media.process", "filesystem.write", "player.command"],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes"
+}

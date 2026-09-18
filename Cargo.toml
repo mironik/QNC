@@ -52,6 +52,7 @@ members = [
     "crates/qnc-media-records",
     "crates/qnc-media-record-db",
     "crates/qnc-media-metadata",
+    "crates/qnc-media-pool-head",
     "crates/qnc-media-probe",
     "crates/qnc-ffprobe-metadata",
     "crates/qnc-media-metadata-compose",
@@ -130,6 +131,7 @@ qnc-json-transport = { path = "crates/qnc-json-transport" }
 qnc-media-records = { path = "crates/qnc-media-records" }
 qnc-media-record-db = { path = "crates/qnc-media-record-db" }
 qnc-media-metadata = { path = "crates/qnc-media-metadata" }
+qnc-media-pool-head = { path = "crates/qnc-media-pool-head" }
 qnc-media-probe = { path = "crates/qnc-media-probe" }
 qnc-ffprobe-metadata = { path = "crates/qnc-ffprobe-metadata" }
 qnc-media-metadata-compose = { path = "crates/qnc-media-metadata-compose" }

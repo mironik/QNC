@@ -3378,6 +3378,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-media-pool-head"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
 name = "qnc-media-probe"
 version = "0.1.0"
 dependencies = [
