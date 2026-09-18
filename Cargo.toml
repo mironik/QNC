@@ -29,6 +29,7 @@ members = [
     "crates/qnc-timeline-assets",
     "crates/qnc-timeline",
     "crates/qnc-media-stream",
+    "crates/qnc-media-card",
     "crates/qnc-media-decode",
     "crates/qnc-ffmpeg-decode",
     "crates/qnc-decoder-catalog",
@@ -108,6 +109,7 @@ qnc-wave-worker = { path = "crates/qnc-wave-worker" }
 qnc-timeline-assets = { path = "crates/qnc-timeline-assets" }
 qnc-timeline = { path = "crates/qnc-timeline" }
 qnc-media-stream = { path = "crates/qnc-media-stream" }
+qnc-media-card = { path = "crates/qnc-media-card" }
 qnc-media-decode = { path = "crates/qnc-media-decode" }
 qnc-ffmpeg-decode = { path = "crates/qnc-ffmpeg-decode" }
 qnc-decoder-catalog = { path = "crates/qnc-decoder-catalog" }

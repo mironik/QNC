@@ -1,0 +1,8 @@
+[package]
+name = "qnc-media-card"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive module: media card and virtualized card grid"
+
+[dependencies]
+eframe = { workspace = true }

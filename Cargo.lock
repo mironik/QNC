@@ -3344,6 +3344,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-media-card"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
 name = "qnc-media-decode"
 version = "0.2.0"
 dependencies = [

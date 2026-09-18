@@ -167,3 +167,23 @@ Verificirano: conformance prolazi; mutacijski test (izmjena `left_ratio` i
 desnog panela grupe e) daje FAIL, nakon vracanja prolazi.
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (sedmo)
+
+Tri nova javna pasivna modula iz v4 reference, bez diranja Ingesta:
+
+- `qnc-editorial-shell`: shell (lijevi stupac, razdjelnik, desni panel), preview
+  monitora, content panel.
+- `qnc-media-pool-head`: tabovi All / Virtual / B-roll / Segment i transport
+  (`>`, `[`, `]`, `B`, Export HI-res); vraca jedan neutralni intent.
+- `qnc-media-card`: kartica i virtualizirana mreza, bez imenovanih presetova po
+  aplikaciji; zastavice (`selection_check`, `status_dots`) dolaze iz ugovora.
+
+Ugovori: `editorial-shell`, `media-pool-head`, `media-card` u
+`contracts/modules/`. Moduli ne drze stanje i ne znaju aplikaciju; boje i mjere
+dobivaju od forme (iz `editorial.layout.json`).
+
+Verificirano: testovi (4 + 4 + 7), `cargo check --workspace`, conformance. Moduli
+jos nisu spojeni ni u jednu formu.
+
+Odobrenje je zatvoreno. Status: zamrznuto.
