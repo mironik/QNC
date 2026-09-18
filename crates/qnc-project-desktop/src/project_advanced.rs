@@ -1,14 +1,14 @@
 use eframe::egui::{self, Color32, RichText, Sense, Vec2};
-use serde::Deserialize;
-use serde_json::{json, Map, Number, Value};
+use qnc_settings_path::{
+    number_string, path_string, set_path, set_string_path,
+};
+use serde_json::{Number, Value};
 
 use crate::{
     layout_contract::{SettingsPanelMetrics, ShellLayoutContract},
     theme::Theme,
     widgets,
 };
-
-const EXPORT_PROFILE_CATALOG_JSON: &str = include_str!("../../../contracts/export_profiles.json");
 
 const INPUT_FORMATS: &[(&str, &str)] = &[
     ("HD 1080p50", "HD 1080p50 (PAL)"),
@@ -55,20 +55,6 @@ const ORIGINAL_POLICIES: &[(&str, &str)] = &[
 ];
 const AUDIO_RATES: &[&str] = &["48000", "44100"];
 const AUDIO_CHANNELS: &[&str] = &["2", "4", "6", "8"];
-
-#[derive(Debug, Clone, Deserialize)]
-struct ExportProfileCatalog {
-    #[serde(default)]
-    presets: Vec<ExportProfilePreset>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct ExportProfilePreset {
-    id: String,
-    name: String,
-    #[serde(default)]
-    values: Value,
-}
 
 pub enum ApplicationSelectionAction {
     Choose {
@@ -321,7 +307,10 @@ pub fn show(
                     )
                     .clicked()
                 {
-                    changed |= save_export_preset(draft_settings, export_preset_draft_name);
+                    if qnc_export_preset::save_custom_preset(draft_settings, export_preset_draft_name) {
+                        export_preset_draft_name.clear();
+                        changed = true;
+                    }
                 }
             });
         }
@@ -387,20 +376,6 @@ pub fn show(
     );
 
     changed
-}
-
-pub fn set_string_path(settings: &mut Value, path: &str, value: String) {
-    set_path(settings, path, Value::String(value));
-}
-
-pub fn set_bool_path(settings: &mut Value, path: &str, value: bool) {
-    set_path(settings, path, Value::Bool(value));
-}
-
-pub fn bool_path(settings: &Value, path: &str, default: bool) -> bool {
-    path_value(settings, path)
-        .and_then(Value::as_bool)
-        .unwrap_or(default)
 }
 
 #[derive(Clone, Copy)]
@@ -573,17 +548,20 @@ fn export_preset_cell(
     settings: &mut Value,
     label_color: Color32,
 ) -> bool {
-    let mut presets = export_presets(settings)
+    let mut presets = qnc_export_preset::presets(settings)
         .into_iter()
-        .map(|preset| (preset.id, preset.name, preset.values))
+        .map(|preset| (preset.id, preset.name))
         .collect::<Vec<_>>();
-    presets.push(("manual".to_string(), "Ručno".to_string(), json!({})));
-    let before = path_string(settings, "export.preset", "manual");
+    presets.push((
+        qnc_export_preset::MANUAL_PRESET_ID.to_string(),
+        "Ručno".to_string(),
+    ));
+    let before = path_string(settings, "export.preset", qnc_export_preset::MANUAL_PRESET_ID);
     let mut selected = before.clone();
     let display = presets
         .iter()
-        .find(|(id, _, _)| id == &selected)
-        .map(|(_, name, _)| name.clone())
+        .find(|(id, _)| id == &selected)
+        .map(|(_, name)| name.clone())
         .unwrap_or_else(|| selected.clone());
 
     let cell_w = field_cell_width(grid_w, 1);
@@ -598,209 +576,14 @@ fn export_preset_cell(
                 .selected_text(display)
                 .width(cell_w)
                 .show_ui(ui, |ui| {
-                    for (id, name, _) in &presets {
+                    for (id, name) in &presets {
                         ui.selectable_value(&mut selected, id.clone(), name);
                     }
                 });
         },
     );
 
-    if selected == before {
-        return false;
-    }
-    if selected == "manual" {
-        set_string_path(settings, "export.preset", selected);
-        return true;
-    }
-    if let Some((_, _, values)) = presets.into_iter().find(|(id, _, _)| id == &selected) {
-        set_string_path(settings, "export.preset", selected);
-        if let Some(values) = values.as_object() {
-            for (key, value) in values {
-                set_path(settings, &format!("export.{key}"), value.clone());
-            }
-        }
-    }
-    true
-}
-
-fn export_presets(settings: &Value) -> Vec<ExportProfilePreset> {
-    let mut presets = serde_json::from_str::<ExportProfileCatalog>(EXPORT_PROFILE_CATALOG_JSON)
-        .map(|catalog| catalog.presets)
-        .unwrap_or_default();
-    presets.extend(custom_export_presets(settings));
-    presets
-}
-
-fn custom_export_presets(settings: &Value) -> Vec<ExportProfilePreset> {
-    settings
-        .get("export")
-        .and_then(|export| export.get("custom_presets"))
-        .and_then(Value::as_array)
-        .map(|presets| {
-            presets
-                .iter()
-                .filter_map(|preset| {
-                    let id = preset.get("id")?.as_str()?.trim();
-                    if id.is_empty() {
-                        return None;
-                    }
-                    let name = preset
-                        .get("name")
-                        .and_then(Value::as_str)
-                        .map(str::trim)
-                        .filter(|name| !name.is_empty())
-                        .unwrap_or(id);
-                    Some(ExportProfilePreset {
-                        id: id.to_string(),
-                        name: name.to_string(),
-                        values: preset.get("values").cloned().unwrap_or_else(|| json!({})),
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn save_export_preset(settings: &mut Value, draft_name: &mut String) -> bool {
-    let name = draft_name.trim().to_string();
-    if name.is_empty() {
-        return false;
-    }
-
-    let id = slug_preset_id(&name);
-    let values = current_export_values(settings);
-    let export = export_object_mut(settings);
-    let custom_presets = export
-        .entry("custom_presets".to_string())
-        .or_insert_with(|| Value::Array(Vec::new()));
-    if !custom_presets.is_array() {
-        *custom_presets = Value::Array(Vec::new());
-    }
-    let presets = custom_presets.as_array_mut().expect("custom_presets array");
-    presets.retain(|preset| preset.get("id").and_then(Value::as_str) != Some(id.as_str()));
-    presets.push(json!({
-        "id": id.clone(),
-        "name": name,
-        "values": values
-    }));
-    export.insert("preset".to_string(), Value::String(id));
-    draft_name.clear();
-    true
-}
-
-fn current_export_values(settings: &Value) -> Value {
-    let mut values = Map::new();
-    for key in [
-        "format",
-        "fps",
-        "width",
-        "height",
-        "field_order",
-        "color_space",
-        "container",
-        "video_codec",
-        "audio_sample_rate",
-        "audio_channels",
-    ] {
-        if let Some(value) = path_value(settings, &format!("export.{key}")) {
-            values.insert(key.to_string(), value.clone());
-        }
-    }
-    Value::Object(values)
-}
-
-fn export_object_mut(settings: &mut Value) -> &mut Map<String, Value> {
-    if !settings.is_object() {
-        *settings = Value::Object(Map::new());
-    }
-    let root = settings.as_object_mut().expect("settings object");
-    let export = root
-        .entry("export".to_string())
-        .or_insert_with(|| Value::Object(Map::new()));
-    if !export.is_object() {
-        *export = Value::Object(Map::new());
-    }
-    export.as_object_mut().expect("export object")
-}
-
-pub fn string_path(settings: &Value, path: &str, default: &str) -> String {
-    path_string(settings, path, default)
-}
-
-fn slug_preset_id(name: &str) -> String {
-    let slug = name
-        .to_lowercase()
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() {
-                character
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>();
-    let slug = slug.trim_matches('_').chars().take(40).collect::<String>();
-    if slug.is_empty() {
-        format!("custom_{}", unix_seconds())
-    } else {
-        format!("custom_{slug}")
-    }
-}
-
-fn unix_seconds() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0)
-}
-
-fn path_string(settings: &Value, path: &str, default: &str) -> String {
-    path_value(settings, path)
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| default.to_string())
-}
-
-fn number_string(settings: &Value, path: &str) -> String {
-    match path_value(settings, path) {
-        Some(Value::Number(number)) => number.to_string(),
-        Some(Value::String(value)) => value.clone(),
-        _ => String::new(),
-    }
-}
-
-fn path_value<'a>(settings: &'a Value, path: &str) -> Option<&'a Value> {
-    let mut current = settings;
-    for part in path.split('.') {
-        current = current.get(part)?;
-    }
-    Some(current)
-}
-
-fn set_path(settings: &mut Value, path: &str, value: Value) {
-    if !settings.is_object() {
-        *settings = Value::Object(Map::new());
-    }
-    let mut current = settings;
-    let parts = path.split('.').collect::<Vec<_>>();
-    for part in &parts[..parts.len().saturating_sub(1)] {
-        if !current.get(part).is_some_and(Value::is_object) {
-            current
-                .as_object_mut()
-                .expect("settings object")
-                .insert((*part).to_string(), Value::Object(Map::new()));
-        }
-        current = current
-            .get_mut(part)
-            .expect("path segment inserted as object");
-    }
-    if let Some(last) = parts.last() {
-        current
-            .as_object_mut()
-            .expect("settings object")
-            .insert((*last).to_string(), value);
-    }
+    qnc_export_preset::apply_preset(settings, &selected)
 }
 
 fn parse_decimal(raw: &str) -> Option<f64> {
@@ -874,34 +657,3 @@ fn field_grid_cols(grid_w: f32) -> usize {
     cols.max(1)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn applies_export_preset_values_to_settings() {
-        let mut settings = json!({});
-        let preset = export_presets(&settings)
-            .into_iter()
-            .find(|preset| preset.id == "h264_1080p50")
-            .expect("preset");
-        set_string_path(&mut settings, "export.preset", preset.id.clone());
-        if let Some(values) = preset.values.as_object() {
-            for (key, value) in values {
-                set_path(&mut settings, &format!("export.{key}"), value.clone());
-            }
-        }
-        assert_eq!(settings["export"]["preset"], "h264_1080p50");
-        assert_eq!(settings["export"]["container"], "mp4");
-        assert_eq!(settings["export"]["video_codec"], "h264");
-    }
-
-    #[test]
-    fn nested_paths_create_objects() {
-        let mut settings = json!({});
-        set_bool_path(&mut settings, "ai.coverage_suggestions", true);
-        set_string_path(&mut settings, "storage.ingest_profile", "house".to_string());
-        assert!(bool_path(&settings, "ai.coverage_suggestions", false));
-        assert_eq!(settings["storage"]["ingest_profile"], "house");
-    }
-}

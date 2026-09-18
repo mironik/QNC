@@ -1,0 +1,8 @@
+[package]
+name = "qnc-settings-path"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: dotted-path read/write helpers over a JSON settings value"
+
+[dependencies]
+serde_json = { workspace = true }

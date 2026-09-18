@@ -1,0 +1,10 @@
+[package]
+name = "qnc-export-preset"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: export profile presets (built-in catalog plus custom presets stored in settings)"
+
+[dependencies]
+qnc-settings-path = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -3102,6 +3102,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-export-preset"
+version = "0.1.0"
+dependencies = [
+ "qnc-settings-path",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-ffmpeg-decode"
 version = "0.1.0"
 dependencies = [
@@ -3611,8 +3620,10 @@ dependencies = [
  "qnc-application-selection",
  "qnc-contracts",
  "qnc-dir-browser",
+ "qnc-export-preset",
  "qnc-keyboard-shortcut",
  "qnc-project-application",
+ "qnc-settings-path",
  "qnc-transport-resolver",
  "qnc-ui-kit",
  "serde",
@@ -3658,6 +3669,13 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tiny_http",
+]
+
+[[package]]
+name = "qnc-settings-path"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

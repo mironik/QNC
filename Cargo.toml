@@ -55,6 +55,8 @@ members = [
     "crates/qnc-ffprobe-metadata",
     "crates/qnc-media-metadata-compose",
     "crates/qnc-project-application",
+    "crates/qnc-export-preset",
+    "crates/qnc-settings-path",
     "crates/qnc-project-desktop",
     "crates/qnc-project-desktop-adapter",
     "crates/qnc-project-close",
@@ -130,6 +132,8 @@ qnc-media-probe = { path = "crates/qnc-media-probe" }
 qnc-ffprobe-metadata = { path = "crates/qnc-ffprobe-metadata" }
 qnc-media-metadata-compose = { path = "crates/qnc-media-metadata-compose" }
 qnc-project-application = { path = "crates/qnc-project-application" }
+qnc-export-preset = { path = "crates/qnc-export-preset" }
+qnc-settings-path = { path = "crates/qnc-settings-path" }
 qnc-project-desktop = { path = "crates/qnc-project-desktop" }
 qnc-project-desktop-adapter = { path = "crates/qnc-project-desktop-adapter" }
 qnc-project-close = { path = "crates/qnc-project-close" }

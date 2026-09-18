@@ -345,37 +345,3 @@ fn short_path(path: &str) -> String {
     format!("...{tail}")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use qnc_dir_browser::BrowserEntry;
-
-    #[test]
-    fn opened_folder_rows_share_breadcrumb_column() {
-        assert_eq!(
-            path_tree_offset(),
-            UP_COL_W + NAV_GAP_W + DISKS_COL_W + NAV_GAP_W
-        );
-    }
-
-    #[test]
-    fn short_path_keeps_short_values() {
-        assert_eq!(
-            short_path("qnc://local/source/test"),
-            "qnc://local/source/test"
-        );
-    }
-
-    #[test]
-    fn root_disk_entries_are_public_browser_entries() {
-        let entry = BrowserEntry {
-            name: "G:".to_string(),
-            qnc_uri: "qnc://local/source/1".to_string(),
-            serial_number: "de666c9f".to_string(),
-            volume_name: String::new(),
-        };
-
-        assert_eq!(entry.name, "G:");
-        assert!(entry.qnc_uri.starts_with("qnc://local/source/"));
-    }
-}

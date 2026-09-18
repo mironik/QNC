@@ -155,7 +155,7 @@ impl Default for LocationBrowserState {
 
 impl ProjectApp {
     pub fn footer_status(&self) -> &str {
-        selected_project_label(&self.projects, self.selected_project)
+        qnc_project_application::selected_project_label(&self.projects, self.selected_project)
     }
 
     pub fn take_navigation_trigger(&mut self) -> bool {
@@ -201,46 +201,6 @@ impl ProjectApp {
         app.refresh_projects();
         app.refresh_templates();
         app
-    }
-}
-
-fn selected_project_label(projects: &[ProjectRow], selected: Option<usize>) -> &str {
-    selected
-        .and_then(|index| projects.get(index))
-        .map(|project| project.name.as_str())
-        .unwrap_or("Projekt nije odabran.")
-}
-
-#[cfg(test)]
-mod footer_tests {
-    use super::*;
-
-    #[test]
-    fn status_follows_selection_not_active_flag_and_never_keeps_removed_name() {
-        let mut rows = vec![
-            ProjectRow {
-                project_id: "p1".into(),
-                name: "First project".into(),
-                created_date: String::new(),
-                project_uri: "qnc://local/project/p1".into(),
-                active: true,
-            },
-            ProjectRow {
-                project_id: "p2".into(),
-                name: "Selected project".into(),
-                created_date: String::new(),
-                project_uri: "qnc://local/project/p2".into(),
-                active: false,
-            },
-        ];
-        assert_eq!(selected_project_label(&rows, Some(0)), "First project");
-        assert_eq!(selected_project_label(&rows, Some(1)), "Selected project");
-        assert_eq!(selected_project_label(&rows, None), "Projekt nije odabran.");
-        rows.clear();
-        assert_eq!(
-            selected_project_label(&rows, Some(1)),
-            "Projekt nije odabran."
-        );
     }
 }
 
@@ -1201,18 +1161,18 @@ impl ProjectApp {
         widgets::section(ui, content_w, "AI", settings, &self.contracts.shell, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
             let mut enabled =
-                project_advanced::bool_path(&self.draft_settings, "ai.enabled", false);
+                qnc_settings_path::bool_path(&self.draft_settings, "ai.enabled", false);
             if ui
                 .checkbox(&mut enabled, "AI analiza kadrova i virtualni kadrovi")
                 .changed()
             {
-                project_advanced::set_bool_path(&mut self.draft_settings, "ai.enabled", enabled);
+                qnc_settings_path::set_bool_path(&mut self.draft_settings, "ai.enabled", enabled);
                 self.status = "Postavke promijenjene.".to_string();
             }
             let mut coverage =
-                project_advanced::bool_path(&self.draft_settings, "ai.coverage_suggestions", true);
+                qnc_settings_path::bool_path(&self.draft_settings, "ai.coverage_suggestions", true);
             if ui.checkbox(&mut coverage, "Coverage suggestions").changed() {
-                project_advanced::set_bool_path(
+                qnc_settings_path::set_bool_path(
                     &mut self.draft_settings,
                     "ai.coverage_suggestions",
                     coverage,
@@ -1220,12 +1180,12 @@ impl ProjectApp {
                 self.status = "Postavke promijenjene.".to_string();
             }
             let mut transcription =
-                project_advanced::bool_path(&self.draft_settings, "ai.transcription", false);
+                qnc_settings_path::bool_path(&self.draft_settings, "ai.transcription", false);
             if ui
                 .checkbox(&mut transcription, "Transkripcija u Media tabu")
                 .changed()
             {
-                project_advanced::set_bool_path(
+                qnc_settings_path::set_bool_path(
                     &mut self.draft_settings,
                     "ai.transcription",
                     transcription,
@@ -1276,14 +1236,14 @@ impl ProjectApp {
         if text_changed {
             if project_root {
                 self.projects_root_dirty = true;
-                project_advanced::set_string_path(
+                qnc_settings_path::set_string_path(
                     &mut self.draft_settings,
                     "storage.projects_root",
                     self.projects_root.clone(),
                 );
             } else {
                 self.export_dir_dirty = true;
-                project_advanced::set_string_path(
+                qnc_settings_path::set_string_path(
                     &mut self.draft_settings,
                     "export.directory",
                     self.export_dir.clone(),
@@ -1454,7 +1414,7 @@ impl ProjectApp {
         let mut keyboard_changed = None;
         let shell = self.contracts.shell.clone();
         let base_name = self.selected_template_name();
-        let mut shortcut_preset = project_advanced::string_path(
+        let mut shortcut_preset = qnc_settings_path::path_string(
             &self.draft_settings,
             "keyboard_shortcuts.active_preset",
             &self.contracts.shortcuts.active_preset,
@@ -1526,7 +1486,7 @@ impl ProjectApp {
             );
         });
         if let Some(preset) = keyboard_changed {
-            project_advanced::set_string_path(
+            qnc_settings_path::set_string_path(
                 &mut self.draft_settings,
                 "keyboard_shortcuts.active_preset",
                 preset,
@@ -1751,7 +1711,7 @@ impl ProjectApp {
                     qnc_dir_browser::display_private_path(Path::new(&projects_root));
                 self.projects_root_dirty = true;
                 self.projects_root_browser_open = false;
-                project_advanced::set_string_path(
+                qnc_settings_path::set_string_path(
                     &mut self.draft_settings,
                     "storage.projects_root",
                     self.projects_root.clone(),
@@ -1837,7 +1797,7 @@ impl ProjectApp {
         self.export_dir = path;
         self.export_dir_dirty = true;
         self.export_dir_browser_open = false;
-        project_advanced::set_string_path(
+        qnc_settings_path::set_string_path(
             &mut self.draft_settings,
             "export.directory",
             self.export_dir.clone(),
@@ -2083,13 +2043,13 @@ impl ProjectApp {
 
     fn settings_draft_for_save(&self) -> Value {
         let mut settings = self.draft_settings.clone();
-        project_advanced::set_string_path(
+        qnc_settings_path::set_string_path(
             &mut settings,
             "storage.projects_root",
             self.projects_root.clone(),
         );
         if self.export_dir_dirty && !self.export_dir.trim().is_empty() {
-            project_advanced::set_string_path(
+            qnc_settings_path::set_string_path(
                 &mut settings,
                 "export.directory",
                 self.export_dir.clone(),

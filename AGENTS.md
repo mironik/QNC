@@ -1335,6 +1335,21 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno (korak 2) ograniceno odobrenje 2026-09-18 (cetvrto): korisnik je
+izricito potvrdio nastavak. Poslovna logika export presetova i JSON putanja
+postavki izlazi iz `crates/qnc-project-desktop/src/project_advanced.rs` u dva
+uska javna modula (novi crateovi `crates/qnc-settings-path` i
+`crates/qnc-export-preset`, s ugovorima u `contracts/modules/`); 8 testova izlazi
+iz desktop cratea (2 uz module, 1 uz `ProjectsState` u `qnc-project-application`,
+2 provjere ugovora u `tools/qnc-conformance`, 3 tautoloska se uklanjaju).
+Otkljucano: `crates/qnc-project-desktop/**`, `crates/qnc-project-application/**`,
+dva nova crate-a, dva nova `*.module.json`, root `Cargo.toml`/`Cargo.lock` samo za
+njih, `tools/qnc-conformance/src/main.rs` samo za dodane provjere. Verificirano:
+conformance (nove provjere `Project form has no tests` i `Project layout and
+shortcut reference`), cijeli workspace se kompajlira, testovi modula prolaze, zivi
+smoke `qnc-project`. Obitelj je zamrznuta. Bez promjene
+ponasanja. Sve ostalo ostaje zamrznuto.
+
 Zatvoreno (korak 1) ograniceno odobrenje 2026-09-18 (cetvrto): korisnik je izricito
 otkljucao sve sto je potrebno da forma Project ne sadrzi store ni poslovnu
 logiku (§3, §10). Korak 1: `ProjectComponent` i `ApplicationSelection` selje

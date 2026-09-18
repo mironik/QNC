@@ -166,31 +166,3 @@ pub struct PtsSlots {
     pub scroll_order: Vec<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn loads_embedded_project_contracts() {
-        let contracts = AppContracts::load_embedded().expect("contracts");
-        assert_eq!(contracts.project.layout_id, "qnc.ui.project");
-        assert_eq!(contracts.project.board.left_ratio, 0.31);
-        assert_eq!(
-            contracts.project.pts_slots.fixed_order,
-            [
-                "TemplatePicker",
-                "ProjectCreate",
-                "AiSettings",
-                "ProjectsRoot",
-                "ExportDirectory",
-                "TemplateActions",
-            ]
-        );
-    }
-
-    #[test]
-    fn shortcut_hint_comes_from_external_catalog() {
-        let contracts = AppContracts::load_embedded().expect("contracts");
-        assert_eq!(contracts.project_open_hint.as_deref(), Some("Enter"));
-    }
-}

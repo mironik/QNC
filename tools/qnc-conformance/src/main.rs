@@ -136,6 +136,8 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
     checks.push(scan_business_app_isolation(root));
     checks.push(scan_shell_app_boundary(root));
     checks.push(scan_project_app_boundary(root));
+    checks.push(validate_project_form_has_no_tests(root));
+    checks.push(validate_project_layout_reference(root));
     checks.push(scan_shared_ui_patterns(root));
     checks.push(scan_timeline_engine_boundary(root));
     checks.push(CheckResult::from_report(
@@ -209,6 +211,81 @@ fn validate_ingest_form_has_no_tests(root: &Path) -> CheckResult {
         }
     }
     CheckResult::from_report("Ingest form has no tests", report)
+}
+
+fn validate_project_form_has_no_tests(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let src = root.join("crates").join("qnc-project-desktop").join("src");
+    let mut files = Vec::new();
+    collect_rs_files(&src, &mut files);
+    for path in files {
+        let Ok(contents) = fs::read_to_string(&path) else {
+            continue;
+        };
+        for forbidden in ["#[cfg(test)]", "#[test]"] {
+            if contents.contains(forbidden) {
+                report.error(format!(
+                    "{}: Project form must not contain tests; tests live in modules or conformance",
+                    display_relative(root, &path)
+                ));
+            }
+        }
+    }
+    CheckResult::from_report("Project form has no tests", report)
+}
+
+/// Reference values of the Project layout and open-project shortcut, read
+/// straight from the contracts (previously asserted by tests inside the form).
+fn validate_project_layout_reference(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let read = |relative: &str| -> Option<serde_json::Value> {
+        fs::read_to_string(root.join(relative))
+            .ok()
+            .and_then(|contents| serde_json::from_str(&contents).ok())
+    };
+    match read("contracts/ui/project.layout.json") {
+        Some(layout) => {
+            if layout["layout_id"] != "qnc.ui.project" {
+                report.error("contracts/ui/project.layout.json: layout_id must be qnc.ui.project".to_string());
+            }
+            if layout["board"]["left_ratio"] != 0.31 {
+                report.error("contracts/ui/project.layout.json: board.left_ratio must be 0.31 (qnc_v4 reference)".to_string());
+            }
+            let expected = [
+                "TemplatePicker",
+                "ProjectCreate",
+                "AiSettings",
+                "ProjectsRoot",
+                "ExportDirectory",
+                "TemplateActions",
+            ];
+            let actual = layout["pts_slots"]["fixed_order"]
+                .as_array()
+                .map(|order| order.iter().filter_map(serde_json::Value::as_str).collect::<Vec<_>>());
+            if actual.as_deref() != Some(&expected[..]) {
+                report.error(format!(
+                    "contracts/ui/project.layout.json: pts_slots.fixed_order must be {expected:?}"
+                ));
+            }
+        }
+        None => report.error("contracts/ui/project.layout.json: missing or invalid JSON".to_string()),
+    }
+    match read("contracts/qnc-keyboard-shortcuts.json") {
+        Some(shortcuts) => {
+            let active = shortcuts["active_preset"].as_str().unwrap_or("default");
+            let chords = &shortcuts["presets"][active]["project"]["project_open_selected"];
+            let chords = if chords.is_array() {
+                chords
+            } else {
+                &shortcuts["presets"]["default"]["project"]["project_open_selected"]
+            };
+            if chords[0]["key"] != "Enter" {
+                report.error("contracts/qnc-keyboard-shortcuts.json: project_open_selected must be bound to Enter".to_string());
+            }
+        }
+        None => report.error("contracts/qnc-keyboard-shortcuts.json: missing or invalid JSON".to_string()),
+    }
+    CheckResult::from_report("Project layout and shortcut reference", report)
 }
 
 fn scan_timeline_engine_boundary(root: &Path) -> CheckResult {

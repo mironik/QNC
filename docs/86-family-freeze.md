@@ -117,3 +117,27 @@ Ostaje otvoreno (korak 2): poslovna logika export presetova u
 crateu (§10). Zahtijeva novo otkljucavanje.
 
 Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (cetvrto, korak 2)
+
+Forma Project vise ne sadrzi poslovnu logiku ni testove (§3, §10).
+
+- `qnc-settings-path` (novo, javni modul): JSON putanje postavki.
+- `qnc-export-preset` (novo, javni modul): export presetovi (ugradjeni katalog
+  `contracts/export_profiles.json` + custom presetovi u postavkama).
+- `qnc-project-application::selected_project_label` s testom.
+- Ugovori `settings-path.module.json`, `export-preset.module.json`.
+- `qnc-conformance`: nove provjere `Project form has no tests` i `Project layout
+  and shortcut reference` (asercije koje su bile u testovima forme, sada citaju
+  ugovore izravno).
+
+Uklonjeno bez zamjene, jer testovi nisu ispitivali kod, nego ponavljali
+implementaciju ili vlastiti literal: `opened_folder_rows_share_breadcrumb_column`,
+`short_path_keeps_short_values`, `root_disk_entries_are_public_browser_entries`
+(sve u `location_browser.rs`; dostupni u git povijesti).
+
+Verificirano: conformance, `cargo check --workspace`, testovi (selection 4,
+export-preset 2, settings-path 1, project-application 1, store 36), zivi smoke
+`qnc-project`.
+
+Status: zamrznuto.
