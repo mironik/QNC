@@ -22,6 +22,8 @@ use qnc_media_card::{
 use qnc_media_pool_head::{
     show_head, LibraryTab, PoolHeadAction, PoolHeadInput, PoolHeadStyle,
 };
+use qnc_source_dock::{dock_height, show_dock, DockAction, DockHeader, DockStyle, MarkFocus};
+use qnc_timeline::{TimelineIntent, TimelineProjection, TimelineTheme};
 use serde_json::Value;
 
 const EDITORIAL: &str = include_str!("../../../contracts/ui/editorial.layout.json");
@@ -67,6 +69,13 @@ struct Demo {
     checked: HashSet<String>,
     rows: Vec<Row>,
     last_action: String,
+    dock_style: DockStyle,
+    dock_actions: Vec<String>,
+    timeline_theme: TimelineTheme,
+    duration_frames: u64,
+    playhead_frame: u64,
+    peaks_a1: Vec<f32>,
+    peaks_a2: Vec<f32>,
 }
 
 impl Demo {
@@ -104,7 +113,59 @@ impl Demo {
         let flag = |name: &str| pool[name].as_bool().expect("pool_head flag");
         let card = &composition["media_card"];
 
+        let dock = &editorial["source_dock"];
+        let dock_style = DockStyle {
+            fill: surface,
+            chrome_fill: surface,
+            border,
+            text,
+            muted,
+            focus: rgb(&colors["focus"]),
+            // Demo-only: qnc_v4 TC_GOLD.
+            timecode_value: Color32::from_rgb(0xf0, 0xb4, 0x00),
+            font_ui: f(&metrics["font_ui"]),
+            font_timecode: f(&metrics["font_timecode"]),
+            chrome_row_height,
+            chrome_control_height: f(&metrics["chrome_control_height"]),
+            chrome_pad_x: metrics["chrome_pad_x"].as_i64().unwrap() as i8,
+            chrome_pad_y: metrics["chrome_pad_y"].as_i64().unwrap() as i8,
+            inset_x: f(&dock["inner_margin_x"]) as i8,
+            header_timeline_gap: f(&dock["header_timeline_gap"]),
+            header_item_gap: f(&dock["header_item_gap"]),
+        };
+        let dock_actions = composition["source_dock"]["actions_rtl"]
+            .as_array()
+            .expect("actions_rtl")
+            .iter()
+            .map(|a| a.as_str().unwrap().to_string())
+            .collect();
+        // Same mapping as the Ingest form: border_soft = border * 0.65.
+        let timeline_theme = TimelineTheme::from_qnc_theme(
+            bg,
+            surface,
+            raised,
+            border.linear_multiply(0.65),
+            text,
+            muted,
+            accent,
+        );
+        let peaks = |seed: f32| -> Vec<f32> {
+            (0..600)
+                .map(|i| {
+                    let x = i as f32;
+                    (((x * 0.13 + seed).sin().abs() * 0.8) + ((i * 7 % 13) as f32) / 40.0).min(1.0)
+                })
+                .collect()
+        };
+
         Self {
+            dock_style,
+            dock_actions,
+            timeline_theme,
+            duration_frames: 5000,
+            playhead_frame: 1200,
+            peaks_a1: peaks(0.0),
+            peaks_a2: peaks(1.7),
             group: group.to_string(),
             geometry,
             shell_style: ShellStyle {
@@ -180,6 +241,18 @@ impl Demo {
     }
 }
 
+/// Frame timecode at 25 fps (demo only).
+fn frame_tc(frame: u64) -> String {
+    let fps = 25;
+    format!(
+        "{:02}:{:02}:{:02}:{:02}",
+        frame / (fps * 3600),
+        frame / (fps * 60) % 60,
+        frame / fps % 60,
+        frame % fps
+    )
+}
+
 fn timecode(seconds: f64) -> String {
     let total = seconds.max(0.0) as u64;
     format!("{:02}:{:02}", total / 60, total % 60)
@@ -187,6 +260,67 @@ fn timecode(seconds: f64) -> String {
 
 impl eframe::App for Demo {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Bottom dock: header (clip label, IN/OUT/Trajanje, buttons) + timeline.
+        let timeline_h = qnc_timeline::source_player_timeline_height();
+        let dock_h = dock_height(timeline_h, true, &self.dock_style);
+        let clip_label = self
+            .rows
+            .iter()
+            .find(|row| row.id == self.selected)
+            .map_or("—".to_string(), |row| row.title.clone());
+        let duration = self.duration_frames;
+        let projection = TimelineProjection::new(0, duration)
+            .with_playhead(self.playhead_frame)
+            .with_cue_enabled(true);
+        let (in_label, out_label, duration_label) =
+            (frame_tc(0), frame_tc(duration), frame_tc(duration));
+        let actions: Vec<&str> = self.dock_actions.iter().map(String::as_str).collect();
+        let dock_style = self.dock_style;
+        let timeline_theme = self.timeline_theme;
+        let (peaks_a1, peaks_a2) = (self.peaks_a1.clone(), self.peaks_a2.clone());
+        let mut dock_action = DockAction::None;
+        let mut cue: Option<u64> = None;
+        egui::TopBottomPanel::bottom("editorial_demo_dock")
+            .exact_height(dock_h)
+            .frame(egui::Frame::NONE)
+            .show(ctx, |ui| {
+                let header = DockHeader {
+                    clip_label: &clip_label,
+                    in_label: &in_label,
+                    out_label: &out_label,
+                    duration_label: &duration_label,
+                    focus: MarkFocus::None,
+                    actions_rtl: &actions,
+                };
+                dock_action = show_dock(ui, &dock_style, Some(&header), |ui| {
+                    let (rect, _) = ui.allocate_exact_size(
+                        egui::vec2(ui.available_width(), timeline_h),
+                        Sense::hover(),
+                    );
+                    let intent = qnc_timeline::show_source_player_timeline_with_artifacts(
+                        ui,
+                        rect,
+                        &projection,
+                        timeline_theme,
+                        None,
+                        &peaks_a1,
+                        &peaks_a2,
+                        &[],
+                        &[],
+                    );
+                    if let TimelineIntent::CueFrame(frame) = intent {
+                        cue = Some(frame);
+                    }
+                });
+            });
+        if let DockAction::Button(index) = dock_action {
+            self.last_action = format!("dock: {}", self.dock_actions[index]);
+        }
+        if let Some(frame) = cue {
+            self.playhead_frame = frame;
+            self.last_action = format!("cue frame {frame}");
+        }
+
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(self.shell_style.bg))
             .show(ctx, |ui| {

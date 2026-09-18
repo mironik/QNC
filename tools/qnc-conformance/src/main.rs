@@ -281,6 +281,21 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             ));
         }
     }
+    for key in ["inner_margin_x", "header_timeline_gap", "header_item_gap"] {
+        if editorial["source_dock"][key] != ingest["source_dock"][key] {
+            report.error(format!(
+                "editorial.layout.json: source_dock.{key} differs from ingest.layout.json"
+            ));
+        }
+    }
+    for group in ["e", "g", "l", "o"] {
+        let actions = editorial["groups"][group]["source_dock"]["actions_rtl"].as_array();
+        if actions.map_or(true, |actions| actions.is_empty()) {
+            report.error(format!(
+                "editorial.layout.json: group '{group}' source_dock.actions_rtl must not be empty"
+            ));
+        }
+    }
     for key in ["reserve_below", "min_height", "min_width"] {
         if editorial["preview"][key] != ingest["preview"][key] {
             report.error(format!(

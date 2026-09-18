@@ -44,6 +44,12 @@
     "card_text_height": 34.0,
     "grid_gap": 10.0
   },
+  "source_dock": {
+    "inner_margin_x": 8.0,
+    "header_timeline_gap": 4.0,
+    "header_item_gap": 8.0,
+    "timecode_labels": ["IN", "OUT", "Trajanje"]
+  },
   "right_panel": {
     "empty_kinds": ["none"],
     "note": "Reserved space for the functions of each group; stays empty until a group specifies it."
@@ -62,7 +68,8 @@
         "show": true,
         "show_header": true,
         "show_story_actions": true,
-        "show_ingest_actions": false
+        "show_ingest_actions": false,
+        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", "Add virtual clip"]
       },
       "media_card": {
         "selection_check": true,
@@ -82,7 +89,8 @@
         "show": true,
         "show_header": true,
         "show_story_actions": true,
-        "show_ingest_actions": false
+        "show_ingest_actions": false,
+        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", "Add virtual clip"]
       },
       "media_card": {
         "selection_check": true,
@@ -102,7 +110,8 @@
         "show": true,
         "show_header": true,
         "show_story_actions": true,
-        "show_ingest_actions": false
+        "show_ingest_actions": false,
+        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", "Add virtual clip"]
       },
       "media_card": {
         "selection_check": true,
@@ -122,7 +131,8 @@
         "show": true,
         "show_header": true,
         "show_story_actions": true,
-        "show_ingest_actions": false
+        "show_ingest_actions": false,
+        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", "Add virtual clip"]
       },
       "media_card": {
         "selection_check": false,

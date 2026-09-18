@@ -154,3 +154,22 @@ prije koda.
    `qnc-app.json` s `priority_group`, samostalni exe.
 
 Status: zamrznuto.
+
+## Dopuna 2026-09-18: donji dock
+
+Probni prozor (`crates/qnc-editorial-shell/examples/editorial_demo.rs`) je bez
+docka bio nepotpun. Dodan je `qnc-source-dock` (header: naziv klipa, IN / OUT /
+Trajanje, gumbi zadani popisom `actions_rtl`; mjesto za timeline) i probni
+prozor sada crta stvarni `qnc-timeline` s lazniim podacima.
+
+Odluka korisnika: raspored docka uzima se iz Ingest layouta (isti header,
+razmak `header_timeline_gap` 4, inset 8, `header_item_gap` 8; ista ploha
+`surface` i gornja crta). Ingest se ne dira; `qnc-conformance` cuva da mjere u
+`editorial.layout.json` ostanu jednake `ingest.layout.json`.
+
+Gumbi za e, g, l i o su zasad v4 popis: Pokrivalice, Voice over, Talking Head,
+Add virtual clip. Popis po grupi je ugovorna stvar i mijenja se u
+`editorial.layout.json`.
+
+Jos nije u shemi: shell footer s karticama aplikacija (Project, Ingest, ...),
+Close project i izbor teme. To pripada shellu (`qnc-app`), ne ovim modulima.

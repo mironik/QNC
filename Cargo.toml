@@ -68,6 +68,7 @@ members = [
     "crates/qnc-sony-metadata",
     "crates/qnc-source-reader",
     "crates/qnc-source-contract",
+    "crates/qnc-source-dock",
     "crates/qnc-source-groups",
     "crates/qnc-source-index-contract",
     "crates/qnc-source-index-db",
@@ -148,6 +149,7 @@ qnc-shell-desktop-api = { path = "crates/qnc-shell-desktop-api" }
 qnc-sony-metadata = { path = "crates/qnc-sony-metadata" }
 qnc-source-reader = { path = "crates/qnc-source-reader" }
 qnc-source-contract = { path = "crates/qnc-source-contract" }
+qnc-source-dock = { path = "crates/qnc-source-dock" }
 qnc-source-groups = { path = "crates/qnc-source-groups" }
 qnc-source-index-contract = { path = "crates/qnc-source-index-contract" }
 qnc-source-index-db = { path = "crates/qnc-source-index-db" }

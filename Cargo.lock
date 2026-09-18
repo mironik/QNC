@@ -3108,6 +3108,8 @@ dependencies = [
  "eframe",
  "qnc-media-card",
  "qnc-media-pool-head",
+ "qnc-source-dock",
+ "qnc-timeline",
  "serde_json",
 ]
 
@@ -3731,6 +3733,13 @@ dependencies = [
  "qnc-contracts",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "qnc-source-dock"
+version = "0.1.0"
+dependencies = [
+ "eframe",
 ]
 
 [[package]]

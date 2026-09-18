@@ -1335,6 +1335,17 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18 (deveto): korisnik je ocijenio da probni
+prozor nije kompletan UI (nedostaje donji dock). Novi javni pasivni modul
+`crates/qnc-source-dock` (header s nazivom klipa, IN/OUT/Trajanje i gumbima,
+mjesto za timeline; iz v4 `qnc_source_dock.rs`, samo varijanta s akcijama
+uredjivanja, ne ingest varijanta), ugovor `contracts/modules/source-dock.module.json`,
+dopuna bloka `source_dock` u `contracts/ui/editorial.layout.json`, proširenje
+probnog prozora, root `Cargo.toml`/`Cargo.lock` samo za taj crate. Ingest se ne
+dira; referenca za raspored docka je Ingest layout (odluka korisnika). Verificirano:
+test modula, conformance (usporedba mjera docka s Ingest ugovorom), smoke probnog
+prozora za grupe e i o. Odobrenje zatvoreno, obitelj je zamrznuta.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (osmo): korisnik je potvrdio nastavak.
 Samo probni prozor (`example`) u `crates/qnc-editorial-shell/examples/` s
 dev-ovisnostima na `qnc-media-pool-head`, `qnc-media-card` i `serde_json`, da se

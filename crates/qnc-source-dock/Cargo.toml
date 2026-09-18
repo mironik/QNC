@@ -1,0 +1,8 @@
+[package]
+name = "qnc-source-dock"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive module: bottom source dock (header with clip label, IN/OUT/duration and action buttons, slot for the timeline)"
+
+[dependencies]
+eframe = { workspace = true }

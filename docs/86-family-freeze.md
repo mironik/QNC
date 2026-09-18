@@ -202,3 +202,15 @@ Nema aplikacije, baze ni manifesta. Vrijednosti `preview_black` i `select_red`
 u demou su privremene (ugovor ih imenuje, ali ne daje vrijednost).
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (deveto)
+
+Dodan je javni pasivni modul `qnc-source-dock` (ugovor `source-dock.module.json`),
+blok `source_dock` i `actions_rtl` po grupama u `editorial.layout.json`, provjera
+podudarnosti mjera docka s Ingest ugovorom u `qnc-conformance`, te dock s
+timelineom u probnom prozoru `editorial_demo`. Referenca za raspored docka je
+Ingest layout (odluka korisnika); Ingest nije diran.
+
+Verificirano: test modula, conformance, smoke probnog prozora (e, o).
+
+Odobrenje je zatvoreno. Status: zamrznuto.
