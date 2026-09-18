@@ -1335,6 +1335,15 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18 (sesto): korisnik je potvrdio da je
+layout isti kao u Ingestu, a razlikuju se samo komponente u slotovima. Korak 2:
+novi ugovor `contracts/ui/editorial.layout.json` (zajednicka geometrija +
+kompozicija po grupama e, g, l, o) i jedna dodana provjera u
+`tools/qnc-conformance/src/main.rs`. Ingest i `ingest.layout.json` se ne dira.
+Desni panel za e, g, l ostaje prazan. Verificirano: conformance prolazi, a provjera
+hvata odstupanje geometrije od Ingest ugovora i neprazan desni panel (mutacijski
+test). Odobrenje zatvoreno, obitelj je zamrznuta.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (peto): korisnik je izricito trazio
 pocetak UI sheme za Media Assist grupe (e, g, l) i Story (o). Korak 1 je samo
 novi dokument `docs/87-editorial-ui-reference-audit.md` (snimka v4 rasporeda i

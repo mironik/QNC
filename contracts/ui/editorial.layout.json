@@ -1,0 +1,141 @@
+{
+  "layout_id": "qnc.ui.editorial",
+  "layout_version": "0.1.0",
+  "mirror_policy": "literal_qnc_v4",
+  "font_policy": "single_qnc_font_system",
+  "allowed_deviation_policy": "explicit_approval_required",
+  "qnc_v4_reference": [
+    "qnc-app/src/composition.rs",
+    "qnc-app/src/qnc_ui.rs",
+    "qnc-app/src/qnc_media_card.rs",
+    "qnc-app/src/editorial/media_pool.rs",
+    "qnc-app/src/story.rs",
+    "qnc-app/src/media_assist.rs",
+    "seed/tabs/story/plugin.json",
+    "seed/tabs/media_assist/plugin.json"
+  ],
+  "audit_note": "Shared editorial shell. Geometry is identical to contracts/ui/ingest.layout.json (v4 qnc_ui::space); applications differ only in the components placed in the slots. See docs/87-editorial-ui-reference-audit.md.",
+  "shell": {
+    "kind": "editorial",
+    "left_ratio": 0.365,
+    "divider_width": 5.0,
+    "left_min_width": 280.0,
+    "right_min_width": 200.0,
+    "outer_padding": 0.0,
+    "left_column_face": "theme.surface",
+    "right_column_face": "theme.bg",
+    "shell_margin_x": 8.0,
+    "block_pad": 10.0,
+    "gap": 8.0
+  },
+  "preview": {
+    "reserve_below": 190.0,
+    "min_height": 160.0,
+    "width_inset": 32.0,
+    "min_width": 240.0,
+    "aspect": "16:9",
+    "fit": "contain_centered",
+    "empty_label": "Odaberi klip",
+    "empty_font_size": 14.0,
+    "face": "preview_black"
+  },
+  "media_card": {
+    "min_card_width": 160.0,
+    "card_text_height": 34.0,
+    "grid_gap": 10.0
+  },
+  "right_panel": {
+    "empty_kinds": ["none"],
+    "note": "Reserved space for the functions of each group; stays empty until a group specifies it."
+  },
+  "groups": {
+    "e": {
+      "role": "media_assist_audio_ai",
+      "pool_head": {
+        "show_segment_tab": false,
+        "show_cover_tab": true,
+        "show_export_hires": false,
+        "show_quick_cover": false
+      },
+      "right_panel": "none",
+      "source_dock": {
+        "show": true,
+        "show_header": true,
+        "show_story_actions": true,
+        "show_ingest_actions": false
+      },
+      "media_card": {
+        "selection_check": true,
+        "status_dots": "pipeline"
+      }
+    },
+    "g": {
+      "role": "media_assist_audio",
+      "pool_head": {
+        "show_segment_tab": false,
+        "show_cover_tab": true,
+        "show_export_hires": false,
+        "show_quick_cover": false
+      },
+      "right_panel": "none",
+      "source_dock": {
+        "show": true,
+        "show_header": true,
+        "show_story_actions": true,
+        "show_ingest_actions": false
+      },
+      "media_card": {
+        "selection_check": true,
+        "status_dots": "pipeline"
+      }
+    },
+    "l": {
+      "role": "media_assist_video",
+      "pool_head": {
+        "show_segment_tab": false,
+        "show_cover_tab": true,
+        "show_export_hires": false,
+        "show_quick_cover": false
+      },
+      "right_panel": "none",
+      "source_dock": {
+        "show": true,
+        "show_header": true,
+        "show_story_actions": true,
+        "show_ingest_actions": false
+      },
+      "media_card": {
+        "selection_check": true,
+        "status_dots": "pipeline"
+      }
+    },
+    "o": {
+      "role": "story",
+      "pool_head": {
+        "show_segment_tab": true,
+        "show_cover_tab": true,
+        "show_export_hires": true,
+        "show_quick_cover": true
+      },
+      "right_panel": "segment_panel",
+      "source_dock": {
+        "show": true,
+        "show_header": true,
+        "show_story_actions": true,
+        "show_ingest_actions": false
+      },
+      "media_card": {
+        "selection_check": false,
+        "status_dots": "pipeline"
+      }
+    }
+  },
+  "forbidden_changes_without_approval": [
+    "redesign",
+    "changing_qnc_v4_layout",
+    "changing_labels",
+    "changing_font_system",
+    "adding_business_logic_to_ui",
+    "filling_empty_right_panel_without_group_specification"
+  ]
+}

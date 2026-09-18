@@ -138,6 +138,7 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
     checks.push(scan_project_app_boundary(root));
     checks.push(validate_project_form_has_no_tests(root));
     checks.push(validate_project_layout_reference(root));
+    checks.push(validate_editorial_layout_composition(root));
     checks.push(scan_shared_ui_patterns(root));
     checks.push(scan_timeline_engine_boundary(root));
     checks.push(CheckResult::from_report(
@@ -232,6 +233,62 @@ fn validate_project_form_has_no_tests(root: &Path) -> CheckResult {
         }
     }
     CheckResult::from_report("Project form has no tests", report)
+}
+
+/// Shared editorial layout: groups e, g, l keep the right panel empty, o uses
+/// the segment panel, and the shell geometry matches the Ingest contract
+/// (same v4 `qnc_ui::space`), so the two cannot drift apart.
+fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let read = |relative: &str| -> Option<serde_json::Value> {
+        fs::read_to_string(root.join(relative))
+            .ok()
+            .and_then(|contents| serde_json::from_str(&contents).ok())
+    };
+    let (Some(editorial), Some(ingest)) = (
+        read("contracts/ui/editorial.layout.json"),
+        read("contracts/ui/ingest.layout.json"),
+    ) else {
+        return CheckResult::error(
+            "Editorial layout composition",
+            "contracts/ui/editorial.layout.json or ingest.layout.json missing or invalid JSON",
+        );
+    };
+    for group in ["e", "g", "l", "o"] {
+        if !editorial["groups"][group].is_object() {
+            report.error(format!("editorial.layout.json: missing composition for group '{group}'"));
+        }
+    }
+    for group in ["e", "g", "l"] {
+        if editorial["groups"][group]["right_panel"] != "none" {
+            report.error(format!(
+                "editorial.layout.json: group '{group}' must keep the right panel empty (none)"
+            ));
+        }
+    }
+    if editorial["groups"]["o"]["right_panel"] != "segment_panel" {
+        report.error("editorial.layout.json: group 'o' (Story) must use segment_panel".to_string());
+    }
+    for (editorial_path, ingest_path) in [
+        ("left_ratio", "left_ratio"),
+        ("divider_width", "divider_width"),
+        ("left_min_width", "left_min_width"),
+        ("right_min_width", "right_min_width"),
+    ] {
+        if editorial["shell"][editorial_path] != ingest["board"][ingest_path] {
+            report.error(format!(
+                "editorial.layout.json: shell.{editorial_path} differs from ingest.layout.json board.{ingest_path}"
+            ));
+        }
+    }
+    for key in ["reserve_below", "min_height", "min_width"] {
+        if editorial["preview"][key] != ingest["preview"][key] {
+            report.error(format!(
+                "editorial.layout.json: preview.{key} differs from ingest.layout.json"
+            ));
+        }
+    }
+    CheckResult::from_report("Editorial layout composition", report)
 }
 
 /// Reference values of the Project layout and open-project shortcut, read

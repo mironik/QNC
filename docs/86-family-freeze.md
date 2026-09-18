@@ -153,3 +153,17 @@ grupe), a Ingest se ne dira; nove komponente gradit ce se izravno iz v4
 reference.
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (sesto)
+
+Dodan je ugovor `contracts/ui/editorial.layout.json`: zajednicka geometrija
+editorial shella (ista kao `ingest.layout.json`, v4 `qnc_ui::space`) i
+kompozicija po grupama e, g, l, o. Desni panel za e, g, l je prazan, za o je
+`segment_panel`. U `tools/qnc-conformance` dodana je provjera `Editorial layout
+composition` (kompozicija po grupama i podudarnost geometrije s Ingest
+ugovorom). `ingest.layout.json` i Ingest nisu diranji.
+
+Verificirano: conformance prolazi; mutacijski test (izmjena `left_ratio` i
+desnog panela grupe e) daje FAIL, nakon vracanja prolazi.
+
+Odobrenje je zatvoreno. Status: zamrznuto.
