@@ -1335,6 +1335,22 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno (korak 1) ograniceno odobrenje 2026-09-18 (cetvrto): korisnik je izricito
+otkljucao sve sto je potrebno da forma Project ne sadrzi store ni poslovnu
+logiku (§3, §10). Korak 1: `ProjectComponent` i `ApplicationSelection` selje
+iz `crates/qnc-project-desktop` u novi crate `crates/qnc-project-application`
+(po uzoru na `qnc-ingest-application`); desktop crate gubi ovisnost o
+`qnc-project-store`. Otkljucano: `crates/qnc-project-desktop/**`,
+`crates/qnc-project-application/**` (novo), root `Cargo.toml`/`Cargo.lock` samo
+za taj crate, i samo pravila Project granice u `tools/qnc-conformance/src/main.rs`
+(`scan_project_app_boundary`) koja trenutno traze suprotno. Bez promjene
+ponasanja. Izdvojen je i `crates/qnc-application-selection` (uski javni modul,
+ugovor `contracts/modules/application-selection.module.json`); `qnc-project-application`
+je samo tanki composition root i ne smije rasti. Verificirano: conformance,
+testovi, gradnja, zivi smoke `qnc-project`. Ostaje otvoreno (korak 2, treba
+novo otkljucavanje): poslovna logika export presetova u `project_advanced.rs`
+i 8 testova u desktop crateu. Obitelj je zamrznuta.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (trece): korisnik je izricito otkljucao
 samo `crates/qnc-dev-diagnostics/src/lib.rs`, funkciju `log_line`: cijela linija
 se sastavlja u jedan string i pise jednim `write_all`, jer `writeln!` na

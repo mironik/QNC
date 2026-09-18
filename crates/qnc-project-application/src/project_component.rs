@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::application_selection::ApplicationSelection;
+use qnc_application_selection::ApplicationSelection;
 use qnc_dir_browser::{BrowserState, DirectoryBrowserSession};
 use serde_json::Value;
 

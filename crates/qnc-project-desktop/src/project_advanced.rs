@@ -80,7 +80,7 @@ pub enum ApplicationSelectionAction {
 pub struct AdvancedDraft<'a> {
     pub draft_settings: &'a mut Value,
     pub export_preset_draft_name: &'a mut String,
-    pub applications: &'a crate::application_selection::ApplicationSelectionView,
+    pub applications: &'a qnc_application_selection::ApplicationSelectionView,
 }
 
 pub fn show(

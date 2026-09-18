@@ -96,3 +96,24 @@ Verificirano stresom (4 procesa x 4 niti, 48000 linija): stara verzija 37259
 neispravnih linija, nova 0. Testovi crate-a i `qnc-conformance` prolaze.
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (cetvrto, korak 1)
+
+Forma Project vise ne ovisi o `qnc-project-store`. `ProjectComponent` je
+premjestena u novi tanki crate `qnc-project-application` (composition root, bez
+UI-ja), a odabir aplikacija po prioritetnim grupama u zaseban javni modul
+`qnc-application-selection` s ugovorom `application-selection.module.json`.
+Pravila Project granice u `qnc-conformance` sada traze: desktop ovisi o
+`qnc-project-application`, a ne o storeu ni rusqlite.
+
+Put zapisa lanca aplikacija je nepromijenjen: komponenta predaje snapshot
+storeu, store ga sprema u `workspace/application_selection`.
+
+Verificirano: conformance, testovi (selection 4, store 36, desktop 8),
+gradnja `qnc-project`/`qnc-app`/adapter, zivi smoke `qnc-project`.
+
+Ostaje otvoreno (korak 2): poslovna logika export presetova u
+`crates/qnc-project-desktop/src/project_advanced.rs` i 8 testova u desktop
+crateu (§10). Zahtijeva novo otkljucavanje.
+
+Status: zamrznuto.

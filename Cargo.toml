@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/qnc-application-catalog",
+    "crates/qnc-application-selection",
     "apps/qnc-app",
     "apps/qnc-ingest",
     "apps/qnc-project",
@@ -53,6 +54,7 @@ members = [
     "crates/qnc-media-probe",
     "crates/qnc-ffprobe-metadata",
     "crates/qnc-media-metadata-compose",
+    "crates/qnc-project-application",
     "crates/qnc-project-desktop",
     "crates/qnc-project-desktop-adapter",
     "crates/qnc-project-close",
@@ -78,6 +80,7 @@ members = [
 
 [workspace.dependencies]
 qnc-application-catalog = { path = "crates/qnc-application-catalog" }
+qnc-application-selection = { path = "crates/qnc-application-selection" }
 qnc-contracts = { path = "crates/qnc-contracts" }
 qnc-camera-patterns = { path = "crates/qnc-camera-patterns" }
 qnc-camera-detector = { path = "crates/qnc-camera-detector" }
@@ -126,6 +129,7 @@ qnc-media-metadata = { path = "crates/qnc-media-metadata" }
 qnc-media-probe = { path = "crates/qnc-media-probe" }
 qnc-ffprobe-metadata = { path = "crates/qnc-ffprobe-metadata" }
 qnc-media-metadata-compose = { path = "crates/qnc-media-metadata-compose" }
+qnc-project-application = { path = "crates/qnc-project-application" }
 qnc-project-desktop = { path = "crates/qnc-project-desktop" }
 qnc-project-desktop-adapter = { path = "crates/qnc-project-desktop-adapter" }
 qnc-project-close = { path = "crates/qnc-project-close" }

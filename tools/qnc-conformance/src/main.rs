@@ -1773,11 +1773,19 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
     if let Ok(contents) = fs::read_to_string(&desktop_cargo_toml) {
         has_dir_browser_dependency = contents.contains("qnc-dir-browser");
         has_keyboard_dependency = contents.contains("qnc-keyboard-shortcut");
-        if !contents.contains("qnc-project-store") {
+        if !contents.contains("qnc-project-application") {
             report.error(format!(
-                "{}: Project desktop surface must depend on qnc-project-store through its component boundary",
+                "{}: Project desktop form must reach the Project store through qnc-project-application",
                 display_relative(root, &desktop_cargo_toml)
             ));
+        }
+        for dependency in ["qnc-project-store", "rusqlite"] {
+            if contents.contains(dependency) {
+                report.error(format!(
+                    "{}: Project desktop form must not depend directly on '{dependency}'",
+                    display_relative(root, &desktop_cargo_toml)
+                ));
+            }
         }
     } else {
         report.error(format!(
@@ -1883,6 +1891,8 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
     collect_rs_files(&project_app_root.join("src"), &mut files);
     collect_rs_files(&project_desktop_root.join("src"), &mut files);
     collect_rs_files(&project_store_root.join("src"), &mut files);
+    collect_rs_files(&root.join("crates").join("qnc-project-application").join("src"), &mut files);
+    collect_rs_files(&root.join("crates").join("qnc-application-selection").join("src"), &mut files);
     let mut uses_transport_resolver = false;
     let mut uses_dir_browser = false;
     let mut dispatches_project_shortcuts = false;
@@ -1894,7 +1904,7 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
             continue;
         };
         let relative = display_relative(root, &file);
-        if relative == "crates/qnc-project-desktop/src/project_component.rs" {
+        if relative == "crates/qnc-project-application/src/project_component.rs" {
             has_project_component = true;
         }
         if relative == "crates/qnc-project-desktop/src/location_browser.rs"
@@ -1923,7 +1933,7 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
                     .to_string(),
             );
         }
-        if relative == "crates/qnc-project-desktop/src/project_component.rs" {
+        if relative == "crates/qnc-project-application/src/project_component.rs" {
             for forbidden in [
                 "struct DirectoryBrowserEntry",
                 "struct DirectoryBrowserListing",
@@ -1931,13 +1941,13 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
             ] {
                 if contents.contains(forbidden) {
                     report.error(format!(
-                        "crates/qnc-project-desktop/src/project_component.rs: Project must use qnc-dir-browser DirectoryBrowserSession instead of private browser type '{forbidden}'"
+                        "crates/qnc-project-application/src/project_component.rs: Project must use qnc-dir-browser DirectoryBrowserSession instead of private browser type '{forbidden}'"
                     ));
                 }
             }
             if !contents.contains("DirectoryBrowserSession") {
                 report.error(
-                    "crates/qnc-project-desktop/src/project_component.rs: Project component must use the shared qnc-dir-browser session"
+                    "crates/qnc-project-application/src/project_component.rs: Project component must use the shared qnc-dir-browser session"
                         .to_string(),
                 );
             }

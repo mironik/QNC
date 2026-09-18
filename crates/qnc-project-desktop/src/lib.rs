@@ -1,9 +1,7 @@
 mod app;
-mod application_selection;
 mod layout_contract;
 mod location_browser;
 mod project_advanced;
-mod project_component;
 mod theme;
 mod widgets;
 
@@ -14,12 +12,10 @@ use eframe::egui;
 pub use app::ProjectApp;
 
 use layout_contract::AppContracts;
-use project_component::ProjectComponent;
-use qnc_project_store::ProjectStore;
 
 pub fn check_contracts_message() -> Result<String, String> {
     let contracts = AppContracts::load_embedded()?;
-    ProjectStore::validate_embedded_contracts()?;
+    qnc_project_application::validate_embedded_contracts()?;
     Ok(format!(
         "qnc-project contracts OK: shell={} layout={} shortcut_preset={} open_hint={}",
         contracts.shell.layout_id,
@@ -31,12 +27,8 @@ pub fn check_contracts_message() -> Result<String, String> {
 
 pub fn create_project_app(project_root: impl Into<PathBuf>) -> Result<ProjectApp, String> {
     let contracts = AppContracts::load_embedded()?;
-    let root = project_root.into();
-    let store = ProjectStore::open(&root)?;
-    Ok(ProjectApp::new(
-        contracts,
-        ProjectComponent::new(store, &root),
-    ))
+    let component = qnc_project_application::open_project_component(project_root)?;
+    Ok(ProjectApp::new(contracts, component))
 }
 
 pub fn apply_project_style(ctx: &egui::Context) -> Result<(), String> {

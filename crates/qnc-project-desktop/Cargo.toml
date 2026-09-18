@@ -11,7 +11,8 @@ eframe = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
-qnc-project-store = { workspace = true }
+qnc-application-selection = { workspace = true }
+qnc-project-application = { workspace = true }
 qnc-ui-kit = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

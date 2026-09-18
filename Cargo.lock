@@ -2934,6 +2934,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-application-selection"
+version = "0.1.0"
+dependencies = [
+ "qnc-application-catalog",
+ "qnc-contracts",
+ "qnc-transport-resolver",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-audio-output"
 version = "0.1.0"
 dependencies = [
@@ -3570,6 +3580,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-project-application"
+version = "0.1.0"
+dependencies = [
+ "qnc-application-selection",
+ "qnc-dir-browser",
+ "qnc-project-store",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-project-close"
 version = "0.1.0"
 dependencies = [
@@ -3588,10 +3608,11 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-application-catalog",
+ "qnc-application-selection",
  "qnc-contracts",
  "qnc-dir-browser",
  "qnc-keyboard-shortcut",
- "qnc-project-store",
+ "qnc-project-application",
  "qnc-transport-resolver",
  "qnc-ui-kit",
  "serde",

@@ -9,11 +9,13 @@ use crate::{
     layout_contract::{AppContracts, ProjectListMetrics, SettingsPanelMetrics},
     location_browser::{self, LocationBrowserAction, LocationBrowserInput, LocationSourceKind},
     project_advanced,
-    project_component::{ProjectBrowserTarget, ProjectComponent, ProjectsState, TemplatesState},
     theme::{self, Theme},
     widgets,
 };
-use qnc_project_store::{ProjectRow, ProjectTemplateRow};
+use qnc_project_application::{
+    ProjectBrowserTarget, ProjectComponent, ProjectRow, ProjectTemplateRow, ProjectsState,
+    TemplatesState,
+};
 
 pub struct ProjectApp {
     contracts: AppContracts,
@@ -162,7 +164,7 @@ impl ProjectApp {
 
     pub fn navigation_sequence(
         &self,
-    ) -> Result<Vec<qnc_project_store::ProjectNavigationStep>, String> {
+    ) -> Result<Vec<qnc_project_application::ProjectNavigationStep>, String> {
         self.component.navigation_sequence()
     }
 
