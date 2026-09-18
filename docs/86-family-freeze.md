@@ -141,3 +141,15 @@ export-preset 2, settings-path 1, project-application 1, store 36), zivi smoke
 `qnc-project`.
 
 Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (peto)
+
+Dodan je samo dokument `docs/87-editorial-ui-reference-audit.md`: snimka v4
+rasporeda Story / Media Assist i mapa pasivnih komponenti za planirane
+aplikacije po grupama e, g, l, o. Nema izmjena koda ni ugovora.
+
+Odluke korisnika: desni panel ostaje prazan (prostor za funkcije pojedine
+grupe), a Ingest se ne dira; nove komponente gradit ce se izravno iz v4
+reference.
+
+Odobrenje je zatvoreno. Status: zamrznuto.

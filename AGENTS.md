@@ -1335,6 +1335,14 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18 (peto): korisnik je izricito trazio
+pocetak UI sheme za Media Assist grupe (e, g, l) i Story (o). Korak 1 je samo
+novi dokument `docs/87-editorial-ui-reference-audit.md` (snimka v4 rasporeda i
+mapa komponenti). Nema izmjena koda. Odluke korisnika: desni panel ostaje prazan
+(prostor za funkcije pojedine grupe) kao u v4 Media Assistu; Ingest se NE dira
+(nove komponente grade se izravno iz v4 reference, ne izdvajaju iz Ingest forme).
+Sve ostalo ostaje zamrznuto.
+
 Zatvoreno (korak 2) ograniceno odobrenje 2026-09-18 (cetvrto): korisnik je
 izricito potvrdio nastavak. Poslovna logika export presetova i JSON putanja
 postavki izlazi iz `crates/qnc-project-desktop/src/project_advanced.rs` u dva
