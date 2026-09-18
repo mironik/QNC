@@ -224,3 +224,23 @@ prema novom QNC-u. Nema izmjena koda ni ugovora. Ispravak boje playheada u
 `qnc-timeline` je zabiljezen kao nalaz i trazi zasebno otkljucavanje.
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (jedanaesto)
+
+Novi crate forme `qnc-editorial-desktop`: Ingest layout i UI kopirani 1:1
+(`theme.rs`, shell, preview monitor, glava pool-a, dock s timelineom), bez
+desne mreze klipova i izbora direktorija (to mjesto je prazno, kasnije izbor
+klipova). Forma je pasivna: host popunjava `EditorialView` i prima
+`EditorialIntent` (action_id iz keyboard ugovora, ili timeline intent). Nema
+ovisnosti o Ingestu, Projectu, storeu, scanneru, probeu ni playeru.
+
+Ugovor `editorial.layout.json` dobio je `pool_head` (tabs_left, transport_right)
+i `source_dock.clip_label_fallback`, iste vrijednosti kao `ingest.layout.json`.
+Dodana provjera `Editorial form boundary` (bez testova u formi, bez zabranjenih
+ovisnosti). Probni prozor: `cargo run -p qnc-editorial-desktop --example
+editorial_form -- e`.
+
+Nije ukljuceno: tipkovnicki precaci (scope u keyboard ugovoru), gumbi docka su
+prikazani ali onemoguceni, desni panel je prazan.
+
+Odobrenje je zatvoreno. Status: zamrznuto.

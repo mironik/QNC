@@ -1,0 +1,15 @@
+[package]
+name = "qnc-editorial-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "QNC editorial form base: Ingest layout copied 1:1 without the clip grid and directory browser (passive UI only)"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-contracts = { workspace = true }
+qnc-filmstrip = { workspace = true }
+qnc-monitor = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-ui-kit = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

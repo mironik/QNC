@@ -1335,6 +1335,19 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18 (jedanaesto): korisnik je odredio da se
+Ingest layout i UI kopiraju 100% vjerno kao osnova za Media Assist i Story, uz
+izostavljanje desnog prikaza klipova; mjesto izbora direktorija ostaje prazno
+(kasnije izbor klipova). Novi crate forme `crates/qnc-editorial-desktop`
+(kopija koda Ingest forme: shell, preview monitor, glava pool-a, dock s
+timelineom; bez ovisnosti o Ingestu i Projectu), dopuna `contracts/ui/editorial.layout.json`
+(`pool_head`, `clip_label_fallback`), jedna dodana provjera granice u
+`tools/qnc-conformance/src/main.rs`, root `Cargo.toml`/`Cargo.lock` samo za taj
+crate. Ingest se ne dira. Tipkovnicki prečaci nisu dio ovog koraka. Verificirano:
+kompajlira se bez upozorenja, conformance (nova provjera `Editorial form boundary`),
+smoke za grupe e, g, l, o. Odobrenje zatvoreno, obitelj je zamrznuta. Sve ostalo
+ostaje zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (deseto): korisnik je trazio izvlacenje
 tocnih layouta iz qnc_v4. Samo novi dokument `docs/88-qnc-v4-layout-extract.md`
 (tocne mjere, boje i razlike prema novom QNC-u). Nema izmjena koda ni ugovora.

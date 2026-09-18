@@ -3102,6 +3102,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-editorial-desktop"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-contracts",
+ "qnc-filmstrip",
+ "qnc-monitor",
+ "qnc-timeline",
+ "qnc-ui-kit",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-editorial-shell"
 version = "0.1.0"
 dependencies = [

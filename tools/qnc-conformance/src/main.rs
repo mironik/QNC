@@ -139,6 +139,7 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
     checks.push(validate_project_form_has_no_tests(root));
     checks.push(validate_project_layout_reference(root));
     checks.push(validate_editorial_layout_composition(root));
+    checks.push(validate_editorial_form_boundary(root));
     checks.push(scan_shared_ui_patterns(root));
     checks.push(scan_timeline_engine_boundary(root));
     checks.push(CheckResult::from_report(
@@ -212,6 +213,56 @@ fn validate_ingest_form_has_no_tests(root: &Path) -> CheckResult {
         }
     }
     CheckResult::from_report("Ingest form has no tests", report)
+}
+
+/// Editorial form base: passive UI only. No tests inside the form, and no
+/// dependency on another application, a store, a scanner, a probe or a player.
+fn validate_editorial_form_boundary(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::new();
+    let form = root.join("crates").join("qnc-editorial-desktop");
+    let mut files = Vec::new();
+    collect_rs_files(&form.join("src"), &mut files);
+    for path in files {
+        let Ok(contents) = fs::read_to_string(&path) else {
+            continue;
+        };
+        for forbidden in ["#[cfg(test)]", "#[test]"] {
+            if contents.contains(forbidden) {
+                report.error(format!(
+                    "{}: editorial form must not contain tests",
+                    display_relative(root, &path)
+                ));
+            }
+        }
+        for forbidden in ["rusqlite", "std::process", "Command::new", "std::fs"] {
+            if contents.contains(forbidden) {
+                report.error(format!(
+                    "{}: editorial form must not use '{forbidden}'",
+                    display_relative(root, &path)
+                ));
+            }
+        }
+    }
+    if let Ok(manifest) = fs::read_to_string(form.join("Cargo.toml")) {
+        for dependency in [
+            "qnc-ingest",
+            "qnc-project",
+            "qnc-scanner",
+            "qnc-media-probe",
+            "qnc-broadcast",
+            "qnc-player-client",
+            "rusqlite",
+        ] {
+            if manifest.contains(dependency) {
+                report.error(format!(
+                    "crates/qnc-editorial-desktop/Cargo.toml: editorial form must not depend on '{dependency}'"
+                ));
+            }
+        }
+    } else {
+        report.error("crates/qnc-editorial-desktop/Cargo.toml missing".to_string());
+    }
+    CheckResult::from_report("Editorial form boundary", report)
 }
 
 fn validate_project_form_has_no_tests(root: &Path) -> CheckResult {

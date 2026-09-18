@@ -44,10 +44,15 @@
     "card_text_height": 34.0,
     "grid_gap": 10.0
   },
+  "pool_head": {
+    "tabs_left": ["All", "Virtual"],
+    "transport_right": [">", "[", "]"]
+  },
   "source_dock": {
     "inner_margin_x": 8.0,
     "header_timeline_gap": 4.0,
     "header_item_gap": 8.0,
+    "clip_label_fallback": "—",
     "timecode_labels": ["IN", "OUT", "Trajanje"]
   },
   "right_panel": {
