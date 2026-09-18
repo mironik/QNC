@@ -214,3 +214,13 @@ Ingest layout (odluka korisnika); Ingest nije diran.
 Verificirano: test modula, conformance, smoke probnog prozora (e, o).
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (deseto)
+
+Dodan je samo dokument `docs/88-qnc-v4-layout-extract.md`: tocne mjere, boje i
+izracuni iz qnc_v4 (teme, chrome, shell, preview, glava pool-a, kartica, dock,
+timeline, filmstrip, location browser, form kit, Story paneli) i popis razlika
+prema novom QNC-u. Nema izmjena koda ni ugovora. Ispravak boje playheada u
+`qnc-timeline` je zabiljezen kao nalaz i trazi zasebno otkljucavanje.
+
+Odobrenje je zatvoreno. Status: zamrznuto.

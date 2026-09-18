@@ -1335,6 +1335,12 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18 (deseto): korisnik je trazio izvlacenje
+tocnih layouta iz qnc_v4. Samo novi dokument `docs/88-qnc-v4-layout-extract.md`
+(tocne mjere, boje i razlike prema novom QNC-u). Nema izmjena koda ni ugovora.
+Odobrenje zatvoreno, obitelj je zamrznuta.
+Sve ostalo ostaje zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (deveto): korisnik je ocijenio da probni
 prozor nije kompletan UI (nedostaje donji dock). Novi javni pasivni modul
 `crates/qnc-source-dock` (header s nazivom klipa, IN/OUT/Trajanje i gumbima,
