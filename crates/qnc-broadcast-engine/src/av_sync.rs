@@ -205,6 +205,7 @@ fn recorded_fixture_detects_picture_behind_sound() {
 }
 
 #[test]
+#[ignore = "reads the local, untracked data/diagnostics/player.log, which accumulates old sessions; run with --ignored"]
 fn recorded_player_log_picture_must_not_lag_sound() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/diagnostics/player.log");
     let Ok(text) = std::fs::read_to_string(&path) else {

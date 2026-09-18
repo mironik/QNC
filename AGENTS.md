@@ -1335,6 +1335,14 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18 (drugo): korisnik je izricito otkljucao
+samo `crates/qnc-broadcast-engine/src/av_sync.rs` za jednu promjenu: test
+`recorded_player_log_picture_must_not_lag_sound` dobiva `#[ignore]` s
+razlogom, jer cita lokalni, netrackirani `data/diagnostics/player.log` koji
+skuplja stare sesije i zato nije deterministicki. Test ostaje pokretljiv s
+`--ignored`. Verificirano: `qnc-broadcast-engine` lib testovi prolaze,
+`qnc-conformance` prolazi. Odobrenje zatvoreno, obitelj je zamrznuta.
+
 Zatvoreno ograniceno odobrenje 2026-09-18: korisnik je izricito otkljucao samo
 `crates/qnc-broadcast-engine/src/av_sync.rs` za jednu promjenu: oznaka
 `#![cfg(test)]` na pocetku datoteke, da `qnc-conformance` (player boundary)

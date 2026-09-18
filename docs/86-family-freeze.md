@@ -73,3 +73,15 @@ Verificirano: `qnc-conformance` prolazi sve provjere. Test
 promjene; to je zaseban nalaz o A/V pomaku, nije dio ovog odobrenja.
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (drugo)
+
+Otkljucana je samo `crates/qnc-broadcast-engine/src/av_sync.rs`, jedna
+promjena: `#[ignore]` s razlogom na testu
+`recorded_player_log_picture_must_not_lag_sound`. Test cita lokalni,
+netrackirani `data/diagnostics/player.log` i hvata stare sesije, pa nije
+deterministicki. Analiza loga: pomak slike od zvuka (do -21 kadra) potjece iz
+starih sesija; zadnje sesije imaju -1..0 kadra. Test se i dalje pokrece s
+`--ignored`.
+
+Odobrenje je zatvoreno. Status: zamrznuto.
