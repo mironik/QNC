@@ -563,7 +563,10 @@ pub fn log_line(stream: DiagnosticsStream, message: impl AsRef<str>) {
         Ok(file) => file,
         Err(_) => return,
     };
-    let _ = writeln!(file, "{} {}", unix_ms(), message.as_ref());
+    // One write per line: `writeln!` on a bare `File` issues several writes, so
+    // lines from concurrent processes interleave in the shared log.
+    let line = format!("{} {}\n", unix_ms(), message.as_ref());
+    let _ = file.write_all(line.as_bytes());
 }
 
 pub fn recent_lines_from_root(

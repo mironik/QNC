@@ -85,3 +85,14 @@ starih sesija; zadnje sesije imaju -1..0 kadra. Test se i dalje pokrece s
 `--ignored`.
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (trece)
+
+Otkljucana je samo `crates/qnc-dev-diagnostics/src/lib.rs`, funkcija
+`log_line`: cijela linija se pise jednim `write_all`. Prije su se linije vise
+procesa isprepletale u `player.log`. Format se nije promijenio.
+
+Verificirano stresom (4 procesa x 4 niti, 48000 linija): stara verzija 37259
+neispravnih linija, nova 0. Testovi crate-a i `qnc-conformance` prolaze.
+
+Odobrenje je zatvoreno. Status: zamrznuto.

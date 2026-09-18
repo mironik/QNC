@@ -1335,6 +1335,14 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18 (trece): korisnik je izricito otkljucao
+samo `crates/qnc-dev-diagnostics/src/lib.rs`, funkciju `log_line`: cijela linija
+se sastavlja u jedan string i pise jednim `write_all`, jer `writeln!` na
+neuslojenom `File` salje vise zapisa pa se linije vise procesa isprepletu u
+`player.log`. Bez promjene formata. Verificirano stresom: 4 procesa x 4 niti,
+48000 linija, stara verzija 37259 neispravnih, nova 0; testovi i conformance
+prolaze. Odobrenje zatvoreno, obitelj je zamrznuta.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (drugo): korisnik je izricito otkljucao
 samo `crates/qnc-broadcast-engine/src/av_sync.rs` za jednu promjenu: test
 `recorded_player_log_picture_must_not_lag_sound` dobiva `#[ignore]` s
