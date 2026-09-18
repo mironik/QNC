@@ -1335,6 +1335,14 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18 (osmo): korisnik je potvrdio nastavak.
+Samo probni prozor (`example`) u `crates/qnc-editorial-shell/examples/` s
+dev-ovisnostima na `qnc-media-pool-head`, `qnc-media-card` i `serde_json`, da se
+tri nova modula vide nacrtana s lazniim podacima prema `editorial.layout.json`.
+Nema aplikacije, baze ni manifesta (aplikacije e, g, l traze prvo definiranu
+bazu, §13). Verificirano: kompajlira se bez upozorenja, pokrece se za grupe e i o
+(Responding, bez stderr-a). Odobrenje zatvoreno, obitelj je zamrznuta.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (sedmo): korisnik je potvrdio korak 3
 (uz odluku "ne Ingest"). Novi javni pasivni moduli iz v4 reference, bez diranja
 Ingesta: `crates/qnc-editorial-shell`, `crates/qnc-media-pool-head`,

@@ -3106,6 +3106,9 @@ name = "qnc-editorial-shell"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-media-card",
+ "qnc-media-pool-head",
+ "serde_json",
 ]
 
 [[package]]

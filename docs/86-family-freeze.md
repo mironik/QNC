@@ -187,3 +187,18 @@ Verificirano: testovi (4 + 4 + 7), `cargo check --workspace`, conformance. Modul
 jos nisu spojeni ni u jednu formu.
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (osmo)
+
+Dodan je samo probni prozor `crates/qnc-editorial-shell/examples/editorial_demo.rs`
+(s dev-ovisnostima) koji crta `qnc-editorial-shell`, `qnc-media-pool-head` i
+`qnc-media-card` s lazniim podacima. Kompozicija dolazi iz
+`contracts/ui/editorial.layout.json` za odabranu grupu (e, g, l, o), boje i
+mjere iz `contracts/ui/shell.layout.json`. Pokretanje:
+
+    cargo run -p qnc-editorial-shell --example editorial_demo -- e
+
+Nema aplikacije, baze ni manifesta. Vrijednosti `preview_black` i `select_red`
+u demou su privremene (ugovor ih imenuje, ali ne daje vrijednost).
+
+Odobrenje je zatvoreno. Status: zamrznuto.

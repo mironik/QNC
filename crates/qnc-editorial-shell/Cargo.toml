@@ -6,3 +6,8 @@ description = "QNC public passive module: editorial shell (left media column, di
 
 [dependencies]
 eframe = { workspace = true }
+
+[dev-dependencies]
+qnc-media-card = { workspace = true }
+qnc-media-pool-head = { workspace = true }
+serde_json = { workspace = true }
