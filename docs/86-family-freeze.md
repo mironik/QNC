@@ -60,3 +60,16 @@ Sve ispod root-a `C:\Users\miron\Projects\QNC` sto je razvojni kod:
 3. Tražiti izricitu korisnicku dozvolu.
 4. Nakon odobrene promjene ponovno vratiti status na zamrznuto ovdje i u
    `AGENTS.md` odjeljku 18.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18
+
+Otkljucana je samo `crates/qnc-broadcast-engine/src/av_sync.rs`, jedna
+promjena: `#![cfg(test)]` na pocetku datoteke, da `qnc-conformance`
+(player boundary) prepozna test-only kod. Bez promjene ponasanja.
+
+Verificirano: `qnc-conformance` prolazi sve provjere. Test
+`recorded_player_log_picture_must_not_lag_sound` cita lokalni
+`data/diagnostics/player.log` i pada na tim podacima jednako i bez ove
+promjene; to je zaseban nalaz o A/V pomaku, nije dio ovog odobrenja.
+
+Odobrenje je zatvoreno. Status: zamrznuto.

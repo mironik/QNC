@@ -1335,6 +1335,13 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18: korisnik je izricito otkljucao samo
+`crates/qnc-broadcast-engine/src/av_sync.rs` za jednu promjenu: oznaka
+`#![cfg(test)]` na pocetku datoteke, da `qnc-conformance` (player boundary)
+prepozna test-only kod. Bez promjene ponasanja. Verificirano: `qnc-conformance`
+prolazi sve provjere. Odobrenje je zatvoreno i cijela obitelj je ponovno
+zamrznuta.
+
 - Nema izmjena koda, ugovora, manifesta, seeda, conformancea ni razvojnih
   dokumenata bez izricite dozvole koja imenuje tocnu putanju ili modul i
   vrstu promjene.

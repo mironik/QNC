@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Picture vs sound on the saved source timebase. Not a second clock.
 
 use super::input::{frame_from_samples, picture_audio_offset_frames, sample_boundary};
