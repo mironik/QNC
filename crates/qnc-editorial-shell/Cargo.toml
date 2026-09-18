@@ -1,0 +1,8 @@
+[package]
+name = "qnc-editorial-shell"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive module: editorial shell (left media column, divider, right panel) and monitor preview"
+
+[dependencies]
+eframe = { workspace = true }

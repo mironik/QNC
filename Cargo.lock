@@ -3102,6 +3102,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-editorial-shell"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
 name = "qnc-export-preset"
 version = "0.1.0"
 dependencies = [

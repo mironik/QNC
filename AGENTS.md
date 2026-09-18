@@ -1335,6 +1335,14 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Otvoreno ograniceno odobrenje 2026-09-18 (sedmo): korisnik je potvrdio korak 3
+(uz odluku "ne Ingest"). Novi javni pasivni moduli iz v4 reference, bez diranja
+Ingesta: `crates/qnc-editorial-shell`, `crates/qnc-media-pool-head`,
+`crates/qnc-media-card`, s ugovorima u `contracts/modules/`. Otkljucano: ti novi
+crateovi, novi `*.module.json`, root `Cargo.toml`/`Cargo.lock` samo za njih.
+Moduli su pasivni: boje i mjere dobivaju od forme (iz ugovora), ne drze stanje,
+ne citaju bazu, ne rade probe/scan. Sve ostalo ostaje zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (sesto): korisnik je potvrdio da je
 layout isti kao u Ingestu, a razlikuju se samo komponente u slotovima. Korak 2:
 novi ugovor `contracts/ui/editorial.layout.json` (zajednicka geometrija +

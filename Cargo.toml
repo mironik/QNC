@@ -12,6 +12,7 @@ members = [
     "crates/qnc-db-contract",
     "crates/qnc-dev-diagnostics",
     "crates/qnc-dir-browser",
+    "crates/qnc-editorial-shell",
     "crates/qnc-frame-timebase",
     "crates/qnc-player-contract",
     "crates/qnc-player-frame-transport",
@@ -89,6 +90,7 @@ qnc-camera-detector = { path = "crates/qnc-camera-detector" }
 qnc-db-contract = { path = "crates/qnc-db-contract" }
 qnc-dev-diagnostics = { path = "crates/qnc-dev-diagnostics" }
 qnc-dir-browser = { path = "crates/qnc-dir-browser" }
+qnc-editorial-shell = { path = "crates/qnc-editorial-shell" }
 qnc-frame-timebase = { path = "crates/qnc-frame-timebase" }
 qnc-player-contract = { path = "crates/qnc-player-contract" }
 qnc-player-frame-transport = { path = "crates/qnc-player-frame-transport" }
