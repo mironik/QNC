@@ -1,0 +1,13 @@
+{
+  "database_id": "qnc.db.media_assist_video",
+  "owner_application": "qnc.media-assist-video",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/media_assist_video",
+  "tables": [],
+  "public_read_views": [],
+  "write_owner": "qnc.media-assist-video",
+  "public_read_policy": "owner_only",
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-09-19T00:00:00Z",
+  "updated_at": "2026-09-19T00:00:00Z"
+}

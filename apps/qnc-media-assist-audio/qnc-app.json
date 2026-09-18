@@ -1,0 +1,12 @@
+{
+  "application_id": "qnc.media-assist-audio",
+  "tab_id": "media_assist_audio",
+  "label": "MA Audio",
+  "enabled": true,
+  "system": true,
+  "removable": false,
+  "priority_group": "g",
+  "host_mode": "embedded_public_api",
+  "desktop_entry": "qnc_media_assist_audio",
+  "standalone_executable": "qnc-media-assist-audio"
+}

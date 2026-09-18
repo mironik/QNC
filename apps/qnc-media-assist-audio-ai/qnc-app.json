@@ -1,0 +1,12 @@
+{
+  "application_id": "qnc.media-assist-audio-ai",
+  "tab_id": "media_assist_audio_ai",
+  "label": "MA Audio AI",
+  "enabled": true,
+  "system": true,
+  "removable": false,
+  "priority_group": "e",
+  "host_mode": "embedded_public_api",
+  "desktop_entry": "qnc_media_assist_audio_ai",
+  "standalone_executable": "qnc-media-assist-audio-ai"
+}

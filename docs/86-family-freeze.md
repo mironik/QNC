@@ -244,3 +244,28 @@ Nije ukljuceno: tipkovnicki precaci (scope u keyboard ugovoru), gumbi docka su
 prikazani ali onemoguceni, desni panel je prazan.
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-18 (dvanaesto)
+
+Aplikacije grupa e, g, l, o dodane su u shell desktop istim putem kao Ingest:
+
+| Grupa | Aplikacija | App crate / exe | Tab | desktop_entry |
+|---|---|---|---|---|
+| e | MA Audio AI | `qnc-media-assist-audio-ai` | `media_assist_audio_ai` | `qnc_media_assist_audio_ai` |
+| g | MA Audio | `qnc-media-assist-audio` | `media_assist_audio` | `qnc_media_assist_audio` |
+| l | MA Video | `qnc-media-assist-video` | `media_assist_video` | `qnc_media_assist_video` |
+| o | Story | `qnc-story` | `storyboard` | `qnc_story` |
+
+Svaka ima `qnc-app.json`, samostalni exe i javni desktop adapter
+(`*-desktop-adapter`); shell ovisi samo o adapterima i ima 4 unosa u tablici
+tvornica. Sve koriste zajednicku pasivnu formu `qnc-editorial-desktop`
+(`EditorialApp`). Novi ugovori aplikacija: `media-assist-audio-ai`,
+`media-assist-audio`, `media-assist-video` (Story vec postoji) i deklarativni
+ugovori baze (`tables` prazne, `public_read_policy` `owner_only`): sheme se
+definiraju prije stvarnog rada aplikacija (§13).
+
+Katalog aplikacija je osvjezen alatom `qnc-app-catalog refresh apps target/debug
+data/application-catalog.json` (`data/` nije pod gitom; prethodni katalog je
+spremljen izvan repozitorija).
+
+Odobrenje je zatvoreno. Status: zamrznuto.

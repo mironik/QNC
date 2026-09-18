@@ -3,6 +3,7 @@
 //! timeline), without the right clip grid and the directory browser. Passive:
 //! the host fills `EditorialView` and receives `EditorialIntent`s.
 
+mod app;
 mod layout_contract;
 mod theme;
 mod view;
@@ -10,6 +11,7 @@ mod widgets;
 
 use eframe::egui;
 
+pub use app::EditorialApp;
 pub use layout_contract::{check_contracts_message, EditorialContracts};
 pub use view::{action_ids, EditorialIntent, EditorialView, MonitorFrame, Poster};
 

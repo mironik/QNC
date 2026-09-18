@@ -2901,9 +2901,13 @@ dependencies = [
  "eframe",
  "qnc-contracts",
  "qnc-ingest-desktop-adapter",
+ "qnc-media-assist-audio-ai-desktop-adapter",
+ "qnc-media-assist-audio-desktop-adapter",
+ "qnc-media-assist-video-desktop-adapter",
  "qnc-project-close",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
+ "qnc-story-desktop-adapter",
  "rusqlite",
  "serde",
  "serde_json",
@@ -3363,6 +3367,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-media-assist-audio"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-editorial-desktop",
+]
+
+[[package]]
+name = "qnc-media-assist-audio-ai"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-editorial-desktop",
+]
+
+[[package]]
+name = "qnc-media-assist-audio-ai-desktop-adapter"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-editorial-desktop",
+ "qnc-shell-desktop-api",
+]
+
+[[package]]
+name = "qnc-media-assist-audio-desktop-adapter"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-editorial-desktop",
+ "qnc-shell-desktop-api",
+]
+
+[[package]]
+name = "qnc-media-assist-video"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-editorial-desktop",
+]
+
+[[package]]
+name = "qnc-media-assist-video-desktop-adapter"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-editorial-desktop",
+ "qnc-shell-desktop-api",
+]
+
+[[package]]
 name = "qnc-media-card"
 version = "0.1.0"
 dependencies = [
@@ -3815,6 +3870,23 @@ dependencies = [
  "tiny_http",
  "ureq",
  "url",
+]
+
+[[package]]
+name = "qnc-story"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-editorial-desktop",
+]
+
+[[package]]
+name = "qnc-story-desktop-adapter"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-editorial-desktop",
+ "qnc-shell-desktop-api",
 ]
 
 [[package]]

@@ -5,6 +5,10 @@ members = [
     "crates/qnc-application-selection",
     "apps/qnc-app",
     "apps/qnc-ingest",
+    "apps/qnc-media-assist-audio-ai",
+    "apps/qnc-story",
+    "apps/qnc-media-assist-video",
+    "apps/qnc-media-assist-audio",
     "apps/qnc-project",
     "crates/qnc-contracts",
     "crates/qnc-camera-patterns",
@@ -48,6 +52,10 @@ members = [
     "crates/qnc-image-assets",
     "crates/qnc-ingest-desktop",
     "crates/qnc-ingest-desktop-adapter",
+    "crates/qnc-media-assist-audio-ai-desktop-adapter",
+    "crates/qnc-story-desktop-adapter",
+    "crates/qnc-media-assist-video-desktop-adapter",
+    "crates/qnc-media-assist-audio-desktop-adapter",
     "crates/qnc-ingest-store",
     "crates/qnc-keyboard-shortcut",
     "crates/qnc-json-transport",
@@ -130,6 +138,10 @@ qnc-ingest-application = { path = "crates/qnc-ingest-application" }
 qnc-image-assets = { path = "crates/qnc-image-assets" }
 qnc-ingest-desktop = { path = "crates/qnc-ingest-desktop" }
 qnc-ingest-desktop-adapter = { path = "crates/qnc-ingest-desktop-adapter" }
+qnc-media-assist-audio-ai-desktop-adapter = { path = "crates/qnc-media-assist-audio-ai-desktop-adapter" }
+qnc-story-desktop-adapter = { path = "crates/qnc-story-desktop-adapter" }
+qnc-media-assist-video-desktop-adapter = { path = "crates/qnc-media-assist-video-desktop-adapter" }
+qnc-media-assist-audio-desktop-adapter = { path = "crates/qnc-media-assist-audio-desktop-adapter" }
 qnc-ingest-store = { path = "crates/qnc-ingest-store" }
 qnc-keyboard-shortcut = { path = "crates/qnc-keyboard-shortcut" }
 qnc-json-transport = { path = "crates/qnc-json-transport" }

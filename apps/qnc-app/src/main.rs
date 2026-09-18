@@ -287,9 +287,26 @@ impl AppRegistry {
 fn embedded_app_factories() -> HashMap<String, EmbeddedAppFactory> {
     let project = qnc_project_desktop_adapter::factory();
     let ingest = qnc_ingest_desktop_adapter::factory();
+    let media_assist_audio_ai = qnc_media_assist_audio_ai_desktop_adapter::factory();
+    let media_assist_audio = qnc_media_assist_audio_desktop_adapter::factory();
+    let media_assist_video = qnc_media_assist_video_desktop_adapter::factory();
+    let story = qnc_story_desktop_adapter::factory();
     HashMap::from([
         (project.desktop_entry.to_string(), project),
         (ingest.desktop_entry.to_string(), ingest),
+        (
+            media_assist_audio_ai.desktop_entry.to_string(),
+            media_assist_audio_ai,
+        ),
+        (
+            media_assist_audio.desktop_entry.to_string(),
+            media_assist_audio,
+        ),
+        (
+            media_assist_video.desktop_entry.to_string(),
+            media_assist_video,
+        ),
+        (story.desktop_entry.to_string(), story),
     ])
 }
 

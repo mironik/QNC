@@ -1,0 +1,42 @@
+{
+  "application_id": "qnc.media-assist-audio",
+  "application_name": "Media Assist Audio",
+  "application_version": "0.1.0",
+  "application_kind": "interactive_form_variant",
+  "lifecycle": "interactive_form",
+  "owned_database_contracts": ["qnc://local/db/media_assist_audio"],
+  "read_database_contracts": ["qnc://local/db/project_registry", "qnc://local/db/ingest_content"],
+  "owned_artifacts": [],
+  "module_dependencies": [
+    "qnc.module.timeline",
+    "qnc.module.monitor"
+  ],
+  "capabilities": ["media-assist-audio.workflow", "timeline.view"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "keyboard_shortcut_contract": "contracts/qnc-keyboard-shortcuts.json",
+  "ui_layout_reference_contract": "docs/07-ui-layout-reference.md",
+  "ui_layout_contracts": [
+    "contracts/ui/shell.layout.json",
+    "contracts/ui/editorial.layout.json"
+  ],
+  "workflow_forbidden_operations": [
+    "media.scan",
+    "media.probe",
+    "ingest.workflow",
+    "ingest.db.write",
+    "story.db.write"
+  ],
+  "workflow_forbidden_capabilities": [
+    "source.scan.roles",
+    "media.probe.full"
+  ],
+  "status_contract": "qnc.status.basic.v1",
+  "error_contract": "qnc.error.basic.v1",
+  "qnc_v4_ui_reference": [
+    "seed/tabs/media_assist/plugin.json",
+    "qnc-app/src/media_assist.rs",
+    "qnc-app/src/story.rs"
+  ]
+}

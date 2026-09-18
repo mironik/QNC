@@ -1,0 +1,12 @@
+{
+  "application_id": "qnc.story",
+  "tab_id": "storyboard",
+  "label": "Story",
+  "enabled": true,
+  "system": true,
+  "removable": false,
+  "priority_group": "o",
+  "host_mode": "embedded_public_api",
+  "desktop_entry": "qnc_story",
+  "standalone_executable": "qnc-story"
+}

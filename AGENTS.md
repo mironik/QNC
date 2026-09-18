@@ -1335,6 +1335,24 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-18 (dvanaesto): korisnik je trazio da se
+aplikacije grupa e, g, l, o dobiju u shell desktopu. Za svaku (Media Assist Audio
+AI, Media Assist Audio, Media Assist Video, Story): novi app crate
+`apps/qnc-media-assist-audio-ai`, `apps/qnc-media-assist-audio`,
+`apps/qnc-media-assist-video`, `apps/qnc-story` s `qnc-app.json` i samostalnim exe-om,
+javni desktop adapter crate (`crates/*-desktop-adapter`), ugovor aplikacije u
+`contracts/applications/` (tri nova; Story vec postoji) i deklarativni ugovor baze u
+`contracts/databases/` (tri nova, bez sheme: tablice se definiraju kasnije), dopuna
+`crates/qnc-editorial-desktop` (`EditorialApp`), u shellu samo Cargo ovisnost na te
+adaptere i njihovi unosi u tablicu tvornica (`apps/qnc-app/Cargo.toml`,
+`apps/qnc-app/src/main.rs`), root `Cargo.toml`/`Cargo.lock`, i eventualne
+prilagodbe `tools/qnc-conformance` samo ako pravila trebaju znati za nove
+aplikacije. Ingest i Project se ne diraju. Verificirano: cijeli workspace se
+kompajlira, conformance prolazi bez izmjene pravila, testovi shella (12), svaka
+samostalna aplikacija prolazi `--check-contracts`, katalog osvjezen (a, b, e, g, l, o),
+smoke shella. Ugovori baze za e, g, l su deklarativni (tablice prazne, politika
+`owner_only`). Odobrenje zatvoreno, obitelj je zamrznuta.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (jedanaesto): korisnik je odredio da se
 Ingest layout i UI kopiraju 100% vjerno kao osnova za Media Assist i Story, uz
 izostavljanje desnog prikaza klipova; mjesto izbora direktorija ostaje prazno

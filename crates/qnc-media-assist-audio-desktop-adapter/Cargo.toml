@@ -1,0 +1,10 @@
+[package]
+name = "qnc-media-assist-audio-desktop-adapter"
+version = "0.1.0"
+edition = "2021"
+description = "QNC QNC Media Assist Audio public desktop adapter"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-editorial-desktop = { workspace = true }
+qnc-shell-desktop-api = { workspace = true }

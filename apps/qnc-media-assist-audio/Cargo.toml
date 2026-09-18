@@ -1,0 +1,8 @@
+[package]
+name = "qnc-media-assist-audio"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-editorial-desktop = { workspace = true }

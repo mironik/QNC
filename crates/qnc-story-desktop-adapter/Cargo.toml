@@ -1,0 +1,10 @@
+[package]
+name = "qnc-story-desktop-adapter"
+version = "0.1.0"
+edition = "2021"
+description = "QNC QNC Story public desktop adapter"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-editorial-desktop = { workspace = true }
+qnc-shell-desktop-api = { workspace = true }

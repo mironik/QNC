@@ -1,0 +1,12 @@
+{
+  "application_id": "qnc.media-assist-video",
+  "tab_id": "media_assist_video",
+  "label": "MA Video",
+  "enabled": true,
+  "system": true,
+  "removable": false,
+  "priority_group": "l",
+  "host_mode": "embedded_public_api",
+  "desktop_entry": "qnc_media_assist_video",
+  "standalone_executable": "qnc-media-assist-video"
+}
