@@ -15,6 +15,6 @@
   "database_write_policy": "public_ingest_content_write_transport_only",
   "runtime_crate": "qnc-ingest-artifacts",
   "input": "Reader of project settings, Ingest work plan, content target and selection config.",
-  "output": "An ArtifactHostContext wired to the Ingest content transport (local, LAN or intranet).",
+  "output": "An ArtifactsContext wired to the Ingest content transport (local, LAN or intranet).",
   "specification": "docs/v5-book/08-audit-and-plan.md (audit response)"
 }

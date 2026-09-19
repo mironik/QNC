@@ -18,7 +18,7 @@ impl IngestApplication {
         ) else {
             return;
         };
-        match qnc_ingest_artifacts::host_context(reader, plan, target, config) {
+        match qnc_ingest_artifacts::artifacts_context(reader, plan, target, config) {
             Ok(context) => self.artifacts.configure(context),
             Err(error) => self.view.message = error,
         }

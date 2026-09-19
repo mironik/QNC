@@ -1,0 +1,10 @@
+[package]
+name = "qnc-timeline-artifacts"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: keeps the filmstrip and wave of clips up to date and hands the artifacts to a timeline; independent of any application, form or database owner (content comes through traits)"
+
+[dependencies]
+qnc-filmstrip-worker = { workspace = true }
+qnc-timeline-assets = { workspace = true }
+qnc-wave-worker = { workspace = true }

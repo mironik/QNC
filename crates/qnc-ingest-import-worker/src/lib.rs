@@ -17,11 +17,11 @@
 //! Not done here: proxy generation (transcode) and the card poster copy.
 
 mod config;
-mod host;
+mod importer;
 mod session;
 
 pub use config::ConfigMediaOpener;
-pub use host::{ImportHost, ImportNotice};
+pub use importer::{Importer, ImportNotice};
 pub use session::{ImportEvent, ImportSession, ImportSummary};
 
 use qnc_ingest_store::content::{ContentClient, StoredClip};

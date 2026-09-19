@@ -1,11 +1,11 @@
-//! Ingest adapters for the timeline artifact host: they read and write the filmstrip
+//! Ingest adapters for the timeline artifacts: they read and write the filmstrip
 //! and wave content through the Ingest content transport (local, LAN or intranet) and
-//! give the neutral host everything it needs. The host itself names no Ingest type.
+//! give the neutral component everything it needs. It names no Ingest type.
 
 use qnc_ingest_select::selection_config::SelectionConfig;
 use qnc_ingest_store::content::ContentTarget;
 use qnc_ingest_work_plan::IngestWorkPlan;
-use qnc_timeline_artifacts_host::ArtifactHostContext;
+use qnc_timeline_artifacts::ArtifactsContext;
 use qnc_work_settings::SettingsReader;
 use std::sync::Arc;
 
@@ -314,22 +314,22 @@ fn wave_source_bindings(
 }
 
 
-/// The host context of one project: readers and writers over the Ingest content
+/// The context of one project: readers and writers over the Ingest content
 /// transport, the source bindings of the Select configuration and the project folder
 /// of this machine. Without local access to the project folder there is no context.
-pub fn host_context(
+pub fn artifacts_context(
     reader: &SettingsReader,
     plan: &IngestWorkPlan,
     content_target: ContentTarget,
     config: &SelectionConfig,
-) -> Result<ArtifactHostContext, String> {
+) -> Result<ArtifactsContext, String> {
     let project_dir = reader
         .local_workspace_dir(&plan.settings)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Artefakti timelinea nemaju lokalni binding projekta.".to_string())?;
     let filmstrip_dir = project_dir.join("filmstrip");
     let project_audio_channels = plan.settings.audio_channels().map_err(|e| e.to_string())?;
-    Ok(ArtifactHostContext {
+    Ok(ArtifactsContext {
         project_id: plan.settings.project_id.clone(),
         filmstrip_root_uri: plan.filmstrip_uri.clone(),
         filmstrip_dir: filmstrip_dir.clone(),

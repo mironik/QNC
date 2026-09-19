@@ -35,7 +35,7 @@ members = [
     "crates/qnc-wave",
     "crates/qnc-wave-view",
     "crates/qnc-wave-worker",
-    "crates/qnc-timeline-artifacts-host",
+    "crates/qnc-timeline-artifacts",
     "crates/qnc-timeline-assets",
     "crates/qnc-timeline",
     "crates/qnc-media-stream",
@@ -131,7 +131,7 @@ qnc-filmstrip-worker = { path = "crates/qnc-filmstrip-worker" }
 qnc-wave = { path = "crates/qnc-wave" }
 qnc-wave-view = { path = "crates/qnc-wave-view" }
 qnc-wave-worker = { path = "crates/qnc-wave-worker" }
-qnc-timeline-artifacts-host = { path = "crates/qnc-timeline-artifacts-host" }
+qnc-timeline-artifacts = { path = "crates/qnc-timeline-artifacts" }
 qnc-timeline-assets = { path = "crates/qnc-timeline-assets" }
 qnc-timeline = { path = "crates/qnc-timeline" }
 qnc-media-stream = { path = "crates/qnc-media-stream" }

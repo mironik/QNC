@@ -1,10 +1,10 @@
-//! Timeline artifact host.
+//! Timeline artifacts.
 //!
 //! One public component for every form that shows a source timeline: it runs the
 //! filmstrip and wave workers, reads what they published and hands the artifacts of
 //! the focused clip to the timeline. It knows no application and no database owner:
 //! the caller supplies the content readers and writers (traits of the workers and of
-//! `qnc-timeline-assets`) and the source bindings, so the same host serves Ingest,
+//! `qnc-timeline-assets`) and the source bindings, so the same component serves Ingest,
 //! Media Assist, Story or any future form, on a local disk, LAN or intranet.
 
 use qnc_filmstrip_worker::{
@@ -19,11 +19,11 @@ use qnc_wave_worker::{
 };
 use std::{path::PathBuf, sync::Arc};
 
-pub const MODULE_ID: &str = "qnc.module.timeline-artifacts-host";
+pub const MODULE_ID: &str = "qnc.module.timeline-artifacts";
 pub const VERSION: &str = "0.1.0";
 
-/// Everything the host needs for one project.
-pub struct ArtifactHostContext {
+/// Everything it needs for one project.
+pub struct ArtifactsContext {
     pub project_id: String,
     pub filmstrip_root_uri: String,
     /// Where the filmstrip frames of this machine live.
@@ -49,14 +49,14 @@ pub struct Polled {
 }
 
 #[derive(Default)]
-pub struct TimelineArtifactsHost {
+pub struct Artifacts {
     filmstrip: TimelineFilmstripService,
     wave: TimelineWaveService,
     assets: TimelineAssetReader,
     sync_deferred: bool,
 }
 
-impl TimelineArtifactsHost {
+impl Artifacts {
     pub fn new() -> Self {
         Self::default()
     }
@@ -69,7 +69,7 @@ impl TimelineArtifactsHost {
         self.sync_deferred = false;
     }
 
-    pub fn configure(&mut self, context: ArtifactHostContext) {
+    pub fn configure(&mut self, context: ArtifactsContext) {
         self.assets.configure(TimelineAssetContext {
             project_id: context.project_id.clone(),
             reader: context.timeline_reader,
@@ -149,9 +149,9 @@ impl TimelineArtifactsHost {
     }
 }
 
-impl std::fmt::Debug for TimelineArtifactsHost {
+impl std::fmt::Debug for Artifacts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TimelineArtifactsHost")
+        f.debug_struct("Artifacts")
             .field("pending", &self.has_pending_work())
             .field("sync_deferred", &self.sync_deferred)
             .finish()
@@ -164,30 +164,30 @@ mod tests {
 
     #[test]
     fn a_new_host_has_nothing_pending_and_focus_of_an_unknown_clip_is_empty() {
-        let mut host = TimelineArtifactsHost::new();
-        assert!(!host.has_pending_work());
-        assert!(!host.sync_deferred());
-        let assets = host.focus("clip-1");
+        let mut artifacts = Artifacts::new();
+        assert!(!artifacts.has_pending_work());
+        assert!(!artifacts.sync_deferred());
+        let assets = artifacts.focus("clip-1");
         assert_eq!(assets.clip_id, "clip-1");
         assert!(assets.filmstrip_background().is_none());
     }
 
     #[test]
     fn a_deferred_sync_is_remembered_until_it_can_run() {
-        let mut host = TimelineArtifactsHost::new();
-        host.sync(true).unwrap();
-        assert!(host.sync_deferred());
-        host.sync(false).ok();
-        assert!(!host.sync_deferred());
+        let mut artifacts = Artifacts::new();
+        artifacts.sync(true).unwrap();
+        assert!(artifacts.sync_deferred());
+        artifacts.sync(false).ok();
+        assert!(!artifacts.sync_deferred());
     }
 
     #[test]
     fn polling_without_a_project_changes_nothing() {
-        let mut host = TimelineArtifactsHost::new();
-        let polled = host.poll(Some("clip-1"));
+        let mut artifacts = Artifacts::new();
+        let polled = artifacts.poll(Some("clip-1"));
         assert!(!polled.changed);
         assert!(polled.assets.is_none());
-        host.reset();
-        host.remove_clips(&["clip-1".into()]);
+        artifacts.reset();
+        artifacts.remove_clips(&["clip-1".into()]);
     }
 }

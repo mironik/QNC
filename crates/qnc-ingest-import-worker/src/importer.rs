@@ -1,4 +1,4 @@
-//! The import host: everything a form's application needs to start an import and
+//! The importer: everything a form's application needs to start an import and
 //! follow it, in one public component. The application passes what it already
 //! holds (settings reader, plan, sources, database target) and shows the notices.
 
@@ -17,11 +17,11 @@ pub struct ImportNotice {
 }
 
 #[derive(Debug, Default)]
-pub struct ImportHost {
+pub struct Importer {
     session: ImportSession,
 }
 
-impl ImportHost {
+impl Importer {
     pub fn has_pending_work(&self) -> bool {
         self.session.has_pending_work()
     }

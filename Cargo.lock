@@ -3294,7 +3294,7 @@ dependencies = [
  "qnc-player-timeline",
  "qnc-source-reader",
  "qnc-timeline",
- "qnc-timeline-artifacts-host",
+ "qnc-timeline-artifacts",
  "qnc-timeline-assets",
  "qnc-work-settings",
  "rusqlite",
@@ -3313,7 +3313,7 @@ dependencies = [
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
- "qnc-timeline-artifacts-host",
+ "qnc-timeline-artifacts",
  "qnc-timeline-assets",
  "qnc-wave",
  "qnc-wave-worker",
@@ -4019,7 +4019,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "qnc-timeline-artifacts-host"
+name = "qnc-timeline-artifacts"
 version = "0.1.0"
 dependencies = [
  "qnc-filmstrip-worker",
