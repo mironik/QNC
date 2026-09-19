@@ -292,3 +292,29 @@ Odobrenje je zatvoreno. Status: zamrznuto.
 Ispravak zapisa (trinaesto): gradnja je provjerena za `qnc-ingest`. Shell
 `qnc-app` nije ponovno izgradjen jer je exe bio zauzet pokrenutim procesom, pa
 popravak u shellu (Ingest tab) tek nakon ponovne gradnje.
+
+## Zatvoreno ograniceno odobrenje 2026-09-19 (cetrnaesto)
+
+Preview monitor i source timeline u aplikacijama e, g, l, o spojeni na Broadcast
+Player, popis klipova ispod monitora (virtualizirana mreza kartica). Novi javni
+moduli bez ovisnosti o Ingestu i Projectu: `qnc-source-bindings`, `qnc-content-read`
+(samo javni pogledi projektnog sadrzaja), `qnc-source-preview`; tanki composition
+root `qnc-editorial-application`. Forma ostaje pasivna. Blokada pravila
+"business app DB-only isolation" rijesena sesnaestim odobrenjem; conformance
+prolazi. Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Povuceno ograniceno odobrenje 2026-09-19 (petnaesto)
+
+Predlozeni prvi korak kartice klipa (`qnc-clip-status`, sličica i točkice) nije
+izvrsen i nista nije otkljucano. Nakon audita (`docs/v5-book/08-audit-and-plan.md`)
+opseg se prepisuje uz pravilo: UI je zakljucan, dopusteno je samo dodavanje.
+
+## Zatvoreno ograniceno odobrenje 2026-09-19 (sesnaesto)
+
+Pravilo provjere "business app DB-only isolation" (`tools/qnc-conformance`):
+`[dev-dependencies]` tranzitivnih crateova se ne broje (ne povezuju se u
+aplikaciju). Broje se i dalje runtime ovisnosti tranzitivnih crateova i
+dev-ovisnosti samog provjeravanog cratea. Tri nova testa (dev tranzitivno ne
+racuna, runtime tranzitivno racuna, vlastita dev-ovisnost racuna). Verificirano:
+20 testova conformancea, pun conformance prolazi. Odobrenje je zatvoreno. Status:
+zamrznuto.

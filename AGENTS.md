@@ -1335,7 +1335,23 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
-Otvoreno ograniceno odobrenje 2026-09-19 (cetrnaesto): korisnik je izricito
+Povuceno ograniceno odobrenje 2026-09-19 (petnaesto): predlozeni prvi korak kartice
+klipa (crate `qnc-clip-status` i izmjene `qnc-content-read`, `qnc-editorial-*`,
+`editorial.layout.json`) nije izvrsen. Nakon audita (docs/v5-book/08) opseg se
+prepisuje u novo odobrenje uz pravilo da je UI zakljucan i da se smije samo
+dodavati. Nista nije otkljucano, nista nije promijenjeno.
+
+Zatvoreno ograniceno odobrenje 2026-09-19 (sesnaesto): korisnik je izricito
+odobrio izmjenu pravila provjere "business app DB-only isolation": dev-ovisnosti
+(`[dev-dependencies]`) tranzitivnih crateova vise se ne broje, jer se ne povezuju
+u aplikaciju. I dalje se broje sve runtime ovisnosti tranzitivnih crateova te
+dev-ovisnosti samog provjeravanog cratea. Otkljucano samo
+`tools/qnc-conformance/src/main.rs` (`cargo_dependency_names`,
+`collect_transitive_cargo_dependencies` i tri nova testa). Verificirano: testovi
+conformancea (20), pun conformance prolazi bez greske. Odobrenje zatvoreno. Sve
+ostalo ostaje zamrznuto.
+
+Zatvoreno ograniceno odobrenje 2026-09-19 (cetrnaesto): korisnik je izricito
 zatrazio da preview monitor i source timeline u aplikacijama e, g, l, o budu
 stvarno spojeni na Broadcast Player, uz popis klipova ispod monitora (lijevo
 tijelo, mjesto izbora direktorija). Novi crateovi: `crates/qnc-editorial-application`
@@ -1346,7 +1362,9 @@ korijene iz host konfiguracije; ugovor `contracts/modules/source-bindings.module
 Izmjene: `crates/qnc-editorial-desktop` (forma prikazuje popis, koristi view iz
 application cratea), `contracts/ui/editorial.layout.json` (popis klipova),
 `tools/qnc-conformance` (granica forme), root `Cargo.toml`/`Cargo.lock`. Ingest se
-ne dira. Bez skeniranja, probea i pisanja u tude baze. Sve ostalo ostaje zamrznuto.
+ne dira. Bez skeniranja, probea i pisanja u tude baze. Verificirano nakon sesnaestog
+odobrenja: pun conformance prolazi. Zatvoreno; grana `wip/editorial-player-monitor`
+ceka spajanje. Sve ostalo ostaje zamrznuto.
 
 Zatvoreno ograniceno odobrenje 2026-09-19 (trinaesto): korisnik je izricito
 otkljucao Ingest za popravak nalaza 2 iz auditâ: playback guard blokira odabir

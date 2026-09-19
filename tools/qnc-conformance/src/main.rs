@@ -1479,7 +1479,8 @@ fn collect_transitive_cargo_dependencies(
         let Ok(contents) = fs::read_to_string(cargo_toml) else {
             continue;
         };
-        for dependency in cargo_dependency_names(&contents, cargo_packages) {
+        let is_root = crate_name == root_crate;
+        for dependency in cargo_dependency_names(&contents, cargo_packages, is_root) {
             if !visited.contains(&dependency) {
                 stack.push(dependency);
             }
@@ -1507,15 +1508,19 @@ fn parse_cargo_package_name(contents: &str) -> Option<String> {
     None
 }
 
+/// Path dependencies named in a Cargo.toml. `include_dev` counts `[dev-dependencies]`:
+/// dev-dependencies are never linked into an application, so they count only for
+/// the crate being checked itself, not for the crates it depends on.
 fn cargo_dependency_names(
     contents: &str,
     cargo_packages: &BTreeMap<String, PathBuf>,
+    include_dev: bool,
 ) -> Vec<String> {
     let mut dependencies = Vec::new();
     let mut in_dependencies = false;
     for line in contents.lines() {
         let trimmed = line.trim();
-        if trimmed == "[dependencies]" || trimmed == "[dev-dependencies]" {
+        if trimmed == "[dependencies]" || (include_dev && trimmed == "[dev-dependencies]") {
             in_dependencies = true;
             continue;
         }
@@ -2582,5 +2587,94 @@ mod freeze_status_tests {
         ] {
             assert!(!validate_project_freeze_status(text).is_ok());
         }
+    }
+}
+
+#[cfg(test)]
+mod dependency_scope_tests {
+    use super::*;
+
+    fn workspace(name: &str, crates: &[(&str, &str)]) -> (PathBuf, BTreeMap<String, PathBuf>) {
+        let root = std::env::temp_dir().join(format!(
+            "qnc_conformance_{name}_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let mut packages = BTreeMap::new();
+        for (crate_name, dependencies) in crates {
+            let dir = root.join(crate_name);
+            fs::create_dir_all(&dir).unwrap();
+            let file = dir.join("Cargo.toml");
+            fs::write(
+                &file,
+                format!("[package]\nname = \"{crate_name}\"\n{dependencies}"),
+            )
+            .unwrap();
+            packages.insert(crate_name.to_string(), file);
+        }
+        (root, packages)
+    }
+
+    #[test]
+    fn dev_dependencies_of_transitive_crates_do_not_count() {
+        let (root, packages) = workspace(
+            "transitive_dev",
+            &[
+                (
+                    "qnc-story-app",
+                    "[dependencies]\nqnc-shared = { workspace = true }\n",
+                ),
+                (
+                    "qnc-shared",
+                    "[dependencies]\n[dev-dependencies]\nqnc-ingest-store = { workspace = true }\n",
+                ),
+                ("qnc-ingest-store", "[dependencies]\n"),
+            ],
+        );
+        let found = collect_transitive_cargo_dependencies("qnc-story-app", &packages);
+        assert!(found.contains("qnc-shared"));
+        assert!(!found.contains("qnc-ingest-store"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn runtime_dependencies_of_transitive_crates_still_count() {
+        let (root, packages) = workspace(
+            "transitive_runtime",
+            &[
+                (
+                    "qnc-story-app",
+                    "[dependencies]\nqnc-shared = { workspace = true }\n",
+                ),
+                (
+                    "qnc-shared",
+                    "[dependencies]\nqnc-ingest-store = { workspace = true }\n",
+                ),
+                ("qnc-ingest-store", "[dependencies]\n"),
+            ],
+        );
+        let found = collect_transitive_cargo_dependencies("qnc-story-app", &packages);
+        assert!(found.contains("qnc-ingest-store"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn dev_dependencies_of_the_checked_crate_itself_still_count() {
+        let (root, packages) = workspace(
+            "own_dev",
+            &[
+                (
+                    "qnc-story-app",
+                    "[dependencies]\n[dev-dependencies]\nqnc-ingest-store = { workspace = true }\n",
+                ),
+                ("qnc-ingest-store", "[dependencies]\n"),
+            ],
+        );
+        let found = collect_transitive_cargo_dependencies("qnc-story-app", &packages);
+        assert!(found.contains("qnc-ingest-store"));
+        let _ = fs::remove_dir_all(root);
     }
 }
