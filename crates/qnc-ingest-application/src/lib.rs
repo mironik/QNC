@@ -446,7 +446,7 @@ impl IngestDispatchResult {
 
 #[derive(Debug, Default)]
 pub struct IngestApplication {
-    player: Option<qnc_player_client::Player>,
+    preview: qnc_source_preview::SourcePreview,
     view: IngestViewModel,
     dispatch_log: Vec<String>,
     source_browser: DirectoryBrowserSession,
@@ -459,7 +459,6 @@ pub struct IngestApplication {
     thumbnail_loader: qnc_media_thumbnail::ThumbnailBatchService,
     artifacts: qnc_timeline_artifacts::Artifacts,
     catalog_stats: Option<CatalogStats>,
-    play_when_ready: bool,
     work_plan: Option<IngestWorkPlan>,
     pending_source: Option<String>,
     selection_config: Option<selection_config::SelectionConfig>,
@@ -617,40 +616,17 @@ impl IngestApplication {
 
     pub fn poll(&mut self) -> bool {
         let mut changed = self.poll_settings();
-        if let Some(player) = &self.player {
-            let playback = player.view();
-            if self.view.playback != playback {
-                if let Some(error) = &playback.error {
-                    self.view.message = error.clone();
-                    self.play_when_ready = false;
-                }
-                self.view.playback = playback;
-                self.view.timeline = playback_timeline_projection(&self.view.playback);
-                changed = true;
+        if self.preview.poll() {
+            self.sync_playback_view();
+            let message = self.preview.take_message();
+            if !message.is_empty() {
+                self.view.message = message;
             }
+            changed = true;
         }
         self.apply_playback_guard();
         if !self.playback_guard_active() {
             changed |= self.poll_thumbnails();
-        }
-        if self.play_when_ready {
-            if self.view.playback.error.is_some() {
-                self.play_when_ready = false;
-            } else if self.view.playback.can_start_playback() && !self.view.playback.playing() {
-                if let Some(player) = &self.player {
-                    match player.send(qnc_player_client::Action::TogglePlayPause) {
-                        Ok(()) => self.play_when_ready = false,
-                        Err(error) if error == "Player se priprema." => {}
-                        Err(error) => {
-                            self.play_when_ready = false;
-                            self.view.message = error;
-                        }
-                    }
-                    changed = true;
-                }
-            } else if self.view.playback.playing() {
-                self.play_when_ready = false;
-            }
         }
         self.apply_playback_guard();
         if !self.playback_guard_active() && self.artifacts.sync_deferred() {
@@ -901,18 +877,18 @@ impl IngestApplication {
             || self.thumbnail_loader.has_pending_work()
             || self.selection_session.has_pending_work()
             || self.artifacts.has_pending_work()
-            || self.play_when_ready
+            || self.preview.play_when_ready()
     }
     pub fn has_player(&self) -> bool {
         self.view.playback.preparing || self.view.playback.reply.is_some()
     }
 
     pub fn needs_player_poll(&self) -> bool {
-        self.play_when_ready || self.view.playback.preparing || self.view.playback.playing()
+        self.preview.play_when_ready() || self.view.playback.preparing || self.view.playback.playing()
     }
 
     fn playback_guard_active(&self) -> bool {
-        playback_guard::PlaybackGuard::active(self.play_when_ready, &self.view)
+        playback_guard::PlaybackGuard::active(self.preview.play_when_ready(), &self.view)
     }
 
     fn apply_playback_guard(&mut self) {
@@ -1485,7 +1461,6 @@ impl IngestApplication {
 impl Drop for IngestApplication {
     fn drop(&mut self) {
         self.stop_player();
-        self.player = None;
         self.cancel_thumbnail_load();
         self.catalog_result = None;
         if let Some(thread) = self.catalog_thread.take() {
@@ -1587,7 +1562,9 @@ mod tests {
         for (preparing, play_when_ready) in [(true, false), (false, true)] {
             let mut component = IngestApplication::default();
             component.view.playback.preparing = preparing;
-            component.play_when_ready = play_when_ready;
+            if play_when_ready {
+                crate::playback::queue_play(&mut component);
+            }
             assert!(component.playback_guard_active());
 
             let requests = [

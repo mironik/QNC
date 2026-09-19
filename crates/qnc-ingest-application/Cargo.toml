@@ -7,6 +7,8 @@ edition = "2021"
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
 qnc-ingest-artifacts = { workspace = true }
+qnc-ingest-preview = { workspace = true }
+qnc-source-preview = { workspace = true }
 qnc-ingest-catalog = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-camera-adapter = { workspace = true }
@@ -17,8 +19,6 @@ qnc-ingest-store = { workspace = true }
 qnc-media-thumbnail = { workspace = true }
 qnc-work-settings = { workspace = true }
 qnc-player-client = { workspace = true }
-qnc-player-input = { workspace = true }
-qnc-player-launcher = { workspace = true }
 qnc-player-timeline = { workspace = true }
 qnc-source-reader = { workspace = true }
 qnc-timeline = { workspace = true }

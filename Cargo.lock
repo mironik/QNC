@@ -3284,14 +3284,14 @@ dependencies = [
  "qnc-ingest-cameras",
  "qnc-ingest-catalog",
  "qnc-ingest-import-worker",
+ "qnc-ingest-preview",
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
  "qnc-player-client",
- "qnc-player-input",
- "qnc-player-launcher",
  "qnc-player-timeline",
+ "qnc-source-preview",
  "qnc-source-reader",
  "qnc-timeline",
  "qnc-timeline-artifacts",
@@ -3377,6 +3377,18 @@ dependencies = [
  "qnc-work-settings",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-ingest-preview"
+version = "0.1.0"
+dependencies = [
+ "qnc-ingest-select",
+ "qnc-ingest-store",
+ "qnc-player-input",
+ "qnc-source-bindings",
+ "qnc-source-preview",
+ "qnc-work-settings",
 ]
 
 [[package]]

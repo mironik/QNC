@@ -1,33 +1,20 @@
+//! The application only decides *when* to preview and what the playback guard allows;
+//! the neutral `qnc-source-preview` holds the player, and `qnc-ingest-preview` tells it
+//! where Ingest keeps its clips.
+
 use super::*;
-use qnc_player_client::{Action, Player};
-use qnc_player_input::{InputReader, PlayerClipRecord, PlayerContentRead};
-use qnc_player_launcher::SourceTransportBinding;
-use std::sync::Arc;
-
-#[derive(Clone)]
-struct IngestPlayerContentReader {
-    content_target: qnc_ingest_store::content::ContentTarget,
-}
-
-impl PlayerContentRead for IngestPlayerContentReader {
-    fn read_clip(&self, clip_id: &str) -> Result<Option<PlayerClipRecord>, String> {
-        let stored = self
-            .content_target
-            .open(qnc_ingest_store::content::Access::ReadOnly)?
-            .read(clip_id)?;
-        Ok(stored.map(|stored| PlayerClipRecord {
-            name: stored.clip.name,
-            snapshot: stored.clip.snapshot,
-            imported_media_uri: stored.imported_media_uri,
-        }))
-    }
-}
+#[cfg(test)]
+use qnc_player_client::Player;
 
 impl IngestApplication {
     pub fn notify_on_player_change(&self, notify: impl Fn() + Send + Sync + 'static) {
-        if let Some(player) = &self.player {
-            player.notify_on_change(notify);
-        }
+        self.preview.notify_on_change(notify);
+    }
+
+    /// Copies what the preview reports into the view the form reads.
+    pub(super) fn sync_playback_view(&mut self) {
+        self.view.playback = self.preview.player_view().clone();
+        self.view.timeline = playback_timeline_projection(&self.view.playback);
     }
 
     pub(super) fn prepare_preview(&mut self, clip_id: String) -> IngestDispatchResult {
@@ -51,7 +38,6 @@ impl IngestApplication {
         };
         // Cut the old session even when the new clip/settings cannot be prepared.
         self.stop_player();
-        self.play_when_ready = false;
         self.set_timeline_artifact_playback_priority(true);
         self.view.preview_clip_id = Some(clip_id.clone());
         if save_state != SaveState::Saved {
@@ -68,112 +54,69 @@ impl IngestApplication {
         ) else {
             return IngestDispatchResult::accepted(None, true);
         };
-        let workspace = plan.settings.workspace_db_uri.clone();
-        if self.player.is_none() {
-            match Player::new() {
-                Ok(player) => self.player = Some(player),
-                Err(error) => {
-                    let mut result = IngestDispatchResult::rejected(error);
-                    result.request_repaint = true;
-                    return result;
-                }
-            }
-        }
-        self.player.as_ref().unwrap().prepare(move || {
-            let sources = config
-                .sources
-                .iter()
-                .map(|source| {
-                    if let Some(root) = &source.location.file {
-                        return Ok(SourceTransportBinding::local(
-                            source.location.uri.clone(),
-                            root.clone(),
-                        ));
-                    }
-                    SourceTransportBinding::network(
-                        source.location.uri.clone(),
-                        source
-                            .location
-                            .endpoint
-                            .clone()
-                            .ok_or("Source endpoint missing.")?,
-                        source
-                            .location
-                            .token()
-                            .map_err(|e| e.to_string())?
-                            .ok_or("Source credential missing.")?,
-                    )
-                })
-                .collect::<Result<Vec<_>, String>>()?;
-            let executable = qnc_player_launcher::sibling_executable("qnc-broadcast-player")?;
-            let input = InputReader::with_content_reader(
-                reader,
-                Arc::new(IngestPlayerContentReader { content_target }),
-            )
-            .load(&workspace, &clip_id)
-            .map_err(|e| e.to_string())?;
-            qnc_player_launcher::prepare_launch(input, &sources, executable)
-        });
-        self.view.playback = self.player.as_ref().unwrap().view();
-        self.view.timeline = playback_timeline_projection(&self.view.playback);
+        self.preview.configure(qnc_ingest_preview::preview_context(
+            reader,
+            plan.settings.clone(),
+            &config,
+            content_target,
+        ));
+        self.preview.open(&clip_id);
+        let error = self.preview.take_message();
+        self.sync_playback_view();
         self.update_timeline_artifact_playback_priority();
+        if !error.is_empty() {
+            let mut result = IngestDispatchResult::rejected(error);
+            result.request_repaint = true;
+            return result;
+        }
         IngestDispatchResult::accepted(None, true)
     }
+
     pub(super) fn stop_player(&mut self) {
-        self.play_when_ready = false;
-        if let Some(player) = &self.player {
-            player.close();
-        }
+        self.preview.close();
         self.view.playback = Default::default();
         self.view.timeline = Default::default();
         self.set_timeline_artifact_playback_priority(false);
     }
+
     pub(super) fn player_action(&mut self, intent: IngestIntent) -> IngestDispatchResult {
-        if self.player.is_none() {
+        if !self.preview.has_player() {
             let message = "Broadcast Player nije povezan.";
             self.view.message = message.into();
             let mut result = IngestDispatchResult::rejected(message);
             result.request_repaint = true;
             return result;
         }
-        let action = match intent.action_id.as_str() {
-            action_ids::PLAY_PAUSE => Action::TogglePlayPause,
-            action_ids::STEP_BACK_FRAME => Action::Step(-1),
-            action_ids::STEP_FORWARD_FRAME => Action::Step(1),
+        match intent.action_id.as_str() {
+            action_ids::PLAY_PAUSE => {
+                let was_playing = self.preview.player_view().playing();
+                self.preview.toggle_play();
+                if !was_playing {
+                    self.apply_playback_guard();
+                }
+            }
+            action_ids::STEP_BACK_FRAME => {
+                self.preview.step(-1);
+            }
+            action_ids::STEP_FORWARD_FRAME => {
+                self.preview.step(1);
+            }
             action_ids::INGEST_CUE_FRAME => match intent.payload {
-                IngestPayload::Frame(frame) if frame >= 0 => Action::Cue(frame as u64),
+                IngestPayload::Frame(frame) if frame >= 0 => {
+                    self.preview.cue(frame as u64);
+                }
                 _ => return IngestDispatchResult::rejected("Neispravan frame."),
             },
             _ => return IngestDispatchResult::rejected("Nepoznata player akcija."),
-        };
-        if matches!(action, Action::TogglePlayPause) {
-            let playback = self.player.as_ref().unwrap().view();
-            if !playback.playing() && !playback.can_start_playback() && playback.error.is_none() {
-                self.play_when_ready = true;
-                self.apply_playback_guard();
-                return IngestDispatchResult::accepted(None, true);
-            }
-            if !playback.playing() {
-                self.apply_playback_guard();
-            }
         }
-        let result = self
-            .player
-            .as_ref()
-            .ok_or_else(|| "Broadcast Player nije povezan.".to_string())
-            .and_then(|player| player.send(action));
-        match result {
-            Ok(()) => {
-                self.play_when_ready = false;
-                IngestDispatchResult::accepted(None, true)
-            }
-            Err(error) => {
-                self.view.message = error.clone();
-                let mut result = IngestDispatchResult::rejected(error);
-                result.request_repaint = true;
-                result
-            }
+        let error = self.preview.take_message();
+        if error.is_empty() {
+            return IngestDispatchResult::accepted(None, true);
         }
+        self.view.message = error.clone();
+        let mut result = IngestDispatchResult::rejected(error);
+        result.request_repaint = true;
+        result
     }
 }
 
@@ -183,8 +126,7 @@ mod tests {
     #[test]
     fn selecting_pending_clip_cuts_old_session_and_keeps_thumbnail_selection() {
         let mut component = IngestApplication::default();
-        component.player = Some(Player::new().unwrap());
-        component.play_when_ready = true;
+        queue_play(&mut component);
         component.view.preview_clip_id = Some("old".into());
         component.view.playback.video_visible = true;
         component.view.clips = vec![ClipView {
@@ -197,10 +139,10 @@ mod tests {
         assert_eq!(component.view.preview_clip_id.as_deref(), Some("new"));
         assert_eq!(component.view.playback, qnc_player_client::View::default());
         assert_eq!(
-            component.player.as_ref().unwrap().view(),
-            qnc_player_client::View::default()
+            component.preview.player_view(),
+            &qnc_player_client::View::default()
         );
-        assert!(!component.play_when_ready);
+        assert!(!component.preview.play_when_ready());
     }
 
     #[test]
@@ -212,13 +154,13 @@ mod tests {
             let _ = wait.recv_timeout(std::time::Duration::from_secs(1));
             Err("test prepare stopped".into())
         });
-        component.player = Some(player);
+        component.preview.attach_player(player);
 
         let result = component.player_action(IngestIntent::empty(action_ids::PLAY_PAUSE));
 
         assert!(result.accepted);
         assert!(result.request_repaint);
-        assert!(component.play_when_ready);
+        assert!(component.preview.play_when_ready());
         assert_ne!(component.view.message, "Play ceka spreman player.");
         let _ = resume.send(());
     }
@@ -238,4 +180,16 @@ mod preview_refresh_tests {
         assert!(result.accepted);
         assert_eq!(app.view.timeline_assets.clip_id, "clip-1");
     }
+}
+
+#[cfg(test)]
+pub(crate) fn queue_play(component: &mut IngestApplication) {
+    let player = Player::new().unwrap();
+    player.prepare(|| {
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        Err("test prepare stopped".into())
+    });
+    component.preview.attach_player(player);
+    component.preview.toggle_play();
+    assert!(component.preview.play_when_ready());
 }

@@ -123,7 +123,7 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
         component.view.browser_entries[0].qnc_uri,
         "qnc://intranet/test/source/remote"
     );
-    assert!(component.player.is_none());
+    assert!(!component.preview.has_player());
     assert!(!component.selection_session.has_pending_work());
     assert!(component.work_plan().is_some());
 }

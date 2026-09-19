@@ -13,11 +13,13 @@ use std::{sync::Arc, time::Duration};
 
 use qnc_content_read::ContentReader;
 use qnc_player_client::{Action, Player, View as PlayerView};
-use qnc_player_input::InputReader;
+use qnc_player_input::{InputReader, PlayerContentRead};
 use qnc_player_launcher::SourceTransportBinding;
-use qnc_source_bindings::TransportBindings;
+use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_timeline::{TimelineIntent, TimelineProjection};
-use qnc_timeline_assets::{SourceTimelineAssets, TimelineAssetContext, TimelineAssetReader};
+use qnc_timeline_assets::{
+    SourceTimelineAssets, TimelineArtifactRead, TimelineAssetContext, TimelineAssetReader,
+};
 use qnc_work_settings::{SettingsReader, WorkSettings};
 
 pub const MODULE_ID: &str = "qnc.module.source-preview";
@@ -63,27 +65,72 @@ impl Default for PreviewView {
     }
 }
 
-/// The project a preview works in.
+/// The project a preview works in. Where the clips and artifacts come from is decided
+/// by the readers it carries, so any form over any content database can use it.
 #[derive(Clone)]
 pub struct PreviewContext {
     reader: SettingsReader,
     settings: WorkSettings,
-    content: ContentReader,
-    bindings: TransportBindings,
+    sources: Vec<SourceBinding>,
+    player_content: Arc<dyn PlayerContentRead>,
+    artifacts: Option<Arc<dyn TimelineArtifactRead>>,
+    notice: Option<String>,
 }
 
 impl PreviewContext {
+    /// Any content database: the caller supplies the readers.
+    pub fn with_readers(
+        reader: SettingsReader,
+        settings: WorkSettings,
+        sources: Vec<SourceBinding>,
+        player_content: Arc<dyn PlayerContentRead>,
+        artifacts: Option<Arc<dyn TimelineArtifactRead>>,
+    ) -> Self {
+        Self {
+            reader,
+            settings,
+            sources,
+            player_content,
+            artifacts,
+            notice: None,
+        }
+    }
+
+    /// The project content views (`qnc-content-read`).
     pub fn new(
         reader: SettingsReader,
         settings: WorkSettings,
         content: ContentReader,
         bindings: TransportBindings,
     ) -> Self {
+        let (artifacts, notice) = match reader.local_workspace_dir(&settings) {
+            Ok(Some(project_dir)) => {
+                let artifacts: Arc<dyn TimelineArtifactRead> = Arc::new(content::ArtifactReader {
+                    content: content.clone(),
+                    filmstrip_root_uri: format!(
+                        "{}/filmstrip",
+                        settings.output_root_uri.trim_end_matches('/')
+                    ),
+                    filmstrip_dir: project_dir.join("filmstrip"),
+                });
+                (Some(artifacts), None)
+            }
+            Ok(None) => (
+                None,
+                Some("Timeline artefakti nemaju lokalni filmstrip binding.".to_string()),
+            ),
+            Err(error) => (None, Some(error.to_string())),
+        };
         Self {
             reader,
             settings,
-            content,
-            bindings,
+            sources: bindings.sources,
+            player_content: Arc::new(content::PlayerContent {
+                content,
+                records: bindings.media_records,
+            }),
+            artifacts,
+            notice,
         }
     }
 
@@ -123,6 +170,26 @@ impl SourcePreview {
         &self.view
     }
 
+    /// The player state as the player reports it, for forms that paint it themselves.
+    pub fn player_view(&self) -> &PlayerView {
+        &self.player_view
+    }
+
+    /// A play command is waiting for the prepared session.
+    pub fn play_when_ready(&self) -> bool {
+        self.play_when_ready
+    }
+
+    /// Uses a player the caller already made instead of creating one on `open`.
+    pub fn attach_player(&mut self, player: Player) {
+        self.player = Some(player);
+    }
+
+    /// The message of the last failed command; it is handed over once.
+    pub fn take_message(&mut self) -> String {
+        std::mem::take(&mut self.view.message)
+    }
+
     pub fn has_player(&self) -> bool {
         self.player.is_some()
     }
@@ -152,27 +219,14 @@ impl SourcePreview {
             self.close();
             self.timeline_assets.reset();
         }
-        match context
-            .reader
-            .local_workspace_dir(&context.settings)
-        {
-            Ok(Some(project_dir)) => {
-                self.timeline_assets.configure(TimelineAssetContext {
-                    project_id: context.settings.project_id.clone(),
-                    reader: Arc::new(content::ArtifactReader {
-                        content: context.content.clone(),
-                        filmstrip_root_uri: format!(
-                            "{}/filmstrip",
-                            context.settings.output_root_uri.trim_end_matches('/')
-                        ),
-                        filmstrip_dir: project_dir.join("filmstrip"),
-                    }),
-                });
-            }
-            Ok(None) => {
-                self.view.message = "Timeline artefakti nemaju lokalni filmstrip binding.".into();
-            }
-            Err(error) => self.view.message = error.to_string(),
+        if let Some(artifacts) = &context.artifacts {
+            self.timeline_assets.configure(TimelineAssetContext {
+                project_id: context.settings.project_id.clone(),
+                reader: artifacts.clone(),
+            });
+        }
+        if let Some(notice) = &context.notice {
+            self.view.message = notice.clone();
         }
         self.context = Some(context);
     }
@@ -227,7 +281,6 @@ impl SourcePreview {
         let clip_id = clip_id.to_string();
         player.prepare(move || {
             let sources = context
-                .bindings
                 .sources
                 .iter()
                 .map(|binding| {
@@ -250,10 +303,7 @@ impl SourcePreview {
             let executable = qnc_player_launcher::sibling_executable("qnc-broadcast-player")?;
             let input = InputReader::with_content_reader(
                 context.reader.clone(),
-                Arc::new(content::PlayerContent {
-                    content: context.content.clone(),
-                    records: context.bindings.media_records.clone(),
-                }),
+                context.player_content.clone(),
             )
             .load(&context.settings.workspace_db_uri, &clip_id)
             .map_err(|error| error.to_string())?;
@@ -413,5 +463,15 @@ mod tests {
         preview.close();
         assert!(preview.view().clip_id.is_none());
         assert!(preview.view().message.is_empty());
+    }
+}
+
+impl std::fmt::Debug for SourcePreview {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SourcePreview")
+            .field("clip_id", &self.view.clip_id)
+            .field("has_player", &self.player.is_some())
+            .field("play_when_ready", &self.play_when_ready)
+            .finish()
     }
 }
