@@ -131,7 +131,7 @@ pub struct EditorialLayoutContract {
     pub board: EditorialBoard,
     pub preview: EditorialPreview,
     pub pool_head: EditorialPoolHead,
-    pub clip_list: EditorialClipList,
+    pub media_card: EditorialMediaCard,
     pub source_dock: EditorialSourceDock,
     pub groups: HashMap<String, GroupComposition>,
 }
@@ -182,6 +182,7 @@ pub struct GroupComposition {
     pub role: String,
     pub right_panel: String,
     pub source_dock: GroupSourceDock,
+    pub media_card: GroupMediaCard,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -189,8 +190,16 @@ pub struct GroupSourceDock {
     pub actions_rtl: Vec<String>,
 }
 
+
 #[derive(Debug, Clone, Deserialize)]
-pub struct EditorialClipList {
-    pub row_height: f32,
-    pub row_pad_x: f32,
+pub struct EditorialMediaCard {
+    pub min_card_width: f32,
+    pub card_text_height: f32,
+    pub grid_gap: f32,
+    pub empty_message: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GroupMediaCard {
+    pub selection_check: bool,
 }

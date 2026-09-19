@@ -3,14 +3,14 @@
 // filled by later group functions). Painting, metrics and helpers are unchanged.
 use eframe::egui::{
     self, Align, Align2, Button, Color32, CornerRadius, FontId, Label, Layout, Rect, RichText,
-    ScrollArea, Sense, Stroke, Ui,
+    ScrollArea, Sense, Stroke, StrokeKind, Ui,
     Vec2,
 };
 
 use qnc_monitor::{MonitorChrome, MonitorPaint, MonitorPicture, MonitorSurface};
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
-use qnc_editorial_application::{action_ids, EditorialIntent, EditorialView};
+use qnc_editorial_application::{action_ids, EditorialClip, EditorialIntent, EditorialView};
 
 use crate::{
     layout_contract::EditorialContracts,
@@ -115,23 +115,6 @@ fn render_left_column(
         egui::pos2(rect.left(), head_rect.bottom()),
         rect.right_bottom(),
     );
-    let action_rect = Rect::from_min_size(
-        egui::pos2(
-            browser_rect.left(),
-            (browser_rect.bottom()
-                - theme.chrome_control_height
-                - contracts.editorial.board.block_pad)
-                .max(browser_rect.top()),
-        ),
-        Vec2::new(browser_rect.width(), theme.chrome_control_height),
-    );
-    let browser_content_rect = Rect::from_min_max(
-        browser_rect.left_top(),
-        egui::pos2(
-            browser_rect.right(),
-            (action_rect.top() - 8.0).max(browser_rect.top()),
-        ),
-    );
 
     render_preview(ui, preview_rect, contracts, theme, view);
 
@@ -139,12 +122,11 @@ fn render_left_column(
     ui.scope_builder(egui::UiBuilder::new().max_rect(head_rect), |ui| {
         intent = render_pool_head(ui, contracts, theme);
     });
-    // Where Ingest shows the directory browser: the clip list of the project.
-    ui.painter()
-        .rect_filled(browser_content_rect, 0.0, theme.bg);
+    // Clip menu (qnc_v5 media pool): the card grid fills the column under the
+    // pool head, down to the dock, on the panel background.
     if intent.is_none() {
-        ui.scope_builder(egui::UiBuilder::new().max_rect(browser_content_rect), |ui| {
-            intent = render_clip_list(ui, contracts, theme, view);
+        ui.scope_builder(egui::UiBuilder::new().max_rect(browser_rect), |ui| {
+            intent = render_clip_grid(ui, contracts, theme, view);
         });
     }
     intent
@@ -390,68 +372,226 @@ fn timeline_theme(theme: &Theme) -> TimelineTheme {
     )
 }
 
-/// Clip list of the project (summary rows). Click activates the preview of the
-/// clip; the chosen clip is marked. Virtualized: only visible rows are painted.
-fn render_clip_list(
+struct GridMetrics {
+    columns: usize,
+    card_width: f32,
+    card_height: f32,
+    gap: f32,
+}
+
+/// Same arithmetic as the Ingest clip grid (usable width is the panel width less 8).
+fn grid_metrics(available_width: f32, count: usize, contracts: &EditorialContracts) -> GridMetrics {
+    let card = &contracts.editorial.media_card;
+    let count = count.max(1);
+    let usable_width = (available_width - 8.0).max(card.min_card_width);
+    let columns = (((usable_width + card.grid_gap) / (card.min_card_width + card.grid_gap)).floor()
+        as usize)
+        .max(1)
+        .min(count);
+    let card_width = (usable_width - card.grid_gap * columns.saturating_sub(1) as f32) / columns as f32;
+    let card_height = card_width * 9.0 / 16.0 + card.card_text_height;
+    GridMetrics {
+        columns,
+        card_width,
+        card_height,
+        gap: card.grid_gap,
+    }
+}
+
+/// The clip menu: a virtualized card grid of the project clips. Click on a card
+/// chooses the clip for the preview. Presentation as in Ingest and the qnc_v5
+/// media pool: chosen card has a 2 px red outline, others a 1 px border.
+fn render_clip_grid(
     ui: &mut Ui,
     contracts: &EditorialContracts,
     theme: &Theme,
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
-    let outer = ui.max_rect();
-    ui.allocate_rect(outer, Sense::hover());
+    let outer = ui.available_rect_before_wrap();
+    ui.painter().rect_filled(outer, 0.0, theme.bg);
     let rect = outer.shrink(contracts.editorial.board.block_pad);
-    let list = &contracts.editorial.clip_list;
+    let clips = &view.clips;
+
+    if clips.is_empty() {
+        ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+            ui.vertical_centered(|ui| {
+                ui.add_space(24.0);
+                let message = if view.loading {
+                    "Citam projektni katalog..."
+                } else if !view.message.is_empty() {
+                    view.message.as_str()
+                } else {
+                    contracts.editorial.media_card.empty_message.as_str()
+                };
+                ui.label(RichText::new(message).color(theme.text_muted));
+            });
+        });
+        return None;
+    }
+
+    let metrics = grid_metrics(rect.width(), clips.len(), contracts);
+    let show_check = contracts.composition().media_card.selection_check;
+    let row_stride = metrics.card_height + metrics.gap;
+    let total_rows = clips.len().div_ceil(metrics.columns);
     let mut intent = None;
+
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-        if view.clips.is_empty() {
-            let text = if view.loading {
-                "Citam projektni katalog..."
-            } else {
-                view.message.as_str()
-            };
-            ui.label(RichText::new(text).color(theme.text_muted));
-            return;
-        }
         ScrollArea::vertical()
-            .id_salt("editorial_clip_list")
+            .id_salt("editorial_clip_grid")
             .auto_shrink([false, false])
-            .show_rows(ui, list.row_height, view.clips.len(), |ui, range| {
-                ui.spacing_mut().item_spacing.y = 0.0;
-                for clip in &view.clips[range] {
-                    let (row, response) = ui.allocate_exact_size(
-                        Vec2::new(ui.available_width(), list.row_height),
-                        Sense::click(),
-                    );
-                    let chosen = view.chosen_clip_id() == Some(clip.clip_id.as_str());
-                    if chosen {
-                        ui.painter().rect_filled(row, 0.0, theme.surface_alt);
-                    } else if response.hovered() {
-                        ui.painter().rect_filled(row, 0.0, theme.surface);
-                    }
-                    let text_color = if chosen { theme.text } else { theme.text_muted };
-                    let font = FontId::proportional(theme.font_ui);
-                    ui.painter().text(
-                        egui::pos2(row.left() + list.row_pad_x, row.center().y),
-                        Align2::LEFT_CENTER,
-                        &clip.name,
-                        font.clone(),
-                        text_color,
-                    );
-                    ui.painter().text(
-                        egui::pos2(row.right() - list.row_pad_x, row.center().y),
-                        Align2::RIGHT_CENTER,
-                        format_duration(clip.duration_seconds),
-                        font,
-                        theme.text_muted,
-                    );
-                    if response.clicked() {
-                        intent = Some(EditorialIntent::PreviewClip(clip.clip_id.clone()));
-                    }
+            .show_viewport(ui, |ui, viewport| {
+                let first_row = (viewport.top() / row_stride).floor().max(0.0) as usize;
+                let last_row =
+                    ((viewport.bottom() / row_stride).ceil() as usize + 1).min(total_rows);
+                ui.add_space(first_row as f32 * row_stride);
+                for row_index in first_row..last_row {
+                    let start = row_index * metrics.columns;
+                    let end = (start + metrics.columns).min(clips.len());
+                    ui.horizontal(|ui| {
+                        for clip in &clips[start..end] {
+                            let chosen = view.chosen_clip_id() == Some(clip.clip_id.as_str());
+                            let card = render_clip_card(
+                                ui,
+                                clip,
+                                chosen,
+                                show_check,
+                                Vec2::new(metrics.card_width, metrics.card_height),
+                                theme,
+                            );
+                            if card.clicked() {
+                                intent = Some(EditorialIntent::PreviewClip(clip.clip_id.clone()));
+                            }
+                            ui.add_space(metrics.gap);
+                        }
+                    });
+                    ui.add_space(metrics.gap);
                 }
+                let rendered = last_row.saturating_sub(first_row);
+                let remaining = total_rows.saturating_sub(first_row + rendered);
+                ui.add_space(remaining as f32 * row_stride);
             });
     });
+
     intent
+}
+
+/// Card painting as in the Ingest clip grid (no thumbnail yet: the "..." placeholder).
+fn render_clip_card(
+    ui: &mut Ui,
+    clip: &EditorialClip,
+    chosen: bool,
+    show_check: bool,
+    size: Vec2,
+    theme: &Theme,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    let stroke = if chosen {
+        Stroke::new(2.0, theme.danger)
+    } else {
+        Stroke::new(1.0, theme.border)
+    };
+    ui.painter().rect_filled(rect, 0.0, theme.surface_alt);
+    ui.painter()
+        .rect_stroke(rect, 0.0, stroke, StrokeKind::Inside);
+    let image_rect = Rect::from_min_size(
+        rect.left_top(),
+        Vec2::new(rect.width(), rect.width() * 9.0 / 16.0),
+    );
+    ui.painter()
+        .rect_filled(image_rect.shrink(1.0), 0.0, theme.surface);
+    ui.painter().text(
+        image_rect.center(),
+        Align2::CENTER_CENTER,
+        "...",
+        FontId::proportional(theme.font_ui),
+        theme.text_muted,
+    );
+    if show_check {
+        // Media Assist mirrors the chosen clip in the check mark (qnc_v5).
+        paint_selection_check(ui, image_rect, chosen);
+    }
+    let marker = if clip.imported {
+        Color32::from_rgb(55, 210, 145)
+    } else {
+        theme.text_muted
+    };
+    ui.painter().circle_filled(
+        egui::pos2(rect.right() - 10.0, rect.top() + 10.0),
+        4.0,
+        marker,
+    );
+    ui.painter().text(
+        egui::pos2(rect.left() + 8.0, image_rect.bottom() + 8.0),
+        Align2::LEFT_TOP,
+        truncate(
+            &clip.name,
+            ((rect.width() - 76.0) / 7.0).floor().clamp(8.0, 42.0) as usize,
+        ),
+        FontId::proportional(theme.font_ui - 1.0),
+        theme.text,
+    );
+    ui.painter().text(
+        egui::pos2(rect.right() - 8.0, image_rect.bottom() + 8.0),
+        Align2::RIGHT_TOP,
+        format_duration(clip.duration_seconds),
+        FontId::proportional(theme.font_ui - 1.0),
+        theme.text_muted,
+    );
+    response
+}
+
+fn selection_check_rect(image_rect: Rect) -> Rect {
+    let size = 16.0;
+    let pad = 6.0;
+    Rect::from_min_size(
+        egui::pos2(image_rect.left() + pad, image_rect.bottom() - pad - size),
+        Vec2::splat(size),
+    )
+}
+
+fn paint_selection_check(ui: &Ui, image_rect: Rect, checked: bool) {
+    let check_rect = selection_check_rect(image_rect);
+    if checked {
+        let fill = Color32::from_rgb(0xff, 0x95, 0x00);
+        ui.painter().rect_filled(check_rect, 3.0, fill);
+        ui.painter()
+            .rect_stroke(check_rect, 3.0, Stroke::new(1.5, fill), StrokeKind::Inside);
+        let c = check_rect.center();
+        let dark = Color32::from_rgb(0x1a, 0x1a, 0x1a);
+        ui.painter().line_segment(
+            [egui::pos2(c.x - 3.5, c.y), egui::pos2(c.x - 1.0, c.y + 3.0)],
+            Stroke::new(2.0, dark),
+        );
+        ui.painter().line_segment(
+            [
+                egui::pos2(c.x - 1.0, c.y + 3.0),
+                egui::pos2(c.x + 4.0, c.y - 3.0),
+            ],
+            Stroke::new(2.0, dark),
+        );
+    } else {
+        ui.painter().rect_filled(
+            check_rect,
+            3.0,
+            Color32::from_rgba_unmultiplied(0, 0, 0, 90),
+        );
+        ui.painter().rect_stroke(
+            check_rect,
+            3.0,
+            Stroke::new(1.5, Color32::from_rgba_unmultiplied(255, 255, 255, 140)),
+            StrokeKind::Inside,
+        );
+    }
+}
+
+fn truncate(text: &str, max_chars: usize) -> String {
+    let mut chars = text.chars();
+    let head = chars.by_ref().take(max_chars).collect::<String>();
+    if chars.next().is_some() {
+        format!("{head}...")
+    } else {
+        head
+    }
 }
 
 fn format_duration(seconds: f64) -> String {
@@ -459,7 +599,9 @@ fn format_duration(seconds: f64) -> String {
         return "00:00".to_string();
     }
     let total = seconds.round() as i64;
-    format!("{:02}:{:02}", total / 60, total % 60)
+    let minutes = total / 60;
+    let secs = total % 60;
+    format!("{minutes:02}:{secs:02}")
 }
 
 fn text_tab(ui: &mut Ui, text: &str, selected: bool, theme: &Theme) -> egui::Response {

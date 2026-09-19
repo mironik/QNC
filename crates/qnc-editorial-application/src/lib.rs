@@ -217,6 +217,7 @@ impl EditorialApplication {
                     clip_id: clip.clip_id,
                     name: clip.name,
                     duration_seconds: clip.duration_seconds,
+                    imported: clip.imported,
                 })
                 .collect();
         }
@@ -300,6 +301,7 @@ mod tests {
             clip_id: id.into(),
             name: name.into(),
             duration_seconds: 10.0,
+            imported: true,
         }
     }
 

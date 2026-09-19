@@ -26,6 +26,8 @@ pub struct ClipSummary {
     pub clip_id: String,
     pub name: String,
     pub duration_seconds: f64,
+    /// Import finished (`imported` or `done`).
+    pub imported: bool,
 }
 
 /// What a player needs beyond the media record: display name, imported media
@@ -108,7 +110,7 @@ impl ContentReader {
         }
         let mut statement = conn
             .prepare(
-                "SELECT clip_id, name, duration_seconds FROM public_clips
+                "SELECT clip_id, name, duration_seconds, import_status IN ('imported', 'done') FROM public_clips
                  ORDER BY name, clip_id LIMIT ?1",
             )
             .map_err(|error| error.to_string())?;
@@ -118,6 +120,7 @@ impl ContentReader {
                     clip_id: row.get(0)?,
                     name: row.get(1)?,
                     duration_seconds: row.get::<_, Option<f64>>(2)?.unwrap_or(0.0),
+                    imported: row.get(3)?,
                 })
             })
             .map_err(|error| error.to_string())?;
@@ -250,20 +253,20 @@ mod tests {
 
     /// The public views of the content DB contract, over minimal tables.
     const SCHEMA: &str = "
-        CREATE TABLE clips (clip_id TEXT PRIMARY KEY, name TEXT, created_at_utc TEXT,
+        CREATE TABLE clips (clip_id TEXT PRIMARY KEY, name TEXT, created_at_utc TEXT, import_status TEXT DEFAULT 'detected',
             duration_seconds REAL, duration_frames INTEGER, imported_media_uri TEXT);
         CREATE TABLE probe_records (clip_id TEXT, record_db_uri TEXT, record_revision INTEGER);
         CREATE TABLE filmstrip_artifacts (clip_id TEXT, frames_json TEXT);
         CREATE TABLE filmstrip_frames (clip_id TEXT, frame_index INTEGER, seek_sec REAL, artifact_uri TEXT);
         CREATE TABLE wave_artifacts (clip_id TEXT, peaks_json TEXT);
         CREATE VIEW public_clips AS SELECT clip_id,name,created_at_utc,duration_seconds,
-            duration_frames,imported_media_uri FROM clips;
+            duration_frames,imported_media_uri,import_status FROM clips;
         CREATE VIEW public_probe_records AS SELECT * FROM probe_records;
         CREATE VIEW public_filmstrip_artifacts AS SELECT * FROM filmstrip_artifacts;
         CREATE VIEW public_filmstrip_frames AS SELECT * FROM filmstrip_frames;
         CREATE VIEW public_wave_artifacts AS SELECT * FROM wave_artifacts;
-        INSERT INTO clips VALUES ('clip-b','Beta','2026-09-01',20.5,1000,NULL);
-        INSERT INTO clips VALUES ('clip-a','Alfa','2026-09-02',NULL,NULL,'qnc://local/x/a.mp4');
+        INSERT INTO clips (clip_id,name,created_at_utc,duration_seconds,duration_frames,imported_media_uri,import_status) VALUES ('clip-b','Beta','2026-09-01',20.5,1000,NULL,'imported');
+        INSERT INTO clips (clip_id,name,created_at_utc,duration_seconds,duration_frames,imported_media_uri) VALUES ('clip-a','Alfa','2026-09-02',NULL,NULL,'qnc://local/x/a.mp4');
         INSERT INTO probe_records VALUES ('clip-a','qnc://local/db/media_records',3);
         INSERT INTO filmstrip_artifacts VALUES ('clip-a',
             '{\"clip_id\":\"clip-a\",\"status\":\"ready\",\"duration_sec\":\"5.00\",\"frame_count\":1,\"artifact_uri\":\"qnc://local/f\",\"frames\":[]}');
@@ -293,6 +296,7 @@ mod tests {
         assert_eq!(clips.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["Alfa", "Beta"]);
         assert_eq!(clips[0].duration_seconds, 0.0);
         assert_eq!(clips[1].duration_seconds, 20.5);
+        assert!(!clips[0].imported && clips[1].imported);
     }
 
     #[test]
@@ -310,7 +314,7 @@ mod tests {
         assert_eq!(before.clip_count, 2);
         Connection::open(dir.path().join("project.db"))
             .unwrap()
-            .execute("INSERT INTO clips VALUES ('clip-c','Gama',NULL,1.0,25,NULL)", [])
+            .execute("INSERT INTO clips (clip_id,name,created_at_utc,duration_seconds,duration_frames) VALUES ('clip-c','Gama',NULL,1.0,25)", [])
             .unwrap();
         assert_ne!(reader.signature().unwrap(), before);
     }

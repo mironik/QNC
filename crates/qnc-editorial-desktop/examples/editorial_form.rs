@@ -49,6 +49,7 @@ fn main() -> eframe::Result<()> {
             clip_id: format!("clip-{i:03}"),
             name: format!("Izjava {i:03}.MXF"),
             duration_seconds: 20.0 + (i as f64 * 7.3) % 190.0,
+            imported: i % 3 != 0,
         })
         .collect();
     view.preview.timeline = TimelineProjection::new(0, 5000)

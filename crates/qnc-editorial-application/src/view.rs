@@ -9,6 +9,8 @@ pub struct EditorialClip {
     pub clip_id: String,
     pub name: String,
     pub duration_seconds: f64,
+    /// Import finished.
+    pub imported: bool,
 }
 
 #[derive(Clone, Default)]

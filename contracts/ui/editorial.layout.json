@@ -42,15 +42,12 @@
   "media_card": {
     "min_card_width": 160.0,
     "card_text_height": 34.0,
-    "grid_gap": 10.0
+    "grid_gap": 10.0,
+    "empty_message": "Nema klipova — prvo Ingest import."
   },
   "pool_head": {
     "tabs_left": ["All", "Virtual"],
     "transport_right": [">", "[", "]"]
-  },
-  "clip_list": {
-    "row_height": 28.0,
-    "row_pad_x": 8.0
   },
   "source_dock": {
     "inner_margin_x": 8.0,
