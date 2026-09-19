@@ -405,6 +405,7 @@ impl ContentStore {
             Operation::FinishImport {
                 clip_id,
                 media_uri,
+                thumbnail_uri,
                 error,
             } => {
                 if media_uri.is_some() == error.is_some() {
@@ -422,8 +423,8 @@ impl ContentStore {
                     "imported"
                 };
                 let n = self.conn.execute(
-                    "UPDATE clips SET import_status=?1,imported_media_uri=?2,import_error=?3 WHERE clip_id=?4 AND import_status='processing'",
-                    params![status,media_uri,error,clip_id]).map_err(err)?;
+                    "UPDATE clips SET import_status=?1,imported_media_uri=?2,import_error=?3,thumbnail_uri=COALESCE(?5,thumbnail_uri) WHERE clip_id=?4 AND import_status='processing'",
+                    params![status,media_uri,error,clip_id,thumbnail_uri]).map_err(err)?;
                 if n != 1 {
                     return Err("Import posao nije preuzet ili je vec zavrsen.".into());
                 }
@@ -721,7 +722,8 @@ impl ContentStore {
             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)
             ON CONFLICT(clip_id) DO UPDATE SET name=excluded.name,catalog_json=excluded.catalog_json,revision=excluded.revision,final=excluded.final,
             duration_seconds=excluded.duration_seconds,duration_frames=excluded.duration_frames,fps_num=excluded.fps_num,fps_den=excluded.fps_den,
-            created_at_utc=excluded.created_at_utc,thumbnail_uri=excluded.thumbnail_uri",
+            created_at_utc=excluded.created_at_utc,
+            thumbnail_uri=CASE WHEN clips.import_status='imported' THEN clips.thumbnail_uri ELSE excluded.thumbnail_uri END",
             params![clip.id(),clip.source_uri,original.media_uri,clip.name,original.tags.get("creation_time").map(|f| &f.value),duration,
                 video.and_then(|v|v.exact_frame_count()),fps.map(|f|f.fps_num),fps.map(|f|f.fps_den),clip.thumbnail_uri.as_deref(),json,
                 clip.snapshot.revision,clip.snapshot.phase == Phase::Final]).map_err(err)?;

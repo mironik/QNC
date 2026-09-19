@@ -201,6 +201,9 @@ pub enum Operation {
     FinishImport {
         clip_id: String,
         media_uri: Option<String>,
+        /// The poster copied into the project together with the media, if any.
+        #[serde(default)]
+        thumbnail_uri: Option<String>,
         error: Option<String>,
     },
 }

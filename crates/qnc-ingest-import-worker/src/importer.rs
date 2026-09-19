@@ -7,7 +7,7 @@ use qnc_ingest_select::selection_config::SourceConfig;
 use qnc_ingest_store::content::ContentTarget;
 use qnc_ingest_work_plan::IngestWorkPlan;
 use qnc_work_settings::SettingsReader;
-use std::sync::Arc;
+use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
 
 /// One line for the user and whether the import is over.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,9 +19,15 @@ pub struct ImportNotice {
 #[derive(Debug, Default)]
 pub struct Importer {
     session: ImportSession,
+    pause: Arc<AtomicBool>,
 }
 
 impl Importer {
+    /// While true the copy waits (the application sets it while the player works).
+    pub fn set_paused(&self, paused: bool) {
+        self.pause.store(paused, Ordering::Relaxed);
+    }
+
     pub fn has_pending_work(&self) -> bool {
         self.session.has_pending_work()
     }
@@ -50,7 +56,7 @@ impl Importer {
                 "Uvoz trazi lokalni pristup direktoriju projekta na ovom stroju.".to_string()
             })?;
         queue_selected(target.clone())?;
-        let opener = Arc::new(ConfigMediaOpener::new(sources));
+        let opener = Arc::new(ConfigMediaOpener::new(sources, self.pause.clone()));
         self.session.start(plan, project_dir, opener, target)
     }
 

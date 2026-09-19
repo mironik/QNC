@@ -608,6 +608,7 @@ impl IngestApplication {
             changed = true;
         }
         self.apply_playback_guard();
+        self.importer.set_paused(self.playback_guard_active());
         if !self.playback_guard_active() {
             changed |= self.poll_thumbnails();
         }
@@ -1286,7 +1287,12 @@ impl IngestApplication {
             .iter()
             .filter_map(|source| source.reader().ok())
             .collect::<Vec<_>>();
-        if sources.is_empty() {
+        let project = self
+            .settings_reader
+            .as_ref()
+            .zip(self.work_plan.as_ref())
+            .and_then(|(reader, plan)| catalog::project_folder(reader, plan));
+        if sources.is_empty() && project.is_none() {
             return;
         }
         let requests = clips
@@ -1296,7 +1302,7 @@ impl IngestApplication {
                 uri,
             })
             .collect::<Vec<_>>();
-        if let Err(error) = self.thumbnail_loader.start(sources, requests) {
+        if let Err(error) = self.thumbnail_loader.start_with_project(sources, project, requests) {
             self.view.message = error;
         }
     }

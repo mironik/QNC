@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 qnc-image-assets = { workspace = true }
 qnc-source-reader = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

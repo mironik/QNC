@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 qnc-ingest-store = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
+qnc-media-thumbnail = { workspace = true }
 qnc-work-settings = { workspace = true }

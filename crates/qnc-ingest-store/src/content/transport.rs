@@ -262,11 +262,13 @@ impl ContentClient {
         &mut self,
         clip_id: String,
         media_uri: Option<String>,
+        thumbnail_uri: Option<String>,
         error: Option<String>,
     ) -> Result<()> {
         self.execute(Operation::FinishImport {
             clip_id,
             media_uri,
+            thumbnail_uri,
             error,
         })
         .map(|_| ())
@@ -424,6 +426,7 @@ impl ContentWriteTransport {
         key: String,
         clip_id: String,
         media_uri: Option<String>,
+        thumbnail_uri: Option<String>,
         error: Option<String>,
     ) -> Result<()> {
         self.send_operation(
@@ -431,6 +434,7 @@ impl ContentWriteTransport {
             Operation::FinishImport {
                 clip_id,
                 media_uri,
+                thumbnail_uri,
                 error,
             },
         )
@@ -565,9 +569,10 @@ fn execute_write_command(
         Operation::FinishImport {
             clip_id,
             media_uri,
+            thumbnail_uri,
             error,
         } => {
-            client.finish_import(clip_id, media_uri, error)?;
+            client.finish_import(clip_id, media_uri, thumbnail_uri, error)?;
             Ok(ContentWriteData::Changed)
         }
         _ => Err("Nepodrzana content write transport operacija.".into()),

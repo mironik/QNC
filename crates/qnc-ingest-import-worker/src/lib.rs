@@ -9,12 +9,11 @@
 //! * `original`: the original is copied into the project `original` folder.
 //!
 //! Source media is read through the media stream transport (local disk, LAN or
-//! intranet behind one contract), never by a path. The copy goes to a temporary
-//! `.partial` file that is renamed when complete, so a stopped copy never looks
-//! like a finished one. The outcome is written through the content transport
+//! intranet behind one contract), never by a path. The copy is a plain copy. The outcome is
+//! written through the content transport
 //! (`finish_import`). Nothing here depends on an operating system or a drive.
 //!
-//! Not done here: proxy generation (transcode) and the card poster copy.
+//! With the media the poster is copied too. Not done here: proxy generation (transcode).
 
 mod config;
 mod importer;
@@ -29,7 +28,7 @@ use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
 use std::{
     fs,
     io::{Read, Write},
-    path::{Path, PathBuf},
+    path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -46,6 +45,10 @@ pub trait MediaRead: Read + Send {
 /// Opens source media by QNC URI: local disk, LAN or intranet.
 pub trait MediaOpener: Send + Sync {
     fn open(&self, media_uri: &str) -> Result<Box<dyn MediaRead>, String>;
+    /// The copy waits while this is true (for example while the player works).
+    fn paused(&self) -> bool {
+        false
+    }
 }
 
 /// The queue of the content database seen by the executor.
@@ -59,6 +62,7 @@ pub trait ImportQueue {
         &mut self,
         clip_id: String,
         media_uri: Option<String>,
+        thumbnail_uri: Option<String>,
         error: Option<String>,
     ) -> Result<(), String>;
 }
@@ -76,9 +80,10 @@ impl ImportQueue for ContentClient {
         &mut self,
         clip_id: String,
         media_uri: Option<String>,
+        thumbnail_uri: Option<String>,
         error: Option<String>,
     ) -> Result<(), String> {
-        ContentClient::finish_import(self, clip_id, media_uri, error).map_err(|e| e.to_string())
+        ContentClient::finish_import(self, clip_id, media_uri, thumbnail_uri, error).map_err(|e| e.to_string())
     }
 }
 
@@ -163,48 +168,33 @@ fn copy_into(
     beat: &mut dyn FnMut(),
 ) -> Result<(), String> {
     let mut source = opener.open(source_uri)?;
-    let expected = source.byte_len();
-    if let Ok(existing) = fs::metadata(destination) {
-        if existing.is_file() && existing.len() == expected {
-            return Ok(());
-        }
-    }
-    let mut partial = destination.as_os_str().to_owned();
-    partial.push(".partial");
-    let partial = PathBuf::from(partial);
-    let result = (|| -> Result<(), String> {
-        let mut file = fs::File::create(&partial).map_err(|e| e.to_string())?;
-        let mut buffer = vec![0_u8; CHUNK];
-        let mut copied = 0_u64;
-        let mut last_beat = std::time::Instant::now();
-        loop {
+    let mut file = fs::File::create(destination).map_err(|e| e.to_string())?;
+    let mut buffer = vec![0_u8; CHUNK];
+    let mut last_beat = std::time::Instant::now();
+    loop {
+        while opener.paused() {
             if cancel.load(Ordering::Relaxed) {
                 return Err("Uvoz je prekinut.".into());
             }
-            let n = source.read(&mut buffer).map_err(|e| e.to_string())?;
-            if n == 0 {
-                break;
-            }
-            file.write_all(&buffer[..n]).map_err(|e| e.to_string())?;
-            copied += n as u64;
             if last_beat.elapsed() >= HEARTBEAT_EVERY {
                 beat();
                 last_beat = std::time::Instant::now();
             }
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
-        file.flush().map_err(|e| e.to_string())?;
-        drop(file);
-        if copied != expected {
-            return Err(format!(
-                "Kopija je nepotpuna: {copied} od {expected} bajtova."
-            ));
+        if cancel.load(Ordering::Relaxed) {
+            return Err("Uvoz je prekinut.".into());
         }
-        fs::rename(&partial, destination).map_err(|e| e.to_string())
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&partial);
+        let n = source.read(&mut buffer).map_err(|e| e.to_string())?;
+        if n == 0 {
+            return Ok(());
+        }
+        file.write_all(&buffer[..n]).map_err(|e| e.to_string())?;
+        if last_beat.elapsed() >= HEARTBEAT_EVERY {
+            beat();
+            last_beat = std::time::Instant::now();
+        }
     }
-    result
 }
 
 /// Executes the action for one clip and returns the URI of the imported media.
@@ -245,10 +235,36 @@ pub fn import_clip_beating(
     }
 }
 
+/// The poster of a clip whose media was copied goes into the project too, so the clip
+/// keeps its picture when the card is gone. A missing or unreadable poster never fails
+/// the import: the clip simply keeps the poster reference of the card.
+pub fn import_poster(
+    clip: &StoredClip,
+    plan: &IngestWorkPlan,
+    project_dir: &Path,
+    opener: &dyn MediaOpener,
+    cancel: &AtomicBool,
+) -> Option<String> {
+    if !matches!(action_for(clip, plan), Ok(Action::Copy { .. })) {
+        return None;
+    }
+    let source_uri = clip.clip.thumbnail_uri.as_deref()?;
+    let clip_id = clip.clip.id();
+    let directory = project_dir.join("ingest").join("thumbnails").join(clip_id);
+    fs::create_dir_all(&directory).ok()?;
+    copy_into(opener, source_uri, &directory.join("poster.jpg"), cancel, &mut || {}).ok()?;
+    Some(format!(
+        "{}/{clip_id}/poster.jpg",
+        plan.thumbnails_uri.trim_end_matches('/')
+    ))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Outcome {
     pub clip_id: String,
     pub result: Result<String, String>,
+    /// The poster copied into the project together with the media, if any.
+    pub thumbnail_uri: Option<String>,
 }
 
 /// Claims the next queued clip, imports it and records the outcome. `None` when
@@ -268,14 +284,27 @@ pub fn run_next(
     let result = import_clip_beating(&clip, plan, project_dir, opener, cancel, &mut || {
         let _ = queue.heartbeat(&clip_id);
     });
+    let mut thumbnail_uri = None;
     match &result {
-        Ok(uri) => queue.finish_import(clip_id.clone(), Some(uri.clone()), None)?,
+        Ok(uri) => {
+            thumbnail_uri = import_poster(&clip, plan, project_dir, opener, cancel);
+            queue.finish_import(
+                clip_id.clone(),
+                Some(uri.clone()),
+                thumbnail_uri.clone(),
+                None,
+            )?
+        }
         Err(error) => {
             let message: String = error.chars().take(4000).collect();
-            queue.finish_import(clip_id.clone(), None, Some(message))?
+            queue.finish_import(clip_id.clone(), None, None, Some(message))?
         }
     }
-    Ok(Some(Outcome { clip_id, result }))
+    Ok(Some(Outcome {
+        clip_id,
+        result,
+        thumbnail_uri,
+    }))
 }
 
 /// Runs until the queue is empty or the import is cancelled.
@@ -375,11 +404,12 @@ impl ImportQueue for TransportQueue {
         &mut self,
         clip_id: String,
         media_uri: Option<String>,
+        thumbnail_uri: Option<String>,
         error: Option<String>,
     ) -> Result<(), String> {
         let key = self.next_key("finish");
         self.transport
-            .finish_import(key.clone(), clip_id, media_uri, error)
+            .finish_import(key.clone(), clip_id, media_uri, thumbnail_uri, error)
             .map_err(|e| e.to_string())?;
         self.wait(&key).map(|_| ())
     }

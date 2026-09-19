@@ -654,6 +654,7 @@ fn reselection_preserves_import_and_never_replaces_final_metadata() {
         Operation::FinishImport {
             clip_id: "c1".into(),
             media_uri: Some(clip("c1").snapshot.binding.original_uri),
+            thumbnail_uri: None,
             error: None,
         },
     )
@@ -1004,9 +1005,43 @@ fn a_heartbeat_keeps_the_lease_alive_and_needs_a_running_import() {
         Operation::FinishImport {
             clip_id: "c1".into(),
             media_uri: Some(clip("c1").snapshot.binding.original_uri),
+            thumbnail_uri: None,
             error: None,
         },
     )
     .unwrap();
     assert!(run(&mut store, Operation::Heartbeat { clip_id: "c1".into() }).is_err());
 }
+
+fn poster_uri() -> String {
+    "qnc://local/project/ingest/thumbnails/c1_poster.jpg".into()
+}
+
+#[test]
+fn an_imported_poster_replaces_the_card_poster_and_survives_a_new_select() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = claimed_store(&path);
+    run(
+        &mut store,
+        Operation::FinishImport {
+            clip_id: "c1".into(),
+            media_uri: Some(clip("c1").snapshot.binding.original_uri),
+            thumbnail_uri: Some(poster_uri()),
+            error: None,
+        },
+    )
+    .unwrap();
+    let poster = |path: &std::path::Path| {
+        Connection::open(path)
+            .unwrap()
+            .query_row::<Option<String>, _, _>("SELECT thumbnail_uri FROM public_clips", [], |r| {
+                r.get(0)
+            })
+            .unwrap()
+    };
+    assert_eq!(poster(&path), Some(poster_uri()));
+    run(&mut store, Operation::Publish(Box::new(clip("c1")))).unwrap();
+    assert_eq!(poster(&path), Some(poster_uri()));
+}
+

@@ -29,6 +29,30 @@ pub enum ThumbnailEvent {
     Finished,
 }
 
+/// A project folder on this machine: posters copied into it are addressed by project
+/// URIs (`<root_uri>/<relative path>`), which are not source references.
+#[derive(Debug, Clone)]
+pub struct ProjectFolder {
+    pub root_uri: String,
+    pub dir: std::path::PathBuf,
+}
+
+impl ProjectFolder {
+    fn read(&self, uri: &str) -> Option<Result<Arc<qnc_image_assets::RgbaImage>, String>> {
+        let relative = uri
+            .strip_prefix(self.root_uri.trim_end_matches('/'))?
+            .strip_prefix('/')?;
+        Some(self.read_relative(relative))
+    }
+
+    fn read_relative(&self, relative: &str) -> Result<Arc<qnc_image_assets::RgbaImage>, String> {
+        let data = std::fs::read(self.dir.join(relative)).map_err(|e| e.to_string())?;
+        qnc_image_assets::decode_thumbnail(&data)
+            .map(Arc::new)
+            .map_err(|e| e.to_string())
+    }
+}
+
 #[derive(Default)]
 pub struct ThumbnailBatchService {
     result: Option<Receiver<ThumbnailEvent>>,
@@ -42,8 +66,19 @@ impl ThumbnailBatchService {
         sources: Vec<SourceReader>,
         requests: Vec<ThumbnailRequest>,
     ) -> Result<(), String> {
+        self.start_with_project(sources, None, requests)
+    }
+
+    /// Like `start`, and posters that live in the project folder of this machine are
+    /// read from it as well.
+    pub fn start_with_project(
+        &mut self,
+        sources: Vec<SourceReader>,
+        project: Option<ProjectFolder>,
+        requests: Vec<ThumbnailRequest>,
+    ) -> Result<(), String> {
         self.cancel();
-        if sources.is_empty() || requests.is_empty() {
+        if (sources.is_empty() && project.is_none()) || requests.is_empty() {
             return Ok(());
         }
         let (send, receive) = mpsc::sync_channel(32);
@@ -51,7 +86,7 @@ impl ThumbnailBatchService {
         let worker_cancel = cancel.clone();
         let thread = std::thread::Builder::new()
             .name("qnc-media-thumbnail".into())
-            .spawn(move || load_from_sources(sources, requests, send, worker_cancel))
+            .spawn(move || load_thumbnails(sources, project, requests, send, worker_cancel))
             .map_err(|error| format!("thumbnail worker start: {error}"))?;
         self.result = Some(receive);
         self.cancel = Some(cancel);
@@ -115,6 +150,16 @@ pub fn load_from_sources(
     send: SyncSender<ThumbnailEvent>,
     cancel: Arc<AtomicBool>,
 ) {
+    load_thumbnails(sources, None, requests, send, cancel)
+}
+
+pub fn load_thumbnails(
+    sources: Vec<SourceReader>,
+    project: Option<ProjectFolder>,
+    requests: Vec<ThumbnailRequest>,
+    send: SyncSender<ThumbnailEvent>,
+    cancel: Arc<AtomicBool>,
+) {
     let readers = sources
         .into_iter()
         .map(|reader| (reader.source_uri().to_string(), reader))
@@ -123,7 +168,11 @@ pub fn load_from_sources(
         if cancel.load(Ordering::Relaxed) {
             break;
         }
-        let Ok(image) = thumbnail(&readers, &request.uri) else {
+        let image = match project.as_ref().and_then(|p| p.read(&request.uri)) {
+            Some(result) => result,
+            None => thumbnail(&readers, &request.uri),
+        };
+        let Ok(image) = image else {
             continue;
         };
         if send
@@ -154,4 +203,33 @@ fn thumbnail(
     qnc_image_assets::decode_thumbnail(&data.bytes)
         .map(Arc::new)
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod project_read_tests {
+    use super::*;
+
+    const PNG_1X1: &[u8] = &[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
+        0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8,
+        0xCF, 0xC0, 0xF0, 0x1F, 0x00, 0x05, 0x00, 0x01, 0xFF, 0x89, 0x99, 0x3D, 0x1D, 0x00, 0x00,
+        0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60,
+    ];
+
+    #[test]
+    fn a_poster_copied_into_the_project_is_read_from_the_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let posters = dir.path().join("ingest").join("thumbnails");
+        std::fs::create_dir_all(&posters).unwrap();
+        std::fs::write(posters.join("c1_poster.png"), PNG_1X1).unwrap();
+        let folder = ProjectFolder {
+            root_uri: "qnc://local/project/p1".into(),
+            dir: dir.path().to_path_buf(),
+        };
+        let image = folder
+            .read("qnc://local/project/p1/ingest/thumbnails/c1_poster.png")
+            .unwrap();
+        assert!(image.is_ok(), "{:?}", image.err());
+    }
 }

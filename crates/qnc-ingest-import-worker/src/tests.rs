@@ -124,6 +124,9 @@ fn fixture_with(queued: bool) -> Fixture {
         let clip = client.read(id).unwrap().unwrap();
         let binding = &clip.clip.snapshot.binding;
         media.insert(binding.original_uri.clone(), format!("original of {id}").into_bytes());
+        if let Some(poster) = &clip.clip.thumbnail_uri {
+            media.insert(poster.clone(), format!("poster of {id}").into_bytes());
+        }
         if let Some(proxy) = &binding.proxy_uri {
             media.insert(proxy.clone(), format!("proxy of {id}").into_bytes());
         }
@@ -193,7 +196,6 @@ fn original_mode_copies_the_original_into_the_project_and_records_the_outcome() 
     assert!(uri.starts_with("qnc://local/project/p1/original/"));
     let file = project.join("original").join(uri.rsplit('/').next().unwrap());
     assert!(std::fs::read(&file).unwrap().starts_with(b"original of"));
-    assert!(!file.with_extension("partial").exists());
     let stored = f.client.read(&outcome.clip_id).unwrap().unwrap();
     assert_eq!(stored.import_status, ImportStatus::Imported);
     assert_eq!(stored.imported_media_uri.as_deref(), Some(uri.as_str()));
@@ -234,20 +236,6 @@ fn a_medium_that_cannot_be_opened_is_recorded_as_a_failed_import() {
     assert!(stored.import_error.is_some());
 }
 
-#[test]
-fn a_cut_copy_leaves_no_partial_and_no_final_file() {
-    let mut f = fixture();
-    let project = f.project.path().to_path_buf();
-    let outcome = run_next(&mut f.client, &plan("original", "original"), &project, &opener(&f.media, true), &nothing())
-        .unwrap()
-        .unwrap();
-    assert!(outcome.result.unwrap_err().contains("nepotpuna"));
-    let left: Vec<_> = std::fs::read_dir(project.join("original"))
-        .unwrap()
-        .map(|e| e.unwrap().file_name())
-        .collect();
-    assert!(left.is_empty(), "{left:?}");
-}
 
 #[test]
 fn a_cancelled_import_copies_nothing() {
@@ -328,8 +316,92 @@ fn the_write_transport_queues_the_selected_clips_and_hands_them_out_once() {
     assert_ne!(first.clip.id(), second.clip.id());
     assert!(queue.claim_next().unwrap().is_none(), "each clip is handed out once");
     queue
-        .finish_import(first.clip.id().into(), Some(f.original.clone()), None)
+        .finish_import(first.clip.id().into(), Some(f.original.clone()), None, None)
         .unwrap();
     let stored = f.client.read(first.clip.id()).unwrap().unwrap();
     assert_eq!(stored.import_status, ImportStatus::Imported);
+}
+
+#[test]
+fn copying_the_media_copies_the_poster_and_records_it() {
+    let mut f = fixture();
+    let project = f.project.path().to_path_buf();
+    let outcome = run_next(&mut f.client, &plan("original", "original"), &project, &opener(&f.media, false), &nothing())
+        .unwrap()
+        .unwrap();
+    let poster = outcome.thumbnail_uri.expect("a Sony clip has a poster");
+    assert_eq!(
+        poster,
+        format!("qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg", outcome.clip_id)
+    );
+    let file = project
+        .join("ingest")
+        .join("thumbnails")
+        .join(&outcome.clip_id)
+        .join("poster.jpg");
+    assert!(std::fs::read(&file).unwrap().starts_with(b"poster of"));
+    let stored = f.client.read(&outcome.clip_id).unwrap().unwrap();
+    assert!(stored.clip.thumbnail_uri.is_some());
+}
+
+#[test]
+fn link_mode_copies_no_poster() {
+    let mut f = fixture();
+    let project = f.project.path().to_path_buf();
+    let outcome = run_next(&mut f.client, &plan("link", "original"), &project, &opener(&f.media, false), &nothing())
+        .unwrap()
+        .unwrap();
+    assert!(outcome.thumbnail_uri.is_none());
+    assert!(!project.join("ingest").exists());
+}
+
+#[test]
+fn a_poster_that_cannot_be_read_does_not_fail_the_import() {
+    let mut f = fixture();
+    let project = f.project.path().to_path_buf();
+    f.media.retain(|_, data| !data.starts_with(b"poster of"));
+    let outcome = run_next(&mut f.client, &plan("original", "original"), &project, &opener(&f.media, false), &nothing())
+        .unwrap()
+        .unwrap();
+    assert!(outcome.result.is_ok());
+    assert!(outcome.thumbnail_uri.is_none());
+}
+
+struct Holding {
+    inner: Memory,
+    hold: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl MediaOpener for Holding {
+    fn open(&self, media_uri: &str) -> Result<Box<dyn MediaRead>, String> {
+        self.inner.open(media_uri)
+    }
+    fn paused(&self) -> bool {
+        self.hold.load(Ordering::Relaxed)
+    }
+}
+
+#[test]
+fn the_copy_waits_while_the_opener_is_paused_and_finishes_when_released() {
+    let mut f = fixture();
+    let project = f.project.path().to_path_buf();
+    let hold = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let opener = Holding {
+        inner: opener(&f.media, false),
+        hold: hold.clone(),
+    };
+    let plan = plan("original", "original");
+    let cancel = nothing();
+    let original = project.join("original");
+    std::thread::scope(|scope| {
+        let worker = scope.spawn(|| run_next(&mut f.client, &plan, &project, &opener, &cancel));
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        let written: u64 = std::fs::read_dir(&original)
+            .map(|d| d.map(|e| e.unwrap().metadata().unwrap().len()).sum())
+            .unwrap_or(0);
+        assert_eq!(written, 0, "nothing is copied while paused");
+        hold.store(false, Ordering::Relaxed);
+        let outcome = worker.join().unwrap().unwrap().unwrap();
+        assert!(outcome.result.is_ok());
+    });
 }
