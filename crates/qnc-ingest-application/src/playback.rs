@@ -35,6 +35,9 @@ impl IngestApplication {
             && self.view.playback.error.is_none()
             && (self.view.playback.preparing || self.view.playback.reply.is_some())
         {
+            // The player session is already right, but the artifacts of the clip may
+            // have changed (filmstrip or wave finished): never keep a stale timeline.
+            self.focus_timeline_assets(&clip_id);
             return IngestDispatchResult::accepted(None, true);
         }
         let Some(save_state) = self
@@ -218,5 +221,21 @@ mod tests {
         assert!(component.play_when_ready);
         assert_ne!(component.view.message, "Play ceka spreman player.");
         let _ = resume.send(());
+    }
+}
+
+#[cfg(test)]
+mod preview_refresh_tests {
+    use super::*;
+
+    #[test]
+    fn choosing_the_clip_that_is_already_prepared_still_refreshes_its_timeline_artifacts() {
+        let mut app = IngestApplication::new();
+        app.view.preview_clip_id = Some("clip-1".into());
+        app.view.playback.preparing = true;
+        assert!(app.view.timeline_assets.clip_id.is_empty());
+        let result = app.prepare_preview("clip-1".into());
+        assert!(result.accepted);
+        assert_eq!(app.view.timeline_assets.clip_id, "clip-1");
     }
 }

@@ -78,6 +78,8 @@ pub struct SelectedClip {
     pub thumb_image: Option<Arc<qnc_image_assets::RgbaImage>>,
 }
 
+const CANCEL_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
+
 #[derive(Default)]
 pub struct SelectSession {
     result: Option<Receiver<Event>>,
@@ -107,12 +109,24 @@ impl SelectSession {
         Ok(())
     }
 
+    /// Stops the running Select. Late events are discarded (the receiver is gone) and
+    /// the worker starts no new database write once it sees the flag. The thread is
+    /// waited for a short, bounded time so that a normal cancel ends deterministically
+    /// without freezing the caller behind a long media read.
     pub fn cancel(&mut self) {
         if let Some(cancel) = self.cancel.take() {
             cancel.store(true, Ordering::Relaxed);
         }
         self.result = None;
-        drop(self.thread.take());
+        if let Some(thread) = self.thread.take() {
+            let deadline = std::time::Instant::now() + CANCEL_WAIT;
+            while !thread.is_finished() && std::time::Instant::now() < deadline {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            if thread.is_finished() {
+                let _ = thread.join();
+            }
+        }
     }
 
     pub fn poll(&mut self, limit: usize) -> Vec<Event> {
@@ -367,6 +381,10 @@ fn run_inner(
             let mut failed = false;
             let mut sequence = 0_u64;
             while let Ok(first) = publications.recv() {
+                // A cancelled Select starts no new database write.
+                if cancel.load(Ordering::Relaxed) {
+                    break;
+                }
                 let mut batch = vec![first];
                 while batch.len() < 16 {
                     match publications.try_recv() {

@@ -786,3 +786,29 @@ fn only_the_clip_whose_record_has_no_probe_data_is_probed() {
     crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
     assert_eq!(calls.load(Ordering::SeqCst), 2, "never a second probe");
 }
+
+#[test]
+fn cancel_ends_the_worker_deterministically_and_discards_late_events() {
+    let exited = Arc::new(AtomicBool::new(false));
+    let cancel = Arc::new(AtomicBool::new(false));
+    let (send, receive) = mpsc::sync_channel::<Event>(4);
+    let (worker_exited, worker_cancel) = (exited.clone(), cancel.clone());
+    let thread = std::thread::spawn(move || {
+        while !worker_cancel.load(Ordering::Relaxed) {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        // A late event after cancel must go nowhere.
+        assert!(send.send(Event::Status("late".into())).is_err());
+        worker_exited.store(true, Ordering::SeqCst);
+    });
+    let mut session = SelectSession {
+        result: Some(receive),
+        cancel: Some(cancel.clone()),
+        thread: Some(thread),
+    };
+    session.cancel();
+    assert!(cancel.load(Ordering::SeqCst));
+    assert!(exited.load(Ordering::SeqCst), "cancel waited for the worker");
+    assert!(!session.has_pending_work());
+    assert!(session.poll(8).is_empty());
+}
