@@ -288,3 +288,7 @@ ne dira izvor, scan ni thumbnailove. Ostaje blokirano: ponovno citanje, promjena
 izvora, direktoriji, generiranje postera. Guard je sužen, ne prosiren.
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+Ispravak zapisa (trinaesto): gradnja je provjerena za `qnc-ingest`. Shell
+`qnc-app` nije ponovno izgradjen jer je exe bio zauzet pokrenutim procesom, pa
+popravak u shellu (Ingest tab) tek nakon ponovne gradnje.

@@ -1344,7 +1344,9 @@ akcije odabira (`ingest_clip_toggle`, `ingest_select_all`, `ingest_clear_selecti
 vise ne blokira guard; ostaje blokirano ponovno citanje, promjena izvora,
 direktoriji i generiranje postera. Guard se ne siri, nego sužava. Verificirano:
 testovi (27, novi `clip_selection_is_not_blocked_by_the_playback_guard` pada na
-starom ponasanju), conformance, gradnja `qnc-ingest` i `qnc-app`. Odobrenje
+starom ponasanju), conformance, gradnja `qnc-ingest`. `qnc-app` (shell) nije
+ponovno izgradjen jer je njegov exe bio zauzet pokrenutim procesom; treba ga
+izgraditi nakon zatvaranja shella. Odobrenje
 zatvoreno, Ingest je ponovno zamrznut. Sve ostalo
 ostaje zamrznuto.
 
