@@ -1,0 +1,16 @@
+{
+  "module_id": "qnc.module.source-preview",
+  "module_name": "Source preview session (Broadcast Player, monitor picture, timeline projection and published artifacts for one clip)",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["preview.clip.open", "preview.transport", "preview.monitor.picture", "preview.timeline.projection", "preview.timeline.artifacts"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["application.start", "business.db.write", "workflow.run", "media.scan", "media.probe", "filesystem.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes"
+}

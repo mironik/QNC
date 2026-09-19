@@ -5,5 +5,7 @@ edition = "2021"
 description = "QNC public module: read-only source bindings (QNC source URI to a local root or a network authority) from the host transport configuration"
 
 [dependencies]
+qnc-contracts = { workspace = true }
+qnc-transport-resolver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

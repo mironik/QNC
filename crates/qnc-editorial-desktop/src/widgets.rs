@@ -172,9 +172,10 @@ fn render_preview(
         font_size: theme.font_ui,
     };
     let picture = view
+        .preview
         .monitor_frame
         .as_ref()
-        .filter(|_| view.video_visible)
+        .filter(|_| view.preview.video_visible)
         .map(|frame| MonitorPicture {
             session_id: &frame.session_id,
             generation: frame.generation,
@@ -189,7 +190,7 @@ fn render_preview(
             id: egui::Id::new(("qnc-monitor", "editorial-source")),
             chrome,
             picture,
-            message: view.monitor_message.as_deref(),
+            message: view.preview.monitor_message.as_deref(),
         },
     ) {
         MonitorPaint::Picture | MonitorPaint::Message => return,
@@ -363,13 +364,13 @@ fn render_player_timeline(
     let intent = qnc_timeline::show_source_player_timeline_with_artifacts(
         ui,
         rect,
-        &view.timeline,
+        &view.preview.timeline,
         timeline_theme(theme),
-        view.assets.filmstrip_background(),
-        view.assets.a1_peaks(),
-        view.assets.a2_peaks(),
-        view.assets.a3_peaks(),
-        view.assets.a4_peaks(),
+        view.preview.assets.filmstrip_background(),
+        view.preview.assets.a1_peaks(),
+        view.preview.assets.a2_peaks(),
+        view.preview.assets.a3_peaks(),
+        view.preview.assets.a4_peaks(),
     );
     match intent {
         TimelineIntent::None => None,
@@ -422,7 +423,7 @@ fn render_clip_list(
                         Vec2::new(ui.available_width(), list.row_height),
                         Sense::click(),
                     );
-                    let chosen = view.preview_clip_id.as_deref() == Some(clip.clip_id.as_str());
+                    let chosen = view.chosen_clip_id() == Some(clip.clip_id.as_str());
                     if chosen {
                         ui.painter().rect_filled(row, 0.0, theme.surface_alt);
                     } else if response.hovered() {

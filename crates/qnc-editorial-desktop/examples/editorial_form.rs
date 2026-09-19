@@ -24,11 +24,11 @@ impl eframe::App for Host {
                 if let Some(intent) = self.form.show_desktop(ui, &self.view) {
                     eprintln!("intent: {intent:?}");
                     match intent {
-                        EditorialIntent::PreviewClip(id) => self.view.preview_clip_id = Some(id),
+                        EditorialIntent::PreviewClip(id) => self.view.preview.clip_id = Some(id),
                         EditorialIntent::Timeline(qnc_timeline::TimelineIntent::CueFrame(
                             frame,
                         )) => {
-                            self.view.timeline = self.view.timeline.with_playhead(frame);
+                            self.view.preview.timeline = self.view.preview.timeline.with_playhead(frame);
                         }
                         _ => {}
                     }
@@ -51,7 +51,7 @@ fn main() -> eframe::Result<()> {
             duration_seconds: 20.0 + (i as f64 * 7.3) % 190.0,
         })
         .collect();
-    view.timeline = TimelineProjection::new(0, 5000)
+    view.preview.timeline = TimelineProjection::new(0, 5000)
         .with_playhead(1200)
         .with_cue_enabled(true);
     let host = Host { form, view };

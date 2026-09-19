@@ -3046,6 +3046,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-content-read"
+version = "0.1.0"
+dependencies = [
+ "qnc-filmstrip",
+ "qnc-media-records",
+ "qnc-transport-resolver",
+ "qnc-wave",
+ "qnc-work-settings",
+ "rusqlite",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-contracts"
 version = "0.1.0"
 dependencies = [
@@ -3109,18 +3123,10 @@ dependencies = [
 name = "qnc-editorial-application"
 version = "0.1.0"
 dependencies = [
- "qnc-filmstrip",
- "qnc-ingest-catalog",
- "qnc-ingest-store",
- "qnc-ingest-work-plan",
- "qnc-player-client",
- "qnc-player-input",
- "qnc-player-launcher",
- "qnc-player-timeline",
+ "qnc-content-read",
  "qnc-source-bindings",
+ "qnc-source-preview",
  "qnc-timeline",
- "qnc-timeline-assets",
- "qnc-wave",
  "qnc-work-settings",
 ]
 
@@ -3816,6 +3822,8 @@ dependencies = [
 name = "qnc-source-bindings"
 version = "0.1.0"
 dependencies = [
+ "qnc-contracts",
+ "qnc-transport-resolver",
  "serde",
  "serde_json",
 ]
@@ -3878,6 +3886,25 @@ dependencies = [
  "tiny_http",
  "ureq",
  "uuid",
+]
+
+[[package]]
+name = "qnc-source-preview"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-read",
+ "qnc-filmstrip",
+ "qnc-media-record-db",
+ "qnc-media-records",
+ "qnc-player-client",
+ "qnc-player-input",
+ "qnc-player-launcher",
+ "qnc-player-timeline",
+ "qnc-source-bindings",
+ "qnc-timeline",
+ "qnc-timeline-assets",
+ "qnc-wave",
+ "qnc-work-settings",
 ]
 
 [[package]]

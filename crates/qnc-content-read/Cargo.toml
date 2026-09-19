@@ -1,0 +1,17 @@
+[package]
+name = "qnc-content-read"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: read-only reader of the project content DB contract, public views only (clip list, clip head, filmstrip and wave artifacts)"
+
+[dependencies]
+qnc-filmstrip = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-transport-resolver = { workspace = true }
+qnc-wave = { workspace = true }
+qnc-work-settings = { workspace = true }
+rusqlite = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
