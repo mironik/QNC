@@ -12,7 +12,9 @@ members = [
     "apps/qnc-project",
     "crates/qnc-contracts",
     "crates/qnc-camera-patterns",
+    "crates/qnc-camera-adapter",
     "crates/qnc-camera-detector",
+    "crates/qnc-camera-sony-fx6-v6",
     "crates/qnc-db-contract",
     "crates/qnc-content-read",
     "crates/qnc-dev-diagnostics",
@@ -102,7 +104,9 @@ qnc-application-catalog = { path = "crates/qnc-application-catalog" }
 qnc-application-selection = { path = "crates/qnc-application-selection" }
 qnc-contracts = { path = "crates/qnc-contracts" }
 qnc-camera-patterns = { path = "crates/qnc-camera-patterns" }
+qnc-camera-adapter = { path = "crates/qnc-camera-adapter" }
 qnc-camera-detector = { path = "crates/qnc-camera-detector" }
+qnc-camera-sony-fx6-v6 = { path = "crates/qnc-camera-sony-fx6-v6" }
 qnc-db-contract = { path = "crates/qnc-db-contract" }
 qnc-content-read = { path = "crates/qnc-content-read" }
 qnc-dev-diagnostics = { path = "crates/qnc-dev-diagnostics" }

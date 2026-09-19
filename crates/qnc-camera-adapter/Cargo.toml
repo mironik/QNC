@@ -1,0 +1,10 @@
+[package]
+name = "qnc-camera-adapter"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public capability: one camera adapter per catalog pattern (camera and record layout); no I/O, no DB, no UI"
+
+[dependencies]
+qnc-media-metadata = { workspace = true }
+qnc-source-contract = { workspace = true }
+qnc-source-groups = { workspace = true }

@@ -1335,6 +1335,38 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-19 (sedamnaesto): korisnik je izricito
+odobrio (a) pravilo probea: klip ciji zapis kartice (npr. Sony XML za original i proxy)
+daje metapodatke nikad se ne probe-a, a klip bez takvog zapisa probe-a se jednom u
+Ingestu; (b) kameru kao samostalnu komponentu po uzorku kataloga (kamera i vrsta
+zapisa), ne po proizvodacu. Otkljucano: novi crateovi `crates/qnc-camera-adapter`
+(sucelje `CameraAdapter`, `CameraRegistry`, `MetadataSufficiency`) i
+`crates/qnc-camera-sony-fx6-v6` (uzorak `sony-fx6-v6`, ovija postojeci
+`qnc-sony-metadata` bez izmjene); `crates/qnc-ingest-select` (popis adaptera
+dolazi izvana umjesto ugradjenog `adapters()`, probe samo za adapter s
+`NeedsProbe`, kamera s `Declared` postaje Final bez probea, testovi);
+`crates/qnc-ingest-application` (samo composition root: sastavlja registar i
+predaje ga Selectu) i po potrebi `crates/qnc-ingest-desktop`,
+`apps/qnc-ingest`; ugovori modula i dokumenti; root `Cargo.toml`/`Cargo.lock`.
+Odobreno je i za `qnc-media-records`, `qnc-media-metadata`,
+`qnc-media-metadata-compose`, ali se diraju samo ako se pokaze da je nuzno.
+Ingest UI se ne mijenja. Sve ostalo ostaje zamrznuto.
+Izvedeno: `qnc-camera-adapter`, `qnc-camera-sony-fx6-v6`; `qnc-ingest-select` prima
+registar i za adapter s `Declared` upisuje Final bez probea (14 testova prolazi,
+uz nove: Declared se ne probe-a, NeedsProbe se probe-a jednom, prazan registar je
+kontrolirana greska); `qnc-ingest-application` sastavlja registar
+(`default_camera_registry`); 27 testova prolazi; conformance prolazi.
+`qnc-media-records`, `qnc-media-metadata`, `qnc-media-metadata-compose` nisu mijenjani:
+pokusaj da Final bez probea bude Complete lomi ugovorni test
+`qnc-media-record-db` (Final s nedostajucim poljima je Partial) i vracen je.
+Korisnik je zatim izricito odobrio i `crates/qnc-ingest-store`: `content/mod.rs`
+`ready()` sada dopusta uvoz kad je zapis Final i (Complete ili bez ffprobe dokaza);
+probani, a nepotpun zapis ostaje blokiran, Camera faza ostaje blokirana (3 nova testa,
+26 testova store prolazi; nastavak end-to-end test u select: Declared klip se odabire,
+stavlja u red i preuzima bez probea, 15 testova select). Conformance prolazi.
+Nije izvedeno (traze zasebna odobrenja): odabir citaca po `pattern_id` u `qnc-scanner`,
+genericki adapter za kamere bez indeksa.
+
 Povuceno ograniceno odobrenje 2026-09-19 (petnaesto): predlozeni prvi korak kartice
 klipa (crate `qnc-clip-status` i izmjene `qnc-content-read`, `qnc-editorial-*`,
 `editorial.layout.json`) nije izvrsen. Nakon audita (docs/v5-book/08) opseg se

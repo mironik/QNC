@@ -475,8 +475,18 @@ pub struct IngestApplication {
         )>,
     >,
     selection_session: selection::SelectSession,
+    camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
     selection_warnings: usize,
     selection_last_warning: Option<String>,
+}
+
+/// The cameras this Ingest application composes. A new camera is one more line here.
+pub fn default_camera_registry() -> Result<qnc_camera_adapter::CameraRegistry, String> {
+    let mut registry = qnc_camera_adapter::CameraRegistry::new();
+    registry.register(std::sync::Arc::new(
+        qnc_camera_sony_fx6_v6::SonyFx6V6::new(),
+    ))?;
+    Ok(registry)
 }
 
 impl IngestApplication {
@@ -484,8 +494,14 @@ impl IngestApplication {
         Self::default()
     }
 
+    /// Replaces the cameras Select can read (composition root only).
+    pub fn with_camera_registry(mut self, registry: qnc_camera_adapter::CameraRegistry) -> Self {
+        self.camera_registry = std::sync::Arc::new(registry);
+        self
+    }
+
     pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
-        let mut component = Self::new();
+        let mut component = Self::new().with_camera_registry(default_camera_registry()?);
         component.store = Some(IngestStore::open(root.as_ref())?);
         match selection_config::SelectionConfig::load(root.as_ref()).and_then(|config| {
             let browser = config.browser()?;
@@ -1255,7 +1271,9 @@ impl IngestApplication {
         let Some(target) = self.catalog_target.clone() else {
             return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
         };
-        match self.selection_session.start(config, selected, target) {
+        match self
+            .selection_session
+            .start(config, selected, target, self.camera_registry.clone()) {
             Ok(()) => {
                 self.selection_warnings = 0;
                 self.view.select_warning_count = 0;

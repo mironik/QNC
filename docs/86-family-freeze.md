@@ -318,3 +318,22 @@ dev-ovisnosti samog provjeravanog cratea. Tri nova testa (dev tranzitivno ne
 racuna, runtime tranzitivno racuna, vlastita dev-ovisnost racuna). Verificirano:
 20 testova conformancea, pun conformance prolazi. Odobrenje je zatvoreno. Status:
 zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-19 (sedamnaesto)
+
+Kamera kao samostalna komponenta po uzorku kataloga i pravilo probea (XML na kartici =
+nikad probe; bez XML-a jednom). Novi crateovi `qnc-camera-adapter` i
+`qnc-camera-sony-fx6-v6` (+ ugovori modula). `qnc-ingest-select`: popis adaptera dolazi
+izvana; Declared kamera postaje Final bez probea. `qnc-ingest-application`: composition
+root sastavlja registar. Verificirano: testovi select (14), application (27), adapter (4),
+fx6 (2), conformance prolazi. Nisu mijenjani `qnc-media-records`, `qnc-media-metadata`,
+`qnc-media-metadata-compose`. Otvoreno: `qnc-ingest-store::ready()` (Declared klip je Final +
+Partial pa jos nije u redu za uvoz), odabir citaca po `pattern_id` u `qnc-scanner`,
+generički adapter za kamere bez indeksa. Status: odobrenje otvoreno do rjesenja `ready()`.
+
+Dopuna (sedamnaesto, zatvoreno): korisnik je izricito otkljucao i `crates/qnc-ingest-store`
+(`content/mod.rs`: `ready()` i testovi). Uvoz je moguc kad je zapis Final i (Complete ili bez
+ffprobe dokaza); probani nepotpun zapis i Camera faza ostaju blokirani. Testovi: store 26,
+select 15, application 27, adapter 4 i 2; conformance prolazi. Nije izvedeno: odabir citaca
+po `pattern_id` u `qnc-scanner`, genericki adapter za kamere bez indeksa (zasebna
+odobrenja). Odobrenje je zatvoreno. Status: zamrznuto.

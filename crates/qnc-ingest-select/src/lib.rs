@@ -8,9 +8,10 @@ use qnc_ingest_store::content::{
     Access, CatalogClip, ContentTarget, ContentWriteData, ContentWriteResult,
     ContentWriteTransport, ImportStatus, StoredClip,
 };
+use qnc_camera_adapter::{CameraRegistry, MetadataSufficiency};
 use qnc_media_probe::{ProbeBackend, Request as ProbeRequest};
 use qnc_media_record_db::{contract::*, Client};
-use qnc_source_groups::{GroupProposal, IndexDocument, IndexReader};
+use qnc_source_groups::IndexDocument;
 use qnc_source_reader::{SourceReader, SourceReference, MAX_TEXT_BYTES};
 use selection_config::Result;
 use std::fmt;
@@ -90,6 +91,7 @@ impl SelectSession {
         config: SelectionConfig,
         selected: SourceReference,
         target: ContentTarget,
+        registry: Arc<CameraRegistry>,
     ) -> std::result::Result<(), String> {
         self.cancel();
         let cancel = Arc::new(AtomicBool::new(false));
@@ -97,7 +99,7 @@ impl SelectSession {
         let (send, receive) = mpsc::sync_channel(32);
         let thread = std::thread::Builder::new()
             .name("qnc-ingest-select".into())
-            .spawn(move || run(config, selected, target, send, worker_cancel))
+            .spawn(move || run(config, selected, target, registry, send, worker_cancel))
             .map_err(|error| error.to_string())?;
         self.cancel = Some(cancel);
         self.result = Some(receive);
@@ -193,26 +195,11 @@ impl Default for SelectedClip {
     }
 }
 
-struct CameraAdapter {
-    index: &'static dyn IndexReader,
-    documents: fn(&GroupProposal) -> Vec<SourceReference>,
-    thumbnail: fn(&GroupProposal) -> Option<SourceReference>,
-    metadata:
-        fn(&str, &GroupProposal, &[IndexDocument]) -> std::result::Result<ClipMetadata, String>,
-}
-fn adapters() -> Vec<CameraAdapter> {
-    vec![CameraAdapter {
-        index: &qnc_sony_metadata::SonyIndexReader,
-        documents: qnc_sony_metadata::metadata_references,
-        thumbnail: qnc_sony_metadata::thumbnail_reference,
-        metadata: qnc_sony_metadata::read_group_metadata,
-    }]
-}
-
 pub fn run(
     config: SelectionConfig,
     selected: SourceReference,
     target: ContentTarget,
+    registry: Arc<CameraRegistry>,
     send: SyncSender<Event>,
     cancel: Arc<AtomicBool>,
 ) {
@@ -223,6 +210,7 @@ pub fn run(
         &cancel,
         |s, media| s.backend(media),
         target,
+        &registry,
     )
     .map_err(|e| e.to_string());
     let _ = send.send(Event::Finished(result));
@@ -238,10 +226,14 @@ fn run_inner(
         &[SourceReference],
     ) -> Result<Box<dyn ProbeBackend + Send>>,
     content_target: ContentTarget,
+    registry: &CameraRegistry,
 ) -> Result<Summary> {
     let started = std::time::Instant::now();
     if cancel.load(Ordering::Relaxed) {
         return Err("Select je prekinut.".into());
+    }
+    if registry.is_empty() {
+        return Err("Nema registriranog adaptera kamere.".into());
     }
     selected.validate()?;
     let mut content = content_target.open(Access::ReadOnly)?;
@@ -273,8 +265,7 @@ fn run_inner(
         &config.catalog.uri,
         config.catalog.token()?.as_deref(),
     )?;
-    let readers = adapters();
-    let indexes: Vec<_> = readers.iter().map(|r| r.index).collect();
+    let indexes = registry.indexes();
     send.send(Event::Status("Prepoznavanje izvora...".into()))?;
     let scan = qnc_scanner::scan_roles(
         &catalog,
@@ -426,7 +417,7 @@ fn run_inner(
                         .rsplit('/')
                         .next()
                         .unwrap_or("Clip");
-                    let thumbnail = read_thumbnail(record, source);
+                    let thumbnail = read_thumbnail(record, source, registry);
                     if let Err(error) = &thumbnail {
                         send.send(Event::Warning(format!("{name}: {error}")))?;
                     }
@@ -437,7 +428,7 @@ fn run_inner(
                         name: name.into(),
                         previously_seen: existing.contains_key(&clip_id),
                         save_state: SelectSaveState::Pending,
-                        thumb_uri: thumbnail_reference(record).map(|r| r.uri()),
+                        thumb_uri: thumbnail_reference(record, registry).map(|r| r.uri()),
                         ..Default::default()
                     };
                     if let Some((_, image)) = &thumbnail {
@@ -452,6 +443,7 @@ fn run_inner(
                         source,
                         backend,
                         cancel,
+                        registry,
                         |snapshot| {
                             let catalog_clip = CatalogClip {
                                 name: name.into(),
@@ -459,7 +451,7 @@ fn run_inner(
                                 source_name: source_config.name.clone(),
                                 serial_number: source_config.serial_number.clone(),
                                 volume_name: source_config.volume_name.clone(),
-                                thumbnail_uri: thumbnail_reference(record).map(|r| r.uri()),
+                                thumbnail_uri: thumbnail_reference(record, registry).map(|r| r.uri()),
                                 media_records_uri: config.media_records.uri.clone(),
                                 snapshot: snapshot.clone(),
                             };
@@ -557,8 +549,12 @@ fn expect_changed(result: ContentWriteResult) -> Result<()> {
 }
 
 type Thumbnail = (String, Arc<qnc_image_assets::RgbaImage>);
-fn read_thumbnail(record: &SourceRecord, source: &SourceReader) -> Result<Option<Thumbnail>> {
-    let Some(reference) = thumbnail_reference(record) else {
+fn read_thumbnail(
+    record: &SourceRecord,
+    source: &SourceReader,
+    registry: &CameraRegistry,
+) -> Result<Option<Thumbnail>> {
+    let Some(reference) = thumbnail_reference(record, registry) else {
         return Ok(None);
     };
     let data = match source.read_bytes(&reference, qnc_image_assets::MAX_BYTES as u64) {
@@ -570,16 +566,9 @@ fn read_thumbnail(record: &SourceRecord, source: &SourceReader) -> Result<Option
     Ok(Some((reference.uri(), Arc::new(decoded))))
 }
 
-fn thumbnail_reference(record: &SourceRecord) -> Option<SourceReference> {
-    let readers = adapters();
+fn thumbnail_reference(record: &SourceRecord, registry: &CameraRegistry) -> Option<SourceReference> {
     let p = &record.group.proposal;
-    let Some(reader) = readers
-        .iter()
-        .find(|r| r.index.reader_id() == p.evidence.reader_id)
-    else {
-        return None;
-    };
-    (reader.thumbnail)(p)
+    registry.for_reader(&p.evidence.reader_id)?.thumbnail(p)
 }
 
 fn view(stored: &StoredClip) -> SelectedClip {
@@ -621,20 +610,19 @@ fn process_record(
     source: &SourceReader,
     backend: &dyn ProbeBackend,
     cancel: &AtomicBool,
+    registry: &CameraRegistry,
     mut publish: impl FnMut(&Snapshot) -> Result<()>,
 ) -> Result<()> {
     let clip_id = format!("clip-{}", record.record_id);
+    let adapter = registry
+        .for_reader(&record.group.proposal.evidence.reader_id)
+        .ok_or("camera metadata reader unavailable")?;
     let snapshot = if let Some(snapshot) = db.read(&clip_id, None)? {
         snapshot
     } else {
         let p = &record.group.proposal;
-        let readers = adapters();
-        let reader = readers
-            .iter()
-            .find(|r| r.index.reader_id() == p.evidence.reader_id)
-            .ok_or("camera metadata reader unavailable")?;
         let mut documents = Vec::new();
-        for reference in (reader.documents)(p) {
+        for reference in adapter.documents(p) {
             match source.read_text(&reference, MAX_TEXT_BYTES) {
                 Ok(text) => documents.push(IndexDocument {
                     reference,
@@ -645,7 +633,7 @@ fn process_record(
                 Err(error) => return Err(error.into()),
             }
         }
-        let mut metadata = (reader.metadata)(&clip_id, p, &documents)?;
+        let mut metadata = adapter.metadata(&clip_id, p, &documents)?;
         let evidence_uris: BTreeSet<_> = metadata
             .evidence
             .iter()
@@ -674,10 +662,19 @@ fn process_record(
             .ok_or("camera snapshot missing after commit")?
     };
     publish(&snapshot)?;
+    let declared = adapter.sufficiency() == MetadataSufficiency::Declared;
     if snapshot.phase == Phase::Final {
-        if snapshot.completeness == Completeness::Partial {
+        // A declared record is final by itself; an incomplete one is complete
+        // enough by definition and is never probed.
+        if snapshot.completeness == Completeness::Partial && !declared {
             return Err("Baza sadrzi nepotpune metapodatke. Nema ponovnog probea.".into());
         }
+        return Ok(());
+    }
+    if declared {
+        // The card records are the final metadata: no probe, ever.
+        let snapshot = finalize_declared(db, source_index_uri, record, snapshot)?;
+        publish(&snapshot)?;
         return Ok(());
     }
     let snapshot = complete_record(db, source_index_uri, record, snapshot, backend, cancel)?;
@@ -686,6 +683,37 @@ fn process_record(
         return Err("Nepotpuni metapodaci spremljeni; ponovni probe nije dopusten.".into());
     }
     Ok(())
+}
+
+/// Camera records that declare enough become the final snapshot without any probe.
+fn finalize_declared(
+    db: &mut Client,
+    source_index_uri: &str,
+    record: &SourceRecord,
+    camera: Snapshot,
+) -> Result<Snapshot> {
+    let mut documents = Vec::new();
+    let uris: BTreeSet<_> = camera
+        .metadata
+        .evidence
+        .iter()
+        .map(|e| &e.document_uri)
+        .collect();
+    for uri in uris {
+        documents.push(db.document(uri)?.ok_or("camera evidence missing")?);
+    }
+    db.write(Write {
+        request_id: uuid::Uuid::new_v4().to_string(),
+        expected_revision: camera.revision,
+        phase: Phase::Final,
+        source_index_uri: source_index_uri.into(),
+        source_record: record.clone(),
+        metadata: camera.metadata.clone(),
+        documents,
+    })?;
+    Ok(db
+        .read(&camera.metadata.clip_id, None)?
+        .ok_or("final snapshot missing")?)
 }
 
 fn complete_record(

@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.camera-sony-fx6-v6",
+  "module_name": "Camera adapter: Sony FX6 (sony-fx6-v6)",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["camera.adapter.sony-fx6-v6"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.2.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "ffmpeg", "media.probe.full", "source.scan.roles", "filesystem", "db.write", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-camera-sony-fx6-v6",
+  "input": "Already read Sony MediaProfile and NonRealTimeMeta documents of one verified group. No OS paths or I/O.",
+  "output": "Camera metadata for original and proxy; metadata sufficiency Declared (the media is never probed).",
+  "specification": "docs/26-sony-metadata-reader.md; docs/v5-book/08-audit-and-plan.md sections 10 and 11",
+  "catalog_pattern": "sony-fx6-v6"
+}

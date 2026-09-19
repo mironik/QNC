@@ -1,0 +1,12 @@
+[package]
+name = "qnc-camera-sony-fx6-v6"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public camera adapter for the catalog pattern sony-fx6-v6 (Sony FX6, XDROOT MediaProfile with NonRealTimeMeta sidecars); no I/O, no DB, no UI"
+
+[dependencies]
+qnc-camera-adapter = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-sony-metadata = { workspace = true }
+qnc-source-contract = { workspace = true }
+qnc-source-groups = { workspace = true }

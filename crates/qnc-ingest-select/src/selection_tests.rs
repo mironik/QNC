@@ -156,6 +156,7 @@ pub(crate) fn execute(
             "qnc://local/db/ingest_content/p1",
         )
         .unwrap(),
+        &crate::test_support::registry(MetadataSufficiency::NeedsProbe),
     );
     drop(send);
     let events: Vec<_> = receive.into_iter().collect();
@@ -352,6 +353,7 @@ fn preview_arrives_while_publication_is_blocked() {
                 },
                 ContentTarget::from_owner_binding(&path, "qnc://local/db/ingest_content/p1")
                     .unwrap(),
+                &crate::test_support::registry(MetadataSufficiency::NeedsProbe),
             )
         });
         worker.join().unwrap().unwrap();
@@ -560,6 +562,7 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
                         "fixture-write".to_string(),
                     )
                     .unwrap(),
+                    &crate::test_support::registry(MetadataSufficiency::NeedsProbe),
                 )
                 .unwrap();
                 drop(send);
@@ -617,4 +620,146 @@ fn mounted_lan_and_intranet_sources_use_qnc_uri_with_private_host_binding() {
             .entries
             .is_empty());
     }
+}
+
+fn fx6_registry() -> CameraRegistry {
+    let mut registry = CameraRegistry::new();
+    registry
+        .register(Arc::new(qnc_camera_sony_fx6_v6::SonyFx6V6::new()))
+        .unwrap();
+    registry
+}
+
+#[test]
+fn a_camera_that_declares_its_metadata_is_never_probed() {
+    let (_dir, config) = fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let events = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    let warnings: Vec<_> = events
+        .iter()
+        .filter_map(|e| if let Event::Warning(w) = e { Some(w) } else { None })
+        .collect();
+    assert!(warnings.is_empty(), "{warnings:?}");
+    assert_eq!(calls.load(Ordering::SeqCst), 0, "the card XML is the final metadata");
+    let clips: BTreeSet<_> = events
+        .iter()
+        .filter_map(|e| if let Event::Clip(c) = e { Some(c.clip_id.clone()) } else { None })
+        .collect();
+    assert_eq!(clips.len(), 2);
+    let mut db = config.media_records.media_db().unwrap();
+    for id in &clips {
+        let saved = db.read(id, None).unwrap().unwrap();
+        assert_eq!(saved.phase, Phase::Final);
+        // Both the original and the proxy come from the card records.
+        assert!(saved.metadata.proxy.is_some());
+        assert!(saved
+            .metadata
+            .evidence
+            .iter()
+            .all(|e| e.kind != qnc_media_record_db::contract::EvidenceKind::Ffprobe));
+        for evidence in &saved.metadata.evidence {
+            assert!(db.document(&evidence.document_uri).unwrap().is_some());
+        }
+    }
+    // A second Select changes nothing and still never probes.
+    let again = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert!(again.iter().all(|e| !matches!(e, Event::Warning(_))));
+}
+
+#[test]
+fn a_camera_that_needs_a_probe_is_probed_once_and_a_declared_camera_is_not() {
+    let (_dir, config) = fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    crate::test_support::execute_with(
+        &config,
+        &calls,
+        false,
+        false,
+        ".",
+        &crate::test_support::registry(MetadataSufficiency::NeedsProbe),
+    );
+    let probed = calls.load(Ordering::SeqCst);
+    assert_eq!(probed, 4, "original and proxy of two clips");
+    crate::test_support::execute_with(
+        &config,
+        &calls,
+        false,
+        false,
+        ".",
+        &crate::test_support::registry(MetadataSufficiency::NeedsProbe),
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), probed, "never a second probe");
+}
+
+#[test]
+fn select_without_any_registered_camera_is_a_controlled_error() {
+    let (_dir, config) = fixture();
+    let (send, _receive) = mpsc::sync_channel(8);
+    let error = run_inner(
+        &config,
+        &SourceReference::new(SOURCE, ".").unwrap(),
+        &send,
+        &AtomicBool::new(false),
+        |_, _| unreachable!("no backend without a camera"),
+        ContentTarget::from_owner_binding(
+            &config
+                .source_index
+                .file
+                .as_ref()
+                .unwrap()
+                .with_file_name("content.db"),
+            "qnc://local/db/ingest_content/p1",
+        )
+        .unwrap(),
+        &CameraRegistry::new(),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("adaptera kamere"));
+}
+
+#[test]
+fn declared_final_snapshot_is_final_and_needs_no_probe() {
+    let (_dir, config) = fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let events = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    let id = events
+        .iter()
+        .find_map(|e| if let Event::Clip(c) = e { Some(c.clip_id.clone()) } else { None })
+        .unwrap();
+    let mut db = config.media_records.media_db().unwrap();
+    let saved = db.read(&id, None).unwrap().unwrap();
+    assert_eq!(saved.phase, Phase::Final);
+    // The card declared what it declared: final, and never probed to fill the rest.
+    assert_eq!(saved.completeness, Completeness::Partial);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn a_declared_clip_from_the_card_can_be_selected_and_queued_for_import_without_a_probe() {
+    let (_dir, config) = fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let events = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    let ids: Vec<String> = events
+        .iter()
+        .filter_map(|e| if let Event::Clip(c) = e { Some(c.clip_id.clone()) } else { None })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let content = config
+        .source_index
+        .file
+        .as_ref()
+        .unwrap()
+        .with_file_name("content.db");
+    let mut client = ContentClient::from_owner_binding(
+        &content,
+        "qnc://local/db/ingest_content/p1",
+        qnc_ingest_store::content::Access::ReadWrite,
+    )
+    .unwrap();
+    client.select(ids, true).unwrap();
+    client.queue_selected().unwrap();
+    assert!(client.claim_next().unwrap().is_some());
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
 }

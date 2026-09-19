@@ -2995,6 +2995,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-camera-adapter"
+version = "0.1.0"
+dependencies = [
+ "qnc-media-metadata",
+ "qnc-source-contract",
+ "qnc-source-groups",
+]
+
+[[package]]
 name = "qnc-camera-catalog"
 version = "0.1.0"
 dependencies = [
@@ -3034,6 +3043,17 @@ dependencies = [
  "tiny_http",
  "ureq",
  "url",
+]
+
+[[package]]
+name = "qnc-camera-sony-fx6-v6"
+version = "0.1.0"
+dependencies = [
+ "qnc-camera-adapter",
+ "qnc-media-metadata",
+ "qnc-sony-metadata",
+ "qnc-source-contract",
+ "qnc-source-groups",
 ]
 
 [[package]]
@@ -3256,6 +3276,8 @@ name = "qnc-ingest-application"
 version = "0.1.0"
 dependencies = [
  "image",
+ "qnc-camera-adapter",
+ "qnc-camera-sony-fx6-v6",
  "qnc-contracts",
  "qnc-dir-browser",
  "qnc-filmstrip",
@@ -3321,13 +3343,16 @@ name = "qnc-ingest-select"
 version = "0.1.0"
 dependencies = [
  "image",
+ "qnc-camera-adapter",
  "qnc-camera-detector",
  "qnc-camera-patterns",
+ "qnc-camera-sony-fx6-v6",
  "qnc-contracts",
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-image-assets",
  "qnc-ingest-store",
+ "qnc-media-metadata",
  "qnc-media-metadata-compose",
  "qnc-media-probe",
  "qnc-media-record-db",

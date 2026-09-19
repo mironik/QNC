@@ -120,12 +120,64 @@ impl ProbeBackend for Backend {
     }
 }
 
+/// A camera adapter for tests: the Sony reader with a chosen metadata sufficiency.
+pub struct TestCamera(pub MetadataSufficiency);
+
+const TEST_PATTERNS: &[&str] = &["test-sony"];
+
+impl qnc_camera_adapter::CameraAdapter for TestCamera {
+    fn adapter_id(&self) -> &str {
+        "camera.test.sony"
+    }
+    fn pattern_ids(&self) -> &[&'static str] {
+        TEST_PATTERNS
+    }
+    fn index(&self) -> &dyn qnc_source_groups::IndexReader {
+        &qnc_sony_metadata::SonyIndexReader
+    }
+    fn documents(&self, group: &qnc_source_groups::GroupProposal) -> Vec<SourceReference> {
+        qnc_sony_metadata::metadata_references(group)
+    }
+    fn thumbnail(&self, group: &qnc_source_groups::GroupProposal) -> Option<SourceReference> {
+        qnc_sony_metadata::thumbnail_reference(group)
+    }
+    fn metadata(
+        &self,
+        clip_id: &str,
+        group: &qnc_source_groups::GroupProposal,
+        documents: &[IndexDocument],
+    ) -> std::result::Result<qnc_media_record_db::contract::ClipMetadata, String> {
+        qnc_sony_metadata::read_group_metadata(clip_id, group, documents)
+    }
+    fn sufficiency(&self) -> MetadataSufficiency {
+        self.0
+    }
+}
+
+pub fn registry(sufficiency: MetadataSufficiency) -> CameraRegistry {
+    let mut registry = CameraRegistry::new();
+    registry.register(Arc::new(TestCamera(sufficiency))).unwrap();
+    registry
+}
+
+/// Runs Select with a camera that needs one probe (the behaviour before cameras declared metadata).
 pub fn execute(
     config: &SelectionConfig,
     calls: &Arc<AtomicUsize>,
     fail: bool,
     partial: bool,
     path: &str,
+) -> Vec<Event> {
+    execute_with(config, calls, fail, partial, path, &registry(MetadataSufficiency::NeedsProbe))
+}
+
+pub fn execute_with(
+    config: &SelectionConfig,
+    calls: &Arc<AtomicUsize>,
+    fail: bool,
+    partial: bool,
+    path: &str,
+    registry: &CameraRegistry,
 ) -> Vec<Event> {
     let (send, receive) = mpsc::sync_channel(128);
     run_inner(
@@ -150,6 +202,7 @@ pub fn execute(
             "qnc://local/db/ingest_content/p1",
         )
         .unwrap(),
+        registry,
     )
     .unwrap();
     drop(send);

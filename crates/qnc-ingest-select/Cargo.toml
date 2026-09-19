@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-test-support = ["dep:image", "dep:tempfile"]
+test-support = ["dep:image", "dep:tempfile", "dep:qnc-sony-metadata"]
 
 [dependencies]
+qnc-camera-adapter = { workspace = true }
 qnc-camera-detector = { workspace = true }
 qnc-camera-patterns = { workspace = true }
 qnc-contracts = { workspace = true }
@@ -18,7 +19,6 @@ qnc-media-metadata-compose = { workspace = true }
 qnc-media-probe = { workspace = true }
 qnc-media-record-db = { workspace = true }
 qnc-scanner = { workspace = true }
-qnc-sony-metadata = { workspace = true }
 qnc-source-groups = { workspace = true }
 qnc-source-index-db = { workspace = true }
 qnc-source-reader = { workspace = true }
@@ -29,8 +29,12 @@ uuid = { version = "1", features = ["v4"] }
 
 image = { version = "0.25.10", default-features = false, features = ["jpeg"], optional = true }
 tempfile = { version = "3", optional = true }
+qnc-sony-metadata = { workspace = true, optional = true }
 
 [dev-dependencies]
+qnc-camera-sony-fx6-v6 = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-sony-metadata = { workspace = true }
 image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
 tempfile = "3"
 tiny_http = "0.12"
