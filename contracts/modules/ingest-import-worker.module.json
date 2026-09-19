@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.ingest-import-worker",
+  "module_name": "Ingest import executor",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ingest.import.execute"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.2.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "public_ingest_content_write_transport_only",
+  "runtime_crate": "qnc-ingest-import-worker",
+  "input": "A clip claimed from the content database queue, the work plan of the project settings, the project directory of the machine that runs the worker, and a media opener (local, LAN or intranet transport).",
+  "output": "The imported media URI (link: the source URI chosen by playback.input; proxy/original: the copy in the project) written with finish_import; a failed import is recorded as failed with a message.",
+  "specification": "docs/v5-book/02-ingest.md (I2.7, I2.8), docs/96-v5-ingest-db-and-workers.md; not done: proxy generation, card poster copy"
+}

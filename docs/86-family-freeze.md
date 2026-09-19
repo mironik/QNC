@@ -351,3 +351,17 @@ prolazi. Izvan opsega ostaje genericki put za kamere bez indeksa (grupiranje bez
 probe prije snimke kamere): trazi `qnc-scanner`, `qnc-source-groups` i ugovor
 `qnc-media-record-db` (akvizicija trazi snimku kamere). Odobrenje je zatvoreno. Status:
 zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto)
+
+Izvrsitelj uvoza u obitelji Ingest, OS-neutralan i za lokalno, LAN i intranet. Novi crate
+`qnc-ingest-import-worker`: plan po postavkama projekta (`link`, kopija proxyja, kopija
+originala), izvorni medij kroz `qnc-media-stream`, kopija u komadima kroz `.partial` i
+preimenovanje u direktorij projekta, ishod `finish_import`, `ImportSession` u pozadini.
+`qnc-ingest-store`: write transport dobiva `queue_selected`, `claim_next`, `finish_import`
+i `Claimed` (izvrsitelj pise samo kroz serijalizirani write transport). `qnc-ingest-select`
+prilagodjen novoj varijanti. `qnc-ingest-application`: radnja `ingest_import_selected` sada
+stavlja odabrane u red i pokrece uvoz; Ingest UI se ne mijenja. Testovi: import-worker 10,
+application 27, select 16, store 26; conformance prolazi. Nije izvedeno: generiranje proxyja,
+kopija postera, test kroz cijelu aplikaciju i na stvarnoj kartici. Odobrenje je zatvoreno.
+Status: zamrznuto.

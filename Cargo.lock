@@ -3284,6 +3284,7 @@ dependencies = [
  "qnc-filmstrip-worker",
  "qnc-image-assets",
  "qnc-ingest-catalog",
+ "qnc-ingest-import-worker",
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
@@ -3336,6 +3337,24 @@ dependencies = [
  "eframe",
  "qnc-ingest-desktop",
  "qnc-shell-desktop-api",
+]
+
+[[package]]
+name = "qnc-ingest-import-worker"
+version = "0.1.0"
+dependencies = [
+ "qnc-camera-adapter",
+ "qnc-camera-sony-fx6-v6",
+ "qnc-contracts",
+ "qnc-dir-browser",
+ "qnc-ingest-select",
+ "qnc-ingest-store",
+ "qnc-ingest-work-plan",
+ "qnc-media-stream",
+ "qnc-source-reader",
+ "qnc-work-settings",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

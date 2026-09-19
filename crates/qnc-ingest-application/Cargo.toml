@@ -12,6 +12,7 @@ qnc-ingest-catalog = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-camera-adapter = { workspace = true }
 qnc-camera-sony-fx6-v6 = { workspace = true }
+qnc-ingest-import-worker = { workspace = true }
 qnc-ingest-select = { workspace = true }
 qnc-ingest-store = { workspace = true }
 qnc-media-thumbnail = { workspace = true }

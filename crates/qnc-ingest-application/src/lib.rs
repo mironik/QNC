@@ -475,6 +475,7 @@ pub struct IngestApplication {
         )>,
     >,
     selection_session: selection::SelectSession,
+    import_session: qnc_ingest_import_worker::ImportSession,
     camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
     selection_warnings: usize,
     selection_last_warning: Option<String>,
@@ -709,6 +710,33 @@ impl IngestApplication {
                 }
                 Err(TryRecvError::Empty) => {}
             }
+        }
+        let mut import_finished = false;
+        for event in self.import_session.poll(64) {
+            changed = true;
+            match event {
+                qnc_ingest_import_worker::ImportEvent::Clip(outcome) => {
+                    self.view.message = match outcome.result {
+                        Ok(_) => format!("Uvezeno: {}", outcome.clip_id),
+                        Err(error) => format!("Uvoz nije uspio ({}): {error}", outcome.clip_id),
+                    };
+                }
+                qnc_ingest_import_worker::ImportEvent::Finished(result) => {
+                    self.view.command_busy = false;
+                    import_finished = true;
+                    self.view.message = match result {
+                        Ok(summary) => format!(
+                            "Uvoz: {} uvezeno; {} neuspjelo.",
+                            summary.imported, summary.failed
+                        ),
+                        Err(error) => error,
+                    };
+                }
+            }
+        }
+        if import_finished {
+            // Re-read the catalog: the imported clips changed state in the database.
+            self.load_work_settings(None);
         }
         for event in self.selection_session.poll(64) {
             changed = true;
@@ -1182,13 +1210,7 @@ impl IngestApplication {
             action_ids::INGEST_SET_AI_MINING => IngestDispatchResult::rejected(
                 "AI postavka dolazi iz baze; nema lokalnog overridea.",
             ),
-            action_ids::INGEST_IMPORT_SELECTED => {
-                IngestDispatchResult::rejected(if self.work_plan.is_none() {
-                    "Radne postavke nisu dostupne."
-                } else {
-                    "Media import jos nije implementiran."
-                })
-            }
+            action_ids::INGEST_IMPORT_SELECTED => self.start_import(),
             action_ids::PLAY_PAUSE
             | action_ids::STEP_BACK_FRAME
             | action_ids::STEP_FORWARD_FRAME
@@ -1252,6 +1274,58 @@ impl IngestApplication {
             }
         }
         IngestDispatchResult::accepted(None, true)
+    }
+
+    /// Queues the selected clips (the selection lives in the database) and starts
+    /// the import in the background. What is copied and where is decided by the
+    /// project settings in the work plan; the media is read through the transport
+    /// of its source (local, LAN or intranet) and copied into the project folder of
+    /// this machine.
+    fn start_import(&mut self) -> IngestDispatchResult {
+        let Some(plan) = self.work_plan.clone() else {
+            return IngestDispatchResult::rejected("Radne postavke nisu dostupne.");
+        };
+        if self.playback_guard_active() {
+            return self.playback_guard_rejected();
+        }
+        if self.import_session.has_pending_work() {
+            return IngestDispatchResult::rejected("Uvoz je vec u tijeku.");
+        }
+        let Some(config) = self.selection_config.clone() else {
+            return IngestDispatchResult::rejected("Nema Select konfiguracije.");
+        };
+        let Some(target) = self.catalog_target.clone() else {
+            return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
+        };
+        let project_dir = match self
+            .settings_reader
+            .as_ref()
+            .map(|reader| reader.local_workspace_dir(&plan.settings))
+        {
+            Some(Ok(Some(dir))) => dir,
+            Some(Ok(None)) => {
+                return IngestDispatchResult::rejected(
+                    "Uvoz trazi lokalni pristup direktoriju projekta na ovom stroju.",
+                )
+            }
+            Some(Err(error)) => return IngestDispatchResult::rejected(error.to_string()),
+            None => return IngestDispatchResult::rejected("Radne postavke nisu dostupne."),
+        };
+        let queued = qnc_ingest_import_worker::queue_selected(target.clone());
+        if let Err(error) = queued {
+            return IngestDispatchResult::rejected(error);
+        }
+        let opener = std::sync::Arc::new(qnc_ingest_import_worker::ConfigMediaOpener::new(
+            config.sources.clone(),
+        ));
+        match self.import_session.start(plan, project_dir, opener, target) {
+            Ok(()) => {
+                self.view.command_busy = true;
+                self.view.message = "Uvoz je pokrenut.".into();
+                IngestDispatchResult::accepted(None, true)
+            }
+            Err(error) => IngestDispatchResult::rejected(error),
+        }
     }
 
     fn start_selection(&mut self, uri: &str) -> IngestDispatchResult {

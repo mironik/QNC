@@ -1335,6 +1335,32 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
+odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i
+intranet. Otkljucano: novi crate `crates/qnc-ingest-import-worker` (javni modul:
+preuzima klip iz reda u bazi sadrzaja `claim_next`, radi po postavkama projekta
+`storage.ingest_media` i `playback.input`: link, kopija proxyja ili originala;
+izvorni medij cita kroz `qnc-media-stream` (lokalno ili udaljeno), kopira u
+komadima kroz privremenu datoteku i preimenovanje u direktorij projekta, upisuje
+ishod `finish_import`); ugovor modula `contracts/modules/ingest-import-worker.module.json`;
+root `Cargo.toml`/`Cargo.lock`; `crates/qnc-ingest-application` (samo radnja
+`ingest_import_selected`: stavlja odabrane u red i pokrece izvrsitelja) i po
+potrebi `crates/qnc-ingest-store` (samo ako je nuzno); dokumenti. Ne dira se Ingest UI.
+Izvan opsega: generiranje proxyja (transcode), kopija postera (traži prosirenje
+`FinishImport` o `thumbnail_uri`, zasebno odobrenje), mrezni upis medija u projekt bez
+lokalnog pristupa direktoriju projekta. Sve ostalo ostaje zamrznuto.
+Izvedeno: `qnc-ingest-import-worker` (plan po postavkama, kopija u komadima kroz
+`.partial`, `ImportSession` u pozadini, `TransportQueue`); `qnc-ingest-store`:
+`ContentWriteTransport` dobiva `queue_selected`, `claim_next`, `finish_import` i
+`ContentWriteData::Claimed` (izvrsitelj pise samo kroz serijalizirani write transport,
+kako trazi conformance), `qnc-ingest-select` prilagodjen novoj varijanti;
+`qnc-ingest-application`: radnja `ingest_import_selected` stavlja odabrane u red i
+pokrece uvoz (widgeti se ne diraju). Testovi: import-worker 10, application 27, select
+16, store 26; conformance prolazi. Nije izvedeno: generiranje proxyja, kopija postera
+(traži `thumbnail_uri` u `FinishImport`), test uvoza kroz cijelu aplikaciju i na
+stvarnoj kartici, nastavak prekinutog uvoza za klip u stanju `Processing`.
+Odobrenje je zatvoreno.
+
 Zatvoreno ograniceno odobrenje 2026-09-19 (osamnaesto): korisnik je izricito
 odobrio pravilo probea po zapisu: klip ciji zapis ima zapisane probe podatke
 (dimenzije, frame rate, tocan broj frameova, odnosno audio format) nikad se ne
