@@ -1362,6 +1362,18 @@ Nije izvedeno: kopija postera (traži odluku o DB ugovoru), izbor citaca indeksa
 pattern-id u `qnc-scanner` (nije otkljucan), test kroz cijelu aplikaciju i na stvarnoj kartici.
 Odobrenje je zatvoreno.
 
+Otvoreno ograniceno odobrenje 2026-09-19 (dvadeset prvo): korisnik je izricito odobrio
+(a) kopiju postera pri uvozu, varijanta A: uvoz kopira poster u direktorij projekta samo kad
+kopira proxy ili original, `FinishImport` nosi `thumbnail_uri`, store upisuje URI kopije u
+`thumbnail_uri` klipa, a ponovni Select ne vraca URI postera klipa u statusu `imported` na
+karticu; (b) odmrzavanje `qnc-scanner` (i po potrebi `qnc-source-groups`) za izbor citaca
+indeksa po pattern-id, tako da dva adaptera s istim XML namespaceom ne daju
+`ReaderAmbiguous`. Otkljucano: `qnc-ingest-store`, `qnc-ingest-import-worker`,
+`qnc-ingest-application`, `qnc-ingest-catalog`, `qnc-ingest-select`, `qnc-camera-adapter`,
+`qnc-scanner`, `qnc-source-groups`, testovi, `Cargo.toml`/`Cargo.lock`, ugovori modula,
+dokumenti. UI i layout ostaju zakljucani (`qnc-ingest-desktop`, `qnc-media-card` i ostali
+popisani u dvadesetom). Sve ostalo ostaje zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
 odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i
 intranet. Otkljucano: novi crate `crates/qnc-ingest-import-worker` (javni modul:
