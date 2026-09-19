@@ -51,6 +51,10 @@ pub trait MediaOpener: Send + Sync {
 /// The queue of the content database seen by the executor.
 pub trait ImportQueue {
     fn claim_next(&mut self) -> Result<Option<StoredClip>, String>;
+    /// Tells the queue this clip is still being imported (renews its lease).
+    fn heartbeat(&mut self, _clip_id: &str) -> Result<(), String> {
+        Ok(())
+    }
     fn finish_import(
         &mut self,
         clip_id: String,
@@ -60,6 +64,10 @@ pub trait ImportQueue {
 }
 
 impl ImportQueue for ContentClient {
+    fn heartbeat(&mut self, clip_id: &str) -> Result<(), String> {
+        ContentClient::heartbeat(self, clip_id.to_string()).map_err(|e| e.to_string())
+    }
+
     fn claim_next(&mut self) -> Result<Option<StoredClip>, String> {
         ContentClient::claim_next(self).map_err(|e| e.to_string())
     }
@@ -144,11 +152,15 @@ fn safe_name(clip_id: &str, source_uri: &str) -> String {
     name
 }
 
+/// Well inside the store lease, so a slow copy never loses its clip.
+const HEARTBEAT_EVERY: std::time::Duration = std::time::Duration::from_secs(20);
+
 fn copy_into(
     opener: &dyn MediaOpener,
     source_uri: &str,
     destination: &Path,
     cancel: &AtomicBool,
+    beat: &mut dyn FnMut(),
 ) -> Result<(), String> {
     let mut source = opener.open(source_uri)?;
     let expected = source.byte_len();
@@ -164,6 +176,7 @@ fn copy_into(
         let mut file = fs::File::create(&partial).map_err(|e| e.to_string())?;
         let mut buffer = vec![0_u8; CHUNK];
         let mut copied = 0_u64;
+        let mut last_beat = std::time::Instant::now();
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err("Uvoz je prekinut.".into());
@@ -174,6 +187,10 @@ fn copy_into(
             }
             file.write_all(&buffer[..n]).map_err(|e| e.to_string())?;
             copied += n as u64;
+            if last_beat.elapsed() >= HEARTBEAT_EVERY {
+                beat();
+                last_beat = std::time::Instant::now();
+            }
         }
         file.flush().map_err(|e| e.to_string())?;
         drop(file);
@@ -198,13 +215,25 @@ pub fn import_clip(
     opener: &dyn MediaOpener,
     cancel: &AtomicBool,
 ) -> Result<String, String> {
+    import_clip_beating(clip, plan, project_dir, opener, cancel, &mut || {})
+}
+
+/// Like `import_clip`, and calls `beat` regularly while a long copy runs.
+pub fn import_clip_beating(
+    clip: &StoredClip,
+    plan: &IngestWorkPlan,
+    project_dir: &Path,
+    opener: &dyn MediaOpener,
+    cancel: &AtomicBool,
+    beat: &mut dyn FnMut(),
+) -> Result<String, String> {
     match action_for(clip, plan)? {
         Action::Link { media_uri } => Ok(media_uri),
         Action::Copy { source_uri, folder } => {
             let name = safe_name(clip.clip.id(), &source_uri);
             let directory = project_dir.join(folder.name());
             fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-            copy_into(opener, &source_uri, &directory.join(&name), cancel)?;
+            copy_into(opener, &source_uri, &directory.join(&name), cancel, beat)?;
             let root = match folder {
                 Folder::Original => &plan.original_uri,
                 Folder::Proxy => &plan.proxy_uri,
@@ -236,7 +265,9 @@ pub fn run_next(
         return Ok(None);
     };
     let clip_id = clip.clip.id().to_string();
-    let result = import_clip(&clip, plan, project_dir, opener, cancel);
+    let result = import_clip_beating(&clip, plan, project_dir, opener, cancel, &mut || {
+        let _ = queue.heartbeat(&clip_id);
+    });
     match &result {
         Ok(uri) => queue.finish_import(clip_id.clone(), Some(uri.clone()), None)?,
         Err(error) => {
@@ -320,6 +351,14 @@ impl TransportQueue {
 }
 
 impl ImportQueue for TransportQueue {
+    fn heartbeat(&mut self, clip_id: &str) -> Result<(), String> {
+        let key = self.next_key("beat");
+        self.transport
+            .heartbeat(key.clone(), clip_id.to_string())
+            .map_err(|e| e.to_string())?;
+        self.wait(&key).map(|_| ())
+    }
+
     fn claim_next(&mut self) -> Result<Option<StoredClip>, String> {
         use qnc_ingest_store::content::ContentWriteData;
         let key = self.next_key("claim");

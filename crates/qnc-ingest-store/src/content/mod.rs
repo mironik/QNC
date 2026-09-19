@@ -194,6 +194,10 @@ pub enum Operation {
     },
     QueueSelected,
     ClaimNext,
+    /// The importer still works on this clip: renews its lease.
+    Heartbeat {
+        clip_id: String,
+    },
     FinishImport {
         clip_id: String,
         media_uri: Option<String>,

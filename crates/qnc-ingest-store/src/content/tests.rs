@@ -933,3 +933,80 @@ fn a_camera_phase_record_cannot_be_queued() {
     camera.snapshot.phase = Phase::Camera;
     assert!(queue(camera).is_err());
 }
+
+fn claimed_store(path: &std::path::Path) -> ContentStore {
+    database(path);
+    let mut store = ContentStore::open_owner_binding(path, URI, Access::ReadWrite).unwrap();
+    run(&mut store, Operation::Publish(Box::new(clip("c1")))).unwrap();
+    run(
+        &mut store,
+        Operation::Select {
+            clip_ids: vec!["c1".into()],
+            selected: true,
+        },
+    )
+    .unwrap();
+    run(&mut store, Operation::QueueSelected).unwrap();
+    assert!(matches!(
+        run(&mut store, Operation::ClaimNext).unwrap(),
+        Data::Claimed(Some(_))
+    ));
+    store
+}
+
+fn age_lease(path: &std::path::Path, seconds: i64) {
+    let db = Connection::open(path).unwrap();
+    db.pragma_update(None, "journal_mode", "PERSIST").unwrap();
+    db.execute(
+        "UPDATE clips SET import_claimed_at = import_claimed_at - ?1",
+        [seconds],
+    )
+    .unwrap();
+}
+
+#[test]
+fn an_import_with_a_fresh_lease_is_not_claimed_twice() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = claimed_store(&path);
+    age_lease(&path, 60);
+    assert!(matches!(
+        run(&mut store, Operation::ClaimNext).unwrap(),
+        Data::Claimed(None)
+    ));
+}
+
+#[test]
+fn an_import_whose_importer_stopped_reporting_is_offered_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = claimed_store(&path);
+    age_lease(&path, 600);
+    assert!(matches!(
+        run(&mut store, Operation::ClaimNext).unwrap(),
+        Data::Claimed(Some(_))
+    ));
+}
+
+#[test]
+fn a_heartbeat_keeps_the_lease_alive_and_needs_a_running_import() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = claimed_store(&path);
+    age_lease(&path, 600);
+    run(&mut store, Operation::Heartbeat { clip_id: "c1".into() }).unwrap();
+    assert!(matches!(
+        run(&mut store, Operation::ClaimNext).unwrap(),
+        Data::Claimed(None)
+    ));
+    run(
+        &mut store,
+        Operation::FinishImport {
+            clip_id: "c1".into(),
+            media_uri: Some(clip("c1").snapshot.binding.original_uri),
+            error: None,
+        },
+    )
+    .unwrap();
+    assert!(run(&mut store, Operation::Heartbeat { clip_id: "c1".into() }).is_err());
+}

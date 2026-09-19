@@ -114,6 +114,7 @@ impl ContentStore {
         }
         if access == Access::ReadWrite {
             ensure_summary_columns(&conn)?;
+            ensure_lease_column(&conn)?;
             ensure_filmstrip_schema(&conn)?;
             ensure_wave_schema(&conn)?;
         }
@@ -368,12 +369,18 @@ impl ContentStore {
                     .conn
                     .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
                     .map_err(err)?;
+                // A clip whose importer stopped reporting is offered again.
+                tx.execute(
+                    "UPDATE clips SET import_status='queued',import_claimed_at=NULL WHERE import_status='processing' AND (import_claimed_at IS NULL OR import_claimed_at < CAST(strftime('%s','now') AS INTEGER) - ?1)",
+                    [IMPORT_LEASE_SECONDS],
+                )
+                .map_err(err)?;
                 let mut clip = tx.query_row(
                     "SELECT catalog_json,selected,import_status,import_error,imported_media_uri FROM clips WHERE import_status='queued' ORDER BY clip_id LIMIT 1",
                     [], row).optional().map_err(err)?;
                 if let Some(clip) = &mut clip {
                     tx.execute(
-                        "UPDATE clips SET import_status='processing' WHERE clip_id=?1",
+                        "UPDATE clips SET import_status='processing',import_claimed_at=CAST(strftime('%s','now') AS INTEGER) WHERE clip_id=?1",
                         [clip.clip.id()],
                     )
                     .map_err(err)?;
@@ -381,6 +388,19 @@ impl ContentStore {
                 }
                 tx.commit().map_err(err)?;
                 Ok(Data::Claimed(clip.map(Box::new)))
+            }
+            Operation::Heartbeat { clip_id } => {
+                let n = self
+                    .conn
+                    .execute(
+                        "UPDATE clips SET import_claimed_at=CAST(strftime('%s','now') AS INTEGER) WHERE clip_id=?1 AND import_status='processing'",
+                        [clip_id],
+                    )
+                    .map_err(err)?;
+                if n != 1 {
+                    return Err("Import posao nije preuzet ili je vec zavrsen.".into());
+                }
+                Ok(Data::Changed)
             }
             Operation::FinishImport {
                 clip_id,
@@ -881,6 +901,18 @@ fn codec(media: &MediaRepresentation) -> Option<&str> {
             Some(Signal::Known(codec)) => Some(codec.as_str()),
             _ => None,
         })
+}
+
+/// Seconds an import may go without a heartbeat before another importer may take
+/// its clip over (an importer that died or lost its connection).
+const IMPORT_LEASE_SECONDS: i64 = 120;
+
+fn ensure_lease_column(conn: &Connection) -> Result<()> {
+    if !has_column(conn, "clips", "import_claimed_at")? {
+        conn.execute("ALTER TABLE clips ADD COLUMN import_claimed_at INTEGER", [])
+            .map_err(err)?;
+    }
+    Ok(())
 }
 fn ensure_summary_columns(conn: &Connection) -> Result<()> {
     let added_thumbnail = if !has_column(conn, "clips", "thumbnail_uri")? {

@@ -254,6 +254,10 @@ impl ContentClient {
             _ => Err("Neispravan claim odgovor.".into()),
         }
     }
+    /// Renews the lease of the clip this importer is working on.
+    pub fn heartbeat(&mut self, clip_id: String) -> Result<()> {
+        self.execute(Operation::Heartbeat { clip_id }).map(|_| ())
+    }
     pub fn finish_import(
         &mut self,
         clip_id: String,
@@ -409,6 +413,11 @@ impl ContentWriteTransport {
         self.send_operation(key, Operation::ClaimNext)
     }
 
+    /// Renews the lease of the clip an importer is working on.
+    pub fn heartbeat(&mut self, key: String, clip_id: String) -> Result<()> {
+        self.send_operation(key, Operation::Heartbeat { clip_id })
+    }
+
     /// Records the outcome of one import: the imported media URI or an error.
     pub fn finish_import(
         &mut self,
@@ -549,6 +558,10 @@ fn execute_write_command(
             Ok(ContentWriteData::Changed)
         }
         Operation::ClaimNext => Ok(ContentWriteData::Claimed(client.claim_next()?.map(Box::new))),
+        Operation::Heartbeat { clip_id } => {
+            client.heartbeat(clip_id)?;
+            Ok(ContentWriteData::Changed)
+        }
         Operation::FinishImport {
             clip_id,
             media_uri,
