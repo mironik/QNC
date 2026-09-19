@@ -1335,6 +1335,19 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-19 (trinaesto): korisnik je izricito
+otkljucao Ingest za popravak nalaza 2 iz auditâ: playback guard blokira odabir
+klipa tijekom pripreme ili reprodukcije playera. Otkljucano samo
+`crates/qnc-ingest-application/src/lib.rs` (`select_clips` i test) i
+`crates/qnc-ingest-application/src/playback_guard.rs` (`blocks_action`). Promjena:
+akcije odabira (`ingest_clip_toggle`, `ingest_select_all`, `ingest_clear_selection`)
+vise ne blokira guard; ostaje blokirano ponovno citanje, promjena izvora,
+direktoriji i generiranje postera. Guard se ne siri, nego sužava. Verificirano:
+testovi (27, novi `clip_selection_is_not_blocked_by_the_playback_guard` pada na
+starom ponasanju), conformance, gradnja `qnc-ingest` i `qnc-app`. Odobrenje
+zatvoreno, Ingest je ponovno zamrznut. Sve ostalo
+ostaje zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (dvanaesto): korisnik je trazio da se
 aplikacije grupa e, g, l, o dobiju u shell desktopu. Za svaku (Media Assist Audio
 AI, Media Assist Audio, Media Assist Video, Story): novi app crate

@@ -7,6 +7,10 @@ impl PlaybackGuard {
         play_when_ready || view.playback.preparing || view.playback.playing()
     }
 
+    /// Heavy source work only. Clip selection (`ingest_clip_toggle`,
+    /// `ingest_select_all`, `ingest_clear_selection`) is deliberately not
+    /// listed: it writes just the `selected` flag through the serialized write
+    /// transport and must stay possible while a preview prepares or plays.
     pub(super) fn blocks_action(action_id: &str) -> bool {
         matches!(
             action_id,
@@ -18,9 +22,6 @@ impl PlaybackGuard {
                 | action_ids::INGEST_DIR_UP
                 | action_ids::INGEST_DIR_OPEN
                 | action_ids::INGEST_DIR_CONFIRM
-                | action_ids::INGEST_SELECT_ALL
-                | action_ids::INGEST_CLEAR_SELECTION
-                | action_ids::INGEST_CLIP_TOGGLE
                 | action_ids::INGEST_APPROVE_PROXY_POSTERS
         )
     }

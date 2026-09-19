@@ -943,9 +943,6 @@ impl IngestApplication {
     }
 
     fn select_clips(&mut self, ids: Vec<String>, selected: bool) -> IngestDispatchResult {
-        if self.playback_guard_active() {
-            return self.playback_guard_rejected();
-        }
         if self
             .view
             .clips
@@ -1533,11 +1530,36 @@ mod tests {
         )]);
         assert!(!component.thumbnail_loader.has_pending_work());
 
-        let result = component.dispatch(IngestIntent::empty(action_ids::INGEST_SELECT_ALL));
+        let result = component.dispatch(IngestIntent::empty(action_ids::INGEST_RELOAD));
         assert!(!result.accepted);
         assert!(result.request_repaint);
         assert_eq!(result.message.as_deref(), Some(playback_guard_message()));
         assert_eq!(component.view().message, playback_guard_message());
+    }
+
+    #[test]
+    fn clip_selection_is_not_blocked_by_the_playback_guard() {
+        for (preparing, play_when_ready) in [(true, false), (false, true)] {
+            let mut component = IngestApplication::default();
+            component.view.playback.preparing = preparing;
+            component.play_when_ready = play_when_ready;
+            assert!(component.playback_guard_active());
+
+            let requests = [
+                IngestIntent::empty(action_ids::INGEST_SELECT_ALL),
+                IngestIntent::empty(action_ids::INGEST_CLEAR_SELECTION),
+                IngestIntent::new(
+                    action_ids::INGEST_CLIP_TOGGLE,
+                    IngestPayload::ClipId("missing".into()),
+                ),
+            ];
+            for intent in requests {
+                let result = component.dispatch(intent);
+                // Rejected for its own reason (no catalog / unknown clip), never by the guard.
+                assert_ne!(result.message.as_deref(), Some(playback_guard_message()));
+                assert_ne!(component.view().message, playback_guard_message());
+            }
+        }
     }
 
     #[test]

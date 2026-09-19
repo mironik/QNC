@@ -269,3 +269,22 @@ data/application-catalog.json` (`data/` nije pod gitom; prethodni katalog je
 spremljen izvan repozitorija).
 
 Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-19 (trinaesto)
+
+Ingest, nalaz 2 iz audita: playback guard je blokirao odabir klipa tijekom
+pripreme ili reprodukcije playera ("Zaustavi Broadcast Player prije ove radnje").
+Popravak u `crates/qnc-ingest-application`:
+
+- `playback_guard.rs`: `blocks_action` vise ne sadrzi `ingest_clip_toggle`,
+  `ingest_select_all` i `ingest_clear_selection`.
+- `lib.rs`: `select_clips` vise ne provjerava guard.
+- Test `playback_guard_blocks_background_source_work` sada provjerava
+  `ingest_reload`; dodan `clip_selection_is_not_blocked_by_the_playback_guard`
+  (pada na starom ponasanju).
+
+Razlog: odabir pise samo oznaku `selected` kroz serijalizirani write transport,
+ne dira izvor, scan ni thumbnailove. Ostaje blokirano: ponovno citanje, promjena
+izvora, direktoriji, generiranje postera. Guard je sužen, ne prosiren.
+
+Odobrenje je zatvoreno. Status: zamrznuto.
