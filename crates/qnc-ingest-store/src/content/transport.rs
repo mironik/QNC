@@ -299,6 +299,8 @@ pub struct ContentWriteResult {
 pub enum ContentWriteData {
     Changed,
     Removed(Vec<String>),
+    /// The clip taken from the import queue, if any.
+    Claimed(Option<Box<StoredClip>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -388,6 +390,45 @@ impl ContentWriteTransport {
             key,
             operation: Operation::Select { clip_ids, selected },
         };
+        self.send
+            .as_ref()
+            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .send(command)
+            .map_err(err)?;
+        self.pending += 1;
+        Ok(())
+    }
+
+    /// Puts the selected, ready clips into the import queue.
+    pub fn queue_selected(&mut self, key: String) -> Result<()> {
+        self.send_operation(key, Operation::QueueSelected)
+    }
+
+    /// Takes the next queued clip for import (`Claimed`).
+    pub fn claim_next(&mut self, key: String) -> Result<()> {
+        self.send_operation(key, Operation::ClaimNext)
+    }
+
+    /// Records the outcome of one import: the imported media URI or an error.
+    pub fn finish_import(
+        &mut self,
+        key: String,
+        clip_id: String,
+        media_uri: Option<String>,
+        error: Option<String>,
+    ) -> Result<()> {
+        self.send_operation(
+            key,
+            Operation::FinishImport {
+                clip_id,
+                media_uri,
+                error,
+            },
+        )
+    }
+
+    fn send_operation(&mut self, key: String, operation: Operation) -> Result<()> {
+        let command = ContentWriteCommand { key, operation };
         self.send
             .as_ref()
             .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
@@ -501,6 +542,19 @@ fn execute_write_command(
         }
         Operation::PublishWave(artifact) => {
             client.publish_wave(*artifact)?;
+            Ok(ContentWriteData::Changed)
+        }
+        Operation::QueueSelected => {
+            client.queue_selected()?;
+            Ok(ContentWriteData::Changed)
+        }
+        Operation::ClaimNext => Ok(ContentWriteData::Claimed(client.claim_next()?.map(Box::new))),
+        Operation::FinishImport {
+            clip_id,
+            media_uri,
+            error,
+        } => {
+            client.finish_import(clip_id, media_uri, error)?;
             Ok(ContentWriteData::Changed)
         }
         _ => Err("Nepodrzana content write transport operacija.".into()),
