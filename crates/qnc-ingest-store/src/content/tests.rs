@@ -881,3 +881,55 @@ fn lan_and_intranet_use_same_authenticated_db_contract() {
         thread.join().unwrap();
     }
 }
+
+fn partial(id: &str, probed: bool) -> CatalogClip {
+    let mut clip = clip(id);
+    let uri = clip.snapshot.metadata.original.media_uri.clone();
+    clip.snapshot.metadata.original.container = None;
+    if probed {
+        clip.snapshot.metadata.evidence.push(m::Evidence {
+            id: "probe".into(),
+            kind: m::EvidenceKind::Ffprobe,
+            document_uri: "qnc://local/artifact/probe-a".into(),
+            media_uri: uri,
+        });
+    }
+    clip.snapshot.report = m::inspect(&clip.snapshot.metadata);
+    clip.snapshot.completeness = Completeness::Partial;
+    clip
+}
+
+fn queue(clip: CatalogClip) -> Result<Data> {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    database(&path);
+    let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+    let id = clip.id().to_string();
+    run(&mut store, Operation::Publish(Box::new(clip))).unwrap();
+    run(
+        &mut store,
+        Operation::Select {
+            clip_ids: vec![id],
+            selected: true,
+        },
+    )
+    .unwrap();
+    run(&mut store, Operation::QueueSelected)
+}
+
+#[test]
+fn a_final_record_declared_by_the_card_can_be_queued_for_import() {
+    assert!(queue(partial("c1", false)).is_ok());
+}
+
+#[test]
+fn a_probed_record_that_is_still_partial_cannot_be_queued() {
+    assert!(queue(partial("c1", true)).is_err());
+}
+
+#[test]
+fn a_camera_phase_record_cannot_be_queued() {
+    let mut camera = partial("c1", false);
+    camera.snapshot.phase = Phase::Camera;
+    assert!(queue(camera).is_err());
+}

@@ -270,9 +270,19 @@ pub(crate) fn project_id(uri: &str) -> Result<String> {
     Ok(id.into())
 }
 
+/// A clip can be imported when its metadata is final and either complete or declared
+/// by the card: a final record without probe evidence is never probed to fill it, so
+/// waiting for more would wait forever. A probed record that is still partial stays
+/// blocked.
 pub(crate) fn ready(clip: &StoredClip) -> bool {
-    clip.clip.snapshot.phase == Phase::Final
-        && clip.clip.snapshot.completeness == qnc_media_records::Completeness::Complete
+    let snapshot = &clip.clip.snapshot;
+    snapshot.phase == Phase::Final
+        && (snapshot.completeness == qnc_media_records::Completeness::Complete
+            || !snapshot
+                .metadata
+                .evidence
+                .iter()
+                .any(|e| e.kind == qnc_media_records::EvidenceKind::Ffprobe))
 }
 
 #[cfg(test)]
