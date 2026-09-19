@@ -43,7 +43,41 @@ pub trait CameraAdapter: Send + Sync {
         group: &GroupProposal,
         documents: &[IndexDocument],
     ) -> Result<ClipMetadata, String>;
-    fn sufficiency(&self) -> MetadataSufficiency;
+    /// Whether the record read for one clip is enough. Decided per record: a clip
+    /// whose record carries no probe facts is probed once even if the camera
+    /// usually declares them (for example a missing sidecar).
+    fn sufficiency(&self, metadata: &ClipMetadata) -> MetadataSufficiency;
+}
+
+/// Does the record of the original carry the facts a probe would state: for video
+/// the dimensions, the frame rate and an exact frame count; for audio only the
+/// sample rate, the channels and the duration.
+pub fn has_probe_facts(metadata: &ClipMetadata) -> bool {
+    use qnc_media_metadata::StreamDetails;
+    let original = &metadata.original;
+    let videos: Vec<_> = original
+        .streams
+        .iter()
+        .filter_map(|s| match &s.details {
+            StreamDetails::Video(video) => Some(video),
+            _ => None,
+        })
+        .collect();
+    if !videos.is_empty() {
+        return videos.iter().any(|v| {
+            v.width.is_some()
+                && v.height.is_some()
+                && v.frame_rate.is_some()
+                && v.exact_frame_count().is_some()
+        });
+    }
+    original.duration_seconds.is_some()
+        && original.streams.iter().any(|s| match &s.details {
+            StreamDetails::Audio(audio) => {
+                audio.sample_rate_hz.is_some() && audio.channels.is_some()
+            }
+            _ => false,
+        })
 }
 
 /// The adapters an application composes. Built by the composition root and
@@ -169,7 +203,7 @@ mod tests {
         ) -> Result<ClipMetadata, String> {
             Err("not used".into())
         }
-        fn sufficiency(&self) -> MetadataSufficiency {
+        fn sufficiency(&self, _: &ClipMetadata) -> MetadataSufficiency {
             MetadataSufficiency::Declared
         }
     }
@@ -218,5 +252,108 @@ mod tests {
         assert!(registry.register(fake("", &["pattern-a"], "reader.a")).is_err());
         assert!(registry.register(fake("cam-a", &[], "reader.a")).is_err());
         assert!(registry.register(fake("cam-a", &[""], "reader.a")).is_err());
+    }
+
+    fn fact<T>(value: T) -> Option<qnc_media_metadata::Fact<T>> {
+        Some(qnc_media_metadata::Fact {
+            value,
+            evidence_id: "camera".into(),
+            locator: "/x".into(),
+        })
+    }
+
+    fn record(streams: Vec<qnc_media_metadata::MediaStream>, duration: bool) -> ClipMetadata {
+        use qnc_media_metadata::{MediaRepresentation, Rational};
+        ClipMetadata {
+            contract_id: qnc_media_metadata::CONTRACT_ID.into(),
+            contract_version: qnc_media_metadata::CONTRACT_VERSION.into(),
+            clip_id: "clip".into(),
+            evidence: vec![],
+            original: MediaRepresentation {
+                media_uri: "qnc://local/source/card/a.mxf".into(),
+                container: None,
+                duration_seconds: if duration {
+                    fact(Rational {
+                        numerator: 10,
+                        denominator: 1,
+                    })
+                } else {
+                    None
+                },
+                streams_complete: None,
+                streams,
+                tags: Default::default(),
+            },
+            proxy: None,
+        }
+    }
+
+    fn stream(details: qnc_media_metadata::StreamDetails) -> qnc_media_metadata::MediaStream {
+        qnc_media_metadata::MediaStream {
+            index: None,
+            codec: None,
+            profile: None,
+            time_base: None,
+            start_pts: None,
+            duration_ts: None,
+            details,
+        }
+    }
+
+    fn video(
+        width: bool,
+        exact_frames: bool,
+    ) -> qnc_media_metadata::StreamDetails {
+        use qnc_media_metadata::{FrameCount, FrameTimebase, VideoMetadata};
+        qnc_media_metadata::StreamDetails::Video(Box::new(VideoMetadata {
+            width: if width { fact(1920) } else { None },
+            height: fact(1080),
+            frame_rate: fact(FrameTimebase::new(25, 1).unwrap()),
+            frame_rate_mode: None,
+            frame_count: if exact_frames {
+                fact(FrameCount::Exact(250))
+            } else {
+                fact(FrameCount::Estimated(250))
+            },
+            scan_mode: None,
+            pixel_format: None,
+            sample_aspect_ratio: None,
+            rotation_degrees: None,
+            color: qnc_media_metadata::ColorMetadata {
+                primaries: None,
+                transfer: None,
+                matrix: None,
+                range: None,
+            },
+        }))
+    }
+
+    #[test]
+    fn a_record_with_dimensions_frame_rate_and_exact_frames_has_probe_facts() {
+        assert!(has_probe_facts(&record(vec![stream(video(true, true))], false)));
+    }
+
+    #[test]
+    fn a_record_missing_any_of_those_facts_has_no_probe_facts() {
+        assert!(!has_probe_facts(&record(vec![], false)));
+        assert!(!has_probe_facts(&record(vec![stream(video(false, true))], false)));
+        assert!(!has_probe_facts(&record(vec![stream(video(true, false))], false)));
+    }
+
+    #[test]
+    fn an_audio_record_needs_sample_rate_channels_and_duration() {
+        use qnc_media_metadata::{AudioMetadata, StreamDetails};
+        let audio = |rate: bool| {
+            stream(StreamDetails::Audio(Box::new(AudioMetadata {
+                sample_rate_hz: if rate { fact(48000) } else { None },
+                channels: fact(2),
+                sample_format: None,
+                channel_layout: None,
+                bits_per_sample: None,
+            })))
+        };
+        assert!(has_probe_facts(&record(vec![audio(true)], true)));
+        assert!(!has_probe_facts(&record(vec![audio(true)], false)));
+        assert!(!has_probe_facts(&record(vec![audio(false)], true)));
     }
 }

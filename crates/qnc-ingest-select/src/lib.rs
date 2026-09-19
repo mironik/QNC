@@ -662,7 +662,7 @@ fn process_record(
             .ok_or("camera snapshot missing after commit")?
     };
     publish(&snapshot)?;
-    let declared = adapter.sufficiency() == MetadataSufficiency::Declared;
+    let declared = adapter.sufficiency(&snapshot.metadata) == MetadataSufficiency::Declared;
     if snapshot.phase == Phase::Final {
         // A declared record is final by itself; an incomplete one is complete
         // enough by definition and is never probed.

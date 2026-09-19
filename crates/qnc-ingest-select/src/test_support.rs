@@ -149,7 +149,7 @@ impl qnc_camera_adapter::CameraAdapter for TestCamera {
     ) -> std::result::Result<qnc_media_record_db::contract::ClipMetadata, String> {
         qnc_sony_metadata::read_group_metadata(clip_id, group, documents)
     }
-    fn sufficiency(&self) -> MetadataSufficiency {
+    fn sufficiency(&self, _: &qnc_media_record_db::contract::ClipMetadata) -> MetadataSufficiency {
         self.0
     }
 }

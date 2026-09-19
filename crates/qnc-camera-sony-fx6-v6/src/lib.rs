@@ -56,8 +56,14 @@ impl CameraAdapter for SonyFx6V6 {
         qnc_sony_metadata::read_group_metadata(clip_id, group, documents)
     }
 
-    fn sufficiency(&self) -> MetadataSufficiency {
-        MetadataSufficiency::Declared
+    fn sufficiency(&self, metadata: &ClipMetadata) -> MetadataSufficiency {
+        // The XML normally declares the probe facts. A clip whose sidecar is missing
+        // (or lacks them) has no record with probe data, so it is probed once.
+        if qnc_camera_adapter::has_probe_facts(metadata) {
+            MetadataSufficiency::Declared
+        } else {
+            MetadataSufficiency::NeedsProbe
+        }
     }
 }
 
@@ -72,7 +78,6 @@ mod tests {
         let adapter = SonyFx6V6::new();
         assert_eq!(adapter.adapter_id(), "camera.sony.fx6-v6");
         assert_eq!(adapter.pattern_ids(), ["sony-fx6-v6"]);
-        assert_eq!(adapter.sufficiency(), MetadataSufficiency::Declared);
         assert_eq!(adapter.index().reader_id(), "camera.sony.index.read");
     }
 

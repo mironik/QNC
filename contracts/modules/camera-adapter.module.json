@@ -15,7 +15,7 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-camera-adapter",
   "input": "Registered CameraAdapter implementations. Adapters receive already read documents; no OS paths or I/O.",
-  "output": "Adapter lookup by index reader id, index readers for the scanner, per-pattern metadata sufficiency (Declared: never probe; NeedsProbe: one probe in Ingest).",
+  "output": "Adapter lookup by index reader id, index readers for the scanner, per-record metadata sufficiency (Declared: the record carries probe facts, never probe; NeedsProbe: one probe in Ingest) and has_probe_facts.",
   "specification": "docs/v5-book/08-audit-and-plan.md sections 10 and 11",
   "adapter_granularity": "one adapter per camera catalog pattern (camera and record layout), never per manufacturer; shared vendor parsing stays in public libraries such as qnc-sony-metadata"
 }

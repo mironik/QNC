@@ -15,7 +15,7 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-camera-sony-fx6-v6",
   "input": "Already read Sony MediaProfile and NonRealTimeMeta documents of one verified group. No OS paths or I/O.",
-  "output": "Camera metadata for original and proxy; metadata sufficiency Declared (the media is never probed).",
+  "output": "Camera metadata for original and proxy; metadata sufficiency is decided per record: Declared when the record carries probe facts (the media is never probed), otherwise NeedsProbe (one probe).",
   "specification": "docs/26-sony-metadata-reader.md; docs/v5-book/08-audit-and-plan.md sections 10 and 11",
   "catalog_pattern": "sony-fx6-v6"
 }

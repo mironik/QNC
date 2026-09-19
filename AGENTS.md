@@ -1335,6 +1335,19 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Zatvoreno ograniceno odobrenje 2026-09-19 (osamnaesto): korisnik je izricito
+odobrio pravilo probea po zapisu: klip ciji zapis ima zapisane probe podatke
+(dimenzije, frame rate, tocan broj frameova, odnosno audio format) nikad se ne
+probe-a; klip ciji zapis nema te podatke (npr. Sony bez sidecara) probe-a se jednom.
+Odluka vise nije svojstvo cijele kamere nego zapisa: `CameraAdapter::sufficiency`
+prima metapodatke klipa. Otkljucano: `crates/qnc-camera-adapter` (sucelje i
+pomocna funkcija `has_probe_facts`), `crates/qnc-camera-sony-fx6-v6`,
+`crates/qnc-ingest-select` (odluka po zapisu, testovi), dokumenti i zapis odobrenja.
+Genericki put za kamere bez indeksa (grupiranje bez indeksa i probe prije snimke
+kamere) nije dio ovog odobrenja: trazi izmjenu `qnc-scanner`, `qnc-source-groups` i
+ugovora `qnc-media-record-db` (akvizicija trazi snimku kamere). Sve ostalo ostaje
+zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-19 (sedamnaesto): korisnik je izricito
 odobrio (a) pravilo probea: klip ciji zapis kartice (npr. Sony XML za original i proxy)
 daje metapodatke nikad se ne probe-a, a klip bez takvog zapisa probe-a se jednom u

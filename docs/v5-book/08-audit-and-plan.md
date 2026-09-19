@@ -200,3 +200,7 @@ Granice, izmjereno:
 2. **Scanner bira čitač po imenskom prostoru** kataloga i traži točno jedan čitač po uzorku (`ReaderAmbiguous`). Drugi adapter s istim imenskim prostorom (npr. drugi Sony uzorak s MediaProfile) zahtijeva izmjenu odabira po `pattern_id` u `qnc-scanner`.
 3. **Kamera bez adaptera / bez XML-a** još nema puta: nema generičkog adaptera koji bi grupirao datoteke bez indeksa. `NeedsProbe` je izveden i testiran samo za adapter koji ima indeks.
 4. Uživo na stvarnoj kartici (G:) nije provjereno; provjera je na Sony fixtureima.
+
+### Izvedeno (osamnaesto odobrenje): odluka o probeu po zapisu
+
+Odluka više nije svojstvo cijele kamere nego zapisa (`CameraAdapter::sufficiency(&ClipMetadata)`): ako zapis klipa nosi probe podatke (video: dimenzije, frame rate, točan broj frameova; audio: sample rate, kanali, trajanje; `has_probe_facts`), klip se nikad ne probe-a; ako ih nema (npr. Sony bez sidecara), probe se radi jednom (original i proxy) i drugi Select ga ne ponavlja. Testirano na Sony fixtureima (select 16). **Kamere bez indeksa** (grupiranje bez indeksa, probe prije snimke kamere) i dalje nisu izvedene: traže izmjene `qnc-scanner`, `qnc-source-groups` i ugovora `qnc-media-record-db`.

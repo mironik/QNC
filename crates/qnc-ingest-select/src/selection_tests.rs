@@ -763,3 +763,26 @@ fn a_declared_clip_from_the_card_can_be_selected_and_queued_for_import_without_a
     assert!(client.claim_next().unwrap().is_some());
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
+
+#[test]
+fn only_the_clip_whose_record_has_no_probe_data_is_probed() {
+    let (dir, config) = fixture();
+    // Clip B loses its sidecar: its record no longer carries probe data.
+    std::fs::remove_file(dir.path().join("card/PRIVATE/XDROOT/Clip/TEST BM01.XML")).unwrap();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let events = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    // The scanner reports the missing sidecar; both clips are still processed.
+    let mut db = config.media_records.media_db().unwrap();
+    let ids: BTreeSet<_> = events
+        .iter()
+        .filter_map(|e| if let Event::Clip(c) = e { Some(c.clip_id.clone()) } else { None })
+        .collect();
+    assert_eq!(ids.len(), 2);
+    for id in &ids {
+        assert_eq!(db.read(id, None).unwrap().unwrap().phase, Phase::Final);
+    }
+    // Original and proxy of B only; A is declared by its XML.
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    assert_eq!(calls.load(Ordering::SeqCst), 2, "never a second probe");
+}

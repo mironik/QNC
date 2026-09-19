@@ -337,3 +337,17 @@ ffprobe dokaza); probani nepotpun zapis i Camera faza ostaju blokirani. Testovi:
 select 15, application 27, adapter 4 i 2; conformance prolazi. Nije izvedeno: odabir citaca
 po `pattern_id` u `qnc-scanner`, genericki adapter za kamere bez indeksa (zasebna
 odobrenja). Odobrenje je zatvoreno. Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-19 (osamnaesto)
+
+Pravilo probea po zapisu: klip ciji zapis ima zapisane probe podatke (video: dimenzije,
+frame rate, tocan broj frameova; audio: sample rate, kanali, trajanje) nikad se ne probe-a;
+klip ciji zapis nema te podatke probe-a se jednom. `CameraAdapter::sufficiency` sada prima
+metapodatke klipa; pomocna funkcija `has_probe_facts` u `qnc-camera-adapter`; adapter
+`sony-fx6-v6` odlucuje po zapisu; `qnc-ingest-select` odlucuje po snimci. Testovi: adapter
+7 (3 nova), fx6 2, select 16 (novi: samo klip bez probe podataka se probe-a, original i
+proxy jednom, drugi Select ne probe-a ponovno), application 27, store 26; conformance
+prolazi. Izvan opsega ostaje genericki put za kamere bez indeksa (grupiranje bez indeksa i
+probe prije snimke kamere): trazi `qnc-scanner`, `qnc-source-groups` i ugovor
+`qnc-media-record-db` (akvizicija trazi snimku kamere). Odobrenje je zatvoreno. Status:
+zamrznuto.
