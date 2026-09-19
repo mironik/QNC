@@ -3431,6 +3431,7 @@ name = "qnc-ingest-selection-write"
 version = "0.1.0"
 dependencies = [
  "qnc-ingest-store",
+ "rusqlite",
 ]
 
 [[package]]
