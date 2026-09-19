@@ -35,6 +35,7 @@ members = [
     "crates/qnc-wave",
     "crates/qnc-wave-view",
     "crates/qnc-wave-worker",
+    "crates/qnc-timeline-artifacts-host",
     "crates/qnc-timeline-assets",
     "crates/qnc-timeline",
     "crates/qnc-media-stream",
@@ -55,6 +56,7 @@ members = [
     "crates/qnc-ingest-application",
     "crates/qnc-image-assets",
     "crates/qnc-ingest-desktop",
+    "crates/qnc-ingest-artifacts",
     "crates/qnc-ingest-cameras",
     "crates/qnc-ingest-desktop-adapter",
     "crates/qnc-ingest-import-worker",
@@ -129,6 +131,7 @@ qnc-filmstrip-worker = { path = "crates/qnc-filmstrip-worker" }
 qnc-wave = { path = "crates/qnc-wave" }
 qnc-wave-view = { path = "crates/qnc-wave-view" }
 qnc-wave-worker = { path = "crates/qnc-wave-worker" }
+qnc-timeline-artifacts-host = { path = "crates/qnc-timeline-artifacts-host" }
 qnc-timeline-assets = { path = "crates/qnc-timeline-assets" }
 qnc-timeline = { path = "crates/qnc-timeline" }
 qnc-media-stream = { path = "crates/qnc-media-stream" }
@@ -143,6 +146,7 @@ qnc-gpu-raster = { path = "crates/qnc-gpu-raster" }
 qnc-broadcast-player = { path = "crates/qnc-broadcast-player" }
 qnc-broadcast-engine = { path = "crates/qnc-broadcast-engine" }
 qnc-ingest-work-plan = { path = "crates/qnc-ingest-work-plan" }
+qnc-ingest-artifacts = { path = "crates/qnc-ingest-artifacts" }
 qnc-ingest-cameras = { path = "crates/qnc-ingest-cameras" }
 qnc-ingest-catalog = { path = "crates/qnc-ingest-catalog" }
 qnc-ingest-import-worker = { path = "crates/qnc-ingest-import-worker" }

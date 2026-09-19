@@ -11,7 +11,7 @@ use qnc_ingest_select::selection_config;
 use qnc_ingest_store::{content::CatalogStats, IngestStore, SourceSelectionRecord};
 pub use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
 use qnc_timeline::{TimelineIntent, TimelineProjection};
-use qnc_timeline_assets::{SourceTimelineAssets, TimelineAssetReader};
+use qnc_timeline_assets::SourceTimelineAssets;
 use qnc_work_settings::SettingsReader;
 use serde::{Deserialize, Serialize};
 
@@ -457,10 +457,7 @@ pub struct IngestApplication {
     catalog_result: Option<Receiver<Result<(Vec<String>, bool), String>>>,
     catalog_thread: Option<std::thread::JoinHandle<()>>,
     thumbnail_loader: qnc_media_thumbnail::ThumbnailBatchService,
-    filmstrip: qnc_filmstrip_worker::TimelineFilmstripService,
-    wave: qnc_wave_worker::TimelineWaveService,
-    timeline_assets: TimelineAssetReader,
-    timeline_artifact_sync_deferred: bool,
+    artifacts: qnc_timeline_artifacts_host::TimelineArtifactsHost,
     catalog_stats: Option<CatalogStats>,
     play_when_ready: bool,
     work_plan: Option<IngestWorkPlan>,
@@ -656,7 +653,7 @@ impl IngestApplication {
             }
         }
         self.apply_playback_guard();
-        if !self.playback_guard_active() && self.timeline_artifact_sync_deferred {
+        if !self.playback_guard_active() && self.artifacts.sync_deferred() {
             self.sync_timeline_artifact_content_db();
             changed = true;
         }
@@ -903,8 +900,7 @@ impl IngestApplication {
             || self.catalog_result.is_some()
             || self.thumbnail_loader.has_pending_work()
             || self.selection_session.has_pending_work()
-            || self.filmstrip.has_pending_work()
-            || self.wave.has_pending_work()
+            || self.artifacts.has_pending_work()
             || self.play_when_ready
     }
     pub fn has_player(&self) -> bool {
@@ -1618,9 +1614,8 @@ mod tests {
 
         component.sync_timeline_artifact_content_db();
 
-        assert!(component.timeline_artifact_sync_deferred);
-        assert!(!component.filmstrip.has_pending_work());
-        assert!(!component.wave.has_pending_work());
+        assert!(component.artifacts.sync_deferred());
+        assert!(!component.artifacts.has_pending_work());
     }
 
     #[test]

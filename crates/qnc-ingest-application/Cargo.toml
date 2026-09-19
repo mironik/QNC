@@ -6,8 +6,7 @@ edition = "2021"
 [dependencies]
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
-qnc-filmstrip = { workspace = true }
-qnc-filmstrip-worker = { workspace = true }
+qnc-ingest-artifacts = { workspace = true }
 qnc-ingest-catalog = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-camera-adapter = { workspace = true }
@@ -24,8 +23,7 @@ qnc-player-timeline = { workspace = true }
 qnc-source-reader = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-timeline-assets = { workspace = true }
-qnc-wave = { workspace = true }
-qnc-wave-worker = { workspace = true }
+qnc-timeline-artifacts-host = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 qnc-image-assets = { workspace = true }

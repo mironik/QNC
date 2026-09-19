@@ -3279,9 +3279,8 @@ dependencies = [
  "qnc-camera-adapter",
  "qnc-contracts",
  "qnc-dir-browser",
- "qnc-filmstrip",
- "qnc-filmstrip-worker",
  "qnc-image-assets",
+ "qnc-ingest-artifacts",
  "qnc-ingest-cameras",
  "qnc-ingest-catalog",
  "qnc-ingest-import-worker",
@@ -3295,15 +3294,30 @@ dependencies = [
  "qnc-player-timeline",
  "qnc-source-reader",
  "qnc-timeline",
+ "qnc-timeline-artifacts-host",
  "qnc-timeline-assets",
- "qnc-wave",
- "qnc-wave-worker",
  "qnc-work-settings",
  "rusqlite",
  "serde",
  "serde_json",
  "tempfile",
  "tiny_http",
+]
+
+[[package]]
+name = "qnc-ingest-artifacts"
+version = "0.1.0"
+dependencies = [
+ "qnc-filmstrip",
+ "qnc-filmstrip-worker",
+ "qnc-ingest-select",
+ "qnc-ingest-store",
+ "qnc-ingest-work-plan",
+ "qnc-timeline-artifacts-host",
+ "qnc-timeline-assets",
+ "qnc-wave",
+ "qnc-wave-worker",
+ "qnc-work-settings",
 ]
 
 [[package]]
@@ -4002,6 +4016,15 @@ dependencies = [
  "qnc-filmstrip",
  "qnc-ui-kit",
  "qnc-wave-view",
+]
+
+[[package]]
+name = "qnc-timeline-artifacts-host"
+version = "0.1.0"
+dependencies = [
+ "qnc-filmstrip-worker",
+ "qnc-timeline-assets",
+ "qnc-wave-worker",
 ]
 
 [[package]]

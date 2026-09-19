@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.timeline-artifacts-host",
+  "module_name": "Timeline artifacts host",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["timeline.artifacts.host"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_write_transports_only",
+  "runtime_crate": "qnc-timeline-artifacts-host",
+  "input": "An ArtifactHostContext: content readers and writers (worker and timeline-assets traits), source bindings, project folder of this machine.",
+  "output": "Filmstrip and wave kept up to date, and the artifacts of the focused clip (SourceTimelineAssets) for any timeline; no application or database owner is named.",
+  "specification": "docs/v5-book/08-audit-and-plan.md (audit response)"
+}
