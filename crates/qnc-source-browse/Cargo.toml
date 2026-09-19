@@ -1,0 +1,9 @@
+[package]
+name = "qnc-source-browse"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: browses the registered sources (local, LAN, intranet) off the caller's thread, one step at a time; no form, no application"
+
+[dependencies]
+qnc-dir-browser = { workspace = true }
+qnc-source-reader = { workspace = true }

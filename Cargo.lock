@@ -3292,6 +3292,7 @@ dependencies = [
  "qnc-media-thumbnail",
  "qnc-player-client",
  "qnc-player-timeline",
+ "qnc-source-browse",
  "qnc-source-preview",
  "qnc-source-reader",
  "qnc-timeline",
@@ -3912,6 +3913,14 @@ dependencies = [
  "qnc-transport-resolver",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "qnc-source-browse"
+version = "0.1.0"
+dependencies = [
+ "qnc-dir-browser",
+ "qnc-source-reader",
 ]
 
 [[package]]

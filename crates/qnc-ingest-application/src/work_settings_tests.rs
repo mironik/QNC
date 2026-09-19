@@ -506,7 +506,7 @@ fn select_rereads_current_active_project_and_cancel_prevents_source_write() {
         .unwrap();
     browser.roots("local").unwrap();
     component.apply_source_browser_result(browser.open(uri));
-    component.transport_browser = Some(browser);
+    component.browse.connect(browser);
     Connection::open(root.path().join("data/project_store.db"))
         .unwrap()
         .execute("UPDATE app_settings SET value='p2'", [])

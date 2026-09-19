@@ -462,15 +462,9 @@ pub struct IngestApplication {
     pending_source: Option<String>,
     selection_config: Option<selection_config::SelectionConfig>,
     selection_config_error: Option<String>,
-    transport_browser: Option<qnc_dir_browser::TransportBrowserSession>,
-    browser_result: Option<
-        Receiver<(
-            qnc_dir_browser::TransportBrowserSession,
-            Result<BrowserState, String>,
-        )>,
-    >,
+    browse: qnc_source_browse::SourceBrowse,
     selection_session: selection::SelectSession,
-    import_host: qnc_ingest_import_worker::Importer,
+    importer: qnc_ingest_import_worker::Importer,
     camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
     selection_warnings: usize,
     selection_last_warning: Option<String>,
@@ -497,7 +491,7 @@ impl IngestApplication {
             Ok((config, mut browser)) => {
                 let state = browser.roots("local");
                 component.selection_config = Some(config);
-                component.transport_browser = Some(browser);
+                component.browse.connect(browser);
                 component.apply_source_browser_result(state);
             }
             Err(error) => component.selection_config_error = Some(error.to_string()),
@@ -647,24 +641,12 @@ impl IngestApplication {
             }
             changed = true;
         }
-        if let Some(receiver) = &self.browser_result {
-            match receiver.try_recv() {
-                Ok((browser, result)) => {
-                    self.browser_result = None;
-                    self.transport_browser = Some(browser);
-                    self.apply_source_browser_result(result);
-                    changed = true;
-                }
-                Err(TryRecvError::Disconnected) => {
-                    self.browser_result = None;
-                    self.apply_source_browser_result(Err("Citanje izvora je prekinuto.".into()));
-                    changed = true;
-                }
-                Err(TryRecvError::Empty) => {}
-            }
+        if let Some(result) = self.browse.poll() {
+            self.apply_source_browser_result(result);
+            changed = true;
         }
         let mut import_finished = false;
-        for notice in self.import_host.poll(64) {
+        for notice in self.importer.poll(64) {
             changed = true;
             self.view.message = notice.message;
             if notice.finished {
@@ -894,7 +876,7 @@ impl IngestApplication {
             self.view.command_busy = false;
             self.view.message = playback_guard_message().to_string();
         }
-        if self.browser_result.take().is_some() {
+        if self.browse.cancel() {
             self.view.browser_busy = false;
             self.view.browser_error = Some(playback_guard_message().to_string());
         }
@@ -976,7 +958,7 @@ impl IngestApplication {
         {
             return IngestDispatchResult::rejected("Obrada odabranog izvora je u tijeku.");
         }
-        if self.transport_browser.is_some() {
+        if self.browse.is_connected() {
             match intent.action_id.as_str() {
                 action_ids::INGEST_SOURCE_KIND_LOCAL => {
                     return self.browse_registered(SourceKind::Local, None);
@@ -1058,11 +1040,7 @@ impl IngestApplication {
             },
             action_ids::INGEST_DIR_CONFIRM => match intent.payload {
                 IngestPayload::LocationUri(uri) => {
-                    if self
-                        .transport_browser
-                        .as_ref()
-                        .and_then(|b| b.selected(&uri))
-                        .is_none()
+                    if self.browse.selected(&uri).is_none()
                     {
                         let error = self
                             .selection_config_error
@@ -1155,35 +1133,32 @@ impl IngestApplication {
         if self.playback_guard_active() {
             return self.playback_guard_rejected();
         }
-        let Some(mut browser) = self.transport_browser.clone() else {
+        if !self.browse.is_connected() {
             return IngestDispatchResult::rejected("Izvor nije povezan.");
-        };
-        self.view.source_kind = kind;
-        if target.is_none() {
-            self.clear_source_browser_state();
         }
-        self.view.browser_busy = true;
-        let (send, receive) = mpsc::sync_channel(1);
-        match std::thread::Builder::new()
-            .name("ingest-browser".into())
-            .spawn(move || {
-                let result = match target {
-                    None => browser.roots(match kind {
+        self.view.source_kind = kind;
+        let step = match target {
+            None => {
+                self.clear_source_browser_state();
+                qnc_source_browse::Step::Roots(
+                    match kind {
                         SourceKind::Internet => "intranet",
                         _ => source_kind_id(kind),
-                    }),
-                    Some(None) => browser.parent(),
-                    Some(Some(uri)) => browser.open(&uri),
-                };
-                let _ = send.send((browser, result));
-            }) {
-            Ok(_) => self.browser_result = Some(receive),
+                    }
+                    .into(),
+                )
+            }
+            Some(None) => qnc_source_browse::Step::Parent,
+            Some(Some(uri)) => qnc_source_browse::Step::Open(uri),
+        };
+        self.view.browser_busy = true;
+        match self.browse.start(step) {
+            Ok(()) => IngestDispatchResult::accepted(None, true),
             Err(error) => {
                 self.view.browser_busy = false;
-                return IngestDispatchResult::rejected(error.to_string());
+                IngestDispatchResult::rejected(error)
             }
         }
-        IngestDispatchResult::accepted(None, true)
     }
 
     /// Queues the selected clips (the selection lives in the database) and starts
@@ -1206,7 +1181,7 @@ impl IngestApplication {
             return IngestDispatchResult::rejected("Uvoz nije dostupan: nema konfiguracije ili kataloga.");
         };
         match self
-            .import_host
+            .importer
             .start(reader, plan, config.sources.clone(), target)
         {
             Ok(()) => {
@@ -1222,10 +1197,7 @@ impl IngestApplication {
         if self.playback_guard_active() {
             return self.playback_guard_rejected();
         }
-        let Some(selected) = self
-            .transport_browser
-            .as_ref()
-            .and_then(|b| b.selected(uri))
+        let Some(selected) = self.browse.selected(uri)
         else {
             return IngestDispatchResult::rejected("Odabrani izvor vise nije dostupan.");
         };

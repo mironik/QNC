@@ -48,7 +48,7 @@ fn filter_projects_existing_catalog_without_changing_selection_or_preview() {
             assert!(component.settings_result.is_none());
             assert!(!component.selection_writer.is_busy());
             assert!(!component.selection_session.has_pending_work());
-            assert!(component.browser_result.is_none());
+            assert!(!component.browse.is_busy());
         }
     }
 }
