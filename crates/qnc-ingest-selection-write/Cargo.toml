@@ -1,0 +1,8 @@
+[package]
+name = "qnc-ingest-selection-write"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: writes the selected flag of clips through the Ingest content write transport, off the caller's thread"
+
+[dependencies]
+qnc-ingest-store = { workspace = true }

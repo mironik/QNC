@@ -3286,6 +3286,7 @@ dependencies = [
  "qnc-ingest-import-worker",
  "qnc-ingest-preview",
  "qnc-ingest-select",
+ "qnc-ingest-selection-write",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
@@ -3420,6 +3421,13 @@ dependencies = [
  "tempfile",
  "tiny_http",
  "uuid",
+]
+
+[[package]]
+name = "qnc-ingest-selection-write"
+version = "0.1.0"
+dependencies = [
+ "qnc-ingest-store",
 ]
 
 [[package]]

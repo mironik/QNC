@@ -58,6 +58,7 @@ members = [
     "crates/qnc-ingest-desktop",
     "crates/qnc-ingest-artifacts",
     "crates/qnc-ingest-preview",
+    "crates/qnc-ingest-selection-write",
     "crates/qnc-ingest-cameras",
     "crates/qnc-ingest-desktop-adapter",
     "crates/qnc-ingest-import-worker",
@@ -149,6 +150,7 @@ qnc-broadcast-engine = { path = "crates/qnc-broadcast-engine" }
 qnc-ingest-work-plan = { path = "crates/qnc-ingest-work-plan" }
 qnc-ingest-artifacts = { path = "crates/qnc-ingest-artifacts" }
 qnc-ingest-preview = { path = "crates/qnc-ingest-preview" }
+qnc-ingest-selection-write = { path = "crates/qnc-ingest-selection-write" }
 qnc-ingest-cameras = { path = "crates/qnc-ingest-cameras" }
 qnc-ingest-catalog = { path = "crates/qnc-ingest-catalog" }
 qnc-ingest-import-worker = { path = "crates/qnc-ingest-import-worker" }

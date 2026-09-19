@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.ingest-selection-write",
+  "module_name": "Ingest selection write",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ingest.selection.write"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "public_ingest_content_write_transport_only",
+  "runtime_crate": "qnc-ingest-selection-write",
+  "input": "Content target, clip ids and the selected flag.",
+  "output": "The applied selection, or a controlled error; the write goes only through the public content write transport.",
+  "specification": "docs/v5-book/08-audit-and-plan.md (audit response)"
+}

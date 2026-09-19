@@ -454,8 +454,7 @@ pub struct IngestApplication {
     settings_reader: Option<SettingsReader>,
     settings_result: Option<Receiver<Result<catalog::LoadedCatalog, String>>>,
     catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
-    catalog_result: Option<Receiver<Result<(Vec<String>, bool), String>>>,
-    catalog_thread: Option<std::thread::JoinHandle<()>>,
+    selection_writer: qnc_ingest_selection_write::SelectionWriter,
     thumbnail_loader: qnc_media_thumbnail::ThumbnailBatchService,
     artifacts: qnc_timeline_artifacts::Artifacts,
     catalog_stats: Option<CatalogStats>,
@@ -565,7 +564,7 @@ impl IngestApplication {
         retain_loaded_workspace: bool,
     ) -> IngestDispatchResult {
         if self.settings_result.is_some()
-            || self.catalog_result.is_some()
+            || self.selection_writer.is_busy()
             || self.selection_session.has_pending_work()
         {
             if retain_loaded_workspace && pending_source.is_none() && self.settings_result.is_some() {
@@ -634,30 +633,19 @@ impl IngestApplication {
             changed = true;
         }
         changed |= self.poll_timeline_artifacts();
-        if let Some(receiver) = &self.catalog_result {
-            let result = match receiver.try_recv() {
-                Ok(result) => Some(result),
-                Err(TryRecvError::Disconnected) => Some(Err("DB odabir je prekinut.".into())),
-                Err(TryRecvError::Empty) => None,
-            };
-            if let Some(result) = result {
-                self.catalog_result = None;
-                if let Some(thread) = self.catalog_thread.take() {
-                    let _ = thread.join();
-                }
-                match result {
-                    Ok((ids, selected)) => {
-                        for clip in &mut self.view.clips {
-                            if ids.contains(&clip.clip_id) {
-                                clip.selected = selected;
-                            }
+        if let Some(result) = self.selection_writer.poll() {
+            match result {
+                Ok(applied) => {
+                    for clip in &mut self.view.clips {
+                        if applied.clip_ids.contains(&clip.clip_id) {
+                            clip.selected = applied.selected;
                         }
-                        self.view.message = self.view.status_label();
                     }
-                    Err(error) => self.view.message = error,
+                    self.view.message = self.view.status_label();
                 }
-                changed = true;
+                Err(error) => self.view.message = error,
             }
+            changed = true;
         }
         if let Some(receiver) = &self.browser_result {
             match receiver.try_recv() {
@@ -873,7 +861,7 @@ impl IngestApplication {
             || self.view.command_busy
             || self.view.browser_busy
             || self.settings_result.is_some()
-            || self.catalog_result.is_some()
+            || self.selection_writer.is_busy()
             || self.thumbnail_loader.has_pending_work()
             || self.selection_session.has_pending_work()
             || self.artifacts.has_pending_work()
@@ -944,42 +932,15 @@ impl IngestApplication {
         {
             return IngestDispatchResult::rejected("Klip jos nije spremljen u bazu.");
         }
-        if self.catalog_result.is_some() || self.view.work_settings_loading {
+        if self.selection_writer.is_busy() || self.view.work_settings_loading {
             return IngestDispatchResult::rejected("DB odabir je u tijeku.");
         }
         let Some(target) = self.catalog_target.clone() else {
             return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
         };
-        let (send, receive) = mpsc::sync_channel(1);
-        match std::thread::Builder::new()
-            .name("ingest-db-selection".into())
-            .spawn(move || {
-                let result = (|| -> Result<(Vec<String>, bool), String> {
-                    let mut transport =
-                        qnc_ingest_store::content::ContentWriteTransport::start(target)?;
-                    let key = "select-clips".to_string();
-                    transport.select(key.clone(), ids.clone(), selected)?;
-                    loop {
-                        for completion in transport.poll() {
-                            if completion.key == key {
-                                completion.result?;
-                                return Ok((ids, selected));
-                            }
-                        }
-                        if !transport.has_pending() {
-                            return Err("Content write transport nije vratio rezultat.".into());
-                        }
-                        std::thread::sleep(Duration::from_millis(2));
-                    }
-                })();
-                let _ = send.send(result);
-            }) {
-            Ok(thread) => {
-                self.catalog_result = Some(receive);
-                self.catalog_thread = Some(thread);
-                IngestDispatchResult::accepted(None, true)
-            }
-            Err(error) => IngestDispatchResult::rejected(error.to_string()),
+        match self.selection_writer.start(target, ids, selected) {
+            Ok(()) => IngestDispatchResult::accepted(None, true),
+            Err(error) => IngestDispatchResult::rejected(error),
         }
     }
 
@@ -1007,7 +968,7 @@ impl IngestApplication {
                 | action_ids::INGEST_DIR_CANCEL
         );
         if source_action
-            && (self.catalog_result.is_some()
+            && (self.selection_writer.is_busy()
                 || self.view.command_busy
                 || self.view.browser_busy
                 || (self.pending_source.is_some()
@@ -1462,10 +1423,7 @@ impl Drop for IngestApplication {
     fn drop(&mut self) {
         self.stop_player();
         self.cancel_thumbnail_load();
-        self.catalog_result = None;
-        if let Some(thread) = self.catalog_thread.take() {
-            let _ = thread.join();
-        }
+        self.selection_writer.cancel();
         self.selection_session.cancel();
     }
 }
