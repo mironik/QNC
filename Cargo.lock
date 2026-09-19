@@ -3337,6 +3337,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
+ "qnc-media-thumbnail",
  "qnc-work-settings",
 ]
 
@@ -3658,6 +3659,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-image-assets",
  "qnc-source-reader",
+ "tempfile",
 ]
 
 [[package]]
