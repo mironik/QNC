@@ -1335,7 +1335,7 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
-Otvoreno ograniceno odobrenje 2026-09-19 (dvadeseto): korisnik je izricito otkljucao
+Zatvoreno ograniceno odobrenje 2026-09-19 (dvadeseto): korisnik je izricito otkljucao
 sav kod potreban za rjesavanje nalaza vanjskog audita Ingesta (monoliti
 `qnc-ingest-application` i `qnc-ingest-select`; uske javne host komponente; jedan
 preview host; osvjezavanje artefakata istog klipa; determinsticki cancel Selecta;
@@ -1349,6 +1349,18 @@ samo ako nova granica to trazi. **Layout i UI ostaju zakljucani**: `qnc-ingest-d
 `qnc-source-dock`, `qnc-ui-kit`, `contracts/ui`. Pravilo: `qnc-ingest-application` i
 `qnc-ingest-select` se ne prosiruju novom logikom, samo se smanjuju; nova logika ide u uske
 javne crateove. Sve ostalo ostaje zamrznuto.
+Izvedeno (dvadeseto): `qnc-ingest-select` podijeljen u module `scan`, `records`, `metadata`,
+`publish` s tankim vozacem; Select cancel ceka nit ogranicen broj ms i baca kasne evente; isti klip
+osvjezava artefakte; kamere u `qnc-camera-*` i `qnc-ingest-cameras`; uvoz u
+`qnc-ingest-import-worker` (`Importer`, najam s otkucajima za zapete `Processing` klipove);
+novi javni crateovi: `qnc-timeline-artifacts` i `qnc-ingest-artifacts`, `qnc-ingest-preview`
+(preview je neutralni `qnc-source-preview` s citacima kroz traitove), `qnc-ingest-selection-write`,
+`qnc-source-browse`, `qnc-playback-priority`, `CatalogLoader` u `qnc-ingest-catalog`.
+`qnc-ingest-application` vise ne drzi player, filmstrip/wave radnike, import, pisanje odabira,
+browsing ni ucitavanje kataloga; ostaje dispatch, mapiranje u view i `confirm_source_selection`.
+Nije izvedeno: kopija postera (traži odluku o DB ugovoru), izbor citaca indeksa po
+pattern-id u `qnc-scanner` (nije otkljucan), test kroz cijelu aplikaciju i na stvarnoj kartici.
+Odobrenje je zatvoreno.
 
 Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
 odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i

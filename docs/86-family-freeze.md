@@ -365,3 +365,22 @@ stavlja odabrane u red i pokrece uvoz; Ingest UI se ne mijenja. Testovi: import-
 application 27, select 16, store 26; conformance prolazi. Nije izvedeno: generiranje proxyja,
 kopija postera, test kroz cijelu aplikaciju i na stvarnoj kartici. Odobrenje je zatvoreno.
 Status: zamrznuto.
+
+## Zatvoreno ograniceno odobrenje 2026-09-19 (dvadeseto)
+
+Rjesavanje nalaza vanjskog audita Ingesta. Layout i UI nisu mijenjani. Uski javni crateovi:
+`qnc-timeline-artifacts` (filmstrip i wave za bilo koju formu, sadrzaj kroz traitove) i
+`qnc-ingest-artifacts` (Ingest citaci i pisaci), `qnc-ingest-preview` (izvor klipova za preview),
+`qnc-ingest-selection-write` (upis odabira kroz write transport), `qnc-source-browse`
+(asinkrono pregledavanje izvora), `qnc-playback-priority` (pravilo prioriteta reprodukcije),
+`CatalogLoader` u `qnc-ingest-catalog`. `qnc-source-preview` prima citace kroz traite
+(`PreviewContext::with_readers`), postojeci `new` za projektnu bazu ostaje. `qnc-ingest-select`:
+moduli `scan`, `records`, `metadata`, `publish` i tanki vozac. `qnc-ingest-store`: najam uvoza
+(`import_claimed_at`, operacija `Heartbeat`, oporavak zapetog `Processing` u `ClaimNext` nakon
+120 s bez otkucaja). `qnc-ingest-import-worker`: `Importer`, otkucaj svakih 20 s tijekom
+kopije. Izmjena naziva: rijec host oznacava samo shell desktop. Testovi: store 29, import-worker
+10, application 28, select 17, source-preview 5, playback-priority 3, source-browse 2,
+timeline-artifacts 3; conformance prolazi; `qnc-app` i `qnc-ingest` se grade. Nije izvedeno:
+kopija postera (odluka o DB ugovoru), izbor citaca indeksa po pattern-id u `qnc-scanner`,
+test kroz cijelu aplikaciju i na stvarnoj kartici, test otkucaja u workeru. Odobrenje je
+zatvoreno. Status: zamrznuto.
