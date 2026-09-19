@@ -3290,6 +3290,7 @@ dependencies = [
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
+ "qnc-playback-priority",
  "qnc-player-client",
  "qnc-player-timeline",
  "qnc-source-browse",
@@ -3687,6 +3688,10 @@ dependencies = [
  "winit",
  "yuv",
 ]
+
+[[package]]
+name = "qnc-playback-priority"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-player-client"

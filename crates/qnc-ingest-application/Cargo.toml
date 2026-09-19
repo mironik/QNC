@@ -9,6 +9,7 @@ qnc-dir-browser = { workspace = true }
 qnc-ingest-artifacts = { workspace = true }
 qnc-ingest-preview = { workspace = true }
 qnc-ingest-selection-write = { workspace = true }
+qnc-playback-priority = { workspace = true }
 qnc-source-browse = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-ingest-catalog = { workspace = true }

@@ -1,0 +1,5 @@
+[package]
+name = "qnc-playback-priority"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: while a source player prepares or plays, heavy background work waits; each form only lists which of its actions are heavy"

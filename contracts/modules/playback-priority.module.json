@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.playback-priority",
+  "module_name": "Playback priority",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["playback.priority"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-playback-priority",
+  "input": "The playback state (preparing, playing, play waiting) and the heavy action ids of a form.",
+  "output": "Whether playback holds the priority and whether an action must be refused.",
+  "specification": "docs/v5-book/08-audit-and-plan.md (audit response)"
+}
