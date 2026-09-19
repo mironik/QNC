@@ -1335,6 +1335,21 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Otvoreno ograniceno odobrenje 2026-09-19 (dvadeseto): korisnik je izricito otkljucao
+sav kod potreban za rjesavanje nalaza vanjskog audita Ingesta (monoliti
+`qnc-ingest-application` i `qnc-ingest-select`; uske javne host komponente; jedan
+preview host; osvjezavanje artefakata istog klipa; determinsticki cancel Selecta;
+uvoz izvan applicationa), do rjesenja svih nalaza. Otkljucano: crateovi obitelji Ingest
+(`qnc-ingest-application`, `qnc-ingest-select`, `qnc-ingest-store`,
+`qnc-ingest-import-worker`, `qnc-ingest-catalog`, `qnc-ingest-work-plan`), `qnc-camera-*`,
+`qnc-source-preview`, `qnc-content-read`, `qnc-timeline-assets`, `qnc-media-thumbnail`, novi
+crateovi i ugovori modula, testovi, `Cargo.toml`/`Cargo.lock`, dokumenti, `tools/qnc-conformance`
+samo ako nova granica to trazi. **Layout i UI ostaju zakljucani**: `qnc-ingest-desktop`,
+`qnc-project-desktop`, `qnc-editorial-desktop`, `qnc-media-card`, `qnc-media-pool-head`,
+`qnc-source-dock`, `qnc-ui-kit`, `contracts/ui`. Pravilo: `qnc-ingest-application` i
+`qnc-ingest-select` se ne prosiruju novom logikom, samo se smanjuju; nova logika ide u uske
+javne crateove. Sve ostalo ostaje zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
 odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i
 intranet. Otkljucano: novi crate `crates/qnc-ingest-import-worker` (javni modul:

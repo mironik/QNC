@@ -475,19 +475,10 @@ pub struct IngestApplication {
         )>,
     >,
     selection_session: selection::SelectSession,
-    import_session: qnc_ingest_import_worker::ImportSession,
+    import_host: qnc_ingest_import_worker::ImportHost,
     camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
     selection_warnings: usize,
     selection_last_warning: Option<String>,
-}
-
-/// The cameras this Ingest application composes. A new camera is one more line here.
-pub fn default_camera_registry() -> Result<qnc_camera_adapter::CameraRegistry, String> {
-    let mut registry = qnc_camera_adapter::CameraRegistry::new();
-    registry.register(std::sync::Arc::new(
-        qnc_camera_sony_fx6_v6::SonyFx6V6::new(),
-    ))?;
-    Ok(registry)
 }
 
 impl IngestApplication {
@@ -502,7 +493,7 @@ impl IngestApplication {
     }
 
     pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
-        let mut component = Self::new().with_camera_registry(default_camera_registry()?);
+        let mut component = Self::new().with_camera_registry(qnc_ingest_cameras::registry()?);
         component.store = Some(IngestStore::open(root.as_ref())?);
         match selection_config::SelectionConfig::load(root.as_ref()).and_then(|config| {
             let browser = config.browser()?;
@@ -712,26 +703,12 @@ impl IngestApplication {
             }
         }
         let mut import_finished = false;
-        for event in self.import_session.poll(64) {
+        for notice in self.import_host.poll(64) {
             changed = true;
-            match event {
-                qnc_ingest_import_worker::ImportEvent::Clip(outcome) => {
-                    self.view.message = match outcome.result {
-                        Ok(_) => format!("Uvezeno: {}", outcome.clip_id),
-                        Err(error) => format!("Uvoz nije uspio ({}): {error}", outcome.clip_id),
-                    };
-                }
-                qnc_ingest_import_worker::ImportEvent::Finished(result) => {
-                    self.view.command_busy = false;
-                    import_finished = true;
-                    self.view.message = match result {
-                        Ok(summary) => format!(
-                            "Uvoz: {} uvezeno; {} neuspjelo.",
-                            summary.imported, summary.failed
-                        ),
-                        Err(error) => error,
-                    };
-                }
+            self.view.message = notice.message;
+            if notice.finished {
+                self.view.command_busy = false;
+                import_finished = true;
             }
         }
         if import_finished {
@@ -1288,37 +1265,17 @@ impl IngestApplication {
         if self.playback_guard_active() {
             return self.playback_guard_rejected();
         }
-        if self.import_session.has_pending_work() {
-            return IngestDispatchResult::rejected("Uvoz je vec u tijeku.");
-        }
-        let Some(config) = self.selection_config.clone() else {
-            return IngestDispatchResult::rejected("Nema Select konfiguracije.");
+        let (Some(config), Some(target), Some(reader)) = (
+            self.selection_config.as_ref(),
+            self.catalog_target.clone(),
+            self.settings_reader.as_ref(),
+        ) else {
+            return IngestDispatchResult::rejected("Uvoz nije dostupan: nema konfiguracije ili kataloga.");
         };
-        let Some(target) = self.catalog_target.clone() else {
-            return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
-        };
-        let project_dir = match self
-            .settings_reader
-            .as_ref()
-            .map(|reader| reader.local_workspace_dir(&plan.settings))
+        match self
+            .import_host
+            .start(reader, plan, config.sources.clone(), target)
         {
-            Some(Ok(Some(dir))) => dir,
-            Some(Ok(None)) => {
-                return IngestDispatchResult::rejected(
-                    "Uvoz trazi lokalni pristup direktoriju projekta na ovom stroju.",
-                )
-            }
-            Some(Err(error)) => return IngestDispatchResult::rejected(error.to_string()),
-            None => return IngestDispatchResult::rejected("Radne postavke nisu dostupne."),
-        };
-        let queued = qnc_ingest_import_worker::queue_selected(target.clone());
-        if let Err(error) = queued {
-            return IngestDispatchResult::rejected(error);
-        }
-        let opener = std::sync::Arc::new(qnc_ingest_import_worker::ConfigMediaOpener::new(
-            config.sources.clone(),
-        ));
-        match self.import_session.start(plan, project_dir, opener, target) {
             Ok(()) => {
                 self.view.command_busy = true;
                 self.view.message = "Uvoz je pokrenut.".into();

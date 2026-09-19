@@ -3277,12 +3277,12 @@ version = "0.1.0"
 dependencies = [
  "image",
  "qnc-camera-adapter",
- "qnc-camera-sony-fx6-v6",
  "qnc-contracts",
  "qnc-dir-browser",
  "qnc-filmstrip",
  "qnc-filmstrip-worker",
  "qnc-image-assets",
+ "qnc-ingest-cameras",
  "qnc-ingest-catalog",
  "qnc-ingest-import-worker",
  "qnc-ingest-select",
@@ -3304,6 +3304,14 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tiny_http",
+]
+
+[[package]]
+name = "qnc-ingest-cameras"
+version = "0.1.0"
+dependencies = [
+ "qnc-camera-adapter",
+ "qnc-camera-sony-fx6-v6",
 ]
 
 [[package]]

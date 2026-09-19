@@ -55,6 +55,7 @@ members = [
     "crates/qnc-ingest-application",
     "crates/qnc-image-assets",
     "crates/qnc-ingest-desktop",
+    "crates/qnc-ingest-cameras",
     "crates/qnc-ingest-desktop-adapter",
     "crates/qnc-ingest-import-worker",
     "crates/qnc-media-assist-audio-ai-desktop-adapter",
@@ -142,6 +143,7 @@ qnc-gpu-raster = { path = "crates/qnc-gpu-raster" }
 qnc-broadcast-player = { path = "crates/qnc-broadcast-player" }
 qnc-broadcast-engine = { path = "crates/qnc-broadcast-engine" }
 qnc-ingest-work-plan = { path = "crates/qnc-ingest-work-plan" }
+qnc-ingest-cameras = { path = "crates/qnc-ingest-cameras" }
 qnc-ingest-catalog = { path = "crates/qnc-ingest-catalog" }
 qnc-ingest-import-worker = { path = "crates/qnc-ingest-import-worker" }
 qnc-ingest-select = { path = "crates/qnc-ingest-select" }

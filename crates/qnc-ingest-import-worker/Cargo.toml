@@ -12,11 +12,11 @@ qnc-ingest-store = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-media-stream = { workspace = true }
 qnc-source-reader = { workspace = true }
+qnc-work-settings = { workspace = true }
 
 [dev-dependencies]
 qnc-camera-adapter = { workspace = true }
 qnc-camera-sony-fx6-v6 = { workspace = true }
-qnc-work-settings = { workspace = true }
 qnc-ingest-select = { workspace = true, features = ["test-support"] }
 serde_json = { workspace = true }
 tempfile = "3"

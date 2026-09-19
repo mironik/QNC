@@ -1,0 +1,9 @@
+[package]
+name = "qnc-ingest-cameras"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public composition: the camera adapters Ingest reads. A new camera is one more line here; Select and the application never name a camera"
+
+[dependencies]
+qnc-camera-adapter = { workspace = true }
+qnc-camera-sony-fx6-v6 = { workspace = true }
