@@ -1,6 +1,7 @@
+#[cfg(test)]
+use std::sync::mpsc;
 use std::{
     path::Path,
-    sync::mpsc::{self, Receiver, TryRecvError},
     time::Duration,
 };
 
@@ -452,7 +453,7 @@ pub struct IngestApplication {
     source_browser: DirectoryBrowserSession,
     store: Option<IngestStore>,
     settings_reader: Option<SettingsReader>,
-    settings_result: Option<Receiver<Result<catalog::LoadedCatalog, String>>>,
+    catalog_loader: catalog::CatalogLoader,
     catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
     selection_writer: qnc_ingest_selection_write::SelectionWriter,
     thumbnail_loader: qnc_media_thumbnail::ThumbnailBatchService,
@@ -537,7 +538,7 @@ impl IngestApplication {
         self.view.clip_filter = ClipFilter::All;
         self.view.preview_clip_id = None;
         self.pending_source = None;
-        self.settings_result = None;
+        self.catalog_loader.cancel();
         self.view.work_settings_loading = false;
         self.view.work_settings_ready = false;
         self.view.work_settings_error = Some(error);
@@ -557,11 +558,11 @@ impl IngestApplication {
         pending_source: Option<String>,
         retain_loaded_workspace: bool,
     ) -> IngestDispatchResult {
-        if self.settings_result.is_some()
+        if self.catalog_loader.is_busy()
             || self.selection_writer.is_busy()
             || self.selection_session.has_pending_work()
         {
-            if retain_loaded_workspace && pending_source.is_none() && self.settings_result.is_some() {
+            if retain_loaded_workspace && pending_source.is_none() && self.catalog_loader.is_busy() {
                 return IngestDispatchResult::accepted(None, true);
             }
             return IngestDispatchResult::rejected("Citanje radnih postavki je u tijeku.");
@@ -590,19 +591,8 @@ impl IngestApplication {
             self.view.work_settings_ready = false;
         }
         self.view.work_settings_error = None;
-        let (send, receive) = mpsc::sync_channel(1);
-        match std::thread::Builder::new()
-            .name("ingest-work-settings".into())
-            .spawn(move || {
-                let result = catalog::load(
-                    &reader,
-                    retained_workspace.as_deref(),
-                    retained_stats.as_ref(),
-                );
-                let _ = send.send(result);
-            }) {
-            Ok(_) => self.settings_result = Some(receive),
-            Err(_) => self.settings_failed("Nije moguce pokrenuti citanje radnih postavki.".into()),
+        if let Err(error) = self.catalog_loader.start(reader, retained_workspace, retained_stats) {
+            self.settings_failed(error);
         }
         IngestDispatchResult::accepted(None, true)
     }
@@ -754,15 +744,9 @@ impl IngestApplication {
     }
 
     fn poll_settings(&mut self) -> bool {
-        let Some(receiver) = self.settings_result.as_ref() else {
+        let Some(result) = self.catalog_loader.poll() else {
             return false;
         };
-        let result = match receiver.try_recv() {
-            Ok(result) => result,
-            Err(TryRecvError::Empty) => return false,
-            Err(TryRecvError::Disconnected) => Err("Citanje radnih postavki je prekinuto.".into()),
-        };
-        self.settings_result = None;
         self.view.work_settings_loading = false;
         match result {
             Ok(loaded) => {
@@ -842,7 +826,7 @@ impl IngestApplication {
         self.view.work_settings_loading
             || self.view.command_busy
             || self.view.browser_busy
-            || self.settings_result.is_some()
+            || self.catalog_loader.is_busy()
             || self.selection_writer.is_busy()
             || self.thumbnail_loader.has_pending_work()
             || self.selection_session.has_pending_work()

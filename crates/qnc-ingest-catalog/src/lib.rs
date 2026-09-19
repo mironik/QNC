@@ -125,3 +125,71 @@ fn row(stored: &StoredClipSummary) -> CatalogClipRow {
         },
     }
 }
+
+/// Loads the catalog off the caller's thread: start it, poll for the outcome.
+/// Only one load runs at a time and a cancelled load never delivers.
+#[derive(Debug, Default)]
+pub struct CatalogLoader {
+    result: Option<std::sync::mpsc::Receiver<Result<LoadedCatalog, String>>>,
+}
+
+impl CatalogLoader {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn is_busy(&self) -> bool {
+        self.result.is_some()
+    }
+
+    pub fn start(
+        &mut self,
+        reader: SettingsReader,
+        retained_workspace: Option<String>,
+        retained_stats: Option<CatalogStats>,
+    ) -> Result<(), String> {
+        let (send, receive) = std::sync::mpsc::sync_channel(1);
+        std::thread::Builder::new()
+            .name("ingest-catalog-load".into())
+            .spawn(move || {
+                let _ = send.send(load(
+                    &reader,
+                    retained_workspace.as_deref(),
+                    retained_stats.as_ref(),
+                ));
+            })
+            .map_err(|_| "Nije moguce pokrenuti citanje radnih postavki.".to_string())?;
+        self.result = Some(receive);
+        Ok(())
+    }
+
+    /// The finished load, `None` while it still runs.
+    pub fn poll(&mut self) -> Option<Result<LoadedCatalog, String>> {
+        use std::sync::mpsc::TryRecvError;
+        let outcome = match self.result.as_ref()?.try_recv() {
+            Ok(outcome) => outcome,
+            Err(TryRecvError::Empty) => return None,
+            Err(TryRecvError::Disconnected) => Err("Citanje radnih postavki je prekinuto.".into()),
+        };
+        self.result = None;
+        Some(outcome)
+    }
+
+    pub fn cancel(&mut self) {
+        self.result = None;
+    }
+}
+
+#[cfg(test)]
+mod loader_tests {
+    use super::*;
+
+    #[test]
+    fn an_idle_loader_delivers_nothing_and_cancels_safely() {
+        let mut loader = CatalogLoader::new();
+        assert!(!loader.is_busy());
+        assert!(loader.poll().is_none());
+        loader.cancel();
+        assert!(!loader.is_busy());
+    }
+}

@@ -45,7 +45,7 @@ fn filter_projects_existing_catalog_without_changing_selection_or_preview() {
             assert_eq!(component.view.selected_count(), 1);
             assert_eq!(component.view.message, before.message);
             assert!(!component.has_pending_work());
-            assert!(component.settings_result.is_none());
+            assert!(!component.catalog_loader.is_busy());
             assert!(!component.selection_writer.is_busy());
             assert!(!component.selection_session.has_pending_work());
             assert!(!component.browse.is_busy());
