@@ -16,6 +16,7 @@ members = [
     "crates/qnc-db-contract",
     "crates/qnc-dev-diagnostics",
     "crates/qnc-dir-browser",
+    "crates/qnc-editorial-application",
     "crates/qnc-editorial-desktop",
     "crates/qnc-editorial-shell",
     "crates/qnc-frame-timebase",
@@ -76,6 +77,7 @@ members = [
     "crates/qnc-shell-desktop-api",
     "crates/qnc-sony-metadata",
     "crates/qnc-source-reader",
+    "crates/qnc-source-bindings",
     "crates/qnc-source-contract",
     "crates/qnc-source-dock",
     "crates/qnc-source-groups",
@@ -102,6 +104,7 @@ qnc-camera-detector = { path = "crates/qnc-camera-detector" }
 qnc-db-contract = { path = "crates/qnc-db-contract" }
 qnc-dev-diagnostics = { path = "crates/qnc-dev-diagnostics" }
 qnc-dir-browser = { path = "crates/qnc-dir-browser" }
+qnc-editorial-application = { path = "crates/qnc-editorial-application" }
 qnc-editorial-desktop = { path = "crates/qnc-editorial-desktop" }
 qnc-editorial-shell = { path = "crates/qnc-editorial-shell" }
 qnc-frame-timebase = { path = "crates/qnc-frame-timebase" }
@@ -162,6 +165,7 @@ qnc-project-store = { path = "crates/qnc-project-store" }
 qnc-shell-desktop-api = { path = "crates/qnc-shell-desktop-api" }
 qnc-sony-metadata = { path = "crates/qnc-sony-metadata" }
 qnc-source-reader = { path = "crates/qnc-source-reader" }
+qnc-source-bindings = { path = "crates/qnc-source-bindings" }
 qnc-source-contract = { path = "crates/qnc-source-contract" }
 qnc-source-dock = { path = "crates/qnc-source-dock" }
 qnc-source-groups = { path = "crates/qnc-source-groups" }

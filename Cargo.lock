@@ -3106,15 +3106,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-editorial-application"
+version = "0.1.0"
+dependencies = [
+ "qnc-filmstrip",
+ "qnc-ingest-catalog",
+ "qnc-ingest-store",
+ "qnc-ingest-work-plan",
+ "qnc-player-client",
+ "qnc-player-input",
+ "qnc-player-launcher",
+ "qnc-player-timeline",
+ "qnc-source-bindings",
+ "qnc-timeline",
+ "qnc-timeline-assets",
+ "qnc-wave",
+ "qnc-work-settings",
+]
+
+[[package]]
 name = "qnc-editorial-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-contracts",
- "qnc-filmstrip",
+ "qnc-editorial-application",
  "qnc-monitor",
  "qnc-timeline",
- "qnc-ui-kit",
  "serde",
  "serde_json",
 ]
@@ -3792,6 +3810,14 @@ dependencies = [
  "serde",
  "serde_json",
  "xml-rs",
+]
+
+[[package]]
+name = "qnc-source-bindings"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

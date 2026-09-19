@@ -48,6 +48,10 @@
     "tabs_left": ["All", "Virtual"],
     "transport_right": [">", "[", "]"]
   },
+  "clip_list": {
+    "row_height": 28.0,
+    "row_pad_x": 8.0
+  },
   "source_dock": {
     "inner_margin_x": 8.0,
     "header_timeline_gap": 4.0,

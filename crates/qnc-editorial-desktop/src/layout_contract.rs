@@ -131,6 +131,7 @@ pub struct EditorialLayoutContract {
     pub board: EditorialBoard,
     pub preview: EditorialPreview,
     pub pool_head: EditorialPoolHead,
+    pub clip_list: EditorialClipList,
     pub source_dock: EditorialSourceDock,
     pub groups: HashMap<String, GroupComposition>,
 }
@@ -186,4 +187,10 @@ pub struct GroupComposition {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GroupSourceDock {
     pub actions_rtl: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct EditorialClipList {
+    pub row_height: f32,
+    pub row_pad_x: f32,
 }

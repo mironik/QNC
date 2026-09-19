@@ -1,18 +1,18 @@
-//! Shows the editorial form base with an empty view.
+//! Shows the editorial form with fake clips and no application behind it.
 //!
 //!     cargo run -p qnc-editorial-desktop --example editorial_form -- e
 //!
-//! Groups: e, g, l, o. Only the layout is shown; no application, database or
-//! player is attached.
+//! Groups: e, g, l, o. Layout only: clicking a clip marks it, the monitor and
+//! the timeline stay empty. The real thing (Broadcast Player, project catalog)
+//! is `EditorialApp`, used by the four applications.
 
 use eframe::egui;
-use qnc_editorial_desktop::{EditorialForm, EditorialView};
+use qnc_editorial_desktop::{EditorialClip, EditorialForm, EditorialIntent, EditorialView};
 use qnc_timeline::TimelineProjection;
 
 struct Host {
     form: EditorialForm,
     view: EditorialView,
-    last_intent: String,
 }
 
 impl eframe::App for Host {
@@ -22,14 +22,16 @@ impl eframe::App for Host {
             .frame(egui::Frame::NONE)
             .show(ctx, |ui| {
                 if let Some(intent) = self.form.show_desktop(ui, &self.view) {
-                    self.last_intent = format!("{intent:?}");
-                    if let qnc_editorial_desktop::EditorialIntent::Timeline(
-                        qnc_timeline::TimelineIntent::CueFrame(frame),
-                    ) = intent
-                    {
-                        self.view.timeline = self.view.timeline.with_playhead(frame);
+                    eprintln!("intent: {intent:?}");
+                    match intent {
+                        EditorialIntent::PreviewClip(id) => self.view.preview_clip_id = Some(id),
+                        EditorialIntent::Timeline(qnc_timeline::TimelineIntent::CueFrame(
+                            frame,
+                        )) => {
+                            self.view.timeline = self.view.timeline.with_playhead(frame);
+                        }
+                        _ => {}
                     }
-                    eprintln!("intent: {}", self.last_intent);
                 }
             });
     }
@@ -42,14 +44,17 @@ fn main() -> eframe::Result<()> {
         std::process::exit(1);
     });
     let mut view = EditorialView::default();
+    view.clips = (1..=40)
+        .map(|i| EditorialClip {
+            clip_id: format!("clip-{i:03}"),
+            name: format!("Izjava {i:03}.MXF"),
+            duration_seconds: 20.0 + (i as f64 * 7.3) % 190.0,
+        })
+        .collect();
     view.timeline = TimelineProjection::new(0, 5000)
         .with_playhead(1200)
         .with_cue_enabled(true);
-    let host = Host {
-        form,
-        view,
-        last_intent: String::new(),
-    };
+    let host = Host { form, view };
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1400.0, 800.0])

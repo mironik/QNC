@@ -14,7 +14,9 @@ fn main() -> eframe::Result<()> {
         }
     }
 
-    let app = qnc_editorial_desktop::EditorialApp::new(GROUP)
+    let root = qnc_editorial_desktop::locate_qnc_root()
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let app = qnc_editorial_desktop::EditorialApp::new(GROUP, root)
         .unwrap_or_else(|error| panic!("failed to create QNC Story: {error}"));
     let options = eframe::NativeOptions {
         renderer: eframe::Renderer::Wgpu,

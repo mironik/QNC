@@ -1,43 +1,60 @@
 //! The editorial application object shared by the standalone executable and the
-//! shell adapter of every group. It holds the form and an (empty) view; the
-//! group functions fill the view later.
+//! shell adapter of every group: the form plus the read-only component.
+
+use std::path::PathBuf;
 
 use eframe::egui::{self, CentralPanel, Frame};
+use qnc_editorial_application::EditorialApplication;
 
-use crate::{EditorialForm, EditorialIntent, EditorialView};
+use crate::EditorialForm;
 
 pub struct EditorialApp {
     form: EditorialForm,
-    view: EditorialView,
-    footer: String,
+    application: EditorialApplication,
+    player_repaint_bound: bool,
 }
 
 impl EditorialApp {
-    pub fn new(group: &str) -> Result<Self, String> {
+    pub fn new(group: &str, root: PathBuf) -> Result<Self, String> {
         Ok(Self {
             form: EditorialForm::new(group)?,
-            view: EditorialView::default(),
-            footer: String::new(),
+            application: EditorialApplication::new(root),
+            player_repaint_bound: false,
         })
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+        if !self.player_repaint_bound && self.application.has_player() {
+            let repaint = ctx.clone();
+            self.application.notify_on_player_change(move || {
+                repaint.request_repaint();
+            });
+            self.player_repaint_bound = true;
+        }
+        let changed = self.application.poll();
+        if changed {
+            ctx.request_repaint();
+        } else if let Some(delay) = self.application.next_repaint_delay() {
+            // Cadence only when this paint had no new picture; scheduling it
+            // after a notify wake would postpone the next source frame.
+            ctx.request_repaint_after(delay);
+        }
         self.form.apply_theme(ctx);
-        if let Some(intent) = self.form.show_desktop(ui, &self.view) {
-            self.handle(intent);
+        let intent = self.form.show_desktop(ui, self.application.view());
+        if let Some(intent) = intent {
+            if self.application.dispatch(intent) {
+                ctx.request_repaint();
+            }
         }
     }
 
     pub fn footer_status(&self) -> &str {
-        &self.footer
+        self.application.footer_status()
     }
 
-    /// Only the timeline cue is handled here: it moves the shown playhead. The
-    /// group functions (player, transcript, ...) come later.
-    fn handle(&mut self, intent: EditorialIntent) {
-        if let EditorialIntent::Timeline(qnc_timeline::TimelineIntent::CueFrame(frame)) = intent {
-            self.view.timeline = self.view.timeline.with_playhead(frame);
-        }
+    /// The surface became visible again: reread the active project cheaply.
+    pub fn on_activated(&mut self) {
+        self.application.refresh();
     }
 }
 

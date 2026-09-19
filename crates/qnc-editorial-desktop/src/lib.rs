@@ -1,19 +1,21 @@
 //! Editorial form base for Media Assist groups and Story: the Ingest layout
 //! and UI copied 1:1 (shell, preview monitor, pool head, source dock with the
-//! timeline), without the right clip grid and the directory browser. Passive:
-//! the host fills `EditorialView` and receives `EditorialIntent`s.
+//! timeline), without the right clip grid; the place of the Ingest directory
+//! browser shows the clip list. Passive: the host fills `EditorialView` and
+//! receives `EditorialIntent`s.
 
 mod app;
 mod layout_contract;
 mod theme;
-mod view;
 mod widgets;
 
 use eframe::egui;
 
 pub use app::EditorialApp;
 pub use layout_contract::{check_contracts_message, EditorialContracts};
-pub use view::{action_ids, EditorialIntent, EditorialView, MonitorFrame, Poster};
+pub use qnc_editorial_application::{
+    action_ids, locate_qnc_root, EditorialClip, EditorialIntent, EditorialView, MonitorFrame,
+};
 
 /// One editorial form for a group (e, g, l or o).
 pub struct EditorialForm {

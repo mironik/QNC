@@ -1335,6 +1335,19 @@ sve aplikacije/forme, shell, svi javni moduli, alati, ugovori i dokumenti
 razvoja. Detalj: `docs/86-family-freeze.md`. Odjeljci 14 i 17 ostaju na snazi
 i strozi su za svoj opseg; ovaj odjeljak zatvara sve sto oni nisu imenovali.
 
+Otvoreno ograniceno odobrenje 2026-09-19 (cetrnaesto): korisnik je izricito
+zatrazio da preview monitor i source timeline u aplikacijama e, g, l, o budu
+stvarno spojeni na Broadcast Player, uz popis klipova ispod monitora (lijevo
+tijelo, mjesto izbora direktorija). Novi crateovi: `crates/qnc-editorial-application`
+(tanki composition root: citanje aktivnog projekta, popis klipova iz projektne baze
+samo za citanje, player klijent, timeline artefakti samo za citanje) i
+`crates/qnc-source-bindings` (javni modul: veze `qnc://local/source/...` na lokalne
+korijene iz host konfiguracije; ugovor `contracts/modules/source-bindings.module.json`).
+Izmjene: `crates/qnc-editorial-desktop` (forma prikazuje popis, koristi view iz
+application cratea), `contracts/ui/editorial.layout.json` (popis klipova),
+`tools/qnc-conformance` (granica forme), root `Cargo.toml`/`Cargo.lock`. Ingest se
+ne dira. Bez skeniranja, probea i pisanja u tude baze. Sve ostalo ostaje zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-19 (trinaesto): korisnik je izricito
 otkljucao Ingest za popravak nalaza 2 iz auditâ: playback guard blokira odabir
 klipa tijekom pripreme ili reprodukcije playera. Otkljucano samo

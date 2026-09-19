@@ -2,17 +2,19 @@
 // right clip grid and the directory browser (its area stays empty and is
 // filled by later group functions). Painting, metrics and helpers are unchanged.
 use eframe::egui::{
-    self, Align, Button, Color32, CornerRadius, Label, Layout, Rect, RichText, Sense, Stroke, Ui,
+    self, Align, Align2, Button, Color32, CornerRadius, FontId, Label, Layout, Rect, RichText,
+    ScrollArea, Sense, Stroke, Ui,
     Vec2,
 };
 
 use qnc_monitor::{MonitorChrome, MonitorPaint, MonitorPicture, MonitorSurface};
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
+use qnc_editorial_application::{action_ids, EditorialIntent, EditorialView};
+
 use crate::{
     layout_contract::EditorialContracts,
     theme::Theme,
-    view::{action_ids, EditorialIntent, EditorialView},
 };
 
 pub fn render_desktop(
@@ -137,9 +139,14 @@ fn render_left_column(
     ui.scope_builder(egui::UiBuilder::new().max_rect(head_rect), |ui| {
         intent = render_pool_head(ui, contracts, theme);
     });
-    // Where Ingest shows the directory browser: empty (clip selection later).
+    // Where Ingest shows the directory browser: the clip list of the project.
     ui.painter()
         .rect_filled(browser_content_rect, 0.0, theme.bg);
+    if intent.is_none() {
+        ui.scope_builder(egui::UiBuilder::new().max_rect(browser_content_rect), |ui| {
+            intent = render_clip_list(ui, contracts, theme, view);
+        });
+    }
     intent
 }
 
@@ -188,21 +195,8 @@ fn render_preview(
         MonitorPaint::Picture | MonitorPaint::Message => return,
         MonitorPaint::Empty => {}
     }
-    if let Some(poster) = &view.poster {
-        if qnc_ui_kit::paint_rgba_image(
-            ui,
-            rect.shrink(1.0),
-            &poster.uri,
-            poster.content_key,
-            poster.size,
-            &poster.pixels,
-        ) {
-            return;
-        }
-    }
     let label = view
-        .clip_label
-        .as_deref()
+        .current_clip_label()
         .unwrap_or(contracts.editorial.preview.empty_label.as_str());
     qnc_monitor::paint_placeholder(ui, rect, chrome, label);
 }
@@ -350,7 +344,7 @@ fn source_dock_clip_label<'a>(
     contracts: &'a EditorialContracts,
     view: &'a EditorialView,
 ) -> &'a str {
-    match &view.clip_label {
+    match view.current_clip_label() {
         Some(label) => label,
         None => &contracts.editorial.source_dock.clip_label_fallback,
     }
@@ -371,11 +365,11 @@ fn render_player_timeline(
         rect,
         &view.timeline,
         timeline_theme(theme),
-        view.filmstrip.as_ref(),
-        &view.a1_peaks,
-        &view.a2_peaks,
-        &view.a3_peaks,
-        &view.a4_peaks,
+        view.assets.filmstrip_background(),
+        view.assets.a1_peaks(),
+        view.assets.a2_peaks(),
+        view.assets.a3_peaks(),
+        view.assets.a4_peaks(),
     );
     match intent {
         TimelineIntent::None => None,
@@ -393,6 +387,78 @@ fn timeline_theme(theme: &Theme) -> TimelineTheme {
         theme.text_muted,
         theme.accent,
     )
+}
+
+/// Clip list of the project (summary rows). Click activates the preview of the
+/// clip; the chosen clip is marked. Virtualized: only visible rows are painted.
+fn render_clip_list(
+    ui: &mut Ui,
+    contracts: &EditorialContracts,
+    theme: &Theme,
+    view: &EditorialView,
+) -> Option<EditorialIntent> {
+    let outer = ui.max_rect();
+    ui.allocate_rect(outer, Sense::hover());
+    let rect = outer.shrink(contracts.editorial.board.block_pad);
+    let list = &contracts.editorial.clip_list;
+    let mut intent = None;
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+        if view.clips.is_empty() {
+            let text = if view.loading {
+                "Citam projektni katalog..."
+            } else {
+                view.message.as_str()
+            };
+            ui.label(RichText::new(text).color(theme.text_muted));
+            return;
+        }
+        ScrollArea::vertical()
+            .id_salt("editorial_clip_list")
+            .auto_shrink([false, false])
+            .show_rows(ui, list.row_height, view.clips.len(), |ui, range| {
+                ui.spacing_mut().item_spacing.y = 0.0;
+                for clip in &view.clips[range] {
+                    let (row, response) = ui.allocate_exact_size(
+                        Vec2::new(ui.available_width(), list.row_height),
+                        Sense::click(),
+                    );
+                    let chosen = view.preview_clip_id.as_deref() == Some(clip.clip_id.as_str());
+                    if chosen {
+                        ui.painter().rect_filled(row, 0.0, theme.surface_alt);
+                    } else if response.hovered() {
+                        ui.painter().rect_filled(row, 0.0, theme.surface);
+                    }
+                    let text_color = if chosen { theme.text } else { theme.text_muted };
+                    let font = FontId::proportional(theme.font_ui);
+                    ui.painter().text(
+                        egui::pos2(row.left() + list.row_pad_x, row.center().y),
+                        Align2::LEFT_CENTER,
+                        &clip.name,
+                        font.clone(),
+                        text_color,
+                    );
+                    ui.painter().text(
+                        egui::pos2(row.right() - list.row_pad_x, row.center().y),
+                        Align2::RIGHT_CENTER,
+                        format_duration(clip.duration_seconds),
+                        font,
+                        theme.text_muted,
+                    );
+                    if response.clicked() {
+                        intent = Some(EditorialIntent::PreviewClip(clip.clip_id.clone()));
+                    }
+                }
+            });
+    });
+    intent
+}
+
+fn format_duration(seconds: f64) -> String {
+    if !seconds.is_finite() || seconds <= 0.0 {
+        return "00:00".to_string();
+    }
+    let total = seconds.round() as i64;
+    format!("{:02}:{:02}", total / 60, total % 60)
 }
 
 fn text_tab(ui: &mut Ui, text: &str, selected: bool, theme: &Theme) -> egui::Response {

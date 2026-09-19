@@ -12,9 +12,9 @@ pub fn factory() -> EmbeddedAppFactory {
     }
 }
 
-fn create(_root: PathBuf) -> Result<Box<dyn ShellDesktopApp>, String> {
+fn create(root: PathBuf) -> Result<Box<dyn ShellDesktopApp>, String> {
     Ok(Box::new(Adapter {
-        app: qnc_editorial_desktop::EditorialApp::new(GROUP)?,
+        app: qnc_editorial_desktop::EditorialApp::new(GROUP, root)?,
     }))
 }
 
@@ -25,6 +25,10 @@ struct Adapter {
 impl ShellDesktopApp for Adapter {
     fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         self.app.show_desktop(ctx, ui);
+    }
+
+    fn on_activated(&mut self) {
+        self.app.on_activated();
     }
 
     fn footer_status(&self) -> Option<&str> {
