@@ -255,6 +255,9 @@ fn filmstrip_seek_args(
             args.push(OsString::from("-skip_frame"));
             args.push(OsString::from("nokey"));
         }
+        // One frame per input: decoder threads only cost start-up and context switches.
+        args.push(OsString::from("-threads"));
+        args.push(OsString::from("1"));
         args.push(OsString::from("-i"));
         args.push(source.as_os_str().to_owned());
     }
