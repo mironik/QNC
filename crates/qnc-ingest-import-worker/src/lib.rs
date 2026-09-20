@@ -42,6 +42,22 @@ const CHUNK: usize = 1024 * 1024;
 /// One open source medium: bytes and the length the transport reports.
 pub trait MediaRead: Read + Send {
     fn byte_len(&self) -> u64;
+
+    /// Continues reading at `offset`. The default reads and drops the bytes before it;
+    /// a transport that can seek does better.
+    fn seek_to(&mut self, offset: u64) -> Result<(), String> {
+        let mut left = offset;
+        let mut sink = [0_u8; 64 * 1024];
+        while left > 0 {
+            let want = sink.len().min(left as usize);
+            let n = self.read(&mut sink[..want]).map_err(|e| e.to_string())?;
+            if n == 0 {
+                return Err("Izvor je kraci od odredista.".into());
+            }
+            left -= n as u64;
+        }
+        Ok(())
+    }
 }
 
 /// Opens source media by QNC URI: local disk, LAN or intranet.
@@ -161,7 +177,9 @@ fn safe_name(clip_id: &str, source_uri: &str) -> String {
 
 /// Well inside the store lease, so a slow copy never loses its clip.
 const HEARTBEAT_EVERY: std::time::Duration = std::time::Duration::from_secs(20);
-
+/// Copies only the difference: a destination that is already as long as the source is
+/// done and nothing is read; a shorter one continues where it stopped; a missing one is
+/// copied whole.
 fn copy_into(
     opener: &dyn MediaOpener,
     source_uri: &str,
@@ -170,7 +188,25 @@ fn copy_into(
     beat: &mut dyn FnMut(),
 ) -> Result<(), String> {
     let mut source = opener.open(source_uri)?;
-    let mut file = fs::File::create(destination).map_err(|e| e.to_string())?;
+    let total = source.byte_len();
+    let mut have = fs::metadata(destination).map(|m| m.len()).unwrap_or(0);
+    if have == total && total > 0 {
+        return Ok(());
+    }
+    if have > total {
+        have = 0;
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(have == 0)
+        .open(destination)
+        .map_err(|e| e.to_string())?;
+    if have > 0 {
+        use std::io::{Seek, SeekFrom};
+        source.seek_to(have)?;
+        file.seek(SeekFrom::Start(have)).map_err(|e| e.to_string())?;
+    }
     let mut buffer = vec![0_u8; CHUNK];
     let mut last_beat = std::time::Instant::now();
     loop {

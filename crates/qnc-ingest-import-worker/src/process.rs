@@ -2,11 +2,11 @@
 //!
 //! Uvezi writes the selection to the database and puts the selected clips in the import
 //! queue; then it makes sure `qnc-ingest-worker`, a separate application, is running.
-//! The worker has no rules of its own. In a loop it reads the settings of the active
-//! project again, takes the next queued clip and does what the settings say for it
-//! (link: nothing is copied; proxy or original: a copy, and the poster with it), and
-//! records the outcome through the content write transport. It ends after it has been
-//! idle for a while; the next Uvezi starts it again. The form never waits for it.
+//! The worker has no rules of its own. It reads the settings of the active project once,
+//! takes the queued clips and does what the settings say for each (link: nothing is
+//! copied; proxy or original: a copy, and the poster with it, unless that copy already
+//! exists), records every outcome through the content write transport and ends. The form
+//! never waits for it.
 
 use crate::{run_next, ConfigMediaOpener, TransportQueue};
 use qnc_ingest_select::selection_config::SelectionConfig;
@@ -17,14 +17,11 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{atomic::AtomicBool, Arc},
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, SystemTime},
 };
 
 /// The name of the executable that runs beside the application.
 pub const WORKER_EXECUTABLE: &str = "qnc-ingest-worker";
-
-/// How often the worker looks at the queue and at the settings while it is idle.
-const IDLE_POLL: Duration = Duration::from_secs(2);
 
 /// The lock is alive while it was touched this recently.
 const LOCK_FRESH_FOR: Duration = Duration::from_secs(10);
@@ -59,7 +56,6 @@ pub fn is_running(root: &Path) -> bool {
 
 /// What one project needs to import: the plan comes from the settings read this cycle.
 struct Project {
-    project_id: String,
     dir: PathBuf,
     queue: TransportQueue,
     opener: ConfigMediaOpener,
@@ -81,7 +77,6 @@ impl Project {
             .map(|config| config.sources)
             .unwrap_or_default();
         Ok(Self {
-            project_id: plan.settings.project_id.clone(),
             dir,
             queue: TransportQueue::start(ContentTarget::for_project(reader, &plan.settings)?)?,
             opener: ConfigMediaOpener::new(sources, pause.clone()),
@@ -89,62 +84,33 @@ impl Project {
     }
 }
 
-/// The worker loop: until it has had nothing to do for `idle_exit`, read the settings of
-/// the active project, take the next queued clip and execute the settings for it. While
-/// `pause` is true the copy waits (a player works on this machine).
-pub fn run_service(
-    root: &Path,
-    pause: Arc<AtomicBool>,
-    idle_exit: Duration,
-) -> Result<ImportSummary, String> {
+/// The import of one Uvezi: the settings of the active project are read once, then the
+/// queued clips are taken one by one until the queue is empty. For each clip the settings
+/// decide: link copies nothing; a copy that already exists is not copied again; what is
+/// missing is copied. While `pause` is true the copy waits (a player works here).
+pub fn run_service(root: &Path, pause: Arc<AtomicBool>) -> Result<ImportSummary, String> {
+    let reader = SettingsReader::from_root(root).map_err(|e| e.to_string())?;
+    let plan = IngestWorkPlan::from_settings(reader.read().map_err(|e| e.to_string())?)?;
+    let mut project = Project::open(root, &reader, &plan, &pause)?;
     let cancel = AtomicBool::new(false);
     let mut summary = ImportSummary {
         imported: 0,
         failed: 0,
     };
-    let mut project: Option<Project> = None;
-    let mut idle_since = Instant::now();
-    loop {
-        match cycle(root, &pause, &cancel, &mut project) {
-            Ok(Some(succeeded)) => {
-                if succeeded {
-                    summary.imported += 1;
-                } else {
-                    summary.failed += 1;
-                }
-                idle_since = Instant::now();
-                continue;
-            }
-            Ok(None) => {}
-            Err(error) if idle_since.elapsed() >= idle_exit => return Err(error),
-            Err(_) => {}
+    while let Some(outcome) = run_next(
+        &mut project.queue,
+        &plan,
+        &project.dir,
+        &project.opener,
+        &cancel,
+    )? {
+        if outcome.result.is_ok() {
+            summary.imported += 1;
+        } else {
+            summary.failed += 1;
         }
-        if idle_since.elapsed() >= idle_exit {
-            return Ok(summary);
-        }
-        std::thread::sleep(IDLE_POLL);
     }
-}
-
-/// One turn: settings of the active project, then at most one clip. `Some(true)` when a
-/// clip was imported, `Some(false)` when it failed, `None` when the queue is empty.
-fn cycle(
-    root: &Path,
-    pause: &Arc<AtomicBool>,
-    cancel: &AtomicBool,
-    project: &mut Option<Project>,
-) -> Result<Option<bool>, String> {
-    let reader = SettingsReader::from_root(root).map_err(|e| e.to_string())?;
-    let plan = IngestWorkPlan::from_settings(reader.read().map_err(|e| e.to_string())?)?;
-    if project
-        .as_ref()
-        .is_none_or(|open| open.project_id != plan.settings.project_id)
-    {
-        *project = Some(Project::open(root, &reader, &plan, pause)?);
-    }
-    let open = project.as_mut().expect("opened above");
-    let outcome = run_next(&mut open.queue, &plan, &open.dir, &open.opener, cancel)?;
-    Ok(outcome.map(|outcome| outcome.result.is_ok()))
+    Ok(summary)
 }
 
 /// Makes sure the worker runs: nothing happens when it does already, otherwise the

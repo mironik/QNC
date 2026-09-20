@@ -19,6 +19,14 @@ impl MediaRead for Stream {
     fn byte_len(&self) -> u64 {
         self.0.info().byte_len
     }
+
+    fn seek_to(&mut self, offset: u64) -> Result<(), String> {
+        use std::io::{Seek, SeekFrom};
+        self.0
+            .seek(SeekFrom::Start(offset))
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
 }
 
 pub struct ConfigMediaOpener {

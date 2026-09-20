@@ -15,8 +15,7 @@ use std::{
     time::Duration,
 };
 
-/// How long the worker stays when there is nothing to do.
-const IDLE_EXIT: Duration = Duration::from_secs(60);
+
 
 fn main() -> ExitCode {
     let Some(root) = root_argument() else {
@@ -34,7 +33,7 @@ fn main() -> ExitCode {
         watcher.store(qnc_playback_marker::is_active(), Ordering::Relaxed);
         std::thread::sleep(Duration::from_millis(500));
     });
-    let result = qnc_ingest_import_worker::run_service(&root, pause, IDLE_EXIT);
+    let result = qnc_ingest_import_worker::run_service(&root, pause);
     qnc_ingest_import_worker::remove_lock(&root);
     match result {
         Ok(summary) => {

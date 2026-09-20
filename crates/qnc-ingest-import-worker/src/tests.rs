@@ -394,3 +394,40 @@ fn the_copy_waits_while_the_opener_is_paused_and_finishes_when_released() {
         assert!(outcome.result.is_ok());
     });
 }
+
+fn first_clip(f: &mut Fixture) -> StoredClip {
+    f.client.claim_next().unwrap().expect("a queued clip")
+}
+
+#[test]
+fn a_complete_copy_is_not_copied_again() {
+    let mut f = fixture();
+    let clip = first_clip(&mut f);
+    let plan = plan("original", "original");
+    let project = f.project.path().to_path_buf();
+    let opener = opener(&f.media, false);
+    let uri = import_clip(&clip, &plan, &project, &opener, &nothing()).unwrap();
+    let file = project.join("original").join(uri.rsplit('/').next().unwrap());
+    let original = std::fs::read(&file).unwrap();
+    // Same length, different bytes: if it were copied again these would be overwritten.
+    let marker = vec![b'#'; original.len()];
+    std::fs::write(&file, &marker).unwrap();
+    import_clip(&clip, &plan, &project, &opener, &nothing()).unwrap();
+    assert_eq!(std::fs::read(&file).unwrap(), marker);
+}
+
+#[test]
+fn only_the_missing_difference_is_copied() {
+    let mut f = fixture();
+    let clip = first_clip(&mut f);
+    let plan = plan("original", "original");
+    let project = f.project.path().to_path_buf();
+    let opener = opener(&f.media, false);
+    let uri = import_clip(&clip, &plan, &project, &opener, &nothing()).unwrap();
+    let file = project.join("original").join(uri.rsplit('/').next().unwrap());
+    let whole = std::fs::read(&file).unwrap();
+    let half = whole.len() / 2;
+    std::fs::write(&file, &whole[..half]).unwrap();
+    import_clip(&clip, &plan, &project, &opener, &nothing()).unwrap();
+    assert_eq!(std::fs::read(&file).unwrap(), whole);
+}
