@@ -107,3 +107,23 @@ Izvor: `qnc-host/src/media_pool/{ingest_db,store}.rs`, `qnc-host/src/ingest/{db,
 5. **Poster u projektu** nastaje pri uvozu (`thumb_copy`) i u v5 ide neovisno o načinu kopiranja medija. U QNC-u je
    odluka korisnika da se poster kopira samo uz kopiju medija; kad se medij linka, poster se cita s kartice
    (izvor mora biti dostupan), a bez kartice nema statusa i prikazuje se info-box preko kartice.
+
+## G. Uvezi u v5, korak po korak (pročitano iz koda) i razlike u našem kodu
+
+Izvor: `qnc-host/src/ingest/{import_actions,store(queue_import),poster_copy,import_pipeline,import_finish}.rs`,
+`qnc-worker/src/lib.rs` (`IngestMediaPrepareJobHandler`), `qnc-app/src/app.rs`.
+
+| # | v5 postupak | Naš kod |
+|---|---|---|
+| 1 | Ulaz je samo baza: klipovi izvora s `selected != 0`; UI popis se ignorira | isto (odabir se zapisuje na Uvezi, red iz baze) |
+| 2 | `imported/done` se preskače; `queued/processing/generating_proxy` se preskače | preskače uvezene; nema stanja `generating_proxy` |
+| 3 | Plan po **postavkama projekta pri stavljanju u red** (`resolve_import_plan`); greška plana → klip `error` s porukom | plan se računa tek u workeru; greška plana nije zapisana pri Uvezi |
+| 4 | Plan radnji za **svaki** način (i `link`): `CopyCardPosterIfAvailable`, zatim `PrepareMedia` ili `GenerateProxy` (test `link_plan_uses_poster_copy_and_media_prepare`) | poster se kopira **samo uz kopiju medija** (tvoja ranija odluka, drukčije od v5) |
+| 5 | Poster: postoji li poster projekta → `thumb_status=ready`; inače traži sličicu na kartici (THM/JPG) → `pending` + posao `thumb_copy`; nema li je → `no_card_thumb`; greška → `error`. **Nikad ne generira poster.** | nema `thumb_status`; poster kopiran samo u modu kopije; generiranje postera nije napravljeno |
+| 6 | Medij: `import_status='queued'` + posao `ingest_media_prepare` (ili `generating_proxy` + `proxy_generate`) | red `queued` u `clips`, bez poslova |
+| 7 | Serija: `ingest_import_batches(status='preparing')` + `ingest_import_batch_items` | nema |
+| 8 | Odgovor: `queued`, `skipped_imported`, `skipped_active`, `failed`, `poster_queued`, `poster_missing`, `actions_queued`, `batch_id` | nema odgovora s brojevima |
+| 9 | Worker preuzima posao; plan (`link`/kopija) računa **iz trenutnih postavki pri preuzimanju**; `Link` ne kopira, samo provjeri da izvor postoji; kopija ide kroz `.partial` | plan iz postavki pročitanih jednom pri pokretanju workera; link ne kopira |
+| 10 | Završetak (`complete_imported_clip`): `imported`, `status` `linked`/`ready`, putanje, `thumb_status=ready` ako poster postoji, probe polja, `bump_project_data_revision('ingest')` | `imported` + `imported_media_uri` + `thumbnail_uri`; nema `status`, putanja, revizije |
+| 11 | Serija: kad su svi klipovi `imported` i `thumb_status` završen → `waveform` poslovi → serija `done` | filmstrip/wave rade odvojeno nad cijelim katalogom |
+| 12 | Shell: `go_workflow(Next{from:"ingest"})` nakon što je red spreman; uvoz teče u pozadini | isto (zahtjev za sljedeću formu) |
