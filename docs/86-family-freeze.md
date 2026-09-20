@@ -384,3 +384,12 @@ timeline-artifacts 3; conformance prolazi; `qnc-app` i `qnc-ingest` se grade. Ni
 kopija postera (odluka o DB ugovoru), izbor citaca indeksa po pattern-id u `qnc-scanner`,
 test kroz cijelu aplikaciju i na stvarnoj kartici, test otkucaja u workeru. Odobrenje je
 zatvoreno. Status: zamrznuto.
+
+## Zatvorena ogranicena odobrenja 2026-09-19/20 (dvadeset prvo, drugo i trece)
+
+Poster uz uvoz; odabir klipova kao lokalna oznaka i upis tek na Uvezi; pozadinska aplikacija
+`qnc-ingest-worker` koja izvrsava postavke projekta i prijenos shellu na sljedecu formu;
+podjela `qnc-ingest-application` i `qnc-ingest-desktop` na jednu datoteku po akciji, tipu i widgetu;
+brzina (sync artefakata, view bez kopije, filmstrip `-threads 1`). Novi crateovi:
+`qnc-application-sequence`, `qnc-playback-marker`, `tools/qnc-ingest-worker`. Nije izvedeno: pattern-id
+izbor citaca u `qnc-scanner`, poster koji kartica nema, pracenje uvoza u shellu. Status: zamrznuto.

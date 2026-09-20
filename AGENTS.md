@@ -1362,7 +1362,7 @@ Nije izvedeno: kopija postera (traži odluku o DB ugovoru), izbor citaca indeksa
 pattern-id u `qnc-scanner` (nije otkljucan), test kroz cijelu aplikaciju i na stvarnoj kartici.
 Odobrenje je zatvoreno.
 
-Otvoreno ograniceno odobrenje 2026-09-19 (dvadeset prvo): korisnik je izricito odobrio
+Zatvoreno ograniceno odobrenje 2026-09-19 (dvadeset prvo): korisnik je izricito odobrio
 (a) kopiju postera pri uvozu, varijanta A: uvoz kopira poster u direktorij projekta samo kad
 kopira proxy ili original, `FinishImport` nosi `thumbnail_uri`, store upisuje URI kopije u
 `thumbnail_uri` klipa, a ponovni Select ne vraca URI postera klipa u statusu `imported` na
@@ -1374,7 +1374,7 @@ indeksa po pattern-id, tako da dva adaptera s istim XML namespaceom ne daju
 dokumenti. UI i layout ostaju zakljucani (`qnc-ingest-desktop`, `qnc-media-card` i ostali
 popisani u dvadesetom). Sve ostalo ostaje zamrznuto.
 
-Otvoreno ograniceno odobrenje 2026-09-20 (dvadeset drugo): korisnik je izricito odkljucao
+Zatvoreno ograniceno odobrenje 2026-09-20 (dvadeset drugo): korisnik je izricito odkljucao
 (a) `qnc-ingest-desktop` samo za podjelu `widgets.rs` u module bez ikakve promjene izgleda,
 rasporeda ili ponasanja (cisto premjestanje koda); (b) prijenos shellu nakon radnje Uvezi:
 `qnc-shell-desktop-api`, `crates/qnc-ingest-desktop-adapter`, `apps/qnc-app` i `apps/qnc-ingest`
@@ -1386,11 +1386,22 @@ ostalo ostaje zamrznuto, a izgled i raspored (`contracts/ui`, `qnc-ui-kit`, `qnc
 `qnc-source-dock`, `qnc-media-pool-head`, `qnc-project-desktop`, `qnc-editorial-desktop`) ostaju
 zakljucani.
 
-Otvoreno ograniceno odobrenje 2026-09-20 (dvadeset trece): korisnik je izricito odkljucao
+Zatvoreno ograniceno odobrenje 2026-09-20 (dvadeset trece): korisnik je izricito odkljucao
 `crates/qnc-filmstrip-worker` (i po potrebi `crates/qnc-ffmpeg-decode` te `crates/qnc-filmstrip`)
 samo radi brzine stvaranja filmstripa: broj istodobnih radnika, nacin ffmpeg dohvata kadrova i
 suvisni rad po klipu, bez promjene izgleda filmstripa, ugovora ni baze. Probe se ne uvodi:
 filmstrip koristi metapodatke iz baze (XML kartice). Sve ostalo ostaje zamrznuto.
+Izvedeno (21.-23.): poster se kopira uz medij (`ingest/thumbnails/<clip>/poster.jpg`, URI u `thumbnail_uri`,
+ponovni Select ga ne vraca na karticu); odabir klipova je lokalna oznaka, upis u bazu i red uvoza tek
+na Uvezi (`qnc-ingest-selection-write`); Uvezi pokrece pozadinsku aplikaciju `tools/qnc-ingest-worker`
+(postavke projekta se citaju jednom, link ne kopira, jedan primjerak, ceka dok radi player kroz
+`qnc-playback-marker`) i javlja shellu prijelaz (`take_navigation_request`, slijed iz javnog prikaza
+`public_project_application_sequence` kroz `qnc-application-sequence`); `qnc-ingest-application` i
+`qnc-ingest-desktop` podijeljeni na jednu datoteku po akciji/tipu/widgetu (cisto premjestanje),
+`IngestApp` posuduje view umjesto kopije u svakom frameu; sync artefakata s 3,2 s na 0,26 s
+(jedna dijeljena veza za citanje); filmstrip: `-threads 1` po ulazu (`qnc-ffmpeg-decode`).
+Nije izvedeno: izbor citaca indeksa po pattern-id u `qnc-scanner`; generiranje postera koji kartica nema;
+pracenje uvoza u shellu; test uvoza s pravom karticom kroz sucelje. Odobrenja su zatvorena.
 
 Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
 odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i
