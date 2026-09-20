@@ -35,6 +35,9 @@ pub struct ClipSummary {
     /// Where the poster is: the project poster when it was copied, else the poster on the
     /// source (link). `None` when the catalog has no poster for the clip.
     pub thumbnail_uri: Option<String>,
+    /// Status and imported media of the catalog record, for any form that shows a clip state.
+    pub import_status: String,
+    pub imported_media_uri: Option<String>,
 }
 
 /// What a player needs beyond the media record: display name, imported media
@@ -126,7 +129,7 @@ impl ContentReader {
         };
         let mut statement = conn
             .prepare(&format!(
-                "SELECT clip_id, name, duration_seconds, import_status IN ('imported', 'done'), {poster} FROM public_clips
+                "SELECT clip_id, name, duration_seconds, import_status IN ('imported', 'done'), {poster}, import_status, imported_media_uri FROM public_clips
                  WHERE {LISTED}
                  ORDER BY name, clip_id LIMIT ?1"
             ))
@@ -139,6 +142,8 @@ impl ContentReader {
                     duration_seconds: row.get::<_, Option<f64>>(2)?.unwrap_or(0.0),
                     imported: row.get(3)?,
                     thumbnail_uri: row.get(4)?,
+                    import_status: row.get(5)?,
+                    imported_media_uri: row.get(6)?,
                 })
             })
             .map_err(|error| error.to_string())?;

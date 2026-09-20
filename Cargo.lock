@@ -3181,6 +3181,7 @@ dependencies = [
  "eframe",
  "qnc-contracts",
  "qnc-editorial-application",
+ "qnc-media-card",
  "qnc-monitor",
  "qnc-timeline",
  "qnc-ui-kit",

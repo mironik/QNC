@@ -202,4 +202,5 @@ pub struct EditorialMediaCard {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GroupMediaCard {
     pub selection_check: bool,
+    pub status_dots: String,
 }

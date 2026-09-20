@@ -431,6 +431,8 @@ fn render_clip_grid(
 
     let metrics = grid_metrics(rect.width(), clips.len(), contracts);
     let show_check = contracts.composition().media_card.selection_check;
+    let dots = qnc_media_card::StatusDotsMode::from_contract(&contracts.composition().media_card.status_dots)
+        .unwrap_or(qnc_media_card::StatusDotsMode::Off);
     let row_stride = metrics.card_height + metrics.gap;
     let total_rows = clips.len().div_ceil(metrics.columns);
     let mut intent = None;
@@ -455,6 +457,7 @@ fn render_clip_grid(
                                 clip,
                                 chosen,
                                 show_check,
+                                dots,
                                 Vec2::new(metrics.card_width, metrics.card_height),
                                 theme,
                             );
@@ -481,6 +484,7 @@ fn render_clip_card(
     clip: &EditorialClip,
     chosen: bool,
     show_check: bool,
+    dots: qnc_media_card::StatusDotsMode,
     size: Vec2,
     theme: &Theme,
 ) -> egui::Response {
@@ -523,25 +527,28 @@ fn render_clip_card(
         // Media Assist mirrors the chosen clip in the check mark (qnc_v5).
         paint_selection_check(ui, image_rect, chosen);
     }
-    let marker = if clip.imported {
-        Color32::from_rgb(55, 210, 145)
-    } else {
-        theme.text_muted
-    };
-    ui.painter().circle_filled(
-        egui::pos2(rect.right() - 10.0, rect.top() + 10.0),
-        4.0,
-        marker,
+    let name_font = FontId::proportional(theme.font_ui - 1.0);
+    let name = truncate(
+        &clip.name,
+        ((rect.width() - 76.0 - 22.0) / 7.0).floor().clamp(8.0, 42.0) as usize,
     );
+    let name_width = ui.fonts(|f| f.layout_no_wrap(name.clone(), name_font.clone(), theme.text).size().x);
+    let name_top = image_rect.bottom() + 8.0;
     ui.painter().text(
-        egui::pos2(rect.left() + 8.0, image_rect.bottom() + 8.0),
+        egui::pos2(rect.left() + 8.0, name_top),
         Align2::LEFT_TOP,
-        truncate(
-            &clip.name,
-            ((rect.width() - 76.0) / 7.0).floor().clamp(8.0, 42.0) as usize,
-        ),
-        FontId::proportional(theme.font_ui - 1.0),
+        name,
+        name_font,
         theme.text,
+    );
+    // The status dots beside the name come from the public card module: the form only passes
+    // what the project database says about the clip.
+    qnc_media_card::paint_clip_status(
+        ui.painter(),
+        egui::pos2(rect.left() + 8.0 + name_width + 8.0, name_top + (theme.font_ui - 1.0) * 0.6),
+        dots,
+        &clip.import_status,
+        &clip.imported_media_uri,
     );
     ui.painter().text(
         egui::pos2(rect.right() - 8.0, image_rect.bottom() + 8.0),

@@ -15,6 +15,9 @@ pub struct EditorialClip {
     pub thumb_uri: Option<String>,
     /// The poster once it is loaded; the form paints a placeholder until then.
     pub thumb_image: Option<std::sync::Arc<qnc_image_assets::RgbaImage>>,
+    /// The catalog record status; the status dots are made from it by the public card module.
+    pub import_status: String,
+    pub imported_media_uri: String,
 }
 
 #[derive(Clone, Default)]

@@ -8,6 +8,7 @@ description = "QNC editorial form base: Ingest layout copied 1:1 without the cli
 eframe = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-editorial-application = { workspace = true }
+qnc-media-card = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-ui-kit = { workspace = true }

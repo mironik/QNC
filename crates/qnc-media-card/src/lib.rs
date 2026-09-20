@@ -229,16 +229,77 @@ enum StatusDotsLayout {
     Two,
 }
 
-fn status_dots_layout(input: &MediaCardInput<'_>) -> StatusDotsLayout {
-    match input.features.status_dots {
-        StatusDotsMode::Off => StatusDotsLayout::None,
-        StatusDotsMode::Pipeline if import_started(input.import_status) => StatusDotsLayout::Two,
-        StatusDotsMode::Pipeline => StatusDotsLayout::None,
-        StatusDotsMode::ImportedOnly if is_imported_status(input.import_status) => {
-            StatusDotsLayout::One
+/// What the two pipeline dots say about a clip, from the catalog record alone (procedure of
+/// QNC v5 `import_status_dots`): the proxy is ready when the import finished and pending while
+/// it runs; the original is ready when it waits for the proxy or lies in the project folder.
+/// Any form passes what the project database says and gets the same dots.
+pub fn pipeline_statuses(import_status: &str, imported_media_uri: &str) -> (&'static str, &'static str) {
+    let status = import_status.trim().to_ascii_lowercase();
+    let proxy = match status.as_str() {
+        "error" => "error",
+        "imported" | "done" => "ready",
+        "queued" | "processing" | "original_ready" | "generating_proxy" => "pending",
+        _ => "idle",
+    };
+    let original = match status.as_str() {
+        "error" => "error",
+        "original_ready" | "generating_proxy" => "ready",
+        "imported" | "done" if imported_media_uri.contains("/original/") => "ready",
+        _ => "idle",
+    };
+    (proxy, original)
+}
+
+/// Paints the status dots of one clip beside its file name: `left_center` is where the first
+/// dot starts. Returns the width taken (0 when the mode or the import status shows none).
+pub fn paint_clip_status(
+    painter: &egui::Painter,
+    left_center: egui::Pos2,
+    mode: StatusDotsMode,
+    import_status: &str,
+    imported_media_uri: &str,
+) -> f32 {
+    let layout = layout_for(mode, import_status);
+    match layout {
+        StatusDotsLayout::None => {}
+        StatusDotsLayout::One => {
+            painter.circle_filled(left_center, 3.5, DOT_READY_GREEN);
         }
+        StatusDotsLayout::Two => {
+            let (proxy, original) = pipeline_statuses(import_status, imported_media_uri);
+            painter.circle_filled(left_center, 3.5, proxy_dot_color(proxy));
+            painter.circle_filled(
+                left_center + egui::vec2(10.0, 0.0),
+                3.5,
+                original_dot_color(original),
+            );
+        }
+    }
+    layout.width()
+}
+
+impl StatusDotsLayout {
+    fn width(self) -> f32 {
+        match self {
+            Self::None => 0.0,
+            Self::One => 12.0,
+            Self::Two => 22.0,
+        }
+    }
+}
+
+fn layout_for(mode: StatusDotsMode, import_status: &str) -> StatusDotsLayout {
+    match mode {
+        StatusDotsMode::Off => StatusDotsLayout::None,
+        StatusDotsMode::Pipeline if import_started(import_status) => StatusDotsLayout::Two,
+        StatusDotsMode::Pipeline => StatusDotsLayout::None,
+        StatusDotsMode::ImportedOnly if is_imported_status(import_status) => StatusDotsLayout::One,
         StatusDotsMode::ImportedOnly => StatusDotsLayout::None,
     }
+}
+
+fn status_dots_layout(input: &MediaCardInput<'_>) -> StatusDotsLayout {
+    layout_for(input.features.status_dots, input.import_status)
 }
 
 // Status colours are semantic (ready / pending / error), not theme colours.
@@ -483,6 +544,16 @@ pub fn show_card_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_pipeline_dots_follow_the_catalog_record_only() {
+        assert_eq!(pipeline_statuses("queued", ""), ("pending", "idle"));
+        assert_eq!(pipeline_statuses("generating_proxy", ""), ("pending", "ready"));
+        assert_eq!(pipeline_statuses("imported", "qnc://local/project/p/proxy/a.mp4"), ("ready", "idle"));
+        assert_eq!(pipeline_statuses("imported", "qnc://local/project/p/original/a.mxf"), ("ready", "ready"));
+        assert_eq!(pipeline_statuses("error", ""), ("error", "error"));
+        assert_eq!(pipeline_statuses("detected", ""), ("idle", "idle"));
+    }
 
     /// Values of `contracts/ui/editorial.layout.json` (`media_card`).
     fn metrics() -> CardMetrics {

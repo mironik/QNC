@@ -317,6 +317,8 @@ fn merge_clips(new: Vec<ClipSummary>, previous: &[EditorialClip]) -> Vec<Editori
                 imported: clip.imported,
                 thumb_uri: clip.thumbnail_uri,
                 thumb_image: image,
+                import_status: clip.import_status,
+                imported_media_uri: clip.imported_media_uri.unwrap_or_default(),
             }
         })
         .collect()
@@ -358,6 +360,8 @@ mod tests {
             imported: true,
             thumb_uri: None,
             thumb_image: None,
+            import_status: String::new(),
+            imported_media_uri: String::new(),
         }
     }
 
@@ -436,6 +440,8 @@ mod poster_tests {
             duration_seconds: 1.0,
             imported: true,
             thumbnail_uri: poster.map(str::to_string),
+            import_status: "imported".into(),
+            imported_media_uri: None,
         }
     }
 
@@ -446,6 +452,8 @@ mod poster_tests {
             duration_seconds: 1.0,
             imported: true,
             thumb_uri: Some(poster.into()),
+            import_status: String::new(),
+            imported_media_uri: String::new(),
             thumb_image: Some(std::sync::Arc::new(qnc_image_assets::RgbaImage {
                 size: [1, 1],
                 pixels: vec![0, 0, 0, 255],
