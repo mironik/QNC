@@ -198,6 +198,14 @@ pub enum Operation {
     Heartbeat {
         clip_id: String,
     },
+    /// What one process or form tells the others (playback, worker lease, result).
+    SetRuntime {
+        key: String,
+        value: String,
+    },
+    GetRuntime {
+        key: String,
+    },
     FinishImport {
         clip_id: String,
         media_uri: Option<String>,
@@ -218,6 +226,7 @@ impl Operation {
                 | Self::Read { .. }
                 | Self::ReadFilmstrip { .. }
                 | Self::ReadWave { .. }
+                | Self::GetRuntime { .. }
         )
     }
 }
@@ -243,7 +252,15 @@ pub enum Data {
     Wave(Option<Box<WaveArtifactRecord>>),
     Inventory(Vec<InventoryClip>),
     Removed(Vec<String>),
+    Runtime(Option<RuntimeEntry>),
     Changed,
+}
+
+/// A runtime entry and how old it is by the clock of the database.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuntimeEntry {
+    pub value: String,
+    pub age_seconds: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

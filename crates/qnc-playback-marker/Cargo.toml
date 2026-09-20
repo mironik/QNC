@@ -1,5 +1,0 @@
-[package]
-name = "qnc-playback-marker"
-version = "0.1.0"
-edition = "2021"
-description = "QNC public component: a small marker file that tells other processes on this machine that a player is working, so background work can wait; no form, no application"

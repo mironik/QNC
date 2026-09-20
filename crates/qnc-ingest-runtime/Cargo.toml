@@ -1,0 +1,12 @@
+[package]
+name = "qnc-ingest-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: what one process or form tells the others (a player works, the background application runs) is kept in the project database and read back from it"
+
+[dependencies]
+qnc-ingest-store = { workspace = true }
+
+[dev-dependencies]
+rusqlite = { workspace = true }
+tempfile = "3"

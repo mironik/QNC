@@ -162,6 +162,21 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
+    /// Tells the other processes and forms something (owner writes only).
+    pub fn set_runtime(&mut self, key: &str, value: &str) -> Result<()> {
+        self.execute(Operation::SetRuntime {
+            key: key.into(),
+            value: value.into(),
+        })
+        .map(|_| ())
+    }
+    /// What was told under `key`, and how old it is by the clock of the database.
+    pub fn get_runtime(&mut self, key: &str) -> Result<Option<RuntimeEntry>> {
+        match self.execute(Operation::GetRuntime { key: key.into() })? {
+            Data::Runtime(entry) => Ok(entry),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     pub fn stats(&mut self) -> Result<CatalogStats> {
         match self.execute(Operation::Stats)? {
             Data::CatalogStats(stats) => Ok(stats),
@@ -415,6 +430,11 @@ impl ContentWriteTransport {
         self.send_operation(key, Operation::ClaimNext)
     }
 
+    /// Tells the other processes and forms something through the serialized transport.
+    pub fn set_runtime(&mut self, key: String, name: String, value: String) -> Result<()> {
+        self.send_operation(key, Operation::SetRuntime { key: name, value })
+    }
+
     /// Renews the lease of the clip an importer is working on.
     pub fn heartbeat(&mut self, key: String, clip_id: String) -> Result<()> {
         self.send_operation(key, Operation::Heartbeat { clip_id })
@@ -564,6 +584,10 @@ fn execute_write_command(
         Operation::ClaimNext => Ok(ContentWriteData::Claimed(client.claim_next()?.map(Box::new))),
         Operation::Heartbeat { clip_id } => {
             client.heartbeat(clip_id)?;
+            Ok(ContentWriteData::Changed)
+        }
+        Operation::SetRuntime { key, value } => {
+            client.set_runtime(&key, &value)?;
             Ok(ContentWriteData::Changed)
         }
         Operation::FinishImport {

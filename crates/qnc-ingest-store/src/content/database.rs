@@ -115,6 +115,7 @@ impl ContentStore {
         if access == Access::ReadWrite {
             ensure_summary_columns(&conn)?;
             ensure_lease_column(&conn)?;
+            ensure_runtime_table(&conn)?;
             ensure_filmstrip_schema(&conn)?;
             ensure_wave_schema(&conn)?;
         }
@@ -162,6 +163,7 @@ impl ContentStore {
                 Operation::List { .. } => Ok(Data::Clips(Vec::new())),
                 Operation::ListSummary { .. } => Ok(Data::ClipSummaries(Vec::new())),
                 Operation::Stats => Ok(Data::CatalogStats(CatalogStats::default())),
+                Operation::GetRuntime { .. } => Ok(Data::Runtime(None)),
                 Operation::Inventory { source_uri, .. } => {
                     let source = qnc_contracts::parse_qnc_uri(source_uri).map_err(err)?;
                     if source.resource_kind != "source" {
@@ -388,6 +390,50 @@ impl ContentStore {
                 }
                 tx.commit().map_err(err)?;
                 Ok(Data::Claimed(clip.map(Box::new)))
+            }
+            Operation::SetRuntime { key, value } => {
+                if key.is_empty()
+                    || key.len() > 64
+                    || !key.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
+                    || value.len() > 4096
+                {
+                    return Err("Neispravan runtime zapis.".into());
+                }
+                self.conn
+                    .execute(
+                        "INSERT INTO ingest_runtime(key,value,updated_at) VALUES(?1,?2,CAST(strftime('%s','now') AS INTEGER)) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
+                        params![key, value],
+                    )
+                    .map_err(err)?;
+                Ok(Data::Changed)
+            }
+            Operation::GetRuntime { key } => {
+                let has_table: bool = self
+                    .conn
+                    .query_row(
+                        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='ingest_runtime')",
+                        [],
+                        |r| r.get(0),
+                    )
+                    .map_err(err)?;
+                if !has_table {
+                    return Ok(Data::Runtime(None));
+                }
+                let entry = self
+                    .conn
+                    .query_row(
+                        "SELECT value, CAST(strftime('%s','now') AS INTEGER) - updated_at FROM ingest_runtime WHERE key=?1",
+                        [key],
+                        |r| {
+                            Ok(RuntimeEntry {
+                                value: r.get(0)?,
+                                age_seconds: r.get(1)?,
+                            })
+                        },
+                    )
+                    .optional()
+                    .map_err(err)?;
+                Ok(Data::Runtime(entry))
             }
             Operation::Heartbeat { clip_id } => {
                 let n = self
@@ -789,6 +835,7 @@ fn owned_table(name: &str) -> bool {
             | "filmstrip_artifacts"
             | "filmstrip_frames"
             | "wave_artifacts"
+            | "ingest_runtime"
     )
 }
 
@@ -1134,4 +1181,13 @@ fn fingerprint_u64(hash: &mut u64, value: u64) {
 }
 fn err(error: impl std::fmt::Display) -> String {
     error.to_string()
+}
+
+fn ensure_runtime_table(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS ingest_runtime(
+            key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
+         CREATE VIEW IF NOT EXISTS public_ingest_runtime AS SELECT key,value,updated_at FROM ingest_runtime;",
+    )
+    .map_err(err)
 }

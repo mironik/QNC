@@ -10,4 +10,3 @@ path = "src/main.rs"
 
 [dependencies]
 qnc-ingest-import-worker = { workspace = true }
-qnc-playback-marker = { workspace = true }

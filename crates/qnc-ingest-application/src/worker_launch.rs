@@ -1,20 +1,23 @@
 //! How the application starts the background application. The real launcher starts the
 //! `qnc-ingest-worker` executable; tests and other compositions can supply their own.
 
+use qnc_ingest_store::content::ContentTarget;
 use std::{path::Path, sync::Arc};
 
-type Start = dyn Fn(&Path) -> Result<(), String> + Send + Sync;
+type Start = dyn Fn(&Path, &ContentTarget) -> Result<(), String> + Send + Sync;
 
 #[derive(Clone)]
 pub(super) struct WorkerLauncher(Arc<Start>);
 
 impl WorkerLauncher {
-    pub(super) fn start(&self, root: &Path) -> Result<(), String> {
-        (self.0)(root)
+    pub(super) fn start(&self, root: &Path, target: &ContentTarget) -> Result<(), String> {
+        (self.0)(root, target)
     }
 
     #[cfg(test)]
-    pub(super) fn with(start: impl Fn(&Path) -> Result<(), String> + Send + Sync + 'static) -> Self {
+    pub(super) fn with(
+        start: impl Fn(&Path, &ContentTarget) -> Result<(), String> + Send + Sync + 'static,
+    ) -> Self {
         Self(Arc::new(start))
     }
 }

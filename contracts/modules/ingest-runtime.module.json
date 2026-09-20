@@ -1,9 +1,9 @@
 {
-  "module_id": "qnc.module.playback-marker",
-  "module_name": "Playback marker",
+  "module_id": "qnc.module.ingest-runtime",
+  "module_name": "Ingest runtime",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["playback.marker"],
+  "capabilities": ["ingest.runtime"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -12,9 +12,9 @@
   "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command"],
   "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
   "state_policy": "stateless",
-  "database_write_policy": "no_db_writes",
-  "runtime_crate": "qnc-playback-marker",
-  "input": "Touch and clear calls from the form that runs a player; a read from background processes.",
-  "output": "Whether a player works on this machine right now (a fresh marker file in the temporary directory); no database.",
+  "database_write_policy": "public_ingest_content_write_transport_only",
+  "runtime_crate": "qnc-ingest-runtime",
+  "input": "Content target of the project and the name of a runtime entry (playback, worker lease, worker result).",
+  "output": "What one process or form told the others, read back from the project database with its age by the database clock; written only through the public content write transport.",
   "specification": "docs/v5-book/08-audit-and-plan.md (audit response)"
 }

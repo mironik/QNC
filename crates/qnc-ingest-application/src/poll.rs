@@ -12,6 +12,9 @@ impl IngestApplication {
             changed = true;
         }
         self.apply_playback_guard();
+        // A player works: the copy of the background application waits (told through the database).
+        self.runtime
+            .update(self.catalog_target.as_ref(), self.playback_guard_active());
         if !self.playback_guard_active() {
             changed |= self.poll_thumbnails();
         }

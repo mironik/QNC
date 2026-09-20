@@ -81,6 +81,7 @@ pub struct IngestApplication {
     selection_session: selection::SelectSession,
     root: Option<std::path::PathBuf>,
     worker: worker_launch::WorkerLauncher,
+    runtime: qnc_ingest_runtime::PlaybackReporter,
     camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
     selection_warnings: usize,
     selection_last_warning: Option<String>,

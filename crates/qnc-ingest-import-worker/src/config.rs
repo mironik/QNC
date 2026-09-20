@@ -22,14 +22,14 @@ impl MediaRead for Stream {
 }
 
 pub struct ConfigMediaOpener {
-    pause: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pause: std::sync::Arc<dyn Fn() -> bool + Send + Sync>,
     sources: Vec<SourceConfig>,
 }
 
 impl ConfigMediaOpener {
     pub fn new(
         sources: Vec<SourceConfig>,
-        pause: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        pause: std::sync::Arc<dyn Fn() -> bool + Send + Sync>,
     ) -> Self {
         Self { sources, pause }
     }
@@ -37,7 +37,7 @@ impl ConfigMediaOpener {
 
 impl MediaOpener for ConfigMediaOpener {
     fn paused(&self) -> bool {
-        self.pause.load(std::sync::atomic::Ordering::Relaxed)
+        (self.pause)()
     }
 
     fn open(&self, media_uri: &str) -> Result<Box<dyn MediaRead>, String> {

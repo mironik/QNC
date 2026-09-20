@@ -7,6 +7,7 @@ description = "QNC public module: executes the import of a claimed clip by the p
 [dependencies]
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
+qnc-ingest-runtime = { workspace = true }
 qnc-ingest-select = { workspace = true }
 qnc-ingest-store = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }

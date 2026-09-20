@@ -3295,6 +3295,7 @@ dependencies = [
  "qnc-ingest-catalog",
  "qnc-ingest-import-worker",
  "qnc-ingest-preview",
+ "qnc-ingest-runtime",
  "qnc-ingest-select",
  "qnc-ingest-selection-write",
  "qnc-ingest-store",
@@ -3383,6 +3384,7 @@ dependencies = [
  "qnc-camera-sony-fx6-v6",
  "qnc-contracts",
  "qnc-dir-browser",
+ "qnc-ingest-runtime",
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
@@ -3403,6 +3405,15 @@ dependencies = [
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-work-settings",
+]
+
+[[package]]
+name = "qnc-ingest-runtime"
+version = "0.1.0"
+dependencies = [
+ "qnc-ingest-store",
+ "rusqlite",
+ "tempfile",
 ]
 
 [[package]]
@@ -3474,7 +3485,6 @@ name = "qnc-ingest-worker"
 version = "0.1.0"
 dependencies = [
  "qnc-ingest-import-worker",
- "qnc-playback-marker",
 ]
 
 [[package]]
@@ -3708,10 +3718,6 @@ dependencies = [
  "winit",
  "yuv",
 ]
-
-[[package]]
-name = "qnc-playback-marker"
-version = "0.1.0"
 
 [[package]]
 name = "qnc-playback-priority"
@@ -4020,7 +4026,6 @@ dependencies = [
  "qnc-filmstrip",
  "qnc-media-record-db",
  "qnc-media-records",
- "qnc-playback-marker",
  "qnc-player-client",
  "qnc-player-input",
  "qnc-player-launcher",

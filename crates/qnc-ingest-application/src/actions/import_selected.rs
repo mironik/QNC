@@ -61,6 +61,10 @@ impl IngestApplication {
             .root
             .clone()
             .ok_or("Uvoz nije dostupan: nema korijena aplikacije.")?;
-        self.worker.start(&root)
+        let target = self
+            .catalog_target
+            .clone()
+            .ok_or("Projektni katalog nije dostupan.")?;
+        self.worker.start(&root, &target)
     }
 }

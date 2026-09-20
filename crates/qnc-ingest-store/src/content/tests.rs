@@ -1045,3 +1045,60 @@ fn an_imported_poster_replaces_the_card_poster_and_survives_a_new_select() {
     assert_eq!(poster(&path), Some(poster_uri()));
 }
 
+
+#[test]
+fn what_a_process_tells_the_others_is_kept_in_the_database_with_its_age() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    database(&path);
+    let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+    let get = |store: &mut ContentStore, key: &str| match run(
+        store,
+        Operation::GetRuntime { key: key.into() },
+    )
+    .unwrap()
+    {
+        Data::Runtime(entry) => entry,
+        _ => panic!(),
+    };
+    assert!(get(&mut store, "playback_active").is_none());
+    run(
+        &mut store,
+        Operation::SetRuntime {
+            key: "playback_active".into(),
+            value: "1".into(),
+        },
+    )
+    .unwrap();
+    let entry = get(&mut store, "playback_active").unwrap();
+    assert_eq!(entry.value, "1");
+    assert!((0..=2).contains(&entry.age_seconds), "{}", entry.age_seconds);
+    // A newer entry replaces the old one.
+    run(
+        &mut store,
+        Operation::SetRuntime {
+            key: "playback_active".into(),
+            value: "0".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(get(&mut store, "playback_active").unwrap().value, "0");
+}
+
+#[test]
+fn a_runtime_key_must_be_plain() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    database(&path);
+    let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+    for key in ["", "Upper", "with space", "a;b"] {
+        assert!(run(
+            &mut store,
+            Operation::SetRuntime {
+                key: key.into(),
+                value: "x".into()
+            }
+        )
+        .is_err());
+    }
+}
