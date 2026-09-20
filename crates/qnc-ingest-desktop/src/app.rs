@@ -50,8 +50,9 @@ impl IngestApp {
         let theme = Theme::from_contract(&self.contracts.shell);
         theme::apply(ctx, &theme);
         ui.data_mut(|data| data.insert_temp(egui::Id::new("qnc_ingest_root"), self.root.clone()));
-        let view = self.application.view().clone();
-        if let Some(intent) = widgets::render_desktop(ui, &self.contracts, &theme, &view) {
+        // The view is borrowed, not copied: it holds every clip and the timeline data.
+        let intent = widgets::render_desktop(ui, &self.contracts, &theme, self.application.view());
+        if let Some(intent) = intent {
             self.dispatch(ctx, intent);
         }
     }
