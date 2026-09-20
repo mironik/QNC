@@ -1,0 +1,9 @@
+[package]
+name = "qnc-poster-create"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: creates the poster of a clip that has none, from one key frame of its media at poster resolution, the way the filmstrip frames are made; no form, no database"
+
+[dependencies]
+qnc-decoder-catalog = { workspace = true }
+qnc-frame-timebase = { workspace = true }

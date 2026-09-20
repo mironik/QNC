@@ -439,3 +439,40 @@ fn the_copy_waits_while_the_database_says_a_player_works() {
     std::thread::sleep(std::time::Duration::from_millis(600));
     assert!(pause());
 }
+
+#[test]
+fn a_clip_without_a_card_poster_and_without_a_local_file_gets_no_poster_and_no_error() {
+    let mut f = fixture();
+    let id = f.client.claim_next().unwrap().unwrap().clip.id().to_string();
+    let mut clip = f.client.read(&id).unwrap().unwrap();
+    clip.clip.thumbnail_uri = None;
+    let project = f.project.path().to_path_buf();
+    let poster = import_poster(
+        &clip,
+        &plan("link", "original"),
+        &project,
+        &opener(&f.media, false),
+        &nothing(),
+    );
+    assert!(poster.is_none());
+    assert!(!project.join("ingest").exists(), "nothing is written when no poster can be made");
+}
+
+#[test]
+fn a_linked_clip_with_a_card_poster_keeps_the_address_of_the_card() {
+    let mut f = fixture();
+    let mut clip = f.client.claim_next().unwrap().unwrap();
+    if clip.clip.thumbnail_uri.is_none() {
+        clip = f.client.claim_next().unwrap().unwrap();
+    }
+    assert!(clip.clip.thumbnail_uri.is_some(), "the fixture has a clip with a card poster");
+    let project = f.project.path().to_path_buf();
+    let poster = import_poster(
+        &clip,
+        &plan("link", "original"),
+        &project,
+        &opener(&f.media, false),
+        &nothing(),
+    );
+    assert!(poster.is_none(), "link: the poster stays on the card");
+}

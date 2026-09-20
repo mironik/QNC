@@ -40,6 +40,15 @@ impl MediaOpener for ConfigMediaOpener {
         (self.pause)()
     }
 
+    fn local_path(&self, media_uri: &str) -> Option<std::path::PathBuf> {
+        let reference = SourceReference::from_uri(media_uri).ok()?;
+        let source = self
+            .sources
+            .iter()
+            .find(|s| s.location.uri == reference.source_uri())?;
+        source.local_media_path(media_uri).ok().flatten()
+    }
+
     fn open(&self, media_uri: &str) -> Result<Box<dyn MediaRead>, String> {
         let reference = SourceReference::from_uri(media_uri).map_err(|e| e.to_string())?;
         let source = self

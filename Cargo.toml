@@ -90,6 +90,7 @@ members = [
     "crates/qnc-source-browse",
     "crates/qnc-application-sequence",
     "crates/qnc-clip-posters",
+    "crates/qnc-poster-create",
     "crates/qnc-ingest-runtime",
     "crates/qnc-playback-priority",
     "crates/qnc-source-preview",
@@ -194,6 +195,7 @@ qnc-source-bindings = { path = "crates/qnc-source-bindings" }
 qnc-source-browse = { path = "crates/qnc-source-browse" }
 qnc-application-sequence = { path = "crates/qnc-application-sequence" }
 qnc-clip-posters = { path = "crates/qnc-clip-posters" }
+qnc-poster-create = { path = "crates/qnc-poster-create" }
 qnc-ingest-runtime = { path = "crates/qnc-ingest-runtime" }
 qnc-playback-priority = { path = "crates/qnc-playback-priority" }
 qnc-source-preview = { path = "crates/qnc-source-preview" }

@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.poster-create",
+  "module_name": "Poster create",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["poster.create"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-poster-create",
+  "input": "A local media file, the key frame time and timebase from the project database, and the output file in the project folder.",
+  "output": "One poster picture at poster resolution written into the project folder; the media and the card are only read.",
+  "specification": "docs/v5-book/08-audit-and-plan.md (audit response)"
+}

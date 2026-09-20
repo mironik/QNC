@@ -48,6 +48,11 @@ pub trait MediaOpener: Send + Sync {
     fn paused(&self) -> bool {
         false
     }
+    /// A local file of the medium when its source is on this machine: what a local extractor
+    /// needs. `None` for a source reached over LAN or intranet.
+    fn local_path(&self, _media_uri: &str) -> Option<std::path::PathBuf> {
+        None
+    }
 }
 
 /// The queue of the content database seen by the executor.
@@ -234,9 +239,14 @@ pub fn import_clip_beating(
     }
 }
 
-/// The poster of a clip whose media was copied goes into the project too, so the clip
-/// keeps its picture when the card is gone. A missing or unreadable poster never fails
-/// the import: the clip simply keeps the poster reference of the card.
+/// The poster of a clip in the project. The card is read only and is never touched.
+/// - The card has a poster and the media is copied: the poster is copied with it, so the
+///   clip keeps its picture when the card is gone.
+/// - The card has a poster and the media is linked: nothing is copied, the clip keeps the
+///   address of the poster on the card.
+/// - The card has no poster: it is created from a key frame of the media, the way the
+///   filmstrip frames are made, at poster resolution.
+/// A poster that cannot be made never fails the import.
 pub fn import_poster(
     clip: &StoredClip,
     plan: &IngestWorkPlan,
@@ -244,18 +254,51 @@ pub fn import_poster(
     opener: &dyn MediaOpener,
     cancel: &AtomicBool,
 ) -> Option<String> {
-    if !matches!(action_for(clip, plan), Ok(Action::Copy { .. })) {
-        return None;
-    }
-    let source_uri = clip.clip.thumbnail_uri.as_deref()?;
     let clip_id = clip.clip.id();
     let directory = project_dir.join("ingest").join("thumbnails").join(clip_id);
-    fs::create_dir_all(&directory).ok()?;
-    copy_into(opener, source_uri, &directory.join("poster.jpg"), cancel, &mut || {}).ok()?;
+    let output = directory.join("poster.jpg");
+    match clip.clip.thumbnail_uri.as_deref() {
+        Some(source_uri) => {
+            if !matches!(action_for(clip, plan), Ok(Action::Copy { .. })) {
+                return None;
+            }
+            fs::create_dir_all(&directory).ok()?;
+            copy_into(opener, source_uri, &output, cancel, &mut || {}).ok()?;
+        }
+        None => create_missing_poster(clip, plan, &output, opener, cancel)?,
+    }
     Some(format!(
         "{}/{clip_id}/poster.jpg",
         plan.thumbnails_uri.trim_end_matches('/')
     ))
+}
+
+/// The frame comes from the middle of the clip, chosen from the length the project
+/// database already holds; the media is never probed.
+fn create_missing_poster(
+    clip: &StoredClip,
+    plan: &IngestWorkPlan,
+    output: &Path,
+    opener: &dyn MediaOpener,
+    cancel: &AtomicBool,
+) -> Option<()> {
+    let filmstrip = qnc_filmstrip::plan_from_snapshot_with_artifact_name(
+        &clip.clip.snapshot,
+        &plan.filmstrip_uri,
+        Some(&clip.clip.name),
+    )
+    .ok()?;
+    let frame = filmstrip.frames.get(filmstrip.frames.len() / 2)?;
+    let source = opener.local_path(&filmstrip.source_uri)?;
+    qnc_poster_create::create_poster(
+        &source,
+        frame.seek_sec,
+        filmstrip.source_timebase,
+        output,
+        cancel,
+    )
+    .ok()?
+    .then_some(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
