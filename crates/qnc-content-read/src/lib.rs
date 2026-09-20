@@ -101,8 +101,9 @@ impl ContentReader {
         Ok(conn)
     }
 
-    /// All clips of the project, by name. Empty when the project has no clip
-    /// catalog yet (nothing was ingested).
+    /// The imported clips of the project, by name: what Uvezi wrote for import and the
+    /// import finished. A clip that is only detected, selected or queued is not shown.
+    /// Empty when the project has no clip catalog yet (nothing was ingested).
     pub fn summaries(&self) -> Result<Vec<ClipSummary>, String> {
         let conn = self.open()?;
         if !has_view(&conn, "public_clips")? {
@@ -111,6 +112,7 @@ impl ContentReader {
         let mut statement = conn
             .prepare(
                 "SELECT clip_id, name, duration_seconds, import_status IN ('imported', 'done') FROM public_clips
+                 WHERE import_status IN ('imported', 'done')
                  ORDER BY name, clip_id LIMIT ?1",
             )
             .map_err(|error| error.to_string())?;
@@ -137,7 +139,8 @@ impl ContentReader {
             "SELECT count(*), coalesce(sum(length(name)),0),
                     coalesce(sum(coalesce(duration_frames,0)),0),
                     coalesce(max(coalesce(created_at_utc,'')),'')
-             FROM public_clips",
+             FROM public_clips
+             WHERE import_status IN ('imported', 'done')",
             [],
             |row| {
                 Ok(CatalogSignature {
@@ -290,13 +293,30 @@ mod tests {
     }
 
     #[test]
-    fn summaries_are_sorted_by_name_and_missing_duration_is_zero() {
-        let (_dir, reader) = reader_for(SCHEMA);
+    fn only_imported_clips_are_listed_by_name() {
+        let (dir, reader) = reader_for(SCHEMA);
+        // `Alfa` was only detected: Uvezi did not write it for import.
+        let clips = reader.summaries().unwrap();
+        assert_eq!(clips.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["Beta"]);
+        assert_eq!(clips[0].duration_seconds, 20.5);
+        assert!(clips[0].imported);
+        Connection::open(dir.path().join("project.db"))
+            .unwrap()
+            .execute("UPDATE clips SET import_status='imported' WHERE clip_id='clip-a'", [])
+            .unwrap();
         let clips = reader.summaries().unwrap();
         assert_eq!(clips.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["Alfa", "Beta"]);
-        assert_eq!(clips[0].duration_seconds, 0.0);
-        assert_eq!(clips[1].duration_seconds, 20.5);
-        assert!(!clips[0].imported && clips[1].imported);
+        assert_eq!(clips[0].duration_seconds, 0.0, "missing duration is zero");
+    }
+
+    #[test]
+    fn a_queued_or_selected_clip_is_not_listed_until_it_is_imported() {
+        let (dir, reader) = reader_for(SCHEMA);
+        Connection::open(dir.path().join("project.db"))
+            .unwrap()
+            .execute("UPDATE clips SET import_status='queued' WHERE clip_id='clip-a'", [])
+            .unwrap();
+        assert_eq!(reader.summaries().unwrap().len(), 1);
     }
 
     #[test]
@@ -311,10 +331,10 @@ mod tests {
     fn signature_changes_when_the_catalog_changes() {
         let (dir, reader) = reader_for(SCHEMA);
         let before = reader.signature().unwrap();
-        assert_eq!(before.clip_count, 2);
+        assert_eq!(before.clip_count, 1, "only the imported clip counts");
         Connection::open(dir.path().join("project.db"))
             .unwrap()
-            .execute("INSERT INTO clips (clip_id,name,created_at_utc,duration_seconds,duration_frames) VALUES ('clip-c','Gama',NULL,1.0,25)", [])
+            .execute("INSERT INTO clips (clip_id,name,created_at_utc,duration_seconds,duration_frames,import_status) VALUES ('clip-c','Gama',NULL,1.0,25,'imported')", [])
             .unwrap();
         assert_ne!(reader.signature().unwrap(), before);
     }
