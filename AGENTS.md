@@ -40,10 +40,13 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 
 ## 0. STROGA PRAVILA (vrijede prije svega ostalog; korisnik ih je ponovio vise puta)
 
-1. **Projekt i njegova baza su jedini izvor svih trajnih podataka.** Sve sto je trajno (klipovi, odabir,
-   statusi, postavke, putanje, sličice, artefakti, slijed aplikacija) cita se iz baze aktivnog projekta i
-   zapisuje u nju kroz javni write transport vlasnika. Nista trajno se ne drzi u datotekama pored koda,
-   u konfiguraciji aplikacije, u memoriji forme ni u testnom stanju kao "istina".
+1. **Projekt i njegova baza su jedini izvor svih trajnih podataka i JEDINA VEZA izmedu procesa i formi.**
+   Sve sto je trajno (klipovi, odabir, statusi, postavke, putanje, sličice, artefakti, slijed aplikacija)
+   cita se iz baze aktivnog projekta i zapisuje u nju kroz javni write transport vlasnika. Sto forma ili
+   proces treba znati o drugom procesu ili formi (rad, stanje, zauzetost, najam, rezultat), zapisano je u
+   bazi. **Privremena memorija nije istina**: kes, memorija forme, zastavice, datoteke-oznake, zakljucavanja i
+   zapisnici pored koda nikad ne nose stanje izmedu procesa i formi; smiju biti samo lokalni pomocnik unutar
+   jednog procesa, a istinu uvijek potvrduje baza.
 2. **Projekt odreduje putanje.** Direktorij projekta, izlazni direktoriji (`original`, `proxy`, `ingest`,
    `filmstrip`, ...), izvori i lokacije dolaze iz postavki projekta i baze. Kod, alat ni test ne smije
    pretpostaviti, sastaviti ni zapisati putanju, disk ili projekt "napamet" ni doci do njega mimo baze.
