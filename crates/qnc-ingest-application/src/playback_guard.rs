@@ -1,7 +1,7 @@
 //! Ingest only lists which of its actions are heavy; the rule itself is the public
 //! `qnc-playback-priority`.
 
-use super::{action_ids, IngestViewModel};
+use super::{action_ids, IngestApplication, IngestDispatchResult, IngestViewModel};
 use qnc_playback_priority::{PlaybackState, Priority};
 
 /// Heavy source work only. Clip selection (`ingest_clip_toggle`, `ingest_select_all`,
@@ -42,4 +42,48 @@ impl PlaybackGuard {
             playing: view.playback.playing(),
         }
     }
+}
+
+impl IngestApplication {
+    pub(crate) fn playback_guard_active(&self) -> bool {
+        PlaybackGuard::active(self.preview.play_when_ready(), &self.view)
+    }
+
+    pub(crate) fn apply_playback_guard(&mut self) {
+        let active = self.playback_guard_active();
+        self.set_timeline_artifact_playback_priority(active);
+        if active {
+            self.cancel_thumbnail_load();
+            self.cancel_source_work_for_playback();
+        }
+    }
+
+    pub(crate) fn cancel_source_work_for_playback(&mut self) {
+        if self.selection_session.has_pending_work() {
+            self.selection_session.cancel();
+            self.view.command_busy = false;
+            self.view.message = playback_guard_message().to_string();
+        }
+        if self.browse.cancel() {
+            self.view.browser_busy = false;
+            self.view.browser_error = Some(playback_guard_message().to_string());
+        }
+        self.pending_source = None;
+    }
+
+    pub(crate) fn playback_guard_rejected(&mut self) -> IngestDispatchResult {
+        let message = playback_guard_message();
+        self.view.message = message.to_string();
+        let mut result = IngestDispatchResult::rejected(message);
+        result.request_repaint = true;
+        result
+    }
+
+    pub(crate) fn playback_guard_blocks_action(action_id: &str) -> bool {
+        PlaybackGuard::blocks_action(action_id)
+    }
+}
+
+pub(crate) fn playback_guard_message() -> &'static str {
+    PlaybackGuard::message()
 }
