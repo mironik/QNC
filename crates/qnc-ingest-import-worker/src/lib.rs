@@ -16,12 +16,14 @@
 //! With the media the poster is copied too. Not done here: proxy generation (transcode).
 
 mod config;
-mod importer;
-mod session;
 
 pub use config::ConfigMediaOpener;
-pub use importer::{Importer, ImportNotice};
-pub use session::{ImportEvent, ImportSession, ImportSummary};
+mod process;
+
+pub use process::{
+    is_running, launch_worker, remove_lock, run_service, touch_lock, ImportSummary,
+    WORKER_EXECUTABLE,
+};
 
 use qnc_ingest_store::content::{ContentClient, StoredClip};
 use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};

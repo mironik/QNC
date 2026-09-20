@@ -146,6 +146,7 @@ pub struct SourcePreview {
     player_view: PlayerView,
     timeline_assets: TimelineAssetReader,
     play_when_ready: bool,
+    marker_at: Option<std::time::Instant>,
 }
 
 impl Default for SourcePreview {
@@ -157,6 +158,7 @@ impl Default for SourcePreview {
             player_view: PlayerView::default(),
             timeline_assets: TimelineAssetReader::default(),
             play_when_ready: false,
+            marker_at: None,
         }
     }
 }
@@ -234,6 +236,7 @@ impl SourcePreview {
     /// Cuts the current session and clears everything shown.
     pub fn close(&mut self) {
         self.play_when_ready = false;
+        self.release_marker();
         if let Some(player) = &self.player {
             player.close();
         }
@@ -389,6 +392,7 @@ impl SourcePreview {
                 self.play_when_ready = false;
             }
         }
+        self.refresh_marker();
         changed
     }
 
@@ -473,5 +477,28 @@ impl std::fmt::Debug for SourcePreview {
             .field("has_player", &self.player.is_some())
             .field("play_when_ready", &self.play_when_ready)
             .finish()
+    }
+}
+
+impl SourcePreview {
+    /// Tells background processes on this machine that a player works, so they can wait.
+    fn refresh_marker(&mut self) {
+        let working = self.player.is_some()
+            && (self.player_view.preparing || self.player_view.playing() || self.play_when_ready);
+        if !working {
+            self.release_marker();
+        } else if self
+            .marker_at
+            .is_none_or(|at| at.elapsed() >= qnc_playback_marker::REFRESH_EVERY)
+        {
+            qnc_playback_marker::touch();
+            self.marker_at = Some(std::time::Instant::now());
+        }
+    }
+
+    fn release_marker(&mut self) {
+        if self.marker_at.take().is_some() {
+            qnc_playback_marker::clear();
+        }
     }
 }

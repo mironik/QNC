@@ -89,6 +89,7 @@ members = [
     "crates/qnc-source-bindings",
     "crates/qnc-source-browse",
     "crates/qnc-application-sequence",
+    "crates/qnc-playback-marker",
     "crates/qnc-playback-priority",
     "crates/qnc-source-preview",
     "crates/qnc-source-contract",
@@ -103,6 +104,7 @@ members = [
     "crates/qnc-work-settings",
     "tools/qnc-conformance",
     "tools/qnc-dev-diagnostics-app",
+    "tools/qnc-ingest-worker",
     "tools/qnc-player-runner",
     "tools/qnc-camera-catalog",
     "tools/qnc-app-catalog",
@@ -190,6 +192,7 @@ qnc-source-reader = { path = "crates/qnc-source-reader" }
 qnc-source-bindings = { path = "crates/qnc-source-bindings" }
 qnc-source-browse = { path = "crates/qnc-source-browse" }
 qnc-application-sequence = { path = "crates/qnc-application-sequence" }
+qnc-playback-marker = { path = "crates/qnc-playback-marker" }
 qnc-playback-priority = { path = "crates/qnc-playback-priority" }
 qnc-source-preview = { path = "crates/qnc-source-preview" }
 qnc-source-contract = { path = "crates/qnc-source-contract" }

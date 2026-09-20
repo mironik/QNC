@@ -270,37 +270,18 @@ fn file_names_are_safe_on_every_operating_system() {
 }
 
 #[test]
-fn a_background_session_imports_the_queue_and_reports_every_clip() {
+fn draining_the_queue_reports_every_clip() {
     let mut f = fixture();
-    let mut session = ImportSession::default();
-    session
-        .start(
-            plan("original", "original"),
-            f.project.path().to_path_buf(),
-            Arc::new(opener(&f.media, false)),
-            f.target.clone(),
-        )
-        .unwrap();
-    let mut clips = 0;
-    let mut summary = None;
-    for _ in 0..500 {
-        for event in session.poll(16) {
-            match event {
-                ImportEvent::Clip(outcome) => {
-                    assert!(outcome.result.is_ok());
-                    clips += 1;
-                }
-                ImportEvent::Finished(result) => summary = Some(result.unwrap()),
-            }
-        }
-        if summary.is_some() {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-    assert_eq!(clips, 2);
-    assert_eq!(summary, Some(ImportSummary { imported: 2, failed: 0 }));
-    assert!(!session.has_pending_work());
+    let outcomes = drain(
+        &mut f.client,
+        &plan("original", "original"),
+        f.project.path(),
+        &opener(&f.media, false),
+        &nothing(),
+    )
+    .unwrap();
+    assert_eq!(outcomes.len(), 2);
+    assert!(outcomes.iter().all(|o| o.result.is_ok()));
     assert!(f.client.claim_next().unwrap().is_none());
 }
 

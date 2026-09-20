@@ -10,7 +10,6 @@ impl IngestApplication {
     /// once; the copying goes on in the background while the form is not shown.
     pub(super) fn request_navigation_after_import(&mut self) {
         self.stop_player();
-        self.importer.set_paused(false);
         self.navigation_requested = true;
     }
 

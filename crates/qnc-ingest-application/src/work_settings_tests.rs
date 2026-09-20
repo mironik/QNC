@@ -420,6 +420,12 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
         "marking never writes the database"
     );
     // Uvezi is where the marks become active code: the whole selection is written once.
+    let launched = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = launched.clone();
+    restarted.worker = crate::worker_launch::WorkerLauncher::with(move |_root| {
+        counter.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    });
     restarted.dispatch(IngestIntent::new(
         action_ids::INGEST_CLIP_TOGGLE,
         IngestPayload::ClipId(id.clone()),
@@ -433,9 +439,11 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
     wait(&mut restarted);
     assert!(
         restarted.take_navigation_request(),
-        "import started: the shell may open the next application; message: {}", restarted.view.message
+        "the background application is started: the shell may open the next application; message: {}",
+        restarted.view.message
     );
     assert!(!restarted.take_navigation_request(), "handed over once");
+    assert_eq!(launched.load(Ordering::SeqCst), 1, "one background application per Uvezi");
     let selected_in_db = target.open(Access::ReadOnly).unwrap().list(None).unwrap();
     assert_eq!(selected_in_db.iter().filter(|c| c.selected).count(), 1);
     assert!(selected_in_db.iter().find(|c| c.clip.id() == id).unwrap().selected);

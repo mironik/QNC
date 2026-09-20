@@ -3470,6 +3470,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ingest-worker"
+version = "0.1.0"
+dependencies = [
+ "qnc-ingest-import-worker",
+ "qnc-playback-marker",
+]
+
+[[package]]
 name = "qnc-json-transport"
 version = "0.1.0"
 dependencies = [
@@ -3700,6 +3708,10 @@ dependencies = [
  "winit",
  "yuv",
 ]
+
+[[package]]
+name = "qnc-playback-marker"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-playback-priority"
@@ -4008,6 +4020,7 @@ dependencies = [
  "qnc-filmstrip",
  "qnc-media-record-db",
  "qnc-media-records",
+ "qnc-playback-marker",
  "qnc-player-client",
  "qnc-player-input",
  "qnc-player-launcher",

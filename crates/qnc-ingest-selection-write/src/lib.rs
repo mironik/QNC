@@ -2,8 +2,8 @@
 //!
 //! Selecting clips is only a mark in the form's cache. The database sees the selection
 //! once, when the user starts the import: this component then writes the whole set
-//! (selected on, the others off) on its own thread through the public content write
-//! transport. It knows no form and no application, and works over a local, LAN or
+//! (selected on, the others off) and puts the selected clips in the import queue, on its
+//! own thread through the public content write transport. It knows no form and no application, and works over a local, LAN or
 //! intranet content target.
 
 use qnc_ingest_store::content::{ContentTarget, ContentWriteTransport};
@@ -106,6 +106,8 @@ fn write(
         run(&mut transport, "select", |t, key| {
             t.select(key, selected.clone(), true)
         })?;
+        // The selected clips wait in the queue for the background application.
+        run(&mut transport, "queue", |t, key| t.queue_selected(key))?;
     }
     Ok(Applied {
         selected,

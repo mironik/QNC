@@ -22,6 +22,7 @@ mod navigation;
 pub use navigation::SequenceStep;
 mod playback;
 mod playback_guard;
+mod worker_launch;
 mod timeline_artifacts;
 #[cfg(test)]
 mod work_settings_tests;
@@ -469,7 +470,8 @@ pub struct IngestApplication {
     selection_config_error: Option<String>,
     browse: qnc_source_browse::SourceBrowse,
     selection_session: selection::SelectSession,
-    importer: qnc_ingest_import_worker::Importer,
+    root: Option<std::path::PathBuf>,
+    worker: worker_launch::WorkerLauncher,
     camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
     selection_warnings: usize,
     selection_last_warning: Option<String>,
@@ -488,6 +490,7 @@ impl IngestApplication {
 
     pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
         let mut component = Self::new().with_camera_registry(qnc_ingest_cameras::registry()?);
+        component.root = Some(root.as_ref().to_path_buf());
         component.store = Some(IngestStore::open(root.as_ref())?);
         match selection_config::SelectionConfig::load(root.as_ref()).and_then(|config| {
             let browser = config.browser()?;
@@ -612,7 +615,6 @@ impl IngestApplication {
             changed = true;
         }
         self.apply_playback_guard();
-        self.importer.set_paused(self.playback_guard_active());
         if !self.playback_guard_active() {
             changed |= self.poll_thumbnails();
         }
@@ -627,7 +629,8 @@ impl IngestApplication {
             match result {
                 Ok(_) if import => match self.begin_import() {
                     Ok(()) => {
-                        self.view.message = "Uvoz je pokrenut.".into();
+                        self.view.command_busy = false;
+                        self.view.message = "Uvoz je predan pozadinskoj aplikaciji.".into();
                         self.request_navigation_after_import();
                     }
                     Err(error) => {
@@ -646,19 +649,6 @@ impl IngestApplication {
         if let Some(result) = self.browse.poll() {
             self.apply_source_browser_result(result);
             changed = true;
-        }
-        let mut import_finished = false;
-        for notice in self.importer.poll(64) {
-            changed = true;
-            self.view.message = notice.message;
-            if notice.finished {
-                self.view.command_busy = false;
-                import_finished = true;
-            }
-        }
-        if import_finished {
-            // Re-read the catalog: the imported clips changed state in the database.
-            self.load_work_settings(None);
         }
         for event in self.selection_session.poll(64) {
             changed = true;
@@ -1173,7 +1163,7 @@ impl IngestApplication {
         if self.playback_guard_active() {
             return self.playback_guard_rejected();
         }
-        if self.selection_writer.is_busy() || self.importer.has_pending_work() {
+        if self.selection_writer.is_busy() {
             return IngestDispatchResult::rejected("Uvoz je vec u tijeku.");
         }
         let selected: Vec<String> = self
@@ -1215,24 +1205,14 @@ impl IngestApplication {
         }
     }
 
-    /// The selection is in the database: queue it and start copying.
+    /// The selection is in the database: the background application takes over. It reads
+    /// the selected clips and the project settings and does what the settings say.
     fn begin_import(&mut self) -> Result<(), String> {
-        let plan = self
-            .work_plan
+        let root = self
+            .root
             .clone()
-            .ok_or("Radne postavke nisu dostupne.")?;
-        let (Some(target), Some(reader)) =
-            (self.catalog_target.clone(), self.settings_reader.as_ref())
-        else {
-            return Err("Uvoz nije dostupan: nema kataloga.".into());
-        };
-        // Link needs no source; a copy from an unconfigured source fails per clip.
-        let sources = self
-            .selection_config
-            .as_ref()
-            .map(|config| config.sources.clone())
-            .unwrap_or_default();
-        self.importer.start(reader, plan, sources, target)
+            .ok_or("Uvoz nije dostupan: nema korijena aplikacije.")?;
+        self.worker.start(&root)
     }
 
     fn start_selection(&mut self, uri: &str) -> IngestDispatchResult {

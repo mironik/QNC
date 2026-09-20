@@ -1,0 +1,13 @@
+[package]
+name = "qnc-ingest-worker"
+version = "0.1.0"
+edition = "2021"
+description = "QNC background application: executes the project settings for the clips selected in Ingest (started by Uvezi, runs without a window, ends when done)"
+
+[[bin]]
+name = "qnc-ingest-worker"
+path = "src/main.rs"
+
+[dependencies]
+qnc-ingest-import-worker = { workspace = true }
+qnc-playback-marker = { workspace = true }
