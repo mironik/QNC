@@ -1425,6 +1425,13 @@ na Uvezi (`qnc-ingest-selection-write`); Uvezi pokrece pozadinsku aplikaciju `to
 Nije izvedeno: izbor citaca indeksa po pattern-id u `qnc-scanner`; generiranje postera koji kartica nema;
 pracenje uvoza u shellu; test uvoza s pravom karticom kroz sucelje. Odobrenja su zatvorena.
 
+Otvoreno ograniceno odobrenje 2026-09-20 (dvadeset cetvrto): korisnik je izricito odkljucao
+`crates/qnc-editorial-application` i `crates/qnc-editorial-desktop` (Media Assist) samo za sličice klipova po
+v5 postupku: adresa postera iz javnog prikaza baze (`qnc-content-read`), ucitavanje u pozadini kroz
+`qnc-media-thumbnail` (odabrani klip prvi, ostali redom; poster iz projekta ili s kartice), a kartica klipa
+crta sliku umjesto "..." kad slika postoji. Popis klipova prikazuje samo uvezene. Izgled i raspored ostaju
+isti; `qnc-media-card`, `qnc-ui-kit` i `contracts/ui` ostaju zakljucani. Sve ostalo ostaje zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
 odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i
 intranet. Otkljucano: novi crate `crates/qnc-ingest-import-worker` (javni modul:
