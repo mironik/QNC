@@ -142,6 +142,7 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
     checks.push(validate_editorial_form_boundary(root));
     checks.push(scan_shared_ui_patterns(root));
     checks.push(scan_timeline_engine_boundary(root));
+    checks.push(scan_sources_are_read_only(root));
     checks.push(CheckResult::from_report(
         "public player boundary",
         player_boundary::check(root),
@@ -1874,6 +1875,13 @@ fn scan_business_app_isolation(root: &Path) -> CheckResult {
         let mut files = Vec::new();
         collect_rs_files(&crate_root.join("src"), &mut files);
         for file in files {
+            let name = file
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default();
+            if name == "tests.rs" || name.ends_with("_tests.rs") || name.starts_with("test_") {
+                continue;
+            }
             let Ok(contents) = fs::read_to_string(&file) else {
                 continue;
             };
@@ -2664,5 +2672,105 @@ mod dependency_scope_tests {
         let found = collect_transitive_cargo_dependencies("qnc-story-app", &packages);
         assert!(found.contains("qnc-ingest-store"));
         let _ = fs::remove_dir_all(root);
+    }
+}
+
+/// Crates that read a source (a camera card, a LAN or intranet source). A source is read
+/// only, in software too: none of them may contain an operation that writes, creates,
+/// removes, renames or changes anything, outside their tests.
+const SOURCE_FACING_CRATES: &[&str] = &[
+    "qnc-source-reader",
+    "qnc-media-stream",
+    "qnc-source-contract",
+    "qnc-camera-detector",
+    "qnc-scanner",
+    "qnc-source-groups",
+    "qnc-dir-browser",
+];
+
+const WRITE_OPERATIONS: &[&str] = &[
+    "File::create",
+    "OpenOptions",
+    "fs::write",
+    "remove_file",
+    "remove_dir",
+    "fs::rename",
+    "fs::copy",
+    "create_dir",
+    "set_permissions",
+    ".write_all(",
+];
+
+fn write_operations_outside_tests(contents: &str) -> Vec<&'static str> {
+    let code = contents
+        .split("#[cfg(test)]")
+        .next()
+        .unwrap_or_default();
+    WRITE_OPERATIONS
+        .iter()
+        .copied()
+        .filter(|operation| code.contains(operation))
+        .collect()
+}
+
+fn scan_sources_are_read_only(root: &Path) -> CheckResult {
+    let mut report = ValidationReport::default();
+    for name in SOURCE_FACING_CRATES {
+        let src = root.join("crates").join(name).join("src");
+        let mut files = Vec::new();
+        collect_rust_files(&src, &mut files);
+        for file in files {
+            let file_name = file
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default();
+            if file_name == "tests.rs" || file_name.ends_with("_tests.rs") || file_name.starts_with("test_")
+            {
+                continue;
+            }
+            let Ok(contents) = fs::read_to_string(&file) else {
+                continue;
+            };
+            for operation in write_operations_outside_tests(&contents) {
+                report.error(format!(
+                    "{}: a source is read only, but this code contains '{operation}'",
+                    display_relative(root, &file)
+                ));
+            }
+        }
+    }
+    CheckResult::from_report("sources are read only", report)
+}
+
+fn collect_rust_files(directory: &Path, files: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_rust_files(&path, files);
+        } else if path.extension().is_some_and(|extension| extension == "rs") {
+            files.push(path);
+        }
+    }
+}
+
+#[cfg(test)]
+mod source_read_only_tests {
+    use super::*;
+
+    #[test]
+    fn a_write_in_source_facing_code_is_found() {
+        assert_eq!(
+            write_operations_outside_tests("fn f() { std::fs::write(p, b); }"),
+            ["fs::write"]
+        );
+    }
+
+    #[test]
+    fn writes_in_tests_are_ignored() {
+        let code = "fn f() {}\n#[cfg(test)]\nmod tests { fn t() { fs::create_dir_all(p); } }";
+        assert!(write_operations_outside_tests(code).is_empty());
     }
 }

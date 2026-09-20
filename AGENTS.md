@@ -59,6 +59,10 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 5. **Postupak (procedura) se uvijek uzima iz QNC v5 koda i tamo se cita do detalja; ne nagada se.**
    Ako v5 nesto ne pokriva, to se kaze korisniku, ne izmisljava. Korisnikove odluke imaju prednost pred v5.
 6. **Postojeci UI i layout ostaju netaknuti** osim uz izricito odobrenje zapisano u odjeljku 18.
+7. **Kartica (izvor medija) je uvijek, i softverski, SAMO ZA CITANJE.** Nijedna aplikacija, alat, test,
+   mjerenje ni dijagnostika ne smije na kartici ili izvoru nista pisati, stvarati, brisati, preimenovati ni
+   mijenjati. Izvori se citaju iskljucivo kroz citace koji nemaju operaciju pisanja. Pisanje je dopusteno samo
+   u direktorije koje odreduje projekt (pravilo 2), a kod koji pise mora to provjeriti prije pisanja.
 
 ## 1. Tocne putanje
 

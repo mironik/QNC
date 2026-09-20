@@ -476,3 +476,11 @@ fn a_linked_clip_with_a_card_poster_keeps_the_address_of_the_card() {
     );
     assert!(poster.is_none(), "link: the poster stays on the card");
 }
+
+#[test]
+fn writing_is_allowed_only_below_the_project_folder() {
+    let project = std::path::Path::new("proj");
+    assert!(inside_project(project, &project.join("original").join("a.mxf")).is_ok());
+    assert!(inside_project(project, std::path::Path::new("card/Clip/a.mxf")).is_err());
+    assert!(inside_project(project, &project.join("..").join("card").join("a")).is_err());
+}

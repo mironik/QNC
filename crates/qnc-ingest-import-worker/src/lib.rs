@@ -226,6 +226,7 @@ pub fn import_clip_beating(
         Action::Copy { source_uri, folder } => {
             let name = safe_name(clip.clip.id(), &source_uri);
             let directory = project_dir.join(folder.name());
+            inside_project(project_dir, &directory.join(&name))?;
             fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
             copy_into(opener, &source_uri, &directory.join(&name), cancel, beat)?;
             let root = match folder {
@@ -236,6 +237,19 @@ pub fn import_clip_beating(
             qnc_contracts::parse_qnc_uri(&uri).map_err(|e| e.to_string())?;
             Ok(uri)
         }
+    }
+}
+
+/// Writes go only where the project says: below the project folder. A source (a card) is read
+/// only, so nothing is ever written, created or changed there.
+pub(crate) fn inside_project(project_dir: &Path, path: &Path) -> Result<(), String> {
+    let plain = path
+        .components()
+        .all(|part| !matches!(part, std::path::Component::ParentDir));
+    if plain && path.starts_with(project_dir) {
+        Ok(())
+    } else {
+        Err("Pisanje je dopusteno samo u direktorij projekta.".into())
     }
 }
 
@@ -257,6 +271,7 @@ pub fn import_poster(
     let clip_id = clip.clip.id();
     let directory = project_dir.join("ingest").join("thumbnails").join(clip_id);
     let output = directory.join("poster.jpg");
+    inside_project(project_dir, &output).ok()?;
     match clip.clip.thumbnail_uri.as_deref() {
         Some(source_uri) => {
             if !matches!(action_for(clip, plan), Ok(Action::Copy { .. })) {
