@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
 mod clip_filter_tests;
+mod navigation;
+pub use navigation::SequenceStep;
 mod playback;
 mod playback_guard;
 mod timeline_artifacts;
@@ -457,6 +459,7 @@ pub struct IngestApplication {
     catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
     selection_writer: qnc_ingest_selection_write::SelectionWriter,
     import_after_selection: bool,
+    navigation_requested: bool,
     thumbnail_loader: qnc_media_thumbnail::ThumbnailBatchService,
     artifacts: qnc_timeline_artifacts::Artifacts,
     catalog_stats: Option<CatalogStats>,
@@ -623,7 +626,10 @@ impl IngestApplication {
             let import = std::mem::take(&mut self.import_after_selection);
             match result {
                 Ok(_) if import => match self.begin_import() {
-                    Ok(()) => self.view.message = "Uvoz je pokrenut.".into(),
+                    Ok(()) => {
+                        self.view.message = "Uvoz je pokrenut.".into();
+                        self.request_navigation_after_import();
+                    }
                     Err(error) => {
                         self.view.command_busy = false;
                         self.view.message = error;
@@ -1215,15 +1221,18 @@ impl IngestApplication {
             .work_plan
             .clone()
             .ok_or("Radne postavke nisu dostupne.")?;
-        let (Some(config), Some(target), Some(reader)) = (
-            self.selection_config.as_ref(),
-            self.catalog_target.clone(),
-            self.settings_reader.as_ref(),
-        ) else {
-            return Err("Uvoz nije dostupan: nema konfiguracije ili kataloga.".into());
+        let (Some(target), Some(reader)) =
+            (self.catalog_target.clone(), self.settings_reader.as_ref())
+        else {
+            return Err("Uvoz nije dostupan: nema kataloga.".into());
         };
-        self.importer
-            .start(reader, plan, config.sources.clone(), target)
+        // Link needs no source; a copy from an unconfigured source fails per clip.
+        let sources = self
+            .selection_config
+            .as_ref()
+            .map(|config| config.sources.clone())
+            .unwrap_or_default();
+        self.importer.start(reader, plan, sources, target)
     }
 
     fn start_selection(&mut self, uri: &str) -> IngestDispatchResult {

@@ -326,10 +326,18 @@ fn the_write_transport_queues_the_selected_clips_and_hands_them_out_once() {
 fn copying_the_media_copies_the_poster_and_records_it() {
     let mut f = fixture();
     let project = f.project.path().to_path_buf();
-    let outcome = run_next(&mut f.client, &plan("original", "original"), &project, &opener(&f.media, false), &nothing())
+    let plan = plan("original", "original");
+    let opener = opener(&f.media, false);
+    let mut with_poster = None;
+    while let Some(outcome) = run_next(&mut f.client, &plan, &project, &opener, &nothing())
         .unwrap()
-        .unwrap();
-    let poster = outcome.thumbnail_uri.expect("a Sony clip has a poster");
+    {
+        if outcome.thumbnail_uri.is_some() {
+            with_poster = Some(outcome);
+        }
+    }
+    let outcome = with_poster.expect("a Sony clip has a poster");
+    let poster = outcome.thumbnail_uri.clone().unwrap();
     assert_eq!(
         poster,
         format!("qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg", outcome.clip_id)

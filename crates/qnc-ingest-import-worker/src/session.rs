@@ -58,7 +58,7 @@ impl ImportSession {
         self.cancel();
         let cancel = Arc::new(AtomicBool::new(false));
         let worker_cancel = cancel.clone();
-        let (send, receive) = mpsc::sync_channel(32);
+        let (send, receive) = mpsc::channel();
         let thread = std::thread::Builder::new()
             .name("qnc-ingest-import".into())
             .spawn(move || {
@@ -117,7 +117,7 @@ fn run(
     project_dir: &std::path::Path,
     opener: &dyn MediaOpener,
     target: &ContentTarget,
-    send: &mpsc::SyncSender<ImportEvent>,
+    send: &mpsc::Sender<ImportEvent>,
     cancel: &AtomicBool,
 ) -> Result<ImportSummary, String> {
     let mut client = crate::TransportQueue::start(target.clone())?;

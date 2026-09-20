@@ -64,6 +64,15 @@ impl IngestApp {
         self.application.refresh_active_project();
     }
 
+    /// Uvezi has started the import: the shell may open the next application.
+    pub fn take_navigation_request(&mut self) -> bool {
+        self.application.take_navigation_request()
+    }
+
+    pub fn navigation_sequence(&self) -> Result<Vec<qnc_ingest_application::SequenceStep>, String> {
+        self.application.navigation_sequence()
+    }
+
     fn dispatch(&mut self, ctx: &egui::Context, intent: IngestIntent) {
         let result = self.application.dispatch(intent);
         if result.request_repaint {

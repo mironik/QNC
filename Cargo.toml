@@ -88,6 +88,7 @@ members = [
     "crates/qnc-source-reader",
     "crates/qnc-source-bindings",
     "crates/qnc-source-browse",
+    "crates/qnc-application-sequence",
     "crates/qnc-playback-priority",
     "crates/qnc-source-preview",
     "crates/qnc-source-contract",
@@ -188,6 +189,7 @@ qnc-sony-metadata = { path = "crates/qnc-sony-metadata" }
 qnc-source-reader = { path = "crates/qnc-source-reader" }
 qnc-source-bindings = { path = "crates/qnc-source-bindings" }
 qnc-source-browse = { path = "crates/qnc-source-browse" }
+qnc-application-sequence = { path = "crates/qnc-application-sequence" }
 qnc-playback-priority = { path = "crates/qnc-playback-priority" }
 qnc-source-preview = { path = "crates/qnc-source-preview" }
 qnc-source-contract = { path = "crates/qnc-source-contract" }

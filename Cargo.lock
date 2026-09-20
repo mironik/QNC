@@ -2948,6 +2948,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-application-sequence"
+version = "0.1.0"
+dependencies = [
+ "qnc-work-settings",
+ "rusqlite",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-audio-output"
 version = "0.1.0"
 dependencies = [
@@ -3276,6 +3285,7 @@ name = "qnc-ingest-application"
 version = "0.1.0"
 dependencies = [
  "image",
+ "qnc-application-sequence",
  "qnc-camera-adapter",
  "qnc-contracts",
  "qnc-dir-browser",
@@ -3431,7 +3441,6 @@ name = "qnc-ingest-selection-write"
 version = "0.1.0"
 dependencies = [
  "qnc-ingest-store",
- "rusqlite",
 ]
 
 [[package]]

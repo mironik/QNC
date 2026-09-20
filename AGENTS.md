@@ -1374,6 +1374,18 @@ indeksa po pattern-id, tako da dva adaptera s istim XML namespaceom ne daju
 dokumenti. UI i layout ostaju zakljucani (`qnc-ingest-desktop`, `qnc-media-card` i ostali
 popisani u dvadesetom). Sve ostalo ostaje zamrznuto.
 
+Otvoreno ograniceno odobrenje 2026-09-20 (dvadeset drugo): korisnik je izricito odkljucao
+(a) `qnc-ingest-desktop` samo za podjelu `widgets.rs` u module bez ikakve promjene izgleda,
+rasporeda ili ponasanja (cisto premjestanje koda); (b) prijenos shellu nakon radnje Uvezi:
+`qnc-shell-desktop-api`, `crates/qnc-ingest-desktop-adapter`, `apps/qnc-app` i `apps/qnc-ingest`
+samo koliko je nuzno da aplikacija nakon Uvezi javi shellu da je radnja gotova i da shell
+pokrene sljedecu aplikaciju (kao `go_workflow(Next{from:"ingest"})` u v5); (c)
+`qnc-ingest-application`: odabir klipova je lokalna oznaka u prikazu (bez upisa u bazu pri
+kliku), a odabir se provjerava i upisuje u bazu tek na Uvezi; podjela `lib.rs` u module. Sve
+ostalo ostaje zamrznuto, a izgled i raspored (`contracts/ui`, `qnc-ui-kit`, `qnc-media-card`,
+`qnc-source-dock`, `qnc-media-pool-head`, `qnc-project-desktop`, `qnc-editorial-desktop`) ostaju
+zakljucani.
+
 Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
 odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i
 intranet. Otkljucano: novi crate `crates/qnc-ingest-import-worker` (javni modul:

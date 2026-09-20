@@ -431,6 +431,11 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
             .accepted
     );
     wait(&mut restarted);
+    assert!(
+        restarted.take_navigation_request(),
+        "import started: the shell may open the next application; message: {}", restarted.view.message
+    );
+    assert!(!restarted.take_navigation_request(), "handed over once");
     let selected_in_db = target.open(Access::ReadOnly).unwrap().list(None).unwrap();
     assert_eq!(selected_in_db.iter().filter(|c| c.selected).count(), 1);
     assert!(selected_in_db.iter().find(|c| c.clip.id() == id).unwrap().selected);

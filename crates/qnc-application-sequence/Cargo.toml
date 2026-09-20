@@ -1,0 +1,12 @@
+[package]
+name = "qnc-application-sequence"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: reads the order of the project's applications (priority groups) from the public project view; read-only, for any form that hands over to the next application"
+
+[dependencies]
+qnc-work-settings = { workspace = true }
+rusqlite = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

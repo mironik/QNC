@@ -8,6 +8,7 @@ qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
 qnc-ingest-artifacts = { workspace = true }
 qnc-ingest-preview = { workspace = true }
+qnc-application-sequence = { workspace = true }
 qnc-ingest-selection-write = { workspace = true }
 qnc-playback-priority = { workspace = true }
 qnc-source-browse = { workspace = true }
