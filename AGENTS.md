@@ -1386,6 +1386,12 @@ ostalo ostaje zamrznuto, a izgled i raspored (`contracts/ui`, `qnc-ui-kit`, `qnc
 `qnc-source-dock`, `qnc-media-pool-head`, `qnc-project-desktop`, `qnc-editorial-desktop`) ostaju
 zakljucani.
 
+Otvoreno ograniceno odobrenje 2026-09-20 (dvadeset trece): korisnik je izricito odkljucao
+`crates/qnc-filmstrip-worker` (i po potrebi `crates/qnc-ffmpeg-decode` te `crates/qnc-filmstrip`)
+samo radi brzine stvaranja filmstripa: broj istodobnih radnika, nacin ffmpeg dohvata kadrova i
+suvisni rad po klipu, bez promjene izgleda filmstripa, ugovora ni baze. Probe se ne uvodi:
+filmstrip koristi metapodatke iz baze (XML kartice). Sve ostalo ostaje zamrznuto.
+
 Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
 odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i
 intranet. Otkljucano: novi crate `crates/qnc-ingest-import-worker` (javni modul:
