@@ -1,8 +1,9 @@
 //! Writes which clips are selected for import.
 //!
-//! One write at a time, on its own thread, through the public content write
-//! transport. The caller starts it, polls for the outcome and never touches the
-//! database. It knows no form and no application, and works over a local, LAN or
+//! Selecting clips is only a mark in the form's cache. The database sees the selection
+//! once, when the user starts the import: this component then writes the whole set
+//! (selected on, the others off) on its own thread through the public content write
+//! transport. It knows no form and no application, and works over a local, LAN or
 //! intranet content target.
 
 use qnc_ingest_store::content::{ContentTarget, ContentWriteTransport};
@@ -13,13 +14,13 @@ use std::{
 };
 
 pub const MODULE_ID: &str = "qnc.module.ingest-selection-write";
-pub const VERSION: &str = "0.1.0";
+pub const VERSION: &str = "0.2.0";
 
-/// What a finished write changed.
+/// The selection as written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Applied {
-    pub clip_ids: Vec<String>,
-    pub selected: bool,
+    pub selected: Vec<String>,
+    pub unselected: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -37,21 +38,21 @@ impl SelectionWriter {
         self.result.is_some()
     }
 
-    /// Starts the write. Refused while the previous one is still running.
+    /// Starts writing the whole selection. Refused while a write is still running.
     pub fn start(
         &mut self,
         target: ContentTarget,
-        clip_ids: Vec<String>,
-        selected: bool,
+        selected: Vec<String>,
+        unselected: Vec<String>,
     ) -> Result<(), String> {
         if self.is_busy() {
-            return Err("DB odabir je u tijeku.".into());
+            return Err("Upis odabira je u tijeku.".into());
         }
         let (send, receive) = mpsc::sync_channel(1);
         let thread = std::thread::Builder::new()
             .name("ingest-selection-write".into())
             .spawn(move || {
-                let _ = send.send(write(target, clip_ids, selected));
+                let _ = send.send(write(target, selected, unselected));
             })
             .map_err(|error| error.to_string())?;
         self.result = Some(receive);
@@ -64,7 +65,7 @@ impl SelectionWriter {
         let receiver = self.result.as_ref()?;
         let outcome = match receiver.try_recv() {
             Ok(outcome) => outcome,
-            Err(TryRecvError::Disconnected) => Err("DB odabir je prekinut.".into()),
+            Err(TryRecvError::Disconnected) => Err("Upis odabira je prekinut.".into()),
             Err(TryRecvError::Empty) => return None,
         };
         self.finish();
@@ -90,15 +91,40 @@ impl Drop for SelectionWriter {
     }
 }
 
-fn write(target: ContentTarget, clip_ids: Vec<String>, selected: bool) -> Result<Applied, String> {
+fn write(
+    target: ContentTarget,
+    selected: Vec<String>,
+    unselected: Vec<String>,
+) -> Result<Applied, String> {
     let mut transport = ContentWriteTransport::start(target)?;
-    let key = "select-clips".to_string();
-    transport.select(key.clone(), clip_ids.clone(), selected)?;
+    if !unselected.is_empty() {
+        run(&mut transport, "unselect", |t, key| {
+            t.select(key, unselected.clone(), false)
+        })?;
+    }
+    if !selected.is_empty() {
+        run(&mut transport, "select", |t, key| {
+            t.select(key, selected.clone(), true)
+        })?;
+    }
+    Ok(Applied {
+        selected,
+        unselected,
+    })
+}
+
+fn run<E: ToString>(
+    transport: &mut ContentWriteTransport,
+    name: &str,
+    send: impl FnOnce(&mut ContentWriteTransport, String) -> Result<(), E>,
+) -> Result<(), String> {
+    let key = format!("selection-{name}");
+    send(transport, key.clone()).map_err(|e| e.to_string())?;
     loop {
         for completion in transport.poll() {
             if completion.key == key {
-                completion.result?;
-                return Ok(Applied { clip_ids, selected });
+                completion.result.map_err(|e| e.to_string())?;
+                return Ok(());
             }
         }
         if !transport.has_pending() {

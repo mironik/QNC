@@ -129,7 +129,7 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
 }
 
 #[test]
-fn uncommitted_preview_cannot_be_selected_and_stale_ack_does_not_mark_it_saved() {
+fn marking_an_uncommitted_preview_is_local_and_stale_ack_does_not_mark_it_saved() {
     let mut component = IngestApplication::default();
     let (send, receive) = mpsc::sync_channel(8);
     component.selection_session = selection::SelectSession::from_receiver_for_test(receive);
@@ -148,10 +148,11 @@ fn uncommitted_preview_cannot_be_selected_and_stale_ack_does_not_mark_it_saved()
     component.poll();
     assert_eq!(component.view.clips[0].save_state, SaveState::Pending);
     assert!(
-        !component
+        component
             .select_clips(vec!["clip-pending".into()], true)
             .accepted
     );
+    assert_eq!(component.view.clips[0].save_state, SaveState::Pending);
     send.send(selection::Event::Saved {
         revisions: vec![("clip-pending".into(), 2)],
         error: Some("write failed".into()),
@@ -159,7 +160,6 @@ fn uncommitted_preview_cannot_be_selected_and_stale_ack_does_not_mark_it_saved()
     .unwrap();
     component.poll();
     assert_eq!(component.view.clips[0].save_state, SaveState::Failed);
-    assert!(!component.view.clips[0].selected);
 }
 
 #[test]
@@ -364,11 +364,13 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
     );
     assert_eq!(
         component.view.selected_count(),
-        0,
-        "no optimistic selection before DB acknowledgement"
+        1,
+        "the checkbox is only a mark in the cache: instant, no database"
     );
-    wait(&mut component);
-    assert_eq!(component.view.selected_count(), 1);
+    assert!(
+        !component.has_pending_work(),
+        "marking starts no thread and no database write"
+    );
     assert_eq!(
         component.view.preview_clip_id.as_deref(),
         Some(preview_id.as_str()),
@@ -378,20 +380,15 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
     let mut restarted = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut restarted);
     assert_eq!(restarted.view.clips.len(), 2);
-    assert!(
-        restarted
-            .view
-            .clips
-            .iter()
-            .find(|c| c.clip_id == id)
-            .unwrap()
-            .selected
+    assert_eq!(
+        restarted.view.selected_count(),
+        0,
+        "a mark that was never imported is not in the database"
     );
     assert!(
         restarted.view.clips.iter().any(|c| c.thumb_uri.is_some()),
         "poster URI survives offline reload"
     );
-    // Keep the selected old clip hidden while batch selection targets only the new clip.
     restarted
         .view
         .clips
@@ -409,37 +406,34 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
             .dispatch(IngestIntent::empty(action_ids::INGEST_SELECT_ALL))
             .accepted
     );
-    wait(&mut restarted);
-    assert_eq!(restarted.view.selected_count(), 2);
+    assert_eq!(restarted.view.selected_count(), 1, "only the visible clip is marked");
     assert!(
         restarted
             .dispatch(IngestIntent::empty(action_ids::INGEST_CLEAR_SELECTION))
             .accepted
     );
-    wait(&mut restarted);
+    assert_eq!(restarted.view.selected_count(), 0);
+    let selected_in_db = target.open(Access::ReadOnly).unwrap().list(None).unwrap();
     assert_eq!(
-        restarted.view.selected_count(),
-        1,
-        "hidden old selection survives clear"
+        selected_in_db.iter().filter(|c| c.selected).count(),
+        0,
+        "marking never writes the database"
     );
+    // Uvezi is where the marks become active code: the whole selection is written once.
+    restarted.dispatch(IngestIntent::new(
+        action_ids::INGEST_CLIP_TOGGLE,
+        IngestPayload::ClipId(id.clone()),
+    ));
+    assert_eq!(restarted.view.selected_count(), 1);
     assert!(
         restarted
-            .view
-            .clips
-            .iter()
-            .find(|c| c.clip_id == id)
-            .unwrap()
-            .selected
+            .dispatch(IngestIntent::empty(action_ids::INGEST_IMPORT_SELECTED))
+            .accepted
     );
+    wait(&mut restarted);
     let selected_in_db = target.open(Access::ReadOnly).unwrap().list(None).unwrap();
     assert_eq!(selected_in_db.iter().filter(|c| c.selected).count(), 1);
-    assert!(
-        selected_in_db
-            .iter()
-            .find(|c| c.clip.id() == id)
-            .unwrap()
-            .selected
-    );
+    assert!(selected_in_db.iter().find(|c| c.clip.id() == id).unwrap().selected);
     let registry = Connection::open(root.path().join("data/project_store.db")).unwrap();
     registry
         .execute("UPDATE app_settings SET value='p2'", [])
@@ -465,7 +459,7 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
 }
 
 #[test]
-fn missing_project_db_is_not_recreated_and_rejected_selection_never_changes_ui() {
+fn missing_project_db_is_not_recreated_and_import_is_rejected() {
     use qnc_ingest_store::content::{Access, ContentTarget};
     let root = fixture();
     let reader = SettingsReader::local(root.path().join("data/project_store.db"));
@@ -479,7 +473,7 @@ fn missing_project_db_is_not_recreated_and_rejected_selection_never_changes_ui()
     assert!(!component.view.work_settings_ready);
     assert!(
         !component
-            .dispatch(IngestIntent::empty(action_ids::INGEST_SELECT_ALL))
+            .dispatch(IngestIntent::empty(action_ids::INGEST_IMPORT_SELECTED))
             .accepted
     );
     assert!(component.view.clips.is_empty());

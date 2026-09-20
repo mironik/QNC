@@ -456,6 +456,7 @@ pub struct IngestApplication {
     catalog_loader: catalog::CatalogLoader,
     catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
     selection_writer: qnc_ingest_selection_write::SelectionWriter,
+    import_after_selection: bool,
     thumbnail_loader: qnc_media_thumbnail::ThumbnailBatchService,
     artifacts: qnc_timeline_artifacts::Artifacts,
     catalog_stats: Option<CatalogStats>,
@@ -619,16 +620,20 @@ impl IngestApplication {
         }
         changed |= self.poll_timeline_artifacts();
         if let Some(result) = self.selection_writer.poll() {
+            let import = std::mem::take(&mut self.import_after_selection);
             match result {
-                Ok(applied) => {
-                    for clip in &mut self.view.clips {
-                        if applied.clip_ids.contains(&clip.clip_id) {
-                            clip.selected = applied.selected;
-                        }
+                Ok(_) if import => match self.begin_import() {
+                    Ok(()) => self.view.message = "Uvoz je pokrenut.".into(),
+                    Err(error) => {
+                        self.view.command_busy = false;
+                        self.view.message = error;
                     }
-                    self.view.message = self.view.status_label();
+                },
+                Ok(_) => {}
+                Err(error) => {
+                    self.view.command_busy = false;
+                    self.view.message = error;
                 }
-                Err(error) => self.view.message = error,
             }
             changed = true;
         }
@@ -776,7 +781,22 @@ impl IngestApplication {
                 self.catalog_target = Some(loaded.target);
                 self.catalog_stats = Some(loaded.stats);
                 if let Some(clips) = loaded.clips {
-                    let clips = clips.into_iter().map(ClipView::from).collect::<Vec<_>>();
+                    let marked: std::collections::HashMap<&str, bool> = self
+                        .view
+                        .clips
+                        .iter()
+                        .map(|clip| (clip.clip_id.as_str(), clip.selected))
+                        .collect();
+                    let clips = clips
+                        .into_iter()
+                        .map(ClipView::from)
+                        .map(|mut clip| {
+                            if let Some(selected) = marked.get(clip.clip_id.as_str()) {
+                                clip.selected = *selected;
+                            }
+                            clip
+                        })
+                        .collect::<Vec<_>>();
                     let thumbnails = clips
                         .iter()
                         .filter_map(|clip| {
@@ -890,25 +910,15 @@ impl IngestApplication {
         None
     }
 
+    /// Selecting clips is only a mark in the cache of the view: no thread, no database.
+    /// The database sees the selection when the user starts the import.
     fn select_clips(&mut self, ids: Vec<String>, selected: bool) -> IngestDispatchResult {
-        if self
-            .view
-            .clips
-            .iter()
-            .any(|c| ids.contains(&c.clip_id) && c.save_state != SaveState::Saved)
-        {
-            return IngestDispatchResult::rejected("Klip jos nije spremljen u bazu.");
+        for clip in &mut self.view.clips {
+            if ids.contains(&clip.clip_id) {
+                clip.selected = selected;
+            }
         }
-        if self.selection_writer.is_busy() || self.view.work_settings_loading {
-            return IngestDispatchResult::rejected("DB odabir je u tijeku.");
-        }
-        let Some(target) = self.catalog_target.clone() else {
-            return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
-        };
-        match self.selection_writer.start(target, ids, selected) {
-            Ok(()) => IngestDispatchResult::accepted(None, true),
-            Err(error) => IngestDispatchResult::rejected(error),
-        }
+        IngestDispatchResult::accepted(None, true)
     }
 
     pub fn dispatch_log(&self) -> &[String] {
@@ -1146,36 +1156,74 @@ impl IngestApplication {
         }
     }
 
-    /// Queues the selected clips (the selection lives in the database) and starts
-    /// the import in the background. What is copied and where is decided by the
-    /// project settings in the work plan; the media is read through the transport
-    /// of its source (local, LAN or intranet) and copied into the project folder of
-    /// this machine.
+    /// Uvezi: checks the marked clips, writes the selection to the database once and then
+    /// starts the import in the background. What is copied and where is decided by the
+    /// project settings in the work plan; the media is read through the transport of its
+    /// source (local, LAN or intranet) and copied into the project folder of this machine.
     fn start_import(&mut self) -> IngestDispatchResult {
-        let Some(plan) = self.work_plan.clone() else {
+        if self.work_plan.is_none() {
             return IngestDispatchResult::rejected("Radne postavke nisu dostupne.");
-        };
+        }
         if self.playback_guard_active() {
             return self.playback_guard_rejected();
         }
+        if self.selection_writer.is_busy() || self.importer.has_pending_work() {
+            return IngestDispatchResult::rejected("Uvoz je vec u tijeku.");
+        }
+        let selected: Vec<String> = self
+            .view
+            .clips
+            .iter()
+            .filter(|clip| clip.selected)
+            .map(|clip| clip.clip_id.clone())
+            .collect();
+        if selected.is_empty() {
+            return IngestDispatchResult::rejected("Nema odabranih klipova.");
+        }
+        if self
+            .view
+            .clips
+            .iter()
+            .any(|clip| clip.selected && clip.save_state != SaveState::Saved)
+        {
+            return IngestDispatchResult::rejected("Klip jos nije spremljen u bazu.");
+        }
+        let unselected: Vec<String> = self
+            .view
+            .clips
+            .iter()
+            .filter(|clip| !clip.selected && clip.save_state == SaveState::Saved)
+            .map(|clip| clip.clip_id.clone())
+            .collect();
+        let Some(target) = self.catalog_target.clone() else {
+            return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
+        };
+        match self.selection_writer.start(target, selected, unselected) {
+            Ok(()) => {
+                self.import_after_selection = true;
+                self.view.command_busy = true;
+                self.view.message = "Spremanje odabira...".into();
+                IngestDispatchResult::accepted(None, true)
+            }
+            Err(error) => IngestDispatchResult::rejected(error),
+        }
+    }
+
+    /// The selection is in the database: queue it and start copying.
+    fn begin_import(&mut self) -> Result<(), String> {
+        let plan = self
+            .work_plan
+            .clone()
+            .ok_or("Radne postavke nisu dostupne.")?;
         let (Some(config), Some(target), Some(reader)) = (
             self.selection_config.as_ref(),
             self.catalog_target.clone(),
             self.settings_reader.as_ref(),
         ) else {
-            return IngestDispatchResult::rejected("Uvoz nije dostupan: nema konfiguracije ili kataloga.");
+            return Err("Uvoz nije dostupan: nema konfiguracije ili kataloga.".into());
         };
-        match self
-            .importer
+        self.importer
             .start(reader, plan, config.sources.clone(), target)
-        {
-            Ok(()) => {
-                self.view.command_busy = true;
-                self.view.message = "Uvoz je pokrenut.".into();
-                IngestDispatchResult::accepted(None, true)
-            }
-            Err(error) => IngestDispatchResult::rejected(error),
-        }
     }
 
     fn start_selection(&mut self, uri: &str) -> IngestDispatchResult {
