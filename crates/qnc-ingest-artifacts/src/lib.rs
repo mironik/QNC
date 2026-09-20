@@ -12,9 +12,55 @@ use std::sync::Arc;
 pub const MODULE_ID: &str = "qnc.module.ingest-artifacts";
 pub const VERSION: &str = "0.1.0";
 
+/// One read connection shared by every read of a reader. Opening a connection for each
+/// clip made a sync of a hundred clips take seconds on the caller's thread.
+#[derive(Clone)]
+struct SharedRead {
+    target: ContentTarget,
+    client: Arc<std::sync::Mutex<Option<qnc_ingest_store::content::ContentClient>>>,
+}
+
+impl SharedRead {
+    fn new(target: ContentTarget) -> Self {
+        Self {
+            target,
+            client: Arc::new(std::sync::Mutex::new(None)),
+        }
+    }
+
+    fn open(&self) -> Result<ReadGuard<'_>, String> {
+        let mut guard = self
+            .client
+            .lock()
+            .map_err(|_| "Veza prema bazi nije dostupna.".to_string())?;
+        if guard.is_none() {
+            *guard = Some(
+                self.target
+                    .open(qnc_ingest_store::content::Access::ReadOnly)?,
+            );
+        }
+        Ok(ReadGuard(guard))
+    }
+}
+
+struct ReadGuard<'a>(std::sync::MutexGuard<'a, Option<qnc_ingest_store::content::ContentClient>>);
+
+impl std::ops::Deref for ReadGuard<'_> {
+    type Target = qnc_ingest_store::content::ContentClient;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().expect("opened by SharedRead::open")
+    }
+}
+
+impl std::ops::DerefMut for ReadGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut().expect("opened by SharedRead::open")
+    }
+}
+
 #[derive(Clone)]
 struct IngestTimelineArtifactReader {
-    content_target: qnc_ingest_store::content::ContentTarget,
+    read: SharedRead,
     filmstrip_root_uri: String,
     filmstrip_dir: std::path::PathBuf,
 }
@@ -24,17 +70,14 @@ impl qnc_timeline_assets::TimelineArtifactRead for IngestTimelineArtifactReader 
         &self,
         clip_id: &str,
     ) -> Result<Option<qnc_filmstrip::FilmstripArtifactRecord>, String> {
-        Ok(self
-            .content_target
-            .open(qnc_ingest_store::content::Access::ReadOnly)?
+        Ok(self.read.open()?
             .read_filmstrip(clip_id)
             .map_err(|error| error.to_string())?
             .map(to_filmstrip_record))
     }
 
     fn read_wave(&self, clip_id: &str) -> Result<Option<qnc_wave::WaveArtifactRecord>, String> {
-        self.content_target
-            .open(qnc_ingest_store::content::Access::ReadOnly)?
+        self.read.open()?
             .read_wave(clip_id)
     }
 
@@ -50,7 +93,7 @@ impl qnc_timeline_assets::TimelineArtifactRead for IngestTimelineArtifactReader 
 
 #[derive(Clone)]
 struct IngestFilmstripContentReader {
-    content_target: qnc_ingest_store::content::ContentTarget,
+    read: SharedRead,
 }
 
 impl qnc_filmstrip_worker::FilmstripContentRead for IngestFilmstripContentReader {
@@ -58,8 +101,7 @@ impl qnc_filmstrip_worker::FilmstripContentRead for IngestFilmstripContentReader
         &self,
         after: Option<String>,
     ) -> Result<Vec<qnc_filmstrip_worker::FilmstripClipRecord>, String> {
-        self.content_target
-            .open(qnc_ingest_store::content::Access::ReadOnly)?
+        self.read.open()?
             .list(after)?
             .into_iter()
             .map(|stored| {
@@ -76,9 +118,7 @@ impl qnc_filmstrip_worker::FilmstripContentRead for IngestFilmstripContentReader
         &self,
         clip_id: &str,
     ) -> Result<Option<qnc_filmstrip_worker::FilmstripClipRecord>, String> {
-        Ok(self
-            .content_target
-            .open(qnc_ingest_store::content::Access::ReadOnly)?
+        Ok(self.read.open()?
             .read(clip_id)?
             .map(|stored| qnc_filmstrip_worker::FilmstripClipRecord {
                 clip_id: stored.clip.id().to_string(),
@@ -91,9 +131,7 @@ impl qnc_filmstrip_worker::FilmstripContentRead for IngestFilmstripContentReader
         &self,
         clip_id: &str,
     ) -> Result<Option<qnc_filmstrip::FilmstripArtifactRecord>, String> {
-        Ok(self
-            .content_target
-            .open(qnc_ingest_store::content::Access::ReadOnly)?
+        Ok(self.read.open()?
             .read_filmstrip(clip_id)?
             .map(to_filmstrip_record))
     }
@@ -148,7 +186,7 @@ impl qnc_filmstrip_worker::FilmstripContentWrite for IngestFilmstripContentWrite
 
 #[derive(Clone)]
 struct IngestWaveContentReader {
-    content_target: qnc_ingest_store::content::ContentTarget,
+    read: SharedRead,
 }
 
 impl qnc_wave_worker::WaveContentRead for IngestWaveContentReader {
@@ -156,8 +194,7 @@ impl qnc_wave_worker::WaveContentRead for IngestWaveContentReader {
         &self,
         after: Option<String>,
     ) -> Result<Vec<qnc_wave_worker::WaveClipRecord>, String> {
-        self.content_target
-            .open(qnc_ingest_store::content::Access::ReadOnly)?
+        self.read.open()?
             .list(after)?
             .into_iter()
             .map(|stored| {
@@ -171,9 +208,7 @@ impl qnc_wave_worker::WaveContentRead for IngestWaveContentReader {
     }
 
     fn read_clip(&self, clip_id: &str) -> Result<Option<qnc_wave_worker::WaveClipRecord>, String> {
-        Ok(self
-            .content_target
-            .open(qnc_ingest_store::content::Access::ReadOnly)?
+        Ok(self.read.open()?
             .read(clip_id)?
             .map(|stored| qnc_wave_worker::WaveClipRecord {
                 clip_id: stored.clip.id().to_string(),
@@ -183,8 +218,7 @@ impl qnc_wave_worker::WaveContentRead for IngestWaveContentReader {
     }
 
     fn read_wave(&self, clip_id: &str) -> Result<Option<qnc_wave::WaveArtifactRecord>, String> {
-        self.content_target
-            .open(qnc_ingest_store::content::Access::ReadOnly)?
+        self.read.open()?
             .read_wave(clip_id)
     }
 }
@@ -336,19 +370,19 @@ pub fn artifacts_context(
         wave_root_uri: format!("{}/wave", content_target.uri().trim_end_matches('/')),
         project_audio_channels,
         timeline_reader: Arc::new(IngestTimelineArtifactReader {
-            content_target: content_target.clone(),
+            read: SharedRead::new(content_target.clone()),
             filmstrip_root_uri: plan.filmstrip_uri.clone(),
             filmstrip_dir,
         }),
         filmstrip_reader: Arc::new(IngestFilmstripContentReader {
-            content_target: content_target.clone(),
+            read: SharedRead::new(content_target.clone()),
         }),
         filmstrip_writer: Arc::new(IngestFilmstripContentWriteFactory {
             content_target: content_target.clone(),
         }),
         filmstrip_sources: filmstrip_source_bindings(config)?,
         wave_reader: Arc::new(IngestWaveContentReader {
-            content_target: content_target.clone(),
+            read: SharedRead::new(content_target.clone()),
         }),
         wave_writer: Arc::new(IngestWaveContentWriteFactory { content_target }),
         wave_sources: wave_source_bindings(config)?,
