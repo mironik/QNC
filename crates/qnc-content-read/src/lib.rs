@@ -17,6 +17,10 @@ use qnc_work_settings::{SettingsReader, WorkSettings};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 
 pub const MODULE_ID: &str = "qnc.module.content-read";
+/// Which clips of the catalog belong to the work of the project.
+const LISTED: &str = "(selected != 0 OR import_status IN ('queued', 'processing', 'original_ready',
+    'generating_proxy', 'imported', 'done'))";
+
 pub const VERSION: &str = "0.1.0";
 
 const MAX_CLIPS: usize = 100_000;
@@ -51,6 +55,8 @@ pub struct CatalogSignature {
     pub name_bytes: u64,
     pub frame_sum: i64,
     pub latest_created: String,
+    /// How many listed clips have finished the import (a status change refreshes the list).
+    pub imported_count: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -104,8 +110,9 @@ impl ContentReader {
         Ok(conn)
     }
 
-    /// The imported clips of the project, by name: what Uvezi wrote for import and the
-    /// import finished. A clip that is only detected, selected or queued is not shown.
+    /// The clips chosen for work in the project, by name: what Uvezi wrote as selected and
+    /// whatever the import has taken over since (queued, being copied, imported). A clip that
+    /// is only detected on a card is not shown. (Procedure of QNC v5, `story/db.rs`.)
     /// Empty when the project has no clip catalog yet (nothing was ingested).
     pub fn summaries(&self) -> Result<Vec<ClipSummary>, String> {
         let conn = self.open()?;
@@ -120,7 +127,7 @@ impl ContentReader {
         let mut statement = conn
             .prepare(&format!(
                 "SELECT clip_id, name, duration_seconds, import_status IN ('imported', 'done'), {poster} FROM public_clips
-                 WHERE import_status IN ('imported', 'done')
+                 WHERE {LISTED}
                  ORDER BY name, clip_id LIMIT ?1"
             ))
             .map_err(|error| error.to_string())?;
@@ -145,11 +152,12 @@ impl ContentReader {
             return Ok(CatalogSignature::default());
         }
         conn.query_row(
-            "SELECT count(*), coalesce(sum(length(name)),0),
+            &format!("SELECT count(*), coalesce(sum(length(name)),0),
                     coalesce(sum(coalesce(duration_frames,0)),0),
-                    coalesce(max(coalesce(created_at_utc,'')),'')
+                    coalesce(max(coalesce(created_at_utc,'')),''),
+                    coalesce(sum(import_status IN ('imported', 'done')),0)
              FROM public_clips
-             WHERE import_status IN ('imported', 'done')",
+             WHERE {LISTED}"),
             [],
             |row| {
                 Ok(CatalogSignature {
@@ -157,6 +165,7 @@ impl ContentReader {
                     name_bytes: row.get::<_, i64>(1)? as u64,
                     frame_sum: row.get(2)?,
                     latest_created: row.get(3)?,
+                    imported_count: row.get::<_, i64>(4)? as u64,
                 })
             },
         )
@@ -266,13 +275,13 @@ mod tests {
     /// The public views of the content DB contract, over minimal tables.
     const SCHEMA: &str = "
         CREATE TABLE clips (clip_id TEXT PRIMARY KEY, name TEXT, created_at_utc TEXT, import_status TEXT DEFAULT 'detected',
-            duration_seconds REAL, duration_frames INTEGER, imported_media_uri TEXT);
+            duration_seconds REAL, duration_frames INTEGER, imported_media_uri TEXT, selected INTEGER DEFAULT 0);
         CREATE TABLE probe_records (clip_id TEXT, record_db_uri TEXT, record_revision INTEGER);
         CREATE TABLE filmstrip_artifacts (clip_id TEXT, frames_json TEXT);
         CREATE TABLE filmstrip_frames (clip_id TEXT, frame_index INTEGER, seek_sec REAL, artifact_uri TEXT);
         CREATE TABLE wave_artifacts (clip_id TEXT, peaks_json TEXT);
         CREATE VIEW public_clips AS SELECT clip_id,name,created_at_utc,duration_seconds,
-            duration_frames,imported_media_uri,import_status FROM clips;
+            duration_frames,imported_media_uri,import_status,selected FROM clips;
         CREATE VIEW public_probe_records AS SELECT * FROM probe_records;
         CREATE VIEW public_filmstrip_artifacts AS SELECT * FROM filmstrip_artifacts;
         CREATE VIEW public_filmstrip_frames AS SELECT * FROM filmstrip_frames;
@@ -302,9 +311,9 @@ mod tests {
     }
 
     #[test]
-    fn only_imported_clips_are_listed_by_name() {
+    fn only_clips_chosen_for_work_are_listed_by_name() {
         let (dir, reader) = reader_for(SCHEMA);
-        // `Alfa` was only detected: Uvezi did not write it for import.
+        // `Alfa` is only detected on a card: Uvezi did not write it.
         let clips = reader.summaries().unwrap();
         assert_eq!(clips.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["Beta"]);
         assert_eq!(clips[0].duration_seconds, 20.5);
@@ -328,7 +337,7 @@ mod tests {
             "ALTER TABLE clips ADD COLUMN thumbnail_uri TEXT;
              DROP VIEW public_clips;
              CREATE VIEW public_clips AS SELECT clip_id,name,created_at_utc,duration_seconds,
-                duration_frames,imported_media_uri,import_status,thumbnail_uri FROM clips;
+                duration_frames,imported_media_uri,import_status,selected,thumbnail_uri FROM clips;
              UPDATE clips SET thumbnail_uri='qnc://local/source/card/file/Thmbnl/b.JPG' WHERE clip_id='clip-b';",
         )
         .unwrap();
@@ -340,13 +349,16 @@ mod tests {
     }
 
     #[test]
-    fn a_queued_or_selected_clip_is_not_listed_until_it_is_imported() {
+    fn a_selected_or_queued_clip_is_listed_at_once_before_it_is_imported() {
         let (dir, reader) = reader_for(SCHEMA);
-        Connection::open(dir.path().join("project.db"))
-            .unwrap()
-            .execute("UPDATE clips SET import_status='queued' WHERE clip_id='clip-a'", [])
-            .unwrap();
-        assert_eq!(reader.summaries().unwrap().len(), 1);
+        let conn = Connection::open(dir.path().join("project.db")).unwrap();
+        conn.execute("UPDATE clips SET selected=1 WHERE clip_id='clip-a'", []).unwrap();
+        let clips = reader.summaries().unwrap();
+        assert_eq!(clips.len(), 2);
+        assert!(!clips[0].imported, "not imported yet, but shown");
+        let before = reader.signature().unwrap();
+        conn.execute("UPDATE clips SET import_status='imported' WHERE clip_id='clip-a'", []).unwrap();
+        assert_ne!(reader.signature().unwrap(), before, "the import finishing refreshes the list");
     }
 
     #[test]
@@ -361,7 +373,7 @@ mod tests {
     fn signature_changes_when_the_catalog_changes() {
         let (dir, reader) = reader_for(SCHEMA);
         let before = reader.signature().unwrap();
-        assert_eq!(before.clip_count, 1, "only the imported clip counts");
+        assert_eq!(before.clip_count, 1, "only the clips chosen for work count");
         Connection::open(dir.path().join("project.db"))
             .unwrap()
             .execute("INSERT INTO clips (clip_id,name,created_at_utc,duration_seconds,duration_frames,import_status) VALUES ('clip-c','Gama',NULL,1.0,25,'imported')", [])
