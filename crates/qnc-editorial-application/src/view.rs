@@ -11,6 +11,10 @@ pub struct EditorialClip {
     pub duration_seconds: f64,
     /// Import finished.
     pub imported: bool,
+    /// Where the poster is (project folder or source), as the project database says.
+    pub thumb_uri: Option<String>,
+    /// The poster once it is loaded; the form paints a placeholder until then.
+    pub thumb_image: Option<std::sync::Arc<qnc_image_assets::RgbaImage>>,
 }
 
 #[derive(Clone, Default)]

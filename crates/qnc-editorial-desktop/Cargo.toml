@@ -10,5 +10,6 @@ qnc-contracts = { workspace = true }
 qnc-editorial-application = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-timeline = { workspace = true }
+qnc-ui-kit = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

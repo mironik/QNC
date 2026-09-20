@@ -3066,6 +3066,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-clip-posters"
+version = "0.1.0"
+dependencies = [
+ "qnc-dir-browser",
+ "qnc-image-assets",
+ "qnc-media-thumbnail",
+ "qnc-source-bindings",
+ "qnc-source-reader",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-conformance"
 version = "0.1.0"
 dependencies = [
@@ -3152,7 +3164,10 @@ dependencies = [
 name = "qnc-editorial-application"
 version = "0.1.0"
 dependencies = [
+ "qnc-clip-posters",
  "qnc-content-read",
+ "qnc-image-assets",
+ "qnc-media-thumbnail",
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-timeline",
@@ -3168,6 +3183,7 @@ dependencies = [
  "qnc-editorial-application",
  "qnc-monitor",
  "qnc-timeline",
+ "qnc-ui-kit",
  "serde",
  "serde_json",
 ]

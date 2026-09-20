@@ -14,6 +14,7 @@ use std::{
     time::Duration,
 };
 
+use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
 use qnc_source_bindings::TransportBindings;
 use qnc_source_preview::{PreviewContext, SourcePreview};
@@ -69,6 +70,7 @@ type LoadResult = Result<Loaded, String>;
 pub struct EditorialApplication {
     view: EditorialView,
     preview: SourcePreview,
+    posters: ClipPosters,
     settings_reader: Option<SettingsReader>,
     bindings: Result<TransportBindings, String>,
     load_result: Option<Receiver<LoadResult>>,
@@ -81,6 +83,7 @@ impl Default for EditorialApplication {
         Self {
             view: EditorialView::default(),
             preview: SourcePreview::new(),
+            posters: ClipPosters::new(),
             settings_reader: None,
             bindings: Err("Izvori medija nisu ucitani.".into()),
             load_result: None,
@@ -138,8 +141,7 @@ impl EditorialApplication {
         if let Some(delay) = self.preview.next_repaint_delay() {
             return Some(delay);
         }
-        self.load_result
-            .is_some()
+        (self.load_result.is_some() || self.posters.has_pending_work())
             .then(|| Duration::from_millis(100))
     }
 
@@ -181,6 +183,17 @@ impl EditorialApplication {
         if self.preview.poll() {
             changed = true;
         }
+        for poster in self.posters.poll() {
+            if let Some(clip) = self
+                .view
+                .clips
+                .iter_mut()
+                .find(|clip| clip.clip_id == poster.clip_id)
+            {
+                clip.thumb_image = Some(poster.image);
+                changed = true;
+            }
+        }
         self.view.preview = self.preview.view().clone();
         changed
     }
@@ -209,17 +222,24 @@ impl EditorialApplication {
         if self.shown_project.as_deref() != Some(project_id.as_str()) {
             self.view.clips.clear();
             self.preview.close();
+            self.posters.reset();
+        }
+        let project_folder = self.settings_reader.as_ref().and_then(|reader| {
+            reader
+                .local_workspace_dir(&loaded.settings)
+                .ok()
+                .flatten()
+                .map(|dir| qnc_media_thumbnail::ProjectFolder {
+                    root_uri: loaded.settings.output_root_uri.clone(),
+                    dir,
+                })
+        });
+        if let Ok(bindings) = &self.bindings {
+            self.posters.configure(&bindings.sources, project_folder);
         }
         if let Some(clips) = loaded.clips {
-            self.view.clips = clips
-                .into_iter()
-                .map(|clip| EditorialClip {
-                    clip_id: clip.clip_id,
-                    name: clip.name,
-                    duration_seconds: clip.duration_seconds,
-                    imported: clip.imported,
-                })
-                .collect();
+            self.view.clips = merge_clips(clips, &self.view.clips);
+            self.request_posters();
         }
         match (&self.settings_reader, &self.bindings) {
             (Some(reader), Ok(bindings)) => {
@@ -241,11 +261,25 @@ impl EditorialApplication {
         };
     }
 
+    /// Asks for the posters the list still lacks; the chosen clip goes first (v5 order).
+    fn request_posters(&mut self) {
+        self.posters.reset();
+        let wanted = self
+            .view
+            .clips
+            .iter()
+            .filter(|clip| clip.thumb_image.is_none())
+            .filter_map(|clip| Some((clip.clip_id.clone(), clip.thumb_uri.clone()?)))
+            .collect();
+        self.posters.request(wanted, self.view.chosen_clip_id());
+    }
+
     /// Handles one intent from the form. Returns whether the view changed.
     pub fn dispatch(&mut self, intent: EditorialIntent) -> bool {
         let changed = match intent {
             EditorialIntent::PreviewClip(clip_id) => {
                 if self.view.clips.iter().any(|clip| clip.clip_id == clip_id) {
+                    self.posters.prioritize(&clip_id);
                     self.preview.open(&clip_id)
                 } else {
                     self.view.message = "Klip nije pronadjen.".into();
@@ -266,6 +300,26 @@ impl EditorialApplication {
         self.view.preview = self.preview.view().clone();
         changed
     }
+}
+
+/// The new list of imported clips; a poster that is already loaded for the same address is kept.
+fn merge_clips(new: Vec<ClipSummary>, previous: &[EditorialClip]) -> Vec<EditorialClip> {
+    new.into_iter()
+        .map(|clip| {
+            let image = previous
+                .iter()
+                .find(|old| old.clip_id == clip.clip_id && old.thumb_uri == clip.thumbnail_uri)
+                .and_then(|old| old.thumb_image.clone());
+            EditorialClip {
+                clip_id: clip.clip_id,
+                name: clip.name,
+                duration_seconds: clip.duration_seconds,
+                imported: clip.imported,
+                thumb_uri: clip.thumbnail_uri,
+                thumb_image: image,
+            }
+        })
+        .collect()
 }
 
 fn read_catalog(
@@ -302,6 +356,8 @@ mod tests {
             name: name.into(),
             duration_seconds: 10.0,
             imported: true,
+            thumb_uri: None,
+            thumb_image: None,
         }
     }
 
@@ -366,5 +422,60 @@ mod tests {
         assert_eq!(app.view().current_clip_label(), None);
         app.view.preview.clip_id = Some("b".into());
         assert_eq!(app.view().current_clip_label(), Some("Drugi"));
+    }
+}
+
+#[cfg(test)]
+mod poster_tests {
+    use super::*;
+
+    fn summary(id: &str, poster: Option<&str>) -> ClipSummary {
+        ClipSummary {
+            clip_id: id.into(),
+            name: id.into(),
+            duration_seconds: 1.0,
+            imported: true,
+            thumbnail_uri: poster.map(str::to_string),
+        }
+    }
+
+    fn loaded_clip(id: &str, poster: &str) -> EditorialClip {
+        EditorialClip {
+            clip_id: id.into(),
+            name: id.into(),
+            duration_seconds: 1.0,
+            imported: true,
+            thumb_uri: Some(poster.into()),
+            thumb_image: Some(std::sync::Arc::new(qnc_image_assets::RgbaImage {
+                size: [1, 1],
+                pixels: vec![0, 0, 0, 255],
+                content_key: 1,
+            })),
+        }
+    }
+
+    #[test]
+    fn a_poster_already_loaded_for_the_same_address_is_kept_when_the_list_changes() {
+        let previous = vec![loaded_clip("a", "qnc://x/a.jpg")];
+        let merged = merge_clips(
+            vec![summary("a", Some("qnc://x/a.jpg")), summary("b", Some("qnc://x/b.jpg"))],
+            &previous,
+        );
+        assert!(merged[0].thumb_image.is_some());
+        assert!(merged[1].thumb_image.is_none());
+        assert_eq!(merged[1].thumb_uri.as_deref(), Some("qnc://x/b.jpg"));
+    }
+
+    #[test]
+    fn a_poster_at_another_address_is_loaded_again() {
+        let previous = vec![loaded_clip("a", "qnc://x/card/a.jpg")];
+        let merged = merge_clips(vec![summary("a", Some("qnc://x/project/a.jpg"))], &previous);
+        assert!(merged[0].thumb_image.is_none(), "the project poster replaces the card poster");
+    }
+
+    #[test]
+    fn a_clip_without_a_poster_address_keeps_the_placeholder() {
+        let merged = merge_clips(vec![summary("a", None)], &[]);
+        assert!(merged[0].thumb_uri.is_none() && merged[0].thumb_image.is_none());
     }
 }

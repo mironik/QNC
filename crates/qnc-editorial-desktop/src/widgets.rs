@@ -475,7 +475,7 @@ fn render_clip_grid(
     intent
 }
 
-/// Card painting as in the Ingest clip grid (no thumbnail yet: the "..." placeholder).
+/// Card painting as in the Ingest clip grid: the poster once it is loaded, the "..." placeholder until then.
 fn render_clip_card(
     ui: &mut Ui,
     clip: &EditorialClip,
@@ -499,13 +499,26 @@ fn render_clip_card(
     );
     ui.painter()
         .rect_filled(image_rect.shrink(1.0), 0.0, theme.surface);
-    ui.painter().text(
-        image_rect.center(),
-        Align2::CENTER_CENTER,
-        "...",
-        FontId::proportional(theme.font_ui),
-        theme.text_muted,
-    );
+    let painted = match (&clip.thumb_uri, &clip.thumb_image) {
+        (Some(uri), Some(image)) => qnc_ui_kit::paint_rgba_image(
+            ui,
+            image_rect.shrink(1.0),
+            uri,
+            image.content_key,
+            image.size,
+            &image.pixels,
+        ),
+        _ => false,
+    };
+    if !painted {
+        ui.painter().text(
+            image_rect.center(),
+            Align2::CENTER_CENTER,
+            "...",
+            FontId::proportional(theme.font_ui),
+            theme.text_muted,
+        );
+    }
     if show_check {
         // Media Assist mirrors the chosen clip in the check mark (qnc_v5).
         paint_selection_check(ui, image_rect, chosen);

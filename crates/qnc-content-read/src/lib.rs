@@ -28,6 +28,9 @@ pub struct ClipSummary {
     pub duration_seconds: f64,
     /// Import finished (`imported` or `done`).
     pub imported: bool,
+    /// Where the poster is: the project poster when it was copied, else the poster on the
+    /// source (link). `None` when the catalog has no poster for the clip.
+    pub thumbnail_uri: Option<String>,
 }
 
 /// What a player needs beyond the media record: display name, imported media
@@ -109,12 +112,17 @@ impl ContentReader {
         if !has_view(&conn, "public_clips")? {
             return Ok(Vec::new());
         }
+        let poster = if has_column(&conn, "public_clips", "thumbnail_uri")? {
+            "thumbnail_uri"
+        } else {
+            "NULL"
+        };
         let mut statement = conn
-            .prepare(
-                "SELECT clip_id, name, duration_seconds, import_status IN ('imported', 'done') FROM public_clips
+            .prepare(&format!(
+                "SELECT clip_id, name, duration_seconds, import_status IN ('imported', 'done'), {poster} FROM public_clips
                  WHERE import_status IN ('imported', 'done')
-                 ORDER BY name, clip_id LIMIT ?1",
-            )
+                 ORDER BY name, clip_id LIMIT ?1"
+            ))
             .map_err(|error| error.to_string())?;
         let rows = statement
             .query_map([MAX_CLIPS as i64], |row| {
@@ -123,6 +131,7 @@ impl ContentReader {
                     name: row.get(1)?,
                     duration_seconds: row.get::<_, Option<f64>>(2)?.unwrap_or(0.0),
                     imported: row.get(3)?,
+                    thumbnail_uri: row.get(4)?,
                 })
             })
             .map_err(|error| error.to_string())?;
@@ -310,6 +319,27 @@ mod tests {
     }
 
     #[test]
+    fn the_poster_address_comes_from_the_public_view_when_the_catalog_has_it() {
+        let (dir, reader) = reader_for(SCHEMA);
+        // A catalog without poster addresses lists the clip without one.
+        assert_eq!(reader.summaries().unwrap()[0].thumbnail_uri, None);
+        let conn = Connection::open(dir.path().join("project.db")).unwrap();
+        conn.execute_batch(
+            "ALTER TABLE clips ADD COLUMN thumbnail_uri TEXT;
+             DROP VIEW public_clips;
+             CREATE VIEW public_clips AS SELECT clip_id,name,created_at_utc,duration_seconds,
+                duration_frames,imported_media_uri,import_status,thumbnail_uri FROM clips;
+             UPDATE clips SET thumbnail_uri='qnc://local/source/card/file/Thmbnl/b.JPG' WHERE clip_id='clip-b';",
+        )
+        .unwrap();
+        let clips = reader.summaries().unwrap();
+        assert_eq!(
+            clips[0].thumbnail_uri.as_deref(),
+            Some("qnc://local/source/card/file/Thmbnl/b.JPG")
+        );
+    }
+
+    #[test]
     fn a_queued_or_selected_clip_is_not_listed_until_it_is_imported() {
         let (dir, reader) = reader_for(SCHEMA);
         Connection::open(dir.path().join("project.db"))
@@ -380,4 +410,17 @@ mod tests {
         };
         assert!(reader.summaries().is_err());
     }
+}
+
+fn has_column(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
+    let mut statement = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(|error| error.to_string())?;
+    let mut rows = statement.query([]).map_err(|error| error.to_string())?;
+    while let Some(row) = rows.next().map_err(|error| error.to_string())? {
+        if row.get::<_, String>(1).map_err(|error| error.to_string())? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
