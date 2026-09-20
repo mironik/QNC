@@ -92,6 +92,44 @@ pub fn paint_placeholder(ui: &mut Ui, rect: Rect, chrome: MonitorChrome, label: 
     );
 }
 
+/// A still picture of the shown clip (its poster), for when the player has no frame yet.
+#[derive(Clone, Copy)]
+pub struct MonitorPoster<'a> {
+    /// Where the picture comes from; part of the texture identity.
+    pub uri: &'a str,
+    pub content_key: u64,
+    pub size: [usize; 2],
+    pub rgba: &'a [u8],
+}
+
+/// The preview of any form, in one order: the player frame, else the player message, else the
+/// poster of the shown clip, else the label. The caller only passes what it knows.
+pub fn paint_source_monitor(
+    ui: &mut Ui,
+    rect: Rect,
+    surface: MonitorSurface<'_>,
+    poster: Option<MonitorPoster<'_>>,
+    label: &str,
+) {
+    match paint_monitor(ui, rect, surface) {
+        MonitorPaint::Picture | MonitorPaint::Message => return,
+        MonitorPaint::Empty => {}
+    }
+    if let Some(poster) = poster {
+        if qnc_ui_kit::paint_rgba_image(
+            ui,
+            rect.shrink(1.0),
+            poster.uri,
+            poster.content_key,
+            poster.size,
+            poster.rgba,
+        ) {
+            return;
+        }
+    }
+    paint_placeholder(ui, rect, surface.chrome, label);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

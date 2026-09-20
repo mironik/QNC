@@ -9,6 +9,7 @@ eframe = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-editorial-application = { workspace = true }
 qnc-media-card = { workspace = true }
+qnc-source-dock = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-ui-kit = { workspace = true }

@@ -6,3 +6,5 @@ description = "QNC public passive module: bottom source dock (header with clip l
 
 [dependencies]
 eframe = { workspace = true }
+qnc-filmstrip = { workspace = true }
+qnc-timeline = { workspace = true }

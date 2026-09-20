@@ -1,5 +1,7 @@
 use super::*;
+use qnc_source_dock::{show_timeline_dock, SourceTimeline};
 
+/// The source dock is the public one; this form adds its own import actions to the header.
 pub(super) fn render_source_dock(
     ui: &mut Ui,
     contracts: &IngestContracts,
@@ -7,44 +9,13 @@ pub(super) fn render_source_dock(
     view: &IngestViewModel,
 ) -> Option<IngestIntent> {
     let rect = ui.available_rect_before_wrap();
-    ui.painter().rect_filled(rect, 0.0, theme.panel_alt);
-    ui.painter().line_segment(
-        [rect.left_top(), rect.right_top()],
-        Stroke::new(1.0, theme.border),
-    );
-
     let mut intent = None;
-    let inner = Rect::from_min_max(
-        egui::pos2(rect.left() + 8.0, rect.top()),
-        egui::pos2(rect.right() - 8.0, rect.bottom()),
-    );
-    let header_rect = Rect::from_min_size(
-        inner.left_top(),
-        Vec2::new(inner.width().max(0.0), theme.chrome_row_height),
-    );
-    let timeline_rect = Rect::from_min_size(
-        egui::pos2(
-            inner.left(),
-            header_rect.bottom() + contracts.ingest.source_dock.header_timeline_gap,
-        ),
-        Vec2::new(
-            inner.width().max(0.0),
-            timeline_placeholder_height().min(
-                (inner.bottom()
-                    - header_rect.bottom()
-                    - contracts.ingest.source_dock.header_timeline_gap)
-                    .max(0.0),
-            ),
-        ),
-    );
-
-    show_chrome_row(ui, header_rect, theme, theme.panel_alt, true, |ui| {
-        ui.label(
-            RichText::new(source_dock_clip_label(contracts, view))
-                .color(theme.text)
-                .strong()
-                .size(theme.font_ui),
-        );
+    let timeline_intent = show_timeline_dock(
+        ui,
+        rect,
+        &dock_style(contracts, theme),
+        source_dock_clip_label(contracts, view),
+        |ui| {
         ui.add_space(10.0);
         if contracts.ingest.source_dock.show_import_actions {
             let status = view.status_label();
@@ -148,13 +119,21 @@ pub(super) fn render_source_dock(
                 ));
             }
         });
-    });
-
+        },
+        SourceTimeline {
+            projection: &view.timeline,
+            theme: timeline_theme(theme),
+            filmstrip: view.timeline_filmstrip_background(),
+            peaks: [
+                view.timeline_a1_peaks(),
+                view.timeline_a2_peaks(),
+                view.timeline_a3_peaks(),
+                view.timeline_a4_peaks(),
+            ],
+        },
+    );
     if intent.is_none() {
-        intent = render_player_timeline(ui, timeline_rect, theme, view);
-    } else {
-        render_player_timeline(ui, timeline_rect, theme, view);
+        intent = timeline_intent_to_ingest_intent(timeline_intent);
     }
-
     intent
 }

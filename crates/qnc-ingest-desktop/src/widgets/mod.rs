@@ -7,7 +7,7 @@ pub(super) use qnc_ingest_application::{
     action_ids, timeline_intent_to_ingest_intent, ClipFilter, ClipView, IngestIntent,
     IngestPayload, IngestViewModel, LocationEntry, SourceKind,
 };
-pub(super) use qnc_monitor::{MonitorChrome, MonitorPaint, MonitorPicture, MonitorSurface};
+pub(super) use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
 pub(super) use qnc_timeline::TimelineTheme;
 pub(super) use qnc_ui_kit::FormActionBarStyle;
 

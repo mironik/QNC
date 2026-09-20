@@ -3183,6 +3183,7 @@ dependencies = [
  "qnc-editorial-application",
  "qnc-media-card",
  "qnc-monitor",
+ "qnc-source-dock",
  "qnc-timeline",
  "qnc-ui-kit",
  "serde",
@@ -3378,6 +3379,7 @@ dependencies = [
  "qnc-ingest-application",
  "qnc-keyboard-shortcut",
  "qnc-monitor",
+ "qnc-source-dock",
  "qnc-timeline",
  "qnc-ui-kit",
  "serde",
@@ -4000,6 +4002,8 @@ name = "qnc-source-dock"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-filmstrip",
+ "qnc-timeline",
 ]
 
 [[package]]

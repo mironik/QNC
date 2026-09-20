@@ -5,6 +5,9 @@
 //! from the UI contract, and gets back one intent (the button index). The
 //! module keeps no state and knows no application.
 
+mod timeline_dock;
+pub use timeline_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
+
 use eframe::egui::{self, Color32, RichText, Vec2};
 
 /// Which timecode is highlighted (the focused mark of the timeline).

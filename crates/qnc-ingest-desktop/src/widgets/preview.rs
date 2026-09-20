@@ -36,7 +36,25 @@ pub(super) fn render_preview(
             ],
             rgba: &picture.rgba,
         });
-    match qnc_monitor::paint_monitor(
+    let poster = view
+        .clips
+        .iter()
+        .find(|c| Some(&c.clip_id) == view.preview_clip_id.as_ref())
+        .and_then(|clip| match (&clip.thumb_uri, &clip.thumb_image) {
+            (Some(uri), Some(image)) => Some(MonitorPoster {
+                uri,
+                content_key: image.content_key,
+                size: image.size,
+                rgba: &image.pixels,
+            }),
+            _ => None,
+        });
+    let label = if view.preview_clip_id.is_some() {
+        view.current_clip_label()
+    } else {
+        contracts.ingest.preview.empty_label.as_str()
+    };
+    qnc_monitor::paint_source_monitor(
         ui,
         rect,
         MonitorSurface {
@@ -45,32 +63,7 @@ pub(super) fn render_preview(
             picture,
             message: view.playback.error.as_deref(),
         },
-    ) {
-        MonitorPaint::Picture | MonitorPaint::Message => return,
-        MonitorPaint::Empty => {}
-    }
-    if let Some(clip) = view
-        .clips
-        .iter()
-        .find(|c| Some(&c.clip_id) == view.preview_clip_id.as_ref())
-    {
-        if let (Some(uri), Some(image)) = (&clip.thumb_uri, &clip.thumb_image) {
-            if qnc_ui_kit::paint_rgba_image(
-                ui,
-                rect.shrink(1.0),
-                uri,
-                image.content_key,
-                image.size,
-                &image.pixels,
-            ) {
-                return;
-            }
-        }
-    }
-    let label = if view.preview_clip_id.is_some() {
-        view.current_clip_label()
-    } else {
-        contracts.ingest.preview.empty_label.as_str()
-    };
-    qnc_monitor::paint_placeholder(ui, rect, chrome, label);
+        poster,
+        label,
+    );
 }

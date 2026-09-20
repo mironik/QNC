@@ -3,7 +3,7 @@
   "module_name": "Source dock (header with clip label, IN/OUT/duration and actions, timeline slot)",
   "module_version": "0.1.0",
   "module_kind": "ui_widget",
-  "capabilities": ["ui.source_dock.header", "ui.source_dock.slot"],
+  "capabilities": ["ui.source_dock.header", "ui.source_dock.slot", "ui.source_dock.timeline"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],

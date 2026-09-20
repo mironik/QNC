@@ -8,7 +8,7 @@ pub(super) fn render_pool_head(
     let rect = ui.available_rect_before_wrap();
 
     let mut intent = None;
-    show_chrome_row(ui, rect, theme, theme.surface, true, |ui| {
+    qnc_source_dock::show_chrome_row(ui, rect, &dock_style(contracts, theme), theme.surface, true, |ui| {
         ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
         ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
         for (index, tab) in contracts.ingest.pool_head.tabs_left.iter().enumerate() {

@@ -3,7 +3,7 @@
   "module_name": "Monitor",
   "module_version": "0.1.0",
   "module_kind": "ui_widget",
-  "capabilities": ["monitor.preview.paint"],
+  "capabilities": ["monitor.preview.paint", "monitor.source.paint"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],

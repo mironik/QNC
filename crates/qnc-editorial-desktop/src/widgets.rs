@@ -7,7 +7,8 @@ use eframe::egui::{
     Vec2,
 };
 
-use qnc_monitor::{MonitorChrome, MonitorPaint, MonitorPicture, MonitorSurface};
+use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
+use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
 use qnc_editorial_application::{action_ids, EditorialClip, EditorialIntent, EditorialView};
@@ -165,7 +166,22 @@ fn render_preview(
             size: [frame.width, frame.height],
             rgba: &frame.rgba,
         });
-    match qnc_monitor::paint_monitor(
+    let poster = view
+        .chosen_clip_id()
+        .and_then(|id| view.clips.iter().find(|clip| clip.clip_id == id))
+        .and_then(|clip| match (&clip.thumb_uri, &clip.thumb_image) {
+            (Some(uri), Some(image)) => Some(MonitorPoster {
+                uri,
+                content_key: image.content_key,
+                size: image.size,
+                rgba: &image.pixels,
+            }),
+            _ => None,
+        });
+    let label = view
+        .current_clip_label()
+        .unwrap_or(contracts.editorial.preview.empty_label.as_str());
+    qnc_monitor::paint_source_monitor(
         ui,
         rect,
         MonitorSurface {
@@ -174,14 +190,9 @@ fn render_preview(
             picture,
             message: view.preview.monitor_message.as_deref(),
         },
-    ) {
-        MonitorPaint::Picture | MonitorPaint::Message => return,
-        MonitorPaint::Empty => {}
-    }
-    let label = view
-        .current_clip_label()
-        .unwrap_or(contracts.editorial.preview.empty_label.as_str());
-    qnc_monitor::paint_placeholder(ui, rect, chrome, label);
+        poster,
+        label,
+    );
 }
 
 fn render_pool_head(
@@ -192,7 +203,7 @@ fn render_pool_head(
     let rect = ui.available_rect_before_wrap();
 
     let mut intent = None;
-    show_chrome_row(ui, rect, theme, theme.surface, true, |ui| {
+    show_chrome_row(ui, rect, &dock_style(contracts, theme), theme.surface, true, |ui| {
         ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
         ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
         for (index, tab) in contracts.editorial.pool_head.tabs_left.iter().enumerate() {
@@ -219,6 +230,22 @@ fn render_pool_head(
     intent
 }
 
+fn dock_style(contracts: &EditorialContracts, theme: &Theme) -> TimelineDockStyle {
+    TimelineDockStyle {
+        fill: theme.panel_alt,
+        border: theme.border,
+        text: theme.text,
+        font_ui: theme.font_ui,
+        chrome_row_height: theme.chrome_row_height,
+        chrome_control_height: theme.chrome_control_height,
+        chrome_pad_x: theme.chrome_pad_x,
+        chrome_pad_y: theme.chrome_pad_y,
+        header_timeline_gap: contracts.editorial.source_dock.header_timeline_gap,
+    }
+}
+
+/// The source dock is the public one; this form only says which clip it shows and which
+/// action buttons its group has.
 fn render_source_dock(
     ui: &mut Ui,
     contracts: &EditorialContracts,
@@ -226,101 +253,36 @@ fn render_source_dock(
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
     let rect = ui.available_rect_before_wrap();
-    ui.painter().rect_filled(rect, 0.0, theme.panel_alt);
-    ui.painter().line_segment(
-        [rect.left_top(), rect.right_top()],
-        Stroke::new(1.0, theme.border),
-    );
-
-    let mut intent = None;
-    let inner = Rect::from_min_max(
-        egui::pos2(rect.left() + 8.0, rect.top()),
-        egui::pos2(rect.right() - 8.0, rect.bottom()),
-    );
-    let header_rect = Rect::from_min_size(
-        inner.left_top(),
-        Vec2::new(inner.width().max(0.0), theme.chrome_row_height),
-    );
-    let timeline_rect = Rect::from_min_size(
-        egui::pos2(
-            inner.left(),
-            header_rect.bottom() + contracts.editorial.source_dock.header_timeline_gap,
-        ),
-        Vec2::new(
-            inner.width().max(0.0),
-            timeline_placeholder_height().min(
-                (inner.bottom()
-                    - header_rect.bottom()
-                    - contracts.editorial.source_dock.header_timeline_gap)
-                    .max(0.0),
-            ),
-        ),
-    );
-
-    show_chrome_row(ui, header_rect, theme, theme.panel_alt, true, |ui| {
-        ui.label(
-            RichText::new(source_dock_clip_label(contracts, view))
-                .color(theme.text)
-                .strong()
-                .size(theme.font_ui),
-        );
-        ui.add_space(10.0);
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            ui.spacing_mut().item_spacing.x = 8.0;
-            // Group actions (contract `actions_rtl`): shown, not wired yet.
-            for label in &contracts.composition().source_dock.actions_rtl {
-                let _ = action_button(ui, label, false, theme);
-            }
-        });
-    });
-
-    if intent.is_none() {
-        intent = render_player_timeline(ui, timeline_rect, theme, view);
-    } else {
-        render_player_timeline(ui, timeline_rect, theme, view);
-    }
-
-    intent
-}
-
-fn show_chrome_row(
-    ui: &mut Ui,
-    rect: Rect,
-    theme: &Theme,
-    fill: Color32,
-    draw_bottom_rule: bool,
-    add_contents: impl FnOnce(&mut Ui),
-) {
-    ui.painter().rect_filled(rect, 0.0, fill);
-    if draw_bottom_rule {
-        ui.painter().hline(
-            rect.x_range(),
-            rect.bottom() - 0.5,
-            Stroke::new(1.0, theme.border),
-        );
-    }
-    let inner = Rect::from_min_max(
-        egui::pos2(
-            rect.left() + theme.chrome_pad_x,
-            rect.top() + theme.chrome_pad_y,
-        ),
-        egui::pos2(
-            rect.right() - theme.chrome_pad_x,
-            rect.bottom() - theme.chrome_pad_y,
-        ),
-    );
-    ui.scope_builder(
-        egui::UiBuilder::new()
-            .max_rect(inner)
-            .layout(Layout::left_to_right(Align::Center)),
+    let intent = show_timeline_dock(
+        ui,
+        rect,
+        &dock_style(contracts, theme),
+        source_dock_clip_label(contracts, view),
         |ui| {
-            ui.set_clip_rect(rect);
-            ui.set_min_height(theme.chrome_control_height);
-            ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
-            ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
-            add_contents(ui);
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.spacing_mut().item_spacing.x = 8.0;
+                // Group actions (contract `actions_rtl`): shown, not wired yet.
+                for label in &contracts.composition().source_dock.actions_rtl {
+                    let _ = action_button(ui, label, false, theme);
+                }
+            });
+        },
+        SourceTimeline {
+            projection: &view.preview.timeline,
+            theme: timeline_theme(theme),
+            filmstrip: view.preview.assets.filmstrip_background(),
+            peaks: [
+                view.preview.assets.a1_peaks(),
+                view.preview.assets.a2_peaks(),
+                view.preview.assets.a3_peaks(),
+                view.preview.assets.a4_peaks(),
+            ],
         },
     );
+    match intent {
+        TimelineIntent::None => None,
+        other => Some(EditorialIntent::Timeline(other)),
+    }
 }
 
 fn source_dock_clip_label<'a>(
@@ -330,33 +292,6 @@ fn source_dock_clip_label<'a>(
     match view.current_clip_label() {
         Some(label) => label,
         None => &contracts.editorial.source_dock.clip_label_fallback,
-    }
-}
-
-fn timeline_placeholder_height() -> f32 {
-    qnc_timeline::source_player_timeline_height()
-}
-
-fn render_player_timeline(
-    ui: &mut Ui,
-    rect: Rect,
-    theme: &Theme,
-    view: &EditorialView,
-) -> Option<EditorialIntent> {
-    let intent = qnc_timeline::show_source_player_timeline_with_artifacts(
-        ui,
-        rect,
-        &view.preview.timeline,
-        timeline_theme(theme),
-        view.preview.assets.filmstrip_background(),
-        view.preview.assets.a1_peaks(),
-        view.preview.assets.a2_peaks(),
-        view.preview.assets.a3_peaks(),
-        view.preview.assets.a4_peaks(),
-    );
-    match intent {
-        TimelineIntent::None => None,
-        other => Some(EditorialIntent::Timeline(other)),
     }
 }
 
