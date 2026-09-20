@@ -118,8 +118,8 @@ Izvor: `qnc-host/src/ingest/{import_actions,store(queue_import),poster_copy,impo
 | 1 | Ulaz je samo baza: klipovi izvora s `selected != 0`; UI popis se ignorira | isto (odabir se zapisuje na Uvezi, red iz baze) |
 | 2 | `imported/done` se preskače; `queued/processing/generating_proxy` se preskače | preskače uvezene; nema stanja `generating_proxy` |
 | 3 | Plan po **postavkama projekta pri stavljanju u red** (`resolve_import_plan`); greška plana → klip `error` s porukom | plan se računa tek u workeru; greška plana nije zapisana pri Uvezi |
-| 4 | Plan radnji za **svaki** način (i `link`): `CopyCardPosterIfAvailable`, zatim `PrepareMedia` ili `GenerateProxy` (test `link_plan_uses_poster_copy_and_media_prepare`) | poster se kopira **samo uz kopiju medija** (tvoja ranija odluka, drukčije od v5) |
-| 5 | Poster: postoji li poster projekta → `thumb_status=ready`; inače traži sličicu na kartici (THM/JPG) → `pending` + posao `thumb_copy`; nema li je → `no_card_thumb`; greška → `error`. **Nikad ne generira poster.** | nema `thumb_status`; poster kopiran samo u modu kopije; generiranje postera nije napravljeno |
+| 4 | v5 kopira poster za svaki način, i za `link`. **To je u v5 pogrešan put; odluka korisnika:** kad projekt kaže `link`, medij se linka i poster se linka (adresa sličice ostaje na kartici); poster se kopira samo kad se kopira medij | ispravno: poster se kopira samo uz kopiju medija, inače link na karticu |
+| 5 | v5: poster projekta postoji → gotovo; inače traži sličicu na kartici (`thumb_copy`), nema → `no_card_thumb`; nikad ne generira poster. **Naš pravilo:** poster kopiran uz medij ili linkan; ako ga kartica nema, kreira se sam (bez odobrenja) | kopija uz medij; generiranje postera koji kartica nema nije napravljeno |
 | 6 | Medij: `import_status='queued'` + posao `ingest_media_prepare` (ili `generating_proxy` + `proxy_generate`) | red `queued` u `clips`, bez poslova |
 | 7 | Serija: `ingest_import_batches(status='preparing')` + `ingest_import_batch_items` | nema |
 | 8 | Odgovor: `queued`, `skipped_imported`, `skipped_active`, `failed`, `poster_queued`, `poster_missing`, `actions_queued`, `batch_id` | nema odgovora s brojevima |
