@@ -2321,8 +2321,13 @@ fn validate_ingest_browser_uses_shared_action_bar(root: &Path, report: &mut Vali
         .join("crates")
         .join("qnc-ingest-desktop")
         .join("src")
-        .join("widgets.rs");
-    let Ok(contents) = fs::read_to_string(&widgets) else {
+        .join("widgets");
+    let browser_file = widgets.join("location_browser.rs");
+    let action_bar_file = widgets.join("browser_action_bar.rs");
+    let (Ok(browser), Ok(action_bar)) = (
+        fs::read_to_string(&browser_file),
+        fs::read_to_string(&action_bar_file),
+    ) else {
         report.error(format!(
             "{}: cannot read Ingest surface widgets",
             display_relative(root, &widgets)
@@ -2330,47 +2335,30 @@ fn validate_ingest_browser_uses_shared_action_bar(root: &Path, report: &mut Vali
         return;
     };
 
-    if !contents.contains("fn render_location_action_bar")
-        || !contents.contains("qnc_ui_kit::show_form_action_bar")
+    if !action_bar.contains("fn render_location_action_bar")
+        || !action_bar.contains("qnc_ui_kit::show_form_action_bar")
     {
         report.error(format!(
             "{}: Ingest browser confirm/cancel bar must use qnc-ui-kit",
-            display_relative(root, &widgets)
+            display_relative(root, &action_bar_file)
         ));
     }
 
-    if let Some(browser_body) = source_between(
-        &contents,
-        "fn render_location_browser",
-        "fn render_location_action_bar",
-    ) {
-        for forbidden in [
-            "qnc_ui_kit::show_form_action_bar",
-            "INGEST_DIR_CONFIRM",
-            "INGEST_DIR_CANCEL",
-            "confirm_label",
-            "cancel_label",
-        ] {
-            if browser_body.contains(forbidden) {
-                report.error(format!(
-                    "{}: Ingest browser view must not own action bar marker '{forbidden}'",
-                    display_relative(root, &widgets)
-                ));
-            }
+    // The browser view is its own file and must not own any marker of the action bar.
+    for forbidden in [
+        "qnc_ui_kit::show_form_action_bar",
+        "INGEST_DIR_CONFIRM",
+        "INGEST_DIR_CANCEL",
+        "confirm_label",
+        "cancel_label",
+    ] {
+        if browser.contains(forbidden) {
+            report.error(format!(
+                "{}: Ingest browser view must not own action bar marker '{forbidden}'",
+                display_relative(root, &browser_file)
+            ));
         }
-    } else {
-        report.error(format!(
-            "{}: cannot locate Ingest location browser/action bar boundary",
-            display_relative(root, &widgets)
-        ));
     }
-}
-
-fn source_between<'a>(contents: &'a str, start: &str, end: &str) -> Option<&'a str> {
-    let start_index = contents.find(start)?;
-    let after_start = &contents[start_index..];
-    let end_index = after_start.find(end)?;
-    Some(&after_start[..end_index])
 }
 
 fn validate_project_location_browser_shortcuts(root: &Path, report: &mut ValidationReport) {
