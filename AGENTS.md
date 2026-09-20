@@ -38,6 +38,25 @@ runtime stanje. Citanje je read-only kroz javni DB/transport ugovor, jednako
 za Local/LAN/Intranet. Potrosaci ne uvode vlastite zamjenske projektne postavke.
 Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
 
+## 0. STROGA PRAVILA (vrijede prije svega ostalog; korisnik ih je ponovio vise puta)
+
+1. **Projekt i njegova baza su jedini izvor svih trajnih podataka.** Sve sto je trajno (klipovi, odabir,
+   statusi, postavke, putanje, sličice, artefakti, slijed aplikacija) cita se iz baze aktivnog projekta i
+   zapisuje u nju kroz javni write transport vlasnika. Nista trajno se ne drzi u datotekama pored koda,
+   u konfiguraciji aplikacije, u memoriji forme ni u testnom stanju kao "istina".
+2. **Projekt odreduje putanje.** Direktorij projekta, izlazni direktoriji (`original`, `proxy`, `ingest`,
+   `filmstrip`, ...), izvori i lokacije dolaze iz postavki projekta i baze. Kod, alat ni test ne smije
+   pretpostaviti, sastaviti ni zapisati putanju, disk ili projekt "napamet" ni doci do njega mimo baze.
+3. **Radi se po stanju aktivnog projekta iz baze, ne po namjeri ni pretpostavci.** Aktivni projekt je onaj u
+   `app_settings.active_project_id`; prije svake provjere, mjerenja ili popravka pogledati koji je aktivan i
+   u kakvom je stanju. Stanje se ponovno cita, ne pamti iz proslog koraka.
+4. **Testovi, mjerenja i dijagnostika nikad ne pisu u stvarni projekt.** Rade nad kopijom u kojoj je putanja
+   projekta preusmjerena na kopiju, a preusmjerenje se provjerava prije pokretanja. Ako se ne moze
+   dokazati da je kopija izolirana, radi se samo citanje.
+5. **Postupak (procedura) se uvijek uzima iz QNC v5 koda i tamo se cita do detalja; ne nagada se.**
+   Ako v5 nesto ne pokriva, to se kaze korisniku, ne izmisljava. Korisnikove odluke imaju prednost pred v5.
+6. **Postojeci UI i layout ostaju netaknuti** osim uz izricito odobrenje zapisano u odjeljku 18.
+
 ## 1. Tocne putanje
 
 - Novi root je tocno: `C:\Users\miron\Projects\QNC`.
