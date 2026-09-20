@@ -88,3 +88,22 @@ v5: klik → odmah `selected` lokalno → spremi cijeli odabir (revizija) → gr
 Naš kod: klik → zapis u bazu u pozadini → tek onda `selected` u prikazu; ako zapis ne uspije,
 vidljivo je samo u poruci u podnožju. Uzrok kvara u živoj aplikaciji nije potvrđen: upis u bazu
 (kopija projektne baze), `SelectionWriter` i aplikacijski testovi rade.
+
+## F. Sličice (poster) u Media Assistu: kako radi v5
+
+Izvor: `qnc-host/src/media_pool/{ingest_db,store}.rs`, `qnc-host/src/ingest/{db,api}.rs`,
+`qnc-app/src/components/editorial_media_assets.rs`, `qnc-app/src/qnc_media_card.rs`.
+
+1. **Popis klipova:** `read_imported_clips` čita samo `import_status = 'imported'`. Klip koji je odabran, u redu
+   ili se obraduje ne prikazuje se.
+2. **Poster se traži redom** (`resolve_ingest_poster_path`, prvi koji postoji): (1) `thumb_path` zapisan uz klip
+   (poster u projektu), (2) zadani poster projekta `ingest/thumbnails/<clip>/poster.jpg`, (3) sličica s kartice
+   (`card_thumb_path`). Nema poziva "na sreću": UI traži sliku tek kad snimka baze kaže da je ima (`thumb_url`).
+3. **Redoslijed učitavanja u Media Assistu:** odabrani klip ima vlastiti učitavač i traži se odmah
+   (`request_selected_poster`); ostali klipovi idu u red `thumbs_queued`, a `pump_thumbs` po frameu pokrece jedan
+   zahtjev dok učitavač nije zasićen. Rezultat se pretvara u teksturu i sprema pod `clip_id`.
+4. **Kartica:** ako tekstura postoji crta se slika (`cover` u okviru sličice), inače crta se `…`. Isto vrijedi u
+   Ingestu, Media Assistu i Storyju (jedan element).
+5. **Poster u projektu** nastaje pri uvozu (`thumb_copy`) i u v5 ide neovisno o načinu kopiranja medija. U QNC-u je
+   odluka korisnika da se poster kopira samo uz kopiju medija; kad se medij linka, poster se cita s kartice
+   (izvor mora biti dostupan), a bez kartice nema statusa i prikazuje se info-box preko kartice.
