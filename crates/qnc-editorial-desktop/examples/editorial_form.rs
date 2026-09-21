@@ -28,7 +28,8 @@ impl eframe::App for Host {
                         EditorialIntent::Timeline(qnc_timeline::TimelineIntent::CueFrame(
                             frame,
                         )) => {
-                            self.view.preview.timeline = self.view.preview.timeline.with_playhead(frame);
+                            self.view.preview.timeline =
+                                self.view.preview.timeline.with_playhead(frame);
                         }
                         _ => {}
                     }

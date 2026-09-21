@@ -25,6 +25,7 @@ impl IngestApplication {
             action_ids::INGEST_PREVIEW_FOCUS => self.on_preview_focus(intent.payload),
             action_ids::INGEST_SET_ARCHIVE => self.on_set_archive(intent.payload),
             action_ids::INGEST_SET_AI_MINING => self.on_set_ai_mining(),
+            action_ids::INGEST_APPROVE_PROXY_POSTERS => self.on_approve_proxy_posters(),
             action_ids::INGEST_IMPORT_SELECTED => self.start_import(),
             action_ids::PLAY_PAUSE
             | action_ids::STEP_BACK_FRAME

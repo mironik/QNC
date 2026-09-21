@@ -30,6 +30,7 @@ pub struct ClipSummary {
     pub clip_id: String,
     pub name: String,
     pub duration_seconds: f64,
+    pub duration_frames: u64,
     /// Import finished (`imported` or `done`).
     pub imported: bool,
     /// Where the poster is: the project poster when it was copied, else the poster on the
@@ -127,9 +128,14 @@ impl ContentReader {
         } else {
             "NULL"
         };
+        let duration_frames = if has_column(&conn, "public_clips", "duration_frames")? {
+            "duration_frames"
+        } else {
+            "NULL"
+        };
         let mut statement = conn
             .prepare(&format!(
-                "SELECT clip_id, name, duration_seconds, import_status IN ('imported', 'done'), {poster}, import_status, imported_media_uri FROM public_clips
+                "SELECT clip_id, name, duration_seconds, {duration_frames}, import_status IN ('imported', 'done'), {poster}, import_status, imported_media_uri FROM public_clips
                  WHERE {LISTED}
                  ORDER BY name, clip_id LIMIT ?1"
             ))
@@ -140,10 +146,11 @@ impl ContentReader {
                     clip_id: row.get(0)?,
                     name: row.get(1)?,
                     duration_seconds: row.get::<_, Option<f64>>(2)?.unwrap_or(0.0),
-                    imported: row.get(3)?,
-                    thumbnail_uri: row.get(4)?,
-                    import_status: row.get(5)?,
-                    imported_media_uri: row.get(6)?,
+                    duration_frames: row.get::<_, Option<i64>>(3)?.unwrap_or(0).max(0) as u64,
+                    imported: row.get(4)?,
+                    thumbnail_uri: row.get(5)?,
+                    import_status: row.get(6)?,
+                    imported_media_uri: row.get(7)?,
                 })
             })
             .map_err(|error| error.to_string())?;
@@ -156,13 +163,20 @@ impl ContentReader {
         if !has_view(&conn, "public_clips")? {
             return Ok(CatalogSignature::default());
         }
+        let duration_frames = if has_column(&conn, "public_clips", "duration_frames")? {
+            "duration_frames"
+        } else {
+            "0"
+        };
         conn.query_row(
-            &format!("SELECT count(*), coalesce(sum(length(name)),0),
-                    coalesce(sum(coalesce(duration_frames,0)),0),
+            &format!(
+                "SELECT count(*), coalesce(sum(length(name)),0),
+                    coalesce(sum(coalesce({duration_frames},0)),0),
                     coalesce(max(coalesce(created_at_utc,'')),''),
                     coalesce(sum(import_status IN ('imported', 'done')),0)
              FROM public_clips
-             WHERE {LISTED}"),
+             WHERE {LISTED}"
+            ),
             [],
             |row| {
                 Ok(CatalogSignature {
@@ -320,15 +334,24 @@ mod tests {
         let (dir, reader) = reader_for(SCHEMA);
         // `Alfa` is only detected on a card: Uvezi did not write it.
         let clips = reader.summaries().unwrap();
-        assert_eq!(clips.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["Beta"]);
+        assert_eq!(
+            clips.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(),
+            ["Beta"]
+        );
         assert_eq!(clips[0].duration_seconds, 20.5);
         assert!(clips[0].imported);
         Connection::open(dir.path().join("project.db"))
             .unwrap()
-            .execute("UPDATE clips SET import_status='imported' WHERE clip_id='clip-a'", [])
+            .execute(
+                "UPDATE clips SET import_status='imported' WHERE clip_id='clip-a'",
+                [],
+            )
             .unwrap();
         let clips = reader.summaries().unwrap();
-        assert_eq!(clips.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["Alfa", "Beta"]);
+        assert_eq!(
+            clips.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(),
+            ["Alfa", "Beta"]
+        );
         assert_eq!(clips[0].duration_seconds, 0.0, "missing duration is zero");
     }
 
@@ -357,13 +380,22 @@ mod tests {
     fn a_selected_or_queued_clip_is_listed_at_once_before_it_is_imported() {
         let (dir, reader) = reader_for(SCHEMA);
         let conn = Connection::open(dir.path().join("project.db")).unwrap();
-        conn.execute("UPDATE clips SET selected=1 WHERE clip_id='clip-a'", []).unwrap();
+        conn.execute("UPDATE clips SET selected=1 WHERE clip_id='clip-a'", [])
+            .unwrap();
         let clips = reader.summaries().unwrap();
         assert_eq!(clips.len(), 2);
         assert!(!clips[0].imported, "not imported yet, but shown");
         let before = reader.signature().unwrap();
-        conn.execute("UPDATE clips SET import_status='imported' WHERE clip_id='clip-a'", []).unwrap();
-        assert_ne!(reader.signature().unwrap(), before, "the import finishing refreshes the list");
+        conn.execute(
+            "UPDATE clips SET import_status='imported' WHERE clip_id='clip-a'",
+            [],
+        )
+        .unwrap();
+        assert_ne!(
+            reader.signature().unwrap(),
+            before,
+            "the import finishing refreshes the list"
+        );
     }
 
     #[test]
@@ -391,7 +423,10 @@ mod tests {
         let (_dir, reader) = reader_for(SCHEMA);
         let head = reader.clip_head("clip-a").unwrap().unwrap();
         assert_eq!(head.name, "Alfa");
-        assert_eq!(head.imported_media_uri.as_deref(), Some("qnc://local/x/a.mp4"));
+        assert_eq!(
+            head.imported_media_uri.as_deref(),
+            Some("qnc://local/x/a.mp4")
+        );
         assert_eq!(head.record_db_uri, "qnc://local/db/media_records");
         assert_eq!(head.record_revision, 3);
         // Beta has no probe record: nothing to play.

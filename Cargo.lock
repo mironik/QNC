@@ -3087,6 +3087,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-content-artifacts"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+ "qnc-filmstrip",
+ "qnc-filmstrip-worker",
+ "qnc-source-bindings",
+ "qnc-timeline-artifacts",
+ "qnc-timeline-assets",
+ "qnc-wave",
+ "qnc-wave-worker",
+ "qnc-work-settings",
+]
+
+[[package]]
 name = "qnc-content-read"
 version = "0.1.0"
 dependencies = [
@@ -3098,6 +3113,24 @@ dependencies = [
  "rusqlite",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-content-store"
+version = "0.1.0"
+dependencies = [
+ "qnc-contracts",
+ "qnc-json-transport",
+ "qnc-media-metadata",
+ "qnc-media-records",
+ "qnc-transport-resolver",
+ "qnc-wave",
+ "qnc-work-settings",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tiny_http",
 ]
 
 [[package]]
@@ -3181,6 +3214,7 @@ dependencies = [
  "eframe",
  "qnc-contracts",
  "qnc-editorial-application",
+ "qnc-keyboard-shortcut",
  "qnc-media-card",
  "qnc-monitor",
  "qnc-source-dock",
@@ -3305,14 +3339,16 @@ dependencies = [
  "image",
  "qnc-application-sequence",
  "qnc-camera-adapter",
+ "qnc-content-artifacts",
+ "qnc-content-store",
  "qnc-contracts",
  "qnc-dir-browser",
  "qnc-image-assets",
- "qnc-ingest-artifacts",
  "qnc-ingest-cameras",
  "qnc-ingest-catalog",
+ "qnc-ingest-clip-list",
  "qnc-ingest-import-worker",
- "qnc-ingest-preview",
+ "qnc-ingest-preview-source",
  "qnc-ingest-runtime",
  "qnc-ingest-select",
  "qnc-ingest-selection-write",
@@ -3321,12 +3357,9 @@ dependencies = [
  "qnc-media-thumbnail",
  "qnc-playback-priority",
  "qnc-player-client",
- "qnc-player-timeline",
  "qnc-source-browse",
- "qnc-source-preview",
  "qnc-source-reader",
  "qnc-timeline",
- "qnc-timeline-artifacts",
  "qnc-timeline-assets",
  "qnc-work-settings",
  "rusqlite",
@@ -3334,22 +3367,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tiny_http",
-]
-
-[[package]]
-name = "qnc-ingest-artifacts"
-version = "0.1.0"
-dependencies = [
- "qnc-filmstrip",
- "qnc-filmstrip-worker",
- "qnc-ingest-select",
- "qnc-ingest-store",
- "qnc-ingest-work-plan",
- "qnc-timeline-artifacts",
- "qnc-timeline-assets",
- "qnc-wave",
- "qnc-wave-worker",
- "qnc-work-settings",
 ]
 
 [[package]]
@@ -3368,6 +3385,13 @@ dependencies = [
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
  "qnc-work-settings",
+]
+
+[[package]]
+name = "qnc-ingest-clip-list"
+version = "0.1.0"
+dependencies = [
+ "qnc-ingest-select",
 ]
 
 [[package]]
@@ -3417,14 +3441,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "qnc-ingest-preview"
+name = "qnc-ingest-preview-source"
 version = "0.1.0"
 dependencies = [
+ "qnc-content-artifacts",
+ "qnc-content-store",
  "qnc-ingest-select",
  "qnc-ingest-store",
+ "qnc-player-client",
  "qnc-player-input",
+ "qnc-player-timeline",
  "qnc-source-bindings",
  "qnc-source-preview",
+ "qnc-timeline",
+ "qnc-timeline-assets",
  "qnc-work-settings",
 ]
 
@@ -3505,7 +3535,10 @@ dependencies = [
 name = "qnc-ingest-worker"
 version = "0.1.0"
 dependencies = [
+ "qnc-content-artifacts",
+ "qnc-content-store",
  "qnc-ingest-import-worker",
+ "qnc-work-settings",
 ]
 
 [[package]]
@@ -3584,6 +3617,7 @@ name = "qnc-media-card"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-ui-kit",
 ]
 
 [[package]]

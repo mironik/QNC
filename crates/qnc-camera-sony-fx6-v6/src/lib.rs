@@ -8,9 +8,9 @@
 
 use qnc_camera_adapter::{CameraAdapter, MetadataSufficiency};
 use qnc_media_metadata::ClipMetadata;
+use qnc_sony_metadata::SonyIndexReader;
 use qnc_source_contract::SourceReference;
 use qnc_source_groups::{GroupProposal, IndexDocument, IndexReader};
-use qnc_sony_metadata::SonyIndexReader;
 
 pub const ADAPTER_ID: &str = "camera.sony.fx6-v6";
 pub const PATTERN_ID: &str = "sony-fx6-v6";

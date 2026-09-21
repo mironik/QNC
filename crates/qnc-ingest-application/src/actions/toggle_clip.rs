@@ -17,7 +17,11 @@ impl IngestApplication {
 
     /// Selecting clips is only a mark in the cache of the view: no thread, no database.
     /// The database sees the selection when the user starts the import.
-    pub(crate) fn select_clips(&mut self, ids: Vec<String>, selected: bool) -> IngestDispatchResult {
+    pub(crate) fn select_clips(
+        &mut self,
+        ids: Vec<String>,
+        selected: bool,
+    ) -> IngestDispatchResult {
         for clip in &mut self.view.clips {
             if ids.contains(&clip.clip_id) {
                 clip.selected = selected;

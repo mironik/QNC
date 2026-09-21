@@ -55,7 +55,12 @@ pub(super) fn fixed_text_link(
     .inner
 }
 
-pub(super) fn small_button(ui: &mut Ui, text: &str, enabled: bool, theme: &Theme) -> egui::Response {
+pub(super) fn small_button(
+    ui: &mut Ui,
+    text: &str,
+    enabled: bool,
+    theme: &Theme,
+) -> egui::Response {
     ui.add_enabled(
         enabled,
         Button::new(RichText::new(text).color(theme.text))
@@ -66,7 +71,12 @@ pub(super) fn small_button(ui: &mut Ui, text: &str, enabled: bool, theme: &Theme
     )
 }
 
-pub(super) fn action_button(ui: &mut Ui, text: &str, enabled: bool, theme: &Theme) -> egui::Response {
+pub(super) fn action_button(
+    ui: &mut Ui,
+    text: &str,
+    enabled: bool,
+    theme: &Theme,
+) -> egui::Response {
     ui.add_enabled(
         enabled,
         Button::new(RichText::new(text).color(theme.text))
@@ -77,7 +87,12 @@ pub(super) fn action_button(ui: &mut Ui, text: &str, enabled: bool, theme: &Them
     )
 }
 
-pub(super) fn primary_button(ui: &mut Ui, text: &str, enabled: bool, theme: &Theme) -> egui::Response {
+pub(super) fn primary_button(
+    ui: &mut Ui,
+    text: &str,
+    enabled: bool,
+    theme: &Theme,
+) -> egui::Response {
     ui.add_enabled(
         enabled,
         Button::new(RichText::new(text).color(Color32::WHITE).strong())

@@ -36,6 +36,8 @@ members = [
     "crates/qnc-wave-view",
     "crates/qnc-wave-worker",
     "crates/qnc-timeline-artifacts",
+    "crates/qnc-content-artifacts",
+    "crates/qnc-content-store",
     "crates/qnc-timeline-assets",
     "crates/qnc-timeline",
     "crates/qnc-media-stream",
@@ -51,13 +53,13 @@ members = [
     "crates/qnc-broadcast-engine",
     "crates/qnc-ingest-work-plan",
     "crates/qnc-ingest-catalog",
+    "crates/qnc-ingest-clip-list",
     "crates/qnc-ingest-select",
     "crates/qnc-media-thumbnail",
     "crates/qnc-ingest-application",
     "crates/qnc-image-assets",
     "crates/qnc-ingest-desktop",
-    "crates/qnc-ingest-artifacts",
-    "crates/qnc-ingest-preview",
+    "crates/qnc-ingest-preview-source",
     "crates/qnc-ingest-selection-write",
     "crates/qnc-ingest-cameras",
     "crates/qnc-ingest-desktop-adapter",
@@ -141,6 +143,8 @@ qnc-wave = { path = "crates/qnc-wave" }
 qnc-wave-view = { path = "crates/qnc-wave-view" }
 qnc-wave-worker = { path = "crates/qnc-wave-worker" }
 qnc-timeline-artifacts = { path = "crates/qnc-timeline-artifacts" }
+qnc-content-artifacts = { path = "crates/qnc-content-artifacts" }
+qnc-content-store = { path = "crates/qnc-content-store" }
 qnc-timeline-assets = { path = "crates/qnc-timeline-assets" }
 qnc-timeline = { path = "crates/qnc-timeline" }
 qnc-media-stream = { path = "crates/qnc-media-stream" }
@@ -155,11 +159,11 @@ qnc-gpu-raster = { path = "crates/qnc-gpu-raster" }
 qnc-broadcast-player = { path = "crates/qnc-broadcast-player" }
 qnc-broadcast-engine = { path = "crates/qnc-broadcast-engine" }
 qnc-ingest-work-plan = { path = "crates/qnc-ingest-work-plan" }
-qnc-ingest-artifacts = { path = "crates/qnc-ingest-artifacts" }
-qnc-ingest-preview = { path = "crates/qnc-ingest-preview" }
+qnc-ingest-preview-source = { path = "crates/qnc-ingest-preview-source" }
 qnc-ingest-selection-write = { path = "crates/qnc-ingest-selection-write" }
 qnc-ingest-cameras = { path = "crates/qnc-ingest-cameras" }
 qnc-ingest-catalog = { path = "crates/qnc-ingest-catalog" }
+qnc-ingest-clip-list = { path = "crates/qnc-ingest-clip-list" }
 qnc-ingest-import-worker = { path = "crates/qnc-ingest-import-worker" }
 qnc-ingest-select = { path = "crates/qnc-ingest-select" }
 qnc-media-thumbnail = { path = "crates/qnc-media-thumbnail" }

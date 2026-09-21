@@ -50,15 +50,17 @@ struct AvPoint {
 }
 
 fn field<'a>(line: &'a str, key: &str) -> Option<&'a str> {
-    let token = line
-        .split_whitespace()
-        .find(|part| part.starts_with(key))?;
+    let token = line.split_whitespace().find(|part| part.starts_with(key))?;
     token.strip_prefix(key)
 }
 
 fn parse_timebase(line: &str) -> Option<Timebase> {
     let num = line.split("fps_num: ").nth(1)?.split([',', ' ']).next()?;
-    let den = line.split("fps_den: ").nth(1)?.split([',', ' ', '}']).next()?;
+    let den = line
+        .split("fps_den: ")
+        .nth(1)?
+        .split([',', ' ', '}'])
+        .next()?;
     Timebase::new(num.parse().ok()?, den.parse().ok()?).ok()
 }
 

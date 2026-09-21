@@ -1,7 +1,5 @@
 use eframe::egui::{self, Color32, RichText, Sense, Vec2};
-use qnc_settings_path::{
-    number_string, path_string, set_path, set_string_path,
-};
+use qnc_settings_path::{number_string, path_string, set_path, set_string_path};
 use serde_json::{Number, Value};
 
 use crate::{
@@ -307,7 +305,10 @@ pub fn show(
                     )
                     .clicked()
                 {
-                    if qnc_export_preset::save_custom_preset(draft_settings, export_preset_draft_name) {
+                    if qnc_export_preset::save_custom_preset(
+                        draft_settings,
+                        export_preset_draft_name,
+                    ) {
                         export_preset_draft_name.clear();
                         changed = true;
                     }
@@ -556,7 +557,11 @@ fn export_preset_cell(
         qnc_export_preset::MANUAL_PRESET_ID.to_string(),
         "Ručno".to_string(),
     ));
-    let before = path_string(settings, "export.preset", qnc_export_preset::MANUAL_PRESET_ID);
+    let before = path_string(
+        settings,
+        "export.preset",
+        qnc_export_preset::MANUAL_PRESET_ID,
+    );
     let mut selected = before.clone();
     let display = presets
         .iter()
@@ -656,4 +661,3 @@ fn field_grid_cols(grid_w: f32) -> usize {
     let cols = ((grid_w + 8.0) / (160.0 + 8.0)).floor() as usize;
     cols.max(1)
 }
-

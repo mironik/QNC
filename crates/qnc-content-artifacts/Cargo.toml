@@ -1,15 +1,14 @@
 [package]
-name = "qnc-ingest-artifacts"
+name = "qnc-content-artifacts"
 version = "0.1.0"
 edition = "2021"
-description = "QNC public adapters: Ingest content transport for the timeline artifacts (filmstrip and wave readers and writers, source bindings)"
+description = "QNC project content artifact adapters for filmstrip and wave workers"
 
 [dependencies]
 qnc-filmstrip = { workspace = true }
 qnc-filmstrip-worker = { workspace = true }
-qnc-ingest-select = { workspace = true }
-qnc-ingest-store = { workspace = true }
-qnc-ingest-work-plan = { workspace = true }
+qnc-content-store = { workspace = true }
+qnc-source-bindings = { workspace = true }
 qnc-timeline-artifacts = { workspace = true }
 qnc-timeline-assets = { workspace = true }
 qnc-wave = { workspace = true }

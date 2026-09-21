@@ -34,6 +34,10 @@ impl EditorialForm {
         &self.contracts.group
     }
 
+    pub(crate) fn shortcuts(&self) -> &qnc_keyboard_shortcut::ShortcutCatalog {
+        &self.contracts.shortcuts
+    }
+
     /// Applies fonts and visuals of the contract theme.
     pub fn apply_theme(&self, ctx: &egui::Context) {
         theme::apply(ctx, &self.theme);

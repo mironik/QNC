@@ -62,7 +62,7 @@ impl IngestApp {
     }
 
     pub fn on_activated(&mut self) {
-        self.application.refresh_active_project();
+        self.application.on_activated();
     }
 
     /// Uvezi has started the import: the shell may open the next application.

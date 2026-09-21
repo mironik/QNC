@@ -135,7 +135,9 @@ impl TimelineAssetReader {
             return Ok(assets.clone());
         }
         let assets = read_assets(context, clip_id)?;
-        self.cache.insert(key, assets.clone());
+        if assets.filmstrip_background.is_some() || assets.wave.is_some() {
+            self.cache.insert(key, assets.clone());
+        }
         Ok(assets)
     }
 
@@ -245,5 +247,51 @@ mod tests {
         assert_eq!(peaks.a2_peaks, [0.1, 0.2]);
         assert_eq!(peaks.a3_peaks, [0.05, 0.15]);
         assert!(peaks.a4_peaks.is_empty());
+    }
+
+    #[test]
+    fn empty_artifact_lookup_is_not_cached() {
+        #[derive(Default)]
+        struct Reader {
+            calls: std::sync::Mutex<usize>,
+        }
+
+        impl TimelineArtifactRead for Reader {
+            fn read_filmstrip(
+                &self,
+                _clip_id: &str,
+            ) -> Result<Option<FilmstripArtifactRecord>, String> {
+                *self.calls.lock().unwrap() += 1;
+                Ok(None)
+            }
+
+            fn read_wave(&self, _clip_id: &str) -> Result<Option<WaveArtifactRecord>, String> {
+                Ok(None)
+            }
+
+            fn read_image_bytes(&self, _artifact_uri: &str) -> Result<Vec<u8>, String> {
+                Ok(Vec::new())
+            }
+        }
+
+        let reader = Arc::new(Reader::default());
+        let mut assets = TimelineAssetReader::default();
+        assets.configure(TimelineAssetContext {
+            project_id: "project-1".into(),
+            reader: reader.clone(),
+        });
+
+        assert!(assets
+            .load_clip("clip-1")
+            .unwrap()
+            .filmstrip_background
+            .is_none());
+        assert!(assets
+            .load_clip("clip-1")
+            .unwrap()
+            .filmstrip_background
+            .is_none());
+
+        assert_eq!(*reader.calls.lock().unwrap(), 2);
     }
 }

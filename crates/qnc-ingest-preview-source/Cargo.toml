@@ -1,0 +1,19 @@
+[package]
+name = "qnc-ingest-preview-source"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public adapter: Ingest content database as a source for the universal source preview (local, LAN or intranet)"
+
+[dependencies]
+qnc-content-artifacts = { workspace = true }
+qnc-content-store = { workspace = true }
+qnc-ingest-select = { workspace = true }
+qnc-ingest-store = { workspace = true }
+qnc-player-client = { workspace = true }
+qnc-player-input = { workspace = true }
+qnc-player-timeline = { workspace = true }
+qnc-source-bindings = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-timeline-assets = { workspace = true }
+qnc-work-settings = { workspace = true }

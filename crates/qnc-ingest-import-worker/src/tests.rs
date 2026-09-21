@@ -1,8 +1,8 @@
 use super::*;
+use qnc_camera_sony_fx6_v6::SonyFx6V6;
 use qnc_ingest_select::{test_support, Event};
 use qnc_ingest_store::content::{Access, ImportStatus};
 use qnc_ingest_work_plan::IngestWorkPlan;
-use qnc_camera_sony_fx6_v6::SonyFx6V6;
 use std::{
     collections::BTreeMap,
     io::Cursor,
@@ -100,7 +100,13 @@ fn fixture_with(queued: bool) -> Fixture {
     let events = test_support::execute_with(&config, &calls, false, false, ".", &registry);
     let ids: Vec<String> = events
         .iter()
-        .filter_map(|e| if let Event::Clip(c) = e { Some(c.clip_id.clone()) } else { None })
+        .filter_map(|e| {
+            if let Event::Clip(c) = e {
+                Some(c.clip_id.clone())
+            } else {
+                None
+            }
+        })
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect();
@@ -110,8 +116,10 @@ fn fixture_with(queued: bool) -> Fixture {
         .as_ref()
         .unwrap()
         .with_file_name("content.db");
-    let mut client = ContentClient::from_owner_binding(&content, DB_URI, Access::ReadWrite).unwrap();
-    let target = qnc_ingest_store::content::ContentTarget::from_owner_binding(&content, DB_URI).unwrap();
+    let mut client =
+        ContentClient::from_owner_binding(&content, DB_URI, Access::ReadWrite).unwrap();
+    let target =
+        qnc_ingest_store::content::ContentTarget::from_owner_binding(&content, DB_URI).unwrap();
     client.select(ids.clone(), true).unwrap();
     if queued {
         client.queue_selected().unwrap();
@@ -123,7 +131,10 @@ fn fixture_with(queued: bool) -> Fixture {
     for id in &ids {
         let clip = client.read(id).unwrap().unwrap();
         let binding = &clip.clip.snapshot.binding;
-        media.insert(binding.original_uri.clone(), format!("original of {id}").into_bytes());
+        media.insert(
+            binding.original_uri.clone(),
+            format!("original of {id}").into_bytes(),
+        );
         if let Some(poster) = &clip.clip.thumbnail_uri {
             media.insert(poster.clone(), format!("poster of {id}").into_bytes());
         }
@@ -165,23 +176,35 @@ fn settings_decide_the_action_for_every_media_mode() {
     let clip = f.client.claim_next().unwrap().unwrap();
     assert_eq!(
         action_for(&clip, &plan("original", "original")).unwrap(),
-        Action::Copy { source_uri: f.original.clone(), folder: Folder::Original }
+        Action::Copy {
+            source_uri: f.original.clone(),
+            folder: Folder::Original
+        }
     );
     assert_eq!(
         action_for(&clip, &plan("proxy", "original")).unwrap(),
-        Action::Copy { source_uri: f.proxy.clone(), folder: Folder::Proxy }
+        Action::Copy {
+            source_uri: f.proxy.clone(),
+            folder: Folder::Proxy
+        }
     );
     assert_eq!(
         action_for(&clip, &plan("link", "original")).unwrap(),
-        Action::Link { media_uri: f.original.clone() }
+        Action::Link {
+            media_uri: f.original.clone()
+        }
     );
     assert_eq!(
         action_for(&clip, &plan("link", "proxy")).unwrap(),
-        Action::Link { media_uri: f.proxy.clone() }
+        Action::Link {
+            media_uri: f.proxy.clone()
+        }
     );
     assert_eq!(
         action_for(&clip, &plan("link", "proxy_if_available")).unwrap(),
-        Action::Link { media_uri: f.proxy.clone() }
+        Action::Link {
+            media_uri: f.proxy.clone()
+        }
     );
 }
 
@@ -189,12 +212,20 @@ fn settings_decide_the_action_for_every_media_mode() {
 fn original_mode_copies_the_original_into_the_project_and_records_the_outcome() {
     let mut f = fixture();
     let project = f.project.path().to_path_buf();
-    let outcome = run_next(&mut f.client, &plan("original", "original"), &project, &opener(&f.media, false), &nothing())
-        .unwrap()
-        .unwrap();
+    let outcome = run_next(
+        &mut f.client,
+        &plan("original", "original"),
+        &project,
+        &opener(&f.media, false),
+        &nothing(),
+    )
+    .unwrap()
+    .unwrap();
     let uri = outcome.result.unwrap();
     assert!(uri.starts_with("qnc://local/project/p1/original/"));
-    let file = project.join("original").join(uri.rsplit('/').next().unwrap());
+    let file = project
+        .join("original")
+        .join(uri.rsplit('/').next().unwrap());
     assert!(std::fs::read(&file).unwrap().starts_with(b"original of"));
     let stored = f.client.read(&outcome.clip_id).unwrap().unwrap();
     assert_eq!(stored.import_status, ImportStatus::Imported);
@@ -206,18 +237,30 @@ fn proxy_mode_copies_the_proxy_and_link_mode_copies_nothing() {
     let mut f = fixture();
     let project = f.project.path().to_path_buf();
     let opener = opener(&f.media, false);
-    let proxy = run_next(&mut f.client, &plan("proxy", "original"), &project, &opener, &nothing())
-        .unwrap()
-        .unwrap()
-        .result
-        .unwrap();
+    let proxy = run_next(
+        &mut f.client,
+        &plan("proxy", "original"),
+        &project,
+        &opener,
+        &nothing(),
+    )
+    .unwrap()
+    .unwrap()
+    .result
+    .unwrap();
     assert!(proxy.starts_with("qnc://local/project/p1/proxy/"));
     assert!(project.join("proxy").is_dir());
-    let linked = run_next(&mut f.client, &plan("link", "original"), &project, &opener, &nothing())
-        .unwrap()
-        .unwrap()
-        .result
-        .unwrap();
+    let linked = run_next(
+        &mut f.client,
+        &plan("link", "original"),
+        &project,
+        &opener,
+        &nothing(),
+    )
+    .unwrap()
+    .unwrap()
+    .result
+    .unwrap();
     assert!(linked.starts_with("qnc://local/source/"));
     assert!(!project.join("original").exists(), "link never copies");
 }
@@ -226,25 +269,39 @@ fn proxy_mode_copies_the_proxy_and_link_mode_copies_nothing() {
 fn a_medium_that_cannot_be_opened_is_recorded_as_a_failed_import() {
     let mut f = fixture();
     let project = f.project.path().to_path_buf();
-    let empty = Memory { media: BTreeMap::new(), lie_about_length: false };
-    let outcome = run_next(&mut f.client, &plan("original", "original"), &project, &empty, &nothing())
-        .unwrap()
-        .unwrap();
+    let empty = Memory {
+        media: BTreeMap::new(),
+        lie_about_length: false,
+    };
+    let outcome = run_next(
+        &mut f.client,
+        &plan("original", "original"),
+        &project,
+        &empty,
+        &nothing(),
+    )
+    .unwrap()
+    .unwrap();
     assert!(outcome.result.is_err());
     let stored = f.client.read(&outcome.clip_id).unwrap().unwrap();
     assert_eq!(stored.import_status, ImportStatus::Failed);
     assert!(stored.import_error.is_some());
 }
 
-
 #[test]
 fn a_cancelled_import_copies_nothing() {
     let mut f = fixture();
     let project = f.project.path().to_path_buf();
     let cancel = AtomicBool::new(true);
-    let outcome = run_next(&mut f.client, &plan("original", "original"), &project, &opener(&f.media, false), &cancel)
-        .unwrap()
-        .unwrap();
+    let outcome = run_next(
+        &mut f.client,
+        &plan("original", "original"),
+        &project,
+        &opener(&f.media, false),
+        &cancel,
+    )
+    .unwrap()
+    .unwrap();
     assert!(outcome.result.unwrap_err().contains("prekinut"));
 }
 
@@ -252,10 +309,24 @@ fn a_cancelled_import_copies_nothing() {
 fn drain_imports_every_queued_clip_once() {
     let mut f = fixture();
     let project = f.project.path().to_path_buf();
-    let outcomes = drain(&mut f.client, &plan("original", "original"), &project, &opener(&f.media, false), &nothing()).unwrap();
+    let outcomes = drain(
+        &mut f.client,
+        &plan("original", "original"),
+        &project,
+        &opener(&f.media, false),
+        &nothing(),
+    )
+    .unwrap();
     assert_eq!(outcomes.len(), 2);
     assert!(outcomes.iter().all(|o| o.result.is_ok()));
-    let again = drain(&mut f.client, &plan("original", "original"), &project, &opener(&f.media, false), &nothing()).unwrap();
+    let again = drain(
+        &mut f.client,
+        &plan("original", "original"),
+        &project,
+        &opener(&f.media, false),
+        &nothing(),
+    )
+    .unwrap();
     assert!(again.is_empty(), "an imported clip is never claimed again");
 }
 
@@ -285,17 +356,22 @@ fn draining_the_queue_reports_every_clip() {
     assert!(f.client.claim_next().unwrap().is_none());
 }
 
-
 #[test]
 fn the_write_transport_queues_the_selected_clips_and_hands_them_out_once() {
     let mut f = fixture_with(false);
-    assert!(f.client.claim_next().unwrap().is_none(), "nothing queued yet");
+    assert!(
+        f.client.claim_next().unwrap().is_none(),
+        "nothing queued yet"
+    );
     queue_selected(f.target.clone()).unwrap();
     let mut queue = TransportQueue::start(f.target.clone()).unwrap();
     let first = queue.claim_next().unwrap().unwrap();
     let second = queue.claim_next().unwrap().unwrap();
     assert_ne!(first.clip.id(), second.clip.id());
-    assert!(queue.claim_next().unwrap().is_none(), "each clip is handed out once");
+    assert!(
+        queue.claim_next().unwrap().is_none(),
+        "each clip is handed out once"
+    );
     queue
         .finish_import(first.clip.id().into(), Some(f.original.clone()), None, None)
         .unwrap();
@@ -310,8 +386,7 @@ fn copying_the_media_copies_the_poster_and_records_it() {
     let plan = plan("original", "original");
     let opener = opener(&f.media, false);
     let mut with_poster = None;
-    while let Some(outcome) = run_next(&mut f.client, &plan, &project, &opener, &nothing())
-        .unwrap()
+    while let Some(outcome) = run_next(&mut f.client, &plan, &project, &opener, &nothing()).unwrap()
     {
         if outcome.thumbnail_uri.is_some() {
             with_poster = Some(outcome);
@@ -321,7 +396,10 @@ fn copying_the_media_copies_the_poster_and_records_it() {
     let poster = outcome.thumbnail_uri.clone().unwrap();
     assert_eq!(
         poster,
-        format!("qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg", outcome.clip_id)
+        format!(
+            "qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg",
+            outcome.clip_id
+        )
     );
     let file = project
         .join("ingest")
@@ -334,14 +412,40 @@ fn copying_the_media_copies_the_poster_and_records_it() {
 }
 
 #[test]
-fn link_mode_copies_no_poster() {
+fn link_mode_keeps_media_link_but_copies_poster_to_project() {
     let mut f = fixture();
     let project = f.project.path().to_path_buf();
-    let outcome = run_next(&mut f.client, &plan("link", "original"), &project, &opener(&f.media, false), &nothing())
-        .unwrap()
-        .unwrap();
-    assert!(outcome.thumbnail_uri.is_none());
-    assert!(!project.join("ingest").exists());
+    let plan = plan("link", "original");
+    let opener = opener(&f.media, false);
+    let mut with_poster = None;
+    while let Some(outcome) = run_next(&mut f.client, &plan, &project, &opener, &nothing()).unwrap()
+    {
+        if outcome.thumbnail_uri.is_some() {
+            with_poster = Some(outcome);
+            break;
+        }
+    }
+    let outcome = with_poster.expect("a Sony clip has a poster");
+    let stored = f.client.read(&outcome.clip_id).unwrap().unwrap();
+    assert_eq!(
+        Some(outcome.result.as_ref().unwrap().as_str()),
+        stored.imported_media_uri.as_deref()
+    );
+    let poster = outcome.thumbnail_uri.unwrap();
+    assert_eq!(
+        poster,
+        format!(
+            "qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg",
+            outcome.clip_id
+        )
+    );
+    assert!(project
+        .join("ingest")
+        .join("thumbnails")
+        .join(&outcome.clip_id)
+        .join("poster.jpg")
+        .is_file());
+    assert_eq!(stored.clip.thumbnail_uri.as_deref(), Some(poster.as_str()));
 }
 
 #[test]
@@ -349,9 +453,15 @@ fn a_poster_that_cannot_be_read_does_not_fail_the_import() {
     let mut f = fixture();
     let project = f.project.path().to_path_buf();
     f.media.retain(|_, data| !data.starts_with(b"poster of"));
-    let outcome = run_next(&mut f.client, &plan("original", "original"), &project, &opener(&f.media, false), &nothing())
-        .unwrap()
-        .unwrap();
+    let outcome = run_next(
+        &mut f.client,
+        &plan("original", "original"),
+        &project,
+        &opener(&f.media, false),
+        &nothing(),
+    )
+    .unwrap()
+    .unwrap();
     assert!(outcome.result.is_ok());
     assert!(outcome.thumbnail_uri.is_none());
 }
@@ -418,7 +528,8 @@ fn launching_while_the_lease_in_the_database_is_alive_starts_nothing() {
     let f = fixture();
     let root = std::path::Path::new("unused");
     // No worker executable beside the test binary: this fails if it tries to start one.
-    let _lease = qnc_ingest_runtime::Beat::start(f.target.clone(), qnc_ingest_runtime::WORKER).unwrap();
+    let _lease =
+        qnc_ingest_runtime::Beat::start(f.target.clone(), qnc_ingest_runtime::WORKER).unwrap();
     assert!(launch_worker(root, &f.target).is_ok());
 }
 
@@ -443,7 +554,14 @@ fn the_copy_waits_while_the_database_says_a_player_works() {
 #[test]
 fn a_clip_without_a_card_poster_and_without_a_local_file_gets_no_poster_and_no_error() {
     let mut f = fixture();
-    let id = f.client.claim_next().unwrap().unwrap().clip.id().to_string();
+    let id = f
+        .client
+        .claim_next()
+        .unwrap()
+        .unwrap()
+        .clip
+        .id()
+        .to_string();
     let mut clip = f.client.read(&id).unwrap().unwrap();
     clip.clip.thumbnail_uri = None;
     let project = f.project.path().to_path_buf();
@@ -455,17 +573,23 @@ fn a_clip_without_a_card_poster_and_without_a_local_file_gets_no_poster_and_no_e
         &nothing(),
     );
     assert!(poster.is_none());
-    assert!(!project.join("ingest").exists(), "nothing is written when no poster can be made");
+    assert!(
+        !project.join("ingest").exists(),
+        "nothing is written when no poster can be made"
+    );
 }
 
 #[test]
-fn a_linked_clip_with_a_card_poster_keeps_the_address_of_the_card() {
+fn a_linked_clip_with_a_card_poster_gets_a_project_poster() {
     let mut f = fixture();
     let mut clip = f.client.claim_next().unwrap().unwrap();
     if clip.clip.thumbnail_uri.is_none() {
         clip = f.client.claim_next().unwrap().unwrap();
     }
-    assert!(clip.clip.thumbnail_uri.is_some(), "the fixture has a clip with a card poster");
+    assert!(
+        clip.clip.thumbnail_uri.is_some(),
+        "the fixture has a clip with a card poster"
+    );
     let project = f.project.path().to_path_buf();
     let poster = import_poster(
         &clip,
@@ -474,7 +598,14 @@ fn a_linked_clip_with_a_card_poster_keeps_the_address_of_the_card() {
         &opener(&f.media, false),
         &nothing(),
     );
-    assert!(poster.is_none(), "link: the poster stays on the card");
+    assert_eq!(
+        poster.as_deref(),
+        Some(format!(
+            "qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg",
+            clip.clip.id()
+        )
+        .as_str())
+    );
 }
 
 #[test]

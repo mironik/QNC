@@ -34,14 +34,13 @@ impl IngestApplication {
         } else {
             uri.clone()
         };
-        let private_local_path = self.source_browser.path_for_uri(&uri);
         let record = SourceSelectionRecord {
             source_uri: uri.clone(),
             source_kind: source_kind_id(self.view.source_kind).to_string(),
             display_name,
             serial_number: self.view.selected_source_serial_number.clone(),
             volume_name: self.view.selected_source_volume_name.clone(),
-            private_local_path,
+            private_local_path: self.browse.selected_private_local_path(&uri),
         };
 
         if let Some(store) = self.store.as_mut() {
@@ -67,8 +66,7 @@ impl IngestApplication {
         if self.playback_guard_active() {
             return self.playback_guard_rejected();
         }
-        let Some(selected) = self.browse.selected(uri)
-        else {
+        let Some(selected) = self.browse.selected(uri) else {
             return IngestDispatchResult::rejected("Odabrani izvor vise nije dostupan.");
         };
         let Some(config) = self.selection_config.clone() else {
@@ -79,11 +77,11 @@ impl IngestApplication {
         };
         match self
             .selection_session
-            .start(config, selected, target, self.camera_registry.clone()) {
+            .start(config, selected, target, self.camera_registry.clone())
+        {
             Ok(()) => {
-                self.selection_warnings = 0;
+                self.selection_events.reset();
                 self.view.select_warning_count = 0;
-                self.selection_last_warning = None;
                 self.view.command_busy = true;
                 self.view.message = "Select je pokrenut.".into();
                 IngestDispatchResult::accepted(None, true)

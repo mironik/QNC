@@ -21,7 +21,85 @@ pub enum Step {
     Open(String),
 }
 
-type Outcome = (TransportBrowserSession, Result<BrowserState, String>);
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct BrowseLocationEntry {
+    pub name: String,
+    pub qnc_uri: String,
+    pub serial_number: String,
+    pub volume_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct BrowseState {
+    pub roots: bool,
+    pub path_label: String,
+    pub current_uri: Option<String>,
+    pub parent_available: bool,
+    pub entries: Vec<BrowseLocationEntry>,
+}
+
+impl From<BrowserState> for BrowseState {
+    fn from(state: BrowserState) -> Self {
+        Self {
+            roots: state.roots,
+            path_label: state.path_label,
+            current_uri: state.current_uri,
+            parent_available: state.parent_available,
+            entries: state
+                .entries
+                .into_iter()
+                .map(|entry| BrowseLocationEntry {
+                    name: entry.name,
+                    qnc_uri: entry.qnc_uri,
+                    serial_number: entry.serial_number,
+                    volume_name: entry.volume_name,
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceMetadata {
+    pub name: String,
+    pub serial_number: String,
+    pub volume_name: String,
+}
+
+pub trait BrowseEntry {
+    fn browse_uri(&self) -> &str;
+    fn browse_name(&self) -> &str;
+    fn browse_serial_number(&self) -> &str;
+    fn browse_volume_name(&self) -> &str;
+}
+
+pub fn selected_metadata<T: BrowseEntry>(
+    entries: &[T],
+    uri: &str,
+    current_name_is_empty: bool,
+) -> Option<SourceMetadata> {
+    let entry = entries.iter().find(|entry| entry.browse_uri() == uri)?;
+    let has_identity = !entry.browse_serial_number().trim().is_empty()
+        || !entry.browse_volume_name().trim().is_empty();
+    if !has_identity && !current_name_is_empty {
+        return None;
+    }
+    Some(SourceMetadata {
+        name: entry.browse_name().to_string(),
+        serial_number: if has_identity {
+            entry.browse_serial_number().to_string()
+        } else {
+            String::new()
+        },
+        volume_name: if has_identity {
+            entry.browse_volume_name().to_string()
+        } else {
+            String::new()
+        },
+    })
+}
+
+type Outcome = (TransportBrowserSession, Result<BrowseState, String>);
 
 #[derive(Debug, Default)]
 pub struct SourceBrowse {
@@ -52,6 +130,12 @@ impl SourceBrowse {
         self.session.as_ref()?.selected(uri)
     }
 
+    /// Owner-side diagnostic/local binding for a confirmed location. It is not part
+    /// of the public browser state and is available only for registered local roots.
+    pub fn selected_private_local_path(&self, uri: &str) -> Option<std::path::PathBuf> {
+        self.session.as_ref()?.selected_private_local_path(uri)
+    }
+
     pub fn start(&mut self, step: Step) -> Result<(), String> {
         let Some(mut session) = self.session.clone() else {
             return Err("Izvor nije povezan.".into());
@@ -64,7 +148,8 @@ impl SourceBrowse {
                     Step::Roots(environment) => session.roots(&environment),
                     Step::Parent => session.parent(),
                     Step::Open(uri) => session.open(&uri),
-                };
+                }
+                .map(Into::into);
                 let _ = send.send((session, state));
             })
             .map_err(|error| error.to_string())?;
@@ -73,7 +158,7 @@ impl SourceBrowse {
     }
 
     /// The finished step, `None` while it still runs or when none was started.
-    pub fn poll(&mut self) -> Option<Result<BrowserState, String>> {
+    pub fn poll(&mut self) -> Option<Result<BrowseState, String>> {
         let receiver = self.result.as_ref()?;
         let (session, state) = match receiver.try_recv() {
             Ok(outcome) => outcome,
@@ -98,6 +183,32 @@ impl SourceBrowse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Debug)]
+    struct TestEntry {
+        uri: &'static str,
+        name: &'static str,
+        serial_number: &'static str,
+        volume_name: &'static str,
+    }
+
+    impl BrowseEntry for TestEntry {
+        fn browse_uri(&self) -> &str {
+            self.uri
+        }
+
+        fn browse_name(&self) -> &str {
+            self.name
+        }
+
+        fn browse_serial_number(&self) -> &str {
+            self.serial_number
+        }
+
+        fn browse_volume_name(&self) -> &str {
+            self.volume_name
+        }
+    }
 
     #[test]
     fn without_sources_nothing_starts() {
@@ -128,5 +239,44 @@ mod tests {
         assert!(browse.poll().is_none());
         assert!(browse.is_connected());
         assert!(!browse.is_busy());
+    }
+
+    #[test]
+    fn selected_metadata_prefers_card_identity_and_preserves_existing_name_without_it() {
+        let entries = vec![
+            TestEntry {
+                uri: "qnc://local/source/card",
+                name: "Card",
+                serial_number: "S1",
+                volume_name: "VOL",
+            },
+            TestEntry {
+                uri: "qnc://local/source/folder",
+                name: "Folder",
+                serial_number: "",
+                volume_name: "",
+            },
+        ];
+
+        assert_eq!(
+            selected_metadata(&entries, "qnc://local/source/card", false),
+            Some(SourceMetadata {
+                name: "Card".into(),
+                serial_number: "S1".into(),
+                volume_name: "VOL".into()
+            })
+        );
+        assert_eq!(
+            selected_metadata(&entries, "qnc://local/source/folder", false),
+            None
+        );
+        assert_eq!(
+            selected_metadata(&entries, "qnc://local/source/folder", true),
+            Some(SourceMetadata {
+                name: "Folder".into(),
+                serial_number: String::new(),
+                volume_name: String::new()
+            })
+        );
     }
 }

@@ -119,7 +119,9 @@ impl CameraRegistry {
             .flat_map(|a| a.pattern_ids().iter().copied())
             .collect();
         if let Some(pattern) = adapter.pattern_ids().iter().find(|p| taken.contains(**p)) {
-            return Err(format!("catalog pattern '{pattern}' already has an adapter"));
+            return Err(format!(
+                "catalog pattern '{pattern}' already has an adapter"
+            ));
         }
         if self
             .adapters
@@ -208,7 +210,11 @@ mod tests {
         }
     }
 
-    fn fake(id: &'static str, patterns: &'static [&'static str], reader: &'static str) -> Arc<Fake> {
+    fn fake(
+        id: &'static str,
+        patterns: &'static [&'static str],
+        reader: &'static str,
+    ) -> Arc<Fake> {
         Arc::new(Fake {
             id,
             patterns,
@@ -220,18 +226,27 @@ mod tests {
     fn registers_cameras_and_finds_them_by_index_reader() {
         let mut registry = CameraRegistry::new();
         assert!(registry.is_empty());
-        registry.register(fake("cam-a", &["pattern-a"], "reader.a")).unwrap();
-        registry.register(fake("cam-b", &["pattern-b"], "reader.b")).unwrap();
+        registry
+            .register(fake("cam-a", &["pattern-a"], "reader.a"))
+            .unwrap();
+        registry
+            .register(fake("cam-b", &["pattern-b"], "reader.b"))
+            .unwrap();
         assert_eq!(registry.adapters().len(), 2);
         assert_eq!(registry.indexes().len(), 2);
-        assert_eq!(registry.for_reader("reader.b").unwrap().adapter_id(), "cam-b");
+        assert_eq!(
+            registry.for_reader("reader.b").unwrap().adapter_id(),
+            "cam-b"
+        );
         assert!(registry.for_reader("reader.none").is_none());
     }
 
     #[test]
     fn a_pattern_can_have_only_one_adapter() {
         let mut registry = CameraRegistry::new();
-        registry.register(fake("cam-a", &["pattern-a"], "reader.a")).unwrap();
+        registry
+            .register(fake("cam-a", &["pattern-a"], "reader.a"))
+            .unwrap();
         let error = registry
             .register(fake("cam-b", &["pattern-a"], "reader.b"))
             .unwrap_err();
@@ -241,15 +256,23 @@ mod tests {
     #[test]
     fn duplicate_adapter_or_reader_identity_is_rejected() {
         let mut registry = CameraRegistry::new();
-        registry.register(fake("cam-a", &["pattern-a"], "reader.a")).unwrap();
-        assert!(registry.register(fake("cam-a", &["pattern-b"], "reader.b")).is_err());
-        assert!(registry.register(fake("cam-b", &["pattern-b"], "reader.a")).is_err());
+        registry
+            .register(fake("cam-a", &["pattern-a"], "reader.a"))
+            .unwrap();
+        assert!(registry
+            .register(fake("cam-a", &["pattern-b"], "reader.b"))
+            .is_err());
+        assert!(registry
+            .register(fake("cam-b", &["pattern-b"], "reader.a"))
+            .is_err());
     }
 
     #[test]
     fn an_adapter_without_identity_or_patterns_is_rejected() {
         let mut registry = CameraRegistry::new();
-        assert!(registry.register(fake("", &["pattern-a"], "reader.a")).is_err());
+        assert!(registry
+            .register(fake("", &["pattern-a"], "reader.a"))
+            .is_err());
         assert!(registry.register(fake("cam-a", &[], "reader.a")).is_err());
         assert!(registry.register(fake("cam-a", &[""], "reader.a")).is_err());
     }
@@ -300,10 +323,7 @@ mod tests {
         }
     }
 
-    fn video(
-        width: bool,
-        exact_frames: bool,
-    ) -> qnc_media_metadata::StreamDetails {
+    fn video(width: bool, exact_frames: bool) -> qnc_media_metadata::StreamDetails {
         use qnc_media_metadata::{FrameCount, FrameTimebase, VideoMetadata};
         qnc_media_metadata::StreamDetails::Video(Box::new(VideoMetadata {
             width: if width { fact(1920) } else { None },
@@ -330,14 +350,23 @@ mod tests {
 
     #[test]
     fn a_record_with_dimensions_frame_rate_and_exact_frames_has_probe_facts() {
-        assert!(has_probe_facts(&record(vec![stream(video(true, true))], false)));
+        assert!(has_probe_facts(&record(
+            vec![stream(video(true, true))],
+            false
+        )));
     }
 
     #[test]
     fn a_record_missing_any_of_those_facts_has_no_probe_facts() {
         assert!(!has_probe_facts(&record(vec![], false)));
-        assert!(!has_probe_facts(&record(vec![stream(video(false, true))], false)));
-        assert!(!has_probe_facts(&record(vec![stream(video(true, false))], false)));
+        assert!(!has_probe_facts(&record(
+            vec![stream(video(false, true))],
+            false
+        )));
+        assert!(!has_probe_facts(&record(
+            vec![stream(video(true, false))],
+            false
+        )));
     }
 
     #[test]

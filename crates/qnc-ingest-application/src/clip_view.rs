@@ -80,3 +80,70 @@ impl From<catalog::CatalogClipRow> for ClipView {
         }
     }
 }
+
+impl catalog::CatalogClipItem for ClipView {
+    fn catalog_clip_id(&self) -> &str {
+        &self.clip_id
+    }
+
+    fn catalog_selected(&self) -> bool {
+        self.selected
+    }
+
+    fn from_catalog_row(row: catalog::CatalogClipRow) -> Self {
+        Self::from(row)
+    }
+}
+
+impl qnc_ingest_clip_list::ClipListItem for ClipView {
+    fn clip_id(&self) -> &str {
+        &self.clip_id
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn selected(&self) -> bool {
+        self.selected
+    }
+
+    fn metadata_revision(&self) -> u32 {
+        self.metadata_revision
+    }
+
+    fn set_selected(&mut self, selected: bool) {
+        self.selected = selected;
+    }
+
+    fn set_previously_seen(&mut self, seen: bool) {
+        self.previously_seen = seen;
+    }
+
+    fn set_save_failed(&mut self, failed: bool) {
+        self.save_state = if failed {
+            SaveState::Failed
+        } else {
+            SaveState::Saved
+        };
+    }
+
+    fn from_selected_clip(clip: selection::SelectedClip) -> Self {
+        Self::from(clip)
+    }
+}
+
+impl qnc_media_thumbnail::ThumbnailItem for ClipView {
+    fn item_id(&self) -> &str {
+        &self.clip_id
+    }
+
+    fn thumbnail_uri(&self) -> Option<&str> {
+        self.thumb_uri.as_deref()
+    }
+
+    fn set_thumbnail_ready(&mut self, image: std::sync::Arc<qnc_image_assets::RgbaImage>) {
+        self.thumb_image = Some(image);
+        self.thumb_status = ThumbStatus::Ready;
+    }
+}

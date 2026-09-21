@@ -205,7 +205,9 @@ impl EditorialApplication {
         let result = match receiver.try_recv() {
             Ok(result) => result,
             Err(TryRecvError::Empty) => return false,
-            Err(TryRecvError::Disconnected) => Err("Citanje projektnog kataloga je prekinuto.".into()),
+            Err(TryRecvError::Disconnected) => {
+                Err("Citanje projektnog kataloga je prekinuto.".into())
+            }
         };
         self.load_result = None;
         self.view.loading = false;
@@ -333,8 +335,8 @@ fn read_catalog(
     settings.validate().map_err(|error| error.to_string())?;
     let content = ContentReader::for_project(reader, &settings)?;
     let signature = content.signature()?;
-    let unchanged = shown_project == Some(settings.project_id.as_str())
-        && shown_signature == Some(&signature);
+    let unchanged =
+        shown_project == Some(settings.project_id.as_str()) && shown_signature == Some(&signature);
     let clips = if unchanged {
         None
     } else {
@@ -376,7 +378,8 @@ mod tests {
 
     #[test]
     fn missing_settings_end_in_a_controlled_error_not_a_default_project() {
-        let root = std::env::temp_dir().join(format!("qnc_editorial_no_project_{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("qnc_editorial_no_project_{}", std::process::id()));
         let _ = std::fs::create_dir_all(&root);
         let app = EditorialApplication::new(&root);
         assert!(app.view().clips.is_empty());
@@ -438,6 +441,7 @@ mod poster_tests {
             clip_id: id.into(),
             name: id.into(),
             duration_seconds: 1.0,
+            duration_frames: 25,
             imported: true,
             thumbnail_uri: poster.map(str::to_string),
             import_status: "imported".into(),
@@ -466,7 +470,10 @@ mod poster_tests {
     fn a_poster_already_loaded_for_the_same_address_is_kept_when_the_list_changes() {
         let previous = vec![loaded_clip("a", "qnc://x/a.jpg")];
         let merged = merge_clips(
-            vec![summary("a", Some("qnc://x/a.jpg")), summary("b", Some("qnc://x/b.jpg"))],
+            vec![
+                summary("a", Some("qnc://x/a.jpg")),
+                summary("b", Some("qnc://x/b.jpg")),
+            ],
             &previous,
         );
         assert!(merged[0].thumb_image.is_some());
@@ -478,7 +485,10 @@ mod poster_tests {
     fn a_poster_at_another_address_is_loaded_again() {
         let previous = vec![loaded_clip("a", "qnc://x/card/a.jpg")];
         let merged = merge_clips(vec![summary("a", Some("qnc://x/project/a.jpg"))], &previous);
-        assert!(merged[0].thumb_image.is_none(), "the project poster replaces the card poster");
+        assert!(
+            merged[0].thumb_image.is_none(),
+            "the project poster replaces the card poster"
+        );
     }
 
     #[test]

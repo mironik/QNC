@@ -139,9 +139,7 @@ impl PlayerWireClient {
         stream
             .write_all(&request)
             .map_err(|e| protocol_io_error("write", e))?;
-        stream
-            .flush()
-            .map_err(|e| protocol_io_error("flush", e))?;
+        stream.flush().map_err(|e| protocol_io_error("flush", e))?;
         let mut response = [0; WIRE_HEADER_BYTES];
         stream
             .read_exact(&mut response)

@@ -17,7 +17,9 @@ pub fn validate_embedded_contracts() -> Result<(), String> {
     ProjectStore::validate_embedded_contracts()
 }
 
-pub fn open_project_component(project_root: impl Into<PathBuf>) -> Result<ProjectComponent, String> {
+pub fn open_project_component(
+    project_root: impl Into<PathBuf>,
+) -> Result<ProjectComponent, String> {
     let root = project_root.into();
     let store = ProjectStore::open(&root)?;
     Ok(ProjectComponent::new(store, &root))

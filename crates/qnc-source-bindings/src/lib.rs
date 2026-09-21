@@ -45,14 +45,13 @@ impl SourceBinding {
             {
                 Ok(resolver.with_local_binding(&self.uri, file))
             }
-            ("lan", None, Some(url)) => Ok(resolver.with_lan_authority(
-                parsed.authority.ok_or("missing authority")?,
-                url,
-            )),
-            ("intranet", None, Some(url)) => Ok(resolver.with_intranet_authority(
-                parsed.authority.ok_or("missing authority")?,
-                url,
-            )),
+            ("lan", None, Some(url)) => {
+                Ok(resolver.with_lan_authority(parsed.authority.ok_or("missing authority")?, url))
+            }
+            ("intranet", None, Some(url)) => {
+                Ok(resolver
+                    .with_intranet_authority(parsed.authority.ok_or("missing authority")?, url))
+            }
             _ => Err("invalid transport binding".to_string()),
         }
     }
@@ -102,15 +101,17 @@ pub fn load(root: &Path) -> Result<TransportBindings, String> {
     let file = std::env::var_os(CONFIG_ENV)
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("data").join(CONFIG_FILE));
-    let file = file
-        .canonicalize()
-        .map_err(|_| "Nedostaje konfiguracija izvora medija (ingest-transport.json).".to_string())?;
+    let file = file.canonicalize().map_err(|_| {
+        "Nedostaje konfiguracija izvora medija (ingest-transport.json).".to_string()
+    })?;
     let metadata = std::fs::metadata(&file).map_err(|error| error.to_string())?;
     if metadata.len() > MAX_CONFIG_BYTES {
         return Err("Konfiguracija izvora medija je prevelika.".to_string());
     }
     let bytes = std::fs::read(&file).map_err(|error| error.to_string())?;
-    let base = file.parent().ok_or("Konfiguracija izvora nema direktorij.")?;
+    let base = file
+        .parent()
+        .ok_or("Konfiguracija izvora nema direktorij.")?;
     parse(&bytes, base)
 }
 
@@ -178,7 +179,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(bindings.sources.len(), 2);
-        assert_eq!(bindings.sources[0].file, Some(Path::new(BASE).join("cards/a")));
+        assert_eq!(
+            bindings.sources[0].file,
+            Some(Path::new(BASE).join("cards/a"))
+        );
         assert_eq!(
             bindings.sources[1].endpoint.as_deref(),
             Some("http://nas.local/qnc")
@@ -204,9 +208,11 @@ mod tests {
         let both = br#"{"version":"0.1.0","sources":[
             {"location":{"uri":"qnc://local/source/a","file":"x","endpoint":"http://h"}}]}"#;
         assert!(parse(both, Path::new(BASE)).is_err());
-        let neither = br#"{"version":"0.1.0","sources":[{"location":{"uri":"qnc://local/source/a"}}]}"#;
+        let neither =
+            br#"{"version":"0.1.0","sources":[{"location":{"uri":"qnc://local/source/a"}}]}"#;
         assert!(parse(neither, Path::new(BASE)).is_err());
-        let ambiguous_records = br#"{"version":"0.1.0","media_records":{"uri":"qnc://local/db/media_records"}}"#;
+        let ambiguous_records =
+            br#"{"version":"0.1.0","media_records":{"uri":"qnc://local/db/media_records"}}"#;
         assert!(parse(ambiguous_records, Path::new(BASE)).is_err());
     }
 
@@ -240,7 +246,10 @@ mod tests {
             Path::new(BASE),
         )
         .unwrap();
-        assert_eq!(bindings.sources[0].uri, "qnc://local/source/volume-de666c9f");
+        assert_eq!(
+            bindings.sources[0].uri,
+            "qnc://local/source/volume-de666c9f"
+        );
         assert_eq!(bindings.sources[0].file, Some(PathBuf::from("G:/")));
         assert!(bindings.media_records.is_some());
     }

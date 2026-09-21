@@ -63,6 +63,27 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
    mjerenje ni dijagnostika ne smije na kartici ili izvoru nista pisati, stvarati, brisati, preimenovati ni
    mijenjati. Izvori se citaju iskljucivo kroz citace koji nemaju operaciju pisanja. Pisanje je dopusteno samo
    u direktorije koje odreduje projekt (pravilo 2), a kod koji pise mora to provjeriti prije pisanja.
+8. **Broadcast Player je centar playback sustava.** Isti javni Broadcast layer,
+   isti javni preview monitor, isti javni media clip izbornik i isti javni
+   source timeline moraju se koristiti u svim formama: Ingest, Story, Media
+   Assist i buducim aplikacijama. Forma ih samo smjesta u layout i salje
+   korisnicki intent kroz javni ugovor. Nijedna forma ne smije imati privatni
+   player, privatni preview monitor, privatni media pool/clip picker, privatni
+   timeline paint ili vlastito tumacenje player stanja.
+9. **Sve playback-adjacent komponente su interfejsi oko Broadcast Playera.**
+   Preview monitor, source/program monitor, timeline, keyboard, media clip
+   izbornik, filmstrip, wave i buduci HDMI/SDI/NDI izlazi sluze Broadcast
+   Playeru kao ulazni ili izlazni interfejsi. Ne smiju postati drugi player,
+   drugi sat, drugi katalog istine ili aplikacijski monolit.
+10. **Source timeline ima jedan javni univerzalni prikazni put.**
+    Ingest, Story, Media Assist i buduce forme za source timeline koriste isti
+    `qnc-source-dock::show_timeline_dock` ulaz i istu `qnc-timeline` UI
+    komponentu. Filmstrip je iskljucivo pasivni background te source timeline
+    komponente. Forma ne smije imati vlastiti source timeline paint, vlastito
+    slaganje filmstripa, vlastitu geometriju slotova ni posebnu varijantu za
+    pojedinu aplikaciju. Segment/program timeline nije predmet ovog pravila:
+    postojeci slot API za segment timeline ostaje dopusten i ne smije se dirati
+    dok se radi source timeline.
 
 ## 1. Tocne putanje
 
@@ -101,6 +122,11 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   QNC aplikacija ako nema vlastiti aplikacijski workflow.
 - Moduli su javno dobro unutar QNC sustava. Ne smije se hardkodirati popis
   aplikacija koje smiju koristiti modul.
+- Javni moduli koji predstavljaju osnovnu montaznu povrsinu moraju biti isti
+  za sve aplikacije: Broadcast layer/player command-state ugovor, preview
+  monitor, media clip izbornik i source timeline. Story, Media Assist, Ingest
+  i buduce forme smiju mijenjati samo layout i domenski workflow oko tih
+  komponenti, ne smiju stvarati njihove privatne varijante.
 - Modul objavljuje capabilityje, input/output contract i state/write policy.
 - Modul ne smije imati hardkodiranu zabranu tko ga smije koristiti.
 - Modul smije imati dependency boundary: sto on sam ne smije pozvati, ucitati
@@ -1368,8 +1394,9 @@ preview host; osvjezavanje artefakata istog klipa; determinsticki cancel Selecta
 uvoz izvan applicationa), do rjesenja svih nalaza. Otkljucano: crateovi obitelji Ingest
 (`qnc-ingest-application`, `qnc-ingest-select`, `qnc-ingest-store`,
 `qnc-ingest-import-worker`, `qnc-ingest-catalog`, `qnc-ingest-work-plan`), `qnc-camera-*`,
-`qnc-source-preview`, `qnc-content-read`, `qnc-timeline-assets`, `qnc-media-thumbnail`, novi
-crateovi i ugovori modula, testovi, `Cargo.toml`/`Cargo.lock`, dokumenti, `tools/qnc-conformance`
+`qnc-source-preview`, `qnc-content-read`, `qnc-timeline-assets`, `qnc-media-thumbnail`,
+`qnc-source-browse`, `qnc-dir-browser`, novi crateovi i ugovori modula, testovi,
+`Cargo.toml`/`Cargo.lock`, dokumenti, `tools/qnc-conformance`
 samo ako nova granica to trazi. **Layout i UI ostaju zakljucani**: `qnc-ingest-desktop`,
 `qnc-project-desktop`, `qnc-editorial-desktop`, `qnc-media-card`, `qnc-media-pool-head`,
 `qnc-source-dock`, `qnc-ui-kit`, `contracts/ui`. Pravilo: `qnc-ingest-application` i
@@ -1379,9 +1406,11 @@ Izvedeno (dvadeseto): `qnc-ingest-select` podijeljen u module `scan`, `records`,
 `publish` s tankim vozacem; Select cancel ceka nit ogranicen broj ms i baca kasne evente; isti klip
 osvjezava artefakte; kamere u `qnc-camera-*` i `qnc-ingest-cameras`; uvoz u
 `qnc-ingest-import-worker` (`Importer`, najam s otkucajima za zapete `Processing` klipove);
-novi javni crateovi: `qnc-timeline-artifacts` i `qnc-ingest-artifacts`, `qnc-ingest-preview`
-(preview je neutralni `qnc-source-preview` s citacima kroz traitove), `qnc-ingest-selection-write`,
-`qnc-source-browse`, `qnc-playback-priority`, `CatalogLoader` u `qnc-ingest-catalog`.
+novi javni crateovi: `qnc-timeline-artifacts` i `qnc-ingest-artifacts`,
+`qnc-ingest-preview-source` (Ingest source adapter; preview je neutralni
+`qnc-source-preview` s citacima kroz traitove), `qnc-ingest-clip-list`,
+`qnc-ingest-selection-write`, `qnc-source-browse`, `qnc-playback-priority`,
+`CatalogLoader` u `qnc-ingest-catalog`.
 `qnc-ingest-application` vise ne drzi player, filmstrip/wave radnike, import, pisanje odabira,
 browsing ni ucitavanje kataloga; ostaje dispatch, mapiranje u view i `confirm_source_selection`.
 Nije izvedeno: kopija postera (traži odluku o DB ugovoru), izbor citaca indeksa po
@@ -1435,6 +1464,46 @@ v5 postupku: adresa postera iz javnog prikaza baze (`qnc-content-read`), ucitava
 `qnc-media-thumbnail` (odabrani klip prvi, ostali redom; poster iz projekta ili s kartice), a kartica klipa
 crta sliku umjesto "..." kad slika postoji. Popis klipova prikazuje samo uvezene. Izgled i raspored ostaju
 isti; `qnc-media-card`, `qnc-ui-kit` i `contracts/ui` ostaju zakljucani. Sve ostalo ostaje zamrznuto.
+
+Zatvoreno ograniceno odobrenje 2026-09-21 (dvadeset peto): korisnik je izricito
+otkljucao samo procesni popravak prikaza postera i source timeline artefakata iz aktivne
+projektne baze u view model, bez citanja u formi i bez promjene layouta. Otkljucano:
+`crates/qnc-ingest-application`, `crates/qnc-media-thumbnail`, `crates/qnc-ingest-catalog`,
+`crates/qnc-ingest-artifacts`, `crates/qnc-timeline-assets` i testovi samo koliko je potrebno.
+Izvedeno: `qnc-ingest-application` vise ne zahtijeva `selection_config` za ucitavanje postera
+koji su vec u direktoriju projekta; projektni poster URI iz aktivne baze moze se ucitati kroz
+`qnc-media-thumbnail` i upisati u `ClipView.thumb_image` dok forma ostaje pasivna. Verificirano:
+`cargo test -p qnc-ingest-application`, `cargo test -p qnc-media-thumbnail`,
+`cargo test -p qnc-timeline-assets -p qnc-ingest-artifacts`, `cargo check -p qnc-app`.
+`cargo build -p qnc-app` nije mogao zamijeniti pokrenuti `qnc-app.exe` jer ga Windows drzi
+zakljucanim. Sve ostalo ostaje zamrznuto.
+
+Zatvoreno ograniceno odobrenje 2026-09-21 (dvadeset sesto): korisnik je izricito
+otkljucao popravak filmstrip/wave artefaktnog procesa: worker ne smije biti hranjen
+Ingest cacheom ni Ingest adapterom, nego aktivnom projektnom bazom i projektnim
+postavkama. Otkljucano: novi javni neutralni moduli `crates/qnc-content-store` i
+`crates/qnc-content-artifacts`, ugovori `contracts/modules/content-store.module.json` i
+`contracts/modules/content-artifacts.module.json`, root `Cargo.toml`/`Cargo.lock`,
+uklanjanje starog `crates/qnc-ingest-artifacts` i njegovog ugovora, te minimalne veze u
+`crates/qnc-ingest-application` i `crates/qnc-ingest-preview-source`. Izvedeno:
+`qnc-content-store` je neutralni owner project content DB transporta; `qnc-content-artifacts`
+je javni adapter za citanje/pisanje timeline artefakata iz aktivnog project content DB-a;
+filmstrip/wave workeri i dalje vide samo svoje javne read/write traitove; `qnc-content-artifacts`
+sam cita host source bindinge iz javne transport konfiguracije. Ingest samo poziva sync za
+aktivni projekt nakon upisa/importa i ne predaje selection config, cache ni listu klipova.
+`tools/qnc-ingest-worker` je prosiren tako da nakon import reda sam pokrene artifact sync
+za aktivni projekt iz `public_app_settings.active_project_id` -> `public_project_settings` ->
+`qnc-work-settings` -> `qnc-content-store`; worker se moze pokrenuti samostalno i nastaviti
+filmstrip/wave generiranje nakon sto su Ingest ili cijeli `qnc-app` ugaseni. Ingest smije
+pokrenuti/wakeati worker, ali worker ne smije ovisiti o Ingest objektima, UI cacheu,
+selection configu ni trenutno otvorenoj formi.
+`focus`/preview put vise ne konfigurira niti pokrece generatore, nego samo cita vec objavljene artefakte za
+odabrani klip. Bez source bindinga nema generiranja. Forma ostaje pasivna. Verificirano:
+`cargo test -p qnc-content-store -p qnc-content-artifacts -p qnc-timeline-artifacts -p
+qnc-filmstrip-worker`, `cargo test -p qnc-ingest-application -p qnc-ingest-preview-source`,
+`cargo test -p qnc-conformance`, `cargo run -p qnc-conformance`, `cargo build -p qnc-app`;
+aktivni artifact/worker put vise nema runtime dependency na
+`qnc-ingest-artifacts` ni `qnc-ingest-store`. Sve ostalo ostaje zamrznuto.
 
 Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
 odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i

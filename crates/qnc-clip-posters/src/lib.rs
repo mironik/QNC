@@ -7,9 +7,7 @@
 //! is written. The caller only says which clips, which is chosen, and polls for pictures.
 
 use qnc_image_assets::RgbaImage;
-use qnc_media_thumbnail::{
-    ProjectFolder, ThumbnailBatchService, ThumbnailEvent, ThumbnailRequest,
-};
+use qnc_media_thumbnail::{ProjectFolder, ThumbnailBatchService, ThumbnailEvent, ThumbnailRequest};
 use qnc_source_bindings::SourceBinding;
 use qnc_source_reader::SourceReader;
 use std::{collections::HashSet, sync::Arc};
@@ -187,7 +185,10 @@ mod tests {
         let started = Instant::now();
         let mut order = Vec::new();
         while order.len() < count {
-            assert!(started.elapsed() < Duration::from_secs(10), "posters never arrived");
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "posters never arrived"
+            );
             order.extend(posters.poll().into_iter().map(|p| p.clip_id));
             std::thread::sleep(Duration::from_millis(5));
         }
@@ -215,7 +216,10 @@ mod tests {
         let (_dir, project) = folder();
         let mut posters = ClipPosters::new();
         posters.configure(&[], Some(project));
-        let clips = vec![("a".to_string(), address("a")), ("b".to_string(), address("b"))];
+        let clips = vec![
+            ("a".to_string(), address("a")),
+            ("b".to_string(), address("b")),
+        ];
         posters.request(clips.clone(), None);
         wait_for(&mut posters, 2);
         posters.request(clips, Some("b"));

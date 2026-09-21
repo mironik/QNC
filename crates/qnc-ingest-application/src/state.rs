@@ -40,7 +40,9 @@ impl IngestApplication {
     }
 
     pub fn needs_player_poll(&self) -> bool {
-        self.preview.play_when_ready() || self.view.playback.preparing || self.view.playback.playing()
+        self.preview.play_when_ready()
+            || self.view.playback.preparing
+            || self.view.playback.playing()
     }
 
     pub fn next_repaint_delay(&self) -> Option<Duration> {

@@ -17,6 +17,7 @@ use std::{
 pub const MODULE_ID: &str = "qnc.module.filmstrip";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const FILMSTRIP_FRAME_COUNT: usize = 13;
+const KEYFRAME_SEEK_MIN_DURATION_SEC: f64 = 10.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -167,7 +168,12 @@ pub fn extraction_mode(
     if source_timebase.fps_num <= 0 || source_timebase.fps_den <= 0 {
         return Err("filmstrip source timebase missing".into());
     }
-    Ok(FilmstripExtractionMode::KeyframeSeek)
+    let duration_sec = duration_from_frames(source_duration_frames, source_timebase);
+    if duration_sec <= KEYFRAME_SEEK_MIN_DURATION_SEC {
+        Ok(FilmstripExtractionMode::RandomSeek)
+    } else {
+        Ok(FilmstripExtractionMode::KeyframeSeek)
+    }
 }
 
 pub fn artifact_record_from_plan(plan: &FilmstripPlan, status: &str) -> FilmstripArtifactRecord {
@@ -478,10 +484,10 @@ mod tests {
     }
 
     #[test]
-    fn short_clip_uses_keyframe_seek_mode() {
+    fn short_clip_uses_random_seek_mode() {
         let plan =
             plan_from_snapshot(&snapshot(None, 500), "qnc://local/project/proj/filmstrip").unwrap();
-        assert_eq!(plan.extraction_mode, FilmstripExtractionMode::KeyframeSeek);
+        assert_eq!(plan.extraction_mode, FilmstripExtractionMode::RandomSeek);
         assert_eq!(plan.frames[1].seek_sec, 0.76);
     }
 

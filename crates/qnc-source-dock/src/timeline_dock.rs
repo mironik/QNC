@@ -46,8 +46,14 @@ pub fn show_chrome_row(
         );
     }
     let inner = Rect::from_min_max(
-        egui::pos2(rect.left() + style.chrome_pad_x, rect.top() + style.chrome_pad_y),
-        egui::pos2(rect.right() - style.chrome_pad_x, rect.bottom() - style.chrome_pad_y),
+        egui::pos2(
+            rect.left() + style.chrome_pad_x,
+            rect.top() + style.chrome_pad_y,
+        ),
+        egui::pos2(
+            rect.right() - style.chrome_pad_x,
+            rect.bottom() - style.chrome_pad_y,
+        ),
     );
     ui.scope_builder(
         egui::UiBuilder::new()

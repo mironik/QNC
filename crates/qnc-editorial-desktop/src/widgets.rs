@@ -2,8 +2,7 @@
 // right clip grid and the directory browser (its area stays empty and is
 // filled by later group functions). Painting, metrics and helpers are unchanged.
 use eframe::egui::{
-    self, Align, Align2, Button, Color32, CornerRadius, FontId, Label, Layout, Rect, RichText,
-    ScrollArea, Sense, Stroke, StrokeKind, Ui,
+    self, Align, Button, Color32, CornerRadius, Label, Layout, Rect, RichText, Sense, Stroke, Ui,
     Vec2,
 };
 
@@ -11,12 +10,9 @@ use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
 use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
-use qnc_editorial_application::{action_ids, EditorialClip, EditorialIntent, EditorialView};
+use qnc_editorial_application::{action_ids, EditorialIntent, EditorialView};
 
-use crate::{
-    layout_contract::EditorialContracts,
-    theme::Theme,
-};
+use crate::{layout_contract::EditorialContracts, theme::Theme};
 
 pub fn render_desktop(
     ui: &mut Ui,
@@ -203,29 +199,36 @@ fn render_pool_head(
     let rect = ui.available_rect_before_wrap();
 
     let mut intent = None;
-    show_chrome_row(ui, rect, &dock_style(contracts, theme), theme.surface, true, |ui| {
-        ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
-        ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
-        for (index, tab) in contracts.editorial.pool_head.tabs_left.iter().enumerate() {
-            let selected = index == 0;
-            let _ = text_tab(ui, tab, selected, theme);
-            ui.add_space(10.0);
-        }
-
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            for command in contracts.editorial.pool_head.transport_right.iter().rev() {
-                let action_id = match command.as_str() {
-                    ">" => action_ids::PLAY_PAUSE,
-                    "[" => action_ids::STEP_BACK_FRAME,
-                    "]" => action_ids::STEP_FORWARD_FRAME,
-                    _ => continue,
-                };
-                if small_button(ui, command, true, theme).clicked() {
-                    intent = Some(EditorialIntent::Action(action_id));
-                }
+    show_chrome_row(
+        ui,
+        rect,
+        &dock_style(contracts, theme),
+        theme.surface,
+        true,
+        |ui| {
+            ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
+            ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
+            for (index, tab) in contracts.editorial.pool_head.tabs_left.iter().enumerate() {
+                let selected = index == 0;
+                let _ = text_tab(ui, tab, selected, theme);
+                ui.add_space(10.0);
             }
-        });
-    });
+
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                for command in contracts.editorial.pool_head.transport_right.iter().rev() {
+                    let action_id = match command.as_str() {
+                        ">" => action_ids::PLAY_PAUSE,
+                        "[" => action_ids::STEP_BACK_FRAME,
+                        "]" => action_ids::STEP_FORWARD_FRAME,
+                        _ => continue,
+                    };
+                    if small_button(ui, command, true, theme).clicked() {
+                        intent = Some(EditorialIntent::Action(action_id));
+                    }
+                }
+            });
+        },
+    );
 
     intent
 }
@@ -307,35 +310,6 @@ fn timeline_theme(theme: &Theme) -> TimelineTheme {
     )
 }
 
-struct GridMetrics {
-    columns: usize,
-    card_width: f32,
-    card_height: f32,
-    gap: f32,
-}
-
-/// Same arithmetic as the Ingest clip grid (usable width is the panel width less 8).
-fn grid_metrics(available_width: f32, count: usize, contracts: &EditorialContracts) -> GridMetrics {
-    let card = &contracts.editorial.media_card;
-    let count = count.max(1);
-    let usable_width = (available_width - 8.0).max(card.min_card_width);
-    let columns = (((usable_width + card.grid_gap) / (card.min_card_width + card.grid_gap)).floor()
-        as usize)
-        .max(1)
-        .min(count);
-    let card_width = (usable_width - card.grid_gap * columns.saturating_sub(1) as f32) / columns as f32;
-    let card_height = card_width * 9.0 / 16.0 + card.card_text_height;
-    GridMetrics {
-        columns,
-        card_width,
-        card_height,
-        gap: card.grid_gap,
-    }
-}
-
-/// The clip menu: a virtualized card grid of the project clips. Click on a card
-/// chooses the clip for the preview. Presentation as in Ingest and the qnc_v5
-/// media pool: chosen card has a 2 px red outline, others a 1 px border.
 fn render_clip_grid(
     ui: &mut Ui,
     contracts: &EditorialContracts,
@@ -345,207 +319,89 @@ fn render_clip_grid(
     let outer = ui.available_rect_before_wrap();
     ui.painter().rect_filled(outer, 0.0, theme.bg);
     let rect = outer.shrink(contracts.editorial.board.block_pad);
-    let clips = &view.clips;
-
-    if clips.is_empty() {
-        ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-            ui.vertical_centered(|ui| {
-                ui.add_space(24.0);
-                let message = if view.loading {
-                    "Citam projektni katalog..."
-                } else if !view.message.is_empty() {
-                    view.message.as_str()
-                } else {
-                    contracts.editorial.media_card.empty_message.as_str()
-                };
-                ui.label(RichText::new(message).color(theme.text_muted));
-            });
-        });
-        return None;
-    }
-
-    let metrics = grid_metrics(rect.width(), clips.len(), contracts);
-    let show_check = contracts.composition().media_card.selection_check;
-    let dots = qnc_media_card::StatusDotsMode::from_contract(&contracts.composition().media_card.status_dots)
-        .unwrap_or(qnc_media_card::StatusDotsMode::Off);
-    let row_stride = metrics.card_height + metrics.gap;
-    let total_rows = clips.len().div_ceil(metrics.columns);
-    let mut intent = None;
-
+    let empty_message = if view.loading {
+        "Citam projektni katalog..."
+    } else if !view.message.is_empty() {
+        view.message.as_str()
+    } else {
+        contracts.editorial.media_card.empty_message.as_str()
+    };
+    let rows = view
+        .clips
+        .iter()
+        .map(|clip| {
+            let (status_proxy, status_original) =
+                qnc_media_card::pipeline_statuses(&clip.import_status, &clip.imported_media_uri);
+            qnc_media_card::CardRow {
+                id: clip.clip_id.as_str(),
+                thumb_id: clip.thumb_uri.as_deref().unwrap_or(clip.clip_id.as_str()),
+                title: clip.name.as_str(),
+                duration_sec: clip.duration_seconds,
+                duration_label: "",
+                import_status: clip.import_status.as_str(),
+                status_proxy,
+                status_original,
+                checked: view.chosen_clip_id() == Some(clip.clip_id.as_str()),
+                rgba_thumb: clip
+                    .thumb_uri
+                    .as_deref()
+                    .zip(clip.thumb_image.as_deref())
+                    .map(|(uri, image)| qnc_media_card::RgbaThumb {
+                        uri,
+                        content_key: image.content_key,
+                        size: image.size,
+                        rgba: &image.pixels,
+                    }),
+            }
+        })
+        .collect::<Vec<_>>();
+    let style = qnc_media_card::CardStyle {
+        raised: theme.surface_alt,
+        surface: theme.surface,
+        border: theme.border,
+        text: theme.text,
+        muted: theme.text_muted,
+        select_red: theme.danger,
+    };
+    let metrics = qnc_media_card::CardMetrics {
+        min_card_width: contracts.editorial.media_card.min_card_width,
+        card_text_height: contracts.editorial.media_card.card_text_height,
+        grid_gap: contracts.editorial.media_card.grid_gap,
+    };
+    let features = qnc_media_card::MediaCardFeatures {
+        selection_check: contracts.composition().media_card.selection_check,
+        status_dots: qnc_media_card::StatusDotsMode::from_contract(
+            &contracts.composition().media_card.status_dots,
+        )
+        .unwrap_or(qnc_media_card::StatusDotsMode::Off),
+    };
+    let no_textures = std::collections::HashMap::new();
+    let mut action = None;
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-        ScrollArea::vertical()
-            .id_salt("editorial_clip_grid")
-            .auto_shrink([false, false])
-            .show_viewport(ui, |ui, viewport| {
-                let first_row = (viewport.top() / row_stride).floor().max(0.0) as usize;
-                let last_row =
-                    ((viewport.bottom() / row_stride).ceil() as usize + 1).min(total_rows);
-                ui.add_space(first_row as f32 * row_stride);
-                for row_index in first_row..last_row {
-                    let start = row_index * metrics.columns;
-                    let end = (start + metrics.columns).min(clips.len());
-                    ui.horizontal(|ui| {
-                        for clip in &clips[start..end] {
-                            let chosen = view.chosen_clip_id() == Some(clip.clip_id.as_str());
-                            let card = render_clip_card(
-                                ui,
-                                clip,
-                                chosen,
-                                show_check,
-                                dots,
-                                Vec2::new(metrics.card_width, metrics.card_height),
-                                theme,
-                            );
-                            if card.clicked() {
-                                intent = Some(EditorialIntent::PreviewClip(clip.clip_id.clone()));
-                            }
-                            ui.add_space(metrics.gap);
-                        }
-                    });
-                    ui.add_space(metrics.gap);
-                }
-                let rendered = last_row.saturating_sub(first_row);
-                let remaining = total_rows.saturating_sub(first_row + rendered);
-                ui.add_space(remaining as f32 * row_stride);
-            });
-    });
-
-    intent
-}
-
-/// Card painting as in the Ingest clip grid: the poster once it is loaded, the "..." placeholder until then.
-fn render_clip_card(
-    ui: &mut Ui,
-    clip: &EditorialClip,
-    chosen: bool,
-    show_check: bool,
-    dots: qnc_media_card::StatusDotsMode,
-    size: Vec2,
-    theme: &Theme,
-) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
-    let stroke = if chosen {
-        Stroke::new(2.0, theme.danger)
-    } else {
-        Stroke::new(1.0, theme.border)
-    };
-    ui.painter().rect_filled(rect, 0.0, theme.surface_alt);
-    ui.painter()
-        .rect_stroke(rect, 0.0, stroke, StrokeKind::Inside);
-    let image_rect = Rect::from_min_size(
-        rect.left_top(),
-        Vec2::new(rect.width(), rect.width() * 9.0 / 16.0),
-    );
-    ui.painter()
-        .rect_filled(image_rect.shrink(1.0), 0.0, theme.surface);
-    let painted = match (&clip.thumb_uri, &clip.thumb_image) {
-        (Some(uri), Some(image)) => qnc_ui_kit::paint_rgba_image(
+        action = qnc_media_card::show_card_grid(
             ui,
-            image_rect.shrink(1.0),
-            uri,
-            image.content_key,
-            image.size,
-            &image.pixels,
-        ),
-        _ => false,
-    };
-    if !painted {
-        ui.painter().text(
-            image_rect.center(),
-            Align2::CENTER_CENTER,
-            "...",
-            FontId::proportional(theme.font_ui),
-            theme.text_muted,
+            &style,
+            &metrics,
+            &qnc_media_card::CardGridInput {
+                height: rect.height(),
+                selected_id: view.chosen_clip_id().unwrap_or(""),
+                focused_id: "",
+                panel_focused: false,
+                cards: &rows,
+                thumb_textures: &no_textures,
+                tc: &format_duration,
+                features,
+                empty_message,
+                id_salt: "editorial_clip_grid",
+            },
         );
-    }
-    if show_check {
-        // Media Assist mirrors the chosen clip in the check mark (qnc_v5).
-        paint_selection_check(ui, image_rect, chosen);
-    }
-    let name_font = FontId::proportional(theme.font_ui - 1.0);
-    let name = truncate(
-        &clip.name,
-        ((rect.width() - 76.0 - 22.0) / 7.0).floor().clamp(8.0, 42.0) as usize,
-    );
-    let name_width = ui.fonts(|f| f.layout_no_wrap(name.clone(), name_font.clone(), theme.text).size().x);
-    let name_top = image_rect.bottom() + 8.0;
-    ui.painter().text(
-        egui::pos2(rect.left() + 8.0, name_top),
-        Align2::LEFT_TOP,
-        name,
-        name_font,
-        theme.text,
-    );
-    // The status dots beside the name come from the public card module: the form only passes
-    // what the project database says about the clip.
-    qnc_media_card::paint_clip_status(
-        ui.painter(),
-        egui::pos2(rect.left() + 8.0 + name_width + 8.0, name_top + (theme.font_ui - 1.0) * 0.6),
-        dots,
-        &clip.import_status,
-        &clip.imported_media_uri,
-    );
-    ui.painter().text(
-        egui::pos2(rect.right() - 8.0, image_rect.bottom() + 8.0),
-        Align2::RIGHT_TOP,
-        format_duration(clip.duration_seconds),
-        FontId::proportional(theme.font_ui - 1.0),
-        theme.text_muted,
-    );
-    response
-}
-
-fn selection_check_rect(image_rect: Rect) -> Rect {
-    let size = 16.0;
-    let pad = 6.0;
-    Rect::from_min_size(
-        egui::pos2(image_rect.left() + pad, image_rect.bottom() - pad - size),
-        Vec2::splat(size),
-    )
-}
-
-fn paint_selection_check(ui: &Ui, image_rect: Rect, checked: bool) {
-    let check_rect = selection_check_rect(image_rect);
-    if checked {
-        let fill = Color32::from_rgb(0xff, 0x95, 0x00);
-        ui.painter().rect_filled(check_rect, 3.0, fill);
-        ui.painter()
-            .rect_stroke(check_rect, 3.0, Stroke::new(1.5, fill), StrokeKind::Inside);
-        let c = check_rect.center();
-        let dark = Color32::from_rgb(0x1a, 0x1a, 0x1a);
-        ui.painter().line_segment(
-            [egui::pos2(c.x - 3.5, c.y), egui::pos2(c.x - 1.0, c.y + 3.0)],
-            Stroke::new(2.0, dark),
-        );
-        ui.painter().line_segment(
-            [
-                egui::pos2(c.x - 1.0, c.y + 3.0),
-                egui::pos2(c.x + 4.0, c.y - 3.0),
-            ],
-            Stroke::new(2.0, dark),
-        );
-    } else {
-        ui.painter().rect_filled(
-            check_rect,
-            3.0,
-            Color32::from_rgba_unmultiplied(0, 0, 0, 90),
-        );
-        ui.painter().rect_stroke(
-            check_rect,
-            3.0,
-            Stroke::new(1.5, Color32::from_rgba_unmultiplied(255, 255, 255, 140)),
-            StrokeKind::Inside,
-        );
-    }
-}
-
-fn truncate(text: &str, max_chars: usize) -> String {
-    let mut chars = text.chars();
-    let head = chars.by_ref().take(max_chars).collect::<String>();
-    if chars.next().is_some() {
-        format!("{head}...")
-    } else {
-        head
+    });
+    match action {
+        Some(qnc_media_card::CardGridAction::Activate(clip_id))
+        | Some(qnc_media_card::CardGridAction::ToggleSelection(clip_id)) => {
+            Some(EditorialIntent::PreviewClip(clip_id))
+        }
+        None => None,
     }
 }
 

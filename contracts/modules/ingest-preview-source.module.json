@@ -1,9 +1,9 @@
 {
-  "module_id": "qnc.module.ingest-preview",
-  "module_name": "Ingest preview source",
+  "module_id": "qnc.module.ingest-preview-source",
+  "module_name": "Ingest preview source adapter",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["ingest.preview.source"],
+  "capabilities": ["ingest.preview.source-adapter"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -13,8 +13,8 @@
   "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
   "state_policy": "stateless",
   "database_write_policy": "no_db_writes",
-  "runtime_crate": "qnc-ingest-preview",
+  "runtime_crate": "qnc-ingest-preview-source",
   "input": "Settings reader, work settings, selection config and content target of Ingest.",
-  "output": "A PreviewContext for the neutral source preview, reading clips from the Ingest content DB (local, LAN or intranet).",
+  "output": "A PreviewContext/source session adapter for the neutral qnc-source-preview, reading clips from the Ingest content DB (local, LAN or intranet).",
   "specification": "docs/v5-book/08-audit-and-plan.md (audit response)"
 }

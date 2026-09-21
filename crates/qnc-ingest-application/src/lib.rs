@@ -1,11 +1,7 @@
 #[cfg(test)]
 use std::sync::mpsc;
-use std::{
-    path::Path,
-    time::Duration,
-};
+use std::{path::Path, time::Duration};
 
-use qnc_dir_browser::{BrowserState, DirectoryBrowserSession};
 use qnc_ingest_catalog as catalog;
 use qnc_ingest_select as selection;
 use qnc_ingest_select::selection_config;
@@ -38,9 +34,9 @@ mod thumbnails;
 mod timeline_artifacts;
 mod timeline_projection;
 mod view_model;
-mod worker_launch;
 #[cfg(test)]
 mod work_settings_tests;
+mod worker_launch;
 
 pub mod action_ids;
 pub use clip_state::{ClipFilter, SaveState, ThumbStatus};
@@ -55,23 +51,21 @@ pub use view_model::IngestViewModel;
 
 pub(crate) use playback_guard::playback_guard_message;
 pub(crate) use source_kind::source_kind_id;
-pub(crate) use timeline_projection::playback_timeline_projection;
 
 #[derive(Debug, Default)]
 pub struct IngestApplication {
-    preview: qnc_source_preview::SourcePreview,
+    preview: qnc_ingest_preview_source::IngestPreviewSource,
     view: IngestViewModel,
     dispatch_log: Vec<String>,
-    source_browser: DirectoryBrowserSession,
     store: Option<IngestStore>,
     settings_reader: Option<SettingsReader>,
     catalog_loader: catalog::CatalogLoader,
     catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
+    artifact_target: Option<qnc_content_store::ContentTarget>,
     selection_writer: qnc_ingest_selection_write::SelectionWriter,
-    import_after_selection: bool,
     navigation_requested: bool,
     thumbnail_loader: qnc_media_thumbnail::ThumbnailBatchService,
-    artifacts: qnc_timeline_artifacts::Artifacts,
+    artifacts: qnc_content_artifacts::ProjectArtifacts,
     catalog_stats: Option<CatalogStats>,
     work_plan: Option<IngestWorkPlan>,
     pending_source: Option<String>,
@@ -83,8 +77,7 @@ pub struct IngestApplication {
     worker: worker_launch::WorkerLauncher,
     runtime: qnc_ingest_runtime::PlaybackReporter,
     camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
-    selection_warnings: usize,
-    selection_last_warning: Option<String>,
+    selection_events: qnc_ingest_clip_list::SelectEventState,
 }
 
 impl IngestApplication {
@@ -101,13 +94,14 @@ impl IngestApplication {
     pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
         let mut component = Self::new().with_camera_registry(qnc_ingest_cameras::registry()?);
         component.root = Some(root.as_ref().to_path_buf());
+        component.artifacts.set_host_root(root.as_ref());
         component.store = Some(IngestStore::open(root.as_ref())?);
         match selection_config::SelectionConfig::load(root.as_ref()).and_then(|config| {
             let browser = config.browser()?;
             Ok((config, browser))
         }) {
             Ok((config, mut browser)) => {
-                let state = browser.roots("local");
+                let state = browser.roots("local").map(Into::into);
                 component.selection_config = Some(config);
                 component.browse.connect(browser);
                 component.apply_source_browser_result(state);
@@ -158,6 +152,39 @@ mod tests {
 
     fn load_local_roots(component: &mut IngestApplication) {
         component.dispatch(IngestIntent::empty(action_ids::INGEST_DIR_ROOTS));
+    }
+
+    fn wait_for_component(component: &mut IngestApplication) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while component.has_pending_work() {
+            component.poll();
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    fn component_with_registered_source() -> (tempfile::TempDir, IngestApplication) {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("PRIVATE")).unwrap();
+        let uri = "qnc://local/source/test-card";
+        let path = dir.path().to_path_buf();
+        let browser = qnc_dir_browser::TransportBrowserSession::new(vec![
+            qnc_dir_browser::BrowserSource::new(
+                qnc_dir_browser::BrowserEntry {
+                    name: "Test".into(),
+                    qnc_uri: uri.into(),
+                    serial_number: "serial".into(),
+                    volume_name: "volume".into(),
+                },
+                move || {
+                    qnc_source_reader::SourceReader::local(uri, &path).map_err(|e| e.to_string())
+                },
+            ),
+        ])
+        .unwrap();
+        let mut component = IngestApplication::new();
+        component.browse.connect(browser);
+        (dir, component)
     }
 
     #[test]
@@ -249,9 +276,33 @@ mod tests {
     }
 
     #[test]
+    fn proxy_poster_approval_action_is_explicitly_handled() {
+        let mut component = IngestApplication::default();
+        component.view.clips.push(ClipView {
+            clip_id: "clip-1".into(),
+            selected: true,
+            thumb_status: ThumbStatus::Missing,
+            ..Default::default()
+        });
+
+        let result = component.dispatch(IngestIntent::empty(
+            action_ids::INGEST_APPROVE_PROXY_POSTERS,
+        ));
+
+        assert!(!result.accepted);
+        assert_eq!(
+            result.message.as_deref(),
+            Some(
+                "Samostalno generiranje postera jos nije spojeno; posteri se generiraju tijekom uvoza."
+            )
+        );
+    }
+
+    #[test]
     fn local_browser_exposes_qnc_uri_not_raw_path() {
-        let mut component = IngestApplication::new();
+        let (_dir, mut component) = component_with_registered_source();
         load_local_roots(&mut component);
+        wait_for_component(&mut component);
         for entry in &component.view().browser_entries {
             assert!(entry.qnc_uri.starts_with("qnc://local/source/"));
             assert!(!qnc_contracts::looks_like_raw_os_path(&entry.qnc_uri));
@@ -260,8 +311,9 @@ mod tests {
 
     #[test]
     fn switching_source_kind_clears_stale_local_browser_state() {
-        let mut component = IngestApplication::new();
+        let (_dir, mut component) = component_with_registered_source();
         load_local_roots(&mut component);
+        wait_for_component(&mut component);
         let first_uri = component
             .view()
             .browser_entries
@@ -273,9 +325,11 @@ mod tests {
             action_ids::INGEST_DIR_OPEN,
             IngestPayload::LocationUri(first_uri),
         ));
+        wait_for_component(&mut component);
         assert!(!component.view().browser_path_label.is_empty());
 
         component.dispatch(IngestIntent::empty(action_ids::INGEST_SOURCE_KIND_LAN));
+        wait_for_component(&mut component);
 
         assert_eq!(component.view().source_kind, SourceKind::Lan);
         assert!(component.view().browser_path_label.is_empty());
@@ -288,8 +342,9 @@ mod tests {
 
     #[test]
     fn cancel_source_browser_returns_to_local_roots() {
-        let mut component = IngestApplication::new();
+        let (_dir, mut component) = component_with_registered_source();
         load_local_roots(&mut component);
+        wait_for_component(&mut component);
         let first_uri = component
             .view()
             .browser_entries
@@ -301,11 +356,13 @@ mod tests {
             action_ids::INGEST_DIR_OPEN,
             IngestPayload::LocationUri(first_uri),
         ));
+        wait_for_component(&mut component);
         component.view.selected_source_name = "stale".to_string();
         component.view.selected_source_serial_number = "serial".to_string();
         component.view.selected_source_volume_name = "volume".to_string();
 
         component.dispatch(IngestIntent::empty(action_ids::INGEST_DIR_CANCEL));
+        wait_for_component(&mut component);
 
         assert_eq!(component.view().source_kind, SourceKind::Local);
         assert!(component.view().browser_roots);
@@ -314,7 +371,7 @@ mod tests {
         assert!(component.view().selected_source_name.is_empty());
         assert!(component.view().selected_source_serial_number.is_empty());
         assert!(component.view().selected_source_volume_name.is_empty());
-        assert_eq!(component.view().message, "Odabir izvora je otkazan.");
+        assert_eq!(component.view().message, "Odaberi lokalni izvor.");
     }
 
     #[test]

@@ -7,21 +7,9 @@ impl IngestApplication {
             return self.browse_registered(kind, None);
         }
         self.view.source_kind = kind;
-        match kind {
-            SourceKind::Local => {
-                let result = self.source_browser.load_roots();
-                self.apply_source_browser_result(result)
-            }
-            SourceKind::Lan => {
-                self.clear_source_browser_state();
-                self.view.message = "LAN izvor nije povezan u ovom rezu.".to_string();
-                IngestDispatchResult::accepted(None, true)
-            }
-            SourceKind::Internet => {
-                self.clear_source_browser_state();
-                self.view.message = "Internet izvor nije povezan u ovom rezu.".to_string();
-                IngestDispatchResult::accepted(None, true)
-            }
-        }
+        self.clear_source_browser_state();
+        self.view.source_kind = kind;
+        self.view.message = "Izvor nije povezan.".to_string();
+        IngestDispatchResult::rejected("Izvor nije povezan.")
     }
 }

@@ -3,15 +3,20 @@
 // and picks the composition of one group (e, g, l, o).
 use std::collections::HashMap;
 
+use qnc_keyboard_shortcut::ShortcutCatalog;
 use serde::Deserialize;
 
 const SHELL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/shell.layout.json");
 const EDITORIAL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/editorial.layout.json");
+const KEYBOARD_SHORTCUTS_JSON: &str =
+    include_str!("../../../contracts/qnc-keyboard-shortcuts.json");
 
 #[derive(Debug, Clone)]
 pub struct EditorialContracts {
     pub shell: ShellLayoutContract,
     pub editorial: EditorialLayoutContract,
+    pub shortcuts: ShortcutCatalog,
+    pub shortcuts_loaded: bool,
     pub group: String,
 }
 
@@ -30,6 +35,9 @@ impl EditorialContracts {
             .map_err(|error| format!("shell layout parse error: {error}"))?;
         let editorial: EditorialLayoutContract = serde_json::from_str(EDITORIAL_LAYOUT_JSON)
             .map_err(|error| format!("editorial layout parse error: {error}"))?;
+        let shortcuts = ShortcutCatalog::from_json_str(KEYBOARD_SHORTCUTS_JSON)
+            .map_err(|error| format!("keyboard shortcut catalog parse error: {error}"))?;
+        let shortcuts_loaded = !shortcuts.actions.is_empty();
 
         if shell.layout_id != "qnc.ui.shell" {
             return Err(format!("unexpected shell layout_id {}", shell.layout_id));
@@ -56,6 +64,8 @@ impl EditorialContracts {
         Ok(Self {
             shell,
             editorial,
+            shortcuts,
+            shortcuts_loaded,
             group: group.to_string(),
         })
     }
@@ -75,10 +85,11 @@ impl EditorialContracts {
 pub fn check_contracts_message(group: &str) -> Result<String, String> {
     let contracts = EditorialContracts::load(group)?;
     Ok(format!(
-        "qnc-editorial contracts ok: {} / group {} / right panel {}",
+        "qnc-editorial contracts ok: {} / group {} / right panel {} / shortcuts={}",
         contracts.editorial.layout_id,
         contracts.group,
-        contracts.composition().right_panel
+        contracts.composition().right_panel,
+        contracts.shortcuts_loaded
     ))
 }
 
@@ -189,7 +200,6 @@ pub struct GroupComposition {
 pub struct GroupSourceDock {
     pub actions_rtl: Vec<String>,
 }
-
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct EditorialMediaCard {

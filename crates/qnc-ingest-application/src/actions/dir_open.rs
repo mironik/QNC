@@ -10,12 +10,6 @@ impl IngestApplication {
             self.capture_selected_source_metadata(&uri);
             return self.browse_registered(self.view.source_kind, Some(Some(uri)));
         }
-        if self.view.source_kind != SourceKind::Local {
-            return IngestDispatchResult::accepted(None, true);
-        }
-        self.pending_source = None;
-        self.capture_selected_source_metadata(&uri);
-        let result = self.source_browser.open_uri(&uri);
-        self.apply_source_browser_result(result)
+        IngestDispatchResult::rejected("Izvor nije povezan.")
     }
 }

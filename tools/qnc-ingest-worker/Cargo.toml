@@ -9,4 +9,7 @@ name = "qnc-ingest-worker"
 path = "src/main.rs"
 
 [dependencies]
+qnc-content-artifacts = { workspace = true }
+qnc-content-store = { workspace = true }
 qnc-ingest-import-worker = { workspace = true }
+qnc-work-settings = { workspace = true }

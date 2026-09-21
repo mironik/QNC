@@ -511,10 +511,8 @@ mod tests {
         writer.publish(&header(1, 10), &[1; 8]).unwrap();
         writer.publish(&header(2, 11), &[2; 8]).unwrap();
         writer.publish(&header(3, 12), &[3; 8]).unwrap();
-        let LatestFrameUpdate::Picture(posted) = reader
-            .recv(Duration::from_millis(50))
-            .unwrap()
-            .unwrap()
+        let LatestFrameUpdate::Picture(posted) =
+            reader.recv(Duration::from_millis(50)).unwrap().unwrap()
         else {
             panic!("expected posted mailbox");
         };

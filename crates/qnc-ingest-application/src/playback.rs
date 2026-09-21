@@ -1,6 +1,6 @@
 //! The application only decides *when* to preview and what the playback guard allows;
-//! the neutral `qnc-source-preview` holds the player, and `qnc-ingest-preview` tells it
-//! where Ingest keeps its clips.
+//! the neutral `qnc-source-preview` holds the player, and `qnc-ingest-preview-source`
+//! adapts the Ingest content database to that universal preview.
 
 use super::*;
 #[cfg(test)]
@@ -13,8 +13,10 @@ impl IngestApplication {
 
     /// Copies what the preview reports into the view the form reads.
     pub(super) fn sync_playback_view(&mut self) {
-        self.view.playback = self.preview.player_view().clone();
-        self.view.timeline = playback_timeline_projection(&self.view.playback);
+        let preview = self.preview.view();
+        self.view.playback = preview.playback;
+        self.view.timeline = preview.timeline;
+        self.view.timeline_assets = preview.assets;
     }
 
     pub(super) fn prepare_preview(&mut self, clip_id: String) -> IngestDispatchResult {
@@ -40,12 +42,12 @@ impl IngestApplication {
         self.stop_player();
         self.set_timeline_artifact_playback_priority(true);
         self.view.preview_clip_id = Some(clip_id.clone());
-        if save_state != SaveState::Saved {
-            let mut result = IngestDispatchResult::rejected("Klip jos nije spremljen u bazu.");
-            result.request_repaint = true;
-            return result;
-        }
         self.focus_timeline_assets(&clip_id);
+        if save_state != SaveState::Saved {
+            self.set_timeline_artifact_playback_priority(false);
+            self.view.message = "Klip jos nije spremljen u bazu.".into();
+            return IngestDispatchResult::accepted(None, true);
+        }
         let (Some(reader), Some(plan), Some(config), Some(content_target)) = (
             self.settings_reader.clone(),
             self.work_plan(),
@@ -54,14 +56,13 @@ impl IngestApplication {
         ) else {
             return IngestDispatchResult::accepted(None, true);
         };
-        self.preview.configure(qnc_ingest_preview::preview_context(
-            reader,
-            plan.settings.clone(),
-            &config,
-            content_target,
-        ));
-        self.preview.open(&clip_id);
-        let error = self.preview.take_message();
+        self.preview
+            .configure(reader, plan.settings.clone(), &config, content_target);
+        let error = self
+            .preview
+            .open_saved_clip(&clip_id, save_state == SaveState::Saved)
+            .err()
+            .unwrap_or_default();
         self.sync_playback_view();
         self.update_timeline_artifact_playback_priority();
         if !error.is_empty() {
@@ -87,34 +88,35 @@ impl IngestApplication {
             result.request_repaint = true;
             return result;
         }
-        match intent.action_id.as_str() {
-            action_ids::PLAY_PAUSE => {
-                let was_playing = self.preview.player_view().playing();
-                self.preview.toggle_play();
-                if !was_playing {
-                    self.apply_playback_guard();
-                }
-            }
-            action_ids::STEP_BACK_FRAME => {
-                self.preview.step(-1);
-            }
-            action_ids::STEP_FORWARD_FRAME => {
-                self.preview.step(1);
-            }
+        let command = match intent.action_id.as_str() {
+            action_ids::PLAY_PAUSE => qnc_ingest_preview_source::PreviewCommand::TogglePlay,
+            action_ids::STEP_BACK_FRAME => qnc_ingest_preview_source::PreviewCommand::Step(-1),
+            action_ids::STEP_FORWARD_FRAME => qnc_ingest_preview_source::PreviewCommand::Step(1),
             action_ids::INGEST_CUE_FRAME => match intent.payload {
                 IngestPayload::Frame(frame) if frame >= 0 => {
-                    self.preview.cue(frame as u64);
+                    qnc_ingest_preview_source::PreviewCommand::Cue(frame as u64)
                 }
                 _ => return IngestDispatchResult::rejected("Neispravan frame."),
             },
             _ => return IngestDispatchResult::rejected("Nepoznata player akcija."),
+        };
+        let outcome = match self.preview.send_command(command) {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                self.view.message = error.clone();
+                let mut result = IngestDispatchResult::rejected(error);
+                result.request_repaint = true;
+                return result;
+            }
+        };
+        if outcome.started_playback {
+            self.apply_playback_guard();
         }
-        let error = self.preview.take_message();
-        if error.is_empty() {
+        if outcome.message.is_empty() {
             return IngestDispatchResult::accepted(None, true);
         }
-        self.view.message = error.clone();
-        let mut result = IngestDispatchResult::rejected(error);
+        self.view.message = outcome.message.clone();
+        let mut result = IngestDispatchResult::rejected(outcome.message);
         result.request_repaint = true;
         result
     }
@@ -135,8 +137,9 @@ mod tests {
             ..Default::default()
         }];
         let result = component.prepare_preview("new".into());
-        assert!(!result.accepted);
+        assert!(result.accepted);
         assert_eq!(component.view.preview_clip_id.as_deref(), Some("new"));
+        assert_eq!(component.view.timeline_assets.clip_id, "new");
         assert_eq!(component.view.playback, qnc_player_client::View::default());
         assert_eq!(
             component.preview.player_view(),

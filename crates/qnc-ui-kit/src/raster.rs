@@ -1,6 +1,10 @@
-use eframe::egui::{self, Color32, PaintCallbackInfo, Rect, TextureHandle, TextureOptions, Ui, Vec2};
+use eframe::egui::{
+    self, Color32, PaintCallbackInfo, Rect, TextureHandle, TextureOptions, Ui, Vec2,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
+
+const RASTER_CACHE_CAPACITY: usize = 1024;
 
 fn stream_frame_valid(size: [usize; 2], rgba: &[u8]) -> bool {
     !size.contains(&0)
@@ -242,7 +246,14 @@ impl MonitorBlit {
         }
         let slot = self.slots.get(&frame.surface).unwrap();
         let bytes_per_row = padded_bytes_per_row(width);
-        write_rgba_texture(queue, &slot.texture, width, height, bytes_per_row, &frame.rgba);
+        write_rgba_texture(
+            queue,
+            &slot.texture,
+            width,
+            height,
+            bytes_per_row,
+            &frame.rgba,
+        );
         let ppp = screen.pixels_per_point;
         let sw = screen.size_in_pixels[0] as f32;
         let sh = screen.size_in_pixels[1] as f32;
@@ -378,9 +389,8 @@ fn report_stream_frame(diagnostic_key: &(String, u64, u64)) {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    static LAST_REPORT: std::sync::OnceLock<
-        std::sync::Mutex<Option<((String, u64, u64), u64)>>,
-    > = std::sync::OnceLock::new();
+    static LAST_REPORT: std::sync::OnceLock<std::sync::Mutex<Option<((String, u64, u64), u64)>>> =
+        std::sync::OnceLock::new();
     let last_report = LAST_REPORT.get_or_init(|| std::sync::Mutex::new(None));
     let unix_ns_u64 = unix_ns.min(u128::from(u64::MAX)) as u64;
     let should_report = {
@@ -455,7 +465,7 @@ pub fn paint_rgba_image(
         ui.data_mut(|data| {
             let cache = data
                 .get_temp_mut_or_default::<RasterCache>(egui::Id::new("qnc-ui-kit-raster-cache"));
-            if cache.textures.len() >= 128 {
+            if cache.textures.len() >= RASTER_CACHE_CAPACITY {
                 if let Some(oldest) = cache
                     .textures
                     .iter()

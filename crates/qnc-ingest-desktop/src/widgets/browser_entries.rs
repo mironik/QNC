@@ -68,7 +68,11 @@ pub(super) fn render_browser_body(
     }
 }
 
-pub(super) fn browser_entry_button(ui: &mut Ui, entry: &LocationEntry, theme: &Theme) -> egui::Response {
+pub(super) fn browser_entry_button(
+    ui: &mut Ui,
+    entry: &LocationEntry,
+    theme: &Theme,
+) -> egui::Response {
     ui.add(Label::new(RichText::new(&entry.name).color(theme.text)).sense(Sense::click()))
 }
 

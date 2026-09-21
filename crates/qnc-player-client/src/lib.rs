@@ -185,16 +185,12 @@ impl Player {
                             {
                                 return Err("superseded player selection".into());
                             }
-                            connection::Connection::launch(
-                                launch,
-                                generation,
-                                {
-                                    let state = state.clone();
-                                    Arc::new(move |picture| {
-                                        publish_picture(&state, generation, picture)
-                                    })
-                                },
-                            )
+                            connection::Connection::launch(launch, generation, {
+                                let state = state.clone();
+                                Arc::new(move |picture| {
+                                    publish_picture(&state, generation, picture)
+                                })
+                            })
                         });
                         if state.generation.load(Ordering::Acquire) == generation {
                             match result {

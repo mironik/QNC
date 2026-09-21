@@ -182,6 +182,68 @@ fn reads_existing_active_settings_and_v4_directory_roles_without_ui_payload() {
 }
 
 #[test]
+fn project_poster_thumbnails_load_after_active_project_plan_is_set() {
+    use qnc_ingest_store::content::{Access, ContentClient, ContentTarget};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    const PNG_1X1: &[u8] = &[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
+        0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8,
+        0xCF, 0xC0, 0xF0, 0x1F, 0x00, 0x05, 0x00, 0x01, 0xFF, 0x89, 0x99, 0x3D, 0x1D, 0x00, 0x00,
+        0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60,
+    ];
+
+    let root = fixture();
+    let (source_fixture, config) = selection::test_support::fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    selection::test_support::execute(&config, &calls, false, false, ".");
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
+
+    let reader = SettingsReader::local(root.path().join("data/project_store.db"));
+    let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();
+    let mut source = ContentClient::from_owner_binding(
+        &source_fixture.path().join("content.db"),
+        "qnc://local/db/ingest_content/p1",
+        Access::ReadOnly,
+    )
+    .unwrap();
+    let mut clip = source.list(None).unwrap().remove(0).clip;
+    let poster_uri = format!(
+        "qnc://local/project/p1/ingest/thumbnails/{}/poster.png",
+        clip.id()
+    );
+    let poster_path = root
+        .path()
+        .join("p1")
+        .join("ingest")
+        .join("thumbnails")
+        .join(clip.id())
+        .join("poster.png");
+    fs::create_dir_all(poster_path.parent().unwrap()).unwrap();
+    fs::write(&poster_path, PNG_1X1).unwrap();
+    clip.thumbnail_uri = Some(poster_uri);
+    target
+        .open(Access::ReadWrite)
+        .unwrap()
+        .publish(clip)
+        .unwrap();
+
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
+    wait(&mut component);
+
+    assert_eq!(component.view.clips.len(), 1);
+    assert_eq!(component.view.clips[0].thumb_status, ThumbStatus::Ready);
+    assert!(
+        component.view.clips[0].thumb_image.is_some(),
+        "project poster URI must be decoded through the active project's folder"
+    );
+}
+
+#[test]
 fn reload_changes_plan_from_db_and_discards_unpersisted_ui_state() {
     let root = fixture();
     let mut component = IngestApplication::with_store_root(root.path()).unwrap();
@@ -406,7 +468,11 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
             .dispatch(IngestIntent::empty(action_ids::INGEST_SELECT_ALL))
             .accepted
     );
-    assert_eq!(restarted.view.selected_count(), 1, "only the visible clip is marked");
+    assert_eq!(
+        restarted.view.selected_count(),
+        1,
+        "only the visible clip is marked"
+    );
     assert!(
         restarted
             .dispatch(IngestIntent::empty(action_ids::INGEST_CLEAR_SELECTION))
@@ -443,10 +509,20 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
         restarted.view.message
     );
     assert!(!restarted.take_navigation_request(), "handed over once");
-    assert_eq!(launched.load(Ordering::SeqCst), 1, "one background application per Uvezi");
+    assert_eq!(
+        launched.load(Ordering::SeqCst),
+        1,
+        "one background application per Uvezi"
+    );
     let selected_in_db = target.open(Access::ReadOnly).unwrap().list(None).unwrap();
     assert_eq!(selected_in_db.iter().filter(|c| c.selected).count(), 1);
-    assert!(selected_in_db.iter().find(|c| c.clip.id() == id).unwrap().selected);
+    assert!(
+        selected_in_db
+            .iter()
+            .find(|c| c.clip.id() == id)
+            .unwrap()
+            .selected
+    );
     let registry = Connection::open(root.path().join("data/project_store.db")).unwrap();
     registry
         .execute("UPDATE app_settings SET value='p2'", [])
@@ -512,7 +588,7 @@ fn select_rereads_current_active_project_and_cancel_prevents_source_write() {
         )])
         .unwrap();
     browser.roots("local").unwrap();
-    component.apply_source_browser_result(browser.open(uri));
+    component.apply_source_browser_result(browser.open(uri).map(Into::into));
     component.browse.connect(browser);
     Connection::open(root.path().join("data/project_store.db"))
         .unwrap()
@@ -540,6 +616,68 @@ fn select_rereads_current_active_project_and_cancel_prevents_source_write() {
         .query_row("SELECT COUNT(*) FROM source_sessions", [], |r| r.get(0))
         .unwrap();
     assert_eq!(count, 0);
+}
+
+#[test]
+fn source_selection_records_private_local_path_for_local_owner_binding() {
+    let root = fixture();
+    let source_root = root.path().join("p1");
+    let config = json!({
+        "version": "0.1.0", "parallelism": 1,
+        "catalog": {"uri":"qnc://local/catalog/camera-patterns", "file":"catalog.db"},
+        "source_index": {"uri":"qnc://local/db/source_index", "file":"source.db"},
+        "media_records": {"uri":"qnc://local/db/media_records", "file":"media.db"},
+        "sources": [{
+            "location": {"uri": "qnc://local/source/test-card", "file": "../p1"},
+            "name": "Test Card",
+            "serial_number": "",
+            "volume_name": "",
+            "scope": "card_relative",
+            "probe": {"kind": "local", "executable": "never-executed", "probe_size_bytes": 8388608, "analyze_duration_us": 1000000}
+        }]
+    });
+    fs::write(
+        root.path().join("data/ingest-transport.json"),
+        serde_json::to_vec(&config).unwrap(),
+    )
+    .unwrap();
+    let mut component = IngestApplication::with_store_root(root.path()).unwrap();
+    wait(&mut component);
+    component.dispatch(IngestIntent::empty(action_ids::INGEST_DIR_ROOTS));
+    wait(&mut component);
+    let uri = component.view.browser_entries[0].qnc_uri.clone();
+
+    assert!(
+        component
+            .dispatch(IngestIntent::new(
+                action_ids::INGEST_DIR_OPEN,
+                IngestPayload::LocationUri(uri.clone())
+            ))
+            .accepted
+    );
+    wait(&mut component);
+    assert!(
+        component
+            .dispatch(IngestIntent::new(
+                action_ids::INGEST_DIR_CONFIRM,
+                IngestPayload::LocationUri(uri)
+            ))
+            .accepted
+    );
+    wait(&mut component);
+
+    let stored: String = Connection::open(root.path().join("data/ingest_registry.db"))
+        .unwrap()
+        .query_row(
+            "SELECT local_path FROM source_location_bindings WHERE source_uri='qnc://local/source/test-card'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        stored,
+        source_root.canonicalize().unwrap().to_string_lossy()
+    );
 }
 
 #[test]

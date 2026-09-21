@@ -3,7 +3,7 @@
 //! What is copied and where it goes is decided only by the project settings
 //! (`storage.ingest_media`, `playback.input`) through [`IngestWorkPlan`]:
 //!
-//! * `link`: nothing is copied; the imported media is the source URI chosen by
+//! * `link`: media is not copied; the imported media is the source URI chosen by
 //!   `playback.input`;
 //! * `proxy`: the proxy of the card is copied into the project `proxy` folder;
 //! * `original`: the original is copied into the project `original` folder.
@@ -87,7 +87,8 @@ impl ImportQueue for ContentClient {
         thumbnail_uri: Option<String>,
         error: Option<String>,
     ) -> Result<(), String> {
-        ContentClient::finish_import(self, clip_id, media_uri, thumbnail_uri, error).map_err(|e| e.to_string())
+        ContentClient::finish_import(self, clip_id, media_uri, thumbnail_uri, error)
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -254,10 +255,8 @@ pub(crate) fn inside_project(project_dir: &Path, path: &Path) -> Result<(), Stri
 }
 
 /// The poster of a clip in the project. The card is read only and is never touched.
-/// - The card has a poster and the media is copied: the poster is copied with it, so the
-///   clip keeps its picture when the card is gone.
-/// - The card has a poster and the media is linked: nothing is copied, the clip keeps the
-///   address of the poster on the card.
+/// - The card has a poster: the poster is copied into the project thumbnail location, so the
+///   clip keeps its picture when the card is gone, even when the media stays linked.
 /// - The card has no poster: it is created from a key frame of the media, the way the
 ///   filmstrip frames are made, at poster resolution.
 /// A poster that cannot be made never fails the import.
@@ -274,9 +273,6 @@ pub fn import_poster(
     inside_project(project_dir, &output).ok()?;
     match clip.clip.thumbnail_uri.as_deref() {
         Some(source_uri) => {
-            if !matches!(action_for(clip, plan), Ok(Action::Copy { .. })) {
-                return None;
-            }
             fs::create_dir_all(&directory).ok()?;
             copy_into(opener, source_uri, &output, cancel, &mut || {}).ok()?;
         }
@@ -406,17 +402,11 @@ impl TransportQueue {
         format!("import-{what}-{}", self.sequence)
     }
 
-    fn wait(
-        &mut self,
-        key: &str,
-    ) -> Result<qnc_ingest_store::content::ContentWriteData, String> {
+    fn wait(&mut self, key: &str) -> Result<qnc_ingest_store::content::ContentWriteData, String> {
         loop {
             for completion in self.transport.poll() {
                 if completion.key == key {
-                    return completion
-                        .result
-                        .map(|r| r.data)
-                        .map_err(|e| e.to_string());
+                    return completion.result.map(|r| r.data).map_err(|e| e.to_string());
                 }
             }
             if !self.transport.has_pending() {

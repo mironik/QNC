@@ -28,8 +28,13 @@ impl PlayerContentRead for PlayerContent {
         }
         let resolver = binding.resolver()?;
         let token = binding.token()?;
-        let mut client = Client::open(&resolver, &head.record_db_uri, Access::ReadOnly, token.as_deref())
-            .map_err(|error| error.to_string())?;
+        let mut client = Client::open(
+            &resolver,
+            &head.record_db_uri,
+            Access::ReadOnly,
+            token.as_deref(),
+        )
+        .map_err(|error| error.to_string())?;
         let snapshot = client
             .read(clip_id, Some(head.record_revision))
             .map_err(|error| error.to_string())?

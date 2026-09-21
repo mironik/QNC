@@ -28,5 +28,9 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
 
-    eframe::run_native("QNC Media Assist Audio AI", options, Box::new(|_| Ok(Box::new(app))))
+    eframe::run_native(
+        "QNC Media Assist Audio AI",
+        options,
+        Box::new(|_| Ok(Box::new(app))),
+    )
 }

@@ -19,9 +19,7 @@ use qnc_media_card::{
     show_card_grid, CardGridAction, CardGridInput, CardMetrics, CardRow, CardStyle,
     MediaCardFeatures, StatusDotsMode,
 };
-use qnc_media_pool_head::{
-    show_head, LibraryTab, PoolHeadAction, PoolHeadInput, PoolHeadStyle,
-};
+use qnc_media_pool_head::{show_head, LibraryTab, PoolHeadAction, PoolHeadInput, PoolHeadStyle};
 use qnc_source_dock::{dock_height, show_dock, DockAction, DockHeader, DockStyle, MarkFocus};
 use qnc_timeline::{TimelineIntent, TimelineProjection, TimelineTheme};
 use serde_json::Value;
@@ -83,7 +81,10 @@ impl Demo {
         let editorial: Value = serde_json::from_str(EDITORIAL).expect("editorial contract");
         let shell: Value = serde_json::from_str(SHELL).expect("shell contract");
         let composition = &editorial["groups"][group];
-        assert!(composition.is_object(), "unknown group '{group}' (use e, g, l or o)");
+        assert!(
+            composition.is_object(),
+            "unknown group '{group}' (use e, g, l or o)"
+        );
 
         let metrics = &shell["theme_metrics"];
         let colors = &shell["colors"];
@@ -219,7 +220,10 @@ impl Demo {
                 export_hires_pending: false,
                 show_quick_cover: flag("show_quick_cover"),
             },
-            empty_label: editorial["preview"]["empty_label"].as_str().unwrap().to_string(),
+            empty_label: editorial["preview"]["empty_label"]
+                .as_str()
+                .unwrap()
+                .to_string(),
             empty_font_size: f(&editorial["preview"]["empty_font_size"]),
             right_panel: composition["right_panel"].as_str().unwrap().to_string(),
             face: bg,
@@ -343,9 +347,14 @@ impl eframe::App for Demo {
                         duration_sec: row.seconds,
                         duration_label: "",
                         import_status: row.status,
-                        status_proxy: if row.status == "queued" { "pending" } else { "ready" },
+                        status_proxy: if row.status == "queued" {
+                            "pending"
+                        } else {
+                            "ready"
+                        },
                         status_original: "ready",
                         checked: self.checked.contains(&row.id),
+                        rgba_thumb: None,
                     })
                     .collect();
 

@@ -1,5 +1,5 @@
-//! The application only decides *when*; the timeline artifact host does the work
-//! and `qnc-ingest-artifacts` connects it to the Ingest content transport.
+//! The application only decides *when*; the neutral project content artifact
+//! adapter feeds the timeline artifact host from the active project database.
 
 use super::*;
 
@@ -9,32 +9,54 @@ impl IngestApplication {
         self.view.timeline_assets = qnc_timeline_assets::SourceTimelineAssets::empty();
     }
 
-    pub(super) fn refresh_timeline_artifact_context(&mut self) {
-        let (Some(reader), Some(plan), Some(target), Some(config)) = (
+    pub(super) fn refresh_timeline_artifact_context(&mut self) -> Result<(), String> {
+        let (Some(reader), Some(plan), Some(target)) = (
             self.settings_reader.as_ref(),
-            self.work_plan(),
-            self.catalog_target.clone(),
-            self.selection_config.as_ref(),
+            self.work_plan().cloned(),
+            self.artifact_target.clone(),
         ) else {
-            return;
+            return Ok(());
         };
-        match qnc_ingest_artifacts::artifacts_context(reader, plan, target, config) {
-            Ok(context) => self.artifacts.configure(context),
-            Err(error) => self.view.message = error,
-        }
+        self.artifacts
+            .configure(reader, &plan.settings, target)
     }
 
     pub(super) fn sync_timeline_artifact_content_db(&mut self) {
-        self.refresh_timeline_artifact_context();
+        let (Some(reader), Some(plan), Some(target)) = (
+            self.settings_reader.as_ref(),
+            self.work_plan().cloned(),
+            self.artifact_target.clone(),
+        ) else {
+            if self.playback_guard_active() {
+                self.artifacts.defer_sync();
+            }
+            return;
+        };
         let defer = self.playback_guard_active();
-        if let Err(error) = self.artifacts.sync(defer) {
+        if let Err(error) = self.artifacts.sync(reader, &plan.settings, target, defer) {
             self.view.message = error;
         }
     }
 
     pub(super) fn focus_timeline_assets(&mut self, clip_id: &str) {
-        self.refresh_timeline_artifact_context();
-        self.view.timeline_assets = self.artifacts.focus(clip_id);
+        let (Some(reader), Some(plan), Some(target)) = (
+            self.settings_reader.as_ref(),
+            self.work_plan().cloned(),
+            self.artifact_target.clone(),
+        ) else {
+            self.view.timeline_assets =
+                qnc_timeline_assets::SourceTimelineAssets::empty_for(clip_id);
+            return;
+        };
+        match self.artifacts.focus(
+            reader,
+            &plan.settings,
+            target,
+            clip_id,
+        ) {
+            Ok(assets) => self.view.timeline_assets = assets,
+            Err(error) => self.view.message = error,
+        }
     }
 
     pub(super) fn remove_timeline_artifact_clips(&mut self, clip_ids: &[String]) {
@@ -56,6 +78,9 @@ impl IngestApplication {
         }
         if let Some(assets) = polled.assets {
             self.view.timeline_assets = assets;
+        }
+        if polled.changed && self.preview.refresh_assets() {
+            self.sync_playback_view();
         }
         polled.changed
     }

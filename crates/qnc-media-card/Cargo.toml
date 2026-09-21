@@ -6,3 +6,4 @@ description = "QNC public passive module: media card and virtualized card grid"
 
 [dependencies]
 eframe = { workspace = true }
+qnc-ui-kit = { workspace = true }

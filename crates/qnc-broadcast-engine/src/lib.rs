@@ -1,10 +1,10 @@
 //! One player owner composing public media/output adapters. No application workflow or DB writes.
+#[cfg(test)]
+mod av_sync;
 mod conversion;
 mod decode_input;
 mod input;
 mod output;
-#[cfg(test)]
-mod av_sync;
 pub use decode_input::DecodeMediaAccess;
 use decode_input::{DecodeInput, seek_start};
 pub use input::InputPlan;
@@ -172,7 +172,7 @@ impl Runtime {
                     plan.spec.clone(),
                     input::preview_raster_bounds(plan.spec.width, plan.spec.height),
                 )
-                    .map_err(error)?,
+                .map_err(error)?,
             )
         } else {
             let converter =
@@ -225,7 +225,7 @@ impl Runtime {
                     converter,
                     input::CONVERT_IN_FLIGHT.min(prebuffer_frames),
                 )
-                    .map_err(error)?,
+                .map_err(error)?,
                 raster_size,
                 rgba,
                 ready: BTreeMap::new(),

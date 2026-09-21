@@ -1,0 +1,8 @@
+[package]
+name = "qnc-ingest-clip-list"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: applies Ingest Select events to a clip list; no form, no database, no player"
+
+[dependencies]
+qnc-ingest-select = { workspace = true }

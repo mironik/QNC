@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.content-artifacts",
+  "module_name": "Project content timeline artifacts",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["project.content.artifacts", "timeline.artifacts.source"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command", "ui.paint"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "public_db_write_transports_only",
+  "runtime_crate": "qnc-content-artifacts",
+  "input": "SettingsReader, WorkSettings snapshot from the active project database, content target of the same project database, and private source transport bindings.",
+  "output": "Timeline artifact context, filmstrip/wave worker readers and writers, and passive timeline asset reader over the project content database.",
+  "specification": "AGENTS.md §0, §4.1, §8; docs/92-v5-processes-workers-project-dir.md; docs/96-v5-ingest-db-and-workers.md"
+}

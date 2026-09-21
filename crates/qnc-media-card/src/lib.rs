@@ -8,6 +8,14 @@ use std::collections::HashMap;
 
 use eframe::egui::{self, Color32, Rect, TextureHandle, Vec2};
 
+#[derive(Clone, Copy)]
+pub struct RgbaThumb<'a> {
+    pub uri: &'a str,
+    pub content_key: u64,
+    pub size: [usize; 2],
+    pub rgba: &'a [u8],
+}
+
 /// How the status dots next to the file name are shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatusDotsMode {
@@ -103,11 +111,12 @@ pub struct MediaCardInput<'a> {
     pub checked: bool,
     pub features: MediaCardFeatures,
     pub thumb: Option<&'a TextureHandle>,
+    pub rgba_thumb: Option<RgbaThumb<'a>>,
     pub tc: &'a dyn Fn(f64) -> String,
 }
 
 pub fn paint_media_card(
-    ui: &egui::Ui,
+    ui: &mut egui::Ui,
     rect: Rect,
     style: &CardStyle,
     metrics: &CardMetrics,
@@ -127,7 +136,16 @@ pub fn paint_media_card(
 
     let thumb_rect = thumb_rect(rect, metrics);
     painter.rect_filled(thumb_rect, 0.0, style.surface);
-    if let Some(tex) = input.thumb {
+    let painted = if let Some(thumb) = input.rgba_thumb {
+        qnc_ui_kit::paint_rgba_image(
+            ui,
+            thumb_rect,
+            thumb.uri,
+            thumb.content_key,
+            thumb.size,
+            thumb.rgba,
+        )
+    } else if let Some(tex) = input.thumb {
         let size = tex.size_vec2();
         if size.x > 0.0 && size.y > 0.0 {
             let scale = (thumb_rect.width() / size.x).max(thumb_rect.height() / size.y);
@@ -138,8 +156,14 @@ pub fn paint_media_card(
                 Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
                 Color32::WHITE,
             );
+            true
+        } else {
+            false
         }
     } else {
+        false
+    };
+    if !painted {
         painter.text(
             thumb_rect.center(),
             egui::Align2::CENTER_CENTER,
@@ -233,7 +257,10 @@ enum StatusDotsLayout {
 /// QNC v5 `import_status_dots`): the proxy is ready when the import finished and pending while
 /// it runs; the original is ready when it waits for the proxy or lies in the project folder.
 /// Any form passes what the project database says and gets the same dots.
-pub fn pipeline_statuses(import_status: &str, imported_media_uri: &str) -> (&'static str, &'static str) {
+pub fn pipeline_statuses(
+    import_status: &str,
+    imported_media_uri: &str,
+) -> (&'static str, &'static str) {
     let status = import_status.trim().to_ascii_lowercase();
     let proxy = match status.as_str() {
         "error" => "error",
@@ -419,6 +446,7 @@ pub struct CardRow<'a> {
     pub status_proxy: &'a str,
     pub status_original: &'a str,
     pub checked: bool,
+    pub rgba_thumb: Option<RgbaThumb<'a>>,
 }
 
 pub struct CardGridInput<'a> {
@@ -515,6 +543,7 @@ pub fn show_card_grid(
                                 checked: card.checked,
                                 features: input.features,
                                 thumb: thumb.as_ref(),
+                                rgba_thumb: card.rgba_thumb,
                                 tc: input.tc,
                             },
                         );
@@ -548,9 +577,18 @@ mod tests {
     #[test]
     fn the_pipeline_dots_follow_the_catalog_record_only() {
         assert_eq!(pipeline_statuses("queued", ""), ("pending", "idle"));
-        assert_eq!(pipeline_statuses("generating_proxy", ""), ("pending", "ready"));
-        assert_eq!(pipeline_statuses("imported", "qnc://local/project/p/proxy/a.mp4"), ("ready", "idle"));
-        assert_eq!(pipeline_statuses("imported", "qnc://local/project/p/original/a.mxf"), ("ready", "ready"));
+        assert_eq!(
+            pipeline_statuses("generating_proxy", ""),
+            ("pending", "ready")
+        );
+        assert_eq!(
+            pipeline_statuses("imported", "qnc://local/project/p/proxy/a.mp4"),
+            ("ready", "idle")
+        );
+        assert_eq!(
+            pipeline_statuses("imported", "qnc://local/project/p/original/a.mxf"),
+            ("ready", "ready")
+        );
         assert_eq!(pipeline_statuses("error", ""), ("error", "error"));
         assert_eq!(pipeline_statuses("detected", ""), ("idle", "idle"));
     }
@@ -583,6 +621,7 @@ mod tests {
                 status_dots: mode,
             },
             thumb: None,
+            rgba_thumb: None,
             tc: &tc,
         }
     }
@@ -636,7 +675,10 @@ mod tests {
 
     #[test]
     fn status_dots_mode_parses_the_contract_values() {
-        assert_eq!(StatusDotsMode::from_contract("pipeline"), Some(StatusDotsMode::Pipeline));
+        assert_eq!(
+            StatusDotsMode::from_contract("pipeline"),
+            Some(StatusDotsMode::Pipeline)
+        );
         assert_eq!(
             StatusDotsMode::from_contract("imported_only"),
             Some(StatusDotsMode::ImportedOnly)

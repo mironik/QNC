@@ -445,11 +445,7 @@ impl GpuRasterConverter {
             rgba.copy_from_slice(&mapped);
         }
         self.readback[pending.index].unmap();
-        self.timing = [
-            pending.upload_us,
-            wait_us,
-            copy_start.elapsed().as_micros(),
-        ];
+        self.timing = [pending.upload_us, wait_us, copy_start.elapsed().as_micros()];
         Ok(())
     }
 }

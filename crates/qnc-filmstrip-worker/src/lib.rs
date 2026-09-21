@@ -43,6 +43,7 @@ pub struct FilmstripClipRecord {
     pub clip_id: String,
     pub name: String,
     pub snapshot: Snapshot,
+    pub priority: bool,
 }
 
 pub trait FilmstripContentRead: Send + Sync {
@@ -244,10 +245,10 @@ struct ActiveFilmstripWorker {
     thread: JoinHandle<()>,
 }
 
-#[derive(Default)]
 pub struct TimelineFilmstripService {
     context: Option<FilmstripContext>,
     ready: BTreeSet<String>,
+    db_complete: bool,
     queue: VecDeque<FilmstripRequest>,
     queued: BTreeSet<String>,
     workers: Vec<ActiveFilmstripWorker>,
@@ -255,11 +256,27 @@ pub struct TimelineFilmstripService {
     playback_priority: bool,
 }
 
+impl Default for TimelineFilmstripService {
+    fn default() -> Self {
+        Self {
+            context: None,
+            ready: BTreeSet::new(),
+            db_complete: true,
+            queue: VecDeque::new(),
+            queued: BTreeSet::new(),
+            workers: Vec::new(),
+            publisher: None,
+            playback_priority: false,
+        }
+    }
+}
+
 impl fmt::Debug for TimelineFilmstripService {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimelineFilmstripService")
             .field("context", &self.context)
             .field("ready", &self.ready.len())
+            .field("db_complete", &self.db_complete)
             .field("queue", &self.queue.len())
             .field("queued", &self.queued.len())
             .field("workers", &self.workers.len())
@@ -274,13 +291,12 @@ impl fmt::Debug for TimelineFilmstripService {
 
 impl TimelineFilmstripService {
     pub fn configure(&mut self, context: FilmstripContext) {
-        let project_changed = self
-            .context
-            .as_ref()
-            .is_some_and(|old| old.project_id() != context.project_id());
+        let project_changed =
+            self.context.as_ref().map(FilmstripContext::project_id) != Some(context.project_id());
         if project_changed {
             self.cancel_and_join_workers();
             self.ready.clear();
+            self.db_complete = false;
             self.queue.clear();
             self.queued.clear();
             self.publisher = None;
@@ -294,6 +310,7 @@ impl TimelineFilmstripService {
         self.cancel_and_join_workers();
         self.context = None;
         self.ready.clear();
+        self.db_complete = false;
         self.queue.clear();
         self.queued.clear();
         self.publisher = None;
@@ -313,9 +330,11 @@ impl TimelineFilmstripService {
 
     pub fn sync_content_db(&mut self) -> Result<(), String> {
         let Some(context) = self.context.clone() else {
+            self.db_complete = true;
             return Ok(());
         };
         let project_id = context.project_id().to_string();
+        let mut all_ready = true;
         let mut after = None;
         loop {
             let page = context.content_reader.list_clips(after.clone())?;
@@ -337,12 +356,13 @@ impl TimelineFilmstripService {
                         continue;
                     }
                 }
+                all_ready = false;
                 self.enqueue(
                     FilmstripRequest {
                         project_id: project_id.clone(),
                         clip_id: clip.clip_id,
                     },
-                    false,
+                    clip.priority,
                 );
             }
             if after.as_deref() == Some(next_after.as_str()) {
@@ -350,6 +370,7 @@ impl TimelineFilmstripService {
             }
             after = Some(next_after);
         }
+        self.db_complete = all_ready;
         self.start_next();
         Ok(())
     }
@@ -373,6 +394,7 @@ impl TimelineFilmstripService {
                 self.ready.remove(&filmstrip_cache_key(&project, clip_id));
             }
         }
+        self.db_complete = false;
     }
 
     pub fn poll(&mut self, active_clip_id: Option<&str>) -> FilmstripPoll {
@@ -385,8 +407,10 @@ impl TimelineFilmstripService {
                     match completion.result {
                         Ok(_) => {
                             self.ready.insert(completion.key);
+                            self.db_complete = false;
                         }
                         Err(error) => {
+                            self.db_complete = false;
                             eprintln!("Filmstrip content transport: {error}");
                             let matches_active = current_project.is_some_and(|project| {
                                 completion.key.starts_with(&format!("{project}::"))
@@ -451,18 +475,28 @@ impl TimelineFilmstripService {
                         self.enqueue(outcome.request, true);
                     }
                 }
-                Err(error) if matches_active => poll.active_error = Some(error),
-                Err(_) => {}
+                Err(error) if matches_active => {
+                    self.db_complete = false;
+                    poll.active_error = Some(error);
+                }
+                Err(_) => self.db_complete = false,
             }
         }
         if !self.playback_priority {
             self.start_next();
+            if self.should_resync_content_db() {
+                match self.sync_content_db() {
+                    Ok(()) => poll.changed = true,
+                    Err(error) => poll.active_error = Some(error),
+                }
+            }
         }
         poll
     }
 
     pub fn has_pending_work(&self) -> bool {
-        !self.workers.is_empty()
+        !self.db_complete
+            || !self.workers.is_empty()
             || !self.queue.is_empty()
             || self
                 .publisher
@@ -470,12 +504,30 @@ impl TimelineFilmstripService {
                 .is_some_and(|publisher| publisher.has_pending())
     }
 
+    fn should_resync_content_db(&self) -> bool {
+        !self.db_complete
+            && self.workers.is_empty()
+            && self.queue.is_empty()
+            && self
+                .publisher
+                .as_ref()
+                .is_none_or(|publisher| !publisher.has_pending())
+    }
+
     fn enqueue(&mut self, request: FilmstripRequest, front: bool) {
         let key = request.key();
-        if self.ready.contains(&key)
-            || self.workers.iter().any(|worker| worker.request == request)
-            || !self.queued.insert(key)
+        if self.ready.contains(&key) || self.workers.iter().any(|worker| worker.request == request)
         {
+            return;
+        }
+        self.db_complete = false;
+        if !self.queued.insert(key.clone()) {
+            if front {
+                if let Some(index) = self.queue.iter().position(|queued| queued == &request) {
+                    let queued = self.queue.remove(index).expect("index exists");
+                    self.queue.push_front(queued);
+                }
+            }
             return;
         }
         if front {

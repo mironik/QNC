@@ -256,7 +256,7 @@ impl SelectionConfig {
             .iter()
             .map(|s| {
                 let source = s.clone();
-                BrowserSource::new(
+                let mut browser_source = BrowserSource::new(
                     BrowserEntry {
                         name: s.name.clone(),
                         qnc_uri: s.location.uri.clone(),
@@ -264,7 +264,11 @@ impl SelectionConfig {
                         volume_name: s.volume_name.clone(),
                     },
                     move || source.reader().map_err(|e| e.to_string()),
-                )
+                );
+                if let Some(path) = &s.location.file {
+                    browser_source = browser_source.with_private_local_root(path.clone());
+                }
+                browser_source
             })
             .collect();
         Ok(TransportBrowserSession::new(sources)?)

@@ -29,6 +29,12 @@ pub enum ThumbnailEvent {
     Finished,
 }
 
+pub trait ThumbnailItem {
+    fn item_id(&self) -> &str;
+    fn thumbnail_uri(&self) -> Option<&str>;
+    fn set_thumbnail_ready(&mut self, image: Arc<qnc_image_assets::RgbaImage>);
+}
+
 /// A project folder on this machine: posters copied into it are addressed by project
 /// URIs (`<root_uri>/<relative path>`), which are not source references.
 #[derive(Debug, Clone)]
@@ -127,6 +133,28 @@ impl ThumbnailBatchService {
 
     pub fn has_pending_work(&self) -> bool {
         self.result.is_some()
+    }
+
+    pub fn poll_into<T: ThumbnailItem>(&mut self, items: &mut [T], limit: usize) -> bool {
+        let mut changed = false;
+        for event in self.poll(limit) {
+            match event {
+                ThumbnailEvent::Ready {
+                    item_id,
+                    uri,
+                    image,
+                } => {
+                    if let Some(item) = items.iter_mut().find(|item| {
+                        item.item_id() == item_id && item.thumbnail_uri() == Some(uri.as_str())
+                    }) {
+                        item.set_thumbnail_ready(image);
+                        changed = true;
+                    }
+                }
+                ThumbnailEvent::Finished => break,
+            }
+        }
+        changed
     }
 }
 
@@ -231,5 +259,60 @@ mod project_read_tests {
             .read("qnc://local/project/p1/ingest/thumbnails/c1_poster.png")
             .unwrap();
         assert!(image.is_ok(), "{:?}", image.err());
+    }
+
+    #[derive(Default)]
+    struct Row {
+        id: String,
+        uri: Option<String>,
+        ready: bool,
+    }
+
+    impl ThumbnailItem for Row {
+        fn item_id(&self) -> &str {
+            &self.id
+        }
+
+        fn thumbnail_uri(&self) -> Option<&str> {
+            self.uri.as_deref()
+        }
+
+        fn set_thumbnail_ready(&mut self, _image: Arc<qnc_image_assets::RgbaImage>) {
+            self.ready = true;
+        }
+    }
+
+    #[test]
+    fn ready_event_updates_matching_row_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let posters = dir.path().join("ingest").join("thumbnails");
+        std::fs::create_dir_all(&posters).unwrap();
+        std::fs::write(posters.join("poster.png"), PNG_1X1).unwrap();
+        let mut service = ThumbnailBatchService::default();
+        service
+            .start_with_project(
+                Vec::new(),
+                Some(ProjectFolder {
+                    root_uri: "qnc://local/project/p1".into(),
+                    dir: dir.path().to_path_buf(),
+                }),
+                vec![ThumbnailRequest {
+                    item_id: "c1".into(),
+                    uri: "qnc://local/project/p1/ingest/thumbnails/poster.png".into(),
+                }],
+            )
+            .unwrap();
+        let mut rows = vec![Row {
+            id: "c1".into(),
+            uri: Some("qnc://local/project/p1/ingest/thumbnails/poster.png".into()),
+            ready: false,
+        }];
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while service.has_pending_work() {
+            service.poll_into(&mut rows, 16);
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(rows[0].ready);
     }
 }

@@ -1,0 +1,21 @@
+[package]
+name = "qnc-content-store"
+version = "0.1.0"
+edition = "2021"
+description = "QNC project content database store and transport"
+
+[dependencies]
+qnc-contracts = { workspace = true }
+qnc-json-transport = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-transport-resolver = { workspace = true }
+qnc-wave = { workspace = true }
+qnc-work-settings = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks"] }
+tiny_http = "0.12"
+
+[dev-dependencies]
+tempfile = "3"

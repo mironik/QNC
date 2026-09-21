@@ -156,7 +156,9 @@ impl qnc_camera_adapter::CameraAdapter for TestCamera {
 
 pub fn registry(sufficiency: MetadataSufficiency) -> CameraRegistry {
     let mut registry = CameraRegistry::new();
-    registry.register(Arc::new(TestCamera(sufficiency))).unwrap();
+    registry
+        .register(Arc::new(TestCamera(sufficiency)))
+        .unwrap();
     registry
 }
 
@@ -168,7 +170,14 @@ pub fn execute(
     partial: bool,
     path: &str,
 ) -> Vec<Event> {
-    execute_with(config, calls, fail, partial, path, &registry(MetadataSufficiency::NeedsProbe))
+    execute_with(
+        config,
+        calls,
+        fail,
+        partial,
+        path,
+        &registry(MetadataSufficiency::NeedsProbe),
+    )
 }
 
 pub fn execute_with(

@@ -1,5 +1,6 @@
 //! One file per action of the form. `dispatch` only says which action runs.
 
+mod approve_proxy_posters;
 mod clear_selection;
 mod dir_cancel;
 mod dir_confirm;

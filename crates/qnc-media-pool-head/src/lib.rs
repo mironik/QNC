@@ -187,7 +187,12 @@ fn chrome_row(ui: &mut egui::Ui, style: &PoolHeadStyle, add_contents: impl FnOnc
 }
 
 /// Ghost chrome button (`>`, `[`, `]`, `B`, Export HI-res).
-fn transport_btn(ui: &mut egui::Ui, style: &PoolHeadStyle, label: &str, active: bool) -> egui::Response {
+fn transport_btn(
+    ui: &mut egui::Ui,
+    style: &PoolHeadStyle,
+    label: &str,
+    active: bool,
+) -> egui::Response {
     let width = if label.starts_with("Export") {
         style.export_button_width
     } else {
@@ -205,17 +210,25 @@ fn transport_btn(ui: &mut egui::Ui, style: &PoolHeadStyle, label: &str, active: 
         egui::Stroke::new(1.0, style.border)
     };
     ui.add(
-        egui::Button::new(RichText::new(label).color(text).monospace().size(style.font_ui))
-            .min_size(Vec2::new(width, style.chrome_control_height))
-            .fill(fill)
-            .stroke(stroke),
+        egui::Button::new(
+            RichText::new(label)
+                .color(text)
+                .monospace()
+                .size(style.font_ui),
+        )
+        .min_size(Vec2::new(width, style.chrome_control_height))
+        .fill(fill)
+        .stroke(stroke),
     )
 }
 
 /// Text tab link (underline when active).
 fn link_tab(ui: &mut egui::Ui, style: &PoolHeadStyle, label: &str, active: bool) -> egui::Response {
     let text = if active {
-        RichText::new(label).color(style.text).strong().size(style.font_ui)
+        RichText::new(label)
+            .color(style.text)
+            .strong()
+            .size(style.font_ui)
     } else {
         RichText::new(label).color(style.muted).size(style.font_ui)
     };

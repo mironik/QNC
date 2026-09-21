@@ -45,7 +45,6 @@ impl IngestApplication {
         };
         match self.selection_writer.start(target, selected, unselected) {
             Ok(()) => {
-                self.import_after_selection = true;
                 self.view.command_busy = true;
                 self.view.message = "Spremanje odabira...".into();
                 IngestDispatchResult::accepted(None, true)

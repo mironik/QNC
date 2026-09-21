@@ -61,7 +61,8 @@ impl ShellMetrics {
     /// above the reserve, never below the minimum.
     pub fn preview_h(&self, geometry: &ShellGeometry) -> f32 {
         let max_h = (self.height - geometry.preview_reserve_below).max(geometry.preview_min_height);
-        let preview_w = (self.left_w - geometry.preview_width_inset).max(geometry.preview_min_width);
+        let preview_w =
+            (self.left_w - geometry.preview_width_inset).max(geometry.preview_min_width);
         (preview_w * 9.0 / 16.0)
             .min(max_h)
             .max(geometry.preview_min_height)

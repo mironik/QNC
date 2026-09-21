@@ -44,11 +44,17 @@ impl CatalogClip {
         }
         for uri in std::iter::once(&self.snapshot.binding.original_uri)
             .chain(self.snapshot.binding.proxy_uri.iter())
-            .chain(self.thumbnail_uri.iter())
         {
             qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
             if !uri.starts_with(&format!("{}/", self.source_uri.trim_end_matches('/'))) {
                 return Err("Medij ne pripada zapisanom izvoru.".into());
+            }
+        }
+        if let Some(uri) = &self.thumbnail_uri {
+            qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+            let parsed = qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
+            if parsed.resource_kind != "source" && parsed.resource_kind != "project" {
+                return Err("Poster ne pripada izvoru ili projektu.".into());
             }
         }
         Ok(())

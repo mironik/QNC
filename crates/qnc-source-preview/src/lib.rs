@@ -244,6 +244,22 @@ impl SourcePreview {
         };
     }
 
+    /// Rereads the published filmstrip/wave artifacts for the shown clip.
+    pub fn refresh_assets(&mut self) -> bool {
+        let Some(clip_id) = self.view.clip_id.clone() else {
+            return false;
+        };
+        let assets = self
+            .timeline_assets
+            .refresh_clip(&clip_id)
+            .unwrap_or_else(|_| SourceTimelineAssets::empty_for(&clip_id));
+        if assets == self.view.assets {
+            return false;
+        }
+        self.view.assets = assets;
+        true
+    }
+
     /// Prepares the preview of `clip_id`: cuts the old session first, even when
     /// the new clip cannot be prepared. Returns whether the view changed.
     pub fn open(&mut self, clip_id: &str) -> bool {
@@ -292,10 +308,7 @@ impl SourcePreview {
                     }
                     SourceTransportBinding::network(
                         binding.uri.clone(),
-                        binding
-                            .endpoint
-                            .clone()
-                            .ok_or("Source endpoint missing.")?,
+                        binding.endpoint.clone().ok_or("Source endpoint missing.")?,
                         binding.token()?.ok_or("Source credential missing.")?,
                     )
                 })
@@ -434,7 +447,10 @@ mod tests {
         let mut preview = SourcePreview::new();
         assert!(preview.open("clip-a"));
         assert_eq!(preview.view().clip_id.as_deref(), Some("clip-a"));
-        assert_eq!(preview.view().message, "Radne postavke projekta nisu ucitane.");
+        assert_eq!(
+            preview.view().message,
+            "Radne postavke projekta nisu ucitane."
+        );
         assert!(!preview.has_player());
     }
 

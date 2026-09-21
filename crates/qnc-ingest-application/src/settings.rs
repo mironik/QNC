@@ -6,6 +6,7 @@ impl IngestApplication {
         self.cancel_thumbnail_load();
         self.work_plan = None;
         self.catalog_target = None;
+        self.artifact_target = None;
         self.catalog_stats = None;
         self.view.clips.clear();
         self.view.timeline = Default::default();
@@ -24,7 +25,29 @@ impl IngestApplication {
         self.load_work_settings_inner(None, true)
     }
 
-    pub(crate) fn load_work_settings(&mut self, pending_source: Option<String>) -> IngestDispatchResult {
+    pub fn on_activated(&mut self) -> IngestDispatchResult {
+        let Some(reader) = self.settings_reader.as_ref() else {
+            return self.refresh_active_project();
+        };
+        let active_project = match reader.read() {
+            Ok(settings) => settings.project_id,
+            Err(_) => return self.refresh_active_project(),
+        };
+        let loaded_project = self
+            .work_plan
+            .as_ref()
+            .map(|plan| plan.settings.project_id.as_str());
+        if loaded_project != Some(active_project.as_str()) {
+            return self.refresh_active_project();
+        }
+        self.request_missing_thumbnails();
+        IngestDispatchResult::accepted(None, true)
+    }
+
+    pub(crate) fn load_work_settings(
+        &mut self,
+        pending_source: Option<String>,
+    ) -> IngestDispatchResult {
         self.load_work_settings_inner(pending_source, false)
     }
 
@@ -37,7 +60,8 @@ impl IngestApplication {
             || self.selection_writer.is_busy()
             || self.selection_session.has_pending_work()
         {
-            if retain_loaded_workspace && pending_source.is_none() && self.catalog_loader.is_busy() {
+            if retain_loaded_workspace && pending_source.is_none() && self.catalog_loader.is_busy()
+            {
                 return IngestDispatchResult::accepted(None, true);
             }
             return IngestDispatchResult::rejected("Citanje radnih postavki je u tijeku.");
@@ -66,7 +90,10 @@ impl IngestApplication {
             self.view.work_settings_ready = false;
         }
         self.view.work_settings_error = None;
-        if let Err(error) = self.catalog_loader.start(reader, retained_workspace, retained_stats) {
+        if let Err(error) = self
+            .catalog_loader
+            .start(reader, retained_workspace, retained_stats)
+        {
             self.settings_failed(error);
         }
         IngestDispatchResult::accepted(None, true)
@@ -101,34 +128,33 @@ impl IngestApplication {
                 self.view.archive_original_available = false;
                 self.view.archive_original = false;
                 self.view.work_settings_ready = true;
+                self.artifact_target = match self.settings_reader.as_ref() {
+                    Some(reader) => {
+                        match qnc_content_store::ContentTarget::for_project(reader, &plan.settings)
+                        {
+                            Ok(target) => Some(target),
+                            Err(error) => {
+                                self.settings_failed(error);
+                                return true;
+                            }
+                        }
+                    }
+                    None => None,
+                };
                 self.catalog_target = Some(loaded.target);
                 self.catalog_stats = Some(loaded.stats);
+                self.work_plan = Some(plan);
                 if let Some(clips) = loaded.clips {
-                    let marked: std::collections::HashMap<&str, bool> = self
+                    let previous = self.view.clips.clone();
+                    let applied = catalog::apply_catalog_rows(&self.view.clips, clips);
+                    self.view.clips = keep_loaded_thumbnails(applied.clips, &previous);
+                    let thumbnails = self
                         .view
                         .clips
                         .iter()
-                        .map(|clip| (clip.clip_id.as_str(), clip.selected))
+                        .filter(|clip| clip.thumb_image.is_none())
+                        .filter_map(|clip| Some((clip.clip_id.clone(), clip.thumb_uri.clone()?)))
                         .collect();
-                    let clips = clips
-                        .into_iter()
-                        .map(ClipView::from)
-                        .map(|mut clip| {
-                            if let Some(selected) = marked.get(clip.clip_id.as_str()) {
-                                clip.selected = *selected;
-                            }
-                            clip
-                        })
-                        .collect::<Vec<_>>();
-                    let thumbnails = clips
-                        .iter()
-                        .filter_map(|clip| {
-                            clip.thumb_uri
-                                .as_ref()
-                                .map(|uri| (clip.clip_id.clone(), uri.clone()))
-                        })
-                        .collect::<Vec<_>>();
-                    self.view.clips = clips;
                     self.start_thumbnail_load(thumbnails);
                 }
                 if self.pending_source.is_none() && catalog_was_loaded {
@@ -144,11 +170,10 @@ impl IngestApplication {
                         self.view.selected_source_volume_name.clear();
                     }
                 }
-                self.work_plan = Some(plan);
-                self.refresh_timeline_artifact_context();
-                if catalog_was_loaded {
-                    self.sync_timeline_artifact_content_db();
+                if let Err(error) = self.refresh_timeline_artifact_context() {
+                    self.view.message = error;
                 }
+                self.sync_timeline_artifact_content_db();
                 if let Some(uri) = self.pending_source.take() {
                     if self.playback_guard_active() {
                         self.view.message = playback_guard_message().to_string();
@@ -161,4 +186,23 @@ impl IngestApplication {
         }
         true
     }
+}
+
+fn keep_loaded_thumbnails(
+    mut clips: Vec<ClipView>,
+    previous: &[ClipView],
+) -> Vec<ClipView> {
+    for clip in &mut clips {
+        let Some(old) = previous
+            .iter()
+            .find(|old| old.clip_id == clip.clip_id && old.thumb_uri == clip.thumb_uri)
+        else {
+            continue;
+        };
+        if let Some(image) = old.thumb_image.clone() {
+            clip.thumb_image = Some(image);
+            clip.thumb_status = ThumbStatus::Ready;
+        }
+    }
+    clips
 }

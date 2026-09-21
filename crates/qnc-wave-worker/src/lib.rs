@@ -34,6 +34,7 @@ pub struct WaveClipRecord {
     pub clip_id: String,
     pub name: String,
     pub snapshot: Snapshot,
+    pub priority: bool,
 }
 
 pub trait WaveContentRead: Send + Sync {
@@ -325,7 +326,7 @@ impl TimelineWaveService {
                         continue;
                     }
                 }
-                self.enqueue(request, false);
+                self.enqueue(request, clip.priority);
             }
             if after.as_deref() == Some(next_after.as_str()) {
                 return Err("Wave content paging se nije pomaknuo.".into());
@@ -497,10 +498,17 @@ impl TimelineWaveService {
 
     fn enqueue(&mut self, request: WaveRequest, front: bool) {
         let key = request.key();
-        if self.ready.contains(&key)
-            || self.workers.iter().any(|worker| worker.request == request)
-            || !self.queued.insert(key)
+        if self.ready.contains(&key) || self.workers.iter().any(|worker| worker.request == request)
         {
+            return;
+        }
+        if !self.queued.insert(key.clone()) {
+            if front {
+                if let Some(index) = self.queue.iter().position(|queued| queued == &request) {
+                    let queued = self.queue.remove(index).expect("index exists");
+                    self.queue.push_front(queued);
+                }
+            }
             return;
         }
         if front {

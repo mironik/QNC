@@ -4,9 +4,11 @@
 use std::path::PathBuf;
 
 use eframe::egui::{self, CentralPanel, Frame};
-use qnc_editorial_application::EditorialApplication;
+use qnc_editorial_application::{action_ids, EditorialApplication, EditorialIntent};
 
 use crate::EditorialForm;
+
+const EDITORIAL_SHORTCUT_SCOPES: [&str; 2] = ["storyboard", "off"];
 
 pub struct EditorialApp {
     form: EditorialForm,
@@ -39,12 +41,11 @@ impl EditorialApp {
             // after a notify wake would postpone the next source frame.
             ctx.request_repaint_after(delay);
         }
+        self.dispatch_keyboard_shortcuts(ctx);
         self.form.apply_theme(ctx);
         let intent = self.form.show_desktop(ui, self.application.view());
         if let Some(intent) = intent {
-            if self.application.dispatch(intent) {
-                ctx.request_repaint();
-            }
+            self.dispatch(ctx, intent);
         }
     }
 
@@ -56,6 +57,44 @@ impl EditorialApp {
     pub fn on_activated(&mut self) {
         self.application.refresh();
     }
+
+    fn dispatch(&mut self, ctx: &egui::Context, intent: EditorialIntent) {
+        if self.application.dispatch(intent) {
+            ctx.request_repaint();
+        }
+    }
+
+    fn dispatch_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
+        let play_presses = qnc_keyboard_shortcut::consume_egui_action_presses(
+            ctx,
+            self.form.shortcuts(),
+            "storyboard",
+            action_ids::PLAY_PAUSE,
+        );
+        for _ in 0..play_presses {
+            self.dispatch(ctx, EditorialIntent::Action(action_ids::PLAY_PAUSE));
+        }
+
+        for event in qnc_keyboard_shortcut::egui_shortcut_events(ctx) {
+            let mut handled_actions = Vec::new();
+            for scope in EDITORIAL_SHORTCUT_SCOPES {
+                let actions = self
+                    .form
+                    .shortcuts()
+                    .action_ids_for_event(scope, &event)
+                    .into_iter()
+                    .filter_map(editorial_shortcut_action)
+                    .collect::<Vec<_>>();
+                for action_id in actions {
+                    if handled_actions.contains(&action_id) {
+                        continue;
+                    }
+                    handled_actions.push(action_id);
+                    self.dispatch(ctx, EditorialIntent::Action(action_id));
+                }
+            }
+        }
+    }
 }
 
 impl eframe::App for EditorialApp {
@@ -63,5 +102,14 @@ impl eframe::App for EditorialApp {
         CentralPanel::default()
             .frame(Frame::NONE)
             .show(ctx, |ui| self.show_desktop(ctx, ui));
+    }
+}
+
+fn editorial_shortcut_action(action_id: &str) -> Option<&'static str> {
+    match action_id {
+        action_ids::PLAY_PAUSE => Some(action_ids::PLAY_PAUSE),
+        action_ids::STEP_BACK_FRAME => Some(action_ids::STEP_BACK_FRAME),
+        action_ids::STEP_FORWARD_FRAME => Some(action_ids::STEP_FORWARD_FRAME),
+        _ => None,
     }
 }

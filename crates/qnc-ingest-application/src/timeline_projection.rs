@@ -14,7 +14,3 @@ pub fn timeline_intent_to_ingest_intent(intent: TimelineIntent) -> Option<Ingest
         TimelineIntent::None => None,
     }
 }
-
-pub(crate) fn playback_timeline_projection(playback: &qnc_player_client::View) -> TimelineProjection {
-    qnc_player_timeline::projection_from_player_reply(playback.reply.as_ref())
-}

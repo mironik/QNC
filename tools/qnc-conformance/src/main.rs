@@ -308,7 +308,9 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
     };
     for group in ["e", "g", "l", "o"] {
         if !editorial["groups"][group].is_object() {
-            report.error(format!("editorial.layout.json: missing composition for group '{group}'"));
+            report.error(format!(
+                "editorial.layout.json: missing composition for group '{group}'"
+            ));
         }
     }
     for group in ["e", "g", "l"] {
@@ -370,7 +372,10 @@ fn validate_project_layout_reference(root: &Path) -> CheckResult {
     match read("contracts/ui/project.layout.json") {
         Some(layout) => {
             if layout["layout_id"] != "qnc.ui.project" {
-                report.error("contracts/ui/project.layout.json: layout_id must be qnc.ui.project".to_string());
+                report.error(
+                    "contracts/ui/project.layout.json: layout_id must be qnc.ui.project"
+                        .to_string(),
+                );
             }
             if layout["board"]["left_ratio"] != 0.31 {
                 report.error("contracts/ui/project.layout.json: board.left_ratio must be 0.31 (qnc_v4 reference)".to_string());
@@ -383,16 +388,21 @@ fn validate_project_layout_reference(root: &Path) -> CheckResult {
                 "ExportDirectory",
                 "TemplateActions",
             ];
-            let actual = layout["pts_slots"]["fixed_order"]
-                .as_array()
-                .map(|order| order.iter().filter_map(serde_json::Value::as_str).collect::<Vec<_>>());
+            let actual = layout["pts_slots"]["fixed_order"].as_array().map(|order| {
+                order
+                    .iter()
+                    .filter_map(serde_json::Value::as_str)
+                    .collect::<Vec<_>>()
+            });
             if actual.as_deref() != Some(&expected[..]) {
                 report.error(format!(
                     "contracts/ui/project.layout.json: pts_slots.fixed_order must be {expected:?}"
                 ));
             }
         }
-        None => report.error("contracts/ui/project.layout.json: missing or invalid JSON".to_string()),
+        None => {
+            report.error("contracts/ui/project.layout.json: missing or invalid JSON".to_string())
+        }
     }
     match read("contracts/qnc-keyboard-shortcuts.json") {
         Some(shortcuts) => {
@@ -407,7 +417,8 @@ fn validate_project_layout_reference(root: &Path) -> CheckResult {
                 report.error("contracts/qnc-keyboard-shortcuts.json: project_open_selected must be bound to Enter".to_string());
             }
         }
-        None => report.error("contracts/qnc-keyboard-shortcuts.json: missing or invalid JSON".to_string()),
+        None => report
+            .error("contracts/qnc-keyboard-shortcuts.json: missing or invalid JSON".to_string()),
     }
     CheckResult::from_report("Project layout and shortcut reference", report)
 }
@@ -1835,6 +1846,7 @@ fn is_test_or_example_path(relative: &str) -> bool {
 
 fn is_public_db_owner_path(relative: &str) -> bool {
     [
+        "crates/qnc-content-store/",
         "crates/qnc-ingest-store/",
         "crates/qnc-media-record-db/",
         "crates/qnc-source-index-db/",
@@ -2104,8 +2116,20 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
     collect_rs_files(&project_app_root.join("src"), &mut files);
     collect_rs_files(&project_desktop_root.join("src"), &mut files);
     collect_rs_files(&project_store_root.join("src"), &mut files);
-    collect_rs_files(&root.join("crates").join("qnc-project-application").join("src"), &mut files);
-    collect_rs_files(&root.join("crates").join("qnc-application-selection").join("src"), &mut files);
+    collect_rs_files(
+        &root
+            .join("crates")
+            .join("qnc-project-application")
+            .join("src"),
+        &mut files,
+    );
+    collect_rs_files(
+        &root
+            .join("crates")
+            .join("qnc-application-selection")
+            .join("src"),
+        &mut files,
+    );
     let mut uses_transport_resolver = false;
     let mut uses_dir_browser = false;
     let mut dispatches_project_shortcuts = false;
@@ -2702,10 +2726,7 @@ const WRITE_OPERATIONS: &[&str] = &[
 ];
 
 fn write_operations_outside_tests(contents: &str) -> Vec<&'static str> {
-    let code = contents
-        .split("#[cfg(test)]")
-        .next()
-        .unwrap_or_default();
+    let code = contents.split("#[cfg(test)]").next().unwrap_or_default();
     WRITE_OPERATIONS
         .iter()
         .copied()
@@ -2724,7 +2745,9 @@ fn scan_sources_are_read_only(root: &Path) -> CheckResult {
                 .file_name()
                 .and_then(|name| name.to_str())
                 .unwrap_or_default();
-            if file_name == "tests.rs" || file_name.ends_with("_tests.rs") || file_name.starts_with("test_")
+            if file_name == "tests.rs"
+                || file_name.ends_with("_tests.rs")
+                || file_name.starts_with("test_")
             {
                 continue;
             }

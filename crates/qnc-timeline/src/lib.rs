@@ -5,7 +5,7 @@
 //! no media processing path, and no Broadcast Player event interpretation.
 
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
-use qnc_filmstrip::FilmstripBackground;
+use qnc_filmstrip::{FILMSTRIP_FRAME_COUNT, FilmstripBackground};
 
 pub const MODULE_ID: &str = "qnc.module.timeline";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -754,9 +754,10 @@ fn paint_filmstrip_background(ui: &mut egui::Ui, track: Rect, background: &Films
     if background.frames.is_empty() || track.width() <= 1.0 || track.height() <= 1.0 {
         return;
     }
-    let count = background.frames.len();
-    let slot_width = track.width() / count as f32;
-    for (slot_index, frame) in background.frames.iter().enumerate() {
+    let slot_count = filmstrip_slot_count(background);
+    let slot_width = track.width() / slot_count as f32;
+    for frame in &background.frames {
+        let slot_index = frame.index.min(slot_count.saturating_sub(1));
         let left = track.left() + slot_index as f32 * slot_width;
         let slot = Rect::from_min_max(
             egui::pos2(left, track.top()),
@@ -771,6 +772,20 @@ fn paint_filmstrip_background(ui: &mut egui::Ui, track: Rect, background: &Films
             &frame.image.pixels,
         );
     }
+}
+
+fn filmstrip_slot_count(background: &FilmstripBackground) -> usize {
+    filmstrip_slot_count_from_indices(background.frames.iter().map(|frame| frame.index))
+}
+
+fn filmstrip_slot_count_from_indices(indices: impl IntoIterator<Item = usize>) -> usize {
+    indices
+        .into_iter()
+        .map(|index| index + 1)
+        .max()
+        .unwrap_or(0)
+        .max(FILMSTRIP_FRAME_COUNT)
+        .max(1)
 }
 
 fn paint_lane_label(ui: &mut egui::Ui, rect: Rect, label: &str, input: &TimelineInput<'_>) {
@@ -1446,6 +1461,14 @@ mod tests {
         assert!(layers.in_out);
         assert!(layers.playhead);
         assert!(layers.video_stack_on());
+    }
+
+    #[test]
+    fn filmstrip_slot_count_is_stable_while_assets_arrive() {
+        assert_eq!(
+            filmstrip_slot_count_from_indices([0, FILMSTRIP_FRAME_COUNT - 1]),
+            FILMSTRIP_FRAME_COUNT
+        );
     }
 
     #[test]

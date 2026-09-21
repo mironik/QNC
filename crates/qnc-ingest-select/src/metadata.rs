@@ -137,7 +137,10 @@ pub(crate) fn read_thumbnail(
     Ok(Some((reference.uri(), Arc::new(decoded))))
 }
 
-pub(crate) fn thumbnail_reference(record: &SourceRecord, registry: &CameraRegistry) -> Option<SourceReference> {
+pub(crate) fn thumbnail_reference(
+    record: &SourceRecord,
+    registry: &CameraRegistry,
+) -> Option<SourceReference> {
     let p = &record.group.proposal;
     registry.for_reader(&p.evidence.reader_id)?.thumbnail(p)
 }

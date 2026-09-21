@@ -1,6 +1,9 @@
 use super::*;
 
-pub(super) fn dock_style(contracts: &IngestContracts, theme: &Theme) -> qnc_source_dock::TimelineDockStyle {
+pub(super) fn dock_style(
+    contracts: &IngestContracts,
+    theme: &Theme,
+) -> qnc_source_dock::TimelineDockStyle {
     qnc_source_dock::TimelineDockStyle {
         fill: theme.panel_alt,
         border: theme.border,

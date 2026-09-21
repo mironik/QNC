@@ -7,3 +7,21 @@ pub struct LocationEntry {
     pub serial_number: String,
     pub volume_name: String,
 }
+
+impl qnc_source_browse::BrowseEntry for LocationEntry {
+    fn browse_uri(&self) -> &str {
+        &self.qnc_uri
+    }
+
+    fn browse_name(&self) -> &str {
+        &self.name
+    }
+
+    fn browse_serial_number(&self) -> &str {
+        &self.serial_number
+    }
+
+    fn browse_volume_name(&self) -> &str {
+        &self.volume_name
+    }
+}

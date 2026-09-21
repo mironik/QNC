@@ -83,7 +83,11 @@ pub(super) struct GridMetrics {
     pub(super) gap: f32,
 }
 
-pub(super) fn grid_metrics(available_width: f32, count: usize, contracts: &IngestContracts) -> GridMetrics {
+pub(super) fn grid_metrics(
+    available_width: f32,
+    count: usize,
+    contracts: &IngestContracts,
+) -> GridMetrics {
     let min_card_width = contracts.ingest.clip_grid.min_card_width;
     let gap = contracts.ingest.clip_grid.grid_gap;
     let count = count.max(1);

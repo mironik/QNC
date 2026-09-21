@@ -634,16 +634,33 @@ fn fx6_registry() -> CameraRegistry {
 fn a_camera_that_declares_its_metadata_is_never_probed() {
     let (_dir, config) = fixture();
     let calls = Arc::new(AtomicUsize::new(0));
-    let events = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    let events =
+        crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
     let warnings: Vec<_> = events
         .iter()
-        .filter_map(|e| if let Event::Warning(w) = e { Some(w) } else { None })
+        .filter_map(|e| {
+            if let Event::Warning(w) = e {
+                Some(w)
+            } else {
+                None
+            }
+        })
         .collect();
     assert!(warnings.is_empty(), "{warnings:?}");
-    assert_eq!(calls.load(Ordering::SeqCst), 0, "the card XML is the final metadata");
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "the card XML is the final metadata"
+    );
     let clips: BTreeSet<_> = events
         .iter()
-        .filter_map(|e| if let Event::Clip(c) = e { Some(c.clip_id.clone()) } else { None })
+        .filter_map(|e| {
+            if let Event::Clip(c) = e {
+                Some(c.clip_id.clone())
+            } else {
+                None
+            }
+        })
         .collect();
     assert_eq!(clips.len(), 2);
     let mut db = config.media_records.media_db().unwrap();
@@ -662,7 +679,8 @@ fn a_camera_that_declares_its_metadata_is_never_probed() {
         }
     }
     // A second Select changes nothing and still never probes.
-    let again = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    let again =
+        crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert!(again.iter().all(|e| !matches!(e, Event::Warning(_))));
 }
@@ -722,10 +740,17 @@ fn select_without_any_registered_camera_is_a_controlled_error() {
 fn declared_final_snapshot_is_final_and_needs_no_probe() {
     let (_dir, config) = fixture();
     let calls = Arc::new(AtomicUsize::new(0));
-    let events = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    let events =
+        crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
     let id = events
         .iter()
-        .find_map(|e| if let Event::Clip(c) = e { Some(c.clip_id.clone()) } else { None })
+        .find_map(|e| {
+            if let Event::Clip(c) = e {
+                Some(c.clip_id.clone())
+            } else {
+                None
+            }
+        })
         .unwrap();
     let mut db = config.media_records.media_db().unwrap();
     let saved = db.read(&id, None).unwrap().unwrap();
@@ -739,10 +764,17 @@ fn declared_final_snapshot_is_final_and_needs_no_probe() {
 fn a_declared_clip_from_the_card_can_be_selected_and_queued_for_import_without_a_probe() {
     let (_dir, config) = fixture();
     let calls = Arc::new(AtomicUsize::new(0));
-    let events = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    let events =
+        crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
     let ids: Vec<String> = events
         .iter()
-        .filter_map(|e| if let Event::Clip(c) = e { Some(c.clip_id.clone()) } else { None })
+        .filter_map(|e| {
+            if let Event::Clip(c) = e {
+                Some(c.clip_id.clone())
+            } else {
+                None
+            }
+        })
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
@@ -770,12 +802,19 @@ fn only_the_clip_whose_record_has_no_probe_data_is_probed() {
     // Clip B loses its sidecar: its record no longer carries probe data.
     std::fs::remove_file(dir.path().join("card/PRIVATE/XDROOT/Clip/TEST BM01.XML")).unwrap();
     let calls = Arc::new(AtomicUsize::new(0));
-    let events = crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
+    let events =
+        crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
     // The scanner reports the missing sidecar; both clips are still processed.
     let mut db = config.media_records.media_db().unwrap();
     let ids: BTreeSet<_> = events
         .iter()
-        .filter_map(|e| if let Event::Clip(c) = e { Some(c.clip_id.clone()) } else { None })
+        .filter_map(|e| {
+            if let Event::Clip(c) = e {
+                Some(c.clip_id.clone())
+            } else {
+                None
+            }
+        })
         .collect();
     assert_eq!(ids.len(), 2);
     for id in &ids {
@@ -808,7 +847,10 @@ fn cancel_ends_the_worker_deterministically_and_discards_late_events() {
     };
     session.cancel();
     assert!(cancel.load(Ordering::SeqCst));
-    assert!(exited.load(Ordering::SeqCst), "cancel waited for the worker");
+    assert!(
+        exited.load(Ordering::SeqCst),
+        "cancel waited for the worker"
+    );
     assert!(!session.has_pending_work());
     assert!(session.poll(8).is_empty());
 }

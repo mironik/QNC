@@ -23,7 +23,10 @@ impl IngestApplication {
             .settings_reader
             .as_ref()
             .ok_or("Nema citaca radnih postavki.")?;
-        let plan = self.work_plan.as_ref().ok_or("Radne postavke nisu dostupne.")?;
+        let plan = self
+            .work_plan
+            .as_ref()
+            .ok_or("Radne postavke nisu dostupne.")?;
         qnc_application_sequence::read(reader, &plan.settings)
     }
 }

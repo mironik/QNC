@@ -275,7 +275,10 @@ mod tests {
         writer.set(PLAYBACK, "off").unwrap();
         assert!(!is_fresh(&target, PLAYBACK, PLAYBACK_FRESH_SECONDS));
         writer.set(WORKER_RESULT, "uvezeno 2, neuspjelo 0").unwrap();
-        assert_eq!(read(&target, WORKER_RESULT).as_deref(), Some("uvezeno 2, neuspjelo 0"));
+        assert_eq!(
+            read(&target, WORKER_RESULT).as_deref(),
+            Some("uvezeno 2, neuspjelo 0")
+        );
     }
 
     #[test]
@@ -304,7 +307,10 @@ mod tests {
         reporter.update(Some(&target), false);
         let started = Instant::now();
         while is_fresh(&target, PLAYBACK, PLAYBACK_FRESH_SECONDS) {
-            assert!(started.elapsed() < Duration::from_secs(5), "never turned off");
+            assert!(
+                started.elapsed() < Duration::from_secs(5),
+                "never turned off"
+            );
             std::thread::sleep(Duration::from_millis(20));
         }
     }

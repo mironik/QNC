@@ -108,7 +108,13 @@ pub fn show_dock(
                                     .size(style.font_ui),
                             );
                             ui.add_space(10.0);
-                            timecode_label(ui, style, "IN", header.in_label, header.focus == MarkFocus::In);
+                            timecode_label(
+                                ui,
+                                style,
+                                "IN",
+                                header.in_label,
+                                header.focus == MarkFocus::In,
+                            );
                             timecode_label(
                                 ui,
                                 style,
@@ -181,8 +187,16 @@ fn action_btn(ui: &mut egui::Ui, style: &DockStyle, label: &str) -> egui::Respon
 
 fn timecode_label(ui: &mut egui::Ui, style: &DockStyle, label: &str, value: &str, focused: bool) {
     let label_color = if focused { style.focus } else { style.muted };
-    let value_color = if focused { style.focus } else { style.timecode_value };
-    ui.label(RichText::new(label).size(style.font_timecode).color(label_color));
+    let value_color = if focused {
+        style.focus
+    } else {
+        style.timecode_value
+    };
+    ui.label(
+        RichText::new(label)
+            .size(style.font_timecode)
+            .color(label_color),
+    );
     ui.label(
         RichText::new(value)
             .monospace()

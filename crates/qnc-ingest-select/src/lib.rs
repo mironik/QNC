@@ -8,11 +8,11 @@ pub mod test_support;
 
 pub use selection_config::{Binding, ProbeConfig, SelectionConfig, SourceConfig};
 
+use qnc_camera_adapter::{CameraRegistry, MetadataSufficiency};
 use qnc_ingest_store::content::{
     Access, CatalogClip, ContentTarget, ContentWriteData, ContentWriteResult,
     ContentWriteTransport, ImportStatus, StoredClip,
 };
-use qnc_camera_adapter::{CameraRegistry, MetadataSufficiency};
 use qnc_media_probe::{ProbeBackend, Request as ProbeRequest};
 use qnc_media_record_db::{contract::*, Client};
 use qnc_source_groups::IndexDocument;
@@ -322,8 +322,8 @@ fn describe_and_publish(worker: &metadata::Worker, content_target: ContentTarget
     let (send, cancel) = (worker.send, worker.cancel);
     std::thread::scope(|scope| {
         let (publish, publications) = std::sync::mpsc::sync_channel::<CatalogClip>(32);
-        let writer =
-            scope.spawn(move || publish::publish_batches(content_target, publications, send, cancel));
+        let writer = scope
+            .spawn(move || publish::publish_batches(content_target, publications, send, cancel));
         let handles: Vec<_> = (0..worker.config.parallelism.min(worker.records.len()))
             .map(|_| {
                 let publish = publish.clone();

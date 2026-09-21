@@ -165,4 +165,3 @@ pub struct PtsSlots {
     pub fixed_order: Vec<String>,
     pub scroll_order: Vec<String>,
 }
-

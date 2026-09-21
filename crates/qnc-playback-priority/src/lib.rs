@@ -64,9 +64,18 @@ mod tests {
     #[test]
     fn preparing_playing_or_a_waiting_play_hold_the_priority() {
         for state in [
-            PlaybackState { preparing: true, ..Default::default() },
-            PlaybackState { playing: true, ..Default::default() },
-            PlaybackState { play_when_ready: true, ..Default::default() },
+            PlaybackState {
+                preparing: true,
+                ..Default::default()
+            },
+            PlaybackState {
+                playing: true,
+                ..Default::default()
+            },
+            PlaybackState {
+                play_when_ready: true,
+                ..Default::default()
+            },
         ] {
             assert!(state.holds_priority());
             assert!(PRIORITY.blocks(state, "browse"));
@@ -75,7 +84,10 @@ mod tests {
 
     #[test]
     fn light_actions_are_never_blocked() {
-        let state = PlaybackState { playing: true, ..Default::default() };
+        let state = PlaybackState {
+            playing: true,
+            ..Default::default()
+        };
         assert!(!PRIORITY.blocks(state, "toggle_clip"));
     }
 }

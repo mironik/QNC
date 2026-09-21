@@ -344,4 +344,3 @@ fn short_path(path: &str) -> String {
         .collect();
     format!("...{tail}")
 }
-

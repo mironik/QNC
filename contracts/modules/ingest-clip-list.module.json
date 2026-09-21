@@ -1,0 +1,26 @@
+{
+  "module_id": "qnc.module.ingest-clip-list",
+  "module_name": "Ingest clip list",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ingest.clip-list"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "database.write", "player.command", "timeline.paint"],
+  "forbidden_dependencies": [
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.player-client",
+    "qnc.module.ui-widget",
+    "qnc.module.timeline"
+  ],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ingest-clip-list",
+  "input": "Ingest Select events, a mutable clip list and the current preview clip id.",
+  "output": "Updated clip list state and narrow orchestration effects.",
+  "specification": "Ingest application reduction cut: Select event to clip-list reducer."
+}

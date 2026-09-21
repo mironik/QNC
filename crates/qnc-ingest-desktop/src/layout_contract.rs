@@ -132,7 +132,7 @@ pub struct IngestLayoutContract {
     pub layout_id: String,
     pub application_id: String,
     pub board: IngestBoard,
-    pub preview: IngestPreview,
+    pub preview: IngestPreviewPane,
     pub pool_head: IngestPoolHead,
     pub dir_browser: IngestDirBrowser,
     pub clip_grid: IngestClipGrid,
@@ -152,14 +152,14 @@ pub struct IngestBoard {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct IngestPreview {
+pub struct IngestPreviewPane {
     pub min_height: f32,
     pub reserve_below: f32,
     pub aspect: String,
     pub empty_label: String,
 }
 
-impl IngestPreview {
+impl IngestPreviewPane {
     pub fn aspect_ratio(&self) -> f32 {
         let Some((width, height)) = self.aspect.split_once(':') else {
             return 16.0 / 9.0;

@@ -54,7 +54,7 @@ impl IngestApplication {
 
     pub(crate) fn apply_source_browser_result(
         &mut self,
-        result: Result<BrowserState, String>,
+        result: Result<qnc_source_browse::BrowseState, String>,
     ) -> IngestDispatchResult {
         match result {
             Ok(state) => {
@@ -87,19 +87,14 @@ impl IngestApplication {
     }
 
     pub(crate) fn capture_selected_source_metadata(&mut self, uri: &str) {
-        if let Some(entry) = self
-            .view
-            .browser_entries
-            .iter()
-            .find(|entry| entry.qnc_uri == uri)
-        {
-            if !entry.serial_number.trim().is_empty() || !entry.volume_name.trim().is_empty() {
-                self.view.selected_source_name = entry.name.clone();
-                self.view.selected_source_serial_number = entry.serial_number.clone();
-                self.view.selected_source_volume_name = entry.volume_name.clone();
-            } else if self.view.selected_source_name.trim().is_empty() {
-                self.view.selected_source_name = entry.name.clone();
-            }
+        if let Some(metadata) = qnc_source_browse::selected_metadata(
+            &self.view.browser_entries,
+            uri,
+            self.view.selected_source_name.trim().is_empty(),
+        ) {
+            self.view.selected_source_name = metadata.name;
+            self.view.selected_source_serial_number = metadata.serial_number;
+            self.view.selected_source_volume_name = metadata.volume_name;
         }
     }
 }
