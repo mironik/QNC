@@ -459,6 +459,7 @@ fn egui_catalog_key_name(key: &egui::Key) -> Option<String> {
         Key::Space => " ",
         Key::I => "i",
         Key::O => "o",
+        Key::Enter => "Enter",
         _ => return None,
     };
     Some(name.to_string())
@@ -514,8 +515,14 @@ mod tests {
 
     #[test]
     fn key_i_and_key_o_reach_the_ingest_mark_actions() {
-        assert_eq!(egui_catalog_key_code(&egui::Key::I).as_deref(), Some("KeyI"));
-        assert_eq!(egui_catalog_key_code(&egui::Key::O).as_deref(), Some("KeyO"));
+        assert_eq!(
+            egui_catalog_key_code(&egui::Key::I).as_deref(),
+            Some("KeyI")
+        );
+        assert_eq!(
+            egui_catalog_key_code(&egui::Key::O).as_deref(),
+            Some("KeyO")
+        );
         let catalog = catalog();
         assert!(catalog
             .action_ids_for_event("ingest", &ShortcutEvent::code("KeyI"))

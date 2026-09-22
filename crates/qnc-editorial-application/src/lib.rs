@@ -2,9 +2,9 @@
 //! groups. It follows the chain of AGENTS.md section 4.1: the active project and
 //! its work settings come from the DB (never from a default), the clip list from
 //! the public views of the project content, the preview from the universal
-//! `qnc-source-preview` component. Everything here is read-only: no scan, no
-//! probe, no write to any database. The form only paints `EditorialView` and
-//! sends `EditorialIntent`.
+//! `qnc-source-preview` component. The one write is a virtual short, through
+//! `qnc-virtual-shots`. No scan and no probe. The form only paints
+//! `EditorialView` and sends `EditorialIntent`.
 
 mod view;
 
@@ -22,7 +22,8 @@ use qnc_timeline::TimelineIntent;
 use qnc_work_settings::{SettingsReader, WorkSettings};
 
 pub use view::{
-    EditorialClip, EditorialIntent, EditorialView, MonitorFrame, PreviewView, action_ids,
+    action_ids, EditorialClip, EditorialIntent, EditorialShort, EditorialView, LibraryTab,
+    MonitorFrame, PreviewView,
 };
 
 /// Finds the QNC root (the directory with `AGENTS.md` and the editorial layout
@@ -76,6 +77,9 @@ pub struct EditorialApplication {
     load_result: Option<Receiver<LoadResult>>,
     shown_project: Option<String>,
     shown_signature: Option<CatalogSignature>,
+    workspace_file: Option<std::path::PathBuf>,
+    /// Shot range to paint once the parent clip's timeline is ready.
+    pending_shot: Option<PendingShot>,
 }
 
 impl Default for EditorialApplication {
@@ -89,8 +93,17 @@ impl Default for EditorialApplication {
             load_result: None,
             shown_project: None,
             shown_signature: None,
+            workspace_file: None,
+            pending_shot: None,
         }
     }
+}
+
+#[derive(Clone)]
+struct PendingShot {
+    clip_id: String,
+    in_frame: u64,
+    out_frame: u64,
 }
 
 impl EditorialApplication {
@@ -209,6 +222,28 @@ impl EditorialApplication {
                 .timeline
                 .preserving_source_marks_from(&previous_timeline);
         }
+        self.apply_pending_shot();
+    }
+
+    fn apply_pending_shot(&mut self) {
+        let Some(pending) = self.pending_shot.clone() else {
+            return;
+        };
+        if self.view.preview.clip_id.as_deref() != Some(pending.clip_id.as_str()) {
+            return;
+        }
+        let duration = self.view.preview.timeline.duration_frames;
+        if duration < pending.out_frame || self.view.preview.timeline.playhead_frame.is_none() {
+            return;
+        }
+        self.view.preview.timeline.source_in_frame = Some(pending.in_frame.min(duration));
+        self.view.preview.timeline.source_out_frame = Some(
+            pending
+                .out_frame
+                .min(duration)
+                .max(pending.in_frame.saturating_add(1)),
+        );
+        self.pending_shot = None;
     }
 
     fn poll_catalog(&mut self) -> bool {
@@ -232,6 +267,7 @@ impl EditorialApplication {
     }
 
     fn apply_loaded(&mut self, loaded: Loaded) {
+        self.workspace_file = Some(loaded.content.database_file().to_path_buf());
         let project_id = loaded.settings.project_id.clone();
         // A different project must never inherit the preceding one's clips or preview.
         if self.shown_project.as_deref() != Some(project_id.as_str()) {
@@ -270,6 +306,7 @@ impl EditorialApplication {
         }
         self.shown_project = Some(project_id);
         self.shown_signature = Some(loaded.signature);
+        self.reload_shorts();
         self.view.message = match self.view.clips.len() {
             0 => "Projekt nema uvezenih klipova.".to_string(),
             count => format!("{count} klipova"),
@@ -293,6 +330,8 @@ impl EditorialApplication {
     pub fn dispatch(&mut self, intent: EditorialIntent) -> bool {
         let changed = match intent {
             EditorialIntent::PreviewClip(clip_id) => {
+                self.view.chosen_shot_id = None;
+                self.pending_shot = None;
                 if self.view.clips.iter().any(|clip| clip.clip_id == clip_id) {
                     self.posters.prioritize(&clip_id);
                     self.preview.open(&clip_id)
@@ -300,6 +339,11 @@ impl EditorialApplication {
                     self.view.message = "Klip nije pronadjen.".into();
                     true
                 }
+            }
+            EditorialIntent::PreviewShort(shot_id) => self.open_short(&shot_id),
+            EditorialIntent::SwitchLibraryTab(tab) => {
+                self.view.library_tab = tab;
+                true
             }
             EditorialIntent::Action(action_id) => match action_id.as_str() {
                 action_ids::PLAY_PAUSE => self.preview.toggle_play(),
@@ -315,6 +359,7 @@ impl EditorialApplication {
                         self.view.preview.timeline.with_source_out_at_confirmed();
                     true
                 }
+                action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
                 _ => false,
             },
             EditorialIntent::Timeline(intent) => match intent {
@@ -325,6 +370,137 @@ impl EditorialApplication {
         self.sync_preview_view();
         changed
     }
+
+    /// Writes one short from the IN/OUT the source timeline is showing.
+    fn save_virtual_shot(&mut self) -> bool {
+        let Some(clip_id) = self.view.chosen_clip_id().map(str::to_string) else {
+            self.view.message = "Odaberi klip.".into();
+            return true;
+        };
+        let Some(clip) = self.view.clips.iter().find(|clip| clip.clip_id == clip_id) else {
+            self.view.message = "Klip nije pronadjen.".into();
+            return true;
+        };
+        if !clip.imported {
+            self.view.message = format!("Klip '{clip_id}' nije uvezen.");
+            return true;
+        }
+        let Some((in_frame, out_frame)) = self.view.preview.timeline.visible_source_marks() else {
+            self.view.message = "IN i OUT nisu potvrdeni na playeru.".into();
+            return true;
+        };
+        let Some(file) = self.workspace_file.clone() else {
+            self.view.message = "Projektna baza nije dostupna za upis.".into();
+            return true;
+        };
+        let Some(project_id) = self.shown_project.clone() else {
+            self.view.message = "Nema aktivnog projekta.".into();
+            return true;
+        };
+        let name = clip.name.clone();
+        match qnc_virtual_shots::save_short(
+            &file,
+            &project_id,
+            &clip_id,
+            &name,
+            in_frame,
+            out_frame,
+        ) {
+            Ok(shot) => {
+                self.reload_shorts();
+                self.view.library_tab = LibraryTab::Virtual;
+                self.view.chosen_shot_id = Some(shot.shot_id.clone());
+                self.view.message = format!("Virtualni kadar {} je spremljen.", shot.shot_id);
+            }
+            Err(error) => self.view.message = error,
+        }
+        true
+    }
+
+    fn open_short(&mut self, shot_id: &str) -> bool {
+        let Some(shot) = self
+            .view
+            .shorts
+            .iter()
+            .find(|shot| shot.shot_id == shot_id)
+            .cloned()
+        else {
+            self.view.message = "Virtualni kadar nije pronadjen.".into();
+            return true;
+        };
+        if !self
+            .view
+            .clips
+            .iter()
+            .any(|clip| clip.clip_id == shot.clip_id)
+        {
+            self.view.message = "Klip nije pronadjen.".into();
+            return true;
+        }
+        self.view.chosen_shot_id = Some(shot.shot_id);
+        self.pending_shot = Some(PendingShot {
+            clip_id: shot.clip_id.clone(),
+            in_frame: shot.in_frame,
+            out_frame: shot.out_frame,
+        });
+        self.posters.prioritize(&shot.clip_id);
+        self.preview.open(&shot.clip_id);
+        true
+    }
+
+    fn reload_shorts(&mut self) {
+        let Some(file) = self.workspace_file.as_deref() else {
+            self.view.shorts.clear();
+            return;
+        };
+        match qnc_virtual_shots::list_shorts(file) {
+            Ok(rows) => {
+                self.view.shorts = rows.into_iter().map(|row| self.short_card(row)).collect();
+            }
+            Err(error) => {
+                self.view.shorts.clear();
+                self.view.message = error;
+            }
+        }
+    }
+
+    fn short_card(&self, row: qnc_virtual_shots::ShortClip) -> EditorialShort {
+        let parent = self
+            .view
+            .clips
+            .iter()
+            .find(|clip| clip.clip_id == row.clip_id);
+        EditorialShort {
+            shot_id: row.shot_id,
+            clip_id: row.clip_id,
+            name: row.name,
+            in_frame: row.in_frame,
+            out_frame: row.out_frame,
+            duration_label: duration_label(row.out_frame.saturating_sub(row.in_frame), parent),
+            import_status: parent
+                .map(|clip| clip.import_status.clone())
+                .unwrap_or_default(),
+            imported_media_uri: parent
+                .map(|clip| clip.imported_media_uri.clone())
+                .unwrap_or_default(),
+        }
+    }
+}
+
+/// v5 card duration: whole seconds and the leftover frames (`12:07`).
+fn duration_label(frames: u64, clip: Option<&EditorialClip>) -> String {
+    let Some(clip) = clip else {
+        return "0:00".into();
+    };
+    if clip.duration_seconds <= 0.0 || clip.duration_frames == 0 {
+        return "0:00".into();
+    }
+    let fps = (clip.duration_frames as f64 / clip.duration_seconds)
+        .round()
+        .max(1.0) as u64;
+    let seconds = frames / fps;
+    let rem = frames % fps;
+    format!("{seconds}:{rem:02}")
 }
 
 /// The new list of imported clips; a poster that is already loaded for the same address is kept.
@@ -339,6 +515,7 @@ fn merge_clips(new: Vec<ClipSummary>, previous: &[EditorialClip]) -> Vec<Editori
                 clip_id: clip.clip_id,
                 name: clip.name,
                 duration_seconds: clip.duration_seconds,
+                duration_frames: clip.duration_frames,
                 imported: clip.imported,
                 thumb_uri: clip.thumbnail_uri,
                 thumb_image: image,
@@ -382,12 +559,33 @@ mod tests {
             clip_id: id.into(),
             name: name.into(),
             duration_seconds: 10.0,
+            duration_frames: 250,
             imported: true,
             thumb_uri: None,
             thumb_image: None,
             import_status: String::new(),
             imported_media_uri: String::new(),
         }
+    }
+
+    #[test]
+    fn save_without_a_confirmed_range_does_not_write() {
+        let mut app = EditorialApplication::default();
+        app.view.clips = vec![clip("clip-a", "Mironik")];
+        app.view.preview.clip_id = Some("clip-a".into());
+        app.dispatch(EditorialIntent::action(action_ids::SAVE_VIRTUAL_SHOT));
+        assert!(app.view().message.contains("IN i OUT"));
+    }
+
+    #[test]
+    fn virtual_tab_is_a_separate_list_and_a_short_duration_is_seconds_and_frames() {
+        let mut app = EditorialApplication::default();
+        app.view.clips = vec![clip("clip-a", "Mironik")];
+        app.dispatch(EditorialIntent::SwitchLibraryTab(LibraryTab::Virtual));
+        assert_eq!(app.view().library_tab, LibraryTab::Virtual);
+        assert!(app.view().shorts.is_empty());
+        let label = duration_label(57, Some(&clip("clip-a", "Mironik")));
+        assert_eq!(label, "2:07");
     }
 
     #[test]
@@ -477,6 +675,7 @@ mod poster_tests {
             clip_id: id.into(),
             name: id.into(),
             duration_seconds: 1.0,
+            duration_frames: 25,
             imported: true,
             thumb_uri: Some(poster.into()),
             import_status: String::new(),

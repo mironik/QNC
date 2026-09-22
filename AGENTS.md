@@ -1719,6 +1719,32 @@ framea, cuvaju se kroz refresh projekcije za isti klip i crtaju se u
 a tipkovnica ide kroz `qnc-keyboard-shortcuts.json`. Verificirano ciljanim
 testovima i conformanceom. Odobrenje zatvoreno, obitelj je zamrznuta.
 
+Zatvoreno ograniceno odobrenje 2026-09-22 (dvadeset deveto): korisnik je
+izricito trazio kreiranje virtualnog short klipa. Otkljucano: novi
+`crates/qnc-virtual-shots`, `contracts/modules/virtual-shots.module.json`,
+`contracts/databases/virtual-shots.database.json`,
+`contracts/databases/story.database.json` (tablica `virtual_shots` vise nije
+u Story ugovoru), `crates/qnc-content-read` (putanja vec razrijesene projektne
+baze), `crates/qnc-editorial-application`, `crates/qnc-editorial-desktop`,
+`crates/qnc-keyboard-shortcut` (Enter), `tools/qnc-conformance`,
+root `Cargo.toml`. Add virtual clip cita IN/OUT koje source timeline vec crta
+i upisuje jedan red klase `short`. Naslovnice, source root, Talking Head,
+Voice over i B-roll nisu dio ovog koraka. Layout ugovori nisu dirani.
+Verificirano: `cargo test -p qnc-virtual-shots -p qnc-editorial-application`
+i `cargo run -p qnc-conformance`. Odobrenje zatvoreno, obitelj je zamrznuta.
+
+Zatvoreno ograniceno odobrenje 2026-09-22 (trideseto): korisnik je trazio
+da tab Virtual prikazuje short virtualne klipove po v5. Otkljucano:
+`crates/qnc-virtual-shots` (`list_shorts` iz `public_short_clips`),
+`crates/qnc-editorial-application`, `crates/qnc-editorial-desktop`.
+All ostaje popis uvezenih klipova. Virtual crta samo shortove, najstariji
+prvi, naziv i trajanje `sekunde:frameovi`. Nakon Add virtual clip tab
+prelazi na Virtual. Klik na short otvara maticni klip i, kad player potvrdi
+trajanje, postavlja IN/OUT tog shorta. Vlastita poster slika (`cover.jpg`)
+nije dio ovog koraka. Layout ugovori nisu dirani.
+Verificirano: `cargo test -p qnc-virtual-shots -p qnc-editorial-application`
+i `cargo check -p qnc-editorial-desktop`. Odobrenje zatvoreno, obitelj je zamrznuta.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (peto): korisnik je izricito trazio
 pocetak UI sheme za Media Assist grupe (e, g, l) i Story (o). Korak 1 je samo
 novi dokument `docs/87-editorial-ui-reference-audit.md` (snimka v4 rasporeda i

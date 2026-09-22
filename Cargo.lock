@@ -3204,6 +3204,7 @@ dependencies = [
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-timeline",
+ "qnc-virtual-shots",
  "qnc-work-settings",
 ]
 
@@ -4192,6 +4193,14 @@ dependencies = [
  "serde_json",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "qnc-virtual-shots"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "tempfile",
 ]
 
 [[package]]

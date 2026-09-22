@@ -1,0 +1,13 @@
+{
+  "database_id": "qnc.db.virtual_shots",
+  "owner_application": "qnc.module.virtual-shots",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/virtual_shots/{project_id}",
+  "tables": ["virtual_shots"],
+  "public_read_views": ["public_short_clips"],
+  "write_owner": "qnc.module.virtual-shots",
+  "public_read_policy": "public_read_views",
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-09-22T00:00:00Z",
+  "updated_at": "2026-09-22T00:00:00Z"
+}

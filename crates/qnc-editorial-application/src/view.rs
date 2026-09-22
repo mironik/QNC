@@ -3,12 +3,35 @@
 
 pub use qnc_source_preview::{MonitorFrame, PreviewView};
 
+/// Pool tab. Virtual lists short shots only, as in v5.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LibraryTab {
+    #[default]
+    All,
+    Virtual,
+}
+
+/// One short shown on the Virtual tab.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EditorialShort {
+    pub shot_id: String,
+    pub clip_id: String,
+    pub name: String,
+    pub in_frame: u64,
+    pub out_frame: u64,
+    /// v5 card duration: whole seconds and leftover frames, `seconds:ff`.
+    pub duration_label: String,
+    pub import_status: String,
+    pub imported_media_uri: String,
+}
+
 /// One row of the clip list (summary only).
 #[derive(Debug, Clone, PartialEq)]
 pub struct EditorialClip {
     pub clip_id: String,
     pub name: String,
     pub duration_seconds: f64,
+    pub duration_frames: u64,
     /// Import finished.
     pub imported: bool,
     /// Where the poster is (project folder or source), as the project database says.
@@ -22,7 +45,12 @@ pub struct EditorialClip {
 
 #[derive(Clone, Default)]
 pub struct EditorialView {
+    pub library_tab: LibraryTab,
     pub clips: Vec<EditorialClip>,
+    /// Short virtual shots for the Virtual tab, oldest first.
+    pub shorts: Vec<EditorialShort>,
+    /// The short card that is selected on the Virtual tab.
+    pub chosen_shot_id: Option<String>,
     /// True while the project catalog is being read.
     pub loading: bool,
     /// Catalog status or controlled error text.
@@ -52,6 +80,9 @@ impl EditorialView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditorialIntent {
     PreviewClip(String),
+    /// Open the parent clip and show this short's IN/OUT.
+    PreviewShort(String),
+    SwitchLibraryTab(LibraryTab),
     Action(String),
     Timeline(qnc_timeline::TimelineIntent),
 }
@@ -68,4 +99,5 @@ pub mod action_ids {
     pub const STEP_FORWARD_FRAME: &str = "step_forward_frame";
     pub const MARK_IN: &str = "mark_in";
     pub const MARK_OUT: &str = "mark_out";
+    pub const SAVE_VIRTUAL_SHOT: &str = "save_virtual_shot";
 }

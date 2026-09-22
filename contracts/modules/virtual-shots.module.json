@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.virtual-shots",
+  "module_name": "Virtual shots",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["virtual_shot.short.write"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command", "ui.paint"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-virtual-shots",
+  "input": "The active project database file, clip id, clip name, and the player-confirmed IN/OUT frames.",
+  "output": "One virtual_shots row of class short, readable through public_short_clips.",
+  "specification": "docs/89-v5-functions-and-procedures.md B2; docs/93-v5-story-processes-and-rules.md R1-R3"
+}

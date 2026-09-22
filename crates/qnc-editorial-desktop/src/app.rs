@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use eframe::egui::{self, CentralPanel, Frame};
-use qnc_editorial_application::{EditorialApplication, EditorialIntent, action_ids};
+use qnc_editorial_application::{action_ids, EditorialApplication, EditorialIntent};
 
 use crate::EditorialForm;
 
@@ -112,6 +112,7 @@ fn editorial_shortcut_action(action_id: &str) -> Option<&'static str> {
         action_ids::STEP_FORWARD_FRAME => Some(action_ids::STEP_FORWARD_FRAME),
         action_ids::MARK_IN => Some(action_ids::MARK_IN),
         action_ids::MARK_OUT => Some(action_ids::MARK_OUT),
+        action_ids::SAVE_VIRTUAL_SHOT => Some(action_ids::SAVE_VIRTUAL_SHOT),
         _ => None,
     }
 }

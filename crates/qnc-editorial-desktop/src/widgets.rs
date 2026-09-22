@@ -7,10 +7,10 @@ use eframe::egui::{
 };
 
 use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
-use qnc_source_dock::{SourceTimeline, TimelineDockStyle, show_chrome_row, show_timeline_dock};
+use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
-use qnc_editorial_application::{EditorialIntent, EditorialView};
+use qnc_editorial_application::{action_ids, EditorialIntent, EditorialView, LibraryTab};
 
 use crate::{layout_contract::EditorialContracts, theme::Theme};
 
@@ -117,7 +117,7 @@ fn render_left_column(
 
     let mut intent = None;
     ui.scope_builder(egui::UiBuilder::new().max_rect(head_rect), |ui| {
-        intent = render_pool_head(ui, contracts, theme);
+        intent = render_pool_head(ui, contracts, theme, view);
     });
     // Clip menu (qnc_v5 media pool): the card grid fills the column under the
     // pool head, down to the dock, on the panel background.
@@ -195,6 +195,7 @@ fn render_pool_head(
     ui: &mut Ui,
     contracts: &EditorialContracts,
     theme: &Theme,
+    view: &EditorialView,
 ) -> Option<EditorialIntent> {
     let rect = ui.available_rect_before_wrap();
 
@@ -208,9 +209,21 @@ fn render_pool_head(
         |ui| {
             ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
             ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
-            for (index, tab) in contracts.editorial.pool_head.tabs_left.iter().enumerate() {
-                let selected = index == 0;
-                let _ = text_tab(ui, tab, selected, theme);
+            for tab in &contracts.editorial.pool_head.tabs_left {
+                let library_tab = match tab.as_str() {
+                    "Virtual" => Some(LibraryTab::Virtual),
+                    "All" => Some(LibraryTab::All),
+                    _ => None,
+                };
+                let Some(library_tab) = library_tab else {
+                    let _ = text_tab(ui, tab, false, theme);
+                    ui.add_space(10.0);
+                    continue;
+                };
+                let selected = view.library_tab == library_tab;
+                if text_tab(ui, tab, selected, theme).clicked() {
+                    intent = Some(EditorialIntent::SwitchLibraryTab(library_tab));
+                }
                 ui.add_space(10.0);
             }
 
@@ -253,6 +266,7 @@ fn render_source_dock(
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
     let rect = ui.available_rect_before_wrap();
+    let mut header_intent = None;
     let intent = show_timeline_dock(
         ui,
         rect,
@@ -261,9 +275,13 @@ fn render_source_dock(
         |ui| {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
-                // Group actions (contract `actions_rtl`): shown, not wired yet.
                 for label in &contracts.composition().source_dock.actions_rtl {
-                    let _ = action_button(ui, label, false, theme);
+                    let save_short = label == "Add virtual clip";
+                    let enabled = save_short && view.chosen_clip_id().is_some();
+                    if action_button(ui, label, enabled, theme).clicked() && save_short {
+                        header_intent =
+                            Some(EditorialIntent::action(action_ids::SAVE_VIRTUAL_SHOT));
+                    }
                 }
             });
         },
@@ -280,7 +298,7 @@ fn render_source_dock(
         },
     );
     match intent {
-        TimelineIntent::None => None,
+        TimelineIntent::None => header_intent,
         other => Some(EditorialIntent::Timeline(other)),
     }
 }
@@ -318,40 +336,73 @@ fn render_clip_grid(
     let rect = outer.shrink(contracts.editorial.board.block_pad);
     let empty_message = if view.loading {
         "Citam projektni katalog..."
+    } else if view.library_tab == LibraryTab::Virtual {
+        "Nema virtualnih — Spremi virtualni kadar."
     } else if !view.message.is_empty() {
         view.message.as_str()
     } else {
         contracts.editorial.media_card.empty_message.as_str()
     };
-    let rows = view
-        .clips
-        .iter()
-        .map(|clip| {
-            let (status_proxy, status_original) =
-                qnc_media_card::pipeline_statuses(&clip.import_status, &clip.imported_media_uri);
-            qnc_media_card::CardRow {
-                id: clip.clip_id.as_str(),
-                thumb_id: clip.thumb_uri.as_deref().unwrap_or(clip.clip_id.as_str()),
-                title: clip.name.as_str(),
-                duration_sec: clip.duration_seconds,
-                duration_label: "",
-                import_status: clip.import_status.as_str(),
-                status_proxy,
-                status_original,
-                checked: view.chosen_clip_id() == Some(clip.clip_id.as_str()),
-                rgba_thumb: clip
-                    .thumb_uri
-                    .as_deref()
-                    .zip(clip.thumb_image.as_deref())
-                    .map(|(uri, image)| qnc_media_card::RgbaThumb {
-                        uri,
-                        content_key: image.content_key,
-                        size: image.size,
-                        rgba: &image.pixels,
-                    }),
-            }
-        })
-        .collect::<Vec<_>>();
+    let short_rows;
+    let clip_rows;
+    let rows: Vec<qnc_media_card::CardRow<'_>> = if view.library_tab == LibraryTab::Virtual {
+        short_rows = view
+            .shorts
+            .iter()
+            .map(|shot| {
+                let (status_proxy, status_original) = qnc_media_card::pipeline_statuses(
+                    &shot.import_status,
+                    &shot.imported_media_uri,
+                );
+                qnc_media_card::CardRow {
+                    id: shot.shot_id.as_str(),
+                    thumb_id: shot.shot_id.as_str(),
+                    title: shot.name.as_str(),
+                    duration_sec: 0.0,
+                    duration_label: shot.duration_label.as_str(),
+                    import_status: shot.import_status.as_str(),
+                    status_proxy,
+                    status_original,
+                    checked: view.chosen_shot_id.as_deref() == Some(shot.shot_id.as_str()),
+                    rgba_thumb: None,
+                }
+            })
+            .collect();
+        short_rows
+    } else {
+        clip_rows = view
+            .clips
+            .iter()
+            .map(|clip| {
+                let (status_proxy, status_original) = qnc_media_card::pipeline_statuses(
+                    &clip.import_status,
+                    &clip.imported_media_uri,
+                );
+                qnc_media_card::CardRow {
+                    id: clip.clip_id.as_str(),
+                    thumb_id: clip.thumb_uri.as_deref().unwrap_or(clip.clip_id.as_str()),
+                    title: clip.name.as_str(),
+                    duration_sec: clip.duration_seconds,
+                    duration_label: "",
+                    import_status: clip.import_status.as_str(),
+                    status_proxy,
+                    status_original,
+                    checked: view.chosen_clip_id() == Some(clip.clip_id.as_str()),
+                    rgba_thumb: clip
+                        .thumb_uri
+                        .as_deref()
+                        .zip(clip.thumb_image.as_deref())
+                        .map(|(uri, image)| qnc_media_card::RgbaThumb {
+                            uri,
+                            content_key: image.content_key,
+                            size: image.size,
+                            rgba: &image.pixels,
+                        }),
+                }
+            })
+            .collect();
+        clip_rows
+    };
     let style = qnc_media_card::CardStyle {
         raised: theme.surface_alt,
         surface: theme.surface,
@@ -381,7 +432,11 @@ fn render_clip_grid(
             &metrics,
             &qnc_media_card::CardGridInput {
                 height: rect.height(),
-                selected_id: view.chosen_clip_id().unwrap_or(""),
+                selected_id: if view.library_tab == LibraryTab::Virtual {
+                    view.chosen_shot_id.as_deref().unwrap_or("")
+                } else {
+                    view.chosen_clip_id().unwrap_or("")
+                },
                 focused_id: "",
                 panel_focused: false,
                 cards: &rows,
@@ -394,9 +449,13 @@ fn render_clip_grid(
         );
     });
     match action {
-        Some(qnc_media_card::CardGridAction::Activate(clip_id))
-        | Some(qnc_media_card::CardGridAction::ToggleSelection(clip_id)) => {
-            Some(EditorialIntent::PreviewClip(clip_id))
+        Some(qnc_media_card::CardGridAction::Activate(id))
+        | Some(qnc_media_card::CardGridAction::ToggleSelection(id)) => {
+            if view.library_tab == LibraryTab::Virtual {
+                Some(EditorialIntent::PreviewShort(id))
+            } else {
+                Some(EditorialIntent::PreviewClip(id))
+            }
         }
         None => None,
     }

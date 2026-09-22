@@ -91,6 +91,12 @@ impl ContentReader {
         }
     }
 
+    /// The project database file this reader already resolved. Callers that
+    /// write their own tables pass this path to the owner of that table.
+    pub fn database_file(&self) -> &std::path::Path {
+        &self.file
+    }
+
     fn open(&self) -> Result<Connection, String> {
         if !self.file.is_file() {
             return Err("Projektna baza vise ne postoji.".to_string());

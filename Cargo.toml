@@ -104,6 +104,7 @@ members = [
     "crates/qnc-scanner",
     "crates/qnc-transport-resolver",
     "crates/qnc-ui-kit",
+    "crates/qnc-virtual-shots",
     "crates/qnc-workstation-identity",
     "crates/qnc-work-settings",
     "tools/qnc-conformance",
@@ -154,6 +155,7 @@ qnc-ffmpeg-decode = { path = "crates/qnc-ffmpeg-decode" }
 qnc-decoder-catalog = { path = "crates/qnc-decoder-catalog" }
 qnc-audio-output = { path = "crates/qnc-audio-output" }
 qnc-video-output = { path = "crates/qnc-video-output" }
+qnc-virtual-shots = { path = "crates/qnc-virtual-shots" }
 qnc-pixel-convert = { path = "crates/qnc-pixel-convert" }
 qnc-gpu-raster = { path = "crates/qnc-gpu-raster" }
 qnc-broadcast-player = { path = "crates/qnc-broadcast-player" }

@@ -1199,7 +1199,7 @@ fn validate_manifest_graph(root: &Path) -> CheckResult {
     validate_shell_manifest_host(root, &mut report, &applications);
     validate_single_desktop_host(root, &mut report);
     validate_module_forbidden_dependencies(root, &mut report, &modules);
-    validate_database_owner_applications(root, &mut report, &applications, databases);
+    validate_database_owner_applications(root, &mut report, &applications, &modules, databases);
 
     CheckResult::from_report("application/module/DB manifest graph", report)
 }
@@ -1596,6 +1596,7 @@ fn validate_database_owner_applications(
     root: &Path,
     report: &mut ValidationReport,
     applications: &BTreeMap<String, PathBuf>,
+    modules: &BTreeMap<String, PathBuf>,
     databases: Vec<(PathBuf, serde_json::Value)>,
 ) {
     for (path, value) in databases {
@@ -1609,9 +1610,10 @@ fn validate_database_owner_applications(
         else {
             continue;
         };
-        if !applications.contains_key(owner_application) {
+        if !applications.contains_key(owner_application) && !modules.contains_key(owner_application)
+        {
             report.error(format!(
-                "{name}: owner_application '{owner_application}' has no application manifest"
+                "{name}: owner_application '{owner_application}' has no application or module manifest"
             ));
         }
     }
@@ -1854,6 +1856,7 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-project-close/",
         "crates/qnc-camera-patterns/",
         "crates/qnc-work-settings/",
+        "crates/qnc-virtual-shots/",
     ]
     .iter()
     .any(|prefix| relative.starts_with(prefix))

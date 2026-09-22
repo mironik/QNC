@@ -12,4 +12,5 @@ qnc-media-thumbnail = { workspace = true }
 qnc-source-bindings = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-timeline = { workspace = true }
+qnc-virtual-shots = { workspace = true }
 qnc-work-settings = { workspace = true }
