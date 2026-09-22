@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.virtual-short-cards",
+  "module_name": "Virtual short cards",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["virtual_shot.card_view", "virtual_shot.in_still_as_poster"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command", "ui.paint", "database.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-virtual-short-cards",
+  "input": "Virtual short DB rows plus optional parent clip summary.",
+  "output": "Reusable virtual short card rows where the IN still URI is the card poster URI.",
+  "specification": "Virtual short card identity and poster rule: IN still is the short poster."
+}

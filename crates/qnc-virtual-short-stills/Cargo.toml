@@ -1,0 +1,12 @@
+[package]
+name = "qnc-virtual-short-stills"
+version = "0.1.0"
+edition = "2021"
+description = "Public helper that stores IN/OUT stills for virtual short clips from confirmed preview frames"
+
+[dependencies]
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
+qnc-source-preview = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

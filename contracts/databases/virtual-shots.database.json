@@ -1,7 +1,7 @@
 {
   "database_id": "qnc.db.virtual_shots",
   "owner_application": "qnc.module.virtual-shots",
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "qnc_uri": "qnc://local/db/virtual_shots/{project_id}",
   "tables": ["virtual_shots"],
   "public_read_views": ["public_short_clips"],
@@ -9,5 +9,11 @@
   "public_read_policy": "public_read_views",
   "migration_policy": "owner_application_only",
   "created_at": "2026-09-22T00:00:00Z",
-  "updated_at": "2026-09-22T00:00:00Z"
+  "updated_at": "2026-09-22T00:00:00Z",
+  "columns": {
+    "virtual_shots.in_still_uri": "TEXT, optional URI of the virtual short IN still",
+    "virtual_shots.out_still_uri": "TEXT, optional URI of the virtual short OUT still",
+    "virtual_shots.still_status": "TEXT: pending | ready | failed",
+    "virtual_shots.still_error": "TEXT, optional controlled error from still artifact creation"
+  }
 }

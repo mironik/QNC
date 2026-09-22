@@ -3,7 +3,7 @@
   "module_name": "Virtual shots",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["virtual_shot.short.write"],
+  "capabilities": ["virtual_shot.short.write", "virtual_shot.stills.publish"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -15,6 +15,6 @@
   "database_write_policy": "public_db_owner_write_adapter_only",
   "runtime_crate": "qnc-virtual-shots",
   "input": "The active project database file, clip id, clip name, and the player-confirmed IN/OUT frames.",
-  "output": "One virtual_shots row of class short, readable through public_short_clips.",
+  "output": "One virtual_shots row of class short, readable through public_short_clips, with optional IN/OUT still artifact status and URIs.",
   "specification": "docs/89-v5-functions-and-procedures.md B2; docs/93-v5-story-processes-and-rules.md R1-R3"
 }

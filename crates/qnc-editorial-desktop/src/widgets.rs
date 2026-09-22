@@ -364,7 +364,16 @@ fn render_clip_grid(
                     status_proxy,
                     status_original,
                     checked: view.chosen_shot_id.as_deref() == Some(shot.shot_id.as_str()),
-                    rgba_thumb: None,
+                    rgba_thumb: shot
+                        .poster_uri
+                        .as_deref()
+                        .zip(shot.poster_image.as_deref())
+                        .map(|(uri, image)| qnc_media_card::RgbaThumb {
+                            uri,
+                            content_key: image.content_key,
+                            size: image.size,
+                            rgba: &image.pixels,
+                        }),
                 }
             })
             .collect();

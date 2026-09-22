@@ -104,6 +104,8 @@ members = [
     "crates/qnc-scanner",
     "crates/qnc-transport-resolver",
     "crates/qnc-ui-kit",
+    "crates/qnc-virtual-short-cards",
+    "crates/qnc-virtual-short-stills",
     "crates/qnc-virtual-shots",
     "crates/qnc-workstation-identity",
     "crates/qnc-work-settings",
@@ -213,6 +215,8 @@ qnc-source-index-db = { path = "crates/qnc-source-index-db" }
 qnc-scanner = { path = "crates/qnc-scanner" }
 qnc-transport-resolver = { path = "crates/qnc-transport-resolver" }
 qnc-ui-kit = { path = "crates/qnc-ui-kit" }
+qnc-virtual-short-cards = { path = "crates/qnc-virtual-short-cards" }
+qnc-virtual-short-stills = { path = "crates/qnc-virtual-short-stills" }
 qnc-workstation-identity = { path = "crates/qnc-workstation-identity" }
 qnc-work-settings = { path = "crates/qnc-work-settings" }
 eframe = { version = "0.31", default-features = false, features = ["accesskit", "default_fonts", "wayland", "wgpu", "x11"] }

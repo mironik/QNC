@@ -1745,6 +1745,31 @@ nije dio ovog koraka. Layout ugovori nisu dirani.
 Verificirano: `cargo test -p qnc-virtual-shots -p qnc-editorial-application`
 i `cargo check -p qnc-editorial-desktop`. Odobrenje zatvoreno, obitelj je zamrznuta.
 
+Zatvoreno ograniceno odobrenje 2026-09-22 (trideset prvo): korisnik je
+trazio novu ideju za slicice virtualnog shorta: MARK_IN uhvati potvrdenu
+sliku u memoriju, MARK_OUT uhvati potvrdenu sliku u memoriju, a nakon upisa
+virtualnog shorta u bazu te se dvije slike spremaju u projektni
+`virtual_shorts/<shot_id>/in.jpg` i `out.jpg`. Memorija nije izvor istine:
+DB red nastaje prvi, a slike su artefakti koji se zatim objave u istom DB
+owneru. Otkljucano: novi javni modul `crates/qnc-virtual-short-stills`
+(`contracts/modules/virtual-short-stills.module.json`), `crates/qnc-virtual-shots`
+(`still_status`, `in_still_uri`, `out_still_uri`, `still_error` i publish API),
+`contracts/databases/virtual-shots.database.json`,
+`contracts/modules/virtual-shots.module.json`, `crates/qnc-editorial-application`
+kao composition root i root `Cargo.toml`/`Cargo.lock`. Forma, source preview,
+timeline, Ingest i Project se ne diraju. Background retry worker nije dio ovog
+reza; status `pending/failed` ga samo omogucuje u kasnijem otkljucavanju.
+
+Zatvoreno ograniceno odobrenje 2026-09-22 (trideset drugo): korisnik je
+trazio da se IN slicica koristi kao poster za short virtual kadar, ali kao
+javna komponenta, ne kao privatno sirenje forme/aplikacije. Otkljucano:
+novi javni modul `crates/qnc-virtual-short-cards`
+(`contracts/modules/virtual-short-cards.module.json`), `Cargo.toml`/`Cargo.lock`,
+te tanko spajanje u `crates/qnc-editorial-application` i
+`crates/qnc-editorial-desktop`. Pravilo "IN still je poster virtual short
+kartice" zivi u `qnc-virtual-short-cards`; desktop forma samo crta dobiveni
+card row, a application root samo predaje DB redove i ucitane slike.
+
 Zatvoreno ograniceno odobrenje 2026-09-18 (peto): korisnik je izricito trazio
 pocetak UI sheme za Media Assist grupe (e, g, l) i Story (o). Korak 1 je samo
 novi dokument `docs/87-editorial-ui-reference-audit.md` (snimka v4 rasporeda i

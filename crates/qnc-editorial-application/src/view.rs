@@ -2,6 +2,7 @@
 //! player, database or store type leaks through it.
 
 pub use qnc_source_preview::{MonitorFrame, PreviewView};
+pub use qnc_virtual_short_cards::VirtualShortCard as EditorialShort;
 
 /// Pool tab. Virtual lists short shots only, as in v5.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -9,20 +10,6 @@ pub enum LibraryTab {
     #[default]
     All,
     Virtual,
-}
-
-/// One short shown on the Virtual tab.
-#[derive(Debug, Clone, PartialEq)]
-pub struct EditorialShort {
-    pub shot_id: String,
-    pub clip_id: String,
-    pub name: String,
-    pub in_frame: u64,
-    pub out_frame: u64,
-    /// v5 card duration: whole seconds and leftover frames, `seconds:ff`.
-    pub duration_label: String,
-    pub import_status: String,
-    pub imported_media_uri: String,
 }
 
 /// One row of the clip list (summary only).

@@ -1,0 +1,9 @@
+[package]
+name = "qnc-virtual-short-cards"
+version = "0.1.0"
+edition = "2021"
+description = "Public virtual short card view model: IN still as the short poster"
+
+[dependencies]
+qnc-image-assets = { workspace = true }
+qnc-virtual-shots = { workspace = true }

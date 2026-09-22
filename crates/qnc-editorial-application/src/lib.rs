@@ -19,6 +19,8 @@ use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
 use qnc_source_bindings::TransportBindings;
 use qnc_source_preview::{PreviewContext, SourcePreview};
 use qnc_timeline::TimelineIntent;
+use qnc_virtual_short_cards::ParentClip;
+use qnc_virtual_short_stills::VirtualShortStillCache;
 use qnc_work_settings::{SettingsReader, WorkSettings};
 
 pub use view::{
@@ -78,8 +80,11 @@ pub struct EditorialApplication {
     shown_project: Option<String>,
     shown_signature: Option<CatalogSignature>,
     workspace_file: Option<std::path::PathBuf>,
+    current_settings: Option<WorkSettings>,
+    project_dir: Option<std::path::PathBuf>,
     /// Shot range to paint once the parent clip's timeline is ready.
     pending_shot: Option<PendingShot>,
+    short_stills: VirtualShortStillCache,
 }
 
 impl Default for EditorialApplication {
@@ -94,7 +99,10 @@ impl Default for EditorialApplication {
             shown_project: None,
             shown_signature: None,
             workspace_file: None,
+            current_settings: None,
+            project_dir: None,
             pending_shot: None,
+            short_stills: VirtualShortStillCache::default(),
         }
     }
 }
@@ -205,6 +213,12 @@ impl EditorialApplication {
             {
                 clip.thumb_image = Some(poster.image);
                 changed = true;
+            } else if qnc_virtual_short_cards::apply_poster(
+                &mut self.view.shorts,
+                &poster.clip_id,
+                poster.image,
+            ) {
+                changed = true;
             }
         }
         self.sync_preview_view();
@@ -221,6 +235,9 @@ impl EditorialApplication {
                 .preview
                 .timeline
                 .preserving_source_marks_from(&previous_timeline);
+        } else {
+            self.short_stills
+                .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
         self.apply_pending_shot();
     }
@@ -269,22 +286,25 @@ impl EditorialApplication {
     fn apply_loaded(&mut self, loaded: Loaded) {
         self.workspace_file = Some(loaded.content.database_file().to_path_buf());
         let project_id = loaded.settings.project_id.clone();
+        let settings = loaded.settings.clone();
         // A different project must never inherit the preceding one's clips or preview.
         if self.shown_project.as_deref() != Some(project_id.as_str()) {
             self.view.clips.clear();
             self.preview.close();
             self.posters.reset();
+            self.short_stills.clear();
         }
-        let project_folder = self.settings_reader.as_ref().and_then(|reader| {
-            reader
-                .local_workspace_dir(&loaded.settings)
-                .ok()
-                .flatten()
+        self.project_dir = self
+            .settings_reader
+            .as_ref()
+            .and_then(|reader| reader.local_workspace_dir(&loaded.settings).ok().flatten());
+        let project_folder =
+            self.project_dir
+                .clone()
                 .map(|dir| qnc_media_thumbnail::ProjectFolder {
                     root_uri: loaded.settings.output_root_uri.clone(),
                     dir,
-                })
-        });
+                });
         if let Ok(bindings) = &self.bindings {
             self.posters.configure(&bindings.sources, project_folder);
         }
@@ -306,6 +326,7 @@ impl EditorialApplication {
         }
         self.shown_project = Some(project_id);
         self.shown_signature = Some(loaded.signature);
+        self.current_settings = Some(settings);
         self.reload_shorts();
         self.view.message = match self.view.clips.len() {
             0 => "Projekt nema uvezenih klipova.".to_string(),
@@ -316,13 +337,14 @@ impl EditorialApplication {
     /// Asks for the posters the list still lacks; the chosen clip goes first (v5 order).
     fn request_posters(&mut self) {
         self.posters.reset();
-        let wanted = self
+        let mut wanted: Vec<(String, String)> = self
             .view
             .clips
             .iter()
             .filter(|clip| clip.thumb_image.is_none())
             .filter_map(|clip| Some((clip.clip_id.clone(), clip.thumb_uri.clone()?)))
             .collect();
+        wanted.extend(qnc_virtual_short_cards::poster_requests(&self.view.shorts));
         self.posters.request(wanted, self.view.chosen_clip_id());
     }
 
@@ -332,6 +354,7 @@ impl EditorialApplication {
             EditorialIntent::PreviewClip(clip_id) => {
                 self.view.chosen_shot_id = None;
                 self.pending_shot = None;
+                self.short_stills.clear_if_clip_changed(Some(&clip_id));
                 if self.view.clips.iter().any(|clip| clip.clip_id == clip_id) {
                     self.posters.prioritize(&clip_id);
                     self.preview.open(&clip_id)
@@ -352,11 +375,17 @@ impl EditorialApplication {
                 action_ids::MARK_IN => {
                     self.view.preview.timeline =
                         self.view.preview.timeline.with_source_in_at_confirmed();
+                    if let Err(error) = self.short_stills.capture_in(&self.view.preview) {
+                        self.view.preview.message = error;
+                    }
                     true
                 }
                 action_ids::MARK_OUT => {
                     self.view.preview.timeline =
                         self.view.preview.timeline.with_source_out_at_confirmed();
+                    if let Err(error) = self.short_stills.capture_out(&self.view.preview) {
+                        self.view.preview.message = error;
+                    }
                     true
                 }
                 action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
@@ -407,6 +436,7 @@ impl EditorialApplication {
             out_frame,
         ) {
             Ok(shot) => {
+                self.store_short_stills(&shot.shot_id, &clip_id, in_frame, out_frame);
                 self.reload_shorts();
                 self.view.library_tab = LibraryTab::Virtual;
                 self.view.chosen_shot_id = Some(shot.shot_id.clone());
@@ -415,6 +445,43 @@ impl EditorialApplication {
             Err(error) => self.view.message = error,
         }
         true
+    }
+
+    fn store_short_stills(&mut self, shot_id: &str, clip_id: &str, in_frame: u64, out_frame: u64) {
+        let Some(file) = self.workspace_file.as_deref() else {
+            return;
+        };
+        let Some(settings) = self.current_settings.as_ref() else {
+            return;
+        };
+        let Some(project_dir) = self.project_dir.as_deref() else {
+            let _ = qnc_virtual_shots::mark_stills_failed(
+                file,
+                shot_id,
+                "Lokalni direktorij projekta nije dostupan.",
+            );
+            return;
+        };
+        match self.short_stills.store_for_short(
+            project_dir,
+            &settings.output_root_uri,
+            shot_id,
+            clip_id,
+            in_frame,
+            out_frame,
+        ) {
+            Ok(stills) => {
+                let _ = qnc_virtual_shots::mark_stills_ready(
+                    file,
+                    shot_id,
+                    &stills.in_uri,
+                    &stills.out_uri,
+                );
+            }
+            Err(error) => {
+                let _ = qnc_virtual_shots::mark_stills_failed(file, shot_id, &error);
+            }
+        }
     }
 
     fn open_short(&mut self, shot_id: &str) -> bool {
@@ -455,7 +522,12 @@ impl EditorialApplication {
         };
         match qnc_virtual_shots::list_shorts(file) {
             Ok(rows) => {
-                self.view.shorts = rows.into_iter().map(|row| self.short_card(row)).collect();
+                let previous = std::mem::take(&mut self.view.shorts);
+                let mut shorts: Vec<EditorialShort> =
+                    rows.into_iter().map(|row| self.short_card(row)).collect();
+                qnc_virtual_short_cards::preserve_loaded_posters(&mut shorts, &previous);
+                self.view.shorts = shorts;
+                self.request_posters();
             }
             Err(error) => {
                 self.view.shorts.clear();
@@ -470,37 +542,17 @@ impl EditorialApplication {
             .clips
             .iter()
             .find(|clip| clip.clip_id == row.clip_id);
-        EditorialShort {
-            shot_id: row.shot_id,
-            clip_id: row.clip_id,
-            name: row.name,
-            in_frame: row.in_frame,
-            out_frame: row.out_frame,
-            duration_label: duration_label(row.out_frame.saturating_sub(row.in_frame), parent),
-            import_status: parent
-                .map(|clip| clip.import_status.clone())
-                .unwrap_or_default(),
-            imported_media_uri: parent
-                .map(|clip| clip.imported_media_uri.clone())
-                .unwrap_or_default(),
-        }
+        qnc_virtual_short_cards::build_card(row, parent.map(parent_clip))
     }
 }
 
-/// v5 card duration: whole seconds and the leftover frames (`12:07`).
-fn duration_label(frames: u64, clip: Option<&EditorialClip>) -> String {
-    let Some(clip) = clip else {
-        return "0:00".into();
-    };
-    if clip.duration_seconds <= 0.0 || clip.duration_frames == 0 {
-        return "0:00".into();
+fn parent_clip(clip: &EditorialClip) -> ParentClip {
+    ParentClip {
+        duration_seconds: clip.duration_seconds,
+        duration_frames: clip.duration_frames,
+        import_status: clip.import_status.clone(),
+        imported_media_uri: clip.imported_media_uri.clone(),
     }
-    let fps = (clip.duration_frames as f64 / clip.duration_seconds)
-        .round()
-        .max(1.0) as u64;
-    let seconds = frames / fps;
-    let rem = frames % fps;
-    format!("{seconds}:{rem:02}")
 }
 
 /// The new list of imported clips; a poster that is already loaded for the same address is kept.
@@ -584,7 +636,20 @@ mod tests {
         app.dispatch(EditorialIntent::SwitchLibraryTab(LibraryTab::Virtual));
         assert_eq!(app.view().library_tab, LibraryTab::Virtual);
         assert!(app.view().shorts.is_empty());
-        let label = duration_label(57, Some(&clip("clip-a", "Mironik")));
+        let label = qnc_virtual_short_cards::build_card(
+            qnc_virtual_shots::ShortClip {
+                shot_id: "shot-a".into(),
+                clip_id: "clip-a".into(),
+                in_frame: 0,
+                out_frame: 57,
+                name: "Mironik 001".into(),
+                in_still_uri: None,
+                out_still_uri: None,
+                still_status: "pending".into(),
+            },
+            Some(parent_clip(&clip("clip-a", "Mironik"))),
+        )
+        .duration_label;
         assert_eq!(label, "2:07");
     }
 

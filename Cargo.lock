@@ -3204,6 +3204,8 @@ dependencies = [
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-timeline",
+ "qnc-virtual-short-cards",
+ "qnc-virtual-short-stills",
  "qnc-virtual-shots",
  "qnc-work-settings",
 ]
@@ -4193,6 +4195,23 @@ dependencies = [
  "serde_json",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "qnc-virtual-short-cards"
+version = "0.1.0"
+dependencies = [
+ "qnc-image-assets",
+ "qnc-virtual-shots",
+]
+
+[[package]]
+name = "qnc-virtual-short-stills"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "qnc-source-preview",
+ "tempfile",
 ]
 
 [[package]]
