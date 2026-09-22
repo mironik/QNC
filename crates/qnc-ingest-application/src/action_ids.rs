@@ -21,6 +21,8 @@ pub const INGEST_TOGGLE_AUDIO_LANE: &str = "ingest_toggle_audio_lane";
 pub const PLAY_PAUSE: &str = "play_pause";
 pub const STEP_BACK_FRAME: &str = "step_back_frame";
 pub const STEP_FORWARD_FRAME: &str = "step_forward_frame";
+pub const MARK_IN: &str = "mark_in";
+pub const MARK_OUT: &str = "mark_out";
 
 pub const ALL: &[&str] = &[
     INGEST_SOURCE_KIND_LOCAL,
@@ -46,4 +48,6 @@ pub const ALL: &[&str] = &[
     PLAY_PAUSE,
     STEP_BACK_FRAME,
     STEP_FORWARD_FRAME,
+    MARK_IN,
+    MARK_OUT,
 ];

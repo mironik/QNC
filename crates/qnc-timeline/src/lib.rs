@@ -229,12 +229,33 @@ impl TimelineTheme {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TimelineSourceMarkFocus {
+    #[default]
+    Playhead,
+    In,
+    Out,
+}
+
+impl TimelineSourceMarkFocus {
+    fn paint_focus(self) -> TimelineFocusPaint {
+        match self {
+            Self::Playhead => TimelineFocusPaint::Playhead,
+            Self::In => TimelineFocusPaint::In,
+            Self::Out => TimelineFocusPaint::Out,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimelineProjection {
     pub range_start_frame: u64,
     pub duration_frames: u64,
     pub playhead_frame: Option<u64>,
     pub cue_enabled: bool,
+    pub source_in_frame: Option<u64>,
+    pub source_out_frame: Option<u64>,
+    pub source_mark_focus: TimelineSourceMarkFocus,
 }
 
 impl Default for TimelineProjection {
@@ -244,6 +265,9 @@ impl Default for TimelineProjection {
             duration_frames: 1,
             playhead_frame: None,
             cue_enabled: false,
+            source_in_frame: None,
+            source_out_frame: None,
+            source_mark_focus: TimelineSourceMarkFocus::Playhead,
         }
     }
 }
@@ -255,6 +279,9 @@ impl TimelineProjection {
             duration_frames: duration_frames.max(1),
             playhead_frame: None,
             cue_enabled: false,
+            source_in_frame: None,
+            source_out_frame: None,
+            source_mark_focus: TimelineSourceMarkFocus::Playhead,
         }
     }
 
@@ -282,6 +309,87 @@ impl TimelineProjection {
 
     pub fn can_cue(&self) -> bool {
         self.cue_enabled
+    }
+
+    pub fn preserving_source_marks_from(mut self, previous: &Self) -> Self {
+        self.source_in_frame = previous.source_in_frame;
+        self.source_out_frame = previous.source_out_frame;
+        self.source_mark_focus = previous.source_mark_focus;
+        self.normalize_source_marks()
+    }
+
+    pub fn with_source_in_at_confirmed(mut self) -> Self {
+        if let Some(frame) = self.confirmed_frame() {
+            self.source_in_frame = Some(self.local_frame(frame));
+            if let Some(out) = self.source_out_frame {
+                if out <= self.source_in_frame.unwrap_or(0) {
+                    self.source_out_frame = Some(self.duration_frames());
+                }
+            }
+            self.source_mark_focus = TimelineSourceMarkFocus::In;
+        }
+        self.normalize_source_marks()
+    }
+
+    pub fn with_source_out_at_confirmed(mut self) -> Self {
+        if let Some(frame) = self.confirmed_frame() {
+            self.source_out_frame = Some(
+                self.local_frame(frame).max(
+                    self.source_in_frame
+                        .unwrap_or(0)
+                        .saturating_add(1)
+                        .min(self.duration_frames()),
+                ),
+            );
+            self.source_mark_focus = TimelineSourceMarkFocus::Out;
+        }
+        self.normalize_source_marks()
+    }
+
+    pub fn focus_source_in(mut self) -> Self {
+        self.source_mark_focus = TimelineSourceMarkFocus::In;
+        self
+    }
+
+    pub fn focus_source_out(mut self) -> Self {
+        self.source_mark_focus = TimelineSourceMarkFocus::Out;
+        self
+    }
+
+    fn local_frame(&self, absolute_frame: u64) -> u64 {
+        absolute_frame
+            .saturating_sub(self.range_start_frame)
+            .min(self.duration_frames())
+    }
+
+    /// IN/OUT the source timeline paints. A confirmed player source shows the
+    /// whole clip at once, the same way v5 does, until a mark replaces that end.
+    pub fn visible_source_marks(&self) -> Option<(u64, u64)> {
+        let duration = self.duration_frames;
+        if self.playhead_frame.is_some() && duration > 0 {
+            let start = self.source_in_frame.unwrap_or(0).min(duration);
+            let mut end = self.source_out_frame.unwrap_or(duration).min(duration);
+            if end <= start {
+                end = start.saturating_add(1).min(duration);
+            }
+            return (end > start).then_some((start, end));
+        }
+        match (self.source_in_frame, self.source_out_frame) {
+            (Some(start), Some(end)) if end > start => Some((start, end)),
+            _ => None,
+        }
+    }
+
+    fn normalize_source_marks(mut self) -> Self {
+        let duration = self.duration_frames();
+        self.source_in_frame = self.source_in_frame.map(|frame| frame.min(duration));
+        self.source_out_frame = self.source_out_frame.map(|frame| frame.min(duration));
+        if let (Some(in_frame), Some(out_frame)) = (self.source_in_frame, self.source_out_frame) {
+            if out_frame <= in_frame {
+                self.source_out_frame = Some(in_frame.saturating_add(1).min(duration));
+            }
+        }
+        self
     }
 }
 
@@ -429,6 +537,8 @@ pub struct TimelineInput<'a> {
     pub shot_out_frame: u64,
     pub draft_in_frame: u64,
     pub draft_out_frame: u64,
+    pub draft_in_active: bool,
+    pub draft_out_active: bool,
     pub a1_peaks: &'a [f32],
     pub a2_peaks: &'a [f32],
     pub a3_peaks: &'a [f32],
@@ -508,6 +618,10 @@ pub fn show_source_player_timeline_with_artifacts(
     a4_peaks: &[f32],
 ) -> TimelineIntent {
     let duration = state.duration_frames();
+    let (draft_in, draft_out, in_active, out_active) = match state.visible_source_marks() {
+        Some((start, end)) => (start, end, true, true),
+        None => (0, duration, false, false),
+    };
     let mut out = TimelineIntent::None;
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
         out = show(
@@ -518,12 +632,14 @@ pub fn show_source_player_timeline_with_artifacts(
                 metrics: TimelineMetrics::default(),
                 theme,
                 expanded_audio: AudioLane::None,
-                focus: TimelineFocusPaint::Playhead,
+                focus: state.source_mark_focus.paint_focus(),
                 show_lane_labels: true,
                 shot_in_frame: 0,
                 shot_out_frame: duration,
-                draft_in_frame: 0,
-                draft_out_frame: duration,
+                draft_in_frame: draft_in,
+                draft_out_frame: draft_out,
+                draft_in_active: in_active,
+                draft_out_active: out_active,
                 a1_peaks,
                 a2_peaks,
                 a3_peaks,
@@ -813,14 +929,16 @@ fn paint_ranges_and_playhead(ui: &mut egui::Ui, track: Rect, input: &TimelineInp
         );
     }
     if input.layers.in_out {
-        paint_in_out_dim(
-            ui,
-            track,
-            duration,
-            input.draft_in_frame,
-            input.draft_out_frame,
-            input.theme.in_out_dim,
-        );
+        if input.draft_in_active || input.draft_out_active {
+            paint_in_out_dim(
+                ui,
+                track,
+                duration,
+                input.draft_in_frame,
+                input.draft_out_frame,
+                input.theme.in_out_dim,
+            );
+        }
         paint_in_out_handles(
             ui,
             track,
@@ -903,14 +1021,16 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
         }
     }
     if input.layers.in_out {
-        paint_in_out_dim(
-            ui,
-            track,
-            duration,
-            input.draft_in_frame,
-            input.draft_out_frame,
-            input.theme.in_out_dim,
-        );
+        if input.draft_in_active || input.draft_out_active {
+            paint_in_out_dim(
+                ui,
+                track,
+                duration,
+                input.draft_in_frame,
+                input.draft_out_frame,
+                input.theme.in_out_dim,
+            );
+        }
         paint_in_out_handles(
             ui,
             track,
@@ -972,20 +1092,24 @@ fn paint_in_out_handles(
     } else {
         Stroke::new(2.0, input.theme.text)
     };
-    ui.painter().line_segment(
-        [
-            egui::pos2(in_x, track.top()),
-            egui::pos2(in_x, track.bottom()),
-        ],
-        in_stroke,
-    );
-    ui.painter().line_segment(
-        [
-            egui::pos2(out_x, track.top()),
-            egui::pos2(out_x, track.bottom()),
-        ],
-        out_stroke,
-    );
+    if input.draft_in_active {
+        ui.painter().line_segment(
+            [
+                egui::pos2(in_x, track.top()),
+                egui::pos2(in_x, track.bottom()),
+            ],
+            in_stroke,
+        );
+    }
+    if input.draft_out_active {
+        ui.painter().line_segment(
+            [
+                egui::pos2(out_x, track.top()),
+                egui::pos2(out_x, track.bottom()),
+            ],
+            out_stroke,
+        );
+    }
 }
 
 fn paint_virtual_spans(
@@ -1428,6 +1552,45 @@ mod tests {
 
         assert_eq!(state.confirmed_frame(), None);
         assert!(!state.can_cue());
+    }
+
+    #[test]
+    fn loaded_source_shows_in_and_out_across_the_clip_until_a_mark_moves_them() {
+        let state = TimelineProjection::new(0, 100).with_playhead(10);
+        assert_eq!(state.visible_source_marks(), Some((0, 100)));
+
+        let marked = state.with_source_in_at_confirmed();
+        assert_eq!(marked.visible_source_marks(), Some((10, 100)));
+    }
+
+    #[test]
+    fn empty_projection_draws_no_in_out_marks() {
+        assert_eq!(TimelineProjection::default().visible_source_marks(), None);
+    }
+
+    #[test]
+    fn source_marks_use_confirmed_player_frame() {
+        let state = TimelineProjection::new(10, 90)
+            .with_playhead(35)
+            .with_source_in_at_confirmed()
+            .with_playhead(55)
+            .with_source_out_at_confirmed();
+
+        assert_eq!(state.source_in_frame, Some(25));
+        assert_eq!(state.source_out_frame, Some(45));
+    }
+
+    #[test]
+    fn source_marks_survive_player_projection_refresh() {
+        let previous = TimelineProjection::new(0, 100)
+            .with_playhead(20)
+            .with_source_in_at_confirmed();
+        let refreshed = TimelineProjection::new(0, 100)
+            .with_playhead(40)
+            .preserving_source_marks_from(&previous);
+
+        assert_eq!(refreshed.confirmed_frame(), Some(40));
+        assert_eq!(refreshed.source_in_frame, Some(20));
     }
 
     #[test]

@@ -47,7 +47,11 @@
   },
   "pool_head": {
     "tabs_left": ["All", "Virtual"],
-    "transport_right": [">", "[", "]"]
+    "transport_right": [
+      { "label": ">", "action_id": "play_pause" },
+      { "label": "[", "action_id": "mark_in" },
+      { "label": "]", "action_id": "mark_out" }
+    ]
   },
   "source_dock": {
     "inner_margin_x": 8.0,

@@ -7,10 +7,10 @@ use eframe::egui::{
 };
 
 use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
-use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
+use qnc_source_dock::{SourceTimeline, TimelineDockStyle, show_chrome_row, show_timeline_dock};
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
-use qnc_editorial_application::{action_ids, EditorialIntent, EditorialView};
+use qnc_editorial_application::{EditorialIntent, EditorialView};
 
 use crate::{layout_contract::EditorialContracts, theme::Theme};
 
@@ -216,14 +216,11 @@ fn render_pool_head(
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 for command in contracts.editorial.pool_head.transport_right.iter().rev() {
-                    let action_id = match command.as_str() {
-                        ">" => action_ids::PLAY_PAUSE,
-                        "[" => action_ids::STEP_BACK_FRAME,
-                        "]" => action_ids::STEP_FORWARD_FRAME,
-                        _ => continue,
+                    let Some(action_id) = command.action_id() else {
+                        continue;
                     };
-                    if small_button(ui, command, true, theme).clicked() {
-                        intent = Some(EditorialIntent::Action(action_id));
+                    if small_button(ui, command.label(), true, theme).clicked() {
+                        intent = Some(EditorialIntent::action(action_id));
                     }
                 }
             });

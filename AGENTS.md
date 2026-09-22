@@ -1505,6 +1505,14 @@ qnc-filmstrip-worker`, `cargo test -p qnc-ingest-application -p qnc-ingest-previ
 aktivni artifact/worker put vise nema runtime dependency na
 `qnc-ingest-artifacts` ni `qnc-ingest-store`. Sve ostalo ostaje zamrznuto.
 
+Zatvoreno ograniceno odobrenje 2026-09-22 (dvadeset sedmo): korisnik je trazio
+da Broadcast Player bude vlasnik vremena. Otkljucano samo
+`crates/qnc-player-client/src/lib.rs` za javni read-only helper
+`View::confirmed_source_frame()`, koji vraca frame iskljucivo iz zadnjeg
+`CarrierPositionChanged` eventa s potvrdjenim rangeom i timebaseom. `PlaybackReadinessChanged`
+frame nije timeline/playhead vrijeme. Izveden je samo test koji zakljucava ovo
+pravilo. Timeline, source preview, forme, Project, Ingest workflow i layout nisu mijenjani.
+
 Zatvoreno ograniceno odobrenje 2026-09-19 (devetnaesto): korisnik je izricito
 odobrio izvrsitelja uvoza u obitelji Ingest, OS-neutralno i za lokalno, LAN i
 intranet. Otkljucano: novi crate `crates/qnc-ingest-import-worker` (javni modul:
@@ -1696,6 +1704,20 @@ kompozicija po grupama e, g, l, o) i jedna dodana provjera u
 Desni panel za e, g, l ostaje prazan. Verificirano: conformance prolazi, a provjera
 hvata odstupanje geometrije od Ingest ugovora i neprazan desni panel (mutacijski
 test). Odobrenje zatvoreno, obitelj je zamrznuta.
+
+Zatvoreno ograniceno odobrenje 2026-09-22 (dvadeset osmo): korisnik je
+izricito trazio da se IN/OUT oznake vide na source timelineu i da nema
+hardkodiranog znacenja gumba iz forme. Otkljucano samo:
+`crates/qnc-timeline`, `crates/qnc-ingest-application`,
+`crates/qnc-editorial-application`, `crates/qnc-ingest-desktop`,
+`crates/qnc-editorial-desktop`, `contracts/ui/ingest.layout.json`,
+`contracts/ui/editorial.layout.json`, `contracts/qnc-keyboard-shortcuts.json`.
+Source timeline ostaje jedina javna timeline komponenta; `source-preview` ne
+postaje vlasnik IN/OUT. Markeri se postavljaju iz potvrdenog Broadcast Player
+framea, cuvaju se kroz refresh projekcije za isti klip i crtaju se u
+`qnc-timeline`. Desktop forme ne tumace labelu `[`/`]`; layout nosi action_id,
+a tipkovnica ide kroz `qnc-keyboard-shortcuts.json`. Verificirano ciljanim
+testovima i conformanceom. Odobrenje zatvoreno, obitelj je zamrznuta.
 
 Zatvoreno ograniceno odobrenje 2026-09-18 (peto): korisnik je izricito trazio
 pocetak UI sheme za Media Assist grupe (e, g, l) i Story (o). Korak 1 je samo

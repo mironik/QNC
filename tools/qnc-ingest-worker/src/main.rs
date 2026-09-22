@@ -3,7 +3,11 @@
 //! copies nothing, proxy or original copies), then ends. Its lease, the pause while a
 //! player works and its result are kept in the project database, nowhere else.
 
-use std::{path::{Path, PathBuf}, process::ExitCode, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process::ExitCode,
+    time::Duration,
+};
 
 fn main() -> ExitCode {
     let Some(root) = root_argument() else {
@@ -25,7 +29,8 @@ fn run_background(root: &Path) -> Result<(), String> {
 }
 
 fn run_artifacts(root: &Path) -> Result<(), String> {
-    let reader = qnc_work_settings::SettingsReader::from_root(root).map_err(|error| error.to_string())?;
+    let reader =
+        qnc_work_settings::SettingsReader::from_root(root).map_err(|error| error.to_string())?;
     let settings = reader.read().map_err(|error| error.to_string())?;
     let target = qnc_content_store::ContentTarget::for_project(&reader, &settings)?;
     let mut artifacts = qnc_content_artifacts::ProjectArtifacts::new();

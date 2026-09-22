@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use eframe::egui::{self, CentralPanel, Frame};
-use qnc_editorial_application::{action_ids, EditorialApplication, EditorialIntent};
+use qnc_editorial_application::{EditorialApplication, EditorialIntent, action_ids};
 
 use crate::EditorialForm;
 
@@ -72,7 +72,7 @@ impl EditorialApp {
             action_ids::PLAY_PAUSE,
         );
         for _ in 0..play_presses {
-            self.dispatch(ctx, EditorialIntent::Action(action_ids::PLAY_PAUSE));
+            self.dispatch(ctx, EditorialIntent::action(action_ids::PLAY_PAUSE));
         }
 
         for event in qnc_keyboard_shortcut::egui_shortcut_events(ctx) {
@@ -90,7 +90,7 @@ impl EditorialApp {
                         continue;
                     }
                     handled_actions.push(action_id);
-                    self.dispatch(ctx, EditorialIntent::Action(action_id));
+                    self.dispatch(ctx, EditorialIntent::action(action_id));
                 }
             }
         }
@@ -110,6 +110,8 @@ fn editorial_shortcut_action(action_id: &str) -> Option<&'static str> {
         action_ids::PLAY_PAUSE => Some(action_ids::PLAY_PAUSE),
         action_ids::STEP_BACK_FRAME => Some(action_ids::STEP_BACK_FRAME),
         action_ids::STEP_FORWARD_FRAME => Some(action_ids::STEP_FORWARD_FRAME),
+        action_ids::MARK_IN => Some(action_ids::MARK_IN),
+        action_ids::MARK_OUT => Some(action_ids::MARK_OUT),
         _ => None,
     }
 }

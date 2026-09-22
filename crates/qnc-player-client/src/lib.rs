@@ -74,17 +74,26 @@ impl View {
         })
     }
     pub fn has_confirmed_position(&self) -> bool {
-        self.reply.as_ref().is_some_and(|r| {
-            r.events.iter().rev().any(|e| {
-                matches!(
-                    e,
-                    Event::CarrierPositionChanged {
-                        range: Some(_),
-                        timebase: Some(_),
-                        ..
-                    }
-                )
-            })
+        self.confirmed_source_frame().is_some()
+    }
+
+    /// Broadcast Player carrier is the only live source-time owner.
+    ///
+    /// Readiness events may mention a frame, but they are preparation facts,
+    /// not the accepted timeline/playhead position.
+    pub fn confirmed_source_frame(&self) -> Option<u64> {
+        self.reply.as_ref()?.events.iter().rev().find_map(|event| {
+            if let Event::CarrierPositionChanged {
+                frame,
+                range: Some(_),
+                timebase: Some(_),
+                ..
+            } = event
+            {
+                Some(*frame)
+            } else {
+                None
+            }
         })
     }
     pub fn can_start_playback(&self) -> bool {
@@ -418,6 +427,40 @@ mod tests {
             view.source_frame_interval(),
             Some(Duration::from_millis(20))
         );
+    }
+
+    #[test]
+    fn confirmed_source_frame_comes_only_from_carrier_position() {
+        let readiness_only = View {
+            reply: Some(reply(vec![Event::PlaybackReadinessChanged {
+                source_id: Some("clip".into()),
+                frame: 44,
+                ready: true,
+            }])),
+            ..View::default()
+        };
+        assert_eq!(readiness_only.confirmed_source_frame(), None);
+        assert!(!readiness_only.has_confirmed_position());
+
+        let confirmed = View {
+            reply: Some(reply(vec![
+                Event::PlaybackReadinessChanged {
+                    source_id: Some("clip".into()),
+                    frame: 44,
+                    ready: true,
+                },
+                Event::CarrierPositionChanged {
+                    source_id: Some("clip".into()),
+                    frame: 45,
+                    range: Some(FrameRange::new(0, 100).unwrap()),
+                    timebase: Some(Timebase::new(50, 1).unwrap()),
+                    status: TransportStatus::Paused,
+                },
+            ])),
+            ..View::default()
+        };
+        assert_eq!(confirmed.confirmed_source_frame(), Some(45));
+        assert!(confirmed.has_confirmed_position());
     }
 
     #[test]

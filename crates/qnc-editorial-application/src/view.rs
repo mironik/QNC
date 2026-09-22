@@ -52,12 +52,20 @@ impl EditorialView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditorialIntent {
     PreviewClip(String),
-    Action(&'static str),
+    Action(String),
     Timeline(qnc_timeline::TimelineIntent),
+}
+
+impl EditorialIntent {
+    pub fn action(action_id: impl Into<String>) -> Self {
+        Self::Action(action_id.into())
+    }
 }
 
 pub mod action_ids {
     pub const PLAY_PAUSE: &str = "play_pause";
     pub const STEP_BACK_FRAME: &str = "step_back_frame";
     pub const STEP_FORWARD_FRAME: &str = "step_forward_frame";
+    pub const MARK_IN: &str = "mark_in";
+    pub const MARK_OUT: &str = "mark_out";
 }

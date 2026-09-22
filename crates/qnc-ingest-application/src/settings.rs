@@ -188,10 +188,7 @@ impl IngestApplication {
     }
 }
 
-fn keep_loaded_thumbnails(
-    mut clips: Vec<ClipView>,
-    previous: &[ClipView],
-) -> Vec<ClipView> {
+fn keep_loaded_thumbnails(mut clips: Vec<ClipView>, previous: &[ClipView]) -> Vec<ClipView> {
     for clip in &mut clips {
         let Some(old) = previous
             .iter()

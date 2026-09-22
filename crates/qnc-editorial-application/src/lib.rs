@@ -22,7 +22,7 @@ use qnc_timeline::TimelineIntent;
 use qnc_work_settings::{SettingsReader, WorkSettings};
 
 pub use view::{
-    action_ids, EditorialClip, EditorialIntent, EditorialView, MonitorFrame, PreviewView,
+    EditorialClip, EditorialIntent, EditorialView, MonitorFrame, PreviewView, action_ids,
 };
 
 /// Finds the QNC root (the directory with `AGENTS.md` and the editorial layout
@@ -194,8 +194,21 @@ impl EditorialApplication {
                 changed = true;
             }
         }
-        self.view.preview = self.preview.view().clone();
+        self.sync_preview_view();
         changed
+    }
+
+    fn sync_preview_view(&mut self) {
+        let previous_clip_id = self.view.preview.clip_id.clone();
+        let previous_timeline = self.view.preview.timeline;
+        self.view.preview = self.preview.view().clone();
+        if previous_clip_id == self.view.preview.clip_id {
+            self.view.preview.timeline = self
+                .view
+                .preview
+                .timeline
+                .preserving_source_marks_from(&previous_timeline);
+        }
     }
 
     fn poll_catalog(&mut self) -> bool {
@@ -288,10 +301,20 @@ impl EditorialApplication {
                     true
                 }
             }
-            EditorialIntent::Action(action_id) => match action_id {
+            EditorialIntent::Action(action_id) => match action_id.as_str() {
                 action_ids::PLAY_PAUSE => self.preview.toggle_play(),
                 action_ids::STEP_BACK_FRAME => self.preview.step(-1),
                 action_ids::STEP_FORWARD_FRAME => self.preview.step(1),
+                action_ids::MARK_IN => {
+                    self.view.preview.timeline =
+                        self.view.preview.timeline.with_source_in_at_confirmed();
+                    true
+                }
+                action_ids::MARK_OUT => {
+                    self.view.preview.timeline =
+                        self.view.preview.timeline.with_source_out_at_confirmed();
+                    true
+                }
                 _ => false,
             },
             EditorialIntent::Timeline(intent) => match intent {
@@ -299,7 +322,7 @@ impl EditorialApplication {
                 _ => false,
             },
         };
-        self.view.preview = self.preview.view().clone();
+        self.sync_preview_view();
         changed
     }
 }
@@ -415,7 +438,7 @@ mod tests {
             action_ids::STEP_BACK_FRAME,
             action_ids::STEP_FORWARD_FRAME,
         ] {
-            app.dispatch(EditorialIntent::Action(action));
+            app.dispatch(EditorialIntent::action(action));
             assert_eq!(app.footer_status(), "Broadcast Player nije povezan.");
         }
         app.dispatch(EditorialIntent::Timeline(TimelineIntent::CueFrame(10)));

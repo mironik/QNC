@@ -13,9 +13,12 @@ impl IngestApplication {
 
     /// Copies what the preview reports into the view the form reads.
     pub(super) fn sync_playback_view(&mut self) {
+        let previous_timeline = self.view.timeline;
         let preview = self.preview.view();
         self.view.playback = preview.playback;
-        self.view.timeline = preview.timeline;
+        self.view.timeline = preview
+            .timeline
+            .preserving_source_marks_from(&previous_timeline);
         self.view.timeline_assets = preview.assets;
     }
 
@@ -87,6 +90,17 @@ impl IngestApplication {
             let mut result = IngestDispatchResult::rejected(message);
             result.request_repaint = true;
             return result;
+        }
+        match intent.action_id.as_str() {
+            action_ids::MARK_IN => {
+                self.view.timeline = self.view.timeline.with_source_in_at_confirmed();
+                return IngestDispatchResult::accepted(None, true);
+            }
+            action_ids::MARK_OUT => {
+                self.view.timeline = self.view.timeline.with_source_out_at_confirmed();
+                return IngestDispatchResult::accepted(None, true);
+            }
+            _ => {}
         }
         let command = match intent.action_id.as_str() {
             action_ids::PLAY_PAUSE => qnc_ingest_preview_source::PreviewCommand::TogglePlay,

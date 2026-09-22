@@ -28,6 +28,21 @@ pub struct SourceTimeline<'a> {
     pub peaks: [&'a [f32]; 4],
 }
 
+fn mark_label(ui: &mut Ui, style: &TimelineDockStyle, name: &str, frame: u64) {
+    ui.label(
+        RichText::new(name)
+            .size(style.font_ui)
+            .color(style.border),
+    );
+    ui.label(
+        RichText::new(frame.to_string())
+            .monospace()
+            .strong()
+            .size(style.font_ui)
+            .color(style.text),
+    );
+}
+
 /// A chrome row: filled, with a bottom rule, controls laid out left to right.
 pub fn show_chrome_row(
     ui: &mut Ui,
@@ -109,6 +124,11 @@ pub fn show_timeline_dock(
                 .size(style.font_ui),
         );
         ui.add_space(10.0);
+        if let Some((start, end)) = timeline.projection.visible_source_marks() {
+            mark_label(ui, style, "IN", start);
+            mark_label(ui, style, "OUT", end);
+            mark_label(ui, style, "Trajanje", end.saturating_sub(start));
+        }
         add_header(ui);
     });
     qnc_timeline::show_source_player_timeline_with_artifacts(

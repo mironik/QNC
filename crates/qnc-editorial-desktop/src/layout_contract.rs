@@ -179,7 +179,29 @@ impl EditorialPreview {
 #[derive(Debug, Clone, Deserialize)]
 pub struct EditorialPoolHead {
     pub tabs_left: Vec<String>,
-    pub transport_right: Vec<String>,
+    pub transport_right: Vec<TransportCommand>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum TransportCommand {
+    Action { label: String, action_id: String },
+    Label(String),
+}
+
+impl TransportCommand {
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Action { label, .. } | Self::Label(label) => label,
+        }
+    }
+
+    pub fn action_id(&self) -> Option<&str> {
+        match self {
+            Self::Action { action_id, .. } => Some(action_id),
+            Self::Label(_) => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

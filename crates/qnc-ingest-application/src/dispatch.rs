@@ -30,6 +30,8 @@ impl IngestApplication {
             action_ids::PLAY_PAUSE
             | action_ids::STEP_BACK_FRAME
             | action_ids::STEP_FORWARD_FRAME
+            | action_ids::MARK_IN
+            | action_ids::MARK_OUT
             | action_ids::INGEST_CUE_FRAME => self.player_action(intent),
             _ => IngestDispatchResult::accepted(
                 Some("Akcija je zapisana, komponenta za izvršenje još nije spojena.".to_string()),

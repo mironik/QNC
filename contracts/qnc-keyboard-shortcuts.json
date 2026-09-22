@@ -281,6 +281,18 @@
             "key": " "
           }
         ],
+        "mark_in": [
+          {
+            "code": "KeyI",
+            "shift": false
+          }
+        ],
+        "mark_out": [
+          {
+            "code": "KeyO",
+            "shift": false
+          }
+        ],
         "step_back_frame": [ { "code": "ArrowLeft", "key": "ArrowLeft" } ],
         "step_forward_frame": [ { "code": "ArrowRight", "key": "ArrowRight" } ]
       },

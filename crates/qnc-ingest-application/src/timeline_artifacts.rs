@@ -17,8 +17,7 @@ impl IngestApplication {
         ) else {
             return Ok(());
         };
-        self.artifacts
-            .configure(reader, &plan.settings, target)
+        self.artifacts.configure(reader, &plan.settings, target)
     }
 
     pub(super) fn sync_timeline_artifact_content_db(&mut self) {
@@ -48,12 +47,10 @@ impl IngestApplication {
                 qnc_timeline_assets::SourceTimelineAssets::empty_for(clip_id);
             return;
         };
-        match self.artifacts.focus(
-            reader,
-            &plan.settings,
-            target,
-            clip_id,
-        ) {
+        match self
+            .artifacts
+            .focus(reader, &plan.settings, target, clip_id)
+        {
             Ok(assets) => self.view.timeline_assets = assets,
             Err(error) => self.view.message = error,
         }

@@ -51,7 +51,11 @@
     "tabs_left": ["All", "Virtual"],
     "hidden_tabs": ["B-roll", "Segment"],
     "tab_gap": 10.0,
-    "transport_right": [">", "[", "]"],
+    "transport_right": [
+      { "label": ">", "action_id": "play_pause" },
+      { "label": "[", "action_id": "mark_in" },
+      { "label": "]", "action_id": "mark_out" }
+    ],
     "play_pause_playing": "||",
     "hidden_transport": ["B", "Export HI-res"]
   },

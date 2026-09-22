@@ -25,13 +25,10 @@ pub(super) fn render_pool_head(
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 for command in contracts.ingest.pool_head.transport_right.iter().rev() {
-                    let action_id = match command.as_str() {
-                        ">" => action_ids::PLAY_PAUSE,
-                        "[" => action_ids::STEP_BACK_FRAME,
-                        "]" => action_ids::STEP_FORWARD_FRAME,
-                        _ => action_ids::INGEST_RELOAD,
+                    let Some(action_id) = command.action_id() else {
+                        continue;
                     };
-                    if small_button(ui, command, true, theme).clicked() {
+                    if small_button(ui, command.label(), true, theme).clicked() {
                         intent = Some(IngestIntent::empty(action_id));
                     }
                 }

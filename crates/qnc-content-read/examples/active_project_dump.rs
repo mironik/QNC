@@ -20,7 +20,13 @@ fn main() -> Result<(), String> {
     println!("project_name={}", settings.project_name);
     println!("workspace_db_uri={}", settings.workspace_db_uri);
     println!("output_root_uri={}", settings.output_root_uri);
-    println!("workspace_dir={}", workspace_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default());
+    println!(
+        "workspace_dir={}",
+        workspace_dir
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default()
+    );
 
     let reader = ContentReader::for_project(&settings_reader, &settings)?;
     let binding = settings_reader
@@ -44,7 +50,10 @@ fn main() -> Result<(), String> {
             .map_err(|error| error.to_string())
     };
     println!("db_file={}", workspace_file.display());
-    println!("db_clips_total={}", counts("SELECT count(*) FROM public_clips")?);
+    println!(
+        "db_clips_total={}",
+        counts("SELECT count(*) FROM public_clips")?
+    );
     println!(
         "db_clips_listed={}",
         counts("SELECT count(*) FROM public_clips WHERE selected != 0 OR import_status IN ('queued','processing','original_ready','generating_proxy','imported','done')")?
@@ -66,7 +75,10 @@ fn main() -> Result<(), String> {
     println!("clips={}", clips.len());
     for clip in clips.iter().take(24) {
         let filmstrip = reader.filmstrip(&clip.clip_id)?;
-        let filmstrip_frames = filmstrip.as_ref().map(|record| record.frame_count).unwrap_or(0);
+        let filmstrip_frames = filmstrip
+            .as_ref()
+            .map(|record| record.frame_count)
+            .unwrap_or(0);
         let first_filmstrip_uri = filmstrip
             .as_ref()
             .and_then(|record| record.frames.first())

@@ -37,10 +37,7 @@ impl SharedRead {
             .lock()
             .map_err(|_| "Veza prema projektnoj bazi nije dostupna.".to_string())?;
         if guard.is_none() {
-            *guard = Some(
-                self.target
-                    .open(qnc_content_store::Access::ReadOnly)?,
-            );
+            *guard = Some(self.target.open(qnc_content_store::Access::ReadOnly)?);
         }
         Ok(ReadGuard(guard))
     }
@@ -375,7 +372,10 @@ pub fn timeline_artifact_reader(
         .ok_or_else(|| "Artefakti timelinea nemaju lokalni binding projekta.".to_string())?;
     Ok(Arc::new(ProjectTimelineArtifactReader {
         read: SharedRead::new(content_target),
-        filmstrip_root_uri: format!("{}/filmstrip", settings.output_root_uri.trim_end_matches('/')),
+        filmstrip_root_uri: format!(
+            "{}/filmstrip",
+            settings.output_root_uri.trim_end_matches('/')
+        ),
         filmstrip_dir: project_dir.join("filmstrip"),
     }))
 }
@@ -392,7 +392,10 @@ pub fn artifacts_context(
         .ok_or_else(|| "Artefakti timelinea nemaju lokalni binding projekta.".to_string())?;
     let filmstrip_dir = project_dir.join("filmstrip");
     let project_audio_channels = settings.audio_channels().map_err(|e| e.to_string())?;
-    let filmstrip_root_uri = format!("{}/filmstrip", settings.output_root_uri.trim_end_matches('/'));
+    let filmstrip_root_uri = format!(
+        "{}/filmstrip",
+        settings.output_root_uri.trim_end_matches('/')
+    );
     Ok(ArtifactsContext {
         project_id: settings.project_id.clone(),
         filmstrip_root_uri: filmstrip_root_uri.clone(),

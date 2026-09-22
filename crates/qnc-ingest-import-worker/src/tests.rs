@@ -600,11 +600,13 @@ fn a_linked_clip_with_a_card_poster_gets_a_project_poster() {
     );
     assert_eq!(
         poster.as_deref(),
-        Some(format!(
-            "qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg",
-            clip.clip.id()
+        Some(
+            format!(
+                "qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg",
+                clip.clip.id()
+            )
+            .as_str()
         )
-        .as_str())
     );
 }
 

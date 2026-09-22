@@ -457,6 +457,8 @@ fn egui_catalog_key_name(key: &egui::Key) -> Option<String> {
         Key::ArrowLeft => "ArrowLeft",
         Key::ArrowRight => "ArrowRight",
         Key::Space => " ",
+        Key::I => "i",
+        Key::O => "o",
         _ => return None,
     };
     Some(name.to_string())
@@ -469,6 +471,8 @@ fn egui_catalog_key_code(key: &egui::Key) -> Option<String> {
         Key::ArrowLeft => "ArrowLeft",
         Key::ArrowRight => "ArrowRight",
         Key::Space => "Space",
+        Key::I => "KeyI",
+        Key::O => "KeyO",
         _ => return None,
     };
     Some(code.to_string())
@@ -506,6 +510,19 @@ mod tests {
         let catalog = catalog();
         let actions = catalog.action_ids_for_event("storyboard", &ShortcutEvent::code("KeyI"));
         assert!(actions.contains(&"mark_in"));
+    }
+
+    #[test]
+    fn key_i_and_key_o_reach_the_ingest_mark_actions() {
+        assert_eq!(egui_catalog_key_code(&egui::Key::I).as_deref(), Some("KeyI"));
+        assert_eq!(egui_catalog_key_code(&egui::Key::O).as_deref(), Some("KeyO"));
+        let catalog = catalog();
+        assert!(catalog
+            .action_ids_for_event("ingest", &ShortcutEvent::code("KeyI"))
+            .contains(&"mark_in"));
+        assert!(catalog
+            .action_ids_for_event("ingest", &ShortcutEvent::code("KeyO"))
+            .contains(&"mark_out"));
     }
 
     #[test]
