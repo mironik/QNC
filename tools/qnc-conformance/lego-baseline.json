@@ -48,7 +48,6 @@
     "C5 public piece without a user|qnc-media-pool-head": 1,
     "C5 public piece without a user|qnc-source-input": 1,
     "C6 application-named piece used elsewhere|qnc-dev-diagnostics-app -> qnc-ingest-store": 1,
-    "C6 application-named piece used elsewhere|qnc-dev-diagnostics-app -> qnc-ingest-work-plan": 1,
-    "C7 preview reaches a host database|qnc-source-preview -> qnc-media-record-db": 1
+    "C6 application-named piece used elsewhere|qnc-dev-diagnostics-app -> qnc-ingest-work-plan": 1
   }
 }

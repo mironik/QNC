@@ -1,48 +1,27 @@
 //! Read-only adapters that feed the player and the timeline from public
-//! contracts: the project content views (`qnc-content-read`) and the media
-//! records database (`qnc-media-record-db`, read-only).
+//! contracts of the active project only: the saved clip with its media record
+//! (`qnc-content-store`, read-only) and the content views (`qnc-content-read`).
+//! Nothing is read from a host database, so a copied project plays anywhere.
 
 use qnc_content_read::ContentReader;
-use qnc_media_record_db::{Access, Client};
+use qnc_content_store::{Access, ContentTarget};
 use qnc_player_input::{PlayerClipRecord, PlayerContentRead};
-use qnc_source_bindings::SourceBinding;
 use qnc_timeline_assets::TimelineArtifactRead;
 
 #[derive(Clone)]
 pub(crate) struct PlayerContent {
-    pub content: ContentReader,
-    pub records: Option<SourceBinding>,
+    /// The content database of the active project; its error is shown on open.
+    pub target: Result<ContentTarget, String>,
 }
 
 impl PlayerContentRead for PlayerContent {
     fn read_clip(&self, clip_id: &str) -> Result<Option<PlayerClipRecord>, String> {
-        let Some(head) = self.content.clip_head(clip_id)? else {
-            return Ok(None);
-        };
-        let binding = self
-            .records
-            .as_ref()
-            .ok_or("Nedostaje veza na bazu zapisa medija.")?;
-        if binding.uri != head.record_db_uri {
-            return Err("Zapis medija je u bazi koja nije konfigurirana.".into());
-        }
-        let resolver = binding.resolver()?;
-        let token = binding.token()?;
-        let mut client = Client::open(
-            &resolver,
-            &head.record_db_uri,
-            Access::ReadOnly,
-            token.as_deref(),
-        )
-        .map_err(|error| error.to_string())?;
-        let snapshot = client
-            .read(clip_id, Some(head.record_revision))
-            .map_err(|error| error.to_string())?
-            .ok_or("Zapis medija nije pronadjen.")?;
-        Ok(Some(PlayerClipRecord {
-            name: head.name,
-            snapshot,
-            imported_media_uri: head.imported_media_uri,
+        let target = self.target.as_ref().map_err(Clone::clone)?;
+        let stored = target.open(Access::ReadOnly)?.read(clip_id)?;
+        Ok(stored.map(|stored| PlayerClipRecord {
+            name: stored.clip.name,
+            snapshot: stored.clip.snapshot,
+            imported_media_uri: stored.imported_media_uri,
         }))
     }
 }

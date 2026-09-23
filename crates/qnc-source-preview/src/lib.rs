@@ -118,14 +118,14 @@ impl PreviewContext {
             ),
             Err(error) => (None, Some(error.to_string())),
         };
+        let player_content = Arc::new(content::PlayerContent {
+            target: qnc_content_store::ContentTarget::for_project(&reader, &settings),
+        });
         Self {
             reader,
             settings,
             sources: bindings.sources,
-            player_content: Arc::new(content::PlayerContent {
-                content,
-                records: bindings.media_records,
-            }),
+            player_content,
             artifacts,
             notice,
         }

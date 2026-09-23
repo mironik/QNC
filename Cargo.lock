@@ -4128,7 +4128,6 @@ dependencies = [
  "qnc-content-read",
  "qnc-content-store",
  "qnc-filmstrip",
- "qnc-media-record-db",
  "qnc-media-records",
  "qnc-playback-activity",
  "qnc-player-client",
