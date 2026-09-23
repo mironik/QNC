@@ -12,6 +12,7 @@ use qnc_contracts::{
 };
 use qnc_db_contract::validate_db_contract_json;
 
+mod lego;
 mod player_boundary;
 
 struct CheckResult {
@@ -45,10 +46,23 @@ impl CheckResult {
 }
 
 fn main() {
-    let root = env::args_os()
-        .nth(1)
+    let args = env::args_os().skip(1).collect::<Vec<_>>();
+    let print_lego_counts = args.iter().any(|arg| arg == "--print-lego-counts");
+    let root = args
+        .iter()
+        .find(|arg| *arg != "--print-lego-counts")
         .map(PathBuf::from)
         .unwrap_or_else(|| env::current_dir().expect("current dir"));
+
+    if print_lego_counts {
+        // Prints the current C1-C13 counts; it never writes the baseline.
+        let counts = lego::current_counts(&root);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&counts).expect("counts serialize")
+        );
+        return;
+    }
 
     let checks = run_checks(&root);
     let mut failed = 0usize;
@@ -146,6 +160,10 @@ fn run_checks(root: &Path) -> Vec<CheckResult> {
     checks.push(CheckResult::from_report(
         "public player boundary",
         player_boundary::check(root),
+    ));
+    checks.push(CheckResult::from_report(
+        "target picture C1-C13 (forms are boards of public pieces)",
+        lego::check(root),
     ));
 
     checks

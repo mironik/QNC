@@ -1948,6 +1948,23 @@ izgraditi istim profilom, ali to nije dozvola za promjenu koda. Sljedeca
 izmjena bilo kojeg od tih dijelova mora prvo imenovati tocan modul/putanju i
 razlog otkljucavanja.
 
+Zatvoreno ograniceno odobrenje 2026-09-23 (Paket A ciljne slike): korisnik je
+odobrio Paket A iz `docs/89-qnc-target-lego-catalog.md`: forma je samo ploca
+javnih univerzalnih lego kockica. Otkljucano samo: `tools/qnc-conformance/**`,
+novi `docs/89-qnc-target-lego-catalog.md` i ovaj zapis. Izvedeno: nova provjera
+„target picture C1-C13 (forms are boards of public pieces)“ u
+`tools/qnc-conformance/src/lego.rs` s poznatim iznimkama u
+`tools/qnc-conformance/lego-baseline.json` (51 kljuc, stanje commita `9fd8b07`).
+Veci broj ili novi kljuc je greska; manji broj je upozorenje da se baseline
+spusti. Baseline se nikad ne podize. Trenutni brojevi:
+`cargo run -p qnc-conformance -- --print-lego-counts`. Nije izvedeno: nijedan
+popravak koda, ugovora, formi ni UI-ja; pakete B-H treba zasebno otkljucati po
+cjelinama iz dokumenta. Ciljna slika ne ukida zakljucavanje Project/Ingest/
+Player/Monitor/Worker iz prethodnog zapisa. Verificirano: `cargo test -p
+qnc-conformance` (25), `cargo run -p qnc-conformance` prolazi, i mutacijska
+provjera (spustena granica C10 obara conformance). Odobrenje je zatvoreno,
+obitelj je zamrznuta.
+
 Zatvoreno (korak 2) ograniceno odobrenje 2026-09-18 (cetvrto): korisnik je
 izricito potvrdio nastavak. Poslovna logika export presetova i JSON putanja
 postavki izlazi iz `crates/qnc-project-desktop/src/project_advanced.rs` u dva
