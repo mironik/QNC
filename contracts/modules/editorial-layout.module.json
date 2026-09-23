@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.editorial-layout",
+  "module_name": "Editorial layout contract",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.layout.contract"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["media.scan", "ffprobe", "media.probe.full", "media.process", "application.db.write", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-editorial-layout",
+  "input": "contracts/ui/editorial.layout.json, contracts/ui/shell.layout.json, contracts/qnc-keyboard-shortcuts.json and the group (e, g, l, o).",
+  "output": "Validated layout model of one editorial group: board, preview, pool head tabs and transport, media card, source dock and the group composition.",
+  "specification": "docs/89-qnc-target-lego-catalog.md 3.7 (layout contract piece)"
+}

@@ -47,6 +47,96 @@ pub fn mark_stills_failed(
     transport.mark_short_stills_failed(key, shot_id, error)
 }
 
+/// Saves a short through the serialized write transport and waits for its id.
+pub fn save_short_now(
+    target: &qnc_content_store::ContentTarget,
+    project_id: &str,
+    clip_id: &str,
+    name: &str,
+    in_frame: u64,
+    out_frame: u64,
+) -> Result<SavedShort, String> {
+    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
+    save_short(
+        &mut transport,
+        format!("virtual_short:{clip_id}:{in_frame}:{out_frame}"),
+        project_id.to_string(),
+        clip_id.to_string(),
+        name.to_string(),
+        in_frame,
+        out_frame,
+    )?;
+    wait_for_saved_short(&mut transport)
+}
+
+/// Publishes the IN/OUT stills of a short and waits until the database has them.
+pub fn mark_stills_ready_now(
+    target: &qnc_content_store::ContentTarget,
+    shot_id: &str,
+    in_uri: &str,
+    out_uri: &str,
+) -> Result<(), String> {
+    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
+    mark_stills_ready(
+        &mut transport,
+        format!("virtual_short_stills:{shot_id}:ready"),
+        shot_id.to_string(),
+        in_uri.to_string(),
+        out_uri.to_string(),
+    )?;
+    wait_for_changed(&mut transport)
+}
+
+/// Records that the stills of a short could not be made.
+pub fn mark_stills_failed_now(
+    target: &qnc_content_store::ContentTarget,
+    shot_id: &str,
+    error: &str,
+) -> Result<(), String> {
+    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
+    mark_stills_failed(
+        &mut transport,
+        format!("virtual_short_stills:{shot_id}:failed"),
+        shot_id.to_string(),
+        error.to_string(),
+    )?;
+    wait_for_changed(&mut transport)
+}
+
+fn wait_for_saved_short(
+    transport: &mut qnc_content_store::ContentWriteTransport,
+) -> Result<SavedShort, String> {
+    match wait_for_write(transport)? {
+        qnc_content_store::ContentWriteData::SavedShort(shot) => Ok(*shot),
+        _ => Err("Neispravan odgovor baze.".into()),
+    }
+}
+
+fn wait_for_changed(
+    transport: &mut qnc_content_store::ContentWriteTransport,
+) -> Result<(), String> {
+    match wait_for_write(transport)? {
+        qnc_content_store::ContentWriteData::Changed => Ok(()),
+        _ => Err("Neispravan odgovor baze.".into()),
+    }
+}
+
+/// The data of the first completed write, or a controlled error after five seconds.
+fn wait_for_write(
+    transport: &mut qnc_content_store::ContentWriteTransport,
+) -> Result<qnc_content_store::ContentWriteData, String> {
+    let started = std::time::Instant::now();
+    loop {
+        if let Some(completion) = transport.poll().into_iter().next() {
+            return Ok(completion.result?.data);
+        }
+        if started.elapsed() > std::time::Duration::from_secs(5) {
+            return Err("Isteklo je cekanje upisa virtualnog kadra.".into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -122,6 +122,7 @@ impl ContentStore {
             ensure_filmstrip_schema(&conn)?;
             ensure_wave_schema(&conn)?;
             ensure_virtual_shots_schema(&conn)?;
+            ensure_program_segments_schema(&conn)?;
         }
         let has_thumbnail_uri = schema && has_column(&conn, "clips", "thumbnail_uri")?;
         if access == Access::ReadOnly {
@@ -188,6 +189,7 @@ impl ContentStore {
                     Ok(Data::Wave(None))
                 }
                 Operation::ListShorts => Ok(Data::ShortClips(Vec::new())),
+                Operation::ListSegments => Ok(Data::Segments(Vec::new())),
                 _ => Err("Ingest shema nije inicijalizirana.".into()),
             };
         }
@@ -304,6 +306,24 @@ impl ContentStore {
                 out_uri.as_deref(),
                 error.as_deref(),
             ),
+            Operation::CreateSegment {
+                project_id,
+                kind,
+                clip_id,
+                in_frame,
+                out_frame,
+                fps_num,
+                fps_den,
+            } => self.create_segment(
+                project_id,
+                kind,
+                clip_id,
+                (*in_frame, *out_frame),
+                (*fps_num, *fps_den),
+            ),
+            Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
+            Operation::MoveSegment { segment_id, up } => self.move_segment(segment_id, *up),
+            Operation::ListSegments => self.list_segments(),
             Operation::List { after } => {
                 let mut statement = self
                     .conn
@@ -864,6 +884,172 @@ impl ContentStore {
         }
     }
 
+    /// Appends a Ton or Off segment (docs/93 R8-R10). The range is copied from the
+    /// source IN/OUT; a story has one timebase, a different one is refused.
+    fn create_segment(
+        &mut self,
+        project_id: &str,
+        kind: &str,
+        clip_id: &str,
+        (in_frame, out_frame): (u64, u64),
+        (fps_num, fps_den): (u32, u32),
+    ) -> Result<Data> {
+        if !matches!(kind, "ton" | "off") {
+            return Err(format!("Nepoznata vrsta segmenta: {kind}."));
+        }
+        qnc_media_records::valid_id(clip_id).map_err(err)?;
+        if out_frame <= in_frame {
+            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+        }
+        if fps_num == 0 || fps_den == 0 {
+            return Err("Segment nema valjan source fps.".into());
+        }
+        let project_matches: bool = self
+            .conn
+            .query_row(
+                "SELECT count(*)=1 AND min(project_id)=?1 FROM public_project_settings",
+                [project_id],
+                |row| row.get(0),
+            )
+            .map_err(err)?;
+        if !project_matches {
+            return Err("Projektna baza pripada drugom projektu.".into());
+        }
+        require_imported_clip(&self.conn, clip_id)?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let story_timebase: Option<(u32, u32)> = tx
+            .query_row(
+                "SELECT fps_num, fps_den FROM program_segments ORDER BY sort_index LIMIT 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(err)?;
+        if let Some((num, den)) = story_timebase {
+            // Same rate even when written differently (50/1 and 100/2).
+            if u64::from(num) * u64::from(fps_den) != u64::from(fps_num) * u64::from(den) {
+                return Err(format!(
+                    "Klip ima {fps_num}/{fps_den} fps, a prica {num}/{den}; mijesani fps nije dopusten."
+                ));
+            }
+        }
+        let next: i64 = tx
+            .query_row(
+                "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM program_segments",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(err)?;
+        let created = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        let segment_id = format!("segment_{created:x}");
+        tx.execute(
+            "INSERT INTO program_segments (
+                segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den,
+                created_at_utc
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                segment_id,
+                kind,
+                next,
+                clip_id,
+                in_frame as i64,
+                out_frame as i64,
+                fps_num,
+                fps_den,
+                (created / 1_000_000_000) as i64
+            ],
+        )
+        .map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::SegmentCreated(segment_id))
+    }
+
+    /// Removes a segment for good; the following ones close the gap (docs/93 R12).
+    fn delete_segment(&mut self, segment_id: &str) -> Result<Data> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let removed = tx
+            .execute(
+                "DELETE FROM program_segments WHERE segment_id = ?1",
+                [segment_id],
+            )
+            .map_err(err)?;
+        if removed == 0 {
+            return Err("Segment nije pronadjen.".into());
+        }
+        renumber_segments(&tx)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// Swaps with the neighbour; at the edge nothing changes (docs/93 R13).
+    fn move_segment(&mut self, segment_id: &str, up: bool) -> Result<Data> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let mut order = segment_order(&tx)?;
+        let index = order
+            .iter()
+            .position(|id| id == segment_id)
+            .ok_or("Segment nije pronadjen.")?;
+        let other = if up {
+            index.checked_sub(1)
+        } else {
+            Some(index + 1).filter(|next| *next < order.len())
+        };
+        if let Some(other) = other {
+            order.swap(index, other);
+            for (sort_index, id) in order.iter().enumerate() {
+                tx.execute(
+                    "UPDATE program_segments SET sort_index = ?1 WHERE segment_id = ?2",
+                    params![sort_index as i64, id],
+                )
+                .map_err(err)?;
+            }
+        }
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    fn list_segments(&self) -> Result<Data> {
+        if !object_exists(&self.conn, "view", "public_program_segments")? {
+            return Ok(Data::Segments(Vec::new()));
+        }
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den
+                 FROM public_program_segments ORDER BY sort_index",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(ProgramSegment {
+                    segment_id: row.get(0)?,
+                    kind: row.get(1)?,
+                    sort_index: row.get::<_, i64>(2)?.max(0) as u32,
+                    clip_id: row.get(3)?,
+                    in_frame: row.get::<_, i64>(4)?.max(0) as u64,
+                    out_frame: row.get::<_, i64>(5)?.max(0) as u64,
+                    fps_num: row.get(6)?,
+                    fps_den: row.get(7)?,
+                })
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        Ok(Data::Segments(rows))
+    }
+
     fn read_wave(&self, clip_id: &str) -> Result<Data> {
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         let row = self
@@ -1010,6 +1196,7 @@ fn owned_table(name: &str) -> bool {
             | "filmstrip_frames"
             | "wave_artifacts"
             | "virtual_shots"
+            | "program_segments"
             | "ingest_runtime"
     )
 }
@@ -1240,6 +1427,51 @@ fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
         WHERE class = 'short';",
     )
     .map_err(err)
+}
+
+fn ensure_program_segments_schema(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS program_segments (
+            segment_id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL CHECK (kind IN ('ton', 'off')),
+            sort_index INTEGER NOT NULL,
+            clip_id TEXT NOT NULL,
+            in_frame INTEGER NOT NULL,
+            out_frame INTEGER NOT NULL CHECK (out_frame > in_frame),
+            fps_num INTEGER NOT NULL CHECK (fps_num > 0),
+            fps_den INTEGER NOT NULL CHECK (fps_den > 0),
+            created_at_utc INTEGER NOT NULL
+        );
+        DROP VIEW IF EXISTS public_program_segments;
+        CREATE VIEW public_program_segments AS
+        SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den,
+               created_at_utc
+        FROM program_segments;",
+    )
+    .map_err(err)
+}
+
+fn segment_order(conn: &Connection) -> Result<Vec<String>> {
+    let mut statement = conn
+        .prepare("SELECT segment_id FROM program_segments ORDER BY sort_index")
+        .map_err(err)?;
+    let ids = statement
+        .query_map([], |row| row.get(0))
+        .map_err(err)?
+        .collect::<rusqlite::Result<Vec<String>>>()
+        .map_err(err)?;
+    Ok(ids)
+}
+
+fn renumber_segments(conn: &Connection) -> Result<()> {
+    for (sort_index, id) in segment_order(conn)?.iter().enumerate() {
+        conn.execute(
+            "UPDATE program_segments SET sort_index = ?1 WHERE segment_id = ?2",
+            params![sort_index as i64, id],
+        )
+        .map_err(err)?;
+    }
+    Ok(())
 }
 
 fn add_virtual_column_if_missing(conn: &Connection, column: &str, definition: &str) -> Result<()> {

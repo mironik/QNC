@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.segment-panel",
+  "module_name": "Segment panel",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": ["ui.render", "ui.intent"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["media.scan", "ffprobe", "media.probe.full", "media.process", "application.db.write", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-segment-panel",
+  "input": "A prepared program segments view, the program playhead frame if a program plays, the form theme and the timeline theme.",
+  "output": "Passive Segmenti panel (program timing header, one qnc-timeline row per segment) and the user's intent: select a segment or point at a program frame.",
+  "specification": "QNC_v5 qnc-app/src/editorial/segment_panel.rs and qnc_segment_timeline.rs show_program"
+}

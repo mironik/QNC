@@ -1,0 +1,11 @@
+[package]
+name = "qnc-editorial-layout"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: validated model of the editorial layout contract (board, preview, pool head, source dock, group compositions)"
+
+[dependencies]
+qnc-contracts = { workspace = true }
+qnc-keyboard-shortcut = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

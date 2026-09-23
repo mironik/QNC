@@ -1,0 +1,8 @@
+[package]
+name = "qnc-program-segments"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: Ton/Off program segments of an edited story in the project database, their order and program model"
+
+[dependencies]
+qnc-content-store = { workspace = true }

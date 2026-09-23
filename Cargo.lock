@@ -3213,6 +3213,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-image-assets",
  "qnc-media-thumbnail",
+ "qnc-program-segments",
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-source-reader",
@@ -3230,12 +3231,24 @@ dependencies = [
  "eframe",
  "qnc-contracts",
  "qnc-editorial-application",
+ "qnc-editorial-layout",
  "qnc-keyboard-shortcut",
  "qnc-media-card",
  "qnc-monitor",
+ "qnc-segment-panel",
  "qnc-source-dock",
  "qnc-timeline",
  "qnc-ui-kit",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-editorial-layout"
+version = "0.1.0"
+dependencies = [
+ "qnc-contracts",
+ "qnc-keyboard-shortcut",
  "serde",
  "serde_json",
 ]
@@ -3912,6 +3925,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-program-segments"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+]
+
+[[package]]
 name = "qnc-project"
 version = "0.1.0"
 dependencies = [
@@ -4000,6 +4020,15 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tiny_http",
+]
+
+[[package]]
+name = "qnc-segment-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-program-segments",
+ "qnc-timeline",
 ]
 
 [[package]]

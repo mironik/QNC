@@ -1988,6 +1988,35 @@ umjesto `on_activated`, bez rasta), `crates/qnc-ingest-application` (`set_active
 uklonjen vlastiti reporter jer to radi preview) i `crates/qnc-editorial-application`
 (`set_active`; dvije petlje cekanja upisa spojene u jednu radi C10), Cargo.
 Baseline ciljne slike spusten: C8 x2 i C9 uklonjeni, C10 Ingest 1758, Editorial 757.
+
+Zatvoreno ograniceno odobrenje 2026-09-24 (Story korak 1 i 1b, v5 Story): korisnik je
+odobrio Story plan (docs/93, inventar v5 Storyja) i rekao "odkljucaj sve sto trebas";
+odluke: zapisi Storyja u bazi projekta, mijesani fps zabranjen jasnom greskom, Off bez
+slike je crn. Otkljucano i izvedeno samo: `crates/qnc-content-store` (tablica
+`program_segments` + `public_program_segments`, operacije CreateSegment, DeleteSegment,
+MoveSegment, ListSegments; pravila R8-R13: vrsta ton/off, OUT >= IN+1, samo uvezeni klip,
+jedan fps po prici, tvrdo brisanje uz zatvaranje rupe, zamjena sa susjedom; testovi),
+`crates/qnc-ingest-select/src/publish.rs` (samo novi write odgovor tretiran kao
+neispravan u Select toku), novi javni `crates/qnc-program-segments` (model programa,
+upis bez blokiranja UI-ja, naredbe Select/Step/Move/Delete), novi javni
+`crates/qnc-segment-panel` (v5 panel "Segmenti" nad `qnc-timeline` i lista taba Segment
+s Up/Down/Del), novi javni `crates/qnc-editorial-layout` (model editorial layout
+ugovora premjesten iz forme; grupa smije imati vlastite tabove i gumbe glave poola),
+`crates/qnc-virtual-shots` (upis shorta i slicica s cekanjem premjesten iz
+`qnc-editorial-application`), `crates/qnc-editorial-application` (Talking Head/Voice
+over, tabovi All/Virtual/B-roll/Segment, tipke strelice gore/dolje i Delete, naredbe
+segmenata), `crates/qnc-editorial-desktop` (desni panel Segmenti za grupu o, lista
+taba Segment, prazan B-roll tab), `contracts/ui/editorial.layout.json` aditivno (grupa
+o: action_id za Talking Head/Voice over, tabovi B-roll/Segment, gumbi B i Export
+HI-res; poruka praznog B-roll taba), ugovori `program-segments`, `segment-panel`,
+`editorial-layout` (moduli) i `program-segments` (baza), Cargo. Nije izvedeno: Wrap
+pogled, M markeri i slotovi, pustanje price, pokrivalice (B, Cover slot, Overwrite,
+Pokrivalice, sadrzaj B-roll taba), Sync/B-roll, Export HI-res (gumbi B i Export su
+vidljivi, ali nisu omoguceni). C10 granice spustene: Editorial application 737, forma
+735 (forma je prije bila 920). Verificirano: `cargo build --workspace`, testovi
+`qnc-content-store` (32), `qnc-program-segments` (6), `qnc-segment-panel`,
+`qnc-editorial-application` (11), `qnc-virtual-shots`, `qnc-editorial-layout`,
+`cargo run -p qnc-conformance` bez upozorenja. Odobrenje je zatvoreno.
 Verificirano: `cargo build --workspace`, testovi `qnc-broadcast-player` (78),
 `qnc-broadcast-engine`, `qnc-playback-activity`, `qnc-ingest-import-worker`,
 `qnc-ingest-worker`, `qnc-ingest-application`, `qnc-editorial-application`,

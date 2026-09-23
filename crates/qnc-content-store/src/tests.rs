@@ -1121,3 +1121,129 @@ fn a_runtime_key_must_be_plain() {
         .is_err());
     }
 }
+
+fn imported_store(path: &std::path::Path) -> ContentStore {
+    let mut store = claimed_store(path);
+    run(
+        &mut store,
+        Operation::FinishImport {
+            clip_id: "c1".into(),
+            media_uri: Some(clip("c1").snapshot.binding.original_uri),
+            thumbnail_uri: None,
+            error: None,
+        },
+    )
+    .unwrap();
+    store
+}
+
+fn create_segment(store: &mut ContentStore, kind: &str, range: (u64, u64), fps: (u32, u32)) -> Result<Data> {
+    run(
+        store,
+        Operation::CreateSegment {
+            project_id: "p1".into(),
+            kind: kind.into(),
+            clip_id: "c1".into(),
+            in_frame: range.0,
+            out_frame: range.1,
+            fps_num: fps.0,
+            fps_den: fps.1,
+        },
+    )
+}
+
+fn segments(store: &mut ContentStore) -> Vec<ProgramSegment> {
+    let Data::Segments(rows) = run(store, Operation::ListSegments).unwrap() else {
+        panic!()
+    };
+    rows
+}
+
+#[test]
+fn segments_are_appended_in_order_and_keep_their_source_range() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = imported_store(&dir.path().join("db"));
+    let Data::SegmentCreated(ton) = create_segment(&mut store, "ton", (10, 60), (50, 1)).unwrap()
+    else {
+        panic!()
+    };
+    create_segment(&mut store, "off", (100, 125), (100, 2)).unwrap();
+    let rows = segments(&mut store);
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].segment_id, ton);
+    assert_eq!((rows[0].kind.as_str(), rows[0].in_frame, rows[0].out_frame), ("ton", 10, 60));
+    assert_eq!((rows[1].kind.as_str(), rows[1].sort_index), ("off", 1));
+}
+
+#[test]
+fn a_segment_needs_a_real_range_a_known_kind_an_imported_clip_and_the_story_rate() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut claimed = claimed_store(&path);
+    assert!(create_segment(&mut claimed, "ton", (0, 10), (50, 1))
+        .unwrap_err()
+        .contains("nije uvezen"));
+    drop(claimed);
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = imported_store(&dir.path().join("db"));
+    assert!(create_segment(&mut store, "ton", (10, 10), (50, 1)).is_err());
+    assert!(create_segment(&mut store, "voice", (0, 10), (50, 1)).is_err());
+    assert!(create_segment(&mut store, "ton", (0, 10), (0, 1)).is_err());
+    create_segment(&mut store, "ton", (0, 10), (50, 1)).unwrap();
+    let mixed = create_segment(&mut store, "off", (0, 10), (25, 1)).unwrap_err();
+    assert!(mixed.contains("mijesani fps"), "{mixed}");
+    assert_eq!(segments(&mut store).len(), 1);
+}
+
+#[test]
+fn deleting_closes_the_gap_and_moving_swaps_neighbours_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = imported_store(&dir.path().join("db"));
+    for start in [0, 100, 200] {
+        create_segment(&mut store, "ton", (start, start + 10), (50, 1)).unwrap();
+    }
+    let ids = segments(&mut store)
+        .into_iter()
+        .map(|row| row.segment_id)
+        .collect::<Vec<_>>();
+    let move_segment = |store: &mut ContentStore, id: &str, up: bool| {
+        run(
+            store,
+            Operation::MoveSegment {
+                segment_id: id.into(),
+                up,
+            },
+        )
+        .unwrap()
+    };
+    move_segment(&mut store, &ids[0], true);
+    move_segment(&mut store, &ids[2], true);
+    let order = |store: &mut ContentStore| {
+        segments(store)
+            .into_iter()
+            .map(|row| (row.segment_id, row.sort_index))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        order(&mut store),
+        vec![(ids[0].clone(), 0), (ids[2].clone(), 1), (ids[1].clone(), 2)]
+    );
+    run(
+        &mut store,
+        Operation::DeleteSegment {
+            segment_id: ids[2].clone(),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        order(&mut store),
+        vec![(ids[0].clone(), 0), (ids[1].clone(), 1)]
+    );
+    assert!(run(
+        &mut store,
+        Operation::DeleteSegment {
+            segment_id: ids[2].clone(),
+        },
+    )
+    .is_err());
+}

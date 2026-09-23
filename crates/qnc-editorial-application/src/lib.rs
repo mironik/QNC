@@ -17,6 +17,7 @@ use std::{
 use qnc_active_project_read::{ActiveProjectChange, ActiveProjectReader, ShownProject};
 use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
+use qnc_program_segments::{SegmentCommand, SegmentKind};
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_source_preview::{PreviewContext, SourcePreview};
 use qnc_source_reader::SourceReader;
@@ -87,6 +88,7 @@ pub struct EditorialApplication {
     /// Shot range to paint once the parent clip's timeline is ready.
     pending_shot: Option<PendingShot>,
     short_stills: VirtualShortStillCache,
+    segments: qnc_program_segments::ProgramSegments,
 }
 
 impl Default for EditorialApplication {
@@ -105,6 +107,7 @@ impl Default for EditorialApplication {
             project_dir: None,
             pending_shot: None,
             short_stills: VirtualShortStillCache::default(),
+            segments: qnc_program_segments::ProgramSegments::new(),
         }
     }
 }
@@ -138,11 +141,10 @@ impl EditorialApplication {
 
     /// Text for the shell footer: the last preview error, else the catalog state.
     pub fn footer_status(&self) -> &str {
-        if self.view.preview.message.is_empty() {
-            &self.view.message
-        } else {
-            &self.view.preview.message
-        }
+        [&self.view.preview.message, &self.view.segments.message]
+            .into_iter()
+            .find(|message| !message.is_empty())
+            .unwrap_or(&self.view.message)
     }
 
     pub fn has_player(&self) -> bool {
@@ -168,8 +170,10 @@ impl EditorialApplication {
         if let Some(delay) = self.preview.next_repaint_delay() {
             return Some(delay);
         }
-        (self.load_result.is_some() || self.posters.has_pending_work())
-            .then(|| Duration::from_millis(100))
+        (self.load_result.is_some()
+            || self.posters.has_pending_work()
+            || self.segments.has_pending_work())
+        .then(|| Duration::from_millis(100))
     }
 
     fn fail(&mut self, error: String) {
@@ -228,6 +232,8 @@ impl EditorialApplication {
     }
 
     fn sync_preview_view(&mut self) {
+        self.segments.poll();
+        self.view.segments = self.segments.view().clone();
         let previous_clip_id = self.view.preview.clip_id.clone();
         let previous_timeline = self.view.preview.timeline;
         self.view.preview = self.preview.view().clone();
@@ -323,7 +329,10 @@ impl EditorialApplication {
                     reader.settings_reader(),
                     &loaded.settings,
                 ) {
-                    Ok(target) => Some(target),
+                    Ok(target) => {
+                        self.segments.configure(target.clone(), &project_id);
+                        Some(target)
+                    }
                     Err(error) => {
                         self.view.message = error;
                         None
@@ -383,12 +392,8 @@ impl EditorialApplication {
                 true
             }
             EditorialIntent::Action(action_id) => match action_id.as_str() {
-                action_ids::EDITORIAL_TAB_ALL => {
-                    self.view.library_tab = LibraryTab::All;
-                    true
-                }
-                action_ids::EDITORIAL_TAB_VIRTUAL => {
-                    self.view.library_tab = LibraryTab::Virtual;
+                tab if LibraryTab::from_action(tab).is_some() => {
+                    self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
                     true
                 }
                 action_ids::PLAY_PAUSE => self.preview.toggle_play(),
@@ -411,8 +416,20 @@ impl EditorialApplication {
                     true
                 }
                 action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
+                action_ids::ADD_TON_SEGMENT => self.add_segment(SegmentKind::Ton),
+                action_ids::ADD_OFF_SEGMENT => self.add_segment(SegmentKind::Off),
+                action_ids::DELETE_SEGMENT | action_ids::DELETE_PART => {
+                    self.segments.apply(SegmentCommand::DeleteSelected)
+                }
+                action_ids::STEP_PREV_PART => {
+                    self.segments.apply(SegmentCommand::Step { up: true })
+                }
+                action_ids::STEP_NEXT_PART => {
+                    self.segments.apply(SegmentCommand::Step { up: false })
+                }
                 _ => false,
             },
+            EditorialIntent::Segment(command) => self.segments.apply(command),
             EditorialIntent::Timeline(intent) => match intent {
                 TimelineIntent::CueFrame(_) => self.preview.timeline_intent(&intent),
                 _ => false,
@@ -423,6 +440,19 @@ impl EditorialApplication {
     }
 
     /// Writes one short from the IN/OUT the source timeline is showing.
+    /// Talking Head or Voice over: the chosen clip between the confirmed IN/OUT, in
+    /// the timebase the player confirmed, is appended to the program.
+    fn add_segment(&mut self, kind: SegmentKind) -> bool {
+        let timebase = self.preview.player_view().source_timebase();
+        self.segments.create_from_source(
+            kind,
+            self.view.chosen_clip_id(),
+            self.view.preview.timeline.visible_source_marks(),
+            timebase.map(|timebase| (timebase.fps_num, timebase.fps_den)),
+        );
+        true
+    }
+
     fn save_virtual_shot(&mut self) -> bool {
         let Some(clip_id) = self.view.chosen_clip_id().map(str::to_string) else {
             self.view.message = "Odaberi klip.".into();
@@ -449,7 +479,14 @@ impl EditorialApplication {
             return true;
         };
         let name = clip.name.clone();
-        match save_short_via_transport(&target, &project_id, &clip_id, &name, in_frame, out_frame) {
+        match qnc_virtual_shots::save_short_now(
+            &target,
+            &project_id,
+            &clip_id,
+            &name,
+            in_frame,
+            out_frame,
+        ) {
             Ok(shot) => {
                 self.store_short_stills(&shot.shot_id, &clip_id, in_frame, out_frame);
                 self.reload_shorts();
@@ -470,7 +507,7 @@ impl EditorialApplication {
             return;
         };
         let Some(project_dir) = self.project_dir.as_deref() else {
-            if let Err(error) = mark_stills_failed_via_transport(
+            if let Err(error) = qnc_virtual_shots::mark_stills_failed_now(
                 &target,
                 shot_id,
                 "Lokalni direktorij projekta nije dostupan.",
@@ -490,7 +527,7 @@ impl EditorialApplication {
             out_frame,
         ) {
             Ok(stills) => {
-                if let Err(error) = mark_stills_ready_via_transport(
+                if let Err(error) = qnc_virtual_shots::mark_stills_ready_now(
                     &target,
                     shot_id,
                     &stills.in_uri,
@@ -500,7 +537,9 @@ impl EditorialApplication {
                 }
             }
             Err(error) => {
-                if let Err(error) = mark_stills_failed_via_transport(&target, shot_id, &error) {
+                if let Err(error) =
+                    qnc_virtual_shots::mark_stills_failed_now(&target, shot_id, &error)
+                {
                     self.view.preview.message = error;
                 }
             }
@@ -589,93 +628,6 @@ fn parent_clip(clip: &EditorialClip) -> ParentClip {
         duration_frames: clip.duration_frames,
         import_status: clip.import_status.clone(),
         imported_media_uri: clip.imported_media_uri.clone(),
-    }
-}
-
-fn save_short_via_transport(
-    target: &qnc_content_store::ContentTarget,
-    project_id: &str,
-    clip_id: &str,
-    name: &str,
-    in_frame: u64,
-    out_frame: u64,
-) -> Result<qnc_virtual_shots::SavedShort, String> {
-    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
-    qnc_virtual_shots::save_short(
-        &mut transport,
-        format!("virtual_short:{clip_id}:{in_frame}:{out_frame}"),
-        project_id.to_string(),
-        clip_id.to_string(),
-        name.to_string(),
-        in_frame,
-        out_frame,
-    )?;
-    wait_for_saved_short(&mut transport)
-}
-
-fn mark_stills_ready_via_transport(
-    target: &qnc_content_store::ContentTarget,
-    shot_id: &str,
-    in_uri: &str,
-    out_uri: &str,
-) -> Result<(), String> {
-    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
-    qnc_virtual_shots::mark_stills_ready(
-        &mut transport,
-        format!("virtual_short_stills:{shot_id}:ready"),
-        shot_id.to_string(),
-        in_uri.to_string(),
-        out_uri.to_string(),
-    )?;
-    wait_for_changed(&mut transport)
-}
-
-fn mark_stills_failed_via_transport(
-    target: &qnc_content_store::ContentTarget,
-    shot_id: &str,
-    error: &str,
-) -> Result<(), String> {
-    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
-    qnc_virtual_shots::mark_stills_failed(
-        &mut transport,
-        format!("virtual_short_stills:{shot_id}:failed"),
-        shot_id.to_string(),
-        error.to_string(),
-    )?;
-    wait_for_changed(&mut transport)
-}
-
-fn wait_for_saved_short(
-    transport: &mut qnc_content_store::ContentWriteTransport,
-) -> Result<qnc_virtual_shots::SavedShort, String> {
-    match wait_for_write(transport)? {
-        qnc_content_store::ContentWriteData::SavedShort(shot) => Ok(*shot),
-        _ => Err("Neispravan odgovor baze.".into()),
-    }
-}
-
-fn wait_for_changed(
-    transport: &mut qnc_content_store::ContentWriteTransport,
-) -> Result<(), String> {
-    match wait_for_write(transport)? {
-        qnc_content_store::ContentWriteData::Changed => Ok(()),
-        _ => Err("Neispravan odgovor baze.".into()),
-    }
-}
-
-/// The data of the first completed write, or a controlled error after five seconds.
-fn wait_for_write(
-    transport: &mut qnc_content_store::ContentWriteTransport,
-) -> Result<qnc_content_store::ContentWriteData, String> {
-    let started = std::time::Instant::now();
-    loop {
-        if let Some(completion) = transport.poll().into_iter().next() {
-            return Ok(completion.result?.data);
-        }
-        if started.elapsed() > Duration::from_secs(5) {
-            return Err("Isteklo je cekanje upisa virtualnog kadra.".into());
-        }
-        std::thread::sleep(Duration::from_millis(5));
     }
 }
 

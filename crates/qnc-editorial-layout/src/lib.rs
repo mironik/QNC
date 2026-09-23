@@ -1,6 +1,7 @@
-// Shape copied from qnc-ingest-desktop/src/layout_contract.rs; reads
-// `contracts/ui/editorial.layout.json` (same geometry as `ingest.layout.json`)
-// and picks the composition of one group (e, g, l, o).
+//! Public model of the editorial layout contract: reads
+//! `contracts/ui/editorial.layout.json` (same geometry as `ingest.layout.json`), the
+//! shell layout and the QNC keyboard catalog, validates them and picks the
+//! composition of one group (e, g, l, o). No paint, no state, no application.
 use std::collections::HashMap;
 
 use qnc_keyboard_shortcut::ShortcutCatalog;
@@ -72,6 +73,18 @@ impl EditorialContracts {
 
     pub fn composition(&self) -> &GroupComposition {
         &self.editorial.groups[&self.group]
+    }
+
+    /// Pool head tabs of this group (All, Virtual, B-roll, Segment ...).
+    pub fn pool_tabs(&self) -> &[TransportCommand] {
+        let own = self.composition().pool_head.tabs_left.as_deref();
+        own.unwrap_or(&self.editorial.pool_head.tabs_left)
+    }
+
+    /// Pool head transport buttons of this group, left to right.
+    pub fn pool_transport(&self) -> &[TransportCommand] {
+        let own = self.composition().pool_head.transport_right.as_deref();
+        own.unwrap_or(&self.editorial.pool_head.transport_right)
     }
 
     pub fn dock_height(&self) -> f32 {
@@ -214,8 +227,17 @@ pub struct EditorialSourceDock {
 pub struct GroupComposition {
     pub role: String,
     pub right_panel: String,
+    /// Tabs and transport of this group; the shared pool head when absent.
+    #[serde(default)]
+    pub pool_head: GroupPoolHead,
     pub source_dock: GroupSourceDock,
     pub media_card: GroupMediaCard,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct GroupPoolHead {
+    pub tabs_left: Option<Vec<TransportCommand>>,
+    pub transport_right: Option<Vec<TransportCommand>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -229,6 +251,7 @@ pub struct EditorialMediaCard {
     pub card_text_height: f32,
     pub grid_gap: f32,
     pub empty_message: String,
+    pub broll_empty_message: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

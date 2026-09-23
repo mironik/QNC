@@ -43,7 +43,8 @@
     "min_card_width": 160.0,
     "card_text_height": 34.0,
     "grid_gap": 10.0,
-    "empty_message": "Nema klipova — prvo Ingest import."
+    "empty_message": "Nema klipova — prvo Ingest import.",
+    "broll_empty_message": "Nema B-roll kadrova — dodaj pokrivalicu."
   },
   "pool_head": {
     "tabs_left": [
@@ -137,7 +138,20 @@
         "show_segment_tab": true,
         "show_cover_tab": true,
         "show_export_hires": true,
-        "show_quick_cover": true
+        "show_quick_cover": true,
+        "tabs_left": [
+          { "label": "All", "action_id": "editorial_tab_all" },
+          { "label": "Virtual", "action_id": "editorial_tab_virtual" },
+          { "label": "B-roll", "action_id": "editorial_tab_broll" },
+          { "label": "Segment", "action_id": "editorial_tab_segment" }
+        ],
+        "transport_right": [
+          { "label": ">", "action_id": "play_pause" },
+          { "label": "[", "action_id": "mark_in" },
+          { "label": "]", "action_id": "mark_out" },
+          { "label": "B", "action_id": "quick_overwrite_cover" },
+          { "label": "Export HI-res", "action_id": "export_hires" }
+        ]
       },
       "right_panel": "segment_panel",
       "source_dock": {
@@ -145,7 +159,7 @@
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
+        "actions_rtl": ["Pokrivalice", { "label": "Voice over", "action_id": "add_off_segment" }, { "label": "Talking Head", "action_id": "add_ton_segment" }, { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
       },
       "media_card": {
         "selection_check": false,

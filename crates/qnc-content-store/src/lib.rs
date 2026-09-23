@@ -142,6 +142,21 @@ pub struct ShortClip {
     pub still_status: String,
 }
 
+/// One segment of the edited program: `ton` (picture and sound) or `off` (sound
+/// only). Frames are source frames of its clip in the timebase `fps_num/fps_den`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProgramSegment {
+    pub segment_id: String,
+    pub kind: String,
+    pub sort_index: u32,
+    pub clip_id: String,
+    pub in_frame: u64,
+    pub out_frame: u64,
+    pub fps_num: u32,
+    pub fps_den: u32,
+}
+
 /// Lightweight catalog signature for deciding whether a visible catalog is stale.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -257,6 +272,25 @@ pub enum Operation {
         out_uri: Option<String>,
         error: Option<String>,
     },
+    /// Appends a segment at the end of the program.
+    CreateSegment {
+        project_id: String,
+        kind: String,
+        clip_id: String,
+        in_frame: u64,
+        out_frame: u64,
+        fps_num: u32,
+        fps_den: u32,
+    },
+    DeleteSegment {
+        segment_id: String,
+    },
+    /// Swaps the segment with its neighbour before (`up`) or after it.
+    MoveSegment {
+        segment_id: String,
+        up: bool,
+    },
+    ListSegments,
 }
 impl Operation {
     pub fn is_write(&self) -> bool {
@@ -271,6 +305,7 @@ impl Operation {
                 | Self::ReadWave { .. }
                 | Self::GetRuntime { .. }
                 | Self::ListShorts
+                | Self::ListSegments
         )
     }
 }
@@ -299,6 +334,8 @@ pub enum Data {
     Runtime(Option<RuntimeEntry>),
     SavedShort(Box<SavedShort>),
     ShortClips(Vec<ShortClip>),
+    SegmentCreated(String),
+    Segments(Vec<ProgramSegment>),
     Changed,
 }
 

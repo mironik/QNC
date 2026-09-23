@@ -96,6 +96,9 @@ members = [
     "crates/qnc-poster-create",
     "crates/qnc-ingest-runtime",
     "crates/qnc-playback-activity",
+    "crates/qnc-program-segments",
+    "crates/qnc-segment-panel",
+    "crates/qnc-editorial-layout",
     "crates/qnc-playback-priority",
     "crates/qnc-source-preview",
     "crates/qnc-source-contract",
@@ -210,6 +213,9 @@ qnc-clip-posters = { path = "crates/qnc-clip-posters" }
 qnc-poster-create = { path = "crates/qnc-poster-create" }
 qnc-ingest-runtime = { path = "crates/qnc-ingest-runtime" }
 qnc-playback-activity = { path = "crates/qnc-playback-activity" }
+qnc-program-segments = { path = "crates/qnc-program-segments" }
+qnc-segment-panel = { path = "crates/qnc-segment-panel" }
+qnc-editorial-layout = { path = "crates/qnc-editorial-layout" }
 qnc-playback-priority = { path = "crates/qnc-playback-priority" }
 qnc-source-preview = { path = "crates/qnc-source-preview" }
 qnc-source-contract = { path = "crates/qnc-source-contract" }

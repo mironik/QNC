@@ -4,12 +4,27 @@
 pub use qnc_source_preview::{MonitorFrame, PreviewView};
 pub use qnc_virtual_short_cards::VirtualShortCard as EditorialShort;
 
-/// Pool tab. Virtual lists short shots only, as in v5.
+/// Pool tab, as in v5: Virtual lists short shots only, B-roll the cover shots and
+/// Segment the program segments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LibraryTab {
     #[default]
     All,
     Virtual,
+    Broll,
+    Segment,
+}
+
+impl LibraryTab {
+    pub fn from_action(action_id: &str) -> Option<Self> {
+        match action_id {
+            action_ids::EDITORIAL_TAB_ALL => Some(Self::All),
+            action_ids::EDITORIAL_TAB_VIRTUAL => Some(Self::Virtual),
+            action_ids::EDITORIAL_TAB_BROLL => Some(Self::Broll),
+            action_ids::EDITORIAL_TAB_SEGMENT => Some(Self::Segment),
+            _ => None,
+        }
+    }
 }
 
 /// One row of the clip list (summary only).
@@ -44,6 +59,8 @@ pub struct EditorialView {
     pub message: String,
     /// The source preview: monitor picture, timeline, artifacts, chosen clip.
     pub preview: PreviewView,
+    /// Ton and Off segments of the story program.
+    pub segments: qnc_program_segments::SegmentsView,
 }
 
 impl EditorialView {
@@ -63,8 +80,13 @@ impl EditorialView {
 
     pub fn action_enabled(&self, action_id: &str) -> bool {
         match action_id {
-            action_ids::SAVE_VIRTUAL_SHOT => self.chosen_clip_id().is_some(),
-            action_ids::EDITORIAL_TAB_ALL | action_ids::EDITORIAL_TAB_VIRTUAL => true,
+            action_ids::SAVE_VIRTUAL_SHOT
+            | action_ids::ADD_TON_SEGMENT
+            | action_ids::ADD_OFF_SEGMENT => self.chosen_clip_id().is_some(),
+            action_ids::DELETE_SEGMENT | action_ids::DELETE_PART => {
+                self.segments.selected().is_some()
+            }
+            tab if LibraryTab::from_action(tab).is_some() => true,
             action_ids::PLAY_PAUSE
             | action_ids::STEP_BACK_FRAME
             | action_ids::STEP_FORWARD_FRAME
@@ -75,11 +97,7 @@ impl EditorialView {
     }
 
     pub fn tab_selected(&self, action_id: &str) -> bool {
-        matches!(
-            (action_id, self.library_tab),
-            (action_ids::EDITORIAL_TAB_ALL, LibraryTab::All)
-                | (action_ids::EDITORIAL_TAB_VIRTUAL, LibraryTab::Virtual)
-        )
+        LibraryTab::from_action(action_id) == Some(self.library_tab)
     }
 }
 
@@ -93,6 +111,7 @@ pub enum EditorialIntent {
     SwitchLibraryTab(LibraryTab),
     Action(String),
     Timeline(qnc_timeline::TimelineIntent),
+    Segment(qnc_program_segments::SegmentCommand),
 }
 
 impl EditorialIntent {
@@ -104,10 +123,18 @@ impl EditorialIntent {
 pub mod action_ids {
     pub const EDITORIAL_TAB_ALL: &str = "editorial_tab_all";
     pub const EDITORIAL_TAB_VIRTUAL: &str = "editorial_tab_virtual";
+    pub const EDITORIAL_TAB_BROLL: &str = "editorial_tab_broll";
+    pub const EDITORIAL_TAB_SEGMENT: &str = "editorial_tab_segment";
+    pub const STEP_PREV_PART: &str = "step_prev_part";
+    pub const STEP_NEXT_PART: &str = "step_next_part";
+    pub const DELETE_PART: &str = "delete_part";
     pub const PLAY_PAUSE: &str = "play_pause";
     pub const STEP_BACK_FRAME: &str = "step_back_frame";
     pub const STEP_FORWARD_FRAME: &str = "step_forward_frame";
     pub const MARK_IN: &str = "mark_in";
     pub const MARK_OUT: &str = "mark_out";
     pub const SAVE_VIRTUAL_SHOT: &str = "save_virtual_shot";
+    pub const ADD_TON_SEGMENT: &str = "add_ton_segment";
+    pub const ADD_OFF_SEGMENT: &str = "add_off_segment";
+    pub const DELETE_SEGMENT: &str = "delete_segment";
 }

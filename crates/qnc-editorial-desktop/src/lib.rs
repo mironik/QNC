@@ -5,7 +5,7 @@
 //! receives `EditorialIntent`s.
 
 mod app;
-mod layout_contract;
+use qnc_editorial_layout as layout_contract;
 mod theme;
 mod widgets;
 

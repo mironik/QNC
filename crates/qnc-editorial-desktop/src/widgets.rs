@@ -90,6 +90,12 @@ fn render_board(
     ui.scope_builder(egui::UiBuilder::new().max_rect(left_rect), |ui| {
         intent = render_left_column(ui, contracts, theme, view);
     });
+    if intent.is_none() && contracts.composition().right_panel == "segment_panel" {
+        ui.scope_builder(egui::UiBuilder::new().max_rect(right_rect), |ui| {
+            intent = qnc_segment_panel::show_selecting(ui, &view.segments, timeline_theme(theme))
+                .map(EditorialIntent::Segment);
+        });
+    }
     intent
 }
 
@@ -209,7 +215,7 @@ fn render_pool_head(
         |ui| {
             ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
             ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
-            for tab in &contracts.editorial.pool_head.tabs_left {
+            for tab in contracts.pool_tabs() {
                 let Some(action_id) = tab.action_id() else {
                     let _ = text_tab(ui, tab.label(), false, theme);
                     ui.add_space(10.0);
@@ -225,7 +231,7 @@ fn render_pool_head(
             }
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                for command in contracts.editorial.pool_head.transport_right.iter().rev() {
+                for command in contracts.pool_transport().iter().rev() {
                     let Some(action_id) = command.action_id() else {
                         continue;
                     };
@@ -327,10 +333,25 @@ fn render_clip_grid(
     let outer = ui.available_rect_before_wrap();
     ui.painter().rect_filled(outer, 0.0, theme.bg);
     let rect = outer.shrink(contracts.editorial.board.block_pad);
+    if view.library_tab == LibraryTab::Segment {
+        let mut command = None;
+        ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+            let segments = &view.segments;
+            command = qnc_segment_panel::show_segment_list(
+                ui,
+                segments,
+                timeline_theme(theme),
+                theme.danger,
+            );
+        });
+        return command.map(EditorialIntent::Segment);
+    }
     let empty_message = if view.loading {
         "Citam projektni katalog..."
     } else if view.library_tab == LibraryTab::Virtual {
         "Nema virtualnih — Spremi virtualni kadar."
+    } else if view.library_tab == LibraryTab::Broll {
+        contracts.editorial.media_card.broll_empty_message.as_str()
     } else if !view.message.is_empty() {
         view.message.as_str()
     } else {
@@ -373,6 +394,8 @@ fn render_clip_grid(
             })
             .collect();
         short_rows
+    } else if view.library_tab == LibraryTab::Broll {
+        Vec::new()
     } else {
         clip_rows = view
             .clips

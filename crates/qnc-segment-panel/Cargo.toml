@@ -1,0 +1,10 @@
+[package]
+name = "qnc-segment-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive UI component: the Segmenti panel (program timing header and one qnc-timeline row per segment)"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-program-segments = { workspace = true }
+qnc-timeline = { workspace = true }

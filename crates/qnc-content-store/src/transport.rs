@@ -255,6 +255,20 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
+    /// The program segments in their order.
+    pub fn list_segments(&mut self) -> Result<Vec<ProgramSegment>> {
+        match self.execute(Operation::ListSegments)? {
+            Data::Segments(rows) => Ok(rows),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
+    fn write_segment(&mut self, operation: Operation) -> Result<Option<String>> {
+        match self.execute(operation)? {
+            Data::SegmentCreated(segment_id) => Ok(Some(segment_id)),
+            Data::Changed => Ok(None),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     pub fn mark_short_stills_ready(
         &mut self,
         shot_id: &str,
@@ -373,6 +387,8 @@ pub enum ContentWriteData {
     /// The clip taken from the import queue, if any.
     Claimed(Option<Box<StoredClip>>),
     SavedShort(Box<SavedShort>),
+    /// The id of a newly appended program segment.
+    SegmentCreated(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -576,6 +592,35 @@ impl ContentWriteTransport {
         )
     }
 
+    /// Appends a segment to the program; the completion carries its id.
+    pub fn create_segment(
+        &mut self,
+        key: String,
+        project_id: String,
+        segment: ProgramSegment,
+    ) -> Result<()> {
+        self.send_operation(
+            key,
+            Operation::CreateSegment {
+                project_id,
+                kind: segment.kind,
+                clip_id: segment.clip_id,
+                in_frame: segment.in_frame,
+                out_frame: segment.out_frame,
+                fps_num: segment.fps_num,
+                fps_den: segment.fps_den,
+            },
+        )
+    }
+
+    pub fn delete_segment(&mut self, key: String, segment_id: String) -> Result<()> {
+        self.send_operation(key, Operation::DeleteSegment { segment_id })
+    }
+
+    pub fn move_segment(&mut self, key: String, segment_id: String, up: bool) -> Result<()> {
+        self.send_operation(key, Operation::MoveSegment { segment_id, up })
+    }
+
     pub fn mark_short_stills_failed(
         &mut self,
         key: String,
@@ -699,6 +744,12 @@ fn execute_write_command(
             in_frame,
             out_frame,
         )?))),
+        operation @ (Operation::CreateSegment { .. }
+        | Operation::DeleteSegment { .. }
+        | Operation::MoveSegment { .. }) => Ok(match client.write_segment(operation)? {
+            Some(segment_id) => ContentWriteData::SegmentCreated(segment_id),
+            None => ContentWriteData::Changed,
+        }),
         Operation::MarkShortStills {
             shot_id,
             status,
