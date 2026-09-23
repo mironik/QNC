@@ -2017,6 +2017,28 @@ vidljivi, ali nisu omoguceni). C10 granice spustene: Editorial application 737, 
 `qnc-content-store` (32), `qnc-program-segments` (6), `qnc-segment-panel`,
 `qnc-editorial-application` (11), `qnc-virtual-shots`, `qnc-editorial-layout`,
 `cargo run -p qnc-conformance` bez upozorenja. Odobrenje je zatvoreno.
+Zatvoreno ograniceno odobrenje 2026-09-24 (Story korak 2, v5 Story): isti Story plan i
+"odkljucaj sve sto trebas"; odluke korisnika: M markeri pripadaju segmentu (sloj iznad
+base videa), svaki segment ima prekidac 1 (markeri prate sliku, zadano) ili 2 (markeri
+ostaju na frameu programa, kao v5); Talking Head i Voice over idu na A1, pokrivalice na
+A2; cijela montaza je frame-precizna. Otkljucano i izvedeno samo: `crates/qnc-content-store`
+(tablica `program_markers` + `public_program_markers`, stupac `marker_mode`, operacije
+TrimSegment, SetSegmentMarkerMode, Create/Move/DeleteMarker, ListMarkers; brisanje
+segmenta brise njegove markere i pomice markere prekidaca 2; testovi),
+`crates/qnc-ingest-select/src/publish.rs` (samo preimenovani write odgovor `Created`),
+`crates/qnc-program-segments` (markeri, M-M slotovi sa stalnim imenima, provjere
+zakljucanih krajeva, navigacija marker/slot/segment/pocetak, Wrap: naredba samo trazi
+klip i source frame od playera, playhead programa dolazi samo iz potvrdjenog framea
+playera; mapiranje tipki kataloga), `crates/qnc-segment-panel` (redovi s markerima i
+slotovima, prekidac 1|2, traka M marker/navigacija iz v5, pregledni red programa;
+Cover slot, Overwrite i Sync/B-roll vidljivi, ali nisu omoguceni),
+`crates/qnc-editorial-application` (Wrap otvaranje klipa i cue, tipke M, Delete, Home,
+I/O skracuju segment samo u Wrap pogledu), `crates/qnc-editorial-desktop` (samo poziv
+novog panela), ugovori `program-segments` (modul i baza) i `segment-panel`. Layout
+ugovori nisu dirani; C10 granice nisu podignute. Nije izvedeno: pustanje price kroz
+segmente, pokrivalice, Sync/B-roll, undo/redo, Export HI-res. Verificirano: testovi
+`qnc-content-store` (35), `qnc-program-segments` (13), `qnc-editorial-application` (11),
+`cargo build --workspace`, `cargo run -p qnc-conformance` prolazi. Odobrenje je zatvoreno.
 Verificirano: `cargo build --workspace`, testovi `qnc-broadcast-player` (78),
 `qnc-broadcast-engine`, `qnc-playback-activity`, `qnc-ingest-import-worker`,
 `qnc-ingest-worker`, `qnc-ingest-application`, `qnc-editorial-application`,

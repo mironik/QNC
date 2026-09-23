@@ -262,9 +262,16 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
+    /// The markers of the program, by program frame.
+    pub fn list_markers(&mut self) -> Result<Vec<ProgramMarker>> {
+        match self.execute(Operation::ListMarkers)? {
+            Data::Markers(rows) => Ok(rows),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     fn write_segment(&mut self, operation: Operation) -> Result<Option<String>> {
         match self.execute(operation)? {
-            Data::SegmentCreated(segment_id) => Ok(Some(segment_id)),
+            Data::Created(segment_id) => Ok(Some(segment_id)),
             Data::Changed => Ok(None),
             _ => Err("Neispravan odgovor baze.".into()),
         }
@@ -388,7 +395,7 @@ pub enum ContentWriteData {
     Claimed(Option<Box<StoredClip>>),
     SavedShort(Box<SavedShort>),
     /// The id of a newly appended program segment.
-    SegmentCreated(String),
+    Created(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -613,6 +620,12 @@ impl ContentWriteTransport {
         )
     }
 
+    /// Any write of program segments or markers: trim, marker mode, create, move or
+    /// delete a marker. A created object reports its id.
+    pub fn write_program(&mut self, key: String, operation: Operation) -> Result<()> {
+        self.send_operation(key, operation)
+    }
+
     pub fn delete_segment(&mut self, key: String, segment_id: String) -> Result<()> {
         self.send_operation(key, Operation::DeleteSegment { segment_id })
     }
@@ -746,8 +759,13 @@ fn execute_write_command(
         )?))),
         operation @ (Operation::CreateSegment { .. }
         | Operation::DeleteSegment { .. }
-        | Operation::MoveSegment { .. }) => Ok(match client.write_segment(operation)? {
-            Some(segment_id) => ContentWriteData::SegmentCreated(segment_id),
+        | Operation::MoveSegment { .. }
+        | Operation::TrimSegment { .. }
+        | Operation::SetSegmentMarkerMode { .. }
+        | Operation::CreateMarker { .. }
+        | Operation::MoveMarker { .. }
+        | Operation::DeleteMarker { .. }) => Ok(match client.write_segment(operation)? {
+            Some(segment_id) => ContentWriteData::Created(segment_id),
             None => ContentWriteData::Changed,
         }),
         Operation::MarkShortStills {

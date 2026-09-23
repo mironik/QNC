@@ -92,7 +92,7 @@ fn render_board(
     });
     if intent.is_none() && contracts.composition().right_panel == "segment_panel" {
         ui.scope_builder(egui::UiBuilder::new().max_rect(right_rect), |ui| {
-            intent = qnc_segment_panel::show_selecting(ui, &view.segments, timeline_theme(theme))
+            intent = qnc_segment_panel::show(ui, &view.segments, timeline_theme(theme))
                 .map(EditorialIntent::Segment);
         });
     }

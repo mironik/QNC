@@ -68,7 +68,7 @@ pub(crate) fn remove_missing(
             ContentWriteData::Changed
             | ContentWriteData::Claimed(_)
             | ContentWriteData::SavedShort(_)
-            | ContentWriteData::SegmentCreated(_) => {
+            | ContentWriteData::Created(_) => {
                 return Err("Neispravan remove-missing odgovor.".into())
             }
         };
@@ -101,6 +101,6 @@ fn expect_changed(result: ContentWriteResult) -> Result<()> {
         ContentWriteData::Removed(_)
         | ContentWriteData::Claimed(_)
         | ContentWriteData::SavedShort(_)
-        | ContentWriteData::SegmentCreated(_) => Err("Neispravan content write odgovor.".into()),
+        | ContentWriteData::Created(_) => Err("Neispravan content write odgovor.".into()),
     }
 }

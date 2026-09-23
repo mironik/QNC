@@ -17,7 +17,7 @@ use std::{
 use qnc_active_project_read::{ActiveProjectChange, ActiveProjectReader, ShownProject};
 use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
-use qnc_program_segments::{SegmentCommand, SegmentKind};
+use qnc_program_segments::{CueStep, SegmentKind};
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_source_preview::{PreviewContext, SourcePreview};
 use qnc_source_reader::SourceReader;
@@ -211,21 +211,18 @@ impl EditorialApplication {
             changed = true;
         }
         for poster in self.posters.poll() {
-            if let Some(clip) = self
-                .view
-                .clips
-                .iter_mut()
-                .find(|clip| clip.clip_id == poster.clip_id)
-            {
-                clip.thumb_image = Some(poster.image);
-                changed = true;
-            } else if qnc_virtual_short_cards::apply_poster(
-                &mut self.view.shorts,
-                &poster.clip_id,
-                poster.image,
-            ) {
-                changed = true;
-            }
+            let clips = &mut self.view.clips;
+            changed |= match clips.iter_mut().find(|clip| clip.clip_id == poster.clip_id) {
+                Some(clip) => {
+                    clip.thumb_image = Some(poster.image);
+                    true
+                }
+                None => qnc_virtual_short_cards::apply_poster(
+                    &mut self.view.shorts,
+                    &poster.clip_id,
+                    poster.image,
+                ),
+            };
         }
         self.sync_preview_view();
         changed
@@ -233,7 +230,6 @@ impl EditorialApplication {
 
     fn sync_preview_view(&mut self) {
         self.segments.poll();
-        self.view.segments = self.segments.view().clone();
         let previous_clip_id = self.view.preview.clip_id.clone();
         let previous_timeline = self.view.preview.timeline;
         self.view.preview = self.preview.view().clone();
@@ -248,6 +244,18 @@ impl EditorialApplication {
                 .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
         self.apply_pending_shot();
+        let confirmed = self.preview.player_view().confirmed_source_frame();
+        let shown = self.view.preview.clip_id.as_deref();
+        match self.segments.drive_player(shown, confirmed) {
+            Some(CueStep::Open(clip_id)) => {
+                self.view.chosen_shot_id = None;
+                self.pending_shot = None;
+                self.preview.open(&clip_id);
+            }
+            Some(CueStep::Cue(frame)) => _ = self.preview.cue(frame),
+            None => {}
+        }
+        self.view.segments = self.segments.view().clone();
     }
 
     fn apply_pending_shot(&mut self) {
@@ -261,13 +269,10 @@ impl EditorialApplication {
         if duration < pending.out_frame || self.view.preview.timeline.playhead_frame.is_none() {
             return;
         }
-        self.view.preview.timeline.source_in_frame = Some(pending.in_frame.min(duration));
-        self.view.preview.timeline.source_out_frame = Some(
-            pending
-                .out_frame
-                .min(duration)
-                .max(pending.in_frame.saturating_add(1)),
-        );
+        // Both lie inside the clip: the timeline is at least as long as the shot.
+        let out_frame = pending.out_frame.max(pending.in_frame.saturating_add(1));
+        self.view.preview.timeline.source_in_frame = Some(pending.in_frame);
+        self.view.preview.timeline.source_out_frame = Some(out_frame);
         self.pending_shot = None;
     }
 
@@ -375,6 +380,7 @@ impl EditorialApplication {
     pub fn dispatch(&mut self, intent: EditorialIntent) -> bool {
         let changed = match intent {
             EditorialIntent::PreviewClip(clip_id) => {
+                self.segments.leave_wrap();
                 self.view.chosen_shot_id = None;
                 self.pending_shot = None;
                 self.short_stills.clear_if_clip_changed(Some(&clip_id));
@@ -386,12 +392,16 @@ impl EditorialApplication {
                     true
                 }
             }
-            EditorialIntent::PreviewShort(shot_id) => self.open_short(&shot_id),
+            EditorialIntent::PreviewShort(shot_id) => {
+                self.segments.leave_wrap();
+                self.open_short(&shot_id)
+            }
             EditorialIntent::SwitchLibraryTab(tab) => {
                 self.view.library_tab = tab;
                 true
             }
             EditorialIntent::Action(action_id) => match action_id.as_str() {
+                action if self.segments.handles(action) => self.segments.apply_action(action),
                 tab if LibraryTab::from_action(tab).is_some() => {
                     self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
                     true
@@ -418,15 +428,6 @@ impl EditorialApplication {
                 action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
                 action_ids::ADD_TON_SEGMENT => self.add_segment(SegmentKind::Ton),
                 action_ids::ADD_OFF_SEGMENT => self.add_segment(SegmentKind::Off),
-                action_ids::DELETE_SEGMENT | action_ids::DELETE_PART => {
-                    self.segments.apply(SegmentCommand::DeleteSelected)
-                }
-                action_ids::STEP_PREV_PART => {
-                    self.segments.apply(SegmentCommand::Step { up: true })
-                }
-                action_ids::STEP_NEXT_PART => {
-                    self.segments.apply(SegmentCommand::Step { up: false })
-                }
                 _ => false,
             },
             EditorialIntent::Segment(command) => self.segments.apply(command),
