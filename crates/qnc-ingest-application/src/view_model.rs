@@ -69,6 +69,16 @@ impl Default for IngestViewModel {
 }
 
 impl IngestViewModel {
+    pub fn action_enabled(&self, action_id: &str) -> bool {
+        match action_id {
+            action_ids::INGEST_IMPORT_SELECTED => self.selected_count() > 0 && !self.command_busy,
+            action_ids::INGEST_CLEAR_SELECTION => self.visible_clips().any(|clip| clip.selected),
+            action_ids::INGEST_SELECT_ALL => self.visible_clips().next().is_some(),
+            action_ids::INGEST_APPROVE_PROXY_POSTERS => self.total_count() > 0,
+            _ => !self.command_busy,
+        }
+    }
+
     pub fn visible_clips(&self) -> impl Iterator<Item = &ClipView> {
         self.clips
             .iter()
@@ -130,27 +140,5 @@ impl IngestViewModel {
             .iter()
             .filter(|clip| clip.selected && matches!(clip.thumb_status, ThumbStatus::Missing))
             .count()
-    }
-
-    pub fn timeline_filmstrip_background(
-        &self,
-    ) -> Option<&qnc_timeline_assets::FilmstripBackground> {
-        self.timeline_assets.filmstrip_background()
-    }
-
-    pub fn timeline_a1_peaks(&self) -> &[f32] {
-        self.timeline_assets.a1_peaks()
-    }
-
-    pub fn timeline_a2_peaks(&self) -> &[f32] {
-        self.timeline_assets.a2_peaks()
-    }
-
-    pub fn timeline_a3_peaks(&self) -> &[f32] {
-        self.timeline_assets.a3_peaks()
-    }
-
-    pub fn timeline_a4_peaks(&self) -> &[f32] {
-        self.timeline_assets.a4_peaks()
     }
 }

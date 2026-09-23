@@ -2,7 +2,10 @@ use super::*;
 use qnc_media_metadata::{MediaRepresentation, Signal, StreamDetails};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde_json::Value;
-use std::{path::Path, time::Duration};
+use std::{
+    path::Path,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 pub struct ContentStore {
     conn: Connection,
@@ -118,6 +121,7 @@ impl ContentStore {
             ensure_runtime_table(&conn)?;
             ensure_filmstrip_schema(&conn)?;
             ensure_wave_schema(&conn)?;
+            ensure_virtual_shots_schema(&conn)?;
         }
         let has_thumbnail_uri = schema && has_column(&conn, "clips", "thumbnail_uri")?;
         if access == Access::ReadOnly {
@@ -183,6 +187,7 @@ impl ContentStore {
                     qnc_media_records::valid_id(clip_id).map_err(err)?;
                     Ok(Data::Wave(None))
                 }
+                Operation::ListShorts => Ok(Data::ShortClips(Vec::new())),
                 _ => Err("Ingest shema nije inicijalizirana.".into()),
             };
         }
@@ -278,6 +283,27 @@ impl ContentStore {
             Operation::PublishFilmstrip(artifact) => self.publish_filmstrip(artifact),
             Operation::ReadWave { clip_id } => self.read_wave(clip_id),
             Operation::PublishWave(artifact) => self.publish_wave(artifact),
+            Operation::SaveShort {
+                project_id,
+                clip_id,
+                clip_name,
+                in_frame,
+                out_frame,
+            } => self.save_short(project_id, clip_id, clip_name, *in_frame, *out_frame),
+            Operation::ListShorts => self.list_shorts(),
+            Operation::MarkShortStills {
+                shot_id,
+                status,
+                in_uri,
+                out_uri,
+                error,
+            } => self.mark_short_stills(
+                shot_id,
+                status,
+                in_uri.as_deref(),
+                out_uri.as_deref(),
+                error.as_deref(),
+            ),
             Operation::List { after } => {
                 let mut statement = self
                     .conn
@@ -690,6 +716,154 @@ impl ContentStore {
         Ok(Data::Changed)
     }
 
+    fn save_short(
+        &mut self,
+        project_id: &str,
+        clip_id: &str,
+        clip_name: &str,
+        in_frame: u64,
+        out_frame: u64,
+    ) -> Result<Data> {
+        if project_id.trim().is_empty() {
+            return Err("Nema aktivnog projekta.".into());
+        }
+        qnc_media_records::valid_id(clip_id).map_err(err)?;
+        if out_frame <= in_frame {
+            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+        }
+        let project_matches: bool = self
+            .conn
+            .query_row(
+                "SELECT count(*)=1 AND min(project_id)=?1 FROM public_project_settings",
+                [project_id],
+                |row| row.get(0),
+            )
+            .map_err(err)?;
+        if !project_matches {
+            return Err("Projektna baza pripada drugom projektu.".into());
+        }
+        require_imported_clip(&self.conn, clip_id)?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let source_shot_id = source_row(&tx, clip_id)?;
+        let index = next_short_index(&tx, clip_id)?;
+        let shot_id = format!("{clip_id}_shot_{index:03}");
+        let name = format!("{} {index:03}", clip_name.trim());
+        let created = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_secs() as i64)
+            .unwrap_or(0);
+        tx.execute(
+            "INSERT INTO virtual_shots (
+                shot_id, clip_id, class, in_frame, out_frame, source_shot_id, name,
+                created_at_utc, still_status
+             ) VALUES (?1, ?2, 'short', ?3, ?4, ?5, ?6, ?7, 'pending')",
+            params![
+                shot_id,
+                clip_id,
+                in_frame as i64,
+                out_frame as i64,
+                source_shot_id,
+                name,
+                created
+            ],
+        )
+        .map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::SavedShort(Box::new(SavedShort {
+            shot_id,
+            in_frame,
+            out_frame,
+        })))
+    }
+
+    fn list_shorts(&self) -> Result<Data> {
+        if !object_exists(&self.conn, "view", "public_short_clips")? {
+            return Ok(Data::ShortClips(Vec::new()));
+        }
+        let current_sql = "SELECT shot_id, clip_id, in_frame, out_frame, name,
+                in_still_uri, out_still_uri, still_status
+            FROM public_short_clips
+            ORDER BY created_at_utc, shot_id";
+        if let Ok(mut statement) = self.conn.prepare(current_sql) {
+            let rows = statement
+                .query_map([], short_clip_row)
+                .map_err(err)?
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(err)?;
+            return Ok(Data::ShortClips(rows));
+        }
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT shot_id, clip_id, in_frame, out_frame, name
+                 FROM public_short_clips
+                 ORDER BY created_at_utc, shot_id",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(ShortClip {
+                    shot_id: row.get(0)?,
+                    clip_id: row.get(1)?,
+                    in_frame: row.get::<_, i64>(2)?.max(0) as u64,
+                    out_frame: row.get::<_, i64>(3)?.max(0) as u64,
+                    name: row.get(4)?,
+                    in_still_uri: None,
+                    out_still_uri: None,
+                    still_status: "pending".into(),
+                })
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        Ok(Data::ShortClips(rows))
+    }
+
+    fn mark_short_stills(
+        &mut self,
+        shot_id: &str,
+        status: &str,
+        in_uri: Option<&str>,
+        out_uri: Option<&str>,
+        error_message: Option<&str>,
+    ) -> Result<Data> {
+        if shot_id.trim().is_empty() {
+            return Err("Virtualni kadar nije pronadjen.".into());
+        }
+        if !matches!(status, "ready" | "failed" | "pending") {
+            return Err("Neispravan status slicica virtualnog kadra.".into());
+        }
+        if let Some(uri) = in_uri {
+            qnc_contracts::parse_qnc_uri(uri).map_err(err)?;
+        }
+        if let Some(uri) = out_uri {
+            qnc_contracts::parse_qnc_uri(uri).map_err(err)?;
+        }
+        if error_message.is_some_and(|value| value.len() > 4096) {
+            return Err("Prevelika poruka greske.".into());
+        }
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE virtual_shots
+                 SET still_status = ?2,
+                     in_still_uri = COALESCE(?3, in_still_uri),
+                     out_still_uri = COALESCE(?4, out_still_uri),
+                     still_error = ?5
+                 WHERE shot_id = ?1 AND class = 'short'",
+                params![shot_id, status, in_uri, out_uri, error_message],
+            )
+            .map_err(err)?;
+        if changed == 0 {
+            Err("Virtualni kadar nije pronadjen.".into())
+        } else {
+            Ok(Data::Changed)
+        }
+    }
+
     fn read_wave(&self, clip_id: &str) -> Result<Data> {
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         let row = self
@@ -835,6 +1009,7 @@ fn owned_table(name: &str) -> bool {
             | "filmstrip_artifacts"
             | "filmstrip_frames"
             | "wave_artifacts"
+            | "virtual_shots"
             | "ingest_runtime"
     )
 }
@@ -1029,6 +1204,99 @@ fn ensure_wave_schema(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS virtual_shots (
+            shot_id TEXT PRIMARY KEY,
+            clip_id TEXT NOT NULL,
+            class TEXT NOT NULL CHECK (class IN ('source', 'short', 'b_roll')),
+            in_frame INTEGER NOT NULL,
+            out_frame INTEGER NOT NULL,
+            source_shot_id TEXT,
+            name TEXT NOT NULL,
+            created_at_utc INTEGER NOT NULL,
+            in_still_uri TEXT,
+            out_still_uri TEXT,
+            still_status TEXT NOT NULL DEFAULT 'pending'
+                CHECK (still_status IN ('pending', 'ready', 'failed')),
+            still_error TEXT
+        );",
+    )
+    .map_err(err)?;
+    add_virtual_column_if_missing(conn, "in_still_uri", "TEXT")?;
+    add_virtual_column_if_missing(conn, "out_still_uri", "TEXT")?;
+    add_virtual_column_if_missing(
+        conn,
+        "still_status",
+        "TEXT NOT NULL DEFAULT 'pending' CHECK (still_status IN ('pending', 'ready', 'failed'))",
+    )?;
+    add_virtual_column_if_missing(conn, "still_error", "TEXT")?;
+    conn.execute_batch(
+        "DROP VIEW IF EXISTS public_short_clips;
+        CREATE VIEW public_short_clips AS
+        SELECT shot_id, clip_id, in_frame, out_frame, source_shot_id, name, created_at_utc,
+               in_still_uri, out_still_uri, still_status, still_error
+        FROM virtual_shots
+        WHERE class = 'short';",
+    )
+    .map_err(err)
+}
+
+fn add_virtual_column_if_missing(conn: &Connection, column: &str, definition: &str) -> Result<()> {
+    let mut statement = conn
+        .prepare("PRAGMA table_info(virtual_shots)")
+        .map_err(err)?;
+    let columns = statement
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(err)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(err)?;
+    if columns.iter().any(|existing| existing == column) {
+        return Ok(());
+    }
+    conn.execute_batch(&format!(
+        "ALTER TABLE virtual_shots ADD COLUMN {column} {definition}"
+    ))
+    .map_err(err)
+}
+
+fn require_imported_clip(conn: &Connection, clip_id: &str) -> Result<()> {
+    let status: Option<String> = conn
+        .query_row(
+            "SELECT import_status FROM public_clips WHERE clip_id = ?1",
+            [clip_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(err)?;
+    match status.as_deref() {
+        Some("imported") | Some("done") => Ok(()),
+        Some(_) => Err(format!("Klip '{clip_id}' nije uvezen.")),
+        None => Err("Klip nije pronadjen.".into()),
+    }
+}
+
+fn source_row(conn: &Connection, clip_id: &str) -> Result<Option<String>> {
+    conn.query_row(
+        "SELECT shot_id FROM virtual_shots WHERE clip_id = ?1 AND class = 'source' LIMIT 1",
+        [clip_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(err)
+}
+
+fn next_short_index(conn: &Connection, clip_id: &str) -> Result<u32> {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM virtual_shots WHERE clip_id = ?1 AND class = 'short'",
+            [clip_id],
+            |row| row.get(0),
+        )
+        .map_err(err)?;
+    Ok(u32::try_from(count).unwrap_or(0).saturating_add(1))
+}
+
 fn validate_filmstrip_artifact(artifact: &FilmstripArtifactRecord) -> Result<()> {
     qnc_media_records::valid_id(&artifact.clip_id).map_err(err)?;
     qnc_media_records::validate_resource_uri(&artifact.artifact_uri).map_err(err)?;
@@ -1153,6 +1421,19 @@ fn summary_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredClipSummary> {
         imported_media_uri: row.get(11)?,
         revision: row.get(12)?,
         final_record: row.get(13)?,
+    })
+}
+
+fn short_clip_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ShortClip> {
+    Ok(ShortClip {
+        shot_id: row.get(0)?,
+        clip_id: row.get(1)?,
+        in_frame: row.get::<_, i64>(2)?.max(0) as u64,
+        out_frame: row.get::<_, i64>(3)?.max(0) as u64,
+        name: row.get(4)?,
+        in_still_uri: row.get(5)?,
+        out_still_uri: row.get(6)?,
+        still_status: row.get(7)?,
     })
 }
 

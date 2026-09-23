@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.source-input",
+  "module_name": "Source input adapters",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["source.input.computer", "source.input.lan", "source.input.intranet"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-source-input",
+  "forbidden_calls": ["ffprobe", "ffmpeg", "db.write", "business.workflow", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "input": "Source transport bindings registered for this host or authority.",
+  "output": "Explicit input adapters for Computer, LAN and Intranet; each adapter can create a read-only source browser session.",
+  "specification": "AGENTS.md §3 and §10: forms are passive layout boards, source input is a public lego component."
+}

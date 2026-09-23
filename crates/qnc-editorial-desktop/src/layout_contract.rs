@@ -178,7 +178,7 @@ impl EditorialPreview {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct EditorialPoolHead {
-    pub tabs_left: Vec<String>,
+    pub tabs_left: Vec<TransportCommand>,
     pub transport_right: Vec<TransportCommand>,
 }
 
@@ -220,7 +220,7 @@ pub struct GroupComposition {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct GroupSourceDock {
-    pub actions_rtl: Vec<String>,
+    pub actions_rtl: Vec<TransportCommand>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

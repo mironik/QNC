@@ -1,8 +1,9 @@
+use qnc_active_project_read::ActiveProjectReader;
 use qnc_ingest_store::content::{
     Access, CatalogStats, ContentTarget, ImportStatus, StoredClipSummary,
 };
 use qnc_ingest_work_plan::IngestWorkPlan;
-use qnc_work_settings::SettingsReader;
+use qnc_work_settings::{SettingsReader, WorkSettings};
 
 pub const MODULE_ID: &str = "qnc.module.ingest-catalog";
 pub const VERSION: &str = "0.1.0";
@@ -93,15 +94,13 @@ pub fn apply_catalog_rows<T: CatalogClipItem>(
 }
 
 pub fn load(
-    reader: &SettingsReader,
+    active_project: &ActiveProjectReader,
     retained_workspace: Option<&str>,
     retained_stats: Option<&CatalogStats>,
 ) -> Result<LoadedCatalog, String> {
-    let plan = reader
-        .read()
-        .map_err(|e| e.to_string())
-        .and_then(IngestWorkPlan::from_settings)?;
-    let target = ContentTarget::for_project(reader, &plan.settings)?;
+    let snapshot = active_project.read().map_err(|e| e.to_string())?;
+    let plan = IngestWorkPlan::from_settings(snapshot.settings)?;
+    let target = ContentTarget::for_project(active_project.settings_reader(), &plan.settings)?;
     let mut db = target.open(Access::ReadOnly)?;
     let stats = db.stats()?;
     if retained_workspace == Some(plan.settings.workspace_db_uri.as_str())
@@ -192,7 +191,7 @@ impl CatalogLoader {
 
     pub fn start(
         &mut self,
-        reader: SettingsReader,
+        active_project: ActiveProjectReader,
         retained_workspace: Option<String>,
         retained_stats: Option<CatalogStats>,
     ) -> Result<(), String> {
@@ -201,7 +200,7 @@ impl CatalogLoader {
             .name("ingest-catalog-load".into())
             .spawn(move || {
                 let _ = send.send(load(
-                    &reader,
+                    &active_project,
                     retained_workspace.as_deref(),
                     retained_stats.as_ref(),
                 ));
@@ -329,6 +328,17 @@ pub fn project_folder(
     let dir = reader.local_workspace_dir(&plan.settings).ok().flatten()?;
     Some(qnc_media_thumbnail::ProjectFolder {
         root_uri: plan.settings.output_root_uri.clone(),
+        dir,
+    })
+}
+
+pub fn project_folder_for_settings(
+    reader: &SettingsReader,
+    settings: &WorkSettings,
+) -> Option<qnc_media_thumbnail::ProjectFolder> {
+    let dir = reader.local_workspace_dir(settings).ok().flatten()?;
+    Some(qnc_media_thumbnail::ProjectFolder {
+        root_uri: settings.output_root_uri.clone(),
         dir,
     })
 }

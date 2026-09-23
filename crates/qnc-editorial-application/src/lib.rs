@@ -14,14 +14,16 @@ use std::{
     time::Duration,
 };
 
+use qnc_active_project_read::{ActiveProjectChange, ActiveProjectReader, ShownProject};
 use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
-use qnc_source_bindings::TransportBindings;
+use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_source_preview::{PreviewContext, SourcePreview};
+use qnc_source_reader::SourceReader;
 use qnc_timeline::TimelineIntent;
 use qnc_virtual_short_cards::ParentClip;
 use qnc_virtual_short_stills::VirtualShortStillCache;
-use qnc_work_settings::{SettingsReader, WorkSettings};
+use qnc_work_settings::{ProductArea, WorkSettings};
 
 pub use view::{
     action_ids, EditorialClip, EditorialIntent, EditorialShort, EditorialView, LibraryTab,
@@ -74,12 +76,12 @@ pub struct EditorialApplication {
     view: EditorialView,
     preview: SourcePreview,
     posters: ClipPosters,
-    settings_reader: Option<SettingsReader>,
+    active_project_reader: Option<ActiveProjectReader>,
     bindings: Result<TransportBindings, String>,
     load_result: Option<Receiver<LoadResult>>,
     shown_project: Option<String>,
     shown_signature: Option<CatalogSignature>,
-    workspace_file: Option<std::path::PathBuf>,
+    content_target: Option<qnc_content_store::ContentTarget>,
     current_settings: Option<WorkSettings>,
     project_dir: Option<std::path::PathBuf>,
     /// Shot range to paint once the parent clip's timeline is ready.
@@ -93,12 +95,12 @@ impl Default for EditorialApplication {
             view: EditorialView::default(),
             preview: SourcePreview::new(),
             posters: ClipPosters::new(),
-            settings_reader: None,
+            active_project_reader: None,
             bindings: Err("Izvori medija nisu ucitani.".into()),
             load_result: None,
             shown_project: None,
             shown_signature: None,
-            workspace_file: None,
+            content_target: None,
             current_settings: None,
             project_dir: None,
             pending_shot: None,
@@ -120,9 +122,9 @@ impl EditorialApplication {
     pub fn new(root: impl AsRef<Path>) -> Self {
         let mut app = Self::default();
         app.bindings = qnc_source_bindings::load(root.as_ref());
-        match SettingsReader::from_root(root.as_ref()) {
+        match ActiveProjectReader::from_root(root.as_ref()) {
             Ok(reader) => {
-                app.settings_reader = Some(reader);
+                app.active_project_reader = Some(reader);
                 app.load_catalog();
             }
             Err(error) => app.fail(error.to_string()),
@@ -175,7 +177,7 @@ impl EditorialApplication {
         if self.load_result.is_some() {
             return;
         }
-        let Some(reader) = self.settings_reader.clone() else {
+        let Some(reader) = self.active_project_reader.clone() else {
             self.fail("Nema konfiguriranog citaca radnih postavki.".into());
             return;
         };
@@ -186,11 +188,7 @@ impl EditorialApplication {
         match std::thread::Builder::new()
             .name("editorial-catalog".into())
             .spawn(move || {
-                let _ = send.send(read_catalog(
-                    &reader,
-                    shown_project.as_deref(),
-                    shown_signature.as_ref(),
-                ));
+                let _ = send.send(read_catalog(&reader, shown_project, shown_signature));
             }) {
             Ok(_) => self.load_result = Some(receive),
             Err(_) => self.fail("Nije moguce pokrenuti citanje projektnog kataloga.".into()),
@@ -284,7 +282,6 @@ impl EditorialApplication {
     }
 
     fn apply_loaded(&mut self, loaded: Loaded) {
-        self.workspace_file = Some(loaded.content.database_file().to_path_buf());
         let project_id = loaded.settings.project_id.clone();
         let settings = loaded.settings.clone();
         // A different project must never inherit the preceding one's clips or preview.
@@ -294,10 +291,13 @@ impl EditorialApplication {
             self.posters.reset();
             self.short_stills.clear();
         }
-        self.project_dir = self
-            .settings_reader
-            .as_ref()
-            .and_then(|reader| reader.local_workspace_dir(&loaded.settings).ok().flatten());
+        self.project_dir = self.active_project_reader.as_ref().and_then(|reader| {
+            reader
+                .settings_reader()
+                .local_workspace_dir(&loaded.settings)
+                .ok()
+                .flatten()
+        });
         let project_folder =
             self.project_dir
                 .clone()
@@ -306,16 +306,27 @@ impl EditorialApplication {
                     dir,
                 });
         if let Ok(bindings) = &self.bindings {
-            self.posters.configure(&bindings.sources, project_folder);
+            self.posters
+                .configure(&source_readers(bindings), project_folder);
         }
         if let Some(clips) = loaded.clips {
             self.view.clips = merge_clips(clips, &self.view.clips);
             self.request_posters();
         }
-        match (&self.settings_reader, &self.bindings) {
+        match (&self.active_project_reader, &self.bindings) {
             (Some(reader), Ok(bindings)) => {
+                self.content_target = match qnc_content_store::ContentTarget::for_project(
+                    reader.settings_reader(),
+                    &loaded.settings,
+                ) {
+                    Ok(target) => Some(target),
+                    Err(error) => {
+                        self.view.message = error;
+                        None
+                    }
+                };
                 self.preview.configure(PreviewContext::new(
-                    reader.clone(),
+                    reader.settings_reader().clone(),
                     loaded.settings,
                     loaded.content,
                     bindings.clone(),
@@ -336,7 +347,6 @@ impl EditorialApplication {
 
     /// Asks for the posters the list still lacks; the chosen clip goes first (v5 order).
     fn request_posters(&mut self) {
-        self.posters.reset();
         let mut wanted: Vec<(String, String)> = self
             .view
             .clips
@@ -369,6 +379,14 @@ impl EditorialApplication {
                 true
             }
             EditorialIntent::Action(action_id) => match action_id.as_str() {
+                action_ids::EDITORIAL_TAB_ALL => {
+                    self.view.library_tab = LibraryTab::All;
+                    true
+                }
+                action_ids::EDITORIAL_TAB_VIRTUAL => {
+                    self.view.library_tab = LibraryTab::Virtual;
+                    true
+                }
                 action_ids::PLAY_PAUSE => self.preview.toggle_play(),
                 action_ids::STEP_BACK_FRAME => self.preview.step(-1),
                 action_ids::STEP_FORWARD_FRAME => self.preview.step(1),
@@ -418,7 +436,7 @@ impl EditorialApplication {
             self.view.message = "IN i OUT nisu potvrdeni na playeru.".into();
             return true;
         };
-        let Some(file) = self.workspace_file.clone() else {
+        let Some(target) = self.content_target.clone() else {
             self.view.message = "Projektna baza nije dostupna za upis.".into();
             return true;
         };
@@ -427,14 +445,7 @@ impl EditorialApplication {
             return true;
         };
         let name = clip.name.clone();
-        match qnc_virtual_shots::save_short(
-            &file,
-            &project_id,
-            &clip_id,
-            &name,
-            in_frame,
-            out_frame,
-        ) {
+        match save_short_via_transport(&target, &project_id, &clip_id, &name, in_frame, out_frame) {
             Ok(shot) => {
                 self.store_short_stills(&shot.shot_id, &clip_id, in_frame, out_frame);
                 self.reload_shorts();
@@ -448,38 +459,46 @@ impl EditorialApplication {
     }
 
     fn store_short_stills(&mut self, shot_id: &str, clip_id: &str, in_frame: u64, out_frame: u64) {
-        let Some(file) = self.workspace_file.as_deref() else {
+        let Some(target) = self.content_target.clone() else {
             return;
         };
         let Some(settings) = self.current_settings.as_ref() else {
             return;
         };
         let Some(project_dir) = self.project_dir.as_deref() else {
-            let _ = qnc_virtual_shots::mark_stills_failed(
-                file,
+            if let Err(error) = mark_stills_failed_via_transport(
+                &target,
                 shot_id,
                 "Lokalni direktorij projekta nije dostupan.",
-            );
+            ) {
+                self.view.preview.message = error;
+            }
             return;
         };
+        let stills_dir = settings.product_local_dir(project_dir, ProductArea::VirtualShorts);
+        let stills_root_uri = settings.product_uri(ProductArea::VirtualShorts);
         match self.short_stills.store_for_short(
-            project_dir,
-            &settings.output_root_uri,
+            &stills_dir,
+            &stills_root_uri,
             shot_id,
             clip_id,
             in_frame,
             out_frame,
         ) {
             Ok(stills) => {
-                let _ = qnc_virtual_shots::mark_stills_ready(
-                    file,
+                if let Err(error) = mark_stills_ready_via_transport(
+                    &target,
                     shot_id,
                     &stills.in_uri,
                     &stills.out_uri,
-                );
+                ) {
+                    self.view.preview.message = error;
+                }
             }
             Err(error) => {
-                let _ = qnc_virtual_shots::mark_stills_failed(file, shot_id, &error);
+                if let Err(error) = mark_stills_failed_via_transport(&target, shot_id, &error) {
+                    self.view.preview.message = error;
+                }
             }
         }
     }
@@ -516,11 +535,11 @@ impl EditorialApplication {
     }
 
     fn reload_shorts(&mut self) {
-        let Some(file) = self.workspace_file.as_deref() else {
+        let Some(target) = self.content_target.as_ref() else {
             self.view.shorts.clear();
             return;
         };
-        match qnc_virtual_shots::list_shorts(file) {
+        match qnc_virtual_shots::list_shorts(target) {
             Ok(rows) => {
                 let previous = std::mem::take(&mut self.view.shorts);
                 let mut shorts: Vec<EditorialShort> =
@@ -546,12 +565,117 @@ impl EditorialApplication {
     }
 }
 
+fn source_readers(bindings: &TransportBindings) -> Vec<SourceReader> {
+    bindings.sources.iter().filter_map(source_reader).collect()
+}
+
+fn source_reader(binding: &SourceBinding) -> Option<SourceReader> {
+    binding.resolver().ok()?;
+    if let Some(path) = &binding.file {
+        SourceReader::local(&binding.uri, path).ok()
+    } else {
+        let token = binding.token().ok()??;
+        SourceReader::remote(&binding.uri, binding.endpoint.as_deref()?, &token).ok()
+    }
+}
+
 fn parent_clip(clip: &EditorialClip) -> ParentClip {
     ParentClip {
         duration_seconds: clip.duration_seconds,
         duration_frames: clip.duration_frames,
         import_status: clip.import_status.clone(),
         imported_media_uri: clip.imported_media_uri.clone(),
+    }
+}
+
+fn save_short_via_transport(
+    target: &qnc_content_store::ContentTarget,
+    project_id: &str,
+    clip_id: &str,
+    name: &str,
+    in_frame: u64,
+    out_frame: u64,
+) -> Result<qnc_virtual_shots::SavedShort, String> {
+    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
+    qnc_virtual_shots::save_short(
+        &mut transport,
+        format!("virtual_short:{clip_id}:{in_frame}:{out_frame}"),
+        project_id.to_string(),
+        clip_id.to_string(),
+        name.to_string(),
+        in_frame,
+        out_frame,
+    )?;
+    wait_for_saved_short(&mut transport)
+}
+
+fn mark_stills_ready_via_transport(
+    target: &qnc_content_store::ContentTarget,
+    shot_id: &str,
+    in_uri: &str,
+    out_uri: &str,
+) -> Result<(), String> {
+    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
+    qnc_virtual_shots::mark_stills_ready(
+        &mut transport,
+        format!("virtual_short_stills:{shot_id}:ready"),
+        shot_id.to_string(),
+        in_uri.to_string(),
+        out_uri.to_string(),
+    )?;
+    wait_for_changed(&mut transport)
+}
+
+fn mark_stills_failed_via_transport(
+    target: &qnc_content_store::ContentTarget,
+    shot_id: &str,
+    error: &str,
+) -> Result<(), String> {
+    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
+    qnc_virtual_shots::mark_stills_failed(
+        &mut transport,
+        format!("virtual_short_stills:{shot_id}:failed"),
+        shot_id.to_string(),
+        error.to_string(),
+    )?;
+    wait_for_changed(&mut transport)
+}
+
+fn wait_for_saved_short(
+    transport: &mut qnc_content_store::ContentWriteTransport,
+) -> Result<qnc_virtual_shots::SavedShort, String> {
+    let started = std::time::Instant::now();
+    loop {
+        for completion in transport.poll() {
+            let data = completion.result?.data;
+            return match data {
+                qnc_content_store::ContentWriteData::SavedShort(shot) => Ok(*shot),
+                _ => Err("Neispravan odgovor baze.".into()),
+            };
+        }
+        if started.elapsed() > Duration::from_secs(5) {
+            return Err("Isteklo je cekanje upisa virtualnog kadra.".into());
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+fn wait_for_changed(
+    transport: &mut qnc_content_store::ContentWriteTransport,
+) -> Result<(), String> {
+    let started = std::time::Instant::now();
+    loop {
+        for completion in transport.poll() {
+            let data = completion.result?.data;
+            return match data {
+                qnc_content_store::ContentWriteData::Changed => Ok(()),
+                _ => Err("Neispravan odgovor baze.".into()),
+            };
+        }
+        if started.elapsed() > Duration::from_secs(5) {
+            return Err("Isteklo je cekanje upisa virtualnog kadra.".into());
+        }
+        std::thread::sleep(Duration::from_millis(5));
     }
 }
 
@@ -579,23 +703,37 @@ fn merge_clips(new: Vec<ClipSummary>, previous: &[EditorialClip]) -> Vec<Editori
 }
 
 fn read_catalog(
-    reader: &SettingsReader,
-    shown_project: Option<&str>,
-    shown_signature: Option<&CatalogSignature>,
+    reader: &ActiveProjectReader,
+    shown_project: Option<String>,
+    shown_signature: Option<CatalogSignature>,
 ) -> LoadResult {
-    let settings = reader.read().map_err(|error| error.to_string())?;
-    settings.validate().map_err(|error| error.to_string())?;
-    let content = ContentReader::for_project(reader, &settings)?;
-    let signature = content.signature()?;
-    let unchanged =
-        shown_project == Some(settings.project_id.as_str()) && shown_signature == Some(&signature);
+    let shown = shown_project
+        .zip(shown_signature)
+        .map(|(project_id, catalog_signature)| ShownProject {
+            project_id,
+            catalog_signature,
+        });
+    let change = reader
+        .compare(shown.as_ref())
+        .map_err(|error| error.to_string())?;
+    let (snapshot, signature, unchanged) = match change {
+        ActiveProjectChange::Same(snapshot, signature) => (snapshot, signature, true),
+        ActiveProjectChange::ProjectChanged(snapshot, signature)
+        | ActiveProjectChange::SignatureChanged(snapshot, signature) => {
+            (snapshot, signature, false)
+        }
+        ActiveProjectChange::NoActiveProject => {
+            return Err("U bazi nije odabran aktivni projekt.".into());
+        }
+    };
+    let content = ContentReader::for_project(reader.settings_reader(), &snapshot.settings)?;
     let clips = if unchanged {
         None
     } else {
         Some(content.summaries()?)
     };
     Ok(Loaded {
-        settings,
+        settings: snapshot.settings,
         content,
         signature,
         clips,

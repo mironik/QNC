@@ -19,7 +19,6 @@ impl IngestApplication {
         self.view.timeline = preview
             .timeline
             .preserving_source_marks_from(&previous_timeline);
-        self.view.timeline_assets = preview.assets;
     }
 
     pub(super) fn prepare_preview(&mut self, clip_id: String) -> IngestDispatchResult {

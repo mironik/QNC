@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-active-project-read = { workspace = true }
 qnc-ingest-store = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-media-thumbnail = { workspace = true }

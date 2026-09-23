@@ -36,8 +36,19 @@ const PROJECT_DIRECTORIES: &[&str] = &[
     "audio",
     "incoming/card",
     "incoming/ftp",
-    "ingest/thumbnails",
-    "filmstrip",
+    "products/thumbnails",
+    "products/filmstrip",
+    "products/virtual_shorts",
+    "products/virtual_segments",
+    "products/b_roll_virtual_clips",
+];
+const PRODUCT_DIRECTORY_FIELDS: &[(&str, &str)] = &[
+    ("root", "products"),
+    ("thumbnails", "products/thumbnails"),
+    ("filmstrip", "products/filmstrip"),
+    ("virtual_shorts", "products/virtual_shorts"),
+    ("virtual_segments", "products/virtual_segments"),
+    ("b_roll_virtual_clips", "products/b_roll_virtual_clips"),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,6 +124,7 @@ impl ProjectStore {
         let conn = store.open_registry()?;
         init_registry_schema(&conn)?;
         ensure_templates_seeded(&conn)?;
+        sanitize_project_templates(&conn)?;
         if let Some(projects_root) = get_local_setting(&conn, PROJECTS_ROOT_KEY)? {
             store.projects_root = PathBuf::from(projects_root);
         }
@@ -173,6 +185,7 @@ impl ProjectStore {
         let conn = self.open_registry()?;
         init_registry_schema(&conn)?;
         ensure_templates_seeded(&conn)?;
+        sanitize_project_templates(&conn)?;
         let selected_template_id = selected_template_id(&conn)?;
         let mut statement = conn
             .prepare(
@@ -206,6 +219,7 @@ impl ProjectStore {
         let conn = self.open_registry()?;
         init_registry_schema(&conn)?;
         ensure_templates_seeded(&conn)?;
+        sanitize_project_templates(&conn)?;
         if get_template(&conn, template_id)?.is_none() {
             return Err(format!("Template '{template_id}' ne postoji."));
         }
@@ -216,6 +230,7 @@ impl ProjectStore {
         let conn = self.open_registry()?;
         init_registry_schema(&conn)?;
         ensure_templates_seeded(&conn)?;
+        sanitize_project_templates(&conn)?;
         let template_id = selected_template_id(&conn)?;
         let template = get_template(&conn, &template_id)?
             .ok_or_else(|| format!("Template '{template_id}' ne postoji."))?;
@@ -240,6 +255,7 @@ impl ProjectStore {
         let conn = self.open_registry()?;
         init_registry_schema(&conn)?;
         ensure_templates_seeded(&conn)?;
+        sanitize_project_templates(&conn)?;
         let base_template_id = if base_template_id.trim().is_empty() {
             selected_template_id(&conn)?
         } else {
@@ -249,6 +265,7 @@ impl ProjectStore {
             .ok_or_else(|| format!("Template '{base_template_id}' ne postoji."))?;
         let mut settings = settings.cloned().unwrap_or_else(|| base.settings.clone());
         apply_application_selection(&mut settings, selection)?;
+        strip_template_project_locations(&mut settings);
         let template_id = format!("tpl_user_{}", slug_id(name));
         let now = now_str();
         let settings_json = json_string(&settings)?;
@@ -340,6 +357,7 @@ impl ProjectStore {
         let mut conn = self.open_registry()?;
         init_registry_schema(&conn)?;
         ensure_templates_seeded(&conn)?;
+        sanitize_project_templates(&conn)?;
         let template_id = if template_id.trim().is_empty() {
             selected_template_id(&conn)?
         } else {
@@ -351,6 +369,7 @@ impl ProjectStore {
             template.settings = settings.clone();
         }
         apply_application_selection(&mut template.settings, selection)?;
+        complete_project_settings(&mut template.settings)?;
         let project_id = format!("{}_{}", slug_base(name), uuid::Uuid::new_v4().simple());
         let project_uri = format!("qnc://local/project/{project_id}");
         parse_qnc_uri(&project_uri)?;
@@ -714,7 +733,7 @@ impl ProjectStore {
     fn project_registry_db_path(&self) -> Result<PathBuf, String> {
         let resolver = ResolverConfig::new(&self.root).with_local_binding(
             PROJECT_REGISTRY_DB_URI,
-            self.data_dir.join("project_store.db"),
+            self.data_dir.join("qnc-projects.db"),
         );
         resolve_local_path(&resolver, PROJECT_REGISTRY_DB_URI)
     }
@@ -726,7 +745,7 @@ impl ProjectStore {
     ) -> Result<PathBuf, String> {
         let uri = project_workspace_db_uri(project_id);
         let resolver = ResolverConfig::new(&self.root)
-            .with_local_binding(uri.clone(), project_dir.join("qnc_project.db"));
+            .with_local_binding(uri.clone(), project_dir.join("project.db"));
         resolve_local_path(&resolver, &uri)
     }
 
@@ -888,17 +907,7 @@ fn validate_project_delete_dir(
             project_dir.display()
         ));
     }
-    let has_workspace_db = workspace_db.is_file();
-    let is_empty = fs::read_dir(project_dir)
-        .map_err(|error| error.to_string())?
-        .next()
-        .is_none();
-    if !has_workspace_db && !is_empty {
-        return Err(format!(
-            "Brisanje zaustavljeno: '{}' nema qnc_project.db.",
-            project_dir.display()
-        ));
-    }
+    let _ = workspace_db;
     Ok(())
 }
 
@@ -1505,6 +1514,50 @@ fn ensure_templates_seeded(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+fn sanitize_project_templates(conn: &Connection) -> Result<(), String> {
+    let mut statement = conn
+        .prepare(
+            "SELECT template_id, settings_json
+             FROM project_templates
+             ORDER BY template_id",
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| error.to_string())?;
+    let mut updates = Vec::new();
+    for row in rows {
+        let (template_id, settings_json) = row.map_err(|error| error.to_string())?;
+        let mut settings = parse_json(&settings_json, json!({}));
+        strip_template_project_locations(&mut settings);
+        let sanitized = json_string(&settings)?;
+        if sanitized != settings_json {
+            updates.push((template_id, sanitized));
+        }
+    }
+    drop(statement);
+
+    let now = now_str();
+    for (template_id, settings_json) in updates {
+        conn.execute(
+            "UPDATE project_templates
+             SET settings_json = ?2, updated_at = ?3
+             WHERE template_id = ?1",
+            params![template_id, settings_json, now],
+        )
+        .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn strip_template_project_locations(settings: &mut Value) {
+    if let Some(root) = settings.as_object_mut() {
+        root.remove("products");
+    }
+}
+
 fn ensure_selected_template(conn: &Connection) -> Result<(), String> {
     let current = get_local_setting(conn, SELECTED_TEMPLATE_KEY)?;
     if let Some(current) = current {
@@ -1635,6 +1688,22 @@ fn apply_application_selection(
                 .collect(),
         ),
     );
+    Ok(())
+}
+
+fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
+    let root = settings
+        .as_object_mut()
+        .ok_or("Postavke moraju biti objekt.")?;
+    let products = root.entry("products").or_insert_with(|| json!({}));
+    let products = products
+        .as_object_mut()
+        .ok_or("Products postavke moraju biti objekt.")?;
+    for (field, value) in PRODUCT_DIRECTORY_FIELDS {
+        products
+            .entry((*field).to_string())
+            .or_insert_with(|| json!(value));
+    }
     Ok(())
 }
 
@@ -1923,7 +1992,7 @@ mod tests {
         let path = root
             .join("projects")
             .join(&project.project_id)
-            .join("qnc_project.db");
+            .join("project.db");
         let before = fs::read(&path).unwrap();
         let steps = store.navigation_sequence(&project.project_id).unwrap();
         assert_eq!(steps[0].application_id, "qnc.alternative");
@@ -1989,7 +2058,7 @@ mod tests {
             .join("projects")
             .join(safe_dir_name(&project.project_id));
         unlock_project_dir(&dir).unwrap();
-        let db = Connection::open(dir.join("qnc_project.db")).unwrap();
+        let db = Connection::open(dir.join("project.db")).unwrap();
         let mut statement = db.prepare("SELECT application_id, priority_group FROM public_project_application_sequence ORDER BY position").unwrap();
         let rows: Vec<(String, String)> = statement
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
@@ -2075,9 +2144,9 @@ mod tests {
 
         assert_eq!(
             store.project_registry_db_path().expect("registry path"),
-            root.join("data").join("project_store.db")
+            root.join("data").join("qnc-projects.db")
         );
-        assert!(root.join("data").join("project_store.db").is_file());
+        assert!(root.join("data").join("qnc-projects.db").is_file());
         cleanup_temp_root(&root);
     }
 
@@ -2116,11 +2185,11 @@ mod tests {
         assert!(row.project_id.starts_with("test_projekt_"));
         assert!(row.project_uri.starts_with("qnc://local/project/"));
         assert!(parse_qnc_uri(&row.project_uri).is_ok());
-        assert!(root.join("data").join("project_store.db").is_file());
+        assert!(root.join("data").join("qnc-projects.db").is_file());
         assert!(root
             .join("projects")
             .join(safe_dir_name(&row.project_id))
-            .join("qnc_project.db")
+            .join("project.db")
             .is_file());
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         for subdir in PROJECT_DIRECTORIES {
@@ -2132,6 +2201,110 @@ mod tests {
         let rows = store.list_projects().expect("rows");
         assert_eq!(rows.len(), 1);
         assert!(rows[0].active);
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn legacy_user_template_creates_complete_project_settings() {
+        let root = temp_root("legacy_user_template");
+        let store = ProjectStore::open(&root).expect("store");
+        let conn = store.open_registry().expect("registry");
+        init_registry_schema(&conn).unwrap();
+        ensure_templates_seeded(&conn).unwrap();
+        let legacy_settings = json!({
+            "storage": {
+                "ingest_profile": "field",
+                "ingest_media": "link",
+                "proxy_policy": "link_when_available",
+                "original_policy": "link_when_available",
+                "projects_root": root.join("projects").to_string_lossy()
+            },
+            "input": {"mode": "auto"},
+            "playback": {"input": "proxy_if_available"},
+            "video": {"fps": 50},
+            "audio": {"sample_rate": 48000, "channels": 2},
+            "ai": {"enabled": false},
+            "keyboard_shortcuts": {"active_preset": "default"}
+        });
+        conn.execute(
+            "INSERT INTO project_templates
+                (template_id, name, description, system, settings_json, source_template_ids_json,
+                 created_at, updated_at)
+             VALUES ('tpl_user_legacy_without_products', 'Legacy', '', 0, ?1, '[]', 'now', 'now')",
+            [legacy_settings.to_string()],
+        )
+        .unwrap();
+        drop(conn);
+
+        let project = store
+            .create_project(
+                "Legacy complete",
+                "tpl_user_legacy_without_products",
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
+            .unwrap();
+        let project_dir = root
+            .join("projects")
+            .join(safe_dir_name(&project.project_id));
+        let conn = Connection::open(project_dir.join("project.db")).unwrap();
+        let saved: String = conn
+            .query_row(
+                "SELECT settings_json FROM project_settings WHERE project_id = ?1",
+                params![project.project_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let saved: Value = serde_json::from_str(&saved).unwrap();
+        assert_eq!(saved["products"]["root"], "products");
+        assert_eq!(saved["products"]["thumbnails"], "products/thumbnails");
+        assert_eq!(saved["products"]["filmstrip"], "products/filmstrip");
+        assert_eq!(
+            saved["products"]["virtual_shorts"],
+            "products/virtual_shorts"
+        );
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn open_sanitizes_template_project_locations() {
+        let root = temp_root("sanitize_template_locations");
+        let store = ProjectStore::open(&root).expect("store");
+        let conn = store.open_registry().expect("registry");
+        let legacy_settings = json!({
+            "products": {
+                "root": "products",
+                "filmstrip": "products/filmstrip",
+                "virtual_segments": "products/virtual_segments"
+            },
+            "storage": {
+                "ingest_profile": "field",
+                "ingest_media": "link"
+            },
+            "input": {"mode": "auto"},
+            "playback": {"input": "original"},
+            "video": {"fps": 50},
+            "audio": {"sample_rate": 48000, "channels": 2},
+            "ai": {"enabled": false},
+            "keyboard_shortcuts": {"active_preset": "default"}
+        });
+        conn.execute(
+            "INSERT INTO project_templates
+                (template_id, name, description, system, settings_json, source_template_ids_json,
+                 created_at, updated_at)
+             VALUES ('tpl_user_open_normalizes', 'Legacy', '', 0, ?1, '[]', 'now', 'now')",
+            [legacy_settings.to_string()],
+        )
+        .unwrap();
+        drop(conn);
+
+        let store = ProjectStore::open(&root).expect("reopen");
+        store
+            .set_selected_template("tpl_user_open_normalizes")
+            .expect("select");
+        let settings = store.selected_template_settings().expect("settings");
+
+        assert!(settings.settings.get("products").is_none());
         cleanup_temp_root(&root);
     }
 
@@ -2151,7 +2324,7 @@ mod tests {
         let workspace_path = root
             .join("projects")
             .join(safe_dir_name(&row.project_id))
-            .join("qnc_project.db");
+            .join("project.db");
         let workspace = Connection::open_with_flags(
             &workspace_path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
@@ -2278,7 +2451,7 @@ mod tests {
         );
 
         unlock_project_dir(&project_dir).expect("unlock for DB inspection");
-        let conn = Connection::open(project_dir.join("qnc_project.db")).expect("workspace db");
+        let conn = Connection::open(project_dir.join("project.db")).expect("workspace db");
         let raw: String = conn
             .query_row(
                 "SELECT settings_json FROM project_settings WHERE project_id = ?1",
@@ -2330,7 +2503,7 @@ mod tests {
             .create_project(
                 "Failed workspace",
                 "tpl_breaking_news",
-                Some(&json!({"export": {"directory": "qnc_project.db"}})),
+                Some(&json!({"export": {"directory": "project.db"}})),
                 &test_selection(&["project", "ingest"]),
             )
             .unwrap_err();
@@ -2400,7 +2573,7 @@ mod tests {
             )
             .unwrap();
         let dir = requested.join(&project.project_id);
-        assert!(dir.join("qnc_project.db").is_file());
+        assert!(dir.join("project.db").is_file());
         assert!(dir.join(DEFAULT_EXPORT_DIRECTORY).is_dir());
         assert!(!root.join("projects").join(&project.project_id).exists());
         let conn = store.open_registry().unwrap();
@@ -2422,7 +2595,7 @@ mod tests {
             requested.canonicalize().unwrap()
         );
         let db = Connection::open_with_flags(
-            dir.join("qnc_project.db"),
+            dir.join("project.db"),
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
         )
         .unwrap();
@@ -2459,7 +2632,7 @@ mod tests {
             .unwrap();
         assert!(requested
             .join(&project.project_id)
-            .join("qnc_project.db")
+            .join("project.db")
             .is_file());
         assert!(!root.join("projects").join(&project.project_id).exists());
         first.delete_project(&project.project_id).unwrap();
@@ -2536,7 +2709,7 @@ mod tests {
         );
 
         unlock_project_dir(&project_dir).expect("unlock for DB inspection");
-        let conn = Connection::open(project_dir.join("qnc_project.db")).expect("workspace db");
+        let conn = Connection::open(project_dir.join("project.db")).expect("workspace db");
         let raw: String = conn
             .query_row(
                 "SELECT settings_json FROM project_settings WHERE project_id = ?1",
@@ -2598,7 +2771,7 @@ mod tests {
             .permissions()
             .readonly());
         assert!(!project_dir
-            .join("qnc_project.db")
+            .join("project.db")
             .metadata()
             .expect("project DB metadata")
             .permissions()
@@ -2627,7 +2800,7 @@ mod tests {
 
         fs::remove_dir_all(&project_dir).expect_err("locked project dir must reject OS delete");
         assert!(project_dir.is_dir());
-        assert!(project_dir.join("qnc_project.db").is_file());
+        assert!(project_dir.join("project.db").is_file());
 
         unlock_project_dir(&project_dir).expect("unlock for delete");
         fs::remove_dir_all(&project_dir).expect("delete after unlock");
@@ -2698,12 +2871,12 @@ mod tests {
             .expect("project");
         assert!(selected_root
             .join(safe_dir_name(&row.project_id))
-            .join("qnc_project.db")
+            .join("project.db")
             .is_file());
         assert!(!root
             .join("projects")
             .join(safe_dir_name(&row.project_id))
-            .join("qnc_project.db")
+            .join("project.db")
             .exists());
         cleanup_temp_root(&root);
     }
@@ -2783,7 +2956,7 @@ mod tests {
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         unlock_project_dir(&project_dir).expect("unlock for DB inspection");
-        let conn = Connection::open(project_dir.join("qnc_project.db")).expect("workspace db");
+        let conn = Connection::open(project_dir.join("project.db")).expect("workspace db");
         let count: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM project_workflow_steps WHERE project_id = ?1",
@@ -2825,7 +2998,7 @@ mod tests {
             .expect("project");
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         unlock_project_dir(&project_dir).expect("unlock for DB inspection");
-        let conn = Connection::open(project_dir.join("qnc_project.db")).expect("workspace db");
+        let conn = Connection::open(project_dir.join("project.db")).expect("workspace db");
         let raw: String = conn
             .query_row(
                 "SELECT settings_json FROM project_settings WHERE project_id = ?1",
@@ -2870,7 +3043,7 @@ mod tests {
         let second_dir = root
             .join("projects")
             .join(safe_dir_name(&second.project_id));
-        assert!(second_dir.join("qnc_project.db").is_file());
+        assert!(second_dir.join("project.db").is_file());
 
         let deleted = store.delete_project(&second.project_id).expect("delete");
         assert_eq!(deleted.name, second.name);
@@ -2900,10 +3073,14 @@ mod tests {
             .join("projects")
             .join(safe_dir_name(&project.project_id));
         let files = [
-            project_dir.join("qnc_project.db"),
-            project_dir.join("qnc_project.db-wal"),
-            project_dir.join("qnc_project.db-shm"),
-            project_dir.join("filmstrip").join("clip").join("000.jpg"),
+            project_dir.join("project.db"),
+            project_dir.join("project.db-wal"),
+            project_dir.join("project.db-shm"),
+            project_dir
+                .join("products")
+                .join("filmstrip")
+                .join("clip")
+                .join("000.jpg"),
         ];
         for file in &files {
             fs::create_dir_all(file.parent().unwrap()).expect("parent dir");
@@ -2930,11 +3107,40 @@ mod tests {
     }
 
     #[test]
+    fn delete_project_removes_registered_directory_even_when_project_db_is_missing() {
+        let root = temp_root("delete_project_missing_db");
+        let store = ProjectStore::open(&root).expect("store");
+        let templates = store.list_project_templates().expect("templates");
+        let project = store
+            .create_project(
+                "Missing DB",
+                &templates[0].template_id,
+                None,
+                &test_selection(&["project", "ingest"]),
+            )
+            .expect("project");
+        let project_dir = root
+            .join("projects")
+            .join(safe_dir_name(&project.project_id));
+        unlock_project_dir(&project_dir).expect("unlock project dir");
+        clear_path_read_only_for_delete(&project_dir.join("project.db")).expect("writable db");
+        fs::remove_file(project_dir.join("project.db")).expect("remove project.db");
+        fs::write(project_dir.join("leftover.txt"), b"stale").expect("leftover");
+
+        let deleted = store.delete_project(&project.project_id).expect("delete");
+
+        assert_eq!(deleted.project_id, project.project_id);
+        assert!(!project_dir.exists());
+        assert!(store.list_projects().expect("rows").is_empty());
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
     fn project_database_files_are_deleted_before_project_directory() {
         let root = temp_root("delete_database_first");
         let project_dir = root.join("projects").join("p1");
         fs::create_dir_all(&project_dir).expect("project dir");
-        let workspace_db = project_dir.join("qnc_project.db");
+        let workspace_db = project_dir.join("project.db");
         for file in sqlite_database_files(&workspace_db) {
             fs::write(&file, b"stale").expect("sqlite file");
             set_test_read_only(&file, true);

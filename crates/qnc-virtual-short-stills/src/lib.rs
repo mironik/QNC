@@ -79,8 +79,8 @@ impl VirtualShortStillCache {
 
     pub fn store_for_short(
         &self,
-        project_dir: &Path,
-        output_root_uri: &str,
+        stills_dir: &Path,
+        stills_root_uri: &str,
         shot_id: &str,
         clip_id: &str,
         in_frame: u64,
@@ -98,14 +98,14 @@ impl VirtualShortStillCache {
         let Some(output) = &self.out_still else {
             return Err("OUT slika nije dostupna.".into());
         };
-        let dir = project_dir.join("virtual_shorts").join(shot_id);
+        let dir = stills_dir.join(shot_id);
         fs::create_dir_all(&dir).map_err(|error| format!("virtual short directory: {error}"))?;
         write_still(input, &dir.join("in.jpg"))?;
         write_still(output, &dir.join("out.jpg"))?;
-        let root = output_root_uri.trim_end_matches('/');
+        let root = stills_root_uri.trim_end_matches('/');
         Ok(StoredShortStills {
-            in_uri: format!("{root}/virtual_shorts/{shot_id}/in.jpg"),
-            out_uri: format!("{root}/virtual_shorts/{shot_id}/out.jpg"),
+            in_uri: format!("{root}/{shot_id}/in.jpg"),
+            out_uri: format!("{root}/{shot_id}/out.jpg"),
         })
     }
 }
@@ -226,6 +226,7 @@ mod tests {
     #[test]
     fn writes_two_poster_sized_jpegs_under_virtual_shorts() {
         let dir = tempfile::tempdir().unwrap();
+        let stills_dir = dir.path().join("products").join("virtual_shorts");
         let mut cache = VirtualShortStillCache::default();
         cache
             .capture_in(&preview("clip-a", 10, [255, 0, 0, 255]))
@@ -235,8 +236,8 @@ mod tests {
             .unwrap();
         let stored = cache
             .store_for_short(
-                dir.path(),
-                "qnc://local/project/p1",
+                &stills_dir,
+                "qnc://local/project/p1/products/virtual_shorts",
                 "clip-a_shot_001",
                 "clip-a",
                 10,
@@ -245,19 +246,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             stored.in_uri,
-            "qnc://local/project/p1/virtual_shorts/clip-a_shot_001/in.jpg"
+            "qnc://local/project/p1/products/virtual_shorts/clip-a_shot_001/in.jpg"
         );
-        assert!(dir
-            .path()
-            .join("virtual_shorts")
-            .join("clip-a_shot_001")
-            .join("in.jpg")
-            .is_file());
-        assert!(dir
-            .path()
-            .join("virtual_shorts")
-            .join("clip-a_shot_001")
-            .join("out.jpg")
-            .is_file());
+        assert!(stills_dir.join("clip-a_shot_001").join("in.jpg").is_file());
+        assert!(stills_dir.join("clip-a_shot_001").join("out.jpg").is_file());
     }
 }

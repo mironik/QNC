@@ -13,7 +13,6 @@ impl IngestApplication {
     }
 
     pub(crate) fn start_thumbnail_load(&mut self, clips: Vec<(String, String)>) {
-        self.cancel_thumbnail_load();
         if self.playback_guard_active() {
             return;
         }
@@ -39,26 +38,29 @@ impl IngestApplication {
         if sources.is_empty() && project.is_none() {
             return;
         }
-        let requests = clips
-            .into_iter()
-            .map(|(clip_id, uri)| qnc_media_thumbnail::ThumbnailRequest {
-                item_id: clip_id,
-                uri,
-            })
-            .collect::<Vec<_>>();
-        if let Err(error) = self
-            .thumbnail_loader
-            .start_with_project(sources, project, requests)
-        {
-            self.view.message = error;
-        }
+        self.posters.configure(&sources, project);
+        self.posters
+            .request(clips, self.view.preview_clip_id.as_deref());
     }
 
     pub(crate) fn cancel_thumbnail_load(&mut self) {
-        self.thumbnail_loader.cancel();
+        self.posters.cancel();
     }
 
     pub(crate) fn poll_thumbnails(&mut self) -> bool {
-        self.thumbnail_loader.poll_into(&mut self.view.clips, 16)
+        let mut changed = false;
+        for poster in self.posters.poll() {
+            if let Some(clip) = self
+                .view
+                .clips
+                .iter_mut()
+                .find(|clip| clip.clip_id == poster.clip_id)
+            {
+                clip.thumb_image = Some(poster.image);
+                clip.thumb_status = ThumbStatus::Ready;
+                changed = true;
+            }
+        }
+        changed
     }
 }

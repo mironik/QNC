@@ -103,10 +103,10 @@
     "actions_rtl": [
       "AI mining",
       "Kopiraj original",
-      "Očisti",
-      "Odaberi sve",
-      "Uvezi",
-      "Generiraj postere",
+      { "label": "Očisti", "action_id": "ingest_clear_selection" },
+      { "label": "Odaberi sve", "action_id": "ingest_select_all" },
+      { "label": "Uvezi", "action_id": "ingest_import_selected" },
+      { "label": "Generiraj postere", "action_id": "ingest_approve_proxy_posters" },
       "Novi / Sve"
     ],
     "clip_filter_labels": ["Novi", "Sve"],

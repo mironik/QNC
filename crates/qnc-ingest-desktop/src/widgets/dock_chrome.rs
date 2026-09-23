@@ -17,16 +17,6 @@ pub(super) fn dock_style(
     }
 }
 
-pub(super) fn action_enabled(action: &str, view: &IngestViewModel) -> bool {
-    match action {
-        "Uvezi" => view.selected_count() > 0 && !view.command_busy,
-        "Očisti" => view.visible_clips().any(|clip| clip.selected),
-        "Odaberi sve" => view.visible_clips().next().is_some(),
-        "Generiraj postere" => view.total_count() > 0,
-        _ => !view.command_busy,
-    }
-}
-
 pub(super) fn source_kind_label(labels: &IngestDirBrowser, kind: SourceKind) -> &str {
     let index = match kind {
         SourceKind::Local => 0,

@@ -24,6 +24,7 @@ pub use process::{launch_worker, run_service, ImportSummary, WORKER_EXECUTABLE};
 
 use qnc_ingest_store::content::{ContentClient, StoredClip};
 use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
+use qnc_work_settings::ProductArea;
 use std::{
     fs,
     io::{Read, Write},
@@ -268,7 +269,10 @@ pub fn import_poster(
     cancel: &AtomicBool,
 ) -> Option<String> {
     let clip_id = clip.clip.id();
-    let directory = project_dir.join("ingest").join("thumbnails").join(clip_id);
+    let directory = plan
+        .settings
+        .product_local_dir(project_dir, ProductArea::Thumbnails)
+        .join(clip_id);
     let output = directory.join("poster.jpg");
     inside_project(project_dir, &output).ok()?;
     match clip.clip.thumbnail_uri.as_deref() {

@@ -29,12 +29,12 @@ def evidence(value):
 
 
 def inputs(root, requested):
-    registry = root / "data/project_store.db"
+    registry = root / "data/qnc-projects.db"
     with read_db(registry) as db:
         active = db.execute("SELECT value FROM public_app_settings WHERE key='active_project_id'").fetchone()[0]
         name = db.execute("SELECT name FROM public_projects WHERE project_id=?", (active,)).fetchone()[0]
         directory = db.execute("SELECT local_path FROM project_storage_locations WHERE project_id=?", (active,)).fetchone()[0]
-    workspace = Path(directory) / "qnc_project.db"
+    workspace = Path(directory) / "project.db"
     with read_db(workspace) as db:
         settings = json.loads(db.execute("SELECT settings_json FROM public_project_settings WHERE project_id=?", (active,)).fetchone()[0])
     config = json.loads((root / "data/ingest-transport.json").read_text(encoding="utf-8"))

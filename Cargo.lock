@@ -2895,6 +2895,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
+name = "qnc-active-project-read"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-read",
+ "qnc-work-settings",
+ "rusqlite",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-app"
 version = "0.1.0"
 dependencies = [
@@ -2951,6 +2961,7 @@ dependencies = [
 name = "qnc-application-sequence"
 version = "0.1.0"
 dependencies = [
+ "qnc-transport-resolver",
  "qnc-work-settings",
  "rusqlite",
  "tempfile",
@@ -3069,10 +3080,8 @@ dependencies = [
 name = "qnc-clip-posters"
 version = "0.1.0"
 dependencies = [
- "qnc-dir-browser",
  "qnc-image-assets",
  "qnc-media-thumbnail",
- "qnc-source-bindings",
  "qnc-source-reader",
  "tempfile",
 ]
@@ -3175,6 +3184,7 @@ name = "qnc-dev-diagnostics-app"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-active-project-read",
  "qnc-dev-diagnostics",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
@@ -3197,12 +3207,15 @@ dependencies = [
 name = "qnc-editorial-application"
 version = "0.1.0"
 dependencies = [
+ "qnc-active-project-read",
  "qnc-clip-posters",
  "qnc-content-read",
+ "qnc-content-store",
  "qnc-image-assets",
  "qnc-media-thumbnail",
  "qnc-source-bindings",
  "qnc-source-preview",
+ "qnc-source-reader",
  "qnc-timeline",
  "qnc-virtual-short-cards",
  "qnc-virtual-short-stills",
@@ -3340,8 +3353,10 @@ name = "qnc-ingest-application"
 version = "0.1.0"
 dependencies = [
  "image",
+ "qnc-active-project-read",
  "qnc-application-sequence",
  "qnc-camera-adapter",
+ "qnc-clip-posters",
  "qnc-content-artifacts",
  "qnc-content-store",
  "qnc-contracts",
@@ -3384,6 +3399,7 @@ dependencies = [
 name = "qnc-ingest-catalog"
 version = "0.1.0"
 dependencies = [
+ "qnc-active-project-read",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
@@ -3405,6 +3421,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-ingest-application",
  "qnc-keyboard-shortcut",
+ "qnc-media-card",
  "qnc-monitor",
  "qnc-source-dock",
  "qnc-timeline",
@@ -3426,6 +3443,7 @@ dependencies = [
 name = "qnc-ingest-import-worker"
 version = "0.1.0"
 dependencies = [
+ "qnc-active-project-read",
  "qnc-camera-adapter",
  "qnc-camera-sony-fx6-v6",
  "qnc-contracts",
@@ -3490,6 +3508,7 @@ dependencies = [
  "qnc-media-record-db",
  "qnc-scanner",
  "qnc-sony-metadata",
+ "qnc-source-bindings",
  "qnc-source-groups",
  "qnc-source-index-db",
  "qnc-source-reader",
@@ -3512,19 +3531,16 @@ dependencies = [
 name = "qnc-ingest-store"
 version = "0.1.0"
 dependencies = [
+ "qnc-content-store",
  "qnc-contracts",
  "qnc-db-contract",
  "qnc-json-transport",
- "qnc-media-metadata",
  "qnc-media-records",
  "qnc-transport-resolver",
- "qnc-wave",
  "qnc-work-settings",
  "rusqlite",
  "serde",
- "serde_json",
  "tempfile",
- "tiny_http",
 ]
 
 [[package]]
@@ -3538,6 +3554,7 @@ dependencies = [
 name = "qnc-ingest-worker"
 version = "0.1.0"
 dependencies = [
+ "qnc-active-project-read",
  "qnc-content-artifacts",
  "qnc-content-store",
  "qnc-ingest-import-worker",
@@ -4041,6 +4058,7 @@ dependencies = [
  "eframe",
  "qnc-filmstrip",
  "qnc-timeline",
+ "qnc-timeline-assets",
 ]
 
 [[package]]
@@ -4084,6 +4102,16 @@ dependencies = [
  "tiny_http",
  "ureq",
  "uuid",
+]
+
+[[package]]
+name = "qnc-source-input"
+version = "0.1.0"
+dependencies = [
+ "qnc-contracts",
+ "qnc-dir-browser",
+ "qnc-source-bindings",
+ "qnc-source-reader",
 ]
 
 [[package]]
@@ -4218,6 +4246,8 @@ dependencies = [
 name = "qnc-virtual-shots"
 version = "0.1.0"
 dependencies = [
+ "qnc-content-store",
+ "qnc-media-records",
  "rusqlite",
  "tempfile",
 ]

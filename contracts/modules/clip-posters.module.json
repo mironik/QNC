@@ -14,7 +14,7 @@
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-clip-posters",
-  "input": "Clips with the address of their poster, the chosen clip, the sources and the project folder of this machine.",
+  "input": "Clips with poster URIs from the active project database snapshot, the chosen clip, resolved read-only source readers and an optional project folder for this machine.",
   "output": "Decoded posters as they arrive, the chosen clip first; read-only, no database.",
   "specification": "docs/v5-book/08-audit-and-plan.md (audit response)"
 }

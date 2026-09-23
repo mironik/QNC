@@ -1,4 +1,5 @@
 pub use qnc_work_settings::PlaybackInput;
+use qnc_work_settings::ProductArea;
 use qnc_work_settings::WorkSettings;
 
 pub const MODULE_ID: &str = "qnc.module.ingest-work-plan";
@@ -42,8 +43,8 @@ impl IngestWorkPlan {
             proxy_uri: format!("{root}/proxy"),
             audio_uri: format!("{root}/audio"),
             incoming_uri: format!("{root}/incoming"),
-            thumbnails_uri: format!("{root}/ingest/thumbnails"),
-            filmstrip_uri: format!("{root}/filmstrip"),
+            thumbnails_uri: settings.product_uri(ProductArea::Thumbnails),
+            filmstrip_uri: settings.product_uri(ProductArea::Filmstrip),
             settings,
         })
     }

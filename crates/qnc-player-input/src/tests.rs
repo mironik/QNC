@@ -7,7 +7,7 @@ use qnc_ingest_store::content::{
 use qnc_media_metadata as m;
 use qnc_media_records::{Binding, Completeness};
 use qnc_transport_resolver::ResolverConfig;
-use qnc_work_settings::{ReaderConfig, StoragePolicy};
+use qnc_work_settings::{ProductLocations, ReaderConfig, StoragePolicy};
 use rusqlite::Connection;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc, time::Duration};
 
@@ -209,6 +209,14 @@ fn settings(context: &str, mode: &str) -> WorkSettings {
             ingest_media: "link".into(),
             proxy_policy: "link_when_available".into(),
             original_policy: "ignore_for_fast_news".into(),
+        },
+        products: ProductLocations {
+            root: "products".into(),
+            thumbnails: "products/thumbnails".into(),
+            filmstrip: "products/filmstrip".into(),
+            virtual_shorts: "products/virtual_shorts".into(),
+            virtual_segments: "products/virtual_segments".into(),
+            b_roll_virtual_clips: "products/b_roll_virtual_clips".into(),
         },
         input: serde_json::json!({"mode":"auto"}),
         playback: serde_json::json!({"input":mode}),
@@ -612,10 +620,19 @@ impl Fixture {
     fn new(context: &str) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let registry = dir.path().join("registry.db");
-        let db = dir.path().join("qnc_project.db");
+        let db = dir.path().join("project.db");
         let s = settings(context, "proxy_if_available");
         let content_uri = content_uri(&s.workspace_db_uri).unwrap();
-        let saved = serde_json::json!({"storage":s.storage,"input":s.input,"playback":s.playback,"video":s.video,"audio":s.audio,"ai":s.ai,"keyboard_shortcuts":s.keyboard_shortcuts});
+        let saved = serde_json::json!({
+            "storage": s.storage,
+            "products": s.products,
+            "input": s.input,
+            "playback": s.playback,
+            "video": s.video,
+            "audio": s.audio,
+            "ai": s.ai,
+            "keyboard_shortcuts": s.keyboard_shortcuts
+        });
         let c = Connection::open(&db).unwrap();
         c.execute_batch("CREATE TABLE project_settings(project_id TEXT,settings_json TEXT); CREATE VIEW public_project_settings AS SELECT * FROM project_settings;").unwrap();
         c.execute(

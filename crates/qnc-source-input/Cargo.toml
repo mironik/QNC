@@ -1,0 +1,11 @@
+[package]
+name = "qnc-source-input"
+version = "0.1.0"
+edition = "2021"
+description = "Public neutral input source adapter catalog for local directories, cards, LAN and intranet sources"
+
+[dependencies]
+qnc-contracts = { workspace = true }
+qnc-dir-browser = { workspace = true }
+qnc-source-bindings = { workspace = true }
+qnc-source-reader = { workspace = true }

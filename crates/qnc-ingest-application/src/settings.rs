@@ -26,11 +26,11 @@ impl IngestApplication {
     }
 
     pub fn on_activated(&mut self) -> IngestDispatchResult {
-        let Some(reader) = self.settings_reader.as_ref() else {
+        let Some(reader) = self.active_project_reader.as_ref() else {
             return self.refresh_active_project();
         };
         let active_project = match reader.read() {
-            Ok(settings) => settings.project_id,
+            Ok(snapshot) => snapshot.project_id,
             Err(_) => return self.refresh_active_project(),
         };
         let loaded_project = self
@@ -66,7 +66,7 @@ impl IngestApplication {
             }
             return IngestDispatchResult::rejected("Citanje radnih postavki je u tijeku.");
         }
-        let Some(reader) = self.settings_reader.clone() else {
+        let Some(active_project) = self.active_project_reader.clone() else {
             self.settings_failed("Nema konfiguriranog citaca radnih postavki.".into());
             return IngestDispatchResult::rejected("Nema konfiguriranog citaca radnih postavki.");
         };
@@ -90,9 +90,9 @@ impl IngestApplication {
             self.view.work_settings_ready = false;
         }
         self.view.work_settings_error = None;
-        if let Err(error) = self
-            .catalog_loader
-            .start(reader, retained_workspace, retained_stats)
+        if let Err(error) =
+            self.catalog_loader
+                .start(active_project, retained_workspace, retained_stats)
         {
             self.settings_failed(error);
         }

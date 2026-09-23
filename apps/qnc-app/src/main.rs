@@ -1207,7 +1207,7 @@ mod tests {
         let mut shell = navigation_shell();
         let data = shell.qnc_root.join("data");
         fs::create_dir_all(&data).unwrap();
-        let db = data.join("project_store.db");
+        let db = data.join("qnc-projects.db");
         let conn = rusqlite::Connection::open(&db).unwrap();
         conn.execute_batch(
             "
@@ -1219,7 +1219,7 @@ mod tests {
         .unwrap();
         let project_dir = shell.qnc_root.join("projects").join("p1");
         fs::create_dir_all(&project_dir).unwrap();
-        fs::write(project_dir.join("qnc_project.db"), []).unwrap();
+        fs::write(project_dir.join("project.db"), []).unwrap();
         shell.embedded_apps.insert(
             "variant".into(),
             Box::new(StatusSurface {
@@ -1239,7 +1239,7 @@ mod tests {
             )
             .unwrap();
         assert!(active.is_empty());
-        assert!(project_dir.join("qnc_project.db").is_file());
+        assert!(project_dir.join("project.db").is_file());
         assert_eq!(shell.active_tab, "variant");
         assert!(shell.embedded_apps.contains_key("variant"));
         assert_eq!(shell.status, "Aktivni projekt zatvoren.");

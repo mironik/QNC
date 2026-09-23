@@ -2,21 +2,18 @@
 name = "qnc-ingest-store"
 version = "0.1.0"
 edition = "2021"
-description = "IngestQNC owned registry/content database store"
+description = "IngestQNC owned registry database store; project content is owned by qnc-content-store"
 
 [dependencies]
 qnc-contracts = { workspace = true }
 qnc-db-contract = { workspace = true }
 qnc-transport-resolver = { workspace = true }
 qnc-json-transport = { workspace = true }
+qnc-content-store = { workspace = true }
 qnc-media-records = { workspace = true }
-qnc-media-metadata = { workspace = true }
-qnc-wave = { workspace = true }
 qnc-work-settings = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 rusqlite = { workspace = true, features = ["hooks"] }
-tiny_http = "0.12"
 
 [dev-dependencies]
 tempfile = "3"

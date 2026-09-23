@@ -9,7 +9,7 @@ use std::{
 fn fixture() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     fs::create_dir(root.path().join("data")).unwrap();
-    let db = Connection::open(root.path().join("data/project_store.db")).unwrap();
+    let db = Connection::open(root.path().join("data/qnc-projects.db")).unwrap();
     db.execute_batch(
         "CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT);
         CREATE VIEW public_app_settings AS SELECT * FROM app_settings;
@@ -32,7 +32,7 @@ fn fixture() -> tempfile::TempDir {
             [id, dir.to_str().unwrap()],
         )
         .unwrap();
-        let workspace = Connection::open(dir.join("qnc_project.db")).unwrap();
+        let workspace = Connection::open(dir.join("project.db")).unwrap();
         workspace
             .execute_batch(
                 "CREATE TABLE project_settings(project_id TEXT, settings_json TEXT);
@@ -42,6 +42,14 @@ fn fixture() -> tempfile::TempDir {
         let value = json!({
             "storage": {"ingest_profile":"field", "ingest_media": if id=="p1" {"link"} else {"original"},
                 "proxy_policy":"link_when_available", "original_policy":"link_when_available"},
+            "products": {
+                "root": "products",
+                "thumbnails": "products/thumbnails",
+                "filmstrip": "products/filmstrip",
+                "virtual_shorts": "products/virtual_shorts",
+                "virtual_segments": "products/virtual_segments",
+                "b_roll_virtual_clips": "products/b_roll_virtual_clips"
+            },
             "input":{"mode":"auto"}, "playback":{"input":"proxy_if_available"},
             "video":{"fps":50}, "audio":{"sample_rate":48000, "channels":2},
             "ai":{"enabled":id=="p2"}, "keyboard_shortcuts":{"active_preset":"default"}
@@ -175,7 +183,11 @@ fn reads_existing_active_settings_and_v4_directory_roles_without_ui_payload() {
     assert_eq!(plan.original_uri, "qnc://local/project/p1/original");
     assert_eq!(
         plan.thumbnails_uri,
-        "qnc://local/project/p1/ingest/thumbnails"
+        "qnc://local/project/p1/products/thumbnails"
+    );
+    assert_eq!(
+        plan.filmstrip_uri,
+        "qnc://local/project/p1/products/filmstrip"
     );
     assert_eq!(plan.settings.video["fps"], 50);
     assert!(!component.view.ai_mining);
@@ -203,7 +215,7 @@ fn project_poster_thumbnails_load_after_active_project_plan_is_set() {
     selection::test_support::execute(&config, &calls, false, false, ".");
     assert_eq!(calls.load(Ordering::SeqCst), 4);
 
-    let reader = SettingsReader::local(root.path().join("data/project_store.db"));
+    let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
     let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();
     let mut source = ContentClient::from_owner_binding(
         &source_fixture.path().join("content.db"),
@@ -213,13 +225,13 @@ fn project_poster_thumbnails_load_after_active_project_plan_is_set() {
     .unwrap();
     let mut clip = source.list(None).unwrap().remove(0).clip;
     let poster_uri = format!(
-        "qnc://local/project/p1/ingest/thumbnails/{}/poster.png",
+        "qnc://local/project/p1/products/thumbnails/{}/poster.png",
         clip.id()
     );
     let poster_path = root
         .path()
         .join("p1")
-        .join("ingest")
+        .join("products")
         .join("thumbnails")
         .join(clip.id())
         .join("poster.png");
@@ -260,7 +272,7 @@ fn reload_changes_plan_from_db_and_discards_unpersisted_ui_state() {
         0,
         "UI is not the selection authority"
     );
-    Connection::open(root.path().join("data/project_store.db"))
+    Connection::open(root.path().join("data/qnc-projects.db"))
         .unwrap()
         .execute("UPDATE app_settings SET value='p2'", [])
         .unwrap();
@@ -299,7 +311,7 @@ fn activation_checks_catalog_signature_and_reloads_only_when_db_changed() {
     selection::test_support::execute(&config, &calls, false, false, ".");
     assert_eq!(calls.load(Ordering::SeqCst), 4);
 
-    let reader = SettingsReader::local(root.path().join("data/project_store.db"));
+    let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
     let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();
     let mut source = ContentClient::from_owner_binding(
         &source_fixture.path().join("content.db"),
@@ -362,7 +374,7 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
     let calls = Arc::new(AtomicUsize::new(0));
     selection::test_support::execute(&config, &calls, false, false, ".");
     assert_eq!(calls.load(Ordering::SeqCst), 4);
-    let reader = SettingsReader::local(root.path().join("data/project_store.db"));
+    let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
     let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();
     let mut db = target.open(Access::ReadWrite).unwrap();
     let mut source = ContentClient::from_owner_binding(
@@ -380,7 +392,7 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
     }
     drop(db);
     let id = seeded[0].clip.id().to_string();
-    let project = Connection::open(root.path().join("p1/qnc_project.db")).unwrap();
+    let project = Connection::open(root.path().join("p1/project.db")).unwrap();
     let before: String = project
         .query_row("SELECT settings_json FROM project_settings", [], |r| {
             r.get(0)
@@ -523,7 +535,7 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
             .unwrap()
             .selected
     );
-    let registry = Connection::open(root.path().join("data/project_store.db")).unwrap();
+    let registry = Connection::open(root.path().join("data/qnc-projects.db")).unwrap();
     registry
         .execute("UPDATE app_settings SET value='p2'", [])
         .unwrap();
@@ -551,9 +563,9 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
 fn missing_project_db_is_not_recreated_and_import_is_rejected() {
     use qnc_ingest_store::content::{Access, ContentTarget};
     let root = fixture();
-    let reader = SettingsReader::local(root.path().join("data/project_store.db"));
+    let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
     let target = ContentTarget::for_project(&reader, &reader.read().unwrap()).unwrap();
-    let file = root.path().join("p1/qnc_project.db");
+    let file = root.path().join("p1/project.db");
     std::fs::remove_file(&file).unwrap();
     assert!(target.open(Access::ReadWrite).is_err());
     assert!(!file.exists());
@@ -590,7 +602,7 @@ fn select_rereads_current_active_project_and_cancel_prevents_source_write() {
     browser.roots("local").unwrap();
     component.apply_source_browser_result(browser.open(uri).map(Into::into));
     component.browse.connect(browser);
-    Connection::open(root.path().join("data/project_store.db"))
+    Connection::open(root.path().join("data/qnc-projects.db"))
         .unwrap()
         .execute("UPDATE app_settings SET value='p2'", [])
         .unwrap();
@@ -683,7 +695,7 @@ fn source_selection_records_private_local_path_for_local_owner_binding() {
 #[test]
 fn missing_settings_gate_selection_and_import_without_default_project() {
     let root = fixture();
-    Connection::open(root.path().join("p1/qnc_project.db"))
+    Connection::open(root.path().join("p1/project.db"))
         .unwrap()
         .execute("UPDATE project_settings SET settings_json='{}'", [])
         .unwrap();
@@ -707,7 +719,7 @@ fn missing_settings_gate_selection_and_import_without_default_project() {
 #[test]
 fn unknown_media_policy_is_not_silently_reinterpreted() {
     let root = fixture();
-    let mut settings = SettingsReader::local(root.path().join("data/project_store.db"))
+    let mut settings = SettingsReader::local(root.path().join("data/qnc-projects.db"))
         .read()
         .unwrap();
     settings.storage.ingest_media = "invented-mode".into();
@@ -732,7 +744,7 @@ fn unknown_media_policy_is_not_silently_reinterpreted() {
 #[test]
 fn footer_reports_only_the_project_loaded_by_ingest_not_stale_or_guessed_names() {
     let root = fixture();
-    let db = Connection::open(root.path().join("data/project_store.db")).unwrap();
+    let db = Connection::open(root.path().join("data/qnc-projects.db")).unwrap();
     db.execute(
         "UPDATE projects SET name='Loaded project' WHERE project_id='p1'",
         [],

@@ -19,14 +19,25 @@ pub struct SequenceStep {
     pub priority_group: String,
 }
 
-/// The sequence of the project the settings describe. The project folder must be on
-/// this machine.
+/// The sequence of the project the settings describe. The DB endpoint comes from
+/// the active project's `workspace_db_uri`; this component never invents a file name.
 pub fn read(reader: &SettingsReader, settings: &WorkSettings) -> Result<Vec<SequenceStep>, String> {
-    let dir = reader
-        .local_workspace_dir(settings)
+    let binding = reader
+        .workspace_binding(settings)
+        .map_err(|e| e.to_string())?;
+    match binding
+        .resolver
+        .resolve(&settings.workspace_db_uri)
         .map_err(|e| e.to_string())?
-        .ok_or("Slijed aplikacija trazi lokalni direktorij projekta.")?;
-    read_file(&dir.join("qnc_project.db"), &settings.project_id)
+        .endpoint
+    {
+        qnc_transport_resolver::ResolvedEndpoint::LocalPath(file) => {
+            read_file(&file, &settings.project_id)
+        }
+        qnc_transport_resolver::ResolvedEndpoint::NetworkEndpoint { .. } => {
+            Err("Slijed aplikacija nema mrežni DB read adapter u ovom rezu.".into())
+        }
+    }
 }
 
 pub fn read_file(database: &Path, project_id: &str) -> Result<Vec<SequenceStep>, String> {

@@ -76,9 +76,6 @@ impl IngestApplication {
         if let Some(assets) = polled.assets {
             self.view.timeline_assets = assets;
         }
-        if polled.changed && self.preview.refresh_assets() {
-            self.sync_playback_view();
-        }
         polled.changed
     }
 

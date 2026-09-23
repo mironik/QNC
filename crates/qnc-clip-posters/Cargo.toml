@@ -2,13 +2,11 @@
 name = "qnc-clip-posters"
 version = "0.1.0"
 edition = "2021"
-description = "QNC public component: loads the posters of clips in the background, the chosen clip first, from the project folder or from the source (local, LAN or intranet); no form, no application, read-only"
+description = "QNC public component: loads clip posters in the background from resolved read-only source readers or a project folder; no form, no application, no location policy"
 
 [dependencies]
-qnc-dir-browser = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-media-thumbnail = { workspace = true }
-qnc-source-bindings = { workspace = true }
 qnc-source-reader = { workspace = true }
 
 [dev-dependencies]

@@ -10,7 +10,7 @@ use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
 use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
-use qnc_editorial_application::{action_ids, EditorialIntent, EditorialView, LibraryTab};
+use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
 
 use crate::{layout_contract::EditorialContracts, theme::Theme};
 
@@ -210,19 +210,16 @@ fn render_pool_head(
             ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
             ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
             for tab in &contracts.editorial.pool_head.tabs_left {
-                let library_tab = match tab.as_str() {
-                    "Virtual" => Some(LibraryTab::Virtual),
-                    "All" => Some(LibraryTab::All),
-                    _ => None,
-                };
-                let Some(library_tab) = library_tab else {
-                    let _ = text_tab(ui, tab, false, theme);
+                let Some(action_id) = tab.action_id() else {
+                    let _ = text_tab(ui, tab.label(), false, theme);
                     ui.add_space(10.0);
                     continue;
                 };
-                let selected = view.library_tab == library_tab;
-                if text_tab(ui, tab, selected, theme).clicked() {
-                    intent = Some(EditorialIntent::SwitchLibraryTab(library_tab));
+                let selected = view.tab_selected(action_id);
+                if text_tab(ui, tab.label(), selected, theme).clicked()
+                    && view.action_enabled(action_id)
+                {
+                    intent = Some(EditorialIntent::action(action_id));
                 }
                 ui.add_space(10.0);
             }
@@ -275,27 +272,23 @@ fn render_source_dock(
         |ui| {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
-                for label in &contracts.composition().source_dock.actions_rtl {
-                    let save_short = label == "Add virtual clip";
-                    let enabled = save_short && view.chosen_clip_id().is_some();
-                    if action_button(ui, label, enabled, theme).clicked() && save_short {
-                        header_intent =
-                            Some(EditorialIntent::action(action_ids::SAVE_VIRTUAL_SHOT));
+                for action in &contracts.composition().source_dock.actions_rtl {
+                    let enabled = action
+                        .action_id()
+                        .is_some_and(|action_id| view.action_enabled(action_id));
+                    if action_button(ui, action.label(), enabled, theme).clicked() {
+                        if let Some(action_id) = action.action_id() {
+                            header_intent = Some(EditorialIntent::action(action_id));
+                        }
                     }
                 }
             });
         },
-        SourceTimeline {
-            projection: &view.preview.timeline,
-            theme: timeline_theme(theme),
-            filmstrip: view.preview.assets.filmstrip_background(),
-            peaks: [
-                view.preview.assets.a1_peaks(),
-                view.preview.assets.a2_peaks(),
-                view.preview.assets.a3_peaks(),
-                view.preview.assets.a4_peaks(),
-            ],
-        },
+        SourceTimeline::from_assets(
+            &view.preview.timeline,
+            timeline_theme(theme),
+            &view.preview.assets,
+        ),
     );
     match intent {
         TimelineIntent::None => header_intent,
@@ -363,6 +356,8 @@ fn render_clip_grid(
                     import_status: shot.import_status.as_str(),
                     status_proxy,
                     status_original,
+                    overlay_label: "",
+                    top_right_marker: None,
                     checked: view.chosen_shot_id.as_deref() == Some(shot.shot_id.as_str()),
                     rgba_thumb: shot
                         .poster_uri
@@ -396,6 +391,8 @@ fn render_clip_grid(
                     import_status: clip.import_status.as_str(),
                     status_proxy,
                     status_original,
+                    overlay_label: "",
+                    top_right_marker: None,
                     checked: view.chosen_clip_id() == Some(clip.clip_id.as_str()),
                     rgba_thumb: clip
                         .thumb_uri
@@ -427,6 +424,7 @@ fn render_clip_grid(
     };
     let features = qnc_media_card::MediaCardFeatures {
         selection_check: contracts.composition().media_card.selection_check,
+        top_right_marker: false,
         status_dots: qnc_media_card::StatusDotsMode::from_contract(
             &contracts.composition().media_card.status_dots,
         )

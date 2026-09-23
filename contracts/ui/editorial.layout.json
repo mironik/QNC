@@ -46,7 +46,10 @@
     "empty_message": "Nema klipova — prvo Ingest import."
   },
   "pool_head": {
-    "tabs_left": ["All", "Virtual"],
+    "tabs_left": [
+      { "label": "All", "action_id": "editorial_tab_all" },
+      { "label": "Virtual", "action_id": "editorial_tab_virtual" }
+    ],
     "transport_right": [
       { "label": ">", "action_id": "play_pause" },
       { "label": "[", "action_id": "mark_in" },
@@ -79,7 +82,7 @@
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", "Add virtual clip"]
+        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
       },
       "media_card": {
         "selection_check": true,
@@ -100,7 +103,7 @@
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", "Add virtual clip"]
+        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
       },
       "media_card": {
         "selection_check": true,
@@ -121,7 +124,7 @@
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", "Add virtual clip"]
+        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
       },
       "media_card": {
         "selection_check": true,
@@ -142,7 +145,7 @@
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", "Add virtual clip"]
+        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
       },
       "media_card": {
         "selection_check": false,

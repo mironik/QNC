@@ -83,13 +83,13 @@ impl EditorialApp {
                     .shortcuts()
                     .action_ids_for_event(scope, &event)
                     .into_iter()
-                    .filter_map(editorial_shortcut_action)
+                    .map(str::to_string)
                     .collect::<Vec<_>>();
                 for action_id in actions {
                     if handled_actions.contains(&action_id) {
                         continue;
                     }
-                    handled_actions.push(action_id);
+                    handled_actions.push(action_id.clone());
                     self.dispatch(ctx, EditorialIntent::action(action_id));
                 }
             }
@@ -102,17 +102,5 @@ impl eframe::App for EditorialApp {
         CentralPanel::default()
             .frame(Frame::NONE)
             .show(ctx, |ui| self.show_desktop(ctx, ui));
-    }
-}
-
-fn editorial_shortcut_action(action_id: &str) -> Option<&'static str> {
-    match action_id {
-        action_ids::PLAY_PAUSE => Some(action_ids::PLAY_PAUSE),
-        action_ids::STEP_BACK_FRAME => Some(action_ids::STEP_BACK_FRAME),
-        action_ids::STEP_FORWARD_FRAME => Some(action_ids::STEP_FORWARD_FRAME),
-        action_ids::MARK_IN => Some(action_ids::MARK_IN),
-        action_ids::MARK_OUT => Some(action_ids::MARK_OUT),
-        action_ids::SAVE_VIRTUAL_SHOT => Some(action_ids::SAVE_VIRTUAL_SHOT),
-        _ => None,
     }
 }

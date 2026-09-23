@@ -60,6 +60,27 @@ impl EditorialView {
             .find(|clip| clip.clip_id == id)
             .map(|clip| clip.name.as_str())
     }
+
+    pub fn action_enabled(&self, action_id: &str) -> bool {
+        match action_id {
+            action_ids::SAVE_VIRTUAL_SHOT => self.chosen_clip_id().is_some(),
+            action_ids::EDITORIAL_TAB_ALL | action_ids::EDITORIAL_TAB_VIRTUAL => true,
+            action_ids::PLAY_PAUSE
+            | action_ids::STEP_BACK_FRAME
+            | action_ids::STEP_FORWARD_FRAME
+            | action_ids::MARK_IN
+            | action_ids::MARK_OUT => true,
+            _ => false,
+        }
+    }
+
+    pub fn tab_selected(&self, action_id: &str) -> bool {
+        matches!(
+            (action_id, self.library_tab),
+            (action_ids::EDITORIAL_TAB_ALL, LibraryTab::All)
+                | (action_ids::EDITORIAL_TAB_VIRTUAL, LibraryTab::Virtual)
+        )
+    }
 }
 
 /// Neutral intent. `Action` carries an `action_id` from
@@ -81,6 +102,8 @@ impl EditorialIntent {
 }
 
 pub mod action_ids {
+    pub const EDITORIAL_TAB_ALL: &str = "editorial_tab_all";
+    pub const EDITORIAL_TAB_VIRTUAL: &str = "editorial_tab_virtual";
     pub const PLAY_PAUSE: &str = "play_pause";
     pub const STEP_BACK_FRAME: &str = "step_back_frame";
     pub const STEP_FORWARD_FRAME: &str = "step_forward_frame";

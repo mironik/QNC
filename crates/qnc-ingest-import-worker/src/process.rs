@@ -10,6 +10,7 @@
 //! the worker did last. The form never waits for the worker.
 
 use crate::{run_next, ConfigMediaOpener, TransportQueue};
+use qnc_active_project_read::ActiveProjectReader;
 use qnc_ingest_runtime::{Beat, Writer, WORKER, WORKER_FRESH_SECONDS, WORKER_RESULT};
 use qnc_ingest_select::selection_config::SelectionConfig;
 use qnc_ingest_store::content::ContentTarget;
@@ -67,8 +68,10 @@ impl Project {
 /// queued clips are taken one by one until the queue is empty. Nothing happens when
 /// another worker already holds the lease of this project.
 pub fn run_service(root: &Path) -> Result<ImportSummary, String> {
-    let reader = SettingsReader::from_root(root).map_err(|e| e.to_string())?;
-    let plan = IngestWorkPlan::from_settings(reader.read().map_err(|e| e.to_string())?)?;
+    let active_project = ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
+    let snapshot = active_project.read().map_err(|e| e.to_string())?;
+    let reader = active_project.settings_reader().clone();
+    let plan = IngestWorkPlan::from_settings(snapshot.settings)?;
     let target = ContentTarget::for_project(&reader, &plan.settings)?;
     let mut summary = ImportSummary {
         imported: 0,

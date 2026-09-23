@@ -70,21 +70,56 @@ impl SourceBinding {
 /// What the host transport configuration binds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportBindings {
+    pub config_version: String,
+    pub catalog: Option<SourceBinding>,
+    pub source_index: Option<SourceBinding>,
     pub sources: Vec<SourceBinding>,
+    pub registered_sources: Vec<RegisteredSource>,
     pub media_records: Option<SourceBinding>,
+    pub parallelism: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegisteredSource {
+    pub location: SourceBinding,
+    pub name: Option<String>,
+    pub serial_number: Option<String>,
+    pub volume_name: Option<String>,
+    pub scope: Option<String>,
+    pub probe: Option<ProbeBinding>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProbeBinding {
+    Local {
+        executable: PathBuf,
+        probe_size_bytes: u64,
+        analyze_duration_us: u64,
+    },
+    Remote {
+        binding: SourceBinding,
+    },
 }
 
 #[derive(Deserialize)]
 struct Config {
     version: String,
+    catalog: Option<ConfigLocation>,
+    source_index: Option<ConfigLocation>,
     #[serde(default)]
     sources: Vec<ConfigSource>,
     media_records: Option<ConfigLocation>,
+    parallelism: Option<usize>,
 }
 
 #[derive(Deserialize)]
 struct ConfigSource {
     location: ConfigLocation,
+    name: Option<String>,
+    serial_number: Option<String>,
+    volume_name: Option<String>,
+    scope: Option<String>,
+    probe: Option<ConfigProbe>,
 }
 
 #[derive(Deserialize)]
@@ -93,6 +128,19 @@ struct ConfigLocation {
     file: Option<PathBuf>,
     endpoint: Option<String>,
     token_env: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ConfigProbe {
+    Local {
+        executable: PathBuf,
+        probe_size_bytes: u64,
+        analyze_duration_us: u64,
+    },
+    Remote {
+        binding: ConfigLocation,
+    },
 }
 
 /// Loads the bindings from the host transport configuration under `root`
@@ -136,6 +184,28 @@ fn binding(location: ConfigLocation, base: &Path) -> Result<SourceBinding, Strin
     })
 }
 
+fn probe(probe: ConfigProbe, base: &Path) -> Result<ProbeBinding, String> {
+    match probe {
+        ConfigProbe::Local {
+            mut executable,
+            probe_size_bytes,
+            analyze_duration_us,
+        } => {
+            if executable.is_relative() {
+                executable = base.join(executable);
+            }
+            Ok(ProbeBinding::Local {
+                executable,
+                probe_size_bytes,
+                analyze_duration_us,
+            })
+        }
+        ConfigProbe::Remote { binding: remote } => Ok(ProbeBinding::Remote {
+            binding: binding(remote, base)?,
+        }),
+    }
+}
+
 fn parse(bytes: &[u8], base: &Path) -> Result<TransportBindings, String> {
     let config: Config = serde_json::from_slice(bytes)
         .map_err(|error| format!("Konfiguracija izvora medija nije valjana: {error}"))?;
@@ -144,19 +214,42 @@ fn parse(bytes: &[u8], base: &Path) -> Result<TransportBindings, String> {
     }
     let mut seen = BTreeSet::new();
     let mut sources = Vec::new();
+    let mut registered_sources = Vec::new();
     for source in config.sources {
         if !seen.insert(source.location.uri.clone()) {
             return Err(format!("Izvor {} je naveden dvaput.", source.location.uri));
         }
-        sources.push(binding(source.location, base)?);
+        let location = binding(source.location, base)?;
+        sources.push(location.clone());
+        registered_sources.push(RegisteredSource {
+            location,
+            name: source.name,
+            serial_number: source.serial_number,
+            volume_name: source.volume_name,
+            scope: source.scope,
+            probe: source.probe.map(|config| probe(config, base)).transpose()?,
+        });
     }
+    let catalog = config
+        .catalog
+        .map(|location| binding(location, base))
+        .transpose()?;
+    let source_index = config
+        .source_index
+        .map(|location| binding(location, base))
+        .transpose()?;
     let media_records = config
         .media_records
         .map(|location| binding(location, base))
         .transpose()?;
     Ok(TransportBindings {
+        config_version: config.version,
+        catalog,
+        source_index,
         sources,
+        registered_sources,
         media_records,
+        parallelism: config.parallelism,
     })
 }
 
@@ -172,7 +265,8 @@ mod tests {
             br#"{"version":"0.1.0","parallelism":8,
                 "media_records":{"uri":"qnc://local/db/media_records","file":"records.db"},
                 "sources":[
-                {"location":{"uri":"qnc://local/source/a","file":"cards/a"},"name":"A","probe":{}},
+                {"location":{"uri":"qnc://local/source/a","file":"cards/a"},"name":"A",
+                    "probe":{"kind":"local","executable":"ffprobe","probe_size_bytes":1,"analyze_duration_us":1}},
                 {"location":{"uri":"qnc://lan/nas/source/b","endpoint":"http://nas.local/qnc","token_env":"QNC_TOKEN"},"name":"B"}
             ]}"#,
             Path::new(BASE),
@@ -197,6 +291,9 @@ mod tests {
     fn media_records_binding_is_optional() {
         let bindings = parse(br#"{"version":"0.1.0","sources":[]}"#, Path::new(BASE)).unwrap();
         assert!(bindings.media_records.is_none());
+        assert!(bindings.catalog.is_none());
+        assert!(bindings.source_index.is_none());
+        assert!(bindings.parallelism.is_none());
     }
 
     #[test]
@@ -250,6 +347,21 @@ mod tests {
             bindings.sources[0].uri,
             "qnc://local/source/volume-de666c9f"
         );
+        assert_eq!(bindings.catalog.unwrap().uri, "qnc://local/catalog/x");
+        assert_eq!(
+            bindings.source_index.unwrap().file,
+            Some(Path::new(BASE).join("ingest_source_index.db"))
+        );
+        assert_eq!(bindings.parallelism, Some(8));
+        assert_eq!(bindings.registered_sources[0].name.as_deref(), Some("G:"));
+        assert_eq!(
+            bindings.registered_sources[0].scope.as_deref(),
+            Some("card_relative")
+        );
+        assert!(matches!(
+            bindings.registered_sources[0].probe,
+            Some(ProbeBinding::Local { .. })
+        ));
         assert_eq!(bindings.sources[0].file, Some(PathBuf::from("G:/")));
         assert!(bindings.media_records.is_some());
     }

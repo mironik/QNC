@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::path::{Component, Path, PathBuf};
 
 pub const VERSION: &str = "0.1.0";
 
@@ -42,12 +43,32 @@ pub struct WorkSettings {
     pub workspace_db_uri: String,
     pub output_root_uri: String,
     pub storage: StoragePolicy,
+    pub products: ProductLocations,
     pub input: Value,
     pub playback: Value,
     pub video: Value,
     pub audio: Value,
     pub ai: Value,
     pub keyboard_shortcuts: Value,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProductArea {
+    Thumbnails,
+    Filmstrip,
+    VirtualShorts,
+    VirtualSegments,
+    BRollVirtualClips,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProductLocations {
+    pub root: String,
+    pub thumbnails: String,
+    pub filmstrip: String,
+    pub virtual_shorts: String,
+    pub virtual_segments: String,
+    pub b_roll_virtual_clips: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +124,29 @@ impl WorkSettings {
                 proxy_policy: required_text(storage, "proxy_policy")?,
                 original_policy: required_text(storage, "original_policy")?,
             },
+            products: ProductLocations {
+                root: required_text(saved.get("products").ok_or_else(incomplete)?, "root")?,
+                thumbnails: required_text(
+                    saved.get("products").ok_or_else(incomplete)?,
+                    "thumbnails",
+                )?,
+                filmstrip: required_text(
+                    saved.get("products").ok_or_else(incomplete)?,
+                    "filmstrip",
+                )?,
+                virtual_shorts: required_text(
+                    saved.get("products").ok_or_else(incomplete)?,
+                    "virtual_shorts",
+                )?,
+                virtual_segments: required_text(
+                    saved.get("products").ok_or_else(incomplete)?,
+                    "virtual_segments",
+                )?,
+                b_roll_virtual_clips: required_text(
+                    saved.get("products").ok_or_else(incomplete)?,
+                    "b_roll_virtual_clips",
+                )?,
+            },
             input: object(&saved, "input")?,
             playback: object(&saved, "playback")?,
             video: object(&saved, "video")?,
@@ -145,6 +189,9 @@ impl WorkSettings {
                 return Err(incomplete());
             }
         }
+        for value in self.products.all_relative_paths() {
+            validate_relative_product_path(value)?;
+        }
         required_text(&self.input, "mode")?;
         required_text(&self.playback, "input")?;
         required_text(&self.keyboard_shortcuts, "active_preset")?;
@@ -173,6 +220,41 @@ impl WorkSettings {
     pub fn ai_enabled(&self) -> bool {
         self.ai.get("enabled").and_then(Value::as_bool) == Some(true)
     }
+
+    pub fn product_uri(&self, area: ProductArea) -> String {
+        format!(
+            "{}/{}",
+            self.output_root_uri.trim_end_matches('/'),
+            self.products.relative_path(area).trim_matches('/')
+        )
+    }
+
+    pub fn product_local_dir(&self, project_dir: &Path, area: ProductArea) -> PathBuf {
+        project_dir.join(self.products.relative_path(area))
+    }
+}
+
+impl ProductLocations {
+    pub fn relative_path(&self, area: ProductArea) -> &str {
+        match area {
+            ProductArea::Thumbnails => &self.thumbnails,
+            ProductArea::Filmstrip => &self.filmstrip,
+            ProductArea::VirtualShorts => &self.virtual_shorts,
+            ProductArea::VirtualSegments => &self.virtual_segments,
+            ProductArea::BRollVirtualClips => &self.b_roll_virtual_clips,
+        }
+    }
+
+    fn all_relative_paths(&self) -> [&str; 6] {
+        [
+            &self.root,
+            &self.thumbnails,
+            &self.filmstrip,
+            &self.virtual_shorts,
+            &self.virtual_segments,
+            &self.b_roll_virtual_clips,
+        ]
+    }
 }
 
 fn incomplete() -> ReadError {
@@ -197,4 +279,21 @@ fn object(value: &Value, key: &str) -> Result<Value, ReadError> {
         .filter(|v| v.is_object())
         .cloned()
         .ok_or_else(incomplete)
+}
+
+fn validate_relative_product_path(value: &str) -> Result<(), ReadError> {
+    let value = value.trim();
+    if value.is_empty() || value.contains('\\') || value.starts_with('/') {
+        return Err(incomplete());
+    }
+    let path = Path::new(value);
+    if path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    }) {
+        return Err(incomplete());
+    }
+    Ok(())
 }

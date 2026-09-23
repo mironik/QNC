@@ -26,7 +26,7 @@
     "public_source_templates",
     "public_module_state"
   ],
-  "implementation_private_files": ["data/project_store.db"],
+  "implementation_private_files": ["data/qnc-projects.db"],
   "schema_source_reference": [
     "qnc-host/src/project/db.rs:init_global_schema",
     "qnc-host/src/project/store.rs",

@@ -29,7 +29,7 @@ impl IngestApplication {
             || self.view.browser_busy
             || self.catalog_loader.is_busy()
             || self.selection_writer.is_busy()
-            || self.thumbnail_loader.has_pending_work()
+            || self.posters.has_pending_work()
             || self.selection_session.has_pending_work()
             || self.artifacts.has_pending_work()
             || self.preview.play_when_ready()

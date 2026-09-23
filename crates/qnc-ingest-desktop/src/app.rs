@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use eframe::egui::{self, CentralPanel, Frame};
-use qnc_ingest_application::{IngestApplication, IngestIntent, action_ids};
+use qnc_ingest_application::{action_ids, IngestApplication, IngestIntent};
 
 use crate::{
     layout_contract::IngestContracts,
@@ -100,16 +100,7 @@ impl IngestApp {
                 .map(str::to_string)
                 .collect::<Vec<_>>();
             for action_id in actions {
-                match action_id.as_str() {
-                    action_ids::PLAY_PAUSE
-                    | action_ids::STEP_BACK_FRAME
-                    | action_ids::STEP_FORWARD_FRAME
-                    | action_ids::MARK_IN
-                    | action_ids::MARK_OUT => {
-                        self.dispatch(ctx, IngestIntent::empty(action_id));
-                    }
-                    _ => {}
-                }
+                self.dispatch(ctx, IngestIntent::empty(action_id));
             }
         }
     }

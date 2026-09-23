@@ -39,7 +39,7 @@ fn run() -> Result<(), String> {
         for request in server.incoming_requests() {
             qnc_work_settings::server::respond(
                 request,
-                &root.join("data").join("project_store.db"),
+                &root.join("data").join("qnc-projects.db"),
                 &uri,
                 &token,
             );

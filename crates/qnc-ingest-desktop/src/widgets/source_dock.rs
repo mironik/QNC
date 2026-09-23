@@ -54,8 +54,22 @@ pub(super) fn render_source_dock(
                     }
                     let poster_count = view.proxy_poster_approval_count();
                     if poster_count > 0 {
-                        let label = format!("Generiraj postere ({poster_count})");
-                        if action_button(ui, &label, !view.command_busy, theme).clicked() {
+                        let label = format!(
+                            "{} ({poster_count})",
+                            action_label(
+                                contracts,
+                                action_ids::INGEST_APPROVE_PROXY_POSTERS,
+                                "Generiraj postere",
+                            )
+                        );
+                        if action_button(
+                            ui,
+                            &label,
+                            view.action_enabled(action_ids::INGEST_APPROVE_PROXY_POSTERS),
+                            theme,
+                        )
+                        .clicked()
+                        {
                             intent = Some(IngestIntent::empty(
                                 action_ids::INGEST_APPROVE_PROXY_POSTERS,
                             ));
@@ -63,20 +77,33 @@ pub(super) fn render_source_dock(
                     } else {
                         ui.label(muted("Nema postera na kartici", theme));
                     }
-                    if primary_button(ui, "Uvezi", action_enabled("Uvezi", view), theme).clicked() {
+                    if primary_button(
+                        ui,
+                        action_label(contracts, action_ids::INGEST_IMPORT_SELECTED, "Uvezi"),
+                        view.action_enabled(action_ids::INGEST_IMPORT_SELECTED),
+                        theme,
+                    )
+                    .clicked()
+                    {
                         intent = Some(IngestIntent::empty(action_ids::INGEST_IMPORT_SELECTED));
                     }
                     if action_button(
                         ui,
-                        "Odaberi sve",
-                        action_enabled("Odaberi sve", view),
+                        action_label(contracts, action_ids::INGEST_SELECT_ALL, "Odaberi sve"),
+                        view.action_enabled(action_ids::INGEST_SELECT_ALL),
                         theme,
                     )
                     .clicked()
                     {
                         intent = Some(IngestIntent::empty(action_ids::INGEST_SELECT_ALL));
                     }
-                    if action_button(ui, "Očisti", action_enabled("Očisti", view), theme).clicked()
+                    if action_button(
+                        ui,
+                        action_label(contracts, action_ids::INGEST_CLEAR_SELECTION, "Očisti"),
+                        view.action_enabled(action_ids::INGEST_CLEAR_SELECTION),
+                        theme,
+                    )
+                    .clicked()
                     {
                         intent = Some(IngestIntent::empty(action_ids::INGEST_CLEAR_SELECTION));
                     }
@@ -122,20 +149,21 @@ pub(super) fn render_source_dock(
                 }
             });
         },
-        SourceTimeline {
-            projection: &view.timeline,
-            theme: timeline_theme(theme),
-            filmstrip: view.timeline_filmstrip_background(),
-            peaks: [
-                view.timeline_a1_peaks(),
-                view.timeline_a2_peaks(),
-                view.timeline_a3_peaks(),
-                view.timeline_a4_peaks(),
-            ],
-        },
+        SourceTimeline::from_assets(&view.timeline, timeline_theme(theme), &view.timeline_assets),
     );
     if intent.is_none() {
         intent = timeline_intent_to_ingest_intent(timeline_intent);
     }
     intent
+}
+
+fn action_label<'a>(contracts: &'a IngestContracts, action_id: &str, fallback: &'a str) -> &'a str {
+    contracts
+        .ingest
+        .source_dock
+        .actions_rtl
+        .iter()
+        .find(|action| action.action_id() == Some(action_id))
+        .map(|action| action.label())
+        .unwrap_or(fallback)
 }

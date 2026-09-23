@@ -228,7 +228,7 @@ mod tests {
     fn resolves_bound_local_qnc_uri_to_private_path() {
         let config = ResolverConfig::new(PathBuf::from("qnc-data")).with_local_binding(
             "qnc://local/db/project_registry",
-            PathBuf::from("data").join("project_store.db"),
+            PathBuf::from("data").join("qnc-projects.db"),
         );
         let resolved = config
             .resolve("qnc://local/db/project_registry")
@@ -236,7 +236,7 @@ mod tests {
 
         assert_eq!(
             resolved.endpoint,
-            ResolvedEndpoint::LocalPath(PathBuf::from("data").join("project_store.db"))
+            ResolvedEndpoint::LocalPath(PathBuf::from("data").join("qnc-projects.db"))
         );
     }
 

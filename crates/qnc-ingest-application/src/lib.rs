@@ -2,6 +2,7 @@
 use std::sync::mpsc;
 use std::{path::Path, time::Duration};
 
+use qnc_active_project_read::ActiveProjectReader;
 use qnc_ingest_catalog as catalog;
 use qnc_ingest_select as selection;
 use qnc_ingest_select::selection_config;
@@ -59,12 +60,13 @@ pub struct IngestApplication {
     dispatch_log: Vec<String>,
     store: Option<IngestStore>,
     settings_reader: Option<SettingsReader>,
+    active_project_reader: Option<ActiveProjectReader>,
     catalog_loader: catalog::CatalogLoader,
     catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
     artifact_target: Option<qnc_content_store::ContentTarget>,
     selection_writer: qnc_ingest_selection_write::SelectionWriter,
     navigation_requested: bool,
-    thumbnail_loader: qnc_media_thumbnail::ThumbnailBatchService,
+    posters: qnc_clip_posters::ClipPosters,
     artifacts: qnc_content_artifacts::ProjectArtifacts,
     catalog_stats: Option<CatalogStats>,
     work_plan: Option<IngestWorkPlan>,
@@ -108,9 +110,10 @@ impl IngestApplication {
             }
             Err(error) => component.selection_config_error = Some(error.to_string()),
         }
-        match SettingsReader::from_root(root.as_ref()) {
-            Ok(reader) => {
-                component.settings_reader = Some(reader);
+        match ActiveProjectReader::from_root(root.as_ref()) {
+            Ok(active_project) => {
+                component.settings_reader = Some(active_project.settings_reader().clone());
+                component.active_project_reader = Some(active_project);
                 // Active project comes from the DB, not from a disk scan or Project call.
                 component.load_work_settings(None);
             }
@@ -228,7 +231,7 @@ mod tests {
             "clip-1".into(),
             "qnc://local/source/card/Clip/0001.jpg".into(),
         )]);
-        assert!(!component.thumbnail_loader.has_pending_work());
+        assert!(!component.posters.has_pending_work());
 
         let result = component.dispatch(IngestIntent::empty(action_ids::INGEST_RELOAD));
         assert!(!result.accepted);

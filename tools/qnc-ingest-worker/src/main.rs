@@ -29,9 +29,11 @@ fn run_background(root: &Path) -> Result<(), String> {
 }
 
 fn run_artifacts(root: &Path) -> Result<(), String> {
-    let reader =
-        qnc_work_settings::SettingsReader::from_root(root).map_err(|error| error.to_string())?;
-    let settings = reader.read().map_err(|error| error.to_string())?;
+    let active_project = qnc_active_project_read::ActiveProjectReader::from_root(root)
+        .map_err(|error| error.to_string())?;
+    let snapshot = active_project.read().map_err(|error| error.to_string())?;
+    let reader = active_project.settings_reader().clone();
+    let settings = snapshot.settings;
     let target = qnc_content_store::ContentTarget::for_project(&reader, &settings)?;
     let mut artifacts = qnc_content_artifacts::ProjectArtifacts::new();
     artifacts.set_host_root(root);

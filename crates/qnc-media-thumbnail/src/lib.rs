@@ -248,7 +248,7 @@ mod project_read_tests {
     #[test]
     fn a_poster_copied_into_the_project_is_read_from_the_folder() {
         let dir = tempfile::tempdir().unwrap();
-        let posters = dir.path().join("ingest").join("thumbnails");
+        let posters = dir.path().join("products").join("thumbnails");
         std::fs::create_dir_all(&posters).unwrap();
         std::fs::write(posters.join("c1_poster.png"), PNG_1X1).unwrap();
         let folder = ProjectFolder {
@@ -256,7 +256,7 @@ mod project_read_tests {
             dir: dir.path().to_path_buf(),
         };
         let image = folder
-            .read("qnc://local/project/p1/ingest/thumbnails/c1_poster.png")
+            .read("qnc://local/project/p1/products/thumbnails/c1_poster.png")
             .unwrap();
         assert!(image.is_ok(), "{:?}", image.err());
     }
@@ -285,7 +285,7 @@ mod project_read_tests {
     #[test]
     fn ready_event_updates_matching_row_only() {
         let dir = tempfile::tempdir().unwrap();
-        let posters = dir.path().join("ingest").join("thumbnails");
+        let posters = dir.path().join("products").join("thumbnails");
         std::fs::create_dir_all(&posters).unwrap();
         std::fs::write(posters.join("poster.png"), PNG_1X1).unwrap();
         let mut service = ThumbnailBatchService::default();
@@ -298,13 +298,13 @@ mod project_read_tests {
                 }),
                 vec![ThumbnailRequest {
                     item_id: "c1".into(),
-                    uri: "qnc://local/project/p1/ingest/thumbnails/poster.png".into(),
+                    uri: "qnc://local/project/p1/products/thumbnails/poster.png".into(),
                 }],
             )
             .unwrap();
         let mut rows = vec![Row {
             id: "c1".into(),
-            uri: Some("qnc://local/project/p1/ingest/thumbnails/poster.png".into()),
+            uri: Some("qnc://local/project/p1/products/thumbnails/poster.png".into()),
             ready: false,
         }];
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);

@@ -435,7 +435,7 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   snapshota, ne iz `video.fps`. Nedostaje li korak 1–4, posao staje.
 
   Zabranjeni precaci: `qnc-project*` crate, shell payload, `player-output.json`,
-  forma cita SQLite, path-join na `qnc_project.db` kao javni korak, novi probe,
+  forma cita SQLite, path-join na `project.db` kao javni korak, novi probe,
   izmisljeni default, HTTP/URL kao decoder ulaz, Project/export FPS kao sat.
 
 ## 5. Ingest kao prvi konkretni primjer
@@ -553,7 +553,7 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
   DB/transport ugovor. Ne zahtijeva posebnu wave mapu, PNG datoteke niti novu
   `wave.db` samo zato sto je generator zaseban modul. U v4 su to `a1_peaks` i
   `a2_peaks` u tablici `audio_waveforms`.
-- Referentni v4 `qnc_project.db` sadrzi tablice `filmstrips`,
+- Referentni v4 `project.db` sadrzi tablice `filmstrips`,
   `filmstrip_frames` i `audio_waveforms`. To je dokaz nacina pohrane, ne dozvola
   za vracanje monolita ili pisanje u tudju shemu: u novom QNC-u upis mora ici
   kroz javni DB/transport ugovor i ownera rezultata, uz postovanje odjeljka 4.
@@ -1745,6 +1745,131 @@ nije dio ovog koraka. Layout ugovori nisu dirani.
 Verificirano: `cargo test -p qnc-virtual-shots -p qnc-editorial-application`
 i `cargo check -p qnc-editorial-desktop`. Odobrenje zatvoreno, obitelj je zamrznuta.
 
+Zatvoreno ograniceno odobrenje 2026-09-23: korisnik je trazio ispravak gresaka
+iz vanjskog audita oko DB vlasnistva i javnih komponenti. Otkljucano:
+`crates/qnc-content-store`, `crates/qnc-ingest-store/src/content/**`,
+`crates/qnc-virtual-shots`, `crates/qnc-editorial-application`,
+`crates/qnc-application-sequence`, `crates/qnc-ingest-select` i pripadajuce
+`Cargo.toml`/`Cargo.lock` promjene. Odluka: jedini owner project content baze je
+`qnc-content-store`.
+`qnc-ingest-store::content` smije ostati samo kompatibilni re-export i ne smije
+ponovno dobiti SQL implementaciju. `qnc-virtual-shots` ne smije otvarati
+projektnu bazu u write modu niti imati vlastiti SQLite schema/write path; save
+shorta i status IN/OUT slicica idu kroz `ContentWriteTransport`. Slijed
+aplikacija cita `workspace_db_uri` iz aktivnih projektnih postavki i resolver
+binding, bez hardkodiranja naziva projektne DB datoteke u komponenti. Select
+publish put smije prihvatiti samo svoje ocekivane write odgovore; novi
+`SavedShort` odgovor iz javnog transporta tretira kao neispravan odgovor u tom
+workflowu, ne kao Ingest logiku.
+Verificirano: `cargo test -p qnc-editorial-application -p qnc-virtual-shots -p
+qnc-content-store -p qnc-ingest-store -p qnc-application-sequence`, fokusirani
+`cargo check` istih crateova, `cargo build -p qnc-app` i `cargo run -p
+qnc-conformance`. Odobrenje zatvoreno, obitelj je zamrznuta.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (K1 forma-lego audit): korisnik je
+dostavio audit i odobrio nastavak prvog koraka: javni read-only port aktivnog
+projekta. Otkljucano samo: novi `crates/qnc-active-project-read`, novi
+`contracts/modules/active-project-read.module.json` i root `Cargo.toml` /
+`Cargo.lock`. Modul omata postojece `qnc-work-settings` i `qnc-content-read`,
+svaki `read`/`compare` ponovno cita aktivni projekt iz baze, ne drzi projektno
+stanje kao istinu, ne pise u bazu, ne otvara medij, ne radi probe i ne ovisi o
+Project/Ingest/Editorial/shell/form crateovima. API daje snapshot aktivnog
+projekta, `CatalogSignature` i usporedbu prikazanog stanja
+(`Same`/`ProjectChanged`/`SignatureChanged`/`NoActiveProject`). Nije izvedeno:
+K2 spajanje potrosaca na port, promjena formi, UI/layout promjene, ni
+semanticko preimenovanje fizickih DB datoteka. Verificirano: `cargo test -p
+qnc-active-project-read -p qnc-work-settings -p qnc-content-read`, `cargo build
+-p qnc-app` i `cargo run -p qnc-conformance`. Odobrenje je zatvoreno, obitelj je
+zamrznuta.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (K2 forma-lego audit): korisnik je
+odobrio nastavak nakon K1. Otkljucano samo za spajanje potrosaca na javni
+read-only port aktivnog projekta: `crates/qnc-editorial-application`,
+`crates/qnc-ingest-application`, `crates/qnc-ingest-catalog`,
+`crates/qnc-ingest-import-worker`, `tools/qnc-ingest-worker`,
+`tools/qnc-dev-diagnostics-app` i pripadajuci `Cargo.toml`/`Cargo.lock`.
+Izvedeno: MA/Story katalog koristi `qnc-active-project-read::compare()` za
+`Same`/`ProjectChanged`/`SignatureChanged`/`NoActiveProject`; Ingest application
+i `qnc-ingest-catalog` citaju aktivni projekt kroz `ActiveProjectReader`, a
+`SettingsReader` ostaje samo transport/binding objekt za postojece javne
+module; import worker, ingest-worker i diagnostics citaju aktivni projekt kroz
+isti javni port. Nije izvedeno: promjena UI/formi, K3 action/tab model, K4
+timeline ulaz, preimenovanje fizickih DB datoteka ni promjena Projecta.
+Verificirano: `cargo test -p qnc-active-project-read -p qnc-ingest-catalog -p
+qnc-editorial-application -p qnc-ingest-application -p qnc-ingest-import-worker
+-p qnc-ingest-worker`, `cargo check -p qnc-dev-diagnostics-app`, `cargo run -p
+qnc-conformance` i `cargo build -p qnc-app`. Odobrenje je zatvoreno, obitelj je
+zamrznuta.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (K3 forma-lego audit): korisnik je
+odobrio nastavak nakon K2. Otkljucano samo za uklanjanje tekstualnih odluka iz
+Ingest i Editorial formi: `contracts/ui/ingest.layout.json`,
+`contracts/ui/editorial.layout.json`, `crates/qnc-ingest-application`,
+`crates/qnc-ingest-desktop`, `crates/qnc-editorial-application` i
+`crates/qnc-editorial-desktop`. Izvedeno: layout ugovori nose `action_id` uz
+postojeci tekst gumba/tabova gdje forma prije toga odlucuje po tekstu; Ingest
+enabled stanje dolazi iz `IngestViewModel::action_enabled`; Editorial
+enabled/selected stanje dolazi iz `EditorialView`; Ingest i Editorial desktop
+keyboard dispatch vise ne drze privatne popise dopustenih akcija nego salju
+akcije iz javnog QNC keyboard kataloga. Izgled nije namjerno mijenjan. Nije
+izvedeno: K4 gotov source timeline ulaz, K5 prelazak Ingest kartica na
+`qnc-media-card`, promjena source previewa, promjena DB sheme ili Projecta.
+Verificirano: `cargo test -p qnc-ingest-application -p
+qnc-editorial-application -p qnc-ingest-desktop -p qnc-editorial-desktop`,
+`cargo run -p qnc-conformance` i `cargo build -p qnc-app`. Odobrenje je
+zatvoreno, obitelj je zamrznuta.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (K4 forma-lego audit): korisnik je
+odobrio nastavak nakon K3. Otkljucano samo za to da javna source timeline dock
+komponenta primi gotov timeline/artifact ulaz, bez promjene izgleda:
+`crates/qnc-source-dock`, `crates/qnc-ingest-desktop`,
+`crates/qnc-editorial-desktop`, `crates/qnc-ingest-application` i pripadajuci
+`Cargo.toml`/`Cargo.lock`. Izvedeno: `qnc-source-dock::SourceTimeline` dobio je
+`from_assets(&TimelineProjection, TimelineTheme, &SourceTimelineAssets)`; Ingest
+i Editorial forme vise ne slazu filmstrip i cetiri wave trake same, nego
+predaju projection/assets javnoj komponenti; stari Ingest helperi za pojedine
+timeline laneove su uklonjeni da ne ostane paralelni put. Nije izvedeno:
+promjena timeline izgleda, DB sheme, source previewa, playera, Projecta, K5
+media-card rez ili bilo kakav novi artifact worker. Verificirano: `cargo test
+-p qnc-source-dock -p qnc-ingest-application -p qnc-ingest-desktop -p
+qnc-editorial-application -p qnc-editorial-desktop`, pretraga koja pokazuje da
+`filmstrip_background()`/`a1_peaks()`... spajanje ostaje samo u
+`qnc-source-dock`, `cargo run -p qnc-conformance` i `cargo build -p qnc-app`.
+Odobrenje je zatvoreno, obitelj je zamrznuta.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (K5 forma-lego audit): korisnik je
+odobrio nastavak nakon K4. Otkljucano samo za prelazak Ingest clip grida na
+javnu univerzalnu komponentu `qnc-media-card`, uz ocuvanje postojeceg izgleda i
+bez izmjena DB-a, Projecta, previewa, timelinea ili ingest workflowa:
+`crates/qnc-media-card`, `crates/qnc-ingest-desktop` i pripadajuci
+`Cargo.toml`/`Cargo.lock`. Izvedeno: `qnc-media-card` je aditivno prosiren
+opcionalnim top-right markerom i overlay labelom; MA/Story eksplicitno ostaju bez
+tih opcija; Ingest `clip_grid` je tanki adapter `ClipView -> CardRow`, koristi
+javni `show_card_grid`, javni checkbox hit-test i javnu geometriju; privatni
+Ingest `clip_card` i `selection_check` aktivni put uklonjeni su. Nije izvedeno:
+promjena layout dimenzija, promjena semantike odabira/preview fokusa, K6 redovi
+kartica iz application sloja, live UI test ili commit. Verificirano: `cargo test
+-p qnc-media-card -p qnc-ingest-desktop -p qnc-editorial-desktop`, pretraga koja
+ne nalazi privatni Ingest card/selection painter, `cargo run -p qnc-conformance`
+i `cargo build -p qnc-app`. Odobrenje je zatvoreno, obitelj je zamrznuta.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (K6/N8 forma-lego audit): korisnik je
+odobrio nastavak nakon K5. Otkljucano samo za ukidanje drugog parsera
+`ingest-transport.json`: `crates/qnc-source-bindings`,
+`crates/qnc-ingest-select` i pripadajuci `Cargo.toml`/`Cargo.lock`. Izvedeno:
+`qnc-source-bindings` je jedini runtime parser host transport konfiguracije
+(`catalog`, `source_index`, `media_records`, registrirani izvori, probe i
+parallelism); `qnc-ingest-select::SelectionConfig::load` vise ne cita JSON
+datoteku, nego konvertira javni model u svoj workflow model i provodi Select
+validaciju. Nepotpuni `probe` podaci se odbijaju, ne dopunjuju se defaultima.
+Nije izvedeno: promjena formi, DB sheme, Projecta, previewa, timelinea,
+workera, scanner/probe logike ili UI izgleda. Verificirano: `cargo test -p
+qnc-source-bindings -p qnc-ingest-select -p qnc-ingest-application -p
+qnc-ingest-import-worker`, pretraga koja pokazuje da runtime reference na
+`ingest-transport.json` ostaju u `qnc-source-bindings` (test fixture reference
+ostaju u testovima), `cargo run -p qnc-conformance` i `cargo build -p qnc-app`.
+Odobrenje je zatvoreno, obitelj je zamrznuta.
+
 Zatvoreno ograniceno odobrenje 2026-09-22 (trideset prvo): korisnik je
 trazio novu ideju za slicice virtualnog shorta: MARK_IN uhvati potvrdenu
 sliku u memoriju, MARK_OUT uhvati potvrdenu sliku u memoriju, a nakon upisa
@@ -1777,6 +1902,51 @@ mapa komponenti). Nema izmjena koda. Odluke korisnika: desni panel ostaje prazan
 (prostor za funkcije pojedine grupe) kao u v4 Media Assistu; Ingest se NE dira
 (nove komponente grade se izravno iz v4 reference, ne izdvajaju iz Ingest forme).
 Sve ostalo ostaje zamrznuto.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (products/work-settings lokacije):
+korisnik je trazio da javne komponente ostanu neutralne i da lokacije dolaze iz
+aktivnog projekta/projektne baze, ne iz forme ni iz hardkodiranog Ingest puta.
+Otkljucano samo: `seed/system_seed.json`, `crates/qnc-work-settings/**`,
+`crates/qnc-project-store/src/lib.rs`, `crates/qnc-ingest-work-plan/**`,
+`crates/qnc-source-preview/**`, `crates/qnc-content-artifacts/**`,
+`crates/qnc-media-thumbnail/**`, `crates/qnc-virtual-short-stills/**`,
+`crates/qnc-editorial-application/**`, `crates/qnc-content-store/src/tests.rs`
+i pripadni ugovorni tekstovi. Izvedeno: radne postavke imaju javni `products`
+blok (`products/thumbnails`, `products/filmstrip`, `products/virtual_shorts`,
+`products/virtual_segments`, `products/b_roll_virtual_clips`); novi projekt
+kreira te direktorije; filmstrip, thumbnail i virtual-short still potrosaci vise
+ne smiju sami pretpostavljati root `filmstrip`, root `virtual_shorts` ni
+`ingest/thumbnails`. Forma/layout nisu dirani. Nije izvedeno: migracija starih
+projekata, promjena UI-ja.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (DB datoteke aktivnog projekta):
+korisnik je odredio novu semantiku baza. Globalna baza projekata je
+`data/qnc-projects.db`; lokalna baza pojedinog projekta je `project.db` u
+direktoriju projekta. Globalno nosi `qnc` prefiks, lokalno ga ne nosi. Put
+citanja ostaje baza -> `active_project_id` -> `project_uri`/binding ->
+`project.db` -> `public_project_settings.settings_json` -> `WorkSettings`.
+Otkljucano samo: ugovori baza, `qnc-project-store`, `qnc-project-close`,
+`qnc-work-settings`, `qnc-active-project-read`, `qnc-player-input` testni
+fixture, app/alati/testovi koji su imali stare nazive. Izvedeno: stari nazivi
+globalne i projektne baze uklonjeni su iz koda, ugovora i alata. Nije izvedeno:
+migracija starih projekata, promjena UI-ja, promjena fizickog modela
+`project.db`.
+
+Zatvoreno zakljucavanje 2026-09-23 (Project/Ingest/Player/Monitor/Worker):
+korisnik je nakon live provjere trazio da se zakljucaju Project, Ingest,
+Broadcast Player, preview monitor i ingest-worker. Zamrznuto je bez daljnjeg
+izricitog otkljucavanja: `crates/qnc-project-*`, `crates/qnc-project-store`,
+`crates/qnc-project-close`, `apps/qnc-app` samo u dijelu Project hostanja,
+`crates/qnc-ingest-*`, `tools/qnc-ingest-worker`, `crates/qnc-broadcast-player`,
+`crates/qnc-broadcast-engine`, `tools/qnc-player-runner`, `crates/qnc-player-*`,
+`crates/qnc-source-preview`, `crates/qnc-monitor`, `crates/qnc-source-dock` u
+dijelu preview/source monitora, i povezani ugovori koji mijenjaju taj runtime.
+Dopusteno bez otkljucavanja ostaje samo citanje, audit, pokretanje testova,
+build i live pokretanje vec sastavljenih aplikacija/helpera, te zapis poslovnih
+rezultata kroz postojece javne write putove. Nedostajuci runtime exe smije se
+izgraditi istim profilom, ali to nije dozvola za promjenu koda. Sljedeca
+izmjena bilo kojeg od tih dijelova mora prvo imenovati tocan modul/putanju i
+razlog otkljucavanja.
 
 Zatvoreno (korak 2) ograniceno odobrenje 2026-09-18 (cetvrto): korisnik je
 izricito potvrdio nastavak. Poslovna logika export presetova i JSON putanja
@@ -1854,3 +2024,35 @@ zamrznuta.
   freeze koda.
 - Ako treba bilo kakva izmjena, prvo otkljucavanje. Ne granati privatnu
   kopiju zamrznutog modula.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (source input adapteri): korisnik je
+odobrio da se vise ulaznih adaptera (Racunalo, LAN, Intranet) modelira kao
+samostalna javna lego komponenta, bez patchanja formi i bez aktivnog koda u
+layoutu. Dodan je `crates/qnc-source-input` i ugovor
+`contracts/modules/source-input.module.json`. Komponenta cita javne source
+transport bindinge i izlozi eksplicitne adaptere `ComputerInputAdapter`,
+`LanInputAdapter`, `IntranetInputAdapter`; ne skenira, ne probea, ne pise u DB i
+ne zna za Ingest/MA/Story forme. Ingest browser smije kasnije birati adapter po
+tabu kroz javni ugovor, ali ovaj rez ne mijenja `qnc-ingest-application` ni
+desktop layout. Projektni sadrzaj i dalje ostaje iskljucivo u aktivnom
+`project.db`/`WorkSettings`.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (timeline asset read): nakon
+preispitivanja odbacen je async/refresh smjer jer je uvodio petlju i dva izvora
+za prikaz. Otkljucano samo: `crates/qnc-content-artifacts`,
+`crates/qnc-source-preview` i Ingest kopiranje preview statea. Zadrzano je
+racionalno pravilo: filmstrip putanje se citaju iz aktivnog `WorkSettings`
+`products/filmstrip`, a Ingest source timeline asseti ne smiju se prepisivati iz
+preview modula. Forma/layout nije diran, nema novog write puta i nema promjene
+worker pokretanja.
+
+Zatvoreno ograniceno odobrenje 2026-09-23 (racionalni poster klik): korisnik je
+trazio v5 postupak za klik na poster: klik nosi samo `clip_id`, projektni
+kontekst je vec poznat, a posteri se citaju iz URI-ja zapisanih u projektnoj
+bazi kroz javnu komponentu. Otkljucano samo: `crates/qnc-clip-posters`,
+`crates/qnc-ingest-application` i `crates/qnc-editorial-application`. Izvedeno:
+`qnc-clip-posters` pamti aktivni red i ne restartira isti posao; Ingest
+application koristi taj javni poster loader umjesto privatnog thumbnail batch
+puta; Editorial application vise ne resetira poster servis pri obicnom zahtjevu
+za postere. Forma/layout nije diran, nema citanja globalne baze na klik, nema
+novog write puta.

@@ -68,6 +68,14 @@ fn qnc_work_settings_fixture(media: &str, playback: &str) -> qnc_work_settings::
             "proxy_policy": "link_when_available",
             "original_policy": "link_when_available"
         },
+        "products": {
+            "root": "products",
+            "thumbnails": "products/thumbnails",
+            "filmstrip": "products/filmstrip",
+            "virtual_shorts": "products/virtual_shorts",
+            "virtual_segments": "products/virtual_segments",
+            "b_roll_virtual_clips": "products/b_roll_virtual_clips"
+        },
         "input": {"mode": "auto"},
         "playback": {"input": playback},
         "video": {"fps": 25.0},
@@ -397,12 +405,12 @@ fn copying_the_media_copies_the_poster_and_records_it() {
     assert_eq!(
         poster,
         format!(
-            "qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg",
+            "qnc://local/project/p1/products/thumbnails/{}/poster.jpg",
             outcome.clip_id
         )
     );
     let file = project
-        .join("ingest")
+        .join("products")
         .join("thumbnails")
         .join(&outcome.clip_id)
         .join("poster.jpg");
@@ -435,12 +443,12 @@ fn link_mode_keeps_media_link_but_copies_poster_to_project() {
     assert_eq!(
         poster,
         format!(
-            "qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg",
+            "qnc://local/project/p1/products/thumbnails/{}/poster.jpg",
             outcome.clip_id
         )
     );
     assert!(project
-        .join("ingest")
+        .join("products")
         .join("thumbnails")
         .join(&outcome.clip_id)
         .join("poster.jpg")
@@ -602,7 +610,7 @@ fn a_linked_clip_with_a_card_poster_gets_a_project_poster() {
         poster.as_deref(),
         Some(
             format!(
-                "qnc://local/project/p1/ingest/thumbnails/{}/poster.jpg",
+                "qnc://local/project/p1/products/thumbnails/{}/poster.jpg",
                 clip.clip.id()
             )
             .as_str()

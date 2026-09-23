@@ -25,7 +25,7 @@ pub(crate) fn workspace_file(registry_file: &Path, id: &str) -> Result<PathBuf, 
     if !directory.is_absolute() {
         return Err(db_error());
     }
-    let file = directory.join("qnc_project.db");
+    let file = directory.join("project.db");
     let db = open_read_only(&file)?;
     let matches: bool = db
         .query_row(
@@ -127,7 +127,7 @@ pub(crate) fn read(registry_file: &Path, context_uri: &str) -> Result<WorkSettin
         ));
     }
     let local_db_uri = format!("qnc://local/db/project_workspace/{active}");
-    let resolver = resolver.with_local_binding(&local_db_uri, directory.join("qnc_project.db"));
+    let resolver = resolver.with_local_binding(&local_db_uri, directory.join("project.db"));
     let db = open_read_only(&bound_path(&resolver, &local_db_uri)?)?;
     let settings: String = db
         .query_row(

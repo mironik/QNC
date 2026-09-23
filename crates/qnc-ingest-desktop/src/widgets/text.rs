@@ -1,15 +1,5 @@
 use super::*;
 
-pub(super) fn truncate(text: &str, max_chars: usize) -> String {
-    let mut chars = text.chars();
-    let head = chars.by_ref().take(max_chars).collect::<String>();
-    if chars.next().is_some() {
-        format!("{head}...")
-    } else {
-        head
-    }
-}
-
 pub(super) fn format_duration(seconds: f64) -> String {
     if !seconds.is_finite() || seconds <= 0.0 {
         return "00:00".to_string();

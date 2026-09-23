@@ -1,5 +1,5 @@
 //! Media card and virtualized card grid. Passive paint (mirrors qnc_v4
-//! `qnc_media_card` and `editorial::media_pool::show_card_grid`). One card, one
+//! the shared media card/grid behavior. One card, one
 //! grid for every application: the caller supplies neutral rows, colours,
 //! metrics and the feature flags from the UI contract, and gets back one
 //! intent. The module knows no application and keeps no state.
@@ -42,6 +42,8 @@ impl StatusDotsMode {
 pub struct MediaCardFeatures {
     /// Bottom-left check mark on the thumbnail.
     pub selection_check: bool,
+    /// Top-right dot on the thumbnail.
+    pub top_right_marker: bool,
     pub status_dots: StatusDotsMode,
 }
 
@@ -105,6 +107,9 @@ pub struct MediaCardInput<'a> {
     pub import_status: &'a str,
     pub status_proxy: &'a str,
     pub status_original: &'a str,
+    /// Short status label painted over the thumbnail; empty means no overlay.
+    pub overlay_label: &'a str,
+    pub top_right_marker: Option<Color32>,
     /// Preview / focus ring. Independent of the check mark.
     pub focused: bool,
     /// Only painted when `features.selection_check`.
@@ -175,6 +180,26 @@ pub fn paint_media_card(
 
     if input.features.selection_check {
         paint_selection_check(ui, thumb_rect, input.checked);
+    }
+    if input.features.top_right_marker {
+        if let Some(marker) = input.top_right_marker {
+            painter.circle_filled(
+                egui::pos2(rect.right() - 10.0, rect.top() + 10.0),
+                4.0,
+                marker,
+            );
+        }
+    }
+    if !input.overlay_label.trim().is_empty() {
+        let font = egui::FontId::proportional(11.0);
+        let galley = painter.layout_no_wrap(input.overlay_label.to_string(), font, style.text);
+        let position = egui::pos2(thumb_rect.left() + 6.0, thumb_rect.top() + 4.0);
+        painter.rect_filled(
+            Rect::from_min_size(position, galley.size()).expand(2.0),
+            0.0,
+            style.surface,
+        );
+        painter.galley(position, galley, style.text);
     }
 
     let dur = if !input.duration_label.trim().is_empty() {
@@ -445,6 +470,8 @@ pub struct CardRow<'a> {
     pub import_status: &'a str,
     pub status_proxy: &'a str,
     pub status_original: &'a str,
+    pub overlay_label: &'a str,
+    pub top_right_marker: Option<Color32>,
     pub checked: bool,
     pub rgba_thumb: Option<RgbaThumb<'a>>,
 }
@@ -539,6 +566,8 @@ pub fn show_card_grid(
                                 import_status: card.import_status,
                                 status_proxy: card.status_proxy,
                                 status_original: card.status_original,
+                                overlay_label: card.overlay_label,
+                                top_right_marker: card.top_right_marker,
                                 focused,
                                 checked: card.checked,
                                 features: input.features,
@@ -593,7 +622,7 @@ mod tests {
         assert_eq!(pipeline_statuses("detected", ""), ("idle", "idle"));
     }
 
-    /// Values of `contracts/ui/editorial.layout.json` (`media_card`).
+    /// Values of a UI layout contract (`media_card`).
     fn metrics() -> CardMetrics {
         CardMetrics {
             min_card_width: 160.0,
@@ -614,10 +643,13 @@ mod tests {
             import_status,
             status_proxy: "pending",
             status_original: "pending",
+            overlay_label: "",
+            top_right_marker: None,
             focused: false,
             checked: false,
             features: MediaCardFeatures {
                 selection_check: true,
+                top_right_marker: false,
                 status_dots: mode,
             },
             thumb: None,

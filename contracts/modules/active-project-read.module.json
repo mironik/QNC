@@ -1,0 +1,19 @@
+{
+  "module_id": "qnc.module.active-project-read",
+  "module_name": "Active project read port",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["project.active.read", "project.work-settings.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["db.write", "db.migrate", "project.activate", "app.workflow", "media.scan", "media.probe", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-active-project-read",
+  "input": "QNC root or an existing work-settings reader.",
+  "output": "Fresh read-only snapshot of the active project and its stored work settings from the public DB contract. The module keeps no active-project cache and does not invent fallback settings."
+}

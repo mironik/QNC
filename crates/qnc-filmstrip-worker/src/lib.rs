@@ -1358,7 +1358,10 @@ mod tests {
 
     #[test]
     fn scratch_dir_is_not_inside_public_filmstrip_artifact_dir() {
-        let public_dir = Path::new("project").join("filmstrip").join("clip-1");
+        let public_dir = Path::new("project")
+            .join("products")
+            .join("filmstrip")
+            .join("clip-1");
         let scratch = filmstrip_scratch_dir("clip-1");
 
         assert!(!scratch.starts_with(&public_dir));

@@ -5,6 +5,7 @@
 use eframe::egui::{self, Align, Color32, Layout, Rect, RichText, Stroke, Ui, Vec2};
 use qnc_filmstrip::FilmstripBackground;
 use qnc_timeline::{TimelineIntent, TimelineProjection, TimelineTheme};
+use qnc_timeline_assets::SourceTimelineAssets;
 
 /// Colours and metrics of the dock frame (from the UI contract and the theme).
 #[derive(Debug, Clone, Copy)]
@@ -28,12 +29,28 @@ pub struct SourceTimeline<'a> {
     pub peaks: [&'a [f32]; 4],
 }
 
+impl<'a> SourceTimeline<'a> {
+    pub fn from_assets(
+        projection: &'a TimelineProjection,
+        theme: TimelineTheme,
+        assets: &'a SourceTimelineAssets,
+    ) -> Self {
+        Self {
+            projection,
+            theme,
+            filmstrip: assets.filmstrip_background(),
+            peaks: [
+                assets.a1_peaks(),
+                assets.a2_peaks(),
+                assets.a3_peaks(),
+                assets.a4_peaks(),
+            ],
+        }
+    }
+}
+
 fn mark_label(ui: &mut Ui, style: &TimelineDockStyle, name: &str, frame: u64) {
-    ui.label(
-        RichText::new(name)
-            .size(style.font_ui)
-            .color(style.border),
-    );
+    ui.label(RichText::new(name).size(style.font_ui).color(style.border));
     ui.label(
         RichText::new(frame.to_string())
             .monospace()

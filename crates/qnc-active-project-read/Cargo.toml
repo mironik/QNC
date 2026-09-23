@@ -1,0 +1,13 @@
+[package]
+name = "qnc-active-project-read"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public read-only port for the active project snapshot"
+
+[dependencies]
+qnc-content-read = { workspace = true }
+qnc-work-settings = { workspace = true }
+
+[dev-dependencies]
+rusqlite = { workspace = true }
+tempfile = "3"

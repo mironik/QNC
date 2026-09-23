@@ -20,7 +20,7 @@ use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_timeline_assets::{
     SourceTimelineAssets, TimelineArtifactRead, TimelineAssetContext, TimelineAssetReader,
 };
-use qnc_work_settings::{SettingsReader, WorkSettings};
+use qnc_work_settings::{ProductArea, SettingsReader, WorkSettings};
 
 pub const MODULE_ID: &str = "qnc.module.source-preview";
 pub const VERSION: &str = "0.1.0";
@@ -107,11 +107,8 @@ impl PreviewContext {
             Ok(Some(project_dir)) => {
                 let artifacts: Arc<dyn TimelineArtifactRead> = Arc::new(content::ArtifactReader {
                     content: content.clone(),
-                    filmstrip_root_uri: format!(
-                        "{}/filmstrip",
-                        settings.output_root_uri.trim_end_matches('/')
-                    ),
-                    filmstrip_dir: project_dir.join("filmstrip"),
+                    filmstrip_root_uri: settings.product_uri(ProductArea::Filmstrip),
+                    filmstrip_dir: settings.product_local_dir(&project_dir, ProductArea::Filmstrip),
                 });
                 (Some(artifacts), None)
             }

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-active-project-read = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-content-artifacts = { workspace = true }
 qnc-content-store = { workspace = true }
@@ -21,6 +22,7 @@ qnc-ingest-cameras = { workspace = true }
 qnc-ingest-import-worker = { workspace = true }
 qnc-ingest-select = { workspace = true }
 qnc-ingest-store = { workspace = true }
+qnc-clip-posters = { workspace = true }
 qnc-media-thumbnail = { workspace = true }
 qnc-work-settings = { workspace = true }
 qnc-player-client = { workspace = true }

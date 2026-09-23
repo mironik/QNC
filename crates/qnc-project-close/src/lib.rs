@@ -50,7 +50,7 @@ impl std::fmt::Debug for CloseProjectComponent {
 
 impl CloseProjectComponent {
     pub fn from_root(root: impl AsRef<Path>) -> Self {
-        Self::local(root.as_ref().join("data").join("project_store.db"))
+        Self::local(root.as_ref().join("data").join("qnc-projects.db"))
     }
 
     pub fn local(registry_file: impl Into<PathBuf>) -> Self {
@@ -274,8 +274,8 @@ mod tests {
         let workspace = root.path().join("projects").join("p1");
         fs::create_dir_all(&data).unwrap();
         fs::create_dir_all(&workspace).unwrap();
-        fs::write(workspace.join("qnc_project.db"), []).unwrap();
-        let db = data.join("project_store.db");
+        fs::write(workspace.join("project.db"), []).unwrap();
+        let db = data.join("qnc-projects.db");
         let conn = Connection::open(&db).unwrap();
         conn.execute_batch(
             "
@@ -300,7 +300,7 @@ mod tests {
             )
             .unwrap();
         assert!(active.is_empty());
-        assert!(workspace.join("qnc_project.db").is_file());
+        assert!(workspace.join("project.db").is_file());
     }
 
     #[test]
@@ -308,7 +308,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let data = root.path().join("data");
         fs::create_dir_all(&data).unwrap();
-        let db = data.join("project_store.db");
+        let db = data.join("qnc-projects.db");
         let conn = Connection::open(&db).unwrap();
         conn.execute_batch(
             "
@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn missing_registry_is_an_error_not_a_new_database() {
         let root = tempfile::tempdir().unwrap();
-        let db = root.path().join("data").join("project_store.db");
+        let db = root.path().join("data").join("qnc-projects.db");
 
         let error = CloseProjectComponent::from_root(root.path())
             .close_active_project()
@@ -401,7 +401,7 @@ mod tests {
     fn project_registry(root: &Path, active_id: &str) -> PathBuf {
         let data = root.join("data");
         fs::create_dir_all(&data).unwrap();
-        let db = data.join("project_store.db");
+        let db = data.join("qnc-projects.db");
         let conn = Connection::open(&db).unwrap();
         conn.execute_batch(
             "

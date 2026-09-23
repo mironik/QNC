@@ -1,5 +1,6 @@
 use qnc_dir_browser::{BrowserEntry, BrowserSource, TransportBrowserSession};
 use qnc_media_probe::{Binding as MediaBinding, Executor, OwnerConfig, ProbeBackend};
+use qnc_source_bindings::{ProbeBinding, RegisteredSource, SourceBinding, TransportBindings};
 use qnc_source_reader::{SourceReader, SourceReference};
 use qnc_transport_resolver::ResolverConfig;
 use serde::Deserialize;
@@ -82,11 +83,15 @@ impl Binding {
             )?)
         }
     }
-    fn absolutize(&mut self, base: &Path) {
-        if let Some(path) = &mut self.file {
-            if path.is_relative() {
-                *path = base.join(&*path);
-            }
+}
+
+impl From<SourceBinding> for Binding {
+    fn from(binding: SourceBinding) -> Self {
+        Self {
+            uri: binding.uri,
+            file: binding.file,
+            endpoint: binding.endpoint,
+            token_env: binding.token_env,
         }
     }
 }
@@ -203,46 +208,55 @@ pub struct SelectionConfig {
 }
 impl SelectionConfig {
     pub fn load(root: &Path) -> Result<Self> {
-        let file = std::env::var_os("QNC_INGEST_TRANSPORT_CONFIG")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| root.join("data").join("ingest-transport.json"));
-        let file = file
-            .canonicalize()
-            .map_err(|_| "Nedostaje ingest-transport.json konfiguracija izvora i baza.")?;
-        if std::fs::metadata(&file)?.len() > 1024 * 1024 {
-            return Err("transport config too large".into());
-        }
-        let mut config: Self = serde_json::from_slice(&std::fs::read(&file)?)?;
+        Self::from_transport_bindings(qnc_source_bindings::load(root)?)
+    }
+
+    pub fn from_transport_bindings(bindings: TransportBindings) -> Result<Self> {
+        let mut config = Self {
+            version: bindings.config_version,
+            catalog: bindings
+                .catalog
+                .ok_or("transport catalog binding missing")?
+                .into(),
+            source_index: bindings
+                .source_index
+                .ok_or("transport source_index binding missing")?
+                .into(),
+            media_records: bindings
+                .media_records
+                .ok_or("transport media_records binding missing")?
+                .into(),
+            sources: bindings
+                .registered_sources
+                .into_iter()
+                .map(source_config)
+                .collect::<Result<Vec<_>>>()?,
+            parallelism: bindings
+                .parallelism
+                .ok_or("transport parallelism missing")?,
+        };
         if config.version != "0.1.0"
             || !(1..=8).contains(&config.parallelism)
             || config.sources.len() > 256
         {
             return Err("invalid Select configuration".into());
         }
-        let base = file.parent().ok_or("config parent missing")?;
         for binding in [
             &mut config.catalog,
             &mut config.source_index,
             &mut config.media_records,
         ] {
-            binding.absolutize(base);
             binding.resolver()?;
         }
         let mut ids = std::collections::BTreeSet::new();
         for source in &mut config.sources {
-            source.location.absolutize(base);
             source.location.resolver()?;
             SourceReference::new(&source.location.uri, ".")?;
             if !ids.insert(source.location.uri.clone()) || source.name.trim().is_empty() {
                 return Err("invalid registered source".into());
             }
             match &mut source.probe {
-                ProbeConfig::Local { executable, .. } => {
-                    if executable.is_relative() {
-                        let resolved = base.join(executable.as_path());
-                        *executable = resolved;
-                    }
-                }
+                ProbeConfig::Local { .. } => {}
                 ProbeConfig::Remote { binding } => {
                     binding.resolver()?;
                 }
@@ -272,5 +286,43 @@ impl SelectionConfig {
             })
             .collect();
         Ok(TransportBrowserSession::new(sources)?)
+    }
+}
+
+fn source_config(source: RegisteredSource) -> Result<SourceConfig> {
+    let probe = match source.probe.ok_or("source probe missing")? {
+        ProbeBinding::Local {
+            executable,
+            probe_size_bytes,
+            analyze_duration_us,
+        } => ProbeConfig::Local {
+            executable,
+            probe_size_bytes,
+            analyze_duration_us,
+        },
+        ProbeBinding::Remote { binding } => ProbeConfig::Remote {
+            binding: binding.into(),
+        },
+    };
+    Ok(SourceConfig {
+        location: source.location.into(),
+        name: required(source.name, "source name missing")?,
+        serial_number: required(source.serial_number, "source serial_number missing")?,
+        volume_name: source.volume_name.unwrap_or_default(),
+        scope: source_scope(required(source.scope, "source scope missing")?.as_str())?,
+        probe,
+    })
+}
+
+fn required(value: Option<String>, message: &'static str) -> Result<String> {
+    value.ok_or_else(|| message.into())
+}
+
+fn source_scope(value: &str) -> Result<qnc_camera_detector::SourceScope> {
+    match value {
+        "card_relative" => Ok(qnc_camera_detector::SourceScope::CardRelative),
+        "recording_relative" => Ok(qnc_camera_detector::SourceScope::RecordingRelative),
+        "reel_relative" => Ok(qnc_camera_detector::SourceScope::ReelRelative),
+        _ => Err("invalid source scope".into()),
     }
 }

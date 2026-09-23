@@ -2,7 +2,9 @@ mod local;
 mod model;
 pub mod server;
 
-pub use model::{PlaybackInput, ReadError, StoragePolicy, WorkSettings, VERSION};
+pub use model::{
+    PlaybackInput, ProductArea, ProductLocations, ReadError, StoragePolicy, WorkSettings, VERSION,
+};
 use qnc_transport_resolver::{ResolvedEndpoint, ResolverConfig};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -135,7 +137,7 @@ impl SettingsReader {
             .clone()
             .unwrap_or_else(|| root.join("data").join("work-settings-transport.json"));
         if configured.is_none() && !path.exists() {
-            return Ok(Self::local(root.join("data").join("project_store.db")));
+            return Ok(Self::local(root.join("data").join("qnc-projects.db")));
         }
         let text = std::fs::read_to_string(&path).map_err(|_| config_error())?;
         let mut config: ReaderConfig = serde_json::from_str(&text).map_err(|_| config_error())?;

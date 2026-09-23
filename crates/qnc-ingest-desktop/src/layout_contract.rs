@@ -222,7 +222,7 @@ pub struct IngestClipGrid {
 #[derive(Debug, Clone, Deserialize)]
 pub struct IngestSourceDock {
     pub clip_label_fallback: String,
-    pub actions_rtl: Vec<String>,
+    pub actions_rtl: Vec<TransportCommand>,
     pub clip_filter_labels: [String; 2],
     pub clip_filter_colors: [[u8; 3]; 2],
     pub clip_filter_width: f32,

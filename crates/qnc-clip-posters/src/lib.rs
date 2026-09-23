@@ -1,14 +1,13 @@
 //! The posters of clips, loaded in the background.
 //!
 //! Procedure of QNC v5: the chosen clip is asked for first and the others follow in the
-//! order of the list; a poster is read from where the project database says it is, in the
-//! project folder when it was copied, otherwise on the source (link). A source that is not
-//! there (no card, another card) leaves the placeholder; nothing is invented and nothing
-//! is written. The caller only says which clips, which is chosen, and polls for pictures.
+//! order of the list; a poster is read from the URI stored for the clip, through source
+//! readers and project folders already resolved from the active project database. A source
+//! that is not there (no card, another card, unavailable LAN/Intranet reader) leaves the
+//! placeholder; nothing is invented and nothing is written.
 
 use qnc_image_assets::RgbaImage;
 use qnc_media_thumbnail::{ProjectFolder, ThumbnailBatchService, ThumbnailEvent, ThumbnailRequest};
-use qnc_source_bindings::SourceBinding;
 use qnc_source_reader::SourceReader;
 use std::{collections::HashSet, sync::Arc};
 
@@ -22,14 +21,15 @@ pub struct Poster {
     pub image: Arc<RgbaImage>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ClipPosters {
     service: ThumbnailBatchService,
-    sources: Vec<SourceBinding>,
+    sources: Vec<SourceReader>,
     project: Option<ProjectFolder>,
     /// (clip id, poster address) still to load, in the order they are asked for.
     wanted: Vec<(String, String)>,
-    loaded: HashSet<String>,
+    loaded: HashSet<(String, String)>,
+    active_requests: Vec<(String, String)>,
 }
 
 impl ClipPosters {
@@ -37,8 +37,8 @@ impl ClipPosters {
         Self::default()
     }
 
-    /// Where posters can be read from: the sources and the project folder of this machine.
-    pub fn configure(&mut self, sources: &[SourceBinding], project: Option<ProjectFolder>) {
+    /// Where posters can be read from: resolved source readers and the project folder of this machine.
+    pub fn configure(&mut self, sources: &[SourceReader], project: Option<ProjectFolder>) {
         self.sources = sources.to_vec();
         self.project = project;
     }
@@ -48,16 +48,23 @@ impl ClipPosters {
         self.service.cancel();
         self.wanted.clear();
         self.loaded.clear();
+        self.active_requests.clear();
+    }
+
+    /// Stops the active read without forgetting which visible posters were already loaded.
+    pub fn cancel(&mut self) {
+        self.service.cancel();
+        self.active_requests.clear();
     }
 
     /// The clips to show, in list order, with the address of their poster. Clips whose
     /// poster is already loaded are not asked for again; the chosen clip is asked first.
     pub fn request(&mut self, clips: Vec<(String, String)>, chosen: Option<&str>) {
-        let present: HashSet<&str> = clips.iter().map(|(id, _)| id.as_str()).collect();
-        self.loaded.retain(|id| present.contains(id.as_str()));
+        let present = clips.iter().cloned().collect::<HashSet<_>>();
+        self.loaded.retain(|entry| present.contains(entry));
         self.wanted = clips
             .into_iter()
-            .filter(|(id, _)| !self.loaded.contains(id))
+            .filter(|entry| !self.loaded.contains(entry))
             .collect();
         self.start(chosen);
     }
@@ -87,8 +94,7 @@ impl ClipPosters {
             self.service.cancel();
             return;
         }
-        let sources: Vec<SourceReader> = self.sources.iter().filter_map(reader).collect();
-        let requests = self
+        let requests: Vec<ThumbnailRequest> = self
             .wanted
             .iter()
             .map(|(id, uri)| ThumbnailRequest {
@@ -96,19 +102,34 @@ impl ClipPosters {
                 uri: uri.clone(),
             })
             .collect();
+        if requests_signature(&requests) == self.active_requests {
+            return;
+        }
         // A failed start leaves the placeholders; the next request tries again.
-        let _ = self
+        if self
             .service
-            .start_with_project(sources, self.project.clone(), requests);
+            .start_with_project(self.sources.clone(), self.project.clone(), requests)
+            .is_ok()
+        {
+            self.active_requests = self.wanted.clone();
+        }
     }
 
     /// Pictures that arrived since the last poll.
     pub fn poll(&mut self) -> Vec<Poster> {
         let mut posters = Vec::new();
         for event in self.service.poll(16) {
-            if let ThumbnailEvent::Ready { item_id, image, .. } = event {
-                self.wanted.retain(|(id, _)| id != &item_id);
-                self.loaded.insert(item_id.clone());
+            if let ThumbnailEvent::Ready {
+                item_id,
+                uri,
+                image,
+            } = event
+            {
+                self.wanted
+                    .retain(|(id, wanted_uri)| id != &item_id || wanted_uri != &uri);
+                self.loaded.insert((item_id.clone(), uri.clone()));
+                self.active_requests
+                    .retain(|(id, active_uri)| id != &item_id || active_uri != &uri);
                 posters.push(Poster {
                     clip_id: item_id,
                     image,
@@ -123,28 +144,11 @@ impl ClipPosters {
     }
 }
 
-/// A reader of one source; a source that is not there is skipped, never guessed.
-fn reader(binding: &SourceBinding) -> Option<SourceReader> {
-    binding.resolver().ok()?;
-    if let Some(path) = &binding.file {
-        // The address of a volume names its serial number: another card in the same slot
-        // must not show its pictures under the clips of this one.
-        let serial = binding
-            .uri
-            .rsplit('/')
-            .next()
-            .and_then(|id| id.strip_prefix("volume-"))
-            .unwrap_or("");
-        qnc_dir_browser::verify_local_volume_serial(path, serial).ok()?;
-        SourceReader::local(&binding.uri, path).ok()
-    } else {
-        SourceReader::remote(
-            &binding.uri,
-            binding.endpoint.as_deref()?,
-            binding.token().ok()??.as_str(),
-        )
-        .ok()
-    }
+fn requests_signature(requests: &[ThumbnailRequest]) -> Vec<(String, String)> {
+    requests
+        .iter()
+        .map(|request| (request.item_id.clone(), request.uri.clone()))
+        .collect()
 }
 
 #[cfg(test)]
@@ -166,7 +170,7 @@ mod tests {
     fn folder() -> (tempfile::TempDir, ProjectFolder) {
         let dir = tempfile::tempdir().unwrap();
         for name in ["a", "b", "c"] {
-            let posters = dir.path().join("ingest").join("thumbnails").join(name);
+            let posters = dir.path().join("products").join("thumbnails").join(name);
             std::fs::create_dir_all(&posters).unwrap();
             std::fs::write(posters.join("poster.jpg"), PNG_1X1).unwrap();
         }
@@ -178,7 +182,7 @@ mod tests {
     }
 
     fn address(name: &str) -> String {
-        format!("{ROOT}/ingest/thumbnails/{name}/poster.jpg")
+        format!("{ROOT}/products/thumbnails/{name}/poster.jpg")
     }
 
     fn wait_for(posters: &mut ClipPosters, count: usize) -> Vec<String> {
@@ -229,6 +233,22 @@ mod tests {
     }
 
     #[test]
+    fn the_same_clip_id_with_a_new_poster_uri_is_loaded_again() {
+        let (_dir, project) = folder();
+        let mut posters = ClipPosters::new();
+        posters.configure(&[], Some(project));
+
+        posters.request(vec![("clip".to_string(), address("a"))], None);
+        let first = wait_for(&mut posters, 1);
+        assert_eq!(first, ["clip"]);
+
+        posters.request(vec![("clip".to_string(), address("b"))], None);
+        let second = wait_for(&mut posters, 1);
+        assert_eq!(second, ["clip"]);
+        assert!(posters.loaded.contains(&("clip".into(), address("b"))));
+    }
+
+    #[test]
     fn a_poster_on_a_source_that_is_not_there_leaves_the_placeholder() {
         let mut posters = ClipPosters::new();
         posters.configure(&[], None);
@@ -238,6 +258,39 @@ mod tests {
         );
         std::thread::sleep(Duration::from_millis(100));
         assert!(posters.poll().is_empty());
+    }
+
+    #[test]
+    fn source_readers_are_neutral_local_lan_or_intranet_inputs() {
+        let dir = tempfile::tempdir().unwrap();
+        let local = SourceReader::local("qnc://local/source/card-a", dir.path()).unwrap();
+        let lan = SourceReader::remote(
+            "qnc://lan/storage/source/card-a",
+            "http://127.0.0.1:1/qnc",
+            "t",
+        )
+        .unwrap();
+        let intranet = SourceReader::remote(
+            "qnc://intranet/storage/source/card-a",
+            "http://127.0.0.1:1/qnc",
+            "t",
+        )
+        .unwrap();
+
+        let mut posters = ClipPosters::new();
+        posters.configure(&[local, lan, intranet], None);
+        assert_eq!(
+            posters
+                .sources
+                .iter()
+                .map(SourceReader::source_uri)
+                .collect::<Vec<_>>(),
+            [
+                "qnc://local/source/card-a",
+                "qnc://lan/storage/source/card-a",
+                "qnc://intranet/storage/source/card-a"
+            ]
+        );
     }
 
     #[test]

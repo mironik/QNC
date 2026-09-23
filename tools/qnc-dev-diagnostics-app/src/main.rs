@@ -892,9 +892,11 @@ fn read_content_db(root: &Path) -> ContentDbSnapshot {
 }
 
 fn read_content_db_inner(root: &Path) -> Result<ContentDbSnapshot, String> {
-    let reader = qnc_work_settings::SettingsReader::from_root(root).map_err(|e| e.to_string())?;
-    let settings = reader.read().map_err(|e| e.to_string())?;
-    let plan = qnc_ingest_work_plan::IngestWorkPlan::from_settings(settings)?;
+    let active_project =
+        qnc_active_project_read::ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
+    let snapshot = active_project.read().map_err(|e| e.to_string())?;
+    let reader = active_project.settings_reader().clone();
+    let plan = qnc_ingest_work_plan::IngestWorkPlan::from_settings(snapshot.settings)?;
     let content_uri = qnc_ingest_store::content::content_uri(&plan.settings.workspace_db_uri)?;
     let target = qnc_ingest_store::content::ContentTarget::for_project(&reader, &plan.settings)?;
     let mut client = target.open(qnc_ingest_store::content::Access::ReadOnly)?;

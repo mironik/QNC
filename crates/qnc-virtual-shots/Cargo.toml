@@ -2,10 +2,12 @@
 name = "qnc-virtual-shots"
 version = "0.1.0"
 edition = "2021"
-description = "Public writer of virtual shot rows in the active project database"
+description = "Public virtual shot component backed by the project content-store contract"
 
 [dependencies]
-rusqlite = { workspace = true }
+qnc-content-store = { workspace = true }
 
 [dev-dependencies]
+qnc-media-records = { workspace = true }
+rusqlite = { workspace = true }
 tempfile = "3"

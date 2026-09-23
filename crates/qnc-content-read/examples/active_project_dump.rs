@@ -2,14 +2,14 @@ use std::path::PathBuf;
 
 use qnc_content_read::ContentReader;
 use qnc_transport_resolver::ResolvedEndpoint;
-use qnc_work_settings::SettingsReader;
+use qnc_work_settings::{ProductArea, SettingsReader};
 use rusqlite::{Connection, OpenFlags};
 
 fn main() -> Result<(), String> {
     let registry = std::env::args()
         .nth(1)
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("data/project_store.db"));
+        .unwrap_or_else(|| PathBuf::from("data/qnc-projects.db"));
     let settings_reader = SettingsReader::local(registry);
     let settings = settings_reader.read().map_err(|error| error.to_string())?;
     let workspace_dir = settings_reader
@@ -125,7 +125,7 @@ fn main() -> Result<(), String> {
         );
     }
     if let Some(dir) = workspace_dir {
-        let filmstrip_dir = dir.join("filmstrip");
+        let filmstrip_dir = settings.product_local_dir(&dir, ProductArea::Filmstrip);
         let mut disk_dirs = std::collections::BTreeSet::new();
         if let Ok(entries) = std::fs::read_dir(&filmstrip_dir) {
             for entry in entries.flatten() {

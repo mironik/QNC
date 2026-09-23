@@ -11,7 +11,7 @@ use qnc_timeline_artifacts::{Artifacts, ArtifactsContext};
 use qnc_timeline_assets::{
     SourceTimelineAssets, TimelineArtifactRead, TimelineAssetContext, TimelineAssetReader,
 };
-use qnc_work_settings::{SettingsReader, WorkSettings};
+use qnc_work_settings::{ProductArea, SettingsReader, WorkSettings};
 use std::{path::PathBuf, sync::Arc};
 
 pub const MODULE_ID: &str = "qnc.module.content-artifacts";
@@ -372,11 +372,8 @@ pub fn timeline_artifact_reader(
         .ok_or_else(|| "Artefakti timelinea nemaju lokalni binding projekta.".to_string())?;
     Ok(Arc::new(ProjectTimelineArtifactReader {
         read: SharedRead::new(content_target),
-        filmstrip_root_uri: format!(
-            "{}/filmstrip",
-            settings.output_root_uri.trim_end_matches('/')
-        ),
-        filmstrip_dir: project_dir.join("filmstrip"),
+        filmstrip_root_uri: settings.product_uri(ProductArea::Filmstrip),
+        filmstrip_dir: settings.product_local_dir(&project_dir, ProductArea::Filmstrip),
     }))
 }
 
@@ -390,12 +387,9 @@ pub fn artifacts_context(
         .local_workspace_dir(settings)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Artefakti timelinea nemaju lokalni binding projekta.".to_string())?;
-    let filmstrip_dir = project_dir.join("filmstrip");
+    let filmstrip_dir = settings.product_local_dir(&project_dir, ProductArea::Filmstrip);
     let project_audio_channels = settings.audio_channels().map_err(|e| e.to_string())?;
-    let filmstrip_root_uri = format!(
-        "{}/filmstrip",
-        settings.output_root_uri.trim_end_matches('/')
-    );
+    let filmstrip_root_uri = settings.product_uri(ProductArea::Filmstrip);
     Ok(ArtifactsContext {
         project_id: settings.project_id.clone(),
         filmstrip_root_uri: filmstrip_root_uri.clone(),

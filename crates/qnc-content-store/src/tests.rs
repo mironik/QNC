@@ -208,17 +208,17 @@ fn filmstrip_publication_writes_public_frame_uris_without_touching_media() {
         status: "ready".into(),
         duration_sec: "10.00".into(),
         frame_count: 2,
-        artifact_uri: "qnc://local/project/p1/filmstrip/c1".into(),
+        artifact_uri: "qnc://local/project/p1/products/filmstrip/c1".into(),
         frames: vec![
             FilmstripFrameRecord {
                 index: 0,
                 seek_sec: "0.00".into(),
-                artifact_uri: "qnc://local/project/p1/filmstrip/c1/000_0_00.jpg".into(),
+                artifact_uri: "qnc://local/project/p1/products/filmstrip/c1/000_0_00.jpg".into(),
             },
             FilmstripFrameRecord {
                 index: 1,
                 seek_sec: "5.00".into(),
-                artifact_uri: "qnc://local/project/p1/filmstrip/c1/001_5_00.jpg".into(),
+                artifact_uri: "qnc://local/project/p1/products/filmstrip/c1/001_5_00.jpg".into(),
             },
         ],
     };
@@ -243,7 +243,7 @@ fn filmstrip_publication_writes_public_frame_uris_without_touching_media() {
             |r| r.get(0)
         )
         .unwrap(),
-        "qnc://local/project/p1/filmstrip/c1/001_5_00.jpg"
+        "qnc://local/project/p1/products/filmstrip/c1/001_5_00.jpg"
     );
 }
 
@@ -512,17 +512,21 @@ fn filmstrip(id: &str) -> FilmstripArtifactRecord {
         status: "ready".into(),
         duration_sec: "10.00".into(),
         frame_count: 2,
-        artifact_uri: format!("qnc://local/project/p1/filmstrip/{id}"),
+        artifact_uri: format!("qnc://local/project/p1/products/filmstrip/{id}"),
         frames: vec![
             FilmstripFrameRecord {
                 index: 0,
                 seek_sec: "0.00".into(),
-                artifact_uri: format!("qnc://local/project/p1/filmstrip/{id}/000_0_00.jpg"),
+                artifact_uri: format!(
+                    "qnc://local/project/p1/products/filmstrip/{id}/000_0_00.jpg"
+                ),
             },
             FilmstripFrameRecord {
                 index: 1,
                 seek_sec: "5.00".into(),
-                artifact_uri: format!("qnc://local/project/p1/filmstrip/{id}/001_5_00.jpg"),
+                artifact_uri: format!(
+                    "qnc://local/project/p1/products/filmstrip/{id}/001_5_00.jpg"
+                ),
             },
         ],
     }
@@ -714,7 +718,7 @@ fn different_project_and_project_settings_file_are_never_repaired() {
 #[test]
 fn trigger_cannot_write_project_settings_through_ingest_connection() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("qnc_project.db");
+    let path = dir.path().join("project.db");
     database(&path);
     drop(ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap());
     Connection::open(&path)
@@ -743,7 +747,7 @@ fn trigger_cannot_write_project_settings_through_ingest_connection() {
 #[test]
 fn existing_project_wal_mode_survives_ingest_writer_and_read_only_settings_reader() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("qnc_project.db");
+    let path = dir.path().join("project.db");
     database(&path);
     let project = Connection::open(&path).unwrap();
     project.pragma_update(None, "journal_mode", "WAL").unwrap();
@@ -765,14 +769,14 @@ fn existing_project_wal_mode_survives_ingest_writer_and_read_only_settings_reade
 #[test]
 fn readonly_wal_companions_do_not_block_owned_schema_writes() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("qnc_project.db");
+    let path = dir.path().join("project.db");
     database(&path);
     let project = Connection::open(&path).unwrap();
     project.pragma_update(None, "journal_mode", "WAL").unwrap();
     project
         .execute_batch("CREATE TABLE unrelated(value TEXT);")
         .unwrap();
-    let files = ["qnc_project.db", "qnc_project.db-wal", "qnc_project.db-shm"];
+    let files = ["project.db", "project.db-wal", "project.db-shm"];
     for name in files {
         let file = dir.path().join(name);
         let mut permissions = std::fs::metadata(&file).unwrap().permissions();
@@ -814,7 +818,7 @@ fn readonly_wal_companions_do_not_block_owned_schema_writes() {
 #[test]
 fn colliding_table_rolls_back_schema_creation_without_migration() {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("qnc_project.db");
+    let path = dir.path().join("project.db");
     database(&path);
     let db = Connection::open(&path).unwrap();
     db.execute_batch("CREATE TABLE clips(value TEXT); INSERT INTO clips VALUES('keep');")
@@ -1026,7 +1030,7 @@ fn a_heartbeat_keeps_the_lease_alive_and_needs_a_running_import() {
 }
 
 fn poster_uri() -> String {
-    "qnc://local/project/ingest/thumbnails/c1_poster.jpg".into()
+    "qnc://local/project/p1/products/thumbnails/c1_poster.jpg".into()
 }
 
 #[test]

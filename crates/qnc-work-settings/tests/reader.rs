@@ -17,7 +17,7 @@ fn settings() -> Value {
 fn fixture() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     fs::create_dir(root.path().join("data")).unwrap();
-    let db = Connection::open(root.path().join("data/project_store.db")).unwrap();
+    let db = Connection::open(root.path().join("data/qnc-projects.db")).unwrap();
     db.execute_batch(
         "CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT);
         CREATE VIEW public_app_settings AS SELECT * FROM app_settings;
@@ -40,7 +40,7 @@ fn fixture() -> tempfile::TempDir {
             [id, dir.to_str().unwrap()],
         )
         .unwrap();
-        let workspace = Connection::open(dir.join("qnc_project.db")).unwrap();
+        let workspace = Connection::open(dir.join("project.db")).unwrap();
         workspace
             .execute_batch(
                 "CREATE TABLE project_settings(project_id TEXT PRIMARY KEY, settings_json TEXT);
@@ -64,7 +64,7 @@ fn fixture() -> tempfile::TempDir {
 #[test]
 fn active_selection_is_read_from_database_not_cached_or_supplied_by_ui() {
     let root = fixture();
-    let path = root.path().join("data/project_store.db");
+    let path = root.path().join("data/qnc-projects.db");
     let reader = SettingsReader::local(&path);
     let first = reader.read().unwrap();
     assert_eq!(first.project_id, "p1");
@@ -86,8 +86,8 @@ fn active_selection_is_read_from_database_not_cached_or_supplied_by_ui() {
 fn standalone_read_has_no_project_app_and_changes_no_database_bytes() {
     let root = fixture();
     let paths = [
-        root.path().join("data/project_store.db"),
-        root.path().join("p1/qnc_project.db"),
+        root.path().join("data/qnc-projects.db"),
+        root.path().join("p1/project.db"),
     ];
     let before = paths.each_ref().map(|p| fs::read(p).unwrap());
     let result = SettingsReader::local(&paths[0]).read().unwrap();
@@ -117,7 +117,7 @@ fn no_active_project_missing_record_and_missing_binding_fail_closed() {
         "DELETE FROM project_storage_locations",
     ] {
         let root = fixture();
-        let file = root.path().join("data/project_store.db");
+        let file = root.path().join("data/qnc-projects.db");
         Connection::open(&file).unwrap().execute_batch(sql).unwrap();
         assert!(SettingsReader::local(&file).read().is_err());
     }
@@ -126,7 +126,7 @@ fn no_active_project_missing_record_and_missing_binding_fail_closed() {
 #[test]
 fn old_public_view_is_not_migrated_or_bypassed() {
     let root = fixture();
-    let file = root.path().join("p1/qnc_project.db");
+    let file = root.path().join("p1/project.db");
     let conn = Connection::open(&file).unwrap();
     conn.execute_batch(
         "DROP VIEW public_project_settings;
@@ -136,7 +136,7 @@ fn old_public_view_is_not_migrated_or_bypassed() {
     drop(conn);
     let before = fs::read(&file).unwrap();
     assert_eq!(
-        SettingsReader::local(root.path().join("data/project_store.db"))
+        SettingsReader::local(root.path().join("data/qnc-projects.db"))
             .read()
             .unwrap_err()
             .code,
@@ -149,12 +149,12 @@ fn old_public_view_is_not_migrated_or_bypassed() {
 fn incomplete_or_invalid_saved_settings_are_not_replaced_with_defaults() {
     for payload in ["{}", "not json"] {
         let root = fixture();
-        Connection::open(root.path().join("p1/qnc_project.db"))
+        Connection::open(root.path().join("p1/project.db"))
             .unwrap()
             .execute("UPDATE project_settings SET settings_json=?1", [payload])
             .unwrap();
         assert!(
-            SettingsReader::local(root.path().join("data/project_store.db"))
+            SettingsReader::local(root.path().join("data/qnc-projects.db"))
                 .read()
                 .is_err()
         );
@@ -170,7 +170,7 @@ fn real_http_transport_reads_same_db_for_lan_and_intranet_and_rejects_unauthoriz
         let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
         let endpoint = format!("http://{}", server.server_addr());
         let uri = format!("qnc://{environment}/storage/db/project_registry");
-        let file = root.path().join("data/project_store.db");
+        let file = root.path().join("data/qnc-projects.db");
         let expected_uri = uri.clone();
         let handler = std::thread::spawn(move || {
             for _ in 0..3 {
@@ -217,7 +217,7 @@ fn real_http_transport_reads_same_db_for_lan_and_intranet_and_rejects_unauthoriz
 fn failed_network_transport_never_falls_back_to_local_registry() {
     let root = fixture();
     assert!(
-        SettingsReader::local(root.path().join("data/project_store.db"))
+        SettingsReader::local(root.path().join("data/qnc-projects.db"))
             .read()
             .is_ok()
     );
