@@ -42,6 +42,8 @@ pub struct Runtime {
     gpu: SharedVideo,
     audio: Option<Rc<RefCell<qnc_audio_output::AudioOutput>>>,
     epoch: Instant,
+    /// An underrun rearm could not start audio yet; retried until it does.
+    audio_rearm_pending: bool,
 }
 impl Runtime {
     pub fn open(
@@ -245,6 +247,7 @@ impl Runtime {
             gpu,
             audio: device,
             epoch: Instant::now(),
+            audio_rearm_pending: false,
         })
     }
     pub fn state(&self) -> &TransportEngineState {
@@ -306,12 +309,38 @@ impl Runtime {
                     ),
                 );
             }
-            if let Err(e) = self.engine.rearm_audio_after_underrun() {
-                if qnc_dev_diagnostics::player_diagnostics_enabled() {
-                    qnc_dev_diagnostics::log_line(
-                        qnc_dev_diagnostics::DiagnosticsStream::Player,
-                        format!("player-rebuffer audio_rearm_failed={e}"),
-                    );
+            match self.engine.rearm_audio_after_underrun() {
+                Ok(()) => self.audio_rearm_pending = false,
+                Err(e) => {
+                    // The preroll keeps filling while playing; finish it on a later tick.
+                    self.audio_rearm_pending = self.audio_waits_for_pcm();
+                    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                        qnc_dev_diagnostics::log_line(
+                            qnc_dev_diagnostics::DiagnosticsStream::Player,
+                            format!("player-rebuffer audio_rearm_failed={e}"),
+                        );
+                    }
+                }
+            }
+        } else if self.audio_rearm_pending {
+            match self.engine.finish_audio_rearm() {
+                Ok(()) => {
+                    self.audio_rearm_pending = false;
+                    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                        qnc_dev_diagnostics::log_line(
+                            qnc_dev_diagnostics::DiagnosticsStream::Player,
+                            format!(
+                                "player-rebuffer audio_resumed frame={}",
+                                self.engine.state().carrier_frame
+                            ),
+                        );
+                    }
+                }
+                // Too little PCM yet: the queue is still being prepared.
+                Err(_) if self.audio_waits_for_pcm() => {}
+                Err(e) => {
+                    self.audio_rearm_pending = false;
+                    return Err(self.enrich_tick_error(e));
                 }
             }
         }
@@ -352,6 +381,13 @@ impl Runtime {
             return Err(error(format!("player preparation failed: {events:?}")));
         }
         Ok(events)
+    }
+
+    /// The audio queue of a rearm exists but has not been started yet.
+    fn audio_waits_for_pcm(&self) -> bool {
+        self.audio.as_ref().is_some_and(|device| {
+            device.borrow().telemetry().status == qnc_audio_output::Status::Preparing
+        })
     }
 
     fn enrich_tick_error(&self, e: BroadcastEngineError) -> BroadcastEngineError {

@@ -53,9 +53,9 @@ impl EditorialApp {
         self.application.footer_status()
     }
 
-    /// The surface became visible again: reread the active project cheaply.
-    pub fn on_activated(&mut self) {
-        self.application.refresh();
+    /// The shell shows or hides this surface.
+    pub fn set_active(&mut self, active: bool) {
+        self.application.set_active(active);
     }
 
     fn dispatch(&mut self, ctx: &egui::Context, intent: EditorialIntent) {

@@ -351,6 +351,13 @@ impl QncShell {
 
         if app.host_mode == "embedded_public_api" {
             if self.ensure_embedded_component(&app) {
+                if self.active_tab != tab_id {
+                    // Only one surface is shown; a hidden one must not keep a player
+                    // reading the media while another plays.
+                    if let Some(previous) = self.embedded_apps.get_mut(&self.active_tab) {
+                        previous.on_deactivated();
+                    }
+                }
                 self.active_tab = tab_id.to_string();
                 if let Some(component) = self.embedded_apps.get_mut(tab_id) {
                     component.on_activated();
@@ -1174,6 +1181,38 @@ mod tests {
             self.activations += 1;
             self.status = format!("Activation {}", self.activations);
         }
+
+        fn on_deactivated(&mut self) {
+            self.status = format!("Deactivated after {}", self.activations);
+        }
+    }
+
+    #[test]
+    fn leaving_a_surface_tells_it_to_release_its_player() {
+        let mut shell = navigation_shell();
+        shell.embedded_apps.insert(
+            "variant".into(),
+            Box::new(StatusSurface {
+                status: String::new(),
+                activations: 0,
+            }),
+        );
+        shell.activate_tab("variant");
+        shell.activate_tab("variant");
+        let status = |shell: &QncShell| {
+            shell.embedded_apps["variant"]
+                .footer_status()
+                .unwrap_or_default()
+                .to_string()
+        };
+        assert_eq!(
+            status(&shell),
+            "Activation 2",
+            "re-selecting the same tab is no switch"
+        );
+        shell.activate_tab("project");
+        assert_eq!(status(&shell), "Deactivated after 2");
+        fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 
     #[test]

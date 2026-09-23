@@ -32,7 +32,11 @@ impl ShellDesktopApp for IngestDesktopAdapter {
     }
 
     fn on_activated(&mut self) {
-        self.app.on_activated();
+        self.app.set_active(true);
+    }
+
+    fn on_deactivated(&mut self) {
+        self.app.set_active(false);
     }
 
     fn take_navigation_request(&mut self) -> Option<DesktopNavigation> {

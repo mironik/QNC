@@ -1965,6 +1965,36 @@ qnc-conformance` (25), `cargo run -p qnc-conformance` prolazi, i mutacijska
 provjera (spustena granica C10 obara conformance). Odobrenje je zatvoreno,
 obitelj je zamrznuta.
 
+Zatvoreno ograniceno odobrenje 2026-09-23 (zastoj playera dok radi pozadina):
+korisnik je live potvrdio da player stane nakon desetak sekundi dok pozadinski
+proces radi i otkljucao cetiri popravka iz dijagnoze: worker samo jedan primjerak,
+worker se sklanja dok bilo koji player radi, skrivena povrsina gasi svoj player,
+player se oporavlja nakon ispraznjenog audio reda. Dokaz iz `player.log`:
+`player-rebuffer reason=audio_underrun` pa `audio_rearm_failed ... initial PCM
+queue is not ready`, player ostaje stajati; istovremeno dva `qnc-ingest-worker`
+procesa rade iste filmstripove i dva playera citaju karticu. Otkljucano i izvedeno
+samo: `crates/qnc-broadcast-player` (`finish_audio_rearm`, test),
+`crates/qnc-broadcast-engine` (ponavlja commit/start dok audio red ceka PCM),
+novi javni `crates/qnc-playback-activity` + `contracts/modules/playback-activity.module.json`
+(neutralni zapis "player radi" i najam workera u projektnoj bazi; kod premjesten iz
+`qnc-ingest-runtime`, koji ostaje samo re-export), `crates/qnc-source-preview`
+(svaki preview javlja rad playera, C9), `crates/qnc-ingest-import-worker`
+(`run_import` bez najma), `tools/qnc-ingest-worker` (jedan najam za uvoz i
+artefakte; filmstrip/wave se pauziraju dok player radi, C8),
+`crates/qnc-shell-desktop-api` (`on_deactivated`), `apps/qnc-app` (poziva ga pri
+promjeni povrsine, test), `crates/qnc-ingest-desktop-adapter` i cetiri editorial
+adaptera, `crates/qnc-ingest-desktop`/`qnc-editorial-desktop` (`set_active`
+umjesto `on_activated`, bez rasta), `crates/qnc-ingest-application` (`set_active`,
+uklonjen vlastiti reporter jer to radi preview) i `crates/qnc-editorial-application`
+(`set_active`; dvije petlje cekanja upisa spojene u jednu radi C10), Cargo.
+Baseline ciljne slike spusten: C8 x2 i C9 uklonjeni, C10 Ingest 1758, Editorial 757.
+Verificirano: `cargo build --workspace`, testovi `qnc-broadcast-player` (78),
+`qnc-broadcast-engine`, `qnc-playback-activity`, `qnc-ingest-import-worker`,
+`qnc-ingest-worker`, `qnc-ingest-application`, `qnc-editorial-application`,
+`qnc-source-preview`, `qnc-app` (13, novi test deaktivacije), `cargo run -p
+qnc-conformance` bez upozorenja. Live provjera slijedi na release buildu.
+Odobrenje je zatvoreno, obitelj je zamrznuta.
+
 Zatvoreno (korak 2) ograniceno odobrenje 2026-09-18 (cetvrto): korisnik je
 izricito potvrdio nastavak. Poslovna logika export presetova i JSON putanja
 postavki izlazi iz `crates/qnc-project-desktop/src/project_advanced.rs` u dva

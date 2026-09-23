@@ -24,7 +24,22 @@ fn main() -> ExitCode {
 }
 
 fn run_background(root: &Path) -> Result<(), String> {
-    qnc_ingest_import_worker::run_service(root)?;
+    let active_project = qnc_active_project_read::ActiveProjectReader::from_root(root)
+        .map_err(|error| error.to_string())?;
+    let snapshot = active_project.read().map_err(|error| error.to_string())?;
+    let reader = active_project.settings_reader().clone();
+    let target = qnc_content_store::ContentTarget::for_project(&reader, &snapshot.settings)?;
+    // One worker per project: the lease covers the import and the artifacts, so a
+    // second start while the artifacts are still built finds it and ends at once.
+    if qnc_playback_activity::is_fresh(
+        &target,
+        qnc_playback_activity::WORKER,
+        qnc_playback_activity::WORKER_FRESH_SECONDS,
+    ) {
+        return Ok(());
+    }
+    let _lease = qnc_playback_activity::Beat::start(target, qnc_playback_activity::WORKER)?;
+    qnc_ingest_import_worker::run_import(root)?;
     run_artifacts(root)
 }
 
@@ -35,11 +50,16 @@ fn run_artifacts(root: &Path) -> Result<(), String> {
     let reader = active_project.settings_reader().clone();
     let settings = snapshot.settings;
     let target = qnc_content_store::ContentTarget::for_project(&reader, &settings)?;
+    // Any player of any form announces itself in the project database; the
+    // generators give way while it prepares or plays.
+    let player_works = qnc_playback_activity::playback_pause(target.clone());
     let mut artifacts = qnc_content_artifacts::ProjectArtifacts::new();
     artifacts.set_host_root(root);
+    artifacts.set_playback_priority(player_works());
     artifacts.sync(&reader, &settings, target, false)?;
     let deadline = std::time::Instant::now() + Duration::from_secs(60 * 60);
     while artifacts.has_pending_work() {
+        artifacts.set_playback_priority(player_works());
         let polled = artifacts.poll(None);
         if let Some(error) = polled.error {
             return Err(error);

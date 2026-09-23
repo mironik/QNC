@@ -153,9 +153,13 @@ impl EditorialApplication {
         self.preview.notify_on_change(notify);
     }
 
-    /// Rereads the active project. Cheap when nothing changed: the clips are
-    /// loaded again only when the lightweight catalog signature differs.
-    pub fn refresh(&mut self) {
+    /// Shown: rereads the active project, cheap when nothing changed (the clips are
+    /// loaded again only when the lightweight catalog signature differs). Hidden: the
+    /// player is closed so it neither plays nor reads media behind another surface.
+    pub fn set_active(&mut self, active: bool) {
+        if !active {
+            return self.preview.close();
+        }
         self.load_catalog();
     }
 
@@ -644,33 +648,29 @@ fn mark_stills_failed_via_transport(
 fn wait_for_saved_short(
     transport: &mut qnc_content_store::ContentWriteTransport,
 ) -> Result<qnc_virtual_shots::SavedShort, String> {
-    let started = std::time::Instant::now();
-    loop {
-        for completion in transport.poll() {
-            let data = completion.result?.data;
-            return match data {
-                qnc_content_store::ContentWriteData::SavedShort(shot) => Ok(*shot),
-                _ => Err("Neispravan odgovor baze.".into()),
-            };
-        }
-        if started.elapsed() > Duration::from_secs(5) {
-            return Err("Isteklo je cekanje upisa virtualnog kadra.".into());
-        }
-        std::thread::sleep(Duration::from_millis(5));
+    match wait_for_write(transport)? {
+        qnc_content_store::ContentWriteData::SavedShort(shot) => Ok(*shot),
+        _ => Err("Neispravan odgovor baze.".into()),
     }
 }
 
 fn wait_for_changed(
     transport: &mut qnc_content_store::ContentWriteTransport,
 ) -> Result<(), String> {
+    match wait_for_write(transport)? {
+        qnc_content_store::ContentWriteData::Changed => Ok(()),
+        _ => Err("Neispravan odgovor baze.".into()),
+    }
+}
+
+/// The data of the first completed write, or a controlled error after five seconds.
+fn wait_for_write(
+    transport: &mut qnc_content_store::ContentWriteTransport,
+) -> Result<qnc_content_store::ContentWriteData, String> {
     let started = std::time::Instant::now();
     loop {
-        for completion in transport.poll() {
-            let data = completion.result?.data;
-            return match data {
-                qnc_content_store::ContentWriteData::Changed => Ok(()),
-                _ => Err("Neispravan odgovor baze.".into()),
-            };
+        if let Some(completion) = transport.poll().into_iter().next() {
+            return Ok(completion.result?.data);
         }
         if started.elapsed() > Duration::from_secs(5) {
             return Err("Isteklo je cekanje upisa virtualnog kadra.".into());

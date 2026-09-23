@@ -20,7 +20,7 @@ mod config;
 pub use config::ConfigMediaOpener;
 mod process;
 
-pub use process::{launch_worker, run_service, ImportSummary, WORKER_EXECUTABLE};
+pub use process::{launch_worker, run_import, run_service, ImportSummary, WORKER_EXECUTABLE};
 
 use qnc_ingest_store::content::{ContentClient, StoredClip};
 use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};

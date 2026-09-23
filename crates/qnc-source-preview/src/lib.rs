@@ -143,6 +143,10 @@ pub struct SourcePreview {
     player_view: PlayerView,
     timeline_assets: TimelineAssetReader,
     play_when_ready: bool,
+    /// Every preview tells the project database while its player prepares or plays,
+    /// so background generators of any process give way.
+    activity: qnc_playback_activity::PlaybackReporter,
+    activity_target: Option<qnc_content_store::ContentTarget>,
 }
 
 impl Default for SourcePreview {
@@ -154,6 +158,8 @@ impl Default for SourcePreview {
             player_view: PlayerView::default(),
             timeline_assets: TimelineAssetReader::default(),
             play_when_ready: false,
+            activity: qnc_playback_activity::PlaybackReporter::new(),
+            activity_target: None,
         }
     }
 }
@@ -225,7 +231,15 @@ impl SourcePreview {
         if let Some(notice) = &context.notice {
             self.view.message = notice.clone();
         }
+        self.activity_target =
+            qnc_content_store::ContentTarget::for_project(&context.reader, &context.settings).ok();
         self.context = Some(context);
+    }
+
+    fn report_activity(&mut self) {
+        let works =
+            self.play_when_ready || self.player_view.preparing || self.player_view.playing();
+        self.activity.update(self.activity_target.as_ref(), works);
     }
 
     /// Cuts the current session and clears everything shown.
@@ -239,6 +253,7 @@ impl SourcePreview {
             assets: SourceTimelineAssets::empty(),
             ..PreviewView::default()
         };
+        self.report_activity();
     }
 
     /// Rereads the published filmstrip/wave artifacts for the shown clip.
@@ -399,6 +414,7 @@ impl SourcePreview {
                 self.play_when_ready = false;
             }
         }
+        self.report_activity();
         changed
     }
 

@@ -61,8 +61,9 @@ impl IngestApp {
         self.application.footer_status()
     }
 
-    pub fn on_activated(&mut self) {
-        self.application.on_activated();
+    /// The shell shows or hides this surface.
+    pub fn set_active(&mut self, active: bool) {
+        self.application.set_active(active);
     }
 
     /// Uvezi has started the import: the shell may open the next application.

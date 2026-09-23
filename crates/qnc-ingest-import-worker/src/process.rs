@@ -71,16 +71,29 @@ pub fn run_service(root: &Path) -> Result<ImportSummary, String> {
     let active_project = ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
     let snapshot = active_project.read().map_err(|e| e.to_string())?;
     let reader = active_project.settings_reader().clone();
+    let target = ContentTarget::for_project(&reader, &snapshot.settings)?;
+    if qnc_ingest_runtime::is_fresh(&target, WORKER, WORKER_FRESH_SECONDS) {
+        return Ok(ImportSummary {
+            imported: 0,
+            failed: 0,
+        });
+    }
+    let _lease = Beat::start(target, WORKER)?;
+    run_import(root)
+}
+
+/// The import of one Uvezi without taking the worker lease: for a caller that already
+/// holds it for its whole run (the background application also builds the artifacts).
+pub fn run_import(root: &Path) -> Result<ImportSummary, String> {
+    let active_project = ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
+    let snapshot = active_project.read().map_err(|e| e.to_string())?;
+    let reader = active_project.settings_reader().clone();
     let plan = IngestWorkPlan::from_settings(snapshot.settings)?;
     let target = ContentTarget::for_project(&reader, &plan.settings)?;
     let mut summary = ImportSummary {
         imported: 0,
         failed: 0,
     };
-    if qnc_ingest_runtime::is_fresh(&target, WORKER, WORKER_FRESH_SECONDS) {
-        return Ok(summary);
-    }
-    let _lease = Beat::start(target.clone(), WORKER)?;
     let mut project = Project::open(root, &reader, &plan, &target)?;
     let cancel = AtomicBool::new(false);
     let outcome = loop {

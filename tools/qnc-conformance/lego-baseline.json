@@ -11,9 +11,9 @@
     "C1 form paints primitives|crates/qnc-project-desktop/src/app.rs": 20,
     "C1 form paints primitives|crates/qnc-project-desktop/src/location_browser.rs": 1,
     "C1 form paints primitives|crates/qnc-project-desktop/src/widgets.rs": 2,
-    "C10 size ceiling (runtime lines)|qnc-editorial-application": 760,
+    "C10 size ceiling (runtime lines)|qnc-editorial-application": 757,
     "C10 size ceiling (runtime lines)|qnc-editorial-desktop": 920,
-    "C10 size ceiling (runtime lines)|qnc-ingest-application": 1760,
+    "C10 size ceiling (runtime lines)|qnc-ingest-application": 1758,
     "C10 size ceiling (runtime lines)|qnc-ingest-desktop": 1440,
     "C10 size ceiling (runtime lines)|qnc-project-application": 237,
     "C10 size ceiling (runtime lines)|qnc-project-desktop": 3414,
@@ -49,9 +49,6 @@
     "C5 public piece without a user|qnc-source-input": 1,
     "C6 application-named piece used elsewhere|qnc-dev-diagnostics-app -> qnc-ingest-store": 1,
     "C6 application-named piece used elsewhere|qnc-dev-diagnostics-app -> qnc-ingest-work-plan": 1,
-    "C7 preview reaches a host database|qnc-source-preview -> qnc-media-record-db": 1,
-    "C8 artifact generation ignores the player|qnc-ingest-worker": 1,
-    "C8 generator process ignores the player|qnc-ingest-worker": 1,
-    "C9 preview does not announce playback|qnc-source-preview": 1
+    "C7 preview reaches a host database|qnc-source-preview -> qnc-media-record-db": 1
   }
 }

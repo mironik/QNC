@@ -28,7 +28,11 @@ impl ShellDesktopApp for Adapter {
     }
 
     fn on_activated(&mut self) {
-        self.app.on_activated();
+        self.app.set_active(true);
+    }
+
+    fn on_deactivated(&mut self) {
+        self.app.set_active(false);
     }
 
     fn footer_status(&self) -> Option<&str> {

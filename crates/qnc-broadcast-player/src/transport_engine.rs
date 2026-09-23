@@ -275,6 +275,21 @@ where
         Ok(())
     }
 
+    /// Finishes a rearm whose commit found too little PCM. The queue of that
+    /// preroll keeps filling while the transport plays, so only commit and start
+    /// are tried again; nothing is reset or refilled.
+    pub fn finish_audio_rearm(&mut self) -> Result<(), BroadcastEngineError> {
+        if self.state.status != TransportStatus::Playing {
+            return Ok(());
+        }
+        if self.require_source()?.audio_format.is_none() {
+            return Ok(());
+        }
+        self.playout_output.commit_playout_preroll()?;
+        self.playout_output.start_playout()?;
+        Ok(())
+    }
+
     /// Reserve AV before Ready without increasing per-tick work.
     pub fn with_min_prebuffer_frames(mut self, frames: usize) -> Self {
         self.min_prebuffer_frames = frames.clamp(MIN_PLAYOUT_BUFFER_FRAMES, 64);

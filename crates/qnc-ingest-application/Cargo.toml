@@ -10,7 +10,6 @@ qnc-content-artifacts = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-ingest-preview-source = { workspace = true }
 qnc-application-sequence = { workspace = true }
-qnc-ingest-runtime = { workspace = true }
 qnc-ingest-selection-write = { workspace = true }
 qnc-playback-priority = { workspace = true }
 qnc-source-browse = { workspace = true }

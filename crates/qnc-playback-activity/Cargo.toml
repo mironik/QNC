@@ -1,0 +1,12 @@
+[package]
+name = "qnc-playback-activity"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: a player announces in the project database that it prepares or plays; background work reads it there and gives way. It also keeps the background worker lease."
+
+[dependencies]
+qnc-content-store = { workspace = true }
+
+[dev-dependencies]
+rusqlite = { workspace = true }
+tempfile = "3"

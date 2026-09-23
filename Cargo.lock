@@ -3367,7 +3367,6 @@ dependencies = [
  "qnc-ingest-clip-list",
  "qnc-ingest-import-worker",
  "qnc-ingest-preview-source",
- "qnc-ingest-runtime",
  "qnc-ingest-select",
  "qnc-ingest-selection-write",
  "qnc-ingest-store",
@@ -3483,9 +3482,7 @@ dependencies = [
 name = "qnc-ingest-runtime"
 version = "0.1.0"
 dependencies = [
- "qnc-ingest-store",
- "rusqlite",
- "tempfile",
+ "qnc-playback-activity",
 ]
 
 [[package]]
@@ -3558,6 +3555,7 @@ dependencies = [
  "qnc-content-artifacts",
  "qnc-content-store",
  "qnc-ingest-import-worker",
+ "qnc-playback-activity",
  "qnc-work-settings",
 ]
 
@@ -3792,6 +3790,15 @@ dependencies = [
  "wgpu",
  "winit",
  "yuv",
+]
+
+[[package]]
+name = "qnc-playback-activity"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+ "rusqlite",
+ "tempfile",
 ]
 
 [[package]]
@@ -4119,9 +4126,11 @@ name = "qnc-source-preview"
 version = "0.1.0"
 dependencies = [
  "qnc-content-read",
+ "qnc-content-store",
  "qnc-filmstrip",
  "qnc-media-record-db",
  "qnc-media-records",
+ "qnc-playback-activity",
  "qnc-player-client",
  "qnc-player-input",
  "qnc-player-launcher",

@@ -25,14 +25,17 @@ impl IngestApplication {
         self.load_work_settings_inner(None, true)
     }
 
-    pub fn on_activated(&mut self) -> IngestDispatchResult {
-        let Some(reader) = self.active_project_reader.as_ref() else {
+    /// Shown: the active project is checked again. Hidden: the player is closed so it
+    /// neither plays nor reads media behind another surface.
+    pub fn set_active(&mut self, active: bool) -> IngestDispatchResult {
+        if !active {
+            self.stop_player();
+            return IngestDispatchResult::accepted(None, false);
+        }
+        let Some(Ok(snapshot)) = self.active_project_reader.as_ref().map(|r| r.read()) else {
             return self.refresh_active_project();
         };
-        let active_project = match reader.read() {
-            Ok(snapshot) => snapshot.project_id,
-            Err(_) => return self.refresh_active_project(),
-        };
+        let active_project = snapshot.project_id;
         let loaded_project = self
             .work_plan
             .as_ref()

@@ -32,6 +32,10 @@ pub trait ShellDesktopApp {
 
     fn on_activated(&mut self) {}
 
+    /// The surface is no longer shown: it releases its player and stops telling the
+    /// project database that a player works. No workflow is started or cancelled.
+    fn on_deactivated(&mut self) {}
+
     fn take_navigation_request(&mut self) -> Option<DesktopNavigation> {
         None
     }

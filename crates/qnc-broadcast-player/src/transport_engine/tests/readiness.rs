@@ -519,6 +519,38 @@ fn output_commit_or_start_failure_never_creates_a_playing_clock() {
 }
 
 #[test]
+fn a_rearm_whose_commit_found_too_little_audio_is_finished_later_without_refill() {
+    let (mut engine, trace) = engine();
+    engine.load_source(&source_runtime(), None).unwrap();
+    engine.prepare().unwrap();
+    engine.play(0).unwrap();
+    assert_eq!(engine.state.status, TransportStatus::Playing);
+    // The underrun rearm began a new preroll, but its commit found too little PCM.
+    engine.playout_output.running = false;
+    engine.playout_output.committed = false;
+    engine.playout_output.fail_commit = true;
+    trace.take();
+    trace.forbid_work.set(false);
+    assert!(engine.finish_audio_rearm().is_err());
+    assert!(!engine.playout_output.running);
+
+    // The queue has filled meanwhile: commit and start only, no new preroll or refill.
+    engine.playout_output.fail_commit = false;
+    engine.finish_audio_rearm().unwrap();
+    assert!(engine.playout_output.running);
+    let calls = trace.take();
+    assert!(calls.contains(&"start"));
+    assert!(!calls.contains(&"begin"));
+    assert!(!calls.contains(&"queue"));
+
+    // Nothing to finish once the transport no longer plays.
+    engine.pause().unwrap();
+    trace.take();
+    engine.finish_audio_rearm().unwrap();
+    assert!(!trace.take().contains(&"start"));
+}
+
+#[test]
 fn preload_does_not_reconfigure_the_active_prepared_output() {
     let (mut engine, trace) = engine();
     engine.load_source(&source_runtime(), None).unwrap();

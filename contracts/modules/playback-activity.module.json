@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.playback-activity",
+  "module_name": "Playback activity",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["playback.activity", "worker.lease"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "public_ingest_content_write_transport_only",
+  "runtime_crate": "qnc-playback-activity",
+  "input": "Content target of the active project and the name of a runtime entry: playback activity of any player, the background worker lease, the last worker result.",
+  "output": "Whether a player prepares or plays and whether the background worker runs, read back from the project database with its age by the database clock; written only through the public content write transport. Every preview reports here and every background generator gives way to it.",
+  "specification": "docs/89-qnc-target-lego-catalog.md (3.4, C8, C9)"
+}
