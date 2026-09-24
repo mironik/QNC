@@ -137,10 +137,12 @@ pub enum Action {
     Cue(u64),
 }
 type Loader = Box<dyn FnOnce() -> Result<Launch> + Send>;
+/// Generation, first cued frame and loader of the latest selection.
+type PendingLoad = (u64, u64, Loader);
 struct Shared {
     generation: AtomicU64,
     stop: AtomicBool,
-    load: Mutex<Option<(u64, Loader)>>,
+    load: Mutex<Option<PendingLoad>>,
     view: Mutex<View>,
     notify: OnceLock<Box<dyn Fn() + Send + Sync>>,
 }
@@ -183,7 +185,7 @@ impl Player {
                         initial_preview = None;
                     }
                     let pending = state.load.lock().unwrap().take();
-                    if let Some((generation, load)) = pending {
+                    if let Some((generation, first_frame, load)) = pending {
                         // Selection may arrive after the generation check above.
                         // Reap the preceding process before reading/preparing its replacement.
                         active = None;
@@ -205,7 +207,7 @@ impl Player {
                             match result {
                                 Ok(connection) => {
                                     active = Some((generation, connection));
-                                    initial_preview = Some((generation, 0));
+                                    initial_preview = Some((generation, first_frame));
                                 }
                                 Err(error) => publish(
                                     &state,
@@ -223,6 +225,10 @@ impl Player {
                             .try_recv()
                             .ok()
                             .and_then(|(g, action)| (g == *generation).then_some(action));
+                        if action.is_some() {
+                            // A caller command is newer than the first-picture cue.
+                            initial_preview = None;
+                        }
                         let action = action.or_else(|| {
                             let view = state.view.lock().unwrap().clone();
                             initial_preview_action(&mut initial_preview, *generation, &view)
@@ -257,13 +263,23 @@ impl Player {
     }
     /// Latest selection wins; loading and process startup never run on the caller/UI thread.
     pub fn prepare(&self, load: impl FnOnce() -> Result<Launch> + Send + 'static) {
+        self.prepare_at(0, load);
+    }
+    /// Like [`Self::prepare`], but the first picture the session prepares is
+    /// `first_frame`, so a caller that needs another frame does not wait for
+    /// frame 0 first. The player confirms the frame; nothing is assumed here.
+    pub fn prepare_at(
+        &self,
+        first_frame: u64,
+        load: impl FnOnce() -> Result<Launch> + Send + 'static,
+    ) {
         let mut view = self.shared.view.lock().unwrap();
         let generation = self.shared.generation.fetch_add(1, Ordering::AcqRel) + 1;
         *view = View {
             preparing: true,
             ..View::default()
         };
-        *self.shared.load.lock().unwrap() = Some((generation, Box::new(load)));
+        *self.shared.load.lock().unwrap() = Some((generation, first_frame, Box::new(load)));
     }
     pub fn close(&self) {
         let mut view = self.shared.view.lock().unwrap();
@@ -522,6 +538,15 @@ mod tests {
         ));
         assert!(pending.is_none());
         assert!(initial_preview_action(&mut pending, 7, &confirmed).is_none());
+
+        let mut pending = Some((7, 42));
+        assert!(
+            matches!(
+                initial_preview_action(&mut pending, 7, &confirmed),
+                Some(Action::Cue(42))
+            ),
+            "a session prepared at a frame cues that frame, not frame 0"
+        );
     }
 
     #[test]

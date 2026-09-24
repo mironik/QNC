@@ -247,10 +247,9 @@ impl EditorialApplication {
         let confirmed = self.preview.player_view().confirmed_source_frame();
         let shown = self.view.preview.clip_id.as_deref();
         match self.segments.drive_player(shown, confirmed) {
-            Some(CueStep::Open(clip_id)) => {
-                self.view.chosen_shot_id = None;
-                self.pending_shot = None;
-                self.preview.open(&clip_id);
+            Some(CueStep::Open(clip_id, frame)) => {
+                (self.view.chosen_shot_id, self.pending_shot) = (None, None);
+                self.preview.open_at(&clip_id, frame);
             }
             Some(CueStep::Cue(frame)) => _ = self.preview.cue(frame),
             None => {}

@@ -275,6 +275,12 @@ impl SourcePreview {
     /// Prepares the preview of `clip_id`: cuts the old session first, even when
     /// the new clip cannot be prepared. Returns whether the view changed.
     pub fn open(&mut self, clip_id: &str) -> bool {
+        self.open_at(clip_id, 0)
+    }
+
+    /// Like [`Self::open`], but the session prepares `first_frame` as its first
+    /// picture instead of frame 0. An already open clip is not reopened.
+    pub fn open_at(&mut self, clip_id: &str, first_frame: u64) -> bool {
         if self.view.clip_id.as_deref() == Some(clip_id)
             && self.player_view.error.is_none()
             && (self.player_view.preparing || self.player_view.reply.is_some())
@@ -307,7 +313,7 @@ impl SourcePreview {
             return true;
         };
         let clip_id = clip_id.to_string();
-        player.prepare(move || {
+        player.prepare_at(first_frame, move || {
             let sources = context
                 .sources
                 .iter()

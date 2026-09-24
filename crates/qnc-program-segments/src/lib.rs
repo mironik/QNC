@@ -288,7 +288,8 @@ pub struct NewSegment {
 /// What the caller asks of the player for a Wrap cue.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CueStep {
-    Open(String),
+    /// Open this clip with this source frame as its first picture.
+    Open(String, u64),
     Cue(u64),
 }
 
@@ -318,8 +319,6 @@ pub struct ProgramSegments {
     wrap_segment: Option<String>,
     playhead: Option<u64>,
     cue: Option<Cue>,
-    /// The cue's clip was asked to open; the frame follows its first picture.
-    cue_opened: bool,
     /// Source frame asked of the player: older confirmed frames do not move the
     /// playhead back.
     awaiting: Option<u64>,
@@ -362,9 +361,10 @@ impl ProgramSegments {
         self.cue.take()
     }
 
-    /// One step of the Wrap view per repaint, from what the player shows: open the
-    /// cue's clip, then cue its frame once the player confirms a picture of that
-    /// clip. The confirmed picture also becomes the program playhead.
+    /// One step of the Wrap view per repaint, from what the player shows: another
+    /// clip is opened straight at the cue frame; the shown clip is cued once the
+    /// player confirms a picture of it. The confirmed picture also becomes the
+    /// program playhead.
     pub fn drive_player(
         &mut self,
         shown_clip: Option<&str>,
@@ -373,11 +373,10 @@ impl ProgramSegments {
         self.follow_player(shown_clip, confirmed_frame);
         let cue = self.cue.as_ref()?;
         if shown_clip != Some(cue.clip_id.as_str()) {
-            if self.cue_opened {
-                return None;
-            }
-            self.cue_opened = true;
-            return Some(CueStep::Open(cue.clip_id.clone()));
+            return self
+                .cue
+                .take()
+                .map(|cue| CueStep::Open(cue.clip_id, cue.source_frame));
         }
         confirmed_frame?;
         self.cue.take().map(|cue| CueStep::Cue(cue.source_frame))
@@ -608,7 +607,6 @@ impl ProgramSegments {
         };
         self.set_playhead(Some(frame.min(self.view.total_frames)));
         self.awaiting = Some(cue.source_frame);
-        self.cue_opened = false;
         self.wrap_segment = Some(cue.segment_id.clone());
         self.cue = Some(cue);
     }

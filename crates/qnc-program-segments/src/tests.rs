@@ -301,21 +301,36 @@ fn keyboard_actions_map_to_commands() {
 }
 
 #[test]
-fn a_wrap_cue_opens_the_clip_once_and_cues_after_its_first_picture() {
+fn a_wrap_cue_opens_another_clip_at_the_cue_frame_and_cues_a_shown_clip() {
     let mut segments = component();
     segments.apply(SegmentCommand::Select("c".into()));
     assert_eq!(
         segments.drive_player(Some("clip-a"), Some(3)),
-        Some(CueStep::Open("clip-c".into()))
+        Some(CueStep::Open("clip-c".into(), 500)),
+        "the new session starts at the cue frame, not at frame 0"
     );
     assert_eq!(segments.drive_player(Some("clip-a"), Some(3)), None);
-    assert_eq!(segments.drive_player(Some("clip-c"), None), None);
     assert_eq!(
         segments.drive_player(Some("clip-c"), Some(0)),
-        Some(CueStep::Cue(500))
+        None,
+        "no second cue after opening"
     );
-    assert_eq!(segments.view().playhead, Some(30), "at once, before the player");
+    assert_eq!(
+        segments.view().playhead,
+        Some(30),
+        "at once, before the player"
+    );
     assert_eq!(segments.drive_player(Some("clip-c"), Some(500)), None);
+    assert_eq!(segments.drive_player(Some("clip-c"), Some(504)), None);
+    assert_eq!(segments.view().playhead, Some(34));
+    segments.apply(SegmentCommand::Cue(32));
+    assert_eq!(segments.drive_player(Some("clip-c"), None), None);
+    assert_eq!(
+        segments.drive_player(Some("clip-c"), Some(504)),
+        Some(CueStep::Cue(502)),
+        "the shown clip is cued once the player confirms a picture"
+    );
+    assert_eq!(segments.drive_player(Some("clip-c"), Some(502)), None);
     assert_eq!(segments.drive_player(Some("clip-c"), Some(504)), None);
     assert_eq!(segments.view().playhead, Some(34));
     segments.leave_wrap();

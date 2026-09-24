@@ -2233,6 +2233,30 @@ nisu dirani. Verificirano: `cargo test -p qnc-content-store` (38),
 `qnc-program-segments` (13), `qnc-editorial-application` (11), `cargo build
 --workspace`, `cargo run -p qnc-conformance`. Odobrenje je zatvoreno.
 
+Zatvoreno ograniceno odobrenje 2026-09-24 (brza slika na klik u Wrap segmentu):
+korisnik je rekao "oba koraka" nakon mjerenja: klik na Wrap segment daje sliku
+na monitoru tek nakon 0,8-1,5 s (isti klip) odnosno 1,5-2,4 s (drugi klip).
+Uzroci: (1) nova sesija playera prvo pripremi frame 0, a tek onda skace na
+trazeni frame; (2) nakon skoka player prikazuje sliku tek kad je za taj frame
+spreman i zvuk. Otkljucano samo: `crates/qnc-player-client` (sesija se
+priprema na zadanom pocetnom frameu umjesto na 0), `crates/qnc-source-preview`
+(otvaranje klipa na zadanom frameu), `crates/qnc-broadcast-player` (nakon skoka
+slika se prikazuje cim je dekodirana; Play i dalje ceka sliku i zvuk cijelog
+pocetnog spremnika), `crates/qnc-broadcast-engine` i `tools/qnc-player-runner`
+samo ako se pokaze nuzno, `crates/qnc-program-segments` i
+`crates/qnc-editorial-application` (Wrap otvara klip odmah na trazenom frameu),
+testovi i ugovori tih modula. Nema promjene sata, A/V sinkronizacije, formi ni
+layouta. Izvedeno: `Player::prepare_at` i `SourcePreview::open_at` (prva slika
+sesije je trazeni frame; naredba pozivatelja ponistava zakasnjeli pocetni skok),
+`CueStep::Open(clip, frame)` bez drugog skoka nakon otvaranja, u playeru
+`cue_picture_ready` (slika nakon skoka ceka samo svoj dekodirani video; Play i
+dalje ceka sliku i zvuk cijelog pocetnog spremnika). Runner i engine nisu dirani.
+Verificirano: testovi `qnc-broadcast-player` (79, novi test slike prije zvuka),
+`qnc-player-client` (17), `qnc-program-segments` (15), `qnc-source-preview`,
+`qnc-editorial-application`, `cargo run -p qnc-conformance`, release build i
+live log playera: skok unutar klipa do slike 0,45-0,5 s (prije 0,8-1,5 s),
+novi klip bez koraka preko frame 0. Odobrenje je zatvoreno.
+
 Zatvoreno ograniceno odobrenje 2026-09-23 (racionalni poster klik): korisnik je
 trazio v5 postupak za klik na poster: klik nosi samo `clip_id`, projektni
 kontekst je vec poznat, a posteri se citaju iz URI-ja zapisanih u projektnoj

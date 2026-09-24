@@ -970,7 +970,9 @@ where
             .min(range.end_frame);
         self.refill_playout_buffer(anchor, end)?;
         if self.pending_cue.is_some_and(|(_, present)| present) {
-            if !self.playout_ready(anchor)? {
+            // The cue picture needs only its decoded video; the audio preroll
+            // keeps building and still gates readiness for Play below.
+            if !self.cue_picture_ready(anchor)? {
                 return Ok(Vec::new());
             }
             if let Some(video) = self.playout.video.get(&anchor)
@@ -1110,6 +1112,16 @@ where
 
     fn playout_ready(&self, frame: FrameNumber) -> Result<bool, BroadcastEngineError> {
         let source = self.require_source()?;
+        Ok(self.playout.has_ready_frame(source, frame))
+    }
+
+    /// A cue shows its picture as soon as the video of that frame is decoded;
+    /// a source without video waits for its audio as before.
+    fn cue_picture_ready(&self, frame: FrameNumber) -> Result<bool, BroadcastEngineError> {
+        let source = self.require_source()?;
+        if source.video_format.is_some() {
+            return Ok(self.playout.video.contains_key(&frame));
+        }
         Ok(self.playout.has_ready_frame(source, frame))
     }
 

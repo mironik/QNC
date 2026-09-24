@@ -946,3 +946,23 @@ fn replay_outside_retained_window_cues_both_adapters_before_preparation() {
     assert_eq!(engine.state.carrier_frame, 0);
     assert_eq!(trace.take(), ["present", "start"]);
 }
+
+#[test]
+fn a_cue_shows_its_picture_before_the_audio_and_play_still_waits_for_the_audio() {
+    let (mut engine, trace) = engine();
+    engine.load_source(&source_runtime(), None).unwrap();
+    engine.prepare().unwrap();
+    engine.cue_frame(7, true).unwrap();
+    trace.pending_audio.set(true);
+    for tick in 1..4 {
+        engine.tick(tick).unwrap();
+    }
+    assert_eq!(engine.state().carrier_frame, 7, "the picture is confirmed");
+    assert_eq!(engine.state().presented_frame, Some(7));
+    assert!(!engine.state().play_ready, "no audio yet, so no Play");
+    assert!(engine.play(4).is_err());
+    trace.pending_audio.set(false);
+    engine.prepare().unwrap();
+    assert!(engine.state().play_ready);
+    assert_eq!(engine.state().carrier_frame, 7);
+}
