@@ -2179,7 +2179,10 @@ puštanje programa, Source/Wrap pogled, pokrivalice, Sync/B-roll. Player, forme
 (osim poziva javnih kockica) i layout ugovori nisu dirani. Verificirano: `cargo
 test -p qnc-content-store` (43), `qnc-program-segments` (15), `qnc-segment-panel`
 (1), `qnc-editorial-application` (11), `cargo build --workspace`, `cargo run -p
-qnc-conformance`. Odobrenje je zatvoreno.
+qnc-conformance`. Dopuna (odluka korisnika): korisnik markere postavlja na Wrap
+segmentima, ne na program timelineu; M salje segment pod playheadom i frame
+unutar njega (v5 `create_marker_from_part_frame`, `origin_local_frame`), a
+spremiste iz toga izvodi frame programa. Odobrenje je zatvoreno.
 
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story korak 3: slotovi i pokrivalice u
 bazi): korisnik je rekao "ok, nastavi" nakon koraka 1; vrijedi pravilo v5

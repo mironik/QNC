@@ -577,25 +577,32 @@ impl ProgramSegments {
         });
     }
 
+    /// M on the Wrap segment under the playhead: the marker is placed on that
+    /// segment at the frame inside it (v5 `create_marker_from_part_frame`); the
+    /// program only shows it. A selected marker moves there (docs/94 7a).
     fn marker_at_playhead(&mut self) {
         let Some(frame) = self.playhead else {
-            return self.refresh_view("M marker trazi playhead programa (Wrap).".into());
+            return self.refresh_view("M marker se stavlja na Wrap segment (playhead).".into());
         };
-        // v5 `marker_at_head` creates; a selected marker moves there (docs/94 7a).
-        if let Some(marker_id) = self.selected_marker.as_deref() {
-            if let Err(error) = check_move(&self.view.markers, marker_id, frame) {
-                return self.refresh_view(error);
-            }
-        }
         let operation = match self.selected_marker.clone() {
-            Some(marker_id) => Operation::MoveMarker {
-                marker_id,
-                program_frame: frame,
-            },
-            None => Operation::CreateMarker {
-                program_frame: frame,
-                part_id: self.selected.clone().unwrap_or_default(),
-            },
+            Some(marker_id) => {
+                if let Err(error) = check_move(&self.view.markers, &marker_id, frame) {
+                    return self.refresh_view(error);
+                }
+                Operation::MoveMarker {
+                    marker_id,
+                    program_frame: frame,
+                }
+            }
+            None => {
+                let Some(segment) = self.view.segment_at(frame) else {
+                    return self.refresh_view("Nema Wrap segmenta pod playheadom.".into());
+                };
+                Operation::CreateMarker {
+                    part_id: segment.segment_id.clone(),
+                    local_frame: frame - segment.start_frame,
+                }
+            }
         };
         self.write(operation);
     }

@@ -330,9 +330,9 @@ impl ContentStore {
             Operation::MoveSegment { segment_id, up } => self.move_segment(segment_id, *up),
             Operation::ListSegments => self.list_segments(),
             Operation::CreateMarker {
-                program_frame,
                 part_id,
-            } => self.create_marker(*program_frame, part_id),
+                local_frame,
+            } => self.create_marker(part_id, *local_frame),
             Operation::MoveMarker {
                 marker_id,
                 program_frame,
@@ -1144,17 +1144,24 @@ impl ContentStore {
         Ok(Data::Changed)
     }
 
-    /// v5 `create_marker_frame`: M at a program frame, remembered on the segment it
-    /// was made on. A marker already on that frame is refreshed, never duplicated.
-    fn create_marker(&mut self, program_frame: u64, part_id: &str) -> Result<Data> {
+    /// v5 `create_marker_from_part_frame`: M is placed on a Wrap segment at a frame
+    /// inside it (`local_to_timeline_frame`, clamped to the segment); the program
+    /// frame follows. A marker already on that frame is refreshed, never duplicated.
+    fn create_marker(&mut self, part_id: &str, local_frame: u64) -> Result<Data> {
         let fps = require_story_fps(&self.conn)?;
-        let frame = program_frame as i64;
-        let tc = frame_timecode(frame, fps);
         let part_id = part_id.trim();
+        if part_id.is_empty() {
+            return Err("part_id required".into());
+        }
         let tx = self
             .conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
+        let (start, end) =
+            segment_window(&tx, part_id)?.ok_or_else(|| format!("part not found: {part_id}"))?;
+        let local = (local_frame as i64).min((end - start) as i64).max(0);
+        let frame = start as i64 + local;
+        let tc = frame_timecode(frame, fps);
         let existing: Option<String> = tx
             .query_row(
                 "SELECT marker_id FROM story_markers WHERE timeline_frame = ?1
@@ -1168,11 +1175,17 @@ impl ContentStore {
             Some(marker_id) => {
                 tx.execute(
                     "UPDATE story_markers
-                     SET tc = ?1,
-                         origin_part_id = CASE WHEN TRIM(?2) != '' THEN ?2 ELSE origin_part_id END,
-                         updated_at = ?3
-                     WHERE marker_id = ?4",
-                    params![tc, part_id, story_now(), marker_id],
+                     SET tc = ?1, origin_part_id = ?2, origin_local_frame = ?3,
+                         origin_local_sec = ?4, updated_at = ?5
+                     WHERE marker_id = ?6",
+                    params![
+                        tc,
+                        part_id,
+                        local,
+                        local as f64 / fps,
+                        story_now(),
+                        marker_id
+                    ],
                 )
                 .map_err(err)?;
                 marker_id
@@ -1184,8 +1197,17 @@ impl ContentStore {
                     "INSERT INTO story_markers
                         (marker_id, timeline_frame, timeline_sec, tc, label, sort_index,
                          origin_part_id, origin_local_frame, origin_local_sec, created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?4, 0, ?5, NULL, NULL, ?6, ?6)",
-                    params![marker_id, frame, timeline_sec(frame, fps), tc, part_id, now],
+                     VALUES (?1, ?2, ?3, ?4, ?4, 0, ?5, ?6, ?7, ?8, ?8)",
+                    params![
+                        marker_id,
+                        frame,
+                        timeline_sec(frame, fps),
+                        tc,
+                        part_id,
+                        local,
+                        local as f64 / fps,
+                        now
+                    ],
                 )
                 .map_err(err)?;
                 marker_id

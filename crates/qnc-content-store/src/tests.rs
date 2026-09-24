@@ -1261,12 +1261,23 @@ fn deleting_closes_the_gap_and_moving_swaps_neighbours_only() {
     .is_err());
 }
 
+/// M on the Wrap segment that holds a program frame (the end belongs to the last one).
 fn marker(store: &mut ContentStore, program_frame: u64) -> Result<Data> {
+    let mut start = 0;
+    let mut target = (String::new(), 0);
+    for segment in segments(store) {
+        let frames = segment.out_frame - segment.in_frame;
+        target = (segment.segment_id, program_frame.saturating_sub(start));
+        if program_frame < start + frames {
+            break;
+        }
+        start += frames;
+    }
     run(
         store,
         Operation::CreateMarker {
-            program_frame,
-            part_id: String::new(),
+            part_id: target.0,
+            local_frame: target.1,
         },
     )
 }
@@ -1350,8 +1361,8 @@ fn m_keeps_its_segment_and_a_marker_on_the_same_frame_is_refreshed() {
     let Data::Created(id) = run(
         &mut store,
         Operation::CreateMarker {
-            program_frame: 14,
             part_id: ids[1].clone(),
+            local_frame: 4,
         },
     )
     .unwrap() else {
@@ -1367,13 +1378,14 @@ fn m_keeps_its_segment_and_a_marker_on_the_same_frame_is_refreshed() {
     assert_ne!(start, id);
     assert_eq!(markers(&mut store), vec![14]);
     let conn = Connection::open(&path).unwrap();
-    let (origin, tc): (String, String) = conn
+    let (origin, tc, local): (String, String, i64) = conn
         .query_row(
-            "SELECT origin_part_id, tc FROM story_markers WHERE marker_id = ?1",
+            "SELECT origin_part_id, tc, origin_local_frame FROM story_markers WHERE marker_id = ?1",
             [&id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .unwrap();
+    assert_eq!(local, 4, "placed on the segment at its own frame 4");
     assert_eq!(
         (origin.as_str(), tc.as_str()),
         (ids[1].as_str(), "00:00:00:14")

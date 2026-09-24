@@ -325,11 +325,12 @@ pub enum Operation {
         up: bool,
     },
     ListSegments,
-    /// M at a program frame on the segment `part_id` (v5 `create_marker_frame`):
-    /// a marker already on that frame is refreshed, not duplicated.
+    /// M placed on a Wrap segment (v5 `create_marker_from_part_frame`): the frame
+    /// inside the segment `part_id`; the program frame follows from it. A marker
+    /// already on that program frame is refreshed, not duplicated.
     CreateMarker {
-        program_frame: u64,
         part_id: String,
+        local_frame: u64,
     },
     MoveMarker {
         marker_id: String,
