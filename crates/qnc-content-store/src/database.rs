@@ -122,7 +122,7 @@ impl ContentStore {
             ensure_filmstrip_schema(&conn)?;
             ensure_wave_schema(&conn)?;
             ensure_virtual_shots_schema(&conn)?;
-            ensure_program_segments_schema(&conn)?;
+            ensure_story_schema(&conn)?;
         }
         let has_thumbnail_uri = schema && has_column(&conn, "clips", "thumbnail_uri")?;
         if access == Access::ReadOnly {
@@ -325,11 +325,14 @@ impl ContentStore {
             Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
             Operation::MoveSegment { segment_id, up } => self.move_segment(segment_id, *up),
             Operation::ListSegments => self.list_segments(),
-            Operation::CreateMarker { program_frame } => self.write_marker(None, *program_frame),
+            Operation::CreateMarker {
+                program_frame,
+                part_id,
+            } => self.create_marker(*program_frame, part_id),
             Operation::MoveMarker {
                 marker_id,
                 program_frame,
-            } => self.write_marker(Some(marker_id), *program_frame),
+            } => self.move_marker(marker_id, *program_frame),
             Operation::DeleteMarker { marker_id } => self.delete_marker(marker_id),
             Operation::ListMarkers => self.list_markers(),
             Operation::List { after } => {
@@ -902,9 +905,7 @@ impl ContentStore {
         (in_frame, out_frame): (u64, u64),
         (fps_num, fps_den): (u32, u32),
     ) -> Result<Data> {
-        if !matches!(kind, "ton" | "off") {
-            return Err(format!("Nepoznata vrsta segmenta: {kind}."));
-        }
+        let kind = story_kind(kind)?;
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         if out_frame <= in_frame {
             return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
@@ -930,7 +931,8 @@ impl ContentStore {
             .map_err(err)?;
         let story_timebase: Option<(u32, u32)> = tx
             .query_row(
-                "SELECT fps_num, fps_den FROM program_segments ORDER BY sort_index LIMIT 1",
+                "SELECT source_fps_num, source_fps_den FROM story_parts
+                 WHERE active = 1 ORDER BY sort_index LIMIT 1",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
@@ -946,7 +948,7 @@ impl ContentStore {
         }
         let next: i64 = tx
             .query_row(
-                "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM program_segments",
+                "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM story_parts WHERE active = 1",
                 [],
                 |row| row.get(0),
             )
@@ -955,61 +957,139 @@ impl ContentStore {
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
             .unwrap_or(0);
-        let segment_id = format!("segment_{created:x}");
+        let segment_id = format!("part_{created:x}");
+        let now = story_now();
+        // v5 `segment_source_from_clip_frames`.
+        let (in_frame, out_frame) = (in_frame as i64, out_frame as i64);
+        let duration = out_frame - in_frame;
+        let fps = f64::from(fps_num) / f64::from(fps_den);
         tx.execute(
-            "INSERT INTO program_segments (
-                segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den,
-                created_at_utc
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO story_parts (
+                part_id, kind, sort_index, title, text, clip_id, virtual_shot_id,
+                in_tc, out_tc, in_seconds, out_seconds, fps, source_fps_num, source_fps_den,
+                in_frame, out_frame, duration_frames, duration_label, duration_color_key,
+                active, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, '', '', ?4, '', ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+                       ?12, ?13, ?14, ?15, ?16, 1, ?17, ?17)",
             params![
                 segment_id,
                 kind,
                 next,
                 clip_id,
-                in_frame as i64,
-                out_frame as i64,
+                frame_timecode(in_frame, fps),
+                frame_timecode(out_frame, fps),
+                in_frame as f64 / fps,
+                out_frame as f64 / fps,
+                fps,
                 fps_num,
                 fps_den,
-                (created / 1_000_000_000) as i64
+                in_frame,
+                out_frame,
+                duration,
+                frames_label(duration, fps),
+                duration_color_key(duration, fps),
+                now
             ],
         )
         .map_err(err)?;
+        ensure_boundary_markers(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Created(segment_id))
     }
 
-    /// Removes a segment for good; the following ones close the gap (docs/93 R12).
-    /// M markers inside its program window go; those after it move left by its
-    /// length (v5 `shift_markers_after_part_removal_frames`).
+    /// v5 `delete_part`: the segment becomes inactive (`active = 0`); markers inside
+    /// its program window go and later ones move left by its length
+    /// (`shift_markers_after_part_removal_frames`); the selection moves to the
+    /// nearest segment; the others close the gap.
     fn delete_segment(&mut self, segment_id: &str) -> Result<Data> {
+        let segment_id = segment_id.trim();
+        if segment_id.is_empty() {
+            return Err("part_id required".into());
+        }
         let tx = self
             .conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
-        if let Some((start, end)) = segment_window(&tx, segment_id)? {
-            tx.execute(
-                "DELETE FROM program_markers WHERE program_frame > ?1 AND program_frame < ?2",
-                params![start as i64, end as i64],
-            )
-            .map_err(err)?;
-            tx.execute(
-                "UPDATE program_markers SET program_frame = program_frame - ?2
-                 WHERE program_frame >= ?1",
-                params![end as i64, (end - start) as i64],
-            )
-            .map_err(err)?;
-        }
-        let removed = tx
-            .execute(
-                "DELETE FROM program_segments WHERE segment_id = ?1",
+        let deleted_sort: i64 = tx
+            .query_row(
+                "SELECT sort_index FROM story_parts WHERE part_id = ?1 AND active = 1",
                 [segment_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(err)?
+            .ok_or_else(|| format!("part not found: {segment_id}"))?;
+        let fps = require_story_fps(&tx).ok();
+        let window = segment_window(&tx, segment_id)?;
+        tx.execute(
+            "UPDATE story_parts SET active = 0, updated_at = ?2 WHERE part_id = ?1",
+            params![segment_id, story_now()],
+        )
+        .map_err(err)?;
+        if let (Some(fps), Some((start, end))) = (fps, window) {
+            let (start, end) = (start as i64, end as i64);
+            tx.execute(
+                "DELETE FROM story_markers WHERE timeline_frame > ?1 AND timeline_frame < ?2",
+                params![start, end],
             )
             .map_err(err)?;
-        if removed == 0 {
-            return Err("Segment nije pronadjen.".into());
+            let shifted = {
+                let mut statement = tx
+                    .prepare("SELECT marker_id, timeline_frame FROM story_markers WHERE timeline_frame >= ?1")
+                    .map_err(err)?;
+                let rows = statement
+                    .query_map([end], |row| {
+                        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                    })
+                    .map_err(err)?
+                    .collect::<rusqlite::Result<Vec<_>>>()
+                    .map_err(err)?;
+                rows
+            };
+            let now = story_now();
+            for (marker_id, frame) in shifted {
+                let frame = (frame - (end - start)).max(0);
+                tx.execute(
+                    "UPDATE story_markers SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3,
+                        updated_at = ?4
+                     WHERE marker_id = ?5",
+                    params![
+                        frame,
+                        timeline_sec(frame, fps),
+                        frame_timecode(frame, fps),
+                        now,
+                        marker_id
+                    ],
+                )
+                .map_err(err)?;
+            }
+        }
+        let selected: String = tx
+            .query_row(
+                "SELECT selected_part_id FROM story_state WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(err)?;
+        if selected == segment_id {
+            let neighbour: String = tx
+                .query_row(
+                    "SELECT part_id FROM story_parts WHERE part_id != ?1 AND active != 0
+                     ORDER BY ABS(sort_index - ?2) ASC, sort_index ASC LIMIT 1",
+                    params![segment_id, deleted_sort],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(err)?
+                .unwrap_or_default();
+            tx.execute(
+                "UPDATE story_state SET selected_part_id = ?1 WHERE id = 1",
+                [neighbour],
+            )
+            .map_err(err)?;
         }
         renumber_segments(&tx)?;
-        prune_markers(&tx)?;
+        ensure_boundary_markers(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
@@ -1034,87 +1114,154 @@ impl ContentStore {
             order.swap(index, other);
             for (sort_index, id) in order.iter().enumerate() {
                 tx.execute(
-                    "UPDATE program_segments SET sort_index = ?1 WHERE segment_id = ?2",
-                    params![sort_index as i64, id],
+                    "UPDATE story_parts SET sort_index = ?1, updated_at = ?3
+                     WHERE part_id = ?2",
+                    params![sort_index as i64, id, story_now()],
                 )
                 .map_err(err)?;
             }
+            ensure_boundary_markers(&tx)?;
         }
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
 
-    /// Creates a user M marker (`marker_id` None) or moves one. It lies strictly
-    /// inside the program (start and end are markers by position) on a free frame
-    /// (v5 `create_marker_frame`); the component also keeps a move between neighbours.
-    fn write_marker(&mut self, marker_id: Option<&String>, program_frame: u64) -> Result<Data> {
+    /// v5 `create_marker_frame`: M at a program frame, remembered on the segment it
+    /// was made on. A marker already on that frame is refreshed, never duplicated.
+    fn create_marker(&mut self, program_frame: u64, part_id: &str) -> Result<Data> {
+        let fps = require_story_fps(&self.conn)?;
         let frame = program_frame as i64;
-        if frame <= 0 || frame >= program_length(&self.conn)? {
-            return Err("Pocetni i zavrsni M marker su zakljucani.".into());
-        }
-        let taken: bool = self
+        let tc = frame_timecode(frame, fps);
+        let part_id = part_id.trim();
+        let tx = self
             .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let existing: Option<String> = tx
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM program_markers
-                 WHERE program_frame = ?1 AND marker_id IS NOT ?2)",
-                params![frame, marker_id],
+                "SELECT marker_id FROM story_markers WHERE timeline_frame = ?1
+                 ORDER BY marker_id LIMIT 1",
+                [frame],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(err)?;
+        let marker_id = match existing {
+            Some(marker_id) => {
+                tx.execute(
+                    "UPDATE story_markers
+                     SET tc = ?1,
+                         origin_part_id = CASE WHEN TRIM(?2) != '' THEN ?2 ELSE origin_part_id END,
+                         updated_at = ?3
+                     WHERE marker_id = ?4",
+                    params![tc, part_id, story_now(), marker_id],
+                )
+                .map_err(err)?;
+                marker_id
+            }
+            None => {
+                let marker_id = new_marker_id();
+                let now = story_now();
+                tx.execute(
+                    "INSERT INTO story_markers
+                        (marker_id, timeline_frame, timeline_sec, tc, label, sort_index,
+                         origin_part_id, origin_local_frame, origin_local_sec, created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?4, 0, ?5, NULL, NULL, ?6, ?6)",
+                    params![marker_id, frame, timeline_sec(frame, fps), tc, part_id, now],
+                )
+                .map_err(err)?;
+                marker_id
+            }
+        };
+        ensure_boundary_markers(&tx)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Created(marker_id))
+    }
+
+    /// v5 `update_marker_frame`: inside the story length, on a free frame; the start
+    /// and the end marker are locked. The label is kept.
+    fn move_marker(&mut self, marker_id: &str, program_frame: u64) -> Result<Data> {
+        let fps = require_story_fps(&self.conn)?;
+        let marker_id = marker_id.trim();
+        if marker_id.is_empty() {
+            return Err("marker_id required".into());
+        }
+        let frame = program_frame as i64;
+        let duration = program_length(&self.conn)?;
+        if frame > duration {
+            return Err(format!(
+                "M marker mora biti unutar trajanja storyja ({:.3} s).",
+                timeline_sec(duration, fps)
+            ));
+        }
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        locked_check(&tx, marker_id, duration)?;
+        let taken: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM story_markers
+                 WHERE marker_id != ?1 AND timeline_frame = ?2)",
+                params![marker_id, frame],
                 |row| row.get(0),
             )
             .map_err(err)?;
         if taken {
-            return Err("Na tom frameu vec postoji M marker.".into());
+            return Err(format!("marker already exists at timeline_frame={frame}"));
         }
-        let Some(marker_id) = marker_id else {
-            let created = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or(0);
-            let marker_id = format!("marker_{created:x}");
-            self.conn
-                .execute(
-                    "INSERT INTO program_markers (marker_id, program_frame, created_at_utc)
-                     VALUES (?1, ?2, ?3)",
-                    params![marker_id, frame, (created / 1_000_000_000) as i64],
-                )
-                .map_err(err)?;
-            return Ok(Data::Created(marker_id));
-        };
-        let changed = self
-            .conn
-            .execute(
-                "UPDATE program_markers SET program_frame = ?2 WHERE marker_id = ?1",
-                params![marker_id, frame],
-            )
-            .map_err(err)?;
-        if changed == 0 {
-            return Err("M marker nije pronadjen.".into());
-        }
+        tx.execute(
+            "UPDATE story_markers SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3,
+                updated_at = ?4
+             WHERE marker_id = ?5",
+            params![
+                frame,
+                timeline_sec(frame, fps),
+                frame_timecode(frame, fps),
+                story_now(),
+                marker_id
+            ],
+        )
+        .map_err(err)?;
+        ensure_boundary_markers(&tx)?;
+        tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
 
+    /// v5 `delete_marker`: the start and the end marker are locked.
     fn delete_marker(&mut self, marker_id: &str) -> Result<Data> {
-        let removed = self
-            .conn
-            .execute(
-                "DELETE FROM program_markers WHERE marker_id = ?1",
-                [marker_id],
-            )
-            .map_err(err)?;
-        if removed == 0 {
-            return Err("M marker nije pronadjen.".into());
+        require_story_fps(&self.conn)?;
+        let marker_id = marker_id.trim();
+        if marker_id.is_empty() {
+            return Err("marker_id required".into());
         }
+        let duration = program_length(&self.conn)?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        locked_check(&tx, marker_id, duration)?;
+        tx.execute(
+            "DELETE FROM story_markers WHERE marker_id = ?1",
+            [marker_id],
+        )
+        .map_err(err)?;
+        ensure_boundary_markers(&tx)?;
+        tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
 
     fn list_markers(&self) -> Result<Data> {
-        if !object_exists(&self.conn, "view", "public_program_markers")? {
+        if !object_exists(&self.conn, "view", "public_story_markers")? {
             return Ok(Data::Markers(Vec::new()));
         }
         let mut statement = self
             .conn
             .prepare(
                 "SELECT marker_id, program_frame
-                 FROM public_program_markers ORDER BY program_frame, marker_id",
+                 FROM public_story_markers
+                 WHERE system_role = ''
+                 ORDER BY program_frame, marker_id",
             )
             .map_err(err)?;
         let rows = statement
@@ -1131,14 +1278,14 @@ impl ContentStore {
     }
 
     fn list_segments(&self) -> Result<Data> {
-        if !object_exists(&self.conn, "view", "public_program_segments")? {
+        if !object_exists(&self.conn, "view", "public_story_parts")? {
             return Ok(Data::Segments(Vec::new()));
         }
         let mut statement = self
             .conn
             .prepare(
                 "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den
-                 FROM public_program_segments ORDER BY sort_index",
+                 FROM public_story_parts WHERE active = 1 ORDER BY sort_index",
             )
             .map_err(err)?;
         let rows = statement
@@ -1306,8 +1453,12 @@ fn owned_table(name: &str) -> bool {
             | "filmstrip_frames"
             | "wave_artifacts"
             | "virtual_shots"
-            | "program_segments"
-            | "program_markers"
+            | "story_parts"
+            | "story_markers"
+            | "story_marker_slots"
+            | "story_covers"
+            | "story_state"
+            | "story_object_history"
             | "ingest_runtime"
     )
 }
@@ -1540,102 +1691,448 @@ fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
     .map_err(err)
 }
 
-fn ensure_program_segments_schema(conn: &Connection) -> Result<()> {
-    // Development records of the per-segment marker model are removed, not
-    // converted (AGENTS section 3: no migrations in development).
-    if table_columns(conn, "program_markers")?
-        .iter()
-        .any(|column| column == "segment_id")
-    {
-        conn.execute_batch(
-            "DROP VIEW IF EXISTS public_program_markers; DROP TABLE program_markers;",
-        )
-        .map_err(err)?;
-    }
-    if table_columns(conn, "program_segments")?
-        .iter()
-        .any(|column| column == "marker_mode")
-    {
-        conn.execute_batch(
-            "DROP VIEW IF EXISTS public_program_segments;
-            ALTER TABLE program_segments DROP COLUMN marker_mode;",
-        )
-        .map_err(err)?;
-    }
+fn ensure_story_schema(conn: &Connection) -> Result<()> {
+    // Development program_segments / program_markers are removed, not converted.
     conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS program_segments (
-            segment_id TEXT PRIMARY KEY,
-            kind TEXT NOT NULL CHECK (kind IN ('ton', 'off')),
+        "DROP VIEW IF EXISTS public_program_segments;
+         DROP VIEW IF EXISTS public_program_markers;
+         DROP TABLE IF EXISTS program_markers;
+         DROP TABLE IF EXISTS program_segments;
+         CREATE TABLE IF NOT EXISTS story_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            selected_part_id TEXT NOT NULL DEFAULT '',
+            selected_shot_id TEXT NOT NULL DEFAULT '',
+            selected_slot_id TEXT NOT NULL DEFAULT '',
+            selected_cover_id TEXT NOT NULL DEFAULT '',
+            draft_updated_at TEXT,
+            committed_at TEXT,
+            updated_at TEXT
+         );
+         CREATE TABLE IF NOT EXISTS story_parts (
+            part_id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL CHECK (kind IN ('tonovi', 'offovi')),
             sort_index INTEGER NOT NULL,
-            clip_id TEXT NOT NULL,
-            in_frame INTEGER NOT NULL,
-            out_frame INTEGER NOT NULL CHECK (out_frame > in_frame),
-            fps_num INTEGER NOT NULL CHECK (fps_num > 0),
-            fps_den INTEGER NOT NULL CHECK (fps_den > 0),
-            created_at_utc INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS program_markers (
+            title TEXT NOT NULL DEFAULT '',
+            text TEXT NOT NULL DEFAULT '',
+            clip_id TEXT NOT NULL DEFAULT '',
+            virtual_shot_id TEXT NOT NULL DEFAULT '',
+            in_tc TEXT NOT NULL DEFAULT '',
+            out_tc TEXT NOT NULL DEFAULT '',
+            in_seconds REAL,
+            out_seconds REAL,
+            fps REAL NOT NULL DEFAULT 0,
+            source_fps_num INTEGER NOT NULL DEFAULT 0,
+            source_fps_den INTEGER NOT NULL DEFAULT 1,
+            in_frame INTEGER NOT NULL DEFAULT 0,
+            out_frame INTEGER NOT NULL DEFAULT 0,
+            duration_frames INTEGER NOT NULL DEFAULT 0,
+            duration_label TEXT NOT NULL DEFAULT '',
+            duration_color_key TEXT NOT NULL DEFAULT '',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+         );
+         CREATE INDEX IF NOT EXISTS idx_story_parts_sort ON story_parts(sort_index);
+         CREATE TABLE IF NOT EXISTS story_markers (
             marker_id TEXT PRIMARY KEY,
-            program_frame INTEGER NOT NULL CHECK (program_frame > 0),
-            created_at_utc INTEGER NOT NULL
-        );
-        DROP VIEW IF EXISTS public_program_segments;
-        CREATE VIEW public_program_segments AS
-        SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den,
-               created_at_utc
-        FROM program_segments;
-        DROP VIEW IF EXISTS public_program_markers;
-        CREATE VIEW public_program_markers AS
-        SELECT marker_id, program_frame, created_at_utc
-        FROM program_markers;",
+            timeline_frame INTEGER NOT NULL DEFAULT 0,
+            timeline_sec REAL NOT NULL DEFAULT 0,
+            tc TEXT NOT NULL DEFAULT '',
+            label TEXT NOT NULL DEFAULT '',
+            sort_index INTEGER NOT NULL DEFAULT 0,
+            system_role TEXT NOT NULL DEFAULT '',
+            origin_part_id TEXT NOT NULL DEFAULT '',
+            origin_local_frame INTEGER,
+            origin_local_sec REAL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+         );
+         CREATE INDEX IF NOT EXISTS idx_story_markers_frame ON story_markers(timeline_frame);
+         CREATE TABLE IF NOT EXISTS story_marker_slots (
+            slot_id TEXT PRIMARY KEY,
+            slot_index INTEGER NOT NULL,
+            start_frame INTEGER NOT NULL DEFAULT 0,
+            end_frame INTEGER NOT NULL DEFAULT 0,
+            duration_frames INTEGER NOT NULL DEFAULT 0,
+            start_sec REAL NOT NULL,
+            end_sec REAL NOT NULL,
+            duration_sec REAL NOT NULL DEFAULT 0,
+            start_marker_id TEXT NOT NULL DEFAULT '',
+            end_marker_id TEXT NOT NULL DEFAULT '',
+            slot_signature TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS story_covers (
+            cover_id TEXT PRIMARY KEY,
+            timeline_start_frame INTEGER NOT NULL DEFAULT 0,
+            timeline_end_frame INTEGER NOT NULL DEFAULT 0,
+            timeline_start_sec REAL NOT NULL DEFAULT 0,
+            timeline_end_sec REAL NOT NULL DEFAULT 0,
+            slot_signature TEXT NOT NULL DEFAULT '',
+            slot_index INTEGER NOT NULL DEFAULT 0,
+            clip_id TEXT NOT NULL DEFAULT '',
+            virtual_shot_id TEXT NOT NULL DEFAULT '',
+            title TEXT NOT NULL DEFAULT '',
+            note TEXT NOT NULL DEFAULT '',
+            in_tc TEXT NOT NULL DEFAULT '',
+            out_tc TEXT NOT NULL DEFAULT '',
+            in_seconds REAL,
+            out_seconds REAL,
+            source_in_frame INTEGER NOT NULL DEFAULT 0,
+            source_out_frame INTEGER NOT NULL DEFAULT 0,
+            source_fps REAL NOT NULL DEFAULT 0,
+            source_fps_num INTEGER NOT NULL DEFAULT 0,
+            source_fps_den INTEGER NOT NULL DEFAULT 1,
+            sort_index INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS story_object_history (
+            object_type TEXT NOT NULL,
+            object_id TEXT NOT NULL,
+            state TEXT NOT NULL DEFAULT '',
+            snapshot_json TEXT NOT NULL DEFAULT '{}',
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (object_type, object_id)
+         );
+         DROP VIEW IF EXISTS public_story_parts;
+         CREATE VIEW public_story_parts AS
+         SELECT part_id AS segment_id, kind, sort_index, clip_id, in_frame, out_frame,
+                source_fps_num AS fps_num, source_fps_den AS fps_den, active,
+                duration_frames, duration_label, duration_color_key
+         FROM story_parts;
+         DROP VIEW IF EXISTS public_story_markers;
+         CREATE VIEW public_story_markers AS
+         SELECT marker_id, timeline_frame AS program_frame, system_role
+         FROM story_markers;
+         DROP VIEW IF EXISTS public_story_state;
+         CREATE VIEW public_story_state AS
+         SELECT selected_part_id, selected_shot_id, selected_slot_id, selected_cover_id,
+                draft_updated_at, committed_at, updated_at
+         FROM story_state;
+         DROP VIEW IF EXISTS public_story_marker_slots;
+         CREATE VIEW public_story_marker_slots AS
+         SELECT slot_id, slot_index, start_frame, end_frame, duration_frames,
+                start_marker_id, end_marker_id, slot_signature, updated_at
+         FROM story_marker_slots;
+         DROP VIEW IF EXISTS public_story_covers;
+         CREATE VIEW public_story_covers AS
+         SELECT cover_id, slot_signature, slot_index, timeline_start_frame, timeline_end_frame,
+                clip_id, virtual_shot_id, source_in_frame, source_out_frame
+         FROM story_covers;",
     )
-    .map_err(err)
+    .map_err(err)?;
+    // Cover identity is the marker pair. The seconds signature stays a column
+    // from v5; this owner does not use it as the slot id.
+    conn.execute(
+        "INSERT INTO story_state (id, updated_at) VALUES (1, ?1)
+         ON CONFLICT(id) DO NOTHING",
+        [story_now()],
+    )
+    .map_err(err)?;
+    Ok(())
 }
 
-fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>> {
-    let mut statement = conn
-        .prepare(&format!("PRAGMA table_info({table})"))
+/// v5 `now_str`.
+fn story_now() -> String {
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0);
+    format!("epoch_{secs}")
+}
+
+/// v5 `validate_kind`: a story segment is `tonovi` or `offovi`.
+fn story_kind(kind: &str) -> Result<&'static str> {
+    match kind.trim() {
+        "tonovi" => Ok("tonovi"),
+        "offovi" => Ok("offovi"),
+        other => Err(format!("Nepoznata vrsta segmenta: {other}.")),
+    }
+}
+
+fn new_marker_id() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    format!("marker_{nanos:x}")
+}
+
+/// v5 `require_current_story_program_source_fps`: the source rate of the first
+/// active segment; markers and slots need it.
+fn require_story_fps(conn: &Connection) -> Result<f64> {
+    let rate: Option<(i64, i64)> = conn
+        .query_row(
+            "SELECT source_fps_num, source_fps_den FROM story_parts
+             WHERE active = 1 AND source_fps_num > 0 AND source_fps_den > 0
+             ORDER BY sort_index LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
         .map_err(err)?;
-    let columns = statement
-        .query_map([], |row| row.get::<_, String>(1))
+    rate.map(|(num, den)| num as f64 / den as f64)
+        .ok_or_else(|| "timeline_fps_invalid: story program nema valjan source FPS".into())
+}
+
+/// v5 `round3(frame_to_seconds(frame, fps))`.
+fn timeline_sec(frame: i64, fps: f64) -> f64 {
+    if fps <= 0.0 {
+        return 0.0;
+    }
+    ((frame.max(0) as f64 / fps) * 1000.0).round() / 1000.0
+}
+
+/// v5 `frame_to_timecode`: `hh:mm:ss:ff` with the rate rounded to whole frames.
+fn frame_timecode(frame: i64, fps: f64) -> String {
+    let fps = fps.round().max(1.0) as i64;
+    let total = frame.max(0);
+    let total_sec = total / fps;
+    format!(
+        "{:02}:{:02}:{:02}:{:02}",
+        total_sec / 3600,
+        (total_sec / 60) % 60,
+        total_sec % 60,
+        total % fps
+    )
+}
+
+/// v5 `seconds_frames_label_from_frames`: `seconds:frames`.
+fn frames_label(frames: i64, fps: f64) -> String {
+    let fps = fps.round().max(1.0) as i64;
+    let frames = frames.max(0);
+    format!("{}:{:02}", frames / fps, frames % fps)
+}
+
+/// v5 `duration_color_key_from_frames` with the default 3, 5, 7 second marks.
+fn duration_color_key(frames: i64, fps: f64) -> &'static str {
+    if fps <= 0.0 {
+        return "over_7";
+    }
+    match frames.max(0) as f64 / fps {
+        seconds if seconds < 3.0 => "under_3",
+        seconds if seconds < 5.0 => "under_5",
+        seconds if seconds < 7.0 => "under_7",
+        _ => "over_7",
+    }
+}
+
+/// v5 lock of the start and the end marker on delete and move.
+fn locked_check(conn: &Connection, marker_id: &str, duration: i64) -> Result<()> {
+    let marker: Option<(i64, String)> = conn
+        .query_row(
+            "SELECT timeline_frame, system_role FROM story_markers WHERE marker_id = ?1",
+            [marker_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(err)?;
+    let (frame, role) = marker.ok_or_else(|| format!("marker not found: {marker_id}"))?;
+    if frame == 0 || role == "program_start" {
+        return Err("Početni M marker je zaključan.".into());
+    }
+    if role == "program_end" || frame == duration {
+        return Err("Završni M marker je zaključan.".into());
+    }
+    Ok(())
+}
+
+struct StoryPartSpan {
+    part_id: String,
+    frames: i64,
+}
+
+/// Active segments in order with v5 `part_span_frames`.
+fn active_part_spans(conn: &Connection) -> Result<Vec<StoryPartSpan>> {
+    let mut statement = conn
+        .prepare(
+            "SELECT part_id, duration_frames, in_frame, out_frame FROM story_parts
+             WHERE active = 1 ORDER BY sort_index",
+        )
+        .map_err(err)?;
+    let rows = statement
+        .query_map([], |row| {
+            let duration: i64 = row.get(1)?;
+            let (in_frame, out_frame): (i64, i64) = (row.get(2)?, row.get(3)?);
+            let frames = if duration > 0 {
+                duration
+            } else {
+                (out_frame - in_frame).max(0)
+            };
+            Ok(StoryPartSpan {
+                part_id: row.get(0)?,
+                frames,
+            })
+        })
         .map_err(err)?
         .collect::<rusqlite::Result<Vec<_>>>()
         .map_err(err)?;
-    Ok(columns)
+    Ok(rows)
+}
+
+fn first_marker(conn: &Connection, sql: &str, value: i64) -> Result<Option<String>> {
+    conn.query_row(sql, [value], |row| row.get(0))
+        .optional()
+        .map_err(err)
+}
+
+/// v5 `ensure_start_marker` + `ensure_end_marker`: exactly one locked start
+/// marker at frame 0 on the first segment and one locked end marker at the
+/// program length on the last segment; no segments, no markers.
+fn ensure_boundary_markers(conn: &Connection) -> Result<()> {
+    let parts = active_part_spans(conn)?;
+    let duration: i64 = parts.iter().map(|part| part.frames).sum();
+    if duration <= 0 {
+        conn.execute_batch(
+            "DELETE FROM story_marker_slots;
+             DELETE FROM story_markers;
+             UPDATE story_state SET selected_slot_id = '' WHERE id = 1;",
+        )
+        .map_err(err)?;
+        return Ok(());
+    }
+    let fps = require_story_fps(conn)?;
+    let now = story_now();
+    let first = parts
+        .first()
+        .map(|part| part.part_id.as_str())
+        .unwrap_or("");
+    let start_tc = frame_timecode(0, fps);
+    let start = match first_marker(
+        conn,
+        "SELECT marker_id FROM story_markers WHERE system_role = 'program_start'
+         AND ?1 = ?1 ORDER BY timeline_frame, marker_id LIMIT 1",
+        0,
+    )? {
+        Some(id) => Some(id),
+        None => first_marker(
+            conn,
+            "SELECT marker_id FROM story_markers WHERE timeline_frame = ?1
+             ORDER BY marker_id LIMIT 1",
+            0,
+        )?,
+    };
+    match start {
+        Some(id) => {
+            conn.execute(
+                "UPDATE story_markers
+                 SET timeline_frame = 0, origin_part_id = ?1, origin_local_frame = 0,
+                     origin_local_sec = 0, tc = ?2, label = ?2, system_role = 'program_start'
+                 WHERE marker_id = ?3",
+                params![first, start_tc, id],
+            )
+            .map_err(err)?;
+            conn.execute(
+                "UPDATE story_markers SET system_role = ''
+                 WHERE system_role = 'program_start' AND marker_id != ?1",
+                [&id],
+            )
+            .map_err(err)?;
+        }
+        None => {
+            conn.execute(
+                "INSERT INTO story_markers
+                    (marker_id, timeline_frame, timeline_sec, tc, label, sort_index, system_role,
+                     origin_part_id, origin_local_frame, origin_local_sec, created_at, updated_at)
+                 VALUES (?1, 0, 0, ?2, ?2, 0, 'program_start', ?3, 0, 0, ?4, ?4)",
+                params![new_marker_id(), start_tc, first, now],
+            )
+            .map_err(err)?;
+        }
+    }
+    let at_duration = first_marker(
+        conn,
+        "SELECT marker_id FROM story_markers
+         WHERE timeline_frame = ?1 AND system_role != 'program_start'
+         ORDER BY marker_id LIMIT 1",
+        duration,
+    )?;
+    let system_end = first_marker(
+        conn,
+        "SELECT marker_id FROM story_markers WHERE system_role = 'program_end'
+         AND ?1 = ?1 ORDER BY timeline_frame, marker_id LIMIT 1",
+        0,
+    )?;
+    if let (Some(system_end), Some(at_duration)) = (&system_end, &at_duration) {
+        if system_end != at_duration {
+            conn.execute(
+                "DELETE FROM story_markers WHERE marker_id = ?1",
+                [system_end],
+            )
+            .map_err(err)?;
+        }
+    }
+    let last = parts.last().expect("duration > 0 has a segment");
+    let end_sec = timeline_sec(duration, fps);
+    let end_tc = frame_timecode(duration, fps);
+    let local_sec = last.frames as f64 / fps;
+    match at_duration.or(system_end) {
+        Some(id) => {
+            conn.execute(
+                "UPDATE story_markers
+                 SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3, label = ?3,
+                     sort_index = 0, system_role = 'program_end', origin_part_id = ?4,
+                     origin_local_frame = ?5, origin_local_sec = ?6, updated_at = ?7
+                 WHERE marker_id = ?8",
+                params![
+                    duration,
+                    end_sec,
+                    end_tc,
+                    last.part_id,
+                    last.frames,
+                    local_sec,
+                    now,
+                    id
+                ],
+            )
+            .map_err(err)?;
+            conn.execute(
+                "UPDATE story_markers SET system_role = ''
+                 WHERE system_role = 'program_end' AND marker_id != ?1",
+                [&id],
+            )
+            .map_err(err)?;
+        }
+        None => {
+            conn.execute(
+                "INSERT INTO story_markers
+                    (marker_id, timeline_frame, timeline_sec, tc, label, sort_index, system_role,
+                     origin_part_id, origin_local_frame, origin_local_sec, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?4, 0, 'program_end', ?5, ?6, ?7, ?8, ?8)",
+                params![
+                    new_marker_id(),
+                    duration,
+                    end_sec,
+                    end_tc,
+                    last.part_id,
+                    last.frames,
+                    local_sec,
+                    now
+                ],
+            )
+            .map_err(err)?;
+        }
+    }
+    Ok(())
 }
 
 /// Program length in frames: the segments one after another.
 fn program_length(conn: &Connection) -> Result<i64> {
     conn.query_row(
-        "SELECT COALESCE(SUM(out_frame - in_frame), 0) FROM program_segments",
+        "SELECT COALESCE(SUM(out_frame - in_frame), 0) FROM story_parts WHERE active = 1",
         [],
         |row| row.get(0),
     )
     .map_err(err)
 }
 
-/// User markers only live strictly inside the program, one per frame.
-fn prune_markers(conn: &Connection) -> Result<()> {
-    let length = program_length(conn)?;
-    conn.execute(
-        "DELETE FROM program_markers WHERE program_frame <= 0 OR program_frame >= ?1",
-        [length],
-    )
-    .map_err(err)?;
-    conn.execute(
-        "DELETE FROM program_markers WHERE rowid NOT IN
-            (SELECT MIN(rowid) FROM program_markers GROUP BY program_frame)",
-        [],
-    )
-    .map_err(err)?;
-    Ok(())
-}
-
 /// Program frames `[start, end)` of a segment in the stored order.
 fn segment_window(conn: &Connection, segment_id: &str) -> Result<Option<(u64, u64)>> {
     let mut statement = conn
         .prepare(
-            "SELECT segment_id, out_frame - in_frame FROM program_segments ORDER BY sort_index",
+            "SELECT part_id, out_frame - in_frame FROM story_parts
+             WHERE active = 1 ORDER BY sort_index",
         )
         .map_err(err)?;
     let rows = statement
@@ -1658,7 +2155,7 @@ fn segment_window(conn: &Connection, segment_id: &str) -> Result<Option<(u64, u6
 
 fn segment_order(conn: &Connection) -> Result<Vec<String>> {
     let mut statement = conn
-        .prepare("SELECT segment_id FROM program_segments ORDER BY sort_index")
+        .prepare("SELECT part_id FROM story_parts WHERE active = 1 ORDER BY sort_index")
         .map_err(err)?;
     let ids = statement
         .query_map([], |row| row.get(0))
@@ -1671,7 +2168,7 @@ fn segment_order(conn: &Connection) -> Result<Vec<String>> {
 fn renumber_segments(conn: &Connection) -> Result<()> {
     for (sort_index, id) in segment_order(conn)?.iter().enumerate() {
         conn.execute(
-            "UPDATE program_segments SET sort_index = ?1 WHERE segment_id = ?2",
+            "UPDATE story_parts SET sort_index = ?1 WHERE part_id = ?2",
             params![sort_index as i64, id],
         )
         .map_err(err)?;

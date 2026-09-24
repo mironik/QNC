@@ -35,15 +35,15 @@ pub enum SegmentKind {
 impl SegmentKind {
     fn db(self) -> &'static str {
         match self {
-            Self::Ton => "ton",
-            Self::Off => "off",
+            Self::Ton => "tonovi",
+            Self::Off => "offovi",
         }
     }
 
     fn from_db(value: &str) -> Option<Self> {
         match value {
-            "ton" => Some(Self::Ton),
-            "off" => Some(Self::Off),
+            "tonovi" => Some(Self::Ton),
+            "offovi" => Some(Self::Off),
             _ => None,
         }
     }
@@ -541,6 +541,7 @@ impl ProgramSegments {
             },
             None => Operation::CreateMarker {
                 program_frame: frame,
+                part_id: self.selected.clone().unwrap_or_default(),
             },
         };
         self.write(operation);

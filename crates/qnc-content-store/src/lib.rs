@@ -142,8 +142,8 @@ pub struct ShortClip {
     pub still_status: String,
 }
 
-/// One segment of the edited program: `ton` (picture and sound) or `off` (sound
-/// only). Frames are source frames of its clip in the timebase `fps_num/fps_den`.
+/// One segment of the edited program. Stored kind is `tonovi` or `offovi`.
+/// Frames are source frames of its clip in the timebase `fps_num/fps_den`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProgramSegment {
@@ -300,9 +300,11 @@ pub enum Operation {
         up: bool,
     },
     ListSegments,
-    /// A user M marker strictly inside the program, on a free frame.
+    /// M at a program frame on the segment `part_id` (v5 `create_marker_frame`):
+    /// a marker already on that frame is refreshed, not duplicated.
     CreateMarker {
         program_frame: u64,
+        part_id: String,
     },
     MoveMarker {
         marker_id: String,

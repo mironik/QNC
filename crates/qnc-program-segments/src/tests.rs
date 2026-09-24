@@ -24,9 +24,9 @@ fn marker(id: &str, program: u64) -> ProgramMarker {
 fn component() -> ProgramSegments {
     let mut segments = ProgramSegments::new();
     segments.stored = vec![
-        stored("a", "ton", (100, 110)),
-        stored("b", "off", (0, 20)),
-        stored("c", "ton", (500, 510)),
+        stored("a", "tonovi", (100, 110)),
+        stored("b", "offovi", (0, 20)),
+        stored("c", "tonovi", (500, 510)),
     ];
     segments.stored_markers = vec![marker("m1", 15), marker("m2", 33)];
     segments.refresh_view(String::new());
@@ -36,7 +36,7 @@ fn component() -> ProgramSegments {
 #[test]
 fn segments_follow_each_other_on_one_program_axis() {
     let view = program(
-        &[stored("a", "ton", (100, 350)), stored("b", "off", (0, 60))],
+        &[stored("a", "tonovi", (100, 350)), stored("b", "offovi", (0, 60))],
         Some("b"),
     );
     assert_eq!(view.total_frames, 310);
@@ -58,7 +58,7 @@ fn segments_follow_each_other_on_one_program_axis() {
 #[test]
 fn the_segment_at_a_frame_and_at_the_end_is_found() {
     let view = program(
-        &[stored("a", "ton", (0, 10)), stored("b", "ton", (0, 5))],
+        &[stored("a", "tonovi", (0, 10)), stored("b", "tonovi", (0, 5))],
         None,
     );
     assert_eq!(view.segment_at(9).unwrap().segment_id, "a");

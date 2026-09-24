@@ -1168,18 +1168,19 @@ fn segments(store: &mut ContentStore) -> Vec<ProgramSegment> {
 fn segments_are_appended_in_order_and_keep_their_source_range() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = imported_store(&dir.path().join("db"));
-    let Data::Created(ton) = create_segment(&mut store, "ton", (10, 60), (50, 1)).unwrap() else {
+    let Data::Created(ton) = create_segment(&mut store, "tonovi", (10, 60), (50, 1)).unwrap()
+    else {
         panic!()
     };
-    create_segment(&mut store, "off", (100, 125), (100, 2)).unwrap();
+    create_segment(&mut store, "offovi", (100, 125), (100, 2)).unwrap();
     let rows = segments(&mut store);
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0].segment_id, ton);
     assert_eq!(
         (rows[0].kind.as_str(), rows[0].in_frame, rows[0].out_frame),
-        ("ton", 10, 60)
+        ("tonovi", 10, 60)
     );
-    assert_eq!((rows[1].kind.as_str(), rows[1].sort_index), ("off", 1));
+    assert_eq!((rows[1].kind.as_str(), rows[1].sort_index), ("offovi", 1));
 }
 
 #[test]
@@ -1187,17 +1188,17 @@ fn a_segment_needs_a_real_range_a_known_kind_an_imported_clip_and_the_story_rate
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     let mut claimed = claimed_store(&path);
-    assert!(create_segment(&mut claimed, "ton", (0, 10), (50, 1))
+    assert!(create_segment(&mut claimed, "tonovi", (0, 10), (50, 1))
         .unwrap_err()
         .contains("nije uvezen"));
     drop(claimed);
     let dir = tempfile::tempdir().unwrap();
     let mut store = imported_store(&dir.path().join("db"));
-    assert!(create_segment(&mut store, "ton", (10, 10), (50, 1)).is_err());
+    assert!(create_segment(&mut store, "tonovi", (10, 10), (50, 1)).is_err());
     assert!(create_segment(&mut store, "voice", (0, 10), (50, 1)).is_err());
-    assert!(create_segment(&mut store, "ton", (0, 10), (0, 1)).is_err());
-    create_segment(&mut store, "ton", (0, 10), (50, 1)).unwrap();
-    let mixed = create_segment(&mut store, "off", (0, 10), (25, 1)).unwrap_err();
+    assert!(create_segment(&mut store, "tonovi", (0, 10), (0, 1)).is_err());
+    create_segment(&mut store, "tonovi", (0, 10), (50, 1)).unwrap();
+    let mixed = create_segment(&mut store, "offovi", (0, 10), (25, 1)).unwrap_err();
     assert!(mixed.contains("mijesani fps"), "{mixed}");
     assert_eq!(segments(&mut store).len(), 1);
 }
@@ -1207,7 +1208,7 @@ fn deleting_closes_the_gap_and_moving_swaps_neighbours_only() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = imported_store(&dir.path().join("db"));
     for start in [0, 100, 200] {
-        create_segment(&mut store, "ton", (start, start + 10), (50, 1)).unwrap();
+        create_segment(&mut store, "tonovi", (start, start + 10), (50, 1)).unwrap();
     }
     let ids = segments(&mut store)
         .into_iter()
@@ -1260,9 +1261,16 @@ fn deleting_closes_the_gap_and_moving_swaps_neighbours_only() {
 }
 
 fn marker(store: &mut ContentStore, program_frame: u64) -> Result<Data> {
-    run(store, Operation::CreateMarker { program_frame })
+    run(
+        store,
+        Operation::CreateMarker {
+            program_frame,
+            part_id: String::new(),
+        },
+    )
 }
 
+/// User markers (not the locked program start and end).
 fn markers(store: &mut ContentStore) -> Vec<u64> {
     let Data::Markers(rows) = run(store, Operation::ListMarkers).unwrap() else {
         panic!()
@@ -1270,10 +1278,26 @@ fn markers(store: &mut ContentStore) -> Vec<u64> {
     rows.into_iter().map(|row| row.program_frame).collect()
 }
 
+/// Locked boundary markers as (role, frame, origin segment).
+fn boundaries(path: &std::path::Path) -> Vec<(String, i64, String)> {
+    let conn = Connection::open(path).unwrap();
+    let mut statement = conn
+        .prepare(
+            "SELECT system_role, timeline_frame, origin_part_id FROM story_markers
+             WHERE system_role != '' ORDER BY timeline_frame",
+        )
+        .unwrap();
+    statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap()
+}
+
 /// Three ten-frame segments: program frames 0..10, 10..20, 20..30.
 fn three_segments(store: &mut ContentStore) -> Vec<String> {
     for start in [0, 100, 200] {
-        create_segment(store, "ton", (start, start + 10), (50, 1)).unwrap();
+        create_segment(store, "tonovi", (start, start + 10), (50, 1)).unwrap();
     }
     segments(store)
         .into_iter()
@@ -1282,40 +1306,121 @@ fn three_segments(store: &mut ContentStore) -> Vec<String> {
 }
 
 #[test]
-fn a_user_marker_lies_strictly_inside_the_program_on_a_free_frame() {
+fn start_and_end_are_stored_locked_markers_that_follow_the_program() {
     let dir = tempfile::tempdir().unwrap();
-    let mut store = imported_store(&dir.path().join("db"));
-    assert!(marker(&mut store, 5).is_err(), "no program, no marker");
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    let ids = three_segments(&mut store);
+    assert_eq!(
+        boundaries(&path),
+        vec![
+            ("program_start".into(), 0, ids[0].clone()),
+            ("program_end".into(), 30, ids[2].clone())
+        ]
+    );
+    let delete = |store: &mut ContentStore, id: &str| {
+        run(
+            store,
+            Operation::DeleteSegment {
+                segment_id: id.into(),
+            },
+        )
+    };
+    delete(&mut store, &ids[2]).unwrap();
+    assert_eq!(
+        boundaries(&path)[1],
+        ("program_end".into(), 20, ids[1].clone())
+    );
+    delete(&mut store, &ids[0]).unwrap();
+    delete(&mut store, &ids[1]).unwrap();
+    assert!(boundaries(&path).is_empty(), "no segments, no markers");
+}
+
+#[test]
+fn m_keeps_its_segment_and_a_marker_on_the_same_frame_is_refreshed() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    assert!(marker(&mut store, 5).is_err(), "no story fps, no marker");
+    let ids = three_segments(&mut store);
+    let Data::Created(id) = run(
+        &mut store,
+        Operation::CreateMarker {
+            program_frame: 14,
+            part_id: ids[1].clone(),
+        },
+    )
+    .unwrap() else {
+        panic!()
+    };
+    let Data::Created(again) = marker(&mut store, 14).unwrap() else {
+        panic!()
+    };
+    assert_eq!(again, id, "v5 refreshes the marker already on that frame");
+    let Data::Created(start) = marker(&mut store, 0).unwrap() else {
+        panic!()
+    };
+    assert_ne!(start, id);
+    assert_eq!(markers(&mut store), vec![14]);
+    let conn = Connection::open(&path).unwrap();
+    let (origin, tc): (String, String) = conn
+        .query_row(
+            "SELECT origin_part_id, tc FROM story_markers WHERE marker_id = ?1",
+            [&id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        (origin.as_str(), tc.as_str()),
+        (ids[1].as_str(), "00:00:00:14")
+    );
+}
+
+#[test]
+fn moving_and_deleting_markers_keep_the_start_and_the_end_locked() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
     three_segments(&mut store);
-    assert!(marker(&mut store, 0).is_err(), "the start is locked");
-    assert!(marker(&mut store, 30).is_err(), "the end is locked");
     let Data::Created(id) = marker(&mut store, 14).unwrap() else {
         panic!()
     };
-    assert!(marker(&mut store, 14).is_err(), "one marker per frame");
     marker(&mut store, 25).unwrap();
-    assert_eq!(markers(&mut store), vec![14, 25]);
-    let move_to = |store: &mut ContentStore, frame| {
+    let move_to = |store: &mut ContentStore, marker_id: &str, frame| {
         run(
             store,
             Operation::MoveMarker {
-                marker_id: id.clone(),
+                marker_id: marker_id.into(),
                 program_frame: frame,
             },
         )
     };
-    assert!(move_to(&mut store, 25).is_err());
-    move_to(&mut store, 21).unwrap();
+    assert!(move_to(&mut store, &id, 25)
+        .unwrap_err()
+        .contains("already exists"));
+    assert!(move_to(&mut store, &id, 31)
+        .unwrap_err()
+        .contains("trajanja"));
+    move_to(&mut store, &id, 21).unwrap();
     assert_eq!(markers(&mut store), vec![21, 25]);
-    run(
-        &mut store,
-        Operation::DeleteMarker {
-            marker_id: id.clone(),
-        },
-    )
-    .unwrap();
+    let Data::Created(start) = marker(&mut store, 0).unwrap() else {
+        panic!()
+    };
+    assert!(move_to(&mut store, &start, 5)
+        .unwrap_err()
+        .contains("Početni"));
+    let delete = |store: &mut ContentStore, marker_id: &str| {
+        run(
+            store,
+            Operation::DeleteMarker {
+                marker_id: marker_id.into(),
+            },
+        )
+    };
+    assert!(delete(&mut store, &start).unwrap_err().contains("Početni"));
+    delete(&mut store, &id).unwrap();
     assert_eq!(markers(&mut store), vec![25]);
-    assert!(run(&mut store, Operation::DeleteMarker { marker_id: id }).is_err());
+    assert!(delete(&mut store, &id).unwrap_err().contains("not found"));
 }
 
 #[test]
@@ -1337,13 +1442,23 @@ fn markers_cross_segment_borders_and_stay_on_their_frame_when_segments_move() {
 }
 
 #[test]
-fn deleting_a_segment_drops_markers_inside_it_and_moves_later_ones_left() {
+fn deleting_a_segment_deactivates_it_shifts_markers_and_moves_the_selection() {
     let dir = tempfile::tempdir().unwrap();
-    let mut store = imported_store(&dir.path().join("db"));
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
     let ids = three_segments(&mut store);
-    for frame in [5, 10, 13, 20, 24] {
+    for frame in [5, 13, 24] {
         marker(&mut store, frame).unwrap();
     }
+    drop(store);
+    Connection::open(&path)
+        .unwrap()
+        .execute(
+            "UPDATE story_state SET selected_part_id = ?1 WHERE id = 1",
+            [&ids[1]],
+        )
+        .unwrap();
+    let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
     run(
         &mut store,
         Operation::DeleteSegment {
@@ -1351,45 +1466,48 @@ fn deleting_a_segment_drops_markers_inside_it_and_moves_later_ones_left() {
         },
     )
     .unwrap();
-    // 13 was inside; 20 lands on 10, where one marker already is; 24 moves to 14.
-    assert_eq!(markers(&mut store), vec![5, 10, 14]);
-    run(
-        &mut store,
-        Operation::DeleteSegment {
-            segment_id: ids[2].clone(),
-        },
-    )
-    .unwrap();
-    assert_eq!(
-        markers(&mut store),
-        vec![5],
-        "a marker on the new program end goes"
-    );
+    // v5: 13 was inside the window 10..20; 24 moves left by ten frames.
+    assert_eq!(markers(&mut store), vec![5, 14]);
+    let conn = Connection::open(&path).unwrap();
+    let (active, selected): (i64, String) = conn
+        .query_row(
+            "SELECT p.active, s.selected_part_id FROM story_parts p, story_state s
+             WHERE p.part_id = ?1",
+            [&ids[1]],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(active, 0, "the row stays, inactive");
+    assert_ne!(selected, ids[1]);
+    assert!(!selected.is_empty());
+    assert_eq!(segments(&mut store).len(), 2);
 }
 
 #[test]
-fn development_records_of_per_segment_markers_are_removed_on_open() {
+fn development_program_tables_are_removed_on_open() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     let mut store = imported_store(&path);
     three_segments(&mut store);
     drop(store);
-    let conn = Connection::open(&path).unwrap();
-    conn.execute_batch(
-        "DROP VIEW public_program_markers; DROP TABLE program_markers;
-        CREATE TABLE program_markers (marker_id TEXT PRIMARY KEY, segment_id TEXT NOT NULL,
-            source_frame INTEGER NOT NULL, program_frame INTEGER NOT NULL,
-            created_at_utc INTEGER NOT NULL);
-        INSERT INTO program_markers VALUES ('old', 's', 3, 3, 0);
-        DROP VIEW public_program_segments;
-        ALTER TABLE program_segments ADD COLUMN marker_mode TEXT NOT NULL DEFAULT 'content'
-            CHECK (marker_mode IN ('content', 'frame'));",
-    )
-    .unwrap();
-    drop(conn);
+    Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            "CREATE TABLE program_segments (segment_id TEXT PRIMARY KEY, marker_mode TEXT);
+             CREATE TABLE program_markers (marker_id TEXT PRIMARY KEY, segment_id TEXT);",
+        )
+        .unwrap();
     let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
-    assert!(markers(&mut store).is_empty());
     assert_eq!(segments(&mut store).len(), 3);
-    marker(&mut store, 12).unwrap();
-    assert_eq!(markers(&mut store), vec![12]);
+    drop(store);
+    let legacy: i64 = Connection::open(&path)
+        .unwrap()
+        .query_row(
+            "SELECT count(*) FROM sqlite_master
+             WHERE name IN ('program_segments', 'program_markers')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(legacy, 0);
 }

@@ -2161,6 +2161,33 @@ racionalno pravilo: filmstrip putanje se citaju iz aktivnog `WorkSettings`
 preview modula. Forma/layout nije diran, nema novog write puta i nema promjene
 worker pokretanja.
 
+Zatvoreno ograniceno odobrenje 2026-09-24 (Story v5 tablice, korak 1): prvi dio
+je napravio drugi AI agent prema dokumentu `qnc-v5-story-postupak-2026-09-24.md`,
+bez korisnikove odluke o otvorenim pitanjima; audit je to utvrdio, korisnik je
+izabrao da se rad zadrzi i ispravi (plan B). Odluke korisnika 2026-09-24: vrijedi
+PRAVILO v5 (`QNC_v5/.cursor/rules/qnc-story-segment-timeline.mdc`), kod pise
+QNC; kad se slotovi promijene pokrivalica se ponovno veze ili skracuje, ne brise;
+identitet slota je par markera; razvojni zapisi se smiju brisati. Otkljucano i
+izvedeno samo: `crates/qnc-content-store` (tablice `story_state`, `story_parts`,
+`story_markers`, `story_marker_slots`, `story_covers`, `story_object_history` i
+javni pogledi; razvojne `program_segments`/`program_markers` brisu se pri
+otvaranju; vrsta samo `tonovi`/`offovi`; segment se puni kao v5
+`segment_source_from_clip_frames` (tc, sekunde, oznaka i boja trajanja); brisanje
+segmenta je v5 `delete_part`: `active = 0`, markeri unutar prozora se brisu,
+kasniji se pomicu ulijevo, odabir prelazi na najblizi segment; M je v5
+`create_marker_frame`: pamti segment (`origin_part_id`), marker na istom frameu se
+osvjezava; pomak i brisanje markera su v5 `update_marker_frame`/`delete_marker`
+sa zakljucanim pocetkom i krajem; pocetni i zavrsni marker su v5
+`ensure_start_marker`/`ensure_end_marker`; javni pogled `public_story_parts`
+nosi i neaktivne segmente), `crates/qnc-program-segments` (samo `tonovi`/`offovi`,
+M salje odabrani segment), ugovori `story.database.json`,
+`program-segments.database.json`, `program-segments.module.json`. Nije izvedeno:
+preracun slotova u bazu i vezanje pokrivalica (korak 3), prikaz neaktivnih
+segmenata u tabu Segment, Source/Wrap playlist, player. Player, forme i layout
+nisu dirani. Verificirano: `cargo test -p qnc-content-store` (38),
+`qnc-program-segments` (13), `qnc-editorial-application` (11), `cargo build
+--workspace`, `cargo run -p qnc-conformance`. Odobrenje je zatvoreno.
+
 Zatvoreno ograniceno odobrenje 2026-09-23 (racionalni poster klik): korisnik je
 trazio v5 postupak za klik na poster: klik nosi samo `clip_id`, projektni
 kontekst je vec poznat, a posteri se citaju iz URI-ja zapisanih u projektnoj
