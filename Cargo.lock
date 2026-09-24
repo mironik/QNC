@@ -3222,6 +3222,7 @@ dependencies = [
  "qnc-virtual-short-stills",
  "qnc-virtual-shots",
  "qnc-work-settings",
+ "qnc-wrap-session",
 ]
 
 [[package]]
@@ -4349,6 +4350,10 @@ dependencies = [
  "smbios-lib",
  "whoami",
 ]
+
+[[package]]
+name = "qnc-wrap-session"
+version = "0.1.0"
 
 [[package]]
 name = "quick-error"

@@ -12,6 +12,7 @@ qnc-content-read = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-media-thumbnail = { workspace = true }
 qnc-program-segments = { workspace = true }
+qnc-wrap-session = { workspace = true }
 qnc-source-bindings = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-reader = { workspace = true }

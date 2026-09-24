@@ -1,0 +1,7 @@
+[package]
+name = "qnc-wrap-session"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: the Wrap view of a story, its program playhead and its requests to the program player"
+
+[dependencies]

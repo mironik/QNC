@@ -6,8 +6,8 @@
 //! `story_marker_slots`, `story_state`, owner `qnc-content-store`), by the v5 rule
 //! `qnc-story-segment-timeline.mdc`. This component reads it, writes
 //! through the serialized content write transport without blocking the caller, and
-//! turns it into a program model on one frame axis. The program playhead comes only
-//! from the player's confirmed frame; navigation only asks for a cue. It knows no
+//! turns it into a program model on one frame axis. The program playhead belongs to
+//! the Wrap view (`qnc-wrap-session`); navigation only asks for a program frame. It knows no
 //! form and no application, and never plays, probes or opens media.
 
 mod markers;
@@ -285,22 +285,6 @@ pub struct NewSegment {
     pub fps_den: u32,
 }
 
-/// What the caller asks of the player for a Wrap cue.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CueStep {
-    /// Open this clip with this source frame as its first picture.
-    Open(String, u64),
-    Cue(u64),
-}
-
-/// Where the player must go: this clip at this source frame (Wrap view).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Cue {
-    pub segment_id: String,
-    pub clip_id: String,
-    pub source_frame: u64,
-}
-
 /// The program of the active project: read, written and turned into a view.
 #[derive(Default)]
 pub struct ProgramSegments {
@@ -315,13 +299,10 @@ pub struct ProgramSegments {
     selected: Option<String>,
     selected_marker: Option<String>,
     selected_slot: Option<String>,
-    /// Segment the Wrap view shows in the player.
-    wrap_segment: Option<String>,
+    /// Program playhead of the Wrap view (`qnc-wrap-session`), given by the caller.
     playhead: Option<u64>,
-    cue: Option<Cue>,
-    /// Source frame asked of the player: older confirmed frames do not move the
-    /// playhead back.
-    awaiting: Option<u64>,
+    /// Program frame the user pointed at, for the Wrap view to take once.
+    seek: Option<u64>,
     writes: Option<ContentWriteTransport>,
     /// Write whose completion selects the new segment.
     pending_create: Option<String>,
@@ -356,67 +337,14 @@ impl ProgramSegments {
             .is_some_and(ContentWriteTransport::has_pending)
     }
 
-    /// Where the player must go, once; the caller opens the clip and cues it.
-    pub fn take_cue(&mut self) -> Option<Cue> {
-        self.cue.take()
+    /// The program frame the user pointed at, once; the Wrap view takes it.
+    pub fn take_seek(&mut self) -> Option<u64> {
+        self.seek.take()
     }
 
-    /// One step of the Wrap view per repaint, from what the player shows: another
-    /// clip is opened straight at the cue frame; the shown clip is cued once the
-    /// player confirms a picture of it. The confirmed picture also becomes the
-    /// program playhead.
-    pub fn drive_player(
-        &mut self,
-        shown_clip: Option<&str>,
-        confirmed_frame: Option<u64>,
-    ) -> Option<CueStep> {
-        self.follow_player(shown_clip, confirmed_frame);
-        let cue = self.cue.as_ref()?;
-        if shown_clip != Some(cue.clip_id.as_str()) {
-            return self
-                .cue
-                .take()
-                .map(|cue| CueStep::Open(cue.clip_id, cue.source_frame));
-        }
-        confirmed_frame?;
-        self.cue.take().map(|cue| CueStep::Cue(cue.source_frame))
-    }
-
-    /// Whether the Wrap view (a segment in the player) is on.
-    pub fn in_wrap(&self) -> bool {
-        self.wrap_segment.is_some()
-    }
-
-    /// Leaves the Wrap view: the player shows a source clip again.
-    pub fn leave_wrap(&mut self) {
-        self.wrap_segment = None;
-        self.cue = None;
-        self.awaiting = None;
-        self.set_playhead(None);
-    }
-
-    /// The player's confirmed picture: in the Wrap view it becomes the program
-    /// playhead when it lies inside the shown segment. Nothing is interpolated.
-    pub fn follow_player(&mut self, clip_id: Option<&str>, confirmed_frame: Option<u64>) {
-        if let Some(awaiting) = self.awaiting {
-            if confirmed_frame != Some(awaiting) {
-                return;
-            }
-            self.awaiting = None;
-        }
-        let playhead = self
-            .wrap_segment
-            .as_deref()
-            .and_then(|id| self.view.rows.iter().find(|row| row.segment_id == id))
-            .filter(|row| Some(row.clip_id.as_str()) == clip_id)
-            .zip(confirmed_frame)
-            .and_then(|(row, frame)| program_frame(row, frame));
-        if playhead.is_some() || clip_id.is_none() {
-            self.set_playhead(playhead);
-        }
-    }
-
-    fn set_playhead(&mut self, playhead: Option<u64>) {
+    /// The Wrap playhead on the program axis, given by the Wrap view; markers
+    /// and navigation start from it.
+    pub fn set_playhead(&mut self, playhead: Option<u64>) {
         if self.playhead != playhead {
             self.playhead = playhead;
             self.view.playhead = playhead;
@@ -595,20 +523,15 @@ impl ProgramSegments {
     }
 
     /// Wrap view: the program playhead goes to the frame at once (v5
-    /// `set_wrap_playhead_frame`) and the player is asked for that picture; its
-    /// confirmed frames take over once it reaches the cue.
+    /// `set_wrap_playhead_frame`) and the Wrap view is asked for that program
+    /// frame. No source clip is chosen here: Wrap plays the program (v5).
     fn cue_program(&mut self, frame: u64) {
-        let Some(cue) = source_at(&self.view, frame).map(|(segment, source_frame)| Cue {
-            segment_id: segment.segment_id.clone(),
-            clip_id: segment.clip_id.clone(),
-            source_frame,
-        }) else {
+        if self.view.is_empty() {
             return;
-        };
-        self.set_playhead(Some(frame.min(self.view.total_frames)));
-        self.awaiting = Some(cue.source_frame);
-        self.wrap_segment = Some(cue.segment_id.clone());
-        self.cue = Some(cue);
+        }
+        let frame = frame.min(self.view.total_frames);
+        self.set_playhead(Some(frame));
+        self.seek = Some(frame);
     }
 
     /// M on the Wrap segment under the playhead: the marker is placed on that
@@ -787,12 +710,6 @@ impl ProgramSegments {
             self.stored.iter().map(|row| row.segment_id.as_str()),
         ) {
             self.selected = None;
-        }
-        if !known(
-            &self.wrap_segment,
-            self.stored.iter().map(|row| row.segment_id.as_str()),
-        ) {
-            self.wrap_segment = None;
         }
         let mut view = program(&self.stored, self.selected.as_deref());
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());

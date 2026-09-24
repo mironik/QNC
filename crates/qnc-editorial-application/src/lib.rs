@@ -17,7 +17,7 @@ use std::{
 use qnc_active_project_read::{ActiveProjectChange, ActiveProjectReader, ShownProject};
 use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
-use qnc_program_segments::{CueStep, SegmentKind};
+use qnc_program_segments::SegmentKind;
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_source_preview::{PreviewContext, SourcePreview};
 use qnc_source_reader::SourceReader;
@@ -89,6 +89,7 @@ pub struct EditorialApplication {
     pending_shot: Option<PendingShot>,
     short_stills: VirtualShortStillCache,
     segments: qnc_program_segments::ProgramSegments,
+    wrap: qnc_wrap_session::WrapSession,
 }
 
 impl Default for EditorialApplication {
@@ -108,6 +109,7 @@ impl Default for EditorialApplication {
             pending_shot: None,
             short_stills: VirtualShortStillCache::default(),
             segments: qnc_program_segments::ProgramSegments::new(),
+            wrap: qnc_wrap_session::WrapSession::new(),
         }
     }
 }
@@ -244,16 +246,10 @@ impl EditorialApplication {
                 .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
         self.apply_pending_shot();
-        let confirmed = self.preview.player_view().confirmed_source_frame();
-        let shown = self.view.preview.clip_id.as_deref();
-        match self.segments.drive_player(shown, confirmed) {
-            Some(CueStep::Open(clip_id, frame)) => {
-                (self.view.chosen_shot_id, self.pending_shot) = (None, None);
-                self.preview.open_at(&clip_id, frame);
-            }
-            Some(CueStep::Cue(frame)) => _ = self.preview.cue(frame),
-            None => {}
-        }
+        // Source and Wrap stay apart (v5): a program frame goes to the Wrap timeline only.
+        let total = self.segments.view().total_frames;
+        let playhead = self.wrap.apply(self.segments.take_seek(), total);
+        self.segments.set_playhead(Some(playhead));
         self.view.segments = self.segments.view().clone();
     }
 
@@ -379,7 +375,7 @@ impl EditorialApplication {
     pub fn dispatch(&mut self, intent: EditorialIntent) -> bool {
         let changed = match intent {
             EditorialIntent::PreviewClip(clip_id) => {
-                self.segments.leave_wrap();
+                self.wrap.leave();
                 self.view.chosen_shot_id = None;
                 self.pending_shot = None;
                 self.short_stills.clear_if_clip_changed(Some(&clip_id));
@@ -392,7 +388,7 @@ impl EditorialApplication {
                 }
             }
             EditorialIntent::PreviewShort(shot_id) => {
-                self.segments.leave_wrap();
+                self.wrap.leave();
                 self.open_short(&shot_id)
             }
             EditorialIntent::SwitchLibraryTab(tab) => {
@@ -405,9 +401,9 @@ impl EditorialApplication {
                     self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
                     true
                 }
-                action_ids::PLAY_PAUSE => self.preview.toggle_play(),
-                action_ids::STEP_BACK_FRAME => self.preview.step(-1),
-                action_ids::STEP_FORWARD_FRAME => self.preview.step(1),
+                action_ids::PLAY_PAUSE => self.wrap.is_active() || self.preview.toggle_play(), // Wrap: program, never the source clip
+                action_ids::STEP_BACK_FRAME => self.wrap.step(-1) || self.preview.step(-1),
+                action_ids::STEP_FORWARD_FRAME => self.wrap.step(1) || self.preview.step(1),
                 action_ids::MARK_IN => {
                     self.view.preview.timeline =
                         self.view.preview.timeline.with_source_in_at_confirmed();
@@ -431,7 +427,10 @@ impl EditorialApplication {
             },
             EditorialIntent::Segment(command) => self.segments.apply(command),
             EditorialIntent::Timeline(intent) => match intent {
-                TimelineIntent::CueFrame(_) => self.preview.timeline_intent(&intent),
+                TimelineIntent::CueFrame(_) => {
+                    self.wrap.leave(); // the source timeline belongs to the Source view
+                    self.preview.timeline_intent(&intent)
+                }
                 _ => false,
             },
         };

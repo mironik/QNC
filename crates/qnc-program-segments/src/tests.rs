@@ -201,35 +201,30 @@ fn the_locked_start_marker_is_not_selected() {
 }
 
 #[test]
-fn a_click_moves_the_playhead_at_once_and_the_player_then_takes_over() {
+fn navigation_asks_only_for_a_program_frame_never_for_a_source_clip() {
     let mut segments = component();
     segments.apply(SegmentCommand::Select("b".into()));
-    let cue = segments.take_cue().unwrap();
-    assert_eq!((cue.clip_id.as_str(), cue.source_frame), ("clip-b", 0));
-    assert!(segments.take_cue().is_none());
+    assert_eq!(
+        segments.take_seek(),
+        Some(10),
+        "the start of b on the program axis"
+    );
+    assert_eq!(segments.take_seek(), None);
     assert_eq!(
         segments.view().playhead,
         Some(10),
         "v5: the playhead goes to the frame at once"
     );
-    segments.follow_player(Some("clip-b"), Some(7));
+    segments.apply(SegmentCommand::Cue(33));
+    assert_eq!(segments.take_seek(), Some(33));
     assert_eq!(
-        segments.view().playhead,
-        Some(10),
-        "an older picture before the cue lands does not move it back"
+        segments.view().selected().unwrap().segment_id,
+        "c",
+        "the segment under the playhead becomes the selected one"
     );
-    segments.follow_player(Some("clip-b"), Some(0));
-    segments.follow_player(Some("clip-b"), Some(7));
-    assert_eq!(segments.view().playhead, Some(17));
-    segments.follow_player(Some("clip-b"), Some(99));
-    assert_eq!(
-        segments.view().playhead,
-        Some(17),
-        "a picture outside the segment is ignored"
-    );
+    segments.set_playhead(Some(20));
     segments.apply(SegmentCommand::StepMarker { up: false });
-    let cue = segments.take_cue().unwrap();
-    assert_eq!((cue.clip_id.as_str(), cue.source_frame), ("clip-c", 503));
+    assert_eq!(segments.take_seek(), Some(33));
     assert!(segments.view().selected_marker().is_some());
     segments.apply(SegmentCommand::SelectSlot {
         slot_id: "m1|m2".into(),
@@ -240,12 +235,15 @@ fn a_click_moves_the_playhead_at_once_and_the_player_then_takes_over() {
         "a slot clears the marker"
     );
     assert_eq!(
-        segments.take_cue().unwrap().source_frame,
-        10,
+        segments.take_seek(),
+        Some(20),
         "the clicked frame, not the slot start"
     );
     segments.apply(SegmentCommand::ProgramStart);
-    assert_eq!(segments.take_cue().unwrap().clip_id, "clip-a");
+    assert_eq!(segments.take_seek(), Some(0));
+    segments.apply(SegmentCommand::Cue(999));
+    assert_eq!(segments.take_seek(), Some(40), "never past the program end");
+    assert!(ProgramSegments::new().take_seek().is_none());
 }
 
 #[test]
@@ -298,41 +296,4 @@ fn keyboard_actions_map_to_commands() {
     );
     assert_eq!(SegmentCommand::from_action("mark_in"), None);
     assert_eq!(SegmentCommand::from_action("play_pause"), None);
-}
-
-#[test]
-fn a_wrap_cue_opens_another_clip_at_the_cue_frame_and_cues_a_shown_clip() {
-    let mut segments = component();
-    segments.apply(SegmentCommand::Select("c".into()));
-    assert_eq!(
-        segments.drive_player(Some("clip-a"), Some(3)),
-        Some(CueStep::Open("clip-c".into(), 500)),
-        "the new session starts at the cue frame, not at frame 0"
-    );
-    assert_eq!(segments.drive_player(Some("clip-a"), Some(3)), None);
-    assert_eq!(
-        segments.drive_player(Some("clip-c"), Some(0)),
-        None,
-        "no second cue after opening"
-    );
-    assert_eq!(
-        segments.view().playhead,
-        Some(30),
-        "at once, before the player"
-    );
-    assert_eq!(segments.drive_player(Some("clip-c"), Some(500)), None);
-    assert_eq!(segments.drive_player(Some("clip-c"), Some(504)), None);
-    assert_eq!(segments.view().playhead, Some(34));
-    segments.apply(SegmentCommand::Cue(32));
-    assert_eq!(segments.drive_player(Some("clip-c"), None), None);
-    assert_eq!(
-        segments.drive_player(Some("clip-c"), Some(504)),
-        Some(CueStep::Cue(502)),
-        "the shown clip is cued once the player confirms a picture"
-    );
-    assert_eq!(segments.drive_player(Some("clip-c"), Some(502)), None);
-    assert_eq!(segments.drive_player(Some("clip-c"), Some(504)), None);
-    assert_eq!(segments.view().playhead, Some(34));
-    segments.leave_wrap();
-    assert!(!segments.in_wrap() && segments.view().playhead.is_none());
 }

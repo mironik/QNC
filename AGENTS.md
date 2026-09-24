@@ -2233,6 +2233,36 @@ nisu dirani. Verificirano: `cargo test -p qnc-content-store` (38),
 `qnc-program-segments` (13), `qnc-editorial-application` (11), `cargo build
 --workspace`, `cargo run -p qnc-conformance`. Odobrenje je zatvoreno.
 
+Zatvoreno ograniceno odobrenje 2026-09-24 (Story Wrap kao samostalna komponenta):
+korisnik je upozorio "krivo vezes source i segment.. to nije tako u qnc v5" i
+predlozio samostalnu Wrap segment komponentu "da ne brkas source i wrap i
+program". v5 (`qnc-app/src/story.rs`, `editorial_playback_transport.rs`,
+`editorial_playback_session.rs`): Source i Wrap su dva nacina rada s dva
+playheada; Wrap pusta PROGRAM (`OpenProgram` na frameu programa, zatim
+`ScrubFrame` u istoj sesiji), a izbor klipa, source timeline i IN/OUT se ne
+diraju (`source_dock_ignores_segment_carrier_when_wrap_is_active`). Otkljucano
+samo: novi javni `crates/qnc-wrap-session` i ugovor
+`contracts/modules/wrap-session.module.json` (Wrap nacin, Wrap playhead na osi
+programa, zahtjev Open/Scrub prema playeru programa), `crates/qnc-program-segments`
+(uklanja se veza segmenta na izvorni klip u playeru: Cue, CueStep, wrap_segment,
+drive_player; model samo trazi frame programa), `crates/qnc-editorial-application`
+(sastavlja Wrap; u Wrapu ne otvara izvorni klip i ne pusta source; monitor
+pise da player programa nije spreman), ugovor `program-segments.module.json`,
+root `Cargo.toml`/`Cargo.lock`. Player programa (playlista i player) nije dio
+ovog koraka. Forme i layout se ne diraju.
+Dopuna korisnika: "monitor ostaje isti, broadcast player isti... samo wrap
+timeline" - nova komponenta je samo Wrap timeline; isti monitor i isti player
+ostaju za sve, bez poruke na monitoru. Izvedeno: `qnc-wrap-session` (Wrap nacin,
+playhead programa, Open/Scrub zahtjev, pomak za frame, prati potvrdjeni frame
+programa); `qnc-program-segments` nema vise Cue/CueStep/drive_player, samo
+`take_seek` i `set_playhead`; editorial application: klik na segment ide samo u
+Wrap, klik u poolu i na source timeline vraca Source, Play i koraci u Wrapu ne
+diraju izvorni klip. Zahtjev Open/Scrub jos nitko ne izvrsava (player programa
+je sljedeci korak). Verificirano: testovi `qnc-wrap-session` (4),
+`qnc-program-segments` (14), `qnc-editorial-application` (11), conformance, live:
+nakon klika na segment izvorni klip, monitor i source timeline ostaju, Wrap
+playhead je na kliknutom frameu. Odobrenje je zatvoreno.
+
 Zatvoreno ograniceno odobrenje 2026-09-24 (brza slika na klik u Wrap segmentu):
 korisnik je rekao "oba koraka" nakon mjerenja: klik na Wrap segment daje sliku
 na monitoru tek nakon 0,8-1,5 s (isti klip) odnosno 1,5-2,4 s (drugi klip).

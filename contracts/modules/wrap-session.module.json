@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.wrap-session",
+  "module_name": "Wrap session",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["program.wrap.view", "program.wrap.playhead", "program.wrap.request"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command", "ui.paint", "database.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.source-preview"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-wrap-session",
+  "input": "Program frames the user points at (segment rows, slots, markers, navigation, frame steps) and program frames a program player confirms.",
+  "output": "Whether the Wrap view is on, the Wrap playhead on the program axis (set at once, v5 set_wrap_playhead_frame; confirmed frames take over once the asked frame lands) and one request for the program player: Open(program frame) when Wrap is entered, Scrub(program frame) inside Wrap (v5 ensure_wrap_or_scrub). It never names a source clip: Source and Wrap are separate views (v5 ViewMode, source_dock_ignores_segment_carrier_when_wrap_is_active).",
+  "specification": "QNC_v5 qnc-app/src/story.rs (ViewMode, ensure_wrap_or_scrub), components/editorial_playback_transport.rs, components/editorial_playback_session.rs"
+}
