@@ -992,7 +992,7 @@ impl ContentStore {
             ],
         )
         .map_err(err)?;
-        ensure_boundary_markers(&tx)?;
+        finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Created(segment_id))
     }
@@ -1089,7 +1089,7 @@ impl ContentStore {
             .map_err(err)?;
         }
         renumber_segments(&tx)?;
-        ensure_boundary_markers(&tx)?;
+        finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
@@ -1120,7 +1120,7 @@ impl ContentStore {
                 )
                 .map_err(err)?;
             }
-            ensure_boundary_markers(&tx)?;
+            finalize_story(&tx)?;
         }
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
@@ -1173,7 +1173,7 @@ impl ContentStore {
                 marker_id
             }
         };
-        ensure_boundary_markers(&tx)?;
+        finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Created(marker_id))
     }
@@ -1223,7 +1223,7 @@ impl ContentStore {
             ],
         )
         .map_err(err)?;
-        ensure_boundary_markers(&tx)?;
+        finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
@@ -1246,7 +1246,7 @@ impl ContentStore {
             [marker_id],
         )
         .map_err(err)?;
-        ensure_boundary_markers(&tx)?;
+        finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
@@ -1692,7 +1692,20 @@ fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
 }
 
 fn ensure_story_schema(conn: &Connection) -> Result<()> {
-    // Development program_segments / program_markers are removed, not converted.
+    // Development program_segments / program_markers are removed, not converted;
+    // so are story_covers rows from before the marker-pair slot binding.
+    let cover_columns = conn
+        .prepare("PRAGMA table_info(story_covers)")
+        .and_then(|mut statement| {
+            statement
+                .query_map([], |row| row.get::<_, String>(1))?
+                .collect::<rusqlite::Result<Vec<_>>>()
+        })
+        .map_err(err)?;
+    if !cover_columns.is_empty() && !cover_columns.iter().any(|column| column == "slot_id") {
+        conn.execute_batch("DROP VIEW IF EXISTS public_story_covers; DROP TABLE story_covers;")
+            .map_err(err)?;
+    }
     conn.execute_batch(
         "DROP VIEW IF EXISTS public_program_segments;
          DROP VIEW IF EXISTS public_program_markers;
@@ -1764,6 +1777,7 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
          );
          CREATE TABLE IF NOT EXISTS story_covers (
             cover_id TEXT PRIMARY KEY,
+            slot_id TEXT NOT NULL DEFAULT '',
             timeline_start_frame INTEGER NOT NULL DEFAULT 0,
             timeline_end_frame INTEGER NOT NULL DEFAULT 0,
             timeline_start_sec REAL NOT NULL DEFAULT 0,
@@ -1812,13 +1826,14 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
          FROM story_state;
          DROP VIEW IF EXISTS public_story_marker_slots;
          CREATE VIEW public_story_marker_slots AS
-         SELECT slot_id, slot_index, start_frame, end_frame, duration_frames,
-                start_marker_id, end_marker_id, slot_signature, updated_at
-         FROM story_marker_slots;
+         SELECT s.slot_id, s.slot_index, s.start_frame, s.end_frame, s.duration_frames,
+                s.start_marker_id, s.end_marker_id, s.slot_signature, s.updated_at,
+                EXISTS(SELECT 1 FROM story_covers c WHERE c.slot_id = s.slot_id) AS has_cover
+         FROM story_marker_slots s;
          DROP VIEW IF EXISTS public_story_covers;
          CREATE VIEW public_story_covers AS
-         SELECT cover_id, slot_signature, slot_index, timeline_start_frame, timeline_end_frame,
-                clip_id, virtual_shot_id, source_in_frame, source_out_frame
+         SELECT cover_id, slot_id, slot_signature, slot_index, timeline_start_frame,
+                timeline_end_frame, clip_id, virtual_shot_id, source_in_frame, source_out_frame
          FROM story_covers;",
     )
     .map_err(err)?;
@@ -2115,6 +2130,220 @@ fn ensure_boundary_markers(conn: &Connection) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// v5 `finalize_story_mutation` under the v5 rule: boundary markers, slots from
+/// adjacent markers, covers bound to their slot again, selection kept valid.
+fn finalize_story(conn: &Connection) -> Result<()> {
+    ensure_boundary_markers(conn)?;
+    recompute_marker_slots(conn)?;
+    rebind_covers(conn)?;
+    normalize_story_selection(conn)
+}
+
+/// v5 `recompute_marker_slots`: one slot between every two adjacent markers,
+/// empty spans skipped. Identity is the marker pair (v5 rule), not seconds.
+fn recompute_marker_slots(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM story_marker_slots", [])
+        .map_err(err)?;
+    let fps = match require_story_fps(conn) {
+        Ok(fps) => fps,
+        Err(_) => return Ok(()),
+    };
+    let markers = {
+        let mut statement = conn
+            .prepare("SELECT marker_id, timeline_frame FROM story_markers ORDER BY timeline_frame, marker_id")
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        rows
+    };
+    let now = story_now();
+    let mut slot_index = 0i64;
+    for pair in markers.windows(2) {
+        let (start_id, start) = (&pair[0].0, pair[0].1.max(0));
+        let (end_id, end) = (&pair[1].0, pair[1].1.max(start));
+        if end <= start {
+            continue;
+        }
+        let (start_sec, end_sec) = (timeline_sec(start, fps), timeline_sec(end, fps));
+        conn.execute(
+            "INSERT INTO story_marker_slots
+                (slot_id, slot_index, start_frame, end_frame, duration_frames,
+                 start_sec, end_sec, duration_sec, start_marker_id, end_marker_id,
+                 slot_signature, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                slot_id(start_id, end_id),
+                slot_index,
+                start,
+                end,
+                end - start,
+                start_sec,
+                end_sec,
+                timeline_sec(end - start, fps),
+                start_id,
+                end_id,
+                format!("start:{start_sec:.3}|end:{end_sec:.3}"),
+                now
+            ],
+        )
+        .map_err(err)?;
+        slot_index += 1;
+    }
+    Ok(())
+}
+
+/// Slot identity: the ids of its start and end marker.
+fn slot_id(start_marker_id: &str, end_marker_id: &str) -> String {
+    format!("{start_marker_id}|{end_marker_id}")
+}
+
+struct SlotRow {
+    slot_id: String,
+    slot_index: i64,
+    start_frame: i64,
+    end_frame: i64,
+    start_marker_id: String,
+    end_marker_id: String,
+    signature: String,
+}
+
+/// v5 rule: a cover is removed only by the user. When slots change, the cover
+/// follows its logical slot: the same marker pair, else the slot that keeps its
+/// start marker (a marker split the slot: the cover is trimmed), else the slot
+/// that keeps its end marker, else the slot holding its old start frame (a marker
+/// of the pair was deleted). A slot holds one cover; a cover that finds only an
+/// occupied slot stays unbound (no frames) until a slot is free again.
+fn rebind_covers(conn: &Connection) -> Result<()> {
+    let slots = {
+        let mut statement = conn
+            .prepare(
+                "SELECT slot_id, slot_index, start_frame, end_frame, start_marker_id,
+                        end_marker_id, slot_signature
+                 FROM story_marker_slots ORDER BY slot_index",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(SlotRow {
+                    slot_id: row.get(0)?,
+                    slot_index: row.get(1)?,
+                    start_frame: row.get(2)?,
+                    end_frame: row.get(3)?,
+                    start_marker_id: row.get(4)?,
+                    end_marker_id: row.get(5)?,
+                    signature: row.get(6)?,
+                })
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        rows
+    };
+    let covers = {
+        let mut statement = conn
+            .prepare(
+                "SELECT cover_id, slot_id, timeline_start_frame FROM story_covers
+                 ORDER BY created_at, cover_id",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        rows
+    };
+    let fps = require_story_fps(conn).unwrap_or(0.0);
+    let mut taken: Vec<&str> = Vec::new();
+    // Exact pairs first, so a cover that still has its slot keeps it.
+    let mut order: Vec<usize> = (0..covers.len()).collect();
+    order.sort_by_key(|&index| !slots.iter().any(|slot| slot.slot_id == covers[index].1));
+    for index in order {
+        let (cover_id, old_slot, old_start) = &covers[index];
+        let (start_marker, end_marker) = old_slot.split_once('|').unwrap_or(("", ""));
+        let free = |slot: &&SlotRow| !taken.contains(&slot.slot_id.as_str());
+        let target = slots
+            .iter()
+            .filter(free)
+            .find(|slot| slot.slot_id == *old_slot)
+            .or_else(|| {
+                slots
+                    .iter()
+                    .filter(free)
+                    .find(|slot| !start_marker.is_empty() && slot.start_marker_id == start_marker)
+            })
+            .or_else(|| {
+                slots
+                    .iter()
+                    .filter(free)
+                    .find(|slot| !end_marker.is_empty() && slot.end_marker_id == end_marker)
+            })
+            .or_else(|| {
+                slots
+                    .iter()
+                    .filter(free)
+                    .find(|slot| (slot.start_frame..slot.end_frame).contains(old_start))
+            });
+        match target {
+            Some(slot) => {
+                taken.push(slot.slot_id.as_str());
+                conn.execute(
+                    "UPDATE story_covers
+                     SET slot_id = ?1, slot_signature = ?2, slot_index = ?3,
+                         timeline_start_frame = ?4, timeline_end_frame = ?5,
+                         timeline_start_sec = ?6, timeline_end_sec = ?7
+                     WHERE cover_id = ?8",
+                    params![
+                        slot.slot_id,
+                        slot.signature,
+                        slot.slot_index,
+                        slot.start_frame,
+                        slot.end_frame,
+                        timeline_sec(slot.start_frame, fps),
+                        timeline_sec(slot.end_frame, fps),
+                        cover_id
+                    ],
+                )
+                .map_err(err)?;
+            }
+            None => {
+                conn.execute(
+                    "UPDATE story_covers
+                     SET timeline_end_frame = timeline_start_frame, timeline_end_sec = timeline_start_sec
+                     WHERE cover_id = ?1",
+                    [cover_id],
+                )
+                .map_err(err)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// v5 `normalize_selected_slot_id` / `normalize_selected_cover_id`.
+fn normalize_story_selection(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "UPDATE story_state SET selected_slot_id = ''
+         WHERE id = 1 AND selected_slot_id != ''
+           AND selected_slot_id NOT IN (SELECT slot_id FROM story_marker_slots);
+         UPDATE story_state SET selected_cover_id = ''
+         WHERE id = 1 AND selected_cover_id != ''
+           AND selected_cover_id NOT IN (SELECT cover_id FROM story_covers);",
+    )
+    .map_err(err)
 }
 
 /// Program length in frames: the segments one after another.

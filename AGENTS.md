@@ -2161,6 +2161,24 @@ racionalno pravilo: filmstrip putanje se citaju iz aktivnog `WorkSettings`
 preview modula. Forma/layout nije diran, nema novog write puta i nema promjene
 worker pokretanja.
 
+Zatvoreno ograniceno odobrenje 2026-09-24 (Story korak 3: slotovi i pokrivalice u
+bazi): korisnik je rekao "ok, nastavi" nakon koraka 1; vrijedi pravilo v5
+(`qnc-story-segment-timeline.mdc`). Otkljucano i izvedeno samo:
+`crates/qnc-content-store` (nakon svake promjene price `finalize_story`: pocetni i
+zavrsni marker, `story_marker_slots` iznova izmedu svaka dva susjedna markera s
+identitetom `start_marker_id|end_marker_id`, pokrivalice ponovno vezane na svoj
+logicki slot: isti par, inace slot s istim pocetnim markerom (skracena), inace
+slot s istim zavrsnim markerom, inace slot na starom pocetnom frameu; slot drzi
+jednu pokrivalicu, pokrivalica bez slobodnog slota ostaje bez frameova i ne
+brise se; odabrani slot i pokrivalica se ponistavaju ako vise ne postoje;
+`story_covers.slot_id`, `public_story_marker_slots.has_cover`; razvojne
+`story_covers` bez `slot_id` se brisu), ugovor `story.database.json` (pravila).
+Nije izvedeno: citanje slotova u modelu programa (korak 4), izrada pokrivalica
+(korak 9), prikaz neaktivnih segmenata. Player, forme i layout nisu dirani.
+Verificirano: `cargo test -p qnc-content-store` (41), `qnc-program-segments`
+(13), `qnc-editorial-application` (11), `cargo build --workspace`,
+`cargo run -p qnc-conformance`. Odobrenje je zatvoreno.
+
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story v5 tablice, korak 1): prvi dio
 je napravio drugi AI agent prema dokumentu `qnc-v5-story-postupak-2026-09-24.md`,
 bez korisnikove odluke o otvorenim pitanjima; audit je to utvrdio, korisnik je

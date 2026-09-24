@@ -1511,3 +1511,188 @@ fn development_program_tables_are_removed_on_open() {
         .unwrap();
     assert_eq!(legacy, 0);
 }
+
+/// Slots as (start marker frame, end marker frame, has a cover).
+fn slot_rows(path: &std::path::Path) -> Vec<(i64, i64, bool)> {
+    let conn = Connection::open(path).unwrap();
+    let mut statement = conn
+        .prepare(
+            "SELECT start_frame, end_frame, has_cover FROM public_story_marker_slots
+             ORDER BY slot_index",
+        )
+        .unwrap();
+    statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap()
+}
+
+/// The slot id (marker pair) covering a program frame.
+fn slot_at_frame(path: &std::path::Path, frame: i64) -> String {
+    Connection::open(path)
+        .unwrap()
+        .query_row(
+            "SELECT slot_id FROM story_marker_slots WHERE start_frame <= ?1 AND ?1 < end_frame",
+            [frame],
+            |row| row.get(0),
+        )
+        .unwrap()
+}
+
+/// Puts a cover into a slot the way the cover owner will (store closed first).
+fn put_cover(path: &std::path::Path, cover_id: &str, slot_id: &str) {
+    let conn = Connection::open(path).unwrap();
+    let (start, end): (i64, i64) = conn
+        .query_row(
+            "SELECT start_frame, end_frame FROM story_marker_slots WHERE slot_id = ?1",
+            [slot_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    conn.execute(
+        "INSERT INTO story_covers (cover_id, slot_id, timeline_start_frame, timeline_end_frame,
+            clip_id, source_in_frame, source_out_frame, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, 'c1', 0, 100, ?1, ?1)",
+        rusqlite::params![cover_id, slot_id, start, end],
+    )
+    .unwrap();
+}
+
+/// (slot id, program start, program end) of a cover.
+fn cover_row(path: &std::path::Path, cover_id: &str) -> (String, i64, i64) {
+    Connection::open(path)
+        .unwrap()
+        .query_row(
+            "SELECT slot_id, timeline_start_frame, timeline_end_frame FROM story_covers
+             WHERE cover_id = ?1",
+            [cover_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .unwrap()
+}
+
+fn reopen(path: &std::path::Path) -> ContentStore {
+    ContentStore::open_owner_binding(path, URI, Access::ReadWrite).unwrap()
+}
+
+#[test]
+fn slots_are_stored_between_adjacent_markers_and_named_by_their_pair() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    assert_eq!(slot_rows(&path), vec![(0, 30, false)]);
+    let Data::Created(m14) = marker(&mut store, 14).unwrap() else {
+        panic!()
+    };
+    marker(&mut store, 25).unwrap();
+    assert_eq!(
+        slot_rows(&path),
+        vec![(0, 14, false), (14, 25, false), (25, 30, false)]
+    );
+    let middle = slot_at_frame(&path, 20);
+    assert!(middle.starts_with(&format!("{m14}|")), "{middle}");
+    // Segment borders at 10 and 20 are no markers, so no slot ends there.
+    assert!(slot_rows(&path)
+        .iter()
+        .all(|(start, end, _)| ![10, 20].contains(start) && ![10, 20].contains(end)));
+}
+
+#[test]
+fn a_cover_follows_its_logical_slot_instead_of_being_dropped() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m14) = marker(&mut store, 14).unwrap() else {
+        panic!()
+    };
+    let Data::Created(m25) = marker(&mut store, 25).unwrap() else {
+        panic!()
+    };
+    let slot = slot_at_frame(&path, 20);
+    drop(store);
+    put_cover(&path, "cover_a", &slot);
+    let mut store = reopen(&path);
+    let move_to = |store: &mut ContentStore, marker_id: &str, frame| {
+        run(
+            store,
+            Operation::MoveMarker {
+                marker_id: marker_id.into(),
+                program_frame: frame,
+            },
+        )
+        .unwrap()
+    };
+    // The same pair moves: the cover takes the new frames.
+    move_to(&mut store, &m25, 27);
+    assert_eq!(cover_row(&path, "cover_a"), (slot.clone(), 14, 27));
+    // A marker splits the slot: the cover is trimmed to the part that keeps its start.
+    let Data::Created(m20) = marker(&mut store, 20).unwrap() else {
+        panic!()
+    };
+    assert_eq!(
+        cover_row(&path, "cover_a"),
+        (format!("{m14}|{m20}"), 14, 20)
+    );
+    // Its start marker is deleted: the cover follows the slot that keeps its end.
+    run(
+        &mut store,
+        Operation::DeleteMarker {
+            marker_id: m14.clone(),
+        },
+    )
+    .unwrap();
+    let (slot_now, start, end) = cover_row(&path, "cover_a");
+    assert!(slot_now.ends_with(&format!("|{m20}")), "{slot_now}");
+    assert_eq!((start, end), (0, 20));
+    assert!(slot_rows(&path)[0].2, "the slot shows its cover");
+}
+
+#[test]
+fn a_cover_without_a_free_slot_stays_but_takes_no_frames() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m14) = marker(&mut store, 14).unwrap() else {
+        panic!()
+    };
+    let (left, right) = (slot_at_frame(&path, 5), slot_at_frame(&path, 20));
+    drop(store);
+    put_cover(&path, "cover_left", &left);
+    put_cover(&path, "cover_right", &right);
+    Connection::open(&path)
+        .unwrap()
+        .execute(
+            "UPDATE story_state SET selected_slot_id = ?1 WHERE id = 1",
+            [&right],
+        )
+        .unwrap();
+    let mut store = reopen(&path);
+    run(
+        &mut store,
+        Operation::DeleteMarker {
+            marker_id: m14.clone(),
+        },
+    )
+    .unwrap();
+    // Both covers wanted the one remaining slot: one holds it, the other is kept
+    // unbound (no frames) instead of being deleted.
+    let left_row = cover_row(&path, "cover_left");
+    let right_row = cover_row(&path, "cover_right");
+    assert_eq!(slot_rows(&path), vec![(0, 30, true)]);
+    let bound = [&left_row, &right_row]
+        .iter()
+        .filter(|row| row.2 > row.1)
+        .count();
+    assert_eq!(bound, 1);
+    let selected: String = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT selected_slot_id FROM story_state", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(selected, "", "a slot that no longer exists is not selected");
+}
