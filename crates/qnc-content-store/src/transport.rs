@@ -269,6 +269,20 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
+    /// The M-M slots of the program, in order.
+    pub fn list_slots(&mut self) -> Result<Vec<ProgramSlot>> {
+        match self.execute(Operation::ListSlots)? {
+            Data::Slots(rows) => Ok(rows),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
+    /// The stored Story selection.
+    pub fn read_story_selection(&mut self) -> Result<StorySelection> {
+        match self.execute(Operation::ReadStorySelection)? {
+            Data::StorySelection(selection) => Ok(selection),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     fn write_segment(&mut self, operation: Operation) -> Result<Option<String>> {
         match self.execute(operation)? {
             Data::Created(segment_id) => Ok(Some(segment_id)),
@@ -762,7 +776,9 @@ fn execute_write_command(
         | Operation::MoveSegment { .. }
         | Operation::CreateMarker { .. }
         | Operation::MoveMarker { .. }
-        | Operation::DeleteMarker { .. }) => Ok(match client.write_segment(operation)? {
+        | Operation::DeleteMarker { .. }
+        | Operation::SelectPart { .. }
+        | Operation::SelectSlot { .. }) => Ok(match client.write_segment(operation)? {
             Some(segment_id) => ContentWriteData::Created(segment_id),
             None => ContentWriteData::Changed,
         }),

@@ -2161,6 +2161,26 @@ racionalno pravilo: filmstrip putanje se citaju iz aktivnog `WorkSettings`
 preview modula. Forma/layout nije diran, nema novog write puta i nema promjene
 worker pokretanja.
 
+Zatvoreno ograniceno odobrenje 2026-09-24 (Story korak 4: model programa iz baze):
+korisnik je rekao "da, nastavi"; vrijedi pravilo v5. Otkljucano i izvedeno samo:
+`crates/qnc-content-store` (citanja: svi segmenti s `active`, svi markeri sa
+`system_role`, slotovi s `has_cover`, odabir iz `story_state`; zapisi v5
+`select_part` i `select_marker_slot`), `crates/qnc-program-segments` (model
+cita markere i slotove iz baze umjesto da ih racuna; zakljucani pocetak i kraj;
+v5 navigacija: slot od odabranog, inace pod playheadom, inace prvi prazni;
+marker prije/poslije playheada; pocetni marker se ne odabire; odabir segmenta i
+slota zapisuje se u bazu, pri otvaranju i nakon zapisa cita se iz baze; M
+stvara marker, a odabrani marker premjesta samo izmedu susjeda (docs/94 7a);
+tab Segment dobiva i neaktivne segmente), `crates/qnc-segment-panel` (granicni
+marker crta se na kraju ranijeg reda kao v5 `local_marker_frame`; slot pokazuje
+pokrivalicu; tab Segment prikazuje neaktivne sivo s "neaktivno" bez klika),
+ugovori `program-segments` i `segment-panel` (moduli). Nije izvedeno: playlista i
+puštanje programa, Source/Wrap pogled, pokrivalice, Sync/B-roll. Player, forme
+(osim poziva javnih kockica) i layout ugovori nisu dirani. Verificirano: `cargo
+test -p qnc-content-store` (43), `qnc-program-segments` (15), `qnc-segment-panel`
+(1), `qnc-editorial-application` (11), `cargo build --workspace`, `cargo run -p
+qnc-conformance`. Odobrenje je zatvoreno.
+
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story korak 3: slotovi i pokrivalice u
 bazi): korisnik je rekao "ok, nastavi" nakon koraka 1; vrijedi pravilo v5
 (`qnc-story-segment-timeline.mdc`). Otkljucano i izvedeno samo:

@@ -2,8 +2,9 @@
 //! segments in order (docs/93 R8-R14), their M markers and M-M slots (docs/93
 //! R15-R23, docs/94).
 //!
-//! Everything lives in the project database (`program_segments`,
-//! `program_markers`, owner `qnc-content-store`). This component reads it, writes
+//! Everything lives in the project database (`story_parts`, `story_markers`,
+//! `story_marker_slots`, `story_state`, owner `qnc-content-store`), by the v5 rule
+//! `qnc-story-segment-timeline.mdc`. This component reads it, writes
 //! through the serialized content write transport without blocking the caller, and
 //! turns it into a program model on one frame axis. The program playhead comes only
 //! from the player's confirmed frame; navigation only asks for a cue. It knows no
@@ -12,13 +13,13 @@
 mod markers;
 
 pub use markers::{
-    check_move, check_new, neighbour_marker, neighbour_segment, neighbour_slot, program_frame,
-    resolve, slot_at, slots, source_at, MarkerPin, Slot, PROGRAM_END, PROGRAM_START,
+    check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
+    program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot,
 };
 
 use qnc_content_store::{
     Access, ContentTarget, ContentWriteData, ContentWriteTransport, Operation, ProgramMarker,
-    ProgramSegment,
+    ProgramSegment, ProgramSlot,
 };
 
 pub const MODULE_ID: &str = "qnc.module.program-segments";
@@ -84,11 +85,24 @@ impl SegmentRow {
     }
 }
 
+/// One row of the Segment tab (v5 `segment_parts`): every segment in stored
+/// order, deleted ones greyed (`active` false) and not clickable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SegmentPart {
+    pub segment_id: String,
+    pub kind: SegmentKind,
+    pub duration_label: String,
+    pub active: bool,
+    pub selected: bool,
+}
+
 /// What a form shows: the program in order, its markers and slots, timebase,
 /// length and the program playhead confirmed by the player.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SegmentsView {
     pub rows: Vec<SegmentRow>,
+    /// The Segment tab list, deleted segments included.
+    pub parts: Vec<SegmentPart>,
     pub markers: Vec<MarkerPin>,
     pub slots: Vec<Slot>,
     /// Story timebase (`num`, `den`); `None` while the program is empty.
@@ -137,11 +151,22 @@ impl SegmentsView {
 pub fn program(segments: &[ProgramSegment], selected: Option<&str>) -> SegmentsView {
     let mut start = 0u64;
     let mut rows = Vec::with_capacity(segments.len());
+    let mut parts = Vec::with_capacity(segments.len());
     for segment in segments {
         let Some(kind) = SegmentKind::from_db(&segment.kind) else {
             continue;
         };
         let frames = segment.out_frame.saturating_sub(segment.in_frame);
+        parts.push(SegmentPart {
+            segment_id: segment.segment_id.clone(),
+            kind,
+            duration_label: duration_label(frames, segment.fps_num, segment.fps_den),
+            active: segment.active,
+            selected: segment.active && selected == Some(segment.segment_id.as_str()),
+        });
+        if !segment.active {
+            continue;
+        }
         rows.push(SegmentRow {
             segment_id: segment.segment_id.clone(),
             kind,
@@ -157,9 +182,10 @@ pub fn program(segments: &[ProgramSegment], selected: Option<&str>) -> SegmentsV
         start += frames;
     }
     SegmentsView {
+        parts,
         timebase: segments
             .iter()
-            .find(|segment| SegmentKind::from_db(&segment.kind).is_some())
+            .find(|segment| segment.active && SegmentKind::from_db(&segment.kind).is_some())
             .map(|first| (first.fps_num, first.fps_den)),
         total_frames: start,
         rows,
@@ -276,6 +302,10 @@ pub struct ProgramSegments {
     project_id: String,
     stored: Vec<ProgramSegment>,
     stored_markers: Vec<ProgramMarker>,
+    stored_slots: Vec<ProgramSlot>,
+    /// Take the stored selection on the next read (on open, and after writes that
+    /// may move it, v5 `story_state`).
+    adopt_selection: bool,
     selected: Option<String>,
     selected_marker: Option<String>,
     selected_slot: Option<String>,
@@ -305,6 +335,7 @@ impl ProgramSegments {
         }
         self.target = Some(target);
         self.project_id = project_id.to_string();
+        self.adopt_selection = !same;
         self.reload();
     }
 
@@ -383,13 +414,24 @@ impl ProgramSegments {
         let Some(target) = &self.target else {
             return;
         };
-        let read = target
-            .open(Access::ReadOnly)
-            .and_then(|mut client| Ok((client.list_segments()?, client.list_markers()?)));
+        let read = target.open(Access::ReadOnly).and_then(|mut client| {
+            Ok((
+                client.list_segments()?,
+                client.list_markers()?,
+                client.list_slots()?,
+                client.read_story_selection()?,
+            ))
+        });
         match read {
-            Ok((stored, markers)) => {
+            Ok((stored, markers, slots, selection)) => {
                 self.stored = stored;
                 self.stored_markers = markers;
+                self.stored_slots = slots;
+                if std::mem::take(&mut self.adopt_selection) {
+                    let some = |id: String| (!id.is_empty()).then_some(id);
+                    self.selected = some(selection.selected_part_id);
+                    self.selected_slot = some(selection.selected_slot_id);
+                }
                 self.refresh_view(String::new());
             }
             Err(error) => self.refresh_view(error),
@@ -473,6 +515,9 @@ impl ProgramSegments {
         self.selected = Some(segment_id.to_string());
         self.selected_marker = None;
         self.selected_slot = None;
+        self.write(Operation::SelectPart {
+            part_id: segment_id.to_string(),
+        });
         self.refresh_view(String::new());
         self.cue_program(start);
     }
@@ -487,9 +532,15 @@ impl ProgramSegments {
         else {
             return;
         };
-        self.selected_marker = Some(marker_id.to_string());
-        self.selected_slot = None;
-        self.refresh_view(String::new());
+        // v5 `select_marker`: the start marker is locked and is not selected.
+        if frame == 0 {
+            self.selected_marker = None;
+            self.refresh_view("Početni M marker je zaključan.".into());
+        } else {
+            self.selected_marker = Some(marker_id.to_string());
+            self.selected_slot = None;
+            self.refresh_view(String::new());
+        }
         self.cue_program(frame);
     }
 
@@ -505,6 +556,9 @@ impl ProgramSegments {
         };
         self.selected_slot = Some(slot_id.to_string());
         self.selected_marker = None;
+        self.write(Operation::SelectSlot {
+            slot_id: slot_id.to_string(),
+        });
         self.refresh_view(String::new());
         self.cue_program(start);
     }
@@ -527,12 +581,11 @@ impl ProgramSegments {
         let Some(frame) = self.playhead else {
             return self.refresh_view("M marker trazi playhead programa (Wrap).".into());
         };
-        let checked = match self.selected_marker.as_deref() {
-            Some(marker_id) => check_move(&self.view, &self.view.markers, marker_id, frame),
-            None => check_new(&self.view, &self.view.markers, frame),
-        };
-        if let Err(error) = checked {
-            return self.refresh_view(error);
+        // v5 `marker_at_head` creates; a selected marker moves there (docs/94 7a).
+        if let Some(marker_id) = self.selected_marker.as_deref() {
+            if let Err(error) = check_move(&self.view.markers, marker_id, frame) {
+                return self.refresh_view(error);
+            }
         }
         let operation = match self.selected_marker.clone() {
             Some(marker_id) => Operation::MoveMarker {
@@ -559,6 +612,7 @@ impl ProgramSegments {
             out_frame: segment.out_frame,
             fps_num: segment.fps_num,
             fps_den: segment.fps_den,
+            active: true,
         };
         let project_id = self.project_id.clone();
         if self.send(|writes| writes.create_segment(key.clone(), project_id, row)) {
@@ -626,18 +680,29 @@ impl ProgramSegments {
             return false;
         }
         let mut message = String::new();
+        let mut created = None;
         for completion in completions {
             match completion.result {
                 Ok(result) => {
                     if let ContentWriteData::Created(segment_id) = result.data {
                         if self.pending_create.as_deref() == Some(completion.key.as_str()) {
-                            self.selected = Some(segment_id);
+                            created = Some(segment_id);
                         }
                     }
                 }
                 Err(error) => message = error,
             }
         }
+        if let Some(segment_id) = created {
+            // A new segment becomes the selection, in the database too.
+            self.selected = Some(segment_id.clone());
+            self.write(Operation::SelectPart {
+                part_id: segment_id,
+            });
+        }
+        // The store may have moved the selection (v5 `delete_part`): take it once
+        // every write of this component has landed.
+        self.adopt_selection = !self.has_pending_work();
         self.reload();
         if !message.is_empty() {
             self.refresh_view(message);
@@ -696,7 +761,7 @@ impl ProgramSegments {
         ) {
             self.selected_marker = None;
         }
-        view.slots = slots(&view, &view.markers, self.selected_slot.as_deref());
+        view.slots = slots(&self.stored_slots, self.selected_slot.as_deref());
         if !known(
             &self.selected_slot,
             view.slots.iter().map(|slot| slot.slot_id.as_str()),

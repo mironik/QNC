@@ -191,6 +191,10 @@ impl ContentStore {
                 Operation::ListShorts => Ok(Data::ShortClips(Vec::new())),
                 Operation::ListSegments => Ok(Data::Segments(Vec::new())),
                 Operation::ListMarkers => Ok(Data::Markers(Vec::new())),
+                Operation::ListSlots => Ok(Data::Slots(Vec::new())),
+                Operation::ReadStorySelection => {
+                    Ok(Data::StorySelection(StorySelection::default()))
+                }
                 _ => Err("Ingest shema nije inicijalizirana.".into()),
             };
         }
@@ -335,6 +339,10 @@ impl ContentStore {
             } => self.move_marker(marker_id, *program_frame),
             Operation::DeleteMarker { marker_id } => self.delete_marker(marker_id),
             Operation::ListMarkers => self.list_markers(),
+            Operation::ListSlots => self.list_slots(),
+            Operation::ReadStorySelection => self.read_story_selection(),
+            Operation::SelectPart { part_id } => self.select_part(part_id),
+            Operation::SelectSlot { slot_id } => self.select_slot(slot_id),
             Operation::List { after } => {
                 let mut statement = self
                     .conn
@@ -1257,6 +1265,8 @@ impl ContentStore {
         Ok(Data::Changed)
     }
 
+    /// v5 `list_markers`: every marker by program frame, the locked start and end
+    /// included (`system_role`).
     fn list_markers(&self) -> Result<Data> {
         if !object_exists(&self.conn, "view", "public_story_markers")? {
             return Ok(Data::Markers(Vec::new()));
@@ -1264,9 +1274,8 @@ impl ContentStore {
         let mut statement = self
             .conn
             .prepare(
-                "SELECT marker_id, program_frame
+                "SELECT marker_id, program_frame, system_role
                  FROM public_story_markers
-                 WHERE system_role = ''
                  ORDER BY program_frame, marker_id",
             )
             .map_err(err)?;
@@ -1275,6 +1284,7 @@ impl ContentStore {
                 Ok(ProgramMarker {
                     marker_id: row.get(0)?,
                     program_frame: row.get::<_, i64>(1)?.max(0) as u64,
+                    system_role: row.get(2)?,
                 })
             })
             .map_err(err)?
@@ -1283,6 +1293,8 @@ impl ContentStore {
         Ok(Data::Markers(rows))
     }
 
+    /// v5 `list_parts`: every segment, deleted ones included (`active = false`),
+    /// by `sort_index`; the program is the active ones.
     fn list_segments(&self) -> Result<Data> {
         if !object_exists(&self.conn, "view", "public_story_parts")? {
             return Ok(Data::Segments(Vec::new()));
@@ -1290,8 +1302,9 @@ impl ContentStore {
         let mut statement = self
             .conn
             .prepare(
-                "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den
-                 FROM public_story_parts WHERE active = 1 ORDER BY sort_index",
+                "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num,
+                        fps_den, active
+                 FROM public_story_parts ORDER BY sort_index, segment_id",
             )
             .map_err(err)?;
         let rows = statement
@@ -1305,12 +1318,118 @@ impl ContentStore {
                     out_frame: row.get::<_, i64>(5)?.max(0) as u64,
                     fps_num: row.get(6)?,
                     fps_den: row.get(7)?,
+                    active: row.get::<_, i64>(8)? != 0,
                 })
             })
             .map_err(err)?
             .collect::<rusqlite::Result<Vec<_>>>()
             .map_err(err)?;
         Ok(Data::Segments(rows))
+    }
+
+    /// v5 `marker_slots_snapshot`: the stored slots in order, with `has_cover`.
+    fn list_slots(&self) -> Result<Data> {
+        if !object_exists(&self.conn, "view", "public_story_marker_slots")? {
+            return Ok(Data::Slots(Vec::new()));
+        }
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT slot_id, start_frame, end_frame, start_marker_id, end_marker_id, has_cover
+                 FROM public_story_marker_slots ORDER BY slot_index",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(ProgramSlot {
+                    slot_id: row.get(0)?,
+                    start_frame: row.get::<_, i64>(1)?.max(0) as u64,
+                    end_frame: row.get::<_, i64>(2)?.max(0) as u64,
+                    start_marker_id: row.get(3)?,
+                    end_marker_id: row.get(4)?,
+                    has_cover: row.get::<_, i64>(5)? != 0,
+                })
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        Ok(Data::Slots(rows))
+    }
+
+    fn read_story_selection(&self) -> Result<Data> {
+        if !object_exists(&self.conn, "view", "public_story_state")? {
+            return Ok(Data::StorySelection(StorySelection::default()));
+        }
+        let selection = self
+            .conn
+            .query_row(
+                "SELECT selected_part_id, selected_slot_id, selected_cover_id
+                 FROM public_story_state LIMIT 1",
+                [],
+                |row| {
+                    Ok(StorySelection {
+                        selected_part_id: row.get(0)?,
+                        selected_slot_id: row.get(1)?,
+                        selected_cover_id: row.get(2)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(err)?
+            .unwrap_or_default();
+        Ok(Data::StorySelection(selection))
+    }
+
+    /// v5 `select_part`: an existing segment, or an empty id to clear.
+    fn select_part(&mut self, part_id: &str) -> Result<Data> {
+        let part_id = part_id.trim();
+        if !part_id.is_empty() {
+            let exists: bool = self
+                .conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM story_parts WHERE part_id = ?1)",
+                    [part_id],
+                    |row| row.get(0),
+                )
+                .map_err(err)?;
+            if !exists {
+                return Err(format!("part not found: {part_id}"));
+            }
+        }
+        self.conn
+            .execute(
+                "UPDATE story_state SET selected_part_id = ?1, draft_updated_at = ?2,
+                    updated_at = ?2 WHERE id = 1",
+                params![part_id, story_now()],
+            )
+            .map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// v5 `select_marker_slot`: an existing slot, or an empty id to clear.
+    fn select_slot(&mut self, slot_id: &str) -> Result<Data> {
+        let slot_id = slot_id.trim();
+        if !slot_id.is_empty() {
+            let exists: bool = self
+                .conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM story_marker_slots WHERE slot_id = ?1)",
+                    [slot_id],
+                    |row| row.get(0),
+                )
+                .map_err(err)?;
+            if !exists {
+                return Err(format!("slot not found: {slot_id}"));
+            }
+        }
+        self.conn
+            .execute(
+                "UPDATE story_state SET selected_slot_id = ?1, draft_updated_at = ?2,
+                    updated_at = ?2 WHERE id = 1",
+                params![slot_id, story_now()],
+            )
+            .map_err(err)?;
+        Ok(Data::Changed)
     }
 
     fn read_wave(&self, clip_id: &str) -> Result<Data> {

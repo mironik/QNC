@@ -1,26 +1,22 @@
-//! M markers and M-M slots of the program (docs/93 R15-R23, docs/94).
+//! M markers and M-M slots of the program as stored by the content store (v5
+//! `story_markers`, `story_marker_slots`; rule `qnc-story-segment-timeline.mdc`).
 //!
-//! Pure functions, program frames only. By default the program has two markers:
-//! the start of the first segment (frame 0) and the end of the last segment
-//! (program length). They are markers by position: never stored, never moved,
-//! and a segment border is no marker. User markers may cross segment borders.
-//! A slot is named after the two markers around it, so moving a marker keeps
-//! the identity of both of its slots (docs/94 7a).
+//! Pure functions, program frames only. The locked start (frame 0) and end
+//! (program length) are stored markers; segment borders are no markers. Slots
+//! come from the database, named by their marker pair. Navigation follows v5
+//! `editorial/segment_program.rs`.
 
-use qnc_content_store::ProgramMarker;
+use qnc_content_store::{ProgramMarker, ProgramSlot};
 
 use crate::{SegmentRow, SegmentsView};
 
-/// Name of the locked start marker in slot ids.
-pub const PROGRAM_START: &str = "program_start";
-/// Name of the locked end marker in slot ids.
-pub const PROGRAM_END: &str = "program_end";
-
-/// A user marker on the program axis.
+/// An M marker on the program axis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkerPin {
     pub marker_id: String,
     pub frame: u64,
+    /// The locked program start or end marker.
+    pub locked: bool,
     pub selected: bool,
 }
 
@@ -30,11 +26,11 @@ pub struct Slot {
     pub slot_id: String,
     pub start_frame: u64,
     pub end_frame: u64,
+    pub has_cover: bool,
     pub selected: bool,
 }
 
-/// The stored user markers strictly inside the program, one per frame (v5 keeps
-/// them on their program frame when segments move).
+/// The stored markers inside the program, by frame.
 pub fn resolve(
     view: &SegmentsView,
     stored: &[ProgramMarker],
@@ -42,16 +38,30 @@ pub fn resolve(
 ) -> Vec<MarkerPin> {
     let mut pins = stored
         .iter()
-        .filter(|marker| marker.program_frame > 0 && marker.program_frame < view.total_frames)
+        .filter(|marker| marker.program_frame <= view.total_frames && !view.is_empty())
         .map(|marker| MarkerPin {
             marker_id: marker.marker_id.clone(),
             frame: marker.program_frame,
+            locked: !marker.system_role.is_empty(),
             selected: selected == Some(marker.marker_id.as_str()),
         })
         .collect::<Vec<_>>();
     pins.sort_by(|a, b| a.frame.cmp(&b.frame).then(a.marker_id.cmp(&b.marker_id)));
-    pins.dedup_by_key(|pin| pin.frame);
     pins
+}
+
+/// The stored slots with the current selection.
+pub fn slots(stored: &[ProgramSlot], selected: Option<&str>) -> Vec<Slot> {
+    stored
+        .iter()
+        .map(|slot| Slot {
+            slot_id: slot.slot_id.clone(),
+            start_frame: slot.start_frame,
+            end_frame: slot.end_frame,
+            has_cover: slot.has_cover,
+            selected: selected == Some(slot.slot_id.as_str()),
+        })
+        .collect()
 }
 
 /// Program frame of a picture of a segment, if the picture is inside it.
@@ -68,30 +78,7 @@ pub fn source_at(view: &SegmentsView, frame: u64) -> Option<(&SegmentRow, u64)> 
     Some((segment, segment.source_in_frame + local))
 }
 
-/// M-M slots between the start, the markers and the end; empty ones are skipped.
-pub fn slots(view: &SegmentsView, pins: &[MarkerPin], selected: Option<&str>) -> Vec<Slot> {
-    if view.total_frames == 0 {
-        return Vec::new();
-    }
-    let mut bounds = vec![(PROGRAM_START, 0u64)];
-    bounds.extend(pins.iter().map(|pin| (pin.marker_id.as_str(), pin.frame)));
-    bounds.push((PROGRAM_END, view.total_frames));
-    bounds
-        .windows(2)
-        .filter(|pair| pair[1].1 > pair[0].1)
-        .map(|pair| {
-            let slot_id = format!("{}|{}", pair[0].0, pair[1].0);
-            Slot {
-                selected: selected == Some(slot_id.as_str()),
-                slot_id,
-                start_frame: pair[0].1,
-                end_frame: pair[1].1,
-            }
-        })
-        .collect()
-}
-
-/// The slot under a frame: `[start, end)`, and the last slot also at its end (docs/94 3.5).
+/// v5 `marker_slot_at_program_frame`: `[start, end)`, and the last slot also at its end.
 pub fn slot_at(slots: &[Slot], frame: u64) -> Option<&Slot> {
     slots
         .iter()
@@ -99,40 +86,30 @@ pub fn slot_at(slots: &[Slot], frame: u64) -> Option<&Slot> {
         .or_else(|| slots.last().filter(|slot| slot.end_frame == frame))
 }
 
-/// A new marker must lie strictly inside the program and on a free frame
-/// (docs/94 section 1); the start and the end are locked.
-pub fn check_new(view: &SegmentsView, pins: &[MarkerPin], frame: u64) -> Result<(), String> {
-    if frame == 0 || frame >= view.total_frames {
-        return Err("Pocetni i zavrsni M marker su zakljucani.".into());
-    }
-    if pins.iter().any(|pin| pin.frame == frame) {
-        return Err("Na tom frameu vec postoji M marker.".into());
-    }
-    Ok(())
+/// v5 `first_empty_marker_slot`.
+pub fn first_empty_slot(slots: &[Slot]) -> Option<&Slot> {
+    slots.iter().find(|slot| !slot.has_cover)
 }
 
-/// A moved marker stays between its neighbours (docs/94 7a).
-pub fn check_move(
-    view: &SegmentsView,
-    pins: &[MarkerPin],
-    marker_id: &str,
-    frame: u64,
-) -> Result<(), String> {
+/// docs/94 7a (user decision): a selected marker moves only between its
+/// neighbours; the locked start and end do not move.
+pub fn check_move(pins: &[MarkerPin], marker_id: &str, frame: u64) -> Result<(), String> {
     let index = pins
         .iter()
         .position(|pin| pin.marker_id == marker_id)
         .ok_or("M marker nije pronadjen.")?;
+    if pins[index].locked {
+        return Err("Početni i završni M marker su zaključani.".into());
+    }
     let low = index.checked_sub(1).map_or(0, |before| pins[before].frame);
-    let high = pins
-        .get(index + 1)
-        .map_or(view.total_frames, |after| after.frame);
+    let high = pins.get(index + 1).map_or(u64::MAX, |after| after.frame);
     if frame <= low || frame >= high {
         return Err("M marker se pomice samo izmedu susjednih markera.".into());
     }
     Ok(())
 }
 
-/// Previous or next marker from a frame (docs/94 3.2).
+/// v5 `previous_marker_for_playhead` / `next_marker_for_playhead`.
 pub fn neighbour_marker(pins: &[MarkerPin], frame: u64, up: bool) -> Option<&MarkerPin> {
     if up {
         pins.iter().rev().find(|pin| pin.frame < frame)
@@ -141,13 +118,21 @@ pub fn neighbour_marker(pins: &[MarkerPin], frame: u64, up: bool) -> Option<&Mar
     }
 }
 
-/// Previous or next slot from the selected one, else from the slot under the frame
-/// (docs/94 3.3); no wrapping around.
-pub fn neighbour_slot<'a>(slots: &'a [Slot], frame: u64, up: bool) -> Option<&'a Slot> {
+/// v5 `adjacent_marker_slot`: from the selected slot, else the slot under the
+/// frame, else the first empty slot; no wrapping around.
+pub fn neighbour_slot(slots: &[Slot], frame: u64, up: bool) -> Option<&Slot> {
     let from = slots
         .iter()
         .position(|slot| slot.selected)
-        .or_else(|| slot_at(slots, frame).and_then(|at| slots.iter().position(|s| s == at)))?;
+        .or_else(|| {
+            slots
+                .iter()
+                .position(|slot| (slot.start_frame..slot.end_frame).contains(&frame))
+        })
+        .or_else(|| {
+            first_empty_slot(slots).and_then(|empty| slots.iter().position(|slot| slot == empty))
+        })
+        .unwrap_or(0);
     if up {
         from.checked_sub(1).map(|index| &slots[index])
     } else {

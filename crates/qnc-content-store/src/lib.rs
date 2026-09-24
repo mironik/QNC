@@ -155,15 +155,40 @@ pub struct ProgramSegment {
     pub out_frame: u64,
     pub fps_num: u32,
     pub fps_den: u32,
+    /// False once deleted (v5 keeps the row, `active = 0`): shown greyed in the
+    /// Segment tab, not part of the program.
+    pub active: bool,
 }
 
-/// A user M marker on the program axis (v5 `story_markers.timeline_frame`). The
-/// program start and end are markers by position and are never stored.
+/// An M marker on the program axis (v5 `story_markers`). `system_role` is
+/// `program_start`, `program_end` (locked) or empty for a user marker.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProgramMarker {
     pub marker_id: String,
     pub program_frame: u64,
+    pub system_role: String,
+}
+
+/// An M-M slot (v5 `story_marker_slots`): `slot_id` is the marker pair.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProgramSlot {
+    pub slot_id: String,
+    pub start_frame: u64,
+    pub end_frame: u64,
+    pub start_marker_id: String,
+    pub end_marker_id: String,
+    pub has_cover: bool,
+}
+
+/// The stored Story selection (v5 `story_state`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StorySelection {
+    pub selected_part_id: String,
+    pub selected_slot_id: String,
+    pub selected_cover_id: String,
 }
 
 /// Lightweight catalog signature for deciding whether a visible catalog is stale.
@@ -314,6 +339,16 @@ pub enum Operation {
         marker_id: String,
     },
     ListMarkers,
+    ListSlots,
+    ReadStorySelection,
+    /// v5 `select_part`.
+    SelectPart {
+        part_id: String,
+    },
+    /// v5 `select_marker_slot`.
+    SelectSlot {
+        slot_id: String,
+    },
 }
 impl Operation {
     pub fn is_write(&self) -> bool {
@@ -330,6 +365,8 @@ impl Operation {
                 | Self::ListShorts
                 | Self::ListSegments
                 | Self::ListMarkers
+                | Self::ListSlots
+                | Self::ReadStorySelection
         )
     }
 }
@@ -361,6 +398,8 @@ pub enum Data {
     Created(String),
     Segments(Vec<ProgramSegment>),
     Markers(Vec<ProgramMarker>),
+    Slots(Vec<ProgramSlot>),
+    StorySelection(StorySelection),
     Changed,
 }
 

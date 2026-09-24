@@ -225,14 +225,16 @@ fn paint_program(
             id: &slot.slot_id,
             start_frame: local(slot.start_frame),
             end_frame: local(slot.end_frame),
-            has_cover: false,
+            has_cover: slot.has_cover,
             selected: slot.selected,
         })
         .collect::<Vec<_>>();
     let markers = segments
         .markers
         .iter()
-        .filter(|pin| (start..=end).contains(&pin.frame))
+        // v5 `local_marker_frame`: a marker on a segment border is drawn at the end
+        // of the earlier row; only the first row shows frame 0.
+        .filter(|pin| (start..=end).contains(&pin.frame) && (pin.frame != start || start == 0))
         .map(|pin| TimelineMarkerPin {
             id: &pin.marker_id,
             frame: local(pin.frame),

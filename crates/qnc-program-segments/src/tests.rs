@@ -10,17 +10,31 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         out_frame: range.1,
         fps_num: 50,
         fps_den: 1,
+        active: true,
     }
 }
 
-fn marker(id: &str, program: u64) -> ProgramMarker {
+fn marker(id: &str, program: u64, role: &str) -> ProgramMarker {
     ProgramMarker {
         marker_id: id.into(),
         program_frame: program,
+        system_role: role.into(),
     }
 }
 
-/// a: 100..110 (program 0..10), b: 0..20 (program 10..30), c: 500..510 (program 30..40).
+fn slot(start: (&str, u64), end: (&str, u64), has_cover: bool) -> ProgramSlot {
+    ProgramSlot {
+        slot_id: format!("{}|{}", start.0, end.0),
+        start_frame: start.1,
+        end_frame: end.1,
+        start_marker_id: start.0.into(),
+        end_marker_id: end.0.into(),
+        has_cover,
+    }
+}
+
+/// a: 100..110 (program 0..10), b: 0..20 (program 10..30), c: 500..510 (program 30..40);
+/// markers S at 0 (locked), m1 at 15, m2 at 33, E at 40 (locked), as the store gives them.
 fn component() -> ProgramSegments {
     let mut segments = ProgramSegments::new();
     segments.stored = vec![
@@ -28,7 +42,17 @@ fn component() -> ProgramSegments {
         stored("b", "offovi", (0, 20)),
         stored("c", "tonovi", (500, 510)),
     ];
-    segments.stored_markers = vec![marker("m1", 15), marker("m2", 33)];
+    segments.stored_markers = vec![
+        marker("S", 0, "program_start"),
+        marker("m1", 15, ""),
+        marker("m2", 33, ""),
+        marker("E", 40, "program_end"),
+    ];
+    segments.stored_slots = vec![
+        slot(("S", 0), ("m1", 15), true),
+        slot(("m1", 15), ("m2", 33), false),
+        slot(("m2", 33), ("E", 40), false),
+    ];
     segments.refresh_view(String::new());
     segments
 }
@@ -36,7 +60,10 @@ fn component() -> ProgramSegments {
 #[test]
 fn segments_follow_each_other_on_one_program_axis() {
     let view = program(
-        &[stored("a", "tonovi", (100, 350)), stored("b", "offovi", (0, 60))],
+        &[
+            stored("a", "tonovi", (100, 350)),
+            stored("b", "offovi", (0, 60)),
+        ],
         Some("b"),
     );
     assert_eq!(view.total_frames, 310);
@@ -56,9 +83,36 @@ fn segments_follow_each_other_on_one_program_axis() {
 }
 
 #[test]
+fn deleted_segments_stay_in_the_segment_tab_but_not_in_the_program() {
+    let mut deleted = stored("b", "offovi", (0, 60));
+    deleted.active = false;
+    let view = program(
+        &[
+            stored("a", "tonovi", (0, 10)),
+            deleted,
+            stored("c", "tonovi", (0, 5)),
+        ],
+        Some("b"),
+    );
+    assert_eq!(view.total_frames, 15);
+    assert_eq!(view.rows.len(), 2);
+    assert_eq!(
+        view.parts
+            .iter()
+            .map(|part| (part.segment_id.as_str(), part.active))
+            .collect::<Vec<_>>(),
+        vec![("a", true), ("b", false), ("c", true)]
+    );
+    assert!(!view.parts[1].selected, "a deleted segment is not selected");
+}
+
+#[test]
 fn the_segment_at_a_frame_and_at_the_end_is_found() {
     let view = program(
-        &[stored("a", "tonovi", (0, 10)), stored("b", "tonovi", (0, 5))],
+        &[
+            stored("a", "tonovi", (0, 10)),
+            stored("b", "tonovi", (0, 5)),
+        ],
         None,
     );
     assert_eq!(view.segment_at(9).unwrap().segment_id, "a");
@@ -85,57 +139,65 @@ fn unknown_kinds_in_the_database_are_not_shown() {
 }
 
 #[test]
-fn markers_stay_on_their_program_frame_and_only_live_inside_the_program() {
-    let mut segments = component();
-    let frames = |segments: &ProgramSegments| {
-        segments
-            .view()
-            .markers
-            .iter()
-            .map(|pin| pin.frame)
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(frames(&segments), vec![15, 33]);
-    // v5: moving segments keeps markers on their program frame.
-    segments.stored.swap(1, 2);
-    segments.refresh_view(String::new());
-    assert_eq!(frames(&segments), vec![15, 33]);
-    // A shorter program hides a marker at or after its end.
-    segments.stored.pop();
-    segments.refresh_view(String::new());
-    assert_eq!(frames(&segments), vec![15]);
-}
-
-#[test]
-fn slots_run_between_the_locked_ends_and_the_markers_with_stable_names() {
-    let segments = component();
-    let slots = &segments.view().slots;
-    assert_eq!(
-        slots
-            .iter()
-            .map(|slot| (slot.slot_id.as_str(), slot.start_frame, slot.end_frame))
-            .collect::<Vec<_>>(),
-        vec![
-            ("program_start|m1", 0, 15),
-            ("m1|m2", 15, 33),
-            ("m2|program_end", 33, 40)
-        ]
-    );
-    assert_eq!(slot_at(slots, 40).unwrap().slot_id, "m2|program_end");
-    assert_eq!(slot_at(slots, 15).unwrap().slot_id, "m1|m2");
-}
-
-#[test]
-fn new_and_moved_markers_respect_the_locked_ends_free_frames_and_neighbours() {
+fn markers_and_slots_come_from_the_store_with_the_locked_ends() {
     let segments = component();
     let view = segments.view();
-    assert!(check_new(view, &view.markers, 0).is_err());
-    assert!(check_new(view, &view.markers, 40).is_err());
-    assert!(check_new(view, &view.markers, 15).is_err());
-    assert!(check_new(view, &view.markers, 20).is_ok());
-    assert!(check_move(view, &view.markers, "m1", 33).is_err());
-    assert!(check_move(view, &view.markers, "m1", 32).is_ok());
-    assert!(check_move(view, &view.markers, "m2", 14).is_err());
+    assert_eq!(
+        view.markers
+            .iter()
+            .map(|pin| (pin.marker_id.as_str(), pin.frame, pin.locked))
+            .collect::<Vec<_>>(),
+        vec![
+            ("S", 0, true),
+            ("m1", 15, false),
+            ("m2", 33, false),
+            ("E", 40, true)
+        ]
+    );
+    assert_eq!(
+        view.slots
+            .iter()
+            .map(|slot| (slot.slot_id.as_str(), slot.has_cover))
+            .collect::<Vec<_>>(),
+        vec![("S|m1", true), ("m1|m2", false), ("m2|E", false)]
+    );
+    assert_eq!(slot_at(&view.slots, 40).unwrap().slot_id, "m2|E");
+    assert_eq!(slot_at(&view.slots, 15).unwrap().slot_id, "m1|m2");
+    assert_eq!(first_empty_slot(&view.slots).unwrap().slot_id, "m1|m2");
+}
+
+#[test]
+fn a_selected_marker_moves_only_between_its_neighbours_and_the_ends_are_locked() {
+    let segments = component();
+    let pins = &segments.view().markers;
+    assert!(check_move(pins, "m1", 33).is_err());
+    assert!(check_move(pins, "m1", 32).is_ok());
+    assert!(check_move(pins, "m2", 14).is_err());
+    assert!(check_move(pins, "m2", 39).is_ok());
+    assert!(check_move(pins, "E", 38).is_err());
+    assert!(check_move(pins, "S", 1).is_err());
+}
+
+#[test]
+fn slot_steps_start_from_the_selection_else_the_playhead_else_the_first_empty_slot() {
+    let segments = component();
+    let slots = &segments.view().slots;
+    assert_eq!(neighbour_slot(slots, 20, false).unwrap().slot_id, "m2|E");
+    assert_eq!(neighbour_slot(slots, 20, true).unwrap().slot_id, "S|m1");
+    assert!(
+        neighbour_slot(slots, 5, true).is_none(),
+        "no wrapping around"
+    );
+}
+
+#[test]
+fn the_locked_start_marker_is_not_selected() {
+    let mut segments = component();
+    segments.apply(SegmentCommand::SelectMarker("S".into()));
+    assert!(segments.view().selected_marker().is_none());
+    assert!(segments.view().message.contains("zaključan"));
+    segments.apply(SegmentCommand::SelectMarker("E".into()));
+    assert_eq!(segments.view().selected_marker().unwrap().marker_id, "E");
 }
 
 #[test]

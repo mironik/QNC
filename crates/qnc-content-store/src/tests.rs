@@ -1157,11 +1157,12 @@ fn create_segment(
     )
 }
 
+/// The program: active segments in order.
 fn segments(store: &mut ContentStore) -> Vec<ProgramSegment> {
     let Data::Segments(rows) = run(store, Operation::ListSegments).unwrap() else {
         panic!()
     };
-    rows
+    rows.into_iter().filter(|row| row.active).collect()
 }
 
 #[test]
@@ -1275,7 +1276,10 @@ fn markers(store: &mut ContentStore) -> Vec<u64> {
     let Data::Markers(rows) = run(store, Operation::ListMarkers).unwrap() else {
         panic!()
     };
-    rows.into_iter().map(|row| row.program_frame).collect()
+    rows.into_iter()
+        .filter(|row| row.system_role.is_empty())
+        .map(|row| row.program_frame)
+        .collect()
 }
 
 /// Locked boundary markers as (role, frame, origin segment).
@@ -1728,4 +1732,75 @@ fn deleting_a_segment_deletes_the_slots_of_the_markers_inside_it() {
     )
     .unwrap();
     assert_eq!(cover_count(&path), 0, "no program, no markers, no covers");
+}
+
+#[test]
+fn reads_list_deleted_segments_all_markers_slots_and_the_selection() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    let ids = three_segments(&mut store);
+    marker(&mut store, 14).unwrap();
+    run(
+        &mut store,
+        Operation::DeleteSegment {
+            segment_id: ids[2].clone(),
+        },
+    )
+    .unwrap();
+    let Data::Segments(all) = run(&mut store, Operation::ListSegments).unwrap() else {
+        panic!()
+    };
+    assert_eq!(all.len(), 3, "a deleted segment stays listed");
+    assert_eq!(all.iter().filter(|row| !row.active).count(), 1);
+    let Data::Markers(markers) = run(&mut store, Operation::ListMarkers).unwrap() else {
+        panic!()
+    };
+    let roles: Vec<(&str, u64)> = markers
+        .iter()
+        .map(|row| (row.system_role.as_str(), row.program_frame))
+        .collect();
+    assert_eq!(
+        roles,
+        vec![("program_start", 0), ("", 14), ("program_end", 20)]
+    );
+    let Data::Slots(slots) = run(&mut store, Operation::ListSlots).unwrap() else {
+        panic!()
+    };
+    let spans: Vec<(u64, u64)> = slots
+        .iter()
+        .map(|slot| (slot.start_frame, slot.end_frame))
+        .collect();
+    assert_eq!(spans, vec![(0, 14), (14, 20)]);
+    assert_eq!(
+        slots[1].slot_id,
+        format!("{}|{}", markers[1].marker_id, markers[2].marker_id)
+    );
+    run(
+        &mut store,
+        Operation::SelectSlot {
+            slot_id: slots[1].slot_id.clone(),
+        },
+    )
+    .unwrap();
+    run(
+        &mut store,
+        Operation::SelectPart {
+            part_id: ids[0].clone(),
+        },
+    )
+    .unwrap();
+    assert!(run(
+        &mut store,
+        Operation::SelectSlot {
+            slot_id: "missing|slot".into(),
+        },
+    )
+    .is_err());
+    let Data::StorySelection(selection) = run(&mut store, Operation::ReadStorySelection).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(selection.selected_part_id, ids[0]);
+    assert_eq!(selection.selected_slot_id, slots[1].slot_id);
 }
