@@ -274,8 +274,14 @@ fn paint_program(
     );
     match intent {
         TimelineIntent::SelectMarker { id, .. } => Some(SegmentCommand::SelectMarker(id)),
-        TimelineIntent::SelectMarkerSlot { id, .. } => Some(SegmentCommand::SelectSlot(id)),
-        TimelineIntent::SelectVirtual { id, .. } => Some(SegmentCommand::Select(id)),
+        // v5 `program_intent_from_timeline_interact`: a click keeps its frame.
+        TimelineIntent::SelectMarkerSlot { id, frame } => Some(SegmentCommand::SelectSlot {
+            slot_id: id,
+            frame: start + frame.min(duration),
+        }),
+        TimelineIntent::SelectVirtual { frame, .. } => {
+            Some(SegmentCommand::Cue(start + frame.min(duration)))
+        }
         TimelineIntent::CueFrame(frame) => Some(SegmentCommand::Cue(start + frame.min(duration))),
         _ => None,
     }

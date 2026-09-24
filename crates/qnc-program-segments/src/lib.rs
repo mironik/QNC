@@ -238,7 +238,12 @@ pub enum SegmentCommand {
     /// The selected marker first, otherwise the selected segment (docs/94 section 2).
     DeleteSelected,
     SelectMarker(String),
-    SelectSlot(String),
+    /// A click on a slot: select it, playhead at the clicked program frame (v5
+    /// `SelectMarkerSlot { frame }`).
+    SelectSlot {
+        slot_id: String,
+        frame: u64,
+    },
     /// Previous or next M marker from the playhead.
     StepMarker {
         up: bool,
@@ -457,7 +462,9 @@ impl ProgramSegments {
             SegmentCommand::Move { up } => self.move_selected(up),
             SegmentCommand::DeleteSelected => self.delete_selected(),
             SegmentCommand::SelectMarker(marker_id) => self.select_marker(&marker_id),
-            SegmentCommand::SelectSlot(slot_id) => self.select_slot(&slot_id),
+            SegmentCommand::SelectSlot { slot_id, frame } => {
+                self.select_slot(&slot_id, Some(frame))
+            }
             SegmentCommand::StepMarker { up } => {
                 match neighbour_marker(&self.view.markers, playhead, up).cloned() {
                     Some(pin) => self.select_marker(&pin.marker_id),
@@ -466,12 +473,12 @@ impl ProgramSegments {
             }
             SegmentCommand::StepSlot { up } => {
                 match neighbour_slot(&self.view.slots, playhead, up).cloned() {
-                    Some(slot) => self.select_slot(&slot.slot_id),
+                    Some(slot) => self.select_slot(&slot.slot_id, None),
                     None => self.refresh_view("Nema prethodnog/sljedeceg M-M slota.".into()),
                 }
             }
             SegmentCommand::ProgramStart => self.cue_program(0),
-            SegmentCommand::Cue(frame) => self.cue_program(frame),
+            SegmentCommand::Cue(frame) => self.cue_at(frame),
             SegmentCommand::Marker => self.marker_at_playhead(),
         }
         true
@@ -544,7 +551,9 @@ impl ProgramSegments {
         self.cue_program(frame);
     }
 
-    fn select_slot(&mut self, slot_id: &str) {
+    /// Selects a slot; the playhead goes to the clicked frame, else to the slot
+    /// start (v5 `SelectMarkerSlot` and `select_adjacent_marker_slot`).
+    fn select_slot(&mut self, slot_id: &str, frame: Option<u64>) {
         let Some(start) = self
             .view
             .slots
@@ -560,7 +569,20 @@ impl ProgramSegments {
             slot_id: slot_id.to_string(),
         });
         self.refresh_view(String::new());
-        self.cue_program(start);
+        self.cue_at(frame.unwrap_or(start));
+    }
+
+    /// A program frame the user pointed at on a Wrap segment: the segment under it
+    /// becomes the selected one (v5 keeps `selected_part_id` on the playhead
+    /// segment) and the player is asked for that frame.
+    fn cue_at(&mut self, frame: u64) {
+        if let Some(segment) = self.view.segment_at(frame) {
+            if self.selected.as_deref() != Some(segment.segment_id.as_str()) {
+                self.selected = Some(segment.segment_id.clone());
+                self.refresh_view(String::new());
+            }
+        }
+        self.cue_program(frame);
     }
 
     /// Asks the player for the picture at a program frame (Wrap view).

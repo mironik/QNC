@@ -224,12 +224,19 @@ fn navigation_only_asks_the_player_and_the_playhead_comes_from_its_picture() {
     let cue = segments.take_cue().unwrap();
     assert_eq!((cue.clip_id.as_str(), cue.source_frame), ("clip-c", 503));
     assert!(segments.view().selected_marker().is_some());
-    segments.apply(SegmentCommand::SelectSlot("m1|m2".into()));
+    segments.apply(SegmentCommand::SelectSlot {
+        slot_id: "m1|m2".into(),
+        frame: 20,
+    });
     assert!(
         segments.view().selected_marker().is_none(),
         "a slot clears the marker"
     );
-    assert_eq!(segments.take_cue().unwrap().source_frame, 5);
+    assert_eq!(
+        segments.take_cue().unwrap().source_frame,
+        10,
+        "the clicked frame, not the slot start"
+    );
     segments.apply(SegmentCommand::ProgramStart);
     assert_eq!(segments.take_cue().unwrap().clip_id, "clip-a");
 }
