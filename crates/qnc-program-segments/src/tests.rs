@@ -201,7 +201,7 @@ fn the_locked_start_marker_is_not_selected() {
 }
 
 #[test]
-fn navigation_only_asks_the_player_and_the_playhead_comes_from_its_picture() {
+fn a_click_moves_the_playhead_at_once_and_the_player_then_takes_over() {
     let mut segments = component();
     segments.apply(SegmentCommand::Select("b".into()));
     let cue = segments.take_cue().unwrap();
@@ -209,9 +209,16 @@ fn navigation_only_asks_the_player_and_the_playhead_comes_from_its_picture() {
     assert!(segments.take_cue().is_none());
     assert_eq!(
         segments.view().playhead,
-        None,
-        "no playhead before the player confirms"
+        Some(10),
+        "v5: the playhead goes to the frame at once"
     );
+    segments.follow_player(Some("clip-b"), Some(7));
+    assert_eq!(
+        segments.view().playhead,
+        Some(10),
+        "an older picture before the cue lands does not move it back"
+    );
+    segments.follow_player(Some("clip-b"), Some(0));
     segments.follow_player(Some("clip-b"), Some(7));
     assert_eq!(segments.view().playhead, Some(17));
     segments.follow_player(Some("clip-b"), Some(99));
@@ -307,6 +314,8 @@ fn a_wrap_cue_opens_the_clip_once_and_cues_after_its_first_picture() {
         segments.drive_player(Some("clip-c"), Some(0)),
         Some(CueStep::Cue(500))
     );
+    assert_eq!(segments.view().playhead, Some(30), "at once, before the player");
+    assert_eq!(segments.drive_player(Some("clip-c"), Some(500)), None);
     assert_eq!(segments.drive_player(Some("clip-c"), Some(504)), None);
     assert_eq!(segments.view().playhead, Some(34));
     segments.leave_wrap();

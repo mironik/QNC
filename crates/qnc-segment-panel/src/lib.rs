@@ -119,7 +119,13 @@ pub fn show(
                 command = command.take().or(bar::show(ui, timeline_theme));
                 ui.add_space(2.0);
                 let total = segments.total_frames;
-                let overview = paint_program(ui, segments, (0, total), timeline_theme, true);
+                // Every timeline row needs its own id space: `qnc-timeline` names its
+                // click area, so rows sharing one id would lose their clicks.
+                let overview = ui
+                    .push_id("qnc_segment_program_overview", |ui| {
+                        paint_program(ui, segments, (0, total), timeline_theme, true)
+                    })
+                    .inner;
                 command = command.take().or(overview);
             });
         },
@@ -178,7 +184,10 @@ fn paint_row(
     theme: TimelineTheme,
 ) -> Option<SegmentCommand> {
     let window = (row.start_frame, row.end_frame);
-    paint_program(ui, segments, window, theme, row.start_frame == 0)
+    ui.push_id(("qnc_segment_row", &row.segment_id), |ui| {
+        paint_program(ui, segments, window, theme, row.start_frame == 0)
+    })
+    .inner
 }
 
 /// The program between `start` and `end`, as one `qnc-timeline` row.

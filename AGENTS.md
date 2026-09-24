@@ -2182,7 +2182,11 @@ test -p qnc-content-store` (43), `qnc-program-segments` (15), `qnc-segment-panel
 qnc-conformance`. Dopuna (odluka korisnika): korisnik markere postavlja na Wrap
 segmentima, ne na program timelineu; M salje segment pod playheadom i frame
 unutar njega (v5 `create_marker_from_part_frame`, `origin_local_frame`), a
-spremiste iz toga izvodi frame programa. Odobrenje je zatvoreno.
+spremiste iz toga izvodi frame programa. Dopuna 2 (korisnik: playhead mora na klik, brzo): klik na red
+segmenta ili slot postavlja Wrap playhead odmah na kliknuti frame (v5
+`set_wrap_playhead_frame`); potvrdjeni frameovi playera preuzimaju tek kad
+player dode na trazeni frame. Svaki red panela ima vlastiti egui id (inace
+klik dobiva samo zadnji nacrtani timeline). Odobrenje je zatvoreno.
 
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story korak 3: slotovi i pokrivalice u
 bazi): korisnik je rekao "ok, nastavi" nakon koraka 1; vrijedi pravilo v5

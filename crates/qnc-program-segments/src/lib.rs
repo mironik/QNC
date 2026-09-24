@@ -320,6 +320,9 @@ pub struct ProgramSegments {
     cue: Option<Cue>,
     /// The cue's clip was asked to open; the frame follows its first picture.
     cue_opened: bool,
+    /// Source frame asked of the player: older confirmed frames do not move the
+    /// playhead back.
+    awaiting: Option<u64>,
     writes: Option<ContentWriteTransport>,
     /// Write whose completion selects the new segment.
     pending_create: Option<String>,
@@ -389,12 +392,19 @@ impl ProgramSegments {
     pub fn leave_wrap(&mut self) {
         self.wrap_segment = None;
         self.cue = None;
+        self.awaiting = None;
         self.set_playhead(None);
     }
 
     /// The player's confirmed picture: in the Wrap view it becomes the program
     /// playhead when it lies inside the shown segment. Nothing is interpolated.
     pub fn follow_player(&mut self, clip_id: Option<&str>, confirmed_frame: Option<u64>) {
+        if let Some(awaiting) = self.awaiting {
+            if confirmed_frame != Some(awaiting) {
+                return;
+            }
+            self.awaiting = None;
+        }
         let playhead = self
             .wrap_segment
             .as_deref()
@@ -585,18 +595,22 @@ impl ProgramSegments {
         self.cue_program(frame);
     }
 
-    /// Asks the player for the picture at a program frame (Wrap view).
+    /// Wrap view: the program playhead goes to the frame at once (v5
+    /// `set_wrap_playhead_frame`) and the player is asked for that picture; its
+    /// confirmed frames take over once it reaches the cue.
     fn cue_program(&mut self, frame: u64) {
-        let Some((segment, source_frame)) = source_at(&self.view, frame) else {
-            return;
-        };
-        self.cue_opened = false;
-        self.wrap_segment = Some(segment.segment_id.clone());
-        self.cue = Some(Cue {
+        let Some(cue) = source_at(&self.view, frame).map(|(segment, source_frame)| Cue {
             segment_id: segment.segment_id.clone(),
             clip_id: segment.clip_id.clone(),
             source_frame,
-        });
+        }) else {
+            return;
+        };
+        self.set_playhead(Some(frame.min(self.view.total_frames)));
+        self.awaiting = Some(cue.source_frame);
+        self.cue_opened = false;
+        self.wrap_segment = Some(cue.segment_id.clone());
+        self.cue = Some(cue);
     }
 
     /// M on the Wrap segment under the playhead: the marker is placed on that
