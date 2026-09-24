@@ -10,15 +10,12 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         out_frame: range.1,
         fps_num: 50,
         fps_den: 1,
-        marker_mode: "content".into(),
     }
 }
 
-fn marker(id: &str, segment: &str, source: u64, program: u64) -> ProgramMarker {
+fn marker(id: &str, program: u64) -> ProgramMarker {
     ProgramMarker {
         marker_id: id.into(),
-        segment_id: segment.into(),
-        source_frame: source,
         program_frame: program,
     }
 }
@@ -31,7 +28,7 @@ fn component() -> ProgramSegments {
         stored("b", "off", (0, 20)),
         stored("c", "ton", (500, 510)),
     ];
-    segments.stored_markers = vec![marker("m1", "b", 5, 15), marker("m2", "c", 503, 33)];
+    segments.stored_markers = vec![marker("m1", 15), marker("m2", 33)];
     segments.refresh_view(String::new());
     segments
 }
@@ -88,34 +85,25 @@ fn unknown_kinds_in_the_database_are_not_shown() {
 }
 
 #[test]
-fn picture_markers_follow_their_segment_and_frame_markers_keep_the_frame() {
+fn markers_stay_on_their_program_frame_and_only_live_inside_the_program() {
     let mut segments = component();
-    assert_eq!(
+    let frames = |segments: &ProgramSegments| {
         segments
             .view()
             .markers
             .iter()
             .map(|pin| pin.frame)
-            .collect::<Vec<_>>(),
-        vec![15, 33]
-    );
-    // b moves after c and gets switch 2: its marker keeps program frame 15, while
-    // the marker of c (switch 1) follows its picture to program frame 13.
-    segments.stored.swap(1, 2);
-    segments.stored[2].marker_mode = "frame".into();
-    segments.stored_markers[0].program_frame = 15;
-    segments.refresh_view(String::new());
-    let pins = &segments.view().markers;
-    assert_eq!(
-        pins.iter()
-            .map(|pin| (pin.marker_id.as_str(), pin.frame))
-            .collect::<Vec<_>>(),
-        vec![("m1", 15), ("m2", 13)]
-            .into_iter()
-            .rev()
             .collect::<Vec<_>>()
-    );
-    assert_eq!(segments.view().rows[2].marker_mode.number(), 2);
+    };
+    assert_eq!(frames(&segments), vec![15, 33]);
+    // v5: moving segments keeps markers on their program frame.
+    segments.stored.swap(1, 2);
+    segments.refresh_view(String::new());
+    assert_eq!(frames(&segments), vec![15, 33]);
+    // A shorter program hides a marker at or after its end.
+    segments.stored.pop();
+    segments.refresh_view(String::new());
+    assert_eq!(frames(&segments), vec![15]);
 }
 
 #[test]
@@ -185,11 +173,9 @@ fn navigation_only_asks_the_player_and_the_playhead_comes_from_its_picture() {
 }
 
 #[test]
-fn marker_and_trim_need_the_program_playhead() {
+fn a_marker_needs_the_program_playhead() {
     let mut segments = component();
     segments.apply(SegmentCommand::Marker);
-    assert!(segments.view().message.contains("playhead"));
-    segments.apply(SegmentCommand::TrimIn);
     assert!(segments.view().message.contains("playhead"));
 }
 
@@ -213,35 +199,29 @@ fn arrow_steps_select_neighbours_and_stop_at_the_ends() {
 }
 
 #[test]
-fn move_delete_and_mode_need_a_selection_and_a_database() {
+fn move_and_delete_need_a_selection_and_a_database() {
     let mut segments = component();
     segments.apply(SegmentCommand::DeleteSelected);
     assert_eq!(segments.view().message, "Odaberi segment.");
     segments.apply(SegmentCommand::Move { up: true });
     assert_eq!(segments.view().message, "Odaberi segment.");
-    segments.apply(SegmentCommand::SetMarkerMode {
-        segment_id: "a".into(),
-        mode: MarkerMode::Frame,
-    });
+    segments.apply(SegmentCommand::Select("a".into()));
+    segments.apply(SegmentCommand::DeleteSelected);
     assert_eq!(segments.view().message, "Projektna baza nije dostupna.");
 }
 
 #[test]
-fn keyboard_actions_map_to_commands_and_marks_trim_only_in_wrap() {
+fn keyboard_actions_map_to_commands() {
     assert_eq!(
-        SegmentCommand::from_action("add_marker", false),
+        SegmentCommand::from_action("add_marker"),
         Some(SegmentCommand::Marker)
     );
     assert_eq!(
-        SegmentCommand::from_action("playlist_input_start", false),
+        SegmentCommand::from_action("playlist_input_start"),
         Some(SegmentCommand::ProgramStart)
     );
-    assert_eq!(SegmentCommand::from_action("mark_in", false), None);
-    assert_eq!(
-        SegmentCommand::from_action("mark_out", true),
-        Some(SegmentCommand::TrimOut)
-    );
-    assert_eq!(SegmentCommand::from_action("play_pause", true), None);
+    assert_eq!(SegmentCommand::from_action("mark_in"), None);
+    assert_eq!(SegmentCommand::from_action("play_pause"), None);
 }
 
 #[test]

@@ -17,9 +17,6 @@
     "program_segments.out_frame": "INTEGER, source OUT frame (exclusive), at least IN + 1",
     "program_segments.fps_num": "INTEGER, source timebase numerator confirmed by the player; one timebase per story",
     "program_segments.fps_den": "INTEGER, source timebase denominator",
-    "program_segments.marker_mode": "TEXT: content (switch 1, markers follow the picture; default) | frame (switch 2, markers keep the program frame)",
-    "program_markers.segment_id": "TEXT, segment the M marker belongs to",
-    "program_markers.source_frame": "INTEGER, source frame inside the segment IN/OUT (switch 1)",
-    "program_markers.program_frame": "INTEGER, program frame (switch 2)"
+    "program_markers.program_frame": "INTEGER, user M marker on the program axis, strictly inside the program (0 < frame < program length), one per frame; the program start and the end of the last segment are markers by position and are not stored; deleting a segment drops markers inside it and moves later ones left (v5)"
   }
 }

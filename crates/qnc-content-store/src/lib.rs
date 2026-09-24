@@ -155,26 +155,14 @@ pub struct ProgramSegment {
     pub out_frame: u64,
     pub fps_num: u32,
     pub fps_den: u32,
-    /// How the M markers of this segment behave when it is trimmed or moved:
-    /// `content` (they stay on the picture) or `frame` (they stay on the program
-    /// frame, as in v5).
-    #[serde(default = "default_marker_mode")]
-    pub marker_mode: String,
 }
 
-fn default_marker_mode() -> String {
-    "content".into()
-}
-
-/// An M marker. It belongs to a segment; `source_frame` is the picture it sits on
-/// (followed in `content` mode), `program_frame` its program position when it was
-/// placed (kept in `frame` mode).
+/// A user M marker on the program axis (v5 `story_markers.timeline_frame`). The
+/// program start and end are markers by position and are never stored.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProgramMarker {
     pub marker_id: String,
-    pub segment_id: String,
-    pub source_frame: u64,
     pub program_frame: u64,
 }
 
@@ -312,25 +300,12 @@ pub enum Operation {
         up: bool,
     },
     ListSegments,
-    /// New source IN/OUT of a segment (Mark IN/OUT in the Wrap view).
-    TrimSegment {
-        segment_id: String,
-        in_frame: u64,
-        out_frame: u64,
-    },
-    SetSegmentMarkerMode {
-        segment_id: String,
-        mode: String,
-    },
+    /// A user M marker strictly inside the program, on a free frame.
     CreateMarker {
-        segment_id: String,
-        source_frame: u64,
         program_frame: u64,
     },
     MoveMarker {
         marker_id: String,
-        segment_id: String,
-        source_frame: u64,
         program_frame: u64,
     },
     DeleteMarker {

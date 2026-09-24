@@ -325,25 +325,11 @@ impl ContentStore {
             Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
             Operation::MoveSegment { segment_id, up } => self.move_segment(segment_id, *up),
             Operation::ListSegments => self.list_segments(),
-            Operation::TrimSegment {
-                segment_id,
-                in_frame,
-                out_frame,
-            } => self.trim_segment(segment_id, *in_frame, *out_frame),
-            Operation::SetSegmentMarkerMode { segment_id, mode } => {
-                self.set_segment_marker_mode(segment_id, mode)
-            }
-            Operation::CreateMarker {
-                segment_id,
-                source_frame,
-                program_frame,
-            } => self.write_marker(None, segment_id, *source_frame, *program_frame),
+            Operation::CreateMarker { program_frame } => self.write_marker(None, *program_frame),
             Operation::MoveMarker {
                 marker_id,
-                segment_id,
-                source_frame,
                 program_frame,
-            } => self.write_marker(Some(marker_id), segment_id, *source_frame, *program_frame),
+            } => self.write_marker(Some(marker_id), *program_frame),
             Operation::DeleteMarker { marker_id } => self.delete_marker(marker_id),
             Operation::ListMarkers => self.list_markers(),
             Operation::List { after } => {
@@ -993,8 +979,8 @@ impl ContentStore {
     }
 
     /// Removes a segment for good; the following ones close the gap (docs/93 R12).
-    /// Its markers and every marker inside its program window go with it; markers
-    /// kept on program frames after it move left by its length (docs/94 section 4).
+    /// M markers inside its program window go; those after it move left by its
+    /// length (v5 `shift_markers_after_part_removal_frames`).
     fn delete_segment(&mut self, segment_id: &str) -> Result<Data> {
         let tx = self
             .conn
@@ -1002,16 +988,13 @@ impl ContentStore {
             .map_err(err)?;
         if let Some((start, end)) = segment_window(&tx, segment_id)? {
             tx.execute(
-                "DELETE FROM program_markers WHERE segment_id = ?1
-                    OR (program_frame >= ?2 AND program_frame < ?3 AND segment_id IN
-                        (SELECT segment_id FROM program_segments WHERE marker_mode = 'frame'))",
-                params![segment_id, start as i64, end as i64],
+                "DELETE FROM program_markers WHERE program_frame > ?1 AND program_frame < ?2",
+                params![start as i64, end as i64],
             )
             .map_err(err)?;
             tx.execute(
                 "UPDATE program_markers SET program_frame = program_frame - ?2
-                 WHERE program_frame >= ?1 AND segment_id IN
-                    (SELECT segment_id FROM program_segments WHERE marker_mode = 'frame')",
+                 WHERE program_frame >= ?1",
                 params![end as i64, (end - start) as i64],
             )
             .map_err(err)?;
@@ -1026,6 +1009,7 @@ impl ContentStore {
             return Err("Segment nije pronadjen.".into());
         }
         renumber_segments(&tx)?;
+        prune_markers(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
@@ -1060,75 +1044,25 @@ impl ContentStore {
         Ok(Data::Changed)
     }
 
-    /// Mark IN/OUT in the Wrap view (docs/93 R11). Markers that follow the picture
-    /// and fall outside the new range go; markers kept on frames stay (v5).
-    fn trim_segment(&mut self, segment_id: &str, in_frame: u64, out_frame: u64) -> Result<Data> {
-        if out_frame <= in_frame {
-            return Err("OUT mora biti poslije IN.".into());
+    /// Creates a user M marker (`marker_id` None) or moves one. It lies strictly
+    /// inside the program (start and end are markers by position) on a free frame
+    /// (v5 `create_marker_frame`); the component also keeps a move between neighbours.
+    fn write_marker(&mut self, marker_id: Option<&String>, program_frame: u64) -> Result<Data> {
+        let frame = program_frame as i64;
+        if frame <= 0 || frame >= program_length(&self.conn)? {
+            return Err("Pocetni i zavrsni M marker su zakljucani.".into());
         }
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
-        let changed = tx
-            .execute(
-                "UPDATE program_segments SET in_frame = ?2, out_frame = ?3 WHERE segment_id = ?1",
-                params![segment_id, in_frame as i64, out_frame as i64],
-            )
-            .map_err(err)?;
-        if changed == 0 {
-            return Err("Segment nije pronadjen.".into());
-        }
-        tx.execute(
-            "DELETE FROM program_markers WHERE segment_id = ?1
-                AND (source_frame < ?2 OR source_frame >= ?3)
-                AND (SELECT marker_mode FROM program_segments WHERE segment_id = ?1) = 'content'",
-            params![segment_id, in_frame as i64, out_frame as i64],
-        )
-        .map_err(err)?;
-        tx.commit().map_err(err)?;
-        Ok(Data::Changed)
-    }
-
-    fn set_segment_marker_mode(&mut self, segment_id: &str, mode: &str) -> Result<Data> {
-        if !matches!(mode, "content" | "frame") {
-            return Err(format!("Nepoznat nacin markera: {mode}."));
-        }
-        let changed = self
-            .conn
-            .execute(
-                "UPDATE program_segments SET marker_mode = ?2 WHERE segment_id = ?1",
-                params![segment_id, mode],
-            )
-            .map_err(err)?;
-        if changed == 0 {
-            return Err("Segment nije pronadjen.".into());
-        }
-        Ok(Data::Changed)
-    }
-
-    /// Creates a marker (`marker_id` None) or moves an existing one. The picture
-    /// must lie inside its segment; the component checks positions against the
-    /// other markers (docs/94 section 1).
-    fn write_marker(
-        &mut self,
-        marker_id: Option<&String>,
-        segment_id: &str,
-        source_frame: u64,
-        program_frame: u64,
-    ) -> Result<Data> {
-        let range: Option<(i64, i64)> = self
+        let taken: bool = self
             .conn
             .query_row(
-                "SELECT in_frame, out_frame FROM program_segments WHERE segment_id = ?1",
-                [segment_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                "SELECT EXISTS(SELECT 1 FROM program_markers
+                 WHERE program_frame = ?1 AND marker_id IS NOT ?2)",
+                params![frame, marker_id],
+                |row| row.get(0),
             )
-            .optional()
             .map_err(err)?;
-        let (in_frame, out_frame) = range.ok_or("Segment nije pronadjen.")?;
-        if (source_frame as i64) < in_frame || (source_frame as i64) >= out_frame {
-            return Err("M marker mora biti unutar segmenta.".into());
+        if taken {
+            return Err("Na tom frameu vec postoji M marker.".into());
         }
         let Some(marker_id) = marker_id else {
             let created = SystemTime::now()
@@ -1138,16 +1072,9 @@ impl ContentStore {
             let marker_id = format!("marker_{created:x}");
             self.conn
                 .execute(
-                    "INSERT INTO program_markers
-                        (marker_id, segment_id, source_frame, program_frame, created_at_utc)
-                     VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![
-                        marker_id,
-                        segment_id,
-                        source_frame as i64,
-                        program_frame as i64,
-                        (created / 1_000_000_000) as i64
-                    ],
+                    "INSERT INTO program_markers (marker_id, program_frame, created_at_utc)
+                     VALUES (?1, ?2, ?3)",
+                    params![marker_id, frame, (created / 1_000_000_000) as i64],
                 )
                 .map_err(err)?;
             return Ok(Data::Created(marker_id));
@@ -1155,9 +1082,8 @@ impl ContentStore {
         let changed = self
             .conn
             .execute(
-                "UPDATE program_markers SET segment_id = ?2, source_frame = ?3, program_frame = ?4
-                 WHERE marker_id = ?1",
-                params![marker_id, segment_id, source_frame as i64, program_frame as i64],
+                "UPDATE program_markers SET program_frame = ?2 WHERE marker_id = ?1",
+                params![marker_id, frame],
             )
             .map_err(err)?;
         if changed == 0 {
@@ -1169,7 +1095,10 @@ impl ContentStore {
     fn delete_marker(&mut self, marker_id: &str) -> Result<Data> {
         let removed = self
             .conn
-            .execute("DELETE FROM program_markers WHERE marker_id = ?1", [marker_id])
+            .execute(
+                "DELETE FROM program_markers WHERE marker_id = ?1",
+                [marker_id],
+            )
             .map_err(err)?;
         if removed == 0 {
             return Err("M marker nije pronadjen.".into());
@@ -1184,7 +1113,7 @@ impl ContentStore {
         let mut statement = self
             .conn
             .prepare(
-                "SELECT marker_id, segment_id, source_frame, program_frame
+                "SELECT marker_id, program_frame
                  FROM public_program_markers ORDER BY program_frame, marker_id",
             )
             .map_err(err)?;
@@ -1192,9 +1121,7 @@ impl ContentStore {
             .query_map([], |row| {
                 Ok(ProgramMarker {
                     marker_id: row.get(0)?,
-                    segment_id: row.get(1)?,
-                    source_frame: row.get::<_, i64>(2)?.max(0) as u64,
-                    program_frame: row.get::<_, i64>(3)?.max(0) as u64,
+                    program_frame: row.get::<_, i64>(1)?.max(0) as u64,
                 })
             })
             .map_err(err)?
@@ -1210,8 +1137,7 @@ impl ContentStore {
         let mut statement = self
             .conn
             .prepare(
-                "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den,
-                        marker_mode
+                "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den
                  FROM public_program_segments ORDER BY sort_index",
             )
             .map_err(err)?;
@@ -1226,7 +1152,6 @@ impl ContentStore {
                     out_frame: row.get::<_, i64>(5)?.max(0) as u64,
                     fps_num: row.get(6)?,
                     fps_den: row.get(7)?,
-                    marker_mode: row.get(8)?,
                 })
             })
             .map_err(err)?
@@ -1616,6 +1541,27 @@ fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
 }
 
 fn ensure_program_segments_schema(conn: &Connection) -> Result<()> {
+    // Development records of the per-segment marker model are removed, not
+    // converted (AGENTS section 3: no migrations in development).
+    if table_columns(conn, "program_markers")?
+        .iter()
+        .any(|column| column == "segment_id")
+    {
+        conn.execute_batch(
+            "DROP VIEW IF EXISTS public_program_markers; DROP TABLE program_markers;",
+        )
+        .map_err(err)?;
+    }
+    if table_columns(conn, "program_segments")?
+        .iter()
+        .any(|column| column == "marker_mode")
+    {
+        conn.execute_batch(
+            "DROP VIEW IF EXISTS public_program_segments;
+            ALTER TABLE program_segments DROP COLUMN marker_mode;",
+        )
+        .map_err(err)?;
+    }
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS program_segments (
             segment_id TEXT PRIMARY KEY,
@@ -1630,34 +1576,23 @@ fn ensure_program_segments_schema(conn: &Connection) -> Result<()> {
         );
         CREATE TABLE IF NOT EXISTS program_markers (
             marker_id TEXT PRIMARY KEY,
-            segment_id TEXT NOT NULL,
-            source_frame INTEGER NOT NULL CHECK (source_frame >= 0),
-            program_frame INTEGER NOT NULL CHECK (program_frame >= 0),
+            program_frame INTEGER NOT NULL CHECK (program_frame > 0),
             created_at_utc INTEGER NOT NULL
-        );",
-    )
-    .map_err(err)?;
-    add_column_if_missing(
-        conn,
-        "program_segments",
-        "marker_mode",
-        "TEXT NOT NULL DEFAULT 'content' CHECK (marker_mode IN ('content', 'frame'))",
-    )?;
-    conn.execute_batch(
-        "DROP VIEW IF EXISTS public_program_segments;
+        );
+        DROP VIEW IF EXISTS public_program_segments;
         CREATE VIEW public_program_segments AS
         SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num, fps_den,
-               marker_mode, created_at_utc
+               created_at_utc
         FROM program_segments;
         DROP VIEW IF EXISTS public_program_markers;
         CREATE VIEW public_program_markers AS
-        SELECT marker_id, segment_id, source_frame, program_frame, created_at_utc
+        SELECT marker_id, program_frame, created_at_utc
         FROM program_markers;",
     )
     .map_err(err)
 }
 
-fn add_column_if_missing(conn: &Connection, table: &str, column: &str, definition: &str) -> Result<()> {
+fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>> {
     let mut statement = conn
         .prepare(&format!("PRAGMA table_info({table})"))
         .map_err(err)?;
@@ -1666,20 +1601,47 @@ fn add_column_if_missing(conn: &Connection, table: &str, column: &str, definitio
         .map_err(err)?
         .collect::<rusqlite::Result<Vec<_>>>()
         .map_err(err)?;
-    if columns.iter().any(|existing| existing == column) {
-        return Ok(());
-    }
-    conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {column} {definition}"))
-        .map_err(err)
+    Ok(columns)
+}
+
+/// Program length in frames: the segments one after another.
+fn program_length(conn: &Connection) -> Result<i64> {
+    conn.query_row(
+        "SELECT COALESCE(SUM(out_frame - in_frame), 0) FROM program_segments",
+        [],
+        |row| row.get(0),
+    )
+    .map_err(err)
+}
+
+/// User markers only live strictly inside the program, one per frame.
+fn prune_markers(conn: &Connection) -> Result<()> {
+    let length = program_length(conn)?;
+    conn.execute(
+        "DELETE FROM program_markers WHERE program_frame <= 0 OR program_frame >= ?1",
+        [length],
+    )
+    .map_err(err)?;
+    conn.execute(
+        "DELETE FROM program_markers WHERE rowid NOT IN
+            (SELECT MIN(rowid) FROM program_markers GROUP BY program_frame)",
+        [],
+    )
+    .map_err(err)?;
+    Ok(())
 }
 
 /// Program frames `[start, end)` of a segment in the stored order.
 fn segment_window(conn: &Connection, segment_id: &str) -> Result<Option<(u64, u64)>> {
     let mut statement = conn
-        .prepare("SELECT segment_id, out_frame - in_frame FROM program_segments ORDER BY sort_index")
+        .prepare(
+            "SELECT segment_id, out_frame - in_frame FROM program_segments ORDER BY sort_index",
+        )
         .map_err(err)?;
     let rows = statement
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
         .map_err(err)?
         .collect::<rusqlite::Result<Vec<_>>>()
         .map_err(err)?;

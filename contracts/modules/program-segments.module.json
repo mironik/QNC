@@ -15,6 +15,6 @@
   "database_write_policy": "public_db_owner_write_adapter_only",
   "runtime_crate": "qnc-program-segments",
   "input": "Content target of the active project; a Ton or Off segment from the chosen clip, the player-confirmed source IN/OUT and the confirmed source timebase.",
-  "output": "program_segments and program_markers rows in the project database through the serialized content write transport, and a program model: segments one after another on one program axis, M markers per segment (switch 1 follows the picture, 2 keeps the program frame), M-M slots, story timebase, total length, duration labels, and a Wrap cue (clip + source frame) for the player; the program playhead comes only from the player-confirmed frame.",
+  "output": "program_segments and program_markers rows in the project database through the serialized content write transport, and a program model: segments one after another on one program axis, user M markers on the program axis (default markers only at the program start and the end of the last segment), M-M slots, story timebase, total length, duration labels, and a Wrap cue (clip + source frame) for the player; the program playhead comes only from the player-confirmed frame.",
   "specification": "docs/93-v5-story-processes-and-rules.md R8-R14; docs/v5-book/04-story.md"
 }

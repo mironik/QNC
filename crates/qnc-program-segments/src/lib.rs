@@ -13,7 +13,7 @@ mod markers;
 
 pub use markers::{
     check_move, check_new, neighbour_marker, neighbour_segment, neighbour_slot, program_frame,
-    resolve, slot_at, slots, source_at, MarkerMode, MarkerPin, Slot, PROGRAM_END, PROGRAM_START,
+    resolve, slot_at, slots, source_at, MarkerPin, Slot, PROGRAM_END, PROGRAM_START,
 };
 
 use qnc_content_store::{
@@ -75,8 +75,6 @@ pub struct SegmentRow {
     pub duration_label: String,
     /// `under_3`, `under_5`, `under_7` or `over_7` seconds (v5 duration marks).
     pub duration_color_key: &'static str,
-    /// Switch 1 or 2: how its markers follow a trim or a move.
-    pub marker_mode: MarkerMode,
     pub selected: bool,
 }
 
@@ -154,7 +152,6 @@ pub fn program(segments: &[ProgramSegment], selected: Option<&str>) -> SegmentsV
             end_frame: start + frames,
             duration_label: duration_label(frames, segment.fps_num, segment.fps_den),
             duration_color_key: duration_color_key(frames, segment.fps_num, segment.fps_den),
-            marker_mode: MarkerMode::from_db(&segment.marker_mode),
             selected: selected == Some(segment.segment_id.as_str()),
         });
         start += frames;
@@ -230,28 +227,17 @@ pub enum SegmentCommand {
     Cue(u64),
     /// M: a new marker at the playhead, or the selected marker moved there (docs/94 7a).
     Marker,
-    /// Switch 1 or 2 of a segment.
-    SetMarkerMode {
-        segment_id: String,
-        mode: MarkerMode,
-    },
-    /// Mark IN / Mark OUT in the Wrap view: trims the segment under the playhead.
-    TrimIn,
-    TrimOut,
 }
 
 impl SegmentCommand {
-    /// The command behind a keyboard catalog `action_id`. Mark IN / Mark OUT trim
-    /// only in the Wrap view; outside it they stay source marks of the caller.
-    pub fn from_action(action_id: &str, in_wrap: bool) -> Option<Self> {
+    /// The command behind a keyboard catalog `action_id`.
+    pub fn from_action(action_id: &str) -> Option<Self> {
         Some(match action_id {
             "add_marker" | "add_marker_continue" => Self::Marker,
             "delete_marker" | "delete_part" | "delete_segment" => Self::DeleteSelected,
             "playlist_input_start" => Self::ProgramStart,
             "step_prev_part" => Self::Step { up: true },
             "step_next_part" => Self::Step { up: false },
-            "mark_in" if in_wrap => Self::TrimIn,
-            "mark_out" if in_wrap => Self::TrimOut,
             _ => return None,
         })
     }
@@ -412,13 +398,12 @@ impl ProgramSegments {
 
     /// Whether a keyboard catalog action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
-        SegmentCommand::from_action(action_id, self.in_wrap()).is_some()
+        SegmentCommand::from_action(action_id).is_some()
     }
 
     /// Applies a keyboard catalog action of the program; false if it is not one.
     pub fn apply_action(&mut self, action_id: &str) -> bool {
-        SegmentCommand::from_action(action_id, self.in_wrap())
-            .is_some_and(|command| self.apply(command))
+        SegmentCommand::from_action(action_id).is_some_and(|command| self.apply(command))
     }
 
     /// Applies a command; returns true so the caller repaints.
@@ -446,11 +431,6 @@ impl ProgramSegments {
             SegmentCommand::ProgramStart => self.cue_program(0),
             SegmentCommand::Cue(frame) => self.cue_program(frame),
             SegmentCommand::Marker => self.marker_at_playhead(),
-            SegmentCommand::SetMarkerMode { segment_id, mode } => {
-                self.set_marker_mode(segment_id, mode)
-            }
-            SegmentCommand::TrimIn => self.trim(true),
-            SegmentCommand::TrimOut => self.trim(false),
         }
         true
     }
@@ -547,10 +527,6 @@ impl ProgramSegments {
         let Some(frame) = self.playhead else {
             return self.refresh_view("M marker trazi playhead programa (Wrap).".into());
         };
-        let Some((segment, source_frame)) = source_at(&self.view, frame) else {
-            return;
-        };
-        let segment_id = segment.segment_id.clone();
         let checked = match self.selected_marker.as_deref() {
             Some(marker_id) => check_move(&self.view, &self.view.markers, marker_id, frame),
             None => check_new(&self.view, &self.view.markers, frame),
@@ -561,53 +537,13 @@ impl ProgramSegments {
         let operation = match self.selected_marker.clone() {
             Some(marker_id) => Operation::MoveMarker {
                 marker_id,
-                segment_id,
-                source_frame,
                 program_frame: frame,
             },
             None => Operation::CreateMarker {
-                segment_id,
-                source_frame,
                 program_frame: frame,
             },
         };
         self.write(operation);
-    }
-
-    fn set_marker_mode(&mut self, segment_id: String, mode: MarkerMode) {
-        self.write(Operation::SetSegmentMarkerMode {
-            segment_id,
-            mode: mode.db().into(),
-        });
-    }
-
-    /// v5 R11: IN = picture at the playhead; OUT = picture at the playhead, at least
-    /// one frame after IN. Only inside the segment the Wrap view shows.
-    fn trim(&mut self, set_in: bool) {
-        let Some(frame) = self.playhead else {
-            return self
-                .refresh_view("Mark IN/OUT segmenta trazi playhead programa (Wrap).".into());
-        };
-        let Some((segment, source_frame)) = source_at(&self.view, frame) else {
-            return;
-        };
-        let (in_frame, out_frame) = if set_in {
-            (source_frame, segment.source_out_frame)
-        } else {
-            (
-                segment.source_in_frame,
-                source_frame.max(segment.source_in_frame + 1),
-            )
-        };
-        if out_frame <= in_frame {
-            return self.refresh_view("OUT mora biti poslije IN.".into());
-        }
-        let segment_id = segment.segment_id.clone();
-        self.write(Operation::TrimSegment {
-            segment_id,
-            in_frame,
-            out_frame,
-        });
     }
 
     /// Appends a segment at the end of the program; it becomes selected once saved.
@@ -622,7 +558,6 @@ impl ProgramSegments {
             out_frame: segment.out_frame,
             fps_num: segment.fps_num,
             fps_den: segment.fps_den,
-            marker_mode: MarkerMode::Content.db().into(),
         };
         let project_id = self.project_id.clone();
         if self.send(|writes| writes.create_segment(key.clone(), project_id, row)) {

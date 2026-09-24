@@ -1137,7 +1137,12 @@ fn imported_store(path: &std::path::Path) -> ContentStore {
     store
 }
 
-fn create_segment(store: &mut ContentStore, kind: &str, range: (u64, u64), fps: (u32, u32)) -> Result<Data> {
+fn create_segment(
+    store: &mut ContentStore,
+    kind: &str,
+    range: (u64, u64),
+    fps: (u32, u32),
+) -> Result<Data> {
     run(
         store,
         Operation::CreateSegment {
@@ -1163,15 +1168,17 @@ fn segments(store: &mut ContentStore) -> Vec<ProgramSegment> {
 fn segments_are_appended_in_order_and_keep_their_source_range() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = imported_store(&dir.path().join("db"));
-    let Data::Created(ton) = create_segment(&mut store, "ton", (10, 60), (50, 1)).unwrap()
-    else {
+    let Data::Created(ton) = create_segment(&mut store, "ton", (10, 60), (50, 1)).unwrap() else {
         panic!()
     };
     create_segment(&mut store, "off", (100, 125), (100, 2)).unwrap();
     let rows = segments(&mut store);
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0].segment_id, ton);
-    assert_eq!((rows[0].kind.as_str(), rows[0].in_frame, rows[0].out_frame), ("ton", 10, 60));
+    assert_eq!(
+        (rows[0].kind.as_str(), rows[0].in_frame, rows[0].out_frame),
+        ("ton", 10, 60)
+    );
     assert_eq!((rows[1].kind.as_str(), rows[1].sort_index), ("off", 1));
 }
 
@@ -1226,7 +1233,11 @@ fn deleting_closes_the_gap_and_moving_swaps_neighbours_only() {
     };
     assert_eq!(
         order(&mut store),
-        vec![(ids[0].clone(), 0), (ids[2].clone(), 1), (ids[1].clone(), 2)]
+        vec![
+            (ids[0].clone(), 0),
+            (ids[2].clone(), 1),
+            (ids[1].clone(), 2)
+        ]
     );
     run(
         &mut store,
@@ -1248,126 +1259,91 @@ fn deleting_closes_the_gap_and_moving_swaps_neighbours_only() {
     .is_err());
 }
 
-fn marker(store: &mut ContentStore, segment_id: &str, source: u64, program: u64) -> Result<Data> {
-    run(
-        store,
-        Operation::CreateMarker {
-            segment_id: segment_id.into(),
-            source_frame: source,
-            program_frame: program,
-        },
-    )
+fn marker(store: &mut ContentStore, program_frame: u64) -> Result<Data> {
+    run(store, Operation::CreateMarker { program_frame })
 }
 
-fn markers(store: &mut ContentStore) -> Vec<(String, u64, u64)> {
+fn markers(store: &mut ContentStore) -> Vec<u64> {
     let Data::Markers(rows) = run(store, Operation::ListMarkers).unwrap() else {
         panic!()
     };
-    rows.into_iter()
-        .map(|row| (row.segment_id, row.source_frame, row.program_frame))
-        .collect()
+    rows.into_iter().map(|row| row.program_frame).collect()
 }
 
+/// Three ten-frame segments: program frames 0..10, 10..20, 20..30.
 fn three_segments(store: &mut ContentStore) -> Vec<String> {
     for start in [0, 100, 200] {
         create_segment(store, "ton", (start, start + 10), (50, 1)).unwrap();
     }
-    segments(store).into_iter().map(|row| row.segment_id).collect()
+    segments(store)
+        .into_iter()
+        .map(|row| row.segment_id)
+        .collect()
 }
 
 #[test]
-fn a_marker_sits_on_a_picture_inside_its_segment_and_can_be_moved_and_deleted() {
+fn a_user_marker_lies_strictly_inside_the_program_on_a_free_frame() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = imported_store(&dir.path().join("db"));
-    let ids = three_segments(&mut store);
-    assert!(marker(&mut store, &ids[1], 99, 9).is_err());
-    assert!(marker(&mut store, &ids[1], 110, 20).is_err());
-    let Data::Created(id) = marker(&mut store, &ids[1], 104, 14).unwrap() else {
+    assert!(marker(&mut store, 5).is_err(), "no program, no marker");
+    three_segments(&mut store);
+    assert!(marker(&mut store, 0).is_err(), "the start is locked");
+    assert!(marker(&mut store, 30).is_err(), "the end is locked");
+    let Data::Created(id) = marker(&mut store, 14).unwrap() else {
         panic!()
     };
-    assert_eq!(markers(&mut store), vec![(ids[1].clone(), 104, 14)]);
+    assert!(marker(&mut store, 14).is_err(), "one marker per frame");
+    marker(&mut store, 25).unwrap();
+    assert_eq!(markers(&mut store), vec![14, 25]);
+    let move_to = |store: &mut ContentStore, frame| {
+        run(
+            store,
+            Operation::MoveMarker {
+                marker_id: id.clone(),
+                program_frame: frame,
+            },
+        )
+    };
+    assert!(move_to(&mut store, 25).is_err());
+    move_to(&mut store, 21).unwrap();
+    assert_eq!(markers(&mut store), vec![21, 25]);
     run(
         &mut store,
-        Operation::MoveMarker {
+        Operation::DeleteMarker {
             marker_id: id.clone(),
-            segment_id: ids[2].clone(),
-            source_frame: 201,
-            program_frame: 21,
         },
     )
     .unwrap();
-    assert_eq!(markers(&mut store), vec![(ids[2].clone(), 201, 21)]);
-    run(&mut store, Operation::DeleteMarker { marker_id: id.clone() }).unwrap();
-    assert!(markers(&mut store).is_empty());
+    assert_eq!(markers(&mut store), vec![25]);
     assert!(run(&mut store, Operation::DeleteMarker { marker_id: id }).is_err());
 }
 
 #[test]
-fn trimming_drops_picture_markers_outside_and_keeps_frame_markers() {
+fn markers_cross_segment_borders_and_stay_on_their_frame_when_segments_move() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = imported_store(&dir.path().join("db"));
     let ids = three_segments(&mut store);
-    marker(&mut store, &ids[0], 2, 2).unwrap();
-    marker(&mut store, &ids[0], 8, 8).unwrap();
-    let trim = |store: &mut ContentStore, id: &str| {
-        run(
-            store,
-            Operation::TrimSegment {
-                segment_id: id.into(),
-                in_frame: 0,
-                out_frame: 5,
-            },
-        )
-    };
-    trim(&mut store, &ids[0]).unwrap();
-    assert_eq!(markers(&mut store), vec![(ids[0].clone(), 2, 2)]);
-    marker(&mut store, &ids[1], 108, 13).unwrap();
+    marker(&mut store, 10).unwrap();
+    marker(&mut store, 16).unwrap();
     run(
         &mut store,
-        Operation::SetSegmentMarkerMode {
-            segment_id: ids[1].clone(),
-            mode: "frame".into(),
+        Operation::MoveSegment {
+            segment_id: ids[2].clone(),
+            up: true,
         },
     )
     .unwrap();
-    assert!(run(
-        &mut store,
-        Operation::SetSegmentMarkerMode {
-            segment_id: ids[1].clone(),
-            mode: "loose".into(),
-        },
-    )
-    .is_err());
-    run(
-        &mut store,
-        Operation::TrimSegment {
-            segment_id: ids[1].clone(),
-            in_frame: 100,
-            out_frame: 105,
-        },
-    )
-    .unwrap();
-    assert_eq!(markers(&mut store).len(), 2, "frame markers stay after a trim");
-    assert_eq!(segments(&mut store)[1].marker_mode, "frame");
-    assert!(trim(&mut store, "missing").is_err());
+    assert_eq!(markers(&mut store), vec![10, 16]);
 }
 
 #[test]
-fn deleting_a_segment_takes_its_markers_and_moves_frame_markers_after_it() {
+fn deleting_a_segment_drops_markers_inside_it_and_moves_later_ones_left() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = imported_store(&dir.path().join("db"));
     let ids = three_segments(&mut store);
-    marker(&mut store, &ids[0], 5, 5).unwrap();
-    marker(&mut store, &ids[1], 103, 13).unwrap();
-    marker(&mut store, &ids[2], 204, 24).unwrap();
-    run(
-        &mut store,
-        Operation::SetSegmentMarkerMode {
-            segment_id: ids[2].clone(),
-            mode: "frame".into(),
-        },
-    )
-    .unwrap();
+    for frame in [5, 10, 13, 20, 24] {
+        marker(&mut store, frame).unwrap();
+    }
     run(
         &mut store,
         Operation::DeleteSegment {
@@ -1375,8 +1351,45 @@ fn deleting_a_segment_takes_its_markers_and_moves_frame_markers_after_it() {
         },
     )
     .unwrap();
+    // 13 was inside; 20 lands on 10, where one marker already is; 24 moves to 14.
+    assert_eq!(markers(&mut store), vec![5, 10, 14]);
+    run(
+        &mut store,
+        Operation::DeleteSegment {
+            segment_id: ids[2].clone(),
+        },
+    )
+    .unwrap();
     assert_eq!(
         markers(&mut store),
-        vec![(ids[0].clone(), 5, 5), (ids[2].clone(), 204, 14)]
+        vec![5],
+        "a marker on the new program end goes"
     );
+}
+
+#[test]
+fn development_records_of_per_segment_markers_are_removed_on_open() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    drop(store);
+    let conn = Connection::open(&path).unwrap();
+    conn.execute_batch(
+        "DROP VIEW public_program_markers; DROP TABLE program_markers;
+        CREATE TABLE program_markers (marker_id TEXT PRIMARY KEY, segment_id TEXT NOT NULL,
+            source_frame INTEGER NOT NULL, program_frame INTEGER NOT NULL,
+            created_at_utc INTEGER NOT NULL);
+        INSERT INTO program_markers VALUES ('old', 's', 3, 3, 0);
+        DROP VIEW public_program_segments;
+        ALTER TABLE program_segments ADD COLUMN marker_mode TEXT NOT NULL DEFAULT 'content'
+            CHECK (marker_mode IN ('content', 'frame'));",
+    )
+    .unwrap();
+    drop(conn);
+    let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+    assert!(markers(&mut store).is_empty());
+    assert_eq!(segments(&mut store).len(), 3);
+    marker(&mut store, 12).unwrap();
+    assert_eq!(markers(&mut store), vec![12]);
 }

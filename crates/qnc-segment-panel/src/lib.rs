@@ -2,8 +2,7 @@
 //! `marker_cover_panel.rs` and `qnc_segment_timeline::show_program`).
 //!
 //! Passive paint only: a header with the timing of the program, one row per segment
-//! with its M markers and M-M slots and a 1 | 2 marker switch above the picture,
-//! the navigation bar and one overview row of the whole program. Every row is a
+//! with its M markers and M-M slots, the navigation bar and one overview row of the whole program. Every row is a
 //! local projection of the same program axis, painted by the one public
 //! `qnc-timeline`. The panel receives a prepared `SegmentsView` and returns what the
 //! user asked for; it never reads a database, plays, seeks or decides the program.
@@ -14,7 +13,7 @@ mod list;
 pub use list::show_segment_list;
 
 use eframe::egui::{self, Color32, RichText, Vec2};
-use qnc_program_segments::{MarkerMode, SegmentCommand, SegmentRow, SegmentsView};
+use qnc_program_segments::{SegmentCommand, SegmentRow, SegmentsView};
 use qnc_timeline::{
     AudioLane, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags,
     TimelineMarkerPin, TimelineMetrics, TimelineProjection, TimelineSlotSpan, TimelineTheme,
@@ -171,7 +170,7 @@ fn layers() -> TimelineLayerFlags {
     TimelineLayerFlags::a1_v_a2().with_overlays()
 }
 
-/// One segment row with its 1 | 2 marker switch above the picture.
+/// One segment row: the program inside its window.
 fn paint_row(
     ui: &mut egui::Ui,
     segments: &SegmentsView,
@@ -179,49 +178,7 @@ fn paint_row(
     theme: TimelineTheme,
 ) -> Option<SegmentCommand> {
     let window = (row.start_frame, row.end_frame);
-    let first = row.start_frame == 0;
-    let painted = ui.scope(|ui| paint_program(ui, segments, window, theme, first));
-    let rect = painted.response.rect;
-    let switch_rect = egui::Rect::from_min_size(
-        egui::pos2(rect.right() - 58.0, rect.top() + 2.0),
-        Vec2::new(54.0, 16.0),
-    );
-    let mut switch = None;
-    ui.scope_builder(egui::UiBuilder::new().max_rect(switch_rect), |ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        ui.spacing_mut().button_padding = Vec2::new(4.0, 0.0);
-        ui.horizontal(|ui| {
-            for mode in [MarkerMode::Content, MarkerMode::Frame] {
-                if marker_switch(ui, mode, row.marker_mode == mode, theme) {
-                    switch = Some(SegmentCommand::SetMarkerMode {
-                        segment_id: row.segment_id.clone(),
-                        mode,
-                    });
-                }
-            }
-        });
-    });
-    switch.or(painted.inner)
-}
-
-/// One half of the 1 | 2 switch; returns true when the user picks it.
-fn marker_switch(ui: &mut egui::Ui, mode: MarkerMode, active: bool, theme: TimelineTheme) -> bool {
-    let text = RichText::new(mode.number().to_string())
-        .small()
-        .color(theme.text);
-    let fill = if active {
-        theme.playhead.gamma_multiply(0.55)
-    } else {
-        Color32::TRANSPARENT
-    };
-    let hint = match mode {
-        MarkerMode::Content => "1: M markeri prate sliku segmenta",
-        MarkerMode::Frame => "2: M markeri ostaju na frameu programa",
-    };
-    let response = ui
-        .add(egui::Button::new(text).fill(fill))
-        .on_hover_text(hint);
-    response.clicked() && !active
+    paint_program(ui, segments, window, theme, row.start_frame == 0)
 }
 
 /// The program between `start` and `end`, as one `qnc-timeline` row.

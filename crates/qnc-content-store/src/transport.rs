@@ -620,8 +620,8 @@ impl ContentWriteTransport {
         )
     }
 
-    /// Any write of program segments or markers: trim, marker mode, create, move or
-    /// delete a marker. A created object reports its id.
+    /// Any write of program markers: create, move or delete. A created marker
+    /// reports its id.
     pub fn write_program(&mut self, key: String, operation: Operation) -> Result<()> {
         self.send_operation(key, operation)
     }
@@ -760,8 +760,6 @@ fn execute_write_command(
         operation @ (Operation::CreateSegment { .. }
         | Operation::DeleteSegment { .. }
         | Operation::MoveSegment { .. }
-        | Operation::TrimSegment { .. }
-        | Operation::SetSegmentMarkerMode { .. }
         | Operation::CreateMarker { .. }
         | Operation::MoveMarker { .. }
         | Operation::DeleteMarker { .. }) => Ok(match client.write_segment(operation)? {

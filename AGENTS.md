@@ -2039,6 +2039,23 @@ ugovori nisu dirani; C10 granice nisu podignute. Nije izvedeno: pustanje price k
 segmente, pokrivalice, Sync/B-roll, undo/redo, Export HI-res. Verificirano: testovi
 `qnc-content-store` (35), `qnc-program-segments` (13), `qnc-editorial-application` (11),
 `cargo build --workspace`, `cargo run -p qnc-conformance` prolazi. Odobrenje je zatvoreno.
+Zatvoreno ograniceno odobrenje 2026-09-24 (Story korak 3a: markeri na osi programa):
+korisnik je nakon analize v5 (`novi13`: slot 16-160 preko granice Off->Ton) odredio:
+segmenti su dijelovi programske trake, programska traka nastaje slaganjem segmenata i
+to je prica; zadani markeri postoje samo na pocetku prvog i na kraju zadnjeg segmenta;
+rekao "kreni". Prekidac 1|2 i skracivanje segmenta (nisu v5 postupak) uklonjeni su.
+Otkljucano i izvedeno samo: `crates/qnc-content-store` (`program_markers` nosi samo
+`program_frame`; stari razvojni zapisi markera po segmentu i stupac `marker_mode` se
+brisu pri otvaranju, bez migracije; marker samo strogo unutar programa i jedan po frameu;
+brisanje segmenta brise markere unutar njega i pomice kasnije ulijevo, kao v5
+`shift_markers_after_part_removal_frames`; premjestanje segmenta ne dira markere;
+uklonjeni TrimSegment i SetSegmentMarkerMode; testovi), `crates/qnc-program-segments`
+(markeri i slotovi samo iz frameova programa; uklonjeni MarkerMode, TrimIn/TrimOut),
+`crates/qnc-segment-panel` (bez prekidaca), ugovori `program-segments` (baza, modul) i
+`segment-panel`. Nije izvedeno: playlista programa i pustanje price (korak 3b),
+pokrivalice Cover slot/Overwrite (3c), Sync/B-roll (3d). Verificirano: testovi
+`qnc-content-store` (36), `qnc-program-segments` (13), `qnc-editorial-application`,
+`cargo build --workspace`, `cargo run -p qnc-conformance`. Odobrenje je zatvoreno.
 Verificirano: `cargo build --workspace`, testovi `qnc-broadcast-player` (78),
 `qnc-broadcast-engine`, `qnc-playback-activity`, `qnc-ingest-import-worker`,
 `qnc-ingest-worker`, `qnc-ingest-application`, `qnc-editorial-application`,

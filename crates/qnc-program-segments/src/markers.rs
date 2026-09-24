@@ -1,7 +1,9 @@
 //! M markers and M-M slots of the program (docs/93 R15-R23, docs/94).
 //!
-//! Pure functions, program frames only. The start (frame 0) and the end (program
-//! length) are M markers by position: always there, never stored, never moved.
+//! Pure functions, program frames only. By default the program has two markers:
+//! the start of the first segment (frame 0) and the end of the last segment
+//! (program length). They are markers by position: never stored, never moved,
+//! and a segment border is no marker. User markers may cross segment borders.
 //! A slot is named after the two markers around it, so moving a marker keeps
 //! the identity of both of its slots (docs/94 7a).
 
@@ -14,46 +16,10 @@ pub const PROGRAM_START: &str = "program_start";
 /// Name of the locked end marker in slot ids.
 pub const PROGRAM_END: &str = "program_end";
 
-/// How the markers of a segment follow it (switch 1 or 2 on the segment).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum MarkerMode {
-    /// 1: the marker stays on its picture when the segment is trimmed or moved.
-    #[default]
-    Content,
-    /// 2: the marker stays on its program frame, as in v5.
-    Frame,
-}
-
-impl MarkerMode {
-    pub(crate) fn from_db(value: &str) -> Self {
-        if value == "frame" {
-            Self::Frame
-        } else {
-            Self::Content
-        }
-    }
-
-    pub(crate) fn db(self) -> &'static str {
-        match self {
-            Self::Content => "content",
-            Self::Frame => "frame",
-        }
-    }
-
-    /// `1` or `2`, as the switch shows it.
-    pub fn number(self) -> u8 {
-        match self {
-            Self::Content => 1,
-            Self::Frame => 2,
-        }
-    }
-}
-
-/// A marker on the program axis.
+/// A user marker on the program axis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkerPin {
     pub marker_id: String,
-    pub segment_id: String,
     pub frame: u64,
     pub selected: bool,
 }
@@ -67,8 +33,8 @@ pub struct Slot {
     pub selected: bool,
 }
 
-/// Where each stored marker is now. Markers whose picture was cut away, or whose
-/// frame lies outside the program, are not shown.
+/// The stored user markers strictly inside the program, one per frame (v5 keeps
+/// them on their program frame when segments move).
 pub fn resolve(
     view: &SegmentsView,
     stored: &[ProgramMarker],
@@ -76,21 +42,11 @@ pub fn resolve(
 ) -> Vec<MarkerPin> {
     let mut pins = stored
         .iter()
-        .filter_map(|marker| {
-            let segment = view
-                .rows
-                .iter()
-                .find(|row| row.segment_id == marker.segment_id)?;
-            let frame = match segment.marker_mode {
-                MarkerMode::Content => program_frame(segment, marker.source_frame)?,
-                MarkerMode::Frame => marker.program_frame,
-            };
-            (frame > 0 && frame < view.total_frames).then(|| MarkerPin {
-                marker_id: marker.marker_id.clone(),
-                segment_id: marker.segment_id.clone(),
-                frame,
-                selected: selected == Some(marker.marker_id.as_str()),
-            })
+        .filter(|marker| marker.program_frame > 0 && marker.program_frame < view.total_frames)
+        .map(|marker| MarkerPin {
+            marker_id: marker.marker_id.clone(),
+            frame: marker.program_frame,
+            selected: selected == Some(marker.marker_id.as_str()),
         })
         .collect::<Vec<_>>();
     pins.sort_by(|a, b| a.frame.cmp(&b.frame).then(a.marker_id.cmp(&b.marker_id)));

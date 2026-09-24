@@ -15,6 +15,6 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-segment-panel",
   "input": "A prepared program segments view (rows, markers, slots, player-confirmed program playhead) and the timeline theme.",
-  "output": "Passive Segmenti panel (program timing header, one qnc-timeline row per segment with its markers, slots and 1/2 marker switch, the navigation bar and a program overview row) and the user's intent as a segment command.",
+  "output": "Passive Segmenti panel (program timing header, one qnc-timeline row per segment with the program markers and slots, the navigation bar and a program overview row) and the user's intent as a segment command.",
   "specification": "QNC_v5 qnc-app/src/editorial/segment_panel.rs and qnc_segment_timeline.rs show_program"
 }
