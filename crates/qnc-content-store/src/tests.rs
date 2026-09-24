@@ -1600,7 +1600,7 @@ fn slots_are_stored_between_adjacent_markers_and_named_by_their_pair() {
 }
 
 #[test]
-fn a_cover_follows_its_logical_slot_instead_of_being_dropped() {
+fn a_cover_follows_its_slot_when_markers_move_or_split_it() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     let mut store = imported_store(&path);
@@ -1615,20 +1615,17 @@ fn a_cover_follows_its_logical_slot_instead_of_being_dropped() {
     drop(store);
     put_cover(&path, "cover_a", &slot);
     let mut store = reopen(&path);
-    let move_to = |store: &mut ContentStore, marker_id: &str, frame| {
-        run(
-            store,
-            Operation::MoveMarker {
-                marker_id: marker_id.into(),
-                program_frame: frame,
-            },
-        )
-        .unwrap()
-    };
+    run(
+        &mut store,
+        Operation::MoveMarker {
+            marker_id: m25.clone(),
+            program_frame: 27,
+        },
+    )
+    .unwrap();
     // The same pair moves: the cover takes the new frames.
-    move_to(&mut store, &m25, 27);
     assert_eq!(cover_row(&path, "cover_a"), (slot.clone(), 14, 27));
-    // A marker splits the slot: the cover is trimmed to the part that keeps its start.
+    // A new marker splits the slot: the cover is trimmed to the part that keeps its start.
     let Data::Created(m20) = marker(&mut store, 20).unwrap() else {
         panic!()
     };
@@ -1636,22 +1633,18 @@ fn a_cover_follows_its_logical_slot_instead_of_being_dropped() {
         cover_row(&path, "cover_a"),
         (format!("{m14}|{m20}"), 14, 20)
     );
-    // Its start marker is deleted: the cover follows the slot that keeps its end.
-    run(
-        &mut store,
-        Operation::DeleteMarker {
-            marker_id: m14.clone(),
-        },
-    )
-    .unwrap();
-    let (slot_now, start, end) = cover_row(&path, "cover_a");
-    assert!(slot_now.ends_with(&format!("|{m20}")), "{slot_now}");
-    assert_eq!((start, end), (0, 20));
-    assert!(slot_rows(&path)[0].2, "the slot shows its cover");
+    assert!(slot_rows(&path)[1].2, "the slot shows its cover");
+}
+
+fn cover_count(path: &std::path::Path) -> i64 {
+    Connection::open(path)
+        .unwrap()
+        .query_row("SELECT count(*) FROM story_covers", [], |row| row.get(0))
+        .unwrap()
 }
 
 #[test]
-fn a_cover_without_a_free_slot_stays_but_takes_no_frames() {
+fn deleting_a_marker_deletes_its_slots_with_their_covers() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     let mut store = imported_store(&path);
@@ -1659,15 +1652,21 @@ fn a_cover_without_a_free_slot_stays_but_takes_no_frames() {
     let Data::Created(m14) = marker(&mut store, 14).unwrap() else {
         panic!()
     };
-    let (left, right) = (slot_at_frame(&path, 5), slot_at_frame(&path, 20));
+    marker(&mut store, 25).unwrap();
+    let (left, middle, right) = (
+        slot_at_frame(&path, 5),
+        slot_at_frame(&path, 20),
+        slot_at_frame(&path, 27),
+    );
     drop(store);
     put_cover(&path, "cover_left", &left);
+    put_cover(&path, "cover_middle", &middle);
     put_cover(&path, "cover_right", &right);
     Connection::open(&path)
         .unwrap()
         .execute(
             "UPDATE story_state SET selected_slot_id = ?1 WHERE id = 1",
-            [&right],
+            [&middle],
         )
         .unwrap();
     let mut store = reopen(&path);
@@ -1678,16 +1677,10 @@ fn a_cover_without_a_free_slot_stays_but_takes_no_frames() {
         },
     )
     .unwrap();
-    // Both covers wanted the one remaining slot: one holds it, the other is kept
-    // unbound (no frames) instead of being deleted.
-    let left_row = cover_row(&path, "cover_left");
-    let right_row = cover_row(&path, "cover_right");
-    assert_eq!(slot_rows(&path), vec![(0, 30, true)]);
-    let bound = [&left_row, &right_row]
-        .iter()
-        .filter(|row| row.2 > row.1)
-        .count();
-    assert_eq!(bound, 1);
+    // M14 closed the left slot and opened the middle one: both go with their covers.
+    assert_eq!(cover_count(&path), 1);
+    assert_eq!(cover_row(&path, "cover_right").1, 25);
+    assert_eq!(slot_rows(&path), vec![(0, 25, false), (25, 30, true)]);
     let selected: String = Connection::open(&path)
         .unwrap()
         .query_row("SELECT selected_slot_id FROM story_state", [], |row| {
@@ -1695,4 +1688,44 @@ fn a_cover_without_a_free_slot_stays_but_takes_no_frames() {
         })
         .unwrap();
     assert_eq!(selected, "", "a slot that no longer exists is not selected");
+}
+
+#[test]
+fn deleting_a_segment_deletes_the_slots_of_the_markers_inside_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    let ids = three_segments(&mut store);
+    marker(&mut store, 5).unwrap();
+    marker(&mut store, 14).unwrap();
+    let (first, inside) = (slot_at_frame(&path, 2), slot_at_frame(&path, 20));
+    drop(store);
+    put_cover(&path, "cover_first", &first);
+    put_cover(&path, "cover_inside", &inside);
+    let mut store = reopen(&path);
+    run(
+        &mut store,
+        Operation::DeleteSegment {
+            segment_id: ids[1].clone(),
+        },
+    )
+    .unwrap();
+    // M14 was inside the deleted segment: its slots and their covers go.
+    assert_eq!(cover_count(&path), 1);
+    assert_eq!(cover_row(&path, "cover_first"), (first, 0, 5));
+    run(
+        &mut store,
+        Operation::DeleteSegment {
+            segment_id: ids[0].clone(),
+        },
+    )
+    .unwrap();
+    run(
+        &mut store,
+        Operation::DeleteSegment {
+            segment_id: ids[2].clone(),
+        },
+    )
+    .unwrap();
+    assert_eq!(cover_count(&path), 0, "no program, no markers, no covers");
 }

@@ -28,6 +28,6 @@
     "story_parts": "TON/OFF segments (kind tonovi | offovi) in sort_index order; the program is their sum; delete sets active = 0",
     "story_markers": "one locked program_start at frame 0 and one locked program_end at the program length; segment borders are no markers; a user M marker keeps origin_part_id",
     "story_marker_slots": "recomputed after every story change, one slot between every two adjacent markers; slot_id = start_marker_id|end_marker_id",
-    "story_covers": "a cover is bound to slot_id and removed only by the user; after a change it follows the same marker pair, else the slot keeping its start marker (trimmed), else the slot keeping its end marker, else the slot holding its old start frame; a slot holds one cover, a cover without a free slot is kept with no frames"
+    "story_covers": "a cover is bound to slot_id; deleting a marker (by the user or with its segment) deletes its slots and their covers; any other change keeps the cover on the same marker pair with the new frames, else on the slot keeping its start marker (a new marker split it: trimmed)"
   }
 }

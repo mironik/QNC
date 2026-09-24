@@ -2166,16 +2166,16 @@ bazi): korisnik je rekao "ok, nastavi" nakon koraka 1; vrijedi pravilo v5
 (`qnc-story-segment-timeline.mdc`). Otkljucano i izvedeno samo:
 `crates/qnc-content-store` (nakon svake promjene price `finalize_story`: pocetni i
 zavrsni marker, `story_marker_slots` iznova izmedu svaka dva susjedna markera s
-identitetom `start_marker_id|end_marker_id`, pokrivalice ponovno vezane na svoj
-logicki slot: isti par, inace slot s istim pocetnim markerom (skracena), inace
-slot s istim zavrsnim markerom, inace slot na starom pocetnom frameu; slot drzi
-jednu pokrivalicu, pokrivalica bez slobodnog slota ostaje bez frameova i ne
-brise se; odabrani slot i pokrivalica se ponistavaju ako vise ne postoje;
+identitetom `start_marker_id|end_marker_id`; odluka korisnika: brisanje
+markera (rucno ili s obrisanim segmentom) brise i njegove slotove s njihovim
+pokrivalicama; svaka druga promjena ostavlja pokrivalicu na istom paru markera s
+novim frameovima, inace na slotu s istim pocetnim markerom (novi marker ju je
+skratio); odabrani slot i pokrivalica se ponistavaju ako vise ne postoje;
 `story_covers.slot_id`, `public_story_marker_slots.has_cover`; razvojne
 `story_covers` bez `slot_id` se brisu), ugovor `story.database.json` (pravila).
 Nije izvedeno: citanje slotova u modelu programa (korak 4), izrada pokrivalica
 (korak 9), prikaz neaktivnih segmenata. Player, forme i layout nisu dirani.
-Verificirano: `cargo test -p qnc-content-store` (41), `qnc-program-segments`
+Verificirano: `cargo test -p qnc-content-store` (42), `qnc-program-segments`
 (13), `qnc-editorial-application` (11), `cargo build --workspace`,
 `cargo run -p qnc-conformance`. Odobrenje je zatvoreno.
 

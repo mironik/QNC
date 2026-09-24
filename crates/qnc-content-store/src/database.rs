@@ -1028,11 +1028,21 @@ impl ContentStore {
         .map_err(err)?;
         if let (Some(fps), Some((start, end))) = (fps, window) {
             let (start, end) = (start as i64, end as i64);
-            tx.execute(
-                "DELETE FROM story_markers WHERE timeline_frame > ?1 AND timeline_frame < ?2",
-                params![start, end],
-            )
-            .map_err(err)?;
+            let inside = {
+                let mut statement = tx
+                    .prepare(
+                        "SELECT marker_id FROM story_markers
+                         WHERE timeline_frame > ?1 AND timeline_frame < ?2",
+                    )
+                    .map_err(err)?;
+                let ids = statement
+                    .query_map(params![start, end], |row| row.get::<_, String>(0))
+                    .map_err(err)?
+                    .collect::<rusqlite::Result<Vec<_>>>()
+                    .map_err(err)?;
+                ids
+            };
+            delete_markers_with_slots(&tx, &inside)?;
             let shifted = {
                 let mut statement = tx
                     .prepare("SELECT marker_id, timeline_frame FROM story_markers WHERE timeline_frame >= ?1")
@@ -1241,11 +1251,7 @@ impl ContentStore {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
         locked_check(&tx, marker_id, duration)?;
-        tx.execute(
-            "DELETE FROM story_markers WHERE marker_id = ?1",
-            [marker_id],
-        )
-        .map_err(err)?;
+        delete_markers_with_slots(&tx, &[marker_id.to_string()])?;
         finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
@@ -2000,7 +2006,8 @@ fn ensure_boundary_markers(conn: &Connection) -> Result<()> {
     let duration: i64 = parts.iter().map(|part| part.frames).sum();
     if duration <= 0 {
         conn.execute_batch(
-            "DELETE FROM story_marker_slots;
+            "DELETE FROM story_covers;
+             DELETE FROM story_marker_slots;
              DELETE FROM story_markers;
              UPDATE story_state SET selected_slot_id = '' WHERE id = 1;",
         )
@@ -2199,6 +2206,42 @@ fn recompute_marker_slots(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Deletes markers with their slots: the covers of every slot that starts or
+/// ends on one of them go too (user decision 2026-09-24).
+fn delete_markers_with_slots(conn: &Connection, marker_ids: &[String]) -> Result<()> {
+    if marker_ids.is_empty() {
+        return Ok(());
+    }
+    let covers = {
+        let mut statement = conn
+            .prepare("SELECT cover_id, slot_id FROM story_covers")
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        rows
+    };
+    for (cover_id, slot) in covers {
+        let (start, end) = slot.split_once('|').unwrap_or(("", ""));
+        if marker_ids.iter().any(|id| id == start || id == end) {
+            conn.execute("DELETE FROM story_covers WHERE cover_id = ?1", [cover_id])
+                .map_err(err)?;
+        }
+    }
+    for marker_id in marker_ids {
+        conn.execute(
+            "DELETE FROM story_markers WHERE marker_id = ?1",
+            [marker_id],
+        )
+        .map_err(err)?;
+    }
+    Ok(())
+}
+
 /// Slot identity: the ids of its start and end marker.
 fn slot_id(start_marker_id: &str, end_marker_id: &str) -> String {
     format!("{start_marker_id}|{end_marker_id}")
@@ -2210,22 +2253,20 @@ struct SlotRow {
     start_frame: i64,
     end_frame: i64,
     start_marker_id: String,
-    end_marker_id: String,
     signature: String,
 }
 
-/// v5 rule: a cover is removed only by the user. When slots change, the cover
-/// follows its logical slot: the same marker pair, else the slot that keeps its
-/// start marker (a marker split the slot: the cover is trimmed), else the slot
-/// that keeps its end marker, else the slot holding its old start frame (a marker
-/// of the pair was deleted). A slot holds one cover; a cover that finds only an
-/// occupied slot stays unbound (no frames) until a slot is free again.
+/// v5 rule: a cover is removed only by the user. Deleting a marker deletes its
+/// slots and their covers (`delete_markers_with_slots`). Any other change keeps
+/// the cover on its logical slot: the same marker pair (moved markers give it the
+/// new frames), else the slot that keeps its start marker (a new marker split the
+/// slot: the cover is trimmed). A cover without a slot keeps no frames.
 fn rebind_covers(conn: &Connection) -> Result<()> {
     let slots = {
         let mut statement = conn
             .prepare(
                 "SELECT slot_id, slot_index, start_frame, end_frame, start_marker_id,
-                        end_marker_id, slot_signature
+                        slot_signature
                  FROM story_marker_slots ORDER BY slot_index",
             )
             .map_err(err)?;
@@ -2237,8 +2278,7 @@ fn rebind_covers(conn: &Connection) -> Result<()> {
                     start_frame: row.get(2)?,
                     end_frame: row.get(3)?,
                     start_marker_id: row.get(4)?,
-                    end_marker_id: row.get(5)?,
-                    signature: row.get(6)?,
+                    signature: row.get(5)?,
                 })
             })
             .map_err(err)?
@@ -2248,18 +2288,11 @@ fn rebind_covers(conn: &Connection) -> Result<()> {
     };
     let covers = {
         let mut statement = conn
-            .prepare(
-                "SELECT cover_id, slot_id, timeline_start_frame FROM story_covers
-                 ORDER BY created_at, cover_id",
-            )
+            .prepare("SELECT cover_id, slot_id FROM story_covers ORDER BY created_at, cover_id")
             .map_err(err)?;
         let rows = statement
             .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, i64>(2)?,
-                ))
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
             })
             .map_err(err)?
             .collect::<rusqlite::Result<Vec<_>>>()
@@ -2272,8 +2305,8 @@ fn rebind_covers(conn: &Connection) -> Result<()> {
     let mut order: Vec<usize> = (0..covers.len()).collect();
     order.sort_by_key(|&index| !slots.iter().any(|slot| slot.slot_id == covers[index].1));
     for index in order {
-        let (cover_id, old_slot, old_start) = &covers[index];
-        let (start_marker, end_marker) = old_slot.split_once('|').unwrap_or(("", ""));
+        let (cover_id, old_slot) = &covers[index];
+        let start_marker = old_slot.split_once('|').map_or("", |(start, _)| start);
         let free = |slot: &&SlotRow| !taken.contains(&slot.slot_id.as_str());
         let target = slots
             .iter()
@@ -2284,18 +2317,6 @@ fn rebind_covers(conn: &Connection) -> Result<()> {
                     .iter()
                     .filter(free)
                     .find(|slot| !start_marker.is_empty() && slot.start_marker_id == start_marker)
-            })
-            .or_else(|| {
-                slots
-                    .iter()
-                    .filter(free)
-                    .find(|slot| !end_marker.is_empty() && slot.end_marker_id == end_marker)
-            })
-            .or_else(|| {
-                slots
-                    .iter()
-                    .filter(free)
-                    .find(|slot| (slot.start_frame..slot.end_frame).contains(old_start))
             });
         match target {
             Some(slot) => {
