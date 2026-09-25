@@ -66,6 +66,9 @@ pub struct SyncCover {
     /// The end of the source closed the slot: write the cover once it is ready.
     auto_commit: bool,
     committing: bool,
+    /// Source frame under the Sync play, then the source OUT of the closed slot
+    /// (v5 `set_source_playhead_frame`).
+    source_frame: Option<u64>,
 }
 
 impl SyncCover {
@@ -155,6 +158,7 @@ impl SyncCover {
         self.pending = None;
         self.ready = None;
         self.auto_commit = false;
+        self.source_frame = Some(source_in);
         self.active = Some(Session {
             anchor,
             auto_finish: end,
@@ -177,6 +181,7 @@ impl SyncCover {
         };
         let frame = window_frame?;
         let program = (session.anchor + frame).min(session.auto_finish);
+        self.source_frame = Some(session.source.source_in + (program - session.anchor));
         if program + 1 >= session.auto_finish {
             let end = session.auto_finish;
             if self.finish(end).is_ok() {
@@ -198,6 +203,7 @@ impl SyncCover {
         if source_out <= session.source.source_in {
             return Err("Sync OUT mora biti poslije Source IN".into());
         }
+        self.source_frame = Some(source_out);
         Ok(self.pending.insert(SyncSlot {
             start,
             end,
@@ -242,6 +248,24 @@ impl SyncCover {
     /// The cover write landed (or failed).
     pub fn landed(&mut self) {
         self.committing = false;
+    }
+
+    /// What the source timeline shows (v5 `sync_playhead_from_player_frame`):
+    /// the source frame under the Sync play, played in parallel with the program,
+    /// and once the slot is closed its source OUT with the IN/OUT of the slot.
+    pub fn source_view(&self) -> Option<(u64, Option<(u64, u64)>)> {
+        if let Some(session) = &self.active {
+            let frame = self.source_frame.unwrap_or(session.source.source_in);
+            return Some((frame, None));
+        }
+        let slot = self
+            .pending
+            .as_ref()
+            .or(self.ready.as_ref().map(|(_, slot)| slot))?;
+        Some((
+            slot.source_out,
+            Some((slot.source.source_in, slot.source_out)),
+        ))
     }
 
     /// The user pointed elsewhere on the program: a running Sync play stops.
@@ -301,8 +325,18 @@ mod tests {
             "the window may start on frame 1 (live player log)"
         );
         assert_eq!(sync.program_frame(Some(12)), Some(32));
+        assert_eq!(
+            sync.source_view(),
+            Some((22, None)),
+            "the source plays in parallel"
+        );
         let slot = sync.finish(32).unwrap().clone();
         assert_eq!((slot.start, slot.end, slot.source_out), (20, 32, 22));
+        assert_eq!(
+            sync.source_view(),
+            Some((22, Some((10, 22)))),
+            "OUT and the slot marks"
+        );
         assert_eq!(sync.missing_marker(&[0, 20]), Some(32));
         assert_eq!(sync.missing_marker(&[0, 20, 32]), None);
         assert_eq!(

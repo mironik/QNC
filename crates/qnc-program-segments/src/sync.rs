@@ -95,6 +95,12 @@ impl ProgramSegments {
         true
     }
 
+    /// The source frame the source timeline shows during Sync, and the IN/OUT of
+    /// a closed Sync slot (v5 `set_source_playhead_frame`).
+    pub fn sync_source(&self) -> Option<(u64, Option<(u64, u64)>)> {
+        self.sync.source_view()
+    }
+
     /// Enter is taken by a closed Sync slot or its cover write.
     pub fn sync_holds_enter(&self) -> bool {
         self.sync.holds_enter()

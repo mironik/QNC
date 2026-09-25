@@ -437,6 +437,20 @@ impl SourcePreview {
         true
     }
 
+    /// The source timeline of a Sync play (v5 `set_source_playhead_frame`): the
+    /// source playhead moves with the program, a closed slot shows its IN/OUT.
+    pub fn with_sync_source(
+        mut timeline: TimelineProjection,
+        (frame, marks): (u64, Option<(u64, u64)>),
+    ) -> TimelineProjection {
+        timeline.playhead_frame = Some(frame.min(timeline.duration_frames));
+        if let Some((in_frame, out_frame)) = marks {
+            timeline.source_in_frame = Some(in_frame);
+            timeline.source_out_frame = Some(out_frame);
+        }
+        timeline
+    }
+
     /// Whether the player plays a program rather than the source clip.
     pub fn in_program(&self) -> bool {
         self.program

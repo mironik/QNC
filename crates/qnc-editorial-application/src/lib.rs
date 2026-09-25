@@ -263,6 +263,10 @@ impl EditorialApplication {
         let changed = self.segments.take_program_changed(); // the program opens again
         changed.then(|| self.reload_shorts()); // a cover writes its B-roll shot
         let confirmed = self.segments.sync_frame(self.preview.program_frame()); // Sync window
+        if let Some(sync) = self.segments.sync_source() {
+            let timeline = self.view.preview.timeline;
+            self.view.preview.timeline = SourcePreview::with_sync_source(timeline, sync);
+        }
         match self.wrap.apply(seek, total, changed) {
             Some(r) => _ = self.preview.show_program_frame(r.frame(), r.opens()),
             None => self.wrap.follow_program(confirmed),
