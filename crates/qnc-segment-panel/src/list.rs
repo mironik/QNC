@@ -24,6 +24,7 @@ pub fn show_segment_list(
                 return;
             }
             for row in &segments.parts {
+                let mut buttons: Option<egui::Rect> = None;
                 let stroke = if row.selected {
                     egui::Stroke::new(2.0, select)
                 } else {
@@ -55,14 +56,23 @@ pub fn show_segment_list(
                             }
                             if row.selected && row.active {
                                 let layout = egui::Layout::right_to_left(egui::Align::Center);
-                                ui.with_layout(layout, |ui| row_buttons(ui, &mut command));
+                                ui.with_layout(layout, |ui| {
+                                    buttons = Some(row_buttons(ui, &mut command));
+                                });
                             }
                         });
                     })
                     .response;
+                // The row is no widget of its own: registered over its buttons it would
+                // swallow Del, Down and Up. A click on it away from them selects it.
+                let pointer = ui.input(|i| i.pointer.interact_pos());
+                let on_row = pointer.is_some_and(|pos| {
+                    response.rect.contains(pos) && !buttons.is_some_and(|b| b.contains(pos))
+                });
                 if row.active
+                    && on_row
                     && command.is_none()
-                    && response.interact(egui::Sense::click()).clicked()
+                    && ui.input(|i| i.pointer.primary_clicked())
                 {
                     command = Some(SegmentCommand::Select(row.segment_id.clone()));
                 }
@@ -72,11 +82,13 @@ pub fn show_segment_list(
     command
 }
 
-fn row_buttons(ui: &mut egui::Ui, command: &mut Option<SegmentCommand>) {
-    let small = |ui: &mut egui::Ui, text: &str, hint: &str| {
-        ui.add(egui::Button::new(RichText::new(text).small()))
-            .on_hover_text(hint)
-            .clicked()
+/// Del, Down and Up of the selected row; returns the area they take.
+fn row_buttons(ui: &mut egui::Ui, command: &mut Option<SegmentCommand>) -> egui::Rect {
+    let mut area = egui::Rect::NOTHING;
+    let mut small = |ui: &mut egui::Ui, text: &str, hint: &str| {
+        let response = ui.add(egui::Button::new(RichText::new(text).small()));
+        area = area.union(response.rect);
+        response.on_hover_text(hint).clicked()
     };
     if small(ui, "Del", "Obriši segment") {
         *command = Some(SegmentCommand::DeleteSelected);
@@ -87,4 +99,5 @@ fn row_buttons(ui: &mut egui::Ui, command: &mut Option<SegmentCommand>) {
     if small(ui, "Up", "Pomakni segment ranije") {
         *command = Some(SegmentCommand::Move { up: true });
     }
+    area
 }
