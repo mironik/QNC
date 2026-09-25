@@ -2277,6 +2277,13 @@ Otkljucano: novi javni `crates/qnc-panel-focus` (+ ugovor modula), dodatak
 `crates/qnc-timeline` samo za povlacenje M markera (intent `DragMarker`, bez upisa;
 Enter potvrduje), `crates/qnc-segment-panel`, `crates/qnc-editorial-application`,
 root Cargo.
+Dopuna 2026-09-25 (korisnik "dodaj UNDO dugme"): Undo/Redo za cijelu pricu,
+ne samo pokrivalice kao v5. Svaka izmjena price (segmenti, markeri, pokrivalice)
+sprema prethodno stanje tablica price u `story_undo` u projektnoj bazi
+(`crates/qnc-content-store`, operacije UndoStory/RedoStory); dugmad Undo i Redo u
+traci panela Segmenti (`crates/qnc-segment-panel`), tipke kataloga `undo_object` /
+`redo_object` kroz `crates/qnc-program-segments` kad je fokus na Segmentima.
+B-roll kadrovi koje je pokrivalica stvorila ostaju. Ugovor `story.database.json`.
 
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story program playlista, koraci 1 do 4):
 korisnik je potvrdio opci plan prijenosa v5 pustanja programa (Wrap) i dodao:

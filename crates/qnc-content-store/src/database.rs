@@ -126,6 +126,7 @@ impl ContentStore {
             ensure_wave_schema(&tx)?;
             ensure_virtual_shots_schema(&tx)?;
             ensure_story_schema(&tx)?;
+            crate::story_undo::ensure_schema(&tx)?;
             tx.commit().map_err(err)?;
         }
         let has_thumbnail_uri = schema && has_column(&conn, "clips", "thumbnail_uri")?;
@@ -203,7 +204,25 @@ impl ContentStore {
                 _ => Err("Ingest shema nije inicijalizirana.".into()),
             };
         }
-        match &request.operation {
+        if request.operation.edits_story() {
+            let before = crate::story_undo::capture(&self.conn)?;
+            let data = self.dispatch(&request.operation)?;
+            crate::story_undo::record(&self.conn, &before)?;
+            return Ok(data);
+        }
+        self.dispatch(&request.operation)
+    }
+
+    fn dispatch(&mut self, operation: &Operation) -> Result<Data> {
+        match operation {
+            Operation::UndoStory => {
+                crate::story_undo::step(&self.conn, true)?;
+                Ok(Data::Changed)
+            }
+            Operation::RedoStory => {
+                crate::story_undo::step(&self.conn, false)?;
+                Ok(Data::Changed)
+            }
             Operation::Publish(clip) => self.publish(clip),
             Operation::PublishBatch(clips) => {
                 if clips.is_empty() || clips.len() > 16 {
@@ -1678,13 +1697,23 @@ impl ContentStore {
                         selected_part_id: row.get(0)?,
                         selected_slot_id: row.get(1)?,
                         selected_cover_id: row.get(2)?,
+                        ..StorySelection::default()
                     })
                 },
             )
             .optional()
             .map_err(err)?
             .unwrap_or_default();
-        Ok(Data::StorySelection(selection))
+        let (undo_depth, redo_depth) = if object_exists(&self.conn, "table", "story_undo")? {
+            crate::story_undo::depth(&self.conn)?
+        } else {
+            (0, 0)
+        };
+        Ok(Data::StorySelection(StorySelection {
+            undo_depth,
+            redo_depth,
+            ..selection
+        }))
     }
 
     /// v5 `select_part`: an existing segment, or an empty id to clear.
@@ -2097,6 +2126,7 @@ fn owned_table(name: &str) -> bool {
             | "story_covers"
             | "story_state"
             | "story_object_history"
+            | "story_undo"
             | "ingest_runtime"
     )
 }
@@ -2509,7 +2539,7 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
 }
 
 /// v5 `now_str`.
-fn story_now() -> String {
+pub(crate) fn story_now() -> String {
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
@@ -3355,7 +3385,7 @@ fn fingerprint_u64(hash: &mut u64, value: u64) {
         *hash = hash.wrapping_mul(CATALOG_FINGERPRINT_PRIME);
     }
 }
-fn err(error: impl std::fmt::Display) -> String {
+pub(crate) fn err(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
 

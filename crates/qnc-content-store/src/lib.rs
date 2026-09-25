@@ -1,5 +1,6 @@
 //! Public project content database. This module neither scans nor probes media.
 mod database;
+mod story_undo;
 mod transport;
 pub use database::ContentStore;
 pub use qnc_json_transport::{Access, Credentials};
@@ -214,6 +215,11 @@ pub struct StorySelection {
     pub selected_part_id: String,
     pub selected_slot_id: String,
     pub selected_cover_id: String,
+    /// Story edits that can be undone and redone (UNDO / REDO).
+    #[serde(default)]
+    pub undo_depth: u64,
+    #[serde(default)]
+    pub redo_depth: u64,
 }
 
 /// Lightweight catalog signature for deciding whether a visible catalog is stale.
@@ -364,6 +370,10 @@ pub enum Operation {
         fps_num: u32,
         fps_den: u32,
     },
+    /// The story as it was before the last edit comes back (UNDO).
+    UndoStory,
+    /// The last undone story edit comes back (REDO).
+    RedoStory,
     /// Removes an excluded segment for good; an active one cannot be purged.
     PurgeSegment {
         segment_id: String,
@@ -423,6 +433,24 @@ pub enum Operation {
     },
 }
 impl Operation {
+    /// Whether this write edits the story (an UNDO step), not only its selection.
+    pub fn edits_story(&self) -> bool {
+        matches!(
+            self,
+            Self::CreateSegment { .. }
+                | Self::DeleteSegment { .. }
+                | Self::IncludeSegment { .. }
+                | Self::ReplaceSegment { .. }
+                | Self::PurgeSegment { .. }
+                | Self::MoveSegment { .. }
+                | Self::CreateMarker { .. }
+                | Self::MoveMarker { .. }
+                | Self::DeleteMarker { .. }
+                | Self::CreateCover { .. }
+                | Self::DeleteCover { .. }
+        )
+    }
+
     pub fn is_write(&self) -> bool {
         !matches!(
             self,

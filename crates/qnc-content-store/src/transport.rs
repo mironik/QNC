@@ -796,6 +796,8 @@ fn execute_write_command(
         | Operation::IncludeSegment { .. }
         | Operation::ReplaceSegment { .. }
         | Operation::PurgeSegment { .. }
+        | Operation::UndoStory
+        | Operation::RedoStory
         | Operation::CreateCover { .. }
         | Operation::DeleteCover { .. }
         | Operation::SelectCover { .. }) => Ok(match client.write_segment(operation)? {

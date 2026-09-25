@@ -161,6 +161,9 @@ pub struct SegmentsView {
     pub total_frames: u64,
     /// Program frame of the confirmed player picture in the Wrap view.
     pub playhead: Option<u64>,
+    /// Story edits that UNDO and REDO can take back and replay (from the database).
+    pub undo_depth: u64,
+    pub redo_depth: u64,
     /// Last controlled error of a read or write; empty otherwise.
     pub message: String,
 }
@@ -192,6 +195,8 @@ impl SegmentsView {
         match SegmentCommand::from_action(action_id) {
             Some(SegmentCommand::Cover { overwrite: false }) => self.quick_cover_slot().is_ok(),
             Some(SegmentCommand::Cover { overwrite: true }) => self.overwrite_cover_slot().is_ok(),
+            Some(SegmentCommand::Undo) => self.undo_depth > 0,
+            Some(SegmentCommand::Redo) => self.redo_depth > 0,
             _ => true,
         }
     }
@@ -391,6 +396,10 @@ pub enum SegmentCommand {
         cover_id: String,
         frame: u64,
     },
+    /// UNDO: the story as it was before the last edit (segments, markers, covers).
+    Undo,
+    /// REDO: the last undone story edit again.
+    Redo,
 }
 
 impl SegmentCommand {
@@ -413,6 +422,8 @@ impl SegmentCommand {
             "overwrite_cover" => Self::Cover { overwrite: true },
             "activate_focused_item" => Self::CommitSync,
             "select_marker" => Self::EditMarker,
+            "undo_object" => Self::Undo,
+            "redo_object" => Self::Redo,
             _ => return None,
         })
     }
@@ -443,6 +454,8 @@ pub struct ProgramSegments {
     /// Take the stored selection on the next read (on open, and after writes that
     /// may move it, v5 `story_state`).
     adopt_selection: bool,
+    /// Undo and redo steps kept in the database, from the last read.
+    history: (u64, u64),
     selected: Option<String>,
     selected_marker: Option<String>,
     selected_slot: Option<String>,
@@ -544,6 +557,7 @@ impl ProgramSegments {
                 self.stored_covers = covers;
                 self.stored_markers = markers;
                 self.stored_slots = slots;
+                self.history = (selection.undo_depth, selection.redo_depth);
                 if std::mem::take(&mut self.adopt_selection) {
                     let some = |id: String| (!id.is_empty()).then_some(id);
                     self.selected = some(selection.selected_part_id);
@@ -597,6 +611,15 @@ impl ProgramSegments {
                 self.write(Operation::IncludeSegment { segment_id });
             }
             SegmentCommand::Purge(segment_id) => self.write(Operation::PurgeSegment { segment_id }),
+            SegmentCommand::Undo | SegmentCommand::Redo => {
+                self.marker_edit = None;
+                self.adopt_selection = true;
+                self.write(if matches!(command, SegmentCommand::Undo) {
+                    Operation::UndoStory
+                } else {
+                    Operation::RedoStory
+                });
+            }
             SegmentCommand::Replace(segment_id) => {
                 if let Some((clip_id, (in_frame, out_frame), (fps_num, fps_den))) =
                     self.marked_source()
@@ -1029,6 +1052,7 @@ impl ProgramSegments {
             self.selected = None;
         }
         let mut view = program(&self.stored, self.selected.as_deref());
+        (view.undo_depth, view.redo_depth) = self.history;
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());
         if let Some((marker_id, draft)) = &self.marker_edit {
             // The draft is drawn where the marker is going.

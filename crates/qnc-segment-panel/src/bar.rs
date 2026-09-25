@@ -11,7 +11,7 @@ use qnc_timeline::TimelineTheme;
 
 const COMPACT_CTRL_H: f32 = 22.0;
 const EDIT_ACTIONS_W: f32 = 250.0;
-const RIGHT_ACTIONS_W: f32 = 110.0;
+const RIGHT_ACTIONS_W: f32 = 210.0;
 const EDIT_ACTION_GAP: f32 = 6.0;
 const CONTROL_GROUP_GAP: f32 = 10.0;
 const TRANSPORT_BTN_W: f32 = 30.0;
@@ -134,6 +134,16 @@ pub(crate) fn show(
                         ));
                 if clicked(ui.add(button).on_hover_text("Sync pokrivalica")) {
                     command = Some(SegmentCommand::ToggleSync);
+                }
+                // Right to left: Redo, then Undo, left of Sync/B-roll.
+                for (label, target) in [("Redo", SegmentCommand::Redo), ("Undo", SegmentCommand::Undo)] {
+                    let enabled = segments.action_enabled(match target {
+                        SegmentCommand::Undo => "undo_object",
+                        _ => "redo_object",
+                    });
+                    if clicked(action_button(ui, label, enabled, theme)) {
+                        command = Some(target);
+                    }
                 }
             },
         );

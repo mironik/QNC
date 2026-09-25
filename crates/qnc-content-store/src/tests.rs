@@ -2187,3 +2187,46 @@ fn replace_takes_the_source_length_and_the_program_around_follows() {
         "mixed fps is refused"
     );
 }
+
+#[test]
+fn undo_puts_the_story_back_step_by_step_and_redo_replays_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    let ids = three_segments(&mut store);
+    marker(&mut store, 25).unwrap();
+    let depth = |store: &mut ContentStore| {
+        let Data::StorySelection(selection) = run(store, Operation::ReadStorySelection).unwrap()
+        else {
+            panic!()
+        };
+        (selection.undo_depth, selection.redo_depth)
+    };
+    assert_eq!(depth(&mut store), (4, 0), "three segments and a marker");
+    run(&mut store, Operation::DeleteSegment { segment_id: ids[1].clone() }).unwrap();
+    assert_eq!(markers(&mut store), vec![15]);
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(markers(&mut store), vec![25], "the marker is back where it was");
+    assert!(segments(&mut store).iter().all(|row| row.active));
+    assert_eq!(depth(&mut store), (4, 1));
+    run(&mut store, Operation::RedoStory).unwrap();
+    assert_eq!(markers(&mut store), vec![15], "redo excludes it again");
+    run(&mut store, Operation::UndoStory).unwrap();
+    run(
+        &mut store,
+        Operation::SelectPart {
+            part_id: ids[0].clone(),
+        },
+    )
+    .unwrap();
+    assert_eq!(depth(&mut store), (4, 1), "a selection is no step");
+    run(&mut store, Operation::MoveSegment { segment_id: ids[0].clone(), up: true }).unwrap();
+    assert_eq!(depth(&mut store), (4, 1), "a move that changes nothing is no step");
+    run(&mut store, Operation::MoveSegment { segment_id: ids[0].clone(), up: false }).unwrap();
+    assert_eq!(depth(&mut store), (5, 0), "a new edit clears redo");
+    for _ in 0..5 {
+        run(&mut store, Operation::UndoStory).unwrap();
+    }
+    assert!(segments(&mut store).is_empty(), "back to an empty story");
+    assert!(run(&mut store, Operation::UndoStory).is_err());
+}
