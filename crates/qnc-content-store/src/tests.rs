@@ -1847,12 +1847,22 @@ fn a_segment_hears_source_channel_one_on_a1_and_covers_are_read_with_their_a2_ch
     assert_eq!(covers.len(), 1);
     let cover = &covers[0];
     assert_eq!(
-        (cover.cover_id.as_str(), cover.clip_id.as_str(), cover.virtual_shot_id.as_str()),
+        (
+            cover.cover_id.as_str(),
+            cover.clip_id.as_str(),
+            cover.virtual_shot_id.as_str()
+        ),
         ("cover-1", "c1", "shot")
     );
-    assert_eq!((cover.program_start_frame, cover.program_end_frame), (14, 30));
+    assert_eq!(
+        (cover.program_start_frame, cover.program_end_frame),
+        (14, 30)
+    );
     assert_eq!((cover.source_in_frame, cover.source_out_frame), (0, 100));
-    assert_eq!((cover.fps_num, cover.fps_den, cover.a2_source_channel), (50, 1, 1));
+    assert_eq!(
+        (cover.fps_num, cover.fps_den, cover.a2_source_channel),
+        (50, 1, 1)
+    );
 }
 
 #[test]
@@ -1874,4 +1884,184 @@ fn a_development_story_without_the_audio_channel_columns_is_removed_on_open() {
     assert!(markers(&mut store).is_empty());
     three_segments(&mut store);
     assert_eq!(segments(&mut store).len(), 3, "a new story starts cleanly");
+}
+
+fn create_cover(store: &mut ContentStore, slot_id: &str, range: (u64, u64)) -> Result<Data> {
+    run(
+        store,
+        Operation::CreateCover {
+            project_id: "p1".into(),
+            slot_id: slot_id.into(),
+            clip_id: "c1".into(),
+            clip_name: "Clip".into(),
+            in_frame: range.0,
+            out_frame: range.1,
+            fps_num: 50,
+            fps_den: 1,
+        },
+    )
+}
+
+fn covers(store: &mut ContentStore) -> Vec<ProgramCover> {
+    let Data::Covers(rows) = run(store, Operation::ListCovers).unwrap() else {
+        panic!()
+    };
+    rows
+}
+
+#[test]
+fn a_cover_is_a_b_roll_virtual_shot_in_its_slot_and_replaces_the_one_there() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    marker(&mut store, 14).unwrap();
+    let slot = slot_at_frame(&path, 20);
+    let Data::Created(first) = create_cover(&mut store, &slot, (40, 90)).unwrap() else {
+        panic!()
+    };
+    let Data::Created(second) = create_cover(&mut store, &slot, (5, 25)).unwrap() else {
+        panic!()
+    };
+    let rows = covers(&mut store);
+    assert_eq!(
+        rows.len(),
+        1,
+        "v5: a new cover replaces the one in its slot"
+    );
+    let cover = &rows[0];
+    assert_eq!(cover.cover_id, second);
+    assert_ne!(first, second);
+    assert_eq!(
+        (cover.program_start_frame, cover.program_end_frame),
+        (14, 30)
+    );
+    assert_eq!(
+        (cover.source_in_frame, cover.source_out_frame),
+        (5, 25),
+        "the source is not cut to the slot"
+    );
+    assert_eq!(
+        (cover.fps_num, cover.fps_den, cover.a2_source_channel),
+        (50, 1, 0)
+    );
+    let classes: Vec<(String, String, i64, i64)> = Connection::open(&path)
+        .unwrap()
+        .prepare("SELECT shot_id, class, in_frame, out_frame FROM virtual_shots ORDER BY shot_id")
+        .unwrap()
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    let b_roll: Vec<_> = classes.iter().filter(|row| row.1 == "b_roll").collect();
+    assert_eq!(b_roll.len(), 2, "each cover writes its B-roll virtual shot");
+    assert_eq!(cover.virtual_shot_id, b_roll[1].0);
+    assert!(classes.iter().all(|row| row.1 != "short"), "never a short");
+    let Data::ShortClips(shorts) = run(&mut store, Operation::ListShorts).unwrap() else {
+        panic!()
+    };
+    assert!(shorts.is_empty());
+    let Data::StorySelection(selection) = run(&mut store, Operation::ReadStorySelection).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(
+        selection.selected_cover_id, second,
+        "v5: the new cover is selected"
+    );
+}
+
+#[test]
+fn a_cover_needs_a_slot_the_story_rate_and_one_frame() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    assert!(
+        create_cover(&mut store, "a|b", (0, 10)).is_err(),
+        "no story"
+    );
+    three_segments(&mut store);
+    let slot = slot_at_frame(&path, 5);
+    assert!(create_cover(&mut store, "missing|slot", (0, 10)).is_err());
+    assert!(create_cover(&mut store, &slot, (10, 10)).is_err());
+    let mixed = run(
+        &mut store,
+        Operation::CreateCover {
+            project_id: "p1".into(),
+            slot_id: slot.clone(),
+            clip_id: "c1".into(),
+            clip_name: "Clip".into(),
+            in_frame: 0,
+            out_frame: 10,
+            fps_num: 25,
+            fps_den: 1,
+        },
+    );
+    assert!(mixed.is_err(), "mixed fps is refused");
+    assert!(covers(&mut store).is_empty());
+}
+
+#[test]
+fn a_cover_is_selected_and_deleted_and_its_selection_goes_with_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    marker(&mut store, 14).unwrap();
+    let Data::Created(early) = create_cover(&mut store, &slot_at_frame(&path, 5), (0, 10)).unwrap()
+    else {
+        panic!()
+    };
+    let Data::Created(late) = create_cover(&mut store, &slot_at_frame(&path, 20), (0, 10)).unwrap()
+    else {
+        panic!()
+    };
+    run(
+        &mut store,
+        Operation::SelectCover {
+            cover_id: early.clone(),
+        },
+    )
+    .unwrap();
+    assert!(run(
+        &mut store,
+        Operation::SelectCover {
+            cover_id: "none".into()
+        }
+    )
+    .is_err());
+    run(
+        &mut store,
+        Operation::DeleteCover {
+            cover_id: late.clone(),
+        },
+    )
+    .unwrap();
+    let Data::StorySelection(selection) = run(&mut store, Operation::ReadStorySelection).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(
+        selection.selected_cover_id, early,
+        "another cover's selection stays"
+    );
+    run(&mut store, Operation::DeleteCover { cover_id: early }).unwrap();
+    let Data::StorySelection(selection) = run(&mut store, Operation::ReadStorySelection).unwrap()
+    else {
+        panic!()
+    };
+    assert!(selection.selected_cover_id.is_empty());
+    assert!(covers(&mut store).is_empty());
+    assert!(run(&mut store, Operation::DeleteCover { cover_id: late }).is_err());
+    let b_roll: i64 = Connection::open(&path)
+        .unwrap()
+        .query_row(
+            "SELECT COUNT(*) FROM virtual_shots WHERE class = 'b_roll'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(b_roll, 2, "the B-roll shots stay in the B-roll tab");
 }

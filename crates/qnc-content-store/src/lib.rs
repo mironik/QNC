@@ -373,6 +373,27 @@ pub enum Operation {
     SelectSlot {
         slot_id: String,
     },
+    /// v5 `create_cover` from source frames: one write makes the B-roll virtual
+    /// shot of the source IN/OUT and the cover of the slot, replacing a cover
+    /// already there, and selects it. A2 starts on source channel 1.
+    CreateCover {
+        project_id: String,
+        slot_id: String,
+        clip_id: String,
+        clip_name: String,
+        in_frame: u64,
+        out_frame: u64,
+        fps_num: u32,
+        fps_den: u32,
+    },
+    /// v5 `delete_cover`; its B-roll virtual shot stays.
+    DeleteCover {
+        cover_id: String,
+    },
+    /// v5 `select_cover`.
+    SelectCover {
+        cover_id: String,
+    },
 }
 impl Operation {
     pub fn is_write(&self) -> bool {

@@ -785,7 +785,10 @@ fn execute_write_command(
         | Operation::MoveMarker { .. }
         | Operation::DeleteMarker { .. }
         | Operation::SelectPart { .. }
-        | Operation::SelectSlot { .. }) => Ok(match client.write_segment(operation)? {
+        | Operation::SelectSlot { .. }
+        | Operation::CreateCover { .. }
+        | Operation::DeleteCover { .. }
+        | Operation::SelectCover { .. }) => Ok(match client.write_segment(operation)? {
             Some(segment_id) => ContentWriteData::Created(segment_id),
             None => ContentWriteData::Changed,
         }),
