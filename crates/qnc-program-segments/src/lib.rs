@@ -396,6 +396,12 @@ pub enum SegmentCommand {
         cover_id: String,
         frame: u64,
     },
+    /// Ctrl+click on a cover (user rule 2026-09-25: Ctrl+ selects): the cover is
+    /// taken, Delete then removes it and Escape lets it go.
+    TakeCover {
+        cover_id: String,
+        frame: u64,
+    },
     /// UNDO: the story as it was before the last edit (segments, markers, covers).
     Undo,
     /// REDO: the last undone story edit again.
@@ -467,6 +473,8 @@ pub struct ProgramSegments {
     sync_in_pressed: bool,
     /// The marker being moved and its draft program frame (Enter writes it).
     marker_edit: Option<(String, u64)>,
+    /// A cover taken with Ctrl+click; Delete removes it.
+    cover_taken: Option<String>,
     /// A marker move was confirmed; Enter stays taken until it lands.
     marker_committing: bool,
     /// Program playhead of the Wrap view (`qnc-wrap-session`), given by the caller.
@@ -584,6 +592,9 @@ impl ProgramSegments {
 
     /// While a marker is edited, the arrows and Escape belong to it.
     fn command_for(&self, action_id: &str) -> Option<SegmentCommand> {
+        if self.cover_taken.is_some() && matches!(action_id, "clear_focus" | "close_player") {
+            return Some(SegmentCommand::CancelMarkerEdit);
+        }
         if self.marker_edit.is_some() {
             match action_id {
                 "step_back_frame" => return Some(SegmentCommand::NudgeMarker(-1)),
@@ -657,6 +668,13 @@ impl ProgramSegments {
             SegmentCommand::AddSegment(kind) => self.create_from_source(kind),
             SegmentCommand::Cover { overwrite } => self.cover_from_source(overwrite),
             SegmentCommand::SelectCover { cover_id, frame } => self.select_cover(cover_id, frame),
+            SegmentCommand::TakeCover { cover_id, frame } => {
+                self.select_cover(cover_id.clone(), frame);
+                if self.selected_cover.as_deref() == Some(cover_id.as_str()) {
+                    self.cover_taken = Some(cover_id);
+                    self.refresh_view("Pokrivalica: Delete briše, Esc odustani".into());
+                }
+            }
             SegmentCommand::ToggleSync => self.toggle_sync(),
             SegmentCommand::CommitSync => {
                 if !self.commit_marker_edit() {
@@ -676,15 +694,24 @@ impl ProgramSegments {
                     self.set_marker_draft(frame);
                 }
             }
-            SegmentCommand::CancelMarkerEdit => self.cancel_marker_edit(),
-            SegmentCommand::DeleteFocused => match self.marker_edit.take() {
-                Some((marker_id, _)) => {
+            SegmentCommand::CancelMarkerEdit => {
+                if self.cover_taken.take().is_some() {
+                    self.refresh_view("Brisanje pokrivalice odustano.".into());
+                }
+                self.cancel_marker_edit();
+            }
+            SegmentCommand::DeleteFocused => match (self.marker_edit.take(), self.cover_taken.take()) {
+                (Some((marker_id, _)), _) => {
                     self.selected_marker = None;
                     self.write(Operation::DeleteMarker { marker_id });
                 }
-                None => {
-                    self.refresh_view("Brisanje traži marker prethodno uzet za uređivanje.".into())
+                (None, Some(cover_id)) => {
+                    self.selected_cover = None;
+                    self.write(Operation::DeleteCover { cover_id });
                 }
+                (None, None) => self.refresh_view(
+                    "Prvo uzmi marker ili pokrivalicu za brisanje.".into(),
+                ),
             },
         }
         true
@@ -933,6 +960,7 @@ impl ProgramSegments {
         }
         self.selected_marker = None;
         self.marker_edit = None;
+        self.cover_taken = None;
         self.selected_cover = Some(cover_id.clone());
         self.write(Operation::SelectCover { cover_id });
         self.refresh_view(String::new());

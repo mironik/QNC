@@ -195,3 +195,49 @@ fn ctrl_m_moves_a_marker_by_arrows_or_to_the_playhead_and_enter_confirms_it() {
     assert!(!segments.editing_marker());
     assert_eq!(segments.view().rows.len(), 3, "no segment deleted with it");
 }
+
+#[test]
+fn a_cover_is_deleted_only_after_ctrl_click_took_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    store_with_story(&file);
+    let mut segments = ProgramSegments::new();
+    segments.configure(ContentTarget::from_owner_binding(&file, URI).unwrap(), "p1");
+    let slot_id = segments.view().slots[0].slot_id.clone();
+    let mut store = ContentStore::open_owner_binding(&file, URI, Access::ReadWrite).unwrap();
+    store
+        .execute(&Request {
+            version: qnc_content_store::VERSION.into(),
+            db_uri: URI.into(),
+            operation: Operation::CreateCover {
+                project_id: "p1".into(),
+                slot_id,
+                clip_id: "c1".into(),
+                clip_name: "C1".into(),
+                in_frame: 10,
+                out_frame: 30,
+                fps_num: 50,
+                fps_den: 1,
+            },
+        })
+        .unwrap();
+    drop(store);
+    segments.reload();
+    let cover_id = segments.view().covers[0].cover_id.clone();
+
+    segments.apply(SegmentCommand::SelectCover { cover_id: cover_id.clone(), frame: 5 });
+    segments.apply_action("delete_marker");
+    settle(&mut segments);
+    assert_eq!(segments.view().covers.len(), 1, "a click does not arm Delete");
+
+    segments.apply(SegmentCommand::TakeCover { cover_id: cover_id.clone(), frame: 5 });
+    segments.apply_action("clear_focus");
+    segments.apply_action("delete_marker");
+    settle(&mut segments);
+    assert_eq!(segments.view().covers.len(), 1, "Escape lets it go");
+
+    segments.apply(SegmentCommand::TakeCover { cover_id, frame: 5 });
+    segments.apply_action("delete_marker");
+    settle(&mut segments);
+    assert!(segments.view().covers.is_empty(), "{}", segments.view().message);
+}

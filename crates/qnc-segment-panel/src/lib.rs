@@ -305,10 +305,16 @@ fn paint_program(
             slot_id: id,
             frame: start + frame.min(duration),
         }),
-        TimelineIntent::SelectCover { id, frame } => Some(SegmentCommand::SelectCover {
-            cover_id: id,
-            frame: start + frame.min(duration),
-        }),
+        // Ctrl+click takes the cover for Delete (Ctrl+ selects); a plain click selects it.
+        TimelineIntent::SelectCover { id, frame } => {
+            let cover_id = id;
+            let frame = start + frame.min(duration);
+            Some(if ui.input(|input| input.modifiers.command) {
+                SegmentCommand::TakeCover { cover_id, frame }
+            } else {
+                SegmentCommand::SelectCover { cover_id, frame }
+            })
+        }
         TimelineIntent::SelectVirtual { frame, .. } => {
             Some(SegmentCommand::Cue(start + frame.min(duration)))
         }
