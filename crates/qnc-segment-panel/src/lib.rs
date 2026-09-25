@@ -293,6 +293,11 @@ fn paint_program(
             video_background: None,
         },
     );
+    // Story rows only: a dragged M marker follows the pointer as a draft (Enter confirms).
+    if let Some((marker_id, frame)) = qnc_timeline::take_marker_drag(ui.ctx()) {
+        let frame = start + frame.min(duration);
+        return Some(SegmentCommand::DragMarker { marker_id, frame });
+    }
     match intent {
         TimelineIntent::SelectMarker { id, .. } => Some(SegmentCommand::SelectMarker(id)),
         // v5 `program_intent_from_timeline_interact`: a click keeps its frame.

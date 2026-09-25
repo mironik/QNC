@@ -1,0 +1,12 @@
+[package]
+name = "qnc-panel-focus"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: the keyboard map acts on the editorial panel in focus (pool, source timeline, segments)"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-program-segments = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-wrap-session = { workspace = true }

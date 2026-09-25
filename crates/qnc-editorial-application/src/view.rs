@@ -61,6 +61,8 @@ pub struct EditorialView {
     pub preview: PreviewView,
     /// Ton and Off segments of the story program.
     pub segments: qnc_program_segments::SegmentsView,
+    /// The panel the keyboard acts on.
+    pub focus: qnc_panel_focus::Panel,
 }
 
 impl EditorialView {

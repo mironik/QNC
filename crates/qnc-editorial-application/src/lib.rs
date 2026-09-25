@@ -17,9 +17,10 @@ use std::{
 use qnc_active_project_read::{ActiveProjectChange, ActiveProjectReader, ShownProject};
 use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
-use qnc_program_segments::{SourcePick, SyncPreview, SyncSpace};
+use qnc_panel_focus::{Panel, PanelFocus};
+use qnc_program_segments::SourcePick;
 use qnc_source_bindings::{SourceBinding, TransportBindings};
-use qnc_source_preview::{PreviewContext, SourcePreview, TransientCover};
+use qnc_source_preview::{PreviewContext, SourcePreview};
 use qnc_source_reader::SourceReader;
 use qnc_timeline::TimelineIntent;
 use qnc_virtual_short_cards::ParentClip;
@@ -90,6 +91,7 @@ pub struct EditorialApplication {
     short_stills: VirtualShortStillCache,
     segments: qnc_program_segments::ProgramSegments,
     wrap: qnc_wrap_session::WrapSession,
+    focus: PanelFocus,
 }
 
 impl Default for EditorialApplication {
@@ -110,6 +112,7 @@ impl Default for EditorialApplication {
             short_stills: VirtualShortStillCache::default(),
             segments: qnc_program_segments::ProgramSegments::new(),
             wrap: qnc_wrap_session::WrapSession::new(),
+            focus: PanelFocus::new(),
         }
     }
 }
@@ -272,6 +275,7 @@ impl EditorialApplication {
             None => self.wrap.follow_program(confirmed),
         }
         self.segments.set_playhead(Some(self.wrap.playhead()));
+        self.view.focus = self.focus.panel();
         self.view.segments = self.segments.view().clone();
     }
 
@@ -397,7 +401,7 @@ impl EditorialApplication {
     pub fn dispatch(&mut self, intent: EditorialIntent) -> bool {
         let changed = match intent {
             EditorialIntent::PreviewClip(clip_id) => {
-                self.wrap.leave();
+                self.focus.to_source(&mut self.wrap); // v5 select_shot
                 self.view.chosen_shot_id = None;
                 self.pending_shot = None;
                 self.short_stills.clear_if_clip_changed(Some(&clip_id));
@@ -410,52 +414,27 @@ impl EditorialApplication {
                 }
             }
             EditorialIntent::PreviewShort(shot_id) => {
-                self.wrap.leave();
+                self.focus.to_source(&mut self.wrap);
                 self.open_short(&shot_id)
             }
             EditorialIntent::SwitchLibraryTab(tab) => {
                 self.view.library_tab = tab;
                 true
             }
-            EditorialIntent::Action(action_id) => match action_id.as_str() {
-                action if self.segments.handles(action) => self.segments.apply_action(action),
-                tab if LibraryTab::from_action(tab).is_some() => {
-                    self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
-                    true
+            EditorialIntent::Action(action_id) => {
+                let pieces = (&mut self.preview, &mut self.wrap, &mut self.segments);
+                match self.focus.route(&action_id, pieces) {
+                    Some(changed) => changed, // the keyboard acts on the panel in focus
+                    None => self.application_action(&action_id),
                 }
-                action_ids::PLAY_PAUSE => match self.segments.sync_space(self.wrap.is_active()) {
-                    SyncSpace::Start(p) => self.wrap.hold(p.window.0) && self.open_sync(p),
-                    SyncSpace::Blocked => true,
-                    SyncSpace::Play => self.preview.toggle_play(), // the program in Wrap
-                },
-                action_ids::MARK_OUT if self.segments.finish_sync() => true, // Sync OUT
-                action_ids::STEP_BACK_FRAME => self.wrap.step(-1) || self.preview.step(-1),
-                action_ids::STEP_FORWARD_FRAME => self.wrap.step(1) || self.preview.step(1),
-                action_ids::MARK_IN => {
-                    self.segments.arm_sync(); // v5: every IN arms Sync/B-roll
-                    self.view.preview.timeline =
-                        self.view.preview.timeline.with_source_in_at_confirmed();
-                    if let Err(error) = self.short_stills.capture_in(&self.view.preview) {
-                        self.view.preview.message = error;
-                    }
-                    true
-                }
-                action_ids::MARK_OUT => {
-                    self.view.preview.timeline =
-                        self.view.preview.timeline.with_source_out_at_confirmed();
-                    if let Err(error) = self.short_stills.capture_out(&self.view.preview) {
-                        self.view.preview.message = error;
-                    }
-                    true
-                }
-                action_ids::SAVE_VIRTUAL_SHOT if self.segments.sync_holds_enter() => true,
-                action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
-                _ => false,
-            },
-            EditorialIntent::Segment(command) => self.segments.apply(command),
+            }
+            EditorialIntent::Segment(command) => {
+                self.focus.set(Panel::Segments);
+                self.segments.apply(command)
+            }
             EditorialIntent::Timeline(intent) => match intent {
                 TimelineIntent::CueFrame(_) => {
-                    self.wrap.leave(); // the source timeline belongs to the Source view
+                    self.focus.to_source(&mut self.wrap); // the Source view
                     self.preview.timeline_intent(&intent)
                 }
                 _ => false,
@@ -465,16 +444,37 @@ impl EditorialApplication {
         changed
     }
 
-    /// Writes one short from the IN/OUT the source timeline is showing.
-    fn open_sync(&mut self, p: SyncPreview) -> bool {
-        let cover = TransientCover {
-            clip_id: p.clip_id,
-            source_in: p.source_in,
-            timebase: p.timebase,
-        };
-        self.preview.open_program_window(p.window, cover)
+    /// The actions of the application itself: library tabs, IN/OUT with their
+    /// stills and saving a short.
+    fn application_action(&mut self, action_id: &str) -> bool {
+        match action_id {
+            tab if LibraryTab::from_action(tab).is_some() => {
+                self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
+                true
+            }
+            action_ids::MARK_IN => {
+                self.view.preview.timeline =
+                    self.view.preview.timeline.with_source_in_at_confirmed();
+                if let Err(error) = self.short_stills.capture_in(&self.view.preview) {
+                    self.view.preview.message = error;
+                }
+                true
+            }
+            action_ids::MARK_OUT => {
+                self.view.preview.timeline =
+                    self.view.preview.timeline.with_source_out_at_confirmed();
+                if let Err(error) = self.short_stills.capture_out(&self.view.preview) {
+                    self.view.preview.message = error;
+                }
+                true
+            }
+            action_ids::SAVE_VIRTUAL_SHOT if self.segments.sync_holds_enter() => true,
+            action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
+            _ => false,
+        }
     }
 
+    /// Writes one short from the IN/OUT the source timeline is showing.
     fn save_virtual_shot(&mut self) -> bool {
         let Some(clip_id) = self.view.chosen_clip_id().map(str::to_string) else {
             self.view.message = "Odaberi klip.".into();

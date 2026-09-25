@@ -616,10 +616,9 @@ impl ProgramSegments {
             }
             SegmentCommand::NudgeMarker(frames) => self.nudge_marker(frames),
             SegmentCommand::DragMarker { marker_id, frame } => {
+                // User rule: a marker moves only after Ctrl+M took it.
                 if self.marker_edit.as_ref().map(|(id, _)| id) == Some(&marker_id) {
                     self.set_marker_draft(frame);
-                } else {
-                    self.start_marker_edit(marker_id, frame);
                 }
             }
             SegmentCommand::CancelMarkerEdit => self.cancel_marker_edit(),
@@ -766,9 +765,10 @@ impl ProgramSegments {
         let Some(frame) = self.playhead else {
             return self.refresh_view("M marker se stavlja na Wrap segment (playhead).".into());
         };
-        let operation = match self.selected_marker.clone() {
-            // A selected marker goes to the playhead as a draft; Enter confirms.
-            Some(marker_id) => return self.marker_to_playhead(marker_id),
+        // User rule: only a marker taken with Ctrl+M goes to the playhead (a draft,
+        // Enter confirms); otherwise M sets a new marker.
+        let operation = match self.marker_edit.clone() {
+            Some((marker_id, _)) => return self.marker_to_playhead(marker_id),
             None => {
                 let Some(segment) = self.view.segment_at(frame) else {
                     return self.refresh_view("Nema Wrap segmenta pod playheadom.".into());

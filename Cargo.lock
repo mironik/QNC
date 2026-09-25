@@ -3214,6 +3214,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-image-assets",
  "qnc-media-thumbnail",
+ "qnc-panel-focus",
  "qnc-program-segments",
  "qnc-source-bindings",
  "qnc-source-preview",
@@ -3237,6 +3238,7 @@ dependencies = [
  "qnc-keyboard-shortcut",
  "qnc-media-card",
  "qnc-monitor",
+ "qnc-panel-focus",
  "qnc-segment-panel",
  "qnc-source-dock",
  "qnc-timeline",
@@ -3787,6 +3789,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-panel-focus"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-program-segments",
+ "qnc-source-preview",
+ "qnc-timeline",
+ "qnc-wrap-session",
+]
+
+[[package]]
 name = "qnc-pixel-convert"
 version = "0.1.0"
 dependencies = [
@@ -3953,6 +3966,8 @@ version = "0.1.0"
 dependencies = [
  "qnc-content-store",
  "qnc-sync-cover",
+ "rusqlite",
+ "tempfile",
 ]
 
 [[package]]

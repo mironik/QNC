@@ -1341,11 +1341,62 @@ fn cue_intent_from_response(
     ))
 }
 
+const MARKER_DRAG: &str = "qnc_timeline_marker_drag";
+
+/// A drag that started on an M marker of a row with markers (Story segment rows,
+/// never the source timeline): the marker follows the pointer as a draft. The
+/// timeline only reports it (`take_marker_drag`); it moves nothing and writes
+/// nothing. Returns whether such a drag runs, so the row does not scrub.
+fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInput<'_>) -> bool {
+    if !(input.layers.covers && input.layers.markers) {
+        return false;
+    }
+    let (ctx, start, duration) = (
+        &response.ctx,
+        input.state.range_start(),
+        input.state.duration_frames(),
+    );
+    let active = egui::Id::new(MARKER_DRAG).with(response.id);
+    if response.drag_started() {
+        let hit = ctx
+            .input(|i| i.pointer.press_origin())
+            .and_then(|pos| marker_hit(track, start, duration, pos, input.markers))
+            .map(str::to_string);
+        ctx.data_mut(|d| match hit {
+            Some(id) => d.insert_temp(active, id),
+            None => d.remove::<String>(active),
+        });
+    }
+    let Some(id) = ctx.data(|d| d.get_temp::<String>(active)) else {
+        return false;
+    };
+    if let Some(pos) = response
+        .interact_pointer_pos()
+        .filter(|_| response.dragged())
+    {
+        let frame = frame_for_x(track, start, duration, pos.x);
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new(MARKER_DRAG), (id, frame)));
+    }
+    if response.drag_stopped() {
+        ctx.data_mut(|d| d.remove::<String>(active));
+    }
+    true
+}
+
+/// The marker a drag moved during the last painted row: its id and the frame on
+/// that row (`None` when no marker is dragged). Read right after the row.
+pub fn take_marker_drag(ctx: &egui::Context) -> Option<(String, u64)> {
+    ctx.data_mut(|d| d.remove_temp::<(String, u64)>(egui::Id::new(MARKER_DRAG)))
+}
+
 fn video_intent_from_response(
     response: &egui::Response,
     track: Rect,
     input: &TimelineInput<'_>,
 ) -> TimelineIntent {
+    if track_marker_drag(response, track, input) {
+        return TimelineIntent::None;
+    }
     if !(response.clicked() || response.dragged()) || !input.state.can_cue() {
         return TimelineIntent::None;
     }

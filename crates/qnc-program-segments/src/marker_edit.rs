@@ -33,9 +33,17 @@ impl ProgramSegments {
 
     /// A draft for a marker: Ctrl+M, M on a selected marker, or a drag.
     pub(crate) fn start_marker_edit(&mut self, marker_id: String, frame: u64) {
+        let pins = self.stored_pins();
+        let Some(pin) = pins
+            .iter()
+            .find(|pin| pin.marker_id == marker_id && !pin.locked)
+        else {
+            return self.refresh_view("Početni i završni M marker su zaključani.".into());
+        };
+        // The draft starts where the marker is stored; a refused frame keeps it there.
         self.selected_marker = Some(marker_id.clone());
         self.selected_slot = None;
-        self.marker_edit = Some((marker_id, frame));
+        self.marker_edit = Some((marker_id, pin.frame));
         self.set_marker_draft(frame);
     }
 

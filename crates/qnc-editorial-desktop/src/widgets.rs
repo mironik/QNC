@@ -11,6 +11,7 @@ use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, Timel
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
 use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
+use qnc_panel_focus::{paint_focus, Panel};
 
 use crate::{layout_contract::EditorialContracts, theme::Theme};
 
@@ -49,6 +50,12 @@ pub fn render_desktop(
             intent = render_source_dock(ui, contracts, theme, view);
         });
     }
+    paint_focus(
+        ui,
+        dock_rect,
+        view.focus == Panel::SourceTimeline,
+        theme.focus,
+    );
 
     intent
 }
@@ -95,6 +102,7 @@ fn render_board(
             intent = qnc_segment_panel::show(ui, &view.segments, timeline_theme(theme))
                 .map(EditorialIntent::Segment);
         });
+        paint_focus(ui, right_rect, view.focus == Panel::Segments, theme.focus);
     }
     intent
 }
@@ -132,6 +140,7 @@ fn render_left_column(
             intent = render_clip_grid(ui, contracts, theme, view);
         });
     }
+    paint_focus(ui, browser_rect, view.focus == Panel::Pool, theme.focus);
     intent
 }
 
@@ -274,7 +283,7 @@ fn render_source_dock(
         ui,
         rect,
         &dock_style(contracts, theme),
-        source_dock_clip_label(contracts, view),
+        (view.current_clip_label()).unwrap_or(&contracts.editorial.source_dock.clip_label_fallback),
         |ui| {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
@@ -299,16 +308,6 @@ fn render_source_dock(
     match intent {
         TimelineIntent::None => header_intent,
         other => Some(EditorialIntent::Timeline(other)),
-    }
-}
-
-fn source_dock_clip_label<'a>(
-    contracts: &'a EditorialContracts,
-    view: &'a EditorialView,
-) -> &'a str {
-    match view.current_clip_label() {
-        Some(label) => label,
-        None => &contracts.editorial.source_dock.clip_label_fallback,
     }
 }
 

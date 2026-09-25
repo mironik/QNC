@@ -2268,7 +2268,15 @@ ne mijenja, Ingest i Project koriste samo vec podrzane tipke. Pravila korisnika:
 Ctrl+tipka odabire (Ctrl+M marker u uredivanje, strelice/M/povlacenje, Enter
 potvrda, Esc odustani), Shift+tipka dodaje (Shift+M novi marker), Delete brise
 samo ono uzeto s Ctrl+; Sync ide od source IN do source OUT ili prvog sljedeceg
-markera i ceka Enter. `qnc-timeline` (povlacenje markera) nije otkljucan.
+markera i ceka Enter.
+Dopuna 2026-09-25 (korisnik "da" na plan): keyboard map vrijedi za panel u
+fokusu, ne za aplikaciju (v5 `story/focus.rs` `PanelFocus`): Pool, Source
+timeline (samo I/O i playhead izvora), Segmenti (Wrap, markeri, pokrivalice).
+Otkljucano: novi javni `crates/qnc-panel-focus` (+ ugovor modula), dodatak
+`crates/qnc-editorial-desktop` samo za oznaku fokusiranog panela,
+`crates/qnc-timeline` samo za povlacenje M markera (intent `DragMarker`, bez upisa;
+Enter potvrduje), `crates/qnc-segment-panel`, `crates/qnc-editorial-application`,
+root Cargo.
 
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story program playlista, koraci 1 do 4):
 korisnik je potvrdio opci plan prijenosa v5 pustanja programa (Wrap) i dodao:

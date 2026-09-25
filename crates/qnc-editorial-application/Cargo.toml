@@ -13,6 +13,7 @@ qnc-image-assets = { workspace = true }
 qnc-media-thumbnail = { workspace = true }
 qnc-program-segments = { workspace = true }
 qnc-wrap-session = { workspace = true }
+qnc-panel-focus = { workspace = true }
 
 qnc-source-bindings = { workspace = true }
 qnc-source-preview = { workspace = true }

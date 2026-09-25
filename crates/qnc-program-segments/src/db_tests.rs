@@ -152,7 +152,17 @@ fn ctrl_m_moves_a_marker_by_arrows_or_to_the_playhead_and_enter_confirms_it() {
     assert!(!segments.editing_marker());
     assert_eq!(marker_frames(&segments), vec![0, 62, 150]);
 
-    // M with the marker selected puts the draft on the playhead; Enter confirms.
+    // A marker moves only after Ctrl+M: a drag of a marker not taken does nothing.
+    let id = segments.view().markers[1].marker_id.clone();
+    segments.apply(SegmentCommand::DragMarker {
+        marker_id: id.clone(),
+        frame: 90,
+    });
+    assert!(!segments.editing_marker());
+    assert_eq!(marker_frames(&segments), vec![0, 62, 150]);
+    // Ctrl+M, then M puts the draft on the playhead; Enter confirms.
+    segments.set_playhead(Some(62));
+    segments.apply_action("select_marker");
     segments.set_playhead(Some(100));
     segments.apply_action("add_marker");
     assert_eq!(marker_frames(&segments), vec![0, 100, 150], "only a draft");
