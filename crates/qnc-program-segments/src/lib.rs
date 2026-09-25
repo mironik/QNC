@@ -368,6 +368,9 @@ pub enum SegmentCommand {
     },
     /// Escape while a marker is edited.
     CancelMarkerEdit,
+    /// The Delete key (user rule 2026-09-25): only what was taken with Ctrl+
+    /// before (Ctrl+M: the marker) is deleted; a click never arms Delete.
+    DeleteFocused,
     /// Sync/B-roll on or off.
     ToggleSync,
     /// Enter: the cover of a closed Sync slot (v5 `sync_cover_enter_or_activate_focused_item`).
@@ -387,7 +390,7 @@ impl SegmentCommand {
             // One Delete press sends delete_part, delete_marker and delete_segment (both
             // scopes); delete_marker holds every delete key in every preset, so only it
             // deletes: one press, one delete (the marker, else the cover, else the segment).
-            "delete_marker" => Self::DeleteSelected,
+            "delete_marker" => Self::DeleteFocused,
             "playlist_input_start" => Self::ProgramStart,
             "step_prev_part" => Self::Step { up: true },
             "step_next_part" => Self::Step { up: false },
@@ -611,6 +614,15 @@ impl ProgramSegments {
                 }
             }
             SegmentCommand::CancelMarkerEdit => self.cancel_marker_edit(),
+            SegmentCommand::DeleteFocused => match self.marker_edit.take() {
+                Some((marker_id, _)) => {
+                    self.selected_marker = None;
+                    self.write(Operation::DeleteMarker { marker_id });
+                }
+                None => self.refresh_view(
+                    "Delete briše ono što je odabrano s Ctrl+ (Ctrl+M: marker).".into(),
+                ),
+            },
         }
         true
     }

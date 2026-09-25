@@ -74,10 +74,13 @@ fn delete_removes_the_selected_segment_from_the_program() {
     assert_eq!(segments.view().rows.len(), 3);
     segments.apply(SegmentCommand::Select(ids[1].clone()));
     settle(&mut segments);
-    // One Delete press sends delete_part, delete_marker and delete_segment.
+    // The Delete key never deletes a segment chosen by a click; the Del button does.
     for action in ["delete_part", "delete_marker", "delete_segment"] {
         segments.apply_action(action);
     }
+    settle(&mut segments);
+    assert_eq!(segments.view().rows.len(), 3, "a click does not arm Delete");
+    segments.apply(SegmentCommand::DeleteSelected);
     settle(&mut segments);
     let left: Vec<&str> = segments
         .view()
