@@ -619,9 +619,9 @@ impl ProgramSegments {
                     self.selected_marker = None;
                     self.write(Operation::DeleteMarker { marker_id });
                 }
-                None => self.refresh_view(
-                    "Delete briše ono što je odabrano s Ctrl+ (Ctrl+M: marker).".into(),
-                ),
+                None => {
+                    self.refresh_view("Brisanje traži marker prethodno uzet za uređivanje.".into())
+                }
             },
         }
         true
