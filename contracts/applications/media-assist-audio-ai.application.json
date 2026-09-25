@@ -4,7 +4,7 @@
   "application_version": "0.1.0",
   "application_kind": "interactive_form_variant",
   "lifecycle": "interactive_form",
-  "owned_database_contracts": ["qnc://local/db/media_assist_audio_ai"],
+  "owned_database_contracts": [],
   "read_database_contracts": ["qnc://local/db/project_registry", "qnc://local/db/ingest_content"],
   "owned_artifacts": [],
   "module_dependencies": [

@@ -2285,6 +2285,21 @@ traci panela Segmenti (`crates/qnc-segment-panel`), tipke kataloga `undo_object`
 `redo_object` kroz `crates/qnc-program-segments` kad je fokus na Segmentima.
 B-roll kadrovi koje je pokrivalica stvorila ostaju. Ugovor `story.database.json`.
 
+Zatvoreno ograniceno odobrenje 2026-09-25 (vlasnik baze je projekt): korisnik je
+odredio: ako baza ima vlasnika, to je projekt; nijedna forma ne pise u bazu pa ne moze
+biti ni vlasnik; podaci nastali u aplikaciji stizu u bazu samo preko posrednika, jedinog
+javnog pisca `qnc-content-store`. Otkljucano i izvedeno samo: ugovori baza u `project.db`
+(`ingest-content`, `story`, `virtual-shots`, `program-segments`, `media-assist*`): polje
+`database_owner: project`, `owner_application`/`write_owner` = `qnc.module.content-store`,
+`ownership_rule`; aplikacijski ugovori `ingest`, `story`, `media-assist*` vise ne navode
+te baze u `owned_database_contracts`; `crates/qnc-ingest-store` provjerava ugovor
+`ingest-content` pod piscem `qnc.module.content-store`. Nije mijenjano: nazivi `ingest_*`
+(URI, tablica `ingest_content_schema`), host baze `ingest-registry`, `source-index`,
+`media-records` (zasebne datoteke u `data/`, izvan projekta; ostaje otvoreno pitanje).
+Verificirano: testovi `qnc-ingest-store`, `qnc-db-contract`, `qnc-content-store`,
+`qnc-virtual-shots`, `qnc-contracts`, `qnc-conformance`, `--check-contracts` svih
+aplikacija, `cargo build --workspace`, conformance. Odobrenje je zatvoreno.
+
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story program playlista, koraci 1 do 4):
 korisnik je potvrdio opci plan prijenosa v5 pustanja programa (Wrap) i dodao:
 korisnik mora moci promijeniti koji source kanal ide na A1 (snimatelj ponekad

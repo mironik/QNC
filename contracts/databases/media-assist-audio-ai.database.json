@@ -1,13 +1,15 @@
 {
   "database_id": "qnc.db.media_assist_audio_ai",
-  "owner_application": "qnc.media-assist-audio-ai",
+  "database_owner": "project",
+  "owner_application": "qnc.module.content-store",
+  "ownership_rule": "User rule 2026-09-25: the project owns this database; no application (Ingest, Media Assist, Story or any other) owns it or its tables. No form writes to it, so none can own it: data made in an application reaches these tables only through the intermediary, the one public writer of the project database, qnc.module.content-store.",
   "schema_version": "0.1.0",
   "qnc_uri": "qnc://local/db/media_assist_audio_ai",
   "tables": [],
   "public_read_views": [],
-  "write_owner": "qnc.media-assist-audio-ai",
+  "write_owner": "qnc.module.content-store",
   "public_read_policy": "owner_only",
   "migration_policy": "owner_application_only",
   "created_at": "2026-09-19T00:00:00Z",
-  "updated_at": "2026-09-19T00:00:00Z"
+  "updated_at": "2026-09-25T00:00:00Z"
 }

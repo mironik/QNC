@@ -18,6 +18,7 @@ const INGEST_REGISTRY_DB_CONTRACT: &str =
 const INGEST_CONTENT_DB_CONTRACT: &str =
     include_str!("../../../contracts/databases/ingest-content.database.json");
 const APPLICATION_ID: &str = "qnc.ingest";
+const PROJECT_DB_WRITER: &str = "qnc.module.content-store";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IngestDbTransport {
@@ -281,16 +282,20 @@ fn validate_ingest_db_transport(transport: &IngestDbTransport) -> Result<(), Str
 }
 
 fn validate_db_contracts() -> Result<(), String> {
-    for (name, contents, expected_id) in [
+    // The content tables belong to the project database; its one public writer is
+    // the content store, never an application (user rule 2026-09-25).
+    for (name, contents, expected_id, writer) in [
         (
             "contracts/databases/ingest-registry.database.json",
             INGEST_REGISTRY_DB_CONTRACT,
             INGEST_REGISTRY_DB_ID,
+            APPLICATION_ID,
         ),
         (
             "contracts/databases/ingest-content.database.json",
             INGEST_CONTENT_DB_CONTRACT,
             INGEST_CONTENT_DB_ID,
+            PROJECT_DB_WRITER,
         ),
     ] {
         let contract = DatabaseContract::from_json_str(name, contents)
@@ -302,7 +307,7 @@ fn validate_db_contracts() -> Result<(), String> {
             ));
         }
         contract
-            .validate_write(APPLICATION_ID)
+            .validate_write(writer)
             .map_err(|error| format!("{error:?}"))?;
     }
     Ok(())

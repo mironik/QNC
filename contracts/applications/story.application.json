@@ -4,7 +4,7 @@
   "application_version": "0.1.0",
   "application_kind": "interactive_form_variant",
   "lifecycle": "interactive_form",
-  "owned_database_contracts": ["qnc://local/db/story/{story_instance}"],
+  "owned_database_contracts": [],
   "read_database_contracts": ["qnc://local/db/project_registry", "qnc://local/db/ingest_content"],
   "owned_artifacts": ["story.decisions", "story.edl", "story.playlist"],
   "module_dependencies": [
