@@ -53,8 +53,6 @@ struct Session {
     auto_finish: u64,
     total_frames: u64,
     source: SyncSource,
-    /// The window program confirmed its first frame: older frames are ignored.
-    started: bool,
 }
 
 #[derive(Debug, Default)]
@@ -124,7 +122,10 @@ impl SyncCover {
         total_frames: u64,
         program_timebase: Option<(u32, u32)>,
     ) -> Result<SyncPreview, String> {
-        let source = self.armed.clone().ok_or("Source IN nije postavljen za Sync.")?;
+        let source = self
+            .armed
+            .clone()
+            .ok_or("Source IN nije postavljen za Sync.")?;
         let (num, den) = program_timebase.ok_or("Playlist input je prazan")?;
         let (src_num, src_den) = source.timebase;
         if u64::from(num) * u64::from(src_den) != u64::from(src_num) * u64::from(den) {
@@ -162,7 +163,6 @@ impl SyncCover {
                 source_in,
                 ..source
             },
-            started: false,
         });
         Ok(preview)
     }
@@ -172,16 +172,10 @@ impl SyncCover {
     /// closes the slot (v5 `should_auto_finish`). Outside a Sync play the frame
     /// is returned as it is.
     pub fn program_frame(&mut self, window_frame: Option<u64>) -> Option<u64> {
-        let Some(session) = self.active.as_mut() else {
+        let Some(session) = self.active.as_ref() else {
             return window_frame;
         };
         let frame = window_frame?;
-        if !session.started {
-            if frame != 0 {
-                return None;
-            }
-            session.started = true;
-        }
         let program = (session.anchor + frame).min(session.auto_finish);
         if program + 1 >= session.auto_finish {
             let end = session.auto_finish;
@@ -199,8 +193,8 @@ impl SyncCover {
         let session = self.active.take().ok_or("Sync play nije aktivan.")?;
         let start = session.anchor;
         let end = end.max(start + 1).min(session.total_frames.max(start + 1));
-        let source_out = (session.source.source_in + (end - start))
-            .min(session.source.duration_frames);
+        let source_out =
+            (session.source.source_in + (end - start)).min(session.source.duration_frames);
         if source_out <= session.source.source_in {
             return Err("Sync OUT mora biti poslije Source IN".into());
         }
@@ -301,8 +295,11 @@ mod tests {
     fn frames_follow_the_window_and_o_closes_the_slot() {
         let mut sync = armed();
         sync.start(&[0, 20], 25, 100, Some((50, 1))).unwrap();
-        assert_eq!(sync.program_frame(Some(7)), None, "an old picture is ignored");
-        assert_eq!(sync.program_frame(Some(0)), Some(20));
+        assert_eq!(
+            sync.program_frame(Some(1)),
+            Some(21),
+            "the window may start on frame 1 (live player log)"
+        );
         assert_eq!(sync.program_frame(Some(12)), Some(32));
         let slot = sync.finish(32).unwrap().clone();
         assert_eq!((slot.start, slot.end, slot.source_out), (20, 32, 22));
@@ -314,7 +311,10 @@ mod tests {
         );
         assert!(sync.take_commit(false).is_none(), "O waits for Enter");
         let (slot_id, slot) = sync.take_commit(true).unwrap();
-        assert_eq!((slot_id.as_str(), slot.source.source_in, slot.source_out), ("b|c", 10, 22));
+        assert_eq!(
+            (slot_id.as_str(), slot.source.source_in, slot.source_out),
+            ("b|c", 10, 22)
+        );
         assert!(sync.holds_enter(), "until the write lands");
         sync.landed();
         assert!(!sync.holds_enter());
@@ -324,7 +324,6 @@ mod tests {
     fn the_end_of_the_source_closes_the_slot_and_writes_it() {
         let mut sync = armed();
         sync.start(&[0, 20], 25, 100, Some((50, 1))).unwrap();
-        sync.program_frame(Some(0));
         assert_eq!(sync.program_frame(Some(29)), Some(50));
         assert!(!sync.is_active());
         sync.resolve([("b|c", 20, 50)].into_iter());
