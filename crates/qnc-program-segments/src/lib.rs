@@ -10,6 +10,7 @@
 //! the Wrap view (`qnc-wrap-session`); navigation only asks for a program frame. It knows no
 //! form and no application, and never plays, probes or opens media.
 
+mod marker_edit;
 mod markers;
 mod sync;
 
@@ -356,6 +357,17 @@ pub enum SegmentCommand {
     Cover {
         overwrite: bool,
     },
+    /// Ctrl+M: the selected (or nearest) marker into editing.
+    EditMarker,
+    /// Arrows while a marker is edited: its draft by frames.
+    NudgeMarker(i64),
+    /// A mouse drag of a marker: its draft on this program frame.
+    DragMarker {
+        marker_id: String,
+        frame: u64,
+    },
+    /// Escape while a marker is edited.
+    CancelMarkerEdit,
     /// Sync/B-roll on or off.
     ToggleSync,
     /// Enter: the cover of a closed Sync slot (v5 `sync_cover_enter_or_activate_focused_item`).
@@ -372,7 +384,10 @@ impl SegmentCommand {
     pub fn from_action(action_id: &str) -> Option<Self> {
         Some(match action_id {
             "add_marker" | "add_marker_continue" => Self::Marker,
-            "delete_marker" | "delete_part" | "delete_segment" => Self::DeleteSelected,
+            // One Delete press sends delete_part, delete_marker and delete_segment (both
+            // scopes); delete_marker holds every delete key in every preset, so only it
+            // deletes: one press, one delete (the marker, else the cover, else the segment).
+            "delete_marker" => Self::DeleteSelected,
             "playlist_input_start" => Self::ProgramStart,
             "step_prev_part" => Self::Step { up: true },
             "step_next_part" => Self::Step { up: false },
@@ -381,6 +396,7 @@ impl SegmentCommand {
             "quick_overwrite_cover" => Self::Cover { overwrite: false },
             "overwrite_cover" => Self::Cover { overwrite: true },
             "activate_focused_item" => Self::CommitSync,
+            "select_marker" => Self::EditMarker,
             _ => return None,
         })
     }
@@ -420,6 +436,10 @@ pub struct ProgramSegments {
     sync: qnc_sync_cover::SyncCover,
     /// IN was pressed since the last source (arms Sync).
     sync_in_pressed: bool,
+    /// The marker being moved and its draft program frame (Enter writes it).
+    marker_edit: Option<(String, u64)>,
+    /// A marker move was confirmed; Enter stays taken until it lands.
+    marker_committing: bool,
     /// Program playhead of the Wrap view (`qnc-wrap-session`), given by the caller.
     playhead: Option<u64>,
     /// Program frame the user pointed at, for the Wrap view to take once.
@@ -523,12 +543,26 @@ impl ProgramSegments {
 
     /// Whether a keyboard catalog action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
-        SegmentCommand::from_action(action_id).is_some()
+        self.command_for(action_id).is_some()
     }
 
     /// Applies a keyboard catalog action of the program; false if it is not one.
     pub fn apply_action(&mut self, action_id: &str) -> bool {
-        SegmentCommand::from_action(action_id).is_some_and(|command| self.apply(command))
+        self.command_for(action_id)
+            .is_some_and(|command| self.apply(command))
+    }
+
+    /// While a marker is edited, the arrows and Escape belong to it.
+    fn command_for(&self, action_id: &str) -> Option<SegmentCommand> {
+        if self.marker_edit.is_some() {
+            match action_id {
+                "step_back_frame" => return Some(SegmentCommand::NudgeMarker(-1)),
+                "step_forward_frame" => return Some(SegmentCommand::NudgeMarker(1)),
+                "clear_focus" | "close_player" => return Some(SegmentCommand::CancelMarkerEdit),
+                _ => {}
+            }
+        }
+        SegmentCommand::from_action(action_id)
     }
 
     /// Applies a command; returns true so the caller repaints.
@@ -562,7 +596,21 @@ impl ProgramSegments {
             SegmentCommand::Cover { overwrite } => self.cover_from_source(overwrite),
             SegmentCommand::SelectCover { cover_id, frame } => self.select_cover(cover_id, frame),
             SegmentCommand::ToggleSync => self.toggle_sync(),
-            SegmentCommand::CommitSync => self.commit_sync(true),
+            SegmentCommand::CommitSync => {
+                if !self.commit_marker_edit() {
+                    self.commit_sync(true);
+                }
+            }
+            SegmentCommand::EditMarker => self.edit_marker(),
+            SegmentCommand::NudgeMarker(frames) => self.nudge_marker(frames),
+            SegmentCommand::DragMarker { marker_id, frame } => {
+                if self.marker_edit.as_ref().map(|(id, _)| id) == Some(&marker_id) {
+                    self.set_marker_draft(frame);
+                } else {
+                    self.start_marker_edit(marker_id, frame);
+                }
+            }
+            SegmentCommand::CancelMarkerEdit => self.cancel_marker_edit(),
         }
         true
     }
@@ -604,6 +652,7 @@ impl ProgramSegments {
         };
         self.selected = Some(segment_id.to_string());
         self.selected_marker = None;
+        self.marker_edit = None;
         self.selected_slot = None;
         self.write(Operation::SelectPart {
             part_id: segment_id.to_string(),
@@ -618,6 +667,7 @@ impl ProgramSegments {
     }
 
     fn select_marker(&mut self, marker_id: &str) {
+        self.marker_edit = None;
         let Some(frame) = self
             .view
             .markers
@@ -653,6 +703,7 @@ impl ProgramSegments {
         };
         self.selected_slot = Some(slot_id.to_string());
         self.selected_marker = None;
+        self.marker_edit = None;
         self.write(Operation::SelectSlot {
             slot_id: slot_id.to_string(),
         });
@@ -695,15 +746,8 @@ impl ProgramSegments {
             return self.refresh_view("M marker se stavlja na Wrap segment (playhead).".into());
         };
         let operation = match self.selected_marker.clone() {
-            Some(marker_id) => {
-                if let Err(error) = check_move(&self.view.markers, &marker_id, frame) {
-                    return self.refresh_view(error);
-                }
-                Operation::MoveMarker {
-                    marker_id,
-                    program_frame: frame,
-                }
-            }
+            // A selected marker goes to the playhead as a draft; Enter confirms.
+            Some(marker_id) => return self.marker_to_playhead(marker_id),
             None => {
                 let Some(segment) = self.view.segment_at(frame) else {
                     return self.refresh_view("Nema Wrap segmenta pod playheadom.".into());
@@ -812,6 +856,7 @@ impl ProgramSegments {
             return;
         }
         self.selected_marker = None;
+        self.marker_edit = None;
         self.selected_cover = Some(cover_id.clone());
         self.write(Operation::SelectCover { cover_id });
         self.refresh_view(String::new());
@@ -819,6 +864,8 @@ impl ProgramSegments {
     }
 
     pub fn delete_selected(&mut self) {
+        // Ctrl+M then Delete: the marker being edited goes (it is the selected one).
+        self.marker_edit = None;
         if let Some(marker_id) = self.selected_marker.clone() {
             self.selected_marker = None;
             return self.write(Operation::DeleteMarker { marker_id });
@@ -882,6 +929,7 @@ impl ProgramSegments {
         self.adopt_selection = !self.has_pending_work();
         if self.adopt_selection {
             self.sync.landed();
+            self.marker_committing = false;
         }
         self.reload();
         if !message.is_empty() {
@@ -929,6 +977,16 @@ impl ProgramSegments {
         }
         let mut view = program(&self.stored, self.selected.as_deref());
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());
+        if let Some((marker_id, draft)) = &self.marker_edit {
+            // The draft is drawn where the marker is going.
+            for pin in view
+                .markers
+                .iter_mut()
+                .filter(|pin| &pin.marker_id == marker_id)
+            {
+                pin.frame = *draft;
+            }
+        }
         if !known(
             &self.selected_marker,
             view.markers.iter().map(|pin| pin.marker_id.as_str()),

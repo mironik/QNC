@@ -111,7 +111,7 @@ impl ProgramSegments {
 
     /// Enter is taken by a closed Sync slot or its cover write.
     pub fn sync_holds_enter(&self) -> bool {
-        self.sync.holds_enter()
+        self.sync.holds_enter() || self.marker_edit.is_some() || self.marker_committing
     }
 
     pub(crate) fn toggle_sync(&mut self) {

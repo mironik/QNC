@@ -74,9 +74,10 @@ fn delete_removes_the_selected_segment_from_the_program() {
     assert_eq!(segments.view().rows.len(), 3);
     segments.apply(SegmentCommand::Select(ids[1].clone()));
     settle(&mut segments);
-    // The keyboard catalog sends both delete_part and delete_marker for Delete.
-    segments.apply_action("delete_part");
-    segments.apply_action("delete_marker");
+    // One Delete press sends delete_part, delete_marker and delete_segment.
+    for action in ["delete_part", "delete_marker", "delete_segment"] {
+        segments.apply_action(action);
+    }
     settle(&mut segments);
     let left: Vec<&str> = segments
         .view()
@@ -90,4 +91,86 @@ fn delete_removes_the_selected_segment_from_the_program() {
         "{}",
         segments.view().message
     );
+}
+
+fn marker_frames(segments: &ProgramSegments) -> Vec<u64> {
+    segments
+        .view()
+        .markers
+        .iter()
+        .map(|pin| pin.frame)
+        .collect()
+}
+
+#[test]
+fn ctrl_m_moves_a_marker_by_arrows_or_to_the_playhead_and_enter_confirms_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    store_with_story(&file);
+    let mut segments = ProgramSegments::new();
+    segments.configure(ContentTarget::from_owner_binding(&file, URI).unwrap(), "p1");
+    segments.set_playhead(Some(60));
+    segments.apply_action("add_marker");
+    settle(&mut segments);
+    assert_eq!(marker_frames(&segments), vec![0, 60, 150]);
+
+    // Ctrl+M takes the marker nearest to the playhead; arrows move its draft.
+    segments.set_playhead(Some(70));
+    assert!(segments.handles("select_marker"));
+    segments.apply_action("select_marker");
+    assert!(segments.editing_marker());
+    for _ in 0..3 {
+        segments.apply_action("step_forward_frame");
+    }
+    segments.apply_action("step_back_frame");
+    assert_eq!(
+        marker_frames(&segments),
+        vec![0, 62, 150],
+        "the draft is drawn"
+    );
+    assert_eq!(
+        segments.view().playhead,
+        Some(62),
+        "the playhead shows the draft"
+    );
+    assert!(segments.sync_holds_enter(), "Enter belongs to the marker");
+    segments.apply_action("activate_focused_item");
+    settle(&mut segments);
+    assert_eq!(
+        marker_frames(&segments),
+        vec![0, 62, 150],
+        "stored after Enter"
+    );
+
+    // Escape drops a draft.
+    segments.apply_action("select_marker");
+    segments.apply_action("step_forward_frame");
+    segments.apply_action("clear_focus");
+    assert!(!segments.editing_marker());
+    assert_eq!(marker_frames(&segments), vec![0, 62, 150]);
+
+    // M with the marker selected puts the draft on the playhead; Enter confirms.
+    segments.set_playhead(Some(100));
+    segments.apply_action("add_marker");
+    assert_eq!(marker_frames(&segments), vec![0, 100, 150], "only a draft");
+    segments.apply_action("activate_focused_item");
+    settle(&mut segments);
+    assert_eq!(marker_frames(&segments), vec![0, 100, 150]);
+
+    // A draft never passes a neighbour; the locked end stays.
+    segments.apply_action("select_marker");
+    segments.apply(SegmentCommand::DragMarker {
+        marker_id: segments.view().markers[1].marker_id.clone(),
+        frame: 150,
+    });
+    assert_eq!(marker_frames(&segments), vec![0, 100, 150]);
+
+    // Ctrl+M then Delete removes the marker only, not the segment as well.
+    for action in ["delete_part", "delete_marker", "delete_segment"] {
+        segments.apply_action(action);
+    }
+    settle(&mut segments);
+    assert_eq!(marker_frames(&segments), vec![0, 150]);
+    assert!(!segments.editing_marker());
+    assert_eq!(segments.view().rows.len(), 3, "no segment deleted with it");
 }
