@@ -70,7 +70,10 @@ impl ProgramSegments {
             return self.refresh_view(error);
         }
         self.marker_edit = Some((marker_id, frame));
-        self.refresh_view("Marker: ←/→ pomak, M na playhead, Enter potvrda, Esc odustani".into());
+        self.refresh_view(
+            "Marker: strelice lijevo/desno pomak, M na playhead, Enter potvrda, Esc odustani"
+                .into(),
+        );
         self.cue_program(frame);
     }
 
