@@ -235,13 +235,6 @@ impl EditorialApplication {
         let previous_clip_id = self.view.preview.clip_id.clone();
         let previous_timeline = self.view.preview.timeline;
         self.view.preview = self.preview.view().clone();
-        let timebase = self.preview.player_view().source_timebase();
-        self.segments.set_source(SourcePick::new(
-            self.view.chosen_clip_id(),
-            self.view.current_clip_label(),
-            self.view.preview.timeline.visible_source_marks(),
-            timebase.map(|timebase| (timebase.fps_num, timebase.fps_den)),
-        ));
         if previous_clip_id == self.view.preview.clip_id {
             self.view.preview.timeline = self
                 .view
@@ -253,10 +246,18 @@ impl EditorialApplication {
                 .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
         self.apply_pending_shot();
+        let timebase = self.preview.player_view().source_timebase();
+        self.segments.set_source(SourcePick::new(
+            self.view.chosen_clip_id(),
+            self.view.current_clip_label(),
+            self.view.preview.timeline.visible_source_marks(),
+            timebase.map(|timebase| (timebase.fps_num, timebase.fps_den)),
+        ));
         // Source and Wrap stay apart (v5): the Wrap timeline plays the program in the same player.
         let seek = self.segments.take_seek();
         let total = self.segments.view().total_frames;
         let changed = self.segments.take_program_changed(); // the program opens again
+        changed.then(|| self.reload_shorts()); // a cover writes its B-roll shot
         match self.wrap.apply(seek, total, changed) {
             Some(r) => _ = self.preview.show_program_frame(r.frame(), r.opens()),
             None => self.wrap.follow_program(self.preview.program_frame()),
