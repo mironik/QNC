@@ -3,18 +3,40 @@
   "module_name": "Program segments",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["program.segment.write", "program.segment.read", "program.marker.write", "program.marker.read", "program.model"],
+  "capabilities": [
+    "program.segment.write",
+    "program.segment.read",
+    "program.marker.write",
+    "program.marker.read",
+    "program.model"
+  ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
-  "supported_os": ["windows", "linux", "macos"],
-  "supported_cpu": ["x86_64", "aarch64"],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
   "transport_protocol_version": "0.1.0",
-  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command", "ui.paint"],
-  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "forbidden_calls": [
+    "ffprobe",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "ui.paint"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner"
+  ],
   "state_policy": "stateless",
   "database_write_policy": "public_db_owner_write_adapter_only",
   "runtime_crate": "qnc-program-segments",
   "input": "Content target of the active project; a Ton or Off segment from the chosen clip, the player-confirmed source IN/OUT and the confirmed source timebase.",
-  "output": "story_parts, story_markers and story_state writes through the serialized content write transport; reads of segments (deleted ones for the Segment tab), all markers with the locked start and end, stored M-M slots (marker pair, has_cover) and the stored selection. The program model is the active segments on one axis, markers, slots, story timebase, total length, duration labels, v5 navigation (segment, slot, marker, first empty slot); navigation only asks for a program frame (take_seek) and draws the Wrap playhead given by qnc-wrap-session. It never chooses a source clip for the player.",
+  "output": "story_parts, story_markers and story_state writes through the serialized content write transport; reads of segments (deleted ones for the Segment tab), all markers with the locked start and end, stored M-M slots (marker pair, has_cover) and the stored selection. The program model is the active segments on one axis, markers, slots, story timebase, total length, duration labels, v5 navigation (segment, slot, marker, first empty slot); navigation only asks for a program frame (take_seek) and draws the Wrap playhead given by qnc-wrap-session. It never chooses a source clip for the player. Covers (v5 quick_cover / overwrite_cover): B / Cover slot writes CreateCover for the selected empty slot, Overwrite for the selected slot or the selected cover's slot, from the source the caller marks (clip, confirmed IN/OUT, player timebase); the store makes it a B-roll virtual shot. Covers are drawn over their slot; a cover click selects it, a segment choice clears it, Delete takes marker, then cover, then segment. take_program_changed tells the Wrap view that segments or covers changed.",
   "specification": "docs/93-v5-story-processes-and-rules.md R8-R14; docs/v5-book/04-story.md"
 }

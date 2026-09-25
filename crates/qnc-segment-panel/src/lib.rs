@@ -15,9 +15,9 @@ pub use list::show_segment_list;
 use eframe::egui::{self, Color32, RichText, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentRow, SegmentsView};
 use qnc_timeline::{
-    AudioLane, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags,
-    TimelineMarkerPin, TimelineMetrics, TimelineProjection, TimelineSlotSpan, TimelineTheme,
-    TimelineVirtualSpan,
+    AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent,
+    TimelineLayerFlags, TimelineMarkerPin, TimelineMetrics, TimelineProjection, TimelineSlotSpan,
+    TimelineTheme, TimelineVirtualSpan,
 };
 
 pub const MODULE_ID: &str = "qnc.module.segment-panel";
@@ -116,7 +116,7 @@ pub fn show(
             ui.scope_builder(egui::UiBuilder::new().max_rect(playlist), |ui| {
                 ui.set_clip_rect(playlist);
                 ui.separator();
-                command = command.take().or(bar::show(ui, timeline_theme));
+                command = command.take().or(bar::show(ui, segments, timeline_theme));
                 ui.add_space(2.0);
                 let total = segments.total_frames;
                 // Every timeline row needs its own id space: `qnc-timeline` names its
@@ -238,6 +238,18 @@ fn paint_program(
             selected: slot.selected,
         })
         .collect::<Vec<_>>();
+    let covers = segments
+        .covers
+        .iter()
+        .filter(|cover| cover.end_frame > start && cover.start_frame < end)
+        .map(|cover| TimelineCoverSpan {
+            id: &cover.cover_id,
+            start_frame: local(cover.start_frame),
+            end_frame: local(cover.end_frame),
+            selected: cover.selected,
+            pending: false,
+        })
+        .collect::<Vec<_>>();
     let markers = segments
         .markers
         .iter()
@@ -273,7 +285,7 @@ fn paint_program(
             a3_peaks: &[],
             a4_peaks: &[],
             virtual_spans: &spans,
-            covers: &[],
+            covers: &covers,
             marker_slots: &slots,
             markers: &markers,
             base_video_blank: no_picture,
@@ -286,6 +298,10 @@ fn paint_program(
         // v5 `program_intent_from_timeline_interact`: a click keeps its frame.
         TimelineIntent::SelectMarkerSlot { id, frame } => Some(SegmentCommand::SelectSlot {
             slot_id: id,
+            frame: start + frame.min(duration),
+        }),
+        TimelineIntent::SelectCover { id, frame } => Some(SegmentCommand::SelectCover {
+            cover_id: id,
             frame: start + frame.min(duration),
         }),
         TimelineIntent::SelectVirtual { frame, .. } => {

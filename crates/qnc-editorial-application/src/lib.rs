@@ -17,7 +17,7 @@ use std::{
 use qnc_active_project_read::{ActiveProjectChange, ActiveProjectReader, ShownProject};
 use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
-use qnc_program_segments::SegmentKind;
+use qnc_program_segments::SourcePick;
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_source_preview::{PreviewContext, SourcePreview};
 use qnc_source_reader::SourceReader;
@@ -235,6 +235,13 @@ impl EditorialApplication {
         let previous_clip_id = self.view.preview.clip_id.clone();
         let previous_timeline = self.view.preview.timeline;
         self.view.preview = self.preview.view().clone();
+        let timebase = self.preview.player_view().source_timebase();
+        self.segments.set_source(SourcePick::new(
+            self.view.chosen_clip_id(),
+            self.view.current_clip_label(),
+            self.view.preview.timeline.visible_source_marks(),
+            timebase.map(|timebase| (timebase.fps_num, timebase.fps_den)),
+        ));
         if previous_clip_id == self.view.preview.clip_id {
             self.view.preview.timeline = self
                 .view
@@ -248,8 +255,10 @@ impl EditorialApplication {
         self.apply_pending_shot();
         // Source and Wrap stay apart (v5): the Wrap timeline plays the program in the same player.
         let seek = self.segments.take_seek();
-        match self.wrap.apply(seek, self.segments.view().total_frames) {
-            Some(request) => _ = self.preview.show_program_frame(request.frame()),
+        let total = self.segments.view().total_frames;
+        let changed = self.segments.take_program_changed(); // the program opens again
+        match self.wrap.apply(seek, total, changed) {
+            Some(r) => _ = self.preview.show_program_frame(r.frame(), r.opens()),
             None => self.wrap.follow_program(self.preview.program_frame()),
         }
         self.segments.set_playhead(Some(self.wrap.playhead()));
@@ -424,8 +433,6 @@ impl EditorialApplication {
                     true
                 }
                 action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
-                action_ids::ADD_TON_SEGMENT => self.add_segment(SegmentKind::Ton),
-                action_ids::ADD_OFF_SEGMENT => self.add_segment(SegmentKind::Off),
                 _ => false,
             },
             EditorialIntent::Segment(command) => self.segments.apply(command),
@@ -442,19 +449,6 @@ impl EditorialApplication {
     }
 
     /// Writes one short from the IN/OUT the source timeline is showing.
-    /// Talking Head or Voice over: the chosen clip between the confirmed IN/OUT, in
-    /// the timebase the player confirmed, is appended to the program.
-    fn add_segment(&mut self, kind: SegmentKind) -> bool {
-        let timebase = self.preview.player_view().source_timebase();
-        self.segments.create_from_source(
-            kind,
-            self.view.chosen_clip_id(),
-            self.view.preview.timeline.visible_source_marks(),
-            timebase.map(|timebase| (timebase.fps_num, timebase.fps_den)),
-        );
-        true
-    }
-
     fn save_virtual_shot(&mut self) -> bool {
         let Some(clip_id) = self.view.chosen_clip_id().map(str::to_string) else {
             self.view.message = "Odaberi klip.".into();

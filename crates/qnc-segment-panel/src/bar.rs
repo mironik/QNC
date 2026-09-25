@@ -1,10 +1,11 @@
 //! The navigation and edit bar under the segment rows (v5 `marker_cover_panel.rs`):
 //! M marker, Cover slot, Overwrite on the left; previous/next segment, slot and
 //! marker around the program start in the middle; Sync/B-roll on the right.
-//! Cover slot, Overwrite and Sync/B-roll come with covers and are shown disabled.
+//! Cover slot needs a selected empty slot, Overwrite a selected slot or cover (v5
+//! `quick_cover_target`, `overwrite_cover_target`); Sync/B-roll comes later.
 
 use eframe::egui::{self, PointerButton, Pos2, Rect, RichText, Sense, Vec2};
-use qnc_program_segments::SegmentCommand;
+use qnc_program_segments::{SegmentCommand, SegmentsView};
 use qnc_timeline::TimelineTheme;
 
 const COMPACT_CTRL_H: f32 = 22.0;
@@ -17,7 +18,11 @@ const TRANSPORT_GAP: f32 = 5.0;
 const TRANSPORT_CONTROLS_W: f32 = TRANSPORT_BTN_W * 7.0 + TRANSPORT_GAP * 6.0;
 const FONT_UI: f32 = 14.0;
 
-pub(crate) fn show(ui: &mut egui::Ui, theme: TimelineTheme) -> Option<SegmentCommand> {
+pub(crate) fn show(
+    ui: &mut egui::Ui,
+    segments: &SegmentsView,
+    theme: TimelineTheme,
+) -> Option<SegmentCommand> {
     let mut command = None;
     let (row, _) = ui.allocate_exact_size(
         Vec2::new(ui.available_width(), COMPACT_CTRL_H),
@@ -95,8 +100,14 @@ pub(crate) fn show(ui: &mut egui::Ui, theme: TimelineTheme) -> Option<SegmentCom
                 if clicked(action_button(ui, "M marker", true, theme)) {
                     command = Some(SegmentCommand::Marker);
                 }
-                let _ = action_button(ui, "Cover slot", false, theme);
-                let _ = action_button(ui, "Overwrite", false, theme);
+                let quick = segments.quick_cover_slot().is_ok();
+                if clicked(action_button(ui, "Cover slot", quick, theme)) {
+                    command = Some(SegmentCommand::Cover { overwrite: false });
+                }
+                let overwrite = segments.overwrite_cover_slot().is_ok();
+                if clicked(action_button(ui, "Overwrite", overwrite, theme)) {
+                    command = Some(SegmentCommand::Cover { overwrite: true });
+                }
             },
         );
     }

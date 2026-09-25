@@ -1692,17 +1692,19 @@ impl ContentStore {
         Ok(Data::Changed)
     }
 
-    /// v5 `select_cover`: an existing cover only.
+    /// v5 `select_cover`: an existing cover, or an empty id to clear (a segment
+    /// chosen on the program clears it, v5 `selected_cover_id.clear()`).
     fn select_cover(&mut self, cover_id: &str) -> Result<Data> {
         let cover_id = cover_id.trim();
-        let exists: bool = self
-            .conn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM story_covers WHERE cover_id = ?1)",
-                [cover_id],
-                |row| row.get(0),
-            )
-            .map_err(err)?;
+        let exists: bool = cover_id.is_empty()
+            || self
+                .conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM story_covers WHERE cover_id = ?1)",
+                    [cover_id],
+                    |row| row.get(0),
+                )
+                .map_err(err)?;
         if !exists {
             return Err(format!("cover not found: {cover_id}"));
         }

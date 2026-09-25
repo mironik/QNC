@@ -87,6 +87,7 @@ impl EditorialView {
                 self.segments.selected().is_some()
             }
             tab if LibraryTab::from_action(tab).is_some() => true,
+            action if self.segments.handles(action) => self.segments.action_enabled(action),
             action_ids::PLAY_PAUSE
             | action_ids::STEP_BACK_FRAME
             | action_ids::STEP_FORWARD_FRAME

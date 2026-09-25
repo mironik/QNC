@@ -298,3 +298,89 @@ fn keyboard_actions_map_to_commands() {
     assert_eq!(SegmentCommand::from_action("mark_in"), None);
     assert_eq!(SegmentCommand::from_action("play_pause"), None);
 }
+
+fn cover(id: &str, slot_id: &str, frames: (u64, u64)) -> ProgramCover {
+    ProgramCover {
+        cover_id: id.into(),
+        slot_id: slot_id.into(),
+        clip_id: "clip-x".into(),
+        virtual_shot_id: "shot".into(),
+        program_start_frame: frames.0,
+        program_end_frame: frames.1,
+        source_in_frame: 0,
+        source_out_frame: 50,
+        fps_num: 50,
+        fps_den: 1,
+        a2_source_channel: 0,
+    }
+}
+
+#[test]
+fn a_cover_is_drawn_over_its_slot_and_targets_follow_v5() {
+    let mut segments = component();
+    segments.stored_covers = vec![cover("k", "S|m1", (0, 15))];
+    segments.selected_slot = Some("S|m1".into());
+    segments.refresh_view(String::new());
+    let view = segments.view();
+    assert_eq!(
+        (view.covers[0].start_frame, view.covers[0].end_frame),
+        (0, 15)
+    );
+    assert_eq!(
+        view.quick_cover_slot().unwrap_err(),
+        "Odabrani marker slot već ima pokrivalicu",
+        "B needs an empty slot"
+    );
+    assert_eq!(view.overwrite_cover_slot(), Ok("S|m1"));
+    segments.selected_slot = None;
+    segments.selected_cover = Some("k".into());
+    segments.refresh_view(String::new());
+    assert_eq!(
+        segments.view().overwrite_cover_slot(),
+        Ok("S|m1"),
+        "Overwrite takes the selected cover's slot"
+    );
+    assert!(segments.view().quick_cover_slot().is_err());
+}
+
+#[test]
+fn a_cover_needs_the_marked_source_and_a_segment_click_clears_the_cover() {
+    let mut segments = component();
+    segments.stored_covers = vec![cover("k", "S|m1", (0, 15))];
+    segments.selected_slot = Some("m1|m2".into());
+    segments.refresh_view(String::new());
+    segments.apply(SegmentCommand::Cover { overwrite: false });
+    assert_eq!(
+        segments.view().message,
+        "Odaberi klip i potvrdi IN i OUT na playeru."
+    );
+    assert!(SegmentCommand::from_action("quick_overwrite_cover").is_some());
+    assert_eq!(
+        SegmentCommand::from_action("overwrite_cover"),
+        Some(SegmentCommand::Cover { overwrite: true })
+    );
+    segments.apply(SegmentCommand::SelectCover {
+        cover_id: "k".into(),
+        frame: 4,
+    });
+    assert_eq!(
+        segments
+            .view()
+            .selected_cover()
+            .map(|c| c.cover_id.as_str()),
+        Some("k")
+    );
+    assert_eq!(segments.view().playhead, Some(4));
+    segments.select("c");
+    assert!(
+        segments.view().selected_cover().is_none(),
+        "v5: choosing a segment clears the cover"
+    );
+    segments.selected_cover = Some("k".into());
+    segments.apply(SegmentCommand::DeleteSelected);
+    assert!(
+        segments.selected_cover.is_none(),
+        "Delete takes the cover first"
+    );
+    assert_eq!(segments.selected.as_deref(), Some("c"), "the segment stays");
+}

@@ -408,9 +408,10 @@ impl SourcePreview {
     }
 
     /// A frame of the active project's story program (Wrap): a cue while the
-    /// program already plays, else the program opens at that frame.
-    pub fn show_program_frame(&mut self, frame: u64) -> bool {
-        if self.program && self.player_view.has_confirmed_position() {
+    /// program already plays, else (or when `reopen`: the story changed) the
+    /// program is built and opened at that frame.
+    pub fn show_program_frame(&mut self, frame: u64, reopen: bool) -> bool {
+        if !reopen && self.program && self.player_view.has_confirmed_position() {
             return self.cue(frame);
         }
         let (Some(target), Some(context)) = (self.activity_target.clone(), &self.context) else {

@@ -18,8 +18,8 @@ pub use markers::{
 };
 
 use qnc_content_store::{
-    Access, ContentTarget, ContentWriteData, ContentWriteTransport, Operation, ProgramMarker,
-    ProgramSegment, ProgramSlot,
+    Access, ContentTarget, ContentWriteData, ContentWriteTransport, Operation, ProgramCover,
+    ProgramMarker, ProgramSegment, ProgramSlot,
 };
 
 pub const MODULE_ID: &str = "qnc.module.program-segments";
@@ -96,6 +96,42 @@ pub struct SegmentPart {
     pub selected: bool,
 }
 
+/// A cover on the program axis: drawn over its slot (v5 `segment_timeline_covers`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CoverSpan {
+    pub cover_id: String,
+    pub slot_id: String,
+    pub start_frame: u64,
+    pub end_frame: u64,
+    pub selected: bool,
+}
+
+/// The source the user marked for Talking Head, Voice over and covers: the chosen
+/// clip, its confirmed IN/OUT and the timebase the player confirmed.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SourcePick {
+    pub clip_id: Option<String>,
+    pub clip_name: String,
+    pub marks: Option<(u64, u64)>,
+    pub timebase: Option<(i64, i64)>,
+}
+
+impl SourcePick {
+    pub fn new(
+        clip_id: Option<&str>,
+        clip_name: Option<&str>,
+        marks: Option<(u64, u64)>,
+        timebase: Option<(i64, i64)>,
+    ) -> Self {
+        Self {
+            clip_id: clip_id.map(str::to_string),
+            clip_name: clip_name.unwrap_or_default().to_string(),
+            marks,
+            timebase,
+        }
+    }
+}
+
 /// What a form shows: the program in order, its markers and slots, timebase,
 /// length and the program playhead confirmed by the player.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -105,6 +141,8 @@ pub struct SegmentsView {
     pub parts: Vec<SegmentPart>,
     pub markers: Vec<MarkerPin>,
     pub slots: Vec<Slot>,
+    /// Covers by program frame.
+    pub covers: Vec<CoverSpan>,
     /// Story timebase (`num`, `den`); `None` while the program is empty.
     pub timebase: Option<(u32, u32)>,
     pub total_frames: u64,
@@ -125,6 +163,48 @@ impl SegmentsView {
 
     pub fn selected_marker(&self) -> Option<&MarkerPin> {
         self.markers.iter().find(|pin| pin.selected)
+    }
+
+    pub fn selected_slot(&self) -> Option<&Slot> {
+        self.slots.iter().find(|slot| slot.selected)
+    }
+
+    pub fn selected_cover(&self) -> Option<&CoverSpan> {
+        self.covers.iter().find(|cover| cover.selected)
+    }
+
+    /// Whether a program action can run now: B needs an empty selected slot,
+    /// Overwrite a selected slot or cover; the others are always offered.
+    pub fn action_enabled(&self, action_id: &str) -> bool {
+        match SegmentCommand::from_action(action_id) {
+            Some(SegmentCommand::Cover { overwrite: false }) => self.quick_cover_slot().is_ok(),
+            Some(SegmentCommand::Cover { overwrite: true }) => self.overwrite_cover_slot().is_ok(),
+            _ => true,
+        }
+    }
+
+    /// Whether an action belongs to the program.
+    pub fn handles(&self, action_id: &str) -> bool {
+        SegmentCommand::from_action(action_id).is_some()
+    }
+
+    /// v5 `quick_cover_target`: the selected slot, while it has no cover.
+    pub fn quick_cover_slot(&self) -> Result<&Slot, String> {
+        let slot = self
+            .selected_slot()
+            .ok_or("Odaberi marker slot za pokrivalicu")?;
+        if slot.has_cover {
+            return Err("Odabrani marker slot već ima pokrivalicu".into());
+        }
+        Ok(slot)
+    }
+
+    /// v5 `overwrite_cover_target`: the selected slot, else the selected cover's slot.
+    pub fn overwrite_cover_slot(&self) -> Result<&str, String> {
+        self.selected_slot()
+            .map(|slot| slot.slot_id.as_str())
+            .or_else(|| self.selected_cover().map(|cover| cover.slot_id.as_str()))
+            .ok_or_else(|| "Odaberi marker slot za pokrivalicu".into())
     }
 
     /// The segment that holds a program frame; at or after the end, the last one.
@@ -258,6 +338,17 @@ pub enum SegmentCommand {
     Cue(u64),
     /// M: a new marker at the playhead, or the selected marker moved there (docs/94 7a).
     Marker,
+    /// Talking Head (Ton) or Voice over (Off) from the marked source.
+    AddSegment(SegmentKind),
+    /// Cover slot / B (empty selected slot) or Overwrite / Shift+B from the marked source.
+    Cover {
+        overwrite: bool,
+    },
+    /// A click on a cover: select it, playhead at the clicked program frame.
+    SelectCover {
+        cover_id: String,
+        frame: u64,
+    },
 }
 
 impl SegmentCommand {
@@ -269,6 +360,10 @@ impl SegmentCommand {
             "playlist_input_start" => Self::ProgramStart,
             "step_prev_part" => Self::Step { up: true },
             "step_next_part" => Self::Step { up: false },
+            "add_ton_segment" => Self::AddSegment(SegmentKind::Ton),
+            "add_off_segment" => Self::AddSegment(SegmentKind::Off),
+            "quick_overwrite_cover" => Self::Cover { overwrite: false },
+            "overwrite_cover" => Self::Cover { overwrite: true },
             _ => return None,
         })
     }
@@ -293,12 +388,18 @@ pub struct ProgramSegments {
     stored: Vec<ProgramSegment>,
     stored_markers: Vec<ProgramMarker>,
     stored_slots: Vec<ProgramSlot>,
+    stored_covers: Vec<ProgramCover>,
+    /// The segments or covers changed since the program player last took them.
+    program_changed: bool,
     /// Take the stored selection on the next read (on open, and after writes that
     /// may move it, v5 `story_state`).
     adopt_selection: bool,
     selected: Option<String>,
     selected_marker: Option<String>,
     selected_slot: Option<String>,
+    selected_cover: Option<String>,
+    /// What Talking Head, Voice over and covers take from the source view.
+    source: SourcePick,
     /// Program playhead of the Wrap view (`qnc-wrap-session`), given by the caller.
     playhead: Option<u64>,
     /// Program frame the user pointed at, for the Wrap view to take once.
@@ -351,6 +452,17 @@ impl ProgramSegments {
         }
     }
 
+    /// The source the user marked, given by the caller each repaint.
+    pub fn set_source(&mut self, source: SourcePick) {
+        self.source = source;
+    }
+
+    /// Whether the playable program (segments or covers) changed since the last
+    /// call; the Wrap view then opens it again.
+    pub fn take_program_changed(&mut self) -> bool {
+        std::mem::take(&mut self.program_changed)
+    }
+
     /// Rereads the program from the database.
     pub fn reload(&mut self) {
         let Some(target) = &self.target else {
@@ -361,18 +473,22 @@ impl ProgramSegments {
                 client.list_segments()?,
                 client.list_markers()?,
                 client.list_slots()?,
+                client.list_covers()?,
                 client.read_story_selection()?,
             ))
         });
         match read {
-            Ok((stored, markers, slots, selection)) => {
+            Ok((stored, markers, slots, covers, selection)) => {
+                self.program_changed |= stored != self.stored || covers != self.stored_covers;
                 self.stored = stored;
+                self.stored_covers = covers;
                 self.stored_markers = markers;
                 self.stored_slots = slots;
                 if std::mem::take(&mut self.adopt_selection) {
                     let some = |id: String| (!id.is_empty()).then_some(id);
                     self.selected = some(selection.selected_part_id);
                     self.selected_slot = some(selection.selected_slot_id);
+                    self.selected_cover = some(selection.selected_cover_id);
                 }
                 self.refresh_view(String::new());
             }
@@ -417,6 +533,9 @@ impl ProgramSegments {
             SegmentCommand::ProgramStart => self.cue_program(0),
             SegmentCommand::Cue(frame) => self.cue_at(frame),
             SegmentCommand::Marker => self.marker_at_playhead(),
+            SegmentCommand::AddSegment(kind) => self.create_from_source(kind),
+            SegmentCommand::Cover { overwrite } => self.cover_from_source(overwrite),
+            SegmentCommand::SelectCover { cover_id, frame } => self.select_cover(cover_id, frame),
         }
         true
     }
@@ -462,6 +581,11 @@ impl ProgramSegments {
         self.write(Operation::SelectPart {
             part_id: segment_id.to_string(),
         });
+        if self.selected_cover.take().is_some() {
+            self.write(Operation::SelectCover {
+                cover_id: String::new(),
+            });
+        }
         self.refresh_view(String::new());
         self.cue_program(start);
     }
@@ -585,35 +709,94 @@ impl ProgramSegments {
         }
     }
 
-    /// Talking Head / Voice over from the source preview: the chosen clip between the
-    /// confirmed IN/OUT, in the timebase the player confirmed. Missing parts end in
-    /// a message, never in a guessed range or rate.
-    pub fn create_from_source(
-        &mut self,
-        kind: SegmentKind,
-        clip_id: Option<&str>,
-        marks: Option<(u64, u64)>,
-        timebase: Option<(i64, i64)>,
-    ) {
-        let (Some(clip_id), Some((in_frame, out_frame)), Some((num, den))) =
-            (clip_id, marks, timebase)
+    /// Talking Head / Voice over from the marked source: the chosen clip between
+    /// the confirmed IN/OUT, in the timebase the player confirmed. Missing parts end
+    /// in a message, never in a guessed range or rate.
+    pub fn create_from_source(&mut self, kind: SegmentKind) {
+        let Some((clip_id, (in_frame, out_frame), (fps_num, fps_den))) = self.marked_source()
         else {
-            return self.refresh_view("Odaberi klip i potvrdi IN i OUT na playeru.".into());
+            return;
         };
         self.create(NewSegment {
             kind,
-            clip_id: clip_id.to_string(),
+            clip_id,
             in_frame,
             out_frame,
-            fps_num: u32::try_from(num).unwrap_or(0),
-            fps_den: u32::try_from(den).unwrap_or(0),
+            fps_num,
+            fps_den,
         });
+    }
+
+    /// v5 `quick_cover` / `overwrite_cover`: the marked source becomes the cover
+    /// of the target slot (a B-roll virtual shot; the store replaces a cover there).
+    pub fn cover_from_source(&mut self, overwrite: bool) {
+        let slot = if overwrite {
+            self.view.overwrite_cover_slot().map(str::to_string)
+        } else {
+            self.view
+                .quick_cover_slot()
+                .map(|slot| slot.slot_id.clone())
+        };
+        let slot_id = match slot {
+            Ok(slot_id) => slot_id,
+            Err(error) => return self.refresh_view(error),
+        };
+        let Some((clip_id, (in_frame, out_frame), (fps_num, fps_den))) = self.marked_source()
+        else {
+            return;
+        };
+        self.write(Operation::CreateCover {
+            project_id: self.project_id.clone(),
+            slot_id,
+            clip_id,
+            clip_name: self.source.clip_name.clone(),
+            in_frame,
+            out_frame,
+            fps_num,
+            fps_den,
+        });
+    }
+
+    fn marked_source(&mut self) -> Option<(String, (u64, u64), (u32, u32))> {
+        let source = &self.source;
+        let rate = |value: i64| u32::try_from(value).unwrap_or(0);
+        let picked = match (&source.clip_id, source.marks, source.timebase) {
+            (Some(clip_id), Some(marks), Some((num, den))) => {
+                Some((clip_id.clone(), marks, (rate(num), rate(den))))
+            }
+            _ => None,
+        };
+        if picked.is_none() {
+            self.refresh_view("Odaberi klip i potvrdi IN i OUT na playeru.".into());
+        }
+        picked
+    }
+
+    /// v5 `select_cover`: clears the selected marker; the playhead goes to the click.
+    fn select_cover(&mut self, cover_id: String, frame: u64) {
+        if !self
+            .view
+            .covers
+            .iter()
+            .any(|cover| cover.cover_id == cover_id)
+        {
+            return;
+        }
+        self.selected_marker = None;
+        self.selected_cover = Some(cover_id.clone());
+        self.write(Operation::SelectCover { cover_id });
+        self.refresh_view(String::new());
+        self.cue_at(frame);
     }
 
     pub fn delete_selected(&mut self) {
         if let Some(marker_id) = self.selected_marker.clone() {
             self.selected_marker = None;
             return self.write(Operation::DeleteMarker { marker_id });
+        }
+        // v5 `delete_selected_timeline_item`: the marker, then the cover, then the segment.
+        if let Some(cover_id) = self.selected_cover.take() {
+            return self.write(Operation::DeleteCover { cover_id });
         }
         let Some(segment_id) = self.selected.clone() else {
             return self.refresh_view("Odaberi segment.".into());
@@ -727,6 +910,25 @@ impl ProgramSegments {
         ) {
             self.selected_slot = None;
         }
+        if !known(
+            &self.selected_cover,
+            self.stored_covers
+                .iter()
+                .map(|cover| cover.cover_id.as_str()),
+        ) {
+            self.selected_cover = None;
+        }
+        view.covers = self
+            .stored_covers
+            .iter()
+            .map(|cover| CoverSpan {
+                cover_id: cover.cover_id.clone(),
+                slot_id: cover.slot_id.clone(),
+                start_frame: cover.program_start_frame,
+                end_frame: cover.program_end_frame,
+                selected: self.selected_cover.as_deref() == Some(cover.cover_id.as_str()),
+            })
+            .collect();
         view.playhead = self.playhead;
         view.message = message;
         self.view = view;

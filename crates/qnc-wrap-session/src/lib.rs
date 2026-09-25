@@ -33,6 +33,11 @@ impl WrapRequest {
             Self::Open(frame) | Self::Scrub(frame) => frame,
         }
     }
+
+    /// Whether the program must be built and opened again.
+    pub fn opens(self) -> bool {
+        matches!(self, Self::Open(_))
+    }
 }
 
 #[derive(Debug, Default)]
@@ -66,12 +71,24 @@ impl WrapSession {
     pub fn seek(&mut self, frame: u64) {
         self.playhead = frame;
         self.awaiting = Some(frame);
-        self.request = Some(if self.active {
-            WrapRequest::Scrub(frame)
-        } else {
-            self.active = true;
-            WrapRequest::Open(frame)
+        self.request = Some(match self.request {
+            // An open still waiting keeps opening, now at this frame.
+            Some(WrapRequest::Open(_)) => WrapRequest::Open(frame),
+            _ if self.active => WrapRequest::Scrub(frame),
+            _ => {
+                self.active = true;
+                WrapRequest::Open(frame)
+            }
         });
+    }
+
+    /// The program changed (a segment or cover was written): in Wrap it is built
+    /// and opened again at the playhead, as v5 rebuilds its program playlist.
+    pub fn reopen(&mut self) {
+        if self.active {
+            self.awaiting = Some(self.playhead);
+            self.request = Some(WrapRequest::Open(self.playhead));
+        }
     }
 
     /// One frame back or forward from the playhead, in Wrap only.
@@ -112,9 +129,18 @@ impl WrapSession {
         self.playhead = frame;
     }
 
-    /// One repaint: a program frame the user pointed at, if any, then the playhead
-    /// kept inside the program. Returns what the program player must do.
-    pub fn apply(&mut self, seek: Option<u64>, total_frames: u64) -> Option<WrapRequest> {
+    /// One repaint: a changed program opens again, a program frame the user
+    /// pointed at, if any, then the playhead kept inside the program. Returns what
+    /// the program player must do.
+    pub fn apply(
+        &mut self,
+        seek: Option<u64>,
+        total_frames: u64,
+        program_changed: bool,
+    ) -> Option<WrapRequest> {
+        if program_changed {
+            self.reopen();
+        }
         if let Some(frame) = seek {
             self.seek(frame);
         }
@@ -180,9 +206,26 @@ mod tests {
     }
 
     #[test]
+    fn a_changed_program_opens_again_only_in_wrap() {
+        let mut wrap = WrapSession::new();
+        wrap.reopen();
+        assert_eq!(wrap.take_request(), None, "nothing to reopen in Source");
+        wrap.seek(20);
+        wrap.take_request();
+        wrap.reopen();
+        wrap.seek(25);
+        assert_eq!(
+            wrap.take_request(),
+            Some(WrapRequest::Open(25)),
+            "a click right after a change still opens the new program"
+        );
+        assert!(WrapRequest::Open(1).opens() && !WrapRequest::Scrub(1).opens());
+    }
+
+    #[test]
     fn steps_stay_inside_the_program() {
         let mut wrap = WrapSession::new();
-        assert_eq!(wrap.apply(Some(0), 10), Some(WrapRequest::Open(0)));
+        assert_eq!(wrap.apply(Some(0), 10, false), Some(WrapRequest::Open(0)));
         wrap.take_request();
         assert!(wrap.step(-1));
         assert_eq!(wrap.playhead(), 0);
