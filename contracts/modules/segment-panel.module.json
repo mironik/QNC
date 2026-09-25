@@ -34,6 +34,6 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-segment-panel",
   "input": "A prepared program segments view (rows, markers, slots, player-confirmed program playhead) and the timeline theme.",
-  "output": "Passive Segmenti panel (program timing header, one qnc-timeline row per segment with the program markers (the locked start and end included; a border marker at the end of the earlier row) and the stored slots with their cover flag, the navigation bar and a program overview row) and the user's intent as a segment command. Covers are painted over their slot on every row; Cover slot and Overwrite are enabled only when the model has a target slot.",
+  "output": "Passive Segmenti panel (program timing header, one qnc-timeline row per segment with the program markers (the locked start and end included; a border marker at the end of the earlier row) and the stored slots with their cover flag, the navigation bar and a program overview row) and the user's intent as a segment command. Covers are painted over their slot on every row; Cover slot and Overwrite are enabled only when the model has a target slot. Segment tab (user rule 2026-09-25): the selected active row has Up, Down and Isključi; an excluded row stays greyed where it was with Uključi and Izbriši; a row click is read from input away from its buttons.",
   "specification": "QNC_v5 qnc-app/src/editorial/segment_panel.rs and qnc_segment_timeline.rs show_program"
 }

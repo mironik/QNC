@@ -148,20 +148,22 @@ impl WrapSession {
         total_frames: u64,
         program_changed: bool,
     ) -> Option<WrapRequest> {
+        // The playhead stays on a frame of the program before anything is asked:
+        // a shorter program (a segment excluded) must not be cued past its end.
+        self.clamp(total_frames);
         if program_changed {
             self.reopen();
         }
         if let Some(frame) = seek {
-            self.seek(frame);
+            self.seek(frame.min(total_frames.saturating_sub(1)));
         }
-        self.clamp(total_frames);
         self.take_request()
     }
 
-    /// Keeps the playhead inside a program that became shorter.
+    /// Keeps the playhead on the last frame of a program that became shorter.
     pub fn clamp(&mut self, total_frames: u64) {
         self.total_frames = total_frames;
-        self.playhead = self.playhead.min(total_frames);
+        self.playhead = self.playhead.min(total_frames.saturating_sub(1));
     }
 }
 
@@ -244,6 +246,12 @@ mod tests {
         assert_eq!(wrap.playhead(), 9);
         assert_eq!(wrap.take_request(), Some(WrapRequest::Scrub(9)));
         wrap.clamp(4);
-        assert_eq!(wrap.playhead(), 4);
+        assert_eq!(wrap.playhead(), 3, "the last frame of a shorter program");
+        wrap.seek(3);
+        assert_eq!(
+            wrap.apply(None, 2, true),
+            Some(WrapRequest::Open(1)),
+            "a changed, shorter program opens on its last frame"
+        );
     }
 }

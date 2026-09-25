@@ -1248,9 +1248,10 @@ fn deleting_closes_the_gap_and_moving_swaps_neighbours_only() {
         },
     )
     .unwrap();
+    // The excluded one keeps its place (1) between the active ones.
     assert_eq!(
         order(&mut store),
-        vec![(ids[0].clone(), 0), (ids[1].clone(), 1)]
+        vec![(ids[0].clone(), 0), (ids[1].clone(), 2)]
     );
     assert!(run(
         &mut store,
@@ -1259,6 +1260,49 @@ fn deleting_closes_the_gap_and_moving_swaps_neighbours_only() {
         },
     )
     .is_err());
+}
+
+#[test]
+fn an_excluded_segment_comes_back_where_it_was_and_only_it_can_be_purged() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    let ids = three_segments(&mut store);
+    marker(&mut store, 25).unwrap();
+    let segment_op = |store: &mut ContentStore, op: fn(String) -> Operation, id: &str| {
+        run(store, op(id.to_string()))
+    };
+    let exclude = |segment_id| Operation::DeleteSegment { segment_id };
+    let include = |segment_id| Operation::IncludeSegment { segment_id };
+    let purge = |segment_id| Operation::PurgeSegment { segment_id };
+    assert!(
+        segment_op(&mut store, purge, &ids[1]).is_err(),
+        "an active one is not purged"
+    );
+    segment_op(&mut store, exclude, &ids[1]).unwrap();
+    let frames = |store: &mut ContentStore| -> Vec<u64> { markers(store) };
+    assert_eq!(frames(&mut store), vec![15], "25 moved left by 10");
+    segment_op(&mut store, include, &ids[1]).unwrap();
+    let order: Vec<String> = segments(&mut store)
+        .into_iter()
+        .map(|row| row.segment_id)
+        .collect();
+    assert_eq!(order, ids, "back where it was");
+    assert_eq!(
+        frames(&mut store),
+        vec![25],
+        "the markers after it move back"
+    );
+    assert!(
+        segment_op(&mut store, include, &ids[1]).is_err(),
+        "already active"
+    );
+    segment_op(&mut store, exclude, &ids[2]).unwrap();
+    segment_op(&mut store, purge, &ids[2]).unwrap();
+    let Data::Segments(all) = run(&mut store, Operation::ListSegments).unwrap() else {
+        panic!()
+    };
+    assert_eq!(all.len(), 2, "gone for good");
 }
 
 /// M on the Wrap segment that holds a program frame (the end belongs to the last one).
@@ -1967,7 +2011,9 @@ fn a_cover_is_a_b_roll_virtual_shot_in_its_slot_and_replaces_the_one_there() {
         panic!()
     };
     assert_eq!(b_roll.len(), 2, "the B-roll tab lists the cover shots");
-    assert!(b_roll.iter().all(|shot| shot.b_roll && shot.name.starts_with("Clip B")));
+    assert!(b_roll
+        .iter()
+        .all(|shot| shot.b_roll && shot.name.starts_with("Clip B")));
     let Data::StorySelection(selection) = run(&mut store, Operation::ReadStorySelection).unwrap()
     else {
         panic!()

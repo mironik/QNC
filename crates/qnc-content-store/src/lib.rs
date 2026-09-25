@@ -343,7 +343,17 @@ pub enum Operation {
         fps_num: u32,
         fps_den: u32,
     },
+    /// Takes a segment out of the program (v5 `delete_part`: `active = 0`); it stays
+    /// listed where it was.
     DeleteSegment {
+        segment_id: String,
+    },
+    /// Puts an excluded segment back where it was (user rule 2026-09-25).
+    IncludeSegment {
+        segment_id: String,
+    },
+    /// Removes an excluded segment for good; an active one cannot be purged.
+    PurgeSegment {
         segment_id: String,
     },
     /// Swaps the segment with its neighbour before (`up`) or after it.

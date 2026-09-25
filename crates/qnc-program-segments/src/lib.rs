@@ -324,6 +324,12 @@ pub enum SegmentCommand {
     Step {
         up: bool,
     },
+    /// Isključi: the segment leaves the program and stays listed where it was.
+    Exclude(String),
+    /// Uključi: an excluded segment comes back where it was.
+    Include(String),
+    /// Izbriši: an excluded segment is removed for good.
+    Purge(String),
     /// Swap the selected segment with its neighbour (Up / Down).
     Move {
         up: bool,
@@ -579,6 +585,15 @@ impl ProgramSegments {
             SegmentCommand::Select(segment_id) => self.select(&segment_id),
             SegmentCommand::Step { up } => self.step(up),
             SegmentCommand::Move { up } => self.move_selected(up),
+            SegmentCommand::Exclude(segment_id) => {
+                let key = self.next_key("exclude");
+                self.send(|writes| writes.delete_segment(key, segment_id));
+            }
+            SegmentCommand::Include(segment_id) => {
+                self.adopt_selection = true;
+                self.write(Operation::IncludeSegment { segment_id });
+            }
+            SegmentCommand::Purge(segment_id) => self.write(Operation::PurgeSegment { segment_id }),
             SegmentCommand::DeleteSelected => self.delete_selected(),
             SegmentCommand::SelectMarker(marker_id) => self.select_marker(&marker_id),
             SegmentCommand::SelectSlot { slot_id, frame } => {

@@ -1,6 +1,7 @@
 //! The Segment tab of the clip menu (v5 `media_pool::segment_cards`): kind, id and
-//! duration per row; the selected row carries Up, Down and Del. Deleted segments
-//! stay listed greyed with "neaktivno" and cannot be picked.
+//! duration per row. The selected active row carries Up, Down and Isključi; an
+//! excluded segment stays listed greyed where it was with Uključi and Izbriši
+//! (user rule 2026-09-25) and cannot be picked.
 
 use eframe::egui::{self, Color32, RichText};
 use qnc_program_segments::{SegmentCommand, SegmentsView};
@@ -52,12 +53,12 @@ pub fn show_segment_list(
                             let duration = RichText::new(&row.duration_label).color(theme.muted);
                             ui.label(duration.small());
                             if !row.active {
-                                ui.label(RichText::new("neaktivno").color(theme.muted).small());
+                                ui.label(RichText::new("isključen").color(theme.muted).small());
                             }
-                            if row.selected && row.active {
+                            if row.selected || !row.active {
                                 let layout = egui::Layout::right_to_left(egui::Align::Center);
                                 ui.with_layout(layout, |ui| {
-                                    buttons = Some(row_buttons(ui, &mut command));
+                                    buttons = Some(row_buttons(ui, row, &mut command));
                                 });
                             }
                         });
@@ -82,16 +83,35 @@ pub fn show_segment_list(
     command
 }
 
-/// Del, Down and Up of the selected row; returns the area they take.
-fn row_buttons(ui: &mut egui::Ui, command: &mut Option<SegmentCommand>) -> egui::Rect {
+/// The buttons of a row: Isključi, Down, Up on the selected active one; Izbriši,
+/// Uključi on an excluded one. Returns the area they take.
+fn row_buttons(
+    ui: &mut egui::Ui,
+    row: &qnc_program_segments::SegmentPart,
+    command: &mut Option<SegmentCommand>,
+) -> egui::Rect {
     let mut area = egui::Rect::NOTHING;
     let mut small = |ui: &mut egui::Ui, text: &str, hint: &str| {
         let response = ui.add(egui::Button::new(RichText::new(text).small()));
         area = area.union(response.rect);
         response.on_hover_text(hint).clicked()
     };
-    if small(ui, "Del", "Obriši segment") {
-        *command = Some(SegmentCommand::DeleteSelected);
+    let id = || row.segment_id.clone();
+    if !row.active {
+        if small(ui, "Izbriši", "Trajno obriši isključeni segment") {
+            *command = Some(SegmentCommand::Purge(id()));
+        }
+        if small(ui, "Uključi", "Vrati segment u program gdje je bio") {
+            *command = Some(SegmentCommand::Include(id()));
+        }
+        return area;
+    }
+    if small(
+        ui,
+        "Isključi",
+        "Makni segment iz programa (ostaje na popisu)",
+    ) {
+        *command = Some(SegmentCommand::Exclude(id()));
     }
     if small(ui, "Down", "Pomakni segment kasnije") {
         *command = Some(SegmentCommand::Move { up: false });

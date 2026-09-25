@@ -793,6 +793,8 @@ fn execute_write_command(
         | Operation::DeleteMarker { .. }
         | Operation::SelectPart { .. }
         | Operation::SelectSlot { .. }
+        | Operation::IncludeSegment { .. }
+        | Operation::PurgeSegment { .. }
         | Operation::CreateCover { .. }
         | Operation::DeleteCover { .. }
         | Operation::SelectCover { .. }) => Ok(match client.write_segment(operation)? {

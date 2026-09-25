@@ -333,6 +333,8 @@ impl ContentStore {
                 (*fps_num, *fps_den),
             ),
             Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
+            Operation::IncludeSegment { segment_id } => self.include_segment(segment_id),
+            Operation::PurgeSegment { segment_id } => self.purge_segment(segment_id),
             Operation::MoveSegment { segment_id, up } => self.move_segment(segment_id, *up),
             Operation::ListSegments => self.list_segments(),
             Operation::CreateMarker {
@@ -1009,7 +1011,7 @@ impl ContentStore {
         }
         let next: i64 = tx
             .query_row(
-                "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM story_parts WHERE active = 1",
+                "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM story_parts",
                 [],
                 |row| row.get(0),
             )
@@ -1165,32 +1167,114 @@ impl ContentStore {
         Ok(Data::Changed)
     }
 
-    /// Swaps with the neighbour; at the edge nothing changes (docs/93 R13).
+    /// Puts an excluded segment back at its place in the order: the program grows by
+    /// its length there and the markers after it move right by as much (the inverse
+    /// of `delete_part`; markers that were inside it are gone). It becomes selected.
+    fn include_segment(&mut self, segment_id: &str) -> Result<Data> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let changed = tx
+            .execute(
+                "UPDATE story_parts SET active = 1, updated_at = ?2 WHERE part_id = ?1 AND active = 0",
+                params![segment_id, story_now()],
+            )
+            .map_err(err)?;
+        if changed == 0 {
+            return Err(format!("Segment nije iskljucen: {segment_id}"));
+        }
+        let fps = require_story_fps(&tx)?;
+        let (start, end) = segment_window(&tx, segment_id)?
+            .ok_or_else(|| format!("part not found: {segment_id}"))?;
+        let (start, length) = (start as i64, (end - start) as i64);
+        let shifted = {
+            let mut statement = tx
+                .prepare(
+                    "SELECT marker_id, timeline_frame FROM story_markers
+                     WHERE timeline_frame >= ?1 AND system_role != 'program_start'",
+                )
+                .map_err(err)?;
+            let rows = statement
+                .query_map([start], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                })
+                .map_err(err)?
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(err)?;
+            rows
+        };
+        let now = story_now();
+        for (marker_id, frame) in shifted {
+            let frame = frame + length;
+            tx.execute(
+                "UPDATE story_markers SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3,
+                    updated_at = ?4
+                 WHERE marker_id = ?5",
+                params![
+                    frame,
+                    timeline_sec(frame, fps),
+                    frame_timecode(frame, fps),
+                    now,
+                    marker_id
+                ],
+            )
+            .map_err(err)?;
+        }
+        tx.execute(
+            "UPDATE story_state SET selected_part_id = ?1, updated_at = ?2 WHERE id = 1",
+            params![segment_id, now],
+        )
+        .map_err(err)?;
+        finalize_story(&tx)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// Removes an excluded segment for good (it is no longer in the program).
+    fn purge_segment(&mut self, segment_id: &str) -> Result<Data> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let removed = tx
+            .execute(
+                "DELETE FROM story_parts WHERE part_id = ?1 AND active = 0",
+                [segment_id],
+            )
+            .map_err(err)?;
+        if removed == 0 {
+            return Err("Brise se samo iskljuceni segment.".into());
+        }
+        renumber_segments(&tx)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// Swaps with the neighbouring active segment; at the edge nothing changes
+    /// (docs/93 R13). Excluded segments keep their place in the order.
     fn move_segment(&mut self, segment_id: &str, up: bool) -> Result<Data> {
         let tx = self
             .conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
-        let mut order = segment_order(&tx)?;
+        let mut order = all_segment_order(&tx)?;
         let index = order
             .iter()
-            .position(|id| id == segment_id)
+            .position(|(id, active)| id == segment_id && *active)
             .ok_or("Segment nije pronadjen.")?;
         let other = if up {
-            index.checked_sub(1)
+            order[..index].iter().rposition(|(_, active)| *active)
         } else {
-            Some(index + 1).filter(|next| *next < order.len())
+            order[index + 1..]
+                .iter()
+                .position(|(_, active)| *active)
+                .map(|offset| index + 1 + offset)
         };
         if let Some(other) = other {
             order.swap(index, other);
-            for (sort_index, id) in order.iter().enumerate() {
-                tx.execute(
-                    "UPDATE story_parts SET sort_index = ?1, updated_at = ?3
-                     WHERE part_id = ?2",
-                    params![sort_index as i64, id, story_now()],
-                )
-                .map_err(err)?;
-            }
+            let ids: Vec<String> = order.into_iter().map(|(id, _)| id).collect();
+            write_segment_order(&tx, &ids)?;
             finalize_story(&tx)?;
         }
         tx.commit().map_err(err)?;
@@ -2863,27 +2947,41 @@ fn segment_window(conn: &Connection, segment_id: &str) -> Result<Option<(u64, u6
     Ok(None)
 }
 
-fn segment_order(conn: &Connection) -> Result<Vec<String>> {
+/// Every segment, active or excluded, in its place: one order for both, so an
+/// excluded segment comes back where it was.
+fn all_segment_order(conn: &Connection) -> Result<Vec<(String, bool)>> {
     let mut statement = conn
-        .prepare("SELECT part_id FROM story_parts WHERE active = 1 ORDER BY sort_index")
+        .prepare("SELECT part_id, active FROM story_parts ORDER BY sort_index, rowid")
         .map_err(err)?;
-    let ids = statement
-        .query_map([], |row| row.get(0))
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? != 0))
+        })
         .map_err(err)?
-        .collect::<rusqlite::Result<Vec<String>>>()
+        .collect::<rusqlite::Result<Vec<_>>>()
         .map_err(err)?;
-    Ok(ids)
+    Ok(rows)
 }
 
-fn renumber_segments(conn: &Connection) -> Result<()> {
-    for (sort_index, id) in segment_order(conn)?.iter().enumerate() {
+fn write_segment_order(conn: &Connection, ids: &[String]) -> Result<()> {
+    let now = story_now();
+    for (sort_index, id) in ids.iter().enumerate() {
         conn.execute(
-            "UPDATE story_parts SET sort_index = ?1 WHERE part_id = ?2",
-            params![sort_index as i64, id],
+            "UPDATE story_parts SET sort_index = ?1, updated_at = ?3 WHERE part_id = ?2",
+            params![sort_index as i64, id, now],
         )
         .map_err(err)?;
     }
     Ok(())
+}
+
+/// 0..n over all segments, keeping their order (active and excluded together).
+fn renumber_segments(conn: &Connection) -> Result<()> {
+    let ids: Vec<String> = all_segment_order(conn)?
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect();
+    write_segment_order(conn, &ids)
 }
 
 fn add_virtual_column_if_missing(conn: &Connection, column: &str, definition: &str) -> Result<()> {
