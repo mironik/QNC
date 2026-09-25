@@ -2260,6 +2260,15 @@ programa s privremenom pokrivalicom u istom playeru (`qnc-program-input`
 `window_loader`), O zatvara slot (marker na kraju ako ga nema), Enter ili kraj
 izvora upisuje pokrivalicu. Live provjereno: Cover slot, Overwrite, Play kroz
 pokrivalicu u Off segmentu, tab B-roll. Sync jos nije provjeren uzivo.
+Dopuna 2026-09-25 (korisnik: "Keyboard map je QNC"): otkljucan
+`crates/qnc-keyboard-shortcut` samo za eksplicitnu tablicu egui tipka -> catalog
+`key`/`code` (M, B, T, V, S, U, Z, R, Y, W, Delete, Backspace, Escape, Tab, F1,
+Home, gore/dolje, [, ], /, '), jer do sada nisu stizale do aplikacije; katalog se
+ne mijenja, Ingest i Project koriste samo vec podrzane tipke. Pravila korisnika:
+Ctrl+tipka odabire (Ctrl+M marker u uredivanje, strelice/M/povlacenje, Enter
+potvrda, Esc odustani), Shift+tipka dodaje (Shift+M novi marker), Delete brise
+samo ono uzeto s Ctrl+; Sync ide od source IN do source OUT ili prvog sljedeceg
+markera i ceka Enter. `qnc-timeline` (povlacenje markera) nije otkljucan.
 
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story program playlista, koraci 1 do 4):
 korisnik je potvrdio opci plan prijenosa v5 pustanja programa (Wrap) i dodao:

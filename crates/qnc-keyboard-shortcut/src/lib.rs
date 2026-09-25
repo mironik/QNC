@@ -453,13 +453,29 @@ fn egui_event_to_shortcut(event: &egui::Event, text_input_reserved: bool) -> Opt
 fn egui_catalog_key_name(key: &egui::Key) -> Option<String> {
     use egui::Key;
 
+    // Explicit table of every key the QNC catalog binds by `key`; letters match
+    // their catalog name without regard to case.
     let name = match key {
         Key::ArrowLeft => "ArrowLeft",
         Key::ArrowRight => "ArrowRight",
+        Key::ArrowUp => "ArrowUp",
+        Key::ArrowDown => "ArrowDown",
         Key::Space => " ",
         Key::I => "i",
         Key::O => "o",
+        Key::M => "m",
+        Key::R => "r",
+        Key::V => "v",
         Key::Enter => "Enter",
+        Key::Delete => "Delete",
+        Key::Backspace => "Backspace",
+        Key::Escape => "Escape",
+        Key::Tab => "Tab",
+        Key::F1 => "F1",
+        Key::Home => "Home",
+        Key::OpenBracket => "[",
+        Key::CloseBracket => "]",
+        Key::Quote => "'",
         _ => return None,
     };
     Some(name.to_string())
@@ -468,12 +484,27 @@ fn egui_catalog_key_name(key: &egui::Key) -> Option<String> {
 fn egui_catalog_key_code(key: &egui::Key) -> Option<String> {
     use egui::Key;
 
+    // Explicit table of every physical key the QNC catalog binds by `code`.
     let code = match key {
         Key::ArrowLeft => "ArrowLeft",
         Key::ArrowRight => "ArrowRight",
         Key::Space => "Space",
         Key::I => "KeyI",
         Key::O => "KeyO",
+        Key::B => "KeyB",
+        Key::T => "KeyT",
+        Key::V => "KeyV",
+        Key::M => "KeyM",
+        Key::S => "KeyS",
+        Key::U => "KeyU",
+        Key::Z => "KeyZ",
+        Key::R => "KeyR",
+        Key::Y => "KeyY",
+        Key::W => "KeyW",
+        Key::Slash => "Slash",
+        Key::Home => "Home",
+        Key::OpenBracket => "BracketLeft",
+        Key::CloseBracket => "BracketRight",
         _ => return None,
     };
     Some(code.to_string())
@@ -586,5 +617,90 @@ mod tests {
             1
         );
         assert!(egui_shortcut_events(&ctx).is_empty());
+    }
+
+    #[test]
+    fn every_story_catalog_key_reaches_its_action() {
+        use egui::Key;
+        // Every key of the storyboard and off scopes has an egui key in the tables.
+        let keys = [
+            Key::ArrowLeft,
+            Key::ArrowRight,
+            Key::ArrowUp,
+            Key::ArrowDown,
+            Key::Space,
+            Key::I,
+            Key::O,
+            Key::M,
+            Key::R,
+            Key::V,
+            Key::Enter,
+            Key::Delete,
+            Key::Backspace,
+            Key::Escape,
+            Key::Tab,
+            Key::F1,
+            Key::Home,
+            Key::OpenBracket,
+            Key::CloseBracket,
+            Key::Quote,
+            Key::B,
+            Key::T,
+            Key::S,
+            Key::U,
+            Key::Z,
+            Key::Y,
+            Key::W,
+            Key::Slash,
+        ];
+        let known: Vec<(Option<String>, Option<String>)> = keys
+            .iter()
+            .map(|key| (egui_catalog_key_name(key), egui_catalog_key_code(key)))
+            .collect();
+        let raw: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../contracts/qnc-keyboard-shortcuts.json"
+        ))
+        .unwrap();
+        for preset in raw["presets"].as_object().unwrap().values() {
+            let bindings = preset.get("bindings").unwrap_or(preset);
+            for scope in ["storyboard", "off"] {
+                for chords in bindings[scope].as_object().unwrap().values() {
+                    for chord in chords.as_array().unwrap() {
+                        let key = chord["key"].as_str().map(str::to_ascii_lowercase);
+                        let code = chord["code"].as_str();
+                        let reachable = known.iter().any(|(name, known_code)| {
+                            (key.is_some() && name.as_deref().map(str::to_ascii_lowercase) == key)
+                                || (code.is_some() && known_code.as_deref() == code)
+                        });
+                        assert!(reachable, "{scope}: {chord} never reaches its action");
+                    }
+                }
+            }
+        }
+        let catalog = catalog();
+        let ctrl_m = ShortcutEvent {
+            code: egui_catalog_key_code(&Key::M),
+            key: egui_catalog_key_name(&Key::M),
+            shift: false,
+            ctrl: true,
+            alt: false,
+            text_input_reserved: false,
+        };
+        assert_eq!(
+            catalog.action_ids_for_event("storyboard", &ctrl_m),
+            vec!["select_marker"]
+        );
+        let delete = ShortcutEvent {
+            code: egui_catalog_key_code(&Key::Delete),
+            key: egui_catalog_key_name(&Key::Delete),
+            ..ctrl_m
+        };
+        let delete = ShortcutEvent {
+            ctrl: false,
+            ..delete
+        };
+        assert!(catalog
+            .action_ids_for_event("storyboard", &delete)
+            .contains(&"delete_marker"));
     }
 }
