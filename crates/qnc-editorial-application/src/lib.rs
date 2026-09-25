@@ -432,6 +432,7 @@ impl EditorialApplication {
                 action_ids::STEP_BACK_FRAME => self.wrap.step(-1) || self.preview.step(-1),
                 action_ids::STEP_FORWARD_FRAME => self.wrap.step(1) || self.preview.step(1),
                 action_ids::MARK_IN => {
+                    self.segments.arm_sync(); // v5: every IN arms Sync/B-roll
                     self.view.preview.timeline =
                         self.view.preview.timeline.with_source_in_at_confirmed();
                     if let Err(error) = self.short_stills.capture_in(&self.view.preview) {

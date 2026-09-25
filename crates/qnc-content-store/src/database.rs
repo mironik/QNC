@@ -116,13 +116,17 @@ impl ContentStore {
             }
         }
         if access == Access::ReadWrite {
-            ensure_summary_columns(&conn)?;
-            ensure_lease_column(&conn)?;
-            ensure_runtime_table(&conn)?;
-            ensure_filmstrip_schema(&conn)?;
-            ensure_wave_schema(&conn)?;
-            ensure_virtual_shots_schema(&conn)?;
-            ensure_story_schema(&conn)?;
+            // One transaction: another process reading meanwhile never sees a
+            // public view dropped and not yet created again ("no such table").
+            let tx = conn.unchecked_transaction().map_err(err)?;
+            ensure_summary_columns(&tx)?;
+            ensure_lease_column(&tx)?;
+            ensure_runtime_table(&tx)?;
+            ensure_filmstrip_schema(&tx)?;
+            ensure_wave_schema(&tx)?;
+            ensure_virtual_shots_schema(&tx)?;
+            ensure_story_schema(&tx)?;
+            tx.commit().map_err(err)?;
         }
         let has_thumbnail_uri = schema && has_column(&conn, "clips", "thumbnail_uri")?;
         if access == Access::ReadOnly {

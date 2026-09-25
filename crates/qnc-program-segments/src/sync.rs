@@ -31,7 +31,8 @@ impl ProgramSegments {
         else {
             return;
         };
-        if previous_in == Some(source_in) || !self.sync.enabled() {
+        let pressed = std::mem::take(&mut self.sync_in_pressed);
+        if (previous_in == Some(source_in) && !pressed) || !self.sync.enabled() {
             return;
         }
         let rate = |value: i64| u32::try_from(value).unwrap_or(0);
@@ -42,6 +43,12 @@ impl ProgramSegments {
             duration_frames: source.duration_frames,
             timebase: (rate(num), rate(den)),
         });
+    }
+
+    /// IN was pressed on the source: every press arms Sync, also on the same
+    /// frame (v5 `mark_in_action` -> `arm_source_in`); taken with the next source.
+    pub fn arm_sync(&mut self) {
+        self.sync_in_pressed = true;
     }
 
     /// Space: a Sync play starts in the Source view once IN armed it.
@@ -147,6 +154,10 @@ impl ProgramSegments {
         let slots = self.stored_slots.iter();
         let found = slots.map(|slot| (slot.slot_id.as_str(), slot.start_frame, slot.end_frame));
         let Some(slot_id) = self.sync.resolve(found) else {
+            // v5 `slot_plan`: another M marker inside the Sync range splits it.
+            if self.sync.has_pending() {
+                self.refresh_view("Sync slot još nije materijaliziran".into());
+            }
             return;
         };
         self.selected_slot = Some(slot_id.clone());

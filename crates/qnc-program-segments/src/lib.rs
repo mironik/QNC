@@ -418,6 +418,8 @@ pub struct ProgramSegments {
     /// What Talking Head, Voice over and covers take from the source view.
     source: SourcePick,
     sync: qnc_sync_cover::SyncCover,
+    /// IN was pressed since the last source (arms Sync).
+    sync_in_pressed: bool,
     /// Program playhead of the Wrap view (`qnc-wrap-session`), given by the caller.
     playhead: Option<u64>,
     /// Program frame the user pointed at, for the Wrap view to take once.
@@ -973,3 +975,6 @@ fn known<'a>(id: &Option<String>, mut ids: impl Iterator<Item = &'a str>) -> boo
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod db_tests;

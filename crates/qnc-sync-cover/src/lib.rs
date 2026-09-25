@@ -212,6 +212,11 @@ impl SyncCover {
         }))
     }
 
+    /// A closed slot still waits for its stored M-M slot.
+    pub fn has_pending(&self) -> bool {
+        self.pending.is_some()
+    }
+
     /// The program frame that still needs its M marker (v5 `marker_at_head` after OUT).
     pub fn missing_marker(&self, markers: &[u64]) -> Option<u64> {
         let pending = self.pending.as_ref()?;

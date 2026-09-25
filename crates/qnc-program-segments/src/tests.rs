@@ -414,6 +414,14 @@ fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
         SyncSpace::Play,
         "Space in Wrap plays"
     );
+    segments.arm_sync();
+    segments.set_source(marked(12));
+    assert!(
+        matches!(segments.sync_space(false), SyncSpace::Start(_)),
+        "IN again on the same frame arms it again (v5)"
+    );
+    segments.finish_sync();
+    segments.set_source(marked(13));
     let SyncSpace::Start(preview) = segments.sync_space(false) else {
         panic!("Sync starts in the Source view")
     };
@@ -422,7 +430,7 @@ fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
         (15, 40),
         "marker m1 at 15, 48 source frames, program 40"
     );
-    assert_eq!(preview.source_in, 12);
+    assert_eq!(preview.source_in, 13);
     assert_eq!(segments.sync_frame(Some(0)), Some(15));
     assert_eq!(segments.sync_frame(Some(8)), Some(23));
     segments.set_playhead(Some(23));
@@ -436,4 +444,10 @@ fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
         "the slot waits for its marker and Enter"
     );
     assert!(!segments.finish_sync(), "no Sync play any more");
+    segments.resolve_sync();
+    assert_eq!(
+        segments.view().message,
+        "Sync slot još nije materijaliziran",
+        "v5: no stored slot 15..23 while its end marker is missing"
+    );
 }
