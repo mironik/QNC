@@ -359,6 +359,8 @@ pub enum SegmentCommand {
     },
     /// Ctrl+M: the selected (or nearest) marker into editing.
     EditMarker,
+    /// Shift+M: always a new marker at the playhead, whatever is selected.
+    AddMarker,
     /// Arrows while a marker is edited: its draft by frames.
     NudgeMarker(i64),
     /// A mouse drag of a marker: its draft on this program frame.
@@ -386,7 +388,9 @@ impl SegmentCommand {
     /// The command behind a keyboard catalog `action_id`.
     pub fn from_action(action_id: &str) -> Option<Self> {
         Some(match action_id {
-            "add_marker" | "add_marker_continue" => Self::Marker,
+            "add_marker" => Self::Marker,
+            // User rule (2026-09-25): Ctrl+key selects, Shift+key adds.
+            "add_marker_continue" => Self::AddMarker,
             // One Delete press sends delete_part, delete_marker and delete_segment (both
             // scopes); delete_marker holds every delete key in every preset, so only it
             // deletes: one press, one delete (the marker, else the cover, else the segment).
@@ -605,6 +609,11 @@ impl ProgramSegments {
                 }
             }
             SegmentCommand::EditMarker => self.edit_marker(),
+            SegmentCommand::AddMarker => {
+                self.marker_edit = None;
+                self.selected_marker = None;
+                self.marker_at_playhead();
+            }
             SegmentCommand::NudgeMarker(frames) => self.nudge_marker(frames),
             SegmentCommand::DragMarker { marker_id, frame } => {
                 if self.marker_edit.as_ref().map(|(id, _)| id) == Some(&marker_id) {

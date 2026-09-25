@@ -168,12 +168,20 @@ fn ctrl_m_moves_a_marker_by_arrows_or_to_the_playhead_and_enter_confirms_it() {
     });
     assert_eq!(marker_frames(&segments), vec![0, 100, 150]);
 
+    // Shift+M adds a new marker even while one is selected.
+    segments.set_playhead(Some(120));
+    segments.apply_action("add_marker_continue");
+    settle(&mut segments);
+    assert_eq!(marker_frames(&segments), vec![0, 100, 120, 150]);
+    segments.set_playhead(Some(100));
+    segments.apply_action("select_marker");
+
     // Ctrl+M then Delete removes the marker only, not the segment as well.
     for action in ["delete_part", "delete_marker", "delete_segment"] {
         segments.apply_action(action);
     }
     settle(&mut segments);
-    assert_eq!(marker_frames(&segments), vec![0, 150]);
+    assert_eq!(marker_frames(&segments), vec![0, 120, 150]);
     assert!(!segments.editing_marker());
     assert_eq!(segments.view().rows.len(), 3, "no segment deleted with it");
 }
