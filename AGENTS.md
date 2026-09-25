@@ -2233,6 +2233,34 @@ nisu dirani. Verificirano: `cargo test -p qnc-content-store` (38),
 `qnc-program-segments` (13), `qnc-editorial-application` (11), `cargo build
 --workspace`, `cargo run -p qnc-conformance`. Odobrenje je zatvoreno.
 
+Otvoreno ograniceno odobrenje 2026-09-25 (Story pokrivalice i Sync/B-roll, v5):
+korisnik je potvrdio plan P1-P4 ("ok, odkljucaj i kreni"). v5: Cover slot i B
+su `quick_cover` (prazan odabrani M-M slot + IN/OUT izvornog klipa: nastaje
+virtualni kadar kategorije `cover` pa pokrivalica u slotu), Overwrite mijenja
+pokrivalicu slota, izvor se ne skracuje na slot; Sync/B-roll: IN na izvoru,
+Space pusta program od markera prije Wrap playheada s privremenim overlayem
+(slika + A2, A1 price ostaje), O zavrsava slot (marker na kraju ako ga nema),
+Enter upisuje pokrivalicu. Otkljucano: `crates/qnc-content-store`,
+`crates/qnc-virtual-shots`, `crates/qnc-program-segments`,
+`crates/qnc-segment-panel`, `crates/qnc-program-input`,
+`crates/qnc-source-preview`, `crates/qnc-editorial-application`,
+`crates/qnc-editorial-desktop` (tab B-roll i crtanje pokrivalica kao dodaci
+zakljucanom sucelju), novi javni `crates/qnc-sync-cover`, ugovori modula i baze,
+`contracts/qnc-keyboard-shortcuts.json` samo ako treba nova akcija, root Cargo.
+Tijekom rada dirani su i `crates/qnc-wrap-session` (ponovno otvaranje programa
+nakon upisa, `hold` za Sync) i `crates/qnc-virtual-short-cards` (oznaka B-roll
+kartice); korisniku je to javljeno.
+Izvedeno do sada: P1 (56e9f9f) pokrivalica je u bazi virtualni kadar klase
+`b_roll` (odluka korisnika: pokrivalice idu u B-roll, ne u virtual short) i red
+`story_covers` u slotu, zamjena postojece, brisanje i odabir; P2 (247f71d,
+c457c6f) Cover slot/B i Overwrite iz IN/OUT source timelinea, crtanje
+pokrivalica na Wrap redovima, program se ponovno otvara nakon upisa; P3
+(5595e63) tab B-roll; P4 (8a1cc4c) Sync/B-roll: `qnc-sync-cover`, prozor
+programa s privremenom pokrivalicom u istom playeru (`qnc-program-input`
+`window_loader`), O zatvara slot (marker na kraju ako ga nema), Enter ili kraj
+izvora upisuje pokrivalicu. Live provjereno: Cover slot, Overwrite, Play kroz
+pokrivalicu u Off segmentu, tab B-roll. Sync jos nije provjeren uzivo.
+
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story program playlista, koraci 1 do 4):
 korisnik je potvrdio opci plan prijenosa v5 pustanja programa (Wrap) i dodao:
 korisnik mora moci promijeniti koji source kanal ide na A1 (snimatelj ponekad
