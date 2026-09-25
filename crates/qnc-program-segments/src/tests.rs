@@ -384,3 +384,56 @@ fn a_cover_needs_the_marked_source_and_a_segment_click_clears_the_cover() {
     );
     assert_eq!(segments.selected.as_deref(), Some("c"), "the segment stays");
 }
+
+fn marked(in_mark: u64) -> SourcePick {
+    SourcePick::new(
+        Some("clip-x"),
+        Some("X"),
+        Some((in_mark, 60)),
+        (Some(in_mark), 60),
+        Some((50, 1)),
+    )
+}
+
+#[test]
+fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.set_source(marked(10));
+    assert_eq!(segments.sync_space(false), SyncSpace::Play, "Sync is off");
+    segments.apply(SegmentCommand::ToggleSync);
+    assert!(segments.view().sync_enabled);
+    assert_eq!(
+        segments.sync_space(false),
+        SyncSpace::Play,
+        "IN before Sync does not arm"
+    );
+    segments.set_source(marked(12));
+    assert_eq!(
+        segments.sync_space(true),
+        SyncSpace::Play,
+        "Space in Wrap plays"
+    );
+    let SyncSpace::Start(preview) = segments.sync_space(false) else {
+        panic!("Sync starts in the Source view")
+    };
+    assert_eq!(
+        preview.window,
+        (15, 40),
+        "marker m1 at 15, 48 source frames, program 40"
+    );
+    assert_eq!(preview.source_in, 12);
+    assert_eq!(segments.sync_frame(Some(0)), Some(15));
+    assert_eq!(segments.sync_frame(Some(8)), Some(23));
+    segments.set_playhead(Some(23));
+    assert!(segments.finish_sync(), "O closes the slot");
+    assert!(
+        segments.take_program_changed(),
+        "the whole program opens again"
+    );
+    assert!(
+        segments.sync_holds_enter(),
+        "the slot waits for its marker and Enter"
+    );
+    assert!(!segments.finish_sync(), "no Sync play any more");
+}

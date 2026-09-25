@@ -15,7 +15,7 @@ use qnc_content_store::{Access, ContentTarget, ProgramCover, ProgramSegment};
 use qnc_media_metadata::{MediaRepresentation, StreamDetails};
 use qnc_player_input::{PreparedInput, ProgramInput, StreamLayout};
 use qnc_program_playlist::{
-    build_flat_program_playlist, FrameRange, FrameTimebase, MediaRef,
+    build_flat_program_playlist, build_program_frame_window, FrameRange, FrameTimebase, MediaRef,
     ProbedAudioFormat, ProbedVideoFormat, ProgramAudioLayout, ProgramCoverInput, ProgramFrameRange,
     ProgramMediaResolver, ProgramPlaylistBuildInput, ProgramSegmentInput, ResolvedProgramMedia,
     ScanMode,
@@ -43,16 +43,79 @@ impl ClipInputs for PlayerClipInputs<'_> {
     }
 }
 
+/// A cover played over a program window only (v5 Sync/B-roll preview): the
+/// source from its IN as cover picture and A2 (source channel 1); the stored
+/// covers of the window give way to it. It is never written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransientCover {
+    pub clip_id: String,
+    pub source_in: u64,
+    pub timebase: (u32, u32),
+}
+
+const TRANSIENT_COVER_ID: &str = "sync-cover-preview";
+
 /// Reads the story of the active project and builds its program.
 pub fn load_program(
     target: &ContentTarget,
     project_id: &str,
     clips: &impl ClipInputs,
 ) -> Result<ProgramInput, String> {
+    load(target, project_id, clips, None)
+}
+
+/// The program window `[in, out)` of the active project with a transient cover
+/// over it (v5 `build_program_frame_window` + `apply_transient_program_overlay`);
+/// its frames start at 0.
+pub fn load_program_window(
+    target: &ContentTarget,
+    project_id: &str,
+    clips: &impl ClipInputs,
+    window: (u64, u64),
+    cover: &TransientCover,
+) -> Result<ProgramInput, String> {
+    load(target, project_id, clips, Some((window, cover)))
+}
+
+/// The stored covers outside the window and the transient cover over all of it.
+pub fn with_transient_cover(
+    covers: &[ProgramCover],
+    (start, end): (u64, u64),
+    cover: &TransientCover,
+) -> Vec<ProgramCover> {
+    covers
+        .iter()
+        .filter(|stored| stored.program_end_frame <= start || stored.program_start_frame >= end)
+        .cloned()
+        .chain(std::iter::once(ProgramCover {
+            cover_id: TRANSIENT_COVER_ID.into(),
+            slot_id: String::new(),
+            clip_id: cover.clip_id.clone(),
+            virtual_shot_id: TRANSIENT_COVER_ID.into(),
+            program_start_frame: start,
+            program_end_frame: end,
+            source_in_frame: cover.source_in,
+            source_out_frame: cover.source_in + end.saturating_sub(start),
+            fps_num: cover.timebase.0,
+            fps_den: cover.timebase.1,
+            a2_source_channel: 0,
+        }))
+        .collect()
+}
+
+fn load(
+    target: &ContentTarget,
+    project_id: &str,
+    clips: &impl ClipInputs,
+    window: Option<((u64, u64), &TransientCover)>,
+) -> Result<ProgramInput, String> {
     let mut client = target.open(Access::ReadOnly)?;
     let segments = client.list_segments()?;
-    let covers = client.list_covers()?;
+    let mut covers = client.list_covers()?;
     drop(client);
+    if let Some((range, cover)) = window {
+        covers = with_transient_cover(&covers, range, cover);
+    }
     let first = segments
         .iter()
         .find(|segment| segment.active)
@@ -63,10 +126,14 @@ pub fn load_program(
     };
     let channels = resolver.prepared(&first.clip_id)?.project_audio.channels;
     let input = build_input(project_id, &segments, &covers, channels)?;
-    let playlist = build_flat_program_playlist(&input, &mut resolver)?;
+    let mut playlist = build_flat_program_playlist(&input, &mut resolver)?;
+    if let Some(((start, end), _)) = window {
+        let range =
+            ProgramFrameRange::new(frame(start)?, frame(end)?).map_err(|error| error.message)?;
+        playlist = build_program_frame_window(&playlist, range)?;
+    }
     ProgramInput::new(playlist, resolver.prepared).map_err(|error| error.to_string())
 }
-
 
 /// The program of the active project, built where the player is prepared (off
 /// the form thread): the story from its database, every clip through the
@@ -87,6 +154,28 @@ pub fn loader(
         )
     }
 }
+/// The program window with a transient cover, built where the player is prepared.
+pub fn window_loader(
+    target: ContentTarget,
+    project_id: String,
+    window: (u64, u64),
+    cover: TransientCover,
+) -> impl FnOnce(&qnc_player_input::InputReader, &str) -> Result<ProgramInput, String> + Send + 'static
+{
+    move |reader, workspace_db_uri| {
+        load_program_window(
+            &target,
+            &project_id,
+            &PlayerClipInputs {
+                reader,
+                workspace_db_uri,
+            },
+            window,
+            &cover,
+        )
+    }
+}
+
 /// v5 `build_segments` + `program_playlist_input`: the active segments one after
 /// another on the program axis, each with the covers that overlap it; a cover
 /// without its virtual shot or timebase is not played (v5 `streamable`).

@@ -215,3 +215,30 @@ fn missing_or_mixed_facts_are_errors() {
     let silent = resolved_media("a", &original, &original, &layout(&[])).unwrap();
     assert!(!silent.has_audio && silent.audio_format.is_none());
 }
+
+#[test]
+fn a_transient_cover_takes_the_window_and_the_stored_covers_there_give_way() {
+    let covers = vec![
+        cover("before", (0, 10), "shot"),
+        cover("inside", (15, 25), "shot"),
+    ];
+    let transient = TransientCover {
+        clip_id: "sync".into(),
+        source_in: 40,
+        timebase: (50, 1),
+    };
+    let covers = with_transient_cover(&covers, (12, 30), &transient);
+    let ids: Vec<&str> = covers.iter().map(|c| c.cover_id.as_str()).collect();
+    assert_eq!(ids, vec!["before", "sync-cover-preview"]);
+    let sync = &covers[1];
+    assert_eq!((sync.program_start_frame, sync.program_end_frame), (12, 30));
+    assert_eq!((sync.source_in_frame, sync.source_out_frame), (40, 58));
+    assert_eq!(sync.a2_source_channel, 0, "v5: source channel 1 on A2");
+    let segments = vec![part("off", "offovi", "b", (0, 40), true)];
+    let input = build_input("p1", &segments, &covers, 2).unwrap();
+    assert_eq!(
+        input.segments[0].covers.len(),
+        2,
+        "played like a stored cover"
+    );
+}

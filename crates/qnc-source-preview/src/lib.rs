@@ -15,6 +15,7 @@ use qnc_content_read::ContentReader;
 use qnc_player_client::{Action, Player, View as PlayerView};
 use qnc_player_input::{InputReader, PlayerContentRead, ProgramInput};
 use qnc_player_launcher::SourceTransportBinding;
+pub use qnc_program_input::TransientCover;
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_timeline_assets::{
@@ -421,6 +422,21 @@ impl SourcePreview {
         let loader = qnc_program_input::loader(target, context.settings.project_id.clone());
         self.open_program(frame, loader)
     }
+    /// Sync/B-roll (v5 `PlayProgram` of the Sync preview): the program window
+    /// `[in, out)` with the source from its IN over it, opened at its first frame
+    /// and played as soon as it is ready. Its frames start at 0.
+    pub fn open_program_window(&mut self, window: (u64, u64), cover: TransientCover) -> bool {
+        let (Some(target), Some(context)) = (self.activity_target.clone(), &self.context) else {
+            self.view.message = "Projektna baza nije dostupna.".into();
+            return true;
+        };
+        let project_id = context.settings.project_id.clone();
+        let loader = qnc_program_input::window_loader(target, project_id, window, cover);
+        self.open_program(0, loader);
+        self.play_when_ready = true;
+        true
+    }
+
     /// Whether the player plays a program rather than the source clip.
     pub fn in_program(&self) -> bool {
         self.program

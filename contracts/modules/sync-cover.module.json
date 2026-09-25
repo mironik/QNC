@@ -1,0 +1,43 @@
+{
+  "module_id": "qnc.module.sync-cover",
+  "module_name": "Sync cover",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "program.sync.session",
+    "program.sync.window",
+    "program.sync.slot"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "ui.paint",
+    "database.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.source-preview",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-sync-cover",
+  "input": "Sync on/off, the source armed by IN (clip, IN, length, rate), the M marker frames, the Wrap playhead, the program length and timebase, frames the window program confirms, O, the stored slots and Enter.",
+  "output": "The program window [marker at or before the playhead, end of the source) with the source from its IN as a transient cover (v5 build_preview); window frames as program frames; the closed slot (program start/end, source IN/OUT = IN + frames played, v5 pending_slot) and the end frame that still needs its M marker; the stored slot to select and the cover to write on Enter or at the end of the source (v5 auto commit). It never writes, plays or opens media.",
+  "specification": "QNC_v5 qnc-app/src/components/sync_cover_capture.rs and its host in qnc-app/src/story.rs (toggle_sync_cover_capture, sync_cover_toggle_play_intent, finish_sync_cover_with_out, select_pending_sync_slot, commit_sync_cover_ready)"
+}

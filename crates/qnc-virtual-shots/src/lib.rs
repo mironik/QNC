@@ -99,6 +99,19 @@ pub fn mark_stills_ready_now(
 }
 
 /// Records that the stills of a short could not be made.
+/// The outcome of storing a short's IN/OUT stills, `(in_uri, out_uri)` or the
+/// error, written as ready or failed.
+pub fn publish_stills_now(
+    target: &qnc_content_store::ContentTarget,
+    shot_id: &str,
+    stills: Result<(String, String), String>,
+) -> Result<(), String> {
+    match stills {
+        Ok((in_uri, out_uri)) => mark_stills_ready_now(target, shot_id, &in_uri, &out_uri),
+        Err(error) => mark_stills_failed_now(target, shot_id, &error),
+    }
+}
+
 pub fn mark_stills_failed_now(
     target: &qnc_content_store::ContentTarget,
     shot_id: &str,

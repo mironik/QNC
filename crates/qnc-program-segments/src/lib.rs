@@ -11,11 +11,15 @@
 //! form and no application, and never plays, probes or opens media.
 
 mod markers;
+mod sync;
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
     program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot,
 };
+
+pub use qnc_sync_cover::SyncPreview;
+pub use sync::SyncSpace;
 
 use qnc_content_store::{
     Access, ContentTarget, ContentWriteData, ContentWriteTransport, Operation, ProgramCover,
@@ -113,6 +117,9 @@ pub struct SourcePick {
     pub clip_id: Option<String>,
     pub clip_name: String,
     pub marks: Option<(u64, u64)>,
+    /// The IN mark itself, set by the user (Sync arms on it).
+    pub in_mark: Option<u64>,
+    pub duration_frames: u64,
     pub timebase: Option<(i64, i64)>,
 }
 
@@ -121,12 +128,15 @@ impl SourcePick {
         clip_id: Option<&str>,
         clip_name: Option<&str>,
         marks: Option<(u64, u64)>,
+        (in_mark, duration_frames): (Option<u64>, u64),
         timebase: Option<(i64, i64)>,
     ) -> Self {
         Self {
             clip_id: clip_id.map(str::to_string),
             clip_name: clip_name.unwrap_or_default().to_string(),
             marks,
+            in_mark,
+            duration_frames,
             timebase,
         }
     }
@@ -143,6 +153,8 @@ pub struct SegmentsView {
     pub slots: Vec<Slot>,
     /// Covers by program frame.
     pub covers: Vec<CoverSpan>,
+    /// Sync/B-roll is on.
+    pub sync_enabled: bool,
     /// Story timebase (`num`, `den`); `None` while the program is empty.
     pub timebase: Option<(u32, u32)>,
     pub total_frames: u64,
@@ -344,6 +356,10 @@ pub enum SegmentCommand {
     Cover {
         overwrite: bool,
     },
+    /// Sync/B-roll on or off.
+    ToggleSync,
+    /// Enter: the cover of a closed Sync slot (v5 `sync_cover_enter_or_activate_focused_item`).
+    CommitSync,
     /// A click on a cover: select it, playhead at the clicked program frame.
     SelectCover {
         cover_id: String,
@@ -364,6 +380,7 @@ impl SegmentCommand {
             "add_off_segment" => Self::AddSegment(SegmentKind::Off),
             "quick_overwrite_cover" => Self::Cover { overwrite: false },
             "overwrite_cover" => Self::Cover { overwrite: true },
+            "activate_focused_item" => Self::CommitSync,
             _ => return None,
         })
     }
@@ -400,6 +417,7 @@ pub struct ProgramSegments {
     selected_cover: Option<String>,
     /// What Talking Head, Voice over and covers take from the source view.
     source: SourcePick,
+    sync: qnc_sync_cover::SyncCover,
     /// Program playhead of the Wrap view (`qnc-wrap-session`), given by the caller.
     playhead: Option<u64>,
     /// Program frame the user pointed at, for the Wrap view to take once.
@@ -454,7 +472,11 @@ impl ProgramSegments {
 
     /// The source the user marked, given by the caller each repaint.
     pub fn set_source(&mut self, source: SourcePick) {
+        let previous_in = (self.source.clip_id == source.clip_id)
+            .then_some(self.source.in_mark)
+            .flatten();
         self.source = source;
+        self.arm_sync_on_new_in(previous_in);
     }
 
     /// Whether the playable program (segments or covers) changed since the last
@@ -491,6 +513,7 @@ impl ProgramSegments {
                     self.selected_cover = some(selection.selected_cover_id);
                 }
                 self.refresh_view(String::new());
+                self.resolve_sync();
             }
             Err(error) => self.refresh_view(error),
         }
@@ -536,6 +559,8 @@ impl ProgramSegments {
             SegmentCommand::AddSegment(kind) => self.create_from_source(kind),
             SegmentCommand::Cover { overwrite } => self.cover_from_source(overwrite),
             SegmentCommand::SelectCover { cover_id, frame } => self.select_cover(cover_id, frame),
+            SegmentCommand::ToggleSync => self.toggle_sync(),
+            SegmentCommand::CommitSync => self.commit_sync(true),
         }
         true
     }
@@ -654,6 +679,8 @@ impl ProgramSegments {
             return;
         }
         let frame = frame.min(self.view.total_frames);
+        // Pointing elsewhere stops a Sync play: the whole program opens again.
+        self.program_changed |= self.sync.cancel();
         self.set_playhead(Some(frame));
         self.seek = Some(frame);
     }
@@ -851,6 +878,9 @@ impl ProgramSegments {
         // The store may have moved the selection (v5 `delete_part`): take it once
         // every write of this component has landed.
         self.adopt_selection = !self.has_pending_work();
+        if self.adopt_selection {
+            self.sync.landed();
+        }
         self.reload();
         if !message.is_empty() {
             self.refresh_view(message);
@@ -929,6 +959,7 @@ impl ProgramSegments {
                 selected: self.selected_cover.as_deref() == Some(cover.cover_id.as_str()),
             })
             .collect();
+        view.sync_enabled = self.sync.enabled();
         view.playhead = self.playhead;
         view.message = message;
         self.view = view;

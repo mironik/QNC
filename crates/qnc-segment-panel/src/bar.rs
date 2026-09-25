@@ -2,7 +2,8 @@
 //! M marker, Cover slot, Overwrite on the left; previous/next segment, slot and
 //! marker around the program start in the middle; Sync/B-roll on the right.
 //! Cover slot needs a selected empty slot, Overwrite a selected slot or cover (v5
-//! `quick_cover_target`, `overwrite_cover_target`); Sync/B-roll comes later.
+//! `quick_cover_target`, `overwrite_cover_target`); Sync/B-roll switches the Sync
+//! capture on and off and shows when it is on.
 
 use eframe::egui::{self, PointerButton, Pos2, Rect, RichText, Sense, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentsView};
@@ -121,8 +122,19 @@ pub(crate) fn show(
             egui::Layout::right_to_left(egui::Align::Center),
             |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(6.0, 1.0);
-                let _ = action_button(ui, "Sync/B-roll", false, theme)
-                    .on_hover_text("Sync pokrivalica");
+                let on = segments.sync_enabled;
+                let text = if on { theme.focus } else { theme.text };
+                let button =
+                    egui::Button::new(RichText::new("Sync/B-roll").color(text).size(FONT_UI))
+                        .min_size(Vec2::new(0.0, COMPACT_CTRL_H))
+                        .fill(egui::Color32::TRANSPARENT)
+                        .stroke(egui::Stroke::new(
+                            1.0,
+                            if on { theme.focus } else { theme.border },
+                        ));
+                if clicked(ui.add(button).on_hover_text("Sync pokrivalica")) {
+                    command = Some(SegmentCommand::ToggleSync);
+                }
             },
         );
     }

@@ -17,9 +17,9 @@ use std::{
 use qnc_active_project_read::{ActiveProjectChange, ActiveProjectReader, ShownProject};
 use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
-use qnc_program_segments::SourcePick;
+use qnc_program_segments::{SourcePick, SyncPreview, SyncSpace};
 use qnc_source_bindings::{SourceBinding, TransportBindings};
-use qnc_source_preview::{PreviewContext, SourcePreview};
+use qnc_source_preview::{PreviewContext, SourcePreview, TransientCover};
 use qnc_source_reader::SourceReader;
 use qnc_timeline::TimelineIntent;
 use qnc_virtual_short_cards::ParentClip;
@@ -246,11 +246,15 @@ impl EditorialApplication {
                 .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
         self.apply_pending_shot();
-        let timebase = self.preview.player_view().source_timebase();
+        let (timebase, timeline) = (
+            self.preview.player_view().source_timebase(),
+            self.view.preview.timeline,
+        );
         self.segments.set_source(SourcePick::new(
             self.view.chosen_clip_id(),
             self.view.current_clip_label(),
             self.view.preview.timeline.visible_source_marks(),
+            (timeline.source_in_frame, timeline.duration_frames),
             timebase.map(|timebase| (timebase.fps_num, timebase.fps_den)),
         ));
         // Source and Wrap stay apart (v5): the Wrap timeline plays the program in the same player.
@@ -258,9 +262,10 @@ impl EditorialApplication {
         let total = self.segments.view().total_frames;
         let changed = self.segments.take_program_changed(); // the program opens again
         changed.then(|| self.reload_shorts()); // a cover writes its B-roll shot
+        let confirmed = self.segments.sync_frame(self.preview.program_frame()); // Sync window
         match self.wrap.apply(seek, total, changed) {
             Some(r) => _ = self.preview.show_program_frame(r.frame(), r.opens()),
-            None => self.wrap.follow_program(self.preview.program_frame()),
+            None => self.wrap.follow_program(confirmed),
         }
         self.segments.set_playhead(Some(self.wrap.playhead()));
         self.view.segments = self.segments.view().clone();
@@ -414,7 +419,12 @@ impl EditorialApplication {
                     self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
                     true
                 }
-                action_ids::PLAY_PAUSE => self.preview.toggle_play(), // the program in Wrap
+                action_ids::PLAY_PAUSE => match self.segments.sync_space(self.wrap.is_active()) {
+                    SyncSpace::Start(p) => self.wrap.hold(p.window.0) && self.open_sync(p),
+                    SyncSpace::Blocked => true,
+                    SyncSpace::Play => self.preview.toggle_play(), // the program in Wrap
+                },
+                action_ids::MARK_OUT if self.segments.finish_sync() => true, // Sync OUT
                 action_ids::STEP_BACK_FRAME => self.wrap.step(-1) || self.preview.step(-1),
                 action_ids::STEP_FORWARD_FRAME => self.wrap.step(1) || self.preview.step(1),
                 action_ids::MARK_IN => {
@@ -433,6 +443,7 @@ impl EditorialApplication {
                     }
                     true
                 }
+                action_ids::SAVE_VIRTUAL_SHOT if self.segments.sync_holds_enter() => true,
                 action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
                 _ => false,
             },
@@ -450,6 +461,15 @@ impl EditorialApplication {
     }
 
     /// Writes one short from the IN/OUT the source timeline is showing.
+    fn open_sync(&mut self, p: SyncPreview) -> bool {
+        let cover = TransientCover {
+            clip_id: p.clip_id,
+            source_in: p.source_in,
+            timebase: p.timebase,
+        };
+        self.preview.open_program_window(p.window, cover)
+    }
+
     fn save_virtual_shot(&mut self) -> bool {
         let Some(clip_id) = self.view.chosen_clip_id().map(str::to_string) else {
             self.view.message = "Odaberi klip.".into();
@@ -497,49 +517,25 @@ impl EditorialApplication {
     }
 
     fn store_short_stills(&mut self, shot_id: &str, clip_id: &str, in_frame: u64, out_frame: u64) {
-        let Some(target) = self.content_target.clone() else {
+        let (Some(target), Some(settings)) = (&self.content_target, &self.current_settings) else {
             return;
         };
-        let Some(settings) = self.current_settings.as_ref() else {
-            return;
-        };
-        let Some(project_dir) = self.project_dir.as_deref() else {
-            if let Err(error) = qnc_virtual_shots::mark_stills_failed_now(
-                &target,
-                shot_id,
-                "Lokalni direktorij projekta nije dostupan.",
-            ) {
-                self.view.preview.message = error;
-            }
-            return;
-        };
-        let stills_dir = settings.product_local_dir(project_dir, ProductArea::VirtualShorts);
-        let stills_root_uri = settings.product_uri(ProductArea::VirtualShorts);
-        match self.short_stills.store_for_short(
-            &stills_dir,
-            &stills_root_uri,
-            shot_id,
-            clip_id,
-            in_frame,
-            out_frame,
-        ) {
-            Ok(stills) => {
-                if let Err(error) = qnc_virtual_shots::mark_stills_ready_now(
-                    &target,
+        let stills = match self.project_dir.as_deref() {
+            None => Err("Lokalni direktorij projekta nije dostupan.".to_string()),
+            Some(dir) => self
+                .short_stills
+                .store_for_short(
+                    &settings.product_local_dir(dir, ProductArea::VirtualShorts),
+                    &settings.product_uri(ProductArea::VirtualShorts),
                     shot_id,
-                    &stills.in_uri,
-                    &stills.out_uri,
-                ) {
-                    self.view.preview.message = error;
-                }
-            }
-            Err(error) => {
-                if let Err(error) =
-                    qnc_virtual_shots::mark_stills_failed_now(&target, shot_id, &error)
-                {
-                    self.view.preview.message = error;
-                }
-            }
+                    clip_id,
+                    in_frame,
+                    out_frame,
+                )
+                .map(|stills| (stills.in_uri, stills.out_uri)),
+        };
+        if let Err(error) = qnc_virtual_shots::publish_stills_now(target, shot_id, stills) {
+            self.view.preview.message = error;
         }
     }
 

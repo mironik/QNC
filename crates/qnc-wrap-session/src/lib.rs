@@ -102,6 +102,16 @@ impl WrapSession {
         true
     }
 
+    /// Wrap at this program frame while another program input plays it (v5 Sync:
+    /// `set_wrap_playhead_frame(anchor)`); nothing is asked of the player.
+    pub fn hold(&mut self, frame: u64) -> bool {
+        self.active = true;
+        self.playhead = frame;
+        self.awaiting = None;
+        self.request = None;
+        true
+    }
+
     /// Back to the Source view: nothing more is asked of the program player.
     pub fn leave(&mut self) {
         self.active = false;

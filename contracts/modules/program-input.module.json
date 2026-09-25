@@ -3,18 +3,39 @@
   "module_name": "Program input",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["program.input.read", "program.playlist.build"],
+  "capabilities": [
+    "program.input.read",
+    "program.playlist.build"
+  ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
-  "supported_os": ["windows", "linux", "macos"],
-  "supported_cpu": ["x86_64", "aarch64"],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
   "transport_protocol_version": "0.1.0",
-  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command", "ui.paint", "database.write", "media.open"],
-  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "forbidden_calls": [
+    "ffprobe",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "ui.paint",
+    "database.write",
+    "media.open"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner"
+  ],
   "state_policy": "stateless",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-program-input",
   "input": "Content target of the active project (story_parts, story_covers read only, owner qnc-content-store) and the qnc-player-input reader of the active workspace for every clip of the story.",
-  "output": "The flat program playlist (qnc-program-playlist) and the prepared player input of every clip in it. Segments follow each other in stored order; covers go to the segments they overlap; the A1 source channel of a segment and the A2 source channel of a cover come from the database; the picture follows playback.input and the sound is the original; the output channel count is the project audio.channels. Missing facts end in an error, never in a stand-in.",
+  "output": "The flat program playlist (qnc-program-playlist) and the prepared player input of every clip in it. Segments follow each other in stored order; covers go to the segments they overlap; the A1 source channel of a segment and the A2 source channel of a cover come from the database; the picture follows playback.input and the sound is the original; the output channel count is the project audio.channels. Missing facts end in an error, never in a stand-in. load_program_window / window_loader: a program window [in, out) (frames from 0) with a transient cover (source from its IN, cover picture and A2 channel 1) replacing the stored covers of the window; never written (v5 Sync preview).",
   "specification": "QNC_v5 qnc-host/src/program_playlist.rs, qnc-host/src/editorial_playlist.rs; AGENTS 4.1 and 8.2"
 }

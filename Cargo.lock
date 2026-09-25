@@ -3952,6 +3952,7 @@ name = "qnc-program-segments"
 version = "0.1.0"
 dependencies = [
  "qnc-content-store",
+ "qnc-sync-cover",
 ]
 
 [[package]]
@@ -4228,6 +4229,10 @@ dependencies = [
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
 ]
+
+[[package]]
+name = "qnc-sync-cover"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-timeline"
