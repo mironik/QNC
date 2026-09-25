@@ -3,7 +3,7 @@
 //! on the source arms it, Space in the Source view starts it from the marker at
 //! or before the Wrap playhead, O or the end of the source closes the slot (its
 //! end marker is written when missing), the stored slot is selected and Enter
-//! (or the end of the source) writes the cover. The program player only gets the
+//! writes the cover; reaching the next marker or the source OUT only stops. The program player only gets the
 //! window to play; nothing here plays or opens media.
 
 use qnc_content_store::Operation;
@@ -40,6 +40,7 @@ impl ProgramSegments {
             clip_id: clip_id.clone(),
             clip_name: source.clip_name.clone(),
             source_in,
+            source_out: source.marks.map_or(source.duration_frames, |(_, out)| out),
             duration_frames: source.duration_frames,
             timebase: (rate(num), rate(den)),
         });
@@ -84,7 +85,7 @@ impl ProgramSegments {
         let was_active = self.sync.is_active();
         let frame = self.sync.program_frame(confirmed);
         if was_active && !self.sync.is_active() {
-            self.after_sync_finish("Sync/B-roll · kraj izvora zatvorio pokrivalicu");
+            self.after_sync_finish("Sync slot zatvoren · Enter dodaje pokrivalicu");
         }
         frame
     }
@@ -149,7 +150,7 @@ impl ProgramSegments {
     }
 
     /// The closed slot is stored: select it (v5 `select_pending_sync_slot`); the
-    /// end of the source writes its cover at once.
+    /// cover waits for Enter.
     pub(crate) fn resolve_sync(&mut self) {
         let slots = self.stored_slots.iter();
         let found = slots.map(|slot| (slot.slot_id.as_str(), slot.start_frame, slot.end_frame));
@@ -167,7 +168,7 @@ impl ProgramSegments {
         self.commit_sync(false);
     }
 
-    /// Enter (or the end of the source): the cover of the closed slot (v5
+    /// Enter: the cover of the closed slot (v5
     /// `commit_sync_cover_ready`); a slot that got a cover meanwhile is kept.
     pub(crate) fn commit_sync(&mut self, enter: bool) {
         let Some((slot_id, slot)) = self.sync.take_commit(enter) else {

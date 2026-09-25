@@ -427,8 +427,8 @@ fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
     };
     assert_eq!(
         preview.window,
-        (15, 40),
-        "marker m1 at 15, 48 source frames, program 40"
+        (15, 33),
+        "from m1 at 15 to the next marker m2 at 33 (before the source OUT)"
     );
     assert_eq!(preview.source_in, 13);
     assert_eq!(segments.sync_frame(Some(0)), Some(15));

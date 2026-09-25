@@ -4,10 +4,10 @@
 //! With Sync on, IN on the source arms it; Space in the Source view plays the
 //! program from the M marker at or before the Wrap playhead with the source from
 //! its IN over it as a transient cover (picture and A2, A1 of the story stays).
-//! O (or the end of the source) closes the slot from that marker to the program
-//! frame reached; the source OUT is IN plus the frames played. The slot needs its
-//! marker pair; once it is stored, Enter writes the cover (the end of the source
-//! writes it at once).
+//! User rule (2026-09-25): it runs to the source OUT or to the first M marker
+//! after that marker, whichever comes first, and stops there; O stops it earlier.
+//! The source OUT of the slot is IN plus the frames played. Enter confirms the
+//! cover once the slot is stored.
 //!
 //! This component owns only the session state and its frame math. It knows no
 //! form, no player, no database and no project: the program model gives it the
@@ -16,12 +16,14 @@
 pub const MODULE_ID: &str = "qnc.module.sync-cover";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The source the Sync plays: the clip, its IN, its length and rate.
+/// The source the Sync plays: the clip, its IN and OUT marks, its length and rate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncSource {
     pub clip_id: String,
     pub clip_name: String,
     pub source_in: u64,
+    /// The source OUT mark (the clip end when none is set).
+    pub source_out: u64,
     pub duration_frames: u64,
     pub timebase: (u32, u32),
 }
@@ -53,6 +55,9 @@ struct Session {
     auto_finish: u64,
     total_frames: u64,
     source: SyncSource,
+    /// Last window frame seen: the player returns to the window start at its
+    /// end, so a frame going back means the end was reached between repaints.
+    last: u64,
 }
 
 #[derive(Debug, Default)]
@@ -63,8 +68,6 @@ pub struct SyncCover {
     active: Option<Session>,
     pending: Option<SyncSlot>,
     ready: Option<(String, SyncSlot)>,
-    /// The end of the source closed the slot: write the cover once it is ready.
-    auto_commit: bool,
     committing: bool,
     /// Source frame under the Sync play, then the source OUT of the closed slot
     /// (v5 `set_source_playhead_frame`).
@@ -106,7 +109,6 @@ impl SyncCover {
             self.armed = Some(source);
             self.pending = None;
             self.ready = None;
-            self.auto_commit = false;
         }
     }
 
@@ -146,8 +148,18 @@ impl SyncCover {
             .min(total_frames - 1);
         let duration = source.duration_frames.max(1);
         let source_in = source.source_in.min(duration - 1);
-        let available = (duration - source_in).max(1);
-        let end = (anchor + available).min(total_frames).max(anchor + 1);
+        // User rule (2026-09-25): Sync runs from the source IN to the source OUT or
+        // to the first M marker after the anchor, whichever comes first.
+        let available = (source.source_out.min(duration).max(source_in + 1)) - source_in;
+        let next_marker = markers
+            .iter()
+            .copied()
+            .filter(|frame| *frame > anchor)
+            .min();
+        let end = (anchor + available)
+            .min(next_marker.unwrap_or(u64::MAX))
+            .min(total_frames)
+            .max(anchor + 1);
         let preview = SyncPreview {
             window: (anchor, end),
             clip_id: source.clip_id.clone(),
@@ -157,7 +169,6 @@ impl SyncCover {
         self.armed = None;
         self.pending = None;
         self.ready = None;
-        self.auto_commit = false;
         self.source_frame = Some(source_in);
         self.active = Some(Session {
             anchor,
@@ -167,6 +178,7 @@ impl SyncCover {
                 source_in,
                 ..source
             },
+            last: 0,
         });
         Ok(preview)
     }
@@ -176,17 +188,18 @@ impl SyncCover {
     /// closes the slot (v5 `should_auto_finish`). Outside a Sync play the frame
     /// is returned as it is.
     pub fn program_frame(&mut self, window_frame: Option<u64>) -> Option<u64> {
-        let Some(session) = self.active.as_ref() else {
+        let Some(session) = self.active.as_mut() else {
             return window_frame;
         };
         let frame = window_frame?;
+        let wrapped = frame < session.last;
+        session.last = frame;
         let program = (session.anchor + frame).min(session.auto_finish);
         self.source_frame = Some(session.source.source_in + (program - session.anchor));
-        if program + 1 >= session.auto_finish {
+        if program + 1 >= session.auto_finish || wrapped {
             let end = session.auto_finish;
-            if self.finish(end).is_ok() {
-                self.auto_commit = true;
-            }
+            // User rule: it stops there; Enter confirms the cover.
+            let _ = self.finish(end);
             return Some(end);
         }
         Some(program)
@@ -238,14 +251,13 @@ impl SyncCover {
         Some(slot_id)
     }
 
-    /// Enter, or the end of the source once the slot is ready: the cover to write
-    /// (v5 `commit_sync_cover_ready`).
+    /// Enter: the cover to write (v5 `commit_sync_cover_ready`). Reaching the next
+    /// marker or the source OUT only stops; the user confirms with Enter.
     pub fn take_commit(&mut self, enter: bool) -> Option<(String, SyncSlot)> {
-        if !enter && !self.auto_commit {
+        if !enter {
             return None;
         }
         let ready = self.ready.take()?;
-        self.auto_commit = false;
         self.committing = true;
         Some(ready)
     }
@@ -288,6 +300,7 @@ mod tests {
             clip_id: "c".into(),
             clip_name: "Clip".into(),
             source_in,
+            source_out: duration,
             duration_frames: duration,
             timebase: (50, 1),
         }
@@ -308,6 +321,21 @@ mod tests {
         assert_eq!(preview.window, (20, 50), "anchor 20, 30 source frames left");
         assert_eq!(preview.source_in, 10);
         assert!(!sync.wants_space(), "IN is used once (v5 set_active)");
+    }
+
+    #[test]
+    fn sync_stops_at_the_source_out_or_the_next_marker_whichever_comes_first() {
+        let mut sync = armed();
+        let preview = sync.start(&[0, 20, 35], 25, 100, Some((50, 1))).unwrap();
+        assert_eq!(preview.window, (20, 35), "the next marker closes it");
+        let mut sync = SyncCover::new();
+        sync.toggle();
+        sync.arm(SyncSource {
+            source_out: 18,
+            ..source(10, 40)
+        });
+        let preview = sync.start(&[0, 20, 35], 25, 100, Some((50, 1))).unwrap();
+        assert_eq!(preview.window, (20, 28), "the source OUT closes it");
     }
 
     #[test]
@@ -360,13 +388,34 @@ mod tests {
     }
 
     #[test]
-    fn the_end_of_the_source_closes_the_slot_and_writes_it() {
+    fn the_end_of_the_source_stops_and_waits_for_enter() {
         let mut sync = armed();
         sync.start(&[0, 20], 25, 100, Some((50, 1))).unwrap();
         assert_eq!(sync.program_frame(Some(29)), Some(50));
         assert!(!sync.is_active());
         sync.resolve([("b|c", 20, 50)].into_iter());
-        assert!(sync.take_commit(false).is_some(), "v5 auto commit");
+        assert!(
+            sync.take_commit(false).is_none(),
+            "it stops; Enter confirms"
+        );
+        assert!(sync.take_commit(true).is_some());
+    }
+
+    #[test]
+    fn a_window_end_missed_between_repaints_still_closes_the_slot() {
+        let mut sync = armed();
+        sync.start(&[0, 20, 35], 25, 100, Some((50, 1))).unwrap();
+        assert_eq!(sync.program_frame(Some(5)), Some(25));
+        assert_eq!(
+            sync.program_frame(Some(0)),
+            Some(35),
+            "the player went back to the window start: its end was reached"
+        );
+        assert!(!sync.is_active());
+        assert!(
+            sync.missing_marker(&[0, 20, 35]).is_none(),
+            "the next marker closes it"
+        );
     }
 
     #[test]
