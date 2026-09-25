@@ -30,6 +30,8 @@ pub struct VirtualShortCard {
     pub imported_media_uri: String,
     pub poster_uri: Option<String>,
     pub poster_image: Option<Arc<qnc_image_assets::RgbaImage>>,
+    /// The shot of a cover: the B-roll tab shows it, the Virtual tab does not.
+    pub b_roll: bool,
 }
 
 pub fn build_card(
@@ -52,6 +54,7 @@ pub fn build_card(
             .unwrap_or_default(),
         poster_uri: row.in_still_uri,
         poster_image: None,
+        b_roll: row.b_roll,
     }
 }
 
@@ -113,6 +116,7 @@ mod tests {
             in_still_uri: Some("qnc://local/project/p1/virtual_shorts/shot-1/in.jpg".into()),
             out_still_uri: Some("qnc://local/project/p1/virtual_shorts/shot-1/out.jpg".into()),
             still_status: "ready".into(),
+            b_roll: false,
         }
     }
 

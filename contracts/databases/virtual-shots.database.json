@@ -4,7 +4,7 @@
   "schema_version": "0.2.0",
   "qnc_uri": "qnc://local/db/virtual_shots/{project_id}",
   "tables": ["virtual_shots"],
-  "public_read_views": ["public_short_clips"],
+  "public_read_views": ["public_short_clips", "public_b_roll_clips"],
   "write_owner": "qnc.module.virtual-shots",
   "public_read_policy": "public_read_views",
   "migration_policy": "owner_application_only",
@@ -14,6 +14,7 @@
     "virtual_shots.in_still_uri": "TEXT, optional URI of the virtual short IN still",
     "virtual_shots.out_still_uri": "TEXT, optional URI of the virtual short OUT still",
     "virtual_shots.still_status": "TEXT: pending | ready | failed",
-    "virtual_shots.still_error": "TEXT, optional controlled error from still artifact creation"
+    "virtual_shots.still_error": "TEXT, optional controlled error from still artifact creation",
+    "virtual_shots.class": "TEXT: source | short (Virtual tab) | b_roll (the shot of a Story cover, B-roll tab; written with the cover, v5 category cover)"
   }
 }

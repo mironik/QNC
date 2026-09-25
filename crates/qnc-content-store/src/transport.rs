@@ -255,6 +255,13 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
+    /// The B-roll virtual shots (covers), oldest first.
+    pub fn list_b_roll(&mut self) -> Result<Vec<ShortClip>> {
+        match self.execute(Operation::ListBroll)? {
+            Data::ShortClips(rows) => Ok(rows),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     /// The program segments in their order.
     pub fn list_segments(&mut self) -> Result<Vec<ProgramSegment>> {
         match self.execute(Operation::ListSegments)? {

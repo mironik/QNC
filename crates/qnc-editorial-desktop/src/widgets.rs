@@ -359,10 +359,13 @@ fn render_clip_grid(
     };
     let short_rows;
     let clip_rows;
-    let rows: Vec<qnc_media_card::CardRow<'_>> = if view.library_tab == LibraryTab::Virtual {
+    // Virtual lists the shorts, B-roll the shots of the covers (v5 pool tabs).
+    let shot_tab = matches!(view.library_tab, LibraryTab::Virtual | LibraryTab::Broll);
+    let rows: Vec<qnc_media_card::CardRow<'_>> = if shot_tab {
         short_rows = view
             .shorts
             .iter()
+            .filter(|shot| shot.b_roll == (view.library_tab == LibraryTab::Broll))
             .map(|shot| {
                 let (status_proxy, status_original) = qnc_media_card::pipeline_statuses(
                     &shot.import_status,
@@ -394,8 +397,6 @@ fn render_clip_grid(
             })
             .collect();
         short_rows
-    } else if view.library_tab == LibraryTab::Broll {
-        Vec::new()
     } else {
         clip_rows = view
             .clips
@@ -462,7 +463,7 @@ fn render_clip_grid(
             &metrics,
             &qnc_media_card::CardGridInput {
                 height: rect.height(),
-                selected_id: if view.library_tab == LibraryTab::Virtual {
+                selected_id: if shot_tab {
                     view.chosen_shot_id.as_deref().unwrap_or("")
                 } else {
                     view.chosen_clip_id().unwrap_or("")
@@ -481,7 +482,7 @@ fn render_clip_grid(
     match action {
         Some(qnc_media_card::CardGridAction::Activate(id))
         | Some(qnc_media_card::CardGridAction::ToggleSelection(id)) => {
-            if view.library_tab == LibraryTab::Virtual {
+            if shot_tab {
                 Some(EditorialIntent::PreviewShort(id))
             } else {
                 Some(EditorialIntent::PreviewClip(id))

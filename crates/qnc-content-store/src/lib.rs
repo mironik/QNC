@@ -128,7 +128,8 @@ pub struct SavedShort {
     pub out_frame: u64,
 }
 
-/// One virtual short stored in the project DB, ordered by creation.
+/// One virtual shot stored in the project DB, ordered by creation: a short
+/// (Virtual tab) or, with `b_roll`, the shot of a cover (B-roll tab).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ShortClip {
@@ -140,6 +141,8 @@ pub struct ShortClip {
     pub in_still_uri: Option<String>,
     pub out_still_uri: Option<String>,
     pub still_status: String,
+    #[serde(default)]
+    pub b_roll: bool,
 }
 
 /// One segment of the edited program. Stored kind is `tonovi` or `offovi`.
@@ -321,6 +324,8 @@ pub enum Operation {
         out_frame: u64,
     },
     ListShorts,
+    /// The B-roll virtual shots (covers), oldest first.
+    ListBroll,
     MarkShortStills {
         shot_id: String,
         status: String,
@@ -408,6 +413,7 @@ impl Operation {
                 | Self::ReadWave { .. }
                 | Self::GetRuntime { .. }
                 | Self::ListShorts
+                | Self::ListBroll
                 | Self::ListSegments
                 | Self::ListMarkers
                 | Self::ListSlots

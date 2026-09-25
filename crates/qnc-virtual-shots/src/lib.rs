@@ -16,6 +16,17 @@ pub fn list_shorts(
         .list_shorts()
 }
 
+/// The virtual shots of the pool: shorts (Virtual tab), then the B-roll shots of
+/// the covers (B-roll tab, `b_roll`), each oldest first, from one read.
+pub fn list_pool_shots(
+    target: &qnc_content_store::ContentTarget,
+) -> Result<Vec<qnc_content_store::ShortClip>, String> {
+    let mut client = target.open(qnc_content_store::Access::ReadOnly)?;
+    let mut shots = client.list_shorts()?;
+    shots.extend(client.list_b_roll()?);
+    Ok(shots)
+}
+
 pub fn save_short(
     transport: &mut qnc_content_store::ContentWriteTransport,
     key: String,

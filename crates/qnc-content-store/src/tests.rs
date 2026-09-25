@@ -1963,6 +1963,11 @@ fn a_cover_is_a_b_roll_virtual_shot_in_its_slot_and_replaces_the_one_there() {
         panic!()
     };
     assert!(shorts.is_empty());
+    let Data::ShortClips(b_roll) = run(&mut store, Operation::ListBroll).unwrap() else {
+        panic!()
+    };
+    assert_eq!(b_roll.len(), 2, "the B-roll tab lists the cover shots");
+    assert!(b_roll.iter().all(|shot| shot.b_roll && shot.name.starts_with("Clip B")));
     let Data::StorySelection(selection) = run(&mut store, Operation::ReadStorySelection).unwrap()
     else {
         panic!()

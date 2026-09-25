@@ -188,7 +188,7 @@ impl ContentStore {
                     qnc_media_records::valid_id(clip_id).map_err(err)?;
                     Ok(Data::Wave(None))
                 }
-                Operation::ListShorts => Ok(Data::ShortClips(Vec::new())),
+                Operation::ListShorts | Operation::ListBroll => Ok(Data::ShortClips(Vec::new())),
                 Operation::ListSegments => Ok(Data::Segments(Vec::new())),
                 Operation::ListMarkers => Ok(Data::Markers(Vec::new())),
                 Operation::ListSlots => Ok(Data::Slots(Vec::new())),
@@ -299,6 +299,7 @@ impl ContentStore {
                 out_frame,
             } => self.save_short(project_id, clip_id, clip_name, *in_frame, *out_frame),
             Operation::ListShorts => self.list_shorts(),
+            Operation::ListBroll => self.list_b_roll(),
             Operation::MarkShortStills {
                 shot_id,
                 status,
@@ -873,6 +874,34 @@ impl ContentStore {
                     in_still_uri: None,
                     out_still_uri: None,
                     still_status: "pending".into(),
+                    b_roll: false,
+                })
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        Ok(Data::ShortClips(rows))
+    }
+
+    /// v5 B-roll tab: the virtual shots of the covers.
+    fn list_b_roll(&self) -> Result<Data> {
+        if !object_exists(&self.conn, "view", "public_b_roll_clips")? {
+            return Ok(Data::ShortClips(Vec::new()));
+        }
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT shot_id, clip_id, in_frame, out_frame, name,
+                    in_still_uri, out_still_uri, still_status
+                 FROM public_b_roll_clips
+                 ORDER BY created_at_utc, shot_id",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| {
+                short_clip_row(row).map(|shot| ShortClip {
+                    b_roll: true,
+                    ..shot
                 })
             })
             .map_err(err)?
@@ -2097,7 +2126,13 @@ fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
         SELECT shot_id, clip_id, in_frame, out_frame, source_shot_id, name, created_at_utc,
                in_still_uri, out_still_uri, still_status, still_error
         FROM virtual_shots
-        WHERE class = 'short';",
+        WHERE class = 'short';
+        DROP VIEW IF EXISTS public_b_roll_clips;
+        CREATE VIEW public_b_roll_clips AS
+        SELECT shot_id, clip_id, in_frame, out_frame, source_shot_id, name, created_at_utc,
+               in_still_uri, out_still_uri, still_status, still_error
+        FROM virtual_shots
+        WHERE class = 'b_roll';",
     )
     .map_err(err)
 }
@@ -3039,6 +3074,7 @@ fn short_clip_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ShortClip> {
         in_still_uri: row.get(5)?,
         out_still_uri: row.get(6)?,
         still_status: row.get(7)?,
+        b_roll: false,
     })
 }
 

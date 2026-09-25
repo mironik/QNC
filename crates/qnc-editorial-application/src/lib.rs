@@ -578,7 +578,7 @@ impl EditorialApplication {
             self.view.shorts.clear();
             return;
         };
-        match qnc_virtual_shots::list_shorts(target) {
+        match qnc_virtual_shots::list_pool_shots(target) {
             Ok(rows) => {
                 let previous = std::mem::take(&mut self.view.shorts);
                 let mut shorts: Vec<EditorialShort> =
@@ -732,6 +732,7 @@ mod tests {
                 in_still_uri: None,
                 out_still_uri: None,
                 still_status: "pending".into(),
+                b_roll: false,
             },
             Some(parent_clip(&clip("clip-a", "Mironik"))),
         )
