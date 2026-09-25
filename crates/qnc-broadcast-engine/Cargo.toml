@@ -7,6 +7,7 @@ edition = "2024"
 qnc-broadcast-player.workspace = true
 qnc-dev-diagnostics.workspace = true
 qnc-player-input.workspace = true
+qnc-program-playlist.workspace = true
 qnc-media-metadata.workspace = true
 qnc-media-decode.workspace = true
 qnc-media-stream.workspace = true

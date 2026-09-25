@@ -86,6 +86,7 @@ mod monitor_buffer_tests {
 }
 
 /// Immutable, validated saved input. No database lookup or representation choice here.
+#[derive(Clone)]
 pub struct InputPlan {
     pub(crate) source: SourceRuntime,
     pub(crate) media: MediaRepresentation,
@@ -106,6 +107,21 @@ pub(crate) struct AudioStreamPlan {
 }
 impl InputPlan {
     pub fn new(input: &PreparedInput, workspace_uri: &str, clip_id: &str) -> Result<Self> {
+        Self::build(input, workspace_uri, clip_id, true)
+    }
+
+    /// A clip inside a story program: the same saved picture and sound, but the
+    /// program chooses the channels (A1/A2), so no project channel layout here.
+    pub fn for_program(input: &PreparedInput, workspace_uri: &str, clip_id: &str) -> Result<Self> {
+        Self::build(input, workspace_uri, clip_id, false)
+    }
+
+    fn build(
+        input: &PreparedInput,
+        workspace_uri: &str,
+        clip_id: &str,
+        project_layout: bool,
+    ) -> Result<Self> {
         input.validate_for(workspace_uri, clip_id).map_err(error)?;
         let media = input.media().map_err(error)?;
         let layout = input
@@ -162,12 +178,16 @@ impl InputPlan {
         );
         let audio_media = input.audio_media();
         let (native_audio_streams, native_audio_format) = native_audio_layout(audio_media)?;
-        let (audio_streams, audio_format, audio_channels) = project_audio_layout(
-            &native_audio_streams,
-            native_audio_format.as_ref(),
-            &input.layout.audio_channels,
-            &input.project_audio,
-        )?;
+        let (audio_streams, audio_format, audio_channels) = if project_layout {
+            project_audio_layout(
+                &native_audio_streams,
+                native_audio_format.as_ref(),
+                &input.layout.audio_channels,
+                &input.project_audio,
+            )?
+        } else {
+            (Vec::new(), None, None)
+        };
         let audio_video = audio_media
             .streams
             .iter()

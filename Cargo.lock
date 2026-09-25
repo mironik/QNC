@@ -2992,6 +2992,7 @@ dependencies = [
  "qnc-media-stream",
  "qnc-pixel-convert",
  "qnc-player-input",
+ "qnc-program-playlist",
  "qnc-video-output",
  "qnc-work-settings",
  "serde_json",
@@ -3864,6 +3865,7 @@ dependencies = [
  "qnc-ingest-store",
  "qnc-media-metadata",
  "qnc-media-records",
+ "qnc-program-playlist",
  "qnc-transport-resolver",
  "qnc-work-settings",
  "rusqlite",
@@ -3923,6 +3925,26 @@ version = "0.1.0"
 dependencies = [
  "qnc-decoder-catalog",
  "qnc-frame-timebase",
+]
+
+[[package]]
+name = "qnc-program-input"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+ "qnc-frame-timebase",
+ "qnc-media-metadata",
+ "qnc-player-input",
+ "qnc-program-playlist",
+]
+
+[[package]]
+name = "qnc-program-playlist"
+version = "0.1.0"
+dependencies = [
+ "qnc-frame-timebase",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4164,6 +4186,7 @@ dependencies = [
  "qnc-player-input",
  "qnc-player-launcher",
  "qnc-player-timeline",
+ "qnc-program-input",
  "qnc-source-bindings",
  "qnc-timeline",
  "qnc-timeline-assets",

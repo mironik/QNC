@@ -1,0 +1,12 @@
+[package]
+name = "qnc-program-input"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: read-only program input of an edited story from the active project database (v5 host program_playlist)"
+
+[dependencies]
+qnc-content-store = { workspace = true }
+qnc-frame-timebase = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-player-input = { workspace = true }
+qnc-program-playlist = { workspace = true }

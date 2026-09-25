@@ -577,6 +577,7 @@ impl ProgramSegments {
             fps_num: segment.fps_num,
             fps_den: segment.fps_den,
             active: true,
+            a1_source_channel: 0,
         };
         let project_id = self.project_id.clone();
         if self.send(|writes| writes.create_segment(key.clone(), project_id, row)) {

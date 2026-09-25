@@ -246,10 +246,13 @@ impl EditorialApplication {
                 .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
         self.apply_pending_shot();
-        // Source and Wrap stay apart (v5): a program frame goes to the Wrap timeline only.
-        let total = self.segments.view().total_frames;
-        let playhead = self.wrap.apply(self.segments.take_seek(), total);
-        self.segments.set_playhead(Some(playhead));
+        // Source and Wrap stay apart (v5): the Wrap timeline plays the program in the same player.
+        let seek = self.segments.take_seek();
+        match self.wrap.apply(seek, self.segments.view().total_frames) {
+            Some(request) => _ = self.preview.show_program_frame(request.frame()),
+            None => self.wrap.follow_program(self.preview.program_frame()),
+        }
+        self.segments.set_playhead(Some(self.wrap.playhead()));
         self.view.segments = self.segments.view().clone();
     }
 
@@ -401,7 +404,7 @@ impl EditorialApplication {
                     self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
                     true
                 }
-                action_ids::PLAY_PAUSE => self.wrap.is_active() || self.preview.toggle_play(), // Wrap: program, never the source clip
+                action_ids::PLAY_PAUSE => self.preview.toggle_play(), // the program in Wrap
                 action_ids::STEP_BACK_FRAME => self.wrap.step(-1) || self.preview.step(-1),
                 action_ids::STEP_FORWARD_FRAME => self.wrap.step(1) || self.preview.step(1),
                 action_ids::MARK_IN => {

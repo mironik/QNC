@@ -444,5 +444,8 @@ fn representation_layout(
     Ok(result)
 }
 
+mod program;
+pub use program::ProgramInput;
+
 #[cfg(test)]
 mod tests;

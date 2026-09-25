@@ -1,5 +1,5 @@
 //! Explicit read-only saved-media test of the same client used by Ingest.
-use qnc_player_client::{Action, Launch, MediaBinding, Player, View};
+use qnc_player_client::{Action, Launch, LaunchInput, MediaBinding, Player, View};
 use qnc_player_input::InputReader;
 use qnc_work_settings::SettingsReader;
 use std::{
@@ -70,10 +70,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         move || {
             Ok(Launch {
                 executable,
-                input,
-                media_binding: MediaBinding::Local {
-                    source_uri: source,
-                    root: source_root,
+                input: LaunchInput::Clip {
+                    input,
+                    media_binding: MediaBinding::Local {
+                        source_uri: source,
+                        root: source_root,
+                    },
                 },
             })
         }

@@ -26,6 +26,15 @@ pub enum WrapRequest {
     Scrub(u64),
 }
 
+impl WrapRequest {
+    /// The program frame asked for.
+    pub fn frame(self) -> u64 {
+        match self {
+            Self::Open(frame) | Self::Scrub(frame) => frame,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct WrapSession {
     active: bool,
@@ -104,13 +113,13 @@ impl WrapSession {
     }
 
     /// One repaint: a program frame the user pointed at, if any, then the playhead
-    /// kept inside the program. Returns the playhead.
-    pub fn apply(&mut self, seek: Option<u64>, total_frames: u64) -> u64 {
+    /// kept inside the program. Returns what the program player must do.
+    pub fn apply(&mut self, seek: Option<u64>, total_frames: u64) -> Option<WrapRequest> {
         if let Some(frame) = seek {
             self.seek(frame);
         }
         self.clamp(total_frames);
-        self.playhead
+        self.take_request()
     }
 
     /// Keeps the playhead inside a program that became shorter.
@@ -173,7 +182,7 @@ mod tests {
     #[test]
     fn steps_stay_inside_the_program() {
         let mut wrap = WrapSession::new();
-        wrap.apply(Some(0), 10);
+        assert_eq!(wrap.apply(Some(0), 10), Some(WrapRequest::Open(0)));
         wrap.take_request();
         assert!(wrap.step(-1));
         assert_eq!(wrap.playhead(), 0);

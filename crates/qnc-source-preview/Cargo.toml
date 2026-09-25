@@ -12,6 +12,7 @@ qnc-media-records = { workspace = true }
 qnc-playback-activity = { workspace = true }
 qnc-player-client = { workspace = true }
 qnc-player-input = { workspace = true }
+qnc-program-input = { workspace = true }
 qnc-player-launcher = { workspace = true }
 qnc-player-timeline = { workspace = true }
 qnc-source-bindings = { workspace = true }

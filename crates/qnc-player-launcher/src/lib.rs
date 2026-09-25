@@ -1,4 +1,4 @@
-use qnc_player_client::{Launch, MediaBinding};
+use qnc_player_client::{Launch, LaunchInput, MediaBinding};
 use std::path::PathBuf;
 
 pub const MODULE_ID: &str = "qnc.module.player-launcher";
@@ -92,19 +92,71 @@ pub fn prepare_launch(
     sources: &[SourceTransportBinding],
     executable: PathBuf,
 ) -> Result<Launch, String> {
-    let media_uri = &input.media().map_err(|e| e.to_string())?.media_uri;
+    let media_binding = binding_for(
+        &input.media().map_err(|e| e.to_string())?.media_uri,
+        sources,
+    )?;
+    Ok(Launch {
+        executable,
+        input: LaunchInput::Clip {
+            input,
+            media_binding,
+        },
+    })
+}
+
+/// A story program: one binding for every media source its clips read.
+pub fn prepare_program_launch(
+    program: qnc_player_input::ProgramInput,
+    sources: &[SourceTransportBinding],
+    executable: PathBuf,
+) -> Result<Launch, String> {
+    let mut source_uris = Vec::new();
+    for media in program
+        .playlist
+        .items
+        .iter()
+        .flat_map(|item| &item.sources)
+        .map(|source| &source.media.media_uri)
+    {
+        let source_uri = qnc_source_reader::SourceReference::from_uri(media)
+            .map_err(|e| e.to_string())?
+            .source_uri()
+            .to_string();
+        if !source_uris.contains(&source_uri) {
+            source_uris.push(source_uri);
+        }
+    }
+    let media_bindings = source_uris
+        .iter()
+        .map(|source_uri| {
+            sources
+                .iter()
+                .find(|binding| binding.source_uri() == source_uri)
+                .map(SourceTransportBinding::media_binding)
+                .ok_or_else(|| "Program source has no transport binding.".to_string())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Launch {
+        executable,
+        input: LaunchInput::Program {
+            program,
+            media_bindings,
+        },
+    })
+}
+
+fn binding_for(
+    media_uri: &str,
+    sources: &[SourceTransportBinding],
+) -> Result<MediaBinding, String> {
     let reference =
         qnc_source_reader::SourceReference::from_uri(media_uri).map_err(|e| e.to_string())?;
-    let media_binding = sources
+    Ok(sources
         .iter()
         .find(|binding| binding.source_uri() == reference.source_uri())
         .ok_or("Player source has no transport binding.")?
-        .media_binding();
-    Ok(Launch {
-        executable,
-        input,
-        media_binding,
-    })
+        .media_binding())
 }
 
 #[cfg(test)]

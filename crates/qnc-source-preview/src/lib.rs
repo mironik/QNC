@@ -13,7 +13,7 @@ use std::{sync::Arc, time::Duration};
 
 use qnc_content_read::ContentReader;
 use qnc_player_client::{Action, Player, View as PlayerView};
-use qnc_player_input::{InputReader, PlayerContentRead};
+use qnc_player_input::{InputReader, PlayerContentRead, ProgramInput};
 use qnc_player_launcher::SourceTransportBinding;
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_timeline::{TimelineIntent, TimelineProjection};
@@ -147,6 +147,8 @@ pub struct SourcePreview {
     /// so background generators of any process give way.
     activity: qnc_playback_activity::PlaybackReporter,
     activity_target: Option<qnc_content_store::ContentTarget>,
+    /// The player plays a story program; the view keeps the source clip.
+    program: bool,
 }
 
 impl Default for SourcePreview {
@@ -160,6 +162,7 @@ impl Default for SourcePreview {
             play_when_ready: false,
             activity: qnc_playback_activity::PlaybackReporter::new(),
             activity_target: None,
+            program: false,
         }
     }
 }
@@ -245,6 +248,7 @@ impl SourcePreview {
     /// Cuts the current session and clears everything shown.
     pub fn close(&mut self) {
         self.play_when_ready = false;
+        self.program = false;
         if let Some(player) = &self.player {
             player.close();
         }
@@ -314,23 +318,7 @@ impl SourcePreview {
         };
         let clip_id = clip_id.to_string();
         player.prepare_at(first_frame, move || {
-            let sources = context
-                .sources
-                .iter()
-                .map(|binding| {
-                    if let Some(root) = &binding.file {
-                        return Ok(SourceTransportBinding::local(
-                            binding.uri.clone(),
-                            root.clone(),
-                        ));
-                    }
-                    SourceTransportBinding::network(
-                        binding.uri.clone(),
-                        binding.endpoint.clone().ok_or("Source endpoint missing.")?,
-                        binding.token()?.ok_or("Source credential missing.")?,
-                    )
-                })
-                .collect::<Result<Vec<_>, String>>()?;
+            let sources = transport_bindings(&context)?;
             let executable = qnc_player_launcher::sibling_executable("qnc-broadcast-player")?;
             let input = InputReader::with_content_reader(
                 context.reader.clone(),
@@ -366,12 +354,82 @@ impl SourcePreview {
         self.send(Action::Cue(frame))
     }
 
-    /// Handles the intent of a passive timeline.
+    /// Handles the intent of a passive timeline. While a program plays, the
+    /// source timeline brings the chosen clip back at the pointed frame (v5).
     pub fn timeline_intent(&mut self, intent: &TimelineIntent) -> bool {
         match intent {
+            TimelineIntent::CueFrame(frame) if self.program => match self.view.clip_id.clone() {
+                Some(clip_id) => self.open_at(&clip_id, *frame),
+                None => false,
+            },
             TimelineIntent::CueFrame(frame) => self.cue(*frame),
             _ => false,
         }
+    }
+
+    /// Opens a story program in the same player and monitor, at a program frame.
+    /// The source clip, its timeline and artifacts stay shown (v5 Wrap).
+    pub fn open_program(
+        &mut self,
+        first_frame: u64,
+        build: impl FnOnce(&InputReader, &str) -> Result<ProgramInput, String> + Send + 'static,
+    ) -> bool {
+        let Some(context) = self.context.clone() else {
+            self.view.message = "Radne postavke projekta nisu ucitane.".into();
+            return true;
+        };
+        if self.player.is_none() {
+            match Player::new() {
+                Ok(player) => self.player = Some(player),
+                Err(error) => {
+                    self.view.message = error;
+                    return true;
+                }
+            }
+        }
+        let Some(player) = &self.player else {
+            return true;
+        };
+        self.program = true;
+        self.play_when_ready = false;
+        player.prepare_at(first_frame, move || {
+            let sources = transport_bindings(&context)?;
+            let executable = qnc_player_launcher::sibling_executable("qnc-broadcast-player")?;
+            let reader = InputReader::with_content_reader(
+                context.reader.clone(),
+                context.player_content.clone(),
+            );
+            let program = build(&reader, &context.settings.workspace_db_uri)?;
+            qnc_player_launcher::prepare_program_launch(program, &sources, executable)
+        });
+        let view = player.view();
+        self.apply_player_view(view);
+        true
+    }
+
+    /// A frame of the active project's story program (Wrap): a cue while the
+    /// program already plays, else the program opens at that frame.
+    pub fn show_program_frame(&mut self, frame: u64) -> bool {
+        if self.program && self.player_view.has_confirmed_position() {
+            return self.cue(frame);
+        }
+        let (Some(target), Some(context)) = (self.activity_target.clone(), &self.context) else {
+            self.view.message = "Projektna baza nije dostupna.".into();
+            return true;
+        };
+        let loader = qnc_program_input::loader(target, context.settings.project_id.clone());
+        self.open_program(frame, loader)
+    }
+    /// Whether the player plays a program rather than the source clip.
+    pub fn in_program(&self) -> bool {
+        self.program
+    }
+
+    /// The program frame the player confirmed, while a program plays.
+    pub fn program_frame(&self) -> Option<u64> {
+        self.program
+            .then(|| self.player_view.confirmed_source_frame())
+            .flatten()
     }
 
     fn send(&mut self, action: Action) -> bool {
@@ -435,8 +493,11 @@ impl SourcePreview {
             height: picture.header.height as usize,
             rgba: picture.rgba.clone(),
         });
-        self.view.timeline =
-            qnc_player_timeline::projection_from_player_reply(playback.reply.as_ref());
+        // A program keeps the source timeline of the chosen clip (v5 Wrap).
+        if !self.program {
+            self.view.timeline =
+                qnc_player_timeline::projection_from_player_reply(playback.reply.as_ref());
+        }
         self.view.playing = playback.playing();
         self.player_view = playback;
     }
@@ -509,4 +570,25 @@ impl std::fmt::Debug for SourcePreview {
             .field("play_when_ready", &self.play_when_ready)
             .finish()
     }
+}
+
+/// Transport bindings of the host's media sources, for the player launch.
+fn transport_bindings(context: &PreviewContext) -> Result<Vec<SourceTransportBinding>, String> {
+    context
+        .sources
+        .iter()
+        .map(|binding| {
+            if let Some(root) = &binding.file {
+                return Ok(SourceTransportBinding::local(
+                    binding.uri.clone(),
+                    root.clone(),
+                ));
+            }
+            SourceTransportBinding::network(
+                binding.uri.clone(),
+                binding.endpoint.clone().ok_or("Source endpoint missing.")?,
+                binding.token()?.ok_or("Source credential missing.")?,
+            )
+        })
+        .collect()
 }

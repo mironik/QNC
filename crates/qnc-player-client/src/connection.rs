@@ -399,31 +399,52 @@ impl Connection {
         let session = uuid::Uuid::new_v4().to_string();
         let read = uuid::Uuid::new_v4().to_string();
         let write = uuid::Uuid::new_v4().to_string();
-        launch
-            .input
-            .validate_for(
-                &launch.input.workspace_db_uri,
-                &launch.input.snapshot.metadata.clip_id,
-            )
-            .map_err(|e| e.to_string())?;
-        let source = launch.input.snapshot.metadata.clip_id.clone();
-        let source_timebase = launch
-            .input
-            .layout
-            .video
-            .as_ref()
-            .ok_or("missing saved source timebase for monitor frame transport")?
-            .timebase;
+        let (source, source_timebase, played) = match &launch.input {
+            LaunchInput::Clip {
+                input,
+                media_binding,
+            } => {
+                input
+                    .validate_for(&input.workspace_db_uri, &input.snapshot.metadata.clip_id)
+                    .map_err(|e| e.to_string())?;
+                let timebase = input
+                    .layout
+                    .video
+                    .as_ref()
+                    .ok_or("missing saved source timebase for monitor frame transport")?
+                    .timebase;
+                (
+                    input.snapshot.metadata.clip_id.clone(),
+                    timebase,
+                    serde_json::json!({ "input": input, "media_binding": media_binding }),
+                )
+            }
+            LaunchInput::Program {
+                program,
+                media_bindings,
+            } => {
+                program
+                    .validate_for(&program.workspace_db_uri)
+                    .map_err(|e| e.to_string())?;
+                (
+                    program.playlist.playlist_id.clone(),
+                    program.playlist.program_timebase,
+                    serde_json::json!({ "program": program, "program_bindings": media_bindings }),
+                )
+            }
+        };
         let frame_map_path = frame_map_path(&session);
         LatestFrameWriter::create(&frame_map_path, MONITOR_PREVIEW_FRAME_CAPACITY)?;
         let frame_reader = LatestFrameReader::open(&frame_map_path)?;
-        let boot = serde_json::to_vec(&serde_json::json!({
+        let mut boot = serde_json::json!({
             "contract_version": VERSION, "session_id": session, "source_generation": generation,
-            "input": launch.input, "media_binding": launch.media_binding,
             "read_token": read, "command_token": write, "idle_timeout_ms": 300000, "listen_port": 0,
             "monitor_frame_map": frame_map_path
-        }))
-        .map_err(|e| e.to_string())?;
+        });
+        if let (Some(boot), serde_json::Value::Object(played)) = (boot.as_object_mut(), played) {
+            boot.extend(played);
+        }
+        let boot = serde_json::to_vec(&boot).map_err(|e| e.to_string())?;
         if boot.len() > 4 * 1024 * 1024 {
             return Err("Player bootstrap exceeds limit.".into());
         }

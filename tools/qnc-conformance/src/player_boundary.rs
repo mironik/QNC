@@ -315,6 +315,7 @@ fn forbidden_dependency(owner: &str, dependency: &str) -> bool {
             return !matches!(
                 dependency,
                 "qnc-player-input"
+                    | "qnc-program-playlist"
                     | "qnc-ingest-store"
                     | "qnc-wave"
                     | "qnc-work-settings"

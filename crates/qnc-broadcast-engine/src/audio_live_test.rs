@@ -151,7 +151,7 @@ fn real_saved_original_mono_tracks() {
         max_gap_us = max_gap_us.max(tick.duration_since(previous_tick).as_micros());
         previous_tick = tick;
         assert!(Instant::now() < deadline, "audio diagnostic timeout");
-        let telemetry = audio.device.as_ref().unwrap().borrow().telemetry();
+        let telemetry = audio.sink.device.as_ref().unwrap().borrow().telemetry();
         assert_ne!(
             telemetry.status,
             qnc_audio_output::Status::Failed,
@@ -204,6 +204,7 @@ fn real_saved_original_mono_tracks() {
         max_work_us = max_work_us.max(tick.elapsed().as_micros());
         // Catch up immediately after a scheduler delay; only wait when buffered or pending.
         if audio
+            .sink
             .device
             .as_ref()
             .unwrap()
@@ -222,7 +223,7 @@ fn real_saved_original_mono_tracks() {
     assert_eq!(counts, [expected; 4]);
     println!(
         "All four native mono streams: sample frames {counts:?}, peaks {peaks:?}; device {:?}",
-        audio.device.as_ref().unwrap().borrow().telemetry()
+        audio.sink.device.as_ref().unwrap().borrow().telemetry()
     );
     audio.pause_audio().unwrap();
     for target in [frames / 2, frames - 1, 0] {

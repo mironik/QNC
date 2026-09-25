@@ -276,6 +276,13 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
+    /// The covers of the program, by program frame.
+    pub fn list_covers(&mut self) -> Result<Vec<ProgramCover>> {
+        match self.execute(Operation::ListCovers)? {
+            Data::Covers(rows) => Ok(rows),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     /// The stored Story selection.
     pub fn read_story_selection(&mut self) -> Result<StorySelection> {
         match self.execute(Operation::ReadStorySelection)? {

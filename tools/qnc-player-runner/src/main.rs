@@ -2,7 +2,7 @@
 mod config;
 mod control;
 mod session;
-use config::Boot;
+use config::{Boot, Plan};
 use qnc_broadcast_engine::Runtime;
 use qnc_json_transport::Credentials;
 use qnc_player_frame_transport::LatestFrameWriter;
@@ -25,7 +25,7 @@ use winit::{
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn run(
-    boot: Boot,
+    mut boot: Boot,
     native: Option<(wgpu::Instance, wgpu::Surface<'static>)>,
     stop: Arc<AtomicBool>,
 ) -> Result<()> {
@@ -44,39 +44,51 @@ fn run(
     let output_scope = output_scope(native.is_some(), monitor_post.is_some())?;
     let plan = boot.plan()?;
     if qnc_dev_diagnostics::player_diagnostics_enabled() {
+        let source = match &plan {
+            Plan::Clip(plan) => plan.source(),
+            Plan::Program(plan) => plan.source(),
+        };
         qnc_dev_diagnostics::log_line(
             qnc_dev_diagnostics::DiagnosticsStream::Player,
             format!(
-                "player-audio decoded_channels={} project_channels={} project_rate={} source_channels={:?}",
-                plan.source()
-                    .audio_format
-                    .as_ref()
-                    .map_or(0, |f| f.channel_count),
-                boot.input.project_audio.channels,
-                boot.input.project_audio.sample_rate_hz,
-                plan.audio_channels().map(|m| m.output_channels())
+                "player-audio source={} channels={} rate={:?}",
+                source.source_id,
+                source.audio_format.as_ref().map_or(0, |f| f.channel_count),
+                source.audio_format.as_ref().map(|f| f.sample_rate_hz),
             ),
         );
     }
-    let media_uri = boot.input.media()?.media_uri.clone();
-    let opener = boot.media_binding.opener(&media_uri)?;
-    let output_config = plan.output_config(&boot.session_id, boot.source_generation)?;
+    let opener = boot.take_opener()?;
+    let output_config = match &plan {
+        Plan::Clip(plan) => plan.output_config(&boot.session_id, boot.source_generation)?,
+        Plan::Program(plan) => plan.output_config(&boot.session_id, boot.source_generation)?,
+    };
     let decoder = qnc_decoder_catalog::installed_config()?;
-    let player = if let Some((instance, surface)) = native {
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            compatible_surface: Some(&surface),
-            ..Default::default()
-        }))
-        .ok_or("no native GPU adapter")?;
-        let output = pollster::block_on(qnc_video_output::VideoOutput::open(
-            &adapter,
-            Some(surface),
-            output_config.clone(),
-            (960, 640),
-        ))?;
-        Runtime::open_access(plan, output, output_config, decoder, None, opener)?
-    } else {
-        Runtime::open_monitor_access(plan, output_config, decoder, None, opener)?
+    let player = match (plan, native) {
+        (Plan::Clip(plan), Some((instance, surface))) => {
+            let adapter =
+                pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+                    compatible_surface: Some(&surface),
+                    ..Default::default()
+                }))
+                .ok_or("no native GPU adapter")?;
+            let output = pollster::block_on(qnc_video_output::VideoOutput::open(
+                &adapter,
+                Some(surface),
+                output_config.clone(),
+                (960, 640),
+            ))?;
+            Runtime::open_access(plan, output, output_config, decoder, None, opener)?
+        }
+        (Plan::Clip(plan), None) => {
+            Runtime::open_monitor_access(plan, output_config, decoder, None, opener)?
+        }
+        (Plan::Program(plan), None) => {
+            Runtime::open_program_monitor(plan, output_config, decoder, None, opener)?
+        }
+        (Plan::Program(_), Some(_)) => {
+            return Err("a story program plays on the preview monitor only".into());
+        }
     };
     let control = control::Control::open(
         boot.listen_port,

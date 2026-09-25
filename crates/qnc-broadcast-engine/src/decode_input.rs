@@ -39,6 +39,17 @@ impl DecodeInput {
             opener: self.opener.clone(),
         }
     }
+    /// Whether the configured decoder supports this saved stream, without opening it.
+    pub fn validate(&self, stream_index: u32) -> Result<()> {
+        DecodeRequest {
+            version: qnc_media_decode::VERSION.into(),
+            media: self.media.clone(),
+            stream_index,
+            start: None,
+        }
+        .validate(&self.config)
+        .map_err(error)
+    }
     pub fn open(&self, stream_index: u32, start: Option<Rational>) -> Result<Decoder> {
         let request = DecodeRequest {
             version: qnc_media_decode::VERSION.into(),

@@ -11,6 +11,7 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         fps_num: 50,
         fps_den: 1,
         active: true,
+        a1_source_channel: 0,
     }
 }
 

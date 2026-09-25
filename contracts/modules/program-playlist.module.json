@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.program-playlist",
+  "module_name": "Program playlist",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["program.playlist.build", "program.playlist.window", "program.playlist.overlay", "program.playlist.validate"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command", "ui.paint", "database.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-program-playlist",
+  "input": "Story segments in program order (Ton/Off, clip, program and source frames, source channel for A1 chosen on the Wrap segment) with their covers (source channel for A2), the program timebase, the project audio.channels as output layout, and a resolver that gives the saved media facts of a clip (QNC media URI, duration, timebase, video and audio format).",
+  "output": "The flat program playlist of v5: contiguous items on one program axis; Ton = picture (Base) + A1, Off = no picture + A1, a cover = picture (Cover) + A2 over the A1 of its segment; one timebase, validated routes and lengths; frame windows and transient cover overlays of it. Missing facts are errors, never stand-in formats.",
+  "specification": "QNC_v5 qnc-program-playlist/src/lib.rs, qnc-service-contracts/src/program_playlist.rs, qnc-host/src/program_playlist.rs"
+}

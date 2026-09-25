@@ -25,9 +25,10 @@
   "updated_at": "2026-09-24T00:00:00Z",
   "rules": {
     "source": "QNC_v5/.cursor/rules/qnc-story-segment-timeline.mdc (the rule wins over the v5 code)",
-    "story_parts": "TON/OFF segments (kind tonovi | offovi) in sort_index order; the program is their sum; delete sets active = 0",
+    "story_parts": "TON/OFF segments (kind tonovi | offovi) in sort_index order; the program is their sum; delete sets active = 0; a1_source_channel is the source channel heard on A1 (zero based, 0 = channel 1 as in v5), chosen on the Wrap segment",
+    "development_records": "a story without a1_source_channel or covers without a2_source_channel are removed on open, not converted (AGENTS 3)",
     "story_markers": "one locked program_start at frame 0 and one locked program_end at the program length; segment borders are no markers; the user places an M marker on a Wrap segment (origin_part_id + origin_local_frame, v5 create_marker_from_part_frame) and the program frame follows; the program timeline only shows markers",
     "story_marker_slots": "recomputed after every story change, one slot between every two adjacent markers; slot_id = start_marker_id|end_marker_id",
-    "story_covers": "a cover is bound to slot_id; deleting a marker (by the user or with its segment) deletes its slots and their covers; any other change keeps the cover on the same marker pair with the new frames, else on the slot keeping its start marker (a new marker split it: trimmed)"
+    "story_covers": "a cover is bound to slot_id; deleting a marker (by the user or with its segment) deletes its slots and their covers; any other change keeps the cover on the same marker pair with the new frames, else on the slot keeping its start marker (a new marker split it: trimmed); a2_source_channel is the source channel heard on A2 (zero based, 0 = channel 1)"
   }
 }

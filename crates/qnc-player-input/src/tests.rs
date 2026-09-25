@@ -803,3 +803,99 @@ fn intranet_uses_the_same_input_contract() {
 fn settings_change_during_read_is_not_accepted() {
     network("lan", true);
 }
+
+fn program_of(
+    input: &PreparedInput,
+    picture_uri: &str,
+) -> qnc_program_playlist::FlatProgramPlaylist {
+    use qnc_program_playlist as p;
+    let video = input.layout.video.as_ref().unwrap();
+    let clip_id = input.snapshot.metadata.clip_id.clone();
+    let media = |uri: &str| p::MediaRef {
+        clip_id: clip_id.clone(),
+        media_uri: uri.into(),
+    };
+    let source = |id: &str, uri: &str, video_layer, routes: Vec<p::ProgramAudioRoute>| {
+        p::FlatProgramSource {
+            source_id: id.into(),
+            clip_id: clip_id.clone(),
+            virtual_shot_id: String::new(),
+            media: media(uri),
+            source_range: p::FrameRange {
+                source_in: 0,
+                source_out: 10,
+                timebase: video.timebase,
+            },
+            source_duration_frames: video.duration_frames as i64,
+            video_layer,
+            source_video_format: video_layer.map(|_| p::ProbedVideoFormat {
+                width: 960,
+                height: 540,
+                scan_mode: p::ScanMode::Progressive,
+            }),
+            source_audio_channels: if routes.is_empty() { 0 } else { 4 },
+            source_audio_format: (!routes.is_empty()).then_some(p::ProbedAudioFormat {
+                sample_rate_hz: 48_000,
+                channel_count: 4,
+            }),
+            audio_routes: routes,
+        }
+    };
+    p::FlatProgramPlaylist {
+        playlist_id: "program:p1".into(),
+        project_id: "p1".into(),
+        revision: 0,
+        program_timebase: video.timebase,
+        audio_layout: p::ProgramAudioLayout::discrete(input.project_audio.channels).unwrap(),
+        duration_frames: 10,
+        items: vec![p::FlatProgramItem {
+            item_id: "item:0-10".into(),
+            record_range: p::ProgramFrameRange::new(0, 10).unwrap(),
+            sources: vec![
+                source(
+                    "part:a:base_video",
+                    picture_uri,
+                    Some(p::ProgramVideoLayer::Base),
+                    vec![],
+                ),
+                source(
+                    "part:a:base_audio",
+                    &input.audio_media().media_uri.clone(),
+                    None,
+                    vec![p::ProgramAudioRoute {
+                        source_channel: 1,
+                        output_channel: 0,
+                    }],
+                ),
+            ],
+        }],
+    }
+}
+
+#[test]
+fn a_program_input_names_the_playback_picture_and_the_original_sound_of_its_clips() {
+    let input = prepare(&settings("qnc://local", "proxy"), &stored("qnc://local")).unwrap();
+    let clip_id = input.snapshot.metadata.clip_id.clone();
+    let picture = input.media().unwrap().media_uri.clone();
+    let clips = std::collections::BTreeMap::from([(clip_id.clone(), input.clone())]);
+
+    let program = ProgramInput::new(program_of(&input, &picture), clips.clone()).unwrap();
+    assert_eq!(program.project_audio, input.project_audio);
+    assert_eq!(program.workspace_db_uri, input.workspace_db_uri);
+    let text = serde_json::to_string(&program).unwrap();
+    assert_eq!(
+        serde_json::from_str::<ProgramInput>(&text).unwrap(),
+        program
+    );
+
+    let original = input.audio_media().media_uri.clone();
+    assert!(
+        ProgramInput::new(program_of(&input, &original), clips.clone()).is_err(),
+        "the picture must be the project playback media (proxy here)"
+    );
+    assert!(ProgramInput::new(program_of(&input, &picture), Default::default()).is_err());
+    assert_eq!(
+        program.validate_for("qnc://local/db/project_workspace/other"),
+        Err(InputError::WrongWorkspace)
+    );
+}

@@ -192,6 +192,7 @@ impl ContentStore {
                 Operation::ListSegments => Ok(Data::Segments(Vec::new())),
                 Operation::ListMarkers => Ok(Data::Markers(Vec::new())),
                 Operation::ListSlots => Ok(Data::Slots(Vec::new())),
+                Operation::ListCovers => Ok(Data::Covers(Vec::new())),
                 Operation::ReadStorySelection => {
                     Ok(Data::StorySelection(StorySelection::default()))
                 }
@@ -340,6 +341,7 @@ impl ContentStore {
             Operation::DeleteMarker { marker_id } => self.delete_marker(marker_id),
             Operation::ListMarkers => self.list_markers(),
             Operation::ListSlots => self.list_slots(),
+            Operation::ListCovers => self.list_covers(),
             Operation::ReadStorySelection => self.read_story_selection(),
             Operation::SelectPart { part_id } => self.select_part(part_id),
             Operation::SelectSlot { slot_id } => self.select_slot(slot_id),
@@ -1325,7 +1327,7 @@ impl ContentStore {
             .conn
             .prepare(
                 "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num,
-                        fps_den, active
+                        fps_den, active, a1_source_channel
                  FROM public_story_parts ORDER BY sort_index, segment_id",
             )
             .map_err(err)?;
@@ -1341,6 +1343,7 @@ impl ContentStore {
                     fps_num: row.get(6)?,
                     fps_den: row.get(7)?,
                     active: row.get::<_, i64>(8)? != 0,
+                    a1_source_channel: channel(row.get(9)?),
                 })
             })
             .map_err(err)?
@@ -1376,6 +1379,43 @@ impl ContentStore {
             .collect::<rusqlite::Result<Vec<_>>>()
             .map_err(err)?;
         Ok(Data::Slots(rows))
+    }
+
+    /// v5 `list_covers`: every cover with its slot, frames and A2 source channel.
+    fn list_covers(&self) -> Result<Data> {
+        if !object_exists(&self.conn, "view", "public_story_covers")? {
+            return Ok(Data::Covers(Vec::new()));
+        }
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT cover_id, slot_id, clip_id, virtual_shot_id, timeline_start_frame,
+                        timeline_end_frame, source_in_frame, source_out_frame, fps_num, fps_den,
+                        a2_source_channel
+                 FROM public_story_covers ORDER BY timeline_start_frame, cover_id",
+            )
+            .map_err(err)?;
+        let frame = |value: i64| value.max(0) as u64;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(ProgramCover {
+                    cover_id: row.get(0)?,
+                    slot_id: row.get(1)?,
+                    clip_id: row.get(2)?,
+                    virtual_shot_id: row.get(3)?,
+                    program_start_frame: frame(row.get(4)?),
+                    program_end_frame: frame(row.get(5)?),
+                    source_in_frame: frame(row.get(6)?),
+                    source_out_frame: frame(row.get(7)?),
+                    fps_num: row.get(8)?,
+                    fps_den: row.get(9)?,
+                    a2_source_channel: channel(row.get(10)?),
+                })
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        Ok(Data::Covers(rows))
     }
 
     fn read_story_selection(&self) -> Result<Data> {
@@ -1839,17 +1879,30 @@ fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
 }
 
 fn ensure_story_schema(conn: &Connection) -> Result<()> {
-    // Development program_segments / program_markers are removed, not converted;
-    // so are story_covers rows from before the marker-pair slot binding.
-    let cover_columns = conn
-        .prepare("PRAGMA table_info(story_covers)")
-        .and_then(|mut statement| {
-            statement
-                .query_map([], |row| row.get::<_, String>(1))?
-                .collect::<rusqlite::Result<Vec<_>>>()
-        })
+    // Development records are removed, not converted (AGENTS section 3):
+    // program_segments / program_markers, story_covers from before the
+    // marker-pair slot binding or the A2 channel, and a story from before the
+    // A1 channel (its markers, slots and covers go with it).
+    let part_columns = table_columns(conn, "story_parts")?;
+    if !part_columns.is_empty() && !part_columns.iter().any(|c| c == "a1_source_channel") {
+        conn.execute_batch(
+            "DROP VIEW IF EXISTS public_story_parts;
+             DROP VIEW IF EXISTS public_story_markers;
+             DROP VIEW IF EXISTS public_story_marker_slots;
+             DROP VIEW IF EXISTS public_story_covers;
+             DROP TABLE IF EXISTS story_covers;
+             DROP TABLE IF EXISTS story_marker_slots;
+             DROP TABLE IF EXISTS story_markers;
+             DROP TABLE story_parts;",
+        )
         .map_err(err)?;
-    if !cover_columns.is_empty() && !cover_columns.iter().any(|column| column == "slot_id") {
+    }
+    let cover_columns = table_columns(conn, "story_covers")?;
+    if !cover_columns.is_empty()
+        && !["slot_id", "a2_source_channel"]
+            .iter()
+            .all(|needed| cover_columns.iter().any(|column| column == needed))
+    {
         conn.execute_batch("DROP VIEW IF EXISTS public_story_covers; DROP TABLE story_covers;")
             .map_err(err)?;
     }
@@ -1889,6 +1942,7 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
             duration_label TEXT NOT NULL DEFAULT '',
             duration_color_key TEXT NOT NULL DEFAULT '',
             active INTEGER NOT NULL DEFAULT 1,
+            a1_source_channel INTEGER NOT NULL DEFAULT 0 CHECK (a1_source_channel >= 0),
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -1945,6 +1999,7 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
             source_fps_num INTEGER NOT NULL DEFAULT 0,
             source_fps_den INTEGER NOT NULL DEFAULT 1,
             sort_index INTEGER NOT NULL DEFAULT 0,
+            a2_source_channel INTEGER NOT NULL DEFAULT 0 CHECK (a2_source_channel >= 0),
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -1960,7 +2015,7 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
          CREATE VIEW public_story_parts AS
          SELECT part_id AS segment_id, kind, sort_index, clip_id, in_frame, out_frame,
                 source_fps_num AS fps_num, source_fps_den AS fps_den, active,
-                duration_frames, duration_label, duration_color_key
+                duration_frames, duration_label, duration_color_key, a1_source_channel
          FROM story_parts;
          DROP VIEW IF EXISTS public_story_markers;
          CREATE VIEW public_story_markers AS
@@ -1980,7 +2035,8 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
          DROP VIEW IF EXISTS public_story_covers;
          CREATE VIEW public_story_covers AS
          SELECT cover_id, slot_id, slot_signature, slot_index, timeline_start_frame,
-                timeline_end_frame, clip_id, virtual_shot_id, source_in_frame, source_out_frame
+                timeline_end_frame, clip_id, virtual_shot_id, source_in_frame, source_out_frame,
+                source_fps_num AS fps_num, source_fps_den AS fps_den, a2_source_channel
          FROM story_covers;",
     )
     .map_err(err)?;
@@ -2800,4 +2856,19 @@ fn ensure_runtime_table(conn: &Connection) -> Result<()> {
          CREATE VIEW IF NOT EXISTS public_ingest_runtime AS SELECT key,value,updated_at FROM ingest_runtime;",
     )
     .map_err(err)
+}
+
+fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>> {
+    conn.prepare(&format!("PRAGMA table_info({table})"))
+        .and_then(|mut statement| {
+            statement
+                .query_map([], |row| row.get::<_, String>(1))?
+                .collect::<rusqlite::Result<Vec<_>>>()
+        })
+        .map_err(err)
+}
+
+/// A stored source channel index; the column never holds a negative one.
+fn channel(value: i64) -> u16 {
+    u16::try_from(value.max(0)).unwrap_or(u16::MAX)
 }

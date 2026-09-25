@@ -104,37 +104,30 @@ impl FramePresenter for Presenter {
     }
 }
 
-pub(crate) struct Audio {
+/// The audio device queue of one session: the clip sound and the program sound
+/// both hand it packets in the session source's frames.
+pub(crate) struct DeviceSink {
     pub device: Option<Rc<RefCell<AudioOutput>>>,
-    decoders: Vec<Decoder>,
-    input: Rc<DecodeInput>,
-    pending_seek: Option<u64>,
-    tracks: Vec<PcmTrack>,
     source: SourceRuntime,
-    origin: (i64, Rational),
-    media_uri: String,
-    consumed_through: u64,
     generation: Option<u64>,
     channel_map: Option<ChannelMap>,
     routed: Vec<f32>,
 }
-impl Audio {
+impl DeviceSink {
     pub fn open(
-        plan: &InputPlan,
-        input: Rc<DecodeInput>,
+        source: &SourceRuntime,
         device_id: Option<String>,
         channel_map: Option<ChannelMap>,
         prebuffer_frames: usize,
     ) -> Result<Self> {
-        validate_channel_map(plan.source.audio_format.as_ref(), channel_map.as_ref())?;
-        let device = plan
-            .source
+        validate_channel_map(source.audio_format.as_ref(), channel_map.as_ref())?;
+        let device = source
             .audio_format
             .as_ref()
             .map(|format| {
                 let ready = sample_boundary(
-                    plan.source.duration_frames.min(prebuffer_frames as u64),
-                    plan.source.timebase,
+                    source.duration_frames.min(prebuffer_frames as u64),
+                    source.timebase,
                     format.sample_rate_hz,
                 )?;
                 AudioOutput::open(Config {
@@ -155,13 +148,141 @@ impl Audio {
                 .map_err(error)
             })
             .transpose()?;
+        Ok(Self {
+            device,
+            source: source.clone(),
+            generation: None,
+            channel_map,
+            routed: Vec::new(),
+        })
+    }
+
+    pub(crate) fn submit(
+        &mut self,
+        packet: AudioFramePacket<Arc<[f32]>>,
+    ) -> Result<Vec<BroadcastEvent>> {
+        let format = self
+            .source
+            .audio_format
+            .as_ref()
+            .ok_or_else(|| error("missing audio format"))?;
+        let start = sample_boundary(
+            packet.start_frame,
+            self.source.timebase,
+            format.sample_rate_hz,
+        )?;
+        let mut device = self
+            .device
+            .as_ref()
+            .ok_or_else(|| error("missing audio device"))?
+            .borrow_mut();
+        let generation = match self.generation {
+            Some(generation) => generation,
+            None => {
+                let generation = device.begin(start).map_err(error)?;
+                self.generation = Some(generation);
+                generation
+            }
+        };
+        self.channel_map
+            .as_ref()
+            .ok_or_else(|| error("missing device channel map"))?
+            .route(&packet.payload, &mut self.routed)
+            .map_err(error)?;
+        device
+            .queue(generation, start, &self.routed)
+            .map_err(error)?;
+        if packet.start_frame + 1 == self.source.duration_frames {
+            device.finish(generation).map_err(error)?;
+        }
+        Ok(Vec::new())
+    }
+    pub(crate) fn begin_preroll(&mut self) -> Result<Vec<BroadcastEvent>> {
+        self.generation = None;
+        Ok(Vec::new())
+    }
+    pub(crate) fn commit_preroll(&mut self) -> Result<Vec<BroadcastEvent>> {
+        self.device
+            .as_ref()
+            .ok_or_else(|| error("missing audio device"))?
+            .borrow_mut()
+            .commit(self.generation.ok_or_else(|| error("audio not queued"))?)
+            .map_err(error)?;
+        Ok(Vec::new())
+    }
+    pub(crate) fn start(&mut self) -> Result<Vec<BroadcastEvent>> {
+        self.device
+            .as_ref()
+            .ok_or_else(|| error("missing audio device"))?
+            .borrow_mut()
+            .start(self.generation.ok_or_else(|| error("audio not ready"))?)
+            .map_err(error)?;
+        Ok(Vec::new())
+    }
+    pub(crate) fn pause(&mut self) -> Result<Vec<BroadcastEvent>> {
+        if let Some(device) = &self.device {
+            device.borrow_mut().pause().map_err(error)?;
+        }
+        self.generation = None;
+        Ok(Vec::new())
+    }
+}
+
+/// Delegates the device part of an audio adapter to its [`DeviceSink`].
+macro_rules! device_sink_adapter {
+    () => {
+        fn submit_audio_packet(
+            &mut self,
+            packet: AudioFramePacket<Arc<[f32]>>,
+        ) -> Result<Vec<BroadcastEvent>> {
+            self.sink.submit(packet)
+        }
+        fn begin_audio_preroll(&mut self) -> Result<Vec<BroadcastEvent>> {
+            self.sink.begin_preroll()
+        }
+        fn commit_audio_preroll(&mut self) -> Result<Vec<BroadcastEvent>> {
+            self.sink.commit_preroll()
+        }
+        fn start_audio(&mut self) -> Result<Vec<BroadcastEvent>> {
+            self.sink.start()
+        }
+        fn pause_audio(&mut self) -> Result<Vec<BroadcastEvent>> {
+            self.sink.pause()
+        }
+        fn stop_audio(&mut self) -> Result<Vec<BroadcastEvent>> {
+            self.sink.pause()
+        }
+    };
+}
+pub(crate) use device_sink_adapter;
+
+pub(crate) struct Audio {
+    pub sink: DeviceSink,
+    decoders: Vec<Decoder>,
+    input: Rc<DecodeInput>,
+    pending_seek: Option<u64>,
+    tracks: Vec<PcmTrack>,
+    source: SourceRuntime,
+    origin: (i64, Rational),
+    media_uri: String,
+    consumed_through: u64,
+}
+impl Audio {
+    pub fn open(
+        plan: &InputPlan,
+        input: Rc<DecodeInput>,
+        device_id: Option<String>,
+        channel_map: Option<ChannelMap>,
+        prebuffer_frames: usize,
+    ) -> Result<Self> {
+        let sink = DeviceSink::open(&plan.source, device_id, channel_map, prebuffer_frames)?;
         let decoders = plan
             .audio_streams
             .iter()
             .map(|stream| input.open(stream.stream_index, None))
             .collect::<Result<Vec<_>>>()?;
         Ok(Self {
-            device,
+            sink,
             decoders,
             input,
             pending_seek: None,
@@ -170,9 +291,6 @@ impl Audio {
             origin: plan.audio_origin,
             media_uri: plan.audio_media.media_uri.clone(),
             consumed_through: 0,
-            generation: None,
-            channel_map,
-            routed: Vec::new(),
         })
     }
 }
@@ -260,78 +378,7 @@ impl AudioOutputAdapter for Audio {
             payload: samples.into(),
         })
     }
-    fn submit_audio_packet(
-        &mut self,
-        packet: AudioFramePacket<Arc<[f32]>>,
-    ) -> Result<Vec<BroadcastEvent>> {
-        let format = self
-            .source
-            .audio_format
-            .as_ref()
-            .ok_or_else(|| error("missing audio format"))?;
-        let start = sample_boundary(
-            packet.start_frame,
-            self.source.timebase,
-            format.sample_rate_hz,
-        )?;
-        let mut device = self
-            .device
-            .as_ref()
-            .ok_or_else(|| error("missing audio device"))?
-            .borrow_mut();
-        let generation = match self.generation {
-            Some(generation) => generation,
-            None => {
-                let generation = device.begin(start).map_err(error)?;
-                self.generation = Some(generation);
-                generation
-            }
-        };
-        self.channel_map
-            .as_ref()
-            .ok_or_else(|| error("missing device channel map"))?
-            .route(&packet.payload, &mut self.routed)
-            .map_err(error)?;
-        device
-            .queue(generation, start, &self.routed)
-            .map_err(error)?;
-        if packet.start_frame + 1 == self.source.duration_frames {
-            device.finish(generation).map_err(error)?;
-        }
-        Ok(Vec::new())
-    }
-    fn begin_audio_preroll(&mut self) -> Result<Vec<BroadcastEvent>> {
-        self.generation = None;
-        Ok(Vec::new())
-    }
-    fn commit_audio_preroll(&mut self) -> Result<Vec<BroadcastEvent>> {
-        self.device
-            .as_ref()
-            .ok_or_else(|| error("missing audio device"))?
-            .borrow_mut()
-            .commit(self.generation.ok_or_else(|| error("audio not queued"))?)
-            .map_err(error)?;
-        Ok(Vec::new())
-    }
-    fn start_audio(&mut self) -> Result<Vec<BroadcastEvent>> {
-        self.device
-            .as_ref()
-            .ok_or_else(|| error("missing audio device"))?
-            .borrow_mut()
-            .start(self.generation.ok_or_else(|| error("audio not ready"))?)
-            .map_err(error)?;
-        Ok(Vec::new())
-    }
-    fn pause_audio(&mut self) -> Result<Vec<BroadcastEvent>> {
-        if let Some(device) = &self.device {
-            device.borrow_mut().pause().map_err(error)?;
-        }
-        self.generation = None;
-        Ok(Vec::new())
-    }
-    fn stop_audio(&mut self) -> Result<Vec<BroadcastEvent>> {
-        self.pause_audio()
-    }
+    device_sink_adapter!();
 }
 
 pub(crate) fn validate_channel_map(
@@ -353,16 +400,16 @@ pub(crate) fn validate_channel_map(
     }
 }
 
-struct PcmTrack {
+pub(crate) struct PcmTrack {
     stream_index: u32,
     source_channels: u16,
     selected_channels: Vec<u16>,
-    samples: VecDeque<f32>,
-    decoded_through: Option<u64>,
-    discard_before: u64,
+    pub(crate) samples: VecDeque<f32>,
+    pub(crate) decoded_through: Option<u64>,
+    pub(crate) discard_before: u64,
 }
 impl PcmTrack {
-    fn new(plan: &AudioStreamPlan) -> Self {
+    pub(crate) fn new(plan: &AudioStreamPlan) -> Self {
         debug_assert!(!plan.selected_channels.is_empty());
         debug_assert!(
             plan.selected_channels
@@ -381,7 +428,7 @@ impl PcmTrack {
     fn output_channels(&self) -> usize {
         self.selected_channels.len()
     }
-    fn push(
+    pub(crate) fn push(
         &mut self,
         packet: qnc_media_decode::DecodedPacket,
         uri: &str,

@@ -1816,3 +1816,62 @@ fn reads_list_deleted_segments_all_markers_slots_and_the_selection() {
     assert_eq!(selection.selected_part_id, ids[0]);
     assert_eq!(selection.selected_slot_id, slots[1].slot_id);
 }
+
+#[test]
+fn a_segment_hears_source_channel_one_on_a1_and_covers_are_read_with_their_a2_channel() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    marker(&mut store, 14).unwrap();
+    assert!(
+        segments(&mut store)
+            .iter()
+            .all(|row| row.a1_source_channel == 0),
+        "v5: channel 1 of the source until the user picks another one"
+    );
+    drop(store);
+    put_cover(&path, "cover-1", &slot_at_frame(&path, 20));
+    Connection::open(&path)
+        .unwrap()
+        .execute(
+            "UPDATE story_covers SET a2_source_channel = 1, source_fps_num = 50,
+                virtual_shot_id = 'shot' WHERE cover_id = 'cover-1'",
+            [],
+        )
+        .unwrap();
+    let mut store = reopen(&path);
+    let Data::Covers(covers) = run(&mut store, Operation::ListCovers).unwrap() else {
+        panic!()
+    };
+    assert_eq!(covers.len(), 1);
+    let cover = &covers[0];
+    assert_eq!(
+        (cover.cover_id.as_str(), cover.clip_id.as_str(), cover.virtual_shot_id.as_str()),
+        ("cover-1", "c1", "shot")
+    );
+    assert_eq!((cover.program_start_frame, cover.program_end_frame), (14, 30));
+    assert_eq!((cover.source_in_frame, cover.source_out_frame), (0, 100));
+    assert_eq!((cover.fps_num, cover.fps_den, cover.a2_source_channel), (50, 1, 1));
+}
+
+#[test]
+fn a_development_story_without_the_audio_channel_columns_is_removed_on_open() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    marker(&mut store, 14).unwrap();
+    drop(store);
+    Connection::open(&path)
+        .unwrap()
+        .execute_batch(
+            "DROP VIEW public_story_parts; ALTER TABLE story_parts DROP COLUMN a1_source_channel;",
+        )
+        .unwrap();
+    let mut store = reopen(&path);
+    assert!(segments(&mut store).is_empty(), "removed, not converted");
+    assert!(markers(&mut store).is_empty());
+    three_segments(&mut store);
+    assert_eq!(segments(&mut store).len(), 3, "a new story starts cleanly");
+}

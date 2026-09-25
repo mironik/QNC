@@ -158,6 +158,10 @@ pub struct ProgramSegment {
     /// False once deleted (v5 keeps the row, `active = 0`): shown greyed in the
     /// Segment tab, not part of the program.
     pub active: bool,
+    /// Source channel heard on A1 (zero based), chosen on the Wrap segment;
+    /// channel 1 (0) unless the user picks another one.
+    #[serde(default)]
+    pub a1_source_channel: u16,
 }
 
 /// An M marker on the program axis (v5 `story_markers`). `system_role` is
@@ -180,6 +184,24 @@ pub struct ProgramSlot {
     pub start_marker_id: String,
     pub end_marker_id: String,
     pub has_cover: bool,
+}
+
+/// A cover (v5 `story_covers`) bound to its M-M slot: program frames, the
+/// source frames of its clip and the source channel heard on A2.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProgramCover {
+    pub cover_id: String,
+    pub slot_id: String,
+    pub clip_id: String,
+    pub virtual_shot_id: String,
+    pub program_start_frame: u64,
+    pub program_end_frame: u64,
+    pub source_in_frame: u64,
+    pub source_out_frame: u64,
+    pub fps_num: u32,
+    pub fps_den: u32,
+    pub a2_source_channel: u16,
 }
 
 /// The stored Story selection (v5 `story_state`).
@@ -341,6 +363,7 @@ pub enum Operation {
     },
     ListMarkers,
     ListSlots,
+    ListCovers,
     ReadStorySelection,
     /// v5 `select_part`.
     SelectPart {
@@ -367,6 +390,7 @@ impl Operation {
                 | Self::ListSegments
                 | Self::ListMarkers
                 | Self::ListSlots
+                | Self::ListCovers
                 | Self::ReadStorySelection
         )
     }
@@ -400,6 +424,7 @@ pub enum Data {
     Segments(Vec<ProgramSegment>),
     Markers(Vec<ProgramMarker>),
     Slots(Vec<ProgramSlot>),
+    Covers(Vec<ProgramCover>),
     StorySelection(StorySelection),
     Changed,
 }

@@ -5,11 +5,14 @@ mod conversion;
 mod decode_input;
 mod input;
 mod output;
+mod program;
 pub use decode_input::DecodeMediaAccess;
 use decode_input::{DecodeInput, seek_start};
 pub use input::InputPlan;
 use input::{relative_position, sample_boundary};
 use output::{Audio, Presenter, SharedVideo, VideoSink};
+pub use program::ProgramPlan;
+use program::{ProgramAudio, ProgramVideo};
 use qnc_broadcast_player::*;
 pub use qnc_broadcast_player::{BroadcastEngineError, BroadcastEngineErrorKind};
 use qnc_media_decode::{DecodeRequest, DecodedFormat, Decoder, DecoderConfig};
@@ -34,7 +37,93 @@ struct PictureData {
     rgba: std::sync::Arc<[u8]>,
 }
 type Picture = Rc<PictureData>;
-type Engine = TransportEngine<Source, Video, SplitAvPlayoutOutput<Audio, Presenter>>;
+type Engine = TransportEngine<Source, VideoPath, SplitAvPlayoutOutput<AudioPath, Presenter>>;
+
+/// The picture of the session: one clip, or a story program as one source.
+enum VideoPath {
+    Clip(Video),
+    Program(ProgramVideo),
+}
+impl VideoDecodeAdapter for VideoPath {
+    type VideoFrame = Picture;
+    fn cue_video(&mut self, request: EngineFrameRequest) -> Result<()> {
+        match self {
+            Self::Clip(video) => video.cue_video(request),
+            Self::Program(video) => video.cue_video(request),
+        }
+    }
+    fn prepare_video(&mut self, source: &EngineSourceHandle) -> Result<Vec<BroadcastEvent>> {
+        match self {
+            Self::Clip(video) => video.prepare_video(source),
+            Self::Program(video) => video.prepare_video(source),
+        }
+    }
+    fn decode_video_frame(
+        &mut self,
+        request: EngineFrameRequest,
+    ) -> Result<DecodedVideoFrame<Picture>> {
+        match self {
+            Self::Clip(video) => video.decode_video_frame(request),
+            Self::Program(video) => video.decode_video_frame(request),
+        }
+    }
+    fn stop_video(&mut self) -> Result<Vec<BroadcastEvent>> {
+        match self {
+            Self::Clip(video) => video.stop_video(),
+            Self::Program(video) => video.stop_video(),
+        }
+    }
+}
+
+/// The sound of the session: one clip, or a story program as one source.
+enum AudioPath {
+    Clip(Audio),
+    Program(ProgramAudio),
+}
+macro_rules! audio_path {
+    ($self:ident, $audio:ident => $call:expr) => {
+        match $self {
+            AudioPath::Clip($audio) => $call,
+            AudioPath::Program($audio) => $call,
+        }
+    };
+}
+impl AudioOutputAdapter for AudioPath {
+    type AudioPacket = std::sync::Arc<[f32]>;
+    fn cue_audio(&mut self, request: EngineFrameRequest) -> Result<()> {
+        audio_path!(self, audio => audio.cue_audio(request))
+    }
+    fn prepare_audio(&mut self, source: &EngineSourceHandle) -> Result<Vec<BroadcastEvent>> {
+        audio_path!(self, audio => audio.prepare_audio(source))
+    }
+    fn render_audio_for_frame(
+        &mut self,
+        request: EngineFrameRequest,
+    ) -> Result<AudioFramePacket<std::sync::Arc<[f32]>>> {
+        audio_path!(self, audio => audio.render_audio_for_frame(request))
+    }
+    fn submit_audio_packet(
+        &mut self,
+        packet: AudioFramePacket<std::sync::Arc<[f32]>>,
+    ) -> Result<Vec<BroadcastEvent>> {
+        audio_path!(self, audio => audio.submit_audio_packet(packet))
+    }
+    fn begin_audio_preroll(&mut self) -> Result<Vec<BroadcastEvent>> {
+        audio_path!(self, audio => audio.begin_audio_preroll())
+    }
+    fn commit_audio_preroll(&mut self) -> Result<Vec<BroadcastEvent>> {
+        audio_path!(self, audio => audio.commit_audio_preroll())
+    }
+    fn start_audio(&mut self) -> Result<Vec<BroadcastEvent>> {
+        audio_path!(self, audio => audio.start_audio())
+    }
+    fn pause_audio(&mut self) -> Result<Vec<BroadcastEvent>> {
+        audio_path!(self, audio => audio.pause_audio())
+    }
+    fn stop_audio(&mut self) -> Result<Vec<BroadcastEvent>> {
+        audio_path!(self, audio => audio.stop_audio())
+    }
+}
 
 /// Created and driven on the one player owner thread, never on an application form thread.
 pub struct Runtime {
@@ -200,7 +289,7 @@ impl Runtime {
             prebuffer_frames,
         )?;
         let video_decoder = decode_input.open(plan.video_index, None)?;
-        let device = audio.device.clone();
+        let device = audio.sink.device.clone();
         let gpu = Rc::new(RefCell::new(VideoSink {
             output: video_output,
             config: output_config,
@@ -217,7 +306,7 @@ impl Runtime {
         let source = plan.source.clone();
         let mut engine = TransportEngine::new(
             Source(source.clone()),
-            Video {
+            VideoPath::Clip(Video {
                 plan,
                 decoder: video_decoder,
                 input: decode_input,
@@ -234,11 +323,71 @@ impl Runtime {
                 next_decode_frame: 0,
                 prefetch_frames: prebuffer_frames,
                 gpu: gpu.clone(),
-            },
-            audio,
+            }),
+            AudioPath::Clip(audio),
             Presenter(gpu.clone()),
         )
         // Catch up bounded source-frame gaps while the converter stays queued ahead.
+        .with_decode_burst_frames(4)
+        .with_min_prebuffer_frames(prebuffer_frames);
+        engine.load_source(&source, None)?;
+        Ok(Self {
+            engine,
+            gpu,
+            audio: device,
+            epoch: Instant::now(),
+            audio_rearm_pending: false,
+        })
+    }
+
+    /// A story program as one source for the passive monitor: the same transport,
+    /// clock and commands as a clip, program frames instead of source frames.
+    pub fn open_program_monitor(
+        plan: ProgramPlan,
+        output_config: OutputConfig,
+        decoder_config: DecoderConfig,
+        audio_device_id: Option<String>,
+        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
+    ) -> Result<Self> {
+        output_config.validate().map_err(error)?;
+        let prebuffer_frames = input::monitor_prebuffer_frames(plan.source.timebase)?;
+        let first = plan
+            .clips
+            .first()
+            .ok_or_else(|| error("program has no clip"))?;
+        let root = DecodeInput::new_access(first.media.clone(), decoder_config, open_media);
+        let inputs: Vec<_> = plan
+            .clips
+            .iter()
+            .map(|clip| Rc::new(root.for_media(clip.media.clone())))
+            .collect();
+        // The decoder refuses an unsupported saved clip before playback, never mid-program.
+        for (clip, input) in plan.clips.iter().zip(&inputs) {
+            input.validate(clip.video_index)?;
+        }
+        let gpu = Rc::new(RefCell::new(VideoSink {
+            output: None,
+            config: output_config,
+            images: BTreeMap::new(),
+            sequence: 0,
+            inflight: false,
+            submit_us: 0,
+            conversion_us: 0,
+            upload_us: 0,
+            converted: 0,
+            monitor: None,
+            monitor_pending: Default::default(),
+        }));
+        let video = ProgramVideo::open(&plan, &inputs, gpu.clone(), prebuffer_frames)?;
+        let audio = ProgramAudio::open(&plan, &inputs, audio_device_id, prebuffer_frames)?;
+        let device = audio.sink.device.clone();
+        let source = plan.source.clone();
+        let mut engine = TransportEngine::new(
+            Source(source.clone()),
+            VideoPath::Program(video),
+            AudioPath::Program(audio),
+            Presenter(gpu.clone()),
+        )
         .with_decode_burst_frames(4)
         .with_min_prebuffer_frames(prebuffer_frames);
         engine.load_source(&source, None)?;

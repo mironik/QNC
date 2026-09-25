@@ -4,7 +4,7 @@ use qnc_player_contract::{
     BroadcastPlayerProtocolEvent as Event, Timebase, TransportStatus, envelope::EventEnvelope,
     session::MonitorHeader,
 };
-use qnc_player_input::PreparedInput;
+use qnc_player_input::{PreparedInput, ProgramInput};
 use serde::Serialize;
 use std::{
     path::PathBuf,
@@ -36,8 +36,20 @@ pub enum MediaBinding {
 }
 pub struct Launch {
     pub executable: PathBuf,
-    pub input: PreparedInput,
-    pub media_binding: MediaBinding,
+    pub input: LaunchInput,
+}
+
+/// What the session plays: one clip, or a story program as one source with a
+/// binding for each media source it reads.
+pub enum LaunchInput {
+    Clip {
+        input: PreparedInput,
+        media_binding: MediaBinding,
+    },
+    Program {
+        program: ProgramInput,
+        media_bindings: Vec<MediaBinding>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

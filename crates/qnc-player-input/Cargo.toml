@@ -9,6 +9,7 @@ qnc-contracts = { workspace = true }
 qnc-frame-timebase = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-media-records = { workspace = true }
+qnc-program-playlist = { workspace = true }
 qnc-work-settings = { workspace = true }
 serde = { workspace = true }
 

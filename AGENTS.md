@@ -2233,6 +2233,68 @@ nisu dirani. Verificirano: `cargo test -p qnc-content-store` (38),
 `qnc-program-segments` (13), `qnc-editorial-application` (11), `cargo build
 --workspace`, `cargo run -p qnc-conformance`. Odobrenje je zatvoreno.
 
+Zatvoreno ograniceno odobrenje 2026-09-24 (Story program playlista, koraci 1 do 4):
+korisnik je potvrdio opci plan prijenosa v5 pustanja programa (Wrap) i dodao:
+korisnik mora moci promijeniti koji source kanal ide na A1 (snimatelj ponekad
+snimi razgovor na kanalu 2 jer mikrofon na kanalu 1 nije bio ukljucen); isto
+za pokrivalicu i A2. Pocetna vrijednost je v5: kanal 1 izvora (indeks 0).
+Odluka korisnika: samo jedan kanal ide na A1 (izbor jednog od postojecih kanala
+klipa, bez zbrajanja kanala); kontrola je mali prozor na klik oznake A1 u Wrap
+segmentu s popisom stvarnih kanala klipa (korak sucelja, trazi otkljucavanje).
+Otkljucano samo: novi javni `crates/qnc-program-playlist` i ugovor
+`contracts/modules/program-playlist.module.json` (doslovno v5
+`qnc-program-playlist` + `qnc-service-contracts/program_playlist.rs`: ravna
+playlista programa, Ton = slika + A1, Off = bez slike + A1, pokrivalica =
+slika + A2 uz A1 segmenta, jedan fps, prozor programa, privremeni overlay), root
+`Cargo.toml`/`Cargo.lock`. Razlike prema v5 po QNC pravilima: broj izlaznih
+kanala dolazi od pozivatelja (projektni `audio.channels`), medij je QNC URI
+(ne raw path), nema zamjenskih vrijednosti (1920x1080, 48 kHz), source kanal
+za A1/A2 je polje segmenta/pokrivalice. Korak 2 (conformance C5 ne pusta
+javni modul bez korisnika): `crates/qnc-content-store` (stupci
+`a1_source_channel` u `story_parts` i `a2_source_channel` u `story_covers`,
+pocetno kanal 1; citanje pokrivalica), novi javni `crates/qnc-program-input`
+(samo citanje: prica iz `project.db` + medij svakog klipa kroz
+`qnc-player-input`, slika po `playback.input`, zvuk iz originala) i njegov
+ugovor, ugovor `story.database.json`. Player i sucelje nisu dio ovih koraka.
+Korak 3 (korisnik "da", 2026-09-24): isti Broadcast Player pusta program kao
+jedan virtualni izvor na osi programa (v5 `qnc-player-runtime/program_playlist.rs`):
+adapter slike daje sliku po itemu programa ili crno, adapter zvuka slaze A1/A2
+po izlaznim kanalima projekta ili tisinu; sat, cue, play, pauza i korak ostaju
+isti. Otkljucano: `crates/qnc-player-contract`, `crates/qnc-player-input`,
+`crates/qnc-player-launcher`, `crates/qnc-player-client`,
+`tools/qnc-player-runner`, `crates/qnc-broadcast-engine` i njihovi testovi i
+ugovori. Monitor i frame-map ostaju isti; nema novog probea, nema zamjenskog
+dekodera, nema HTTP ulaza dekoderu.
+Korak 4 (korisnik "odkljucaj", 2026-09-25): otkljucano jos
+`tools/qnc-conformance` samo za dopustenu ovisnost `qnc-program-playlist`
+(cisti ugovor playliste, bez I/O i baze) u granici playera, te
+`crates/qnc-source-preview` i `crates/qnc-editorial-application` za spoj s
+Wrapom: Wrap otvara program u istom previewu/playeru i na istom monitoru,
+source dock za to vrijeme pokazuje izabrani izvorni klip (v5), klik u poolu
+vraca izvorni klip.
+Izvedeno: `qnc-program-playlist` (ugovor i graditelj ravne playliste, 13
+testova); `qnc-content-store` (`a1_source_channel`, `a2_source_channel`,
+`ListCovers`; razvojna prica bez tih stupaca se brise pri otvaranju, 45 testova);
+`qnc-program-input` (prica + medij svakog klipa -> `ProgramInput`, `loader`);
+`qnc-player-input` (`ProgramInput` s provjerom: slika je medij reprodukcije, zvuk
+original); `qnc-broadcast-engine` (`ProgramPlan`, `ProgramVideo`: jedan niz
+dekodiranja u frameovima programa kroz rezove, pretvarac po formatu slike, Off
+crn; `ProgramAudio`: izabrani kanal na A1/A2, ostali izlazi tisina; `DeviceSink`
+izdvojen iz zvuka klipa bez promjene ponasanja; `InputPlan::for_program`; 28
+testova); runner (klip ili program, veza po izvoru medija, program samo za
+preview monitor); klijent/launcher (`LaunchInput`, `prepare_program_launch`);
+`qnc-source-preview` (`open_program`, `show_program_frame`: dok program svira
+source klip i timeline ostaju, klik na source timeline vraca klip);
+`qnc-wrap-session` (`apply` vraca zahtjev); editorial application samo predaje
+Wrap frameove previewu; conformance: `qnc-program-playlist` dopusten u granici
+playera. Verificirano: testovi navedenih crateova, `cargo run -p qnc-conformance`,
+release build, live: klik na Wrap segment otvara sesiju `program:<projekt>` u
+istom playeru, `Cue(38)`, `Ready`, monitor frame 38 (Off = crno), source dock
+ostaje na izvornom klipu. Nije provjereno uzivo: Play kroz rezove, slika Ton
+segmenta i pokrivalice, zvuk A1/A2. Nije izvedeno: nova snimka programa nakon
+izmjene price dok je Wrap otvoren (program se ponovno gradi tek pri sljedecem
+otvaranju), kontrola izbora kanala u sucelju. Odobrenje je zatvoreno.
+
 Zatvoreno ograniceno odobrenje 2026-09-24 (Story Wrap kao samostalna komponenta):
 korisnik je upozorio "krivo vezes source i segment.. to nije tako u qnc v5" i
 predlozio samostalnu Wrap segment komponentu "da ne brkas source i wrap i
