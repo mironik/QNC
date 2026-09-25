@@ -352,6 +352,18 @@ pub enum Operation {
     IncludeSegment {
         segment_id: String,
     },
+    /// Replace (user rule 2026-09-25): the base layer of a segment becomes the
+    /// marked source; its kind stays. Longer: the markers after it move right and
+    /// the added part is uncovered; shorter: the markers in the cut part go with
+    /// their slots and covers, the ones after it move left.
+    ReplaceSegment {
+        segment_id: String,
+        clip_id: String,
+        in_frame: u64,
+        out_frame: u64,
+        fps_num: u32,
+        fps_den: u32,
+    },
     /// Removes an excluded segment for good; an active one cannot be purged.
     PurgeSegment {
         segment_id: String,

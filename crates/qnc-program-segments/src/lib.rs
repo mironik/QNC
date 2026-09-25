@@ -330,6 +330,9 @@ pub enum SegmentCommand {
     Include(String),
     /// Izbriši: an excluded segment is removed for good.
     Purge(String),
+    /// Replace: the segment takes the marked source (clip, IN/OUT) as its base
+    /// layer and its length; its kind stays (user rule 2026-09-25).
+    Replace(String),
     /// Swap the selected segment with its neighbour (Up / Down).
     Move {
         up: bool,
@@ -594,6 +597,20 @@ impl ProgramSegments {
                 self.write(Operation::IncludeSegment { segment_id });
             }
             SegmentCommand::Purge(segment_id) => self.write(Operation::PurgeSegment { segment_id }),
+            SegmentCommand::Replace(segment_id) => {
+                if let Some((clip_id, (in_frame, out_frame), (fps_num, fps_den))) =
+                    self.marked_source()
+                {
+                    self.write(Operation::ReplaceSegment {
+                        segment_id,
+                        clip_id,
+                        in_frame,
+                        out_frame,
+                        fps_num,
+                        fps_den,
+                    });
+                }
+            }
             SegmentCommand::DeleteSelected => self.delete_selected(),
             SegmentCommand::SelectMarker(marker_id) => self.select_marker(&marker_id),
             SegmentCommand::SelectSlot { slot_id, frame } => {

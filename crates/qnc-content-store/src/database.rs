@@ -334,6 +334,19 @@ impl ContentStore {
             ),
             Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
             Operation::IncludeSegment { segment_id } => self.include_segment(segment_id),
+            Operation::ReplaceSegment {
+                segment_id,
+                clip_id,
+                in_frame,
+                out_frame,
+                fps_num,
+                fps_den,
+            } => self.replace_segment(
+                segment_id,
+                clip_id,
+                (*in_frame, *out_frame),
+                (*fps_num, *fps_den),
+            ),
             Operation::PurgeSegment { segment_id } => self.purge_segment(segment_id),
             Operation::MoveSegment { segment_id, up } => self.move_segment(segment_id, *up),
             Operation::ListSegments => self.list_segments(),
@@ -1224,6 +1237,103 @@ impl ContentStore {
         tx.execute(
             "UPDATE story_state SET selected_part_id = ?1, updated_at = ?2 WHERE id = 1",
             params![segment_id, now],
+        )
+        .map_err(err)?;
+        finalize_story(&tx)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// Replace: the segment takes the marked source as its base layer and its
+    /// length (user rule 2026-09-25); the program around it follows the change.
+    fn replace_segment(
+        &mut self,
+        segment_id: &str,
+        clip_id: &str,
+        (in_frame, out_frame): (u64, u64),
+        (fps_num, fps_den): (u32, u32),
+    ) -> Result<Data> {
+        qnc_media_records::valid_id(clip_id).map_err(err)?;
+        if out_frame <= in_frame {
+            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+        }
+        if fps_num == 0 || fps_den == 0 {
+            return Err("Izvor nema valjan source fps.".into());
+        }
+        require_imported_clip(&self.conn, clip_id)?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let other_rate: Option<(u32, u32)> = tx
+            .query_row(
+                "SELECT source_fps_num, source_fps_den FROM story_parts
+                 WHERE active = 1 AND part_id != ?1 ORDER BY sort_index LIMIT 1",
+                [segment_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(err)?;
+        if let Some((num, den)) = other_rate {
+            if u64::from(num) * u64::from(fps_den) != u64::from(fps_num) * u64::from(den) {
+                return Err(format!(
+                    "Klip ima {fps_num}/{fps_den} fps, a prica {num}/{den}; mijesani fps nije dopusten."
+                ));
+            }
+        }
+        let (start, end) = segment_window(&tx, segment_id)?
+            .ok_or_else(|| format!("part not found: {segment_id}"))?;
+        let (start, end) = (start as i64, end as i64);
+        let (in_frame, out_frame) = (in_frame as i64, out_frame as i64);
+        let length = out_frame - in_frame;
+        let new_end = start + length;
+        let fps = f64::from(fps_num) / f64::from(fps_den);
+        if new_end < end {
+            // Shorter: the markers of the cut part go, with their slots and covers.
+            let cut = {
+                let mut statement = tx
+                    .prepare(
+                        "SELECT marker_id FROM story_markers
+                         WHERE timeline_frame > ?1 AND timeline_frame < ?2 AND system_role = ''",
+                    )
+                    .map_err(err)?;
+                let ids = statement
+                    .query_map(params![new_end, end], |row| row.get::<_, String>(0))
+                    .map_err(err)?
+                    .collect::<rusqlite::Result<Vec<_>>>()
+                    .map_err(err)?;
+                ids
+            };
+            delete_markers_with_slots(&tx, &cut)?;
+        }
+        if new_end != end {
+            shift_markers_from(&tx, end, new_end - end, fps)?;
+        }
+        let now = story_now();
+        tx.execute(
+            "UPDATE story_parts SET clip_id = ?2, virtual_shot_id = '', in_tc = ?3, out_tc = ?4,
+                in_seconds = ?5, out_seconds = ?6, fps = ?7, source_fps_num = ?8,
+                source_fps_den = ?9, in_frame = ?10, out_frame = ?11, duration_frames = ?12,
+                duration_label = ?13, duration_color_key = ?14, a1_source_channel = 0,
+                updated_at = ?15
+             WHERE part_id = ?1 AND active = 1",
+            params![
+                segment_id,
+                clip_id,
+                frame_timecode(in_frame, fps),
+                frame_timecode(out_frame, fps),
+                in_frame as f64 / fps,
+                out_frame as f64 / fps,
+                fps,
+                fps_num,
+                fps_den,
+                in_frame,
+                out_frame,
+                length,
+                frames_label(length, fps),
+                duration_color_key(length, fps),
+                now
+            ],
         )
         .map_err(err)?;
         finalize_story(&tx)?;
@@ -2945,6 +3055,44 @@ fn segment_window(conn: &Connection, segment_id: &str) -> Result<Option<(u64, u6
         start = end;
     }
     Ok(None)
+}
+
+/// Moves the user markers at or after a program frame by `delta` frames.
+fn shift_markers_from(conn: &Connection, from: i64, delta: i64, fps: f64) -> Result<()> {
+    let rows = {
+        let mut statement = conn
+            .prepare(
+                "SELECT marker_id, timeline_frame FROM story_markers
+                 WHERE timeline_frame >= ?1 AND system_role = ''",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([from], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        rows
+    };
+    let now = story_now();
+    for (marker_id, frame) in rows {
+        let frame = (frame + delta).max(0);
+        conn.execute(
+            "UPDATE story_markers SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3,
+                updated_at = ?4
+             WHERE marker_id = ?5",
+            params![
+                frame,
+                timeline_sec(frame, fps),
+                frame_timecode(frame, fps),
+                now,
+                marker_id
+            ],
+        )
+        .map_err(err)?;
+    }
+    Ok(())
 }
 
 /// Every segment, active or excluded, in its place: one order for both, so an

@@ -1,5 +1,5 @@
 //! The Segment tab of the clip menu (v5 `media_pool::segment_cards`): kind, id and
-//! duration per row. The selected active row carries Up, Down and Isključi; an
+//! duration per row. The selected active row carries Replace, Up, Down and Isključi; an
 //! excluded segment stays listed greyed where it was with Uključi and Izbriši
 //! (user rule 2026-09-25) and cannot be picked.
 
@@ -118,6 +118,13 @@ fn row_buttons(
     }
     if small(ui, "Up", "Pomakni segment ranije") {
         *command = Some(SegmentCommand::Move { up: true });
+    }
+    if small(
+        ui,
+        "Replace",
+        "Zamijeni bazni sloj označenim izvorom (IN/OUT)",
+    ) {
+        *command = Some(SegmentCommand::Replace(id()));
     }
     area
 }

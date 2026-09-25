@@ -2116,3 +2116,74 @@ fn a_cover_is_selected_and_deleted_and_its_selection_goes_with_it() {
         .unwrap();
     assert_eq!(b_roll, 2, "the B-roll shots stay in the B-roll tab");
 }
+
+#[test]
+fn replace_takes_the_source_length_and_the_program_around_follows() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    let ids = three_segments(&mut store); // 0-10, 10-20, 20-30
+    marker(&mut store, 15).unwrap();
+    marker(&mut store, 25).unwrap();
+    let slot = slot_at_frame(&path, 17); // 15..25
+    create_cover(&mut store, &slot, (0, 10)).unwrap();
+    let replace = |store: &mut ContentStore, range: (u64, u64)| {
+        run(
+            store,
+            Operation::ReplaceSegment {
+                segment_id: ids[1].clone(),
+                clip_id: "c1".into(),
+                in_frame: range.0,
+                out_frame: range.1,
+                fps_num: 50,
+                fps_den: 1,
+            },
+        )
+    };
+    // Same length: nothing moves.
+    replace(&mut store, (300, 310)).unwrap();
+    assert_eq!(markers(&mut store), vec![15, 25]);
+    let row = segments(&mut store).remove(1);
+    assert_eq!(
+        (row.in_frame, row.out_frame, row.kind.as_str()),
+        (300, 310, "tonovi")
+    );
+    // Longer by 10: the marker after it moves right, the cover stays as it is.
+    replace(&mut store, (300, 320)).unwrap();
+    assert_eq!(markers(&mut store), vec![15, 35]);
+    let covers = |store: &mut ContentStore| {
+        let Data::Covers(rows) = run(store, Operation::ListCovers).unwrap() else {
+            panic!()
+        };
+        rows
+    };
+    let kept = covers(&mut store);
+    assert_eq!(kept.len(), 1);
+    assert_eq!((kept[0].source_in_frame, kept[0].source_out_frame), (0, 10));
+    // Shorter (3 frames): the marker in the cut part goes with its slot and cover.
+    replace(&mut store, (300, 303)).unwrap();
+    assert_eq!(
+        markers(&mut store),
+        vec![18],
+        "35 moved left by 17, 15 was cut"
+    );
+    assert!(
+        covers(&mut store).is_empty(),
+        "the cover of the cut slot is gone"
+    );
+    assert!(
+        run(
+            &mut store,
+            Operation::ReplaceSegment {
+                segment_id: ids[1].clone(),
+                clip_id: "c1".into(),
+                in_frame: 0,
+                out_frame: 10,
+                fps_num: 25,
+                fps_den: 1,
+            },
+        )
+        .is_err(),
+        "mixed fps is refused"
+    );
+}

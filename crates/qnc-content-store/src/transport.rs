@@ -794,6 +794,7 @@ fn execute_write_command(
         | Operation::SelectPart { .. }
         | Operation::SelectSlot { .. }
         | Operation::IncludeSegment { .. }
+        | Operation::ReplaceSegment { .. }
         | Operation::PurgeSegment { .. }
         | Operation::CreateCover { .. }
         | Operation::DeleteCover { .. }
