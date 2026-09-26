@@ -2,12 +2,17 @@
 name = "qnc-virtual-shots"
 version = "0.1.0"
 edition = "2021"
-description = "Public virtual shot component backed by the project content-store contract"
+description = "QNC public module: the virtual shots of a project database (shorts, B-roll shots of covers, stills) as a table module of the project database intermediary"
 
 [dependencies]
-qnc-content-store = { workspace = true }
+qnc-contracts = { workspace = true }
+qnc-content-read = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-media-records = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
-qnc-media-records = { workspace = true }
-rusqlite = { workspace = true }
+qnc-content-store = { workspace = true }
 tempfile = "3"

@@ -15,4 +15,5 @@ serde_json = { workspace = true }
 [dev-dependencies]
 qnc-content-store = { workspace = true }
 qnc-media-metadata = { workspace = true }
+qnc-virtual-shots = { workspace = true }
 tempfile = "3"

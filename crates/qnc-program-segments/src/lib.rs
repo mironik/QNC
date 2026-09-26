@@ -22,11 +22,13 @@ pub use markers::{
 pub use qnc_sync_cover::SyncPreview;
 pub use sync::SyncSpace;
 
-use qnc_content_store::{ContentTarget, ContentWriteData, ContentWriteTransport};
 use qnc_db_broker::ProjectDbTarget;
 use qnc_program_db::{
     Data as StoryData, Operation, ProgramCover, ProgramMarker, ProgramSegment, ProgramSlot,
     StoryPending, StoryReader, StoryWriter,
+};
+use qnc_virtual_shots::{
+    Data as ShotData, Operation as ShotOperation, VirtualShotsPending, VirtualShotsWriter,
 };
 
 /// A cover waiting for its B-roll virtual shot (v5 `create_cover`: the virtual shot
@@ -473,10 +475,8 @@ pub struct NewSegment {
 /// The program of the active project: read, written and turned into a view.
 #[derive(Default)]
 pub struct ProgramSegments {
-    /// The project database of the active project (its story).
+    /// The project database of the active project (its story and virtual shots).
     target: Option<ProjectDbTarget>,
-    /// Its content, where the B-roll virtual shots of covers are made.
-    content: Option<ContentTarget>,
     project_id: String,
     stored: Vec<ProgramSegment>,
     stored_markers: Vec<ProgramMarker>,
@@ -512,8 +512,8 @@ pub struct ProgramSegments {
     /// Story writes sent and not answered yet, by key.
     pending: Vec<(String, StoryPending)>,
     /// The B-roll virtual shots of covers, and the cover each one waits to place.
-    shots: Option<ContentWriteTransport>,
-    covers_waiting: Vec<(String, NewCover)>,
+    shots: Option<VirtualShotsWriter>,
+    covers_waiting: Vec<(VirtualShotsPending, NewCover)>,
     /// Write whose completion selects the new segment.
     pending_create: Option<String>,
     sequence: u64,
@@ -525,15 +525,14 @@ impl ProgramSegments {
         Self::default()
     }
 
-    /// Points to the project database of the active project (its story, and its
-    /// content for the virtual shots of covers) and reads it.
-    pub fn configure(&mut self, content: ContentTarget, story: ProjectDbTarget, project_id: &str) {
+    /// Points to the project database of the active project (its story and the
+    /// virtual shots of covers) and reads it.
+    pub fn configure(&mut self, story: ProjectDbTarget, project_id: &str) {
         let same = self.target.as_ref().map(ProjectDbTarget::uri) == Some(story.uri());
         if !same {
             *self = Self::default();
         }
         self.target = Some(story);
-        self.content = Some(content);
         self.project_id = project_id.to_string();
         self.adopt_selection = !same;
         self.reload();
@@ -544,12 +543,7 @@ impl ProgramSegments {
     }
 
     pub fn has_pending_work(&self) -> bool {
-        !self.pending.is_empty()
-            || !self.covers_waiting.is_empty()
-            || self
-                .shots
-                .as_ref()
-                .is_some_and(ContentWriteTransport::has_pending)
+        !self.pending.is_empty() || !self.covers_waiting.is_empty()
     }
 
     /// The program frame the user pointed at, once; the Wrap view takes it.
@@ -1057,31 +1051,31 @@ impl ProgramSegments {
     }
 
     /// v5 `create_cover` from source frames: the B-roll virtual shot of the source
-    /// IN/OUT is made first (its owner, the project content); the cover of the slot
-    /// follows once it is saved.
+    /// IN/OUT is made first (`qnc-virtual-shots`); the cover of the slot follows once
+    /// it is saved.
     pub(crate) fn cover(&mut self, cover: NewCover, clip_name: String) {
-        let Some(content) = self.content.clone() else {
+        let Some(target) = self.target.clone() else {
             return self.refresh_view("Projektna baza nije dostupna.".into());
         };
         if self.shots.is_none() {
-            match ContentWriteTransport::start(content) {
+            match VirtualShotsWriter::start(target) {
                 Ok(shots) => self.shots = Some(shots),
                 Err(error) => return self.refresh_view(error),
             }
         }
-        let key = self.next_key("cover_shot");
-        let sent = self.shots.as_mut().map_or(Ok(()), |shots| {
-            shots.create_cover_shot(
-                key.clone(),
-                self.project_id.clone(),
-                cover.clip_id.clone(),
+        let sent = self.shots.as_ref().map(|shots| {
+            shots.submit(&ShotOperation::CreateCoverShot {
+                project_id: self.project_id.clone(),
+                clip_id: cover.clip_id.clone(),
                 clip_name,
-                (cover.in_frame, cover.out_frame),
-            )
+                in_frame: cover.in_frame,
+                out_frame: cover.out_frame,
+            })
         });
         match sent {
-            Ok(()) => self.covers_waiting.push((key, cover)),
-            Err(error) => self.refresh_view(error),
+            Some(Ok(pending)) => self.covers_waiting.push((pending, cover)),
+            Some(Err(error)) => self.refresh_view(error),
+            None => {}
         }
     }
 
@@ -1091,23 +1085,16 @@ impl ProgramSegments {
         let mut landed = false;
         // Covers whose B-roll virtual shot is saved go into their slot.
         let mut place = Vec::new();
-        if let Some(shots) = self.shots.as_mut() {
-            for completion in shots.poll() {
-                landed = true;
-                let Some(at) = self
-                    .covers_waiting
-                    .iter()
-                    .position(|(key, _)| *key == completion.key)
-                else {
-                    continue;
-                };
-                let (_, cover) = self.covers_waiting.remove(at);
-                match completion.result {
-                    Ok(result) => match result.data {
-                        ContentWriteData::Created(shot_id) => place.push((cover, shot_id)),
-                        _ => message = "Neispravan odgovor B-roll kadra.".into(),
-                    },
-                    Err(error) => message = error,
+        for (pending, cover) in std::mem::take(&mut self.covers_waiting) {
+            match pending.try_take() {
+                None => self.covers_waiting.push((pending, cover)),
+                Some(result) => {
+                    landed = true;
+                    match result {
+                        Ok(ShotData::Created(shot_id)) => place.push((cover, shot_id)),
+                        Ok(_) => message = "Neispravan odgovor B-roll kadra.".into(),
+                        Err(error) => message = error,
+                    }
                 }
             }
         }

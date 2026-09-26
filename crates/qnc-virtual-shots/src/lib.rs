@@ -1,231 +1,251 @@
-//! Public virtual shot component.
-//!
-//! This crate does not own SQLite and never opens a project DB file directly.
-//! Durable state is read and written through `qnc-content-store`.
+//! Virtual shots of a project (QNC v5 `virtual_shots` in the project database):
+//! shorts (Virtual tab) and the B-roll shots of covers (B-roll tab), with the IN/OUT
+//! stills of shorts. A table module of the project database intermediary
+//! (`qnc-db-broker`): it owns only its table, reads only public views of others
+//! (`public_project_settings`; the clip catalog through `qnc-content-read`) and is
+//! written only through that intermediary. It knows no form and no application.
 
-pub use qnc_content_store::{SavedShort, ShortClip};
+mod store;
+
+use std::sync::Arc;
+
+use qnc_db_broker::{
+    Access, Pending, ProjectDbClient, ProjectDbTarget, ProjectDbWriter, TableModule,
+    TableModuleFactory,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 pub const MODULE_ID: &str = "qnc.module.virtual-shots";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn list_shorts(
-    target: &qnc_content_store::ContentTarget,
-) -> Result<Vec<qnc_content_store::ShortClip>, String> {
-    target
-        .open(qnc_content_store::Access::ReadOnly)?
-        .list_shorts()
+pub type Result<T> = std::result::Result<T, String>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SavedShort {
+    pub shot_id: String,
+    pub in_frame: u64,
+    pub out_frame: u64,
+}
+
+/// One virtual shot stored in the project DB, ordered by creation: a short
+/// (Virtual tab) or, with `b_roll`, the shot of a cover (B-roll tab).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ShortClip {
+    pub shot_id: String,
+    pub clip_id: String,
+    pub in_frame: u64,
+    pub out_frame: u64,
+    pub name: String,
+    pub in_still_uri: Option<String>,
+    pub out_still_uri: Option<String>,
+    pub still_status: String,
+    #[serde(default)]
+    pub b_roll: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Operation {
+    /// A short of an imported clip between IN and OUT (Add virtual clip).
+    SaveShort {
+        project_id: String,
+        clip_id: String,
+        clip_name: String,
+        in_frame: u64,
+        out_frame: u64,
+    },
+    /// v5 `add_virtual_shot_from_frames` for a cover: the B-roll virtual shot of the
+    /// source IN/OUT (its id comes back); the story puts it in a slot.
+    CreateCoverShot {
+        project_id: String,
+        clip_id: String,
+        clip_name: String,
+        in_frame: u64,
+        out_frame: u64,
+    },
+    ListShorts,
+    /// The B-roll virtual shots (covers), oldest first.
+    ListBroll,
+    MarkShortStills {
+        shot_id: String,
+        status: String,
+        in_uri: Option<String>,
+        out_uri: Option<String>,
+        error: Option<String>,
+    },
+}
+
+impl Operation {
+    pub fn is_write(&self) -> bool {
+        !matches!(self, Self::ListShorts | Self::ListBroll)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "data", rename_all = "snake_case")]
+pub enum Data {
+    SavedShort(SavedShort),
+    Created(String),
+    ShortClips(Vec<ShortClip>),
+    Changed,
+}
+
+/// Joins the virtual shot table to a project database.
+pub struct VirtualShotsModule;
+
+impl VirtualShotsModule {
+    pub fn factory() -> Arc<dyn TableModuleFactory> {
+        Arc::new(Self)
+    }
+}
+
+impl TableModuleFactory for VirtualShotsModule {
+    fn id(&self) -> &'static str {
+        MODULE_ID
+    }
+    fn is_write(&self, payload: &Value) -> bool {
+        serde_json::from_value::<Operation>(payload.clone()).is_ok_and(|o| o.is_write())
+    }
+    fn attach(
+        &self,
+        connection: rusqlite::Connection,
+        access: Access,
+    ) -> Result<Box<dyn TableModule>> {
+        Ok(Box::new(Attached(store::Store::attach(connection, access)?)))
+    }
+}
+
+struct Attached(store::Store);
+
+impl TableModule for Attached {
+    fn execute(&mut self, payload: Value) -> Result<Value> {
+        let operation: Operation = serde_json::from_value(payload).map_err(|e| e.to_string())?;
+        let data = self.0.execute(&operation)?;
+        serde_json::to_value(data).map_err(|e| e.to_string())
+    }
+}
+
+fn decode(value: Value) -> Result<Data> {
+    serde_json::from_value(value).map_err(|e| e.to_string())
+}
+
+fn encode(operation: &Operation) -> Result<Value> {
+    serde_json::to_value(operation).map_err(|e| e.to_string())
+}
+
+fn wrong() -> String {
+    "Neispravan odgovor virtualnih kadrova.".into()
+}
+
+fn read(target: &ProjectDbTarget, operation: &Operation) -> Result<Vec<ShortClip>> {
+    let mut client: ProjectDbClient =
+        target.open(Access::ReadOnly, vec![VirtualShotsModule::factory()])?;
+    match decode(client.execute(MODULE_ID, encode(operation)?)?)? {
+        Data::ShortClips(rows) => Ok(rows),
+        _ => Err(wrong()),
+    }
+}
+
+/// The shorts of the active project, oldest first.
+pub fn list_shorts(target: &ProjectDbTarget) -> Result<Vec<ShortClip>> {
+    read(target, &Operation::ListShorts)
 }
 
 /// The virtual shots of the pool: shorts (Virtual tab), then the B-roll shots of
-/// the covers (B-roll tab, `b_roll`), each oldest first, from one read.
-pub fn list_pool_shots(
-    target: &qnc_content_store::ContentTarget,
-) -> Result<Vec<qnc_content_store::ShortClip>, String> {
-    let mut client = target.open(qnc_content_store::Access::ReadOnly)?;
-    let mut shots = client.list_shorts()?;
-    shots.extend(client.list_b_roll()?);
+/// the covers (B-roll tab, `b_roll`), each oldest first.
+pub fn list_pool_shots(target: &ProjectDbTarget) -> Result<Vec<ShortClip>> {
+    let mut shots = list_shorts(target)?;
+    shots.extend(read(target, &Operation::ListBroll)?);
     Ok(shots)
 }
 
-pub fn save_short(
-    transport: &mut qnc_content_store::ContentWriteTransport,
-    key: String,
-    project_id: String,
-    clip_id: String,
-    clip_name: String,
-    in_frame: u64,
-    out_frame: u64,
-) -> Result<(), String> {
-    transport.save_short(key, project_id, clip_id, clip_name, in_frame, out_frame)
+/// Writes of the virtual shots of the active project, through the one serial
+/// writer of its database in this process.
+#[derive(Debug, Clone)]
+pub struct VirtualShotsWriter(ProjectDbWriter);
+
+impl VirtualShotsWriter {
+    pub fn start(target: ProjectDbTarget) -> Result<Self> {
+        Ok(Self(ProjectDbWriter::start(
+            target,
+            vec![VirtualShotsModule::factory()],
+        )?))
+    }
+
+    /// Runs a request and waits for its reply.
+    pub fn call(&self, operation: &Operation) -> Result<Data> {
+        decode(self.0.call(MODULE_ID, encode(operation)?)?)
+    }
+
+    /// Sends a request without waiting; the reply is taken from the returned handle.
+    pub fn submit(&self, operation: &Operation) -> Result<VirtualShotsPending> {
+        Ok(VirtualShotsPending(self.0.submit(MODULE_ID, encode(operation)?)?))
+    }
 }
 
-pub fn mark_stills_ready(
-    transport: &mut qnc_content_store::ContentWriteTransport,
-    key: String,
-    shot_id: String,
-    in_uri: String,
-    out_uri: String,
-) -> Result<(), String> {
-    transport.mark_short_stills_ready(key, shot_id, in_uri, out_uri)
+/// The reply of a submitted request, once it is there.
+#[derive(Debug)]
+pub struct VirtualShotsPending(Pending);
+
+impl VirtualShotsPending {
+    pub fn try_take(&self) -> Option<Result<Data>> {
+        self.0.try_take().map(|result| result.and_then(decode))
+    }
 }
 
-pub fn mark_stills_failed(
-    transport: &mut qnc_content_store::ContentWriteTransport,
-    key: String,
-    shot_id: String,
-    error: String,
-) -> Result<(), String> {
-    transport.mark_short_stills_failed(key, shot_id, error)
-}
-
-/// Saves a short through the serialized write transport and waits for its id.
+/// Saves a short and waits for its id.
 pub fn save_short_now(
-    target: &qnc_content_store::ContentTarget,
+    target: &ProjectDbTarget,
     project_id: &str,
     clip_id: &str,
     name: &str,
     in_frame: u64,
     out_frame: u64,
-) -> Result<SavedShort, String> {
-    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
-    save_short(
-        &mut transport,
-        format!("virtual_short:{clip_id}:{in_frame}:{out_frame}"),
-        project_id.to_string(),
-        clip_id.to_string(),
-        name.to_string(),
+) -> Result<SavedShort> {
+    let writer = VirtualShotsWriter::start(target.clone())?;
+    match writer.call(&Operation::SaveShort {
+        project_id: project_id.into(),
+        clip_id: clip_id.into(),
+        clip_name: name.into(),
         in_frame,
         out_frame,
-    )?;
-    wait_for_saved_short(&mut transport)
+    })? {
+        Data::SavedShort(shot) => Ok(shot),
+        _ => Err(wrong()),
+    }
 }
 
-/// Publishes the IN/OUT stills of a short and waits until the database has them.
-pub fn mark_stills_ready_now(
-    target: &qnc_content_store::ContentTarget,
-    shot_id: &str,
-    in_uri: &str,
-    out_uri: &str,
-) -> Result<(), String> {
-    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
-    mark_stills_ready(
-        &mut transport,
-        format!("virtual_short_stills:{shot_id}:ready"),
-        shot_id.to_string(),
-        in_uri.to_string(),
-        out_uri.to_string(),
-    )?;
-    wait_for_changed(&mut transport)
-}
-
-/// Records that the stills of a short could not be made.
 /// The outcome of storing a short's IN/OUT stills, `(in_uri, out_uri)` or the
 /// error, written as ready or failed.
 pub fn publish_stills_now(
-    target: &qnc_content_store::ContentTarget,
+    target: &ProjectDbTarget,
     shot_id: &str,
-    stills: Result<(String, String), String>,
-) -> Result<(), String> {
-    match stills {
-        Ok((in_uri, out_uri)) => mark_stills_ready_now(target, shot_id, &in_uri, &out_uri),
-        Err(error) => mark_stills_failed_now(target, shot_id, &error),
-    }
-}
-
-pub fn mark_stills_failed_now(
-    target: &qnc_content_store::ContentTarget,
-    shot_id: &str,
-    error: &str,
-) -> Result<(), String> {
-    let mut transport = qnc_content_store::ContentWriteTransport::start(target.clone())?;
-    mark_stills_failed(
-        &mut transport,
-        format!("virtual_short_stills:{shot_id}:failed"),
-        shot_id.to_string(),
-        error.to_string(),
-    )?;
-    wait_for_changed(&mut transport)
-}
-
-fn wait_for_saved_short(
-    transport: &mut qnc_content_store::ContentWriteTransport,
-) -> Result<SavedShort, String> {
-    match wait_for_write(transport)? {
-        qnc_content_store::ContentWriteData::SavedShort(shot) => Ok(*shot),
-        _ => Err("Neispravan odgovor baze.".into()),
-    }
-}
-
-fn wait_for_changed(
-    transport: &mut qnc_content_store::ContentWriteTransport,
-) -> Result<(), String> {
-    match wait_for_write(transport)? {
-        qnc_content_store::ContentWriteData::Changed => Ok(()),
-        _ => Err("Neispravan odgovor baze.".into()),
-    }
-}
-
-/// The data of the first completed write, or a controlled error after five seconds.
-fn wait_for_write(
-    transport: &mut qnc_content_store::ContentWriteTransport,
-) -> Result<qnc_content_store::ContentWriteData, String> {
-    let started = std::time::Instant::now();
-    loop {
-        if let Some(completion) = transport.poll().into_iter().next() {
-            return Ok(completion.result?.data);
-        }
-        if started.elapsed() > std::time::Duration::from_secs(5) {
-            return Err("Isteklo je cekanje upisa virtualnog kadra.".into());
-        }
-        std::thread::sleep(std::time::Duration::from_millis(5));
+    stills: std::result::Result<(String, String), String>,
+) -> Result<()> {
+    let operation = match stills {
+        Ok((in_uri, out_uri)) => Operation::MarkShortStills {
+            shot_id: shot_id.into(),
+            status: "ready".into(),
+            in_uri: Some(in_uri),
+            out_uri: Some(out_uri),
+            error: None,
+        },
+        Err(error) => Operation::MarkShortStills {
+            shot_id: shot_id.into(),
+            status: "failed".into(),
+            in_uri: None,
+            out_uri: None,
+            error: Some(error),
+        },
+    };
+    match VirtualShotsWriter::start(target.clone())?.call(&operation)? {
+        Data::Changed => Ok(()),
+        _ => Err(wrong()),
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use qnc_content_store::{
-        Access, ContentStore, ContentTarget, ContentWriteData, ContentWriteTransport,
-    };
-
-    const URI: &str = "qnc://local/db/ingest_content/p1";
-
-    fn target() -> (tempfile::TempDir, ContentTarget) {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join("project.db");
-        {
-            let conn = rusqlite::Connection::open(&file).unwrap();
-            conn.execute_batch(
-                "CREATE TABLE project_settings (project_id TEXT);
-                 INSERT INTO project_settings (project_id) VALUES ('p1');
-                 CREATE VIEW public_project_settings AS SELECT project_id FROM project_settings;",
-            )
-            .unwrap();
-        }
-        drop(ContentStore::open_owner_binding(&file, URI, Access::ReadWrite).unwrap());
-        let conn = rusqlite::Connection::open(&file).unwrap();
-        conn.execute(
-            "INSERT INTO clips (
-                clip_id, source_uri, original_uri, name, catalog_json, revision, final,
-                selected, import_status
-             ) VALUES (
-                'clip-a', 'qnc://local/source/card-a',
-                'qnc://local/source/card-a/clip-a.mxf', 'Mironik', '{}', 1, 1, 0, 'imported'
-             )",
-            [],
-        )
-        .unwrap();
-        drop(conn);
-        (dir, ContentTarget::from_owner_binding(&file, URI).unwrap())
-    }
-
-    #[test]
-    fn writes_short_through_content_transport() {
-        let (_dir, target) = target();
-        let mut transport = ContentWriteTransport::start(target.clone()).unwrap();
-        save_short(
-            &mut transport,
-            "short".into(),
-            "p1".into(),
-            "clip-a".into(),
-            "Mironik".into(),
-            10,
-            40,
-        )
-        .unwrap();
-        let completion = loop {
-            let mut completions = transport.poll();
-            if let Some(completion) = completions.pop() {
-                break completion;
-            }
-        };
-        let shot = match completion.result.unwrap().data {
-            ContentWriteData::SavedShort(shot) => *shot,
-            data => panic!("unexpected write result: {data:?}"),
-        };
-        assert_eq!(shot.shot_id, "clip-a_shot_001");
-        let shorts = list_shorts(&target).unwrap();
-        assert_eq!(shorts[0].shot_id, "clip-a_shot_001");
-        assert_eq!((shorts[0].in_frame, shorts[0].out_frame), (10, 40));
-    }
-}
+mod tests;

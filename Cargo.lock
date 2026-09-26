@@ -3975,6 +3975,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-media-metadata",
  "qnc-media-records",
+ "qnc-virtual-shots",
  "rusqlite",
  "serde",
  "serde_json",
@@ -4011,6 +4012,7 @@ dependencies = [
  "qnc-program-db",
  "qnc-source-timecode",
  "qnc-sync-cover",
+ "qnc-virtual-shots",
  "rusqlite",
  "tempfile",
 ]
@@ -4414,9 +4416,14 @@ dependencies = [
 name = "qnc-virtual-shots"
 version = "0.1.0"
 dependencies = [
+ "qnc-content-read",
  "qnc-content-store",
+ "qnc-contracts",
+ "qnc-db-broker",
  "qnc-media-records",
  "rusqlite",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 

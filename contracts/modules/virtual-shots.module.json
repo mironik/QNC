@@ -10,11 +10,11 @@
   "supported_cpu": ["x86_64", "aarch64"],
   "transport_protocol_version": "0.1.0",
   "forbidden_calls": ["ffprobe", "source.scan.roles", "business.workflow", "player.command", "ui.paint"],
-  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.content-store"],
   "state_policy": "stateless",
   "database_write_policy": "public_db_owner_write_adapter_only",
   "runtime_crate": "qnc-virtual-shots",
-  "input": "The active project database file, clip id, clip name, and the player-confirmed IN/OUT frames.",
-  "output": "One virtual_shots row of class short, readable through public_short_clips, with optional IN/OUT still artifact status and URIs.",
+  "input": "Requests through the one intermediary of the project database (qnc-db-broker), which hands this table module its connection: a short or the B-roll shot of a cover (clip id, clip name, player-confirmed IN/OUT frames), stills of a short, lists.",
+  "output": "The virtual_shots table of the project database and its public views public_short_clips and public_b_roll_clips: shorts with IN/OUT still status and URIs, and the B-roll shots of covers (v5 add_virtual_shot_from_frames, made before the cover). It creates only its own table, writes no other (authorizer), reads public_project_settings and the clip catalog through qnc-content-read (only an imported clip). Moved unchanged from qnc-content-store (lego split B4, user rule 2026-09-26).",
   "specification": "docs/89-v5-functions-and-procedures.md B2; docs/93-v5-story-processes-and-rules.md R1-R3"
 }

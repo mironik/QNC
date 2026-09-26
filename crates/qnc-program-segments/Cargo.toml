@@ -5,12 +5,13 @@ edition = "2021"
 description = "QNC public component: Ton/Off program segments of an edited story in the project database, their order and program model"
 
 [dependencies]
-qnc-content-store = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-program-db = { workspace = true }
+qnc-virtual-shots = { workspace = true }
 qnc-sync-cover = { workspace = true }
 qnc-source-timecode = { workspace = true }
 
 [dev-dependencies]
+qnc-content-store = { workspace = true }
 rusqlite = { workspace = true }
 tempfile = "3"

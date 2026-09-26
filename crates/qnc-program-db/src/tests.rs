@@ -174,11 +174,18 @@ fn imported_store(path: &Path) -> Story {
     story
 }
 
+/// The virtual shots of the same project database, through their own module.
+fn shots(path: &Path, operation: qnc_virtual_shots::Operation) -> Result<qnc_virtual_shots::Data> {
+    let target =
+        qnc_db_broker::ProjectDbTarget::from_owner_binding(path, "qnc://local/db/project_db/p1")?;
+    qnc_virtual_shots::VirtualShotsWriter::start(target)?.call(&operation)
+}
+
 /// v5 cover from source frames: the B-roll virtual shot first, then the cover.
 fn create_cover(store: &mut Story, slot_id: &str, range: (u64, u64)) -> Result<Data> {
-    let ContentData::Created(shot_id) = content(
+    let qnc_virtual_shots::Data::Created(shot_id) = shots(
         &store.path.clone(),
-        ContentOperation::CreateCoverShot {
+        qnc_virtual_shots::Operation::CreateCoverShot {
             project_id: "p1".into(),
             clip_id: "c1".into(),
             clip_name: "Clip".into(),
@@ -1050,11 +1057,15 @@ fn a_cover_is_a_b_roll_virtual_shot_in_its_slot_and_replaces_the_one_there() {
     assert_eq!(b_roll.len(), 2, "each cover writes its B-roll virtual shot");
     assert_eq!(cover.virtual_shot_id, b_roll[1].0);
     assert!(classes.iter().all(|row| row.1 != "short"), "never a short");
-    let ContentData::ShortClips(shorts) = content(&path, ContentOperation::ListShorts).unwrap() else {
+    let qnc_virtual_shots::Data::ShortClips(shorts) =
+        shots(&path, qnc_virtual_shots::Operation::ListShorts).unwrap()
+    else {
         panic!()
     };
     assert!(shorts.is_empty());
-    let ContentData::ShortClips(b_roll) = content(&path, ContentOperation::ListBroll).unwrap() else {
+    let qnc_virtual_shots::Data::ShortClips(b_roll) =
+        shots(&path, qnc_virtual_shots::Operation::ListBroll).unwrap()
+    else {
         panic!()
     };
     assert_eq!(b_roll.len(), 2, "the B-roll tab lists the cover shots");

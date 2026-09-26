@@ -230,83 +230,6 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
-    pub fn save_short(
-        &mut self,
-        project_id: &str,
-        clip_id: &str,
-        clip_name: &str,
-        in_frame: u64,
-        out_frame: u64,
-    ) -> Result<SavedShort> {
-        match self.execute(Operation::SaveShort {
-            project_id: project_id.into(),
-            clip_id: clip_id.into(),
-            clip_name: clip_name.into(),
-            in_frame,
-            out_frame,
-        })? {
-            Data::SavedShort(shot) => Ok(*shot),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    pub fn list_shorts(&mut self) -> Result<Vec<ShortClip>> {
-        match self.execute(Operation::ListShorts)? {
-            Data::ShortClips(rows) => Ok(rows),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    /// The B-roll virtual shots (covers), oldest first.
-    pub fn list_b_roll(&mut self) -> Result<Vec<ShortClip>> {
-        match self.execute(Operation::ListBroll)? {
-            Data::ShortClips(rows) => Ok(rows),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    /// The B-roll virtual shot of a cover; its id.
-    pub fn create_cover_shot(
-        &mut self,
-        project_id: &str,
-        clip_id: &str,
-        clip_name: &str,
-        in_frame: u64,
-        out_frame: u64,
-    ) -> Result<String> {
-        match self.execute(Operation::CreateCoverShot {
-            project_id: project_id.into(),
-            clip_id: clip_id.into(),
-            clip_name: clip_name.into(),
-            in_frame,
-            out_frame,
-        })? {
-            Data::Created(shot_id) => Ok(shot_id),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    pub fn mark_short_stills_ready(
-        &mut self,
-        shot_id: &str,
-        in_uri: &str,
-        out_uri: &str,
-    ) -> Result<()> {
-        self.execute(Operation::MarkShortStills {
-            shot_id: shot_id.into(),
-            status: "ready".into(),
-            in_uri: Some(in_uri.into()),
-            out_uri: Some(out_uri.into()),
-            error: None,
-        })
-        .map(|_| ())
-    }
-    pub fn mark_short_stills_failed(&mut self, shot_id: &str, error: &str) -> Result<()> {
-        self.execute(Operation::MarkShortStills {
-            shot_id: shot_id.into(),
-            status: "failed".into(),
-            in_uri: None,
-            out_uri: None,
-            error: Some(error.into()),
-        })
-        .map(|_| ())
-    }
     pub fn publish_batch(&mut self, clips: Vec<CatalogClip>) -> Result<()> {
         match self.execute(Operation::PublishBatch(clips))? {
             Data::Changed => Ok(()),
@@ -399,9 +322,6 @@ pub enum ContentWriteData {
     Removed(Vec<String>),
     /// The clip taken from the import queue, if any.
     Claimed(Option<Box<StoredClip>>),
-    SavedShort(Box<SavedShort>),
-    /// The id of a newly made record (the B-roll virtual shot of a cover).
-    Created(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -565,85 +485,6 @@ impl ContentWriteTransport {
         Ok(())
     }
 
-    pub fn save_short(
-        &mut self,
-        key: String,
-        project_id: String,
-        clip_id: String,
-        clip_name: String,
-        in_frame: u64,
-        out_frame: u64,
-    ) -> Result<()> {
-        self.send_operation(
-            key,
-            Operation::SaveShort {
-                project_id,
-                clip_id,
-                clip_name,
-                in_frame,
-                out_frame,
-            },
-        )
-    }
-
-    pub fn mark_short_stills_ready(
-        &mut self,
-        key: String,
-        shot_id: String,
-        in_uri: String,
-        out_uri: String,
-    ) -> Result<()> {
-        self.send_operation(
-            key,
-            Operation::MarkShortStills {
-                shot_id,
-                status: "ready".into(),
-                in_uri: Some(in_uri),
-                out_uri: Some(out_uri),
-                error: None,
-            },
-        )
-    }
-
-    /// The B-roll virtual shot of a cover; the completion carries its id.
-    pub fn create_cover_shot(
-        &mut self,
-        key: String,
-        project_id: String,
-        clip_id: String,
-        clip_name: String,
-        (in_frame, out_frame): (u64, u64),
-    ) -> Result<()> {
-        self.send_operation(
-            key,
-            Operation::CreateCoverShot {
-                project_id,
-                clip_id,
-                clip_name,
-                in_frame,
-                out_frame,
-            },
-        )
-    }
-
-    pub fn mark_short_stills_failed(
-        &mut self,
-        key: String,
-        shot_id: String,
-        error: String,
-    ) -> Result<()> {
-        self.send_operation(
-            key,
-            Operation::MarkShortStills {
-                shot_id,
-                status: "failed".into(),
-                in_uri: None,
-                out_uri: None,
-                error: Some(error),
-            },
-        )
-    }
-
     pub fn poll(&mut self) -> Vec<ContentWriteCompletion> {
         let mut completions = Vec::new();
         loop {
@@ -734,53 +575,6 @@ fn execute_write_command(
         }
         Operation::PublishWave(artifact) => {
             client.publish_wave(*artifact)?;
-            Ok(ContentWriteData::Changed)
-        }
-        Operation::SaveShort {
-            project_id,
-            clip_id,
-            clip_name,
-            in_frame,
-            out_frame,
-        } => Ok(ContentWriteData::SavedShort(Box::new(client.save_short(
-            &project_id,
-            &clip_id,
-            &clip_name,
-            in_frame,
-            out_frame,
-        )?))),
-        Operation::CreateCoverShot {
-            project_id,
-            clip_id,
-            clip_name,
-            in_frame,
-            out_frame,
-        } => Ok(ContentWriteData::Created(client.create_cover_shot(
-            &project_id,
-            &clip_id,
-            &clip_name,
-            in_frame,
-            out_frame,
-        )?)),
-        Operation::MarkShortStills {
-            shot_id,
-            status,
-            in_uri,
-            out_uri,
-            error,
-        } => {
-            match status.as_str() {
-                "ready" => client.mark_short_stills_ready(
-                    &shot_id,
-                    in_uri.as_deref().ok_or("Nedostaje IN slicica.")?,
-                    out_uri.as_deref().ok_or("Nedostaje OUT slicica.")?,
-                )?,
-                "failed" => client.mark_short_stills_failed(
-                    &shot_id,
-                    error.as_deref().ok_or("Nedostaje poruka greske.")?,
-                )?,
-                _ => return Err("Neispravan status slicica virtualnog kadra.".into()),
-            }
             Ok(ContentWriteData::Changed)
         }
         Operation::QueueSelected => {

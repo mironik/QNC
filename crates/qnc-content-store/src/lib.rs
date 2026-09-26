@@ -120,31 +120,6 @@ pub struct FilmstripArtifactRecord {
     pub frames: Vec<FilmstripFrameRecord>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SavedShort {
-    pub shot_id: String,
-    pub in_frame: u64,
-    pub out_frame: u64,
-}
-
-/// One virtual shot stored in the project DB, ordered by creation: a short
-/// (Virtual tab) or, with `b_roll`, the shot of a cover (B-roll tab).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ShortClip {
-    pub shot_id: String,
-    pub clip_id: String,
-    pub in_frame: u64,
-    pub out_frame: u64,
-    pub name: String,
-    pub in_still_uri: Option<String>,
-    pub out_still_uri: Option<String>,
-    pub still_status: String,
-    #[serde(default)]
-    pub b_roll: bool,
-}
-
 /// Lightweight catalog signature for deciding whether a visible catalog is stale.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -245,32 +220,6 @@ pub enum Operation {
         thumbnail_uri: Option<String>,
         error: Option<String>,
     },
-    SaveShort {
-        project_id: String,
-        clip_id: String,
-        clip_name: String,
-        in_frame: u64,
-        out_frame: u64,
-    },
-    ListShorts,
-    /// The B-roll virtual shots (covers), oldest first.
-    ListBroll,
-    MarkShortStills {
-        shot_id: String,
-        status: String,
-        in_uri: Option<String>,
-        out_uri: Option<String>,
-        error: Option<String>,
-    },
-    /// v5 `add_virtual_shot_from_frames` for a cover: the B-roll virtual shot of the
-    /// source IN/OUT (its id comes back); the Story module puts it in a slot.
-    CreateCoverShot {
-        project_id: String,
-        clip_id: String,
-        clip_name: String,
-        in_frame: u64,
-        out_frame: u64,
-    },
 }
 impl Operation {
     pub fn is_write(&self) -> bool {
@@ -284,8 +233,6 @@ impl Operation {
                 | Self::ReadFilmstrip { .. }
                 | Self::ReadWave { .. }
                 | Self::GetRuntime { .. }
-                | Self::ListShorts
-                | Self::ListBroll
         )
     }
 }
@@ -312,9 +259,6 @@ pub enum Data {
     Inventory(Vec<InventoryClip>),
     Removed(Vec<String>),
     Runtime(Option<RuntimeEntry>),
-    SavedShort(Box<SavedShort>),
-    ShortClips(Vec<ShortClip>),
-    Created(String),
     Changed,
 }
 

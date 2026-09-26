@@ -2393,6 +2393,14 @@ Potrosaci: `qnc-program-segments` (`StoryReader`/`StoryWriter`, pokrivalica u dv
 `qnc-program-input` i `qnc-source-preview` (cilj baze projekta), `qnc-editorial-application`.
 Ugovori `story`/`program-segments` baze: vlasnik tablica `qnc.module.program-db`. Conformance:
 `qnc-program-db` na popisu javnih DB vlasnika. Nije izvedeno: live provjera Storyja na release buildu.
+Izvedeno B4: `crates/qnc-virtual-shots` je sam modul tablica posrednika i posjeduje `virtual_shots`
+(shortovi, B-roll kadrovi pokrivalica, IN/OUT slicice); kod premjesten iz `qnc-content-store` bez
+promjene ponasanja, vlastiti autorizator, uvezeni klip kroz `qnc-content-read::imported_on`.
+`qnc-content-store` vise nema ni jednu operaciju virtualnih kadrova (ni odgovore `SavedShort`/`Created`,
+Select ih vise ne ocekuje). Pokrivalica: `qnc-program-segments` salje `CreateCoverShot` modulu
+virtualnih kadrova, pa `CreateCover` modulu price, oboje kroz posrednika; cilj sadrzaja mu vise ne
+treba. Editorial drzi cilj sadrzaja (timecode) i cilj baze projekta (prica, virtualni kadrovi).
+Testovi `qnc-virtual-shots` (6, novi), `qnc-program-db` (22), `qnc-program-segments` (21).
 
 Otvoreno ograniceno odobrenje 2026-09-25 (originalni timecode izvora): korisnik je
 odredio: broadcast montaza radi po timecodeu (veza proxy-original i export); pocetni TC

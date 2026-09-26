@@ -1,8 +1,8 @@
 {
   "database_id": "qnc.db.virtual_shots",
   "database_owner": "project",
-  "owner_application": "qnc.module.content-store",
-  "ownership_rule": "User rule 2026-09-25: the project owns this database; no application (Ingest, Media Assist, Story or any other) owns it or its tables. No form writes to it, so none can own it: data made in an application reaches these tables only through the intermediary, the one public writer of the project database, qnc.module.content-store.",
+  "owner_application": "qnc.module.virtual-shots",
+  "ownership_rule": "User rules 2026-09-25/26: the project owns this database; no application (Ingest, Media Assist, Story or any other) owns it or its tables. No form writes to it, so none can own it: data made in an application reaches these tables only through the one intermediary of the project database (qnc.module.db-broker), whose table module qnc.module.virtual-shots owns this table (lego split of the former content store, 2026-09-26).",
   "schema_version": "0.2.0",
   "qnc_uri": "qnc://local/db/virtual_shots/{project_id}",
   "tables": [
@@ -12,11 +12,11 @@
     "public_short_clips",
     "public_b_roll_clips"
   ],
-  "write_owner": "qnc.module.content-store",
+  "write_owner": "qnc.module.virtual-shots",
   "public_read_policy": "public_read_views",
   "migration_policy": "owner_application_only",
   "created_at": "2026-09-22T00:00:00Z",
-  "updated_at": "2026-09-25T00:00:00Z",
+  "updated_at": "2026-09-26T00:00:00Z",
   "columns": {
     "virtual_shots.in_still_uri": "TEXT, optional URI of the virtual short IN still",
     "virtual_shots.out_still_uri": "TEXT, optional URI of the virtual short OUT still",

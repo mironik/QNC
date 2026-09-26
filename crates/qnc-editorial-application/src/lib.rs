@@ -83,7 +83,7 @@ pub struct EditorialApplication {
     load_result: Option<Receiver<LoadResult>>,
     shown_project: Option<String>,
     shown_signature: Option<CatalogSignature>,
-    content_target: Option<qnc_content_store::ContentTarget>,
+    content_target: Option<(qnc_content_store::ContentTarget, qnc_db_broker::ProjectDbTarget)>,
     current_settings: Option<WorkSettings>,
     project_dir: Option<std::path::PathBuf>,
     /// Shot range to paint once the parent clip's timeline is ready.
@@ -254,7 +254,7 @@ impl EditorialApplication {
         let timebase = self.preview.player_view().source_timebase();
         let timeline = self.view.preview.timeline;
         // The original source timecode of the chosen clip, from its stored record.
-        self.view.source_timecode = self.timecodes.for_clip(self.content_target.as_ref(), self.view.preview.clip_id.as_deref());
+        self.view.source_timecode = self.timecodes.for_clip(self.content_target.as_ref().map(|targets| &targets.0), self.view.preview.clip_id.as_deref());
         self.segments.set_source(SourcePick::new(
             self.view.chosen_clip_id(),
             self.view.current_clip_label(),
@@ -357,9 +357,9 @@ impl EditorialApplication {
                 let story = qnc_db_broker::ProjectDbTarget::for_project(settings, work);
                 let content = qnc_content_store::ContentTarget::for_project(settings, work);
                 self.content_target = match content.and_then(|target| Ok((target, story?))) {
-                    Ok((target, story)) => {
-                        self.segments.configure(target.clone(), story, &project_id);
-                        Some(target)
+                    Ok(targets) => {
+                        self.segments.configure(targets.1.clone(), &project_id);
+                        Some(targets)
                     }
                     Err(error) => {
                         self.view.message = error;
@@ -494,7 +494,7 @@ impl EditorialApplication {
             self.view.message = "IN i OUT nisu potvrdeni na playeru.".into();
             return true;
         };
-        let Some(target) = self.content_target.clone() else {
+        let Some((_, target)) = self.content_target.clone() else {
             self.view.message = "Projektna baza nije dostupna za upis.".into();
             return true;
         };
@@ -524,7 +524,7 @@ impl EditorialApplication {
     }
 
     fn store_short_stills(&mut self, shot_id: &str, clip_id: &str, in_frame: u64, out_frame: u64) {
-        let (Some(target), Some(settings)) = (&self.content_target, &self.current_settings) else {
+        let (Some((_, target)), Some(settings)) = (&self.content_target, &self.current_settings) else {
             return;
         };
         let stills = match self.project_dir.as_deref() {
@@ -578,7 +578,7 @@ impl EditorialApplication {
     }
 
     fn reload_shorts(&mut self) {
-        let Some(target) = self.content_target.as_ref() else {
+        let Some((_, target)) = self.content_target.as_ref() else {
             self.view.shorts.clear();
             return;
         };
