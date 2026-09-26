@@ -147,15 +147,15 @@ fn header(ui: &mut egui::Ui, segments: &SegmentsView, style: SegmentPanelStyle) 
             .unwrap_or(0);
         ui.add_space(14.0);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            value(ui, &segments.label(segments.total_frames), style.total);
+            value(ui, &segments.timecode(segments.total_frames), style.total);
             label(ui, "Trajanje", style.muted);
             ui.add_space(18.0);
             value(ui, &playhead.to_string(), style.playhead);
             label(ui, "frame", style.muted);
-            value(ui, &segments.label(playhead), style.playhead);
+            value(ui, &segments.timecode(playhead), style.playhead);
             label(ui, "Playhead", style.muted);
             ui.add_space(18.0);
-            value(ui, &segments.label(segment_frames), style.segment);
+            value(ui, &segments.timecode(segment_frames), style.segment);
             label(ui, "Segment", style.muted);
         });
     });

@@ -7,6 +7,7 @@ description = "QNC public component: Ton/Off program segments of an edited story
 [dependencies]
 qnc-content-store = { workspace = true }
 qnc-sync-cover = { workspace = true }
+qnc-source-timecode = { workspace = true }
 
 [dev-dependencies]
 rusqlite = { workspace = true }

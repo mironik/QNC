@@ -2299,6 +2299,12 @@ brojevi frameova, pa se Ingest ne mijenja), `crates/qnc-editorial-application`,
 kao ffprobe); 2) segmenti, pokrivalice i tab Segment s izvornim IN/OUT u TC-u;
 3) TC programa; 4) ravna playlista i export s originalnim TC-om. Live prikaz u docku
 nije provjeren jer kartica G: nije bila spojena (player ne otvara medij).
+Izvedeno i korak 3 (v5 `segment_panel.rs` zaglavlje): Segment, Playhead i Trajanje u
+panelu Segmenti su interni TC programa HH:MM:SS:FF od 00:00:00:00
+(`SegmentsView::timecode`, otkljucani `crates/qnc-program-segments` i
+`crates/qnc-segment-panel`); live provjereno. v5 u retcima segmenata ne prikazuje TC,
+pa korak 2 ide uz korak 4 (izvorni TC segmenata i pokrivalica treba playlisti i
+exportu, a export jos ne postoji).
 
 Zatvoreno ograniceno odobrenje 2026-09-25 (vlasnik baze je projekt): korisnik je
 odredio: ako baza ima vlasnika, to je projekt; nijedna forma ne pise u bazu pa ne moze

@@ -451,3 +451,12 @@ fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
         "v5: no stored slot 15..23 while its end marker is missing"
     );
 }
+
+#[test]
+fn the_panel_header_shows_program_time_as_timecode() {
+    let mut view = SegmentsView::default();
+    assert_eq!(view.timecode(10), "--:--:--:--", "no story rate yet");
+    view.timebase = Some((50, 1));
+    assert_eq!(view.timecode(0), "00:00:00:00");
+    assert_eq!(view.timecode(1837), "00:00:36:37");
+}

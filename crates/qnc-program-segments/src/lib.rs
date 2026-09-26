@@ -243,6 +243,16 @@ impl SegmentsView {
             .map(|(num, den)| duration_label(frames, num, den))
             .unwrap_or_else(|| "--".into())
     }
+
+    /// Program time as HH:MM:SS:FF from 00:00:00:00 (v5 segment panel header): the
+    /// internal timecode of the program; exports use the original source timecodes.
+    pub fn timecode(&self, frames: u64) -> String {
+        self.timebase
+            .map(|(num, den)| whole_fps(num, den))
+            .filter(|fps| *fps > 0)
+            .map(|fps| qnc_source_timecode::format_frames(frames, fps as u32))
+            .unwrap_or_else(|| qnc_source_timecode::UNKNOWN.into())
+    }
 }
 
 /// Builds the program: the stored order, one window after another.
