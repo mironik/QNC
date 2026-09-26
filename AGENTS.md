@@ -2285,6 +2285,25 @@ traci panela Segmenti (`crates/qnc-segment-panel`), tipke kataloga `undo_object`
 `redo_object` kroz `crates/qnc-program-segments` kad je fokus na Segmentima.
 B-roll kadrovi koje je pokrivalica stvorila ostaju. Ugovor `story.database.json`.
 
+Otvoreno ograniceno odobrenje 2026-09-26 (klip bez probea kad XML moze, v5): korisnik: "ako
+moze proci bez probe, probe ne treba; ako ne moze, probe samo za fajlove koji se uvoze";
+"ok odkljucaj sto moras". v5: probe samo kad zapisu nedostaje fps, trajanje u frameovima ili
+razlucivost (`media_probe_snapshot_ready`); player iz baze dobiva samo trajanje, fps, pocetni TC
+i opcionalni opis slike/zvuka (`SourceRuntime`), a indeks streama, time_base, start_pts i
+frekvenciju zvuka cita dekoder pri otvaranju datoteke. Nalaz: novi projekt bez naslijedenih
+probe zapisa javlja `IncompleteMedia`, jer QNC engine te podatke spremnika uzima iz baze.
+Otkljucano: `crates/qnc-sony-metadata` (sve iz MEDIAPRO.XML i XML-a klipa), `crates/qnc-camera-*`,
+`crates/qnc-media-metadata`, `crates/qnc-media-records`, `crates/qnc-player-input`,
+`crates/qnc-broadcast-engine`, `crates/qnc-broadcast-player`, `tools/qnc-player-runner`,
+`crates/qnc-media-decode`, `crates/qnc-ffmpeg-decode`, `crates/qnc-decoder-catalog`,
+`crates/qnc-ingest-select`, `crates/qnc-ingest-import-worker`, testovi, ugovori, dokumenti.
+Redoslijed: 2) Sony citac, 1) podaci spremnika od dekodera, 3) probe samo pri Uvezi za klip bez
+fps/trajanja/razlucivosti. Ne dira se UI ni layout.
+Izvedeno 2): Sony citac iz XML-a upisuje i trajanje u sekundama (tocan broj frameova pri
+stalnom fps-u, original i proxy), dimenzije iz eksplicitne oznake kodeka (`AVC_Proxy_1920_1080_...`)
+i omjer piksela iz `aspectRatio`; boja iz `AcquisitionRecord` i audio streamovi iz CH opisa se ne
+prenose (docs/26).
+
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne
 postavke odlucuju gdje sto zivi; aplikacija je OS-neutralna. v5: `ingest_assets`,

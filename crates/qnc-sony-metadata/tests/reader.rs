@@ -75,7 +75,11 @@ fn maps_normal_progressive_source_without_fabricating_full_probe() {
         FrameTimebase::new(50, 1).unwrap()
     );
     assert_eq!(v.exact_frame_count(), Some(500));
-    assert!(original.duration_seconds.is_none());
+    // Stated by the XML: 500 frames at 50p, and 16:9 over 1920x1080 is square pixels.
+    let duration = &original.duration_seconds.as_ref().unwrap().value;
+    assert_eq!((duration.numerator, duration.denominator), (10, 1));
+    let sar = &v.sample_aspect_ratio.as_ref().unwrap().value;
+    assert_eq!((sar.numerator, sar.denominator), (1, 1));
     assert!(original.streams[0].index.is_none());
     assert!(original.streams[0].time_base.is_none());
     assert!(original.streams[0].start_pts.is_none());
@@ -158,7 +162,10 @@ fn proxy_retains_its_container_codec_and_own_evidence() {
         .iter()
         .any(|(k, f)| k.ends_with("/@ch") && f.value == "2"));
     assert!(proxy.tags.values().all(|f| f.evidence_id == "index-proxy"));
-    assert!(video(proxy).width.is_none());
+    // The proxy video type label states its frame size; its own dur/fps give its length.
+    assert_eq!(video(proxy).width.as_ref().unwrap().value, 1920);
+    assert_eq!(video(proxy).height.as_ref().unwrap().value, 1080);
+    assert!(proxy.duration_seconds.is_some());
     assert_eq!(video(proxy).exact_frame_count(), Some(500));
 }
 

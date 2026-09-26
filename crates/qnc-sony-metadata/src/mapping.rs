@@ -119,6 +119,13 @@ pub fn read_metadata(
     } else {
         notice(&mut notices, "unresolved", "duration", "exact duration requires a supported normal progressive sidecar and consistent index facts");
     }
+    // Stated by the XML, not measured (docs/26, user rule 2026-09-26: without a probe
+    // when the card record allows it): the length of a counted constant rate and the
+    // pixel shape of explicit dimensions and display aspect.
+    promote_duration(&mut original, "original.duration_seconds", &mut notices);
+    if let Some(proxy) = &mut proxy {
+        promote_duration(proxy, "proxy.duration_seconds", &mut notices);
+    }
     notice(&mut notices, "incomplete", "streams", "XML channel descriptions do not prove container stream indices, timing or complete audio formats");
     Ok(MetadataRead {
         metadata: ClipMetadata {
@@ -207,13 +214,19 @@ fn representation(
     }
     if let Some(codec) = camera.attributes.get("videoType") {
         ensure_video(&mut media);
-        media.streams[0].codec = codec_fact(
-            codec,
-            id,
-            &format!("{}/@videoType", camera.locator),
-            &format!("{prefix}.codec"),
-            notices,
-        );
+        let locator = format!("{}/@videoType", camera.locator);
+        media.streams[0].codec =
+            codec_fact(codec, id, &locator, &format!("{prefix}.codec"), notices);
+        // Sony video type labels state the frame size: AVC_Proxy_1920_1080_HP@L42.
+        if let Some((width, height)) = label_dimensions(codec) {
+            let video = ensure_video(&mut media);
+            video.width = Some(fact(id, &locator, width));
+            video.height = Some(fact(id, &locator, height));
+        }
+    }
+    if let Some(aspect) = camera.attributes.get("aspectRatio") {
+        let locator = format!("{}/@aspectRatio", camera.locator);
+        set_pixel_aspect(ensure_video(&mut media), aspect, id, &locator);
     }
     if let Some(fps) = camera.attributes.get("fps") {
         let video = ensure_video(&mut media);
@@ -414,6 +427,9 @@ fn apply_sidecar(
                     value.map(|value| fact(id, &format!("{}/@{attribute}", layout.locator), value));
             }
         }
+        if let Some(aspect) = layout.attributes.get("aspectRatio") {
+            set_pixel_aspect(video, aspect, id, &format!("{}/@aspectRatio", layout.locator));
+        }
     }
     let normal = root
         .one("RecordingMode")?
@@ -471,6 +487,79 @@ fn promote_video_count(media: &mut MediaRepresentation, id: &str, locator: &str,
     let video = ensure_video(media);
     video.frame_count = Some(fact(id, locator, FrameCount::Exact(count as u64)));
     video.frame_rate_mode = Some(fact(id, locator, FrameRateMode::Constant));
+}
+
+/// Width and height stated by a Sony video type label (`<codec>_<width>_<height>_...`).
+fn label_dimensions(label: &str) -> Option<(u32, u32)> {
+    let parts: Vec<&str> = label.split('_').collect();
+    parts.windows(2).find_map(|pair| {
+        let width: u32 = pair[0].parse().ok()?;
+        let height: u32 = pair[1].parse().ok()?;
+        (width >= 16 && height >= 16).then_some((width, height))
+    })
+}
+
+/// Pixel aspect of a display aspect `W:H` over the stated frame size, reduced.
+fn set_pixel_aspect(video: &mut VideoMetadata, aspect: &str, id: &str, locator: &str) {
+    let (Some(width), Some(height)) = (&video.width, &video.height) else {
+        return;
+    };
+    let Some((aw, ah)) = aspect
+        .split_once(':')
+        .and_then(|(a, b)| Some((a.trim().parse::<i64>().ok()?, b.trim().parse::<i64>().ok()?)))
+    else {
+        return;
+    };
+    if aw <= 0 || ah <= 0 {
+        return;
+    }
+    let (numerator, denominator) = (aw * i64::from(height.value), ah * i64::from(width.value));
+    let divisor = gcd(numerator, denominator);
+    video.sample_aspect_ratio = Some(fact(
+        id,
+        locator,
+        Rational {
+            numerator: numerator / divisor,
+            denominator: denominator / divisor,
+        },
+    ));
+}
+
+/// Length in seconds of an exact frame count at a constant rate, reduced.
+fn promote_duration(media: &mut MediaRepresentation, field: &str, notices: &mut Vec<ReadNotice>) {
+    let Some(video) = video_ref(media) else {
+        return;
+    };
+    let (Some(rate), Some(frames)) = (&video.frame_rate, video.exact_frame_count()) else {
+        return;
+    };
+    let (Some(count), Some(locator)) = (
+        i64::try_from(frames).ok(),
+        video.frame_count.as_ref().map(|f| (f.evidence_id.clone(), f.locator.clone())),
+    ) else {
+        notice(notices, "invalid", field, "frame count out of range");
+        return;
+    };
+    let (numerator, denominator) = (count * rate.value.fps_den, rate.value.fps_num);
+    if denominator <= 0 {
+        return;
+    }
+    let divisor = gcd(numerator, denominator);
+    media.duration_seconds = Some(fact(
+        &locator.0,
+        &locator.1,
+        Rational {
+            numerator: numerator / divisor,
+            denominator: denominator / divisor,
+        },
+    ));
+}
+
+fn gcd(mut a: i64, mut b: i64) -> i64 {
+    while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    a.abs().max(1)
 }
 
 fn video_ref(media: &MediaRepresentation) -> Option<&VideoMetadata> {
