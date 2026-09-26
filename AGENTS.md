@@ -2335,6 +2335,10 @@ probea, kliknuti neuvezeni klip svira za nekoliko sekundi s TC-om kamere u Inges
 zapisa dovrseno za oko 46 s, 196 probeova spremljeno, nijedan neuspjeh; stvarne baze nepromijenjene.
 Otvoreni rizik: istek vremena probea zapise kao neuspjeh i klip ostaje nedovrsen (ugovor zapisa
 dopusta samo jedan pokusaj po mediju); treba odluku o ponovnom pokusaju nakon isteka vremena.
+Odluka korisnika 2026-09-26 ("zadrzi dosadasnje rjesenje"): kad svira proxy slika, zvuk i dalje
+ide iz originala (§8.2, docs/66), pa pozadinski dovrsetak i dalje probe-a original i proxy.
+Postavka probea (8 MB, 1 s za sve spremnike) ostaje ista; mjereno: MXF s kratkom analizom daje
+iste podatke za oko 0,21 s umjesto 0,5 s, a MP4 s kratkom analizom gubi pixel format, profil i boju.
 
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne
