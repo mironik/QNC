@@ -25,7 +25,51 @@ fn main() -> ExitCode {
     }
 }
 
+/// Runs while it holds the lease; then, with the lease released, looks at the import
+/// queue once more: an Uvezi whose start found the lease held (and ended at once) is
+/// never lost, it is taken here.
 fn run_background(root: &Path) -> Result<(), String> {
+    while run_once(root)? {
+        if !import_waiting(root)? {
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// Whether clips wait in the import queue of the active project.
+fn import_waiting(root: &Path) -> Result<bool, String> {
+    let active_project = qnc_active_project_read::ActiveProjectReader::from_root(root)
+        .map_err(|error| error.to_string())?;
+    let snapshot = active_project.read().map_err(|error| error.to_string())?;
+    let reader = qnc_content_read::ContentReader::for_project(
+        active_project.settings_reader(),
+        &snapshot.settings,
+    )?;
+    Ok(reader
+        .summaries()?
+        .iter()
+        .any(|clip| clip.import_status == "queued"))
+}
+
+/// The import queue as the project database has it, looked at every second while the
+/// other work of this run goes on (Uvezi may come at any time) and once more when it
+/// has ended; an import runs only when clips wait, so its result stays the last real one.
+fn import_while(root: &Path, running: &std::sync::atomic::AtomicBool) -> Result<(), String> {
+    loop {
+        let last = !running.load(std::sync::atomic::Ordering::Relaxed);
+        if import_waiting(root)? {
+            qnc_ingest_import_worker::run_import(root)?;
+        }
+        if last {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_secs(1));
+    }
+}
+
+/// One run under the lease; false when another worker holds it.
+fn run_once(root: &Path) -> Result<bool, String> {
     let active_project = qnc_active_project_read::ActiveProjectReader::from_root(root)
         .map_err(|error| error.to_string())?;
     let snapshot = active_project.read().map_err(|error| error.to_string())?;
@@ -38,11 +82,11 @@ fn run_background(root: &Path) -> Result<(), String> {
         qnc_playback_activity::WORKER,
         qnc_playback_activity::WORKER_FRESH_SECONDS,
     ) {
-        return Ok(());
+        return Ok(false);
     }
     let player_works = qnc_playback_activity::playback_pause(target.clone());
     let _lease = qnc_playback_activity::Beat::start(target, qnc_playback_activity::WORKER)?;
-    qnc_ingest_import_worker::run_import(root)?;
+    let running = std::sync::atomic::AtomicBool::new(true);
     // v5 media probe job: a card record gets what playback lacks, once, in the
     // background, so a preview of a clip not yet imported plays. It runs beside the
     // artifacts, several clips at once, the clip a preview wants first.
@@ -58,7 +102,8 @@ fn run_background(root: &Path) -> Result<(), String> {
     };
     let cancel = std::sync::atomic::AtomicBool::new(false);
     std::thread::scope(|scope| {
-        scope.spawn(|| {
+        let import = scope.spawn(|| import_while(root, &running));
+        let completion = scope.spawn(|| {
             let done = qnc_record_completion::complete_active_project(
                 root,
                 &make_backend,
@@ -75,7 +120,11 @@ fn run_background(root: &Path) -> Result<(), String> {
                 Err(error) => eprintln!("dovrsetak zapisa nije uspio: {error}"),
             }
         });
-        run_artifacts(root)
+        let artifacts = run_artifacts(root);
+        let _ = completion.join();
+        running.store(false, std::sync::atomic::Ordering::Relaxed);
+        let import = import.join().map_err(|_| "Uvoz je pao.".to_string())?;
+        artifacts.and(import).map(|()| true)
     })
 }
 

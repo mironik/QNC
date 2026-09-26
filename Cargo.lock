@@ -3612,6 +3612,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
  "qnc-content-artifacts",
+ "qnc-content-read",
  "qnc-content-store",
  "qnc-ingest-import-worker",
  "qnc-ingest-select",
