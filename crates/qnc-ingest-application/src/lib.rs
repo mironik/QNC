@@ -63,7 +63,8 @@ pub struct IngestApplication {
     active_project_reader: Option<ActiveProjectReader>,
     catalog_loader: catalog::CatalogLoader,
     catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
-    artifact_target: Option<qnc_content_store::ContentTarget>,
+    /// The project database (content and records) Select and the artifacts write into.
+    select_target: Option<qnc_ingest_select::SelectTarget>,
     selection_writer: qnc_ingest_selection_write::SelectionWriter,
     navigation_requested: bool,
     posters: qnc_clip_posters::ClipPosters,

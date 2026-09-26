@@ -8,16 +8,14 @@ use qnc_ingest_store::content::InventoryClip;
 use qnc_source_groups::{FileFact, GroupProposal};
 
 pub(crate) fn register_groups(
-    config: &SelectionConfig,
+    project: &qnc_db_broker::ProjectDbWriter,
     source: &SourceReader,
     groups: &[GroupProposal],
     file_facts: &[FileFact],
     existing: &BTreeMap<String, InventoryClip>,
     cancel: &AtomicBool,
 ) -> Result<Vec<SourceRecord>> {
-    let mut source_db = config.source_index.source_db()?;
-    // Initialize once before opening the bounded worker connections.
-    drop(config.media_records.media_db()?);
+    let source_db = qnc_source_index_db::project::ProjectSourceIndex::new(project.clone());
     let mut records = Vec::new();
     for chunk in groups.chunks(32) {
         if cancel.load(Ordering::Relaxed) {

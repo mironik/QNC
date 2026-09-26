@@ -14,7 +14,8 @@ use qnc_ingest_store::content::{
     ContentWriteTransport, ImportStatus, StoredClip,
 };
 use qnc_media_probe::{ProbeBackend, Request as ProbeRequest};
-use qnc_media_record_db::{contract::*, Client};
+use qnc_media_record_db::project::ProjectMediaRecords as Client;
+use qnc_media_record_db::contract::*;
 use qnc_source_groups::IndexDocument;
 use qnc_source_reader::{SourceReader, SourceReference, MAX_TEXT_BYTES};
 use selection_config::Result;
@@ -84,6 +85,27 @@ pub struct SelectedClip {
 
 const CANCEL_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
 
+/// The project a Select writes into: its content (clips) and the intermediary of its
+/// database for the media records and the source index (v5: all in the project).
+#[derive(Debug, Clone)]
+pub struct SelectTarget {
+    pub content: ContentTarget,
+    pub records: qnc_db_broker::ProjectDbTarget,
+}
+
+impl SelectTarget {
+    /// Both from the active project settings: the same project database binding.
+    pub fn for_project(
+        reader: &qnc_work_settings::SettingsReader,
+        settings: &qnc_work_settings::WorkSettings,
+    ) -> std::result::Result<Self, String> {
+        Ok(Self {
+            content: ContentTarget::for_project(reader, settings)?,
+            records: qnc_db_broker::ProjectDbTarget::for_project(reader, settings)?,
+        })
+    }
+}
+
 #[derive(Default)]
 pub struct SelectSession {
     result: Option<Receiver<Event>>,
@@ -96,7 +118,7 @@ impl SelectSession {
         &mut self,
         config: SelectionConfig,
         selected: SourceReference,
-        target: ContentTarget,
+        target: SelectTarget,
         registry: Arc<CameraRegistry>,
     ) -> std::result::Result<(), String> {
         self.cancel();
@@ -216,7 +238,7 @@ impl Default for SelectedClip {
 pub fn run(
     config: SelectionConfig,
     selected: SourceReference,
-    target: ContentTarget,
+    target: SelectTarget,
     registry: Arc<CameraRegistry>,
     send: SyncSender<Event>,
     cancel: Arc<AtomicBool>,
@@ -245,9 +267,13 @@ fn run_inner(
         &selection_config::SourceConfig,
         &[SourceReference],
     ) -> Result<Box<dyn ProbeBackend + Send>>,
-    content_target: ContentTarget,
+    target: SelectTarget,
     registry: &CameraRegistry,
 ) -> Result<Summary> {
+    let SelectTarget {
+        content: content_target,
+        records: records_target,
+    } = target;
     let started = std::time::Instant::now();
     if cancel.load(Ordering::Relaxed) {
         return Err("Select je prekinut.".into());
@@ -271,8 +297,17 @@ fn run_inner(
         registry,
         send,
     )?;
+    // One intermediary of the project database for every record of this Select
+    // (v5: the ingest records live in the project database).
+    let project = qnc_db_broker::ProjectDbWriter::start(
+        records_target,
+        vec![
+            qnc_media_record_db::project::MediaRecordsModule::factory(),
+            qnc_source_index_db::project::SourceIndexModule::factory(),
+        ],
+    )?;
     let records = records::register_groups(
-        config,
+        &project,
         &source,
         &scanned.groups,
         &scanned.file_facts,
@@ -292,6 +327,7 @@ fn run_inner(
         describe_and_publish(
             &metadata::Worker {
                 config,
+                project: &project,
                 source_config,
                 source: &source,
                 registry,

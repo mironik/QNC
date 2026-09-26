@@ -5,6 +5,7 @@ mod acquisition;
 mod database;
 mod transport;
 pub use database::Store;
+pub mod project;
 pub use transport::{respond, Client, ENDPOINT};
 
 #[cfg(test)]

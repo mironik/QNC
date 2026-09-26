@@ -2308,7 +2308,18 @@ novi `qnc-source-volumes`, ugovori baza, modula i aplikacije Ingest, `tools/qnc-
 root Cargo. UI i layout se ne diraju. Izvedeno: K1; K2 (`open_in_project`,
 `media_write_receipts`, `source_write_receipts`, journal PERSIST kao baza projekta); K3
 (`qnc-content-store`: operacije `MediaRecord`/`SourceIndex` i serijski posrednik
-`ContentRecords`).
+`ContentRecords`). Korisnik 2026-09-26: `qnc-content-store` je monolit i mora preci na lego
+sistem ("kreni"). Novi plan B1-B7: B1 javni posrednik `crates/qnc-db-broker` (v5
+`ProjectDbBroker`: otvara samo postojecu bazu tog projekta, PERSIST/WAL, busy timeout,
+serijski pisac `ProjectDbWriter`, isti zahtjevi Local/LAN/Intranet, bez SQL-a ijedne
+domene; moduli tablica dobivaju vezu i posjeduju svoje tablice); B2 zapisi medija i
+izvorni indeks kao moduli tablica posrednika (`MediaRecordsModule`/`ProjectMediaRecords`,
+`SourceIndexModule`/`ProjectSourceIndex`), K3 dodaci iz `qnc-content-store` uklonjeni
+(zadrzan samo prelazak dviju transakcija na IMMEDIATE), Select pise zapise kroz posrednika
+(`SelectTarget`), `ingest-transport.json` vise nema baza zapisa; B3-B7 Story i undo,
+virtualni kadrovi, filmstrip/wave, red uvoza i runtime, katalog klipova, pa brisanje
+`qnc-content-store`. Otkljucani su i `qnc-db-broker` (novi) i ugovor
+`contracts/modules/db-broker.module.json`. Izvedeno: B1, B2 (ukljucuje K4).
 
 Otvoreno ograniceno odobrenje 2026-09-25 (originalni timecode izvora): korisnik je
 odredio: broadcast montaza radi po timecodeu (veza proxy-original i export); pocetni TC

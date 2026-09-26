@@ -100,6 +100,7 @@ members = [
     "crates/qnc-wrap-session",
     "crates/qnc-sync-cover",
     "crates/qnc-source-timecode",
+    "crates/qnc-db-broker",
     "crates/qnc-panel-focus",
     "crates/qnc-program-playlist",
     "crates/qnc-program-input",
@@ -223,6 +224,7 @@ qnc-program-segments = { path = "crates/qnc-program-segments" }
 qnc-wrap-session = { path = "crates/qnc-wrap-session" }
 qnc-sync-cover = { path = "crates/qnc-sync-cover" }
 qnc-source-timecode = { path = "crates/qnc-source-timecode" }
+qnc-db-broker = { path = "crates/qnc-db-broker" }
 qnc-panel-focus = { path = "crates/qnc-panel-focus" }
 qnc-program-playlist = { path = "crates/qnc-program-playlist" }
 qnc-program-input = { path = "crates/qnc-program-input" }

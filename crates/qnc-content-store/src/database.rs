@@ -9,10 +9,6 @@ use std::{
 
 pub struct ContentStore {
     conn: Connection,
-    /// The project database file, for the media record and source index tables.
-    file: std::path::PathBuf,
-    media: Option<qnc_media_record_db::Store>,
-    sources: Option<qnc_source_index_db::Store>,
     uri: String,
     access: Access,
     schema_ready: bool,
@@ -122,7 +118,11 @@ impl ContentStore {
         if access == Access::ReadWrite {
             // One transaction: another process reading meanwhile never sees a
             // public view dropped and not yet created again ("no such table").
-            let tx = conn.unchecked_transaction().map_err(err)?;
+            // Immediate: another writer of the project database (the media record
+            // tables) is waited for, never deadlocked on a read-then-write upgrade.
+            let tx = conn
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(err)?;
             ensure_summary_columns(&tx)?;
             ensure_lease_column(&tx)?;
             ensure_runtime_table(&tx)?;
@@ -158,9 +158,6 @@ impl ContentStore {
         }));
         Ok(Self {
             conn,
-            file: file.to_path_buf(),
-            media: None,
-            sources: None,
             uri: uri.into(),
             access,
             schema_ready: schema,
@@ -222,8 +219,6 @@ impl ContentStore {
 
     fn dispatch(&mut self, operation: &Operation) -> Result<Data> {
         match operation {
-            Operation::MediaRecord(operation) => self.media_record(operation),
-            Operation::SourceIndex(operation) => self.source_index(operation),
             Operation::UndoStory => {
                 crate::story_undo::step(&self.conn, true)?;
                 Ok(Data::Changed)
@@ -458,7 +453,10 @@ impl ContentStore {
                 if clip_ids.len() > 4096 {
                     return Err("Previse klipova u naredbi.".into());
                 }
-                let tx = self.conn.transaction().map_err(err)?;
+                let tx = self
+                    .conn
+                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                    .map_err(err)?;
                 for id in clip_ids {
                     if tx
                         .execute(
@@ -610,46 +608,6 @@ impl ContentStore {
                 Ok(Data::Changed)
             }
         }
-    }
-
-    /// The media record tables of this project database, opened once.
-    fn media_record(&mut self, operation: &qnc_media_records::Operation) -> Result<Data> {
-        if self.media.is_none() {
-            self.media = Some(
-                qnc_media_record_db::Store::open_in_project(&self.file, self.access)
-                    .map_err(|e| format!("Zapisi medija: {e:?}"))?,
-            );
-        }
-        let store = self.media.as_mut().ok_or("Zapisi medija nisu otvoreni.")?;
-        let request = qnc_media_records::Request {
-            version: qnc_media_records::VERSION.into(),
-            db_uri: MEDIA_RECORDS_URI.into(),
-            operation: operation.clone(),
-        };
-        store
-            .execute(&request)
-            .map(|data| Data::MediaRecord(Box::new(data)))
-            .map_err(|e| format!("Zapisi medija: {e:?}"))
-    }
-
-    /// The source index tables of this project database, opened once.
-    fn source_index(&mut self, operation: &qnc_source_index_contract::Operation) -> Result<Data> {
-        if self.sources.is_none() {
-            self.sources = Some(
-                qnc_source_index_db::Store::open_in_project(&self.file, self.access)
-                    .map_err(|e| format!("Izvorni indeks: {e:?}"))?,
-            );
-        }
-        let store = self.sources.as_mut().ok_or("Izvorni indeks nije otvoren.")?;
-        let request = qnc_source_index_contract::Request {
-            version: qnc_source_index_contract::VERSION.into(),
-            db_uri: SOURCE_INDEX_URI.into(),
-            operation: operation.clone(),
-        };
-        store
-            .execute(&request)
-            .map(|data| Data::SourceIndex(Box::new(data)))
-            .map_err(|e| format!("Izvorni indeks: {e:?}"))
     }
 
     fn catalog_stats(&self) -> Result<CatalogStats> {

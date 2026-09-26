@@ -57,32 +57,6 @@ impl Binding {
             )?)
         }
     }
-    pub fn media_db(&self) -> Result<qnc_media_record_db::Client> {
-        let r = self.resolver()?;
-        if self.file.is_some() {
-            Ok(qnc_media_record_db::Client::create_local(&r, &self.uri)?)
-        } else {
-            Ok(qnc_media_record_db::Client::open(
-                &r,
-                &self.uri,
-                qnc_media_record_db::Access::ReadWrite,
-                self.token()?.as_deref(),
-            )?)
-        }
-    }
-    pub fn source_db(&self) -> Result<qnc_source_index_db::Client> {
-        let r = self.resolver()?;
-        if self.file.is_some() {
-            Ok(qnc_source_index_db::Client::create_local(&r, &self.uri)?)
-        } else {
-            Ok(qnc_source_index_db::Client::open(
-                &r,
-                &self.uri,
-                qnc_source_index_db::Access::ReadWrite,
-                self.token()?.as_deref(),
-            )?)
-        }
-    }
 }
 
 impl From<SourceBinding> for Binding {
@@ -201,8 +175,6 @@ impl SourceConfig {
 pub struct SelectionConfig {
     pub version: String,
     pub catalog: Binding,
-    pub source_index: Binding,
-    pub media_records: Binding,
     pub sources: Vec<SourceConfig>,
     pub parallelism: usize,
 }
@@ -217,14 +189,6 @@ impl SelectionConfig {
             catalog: bindings
                 .catalog
                 .ok_or("transport catalog binding missing")?
-                .into(),
-            source_index: bindings
-                .source_index
-                .ok_or("transport source_index binding missing")?
-                .into(),
-            media_records: bindings
-                .media_records
-                .ok_or("transport media_records binding missing")?
                 .into(),
             sources: bindings
                 .registered_sources
@@ -241,11 +205,9 @@ impl SelectionConfig {
         {
             return Err("invalid Select configuration".into());
         }
-        for binding in [
-            &mut config.catalog,
-            &mut config.source_index,
-            &mut config.media_records,
-        ] {
+        // Media records and the source index live in the project database (v5), never
+        // in a database of the computer: this host configuration names none.
+        for binding in [&mut config.catalog] {
             binding.resolver()?;
         }
         let mut ids = std::collections::BTreeSet::new();

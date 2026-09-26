@@ -72,7 +72,7 @@ impl IngestApplication {
         let Some(config) = self.selection_config.clone() else {
             return IngestDispatchResult::rejected("Nema Select konfiguracije.");
         };
-        let Some(target) = self.catalog_target.clone() else {
+        let Some(target) = self.select_target.clone() else {
             return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
         };
         match self

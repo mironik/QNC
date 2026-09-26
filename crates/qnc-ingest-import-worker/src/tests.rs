@@ -118,12 +118,7 @@ fn fixture_with(queued: bool) -> Fixture {
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect();
-    let content = config
-        .source_index
-        .file
-        .as_ref()
-        .unwrap()
-        .with_file_name("content.db");
+    let content = qnc_ingest_select::test_support::content_file(&config);
     let mut client =
         ContentClient::from_owner_binding(&content, DB_URI, Access::ReadWrite).unwrap();
     let target =

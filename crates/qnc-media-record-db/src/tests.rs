@@ -598,6 +598,8 @@ fn project_file(dir: &Path) -> std::path::PathBuf {
     let conn = rusqlite::Connection::open(&path).unwrap();
     conn.execute_batch(
         "PRAGMA application_id = 77;
+         CREATE TABLE project_settings (project_id TEXT); INSERT INTO project_settings VALUES ('p1');
+         CREATE VIEW public_project_settings AS SELECT project_id FROM project_settings;
          CREATE TABLE clips (clip_id TEXT PRIMARY KEY); INSERT INTO clips VALUES ('x');",
     )
     .unwrap();
@@ -605,29 +607,22 @@ fn project_file(dir: &Path) -> std::path::PathBuf {
 }
 
 #[test]
-fn records_live_in_the_project_database_next_to_its_tables() {
+fn records_live_in_the_project_database_behind_its_intermediary() {
+    use crate::project::{MediaRecordsModule, ProjectMediaRecords};
     let dir = tempfile::tempdir().unwrap();
     let path = project_file(dir.path());
-    let mut store = Store::open_in_project(&path, Access::ReadWrite).unwrap();
-    let request = |operation| Request {
-        version: VERSION.into(),
-        db_uri: URI.into(),
-        operation,
-    };
-    store.execute(&request(Operation::Write(Box::new(input("A"))))).unwrap();
-    drop(store);
-    let mut store = Store::open_in_project(&path, Access::ReadOnly).unwrap();
-    let read = store
-        .execute(&request(Operation::Read {
-            clip_id: "clip-A".into(),
-            revision: None,
-        }))
-        .unwrap();
-    assert!(matches!(read, Data::Snapshot(Some(_))), "{read:?}");
+    let target =
+        qnc_db_broker::ProjectDbTarget::from_owner_binding(&path, "qnc://local/db/project_db/p1")
+            .unwrap();
+    let writer =
+        qnc_db_broker::ProjectDbWriter::start(target, vec![MediaRecordsModule::factory()]).unwrap();
+    let records = ProjectMediaRecords::new(writer);
+    records.write(input("A")).unwrap();
+    assert!(records.read("clip-A", None).unwrap().is_some());
     let conn = rusqlite::Connection::open(&path).unwrap();
     let app: i32 = conn.pragma_query_value(None, "application_id", |r| r.get(0)).unwrap();
     let mode: String = conn.pragma_query_value(None, "journal_mode", |r| r.get(0)).unwrap();
     assert_eq!((app, mode.as_str()), (77, "delete"), "the project keeps its identity and is not turned into WAL");
     assert_eq!(count(&path, "clips"), 1, "the tables of the project stay");
-    assert!(Store::open_in_project(&dir.path().join("none.db"), Access::ReadWrite).is_err());
+    assert_eq!(count(&path, "media_write_receipts"), 1);
 }

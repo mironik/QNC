@@ -6,7 +6,7 @@ impl IngestApplication {
         self.cancel_thumbnail_load();
         self.work_plan = None;
         self.catalog_target = None;
-        self.artifact_target = None;
+        self.select_target = None;
         self.catalog_stats = None;
         self.view.clips.clear();
         self.view.timeline = Default::default();
@@ -131,10 +131,9 @@ impl IngestApplication {
                 self.view.archive_original_available = false;
                 self.view.archive_original = false;
                 self.view.work_settings_ready = true;
-                self.artifact_target = match self.settings_reader.as_ref() {
+                self.select_target = match self.settings_reader.as_ref() {
                     Some(reader) => {
-                        match qnc_content_store::ContentTarget::for_project(reader, &plan.settings)
-                        {
+                        match qnc_ingest_select::SelectTarget::for_project(reader, &plan.settings) {
                             Ok(target) => Some(target),
                             Err(error) => {
                                 self.settings_failed(error);

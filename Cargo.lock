@@ -3132,10 +3132,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-json-transport",
  "qnc-media-metadata",
- "qnc-media-record-db",
  "qnc-media-records",
- "qnc-source-index-contract",
- "qnc-source-index-db",
  "qnc-transport-resolver",
  "qnc-wave",
  "qnc-work-settings",
@@ -3152,6 +3149,21 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "qnc-db-broker"
+version = "0.1.0"
+dependencies = [
+ "qnc-contracts",
+ "qnc-json-transport",
+ "qnc-transport-resolver",
+ "qnc-work-settings",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tiny_http",
 ]
 
 [[package]]
@@ -3516,6 +3528,7 @@ dependencies = [
  "qnc-camera-patterns",
  "qnc-camera-sony-fx6-v6",
  "qnc-contracts",
+ "qnc-db-broker",
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-image-assets",
@@ -3531,6 +3544,8 @@ dependencies = [
  "qnc-source-index-db",
  "qnc-source-reader",
  "qnc-transport-resolver",
+ "qnc-work-settings",
+ "rusqlite",
  "serde",
  "serde_json",
  "tempfile",
@@ -3727,6 +3742,7 @@ dependencies = [
 name = "qnc-media-record-db"
 version = "0.1.0"
 dependencies = [
+ "qnc-db-broker",
  "qnc-db-contract",
  "qnc-json-transport",
  "qnc-media-metadata",
@@ -4169,6 +4185,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-camera-detector",
  "qnc-camera-patterns",
+ "qnc-db-broker",
  "qnc-db-contract",
  "qnc-json-transport",
  "qnc-scanner",

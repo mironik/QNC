@@ -2,6 +2,7 @@
 mod database;
 mod transport;
 pub use database::{Access, Store};
+pub mod project;
 pub use qnc_source_index_contract as contract;
 pub use transport::{respond, Client, Credentials, ENDPOINT};
 

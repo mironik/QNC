@@ -438,58 +438,6 @@ struct ContentWriteCommand {
     operation: Operation,
 }
 
-/// The one serial intermediary of the media record and source index tables of a
-/// project database (QNC v5 `ProjectDbBroker::serialize_project_write`): every
-/// request, from any number of Select workers, runs in order on one writer and
-/// waits for its own reply. Local and remote projects use the same requests.
-#[derive(Debug, Clone)]
-pub struct ContentRecords {
-    requests: Sender<(Operation, Sender<Result<Data>>)>,
-}
-
-impl ContentRecords {
-    pub fn start(target: ContentTarget) -> Result<Self> {
-        let mut client = target.open(Access::ReadWrite)?;
-        let (requests, receive) = mpsc::channel::<(Operation, Sender<Result<Data>>)>();
-        std::thread::Builder::new()
-            .name("qnc-content-records".into())
-            .spawn(move || {
-                for (operation, reply) in receive {
-                    let _ = reply.send(client.execute(operation));
-                }
-            })
-            .map_err(err)?;
-        Ok(Self { requests })
-    }
-
-    fn call(&self, operation: Operation) -> Result<Data> {
-        let (reply, answer) = mpsc::channel();
-        self.requests
-            .send((operation, reply))
-            .map_err(|_| "Posrednik zapisa nije dostupan.".to_string())?;
-        answer
-            .recv()
-            .map_err(|_| "Posrednik zapisa nije odgovorio.".to_string())?
-    }
-
-    pub fn media(&self, operation: qnc_media_records::Operation) -> Result<qnc_media_records::Data> {
-        match self.call(Operation::MediaRecord(Box::new(operation)))? {
-            Data::MediaRecord(data) => Ok(*data),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-
-    pub fn source(
-        &self,
-        operation: qnc_source_index_contract::Operation,
-    ) -> Result<qnc_source_index_contract::Data> {
-        match self.call(Operation::SourceIndex(Box::new(operation)))? {
-            Data::SourceIndex(data) => Ok(*data),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct ContentWriteTransport {
     pending: usize,

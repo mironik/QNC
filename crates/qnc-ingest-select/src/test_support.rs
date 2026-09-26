@@ -60,8 +60,6 @@ pub fn fixture() -> (tempfile::TempDir, SelectionConfig) {
             &Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../catalogs/camera-patterns/camera-patterns-2026.09.07.1.sqlite"),
         ),
-        source_index: local("qnc://local/db/source_index", &dir.path().join("index.db")),
-        media_records: local("qnc://local/db/media_records", &dir.path().join("media.db")),
         sources: vec![SourceConfig {
             location: local(SOURCE, &card),
             name: "Card".into(),
@@ -201,19 +199,49 @@ pub fn execute_with(
                 partial,
             }))
         },
-        ContentTarget::from_owner_binding(
-            &config
-                .source_index
-                .file
-                .as_ref()
-                .unwrap()
-                .with_file_name("content.db"),
-            "qnc://local/db/ingest_content/p1",
-        )
-        .unwrap(),
+        select_target(config),
         registry,
     )
     .unwrap();
     drop(send);
     receive.into_iter().collect()
+}
+
+/// The project database of the fixture: content, media records and source index.
+pub fn content_file(config: &SelectionConfig) -> std::path::PathBuf {
+    config.sources[0]
+        .location
+        .file
+        .as_ref()
+        .and_then(|card| card.parent())
+        .expect("fixture card directory")
+        .join("content.db")
+}
+
+/// The fixture project database: project settings of project p1, so the one
+/// intermediary of the project database accepts it (it is never created there).
+pub fn project_database(file: &Path) {
+    let conn = rusqlite::Connection::open(file).unwrap();
+    conn.execute_batch(
+        "PRAGMA journal_mode = PERSIST;
+         CREATE TABLE IF NOT EXISTS project_settings (project_id TEXT);
+         INSERT INTO project_settings SELECT 'p1' WHERE NOT EXISTS (SELECT 1 FROM project_settings);
+         CREATE VIEW IF NOT EXISTS public_project_settings AS SELECT project_id FROM project_settings;",
+    )
+    .unwrap();
+}
+
+/// Content and records of the project database at `file`.
+pub fn select_target_at(file: &Path) -> crate::SelectTarget {
+    project_database(file);
+    crate::SelectTarget {
+        content: ContentTarget::from_owner_binding(file, "qnc://local/db/ingest_content/p1").unwrap(),
+        records: qnc_db_broker::ProjectDbTarget::from_owner_binding(file, "qnc://local/db/project_db/p1")
+            .unwrap(),
+    }
+}
+
+/// The project database of the fixture as a Select target.
+pub fn select_target(config: &SelectionConfig) -> crate::SelectTarget {
+    select_target_at(&content_file(config))
 }

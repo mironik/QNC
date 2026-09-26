@@ -455,31 +455,26 @@ fn manifests_and_dependency_boundaries_are_explicit() {
 }
 
 #[test]
-fn the_source_index_lives_in_the_project_database_next_to_its_tables() {
+fn the_source_index_lives_in_the_project_database_behind_its_intermediary() {
+    use crate::project::{ProjectSourceIndex, SourceIndexModule};
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("project.db");
     rusqlite::Connection::open(&path)
         .unwrap()
-        .execute_batch("PRAGMA application_id = 77; CREATE TABLE clips (clip_id TEXT);")
+        .execute_batch(
+            "PRAGMA application_id = 77; CREATE TABLE clips (clip_id TEXT);
+             CREATE TABLE project_settings (project_id TEXT); INSERT INTO project_settings VALUES ('p1');
+             CREATE VIEW public_project_settings AS SELECT project_id FROM project_settings;",
+        )
         .unwrap();
-    let mut store = Store::open_in_project(&path, Access::ReadWrite).unwrap();
-    let request = |operation| Request {
-        version: VERSION.into(),
-        db_uri: URI.into(),
-        operation,
-    };
-    let Data::Written(receipt) = store
-        .execute(&request(Operation::Write(batch("one", vec![proposal("A")]))))
-        .unwrap()
-    else {
-        panic!()
-    };
-    let read = store
-        .execute(&request(Operation::Read {
-            record_id: receipt.record_ids[0].clone(),
-        }))
-        .unwrap();
-    assert!(matches!(read, Data::Record(Some(_))));
+    let target =
+        qnc_db_broker::ProjectDbTarget::from_owner_binding(&path, "qnc://local/db/project_db/p1")
+            .unwrap();
+    let index = ProjectSourceIndex::new(
+        qnc_db_broker::ProjectDbWriter::start(target, vec![SourceIndexModule::factory()]).unwrap(),
+    );
+    let receipt = index.write(batch("one", vec![proposal("A")])).unwrap();
+    assert!(index.read(&receipt.record_ids[0]).unwrap().is_some());
     assert_eq!(row_count(&path, "source_write_receipts"), 1);
     let app: i32 = rusqlite::Connection::open(&path)
         .unwrap()

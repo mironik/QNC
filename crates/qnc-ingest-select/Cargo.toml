@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-test-support = ["dep:image", "dep:tempfile", "dep:qnc-sony-metadata"]
+test-support = ["dep:image", "dep:tempfile", "dep:qnc-sony-metadata", "dep:rusqlite"]
 
 [dependencies]
 qnc-camera-adapter = { workspace = true }
@@ -17,6 +17,9 @@ qnc-image-assets = { workspace = true }
 qnc-ingest-store = { workspace = true }
 qnc-media-metadata-compose = { workspace = true }
 qnc-media-probe = { workspace = true }
+qnc-db-broker = { workspace = true }
+rusqlite = { workspace = true, optional = true }
+qnc-work-settings = { workspace = true }
 qnc-media-record-db = { workspace = true }
 qnc-scanner = { workspace = true }
 qnc-source-groups = { workspace = true }
@@ -33,6 +36,7 @@ tempfile = { version = "3", optional = true }
 qnc-sony-metadata = { workspace = true, optional = true }
 
 [dev-dependencies]
+rusqlite = { workspace = true }
 qnc-camera-sony-fx6-v6 = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-sony-metadata = { workspace = true }

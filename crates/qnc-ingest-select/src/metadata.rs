@@ -10,6 +10,8 @@ use qnc_ingest_store::content::InventoryClip;
 /// What one metadata worker needs; shared by all workers of a Select run.
 pub(crate) struct Worker<'a> {
     pub config: &'a SelectionConfig,
+    /// The intermediary of the project database: records live in the project.
+    pub project: &'a qnc_db_broker::ProjectDbWriter,
     pub source_config: &'a SourceConfig,
     pub source: &'a SourceReader,
     pub registry: &'a CameraRegistry,
@@ -24,7 +26,7 @@ pub(crate) struct Worker<'a> {
 impl Worker<'_> {
     /// Takes records one by one until none are left or Select is cancelled.
     pub fn run(&self, publish: SyncSender<CatalogClip>) -> Result<()> {
-        let mut db = self.config.media_records.media_db()?;
+        let mut db = Client::new(self.project.clone());
         while !self.cancel.load(Ordering::Relaxed) {
             let i = self.next.fetch_add(1, Ordering::Relaxed);
             let Some(record) = self.records.get(i) else {
@@ -71,7 +73,7 @@ impl Worker<'_> {
         send.send(Event::Clip(preview))?;
         let result = process_record(
             db,
-            &self.config.source_index.uri,
+            qnc_source_index_db::project::URI,
             record,
             source,
             self.backend,
@@ -85,7 +87,7 @@ impl Worker<'_> {
                     serial_number: self.source_config.serial_number.clone(),
                     volume_name: self.source_config.volume_name.clone(),
                     thumbnail_uri: thumbnail_reference(record, registry).map(|r| r.uri()),
-                    media_records_uri: self.config.media_records.uri.clone(),
+                    media_records_uri: qnc_media_record_db::project::URI.into(),
                     snapshot: snapshot.clone(),
                 };
                 let mut clip = view(&StoredClip {

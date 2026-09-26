@@ -9,6 +9,7 @@ qnc-transport-resolver.workspace = true
 qnc-json-transport.workspace = true
 serde_json.workspace = true
 rusqlite = { workspace = true, features = ["limits"] }
+qnc-db-broker.workspace = true
 uuid = { version = "1", features = ["v4"] }
 tiny_http = "0.12"
 

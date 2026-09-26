@@ -13,7 +13,7 @@ impl IngestApplication {
         let (Some(reader), Some(plan), Some(target)) = (
             self.settings_reader.as_ref(),
             self.work_plan().cloned(),
-            self.artifact_target.clone(),
+            self.select_target.as_ref().map(|target| target.content.clone()),
         ) else {
             return Ok(());
         };
@@ -24,7 +24,7 @@ impl IngestApplication {
         let (Some(reader), Some(plan), Some(target)) = (
             self.settings_reader.as_ref(),
             self.work_plan().cloned(),
-            self.artifact_target.clone(),
+            self.select_target.as_ref().map(|target| target.content.clone()),
         ) else {
             if self.playback_guard_active() {
                 self.artifacts.defer_sync();
@@ -41,7 +41,7 @@ impl IngestApplication {
         let (Some(reader), Some(plan), Some(target)) = (
             self.settings_reader.as_ref(),
             self.work_plan().cloned(),
-            self.artifact_target.clone(),
+            self.select_target.as_ref().map(|target| target.content.clone()),
         ) else {
             self.view.timeline_assets =
                 qnc_timeline_assets::SourceTimelineAssets::empty_for(clip_id);

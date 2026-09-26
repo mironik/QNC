@@ -77,40 +77,17 @@ impl Store {
         Ok(Self { conn, access })
     }
 
-    /// Opens these tables inside the database of the active project (QNC v5: the
-    /// ingest tables live in the project database; user rule 2026-09-26: the project
-    /// owns them). The project file must exist: nothing creates it here, and its
-    /// journal mode and identity stay the project's. Missing tables are created on a
-    /// read-write open; only these tables are checked, never the whole file.
-    pub fn open_in_project(path: &Path, access: Access) -> Result<Self> {
-        let flags = if access == Access::ReadOnly {
-            OpenFlags::SQLITE_OPEN_READ_ONLY
-        } else {
-            OpenFlags::SQLITE_OPEN_READ_WRITE
-        };
-        let mut conn = Connection::open_with_flags(path, flags).map_err(db_error)?;
+    /// These tables inside the database of the active project (QNC v5: the ingest
+    /// tables live in the project database; user rule 2026-09-26: the project owns
+    /// them). The project database intermediary (`qnc-db-broker`) opens the file
+    /// and keeps its policy; this module only creates its missing tables on a
+    /// read-write attach and checks them, never the whole file.
+    pub fn attach(mut conn: Connection, access: Access) -> Result<Self> {
         conn.set_limit(
             rusqlite::limits::Limit::SQLITE_LIMIT_LENGTH,
             (MAX_BYTES * 2) as i32,
         );
-        conn.busy_timeout(Duration::from_secs(5))
-            .map_err(db_error)?;
-        conn.pragma_update(None, "trusted_schema", "OFF")
-            .map_err(db_error)?;
-        conn.pragma_update(None, "foreign_keys", "ON")
-            .map_err(db_error)?;
         if access == Access::ReadWrite {
-            // The project directory denies deletion: keep the rollback journal file
-            // (as the project content store does) unless the project is in WAL.
-            let mode: String = conn
-                .pragma_query_value(None, "journal_mode", |r| r.get(0))
-                .map_err(db_error)?;
-            if !mode.eq_ignore_ascii_case("wal") {
-                conn.pragma_update(None, "journal_mode", "PERSIST")
-                    .map_err(db_error)?;
-            }
-            conn.pragma_update(None, "synchronous", "FULL")
-                .map_err(db_error)?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(db_error)?;

@@ -54,8 +54,6 @@ pub(crate) fn fixture() -> (tempfile::TempDir, SelectionConfig) {
             &Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../catalogs/camera-patterns/camera-patterns-2026.09.07.1.sqlite"),
         ),
-        source_index: local("qnc://local/db/source_index", &dir.path().join("index.db")),
-        media_records: local("qnc://local/db/media_records", &dir.path().join("media.db")),
         sources: vec![SourceConfig {
             location: local(SOURCE, &card),
             name: "Card".into(),
@@ -146,16 +144,7 @@ pub(crate) fn execute(
                 partial,
             }))
         },
-        ContentTarget::from_owner_binding(
-            &config
-                .source_index
-                .file
-                .as_ref()
-                .unwrap()
-                .with_file_name("content.db"),
-            "qnc://local/db/ingest_content/p1",
-        )
-        .unwrap(),
+        crate::test_support::select_target(&config),
         &crate::test_support::registry(MetadataSufficiency::NeedsProbe),
     );
     drop(send);
@@ -213,7 +202,7 @@ fn select_persists_two_original_proxy_groups_and_reselect_reads_db() {
         .collect();
     assert_eq!(clips.len(), 2);
     assert!(events.iter().any(|e| matches!(e, Event::Clip(c) if c.thumb_status == crate::SelectThumbStatus::Ready && c.thumb_image.is_some())));
-    let mut db = config.media_records.media_db().unwrap();
+    let mut db = media_db(&config);
     for id in clips {
         let saved = db.read(id, None).unwrap().unwrap();
         assert_eq!(saved.phase, Phase::Final);
@@ -307,10 +296,7 @@ fn reselect_adds_only_new_clips_removes_confirmed_missing_and_keeps_selection() 
         "no media deletion"
     );
     assert!(
-        config
-            .media_records
-            .media_db()
-            .unwrap()
+        media_db(&config)
             .read(&b_id, None)
             .unwrap()
             .is_some(),
@@ -351,8 +337,7 @@ fn preview_arrives_while_publication_is_blocked() {
                         partial: false,
                     }))
                 },
-                ContentTarget::from_owner_binding(&path, "qnc://local/db/ingest_content/p1")
-                    .unwrap(),
+                crate::test_support::select_target_at(&path),
                 &crate::test_support::registry(MetadataSufficiency::NeedsProbe),
             )
         });
@@ -453,6 +438,7 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
     for environment in ["lan", "intranet"] {
         let (dir, mut config) = fixture();
         let content_uri = format!("qnc://{environment}/fixture/db/ingest_content/p1");
+        crate::test_support::project_database(&dir.path().join("content.db"));
         let mut content = qnc_ingest_store::content::ContentStore::open_owner_binding(
             &dir.path().join("content.db"),
             &content_uri,
@@ -460,30 +446,28 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
         )
         .unwrap();
         let published_content = content_uri.clone();
+        let project_uri = format!("qnc://{environment}/fixture/db/project_db/p1");
+        let record_modules = vec![
+            qnc_media_record_db::project::MediaRecordsModule::factory(),
+            qnc_source_index_db::project::SourceIndexModule::factory(),
+        ];
+        let mut project = qnc_db_broker::ProjectDb::open(
+            &dir.path().join("content.db"),
+            &project_uri,
+            Access::ReadWrite,
+            record_modules.clone(),
+        )
+        .unwrap();
+        let published_project = project_uri.clone();
         let source_uri = format!("qnc://{environment}/fixture/source/card-test");
-        let index_uri = format!("qnc://{environment}/fixture/db/source_index");
-        let media_uri = format!("qnc://{environment}/fixture/db/media_records");
         let local_source =
             qnc_source_reader::LocalSource::new(&source_uri, dir.path().join("card")).unwrap();
-        let mut index = qnc_source_index_db::Store::open_owner_binding(
-            &dir.path().join("index.db"),
-            qnc_source_index_db::Access::ReadWrite,
-            true,
-        )
-        .unwrap();
-        let mut media = qnc_media_record_db::Store::open_owner_binding(
-            &dir.path().join("media.db"),
-            qnc_media_record_db::Access::ReadWrite,
-            true,
-        )
-        .unwrap();
         let credentials =
             qnc_media_record_db::Credentials::new("fixture-read", "fixture-write").unwrap();
         let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
         let endpoint = format!("http://{}", server.server_addr());
         let stop = Arc::new(AtomicBool::new(false));
         let thread_stop = stop.clone();
-        let (published_index, published_media) = (index_uri.clone(), media_uri.clone());
         let server_thread = std::thread::spawn(move || {
             while !thread_stop.load(Ordering::Relaxed) {
                 let Some(request) = server
@@ -499,21 +483,16 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
                         &published_content,
                         &credentials,
                     ),
+                    qnc_db_broker::ENDPOINT => qnc_db_broker::respond(
+                        request,
+                        &mut project,
+                        &published_project,
+                        &credentials,
+                        &record_modules,
+                    ),
                     qnc_source_reader::ENDPOINT => {
                         qnc_source_reader::server::respond(request, &local_source, "fixture-write")
                     }
-                    qnc_source_index_db::ENDPOINT => qnc_source_index_db::respond(
-                        request,
-                        &mut index,
-                        &published_index,
-                        &credentials,
-                    ),
-                    qnc_media_record_db::ENDPOINT => qnc_media_record_db::respond(
-                        request,
-                        &mut media,
-                        &published_media,
-                        &credentials,
-                    ),
                     _ => {
                         let _ = request.respond(tiny_http::Response::empty(404));
                     }
@@ -529,8 +508,6 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
             token_env: Some(variable.clone()),
         };
         config.sources[0].location = remote(source_uri.clone());
-        config.source_index = remote(index_uri);
-        config.media_records = remote(media_uri);
         let result = std::panic::catch_unwind(|| {
             let mut browser = config.browser().unwrap();
             assert_eq!(browser.roots(environment).unwrap().entries.len(), 1);
@@ -550,18 +527,29 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
                             partial: false,
                         }))
                     },
-                    ContentTarget::from_remote_binding(
-                        if environment == "lan" {
+                    {
+                        let resolver = if environment == "lan" {
                             qnc_transport_resolver::ResolverConfig::new(dir.path())
                                 .with_lan_authority("fixture", &endpoint)
                         } else {
                             qnc_transport_resolver::ResolverConfig::new(dir.path())
                                 .with_intranet_authority("fixture", &endpoint)
-                        },
-                        &content_uri,
-                        "fixture-write".to_string(),
-                    )
-                    .unwrap(),
+                        };
+                        crate::SelectTarget {
+                            content: ContentTarget::from_remote_binding(
+                                resolver.clone(),
+                                &content_uri,
+                                "fixture-write".to_string(),
+                            )
+                            .unwrap(),
+                            records: qnc_db_broker::ProjectDbTarget::from_remote_binding(
+                                resolver,
+                                &project_uri,
+                                "fixture-write".to_string(),
+                            )
+                            .unwrap(),
+                        }
+                    },
                     &crate::test_support::registry(MetadataSufficiency::NeedsProbe),
                 )
                 .unwrap();
@@ -663,7 +651,7 @@ fn a_camera_that_declares_its_metadata_is_never_probed() {
         })
         .collect();
     assert_eq!(clips.len(), 2);
-    let mut db = config.media_records.media_db().unwrap();
+    let mut db = media_db(&config);
     for id in &clips {
         let saved = db.read(id, None).unwrap().unwrap();
         assert_eq!(saved.phase, Phase::Final);
@@ -720,16 +708,7 @@ fn select_without_any_registered_camera_is_a_controlled_error() {
         &send,
         &AtomicBool::new(false),
         |_, _| unreachable!("no backend without a camera"),
-        ContentTarget::from_owner_binding(
-            &config
-                .source_index
-                .file
-                .as_ref()
-                .unwrap()
-                .with_file_name("content.db"),
-            "qnc://local/db/ingest_content/p1",
-        )
-        .unwrap(),
+        crate::test_support::select_target(&config),
         &CameraRegistry::new(),
     )
     .unwrap_err();
@@ -752,7 +731,7 @@ fn declared_final_snapshot_is_final_and_needs_no_probe() {
             }
         })
         .unwrap();
-    let mut db = config.media_records.media_db().unwrap();
+    let mut db = media_db(&config);
     let saved = db.read(&id, None).unwrap().unwrap();
     assert_eq!(saved.phase, Phase::Final);
     // The card declared what it declared: final, and never probed to fill the rest.
@@ -778,12 +757,7 @@ fn a_declared_clip_from_the_card_can_be_selected_and_queued_for_import_without_a
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
-    let content = config
-        .source_index
-        .file
-        .as_ref()
-        .unwrap()
-        .with_file_name("content.db");
+    let content = crate::test_support::content_file(&config);
     let mut client = ContentClient::from_owner_binding(
         &content,
         "qnc://local/db/ingest_content/p1",
@@ -805,7 +779,7 @@ fn only_the_clip_whose_record_has_no_probe_data_is_probed() {
     let events =
         crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
     // The scanner reports the missing sidecar; both clips are still processed.
-    let mut db = config.media_records.media_db().unwrap();
+    let mut db = media_db(&config);
     let ids: BTreeSet<_> = events
         .iter()
         .filter_map(|e| {
@@ -853,4 +827,15 @@ fn cancel_ends_the_worker_deterministically_and_discards_late_events() {
     );
     assert!(!session.has_pending_work());
     assert!(session.poll(8).is_empty());
+}
+
+/// The media records of the fixture project, read through its one intermediary.
+fn media_db(config: &SelectionConfig) -> qnc_media_record_db::project::ProjectMediaRecords {
+    qnc_media_record_db::project::ProjectMediaRecords::new(
+        qnc_db_broker::ProjectDbWriter::start(
+            crate::test_support::select_target(config).records,
+            vec![qnc_media_record_db::project::MediaRecordsModule::factory()],
+        )
+        .unwrap(),
+    )
 }
