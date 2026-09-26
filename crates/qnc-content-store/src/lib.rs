@@ -8,7 +8,7 @@ use qnc_media_records::{Phase, Snapshot};
 pub use qnc_wave::WaveArtifactRecord;
 use serde::{Deserialize, Serialize};
 pub use transport::{
-    respond, ContentClient, ContentTarget, ContentWriteCompletion, ContentWriteData,
+    respond, ContentClient, ContentRecords, ContentTarget, ContentWriteCompletion, ContentWriteData,
     ContentWriteResult, ContentWriteTransport, ENDPOINT,
 };
 
@@ -16,6 +16,10 @@ pub const VERSION: &str = "0.2.4";
 pub const SCHEMA_VERSION: &str = "0.2.0";
 pub const MAX_BYTES: usize = 16 * 1024 * 1024;
 pub const PAGE_SIZE: usize = 64;
+/// Media record and source index requests of the project database: their tables
+/// live in the project database, the resolver binding is the project file.
+pub const MEDIA_RECORDS_URI: &str = "qnc://local/db/media_records";
+pub const SOURCE_INDEX_URI: &str = "qnc://local/db/source_index";
 pub type Result<T> = std::result::Result<T, String>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -269,6 +273,12 @@ pub struct InventoryClip {
     deny_unknown_fields
 )]
 pub enum Operation {
+    /// A media record request (camera and probe records of a clip) executed on
+    /// the media record tables of this project database (QNC v5: the ingest
+    /// records live in the project database; user rule 2026-09-26).
+    MediaRecord(Box<qnc_media_records::Operation>),
+    /// A source index request (what a card holds) on the same project database.
+    SourceIndex(Box<qnc_source_index_contract::Operation>),
     Publish(Box<CatalogClip>),
     PublishBatch(Vec<CatalogClip>),
     Inventory {
@@ -452,6 +462,13 @@ impl Operation {
     }
 
     pub fn is_write(&self) -> bool {
+        match self {
+            Self::MediaRecord(operation) => return operation.is_write(),
+            Self::SourceIndex(operation) => {
+                return matches!(**operation, qnc_source_index_contract::Operation::Write(_))
+            }
+            _ => {}
+        }
         !matches!(
             self,
             Self::List { .. }
@@ -484,6 +501,8 @@ pub struct Request {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data", rename_all = "snake_case")]
 pub enum Data {
+    MediaRecord(Box<qnc_media_records::Data>),
+    SourceIndex(Box<qnc_source_index_contract::Data>),
     Saved(Box<StoredClip>),
     Claimed(Option<Box<StoredClip>>),
     Clips(Vec<StoredClip>),

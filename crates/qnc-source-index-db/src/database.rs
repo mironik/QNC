@@ -104,6 +104,17 @@ impl Store {
         conn.pragma_update(None, "foreign_keys", "ON")
             .map_err(db_error)?;
         if access == Access::ReadWrite {
+            // The project directory denies deletion: keep the rollback journal file
+            // (as the project content store does) unless the project is in WAL.
+            let mode: String = conn
+                .pragma_query_value(None, "journal_mode", |r| r.get(0))
+                .map_err(db_error)?;
+            if !mode.eq_ignore_ascii_case("wal") {
+                conn.pragma_update(None, "journal_mode", "PERSIST")
+                    .map_err(db_error)?;
+            }
+            conn.pragma_update(None, "synchronous", "FULL")
+                .map_err(db_error)?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(db_error)?;

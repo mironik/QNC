@@ -8,6 +8,9 @@ description = "QNC project content database store and transport"
 qnc-contracts = { workspace = true }
 qnc-json-transport = { workspace = true }
 qnc-media-records = { workspace = true }
+qnc-media-record-db = { workspace = true }
+qnc-source-index-contract = { workspace = true }
+qnc-source-index-db = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-transport-resolver = { workspace = true }
 qnc-wave = { workspace = true }

@@ -2305,7 +2305,10 @@ Otkljucano: `qnc-media-record-db`, `qnc-source-index-db`, `qnc-content-store`,
 `qnc-ingest-select`, `qnc-ingest-store`, `qnc-ingest-application`, `qnc-source-bindings`,
 `qnc-dir-browser`, `qnc-work-settings`, `qnc-ingest-import-worker`, `tools/qnc-ingest-worker`,
 novi `qnc-source-volumes`, ugovori baza, modula i aplikacije Ingest, `tools/qnc-conformance`,
-root Cargo. UI i layout se ne diraju. Izvedeno: K1.
+root Cargo. UI i layout se ne diraju. Izvedeno: K1; K2 (`open_in_project`,
+`media_write_receipts`, `source_write_receipts`, journal PERSIST kao baza projekta); K3
+(`qnc-content-store`: operacije `MediaRecord`/`SourceIndex` i serijski posrednik
+`ContentRecords`).
 
 Otvoreno ograniceno odobrenje 2026-09-25 (originalni timecode izvora): korisnik je
 odredio: broadcast montaza radi po timecodeu (veza proxy-original i export); pocetni TC
