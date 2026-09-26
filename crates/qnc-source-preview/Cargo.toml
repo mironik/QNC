@@ -7,6 +7,7 @@ description = "QNC public component: source preview session for one clip (Broadc
 [dependencies]
 qnc-content-read = { workspace = true }
 qnc-content-store = { workspace = true }
+qnc-db-broker = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-media-records = { workspace = true }
 qnc-playback-activity = { workspace = true }

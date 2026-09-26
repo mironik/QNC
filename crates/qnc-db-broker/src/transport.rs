@@ -188,10 +188,37 @@ impl ProjectDbWriter {
             .map_err(|_| "Posrednik baze projekta nije odgovorio.".to_string())?
     }
 
+    /// Sends a request without waiting: it runs in order with every other request of
+    /// this writer, and its reply is taken later (a form never waits for a write).
+    pub fn submit(&self, module: &str, payload: Value) -> Result<Pending> {
+        let (reply, answer) = mpsc::channel();
+        self.requests
+            .send((module.into(), payload, reply))
+            .map_err(|_| "Posrednik baze projekta nije dostupan.".to_string())?;
+        Ok(Pending(answer))
+    }
+
     /// A typed request of a table module and its typed reply.
     pub fn request<Q: Serialize, R: DeserializeOwned>(&self, module: &str, request: &Q) -> Result<R> {
         let payload = serde_json::to_value(request).map_err(|e| e.to_string())?;
         serde_json::from_value(self.call(module, payload)?).map_err(|e| e.to_string())
+    }
+}
+
+/// The reply of a submitted request, once it is there.
+#[derive(Debug)]
+pub struct Pending(mpsc::Receiver<Result<Value>>);
+
+impl Pending {
+    /// The reply when the request has run; `None` while it waits in line.
+    pub fn try_take(&self) -> Option<Result<Value>> {
+        match self.0.try_recv() {
+            Ok(result) => Some(result),
+            Err(mpsc::TryRecvError::Empty) => None,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                Some(Err("Posrednik baze projekta nije odgovorio.".into()))
+            }
+        }
     }
 }
 

@@ -6,7 +6,7 @@
 //! come from the database, named by their marker pair. Navigation follows v5
 //! `editorial/segment_program.rs`.
 
-use qnc_content_store::{ProgramMarker, ProgramSlot};
+use qnc_program_db::{ProgramMarker, ProgramSlot};
 
 use crate::{SegmentRow, SegmentsView};
 

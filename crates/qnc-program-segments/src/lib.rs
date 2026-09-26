@@ -3,9 +3,9 @@
 //! R15-R23, docs/94).
 //!
 //! Everything lives in the project database (`story_parts`, `story_markers`,
-//! `story_marker_slots`, `story_state`, owner `qnc-content-store`), by the v5 rule
+//! `story_marker_slots`, `story_state`, table module `qnc-program-db`), by the v5 rule
 //! `qnc-story-segment-timeline.mdc`. This component reads it, writes
-//! through the serialized content write transport without blocking the caller, and
+//! through the one intermediary of the project database without blocking the caller, and
 //! turns it into a program model on one frame axis. The program playhead belongs to
 //! the Wrap view (`qnc-wrap-session`); navigation only asks for a program frame. It knows no
 //! form and no application, and never plays, probes or opens media.
@@ -22,10 +22,24 @@ pub use markers::{
 pub use qnc_sync_cover::SyncPreview;
 pub use sync::SyncSpace;
 
-use qnc_content_store::{
-    Access, ContentTarget, ContentWriteData, ContentWriteTransport, Operation, ProgramCover,
-    ProgramMarker, ProgramSegment, ProgramSlot,
+use qnc_content_store::{ContentTarget, ContentWriteData, ContentWriteTransport};
+use qnc_db_broker::ProjectDbTarget;
+use qnc_program_db::{
+    Data as StoryData, Operation, ProgramCover, ProgramMarker, ProgramSegment, ProgramSlot,
+    StoryPending, StoryReader, StoryWriter,
 };
+
+/// A cover waiting for its B-roll virtual shot (v5 `create_cover`: the virtual shot
+/// of the source IN/OUT first, then the cover of the slot).
+#[derive(Debug, Clone)]
+struct NewCover {
+    slot_id: String,
+    clip_id: String,
+    in_frame: u64,
+    out_frame: u64,
+    fps_num: u32,
+    fps_den: u32,
+}
 
 pub const MODULE_ID: &str = "qnc.module.program-segments";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -459,7 +473,10 @@ pub struct NewSegment {
 /// The program of the active project: read, written and turned into a view.
 #[derive(Default)]
 pub struct ProgramSegments {
-    target: Option<ContentTarget>,
+    /// The project database of the active project (its story).
+    target: Option<ProjectDbTarget>,
+    /// Its content, where the B-roll virtual shots of covers are made.
+    content: Option<ContentTarget>,
     project_id: String,
     stored: Vec<ProgramSegment>,
     stored_markers: Vec<ProgramMarker>,
@@ -491,7 +508,12 @@ pub struct ProgramSegments {
     playhead: Option<u64>,
     /// Program frame the user pointed at, for the Wrap view to take once.
     seek: Option<u64>,
-    writes: Option<ContentWriteTransport>,
+    writer: Option<StoryWriter>,
+    /// Story writes sent and not answered yet, by key.
+    pending: Vec<(String, StoryPending)>,
+    /// The B-roll virtual shots of covers, and the cover each one waits to place.
+    shots: Option<ContentWriteTransport>,
+    covers_waiting: Vec<(String, NewCover)>,
     /// Write whose completion selects the new segment.
     pending_create: Option<String>,
     sequence: u64,
@@ -503,13 +525,15 @@ impl ProgramSegments {
         Self::default()
     }
 
-    /// Points to the content database of the active project and reads it.
-    pub fn configure(&mut self, target: ContentTarget, project_id: &str) {
-        let same = self.target.as_ref().map(ContentTarget::uri) == Some(target.uri());
+    /// Points to the project database of the active project (its story, and its
+    /// content for the virtual shots of covers) and reads it.
+    pub fn configure(&mut self, content: ContentTarget, story: ProjectDbTarget, project_id: &str) {
+        let same = self.target.as_ref().map(ProjectDbTarget::uri) == Some(story.uri());
         if !same {
             *self = Self::default();
         }
-        self.target = Some(target);
+        self.target = Some(story);
+        self.content = Some(content);
         self.project_id = project_id.to_string();
         self.adopt_selection = !same;
         self.reload();
@@ -520,9 +544,12 @@ impl ProgramSegments {
     }
 
     pub fn has_pending_work(&self) -> bool {
-        self.writes
-            .as_ref()
-            .is_some_and(ContentWriteTransport::has_pending)
+        !self.pending.is_empty()
+            || !self.covers_waiting.is_empty()
+            || self
+                .shots
+                .as_ref()
+                .is_some_and(ContentWriteTransport::has_pending)
     }
 
     /// The program frame the user pointed at, once; the Wrap view takes it.
@@ -559,7 +586,7 @@ impl ProgramSegments {
         let Some(target) = &self.target else {
             return;
         };
-        let read = target.open(Access::ReadOnly).and_then(|mut client| {
+        let read = StoryReader::open(target).and_then(|mut client| {
             Ok((
                 client.list_segments()?,
                 client.list_markers()?,
@@ -624,8 +651,7 @@ impl ProgramSegments {
             SegmentCommand::Step { up } => self.step(up),
             SegmentCommand::Move { up } => self.move_selected(up),
             SegmentCommand::Exclude(segment_id) => {
-                let key = self.next_key("exclude");
-                self.send(|writes| writes.delete_segment(key, segment_id));
+                self.write(Operation::DeleteSegment { segment_id });
             }
             SegmentCommand::Include(segment_id) => {
                 self.adopt_selection = true;
@@ -876,22 +902,17 @@ impl ProgramSegments {
 
     /// Appends a segment at the end of the program; it becomes selected once saved.
     pub fn create(&mut self, segment: NewSegment) {
-        let key = self.next_key("create");
-        let row = ProgramSegment {
-            segment_id: String::new(),
+        let key = self.write_keyed(Operation::CreateSegment {
+            project_id: self.project_id.clone(),
             kind: segment.kind.db().into(),
-            sort_index: 0,
             clip_id: segment.clip_id,
             in_frame: segment.in_frame,
             out_frame: segment.out_frame,
             fps_num: segment.fps_num,
             fps_den: segment.fps_den,
-            active: true,
-            a1_source_channel: 0,
-        };
-        let project_id = self.project_id.clone();
-        if self.send(|writes| writes.create_segment(key.clone(), project_id, row)) {
-            self.pending_create = Some(key);
+        });
+        if key.is_some() {
+            self.pending_create = key;
         }
     }
 
@@ -931,16 +952,18 @@ impl ProgramSegments {
         else {
             return;
         };
-        self.write(Operation::CreateCover {
-            project_id: self.project_id.clone(),
-            slot_id,
-            clip_id,
-            clip_name: self.source.clip_name.clone(),
-            in_frame,
-            out_frame,
-            fps_num,
-            fps_den,
-        });
+        let clip_name = self.source.clip_name.clone();
+        self.cover(
+            NewCover {
+                slot_id,
+                clip_id,
+                in_frame,
+                out_frame,
+                fps_num,
+                fps_den,
+            },
+            clip_name,
+        );
     }
 
     fn marked_source(&mut self) -> Option<(String, (u64, u64), (u32, u32))> {
@@ -991,45 +1014,137 @@ impl ProgramSegments {
         let Some(segment_id) = self.selected.clone() else {
             return self.refresh_view("Odaberi segment.".into());
         };
-        let key = self.next_key("delete");
-        self.send(|writes| writes.delete_segment(key, segment_id));
+        self.write(Operation::DeleteSegment { segment_id });
     }
 
     pub fn move_selected(&mut self, up: bool) {
         let Some(segment_id) = self.selected.clone() else {
             return self.refresh_view("Odaberi segment.".into());
         };
-        let key = self.next_key("move");
-        self.send(|writes| writes.move_segment(key, segment_id, up));
+        self.write(Operation::MoveSegment { segment_id, up });
     }
 
     fn write(&mut self, operation: Operation) {
+        self.write_keyed(operation);
+    }
+
+    /// Sends a story write without waiting; its key comes back.
+    fn write_keyed(&mut self, operation: Operation) -> Option<String> {
+        let Some(target) = self.target.clone() else {
+            self.refresh_view("Projektna baza nije dostupna.".into());
+            return None;
+        };
+        if self.writer.is_none() {
+            match StoryWriter::start(target) {
+                Ok(writer) => self.writer = Some(writer),
+                Err(error) => {
+                    self.refresh_view(error);
+                    return None;
+                }
+            }
+        }
         let key = self.next_key("write");
-        self.send(|writes| writes.write_program(key, operation));
+        match self.writer.as_ref()?.submit(&operation) {
+            Ok(pending) => {
+                self.pending.push((key.clone(), pending));
+                Some(key)
+            }
+            Err(error) => {
+                self.refresh_view(error);
+                None
+            }
+        }
+    }
+
+    /// v5 `create_cover` from source frames: the B-roll virtual shot of the source
+    /// IN/OUT is made first (its owner, the project content); the cover of the slot
+    /// follows once it is saved.
+    pub(crate) fn cover(&mut self, cover: NewCover, clip_name: String) {
+        let Some(content) = self.content.clone() else {
+            return self.refresh_view("Projektna baza nije dostupna.".into());
+        };
+        if self.shots.is_none() {
+            match ContentWriteTransport::start(content) {
+                Ok(shots) => self.shots = Some(shots),
+                Err(error) => return self.refresh_view(error),
+            }
+        }
+        let key = self.next_key("cover_shot");
+        let sent = self.shots.as_mut().map_or(Ok(()), |shots| {
+            shots.create_cover_shot(
+                key.clone(),
+                self.project_id.clone(),
+                cover.clip_id.clone(),
+                clip_name,
+                (cover.in_frame, cover.out_frame),
+            )
+        });
+        match sent {
+            Ok(()) => self.covers_waiting.push((key, cover)),
+            Err(error) => self.refresh_view(error),
+        }
     }
 
     /// Applies finished writes and rereads the program. Returns whether it changed.
     pub fn poll(&mut self) -> bool {
-        let Some(writes) = self.writes.as_mut() else {
-            return false;
-        };
-        let completions = writes.poll();
-        if completions.is_empty() {
-            return false;
-        }
         let mut message = String::new();
+        let mut landed = false;
+        // Covers whose B-roll virtual shot is saved go into their slot.
+        let mut place = Vec::new();
+        if let Some(shots) = self.shots.as_mut() {
+            for completion in shots.poll() {
+                landed = true;
+                let Some(at) = self
+                    .covers_waiting
+                    .iter()
+                    .position(|(key, _)| *key == completion.key)
+                else {
+                    continue;
+                };
+                let (_, cover) = self.covers_waiting.remove(at);
+                match completion.result {
+                    Ok(result) => match result.data {
+                        ContentWriteData::Created(shot_id) => place.push((cover, shot_id)),
+                        _ => message = "Neispravan odgovor B-roll kadra.".into(),
+                    },
+                    Err(error) => message = error,
+                }
+            }
+        }
+        for (cover, virtual_shot_id) in place {
+            self.write(Operation::CreateCover {
+                project_id: self.project_id.clone(),
+                slot_id: cover.slot_id,
+                clip_id: cover.clip_id,
+                virtual_shot_id,
+                in_frame: cover.in_frame,
+                out_frame: cover.out_frame,
+                fps_num: cover.fps_num,
+                fps_den: cover.fps_den,
+            });
+        }
         let mut created = None;
-        for completion in completions {
-            match completion.result {
-                Ok(result) => {
-                    if let ContentWriteData::Created(segment_id) = result.data {
-                        if self.pending_create.as_deref() == Some(completion.key.as_str()) {
+        let mut waiting = Vec::new();
+        for (key, pending) in std::mem::take(&mut self.pending) {
+            match pending.try_take() {
+                None => waiting.push((key, pending)),
+                Some(result) => {
+                    landed = true;
+                    match result {
+                        Ok(StoryData::Created(segment_id))
+                            if self.pending_create.as_deref() == Some(key.as_str()) =>
+                        {
                             created = Some(segment_id);
                         }
+                        Ok(_) => {}
+                        Err(error) => message = error,
                     }
                 }
-                Err(error) => message = error,
             }
+        }
+        self.pending = waiting;
+        if !landed {
+            return false;
         }
         if let Some(segment_id) = created {
             // A new segment becomes the selection, in the database too.
@@ -1048,31 +1163,6 @@ impl ProgramSegments {
         self.reload();
         if !message.is_empty() {
             self.refresh_view(message);
-        }
-        true
-    }
-
-    fn send(
-        &mut self,
-        write: impl FnOnce(&mut ContentWriteTransport) -> Result<(), String>,
-    ) -> bool {
-        let Some(target) = self.target.clone() else {
-            self.refresh_view("Projektna baza nije dostupna.".into());
-            return false;
-        };
-        if self.writes.is_none() {
-            match ContentWriteTransport::start(target) {
-                Ok(writes) => self.writes = Some(writes),
-                Err(error) => {
-                    self.refresh_view(error);
-                    return false;
-                }
-            }
-        }
-        let result = self.writes.as_mut().map_or(Ok(()), write);
-        if let Err(error) = result {
-            self.refresh_view(error);
-            return false;
         }
         true
     }

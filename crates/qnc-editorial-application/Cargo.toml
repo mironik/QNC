@@ -8,6 +8,7 @@ description = "QNC editorial application composition root: clip list of the acti
 qnc-active-project-read = { workspace = true }
 qnc-clip-posters = { workspace = true }
 qnc-content-store = { workspace = true }
+qnc-db-broker = { workspace = true }
 qnc-content-read = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-media-thumbnail = { workspace = true }

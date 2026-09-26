@@ -1,0 +1,45 @@
+{
+  "module_id": "qnc.module.program-db",
+  "module_name": "Program (story) tables",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "story.segments",
+    "story.markers",
+    "story.slots",
+    "story.covers",
+    "story.selection",
+    "story.undo"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "ui.paint"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.source-preview",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-program-db",
+  "input": "Requests of the story of the active project (segments, M markers, covers, selection, undo/redo), through the one intermediary of the project database (qnc-db-broker), which hands this table module its connection.",
+  "output": "The story tables of the project database (story_state, story_parts, story_markers, story_marker_slots, story_covers, story_object_history, story_undo) and their public views. It creates only its own tables, writes no other table (authorizer), reads only public views of others (public_project_settings; the clip catalog through qnc-content-read, so only an imported clip goes into a story). A cover names the B-roll virtual shot its owner made first (v5 create_cover after add_virtual_shot_from_frames). Every story edit is an undo step. Moved unchanged from qnc-content-store (lego split B3, user rule 2026-09-26).",
+  "specification": "QNC_v5/.cursor/rules/qnc-story-segment-timeline.mdc and qnc-host/src/story/*.rs; contracts/databases/story.database.json."
+}

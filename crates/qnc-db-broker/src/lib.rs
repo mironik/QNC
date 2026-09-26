@@ -13,7 +13,7 @@ mod transport;
 
 pub use database::ProjectDb;
 pub use qnc_json_transport::{Access, Credentials};
-pub use transport::{respond, ProjectDbClient, ProjectDbTarget, ProjectDbWriter, ENDPOINT};
+pub use transport::{respond, Pending, ProjectDbClient, ProjectDbTarget, ProjectDbWriter, ENDPOINT};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

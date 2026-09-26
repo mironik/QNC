@@ -6,10 +6,10 @@
 //! writes the cover; reaching the next marker or the source OUT only stops. The program player only gets the
 //! window to play; nothing here plays or opens media.
 
-use qnc_content_store::Operation;
+use qnc_program_db::Operation;
 use qnc_sync_cover::{SyncPreview, SyncSource};
 
-use crate::ProgramSegments;
+use crate::{NewCover, ProgramSegments};
 
 /// What Space does (v5 `playback_transport_toggle_intent`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -182,16 +182,17 @@ impl ProgramSegments {
             self.sync.landed();
             return self.refresh_view("Sync slot već ima pokrivalicu".into());
         }
-        self.write(Operation::CreateCover {
-            project_id: self.project_id.clone(),
-            slot_id,
-            clip_id: slot.source.clip_id,
-            clip_name: slot.source.clip_name,
-            in_frame: slot.source.source_in,
-            out_frame: slot.source_out,
-            fps_num: slot.source.timebase.0,
-            fps_den: slot.source.timebase.1,
-        });
+        self.cover(
+            NewCover {
+                slot_id,
+                clip_id: slot.source.clip_id,
+                in_frame: slot.source.source_in,
+                out_frame: slot.source_out,
+                fps_num: slot.source.timebase.0,
+                fps_den: slot.source.timebase.1,
+            },
+            slot.source.clip_name,
+        );
         self.refresh_view("Sync pokrivalica dodana u slot · spremam...".into());
     }
 }

@@ -262,45 +262,23 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
-    /// The program segments in their order.
-    pub fn list_segments(&mut self) -> Result<Vec<ProgramSegment>> {
-        match self.execute(Operation::ListSegments)? {
-            Data::Segments(rows) => Ok(rows),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    /// The markers of the program, by program frame.
-    pub fn list_markers(&mut self) -> Result<Vec<ProgramMarker>> {
-        match self.execute(Operation::ListMarkers)? {
-            Data::Markers(rows) => Ok(rows),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    /// The M-M slots of the program, in order.
-    pub fn list_slots(&mut self) -> Result<Vec<ProgramSlot>> {
-        match self.execute(Operation::ListSlots)? {
-            Data::Slots(rows) => Ok(rows),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    /// The covers of the program, by program frame.
-    pub fn list_covers(&mut self) -> Result<Vec<ProgramCover>> {
-        match self.execute(Operation::ListCovers)? {
-            Data::Covers(rows) => Ok(rows),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    /// The stored Story selection.
-    pub fn read_story_selection(&mut self) -> Result<StorySelection> {
-        match self.execute(Operation::ReadStorySelection)? {
-            Data::StorySelection(selection) => Ok(selection),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    fn write_segment(&mut self, operation: Operation) -> Result<Option<String>> {
-        match self.execute(operation)? {
-            Data::Created(segment_id) => Ok(Some(segment_id)),
-            Data::Changed => Ok(None),
+    /// The B-roll virtual shot of a cover; its id.
+    pub fn create_cover_shot(
+        &mut self,
+        project_id: &str,
+        clip_id: &str,
+        clip_name: &str,
+        in_frame: u64,
+        out_frame: u64,
+    ) -> Result<String> {
+        match self.execute(Operation::CreateCoverShot {
+            project_id: project_id.into(),
+            clip_id: clip_id.into(),
+            clip_name: clip_name.into(),
+            in_frame,
+            out_frame,
+        })? {
+            Data::Created(shot_id) => Ok(shot_id),
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
@@ -422,7 +400,7 @@ pub enum ContentWriteData {
     /// The clip taken from the import queue, if any.
     Claimed(Option<Box<StoredClip>>),
     SavedShort(Box<SavedShort>),
-    /// The id of a newly appended program segment.
+    /// The id of a newly made record (the B-roll virtual shot of a cover).
     Created(String),
 }
 
@@ -627,39 +605,25 @@ impl ContentWriteTransport {
         )
     }
 
-    /// Appends a segment to the program; the completion carries its id.
-    pub fn create_segment(
+    /// The B-roll virtual shot of a cover; the completion carries its id.
+    pub fn create_cover_shot(
         &mut self,
         key: String,
         project_id: String,
-        segment: ProgramSegment,
+        clip_id: String,
+        clip_name: String,
+        (in_frame, out_frame): (u64, u64),
     ) -> Result<()> {
         self.send_operation(
             key,
-            Operation::CreateSegment {
+            Operation::CreateCoverShot {
                 project_id,
-                kind: segment.kind,
-                clip_id: segment.clip_id,
-                in_frame: segment.in_frame,
-                out_frame: segment.out_frame,
-                fps_num: segment.fps_num,
-                fps_den: segment.fps_den,
+                clip_id,
+                clip_name,
+                in_frame,
+                out_frame,
             },
         )
-    }
-
-    /// Any write of program markers: create, move or delete. A created marker
-    /// reports its id.
-    pub fn write_program(&mut self, key: String, operation: Operation) -> Result<()> {
-        self.send_operation(key, operation)
-    }
-
-    pub fn delete_segment(&mut self, key: String, segment_id: String) -> Result<()> {
-        self.send_operation(key, Operation::DeleteSegment { segment_id })
-    }
-
-    pub fn move_segment(&mut self, key: String, segment_id: String, up: bool) -> Result<()> {
-        self.send_operation(key, Operation::MoveSegment { segment_id, up })
     }
 
     pub fn mark_short_stills_failed(
@@ -785,25 +749,19 @@ fn execute_write_command(
             in_frame,
             out_frame,
         )?))),
-        operation @ (Operation::CreateSegment { .. }
-        | Operation::DeleteSegment { .. }
-        | Operation::MoveSegment { .. }
-        | Operation::CreateMarker { .. }
-        | Operation::MoveMarker { .. }
-        | Operation::DeleteMarker { .. }
-        | Operation::SelectPart { .. }
-        | Operation::SelectSlot { .. }
-        | Operation::IncludeSegment { .. }
-        | Operation::ReplaceSegment { .. }
-        | Operation::PurgeSegment { .. }
-        | Operation::UndoStory
-        | Operation::RedoStory
-        | Operation::CreateCover { .. }
-        | Operation::DeleteCover { .. }
-        | Operation::SelectCover { .. }) => Ok(match client.write_segment(operation)? {
-            Some(segment_id) => ContentWriteData::Created(segment_id),
-            None => ContentWriteData::Changed,
-        }),
+        Operation::CreateCoverShot {
+            project_id,
+            clip_id,
+            clip_name,
+            in_frame,
+            out_frame,
+        } => Ok(ContentWriteData::Created(client.create_cover_shot(
+            &project_id,
+            &clip_id,
+            &clip_name,
+            in_frame,
+            out_frame,
+        )?)),
         Operation::MarkShortStills {
             shot_id,
             status,

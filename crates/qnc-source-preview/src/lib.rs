@@ -449,8 +449,10 @@ impl SourcePreview {
         if !reopen && self.program && self.player_view.has_confirmed_position() {
             return self.cue(frame);
         }
-        let (Some(target), Some(context)) = (self.activity_target.clone(), &self.context) else {
-            self.view.message = "Projektna baza nije dostupna.".into();
+        let Some(target) = self.story_target() else {
+            return true;
+        };
+        let Some(context) = &self.context else {
             return true;
         };
         let loader = qnc_program_input::loader(target, context.settings.project_id.clone());
@@ -460,8 +462,10 @@ impl SourcePreview {
     /// `[in, out)` with the source from its IN over it, opened at its first frame
     /// and played as soon as it is ready. Its frames start at 0.
     pub fn open_program_window(&mut self, window: (u64, u64), cover: TransientCover) -> bool {
-        let (Some(target), Some(context)) = (self.activity_target.clone(), &self.context) else {
-            self.view.message = "Projektna baza nije dostupna.".into();
+        let Some(target) = self.story_target() else {
+            return true;
+        };
+        let Some(context) = &self.context else {
             return true;
         };
         let project_id = context.settings.project_id.clone();
@@ -469,6 +473,22 @@ impl SourcePreview {
         self.open_program(0, loader);
         self.play_when_ready = true;
         true
+    }
+
+    /// The project database of the active project, where its story is (the one
+    /// intermediary of the project database, `qnc-program-db`).
+    fn story_target(&mut self) -> Option<qnc_db_broker::ProjectDbTarget> {
+        let target = self.context.as_ref().map_or_else(
+            || Err("Projektna baza nije dostupna.".to_string()),
+            |context| qnc_db_broker::ProjectDbTarget::for_project(&context.reader, &context.settings),
+        );
+        match target {
+            Ok(target) => Some(target),
+            Err(error) => {
+                self.view.message = error;
+                None
+            }
+        }
     }
 
     /// The source timeline of a Sync play (v5 `set_source_playhead_frame`): the

@@ -2,7 +2,7 @@
 //! `editorial_playlist.rs`), read only.
 //!
 //! The story comes from the active project database (`story_parts`,
-//! `story_covers`, owner `qnc-content-store`); the media of every clip comes by
+//! `story_covers`, table module `qnc-program-db`); the media of every clip comes by
 //! the same path as a single clip (`qnc-player-input`): the picture follows the
 //! project `playback.input`, the sound is the original, the facts are the saved
 //! record (no probe). The output is the flat program playlist of
@@ -11,7 +11,8 @@
 
 use std::collections::BTreeMap;
 
-use qnc_content_store::{Access, ContentTarget, ProgramCover, ProgramSegment};
+use qnc_db_broker::ProjectDbTarget;
+use qnc_program_db::{ProgramCover, ProgramSegment, StoryReader};
 use qnc_media_metadata::{MediaRepresentation, StreamDetails};
 use qnc_player_input::{PreparedInput, ProgramInput, StreamLayout};
 use qnc_program_playlist::{
@@ -57,7 +58,7 @@ const TRANSIENT_COVER_ID: &str = "sync-cover-preview";
 
 /// Reads the story of the active project and builds its program.
 pub fn load_program(
-    target: &ContentTarget,
+    target: &ProjectDbTarget,
     project_id: &str,
     clips: &impl ClipInputs,
 ) -> Result<ProgramInput, String> {
@@ -68,7 +69,7 @@ pub fn load_program(
 /// over it (v5 `build_program_frame_window` + `apply_transient_program_overlay`);
 /// its frames start at 0.
 pub fn load_program_window(
-    target: &ContentTarget,
+    target: &ProjectDbTarget,
     project_id: &str,
     clips: &impl ClipInputs,
     window: (u64, u64),
@@ -104,12 +105,12 @@ pub fn with_transient_cover(
 }
 
 fn load(
-    target: &ContentTarget,
+    target: &ProjectDbTarget,
     project_id: &str,
     clips: &impl ClipInputs,
     window: Option<((u64, u64), &TransientCover)>,
 ) -> Result<ProgramInput, String> {
-    let mut client = target.open(Access::ReadOnly)?;
+    let mut client = StoryReader::open(target)?;
     let segments = client.list_segments()?;
     let mut covers = client.list_covers()?;
     drop(client);
@@ -139,7 +140,7 @@ fn load(
 /// the form thread): the story from its database, every clip through the
 /// player input reader of the workspace.
 pub fn loader(
-    target: ContentTarget,
+    target: ProjectDbTarget,
     project_id: String,
 ) -> impl FnOnce(&qnc_player_input::InputReader, &str) -> Result<ProgramInput, String> + Send + 'static
 {
@@ -156,7 +157,7 @@ pub fn loader(
 }
 /// The program window with a transient cover, built where the player is prepared.
 pub fn window_loader(
-    target: ContentTarget,
+    target: ProjectDbTarget,
     project_id: String,
     window: (u64, u64),
     cover: TransientCover,

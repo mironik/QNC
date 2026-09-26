@@ -353,12 +353,12 @@ impl EditorialApplication {
         }
         match (&self.active_project_reader, &self.bindings) {
             (Some(reader), Ok(bindings)) => {
-                self.content_target = match qnc_content_store::ContentTarget::for_project(
-                    reader.settings_reader(),
-                    &loaded.settings,
-                ) {
-                    Ok(target) => {
-                        self.segments.configure(target.clone(), &project_id);
+                let (settings, work) = (reader.settings_reader(), &loaded.settings);
+                let story = qnc_db_broker::ProjectDbTarget::for_project(settings, work);
+                let content = qnc_content_store::ContentTarget::for_project(settings, work);
+                self.content_target = match content.and_then(|target| Ok((target, story?))) {
+                    Ok((target, story)) => {
+                        self.segments.configure(target.clone(), story, &project_id);
                         Some(target)
                     }
                     Err(error) => {

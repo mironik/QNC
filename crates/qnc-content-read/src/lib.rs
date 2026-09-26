@@ -284,6 +284,22 @@ impl ContentReader {
     }
 }
 
+/// Whether clip `clip_id` of the catalog is imported, read on a connection to the
+/// project database another public module already holds (the project database
+/// intermediary hands one to each table module). `None`: not in the catalog.
+pub fn imported_on(conn: &Connection, clip_id: &str) -> Result<Option<bool>, String> {
+    if !has_view(conn, "public_clips")? {
+        return Ok(None);
+    }
+    conn.query_row(
+        "SELECT import_status IN ('imported', 'done') FROM public_clips WHERE clip_id = ?1",
+        [clip_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|error| error.to_string())
+}
+
 fn has_view(conn: &Connection, name: &str) -> Result<bool, String> {
     conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name = ?1)",

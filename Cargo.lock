@@ -3227,6 +3227,7 @@ dependencies = [
  "qnc-clip-posters",
  "qnc-content-read",
  "qnc-content-store",
+ "qnc-db-broker",
  "qnc-image-assets",
  "qnc-media-thumbnail",
  "qnc-panel-focus",
@@ -3966,13 +3967,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-program-db"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-read",
+ "qnc-content-store",
+ "qnc-db-broker",
+ "qnc-media-metadata",
+ "qnc-media-records",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-program-input"
 version = "0.1.0"
 dependencies = [
- "qnc-content-store",
+ "qnc-db-broker",
  "qnc-frame-timebase",
  "qnc-media-metadata",
  "qnc-player-input",
+ "qnc-program-db",
  "qnc-program-playlist",
 ]
 
@@ -3990,6 +4007,8 @@ name = "qnc-program-segments"
 version = "0.1.0"
 dependencies = [
  "qnc-content-store",
+ "qnc-db-broker",
+ "qnc-program-db",
  "qnc-source-timecode",
  "qnc-sync-cover",
  "rusqlite",
@@ -4254,6 +4273,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-content-read",
  "qnc-content-store",
+ "qnc-db-broker",
  "qnc-filmstrip",
  "qnc-media-records",
  "qnc-playback-activity",

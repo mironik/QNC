@@ -2382,6 +2382,17 @@ izvorni indeks kao moduli tablica posrednika (`MediaRecordsModule`/`ProjectMedia
 virtualni kadrovi, filmstrip/wave, red uvoza i runtime, katalog klipova, pa brisanje
 `qnc-content-store`. Otkljucani su i `qnc-db-broker` (novi) i ugovor
 `contracts/modules/db-broker.module.json`. Izvedeno: B1, B2 (ukljucuje K4).
+Izvedeno B3: novi modul tablica `crates/qnc-program-db` (+ ugovor `contracts/modules/program-db.module.json`;
+naziv je neutralan jer `qnc-story-*` pripada obitelji aplikacije Story) posjeduje `story_*` tablice i
+`story_undo`: kod, undo i 22 testa premjesteni iz `qnc-content-store` bez promjene ponasanja; vlastiti
+autorizator (pise samo svoje tablice), klip u prici samo ako je uvezen kroz jedini citac kataloga
+(`qnc-content-read::imported_on`, C11). Pokrivalica kao v5 (`add_virtual_shot_from_frames` pa
+`create_cover`): `qnc-content-store` `CreateCoverShot` stvara B-roll kadar, zatim `qnc-program-db`
+`CreateCover` s tim kadrom. `qnc-db-broker` dobio `submit`/`Pending` (upis bez cekanja forme).
+Potrosaci: `qnc-program-segments` (`StoryReader`/`StoryWriter`, pokrivalica u dva koraka),
+`qnc-program-input` i `qnc-source-preview` (cilj baze projekta), `qnc-editorial-application`.
+Ugovori `story`/`program-segments` baze: vlasnik tablica `qnc.module.program-db`. Conformance:
+`qnc-program-db` na popisu javnih DB vlasnika. Nije izvedeno: live provjera Storyja na release buildu.
 
 Otvoreno ograniceno odobrenje 2026-09-25 (originalni timecode izvora): korisnik je
 odredio: broadcast montaza radi po timecodeu (veza proxy-original i export); pocetni TC

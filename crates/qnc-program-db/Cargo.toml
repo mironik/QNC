@@ -1,0 +1,18 @@
+[package]
+name = "qnc-program-db"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: the Story tables of a project database (segments, markers, slots, covers, selection and undo) as a table module of the project database intermediary; it knows no form and no application"
+
+[dependencies]
+qnc-db-broker = { workspace = true }
+qnc-content-read = { workspace = true }
+qnc-media-records = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+qnc-content-store = { workspace = true }
+qnc-media-metadata = { workspace = true }
+tempfile = "3"

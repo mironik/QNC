@@ -7,7 +7,7 @@
 use rusqlite::{params, types::Value, Connection, OptionalExtension};
 use serde_json::{json, Map, Value as Json};
 
-use crate::database::err;
+use crate::store::err;
 use crate::Result;
 
 /// The story tables a step restores, in an order that keeps no stale row behind.
@@ -124,7 +124,7 @@ pub(crate) fn depth(conn: &Connection) -> Result<(u64, u64)> {
 fn push(conn: &Connection, stack: &str, snapshot: &str) -> Result<()> {
     conn.execute(
         "INSERT INTO story_undo (stack, snapshot_json, created_at) VALUES (?1, ?2, ?3)",
-        params![stack, snapshot, crate::database::story_now()],
+        params![stack, snapshot, crate::store::story_now()],
     )
     .map_err(err)?;
     Ok(())

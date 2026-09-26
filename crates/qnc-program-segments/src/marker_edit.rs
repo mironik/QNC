@@ -5,7 +5,7 @@
 //! the draft. Enter writes it, Escape drops it. A marker moves only between its
 //! neighbours (docs/94 7a); the locked start and end never move.
 
-use qnc_content_store::Operation;
+use qnc_program_db::Operation;
 
 use crate::{check_move, ProgramSegments};
 
