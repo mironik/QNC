@@ -94,7 +94,7 @@ impl ProbeBackend for Backend {
     fn execute(&self, request: &ProbeRequest) -> qnc_media_probe::Result<qnc_media_probe::Report> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         if self.fail {
-            return Err(qnc_media_probe::Error::Timeout);
+            return Err(qnc_media_probe::Error::Failed);
         }
         let a = request.media_uri.contains("TEST%20A");
         let frames = if a { 500 } else { 100 };

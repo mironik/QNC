@@ -6,7 +6,8 @@
 //! container stream facts, docs/26) gets one probe of each medium that lacks them;
 //! the probe evidence is stored before it is interpreted and composed with the
 //! camera facts, which stay a source. A medium probed or tried once is never probed
-//! again. Records are written only through the media record module of the project
+//! again, except when the probe never read it (it did not start or ran out of time,
+//! v5: a media probe job that fails that way goes back to the queue). Records are written only through the media record module of the project
 //! database intermediary. This module knows no application, form or scan.
 
 use std::{
@@ -25,6 +26,50 @@ pub const MODULE_ID: &str = "qnc.module.record-probe";
 
 pub type Result<T> = std::result::Result<T, String>;
 
+/// Why a record was not completed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Error {
+    /// A probe never read its medium (did not start or ran out of time): nothing was
+    /// learned, and the record may be completed again later.
+    Interrupted(String),
+    /// Anything else: the record stays as it is.
+    Failed(String),
+}
+
+impl Error {
+    pub fn is_interrupted(&self) -> bool {
+        matches!(self, Self::Interrupted(_))
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Interrupted(message) | Self::Failed(message) => f.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<String> for Error {
+    fn from(message: String) -> Self {
+        Self::Failed(message)
+    }
+}
+
+impl From<&str> for Error {
+    fn from(message: &str) -> Self {
+        Self::Failed(message.into())
+    }
+}
+
+impl From<Error> for String {
+    fn from(error: Error) -> Self {
+        error.to_string()
+    }
+}
+
 /// Makes the record of `camera` final: without a probe when it lacks nothing,
 /// otherwise with one probe of each medium that lacks something. A final record is
 /// returned as it is.
@@ -34,7 +79,7 @@ pub fn complete(
     camera: Snapshot,
     backend: &dyn ProbeBackend,
     cancel: &AtomicBool,
-) -> Result<Snapshot> {
+) -> std::result::Result<Snapshot, Error> {
     if camera.phase == Phase::Final {
         return Ok(camera);
     }
@@ -44,7 +89,7 @@ pub fn complete(
     let mut reports = Vec::new();
     for (i, media_uri) in needed.into_iter().enumerate() {
         if cancel.load(Ordering::Relaxed) {
-            return Err("Dopuna zapisa je prekinuta.".into());
+            return Err(Error::Interrupted("Dopuna zapisa je prekinuta.".into()));
         }
         let document = probe_once(records, &camera, &media_uri, backend)?;
         // Raw evidence is durable before any semantic interpretation or merge.
@@ -76,7 +121,7 @@ pub fn complete(
     })?;
     records
         .read(&camera.metadata.clip_id, None)?
-        .ok_or_else(|| "Konacni zapis nedostaje.".to_string())
+        .ok_or_else(|| "Konacni zapis nedostaje.".into())
 }
 
 /// Whether a final record still lacks something playback reads.
@@ -104,7 +149,7 @@ fn probe_once(
     camera: &Snapshot,
     media_uri: &str,
     backend: &dyn ProbeBackend,
-) -> Result<Document> {
+) -> std::result::Result<Document, Error> {
     let attempt_id = uuid::Uuid::new_v4().to_string();
     let document_uri = format!("qnc://local/artifact/probe-{attempt_id}");
     let claim = records.begin_acquisition(BeginAcquisition {
@@ -118,7 +163,7 @@ fn probe_once(
         return match claim.acquisition.outcome {
             Some(AcquisitionOutcome::Stored { document_uri }) => records
                 .document(&document_uri)?
-                .ok_or_else(|| "Spremljeni probe dokaz nedostaje.".to_string()),
+                .ok_or_else(|| "Spremljeni probe dokaz nedostaje.".into()),
             _ => Err("Probe je vec pokusan ili je u tijeku. Nema ponovnog pokretanja.".into()),
         };
     }
@@ -147,7 +192,13 @@ fn probe_once(
         }
         Err(error) => {
             let code = format!("{error:?}");
-            let outcome = if matches!(error, qnc_media_probe::Error::TransportUncertain) {
+            let interrupted = matches!(
+                error,
+                qnc_media_probe::Error::Timeout | qnc_media_probe::Error::Spawn
+            );
+            let outcome = if interrupted {
+                AcquisitionOutcome::Interrupted { code: code.clone() }
+            } else if matches!(error, qnc_media_probe::Error::TransportUncertain) {
                 AcquisitionOutcome::Uncertain { code: code.clone() }
             } else {
                 AcquisitionOutcome::Failed { code: code.clone() }
@@ -157,7 +208,12 @@ fn probe_once(
                 outcome,
                 document: None,
             })?;
-            Err(format!("Probe nije uspio: {code}"))
+            let message = format!("Probe nije uspio: {code}");
+            Err(if interrupted {
+                Error::Interrupted(message)
+            } else {
+                Error::Failed(message)
+            })
         }
     }
 }

@@ -2339,6 +2339,13 @@ Odluka korisnika 2026-09-26 ("zadrzi dosadasnje rjesenje"): kad svira proxy slik
 ide iz originala (§8.2, docs/66), pa pozadinski dovrsetak i dalje probe-a original i proxy.
 Postavka probea (8 MB, 1 s za sve spremnike) ostaje ista; mjereno: MXF s kratkom analizom daje
 iste podatke za oko 0,21 s umjesto 0,5 s, a MP4 s kratkom analizom gubi pixel format, profil i boju.
+Izvedeno (ponovni pokusaj, v5 `JobHandlerError::retryable`: neuspjeli media probe posao vraca se u red):
+probe koji medij nije procitao (istek vremena, ffprobe se nije pokrenuo) zapisuje se kao novi ishod
+`Interrupted` (`qnc-media-records`) i smije se ponovno preuzeti (`qnc-media-record-db` zamjenjuje taj
+pokusaj novim); spremljen, neuspio i nesiguran ishod ostaju konacni, pa se losa datoteka ne vrti u
+petlji. `qnc-record-probe` vraca vrstu greske, `qnc-record-completion` prekinuti klip vraca na kraj
+reda do 3 puta u jednom prolazu, a sljedeci prolaz ga opet uzima. Testovi: prekinuti pa dovrseni
+klip, neuspio probe se ne ponavlja, zamjena prekinutog pokusaja u spremistu.
 
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne

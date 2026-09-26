@@ -16,10 +16,19 @@ impl Store {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db_error)?;
         if let Some(existing) = read(&tx, &begin.media_uri)? {
-            return Ok(AcquisitionClaim {
-                granted: false,
-                acquisition: existing,
-            });
+            // An interrupted attempt learned nothing about the medium: it gives way to a
+            // new attempt. Stored, failed and uncertain attempts are final.
+            if !matches!(existing.outcome, Some(AcquisitionOutcome::Interrupted { .. })) {
+                return Ok(AcquisitionClaim {
+                    granted: false,
+                    acquisition: existing,
+                });
+            }
+            tx.execute(
+                "DELETE FROM media_acquisitions WHERE media_uri=?1",
+                [&begin.media_uri],
+            )
+            .map_err(db_error)?;
         }
         let json: Option<String> = tx.query_row(
             "SELECT s.snapshot_json FROM media_heads h JOIN media_snapshots s ON s.clip_id=h.clip_id AND s.revision=h.revision WHERE h.clip_id=?1",

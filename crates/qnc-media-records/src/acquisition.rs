@@ -34,12 +34,15 @@ pub enum AcquisitionOutcome {
     Stored { document_uri: String },
     Failed { code: String },
     Uncertain { code: String },
+    /// The medium was never read to an answer (the probe did not start or ran out
+    /// of time): no media fact was learned, so the medium may be claimed again.
+    Interrupted { code: String },
 }
 impl AcquisitionOutcome {
     fn validate(&self, begin: &BeginAcquisition) -> Result<()> {
         match self {
             Self::Stored { document_uri } if document_uri == &begin.document_uri => Ok(()),
-            Self::Failed { code } | Self::Uncertain { code } => {
+            Self::Failed { code } | Self::Uncertain { code } | Self::Interrupted { code } => {
                 valid_id(code).map_err(|_| Error::InvalidRequest)
             }
             _ => Err(Error::InvalidRequest),
@@ -68,7 +71,9 @@ impl FinishAcquisition {
                 }
             }
             (
-                AcquisitionOutcome::Failed { code } | AcquisitionOutcome::Uncertain { code },
+                AcquisitionOutcome::Failed { code }
+                | AcquisitionOutcome::Uncertain { code }
+                | AcquisitionOutcome::Interrupted { code },
                 None,
             ) => {
                 valid_id(code).map_err(|_| Error::InvalidRequest)?;

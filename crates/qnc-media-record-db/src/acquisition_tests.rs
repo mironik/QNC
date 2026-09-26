@@ -134,6 +134,41 @@ fn failure_and_uncertainty_never_reopen_acquisition() {
 }
 
 #[test]
+fn an_interrupted_attempt_gives_way_to_a_new_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("media.sqlite");
+    let mut db = local(&path, true, Access::ReadWrite);
+    db.write(input("A")).unwrap();
+    db.begin_acquisition(begin()).unwrap();
+    db.finish_acquisition(FinishAcquisition {
+        attempt_id: begin().attempt_id,
+        outcome: AcquisitionOutcome::Interrupted {
+            code: "Timeout".into(),
+        },
+        document: None,
+    })
+    .unwrap();
+    let again = BeginAcquisition {
+        attempt_id: "attempt-2".into(),
+        document_uri: "qnc://local/artifact/probe-2".into(),
+        ..begin()
+    };
+    let claim = db.begin_acquisition(again.clone()).unwrap();
+    assert!(claim.granted, "an interrupted probe may run again");
+    assert_eq!(claim.acquisition.request, again);
+    // The new attempt is final once stored: nothing reopens it.
+    let mut finish = stored();
+    finish.attempt_id = again.attempt_id.clone();
+    finish.outcome = AcquisitionOutcome::Stored {
+        document_uri: again.document_uri.clone(),
+    };
+    let document = finish.document.as_mut().unwrap();
+    document.document_uri = again.document_uri.clone();
+    db.finish_acquisition(finish).unwrap();
+    assert!(!db.begin_acquisition(begin()).unwrap().granted);
+}
+
+#[test]
 fn absent_wrong_or_final_snapshot_cannot_start_probe() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("media.sqlite");

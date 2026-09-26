@@ -32,13 +32,18 @@ pub const MODULE_ID: &str = "qnc.module.record-completion";
 /// shows a clip whose record is not final writes it; completion takes that clip first
 /// (v5: the selected clip first).
 pub const WANTED: &str = qnc_playback_activity::PLAYBACK_CLIP;
+/// How many times one run takes a clip whose probe never read its medium (did not
+/// start or ran out of time, v5: such a job goes back to the queue). A clip still
+/// interrupted after that waits for the next run.
+pub const TRIES: usize = 3;
 
 /// What one run did.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Completion {
     /// Completed clips, in the order they were published.
     pub completed: Vec<String>,
-    /// Clips that could not be completed and why (never retried by a new probe).
+    /// Clips that could not be completed and why. A probe that failed on the medium
+    /// is never run again; one that never read it is taken again by a later run.
     pub failed: Vec<(String, String)>,
 }
 
@@ -137,7 +142,7 @@ pub fn complete_clips(
     content: &ContentTarget,
     run: &Run<'_>,
 ) -> Completion {
-    let queue = Mutex::new(VecDeque::from(waiting));
+    let queue = Mutex::new(waiting.into_iter().map(|clip| (clip, 1)).collect::<VecDeque<_>>());
     let done = Mutex::new(Completion::default());
     std::thread::scope(|scope| {
         for _ in 0..run.workers.max(1) {
@@ -149,14 +154,24 @@ pub fn complete_clips(
                         return;
                     }
                 };
-                while let Some(clip) = next(&queue, run) {
+                while let Some((clip, tries)) = next(&queue, run) {
                     let id = clip.id().to_string();
-                    let result = complete_clip(parts, clip, run.cancel)
-                        .and_then(|clip| publish(&mut publisher, clip));
-                    let mut done = done.lock().expect("completion");
+                    let result = complete_clip(parts, clip.clone(), run.cancel)
+                        .and_then(|clip| Ok(publish(&mut publisher, clip)?));
                     match result {
-                        Ok(()) => done.completed.push(id),
-                        Err(error) => done.failed.push((id, error)),
+                        Ok(()) => done.lock().expect("completion").completed.push(id),
+                        Err(error)
+                            if error.is_interrupted()
+                                && tries < TRIES
+                                && !run.cancel.load(Ordering::Relaxed) =>
+                        {
+                            queue.lock().expect("completion queue").push_back((clip, tries + 1));
+                        }
+                        Err(error) => done
+                            .lock()
+                            .expect("completion")
+                            .failed
+                            .push((id, error.to_string())),
                     }
                 }
             });
@@ -167,7 +182,10 @@ pub fn complete_clips(
 
 /// The next clip: none when cancelled; waits while a player works; the wanted clip
 /// first, else the first in line.
-fn next(queue: &Mutex<VecDeque<CatalogClip>>, run: &Run<'_>) -> Option<CatalogClip> {
+fn next(
+    queue: &Mutex<VecDeque<(CatalogClip, usize)>>,
+    run: &Run<'_>,
+) -> Option<(CatalogClip, usize)> {
     loop {
         if run.cancel.load(Ordering::Relaxed) {
             return None;
@@ -180,7 +198,7 @@ fn next(queue: &Mutex<VecDeque<CatalogClip>>, run: &Run<'_>) -> Option<CatalogCl
     let wanted = (run.wanted)();
     let mut queue = queue.lock().expect("completion queue");
     let at = wanted
-        .and_then(|id| queue.iter().position(|clip| clip.id() == id))
+        .and_then(|id| queue.iter().position(|(clip, _)| clip.id() == id))
         .unwrap_or(0);
     queue.remove(at)
 }
@@ -191,7 +209,7 @@ fn complete_clip(
     parts: &Parts<'_>,
     mut clip: CatalogClip,
     cancel: &AtomicBool,
-) -> Result<CatalogClip, String> {
+) -> Result<CatalogClip, qnc_record_probe::Error> {
     let camera = parts
         .records
         .read(clip.id(), None)?
