@@ -37,6 +37,12 @@ impl std::fmt::Display for InputError {
 }
 impl std::error::Error for InputError {}
 
+/// Whether a player error says the saved record of the clip is not complete yet: it is
+/// completed in the background, so the caller may try again (v5 waits for the probe).
+pub fn is_incomplete_media(message: &str) -> bool {
+    message.contains("IncompleteMedia")
+}
+
 fn playback_input(settings: &WorkSettings) -> Result<PlaybackInput> {
     settings
         .validate()

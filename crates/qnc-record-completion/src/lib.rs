@@ -10,8 +10,12 @@
 //! database modules; it knows no form and no application.
 
 use std::{
+    collections::VecDeque,
     path::Path,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
     time::Duration,
 };
 
@@ -24,11 +28,16 @@ use qnc_source_index_db::project::{ProjectSourceIndex, SourceIndexModule};
 use qnc_source_reader::SourceReference;
 
 pub const MODULE_ID: &str = "qnc.module.record-completion";
+/// Runtime entry of the project database: the clip a preview wants next. Whoever
+/// shows a clip whose record is not final writes it; completion takes that clip first
+/// (v5: the selected clip first).
+pub const WANTED: &str = qnc_playback_activity::PLAYBACK_CLIP;
 
 /// What one run did.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Completion {
-    pub completed: usize,
+    /// Completed clips, in the order they were published.
+    pub completed: Vec<String>,
     /// Clips that could not be completed and why (never retried by a new probe).
     pub failed: Vec<(String, String)>,
 }
@@ -36,8 +45,17 @@ pub struct Completion {
 /// A probe backend for the source `source_uri` and the media of it that lack
 /// something. The composing process binds it to this computer (where the card is
 /// mounted, which ffprobe); this module names no application and no host.
-pub type MakeBackend<'a> =
-    &'a dyn Fn(&str, &[SourceReference]) -> Result<Box<dyn ProbeBackend + Send>, String>;
+pub type MakeBackend<'a> = &'a (dyn Fn(&str, &[SourceReference]) -> Result<Box<dyn ProbeBackend + Send>, String>
+         + Sync);
+
+/// How a run goes: how many clips at once (the host parallelism), which clip is
+/// wanted first, whether a player works (then it waits) and when to stop.
+pub struct Run<'a> {
+    pub workers: usize,
+    pub wanted: &'a (dyn Fn() -> Option<String> + Sync),
+    pub player_works: &'a (dyn Fn() -> bool + Sync),
+    pub cancel: &'a AtomicBool,
+}
 
 /// What completing a clip reads and writes.
 pub struct Parts<'a> {
@@ -51,7 +69,8 @@ pub struct Parts<'a> {
 pub fn complete_active_project(
     root: &Path,
     make_backend: MakeBackend<'_>,
-    player_works: &dyn Fn() -> bool,
+    workers: usize,
+    player_works: &(dyn Fn() -> bool + Sync),
     cancel: &AtomicBool,
 ) -> Result<Completion, String> {
     let active = qnc_active_project_read::ActiveProjectReader::from_root(root)
@@ -69,13 +88,25 @@ pub fn complete_active_project(
     )?;
     let records = ProjectMediaRecords::new(writer.clone());
     let sources = ProjectSourceIndex::new(writer);
-    let mut publisher = ContentWriteTransport::start(content)?;
     let parts = Parts {
         records: &records,
         sources: &sources,
         make_backend,
     };
-    Ok(complete_clips(&parts, waiting, &mut publisher, player_works, cancel))
+    let wanted = || wanted_clip(&content);
+    let run = Run {
+        workers,
+        wanted: &wanted,
+        player_works,
+        cancel,
+    };
+    Ok(complete_clips(&parts, waiting, &content, &run))
+}
+
+/// The clip a preview wants next, from the project database.
+pub fn wanted_clip(content: &ContentTarget) -> Option<String> {
+    let entry = content.open(Access::ReadOnly).ok()?.get_runtime(WANTED).ok()??;
+    Some(entry.value).filter(|value| !value.is_empty())
 }
 
 /// The clips of the project content whose record is still a camera record.
@@ -97,32 +128,61 @@ pub fn camera_clips(content: &ContentTarget) -> Result<Vec<CatalogClip>, String>
     }
 }
 
-/// Completes the given camera clips in order, giving way to a working player.
+/// Completes the given camera clips with `run.workers` at once: the probes run side by
+/// side, the records go through the one serial writer of the project database. The
+/// wanted clip is taken first; all give way to a working player.
 pub fn complete_clips(
     parts: &Parts<'_>,
     waiting: Vec<CatalogClip>,
-    publisher: &mut ContentWriteTransport,
-    player_works: &dyn Fn() -> bool,
-    cancel: &AtomicBool,
+    content: &ContentTarget,
+    run: &Run<'_>,
 ) -> Completion {
-    let mut done = Completion::default();
-    for clip in waiting {
-        while player_works() {
-            if cancel.load(Ordering::Relaxed) {
-                return done;
-            }
-            std::thread::sleep(Duration::from_millis(200));
+    let queue = Mutex::new(VecDeque::from(waiting));
+    let done = Mutex::new(Completion::default());
+    std::thread::scope(|scope| {
+        for _ in 0..run.workers.max(1) {
+            scope.spawn(|| {
+                let mut publisher = match ContentWriteTransport::start(content.clone()) {
+                    Ok(publisher) => publisher,
+                    Err(error) => {
+                        done.lock().expect("completion").failed.push((String::new(), error));
+                        return;
+                    }
+                };
+                while let Some(clip) = next(&queue, run) {
+                    let id = clip.id().to_string();
+                    let result = complete_clip(parts, clip, run.cancel)
+                        .and_then(|clip| publish(&mut publisher, clip));
+                    let mut done = done.lock().expect("completion");
+                    match result {
+                        Ok(()) => done.completed.push(id),
+                        Err(error) => done.failed.push((id, error)),
+                    }
+                }
+            });
         }
-        if cancel.load(Ordering::Relaxed) {
+    });
+    done.into_inner().expect("completion")
+}
+
+/// The next clip: none when cancelled; waits while a player works; the wanted clip
+/// first, else the first in line.
+fn next(queue: &Mutex<VecDeque<CatalogClip>>, run: &Run<'_>) -> Option<CatalogClip> {
+    loop {
+        if run.cancel.load(Ordering::Relaxed) {
+            return None;
+        }
+        if !(run.player_works)() {
             break;
         }
-        let id = clip.id().to_string();
-        match complete_clip(parts, clip, cancel).and_then(|clip| publish(publisher, clip)) {
-            Ok(()) => done.completed += 1,
-            Err(error) => done.failed.push((id, error)),
-        }
+        std::thread::sleep(Duration::from_millis(200));
     }
-    done
+    let wanted = (run.wanted)();
+    let mut queue = queue.lock().expect("completion queue");
+    let at = wanted
+        .and_then(|id| queue.iter().position(|clip| clip.id() == id))
+        .unwrap_or(0);
+    queue.remove(at)
 }
 
 /// One clip: its own media record and source record, a probe backend bound to its

@@ -2323,6 +2323,18 @@ klipova serije 2676-2690 (proxy s vlastitim dur/fps u MEDIAPRO) nije dovrseno je
 trajanje iz XML-a, a spremnik proxyja je dulji od videa (zvuk) pa se sukobio s probeom; ispravljeno
 (trajanje samo za original). Timecode izvora dodan i u Ingest source dock (`qnc-ingest-desktop` jedan
 redak, `qnc-ingest-application` view model; C10 granice nisu podignute).
+Brzina (korisnik: "taj nacin probe je usporio postupak, trazi rjesenje koje ne usporava"): mjereno,
+jedan probe MXF originala na SD kartici oko 0,5 s, MP4 proxyja oko 0,1 s; usko grlo je kartica, ne
+procesor. Izvedeno: `qnc-record-completion` radi s vise radnika (red, serijski upis kroz posrednika),
+klip koji preview otvara ide prvi (`qnc-playback-activity` `PLAYBACK_CLIP`, preview ga javlja pri
+otvaranju), preview klipa bez potpunog zapisa pokazuje "Podaci klipa se pripremaju..." i sam ponovno
+otvara svake sekunde do 3 min (`qnc-player-input::is_incomplete_media`, `qnc-source-preview`),
+dovrsetak ide istodobno s filmstrip/wave, 2 radnika (8 radnika je gusvalo karticu: istek vremena
+probea i klip zauvijek nedovrsen). Provjera od cistog stanja na izoliranoj kopiji: Select bez
+probea, kliknuti neuvezeni klip svira za nekoliko sekundi s TC-om kamere u Ingest docku, svih 98
+zapisa dovrseno za oko 46 s, 196 probeova spremljeno, nijedan neuspjeh; stvarne baze nepromijenjene.
+Otvoreni rizik: istek vremena probea zapise kao neuspjeh i klip ostaje nedovrsen (ugovor zapisa
+dopusta samo jedan pokusaj po mediju); treba odluku o ponovnom pokusaju nakon isteka vremena.
 
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne

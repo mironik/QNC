@@ -22,6 +22,9 @@ pub const VERSION: &str = "0.1.0";
 
 /// A player prepares or plays.
 pub const PLAYBACK: &str = "playback_active";
+/// The clip a preview opens last: whoever completes records takes it first (v5: the
+/// selected clip first).
+pub const PLAYBACK_CLIP: &str = "playback_clip";
 /// The background application runs.
 pub const WORKER: &str = "worker_lease";
 /// What the background application did last.
@@ -153,7 +156,7 @@ impl Drop for Beat {
 #[derive(Default, Debug)]
 pub struct PlaybackReporter {
     target_uri: Option<String>,
-    sender: Option<Sender<bool>>,
+    sender: Option<Sender<Report>>,
     thread: Option<JoinHandle<()>>,
     last: bool,
 }
@@ -169,18 +172,33 @@ impl PlaybackReporter {
         let Some(target) = target else {
             return;
         };
+        self.bind(target);
+        if self.last != active {
+            self.last = active;
+            if let Some(sender) = &self.sender {
+                let _ = sender.send(Report::Active(active));
+            }
+        }
+    }
+
+    /// The clip a preview opens: written once, never blocking the form.
+    pub fn clip(&mut self, target: Option<&ContentTarget>, clip_id: &str) {
+        let Some(target) = target else {
+            return;
+        };
+        self.bind(target);
+        if let Some(sender) = &self.sender {
+            let _ = sender.send(Report::Clip(clip_id.into()));
+        }
+    }
+
+    fn bind(&mut self, target: &ContentTarget) {
         if self.target_uri.as_deref() != Some(target.uri()) {
             self.stop();
             self.target_uri = Some(target.uri().to_string());
             if let Ok(sender) = start_reporter(target.clone(), &mut self.thread) {
                 self.sender = Some(sender);
                 self.last = false;
-            }
-        }
-        if self.last != active {
-            self.last = active;
-            if let Some(sender) = &self.sender {
-                let _ = sender.send(active);
             }
         }
     }
@@ -197,18 +215,24 @@ impl Drop for PlaybackReporter {
     fn drop(&mut self) {
         if self.last {
             if let Some(sender) = &self.sender {
-                let _ = sender.send(false);
+                let _ = sender.send(Report::Active(false));
             }
         }
         self.stop();
     }
 }
 
+#[derive(Debug)]
+enum Report {
+    Active(bool),
+    Clip(String),
+}
+
 fn start_reporter(
     target: ContentTarget,
     thread: &mut Option<JoinHandle<()>>,
-) -> Result<Sender<bool>, String> {
-    let (send, receive) = mpsc::channel::<bool>();
+) -> Result<Sender<Report>, String> {
+    let (send, receive) = mpsc::channel::<Report>();
     let mut writer = Writer::start(target)?;
     *thread = Some(
         std::thread::Builder::new()
@@ -217,9 +241,12 @@ fn start_reporter(
                 let mut active = false;
                 loop {
                     match receive.recv_timeout(RENEW_EVERY) {
-                        Ok(state) => {
+                        Ok(Report::Active(state)) => {
                             active = state;
                             let _ = writer.set(PLAYBACK, if active { ON } else { OFF });
+                        }
+                        Ok(Report::Clip(clip_id)) => {
+                            let _ = writer.set(PLAYBACK_CLIP, &clip_id);
                         }
                         Err(RecvTimeoutError::Timeout) => {
                             if active {

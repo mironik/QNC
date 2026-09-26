@@ -14,6 +14,7 @@ qnc-record-probe = { workspace = true }
 qnc-source-index-db = { workspace = true }
 qnc-source-reader = { workspace = true }
 qnc-media-probe = { workspace = true }
+qnc-playback-activity = { workspace = true }
 
 [dev-dependencies]
 qnc-camera-adapter = { workspace = true }

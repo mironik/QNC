@@ -144,6 +144,8 @@ pub struct SourcePreview {
     player_view: PlayerView,
     timeline_assets: TimelineAssetReader,
     play_when_ready: bool,
+    /// The clip whose record is still completed, since when and the last try.
+    record_wait: Option<(String, std::time::Instant, std::time::Instant)>,
     /// A cue sent and not yet confirmed, when it was sent, and the latest frame
     /// asked meanwhile: a fast scrub or drag sends one cue at a time, latest wins,
     /// so the player command queue never fills.
@@ -166,6 +168,7 @@ impl Default for SourcePreview {
             player_view: PlayerView::default(),
             timeline_assets: TimelineAssetReader::default(),
             play_when_ready: false,
+            record_wait: None,
             cue_in_flight: None,
             cue_next: None,
             activity: qnc_playback_activity::PlaybackReporter::new(),
@@ -302,6 +305,8 @@ impl SourcePreview {
         }
         self.close();
         self.view.clip_id = Some(clip_id.to_string());
+        // Whoever completes records in the background takes this clip first.
+        self.activity.clip(self.activity_target.as_ref(), clip_id);
         let Some(context) = self.context.clone() else {
             self.view.message = "Radne postavke projekta nisu ucitane.".into();
             return true;
@@ -505,9 +510,37 @@ impl SourcePreview {
         true
     }
 
+    /// A clip whose saved record is still completed in the background opens again
+    /// once a second, for up to three minutes (v5 waits for the media probe).
+    fn retry_incomplete_record(&mut self) -> bool {
+        let incomplete = self
+            .player_view
+            .error
+            .as_deref()
+            .is_some_and(qnc_player_input::is_incomplete_media);
+        let Some(clip_id) = self.view.clip_id.clone().filter(|_| incomplete) else {
+            self.record_wait = None;
+            return false;
+        };
+        let now = std::time::Instant::now();
+        let (since, last) = match &self.record_wait {
+            Some((id, since, last)) if *id == clip_id => (*since, *last),
+            _ => (now, now),
+        };
+        self.record_wait = Some((clip_id.clone(), since, last));
+        self.view.message = "Podaci klipa se pripremaju...".into();
+        if now.duration_since(since) > std::time::Duration::from_secs(180)
+            || now.duration_since(last) < std::time::Duration::from_secs(1)
+        {
+            return false;
+        }
+        self.record_wait = Some((clip_id.clone(), since, now));
+        self.open_at(&clip_id, 0)
+    }
+
     /// Applies the player state. Returns whether the view changed.
     pub fn poll(&mut self) -> bool {
-        let mut changed = false;
+        let mut changed = self.retry_incomplete_record();
         if let Some(player) = &self.player {
             let playback = player.view();
             if playback != self.player_view {

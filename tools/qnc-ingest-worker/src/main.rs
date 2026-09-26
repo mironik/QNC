@@ -44,8 +44,8 @@ fn run_background(root: &Path) -> Result<(), String> {
     let _lease = qnc_playback_activity::Beat::start(target, qnc_playback_activity::WORKER)?;
     qnc_ingest_import_worker::run_import(root)?;
     // v5 media probe job: a card record gets what playback lacks, once, in the
-    // background, so a preview of a clip not yet imported plays.
-    let cancel = std::sync::atomic::AtomicBool::new(false);
+    // background, so a preview of a clip not yet imported plays. It runs beside the
+    // artifacts, several clips at once, the clip a preview wants first.
     let config = qnc_ingest_select::selection_config::SelectionConfig::load(root)
         .map_err(|error| error.to_string())?;
     let make_backend = |source_uri: &str, media: &[qnc_source_reader::SourceReference]| {
@@ -56,20 +56,27 @@ fn run_background(root: &Path) -> Result<(), String> {
             .ok_or("Izvor klipa nije spojen na ovo racunalo.")?;
         source.backend(media).map_err(|error| error.to_string())
     };
-    match qnc_record_completion::complete_active_project(
-        root,
-        &make_backend,
-        &*player_works,
-        &cancel,
-    ) {
-        Ok(done) => {
-            for (clip, error) in done.failed {
-                eprintln!("zapis klipa {clip} nije dovrsen: {error}");
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            let done = qnc_record_completion::complete_active_project(
+                root,
+                &make_backend,
+                PROBE_WORKERS,
+                &*player_works,
+                &cancel,
+            );
+            match done {
+                Ok(done) => {
+                    for (clip, error) in done.failed {
+                        eprintln!("zapis klipa {clip} nije dovrsen: {error}");
+                    }
+                }
+                Err(error) => eprintln!("dovrsetak zapisa nije uspio: {error}"),
             }
-        }
-        Err(error) => eprintln!("dovrsetak zapisa nije uspio: {error}"),
-    }
-    run_artifacts(root)
+        });
+        run_artifacts(root)
+    })
 }
 
 fn run_artifacts(root: &Path) -> Result<(), String> {
@@ -100,6 +107,10 @@ fn run_artifacts(root: &Path) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// Probes read the card; the card, not the processor, sets the pace (about 0.5 s per
+/// MXF). Two at once keep it busy without crowding the filmstrip reads into timeouts.
+const PROBE_WORKERS: usize = 2;
 
 fn root_argument() -> Option<PathBuf> {
     let mut args = std::env::args_os().skip(1);
