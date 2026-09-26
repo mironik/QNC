@@ -1,19 +1,45 @@
 {
   "database_id": "qnc.db.source_index",
-  "owner_application": "qnc.ingest",
-  "write_owner": "qnc.ingest",
+  "database_owner": "project",
+  "owner_application": "qnc.module.content-store",
+  "ownership_rule": "User rules 2026-09-25/26 and QNC v5 (ingest_assets, probe_json, metadata_json in the project database, every write through ProjectDbBroker): the project owns this database and Ingest owns neither the database nor the clips. Its tables live in the project database of the active project, never in a database of the computer shared by projects, so a new project never inherits records of another. Every write goes through the one intermediary of the project database, qnc.module.content-store.",
+  "implementation_private_files": [
+    "{project_directory}/project.db"
+  ],
+  "write_owner": "qnc.module.content-store",
   "schema_version": "0.1.0",
   "qnc_uri": "qnc://local/db/source_index",
-  "transport_uri_templates": ["qnc://local/db/source_index", "qnc://lan/{authority}/db/source_index", "qnc://intranet/{authority}/db/source_index"],
-  "transport_scope": ["local", "lan", "intranet"],
-  "tables": ["source_records", "media_references", "support_references", "write_receipts"],
-  "public_read_views": ["public_source_records", "public_source_media", "public_source_support"],
+  "transport_uri_templates": [
+    "qnc://local/db/source_index",
+    "qnc://lan/{authority}/db/source_index",
+    "qnc://intranet/{authority}/db/source_index"
+  ],
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "tables": [
+    "source_records",
+    "media_references",
+    "support_references",
+    "write_receipts"
+  ],
+  "public_read_views": [
+    "public_source_records",
+    "public_source_media",
+    "public_source_support"
+  ],
   "public_read_policy": "public_read_views",
   "record_contracts": {
-    "public_source_records.group_json": {"contract_id": "qnc.source.groups", "contract_version": "0.1.0", "record_type": "SourceGroup"}
+    "public_source_records.group_json": {
+      "contract_id": "qnc.source.groups",
+      "contract_version": "0.1.0",
+      "record_type": "SourceGroup"
+    }
   },
   "migration_policy": "reject_incompatible_no_migration",
   "specification": "docs/30-source-index-database.md",
   "created_at": "2026-09-07T00:00:00Z",
-  "updated_at": "2026-09-07T00:00:00Z"
+  "updated_at": "2026-09-26T00:00:00Z"
 }

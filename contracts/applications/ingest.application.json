@@ -7,13 +7,7 @@
   "owned_database_contracts": [
     "qnc://local/db/ingest_registry",
     "qnc://lan/{authority}/db/ingest_registry",
-    "qnc://intranet/{authority}/db/ingest_registry",
-    "qnc://local/db/source_index",
-    "qnc://lan/{authority}/db/source_index",
-    "qnc://intranet/{authority}/db/source_index",
-    "qnc://local/db/media_records",
-    "qnc://lan/{authority}/db/media_records",
-    "qnc://intranet/{authority}/db/media_records"
+    "qnc://intranet/{authority}/db/ingest_registry"
   ],
   "read_database_contracts": [
     "qnc://local/db/project_registry",

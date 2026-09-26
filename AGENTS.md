@@ -2285,6 +2285,28 @@ traci panela Segmenti (`crates/qnc-segment-panel`), tipke kataloga `undo_object`
 `redo_object` kroz `crates/qnc-program-segments` kad je fokus na Segmentima.
 B-roll kadrovi koje je pokrivalica stvorila ostaju. Ugovor `story.database.json`.
 
+Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
+otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne
+postavke odlucuju gdje sto zivi; aplikacija je OS-neutralna. v5: `ingest_assets`,
+`probe_json`, `metadata_json`, poslovi i serije uvoza su tablice u bazi projekta, svaki
+upis ide kroz `ProjectDbBroker::serialize_project_write`; nema baze racunala koju dijele
+projekti. Nalaz audita: `QNC/data/ingest_media_records.db`, `ingest_source_index.db` i
+`ingest_registry.db` (vlasnik `qnc.ingest`, lokacija iz `ingest-transport.json`) dijele svi
+projekti; novi projekt nasljeduje zapise od 7. 9. (ffprobe uz XML). Plan: K1 ugovori
+(`media-records`, `source-index`: vlasnik projekt, tablice u `project.db`, pisac
+`qnc-content-store`); K2 `qnc-media-record-db` i `qnc-source-index-db` zive u bazi
+projekta (provjera samo svojih tablica, `media_write_receipts`/`source_write_receipts`);
+K3 posrednik `qnc-content-store` izvrsava njihove operacije serijski; K4 Select salje
+zapise kroz transport projekta, `ingest-transport.json` ostaje samo za racunalo
+(montiranje kartice, ffprobe, katalog kamera); K5 Select sesije u `project.db`, identitet
+kartice kroz OS-neutralni `qnc-source-volumes`; K6 conformance pravilo i brisanje
+`data/ingest_content.db`. Stare baze u `QNC/data` se ne brisu bez korisnika.
+Otkljucano: `qnc-media-record-db`, `qnc-source-index-db`, `qnc-content-store`,
+`qnc-ingest-select`, `qnc-ingest-store`, `qnc-ingest-application`, `qnc-source-bindings`,
+`qnc-dir-browser`, `qnc-work-settings`, `qnc-ingest-import-worker`, `tools/qnc-ingest-worker`,
+novi `qnc-source-volumes`, ugovori baza, modula i aplikacije Ingest, `tools/qnc-conformance`,
+root Cargo. UI i layout se ne diraju. Izvedeno: K1.
+
 Otvoreno ograniceno odobrenje 2026-09-25 (originalni timecode izvora): korisnik je
 odredio: broadcast montaza radi po timecodeu (veza proxy-original i export); pocetni TC
 klipa cita se iz XML-a kamere, ffprobe samo za klip bez XML-a (takvi klipovi sluze za
