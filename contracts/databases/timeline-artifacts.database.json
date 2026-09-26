@@ -1,0 +1,42 @@
+{
+  "database_id": "qnc.db.timeline_artifacts",
+  "database_owner": "project",
+  "owner_application": "qnc.module.artifact-db",
+  "ownership_rule": "User rules 2026-09-25/26: the project owns this database; no application (Ingest, Media Assist, Story or any other) owns it or its tables. No form or worker writes to it, so none can own it: filmstrip and wave results reach these tables only through the one intermediary of the project database (qnc.module.db-broker), whose table module qnc.module.artifact-db owns them (lego split of the former content store, 2026-09-27).",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/project_db",
+  "tables": [
+    "filmstrip_artifacts",
+    "filmstrip_frames",
+    "wave_artifacts"
+  ],
+  "public_read_views": [
+    "public_filmstrip_artifacts",
+    "public_filmstrip_frames",
+    "public_wave_artifacts"
+  ],
+  "write_owner": "qnc.module.artifact-db",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "catalog": "A row belongs to a clip of the catalog (clip_id refers to clips.clip_id); a wave belongs to its stored original or proxy, read through qnc-content-read.",
+    "removal": "Before the catalog removes a clip missing on its source, qnc-artifact-db forgets its rows (only of a detected or failed clip); a queued or imported clip keeps them.",
+    "files": "Filmstrip frames are JPEG files under the project products/filmstrip location; the database keeps their URIs, never the pixels."
+  },
+  "record_contracts": {
+    "public_filmstrip_frames.artifact_uri": {
+      "contract_id": "qnc.filmstrip.frame",
+      "contract_version": "0.1.0",
+      "module_id": "qnc.module.filmstrip",
+      "specification": "13 real JPEG frame artifacts under the project products/filmstrip location from WorkSettings; no probe, no scanner, no repeated poster."
+    },
+    "public_wave_artifacts.peaks_json": {
+      "contract_id": "qnc.wave.peaks",
+      "contract_version": "0.1.0",
+      "module_id": "qnc.module.wave",
+      "specification": "Prepared peak arrays for passive timeline painting. Source and lane count come from project audio settings plus saved clip/proxy metadata: two-channel project may use proxy audio when present, original uses saved original channels in public timeline lanes. No waveform probe, no PNG sidecar, no separate wave database."
+    }
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-09-27T00:00:00Z",
+  "updated_at": "2026-09-27T00:00:00Z"
+}

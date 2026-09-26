@@ -304,6 +304,7 @@ fn run_inner(
         vec![
             qnc_media_record_db::project::MediaRecordsModule::factory(),
             qnc_source_index_db::project::SourceIndexModule::factory(),
+            qnc_artifact_db::ArtifactsModule::factory(),
         ],
     )?;
     let records = records::register_groups(
@@ -344,7 +345,7 @@ fn run_inner(
     if cancel.load(Ordering::Relaxed) {
         return Err("Select je prekinut.".into());
     }
-    let removed = publish::remove_missing(content_target, &scanned.missing, send)?;
+    let removed = publish::remove_missing(content_target, &project, &scanned.missing, send)?;
     Ok(Summary {
         unchanged: scanned.groups.len() - records.len(),
         processed: records.len(),

@@ -68,12 +68,7 @@ pub fn preview_context(
             token_env: source.location.token_env.clone(),
         })
         .collect();
-    let artifacts = qnc_content_store::ContentTarget::for_project(&reader, &settings)
-        .ok()
-        .and_then(|artifact_target| {
-            qnc_content_artifacts::timeline_artifact_reader(&reader, &settings, artifact_target)
-                .ok()
-        });
+    let artifacts = qnc_content_artifacts::timeline_artifact_reader(&reader, &settings).ok();
     PreviewContext::with_readers(
         reader,
         settings,

@@ -1,11 +1,14 @@
 //! Project content adapters for timeline artifacts.
 //!
-//! Filmstrip and wave workers are neutral. This module feeds them from the
-//! active project content database and writes results back through the public
-//! content write transport. It does not scan, probe, read UI state or know an
-//! application workflow.
+//! Filmstrip and wave workers are neutral. This module feeds them the clips of the
+//! active project (its content) and reads and writes their results through the
+//! artifact tables of the project database (`qnc-artifact-db`, through the one
+//! intermediary). It does not scan, probe, read UI state or know an application
+//! workflow.
 
+use qnc_artifact_db::{ArtifactPending, ArtifactReader, ArtifactWriter, Operation as ArtifactOperation};
 use qnc_content_store::{ContentTarget, ImportStatus, StoredClip};
+use qnc_db_broker::ProjectDbTarget;
 use qnc_source_bindings::SourceBinding;
 use qnc_timeline_artifacts::{Artifacts, ArtifactsContext};
 use qnc_timeline_assets::{
@@ -58,6 +61,67 @@ impl std::ops::DerefMut for ReadGuard<'_> {
     }
 }
 
+/// One read-only client of the artifact tables, opened on first use and shared.
+#[derive(Clone)]
+struct SharedArtifacts {
+    target: ProjectDbTarget,
+    client: Arc<std::sync::Mutex<Option<ArtifactReader>>>,
+}
+
+impl SharedArtifacts {
+    fn new(target: ProjectDbTarget) -> Self {
+        Self {
+            target,
+            client: Arc::new(std::sync::Mutex::new(None)),
+        }
+    }
+
+    fn read<T>(&self, read: impl FnOnce(&mut ArtifactReader) -> Result<T, String>) -> Result<T, String> {
+        let mut guard = self
+            .client
+            .lock()
+            .map_err(|_| "Veza prema projektnoj bazi nije dostupna.".to_string())?;
+        if guard.is_none() {
+            *guard = Some(ArtifactReader::open(&self.target)?);
+        }
+        read(guard.as_mut().expect("opened above"))
+    }
+}
+
+/// Publications of one worker through the artifact writer, answered later.
+struct ArtifactPublisher {
+    writer: ArtifactWriter,
+    pending: Vec<(String, ArtifactPending)>,
+}
+
+impl ArtifactPublisher {
+    fn start(target: &ProjectDbTarget) -> Result<Self, String> {
+        Ok(Self {
+            writer: ArtifactWriter::start(target.clone())?,
+            pending: Vec::new(),
+        })
+    }
+
+    fn send(&mut self, key: String, operation: ArtifactOperation) -> Result<(), String> {
+        let pending = self.writer.submit(&operation)?;
+        self.pending.push((key, pending));
+        Ok(())
+    }
+
+    fn poll(&mut self) -> Vec<(String, Result<(), String>)> {
+        let mut done = Vec::new();
+        let mut waiting = Vec::new();
+        for (key, pending) in std::mem::take(&mut self.pending) {
+            match pending.try_take() {
+                Some(result) => done.push((key, result.map(|_| ()))),
+                None => waiting.push((key, pending)),
+            }
+        }
+        self.pending = waiting;
+        done
+    }
+}
+
 fn artifact_priority(stored: &StoredClip) -> bool {
     stored.selected
         || matches!(
@@ -68,7 +132,7 @@ fn artifact_priority(stored: &StoredClip) -> bool {
 
 #[derive(Clone)]
 struct ProjectTimelineArtifactReader {
-    read: SharedRead,
+    artifacts: SharedArtifacts,
     filmstrip_root_uri: String,
     filmstrip_dir: std::path::PathBuf,
 }
@@ -78,16 +142,11 @@ impl TimelineArtifactRead for ProjectTimelineArtifactReader {
         &self,
         clip_id: &str,
     ) -> Result<Option<qnc_filmstrip::FilmstripArtifactRecord>, String> {
-        Ok(self
-            .read
-            .open()?
-            .read_filmstrip(clip_id)
-            .map_err(|error| error.to_string())?
-            .map(to_filmstrip_record))
+        self.artifacts.read(|reader| reader.read_filmstrip(clip_id))
     }
 
     fn read_wave(&self, clip_id: &str) -> Result<Option<qnc_wave::WaveArtifactRecord>, String> {
-        self.read.open()?.read_wave(clip_id)
+        self.artifacts.read(|reader| reader.read_wave(clip_id))
     }
 
     fn read_image_bytes(&self, artifact_uri: &str) -> Result<Vec<u8>, String> {
@@ -103,6 +162,7 @@ impl TimelineArtifactRead for ProjectTimelineArtifactReader {
 #[derive(Clone)]
 struct ProjectFilmstripContentReader {
     read: SharedRead,
+    artifacts: SharedArtifacts,
 }
 
 impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReader {
@@ -143,32 +203,22 @@ impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReade
         &self,
         clip_id: &str,
     ) -> Result<Option<qnc_filmstrip::FilmstripArtifactRecord>, String> {
-        Ok(self
-            .read
-            .open()?
-            .read_filmstrip(clip_id)?
-            .map(to_filmstrip_record))
+        self.artifacts.read(|reader| reader.read_filmstrip(clip_id))
     }
 }
 
 #[derive(Clone)]
 struct ProjectFilmstripContentWriteFactory {
-    content_target: ContentTarget,
+    target: ProjectDbTarget,
 }
 
 impl qnc_filmstrip_worker::FilmstripContentWriteFactory for ProjectFilmstripContentWriteFactory {
     fn start(&self) -> Result<Box<dyn qnc_filmstrip_worker::FilmstripContentWrite>, String> {
-        Ok(Box::new(ProjectFilmstripContentWriter {
-            transport: qnc_content_store::ContentWriteTransport::start(
-                self.content_target.clone(),
-            )?,
-        }))
+        Ok(Box::new(ProjectFilmstripContentWriter(ArtifactPublisher::start(&self.target)?)))
     }
 }
 
-struct ProjectFilmstripContentWriter {
-    transport: qnc_content_store::ContentWriteTransport,
-}
+struct ProjectFilmstripContentWriter(ArtifactPublisher);
 
 impl qnc_filmstrip_worker::FilmstripContentWrite for ProjectFilmstripContentWriter {
     fn publish_filmstrip(
@@ -176,31 +226,27 @@ impl qnc_filmstrip_worker::FilmstripContentWrite for ProjectFilmstripContentWrit
         key: String,
         artifact: qnc_filmstrip::FilmstripArtifactRecord,
     ) -> Result<(), String> {
-        self.transport
-            .publish_filmstrip(key, to_store_filmstrip_record(artifact))
+        self.0
+            .send(key, ArtifactOperation::PublishFilmstrip(Box::new(artifact)))
     }
 
     fn poll(&mut self) -> Vec<qnc_filmstrip_worker::FilmstripWriteCompletion> {
-        self.transport
+        self.0
             .poll()
             .into_iter()
-            .map(
-                |completion| qnc_filmstrip_worker::FilmstripWriteCompletion {
-                    key: completion.key,
-                    result: completion.result.map(|_| ()),
-                },
-            )
+            .map(|(key, result)| qnc_filmstrip_worker::FilmstripWriteCompletion { key, result })
             .collect()
     }
 
     fn has_pending(&self) -> bool {
-        self.transport.has_pending()
+        !self.0.pending.is_empty()
     }
 }
 
 #[derive(Clone)]
 struct ProjectWaveContentReader {
     read: SharedRead,
+    artifacts: SharedArtifacts,
 }
 
 impl qnc_wave_worker::WaveContentRead for ProjectWaveContentReader {
@@ -237,28 +283,22 @@ impl qnc_wave_worker::WaveContentRead for ProjectWaveContentReader {
     }
 
     fn read_wave(&self, clip_id: &str) -> Result<Option<qnc_wave::WaveArtifactRecord>, String> {
-        self.read.open()?.read_wave(clip_id)
+        self.artifacts.read(|reader| reader.read_wave(clip_id))
     }
 }
 
 #[derive(Clone)]
 struct ProjectWaveContentWriteFactory {
-    content_target: ContentTarget,
+    target: ProjectDbTarget,
 }
 
 impl qnc_wave_worker::WaveContentWriteFactory for ProjectWaveContentWriteFactory {
     fn start(&self) -> Result<Box<dyn qnc_wave_worker::WaveContentWrite>, String> {
-        Ok(Box::new(ProjectWaveContentWriter {
-            transport: qnc_content_store::ContentWriteTransport::start(
-                self.content_target.clone(),
-            )?,
-        }))
+        Ok(Box::new(ProjectWaveContentWriter(ArtifactPublisher::start(&self.target)?)))
     }
 }
 
-struct ProjectWaveContentWriter {
-    transport: qnc_content_store::ContentWriteTransport,
-}
+struct ProjectWaveContentWriter(ArtifactPublisher);
 
 impl qnc_wave_worker::WaveContentWrite for ProjectWaveContentWriter {
     fn publish_wave(
@@ -266,64 +306,20 @@ impl qnc_wave_worker::WaveContentWrite for ProjectWaveContentWriter {
         key: String,
         artifact: qnc_wave::WaveArtifactRecord,
     ) -> Result<(), String> {
-        self.transport.publish_wave(key, artifact)
+        self.0
+            .send(key, ArtifactOperation::PublishWave(Box::new(artifact)))
     }
 
     fn poll(&mut self) -> Vec<qnc_wave_worker::WaveWriteCompletion> {
-        self.transport
+        self.0
             .poll()
             .into_iter()
-            .map(|completion| qnc_wave_worker::WaveWriteCompletion {
-                key: completion.key,
-                result: completion.result.map(|_| ()),
-            })
+            .map(|(key, result)| qnc_wave_worker::WaveWriteCompletion { key, result })
             .collect()
     }
 
     fn has_pending(&self) -> bool {
-        self.transport.has_pending()
-    }
-}
-
-fn to_filmstrip_record(
-    record: qnc_content_store::FilmstripArtifactRecord,
-) -> qnc_filmstrip::FilmstripArtifactRecord {
-    qnc_filmstrip::FilmstripArtifactRecord {
-        clip_id: record.clip_id,
-        status: record.status,
-        duration_sec: record.duration_sec,
-        frame_count: record.frame_count,
-        artifact_uri: record.artifact_uri,
-        frames: record
-            .frames
-            .into_iter()
-            .map(|frame| qnc_filmstrip::FilmstripFrameRecord {
-                index: frame.index,
-                seek_sec: frame.seek_sec,
-                artifact_uri: frame.artifact_uri,
-            })
-            .collect(),
-    }
-}
-
-fn to_store_filmstrip_record(
-    record: qnc_filmstrip::FilmstripArtifactRecord,
-) -> qnc_content_store::FilmstripArtifactRecord {
-    qnc_content_store::FilmstripArtifactRecord {
-        clip_id: record.clip_id,
-        status: record.status,
-        duration_sec: record.duration_sec,
-        frame_count: record.frame_count,
-        artifact_uri: record.artifact_uri,
-        frames: record
-            .frames
-            .into_iter()
-            .map(|frame| qnc_content_store::FilmstripFrameRecord {
-                index: frame.index,
-                seek_sec: frame.seek_sec,
-                artifact_uri: frame.artifact_uri,
-            })
-            .collect(),
+        !self.0.pending.is_empty()
     }
 }
 
@@ -364,14 +360,13 @@ fn wave_source_bindings(
 pub fn timeline_artifact_reader(
     reader: &SettingsReader,
     settings: &WorkSettings,
-    content_target: ContentTarget,
 ) -> Result<Arc<dyn TimelineArtifactRead>, String> {
     let project_dir = reader
         .local_workspace_dir(settings)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Artefakti timelinea nemaju lokalni binding projekta.".to_string())?;
     Ok(Arc::new(ProjectTimelineArtifactReader {
-        read: SharedRead::new(content_target),
+        artifacts: SharedArtifacts::new(ProjectDbTarget::for_project(reader, settings)?),
         filmstrip_root_uri: settings.product_uri(ProductArea::Filmstrip),
         filmstrip_dir: settings.product_local_dir(&project_dir, ProductArea::Filmstrip),
     }))
@@ -390,6 +385,8 @@ pub fn artifacts_context(
     let filmstrip_dir = settings.product_local_dir(&project_dir, ProductArea::Filmstrip);
     let project_audio_channels = settings.audio_channels().map_err(|e| e.to_string())?;
     let filmstrip_root_uri = settings.product_uri(ProductArea::Filmstrip);
+    let project_db = ProjectDbTarget::for_project(reader, settings)?;
+    let artifacts = SharedArtifacts::new(project_db.clone());
     Ok(ArtifactsContext {
         project_id: settings.project_id.clone(),
         filmstrip_root_uri: filmstrip_root_uri.clone(),
@@ -397,21 +394,23 @@ pub fn artifacts_context(
         wave_root_uri: format!("{}/wave", content_target.uri().trim_end_matches('/')),
         project_audio_channels,
         timeline_reader: Arc::new(ProjectTimelineArtifactReader {
-            read: SharedRead::new(content_target.clone()),
+            artifacts: artifacts.clone(),
             filmstrip_root_uri,
             filmstrip_dir,
         }),
         filmstrip_reader: Arc::new(ProjectFilmstripContentReader {
             read: SharedRead::new(content_target.clone()),
+            artifacts: artifacts.clone(),
         }),
         filmstrip_writer: Arc::new(ProjectFilmstripContentWriteFactory {
-            content_target: content_target.clone(),
+            target: project_db.clone(),
         }),
         filmstrip_sources: filmstrip_source_bindings(source_bindings)?,
         wave_reader: Arc::new(ProjectWaveContentReader {
-            read: SharedRead::new(content_target.clone()),
+            read: SharedRead::new(content_target),
+            artifacts,
         }),
-        wave_writer: Arc::new(ProjectWaveContentWriteFactory { content_target }),
+        wave_writer: Arc::new(ProjectWaveContentWriteFactory { target: project_db }),
         wave_sources: wave_source_bindings(source_bindings)?,
     })
 }
@@ -456,11 +455,10 @@ impl ProjectArtifacts {
         &mut self,
         reader: &SettingsReader,
         settings: &WorkSettings,
-        content_target: ContentTarget,
     ) -> Result<(), String> {
         self.assets.configure(TimelineAssetContext {
             project_id: settings.project_id.clone(),
-            reader: timeline_artifact_reader(reader, settings, content_target)?,
+            reader: timeline_artifact_reader(reader, settings)?,
         });
         Ok(())
     }
@@ -471,7 +469,7 @@ impl ProjectArtifacts {
         settings: &WorkSettings,
         content_target: ContentTarget,
     ) -> Result<(), String> {
-        self.configure_assets(reader, settings, content_target.clone())?;
+        self.configure_assets(reader, settings)?;
         let source_bindings = self.source_bindings()?;
         if source_bindings.is_empty() {
             self.artifacts.reset();
@@ -509,10 +507,9 @@ impl ProjectArtifacts {
         &mut self,
         reader: &SettingsReader,
         settings: &WorkSettings,
-        content_target: ContentTarget,
         clip_id: &str,
     ) -> Result<SourceTimelineAssets, String> {
-        self.configure_assets(reader, settings, content_target)?;
+        self.configure_assets(reader, settings)?;
         self.assets.load_clip(clip_id)
     }
 

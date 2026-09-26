@@ -1,0 +1,43 @@
+{
+  "module_id": "qnc.module.artifact-db",
+  "module_name": "Timeline artifact tables",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "timeline.artifacts.filmstrip",
+    "timeline.artifacts.wave",
+    "timeline.artifacts.forget"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "ui.paint"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.content-store",
+    "qnc.module.filmstrip-worker",
+    "qnc.module.wave-worker"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-artifact-db",
+  "input": "Requests through the one intermediary of the project database (qnc-db-broker), which hands this table module its connection: publish or read the filmstrip or wave record of a clip, forget the artifacts of clips about to leave the catalog.",
+  "output": "The filmstrip_artifacts, filmstrip_frames and wave_artifacts tables of the project database and their public views. It creates only its own tables, writes no other (authorizer), reads the clip catalog through qnc-content-read (the clip exists; a wave belongs to its stored original or proxy; only a detected or failed clip is forgotten). Moved unchanged from qnc-content-store (lego split B5, user rule 2026-09-27).",
+  "specification": "contracts/databases/timeline-artifacts.database.json; AGENTS section 8 (filmstrip JPEG files, wave peaks in the project database)."
+}

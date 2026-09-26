@@ -10,7 +10,6 @@ qnc-json-transport = { workspace = true }
 qnc-media-records = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-transport-resolver = { workspace = true }
-qnc-wave = { workspace = true }
 qnc-work-settings = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

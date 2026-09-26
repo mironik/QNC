@@ -5,6 +5,8 @@ edition = "2021"
 description = "QNC project content artifact adapters for filmstrip and wave workers"
 
 [dependencies]
+qnc-artifact-db = { workspace = true }
+qnc-db-broker = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-filmstrip-worker = { workspace = true }
 qnc-content-store = { workspace = true }

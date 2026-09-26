@@ -52,15 +52,22 @@ pub(crate) fn publish_batches(
     }
 }
 
-/// Removes the clips the scan confirmed missing and reports how many went.
+/// Removes the clips the scan confirmed missing and reports how many went. Their
+/// timeline artifacts go first (`qnc-artifact-db`, whose tables refer to the clip);
+/// a clip the catalog keeps (queued or imported) keeps them too.
 pub(crate) fn remove_missing(
     content_target: ContentTarget,
+    project: &qnc_db_broker::ProjectDbWriter,
     missing: &[InventoryClip],
     send: &SyncSender<Event>,
 ) -> Result<usize> {
     let mut removed_count = 0;
     let mut writer = ContentWriteTransport::start(content_target)?;
     for chunk in missing.chunks(4096) {
+        let forget = qnc_artifact_db::Operation::ForgetClips {
+            clip_ids: chunk.iter().map(|clip| clip.clip_id.clone()).collect(),
+        };
+        let _: qnc_artifact_db::Data = project.request(qnc_artifact_db::MODULE_ID, &forget)?;
         let key = format!("select-remove-missing-{removed_count}");
         writer.remove_missing(key.clone(), chunk.to_vec())?;
         let removed = match wait_write_completion(&mut writer, &key)?.data {

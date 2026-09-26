@@ -38,18 +38,15 @@ impl IngestApplication {
     }
 
     pub(super) fn focus_timeline_assets(&mut self, clip_id: &str) {
-        let (Some(reader), Some(plan), Some(target)) = (
-            self.settings_reader.as_ref(),
-            self.work_plan().cloned(),
-            self.select_target.as_ref().map(|target| target.content.clone()),
-        ) else {
+        let (Some(reader), Some(plan)) = (self.settings_reader.as_ref(), self.work_plan().cloned())
+        else {
             self.view.timeline_assets =
                 qnc_timeline_assets::SourceTimelineAssets::empty_for(clip_id);
             return;
         };
         match self
             .artifacts
-            .focus(reader, &plan.settings, target, clip_id)
+            .focus(reader, &plan.settings, clip_id)
         {
             Ok(assets) => self.view.timeline_assets = assets,
             Err(error) => self.view.message = error,

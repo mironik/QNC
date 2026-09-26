@@ -7,6 +7,7 @@ edition = "2021"
 test-support = ["dep:image", "dep:tempfile", "dep:qnc-sony-metadata", "dep:rusqlite"]
 
 [dependencies]
+qnc-artifact-db = { workspace = true }
 qnc-camera-adapter = { workspace = true }
 qnc-camera-detector = { workspace = true }
 qnc-camera-patterns = { workspace = true }

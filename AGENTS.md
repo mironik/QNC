@@ -2401,6 +2401,17 @@ Select ih vise ne ocekuje). Pokrivalica: `qnc-program-segments` salje `CreateCov
 virtualnih kadrova, pa `CreateCover` modulu price, oboje kroz posrednika; cilj sadrzaja mu vise ne
 treba. Editorial drzi cilj sadrzaja (timecode) i cilj baze projekta (prica, virtualni kadrovi).
 Testovi `qnc-virtual-shots` (6, novi), `qnc-program-db` (22), `qnc-program-segments` (21).
+Izvedeno B5: novi modul tablica `crates/qnc-artifact-db` (+ `contracts/modules/artifact-db.module.json` i
+ugovor baze `contracts/databases/timeline-artifacts.database.json`; tablice i pogledi izasli iz ugovora
+`ingest-content` i iz `schema.sql`) posjeduje `filmstrip_artifacts`, `filmstrip_frames`, `wave_artifacts`;
+kod i testovi premjesteni bez promjene ponasanja, zapis filmstripa jedan tip (`qnc-filmstrip`), bez
+pretvorbi. Tablice ostaju sa stranim kljucem na `clips` (bez gubitka postojecih artefakata), zato
+brisanje nestalog klipa ide u dva koraka: Select prvo salje `ForgetClips` modulu artefakata (samo za
+klip `detected`/`failed`, kroz istog posrednika kao zapise medija), pa katalog brise klip.
+`qnc-content-read` dobio `import_status_on` i `media_uris_on` (jedini citac kataloga, C11).
+`qnc-content-artifacts` cita i pise artefakte kroz modul (cilj baze iz postavki), `focus` i
+`timeline_artifact_reader` vise ne primaju cilj sadrzaja (`qnc-ingest-application`,
+`qnc-ingest-preview-source` po jedan poziv); dijagnostika cita kroz modul. C10 baseline Ingest 1749.
 
 Otvoreno ograniceno odobrenje 2026-09-25 (originalni timecode izvora): korisnik je
 odredio: broadcast montaza radi po timecodeu (veza proxy-original i export); pocetni TC

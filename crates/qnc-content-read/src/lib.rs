@@ -288,13 +288,38 @@ impl ContentReader {
 /// project database another public module already holds (the project database
 /// intermediary hands one to each table module). `None`: not in the catalog.
 pub fn imported_on(conn: &Connection, clip_id: &str) -> Result<Option<bool>, String> {
+    Ok(import_status_on(conn, clip_id)?.map(|status| matches!(status.as_str(), "imported" | "done")))
+}
+
+/// The import status of clip `clip_id` of the catalog (`detected`, `queued`, ...,
+/// `imported`), on a connection another public module holds. `None`: not in it.
+pub fn import_status_on(conn: &Connection, clip_id: &str) -> Result<Option<String>, String> {
     if !has_view(conn, "public_clips")? {
         return Ok(None);
     }
     conn.query_row(
-        "SELECT import_status IN ('imported', 'done') FROM public_clips WHERE clip_id = ?1",
+        "SELECT import_status FROM public_clips WHERE clip_id = ?1",
         [clip_id],
         |row| row.get(0),
+    )
+    .optional()
+    .map_err(|error| error.to_string())
+}
+
+/// The stored media of clip `clip_id`: its original and, when it has one, its proxy
+/// (QNC URIs), on a connection another public module holds. `None`: not in it.
+pub fn media_uris_on(
+    conn: &Connection,
+    clip_id: &str,
+) -> Result<Option<(String, Option<String>)>, String> {
+    if !has_view(conn, "public_clips")? || !has_view(conn, "public_clip_proxy")? {
+        return Ok(None);
+    }
+    conn.query_row(
+        "SELECT c.original_uri, p.proxy_uri FROM public_clips c
+         LEFT JOIN public_clip_proxy p ON p.clip_id = c.clip_id WHERE c.clip_id = ?1",
+        [clip_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
     )
     .optional()
     .map_err(|error| error.to_string())

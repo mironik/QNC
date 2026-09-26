@@ -2968,6 +2968,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-artifact-db"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-read",
+ "qnc-content-store",
+ "qnc-db-broker",
+ "qnc-filmstrip",
+ "qnc-media-records",
+ "qnc-wave",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-audio-output"
 version = "0.1.0"
 dependencies = [
@@ -3100,7 +3116,9 @@ dependencies = [
 name = "qnc-content-artifacts"
 version = "0.1.0"
 dependencies = [
+ "qnc-artifact-db",
  "qnc-content-store",
+ "qnc-db-broker",
  "qnc-filmstrip",
  "qnc-filmstrip-worker",
  "qnc-source-bindings",
@@ -3134,7 +3152,6 @@ dependencies = [
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-transport-resolver",
- "qnc-wave",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3201,6 +3218,8 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-active-project-read",
+ "qnc-artifact-db",
+ "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
@@ -3525,6 +3544,7 @@ name = "qnc-ingest-select"
 version = "0.1.0"
 dependencies = [
  "image",
+ "qnc-artifact-db",
  "qnc-camera-adapter",
  "qnc-camera-detector",
  "qnc-camera-patterns",

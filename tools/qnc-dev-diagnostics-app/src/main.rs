@@ -900,6 +900,9 @@ fn read_content_db_inner(root: &Path) -> Result<ContentDbSnapshot, String> {
     let content_uri = qnc_ingest_store::content::content_uri(&plan.settings.workspace_db_uri)?;
     let target = qnc_ingest_store::content::ContentTarget::for_project(&reader, &plan.settings)?;
     let mut client = target.open(qnc_ingest_store::content::Access::ReadOnly)?;
+    let mut artifacts = qnc_artifact_db::ArtifactReader::open(
+        &qnc_db_broker::ProjectDbTarget::for_project(&reader, &plan.settings)?,
+    )?;
     let mut snapshot = ContentDbSnapshot {
         project_name: plan.settings.project_name.clone(),
         project_id: plan.settings.project_id.clone(),
@@ -914,8 +917,8 @@ fn read_content_db_inner(root: &Path) -> Result<ContentDbSnapshot, String> {
         }
         after = page.last().map(|clip| clip.clip.id().to_string());
         for clip in page {
-            let wave = client.read_wave(clip.clip.id())?;
-            let filmstrip = client.read_filmstrip(clip.clip.id())?;
+            let wave = artifacts.read_wave(clip.clip.id())?;
+            let filmstrip = artifacts.read_filmstrip(clip.clip.id())?;
             if wave.is_some() {
                 snapshot.waves += 1;
             }

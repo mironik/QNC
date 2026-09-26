@@ -12,6 +12,8 @@ path = "src/main.rs"
 [dependencies]
 eframe = { workspace = true }
 qnc-active-project-read = { workspace = true }
+qnc-artifact-db = { workspace = true }
+qnc-db-broker = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-ingest-store = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }

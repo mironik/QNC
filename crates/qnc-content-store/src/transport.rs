@@ -49,14 +49,6 @@ impl ContentTarget {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn for_test_owner_binding(file: &Path, uri: &str) -> Self {
-        Self {
-            uri: uri.into(),
-            binding: TargetBinding::Local(file.to_path_buf()),
-        }
-    }
-
     pub fn for_project(
         reader: &qnc_work_settings::SettingsReader,
         settings: &qnc_work_settings::WorkSettings,
@@ -200,36 +192,6 @@ impl ContentClient {
             _ => Err("Neispravan odgovor baze.".into()),
         }
     }
-    pub fn publish_filmstrip(&mut self, artifact: FilmstripArtifactRecord) -> Result<()> {
-        match self.execute(Operation::PublishFilmstrip(Box::new(artifact)))? {
-            Data::Changed => Ok(()),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    pub fn read_filmstrip(&mut self, clip_id: &str) -> Result<Option<FilmstripArtifactRecord>> {
-        qnc_media_records::valid_id(clip_id).map_err(err)?;
-        match self.execute(Operation::ReadFilmstrip {
-            clip_id: clip_id.into(),
-        })? {
-            Data::Filmstrip(artifact) => Ok(artifact.map(|record| *record)),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    pub fn publish_wave(&mut self, artifact: WaveArtifactRecord) -> Result<()> {
-        match self.execute(Operation::PublishWave(Box::new(artifact)))? {
-            Data::Changed => Ok(()),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
-    pub fn read_wave(&mut self, clip_id: &str) -> Result<Option<WaveArtifactRecord>> {
-        qnc_media_records::valid_id(clip_id).map_err(err)?;
-        match self.execute(Operation::ReadWave {
-            clip_id: clip_id.into(),
-        })? {
-            Data::Wave(artifact) => Ok(artifact.map(|record| *record)),
-            _ => Err("Neispravan odgovor baze.".into()),
-        }
-    }
     pub fn publish_batch(&mut self, clips: Vec<CatalogClip>) -> Result<()> {
         match self.execute(Operation::PublishBatch(clips))? {
             Data::Changed => Ok(()),
@@ -360,24 +322,6 @@ impl ContentWriteTransport {
         })
     }
 
-    pub fn publish_filmstrip(
-        &mut self,
-        key: String,
-        artifact: FilmstripArtifactRecord,
-    ) -> Result<()> {
-        let command = ContentWriteCommand {
-            key,
-            operation: Operation::PublishFilmstrip(Box::new(artifact)),
-        };
-        self.send
-            .as_ref()
-            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
-            .send(command)
-            .map_err(err)?;
-        self.pending += 1;
-        Ok(())
-    }
-
     pub fn publish_batch(&mut self, key: String, clips: Vec<CatalogClip>) -> Result<()> {
         let command = ContentWriteCommand {
             key,
@@ -471,20 +415,6 @@ impl ContentWriteTransport {
         Ok(())
     }
 
-    pub fn publish_wave(&mut self, key: String, artifact: WaveArtifactRecord) -> Result<()> {
-        let command = ContentWriteCommand {
-            key,
-            operation: Operation::PublishWave(Box::new(artifact)),
-        };
-        self.send
-            .as_ref()
-            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
-            .send(command)
-            .map_err(err)?;
-        self.pending += 1;
-        Ok(())
-    }
-
     pub fn poll(&mut self) -> Vec<ContentWriteCompletion> {
         let mut completions = Vec::new();
         loop {
@@ -567,14 +497,6 @@ fn execute_write_command(
         }
         Operation::Select { clip_ids, selected } => {
             client.select(clip_ids, selected)?;
-            Ok(ContentWriteData::Changed)
-        }
-        Operation::PublishFilmstrip(artifact) => {
-            client.publish_filmstrip(*artifact)?;
-            Ok(ContentWriteData::Changed)
-        }
-        Operation::PublishWave(artifact) => {
-            client.publish_wave(*artifact)?;
             Ok(ContentWriteData::Changed)
         }
         Operation::QueueSelected => {

@@ -1,0 +1,19 @@
+[package]
+name = "qnc-artifact-db"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: the timeline artifacts of a project database (filmstrip frames, wave peaks) as a table module of the project database intermediary; it knows no worker, form or application"
+
+[dependencies]
+qnc-content-read = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-filmstrip = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-wave = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+qnc-content-store = { workspace = true }
+tempfile = "3"
