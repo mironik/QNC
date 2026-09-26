@@ -3592,7 +3592,10 @@ dependencies = [
  "qnc-content-artifacts",
  "qnc-content-store",
  "qnc-ingest-import-worker",
+ "qnc-ingest-select",
  "qnc-playback-activity",
+ "qnc-record-completion",
+ "qnc-source-reader",
  "qnc-work-settings",
 ]
 
@@ -4064,6 +4067,24 @@ dependencies = [
  "serde",
  "serde_json",
  "uuid",
+]
+
+[[package]]
+name = "qnc-record-completion"
+version = "0.1.0"
+dependencies = [
+ "qnc-active-project-read",
+ "qnc-camera-adapter",
+ "qnc-camera-sony-fx6-v6",
+ "qnc-content-store",
+ "qnc-db-broker",
+ "qnc-ingest-select",
+ "qnc-media-metadata-compose",
+ "qnc-media-probe",
+ "qnc-media-record-db",
+ "qnc-record-probe",
+ "qnc-source-index-db",
+ "qnc-source-reader",
 ]
 
 [[package]]

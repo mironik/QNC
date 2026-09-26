@@ -1,6 +1,8 @@
-//! Background application started by Uvezi. It reads the settings of the active project
-//! once, takes the queued clips of the selection and does what the settings say (link
-//! copies nothing, proxy or original copies), then ends. Its lease, the pause while a
+//! Background application started by Select and by Uvezi. It reads the settings of the
+//! active project once, takes the queued clips of the selection and does what the
+//! settings say (link copies nothing, proxy or original copies), completes the card
+//! records that playback still lacks something of (v5 media probe), builds the
+//! artifacts, then ends. Its lease, the pause while a
 //! player works and its result are kept in the project database, nowhere else.
 
 use std::{
@@ -38,8 +40,35 @@ fn run_background(root: &Path) -> Result<(), String> {
     ) {
         return Ok(());
     }
+    let player_works = qnc_playback_activity::playback_pause(target.clone());
     let _lease = qnc_playback_activity::Beat::start(target, qnc_playback_activity::WORKER)?;
     qnc_ingest_import_worker::run_import(root)?;
+    // v5 media probe job: a card record gets what playback lacks, once, in the
+    // background, so a preview of a clip not yet imported plays.
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let config = qnc_ingest_select::selection_config::SelectionConfig::load(root)
+        .map_err(|error| error.to_string())?;
+    let make_backend = |source_uri: &str, media: &[qnc_source_reader::SourceReference]| {
+        let source = config
+            .sources
+            .iter()
+            .find(|source| source.location.uri == source_uri)
+            .ok_or("Izvor klipa nije spojen na ovo racunalo.")?;
+        source.backend(media).map_err(|error| error.to_string())
+    };
+    match qnc_record_completion::complete_active_project(
+        root,
+        &make_backend,
+        &*player_works,
+        &cancel,
+    ) {
+        Ok(done) => {
+            for (clip, error) in done.failed {
+                eprintln!("zapis klipa {clip} nije dovrsen: {error}");
+            }
+        }
+        Err(error) => eprintln!("dovrsetak zapisa nije uspio: {error}"),
+    }
     run_artifacts(root)
 }
 

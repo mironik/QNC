@@ -56,14 +56,8 @@ impl IngestApplication {
     /// The selection is in the database: the background application takes over. It reads
     /// the selected clips and the project settings and does what the settings say.
     pub(crate) fn begin_import(&mut self) -> Result<(), String> {
-        let root = self
-            .root
-            .clone()
-            .ok_or("Uvoz nije dostupan: nema korijena aplikacije.")?;
-        let target = self
-            .catalog_target
-            .clone()
-            .ok_or("Projektni katalog nije dostupan.")?;
+        let root = self.root.clone().ok_or("Uvoz nije dostupan: nema korijena aplikacije.")?;
+        let target = self.catalog_target.clone().ok_or("Projektni katalog nije dostupan.")?;
         self.worker.start(&root, &target)
     }
 }

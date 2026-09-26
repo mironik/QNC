@@ -71,6 +71,8 @@ impl IngestApplication {
                 self.view.command_busy = false;
                 if outcome.finished_ok {
                     self.sync_timeline_artifact_content_db();
+                    // The background completes the card records playback still lacks (v5).
+                    self.view.message = self.begin_import().err().unwrap_or_default();
                 }
             }
         }

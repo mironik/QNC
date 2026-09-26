@@ -2311,6 +2311,11 @@ Izvedeno: nova kockica `crates/qnc-record-probe` (postupak dovrsetka zapisa prem
 nove logike; "sto nedostaje" je postojeca `qnc_media_metadata_compose::required_probes`), Select zapis
 kartice ostavlja u fazi kamera za pozadinski dovrsetak, klip bez XML-a Select dovrsava odmah kroz istu
 kockicu, red uvoza prima zapis kartice koji ceka dovrsetak (`qnc-content-store` `ready`).
+Zatim nova kockica `crates/qnc-record-completion` (v5 `ingest_probe/scheduler.rs`): nade klipove aktivnog
+projekta u fazi kamera, dovrsi svaki kroz `qnc-record-probe` (bez probea i bez kartice kad nista ne
+nedostaje), objavi konacni zapis i ceka dok player radi; izvor probea joj daje proces koji je slaze
+(`tools/qnc-ingest-worker`), pa ne ovisi o Ingestu (C6). Ingest pokrece pozadinski proces i nakon
+uspjesnog Selecta.
 
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne

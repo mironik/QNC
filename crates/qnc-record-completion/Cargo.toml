@@ -1,0 +1,21 @@
+[package]
+name = "qnc-record-completion"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: completes the card records of the active project in the background (v5 media probe scheduler); it knows no form"
+
+[dependencies]
+qnc-active-project-read = { workspace = true }
+qnc-content-store = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-media-metadata-compose = { workspace = true }
+qnc-media-record-db = { workspace = true }
+qnc-record-probe = { workspace = true }
+qnc-source-index-db = { workspace = true }
+qnc-source-reader = { workspace = true }
+qnc-media-probe = { workspace = true }
+
+[dev-dependencies]
+qnc-camera-adapter = { workspace = true }
+qnc-camera-sony-fx6-v6 = { workspace = true }
+qnc-ingest-select = { workspace = true, features = ["test-support"] }

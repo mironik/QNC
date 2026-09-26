@@ -245,3 +245,12 @@ pub fn select_target_at(file: &Path) -> crate::SelectTarget {
 pub fn select_target(config: &SelectionConfig) -> crate::SelectTarget {
     select_target_at(&content_file(config))
 }
+
+/// The fixture probe backend for other modules' tests: counts calls, never fails.
+pub fn probe_backend(calls: Arc<AtomicUsize>) -> Box<dyn ProbeBackend + Send> {
+    Box::new(Backend {
+        calls,
+        fail: false,
+        partial: false,
+    })
+}

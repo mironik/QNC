@@ -14,4 +14,7 @@ qnc-content-artifacts = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-ingest-import-worker = { workspace = true }
 qnc-playback-activity = { workspace = true }
+qnc-record-completion = { workspace = true }
+qnc-ingest-select = { workspace = true }
+qnc-source-reader = { workspace = true }
 qnc-work-settings = { workspace = true }
