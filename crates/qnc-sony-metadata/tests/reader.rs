@@ -162,10 +162,10 @@ fn proxy_retains_its_container_codec_and_own_evidence() {
         .iter()
         .any(|(k, f)| k.ends_with("/@ch") && f.value == "2"));
     assert!(proxy.tags.values().all(|f| f.evidence_id == "index-proxy"));
-    // The proxy video type label states its frame size; its own dur/fps give its length.
+    // The proxy video type label states its frame size.
     assert_eq!(video(proxy).width.as_ref().unwrap().value, 1920);
     assert_eq!(video(proxy).height.as_ref().unwrap().value, 1080);
-    assert!(proxy.duration_seconds.is_some());
+    assert!(proxy.duration_seconds.is_none(), "a proxy container is longer than its video");
     assert_eq!(video(proxy).exact_frame_count(), Some(500));
 }
 

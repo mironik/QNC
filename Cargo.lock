@@ -3409,6 +3409,7 @@ dependencies = [
  "qnc-player-client",
  "qnc-source-browse",
  "qnc-source-reader",
+ "qnc-source-timecode",
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-work-settings",

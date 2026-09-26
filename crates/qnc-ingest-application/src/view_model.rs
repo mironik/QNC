@@ -2,6 +2,9 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IngestViewModel {
+    /// Original timecode of the previewed clip (camera XML, else the one probe).
+    #[serde(skip)]
+    pub source_timecode: Option<qnc_source_timecode::SourceTimecode>,
     #[serde(skip)]
     pub playback: qnc_player_client::View,
     #[serde(skip)]
@@ -38,6 +41,7 @@ impl Default for IngestViewModel {
     fn default() -> Self {
         Self {
             source_kind: SourceKind::Local,
+            source_timecode: None,
             playback: Default::default(),
             timeline: Default::default(),
             timeline_assets: SourceTimelineAssets::empty(),

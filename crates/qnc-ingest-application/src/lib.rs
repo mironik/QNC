@@ -78,6 +78,7 @@ pub struct IngestApplication {
     selection_session: selection::SelectSession,
     root: Option<std::path::PathBuf>,
     worker: worker_launch::WorkerLauncher,
+    timecodes: qnc_source_timecode::SourceTimecodes,
     camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
     selection_events: qnc_ingest_clip_list::SelectEventState,
 }

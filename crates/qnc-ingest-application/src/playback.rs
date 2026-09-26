@@ -16,9 +16,9 @@ impl IngestApplication {
         let previous_timeline = self.view.timeline;
         let preview = self.preview.view();
         self.view.playback = preview.playback;
-        self.view.timeline = preview
-            .timeline
-            .preserving_source_marks_from(&previous_timeline);
+        self.view.timeline = preview.timeline.preserving_source_marks_from(&previous_timeline);
+        let (target, clip) = (self.catalog_target.as_ref(), self.view.preview_clip_id.as_deref());
+        self.view.source_timecode = self.timecodes.for_clip(target, clip);
     }
 
     pub(super) fn prepare_preview(&mut self, clip_id: String) -> IngestDispatchResult {

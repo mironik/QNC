@@ -69,12 +69,8 @@ impl IngestApplication {
         let Some(selected) = self.browse.selected(uri) else {
             return IngestDispatchResult::rejected("Odabrani izvor vise nije dostupan.");
         };
-        let Some(config) = self.selection_config.clone() else {
-            return IngestDispatchResult::rejected("Nema Select konfiguracije.");
-        };
-        let Some(target) = self.select_target.clone() else {
-            return IngestDispatchResult::rejected("Projektni katalog nije dostupan.");
-        };
+        let Some(config) = self.selection_config.clone() else { return IngestDispatchResult::rejected("Nema Select konfiguracije.") };
+        let Some(target) = self.select_target.clone() else { return IngestDispatchResult::rejected("Projektni katalog nije dostupan.") };
         match self
             .selection_session
             .start(config, selected, target, self.camera_registry.clone())

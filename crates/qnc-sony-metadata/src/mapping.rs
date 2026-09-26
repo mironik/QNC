@@ -122,10 +122,9 @@ pub fn read_metadata(
     // Stated by the XML, not measured (docs/26, user rule 2026-09-26: without a probe
     // when the card record allows it): the length of a counted constant rate and the
     // pixel shape of explicit dimensions and display aspect.
+    // The original only: the XML counts video edit units, and a proxy container is
+    // longer than its video (its audio pads it), so its length is not the XML count.
     promote_duration(&mut original, "original.duration_seconds", &mut notices);
-    if let Some(proxy) = &mut proxy {
-        promote_duration(proxy, "proxy.duration_seconds", &mut notices);
-    }
     notice(&mut notices, "incomplete", "streams", "XML channel descriptions do not prove container stream indices, timing or complete audio formats");
     Ok(MetadataRead {
         metadata: ClipMetadata {

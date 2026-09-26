@@ -149,7 +149,7 @@ pub(super) fn render_source_dock(
                 }
             });
         },
-        SourceTimeline::from_assets(&view.timeline, timeline_theme(theme), &view.timeline_assets),
+        SourceTimeline::from_assets(&view.timeline, timeline_theme(theme), &view.timeline_assets).with_timecode(view.source_timecode),
     );
     if intent.is_none() {
         intent = timeline_intent_to_ingest_intent(timeline_intent);

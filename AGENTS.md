@@ -2316,6 +2316,13 @@ projekta u fazi kamera, dovrsi svaki kroz `qnc-record-probe` (bez probea i bez k
 nedostaje), objavi konacni zapis i ceka dok player radi; izvor probea joj daje proces koji je slaze
 (`tools/qnc-ingest-worker`), pa ne ovisi o Ingestu (C6). Ingest pokrece pozadinski proces i nakon
 uspjesnog Selecta.
+Provjera od cistog stanja na izoliranoj kopiji (vlastiti QNC korijen, kopija baze projekata s vezom
+projekta preusmjerenom na kopiju `project.db`, ocisceni klipovi i zapisi; kartica samo citana): Select 98
+klipova bez probea, trajanja iz XML-a, pozadinski dovrsetak, preview neuvezenog klipa radi. Nalaz: 12
+klipova serije 2676-2690 (proxy s vlastitim dur/fps u MEDIAPRO) nije dovrseno jer je citac proxyju upisao
+trajanje iz XML-a, a spremnik proxyja je dulji od videa (zvuk) pa se sukobio s probeom; ispravljeno
+(trajanje samo za original). Timecode izvora dodan i u Ingest source dock (`qnc-ingest-desktop` jedan
+redak, `qnc-ingest-application` view model; C10 granice nisu podignute).
 
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne
