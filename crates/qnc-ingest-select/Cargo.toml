@@ -18,6 +18,7 @@ qnc-ingest-store = { workspace = true }
 qnc-media-metadata-compose = { workspace = true }
 qnc-media-probe = { workspace = true }
 qnc-db-broker = { workspace = true }
+qnc-record-probe = { workspace = true }
 rusqlite = { workspace = true, optional = true }
 qnc-work-settings = { workspace = true }
 qnc-media-record-db = { workspace = true }

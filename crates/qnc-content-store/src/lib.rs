@@ -550,13 +550,16 @@ pub(crate) fn project_id(uri: &str) -> Result<String> {
 /// blocked.
 pub(crate) fn ready(clip: &StoredClip) -> bool {
     let snapshot = &clip.clip.snapshot;
-    snapshot.phase == Phase::Final
-        && (snapshot.completeness == qnc_media_records::Completeness::Complete
-            || !snapshot
-                .metadata
-                .evidence
-                .iter()
-                .any(|e| e.kind == qnc_media_records::EvidenceKind::Ffprobe))
+    // A card record (camera phase, no probe evidence) is queued: the import needs only
+    // its media references, and what playback lacks is completed in the background
+    // (v5). A probed record that is still partial stays blocked.
+    (snapshot.phase == Phase::Final
+        && snapshot.completeness == qnc_media_records::Completeness::Complete)
+        || !snapshot
+            .metadata
+            .evidence
+            .iter()
+            .any(|e| e.kind == qnc_media_records::EvidenceKind::Ffprobe)
 }
 
 #[cfg(test)]

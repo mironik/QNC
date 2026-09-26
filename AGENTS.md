@@ -2303,6 +2303,14 @@ Izvedeno 2): Sony citac iz XML-a upisuje i trajanje u sekundama (tocan broj fram
 stalnom fps-u, original i proxy), dimenzije iz eksplicitne oznake kodeka (`AVC_Proxy_1920_1080_...`)
 i omjer piksela iz `aspectRatio`; boja iz `AcquisitionRecord` i audio streamovi iz CH opisa se ne
 prenose (docs/26).
+Audit v5 (26. 9.): v5 ne cita Sony XML; nakon skeniranja pozadinski raspored (`ingest_probe/scheduler.rs`)
+za svaki klip izvora bez fps/trajanja/razlucivosti radi jedan `media_probe`, a Ingest preview neuvezenog
+klipa ceka taj rezultat. Nas QNC od 24. 9. radio je samo jer je dijeljena baza racunala imala probe zapise
+od 7. 9.; pravilo "XML = nikad probe" (19. 9.) nikad nije radilo. Odluka korisnika: v5 nacin, lego.
+Izvedeno: nova kockica `crates/qnc-record-probe` (postupak dovrsetka zapisa premjesten iz Selecta, bez
+nove logike; "sto nedostaje" je postojeca `qnc_media_metadata_compose::required_probes`), Select zapis
+kartice ostavlja u fazi kamera za pozadinski dovrsetak, klip bez XML-a Select dovrsava odmah kroz istu
+kockicu, red uvoza prima zapis kartice koji ceka dovrsetak (`qnc-content-store` `ready`).
 
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne

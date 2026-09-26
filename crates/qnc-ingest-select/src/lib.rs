@@ -13,7 +13,7 @@ use qnc_ingest_store::content::{
     Access, CatalogClip, ContentTarget, ContentWriteData, ContentWriteResult,
     ContentWriteTransport, ImportStatus, StoredClip,
 };
-use qnc_media_probe::{ProbeBackend, Request as ProbeRequest};
+use qnc_media_probe::ProbeBackend;
 use qnc_media_record_db::project::ProjectMediaRecords as Client;
 use qnc_media_record_db::contract::*;
 use qnc_source_groups::IndexDocument;

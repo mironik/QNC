@@ -1,4 +1,5 @@
 use super::*;
+use qnc_media_probe::Request as ProbeRequest;
 use crate::selection_config::{Binding, ProbeConfig, SourceConfig};
 use qnc_ingest_store::content::ContentClient;
 use serde_json::json;
@@ -202,7 +203,7 @@ fn select_persists_two_original_proxy_groups_and_reselect_reads_db() {
         .collect();
     assert_eq!(clips.len(), 2);
     assert!(events.iter().any(|e| matches!(e, Event::Clip(c) if c.thumb_status == crate::SelectThumbStatus::Ready && c.thumb_image.is_some())));
-    let mut db = media_db(&config);
+    let db = media_db(&config);
     for id in clips {
         let saved = db.read(id, None).unwrap().unwrap();
         assert_eq!(saved.phase, Phase::Final);
@@ -619,7 +620,8 @@ fn fx6_registry() -> CameraRegistry {
 }
 
 #[test]
-fn a_camera_that_declares_its_metadata_is_never_probed() {
+fn a_card_record_is_never_probed_in_select_and_stays_a_camera_record() {
+    // v5: what playback still lacks is completed in the background after Select.
     let (_dir, config) = fixture();
     let calls = Arc::new(AtomicUsize::new(0));
     let events =
@@ -651,10 +653,10 @@ fn a_camera_that_declares_its_metadata_is_never_probed() {
         })
         .collect();
     assert_eq!(clips.len(), 2);
-    let mut db = media_db(&config);
+    let db = media_db(&config);
     for id in &clips {
         let saved = db.read(id, None).unwrap().unwrap();
-        assert_eq!(saved.phase, Phase::Final);
+        assert_eq!(saved.phase, Phase::Camera);
         // Both the original and the proxy come from the card records.
         assert!(saved.metadata.proxy.is_some());
         assert!(saved
@@ -716,7 +718,7 @@ fn select_without_any_registered_camera_is_a_controlled_error() {
 }
 
 #[test]
-fn declared_final_snapshot_is_final_and_needs_no_probe() {
+fn a_declared_record_waits_as_a_camera_record_and_is_not_probed() {
     let (_dir, config) = fixture();
     let calls = Arc::new(AtomicUsize::new(0));
     let events =
@@ -731,10 +733,10 @@ fn declared_final_snapshot_is_final_and_needs_no_probe() {
             }
         })
         .unwrap();
-    let mut db = media_db(&config);
+    let db = media_db(&config);
     let saved = db.read(&id, None).unwrap().unwrap();
-    assert_eq!(saved.phase, Phase::Final);
-    // The card declared what it declared: final, and never probed to fill the rest.
+    assert_eq!(saved.phase, Phase::Camera);
+    // The card declared what it declared; the background completes the rest.
     assert_eq!(saved.completeness, Completeness::Partial);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
@@ -779,7 +781,7 @@ fn only_the_clip_whose_record_has_no_probe_data_is_probed() {
     let events =
         crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());
     // The scanner reports the missing sidecar; both clips are still processed.
-    let mut db = media_db(&config);
+    let db = media_db(&config);
     let ids: BTreeSet<_> = events
         .iter()
         .filter_map(|e| {
@@ -791,9 +793,12 @@ fn only_the_clip_whose_record_has_no_probe_data_is_probed() {
         })
         .collect();
     assert_eq!(ids.len(), 2);
-    for id in &ids {
-        assert_eq!(db.read(id, None).unwrap().unwrap().phase, Phase::Final);
-    }
+    let phases: BTreeSet<_> = ids
+        .iter()
+        .map(|id| format!("{:?}", db.read(id, None).unwrap().unwrap().phase))
+        .collect();
+    // B without its sidecar is probed once in Select; A waits for the background.
+    assert_eq!(phases, ["Camera".to_string(), "Final".to_string()].into());
     // Original and proxy of B only; A is declared by its XML.
     assert_eq!(calls.load(Ordering::SeqCst), 2);
     crate::test_support::execute_with(&config, &calls, false, false, ".", &fx6_registry());

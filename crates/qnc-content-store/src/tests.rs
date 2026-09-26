@@ -933,10 +933,10 @@ fn a_probed_record_that_is_still_partial_cannot_be_queued() {
 }
 
 #[test]
-fn a_camera_phase_record_cannot_be_queued() {
+fn a_card_record_awaiting_background_completion_can_be_queued() {
     let mut camera = partial("c1", false);
     camera.snapshot.phase = Phase::Camera;
-    assert!(queue(camera).is_err());
+    assert!(queue(camera).is_ok());
 }
 
 fn claimed_store(path: &std::path::Path) -> ContentStore {

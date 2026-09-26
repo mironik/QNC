@@ -3537,6 +3537,7 @@ dependencies = [
  "qnc-media-metadata-compose",
  "qnc-media-probe",
  "qnc-media-record-db",
+ "qnc-record-probe",
  "qnc-scanner",
  "qnc-sony-metadata",
  "qnc-source-bindings",
@@ -4062,6 +4063,18 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "qnc-record-probe"
+version = "0.1.0"
+dependencies = [
+ "qnc-ffprobe-metadata",
+ "qnc-media-metadata-compose",
+ "qnc-media-probe",
+ "qnc-media-record-db",
+ "qnc-source-index-db",
  "uuid",
 ]
 

@@ -1,0 +1,13 @@
+[package]
+name = "qnc-record-probe"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: completes one media record once (what the camera record lacks for playback is probed once and composed with the camera facts); it knows no application"
+
+[dependencies]
+qnc-ffprobe-metadata = { workspace = true }
+qnc-media-metadata-compose = { workspace = true }
+qnc-media-probe = { workspace = true }
+qnc-media-record-db = { workspace = true }
+qnc-source-index-db = { workspace = true }
+uuid = { version = "1", features = ["v4"] }
