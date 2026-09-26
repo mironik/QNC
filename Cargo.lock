@@ -3219,6 +3219,7 @@ dependencies = [
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-source-reader",
+ "qnc-source-timecode",
  "qnc-timeline",
  "qnc-virtual-short-cards",
  "qnc-virtual-short-stills",
@@ -4132,6 +4133,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-filmstrip",
+ "qnc-source-timecode",
  "qnc-timeline",
  "qnc-timeline-assets",
 ]
@@ -4226,6 +4228,14 @@ dependencies = [
  "tiny_http",
  "ureq",
  "url",
+]
+
+[[package]]
+name = "qnc-source-timecode"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+ "qnc-media-metadata",
 ]
 
 [[package]]

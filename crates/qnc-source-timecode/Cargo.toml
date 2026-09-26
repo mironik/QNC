@@ -1,0 +1,14 @@
+[package]
+name = "qnc-source-timecode"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: original source timecode of a clip from its stored record (camera XML first, the one Ingest probe only without XML) at the source frame rate"
+
+[features]
+default = []
+# Reads the stored record of a clip through the project content store.
+read = ["dep:qnc-content-store", "dep:qnc-media-metadata"]
+
+[dependencies]
+qnc-content-store = { workspace = true, optional = true }
+qnc-media-metadata = { workspace = true, optional = true }

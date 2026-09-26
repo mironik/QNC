@@ -9,3 +9,4 @@ eframe = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-timeline-assets = { workspace = true }
+qnc-source-timecode = { workspace = true }

@@ -14,6 +14,7 @@ qnc-media-thumbnail = { workspace = true }
 qnc-program-segments = { workspace = true }
 qnc-wrap-session = { workspace = true }
 qnc-panel-focus = { workspace = true }
+qnc-source-timecode = { workspace = true, features = ["read"] }
 
 qnc-source-bindings = { workspace = true }
 qnc-source-preview = { workspace = true }

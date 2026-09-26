@@ -63,6 +63,8 @@ pub struct EditorialView {
     pub segments: qnc_program_segments::SegmentsView,
     /// The panel the keyboard acts on.
     pub focus: qnc_panel_focus::Panel,
+    /// Original timecode of the chosen source clip (camera XML, else the one probe).
+    pub source_timecode: Option<qnc_source_timecode::SourceTimecode>,
 }
 
 impl EditorialView {

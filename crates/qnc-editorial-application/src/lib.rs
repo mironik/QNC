@@ -92,6 +92,7 @@ pub struct EditorialApplication {
     segments: qnc_program_segments::ProgramSegments,
     wrap: qnc_wrap_session::WrapSession,
     focus: PanelFocus,
+    timecodes: qnc_source_timecode::SourceTimecodes,
 }
 
 impl Default for EditorialApplication {
@@ -113,6 +114,7 @@ impl Default for EditorialApplication {
             segments: qnc_program_segments::ProgramSegments::new(),
             wrap: qnc_wrap_session::WrapSession::new(),
             focus: PanelFocus::new(),
+            timecodes: qnc_source_timecode::SourceTimecodes::new(),
         }
     }
 }
@@ -249,10 +251,10 @@ impl EditorialApplication {
                 .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
         self.apply_pending_shot();
-        let (timebase, timeline) = (
-            self.preview.player_view().source_timebase(),
-            self.view.preview.timeline,
-        );
+        let timebase = self.preview.player_view().source_timebase();
+        let timeline = self.view.preview.timeline;
+        // The original source timecode of the chosen clip, from its stored record.
+        self.view.source_timecode = self.timecodes.for_clip(self.content_target.as_ref(), self.view.preview.clip_id.as_deref());
         self.segments.set_source(SourcePick::new(
             self.view.chosen_clip_id(),
             self.view.current_clip_label(),

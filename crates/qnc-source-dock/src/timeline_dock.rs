@@ -27,6 +27,8 @@ pub struct SourceTimeline<'a> {
     pub theme: TimelineTheme,
     pub filmstrip: Option<&'a FilmstripBackground>,
     pub peaks: [&'a [f32]; 4],
+    /// Original source timecode of the clip: IN/OUT as camera timecode (v5 source dock).
+    pub timecode: Option<qnc_source_timecode::SourceTimecode>,
 }
 
 impl<'a> SourceTimeline<'a> {
@@ -45,14 +47,21 @@ impl<'a> SourceTimeline<'a> {
                 assets.a3_peaks(),
                 assets.a4_peaks(),
             ],
+            timecode: None,
         }
+    }
+
+    /// IN, OUT and length in the timecode of the source clip.
+    pub fn with_timecode(mut self, timecode: Option<qnc_source_timecode::SourceTimecode>) -> Self {
+        self.timecode = timecode;
+        self
     }
 }
 
-fn mark_label(ui: &mut Ui, style: &TimelineDockStyle, name: &str, frame: u64) {
+fn mark_label(ui: &mut Ui, style: &TimelineDockStyle, name: &str, value: &str) {
     ui.label(RichText::new(name).size(style.font_ui).color(style.border));
     ui.label(
-        RichText::new(frame.to_string())
+        RichText::new(value)
             .monospace()
             .strong()
             .size(style.font_ui)
@@ -142,9 +151,14 @@ pub fn show_timeline_dock(
         );
         ui.add_space(10.0);
         if let Some((start, end)) = timeline.projection.visible_source_marks() {
-            mark_label(ui, style, "IN", start);
-            mark_label(ui, style, "OUT", end);
-            mark_label(ui, style, "Trajanje", end.saturating_sub(start));
+            let length = end.saturating_sub(start);
+            let [start, end, length] = match timeline.timecode {
+                Some(tc) => [tc.label(start), tc.label(end), tc.duration_label(length)],
+                None => [start, end, length].map(|frame| frame.to_string()),
+            };
+            mark_label(ui, style, "IN", &start);
+            mark_label(ui, style, "OUT", &end);
+            mark_label(ui, style, "Trajanje", &length);
         }
         add_header(ui);
     });

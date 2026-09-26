@@ -2285,6 +2285,21 @@ traci panela Segmenti (`crates/qnc-segment-panel`), tipke kataloga `undo_object`
 `redo_object` kroz `crates/qnc-program-segments` kad je fokus na Segmentima.
 B-roll kadrovi koje je pokrivalica stvorila ostaju. Ugovor `story.database.json`.
 
+Otvoreno ograniceno odobrenje 2026-09-25 (originalni timecode izvora): korisnik je
+odredio: broadcast montaza radi po timecodeu (veza proxy-original i export); pocetni TC
+klipa cita se iz XML-a kamere, ffprobe samo za klip bez XML-a (takvi klipovi sluze za
+test tog puta); source klip odreduje fps (50p broji 0-49, LTC kamere na 25 s
+`halfStep` se preracunava); program smije imati svoj interni TC, a XML export i ravna
+playlista programa koriste originalne TC-ove izvora. Otkljucano: novi javni
+`crates/qnc-source-timecode` (+ ugovor `contracts/modules/source-timecode.module.json`),
+`crates/qnc-source-dock` (samo IN/OUT/Trajanje kao TC kad je TC dan; bez TC-a ostaju
+brojevi frameova, pa se Ingest ne mijenja), `crates/qnc-editorial-application`,
+`crates/qnc-editorial-desktop`, root Cargo. Koraci: 1) modul i Story source dock
+(izvedeno: testovi, citanje kopije baze: 2676 -> 00:14:37:16, 2002 -> 17:35:04:42 isto
+kao ffprobe); 2) segmenti, pokrivalice i tab Segment s izvornim IN/OUT u TC-u;
+3) TC programa; 4) ravna playlista i export s originalnim TC-om. Live prikaz u docku
+nije provjeren jer kartica G: nije bila spojena (player ne otvara medij).
+
 Zatvoreno ograniceno odobrenje 2026-09-25 (vlasnik baze je projekt): korisnik je
 odredio: ako baza ima vlasnika, to je projekt; nijedna forma ne pise u bazu pa ne moze
 biti ni vlasnik; podaci nastali u aplikaciji stizu u bazu samo preko posrednika, jedinog

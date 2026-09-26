@@ -299,11 +299,8 @@ fn render_source_dock(
                 }
             });
         },
-        SourceTimeline::from_assets(
-            &view.preview.timeline,
-            timeline_theme(theme),
-            &view.preview.assets,
-        ),
+        SourceTimeline::from_assets(&view.preview.timeline, timeline_theme(theme), &view.preview.assets)
+            .with_timecode(view.source_timecode),
     );
     match intent {
         TimelineIntent::None => header_intent,
