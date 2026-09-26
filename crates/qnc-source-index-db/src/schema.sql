@@ -20,7 +20,7 @@ CREATE TABLE support_references (
     state TEXT NOT NULL CHECK(state IN ('file', 'missing', 'unavailable')),
     PRIMARY KEY(media_uri, record_id, role)
 );
-CREATE TABLE write_receipts (
+CREATE TABLE source_write_receipts (
     batch_id TEXT PRIMARY KEY NOT NULL,
     payload BLOB NOT NULL,
     receipt_json TEXT NOT NULL

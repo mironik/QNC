@@ -130,7 +130,7 @@ fn changed_request_id_or_group_never_overwrites() {
             .proposal,
         original.proposals[0]
     );
-    assert_eq!(row_count(&path, "write_receipts"), 1);
+    assert_eq!(row_count(&path, "source_write_receipts"), 1);
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn later_storage_conflict_rolls_back_entire_batch() {
     );
     assert_eq!(row_count(&path, "public_source_records"), 1);
     assert_eq!(row_count(&path, "public_source_media"), 2);
-    assert_eq!(row_count(&path, "write_receipts"), 1);
+    assert_eq!(row_count(&path, "source_write_receipts"), 1);
     assert!(client.write(batch("two", vec![proposal("C")])).is_ok());
 }
 
@@ -226,7 +226,7 @@ fn parallel_connections_return_one_committed_identity_and_receipt() {
     let receipts: Vec<_> = handles.into_iter().map(|t| t.join().unwrap()).collect();
     assert_eq!(receipts[0], receipts[1]);
     assert_eq!(row_count(&path, "public_source_records"), 1);
-    assert_eq!(row_count(&path, "write_receipts"), 1);
+    assert_eq!(row_count(&path, "source_write_receipts"), 1);
 }
 
 #[test]
@@ -452,4 +452,38 @@ fn manifests_and_dependency_boundaries_are_explicit() {
         assert_eq!(json["module_version"], VERSION);
         assert!(json.get("allowed_applications").is_none());
     }
+}
+
+#[test]
+fn the_source_index_lives_in_the_project_database_next_to_its_tables() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("project.db");
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute_batch("PRAGMA application_id = 77; CREATE TABLE clips (clip_id TEXT);")
+        .unwrap();
+    let mut store = Store::open_in_project(&path, Access::ReadWrite).unwrap();
+    let request = |operation| Request {
+        version: VERSION.into(),
+        db_uri: URI.into(),
+        operation,
+    };
+    let Data::Written(receipt) = store
+        .execute(&request(Operation::Write(batch("one", vec![proposal("A")]))))
+        .unwrap()
+    else {
+        panic!()
+    };
+    let read = store
+        .execute(&request(Operation::Read {
+            record_id: receipt.record_ids[0].clone(),
+        }))
+        .unwrap();
+    assert!(matches!(read, Data::Record(Some(_))));
+    assert_eq!(row_count(&path, "source_write_receipts"), 1);
+    let app: i32 = rusqlite::Connection::open(&path)
+        .unwrap()
+        .pragma_query_value(None, "application_id", |r| r.get(0))
+        .unwrap();
+    assert_eq!(app, 77);
 }

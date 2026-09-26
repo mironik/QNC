@@ -27,7 +27,7 @@ CREATE TABLE snapshot_documents (
     PRIMARY KEY(clip_id, revision, document_uri),
     FOREIGN KEY(clip_id, revision) REFERENCES media_snapshots(clip_id, revision)
 );
-CREATE TABLE write_receipts (
+CREATE TABLE media_write_receipts (
     request_id TEXT PRIMARY KEY NOT NULL,
     descriptor_json TEXT NOT NULL,
     receipt_json TEXT NOT NULL

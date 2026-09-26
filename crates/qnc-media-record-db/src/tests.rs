@@ -330,14 +330,14 @@ fn shared_document_is_deduplicated_and_changed_text_rolls_back_new_documents() {
     assert_eq!(client.write(c), Err(Error::Conflict));
     assert_eq!(count(&path, "media_heads"), 2);
     assert_eq!(count(&path, "evidence_documents"), 1);
-    assert_eq!(count(&path, "write_receipts"), 2);
+    assert_eq!(count(&path, "media_write_receipts"), 2);
     let mut replay = a;
     replay.documents[0].text = "<changed/>".into();
     assert_eq!(client.write(replay), Err(Error::Conflict));
     let conn = rusqlite::Connection::open(&path).unwrap();
     assert_eq!(
         conn.query_row(
-            "SELECT sum(instr(descriptor_json, '<camera/>')) FROM write_receipts",
+            "SELECT sum(instr(descriptor_json, '<camera/>')) FROM media_write_receipts",
             [],
             |r| r.get::<_, i64>(0)
         )
@@ -590,4 +590,44 @@ fn media_db_contract_and_immutable_json_probe_evidence_round_trip() {
         Some(write.documents[0].clone())
     );
     assert_eq!(client.write(write).unwrap(), receipt);
+}
+
+/// A project database that already holds other tables and its own identity.
+fn project_file(dir: &Path) -> std::path::PathBuf {
+    let path = dir.join("project.db");
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    conn.execute_batch(
+        "PRAGMA application_id = 77;
+         CREATE TABLE clips (clip_id TEXT PRIMARY KEY); INSERT INTO clips VALUES ('x');",
+    )
+    .unwrap();
+    path
+}
+
+#[test]
+fn records_live_in_the_project_database_next_to_its_tables() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = project_file(dir.path());
+    let mut store = Store::open_in_project(&path, Access::ReadWrite).unwrap();
+    let request = |operation| Request {
+        version: VERSION.into(),
+        db_uri: URI.into(),
+        operation,
+    };
+    store.execute(&request(Operation::Write(Box::new(input("A"))))).unwrap();
+    drop(store);
+    let mut store = Store::open_in_project(&path, Access::ReadOnly).unwrap();
+    let read = store
+        .execute(&request(Operation::Read {
+            clip_id: "clip-A".into(),
+            revision: None,
+        }))
+        .unwrap();
+    assert!(matches!(read, Data::Snapshot(Some(_))), "{read:?}");
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    let app: i32 = conn.pragma_query_value(None, "application_id", |r| r.get(0)).unwrap();
+    let mode: String = conn.pragma_query_value(None, "journal_mode", |r| r.get(0)).unwrap();
+    assert_eq!((app, mode.as_str()), (77, "delete"), "the project keeps its identity and is not turned into WAL");
+    assert_eq!(count(&path, "clips"), 1, "the tables of the project stay");
+    assert!(Store::open_in_project(&dir.path().join("none.db"), Access::ReadWrite).is_err());
 }

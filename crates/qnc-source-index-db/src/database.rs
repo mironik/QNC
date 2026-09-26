@@ -81,6 +81,53 @@ impl Store {
         })
     }
 
+    /// Opens these tables inside the database of the active project (QNC v5: the
+    /// ingest tables live in the project database; user rule 2026-09-26: the project
+    /// owns them). The project file must exist: nothing creates it here, and its
+    /// journal mode and identity stay the project's. Missing tables are created on a
+    /// read-write open; only these tables are checked, never the whole file.
+    pub fn open_in_project(path: &Path, access: Access) -> Result<Self> {
+        let flags = if access == Access::ReadOnly {
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+        } else {
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+        };
+        let mut conn = Connection::open_with_flags(path, flags).map_err(db_error)?;
+        conn.set_limit(
+            rusqlite::limits::Limit::SQLITE_LIMIT_LENGTH,
+            (MAX_BYTES * 2) as i32,
+        );
+        conn.busy_timeout(Duration::from_secs(5))
+            .map_err(db_error)?;
+        conn.pragma_update(None, "trusted_schema", "OFF")
+            .map_err(db_error)?;
+        conn.pragma_update(None, "foreign_keys", "ON")
+            .map_err(db_error)?;
+        if access == Access::ReadWrite {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(db_error)?;
+            let present: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='source_write_receipts')",
+                    [],
+                    |r| r.get(0),
+                )
+                .map_err(db_error)?;
+            if !present {
+                tx.execute_batch(SCHEMA).map_err(db_error)?;
+            }
+            validate_own_schema(&tx)?;
+            tx.commit().map_err(db_error)?;
+        } else {
+            validate_own_schema(&conn)?;
+        }
+        Ok(Self {
+            connection: conn,
+            access,
+        })
+    }
+
     pub fn execute(&mut self, request: &Request) -> Result<Data> {
         request.validate()?;
         match &request.operation {
@@ -117,7 +164,7 @@ impl Store {
             .map_err(db_error)?;
         let previous: Option<(Vec<u8>, String)> = tx
             .query_row(
-                "SELECT payload, receipt_json FROM write_receipts WHERE batch_id=?1",
+                "SELECT payload, receipt_json FROM source_write_receipts WHERE batch_id=?1",
                 [&batch.batch_id],
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
@@ -217,7 +264,7 @@ impl Store {
             record_ids,
         };
         tx.execute(
-            "INSERT INTO write_receipts VALUES (?1, ?2, ?3)",
+            "INSERT INTO source_write_receipts VALUES (?1, ?2, ?3)",
             params![
                 batch.batch_id,
                 payload,
@@ -260,6 +307,33 @@ fn validate_schema(conn: &Connection) -> Result<()> {
     let expected = Connection::open_in_memory().map_err(db_error)?;
     expected.execute_batch(SCHEMA).map_err(db_error)?;
     if app != APPLICATION_ID || version != 1 || schema_rows(conn)? != schema_rows(&expected)? {
+        return Err(Error::IncompatibleSchema);
+    }
+    Ok(())
+}
+/// Only the objects of these tables, so they can live in a shared project database.
+fn validate_own_schema(conn: &Connection) -> Result<()> {
+    let expected = Connection::open_in_memory().map_err(db_error)?;
+    expected.execute_batch(SCHEMA).map_err(db_error)?;
+    let tables: Vec<String> = schema_rows(&expected)?
+        .into_iter()
+        .map(|(_, name, _)| name)
+        .collect();
+    let mut stmt = conn
+        .prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name")
+        .map_err(db_error)?;
+    let rows: Vec<(String, String, Option<String>)> = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+        .map_err(db_error)?
+        .collect::<std::result::Result<_, _>>()
+        .map_err(db_error)?;
+    let owned = |name: &str| {
+        tables.iter().any(|table| {
+            name == table || name.starts_with(&format!("sqlite_autoindex_{table}_"))
+        })
+    };
+    let rows: Vec<_> = rows.into_iter().filter(|(_, name, _)| owned(name)).collect();
+    if rows != schema_rows(&expected)? {
         return Err(Error::IncompatibleSchema);
     }
     Ok(())
