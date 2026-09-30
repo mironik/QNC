@@ -1,0 +1,8 @@
+[package]
+name = "qnc-program-waveform"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: passive program waveform (A1 segments, A2 covers) composed from the stored clip waves, and its slice for one Wrap row"
+
+[dependencies]
+qnc-timeline-assets = { workspace = true }

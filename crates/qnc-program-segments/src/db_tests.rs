@@ -11,7 +11,7 @@ fn story_target(file: &std::path::Path) -> ProjectDbTarget {
 }
 
 fn configure(segments: &mut ProgramSegments, file: &std::path::Path) {
-    segments.configure(story_target(file), "p1");
+    segments.configure(story_target(file), "p1", None);
 }
 
 const URI: &str = "qnc://local/db/ingest_content/p1";

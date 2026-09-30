@@ -278,7 +278,7 @@ impl EditorialApplication {
         }
         self.segments.set_playhead(Some(self.wrap.playhead()));
         self.view.focus = self.focus.panel();
-        self.view.segments = self.segments.view().clone();
+        self.view.segments = self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames)));
     }
 
     fn apply_pending_shot(&mut self) {
@@ -358,7 +358,7 @@ impl EditorialApplication {
                 let content = qnc_content_store::ContentTarget::for_project(settings, work);
                 self.content_target = match content.and_then(|target| Ok((target, story?))) {
                     Ok(targets) => {
-                        self.segments.configure(targets.1.clone(), &project_id);
+                        self.segments.configure(targets.1.clone(), &project_id, qnc_content_artifacts::timeline_artifact_reader(settings, work).ok());
                         Some(targets)
                     }
                     Err(error) => {

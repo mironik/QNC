@@ -99,6 +99,7 @@ members = [
     "crates/qnc-program-segments",
     "crates/qnc-wrap-session",
     "crates/qnc-sync-cover",
+    "crates/qnc-program-waveform",
     "crates/qnc-source-timecode",
     "crates/qnc-db-broker",
     "crates/qnc-record-probe",
@@ -228,6 +229,7 @@ qnc-playback-activity = { path = "crates/qnc-playback-activity" }
 qnc-program-segments = { path = "crates/qnc-program-segments" }
 qnc-wrap-session = { path = "crates/qnc-wrap-session" }
 qnc-sync-cover = { path = "crates/qnc-sync-cover" }
+qnc-program-waveform = { path = "crates/qnc-program-waveform" }
 qnc-source-timecode = { path = "crates/qnc-source-timecode" }
 qnc-db-broker = { path = "crates/qnc-db-broker" }
 qnc-record-probe = { path = "crates/qnc-record-probe" }

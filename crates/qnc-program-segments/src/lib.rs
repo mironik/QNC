@@ -90,6 +90,8 @@ pub struct SegmentRow {
     pub clip_id: String,
     pub source_in_frame: u64,
     pub source_out_frame: u64,
+    /// Source channel heard on A1 (zero based).
+    pub a1_source_channel: u16,
     /// Program frames `[start, end)`: segments follow each other without gaps.
     pub start_frame: u64,
     pub end_frame: u64,
@@ -125,6 +127,11 @@ pub struct CoverSpan {
     pub start_frame: u64,
     pub end_frame: u64,
     pub selected: bool,
+    /// The clip the cover plays, its source IN/OUT and the channel heard on A2.
+    pub clip_id: String,
+    pub source_in_frame: u64,
+    pub source_out_frame: u64,
+    pub a2_source_channel: u16,
 }
 
 /// The source the user marked for Talking Head, Voice over and covers: the chosen
@@ -182,11 +189,34 @@ pub struct SegmentsView {
     pub redo_depth: u64,
     /// Last controlled error of a read or write; empty otherwise.
     pub message: String,
+    /// The program wave (A1 segments, A2 covers) from the stored clip waves.
+    pub peaks: qnc_program_waveform::ProgramPeaks,
 }
 
 impl SegmentsView {
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
+    }
+
+    /// Where each clip sounds in the program: segments on A1, covers on A2.
+    pub fn wave_placements(&self) -> (Vec<qnc_program_waveform::Placement>, Vec<qnc_program_waveform::Placement>) {
+        let segments = self.rows.iter().map(|row| qnc_program_waveform::Placement {
+            clip_id: row.clip_id.clone(),
+            channel: row.a1_source_channel,
+            program_start: row.start_frame,
+            program_end: row.end_frame,
+            source_in: row.source_in_frame,
+            source_out: row.source_out_frame,
+        });
+        let covers = self.covers.iter().map(|cover| qnc_program_waveform::Placement {
+            clip_id: cover.clip_id.clone(),
+            channel: cover.a2_source_channel,
+            program_start: cover.start_frame,
+            program_end: cover.end_frame,
+            source_in: cover.source_in_frame,
+            source_out: cover.source_out_frame,
+        });
+        (segments.collect(), covers.collect())
     }
 
     pub fn selected(&self) -> Option<&SegmentRow> {
@@ -297,6 +327,7 @@ pub fn program(segments: &[ProgramSegment], selected: Option<&str>) -> SegmentsV
             clip_id: segment.clip_id.clone(),
             source_in_frame: segment.in_frame,
             source_out_frame: segment.out_frame,
+            a1_source_channel: segment.a1_source_channel,
             start_frame: start,
             end_frame: start + frames,
             duration_label: duration_label(frames, segment.fps_num, segment.fps_den),
@@ -477,6 +508,8 @@ pub struct NewSegment {
 pub struct ProgramSegments {
     /// The project database of the active project (its story and virtual shots).
     target: Option<ProjectDbTarget>,
+    /// The stored waves of the clips the program plays (v5 program waveform).
+    waves: qnc_program_waveform::ProgramWaves,
     project_id: String,
     stored: Vec<ProgramSegment>,
     stored_markers: Vec<ProgramMarker>,
@@ -527,10 +560,17 @@ impl ProgramSegments {
 
     /// Points to the project database of the active project (its story and the
     /// virtual shots of covers) and reads it.
-    pub fn configure(&mut self, story: ProjectDbTarget, project_id: &str) {
+    /// `waves` reads the stored clip waves of that project (the program wave).
+    pub fn configure(
+        &mut self,
+        story: ProjectDbTarget,
+        project_id: &str,
+        waves: Option<std::sync::Arc<dyn qnc_program_waveform::TimelineArtifactRead>>,
+    ) {
         let same = self.target.as_ref().map(ProjectDbTarget::uri) == Some(story.uri());
         if !same {
             *self = Self::default();
+            self.waves.set_reader(waves);
         }
         self.target = Some(story);
         self.project_id = project_id.to_string();
@@ -540,6 +580,16 @@ impl ProgramSegments {
 
     pub fn view(&self) -> &SegmentsView {
         &self.view
+    }
+
+    /// The view with its program wave; `clips` gives each clip's length in the frames
+    /// its IN/OUT use (a clip wave spans the whole clip).
+    pub fn view_with_waves<'a>(&mut self, clips: impl Iterator<Item = (&'a str, u64)>) -> SegmentsView {
+        let durations: std::collections::HashMap<&str, u64> = clips.collect();
+        let (segments, covers) = self.view.wave_placements();
+        let mut view = self.view.clone();
+        view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());
+        view
     }
 
     pub fn has_pending_work(&self) -> bool {
@@ -1209,6 +1259,10 @@ impl ProgramSegments {
                 start_frame: cover.program_start_frame,
                 end_frame: cover.program_end_frame,
                 selected: self.selected_cover.as_deref() == Some(cover.cover_id.as_str()),
+                clip_id: cover.clip_id.clone(),
+                source_in_frame: cover.source_in_frame,
+                source_out_frame: cover.source_out_frame,
+                a2_source_channel: cover.a2_source_channel,
             })
             .collect();
         view.sync_enabled = self.sync.enabled();

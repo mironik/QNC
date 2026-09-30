@@ -2627,3 +2627,18 @@ usporedno i kasnije (filmstrip je gotov prije njih), a radnik je artefakte prola
 Izvedeno: `tools/qnc-ingest-worker` nakon dovrsetka zapisa jos jednom pokrece artefakte; gotovi
 filmstripovi se preskacu, nastaju wave koji su cekali konacni zapis. Live provjereno na novom
 projektu: 98 filmstripova i 98 wavea.
+
+Zatvoreno ograniceno odobrenje 2026-09-30 (wave u segmentima, v5): korisnik: "wave se ne prikazuje u
+segmentima"; odobrio ("da") `qnc-segment-panel`, `qnc-editorial-application` i novu kockicu. Po v5
+(`editorial/program_waveform.rs`, `qnc_segment_timeline.rs` `local_peaks_for_row`) wave programa se
+slaze iz spremljenih waveova klipova: segmenti na A1, pokrivalice na A2, po izvornom IN/OUT; svaki Wrap
+red crta svoj isjecak. Razlika od v5 (odluka korisnika): crta se izabrani kanal (`a1_source_channel`,
+`a2_source_channel`), kanal 1 zadrzava v5 zamjenu sljedecom trakom kad je prazan. Izvedeno: novi javni
+`crates/qnc-program-waveform` (+ `contracts/modules/program-waveform.module.json`; racun, isjecak reda,
+cuvanje waveova klipova s ponovnim pokusajem za 2 s, citanje kroz javni citac artefakata, bez
+dekodiranja i pisanja), `crates/qnc-program-segments` (kanal i izvorni IN/OUT segmenata i pokrivalica,
+`SegmentsView::peaks`, `view_with_waves`, citac u `configure`), `crates/qnc-segment-panel` (A1/A2 trake
+reda), `crates/qnc-editorial-application` (dva postojeca retka; C10 nije narastao), root Cargo.
+Forma i layout nisu dirani. Sljedeci korak (odobren, nije izveden): u source timelineu klik na oznaku A1
+otvara tanki izbornik desno od nje, visine audio trake, s kucicama 1-4 za kanal koji ide na A1 (jedan
+kanal). Odobrenje za wave u segmentima je zatvoreno.

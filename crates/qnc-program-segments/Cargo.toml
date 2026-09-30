@@ -9,6 +9,7 @@ qnc-db-broker = { workspace = true }
 qnc-program-db = { workspace = true }
 qnc-virtual-shots = { workspace = true }
 qnc-sync-cover = { workspace = true }
+qnc-program-waveform = { workspace = true }
 qnc-source-timecode = { workspace = true }
 
 [dev-dependencies]

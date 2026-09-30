@@ -7,4 +7,5 @@ description = "QNC public passive UI component: the Segmenti panel (program timi
 [dependencies]
 eframe = { workspace = true }
 qnc-program-segments = { workspace = true }
+qnc-program-waveform = { workspace = true }
 qnc-timeline = { workspace = true }

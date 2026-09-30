@@ -261,6 +261,9 @@ fn paint_program(
             frame: local(pin.frame),
         })
         .collect::<Vec<_>>();
+    // v5 `local_peaks_for_row`: this row's part of the program wave.
+    let row_wave = |program: &[f32]| qnc_program_waveform::row_peaks(program, segments.total_frames, start, end);
+    let (a1, a2) = (row_wave(&segments.peaks.a1), row_wave(&segments.peaks.a2));
     let no_picture = segments
         .segment_at(start)
         .is_some_and(|row| !row.kind.has_base_video() && row.end_frame >= end);
@@ -280,8 +283,8 @@ fn paint_program(
             draft_out_frame: duration,
             draft_in_active: false,
             draft_out_active: false,
-            a1_peaks: &[],
-            a2_peaks: &[],
+            a1_peaks: &a1,
+            a2_peaks: &a2,
             a3_peaks: &[],
             a4_peaks: &[],
             virtual_spans: &spans,

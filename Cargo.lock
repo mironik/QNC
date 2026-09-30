@@ -3244,6 +3244,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
  "qnc-clip-posters",
+ "qnc-content-artifacts",
  "qnc-content-read",
  "qnc-content-store",
  "qnc-db-broker",
@@ -3251,6 +3252,7 @@ dependencies = [
  "qnc-media-thumbnail",
  "qnc-panel-focus",
  "qnc-program-segments",
+ "qnc-program-waveform",
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-source-reader",
@@ -4032,11 +4034,19 @@ dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-program-db",
+ "qnc-program-waveform",
  "qnc-source-timecode",
  "qnc-sync-cover",
  "qnc-virtual-shots",
  "rusqlite",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-program-waveform"
+version = "0.1.0"
+dependencies = [
+ "qnc-timeline-assets",
 ]
 
 [[package]]
@@ -4168,6 +4178,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-program-segments",
+ "qnc-program-waveform",
  "qnc-timeline",
 ]
 
