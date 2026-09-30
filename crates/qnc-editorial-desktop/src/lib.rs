@@ -6,7 +6,7 @@
 
 mod app;
 use qnc_editorial_layout as layout_contract;
-mod theme;
+use qnc_editorial_layout::theme;
 mod widgets;
 
 use eframe::egui;

@@ -2999,6 +2999,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3306,6 +3307,7 @@ dependencies = [
 name = "qnc-editorial-layout"
 version = "0.1.0"
 dependencies = [
+ "eframe",
  "qnc-board",
  "qnc-contracts",
  "qnc-keyboard-shortcut",
@@ -3494,6 +3496,7 @@ dependencies = [
  "qnc-board",
  "qnc-contracts",
  "qnc-ingest-application",
+ "qnc-ingest-layout",
  "qnc-keyboard-shortcut",
  "qnc-media-card",
  "qnc-monitor",
@@ -3533,6 +3536,18 @@ dependencies = [
  "qnc-work-settings",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-ingest-layout"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-board",
+ "qnc-contracts",
+ "qnc-keyboard-shortcut",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

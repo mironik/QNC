@@ -9,20 +9,16 @@ pub fn render_desktop(
     theme: &Theme,
     view: &IngestViewModel,
 ) -> Option<IngestIntent> {
-    let faces = qnc_board::BoardFaces {
-        bg: theme.bg,
-        left: theme.surface,
-        right: theme.bg,
-        divider: theme.border_soft,
-    };
-    qnc_board::show(ui, &contracts.board_sizes(), &faces, |ui, place, rect| match place {
-        qnc_board::Place::Monitor => {
+    let (sizes, faces, names) = (contracts.board_sizes(), theme.board_faces(), contracts.board_names());
+    qnc_board::show(ui, &sizes, &faces, &names, |ui, block, rect| match block {
+        "preview" => {
             render_preview(ui, rect, contracts, theme, view);
             None
         }
-        qnc_board::Place::Head => render_pool_head(ui, contracts, theme),
-        qnc_board::Place::Body => render_source_browser(ui, rect, contracts, theme, view),
-        qnc_board::Place::Right => render_clip_grid(ui, contracts, theme, view),
-        qnc_board::Place::Dock => render_source_dock(ui, contracts, theme, view),
+        "pool-head" => render_pool_head(ui, contracts, theme),
+        "source-browser" => render_source_browser(ui, rect, contracts, theme, view),
+        "clip-cards" => render_clip_grid(ui, contracts, theme, view),
+        "source-dock" => render_source_dock(ui, contracts, theme, view),
+        _ => None,
     })
 }

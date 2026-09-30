@@ -4,6 +4,7 @@
   "module_version": "0.1.0",
   "module_kind": "library",
   "capabilities": [
+    "ui.board.layout_tree",
     "ui.board.places",
     "ui.board.paint"
   ],
@@ -36,7 +37,7 @@
   "state_policy": "stateless",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-board",
-  "input": "The sizes of the places from the application layout contract (left share, divider, minimum widths, monitor, head row and dock heights) and the faces.",
-  "output": "The one desktop board every application uses: monitor, head row and body of the left column, right panel and dock; it calls the caller for each place. A place of size 1 shows nothing. It knows no application, keeps no state and never reads or writes the database.",
+  "input": "A layout: a tree of splits whose parts have a size (pixels with a largest share, a share with minimum widths, a picture shape or the rest), a face and a further split or one block by name. The standard layout of every application is built from the measures of its layout contract.",
+  "output": "The rectangles of the faces and blocks of the layout; it paints the faces and calls the caller once per block by name. It knows no application, keeps no state and never reads or writes the database. Saved layouts, dragged dividers and a layout chosen per project are added here later without changing the forms.",
   "specification": "User rule 2026-09-30: every application uses the same layout, only the sizes of its places and the blocks in them differ; geometry from qnc-editorial-desktop render_desktop/render_board and qnc-project-desktop project_board."
 }

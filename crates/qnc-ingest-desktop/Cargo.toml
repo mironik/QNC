@@ -7,6 +7,7 @@ description = "QNC Ingest public desktop surface"
 [dependencies]
 eframe = { workspace = true }
 qnc-board = { workspace = true }
+qnc-ingest-layout = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-ingest-application = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }

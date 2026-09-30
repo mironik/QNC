@@ -64,10 +64,17 @@ impl Blocks<'_> {
         let t = Theme::from_contract(&self.contracts.shell.colors);
         let faces = qnc_board::BoardFaces { bg: t.bg, left: t.bg, right: t.bg, divider: t.border };
         let sizes = self.contracts.project.board;
-        qnc_board::show(ui, &sizes, &faces, |ui, place, rect| {
-            match place {
-                qnc_board::Place::Body => self.project_list(ui, rect.width(), rect.height()),
-                qnc_board::Place::Right => self.settings_panel(ui, rect.width(), rect.height()),
+        let names = qnc_board::BoardNames {
+            monitor: "",
+            head: "",
+            body: "project-list",
+            right: "project-settings",
+            dock: "",
+        };
+        qnc_board::show(ui, &sizes, &faces, &names, |ui, block, rect| {
+            match block {
+                "project-list" => self.project_list(ui, rect.width(), rect.height()),
+                "project-settings" => self.settings_panel(ui, rect.width(), rect.height()),
                 _ => {}
             }
             None::<()>

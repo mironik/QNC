@@ -1,6 +1,6 @@
 use eframe::egui::{self, Color32, FontFamily, FontId, Stroke, TextStyle, Visuals};
 
-use crate::layout_contract::{ShellColors, ShellLayoutContract};
+use crate::{ShellColors, ShellLayoutContract};
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -109,3 +109,11 @@ fn rgb(value: [u8; 3]) -> Color32 {
 
 #[allow(dead_code)]
 fn _shell_colors_type(_: &ShellColors) {}
+
+impl Theme {
+    /// The faces of the desktop board: the board, the left column, the right panel and
+    /// the divider between them.
+    pub fn board_faces(&self) -> qnc_board::BoardFaces {
+        qnc_board::BoardFaces { bg: self.bg, left: self.surface, right: self.bg, divider: self.border_soft }
+    }
+}

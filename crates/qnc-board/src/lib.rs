@@ -1,5 +1,11 @@
 //! The one QNC desktop board (user rule 2026-09-30): every application uses the same
-//! layout and gives only the sizes of its places and what goes in each one.
+//! board; a layout says how the window is split and which block goes where, and forms
+//! only draw blocks by name.
+//!
+//! A layout is a tree of splits (data, [`Layout`]): each part of a split has a size
+//! (pixels, a share with minimum widths, a picture shape, or the rest) and holds either
+//! a further split or one block by name. The standard layout of every application today
+//! is one such tree ([`BoardSizes::standard_layout`]):
 //!
 //! ```text
 //! +-----------+---+--------------------+
@@ -13,14 +19,15 @@
 //! +------------------------------------+
 //! ```
 //!
-//! A place of size 1 is there but shows nothing (Project: monitor, head row and dock).
-//! Passive paint only: the board keeps no state, knows no application and never reads
-//! or writes the database; sizes and faces come from the application's layout contract.
+//! Later (user rule 2026-09-30) layouts saved by a user, dragged dividers or a layout
+//! chosen per project are added here, in this block; the forms do not change, because
+//! they only draw what a place asks for by name. Passive paint only: the board keeps no
+//! state, knows no application and never reads or writes the database.
 
 use eframe::egui::{self, Color32, Rect, Sense, Vec2};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-/// The sizes of the places, from the layout contract (`board`).
+/// The measures of the standard layout, from the application's layout contract.
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 pub struct BoardSizes {
     /// Share of the width the left column takes.
@@ -41,7 +48,7 @@ pub struct BoardSizes {
 }
 
 /// A monitor that keeps its picture shape (from the preview block of the contract).
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
 pub struct MonitorAspect {
     /// Width over height, e.g. 16/9.
     pub ratio: f32,
@@ -54,7 +61,7 @@ pub struct MonitorAspect {
 }
 
 impl MonitorAspect {
-    /// The monitor height in a left column of `width` x `height`.
+    /// The monitor height in a column of `width` x `height`.
     pub fn height(&self, width: f32, height: f32) -> f32 {
         let picture_width = (width - self.width_inset).max(self.min_width);
         let available = (height - self.reserve_below).max(self.min_height);
@@ -65,7 +72,7 @@ impl MonitorAspect {
 /// The dock never takes more than this share of the board height.
 pub const DOCK_MAX_SHARE: f32 = 0.42;
 
-/// Faces of the board.
+/// The faces of the standard layout, by the names it uses.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BoardFaces {
     pub bg: Color32,
@@ -74,106 +81,261 @@ pub struct BoardFaces {
     pub divider: Color32,
 }
 
-/// A place of the board.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Place {
-    Monitor,
-    Head,
-    Body,
-    Right,
-    Dock,
-}
-
-/// The rectangles of the places inside `rect`.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct BoardRects {
-    pub monitor: Rect,
-    pub head: Rect,
-    pub body: Rect,
-    pub divider: Rect,
-    pub right: Rect,
-    pub dock: Rect,
-}
-
-impl BoardRects {
-    pub fn place(&self, place: Place) -> Rect {
-        match place {
-            Place::Monitor => self.monitor,
-            Place::Head => self.head,
-            Place::Body => self.body,
-            Place::Right => self.right,
-            Place::Dock => self.dock,
+impl BoardFaces {
+    pub fn named(&self, name: &str) -> Option<Color32> {
+        match name {
+            "bg" => Some(self.bg),
+            "left" => Some(self.left),
+            "right" => Some(self.right),
+            "divider" => Some(self.divider),
+            _ => None,
         }
     }
+}
 
-    /// The whole left column (monitor, head row and body).
-    pub fn left(&self) -> Rect {
-        Rect::from_min_max(self.monitor.min, self.body.max)
+/// The block names an application gives the five places of the standard layout; an
+/// empty name leaves the place empty.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BoardNames<'a> {
+    pub monitor: &'a str,
+    pub head: &'a str,
+    pub body: &'a str,
+    pub right: &'a str,
+    pub dock: &'a str,
+}
+
+/// Which way a split lays its parts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Axis {
+    /// Side by side, left to right.
+    Horizontal,
+    /// One under the other, top to bottom.
+    Vertical,
+}
+
+/// The size of one part along its split.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Size {
+    /// Fixed pixels, never more than `max_share` of the split.
+    Px { px: f32, max_share: Option<f32> },
+    /// A share of the split; never below `min`, and leaves `rest_min` to the rest.
+    Share { ratio: f32, min: f32, rest_min: f32 },
+    /// Keeps a picture shape in the width of a vertical split.
+    Aspect(MonitorAspect),
+    /// What the other parts leave.
+    Rest,
+}
+
+/// One part of a split: its size, its face and what it holds.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct Part {
+    pub size: Size,
+    #[serde(default)]
+    pub face: Option<String>,
+    /// Nothing for a plain face (a divider).
+    #[serde(default)]
+    pub node: Option<Node>,
+}
+
+/// A split or one block by name.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Node {
+    Split { axis: Axis, parts: Vec<Part> },
+    Block { name: String },
+}
+
+/// A whole layout: the face of the board and its tree.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct Layout {
+    #[serde(default)]
+    pub face: Option<String>,
+    pub root: Node,
+}
+
+impl BoardSizes {
+    /// The layout every application uses today: left column (monitor, head row, body),
+    /// divider and right panel over the dock.
+    pub fn standard_layout(&self, names: &BoardNames<'_>) -> Layout {
+        let block = |name: &str| Some(Node::Block { name: name.to_string() });
+        let px = |px| Size::Px { px, max_share: None };
+        let monitor = match self.monitor_aspect {
+            Some(aspect) => Size::Aspect(aspect),
+            None => px(self.monitor_height),
+        };
+        let left = Node::Split {
+            axis: Axis::Vertical,
+            parts: vec![
+                Part { size: monitor, face: None, node: block(names.monitor) },
+                Part { size: px(self.head_height), face: None, node: block(names.head) },
+                Part { size: Size::Rest, face: None, node: block(names.body) },
+            ],
+        };
+        let content = Node::Split {
+            axis: Axis::Horizontal,
+            parts: vec![
+                Part {
+                    size: Size::Share {
+                        ratio: self.left_ratio,
+                        min: self.left_min_width,
+                        rest_min: self.right_min_width,
+                    },
+                    face: Some("left".into()),
+                    node: Some(left),
+                },
+                Part { size: px(self.divider_width), face: Some("divider".into()), node: None },
+                Part { size: Size::Rest, face: Some("right".into()), node: block(names.right) },
+            ],
+        };
+        Layout {
+            face: Some("bg".into()),
+            root: Node::Split {
+                axis: Axis::Vertical,
+                parts: vec![
+                    Part { size: Size::Rest, face: None, node: Some(content) },
+                    Part {
+                        size: Size::Px { px: self.dock_height, max_share: Some(DOCK_MAX_SHARE) },
+                        face: None,
+                        node: block(names.dock),
+                    },
+                ],
+            },
+        }
     }
 }
 
-/// Splits `rect` into the places of the board.
-pub fn layout(rect: Rect, sizes: &BoardSizes) -> BoardRects {
-    let dock_height = sizes.dock_height.min(rect.height() * DOCK_MAX_SHARE).max(0.0);
-    let dock = Rect::from_min_max(egui::pos2(rect.left(), rect.bottom() - dock_height), rect.max);
-    let content = Rect::from_min_max(rect.min, egui::pos2(rect.right(), dock.top()));
-
-    let usable = content.width().max(sizes.left_min_width + sizes.right_min_width);
-    let split = (usable * sizes.left_ratio)
-        .clamp(sizes.left_min_width, usable - sizes.right_min_width);
-    let left = Rect::from_min_size(content.min, Vec2::new(split, content.height()));
-    let divider = Rect::from_min_size(
-        egui::pos2(left.right(), content.top()),
-        Vec2::new(sizes.divider_width, content.height()),
-    );
-    let right = Rect::from_min_max(egui::pos2(divider.right(), content.top()), content.max);
-
-    let monitor_height = sizes
-        .monitor_aspect
-        .map_or(sizes.monitor_height, |aspect| aspect.height(left.width(), left.height()))
-        .clamp(0.0, left.height());
-    let monitor = Rect::from_min_size(left.min, Vec2::new(left.width(), monitor_height));
-    let head_height = sizes.head_height.clamp(0.0, left.bottom() - monitor.bottom());
-    let head = Rect::from_min_size(
-        egui::pos2(left.left(), monitor.bottom()),
-        Vec2::new(left.width(), head_height),
-    );
-    let body = Rect::from_min_max(egui::pos2(left.left(), head.bottom()), left.max);
-    BoardRects { monitor, head, body, divider, right, dock }
+/// What a layout puts in a rectangle: faces (in paint order) and blocks (in draw order).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Solved {
+    pub faces: Vec<(String, Rect)>,
+    pub blocks: Vec<(String, Rect)>,
 }
 
-/// Paints the board and calls `place` for every place in the order monitor, head, body,
-/// right, dock; the first answer stops the rest (one intent per frame, as the forms do).
+impl Solved {
+    /// The rectangle of the block `name`.
+    pub fn block(&self, name: &str) -> Option<Rect> {
+        self.blocks.iter().find(|(block, _)| block == name).map(|(_, rect)| *rect)
+    }
+}
+
+/// Places the layout in `rect`.
+pub fn solve(layout: &Layout, rect: Rect) -> Solved {
+    let mut solved = Solved::default();
+    if let Some(face) = &layout.face {
+        solved.faces.push((face.clone(), rect));
+    }
+    place_node(&layout.root, rect, &mut solved);
+    solved
+}
+
+fn place_node(node: &Node, rect: Rect, solved: &mut Solved) {
+    match node {
+        Node::Block { name } => {
+            if !name.is_empty() {
+                solved.blocks.push((name.clone(), rect));
+            }
+        }
+        Node::Split { axis, parts } => {
+            let (total, cross) = match axis {
+                Axis::Horizontal => (rect.width(), rect.height()),
+                Axis::Vertical => (rect.height(), rect.width()),
+            };
+            let lengths = part_lengths(parts, total, cross);
+            let mut at = 0.0;
+            for (part, length) in parts.iter().zip(lengths) {
+                let area = match axis {
+                    Axis::Horizontal => Rect::from_min_size(
+                        egui::pos2(rect.left() + at, rect.top()),
+                        Vec2::new(length, rect.height()),
+                    ),
+                    Axis::Vertical => Rect::from_min_size(
+                        egui::pos2(rect.left(), rect.top() + at),
+                        Vec2::new(rect.width(), length),
+                    ),
+                };
+                at += length;
+                if let Some(face) = &part.face {
+                    solved.faces.push((face.clone(), area));
+                }
+                if let Some(node) = &part.node {
+                    place_node(node, area, solved);
+                }
+            }
+        }
+    }
+}
+
+/// Lengths of the parts along a split of `total`: fixed parts in order, each at most what
+/// is left, then the rest shared by the rest parts.
+fn part_lengths(parts: &[Part], total: f32, cross: f32) -> Vec<f32> {
+    let mut left = total;
+    let mut lengths: Vec<Option<f32>> = parts
+        .iter()
+        .map(|part| {
+            let wanted = match part.size {
+                Size::Px { px, max_share } => max_share.map_or(px, |share| px.min(total * share)),
+                Size::Share { ratio, min, rest_min } => {
+                    let usable = total.max(min + rest_min);
+                    (usable * ratio).clamp(min, usable - rest_min)
+                }
+                Size::Aspect(aspect) => aspect.height(cross, total),
+                Size::Rest => return None,
+            };
+            let length = wanted.clamp(0.0, left.max(0.0));
+            left -= length;
+            Some(length)
+        })
+        .collect();
+    let rest_count = lengths.iter().filter(|length| length.is_none()).count().max(1) as f32;
+    let rest = left.max(0.0) / rest_count;
+    lengths.iter_mut().map(|length| length.unwrap_or(rest)).collect()
+}
+
+/// Paints the standard layout with `faces` and calls `block` for every named place in
+/// the order monitor, head, body, right, dock; the first answer stops the rest (one
+/// intent per frame, as the forms do).
 pub fn show<R>(
     ui: &mut egui::Ui,
     sizes: &BoardSizes,
     faces: &BoardFaces,
-    mut place: impl FnMut(&mut egui::Ui, Place, Rect) -> Option<R>,
+    names: &BoardNames<'_>,
+    block: impl FnMut(&mut egui::Ui, &str, Rect) -> Option<R>,
+) -> Option<R> {
+    show_layout(ui, &sizes.standard_layout(names), |name| faces.named(name), block)
+}
+
+/// Paints any layout (faces by name through `face`) and calls `block` for every block.
+pub fn show_layout<R>(
+    ui: &mut egui::Ui,
+    layout: &Layout,
+    face: impl Fn(&str) -> Option<Color32>,
+    mut block: impl FnMut(&mut egui::Ui, &str, Rect) -> Option<R>,
 ) -> Option<R> {
     let rect = ui.available_rect_before_wrap();
     if rect.width() <= 1.0 || rect.height() <= 1.0 {
         return None;
     }
     ui.allocate_rect(rect, Sense::hover());
-    let rects = layout(rect, sizes);
-    let painter = ui.painter();
-    painter.rect_filled(rect, 0.0, faces.bg);
-    painter.rect_filled(rects.left(), 0.0, faces.left);
-    painter.rect_filled(rects.divider, 0.0, faces.divider);
-    painter.rect_filled(rects.right, 0.0, faces.right);
-    for which in [Place::Monitor, Place::Head, Place::Body, Place::Right, Place::Dock] {
-        let area = rects.place(which);
+    let solved = solve(layout, rect);
+    for (name, area) in &solved.faces {
+        if let Some(color) = face(name) {
+            ui.painter().rect_filled(*area, 0.0, color);
+        }
+    }
+    for (name, area) in &solved.blocks {
         if area.width() < 1.0 || area.height() < 1.0 {
             continue;
         }
         let answer = ui
             .scope_builder(
                 egui::UiBuilder::new()
-                    .max_rect(area)
+                    .max_rect(*area)
                     .layout(egui::Layout::top_down(egui::Align::Min)),
                 // No clip: a place may draw its own edge half a pixel outside (the dock
                 // top line), as the forms did.
-                |ui| place(ui, which, area),
+                |ui| block(ui, name, *area),
             )
             .inner;
         if answer.is_some() {
@@ -184,59 +346,4 @@ pub fn show<R>(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sizes() -> BoardSizes {
-        BoardSizes {
-            left_ratio: 0.31,
-            divider_width: 5.0,
-            left_min_width: 280.0,
-            right_min_width: 200.0,
-            monitor_height: 1.0,
-            head_height: 1.0,
-            dock_height: 1.0,
-            monitor_aspect: None,
-        }
-    }
-
-    #[test]
-    fn project_places_fill_the_board_around_one_pixel_places() {
-        let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(1000.0, 700.0));
-        let rects = layout(rect, &sizes());
-        assert_eq!(rects.dock.height(), 1.0);
-        assert_eq!(rects.monitor.height(), 1.0);
-        assert_eq!(rects.head.height(), 1.0);
-        assert_eq!(rects.body.height(), 700.0 - 3.0);
-        assert_eq!(rects.left().width(), 310.0);
-        assert_eq!(rects.divider.width(), 5.0);
-        assert_eq!(rects.right.left(), 315.0);
-        assert_eq!(rects.right.right(), 1000.0);
-    }
-
-    #[test]
-    fn the_dock_never_takes_more_than_its_share_and_columns_keep_their_minimum() {
-        let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(400.0, 300.0));
-        let rects = layout(rect, &BoardSizes { dock_height: 500.0, ..sizes() });
-        assert!((rects.dock.height() - 300.0 * DOCK_MAX_SHARE).abs() < 0.01);
-        assert_eq!(rects.left().width(), 280.0);
-    }
-
-    #[test]
-    fn a_monitor_with_a_picture_shape_follows_the_column_width() {
-        let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(1000.0, 900.0));
-        let aspect = MonitorAspect { ratio: 16.0 / 9.0, reserve_below: 190.0, min_height: 160.0, width_inset: 32.0, min_width: 240.0 };
-        let rects = layout(rect, &BoardSizes { left_ratio: 0.365, monitor_aspect: Some(aspect), head_height: 34.0, ..sizes() });
-        // Column 365 px: picture 333 px wide, 187.3 px high.
-        assert!((rects.monitor.height() - 333.0 * 9.0 / 16.0).abs() < 0.01);
-        assert_eq!(rects.head.top(), rects.monitor.bottom());
-    }
-
-    #[test]
-    fn the_monitor_never_grows_past_the_column() {
-        let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(1000.0, 400.0));
-        let rects = layout(rect, &BoardSizes { monitor_height: 900.0, head_height: 30.0, ..sizes() });
-        assert_eq!(rects.monitor.bottom(), rects.left().bottom());
-        assert_eq!(rects.body.height(), 0.0);
-    }
-}
+mod tests;

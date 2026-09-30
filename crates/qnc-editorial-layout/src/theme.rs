@@ -1,7 +1,7 @@
 // Copied 1:1 from qnc-ingest-desktop/src/theme.rs (only the contract type differs).
 use eframe::egui::{self, Color32, FontFamily, FontId, Stroke, TextStyle, Visuals};
 
-use crate::layout_contract::ShellLayoutContract;
+use crate::ShellLayoutContract;
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -107,4 +107,12 @@ pub fn apply(ctx: &egui::Context, theme: &Theme) {
 
 fn rgb(value: [u8; 3]) -> Color32 {
     Color32::from_rgb(value[0], value[1], value[2])
+}
+
+impl Theme {
+    /// The faces of the desktop board: the board, the left column, the right panel and
+    /// the divider between them.
+    pub fn board_faces(&self) -> qnc_board::BoardFaces {
+        qnc_board::BoardFaces { bg: self.bg, left: self.surface, right: self.bg, divider: self.border_soft }
+    }
 }

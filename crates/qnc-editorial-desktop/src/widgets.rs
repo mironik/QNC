@@ -24,38 +24,33 @@ pub fn render_desktop(
     theme: &Theme,
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
-    let faces = qnc_board::BoardFaces {
-        bg: theme.bg,
-        left: theme.surface,
-        right: theme.bg,
-        divider: theme.border_soft,
-    };
-    qnc_board::show(ui, &contracts.board_sizes(), &faces, |ui, place, rect| match place {
-        qnc_board::Place::Monitor => {
+    let (sizes, faces, names) = (contracts.board_sizes(), theme.board_faces(), contracts.board_names());
+    qnc_board::show(ui, &sizes, &faces, &names, |ui, block, rect| match block {
+        "preview" => {
             render_preview(ui, rect, contracts, theme, view);
             None
         }
-        qnc_board::Place::Head => render_pool_head(ui, contracts, theme, view),
-        qnc_board::Place::Body => {
+        "pool-head" => render_pool_head(ui, contracts, theme, view),
+        "clip-cards" => {
             // Clip menu (qnc_v5 media pool): the card grid fills the column under the
             // pool head, down to the dock, on the panel background.
             let intent = render_clip_grid(ui, contracts, theme, view);
             paint_focus(ui, rect, view.focus == Panel::Pool, theme.focus);
             intent
         }
-        qnc_board::Place::Right if contracts.composition().right_panel == "segment_panel" => {
+        "right-panel" if contracts.composition().right_panel == "segment_panel" => {
             let intent = qnc_segment_panel::show(ui, &view.segments, timeline_theme(theme))
                 .map(EditorialIntent::Segment);
             paint_focus(ui, rect, view.focus == Panel::Segments, theme.focus);
             intent
         }
-        // Right panel: empty, reserved for the functions of the group.
-        qnc_board::Place::Right => None,
-        qnc_board::Place::Dock => {
+        "source-dock" => {
             let intent = render_source_dock(ui, contracts, theme, view);
             paint_focus(ui, rect, view.focus == Panel::SourceTimeline, theme.focus);
             intent
         }
+        // Right panel of the other groups: empty, reserved for their functions.
+        _ => None,
     })
 }
 

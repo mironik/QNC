@@ -1,8 +1,8 @@
 [package]
-name = "qnc-editorial-layout"
+name = "qnc-ingest-layout"
 version = "0.1.0"
 edition = "2021"
-description = "QNC public component: validated model of the editorial layout contract (board, preview, pool head, source dock, group compositions)"
+description = "QNC Ingest piece: the model of the Ingest layout contract and its places on the desktop board"
 
 [dependencies]
 eframe = { workspace = true }

@@ -7,3 +7,6 @@ description = "QNC public passive UI component: the one desktop board every appl
 [dependencies]
 eframe = { workspace = true }
 serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

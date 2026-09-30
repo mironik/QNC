@@ -7,6 +7,8 @@ use std::collections::HashMap;
 use qnc_keyboard_shortcut::ShortcutCatalog;
 use serde::Deserialize;
 
+pub mod theme;
+
 const SHELL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/shell.layout.json");
 const EDITORIAL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/editorial.layout.json");
 const KEYBOARD_SHORTCUTS_JSON: &str =
@@ -92,6 +94,17 @@ impl EditorialContracts {
         self.shell.theme_metrics.chrome_row_height
             + self.editorial.source_dock.header_timeline_gap
             + timeline_height
+    }
+
+    /// The blocks of Media Assist and Story in the places of the standard layout.
+    pub fn board_names(&self) -> qnc_board::BoardNames<'static> {
+        qnc_board::BoardNames {
+            monitor: "preview",
+            head: "pool-head",
+            body: "clip-cards",
+            right: "right-panel",
+            dock: "source-dock",
+        }
     }
 
     /// The sizes of Media Assist and Story on the one desktop board: the monitor keeps

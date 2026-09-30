@@ -1,5 +1,11 @@
+//! The model of the Ingest layout contract (moved unchanged out of the Ingest form,
+//! user rule 2026-09-30: forms are boards of public pieces) and the Ingest places on
+//! the one desktop board.
+
 use qnc_keyboard_shortcut::ShortcutCatalog;
 use serde::Deserialize;
+
+pub mod theme;
 
 const SHELL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/shell.layout.json");
 const INGEST_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/ingest.layout.json");
@@ -74,6 +80,11 @@ impl IngestContracts {
         self.shell.theme_metrics.chrome_row_height
             + self.ingest.source_dock.header_timeline_gap
             + timeline_height
+    }
+
+    /// The blocks of Ingest in the places of the standard layout.
+    pub fn board_names(&self) -> qnc_board::BoardNames<'static> {
+        qnc_board::BoardNames { monitor: "preview", head: "pool-head", body: "source-browser", right: "clip-cards", dock: "source-dock" }
     }
 
     /// The sizes of Ingest on the one desktop board: the monitor keeps its picture
