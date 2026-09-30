@@ -58,6 +58,12 @@
     "group_title_font_size": 12.0,
     "row_height": 24.0
   },
+  "ai_switches": [
+    {"path": "ai.enabled", "on": true, "off": false, "default_on": false, "label": "AI analiza kadrova i virtualni kadrovi"},
+    {"path": "ai.coverage_suggestions", "on": true, "off": false, "default_on": true, "label": "Coverage suggestions"},
+    {"path": "ai.transcription", "on": true, "off": false, "default_on": false, "label": "Transkripcija u Media tabu"},
+    {"path": "artifacts.filmstrip", "on": "auto", "off": "off", "default_on": true, "label": "Filmstrip automatski nakon Odaberi"}
+  ],
   "pts_slots": {
     "head": ["Postavke", "subtitle"],
     "fixed_order": [

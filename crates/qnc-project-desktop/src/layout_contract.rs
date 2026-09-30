@@ -118,6 +118,9 @@ pub struct ProjectLayoutContract {
     pub board: BoardMetrics,
     pub left_project_list: ProjectListMetrics,
     pub right_settings_panel: SettingsPanelMetrics,
+    /// The checkboxes of the AI box; the filmstrip one decides `artifacts.filmstrip`
+    /// (user rule 2026-09-30).
+    pub ai_switches: Vec<qnc_settings_switches::Switch>,
     pub pts_slots: PtsSlots,
 }
 

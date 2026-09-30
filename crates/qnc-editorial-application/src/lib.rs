@@ -240,12 +240,12 @@ impl EditorialApplication {
         let previous_clip_id = self.view.preview.clip_id.clone();
         let previous_timeline = self.view.preview.timeline;
         self.view.preview = self.preview.view().clone();
+        let (assets, settings) = (std::mem::take(&mut self.view.preview.assets), self.current_settings.as_ref());
+        let posters = self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.thumb_image.as_deref()));
+        self.view.preview.assets = qnc_timeline_assets::with_clip_poster(assets, settings, posters);
         if previous_clip_id == self.view.preview.clip_id {
-            self.view.preview.timeline = self
-                .view
-                .preview
-                .timeline
-                .preserving_source_marks_from(&previous_timeline);
+            let timeline = self.view.preview.timeline.preserving_source_marks_from(&previous_timeline);
+            self.view.preview.timeline = timeline;
         } else {
             self.short_stills
                 .clear_if_clip_changed(self.view.preview.clip_id.as_deref());

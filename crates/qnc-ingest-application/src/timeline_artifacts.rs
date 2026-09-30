@@ -27,11 +27,11 @@ impl IngestApplication {
                 qnc_timeline_assets::SourceTimelineAssets::empty_for(clip_id);
             return;
         };
-        match self
-            .artifacts
-            .focus(reader, &plan.settings, clip_id)
-        {
-            Ok(assets) => self.view.timeline_assets = assets,
+        let posters = self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.thumb_image.as_deref()));
+        match self.artifacts.focus(reader, &plan.settings, clip_id) {
+            Ok(found) => {
+                self.view.timeline_assets = qnc_timeline_assets::with_clip_poster(found, Some(&plan.settings), posters)
+            }
             Err(error) => self.view.message = error,
         }
     }

@@ -19,6 +19,7 @@ qnc-source-timecode = { workspace = true, features = ["read"] }
 
 qnc-source-bindings = { workspace = true }
 qnc-source-preview = { workspace = true }
+qnc-timeline-assets = { workspace = true }
 qnc-source-reader = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-virtual-short-cards = { workspace = true }

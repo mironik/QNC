@@ -58,6 +58,11 @@ pub fn set_path(settings: &mut Value, path: &str, value: Value) {
     }
 }
 
+/// A two-state setting (a checkbox): whether `path` holds `on`; `default_on` when absent.
+pub fn switch_on(settings: &Value, path: &str, on: &Value, default_on: bool) -> bool {
+    path_value(settings, path).map_or(default_on, |value| value == on)
+}
+
 pub fn set_string_path(settings: &mut Value, path: &str, value: String) {
     set_path(settings, path, Value::String(value));
 }
@@ -70,6 +75,14 @@ pub fn set_bool_path(settings: &mut Value, path: &str, value: bool) {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_switch_reads_its_own_values_and_its_default() {
+        let settings = json!({"artifacts": {"filmstrip": "off"}, "ai": {"enabled": true}});
+        assert!(!switch_on(&settings, "artifacts.filmstrip", &json!("auto"), true));
+        assert!(switch_on(&settings, "ai.enabled", &json!(true), false));
+        assert!(switch_on(&settings, "artifacts.wave", &json!("auto"), true));
+    }
 
     #[test]
     fn nested_paths_create_objects() {

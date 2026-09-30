@@ -3256,6 +3256,7 @@ dependencies = [
  "qnc-source-reader",
  "qnc-source-timecode",
  "qnc-timeline",
+ "qnc-timeline-assets",
  "qnc-virtual-short-cards",
  "qnc-virtual-short-stills",
  "qnc-virtual-shots",
@@ -4082,6 +4083,7 @@ dependencies = [
  "qnc-keyboard-shortcut",
  "qnc-project-application",
  "qnc-settings-path",
+ "qnc-settings-switches",
  "qnc-transport-resolver",
  "qnc-ui-kit",
  "serde",
@@ -4173,6 +4175,16 @@ dependencies = [
 name = "qnc-settings-path"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-settings-switches"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-settings-path",
+ "serde",
  "serde_json",
 ]
 
@@ -4386,6 +4398,7 @@ dependencies = [
  "qnc-image-assets",
  "qnc-media-records",
  "qnc-wave",
+ "qnc-work-settings",
 ]
 
 [[package]]

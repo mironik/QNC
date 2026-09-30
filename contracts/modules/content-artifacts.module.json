@@ -15,6 +15,6 @@
   "database_write_policy": "public_db_write_transports_only",
   "runtime_crate": "qnc-content-artifacts",
   "input": "SettingsReader, WorkSettings snapshot from the active project database, content target of the same project database, and private source transport bindings.",
-  "output": "Timeline artifact context, filmstrip/wave worker readers and writers, and passive timeline asset reader over the project content database.",
+  "output": "Timeline artifact context, filmstrip/wave worker readers and writers, and passive timeline asset reader over the project content database. The project settings decide which artifact is made: artifacts.filmstrip and artifacts.wave (auto / off, user rule 2026-09-30); off gives that generator no clip, a project without the block is a controlled error, never a default.",
   "specification": "AGENTS.md §0, §4.1, §8; docs/92-v5-processes-workers-project-dir.md; docs/96-v5-ingest-db-and-workers.md"
 }

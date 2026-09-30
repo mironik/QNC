@@ -1,0 +1,11 @@
+[package]
+name = "qnc-settings-switches"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public UI piece: a list of two-state settings (checkboxes) described by a layout contract, read and written in a JSON settings draft; it knows no application"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-settings-path = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -150,6 +150,49 @@ impl TimelineAssetReader {
     }
 }
 
+/// The poster of a clip across the filmstrip row, in every slot, when the project
+/// makes no filmstrip (`artifacts.filmstrip = off`, user rule 2026-09-30). It is not a
+/// generated filmstrip and never stands in for one: a project that makes filmstrips
+/// (`made`) keeps its row empty until the real frames are there.
+pub fn with_poster_filmstrip(
+    mut assets: SourceTimelineAssets,
+    made: bool,
+    poster: Option<&qnc_image_assets::RgbaImage>,
+) -> SourceTimelineAssets {
+    if made || assets.filmstrip_background.is_some() || assets.clip_id.is_empty() {
+        return assets;
+    }
+    let Some(poster) = poster else {
+        return assets;
+    };
+    let uri = format!("poster:{}", assets.clip_id);
+    assets.filmstrip_background = Some(FilmstripBackground {
+        clip_id: assets.clip_id.clone(),
+        frames: (0..FILMSTRIP_FRAME_COUNT)
+            .map(|index| FilmstripFrameAsset {
+                index,
+                seek_sec: 0.0,
+                uri: uri.clone(),
+                image: poster.clone(),
+            })
+            .collect(),
+    });
+    assets
+}
+
+/// The same for the clip on screen, its poster found among `posters` (clip id, loaded
+/// poster) and `made` read from the project settings (`None`: not loaded, treated as made).
+pub fn with_clip_poster<'a>(
+    assets: SourceTimelineAssets,
+    settings: Option<&qnc_work_settings::WorkSettings>,
+    posters: impl IntoIterator<Item = (&'a str, Option<&'a qnc_image_assets::RgbaImage>)>,
+) -> SourceTimelineAssets {
+    let made = settings.is_none_or(qnc_work_settings::WorkSettings::filmstrip_made);
+    let clip_id = assets.clip_id.clone();
+    let poster = posters.into_iter().find(|(id, _)| *id == clip_id).and_then(|(_, poster)| poster);
+    with_poster_filmstrip(assets, made, poster)
+}
+
 fn read_assets(
     context: &TimelineAssetContext,
     clip_id: &str,
@@ -222,6 +265,23 @@ mod tests {
         assert!(assets.a2_peaks().is_empty());
         assert!(assets.a3_peaks().is_empty());
         assert!(assets.a4_peaks().is_empty());
+    }
+
+    #[test]
+    fn a_project_without_filmstrips_shows_the_poster_across_the_row() {
+        let poster = qnc_image_assets::RgbaImage {
+            size: [2, 1],
+            pixels: vec![255; 8],
+            content_key: 7,
+        };
+        let off = with_poster_filmstrip(SourceTimelineAssets::empty_for("clip-1"), false, Some(&poster));
+        let row = off.filmstrip_background().expect("the poster fills the row");
+        assert_eq!(row.frames.len(), FILMSTRIP_FRAME_COUNT);
+        assert!(row.frames.iter().all(|frame| frame.image == poster));
+        let made = with_poster_filmstrip(SourceTimelineAssets::empty_for("clip-1"), true, Some(&poster));
+        assert!(made.filmstrip_background().is_none(), "a real filmstrip is never replaced");
+        let without = with_poster_filmstrip(SourceTimelineAssets::empty_for("clip-1"), false, None);
+        assert!(without.filmstrip_background().is_none());
     }
 
     #[test]

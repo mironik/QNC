@@ -2361,6 +2361,25 @@ drzi jednim); Ingest ga samo budi (`wake_artifact_worker`, i pri ucitavanju proj
 generatore u svom procesu, a prikazani klip ponovno cita iz baze jednom u sekundi dok mu nedostaje
 filmstrip ili wave (`qnc-content-artifacts::ProjectArtifacts::refresh_due`). C10 Ingest 1717.
 
+Zatvoreno ograniceno odobrenje 2026-09-30 (filmstrip po projektnim postavkama): korisnik je trazio da
+samostalno pokretanje filmstripa kontroliraju projektne postavke ("mozda nekome nece ni trebati
+filmstrip"), kvacicu u Project postavkama pored AI postavki (zadano ukljuceno, auto), a kad je filmstrip
+iskljucen, poster klipa u traci filmstripa na timelineu; odobrio "odmrznuti i zamrznuti" Project.
+Otkljucano i izvedeno samo: `seed/system_seed.json` (svaki sistemski predlozak: `artifacts` =
+`{filmstrip: auto, wave: auto}`), `crates/qnc-project-store` (`complete_project_settings` dopunjuje
+`artifacts` kao `products`), `contracts/ui/project.layout.json` (`ai_switches`: tri postojece AI
+kvacice i nova "Filmstrip automatski nakon Odaberi"), `crates/qnc-project-desktop` (AI okvir samo
+poziva kockicu; forma je manja: C10 3387, C2 109), novi javni `crates/qnc-settings-switches` (+ ugovor;
+kvacice iz layout ugovora, citanje i zapis nacrta postavki), `crates/qnc-settings-path` (`switch_on`),
+`crates/qnc-work-settings` (`artifact_mode` strogo, `filmstrip_made` samo za prikaz; testni fixture
+dobio `products` kao pravi projekt, 4 testa su padala od 23. 9.), `crates/qnc-content-artifacts`
+(`off` generatoru ne daje klip), `crates/qnc-timeline-assets` (`with_clip_poster`: poster na svih 13
+mjesta trake samo kad je filmstrip `off`; iznimka od §8 po odluci korisnika, pravi filmstrip se nikad
+ne zamjenjuje), `crates/qnc-ingest-application` i `crates/qnc-editorial-application` (samo poziv),
+`crates/qnc-player-input` (testni primjerak). `on_demand` nije izveden (trazi odluku tko ga pokrece u
+Storyju/MA). Stari projekti bez bloka dobivaju kontroliranu gresku samo za artefakte (korisnik ih brise).
+Odobrenje je zatvoreno, Project je ponovno zamrznut.
+
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne
 postavke odlucuju gdje sto zivi; aplikacija je OS-neutralna. v5: `ingest_assets`,

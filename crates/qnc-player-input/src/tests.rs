@@ -224,6 +224,7 @@ fn settings(context: &str, mode: &str) -> WorkSettings {
         audio: serde_json::json!({"sample_rate":44100,"channels":2}),
         ai: serde_json::json!({"enabled":false}),
         keyboard_shortcuts: serde_json::json!({"active_preset":"qnc"}),
+        artifacts: serde_json::json!({"filmstrip":"auto","wave":"auto"}),
     }
 }
 

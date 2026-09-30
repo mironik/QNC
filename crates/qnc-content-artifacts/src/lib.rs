@@ -14,7 +14,7 @@ use qnc_timeline_artifacts::{Artifacts, ArtifactsContext};
 use qnc_timeline_assets::{
     SourceTimelineAssets, TimelineArtifactRead, TimelineAssetContext, TimelineAssetReader,
 };
-use qnc_work_settings::{ProductArea, SettingsReader, WorkSettings};
+use qnc_work_settings::{ArtifactKind, ArtifactMode, ProductArea, SettingsReader, WorkSettings};
 use std::{path::PathBuf, sync::Arc};
 
 pub const MODULE_ID: &str = "qnc.module.content-artifacts";
@@ -163,6 +163,8 @@ impl TimelineArtifactRead for ProjectTimelineArtifactReader {
 struct ProjectFilmstripContentReader {
     read: SharedRead,
     artifacts: SharedArtifacts,
+    /// `artifacts.filmstrip` of the project: `off` gives the generator no clip.
+    enabled: bool,
 }
 
 impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReader {
@@ -170,6 +172,9 @@ impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReade
         &self,
         after: Option<String>,
     ) -> Result<Vec<qnc_filmstrip_worker::FilmstripClipRecord>, String> {
+        if !self.enabled {
+            return Ok(Vec::new());
+        }
         self.read
             .open()?
             .list(after)?
@@ -189,6 +194,9 @@ impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReade
         &self,
         clip_id: &str,
     ) -> Result<Option<qnc_filmstrip_worker::FilmstripClipRecord>, String> {
+        if !self.enabled {
+            return Ok(None);
+        }
         Ok(self.read.open()?.read(clip_id)?.map(|stored| {
             qnc_filmstrip_worker::FilmstripClipRecord {
                 priority: artifact_priority(&stored),
@@ -247,6 +255,8 @@ impl qnc_filmstrip_worker::FilmstripContentWrite for ProjectFilmstripContentWrit
 struct ProjectWaveContentReader {
     read: SharedRead,
     artifacts: SharedArtifacts,
+    /// `artifacts.wave` of the project: `off` gives the generator no clip.
+    enabled: bool,
 }
 
 impl qnc_wave_worker::WaveContentRead for ProjectWaveContentReader {
@@ -254,6 +264,9 @@ impl qnc_wave_worker::WaveContentRead for ProjectWaveContentReader {
         &self,
         after: Option<String>,
     ) -> Result<Vec<qnc_wave_worker::WaveClipRecord>, String> {
+        if !self.enabled {
+            return Ok(Vec::new());
+        }
         self.read
             .open()?
             .list(after)?
@@ -270,6 +283,9 @@ impl qnc_wave_worker::WaveContentRead for ProjectWaveContentReader {
     }
 
     fn read_clip(&self, clip_id: &str) -> Result<Option<qnc_wave_worker::WaveClipRecord>, String> {
+        if !self.enabled {
+            return Ok(None);
+        }
         Ok(self
             .read
             .open()?
@@ -387,6 +403,10 @@ pub fn artifacts_context(
     let filmstrip_root_uri = settings.product_uri(ProductArea::Filmstrip);
     let project_db = ProjectDbTarget::for_project(reader, settings)?;
     let artifacts = SharedArtifacts::new(project_db.clone());
+    let made = |kind| -> Result<bool, String> {
+        Ok(settings.artifact_mode(kind).map_err(|e| e.message)? == ArtifactMode::Auto)
+    };
+    let (filmstrip_enabled, wave_enabled) = (made(ArtifactKind::Filmstrip)?, made(ArtifactKind::Wave)?);
     Ok(ArtifactsContext {
         project_id: settings.project_id.clone(),
         filmstrip_root_uri: filmstrip_root_uri.clone(),
@@ -401,6 +421,7 @@ pub fn artifacts_context(
         filmstrip_reader: Arc::new(ProjectFilmstripContentReader {
             read: SharedRead::new(content_target.clone()),
             artifacts: artifacts.clone(),
+            enabled: filmstrip_enabled,
         }),
         filmstrip_writer: Arc::new(ProjectFilmstripContentWriteFactory {
             target: project_db.clone(),
@@ -409,6 +430,7 @@ pub fn artifacts_context(
         wave_reader: Arc::new(ProjectWaveContentReader {
             read: SharedRead::new(content_target),
             artifacts,
+            enabled: wave_enabled,
         }),
         wave_writer: Arc::new(ProjectWaveContentWriteFactory { target: project_db }),
         wave_sources: wave_source_bindings(source_bindings)?,

@@ -111,6 +111,10 @@
           "enabled": false,
           "coverage_suggestions": false
         },
+        "artifacts": {
+          "filmstrip": "auto",
+          "wave": "auto"
+        },
         "keyboard_shortcuts": {
           "active_preset": "default"
         },
@@ -182,6 +186,10 @@
         "ai": {
           "enabled": false,
           "coverage_suggestions": true
+        },
+        "artifacts": {
+          "filmstrip": "auto",
+          "wave": "auto"
         },
         "keyboard_shortcuts": {
           "active_preset": "resolve"
@@ -255,6 +263,10 @@
           "enabled": false,
           "coverage_suggestions": true
         },
+        "artifacts": {
+          "filmstrip": "auto",
+          "wave": "auto"
+        },
         "keyboard_shortcuts": {
           "active_preset": "default"
         },
@@ -326,6 +338,10 @@
         "ai": {
           "enabled": false,
           "coverage_suggestions": true
+        },
+        "artifacts": {
+          "filmstrip": "auto",
+          "wave": "auto"
         },
         "keyboard_shortcuts": {
           "active_preset": "resolve"

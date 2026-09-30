@@ -1704,6 +1704,16 @@ fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
             .entry((*field).to_string())
             .or_insert_with(|| json!(value));
     }
+    // Timeline artifacts (user rule 2026-09-30): made in the background unless the
+    // template says `off`.
+    let artifacts = root
+        .entry("artifacts")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+        .ok_or("Artifacts postavke moraju biti objekt.")?;
+    for field in ["filmstrip", "wave"] {
+        artifacts.entry(field.to_string()).or_insert_with(|| json!("auto"));
+    }
     Ok(())
 }
 
@@ -1938,6 +1948,16 @@ fn safe_dir_name(project_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_project_states_whether_filmstrip_and_wave_are_made() {
+        let mut from_user_template = json!({});
+        complete_project_settings(&mut from_user_template).unwrap();
+        assert_eq!(from_user_template["artifacts"], json!({"filmstrip": "auto", "wave": "auto"}));
+        let mut switched_off = json!({"artifacts": {"filmstrip": "off"}});
+        complete_project_settings(&mut switched_off).unwrap();
+        assert_eq!(switched_off["artifacts"], json!({"filmstrip": "off", "wave": "auto"}));
+    }
 
     #[test]
     fn public_settings_exposes_exact_saved_payload_without_changing_it() {

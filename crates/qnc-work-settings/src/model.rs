@@ -12,6 +12,22 @@ pub enum PlaybackInput {
     ProxyIfAvailable,
 }
 
+/// Whether a timeline artifact of the project is made in the background after Select
+/// (`auto`) or never (`off`); the project settings decide (user rule 2026-09-30).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ArtifactMode {
+    Auto,
+    Off,
+}
+
+/// A timeline artifact the project settings govern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArtifactKind {
+    Filmstrip,
+    Wave,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReadError {
     pub code: String,
@@ -50,6 +66,10 @@ pub struct WorkSettings {
     pub audio: Value,
     pub ai: Value,
     pub keyboard_shortcuts: Value,
+    /// `artifacts` as saved (`Null` when the project has none); read through
+    /// `artifact_mode`, never substituted.
+    #[serde(default)]
+    pub artifacts: Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +111,29 @@ impl WorkSettings {
                 "Baza sadrzi nepodrzani playback.input.",
             )),
         }
+    }
+
+    /// Whether the filmstrip or wave of this project is made (`artifacts.filmstrip`,
+    /// `artifacts.wave`). A project without it gets a controlled error, not a default.
+    pub fn artifact_mode(&self, kind: ArtifactKind) -> Result<ArtifactMode, ReadError> {
+        let key = match kind {
+            ArtifactKind::Filmstrip => "filmstrip",
+            ArtifactKind::Wave => "wave",
+        };
+        match self.artifacts.get(key).and_then(Value::as_str) {
+            Some("auto") => Ok(ArtifactMode::Auto),
+            Some("off") => Ok(ArtifactMode::Off),
+            _ => Err(ReadError::new(
+                "artifacts",
+                "Projektne postavke nemaju valjan artifacts.filmstrip / artifacts.wave.",
+            )),
+        }
+    }
+
+    /// For showing only: filmstrips are made unless the project says `off` (the poster
+    /// then fills the filmstrip row). Making them reads `artifact_mode`, strictly.
+    pub fn filmstrip_made(&self) -> bool {
+        self.artifact_mode(ArtifactKind::Filmstrip) != Ok(ArtifactMode::Off)
     }
 
     pub fn audio_channels(&self) -> Result<u16, ReadError> {
@@ -153,6 +196,7 @@ impl WorkSettings {
             audio: object(&saved, "audio")?,
             ai: object(&saved, "ai")?,
             keyboard_shortcuts: object(&saved, "keyboard_shortcuts")?,
+            artifacts: saved.get("artifacts").cloned().unwrap_or(Value::Null),
         };
         result.validate()?;
         Ok(result)

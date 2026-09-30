@@ -1160,36 +1160,8 @@ impl ProjectApp {
     fn ai_settings(&mut self, ui: &mut egui::Ui, content_w: f32, settings: &SettingsPanelMetrics) {
         widgets::section(ui, content_w, "AI", settings, &self.contracts.shell, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
-            let mut enabled =
-                qnc_settings_path::bool_path(&self.draft_settings, "ai.enabled", false);
-            if ui
-                .checkbox(&mut enabled, "AI analiza kadrova i virtualni kadrovi")
-                .changed()
-            {
-                qnc_settings_path::set_bool_path(&mut self.draft_settings, "ai.enabled", enabled);
-                self.status = "Postavke promijenjene.".to_string();
-            }
-            let mut coverage =
-                qnc_settings_path::bool_path(&self.draft_settings, "ai.coverage_suggestions", true);
-            if ui.checkbox(&mut coverage, "Coverage suggestions").changed() {
-                qnc_settings_path::set_bool_path(
-                    &mut self.draft_settings,
-                    "ai.coverage_suggestions",
-                    coverage,
-                );
-                self.status = "Postavke promijenjene.".to_string();
-            }
-            let mut transcription =
-                qnc_settings_path::bool_path(&self.draft_settings, "ai.transcription", false);
-            if ui
-                .checkbox(&mut transcription, "Transkripcija u Media tabu")
-                .changed()
-            {
-                qnc_settings_path::set_bool_path(
-                    &mut self.draft_settings,
-                    "ai.transcription",
-                    transcription,
-                );
+            let switches = &self.contracts.project.ai_switches;
+            if qnc_settings_switches::show(ui, &mut self.draft_settings, switches) {
                 self.status = "Postavke promijenjene.".to_string();
             }
         });

@@ -3,15 +3,26 @@ use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::{fs, time::Duration};
 
+/// The settings of a project made from the breaking news template: the template plus
+/// what Project completes when it creates the project (the product locations).
 fn settings() -> Value {
     let seed: Value = serde_json::from_str(include_str!("../../../seed/system_seed.json")).unwrap();
-    seed["project_templates"]
+    let mut settings = seed["project_templates"]
         .as_array()
         .unwrap()
         .iter()
         .find(|t| t["template_id"] == "tpl_breaking_news")
         .unwrap()["settings"]
-        .clone()
+        .clone();
+    settings["products"] = json!({
+        "root": "products",
+        "thumbnails": "products/thumbnails",
+        "filmstrip": "products/filmstrip",
+        "virtual_shorts": "products/virtual_shorts",
+        "virtual_segments": "products/virtual_segments",
+        "b_roll_virtual_clips": "products/b_roll_virtual_clips"
+    });
+    settings
 }
 
 fn fixture() -> tempfile::TempDir {
@@ -247,4 +258,22 @@ fn module_does_not_depend_on_application_crates_or_run_media_tools() {
     assert!(!local.contains("SQLITE_OPEN_CREATE"));
     assert!(!local.contains("SELECT settings_json FROM project_settings"));
     assert!(!local.contains("Command::new"));
+}
+
+#[test]
+fn the_project_settings_decide_whether_filmstrip_and_wave_are_made() {
+    use qnc_work_settings::{ArtifactKind, ArtifactMode};
+    let root = fixture();
+    let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
+    let mut settings = reader.read().unwrap();
+    assert_eq!(settings.artifact_mode(ArtifactKind::Filmstrip).unwrap(), ArtifactMode::Auto);
+    assert_eq!(settings.artifact_mode(ArtifactKind::Wave).unwrap(), ArtifactMode::Auto);
+    settings.artifacts = json!({"filmstrip": "off", "wave": "auto"});
+    assert_eq!(settings.artifact_mode(ArtifactKind::Filmstrip).unwrap(), ArtifactMode::Off);
+    // A project without the block, or with an unknown value, is refused, never defaulted.
+    settings.artifacts = Value::Null;
+    assert!(settings.artifact_mode(ArtifactKind::Filmstrip).is_err());
+    settings.artifacts = json!({"filmstrip": "sometimes"});
+    assert!(settings.artifact_mode(ArtifactKind::Filmstrip).is_err());
+    assert!(settings.artifact_mode(ArtifactKind::Wave).is_err());
 }
