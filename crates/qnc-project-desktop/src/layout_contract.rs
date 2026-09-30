@@ -124,13 +124,8 @@ pub struct ProjectLayoutContract {
     pub pts_slots: PtsSlots,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct BoardMetrics {
-    pub left_ratio: f32,
-    pub divider_width: f32,
-    pub left_min_width: f32,
-    pub right_min_width: f32,
-}
+/// The one desktop board (`qnc-board`): Project fills the body and the right panel.
+pub type BoardMetrics = qnc_board::BoardSizes;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProjectListMetrics {

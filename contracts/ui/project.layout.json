@@ -26,6 +26,9 @@
     "divider_width": 5.0,
     "left_min_width": 280.0,
     "right_min_width": 200.0,
+    "monitor_height": 1.0,
+    "head_height": 1.0,
+    "dock_height": 1.0,
     "outer_padding": 0.0,
     "body_face": "theme.bg"
   },

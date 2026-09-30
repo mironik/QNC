@@ -1,0 +1,42 @@
+{
+  "module_id": "qnc.module.board",
+  "module_name": "Desktop board",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "ui.board.places",
+    "ui.board.paint"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "database.read",
+    "database.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-board",
+  "input": "The sizes of the places from the application layout contract (left share, divider, minimum widths, monitor, head row and dock heights) and the faces.",
+  "output": "The one desktop board every application uses: monitor, head row and body of the left column, right panel and dock; it calls the caller for each place. A place of size 1 shows nothing. It knows no application, keeps no state and never reads or writes the database.",
+  "specification": "User rule 2026-09-30: every application uses the same layout, only the sizes of its places and the blocks in them differ; geometry from qnc-editorial-desktop render_desktop/render_board and qnc-project-desktop project_board."
+}

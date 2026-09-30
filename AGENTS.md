@@ -2642,3 +2642,17 @@ reda), `crates/qnc-editorial-application` (dva postojeca retka; C10 nije narasta
 Forma i layout nisu dirani. Sljedeci korak (odobren, nije izveden): u source timelineu klik na oznaku A1
 otvara tanki izbornik desno od nje, visine audio trake, s kucicama 1-4 za kanal koji ide na A1 (jedan
 kanal). Odobrenje za wave u segmentima je zatvoreno.
+
+Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
+korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav
+prelazak, vise klikova, oko 220 MB po aplikaciji) i odredio: "sve se pretvara u kocke.. qnc-app se
+pretvara u radnu povrsinu"; "sve se moze zasnivati na istom layoutu, samo neki dijelovi budu drugih
+dimenzija" (Project: monitor, traka i source timeline visine 1); "idemo od pocetka.. projekt, pa dalje
+redom"; "ok otkljucaj i nastavi.. to radimo u novoj grani". Grana `desktop-blocks` krece od oznake
+`v-embedded-shell-2026-09-30`. Model: jedna opca ploca (`crates/qnc-board`: monitor, traka i tijelo
+lijevog stupca, desni panel, dock); aplikacija je samo mjere mjesta i kocke u njima iz svog ugovora
+rasporeda; izgled ostaje isti. Otkljucano za prvi korak (Project): novi `crates/qnc-board` (+ ugovor
+modula), `apps/qnc-project`, `crates/qnc-project-desktop`, `crates/qnc-project-application`,
+`contracts/ui/project.layout.json` (samo mjere mjesta ploce, bez promjene izgleda), `apps/qnc-app`,
+nove kocke Projecta i njihovi ugovori, `tools/qnc-conformance`, root Cargo. Zatim redom Ingest, MA,
+Story, uz isto odobrenje za njihove forme i ugovore rasporeda.

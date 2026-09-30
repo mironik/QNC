@@ -2994,6 +2994,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-board"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "serde",
+]
+
+[[package]]
 name = "qnc-broadcast-engine"
 version = "0.1.0"
 dependencies = [
@@ -4087,6 +4095,7 @@ dependencies = [
  "eframe",
  "qnc-application-catalog",
  "qnc-application-selection",
+ "qnc-board",
  "qnc-contracts",
  "qnc-dir-browser",
  "qnc-export-preset",

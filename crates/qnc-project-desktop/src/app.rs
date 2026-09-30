@@ -368,48 +368,20 @@ impl ProjectApp {
         }
     }
 
+    /// The one desktop board: the project list in the body of the left column, the
+    /// settings in the right panel; monitor, head row and dock are one pixel.
     fn project_board(&mut self, ui: &mut egui::Ui) {
         let t = Theme::from_contract(&self.contracts.shell.colors);
-        let rect = ui.available_rect_before_wrap();
-        ui.allocate_exact_size(rect.size(), Sense::hover());
-        ui.set_clip_rect(rect);
-        ui.painter().rect_filled(rect, 0.0, t.bg);
-
-        let board = &self.contracts.project.board;
-        let mut left_w = (rect.width() * board.left_ratio).max(board.left_min_width);
-        let divider_w = board.divider_width;
-        if left_w + divider_w + board.right_min_width > rect.width() {
-            left_w = (rect.width() - divider_w - board.right_min_width).max(180.0);
-        }
-        let right_w = (rect.width() - left_w - divider_w).max(0.0);
-
-        let left_rect = egui::Rect::from_min_size(rect.min, Vec2::new(left_w, rect.height()));
-        let divider_rect = egui::Rect::from_min_size(
-            egui::pos2(left_rect.right(), rect.top()),
-            Vec2::new(divider_w, rect.height()),
-        );
-        let right_rect =
-            egui::Rect::from_min_max(egui::pos2(divider_rect.right(), rect.top()), rect.max);
-        ui.painter().rect_filled(divider_rect, 0.0, t.border);
-
-        ui.allocate_new_ui(
-            egui::UiBuilder::new()
-                .max_rect(left_rect)
-                .layout(egui::Layout::top_down(egui::Align::Min)),
-            |ui| {
-                ui.set_clip_rect(left_rect);
-                self.project_list(ui, left_w, rect.height());
-            },
-        );
-        ui.allocate_new_ui(
-            egui::UiBuilder::new()
-                .max_rect(right_rect)
-                .layout(egui::Layout::top_down(egui::Align::Min)),
-            |ui| {
-                ui.set_clip_rect(right_rect);
-                self.settings_panel(ui, right_w, rect.height());
-            },
-        );
+        let faces = qnc_board::BoardFaces { bg: t.bg, left: t.bg, right: t.bg, divider: t.border };
+        let sizes = self.contracts.project.board;
+        qnc_board::show(ui, &sizes, &faces, |ui, place, rect| {
+            match place {
+                qnc_board::Place::Body => self.project_list(ui, rect.width(), rect.height()),
+                qnc_board::Place::Right => self.settings_panel(ui, rect.width(), rect.height()),
+                _ => {}
+            }
+            None::<()>
+        });
     }
 
     fn shortcut_events(ctx: &egui::Context) -> Vec<ShortcutEvent> {

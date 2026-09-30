@@ -1,0 +1,9 @@
+[package]
+name = "qnc-board"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive UI component: the one desktop board every application uses (monitor, head row and body of the left column, right panel, dock); each application gives only the sizes and what goes in each place"
+
+[dependencies]
+eframe = { workspace = true }
+serde = { workspace = true }
