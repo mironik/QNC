@@ -2346,6 +2346,13 @@ pokusaj novim); spremljen, neuspio i nesiguran ishod ostaju konacni, pa se losa 
 petlji. `qnc-record-probe` vraca vrstu greske, `qnc-record-completion` prekinuti klip vraca na kraj
 reda do 3 puta u jednom prolazu, a sljedeci prolaz ga opet uzima. Testovi: prekinuti pa dovrseni
 klip, neuspio probe se ne ponavlja, zamjena prekinutog pokusaja u spremistu.
+Live nalaz 30. 9. (korisnik: filmstrip presporo): iz baze, filmstrip sam 0,96 s po klipu (`tesssrt4`),
+a s probeom uz njega 1,5-2,0 s (`hhhggff`, novi projekt; 95-96 od 98 zapisa dovrseno usred filmstripa);
+kartica je usko grlo. Izvedeno: `qnc-record-completion` `Run::card_busy` (dok filmstrip/wave
+citaju karticu, dovrsava se samo klip koji preview trazi, ostali odmah nakon njih),
+`tools/qnc-ingest-worker` javlja zauzetost dok radi `run_artifacts`; test da dok je kartica
+zauzeta probe cita samo medije trazenog klipa. Uz to worker cita red uvoza iz baze svake
+sekunde i jos jednom nakon otpustanja najma (Uvezi dok radi worker Selecta vise ne propada).
 
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne

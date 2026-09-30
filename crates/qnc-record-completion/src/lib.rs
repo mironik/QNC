@@ -59,6 +59,10 @@ pub struct Run<'a> {
     pub workers: usize,
     pub wanted: &'a (dyn Fn() -> Option<String> + Sync),
     pub player_works: &'a (dyn Fn() -> bool + Sync),
+    /// Whether the source is busy with other reads (filmstrip and wave): meanwhile
+    /// only the clip a preview wants is completed, the others wait (the card sets
+    /// the pace; two jobs on it at once make both slower).
+    pub card_busy: &'a (dyn Fn() -> bool + Sync),
     pub cancel: &'a AtomicBool,
 }
 
@@ -76,6 +80,7 @@ pub fn complete_active_project(
     make_backend: MakeBackend<'_>,
     workers: usize,
     player_works: &(dyn Fn() -> bool + Sync),
+    card_busy: &(dyn Fn() -> bool + Sync),
     cancel: &AtomicBool,
 ) -> Result<Completion, String> {
     let active = qnc_active_project_read::ActiveProjectReader::from_root(root)
@@ -103,6 +108,7 @@ pub fn complete_active_project(
         workers,
         wanted: &wanted,
         player_works,
+        card_busy,
         cancel,
     };
     Ok(complete_clips(&parts, waiting, &content, &run))
@@ -180,8 +186,8 @@ pub fn complete_clips(
     done.into_inner().expect("completion")
 }
 
-/// The next clip: none when cancelled; waits while a player works; the wanted clip
-/// first, else the first in line.
+/// The next clip: none when cancelled or all are taken; waits while a player works;
+/// the wanted clip first, else the first in line once the card is free.
 fn next(
     queue: &Mutex<VecDeque<(CatalogClip, usize)>>,
     run: &Run<'_>,
@@ -191,16 +197,20 @@ fn next(
             return None;
         }
         if !(run.player_works)() {
-            break;
+            let wanted = (run.wanted)();
+            let mut queue = queue.lock().expect("completion queue");
+            if queue.is_empty() {
+                return None;
+            }
+            let at = wanted.and_then(|id| queue.iter().position(|(clip, _)| clip.id() == id));
+            match at {
+                Some(at) => return queue.remove(at),
+                None if !(run.card_busy)() => return queue.pop_front(),
+                None => {}
+            }
         }
         std::thread::sleep(Duration::from_millis(200));
     }
-    let wanted = (run.wanted)();
-    let mut queue = queue.lock().expect("completion queue");
-    let at = wanted
-        .and_then(|id| queue.iter().position(|(clip, _)| clip.id() == id))
-        .unwrap_or(0);
-    queue.remove(at)
 }
 
 /// One clip: its own media record and source record, a probe backend bound to its

@@ -32,6 +32,6 @@
   "database_write_policy": "public_db_owner_write_adapter_only",
   "runtime_crate": "qnc-record-completion",
   "input": "The active project (read from the database), a probe backend factory bound by the composing process to this computer, whether a player works, and a cancel flag.",
-  "output": "Every clip of the project whose media record is still a camera record is completed once through qnc-record-probe (without a probe, and without touching the card, when nothing is missing) and its final record is published to the project content; it waits while any player works. A clip whose probe was interrupted (did not start or ran out of time) goes back to the end of the queue, at most 3 tries in one run; a later run takes it again. QNC v5 ingest_probe/scheduler.rs.",
+  "output": "Every clip of the project whose media record is still a camera record is completed once through qnc-record-probe (without a probe, and without touching the card, when nothing is missing) and its final record is published to the project content; it waits while any player works; while the source is busy with filmstrip and wave reads it completes only the clip a preview wants, the others right after (the card sets the pace). A clip whose probe was interrupted (did not start or ran out of time) goes back to the end of the queue, at most 3 tries in one run; a later run takes it again. QNC v5 ingest_probe/scheduler.rs.",
   "specification": "QNC_v5 qnc-host/src/ingest_probe/scheduler.rs and qnc-host/src/ingest/store.rs (queue_missing_media_probe_jobs)."
 }

@@ -88,8 +88,8 @@ fn run_once(root: &Path) -> Result<bool, String> {
     let _lease = qnc_playback_activity::Beat::start(target, qnc_playback_activity::WORKER)?;
     let running = std::sync::atomic::AtomicBool::new(true);
     // v5 media probe job: a card record gets what playback lacks, once, in the
-    // background, so a preview of a clip not yet imported plays. It runs beside the
-    // artifacts, several clips at once, the clip a preview wants first.
+    // background, so a preview of a clip not yet imported plays. Beside the artifacts
+    // only the clip a preview wants; the others after them, several at once.
     let config = qnc_ingest_select::selection_config::SelectionConfig::load(root)
         .map_err(|error| error.to_string())?;
     let make_backend = |source_uri: &str, media: &[qnc_source_reader::SourceReference]| {
@@ -101,6 +101,10 @@ fn run_once(root: &Path) -> Result<bool, String> {
         source.backend(media).map_err(|error| error.to_string())
     };
     let cancel = std::sync::atomic::AtomicBool::new(false);
+    // The card sets the pace: while filmstrip and wave read it, the completion takes
+    // only the clip a preview wants, the rest right after them.
+    let artifacts_running = std::sync::atomic::AtomicBool::new(true);
+    let card_busy = || artifacts_running.load(std::sync::atomic::Ordering::Relaxed);
     std::thread::scope(|scope| {
         let import = scope.spawn(|| import_while(root, &running));
         let completion = scope.spawn(|| {
@@ -109,6 +113,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 &make_backend,
                 PROBE_WORKERS,
                 &*player_works,
+                &card_busy,
                 &cancel,
             );
             match done {
@@ -121,6 +126,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
             }
         });
         let artifacts = run_artifacts(root);
+        artifacts_running.store(false, std::sync::atomic::Ordering::Relaxed);
         let _ = completion.join();
         running.store(false, std::sync::atomic::Ordering::Relaxed);
         let import = import.join().map_err(|_| "Uvoz je pao.".to_string())?;

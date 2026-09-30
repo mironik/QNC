@@ -41,6 +41,7 @@ fn card_records_are_completed_once_in_the_background_and_published() {
         workers: 2,
         wanted: &|| None,
         player_works: &|| false,
+        card_busy: &|| false,
         cancel: &cancel,
     };
     let done = complete_clips(&parts, waiting, &target.content, &run);
@@ -86,6 +87,7 @@ fn a_working_player_is_waited_for_and_cancel_ends_the_wait() {
         workers: 2,
         wanted: &|| None,
         player_works: &player,
+        card_busy: &|| false,
         cancel: &cancel,
     };
     let done = complete_clips(&parts, waiting, &target.content, &run);
@@ -123,6 +125,7 @@ fn the_wanted_clip_is_completed_first() {
         workers: 1,
         wanted: &wanted,
         player_works: &|| false,
+        card_busy: &|| false,
         cancel: &cancel,
     };
     let done = complete_clips(&parts, waiting, &target.content, &run);
@@ -161,6 +164,7 @@ fn run_with_first_failure(first: qnc_media_probe::Error) -> (Completion, usize) 
         workers: 1,
         wanted: &|| None,
         player_works: &|| false,
+        card_busy: &|| false,
         cancel: &cancel,
     };
     let waiting = camera_clips(&target.content).unwrap();
@@ -199,4 +203,70 @@ fn a_probe_that_failed_on_the_medium_is_never_run_again() {
     assert!(done.completed.is_empty());
     assert_eq!(done.failed.len(), 2);
     assert_eq!(left, 2, "the records stay camera records");
+}
+
+/// Records which media each probe reads, then answers as the fixture probe does.
+struct Recording {
+    media: Arc<Mutex<Vec<String>>>,
+    inner: Box<dyn ProbeBackend + Send>,
+}
+
+impl ProbeBackend for Recording {
+    fn execute(&self, request: &ProbeRequest) -> qnc_media_probe::Result<Report> {
+        self.media.lock().unwrap().push(request.media_uri.clone());
+        self.inner.execute(request)
+    }
+}
+
+#[test]
+fn while_the_card_is_busy_only_the_wanted_clip_is_completed() {
+    let (_dir, config) = qnc_ingest_select::test_support::fixture();
+    let calls = Arc::new(AtomicUsize::new(0));
+    qnc_ingest_select::test_support::execute_with(&config, &calls, false, false, ".", &fx6());
+    let target = qnc_ingest_select::test_support::select_target(&config);
+    let writer = ProjectDbWriter::start(
+        target.records.clone(),
+        vec![MediaRecordsModule::factory(), SourceIndexModule::factory()],
+    )
+    .unwrap();
+    let records = ProjectMediaRecords::new(writer.clone());
+    let sources = ProjectSourceIndex::new(writer);
+    let media = Arc::new(Mutex::new(Vec::new()));
+    let (seen, probes) = (media.clone(), calls.clone());
+    let make_backend = move |_: &str, _: &[SourceReference]| -> Result<Box<dyn ProbeBackend + Send>, String> {
+        Ok(Box::new(Recording {
+            media: seen.clone(),
+            inner: qnc_ingest_select::test_support::probe_backend(probes.clone()),
+        }))
+    };
+    let parts = Parts {
+        records: &records,
+        sources: &sources,
+        make_backend: &make_backend,
+    };
+    let waiting = camera_clips(&target.content).unwrap();
+    let wanted_clip = waiting.last().unwrap().clone();
+    let wanted_id = wanted_clip.id().to_string();
+    let wanted = || Some(wanted_id.clone());
+    // The card is busy until the two media of the wanted clip were probed.
+    let before = calls.load(Ordering::SeqCst);
+    let busy = || calls.load(Ordering::SeqCst) < before + 2;
+    let cancel = AtomicBool::new(false);
+    let run = Run {
+        workers: 2,
+        wanted: &wanted,
+        player_works: &|| false,
+        card_busy: &busy,
+        cancel: &cancel,
+    };
+    let done = complete_clips(&parts, waiting, &target.content, &run);
+    assert_eq!(done.completed.first(), Some(&wanted_id));
+    assert_eq!(done.completed.len(), 2, "{:?}", done.failed);
+    let media = media.lock().unwrap();
+    let binding = &wanted_clip.snapshot.binding;
+    let own = [Some(binding.original_uri.clone()), binding.proxy_uri.clone()];
+    assert!(
+        media[..2].iter().all(|uri| own.contains(&Some(uri.clone()))),
+        "while the card is busy no other clip is probed: {media:?}"
+    );
 }
