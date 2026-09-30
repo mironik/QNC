@@ -3221,6 +3221,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-desktop-theme"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-board",
+ "serde",
+]
+
+[[package]]
 name = "qnc-dev-diagnostics"
 version = "0.1.0"
 dependencies = [
@@ -3317,6 +3326,7 @@ dependencies = [
  "eframe",
  "qnc-board",
  "qnc-contracts",
+ "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
  "serde",
  "serde_json",
@@ -3559,6 +3569,7 @@ dependencies = [
  "eframe",
  "qnc-board",
  "qnc-contracts",
+ "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
  "serde",
  "serde_json",

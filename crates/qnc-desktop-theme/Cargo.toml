@@ -1,0 +1,10 @@
+[package]
+name = "qnc-desktop-theme"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: the one desktop theme (shell colours and chrome measures, fonts, visuals, board faces)"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-board = { workspace = true }
+serde = { workspace = true }

@@ -7,7 +7,8 @@ use std::collections::HashMap;
 use qnc_keyboard_shortcut::ShortcutCatalog;
 use serde::Deserialize;
 
-pub mod theme;
+pub use qnc_desktop_theme as theme;
+pub use qnc_desktop_theme::{ShellColors, ShellLayoutContract, ShellThemeMetrics};
 
 const SHELL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/shell.layout.json");
 const EDITORIAL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/editorial.layout.json");
@@ -154,35 +155,6 @@ fn report_to_result(report: qnc_contracts::ValidationReport) -> Result<(), Strin
             .collect::<Vec<_>>()
             .join("; "))
     }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ShellLayoutContract {
-    pub layout_id: String,
-    pub colors: ShellColors,
-    pub theme_metrics: ShellThemeMetrics,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ShellThemeMetrics {
-    pub font_ui: f32,
-    pub font_timecode: f32,
-    pub chrome_row_height: f32,
-    pub chrome_control_height: f32,
-    pub chrome_pad_x: i8,
-    pub chrome_pad_y: i8,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ShellColors {
-    pub bg: [u8; 3],
-    pub surface: [u8; 3],
-    pub raised: [u8; 3],
-    pub border: [u8; 3],
-    pub text: [u8; 3],
-    pub muted: [u8; 3],
-    pub accent: [u8; 3],
-    pub focus: [u8; 3],
 }
 
 #[derive(Debug, Clone, Deserialize)]

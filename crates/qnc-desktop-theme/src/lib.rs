@@ -1,7 +1,11 @@
-// Copied 1:1 from qnc-ingest-desktop/src/theme.rs (only the contract type differs).
+//! The one desktop theme (user rule 2026-09-30: the Ingest and editorial copies became
+//! one piece): the shell layout model (colours and chrome measures of
+//! `contracts/ui/shell.layout.json`), the theme made from it, the fonts and visuals it
+//! applies, and the faces of the desktop board. Passive: it knows no application.
+
 use eframe::egui::{self, Color32, FontFamily, FontId, Stroke, TextStyle, Visuals};
 
-use crate::ShellLayoutContract;
+use serde::Deserialize;
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -14,7 +18,6 @@ pub struct Theme {
     pub text_muted: Color32,
     pub accent: Color32,
     pub focus: Color32,
-    #[allow(dead_code)]
     pub danger: Color32,
     pub input_bg: Color32,
     pub surface: Color32,
@@ -109,10 +112,40 @@ fn rgb(value: [u8; 3]) -> Color32 {
     Color32::from_rgb(value[0], value[1], value[2])
 }
 
+
 impl Theme {
     /// The faces of the desktop board: the board, the left column, the right panel and
     /// the divider between them.
     pub fn board_faces(&self) -> qnc_board::BoardFaces {
         qnc_board::BoardFaces { bg: self.bg, left: self.surface, right: self.bg, divider: self.border_soft }
     }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShellLayoutContract {
+    pub layout_id: String,
+    pub colors: ShellColors,
+    pub theme_metrics: ShellThemeMetrics,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShellThemeMetrics {
+    pub font_ui: f32,
+    pub font_timecode: f32,
+    pub chrome_row_height: f32,
+    pub chrome_control_height: f32,
+    pub chrome_pad_x: i8,
+    pub chrome_pad_y: i8,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShellColors {
+    pub bg: [u8; 3],
+    pub surface: [u8; 3],
+    pub raised: [u8; 3],
+    pub border: [u8; 3],
+    pub text: [u8; 3],
+    pub muted: [u8; 3],
+    pub accent: [u8; 3],
+    pub focus: [u8; 3],
 }
