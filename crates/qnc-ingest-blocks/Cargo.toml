@@ -1,0 +1,16 @@
+[package]
+name = "qnc-ingest-blocks"
+version = "0.1.0"
+edition = "2021"
+description = "QNC Ingest blocks on the desktop board: preview, pool head, source browser, clip cards and source dock; they draw the Ingest view and return intents"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-board = { workspace = true }
+qnc-ingest-application = { workspace = true }
+qnc-ingest-layout = { workspace = true }
+qnc-media-card = { workspace = true }
+qnc-monitor = { workspace = true }
+qnc-source-dock = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-ui-kit = { workspace = true }

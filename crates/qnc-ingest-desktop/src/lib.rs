@@ -1,7 +1,6 @@
 mod app;
 pub(crate) use qnc_ingest_layout as layout_contract;
 pub(crate) use qnc_ingest_layout::theme;
-mod widgets;
 
 use std::path::PathBuf;
 

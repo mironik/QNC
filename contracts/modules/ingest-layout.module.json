@@ -1,0 +1,42 @@
+{
+  "module_id": "qnc.module.ingest-layout",
+  "module_name": "Ingest layout",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "ui.ingest.layout_contract",
+    "ui.ingest.theme",
+    "ui.ingest.board"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "source.scan.roles",
+    "player.command",
+    "database.read",
+    "database.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ingest-layout",
+  "input": "contracts/ui/ingest.layout.json, the shell layout, the Ingest application contract and the keyboard catalog.",
+  "output": "The validated Ingest layout model, its theme and its places on the desktop board.",
+  "specification": "User rule 2026-09-30: moved unchanged out of the Ingest form."
+}

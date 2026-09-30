@@ -1,0 +1,18 @@
+[package]
+name = "qnc-editorial-blocks"
+version = "0.1.0"
+edition = "2021"
+description = "QNC Media Assist and Story blocks on the desktop board: preview, pool head, clip cards, the group's right panel and source dock; they draw the editorial view and return intents"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-board = { workspace = true }
+qnc-editorial-application = { workspace = true }
+qnc-editorial-layout = { workspace = true }
+qnc-media-card = { workspace = true }
+qnc-monitor = { workspace = true }
+qnc-panel-focus = { workspace = true }
+qnc-segment-panel = { workspace = true }
+qnc-source-dock = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-ui-kit = { workspace = true }

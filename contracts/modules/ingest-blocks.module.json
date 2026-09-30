@@ -1,0 +1,44 @@
+{
+  "module_id": "qnc.module.ingest-blocks",
+  "module_name": "Ingest blocks",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "ui.ingest.preview",
+    "ui.ingest.pool_head",
+    "ui.ingest.source_browser",
+    "ui.ingest.clip_cards",
+    "ui.ingest.source_dock"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "source.scan.roles",
+    "player.command",
+    "database.read",
+    "database.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ingest-blocks",
+  "input": "The Ingest layout contract, the theme and the Ingest view.",
+  "output": "The Ingest blocks on the desktop board (preview, pool head, source browser, clip cards, source dock) and the IngestIntents they ask for. They draw only.",
+  "specification": "User rule 2026-09-30: forms are boards of blocks; moved unchanged from qnc-ingest-desktop."
+}

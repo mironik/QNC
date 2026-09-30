@@ -3283,15 +3283,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "qnc-editorial-desktop"
+name = "qnc-editorial-blocks"
 version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
- "qnc-contracts",
  "qnc-editorial-application",
  "qnc-editorial-layout",
- "qnc-keyboard-shortcut",
  "qnc-media-card",
  "qnc-monitor",
  "qnc-panel-focus",
@@ -3299,8 +3297,17 @@ dependencies = [
  "qnc-source-dock",
  "qnc-timeline",
  "qnc-ui-kit",
- "serde",
- "serde_json",
+]
+
+[[package]]
+name = "qnc-editorial-desktop"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-editorial-application",
+ "qnc-editorial-blocks",
+ "qnc-editorial-layout",
+ "qnc-keyboard-shortcut",
 ]
 
 [[package]]
@@ -3463,6 +3470,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ingest-blocks"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-board",
+ "qnc-ingest-application",
+ "qnc-ingest-layout",
+ "qnc-media-card",
+ "qnc-monitor",
+ "qnc-source-dock",
+ "qnc-timeline",
+ "qnc-ui-kit",
+]
+
+[[package]]
 name = "qnc-ingest-cameras"
 version = "0.1.0"
 dependencies = [
@@ -3493,18 +3515,10 @@ name = "qnc-ingest-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "qnc-board",
- "qnc-contracts",
  "qnc-ingest-application",
+ "qnc-ingest-blocks",
  "qnc-ingest-layout",
  "qnc-keyboard-shortcut",
- "qnc-media-card",
- "qnc-monitor",
- "qnc-source-dock",
- "qnc-timeline",
- "qnc-ui-kit",
- "serde",
- "serde_json",
 ]
 
 [[package]]

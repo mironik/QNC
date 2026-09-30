@@ -1,20 +1,21 @@
-pub(super) use eframe::egui::{
+//! The Ingest blocks on the desktop board (moved unchanged out of the Ingest form, user
+//! rule 2026-09-30: forms are boards of blocks): preview, pool head, source browser,
+//! clip cards and source dock. They draw the Ingest view and return intents.
+
+pub(crate) use eframe::egui::{
     self, Align, Button, Color32, CornerRadius, Label, Layout, Rect, RichText, ScrollArea, Sense,
     Stroke, Ui, Vec2,
 };
 
-pub(super) use qnc_ingest_application::{
+pub(crate) use qnc_ingest_application::{
     action_ids, timeline_intent_to_ingest_intent, ClipFilter, ClipView, IngestIntent,
     IngestPayload, IngestViewModel, LocationEntry, SourceKind,
 };
-pub(super) use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
-pub(super) use qnc_timeline::TimelineTheme;
-pub(super) use qnc_ui_kit::FormActionBarStyle;
+pub(crate) use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
+pub(crate) use qnc_timeline::TimelineTheme;
+pub(crate) use qnc_ui_kit::FormActionBarStyle;
 
-pub(super) use crate::{
-    layout_contract::{IngestContracts, IngestDirBrowser},
-    theme::Theme,
-};
+pub(crate) use qnc_ingest_layout::{theme::Theme, IngestContracts, IngestDirBrowser};
 
 mod board;
 mod browser_action_bar;

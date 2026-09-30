@@ -2339,7 +2339,7 @@ fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
         )),
     }
 
-    for crate_name in ["qnc-project-blocks", "qnc-ingest-desktop"] {
+    for crate_name in ["qnc-project-blocks", "qnc-ingest-blocks"] {
         let cargo = root.join("crates").join(crate_name).join("Cargo.toml");
         match fs::read_to_string(&cargo) {
             Ok(contents) => {
@@ -2389,9 +2389,8 @@ fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
 fn validate_ingest_browser_uses_shared_action_bar(root: &Path, report: &mut ValidationReport) {
     let widgets = root
         .join("crates")
-        .join("qnc-ingest-desktop")
-        .join("src")
-        .join("widgets");
+        .join("qnc-ingest-blocks")
+        .join("src");
     let browser_file = widgets.join("location_browser.rs");
     let action_bar_file = widgets.join("browser_action_bar.rs");
     let (Ok(browser), Ok(action_bar)) = (

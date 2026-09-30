@@ -1,3 +1,6 @@
+//! The Media Assist and Story blocks on the desktop board (moved unchanged out of the
+//! editorial form, user rule 2026-09-30: forms are boards of blocks).
+
 // Copied 1:1 from qnc-ingest-desktop/src/widgets.rs. Left out on purpose: the
 // right clip grid and the directory browser (its area stays empty and is
 // filled by later group functions). Painting, metrics and helpers are unchanged.
@@ -13,7 +16,7 @@ use qnc_timeline::{TimelineIntent, TimelineTheme};
 use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
 use qnc_panel_focus::{paint_focus, Panel};
 
-use crate::{layout_contract::EditorialContracts, theme::Theme};
+use qnc_editorial_layout::{theme::Theme, EditorialContracts};
 
 /// Media Assist and Story on the one desktop board: preview in the monitor, pool head
 /// in the head row, the clip cards in the body, the group's right panel (Segmenti for

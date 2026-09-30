@@ -105,6 +105,8 @@ members = [
     "crates/qnc-project-blocks",
     "crates/qnc-confirm-dialog",
     "crates/qnc-ingest-layout",
+    "crates/qnc-ingest-blocks",
+    "crates/qnc-editorial-blocks",
     "crates/qnc-source-timecode",
     "crates/qnc-db-broker",
     "crates/qnc-record-probe",
@@ -240,6 +242,8 @@ qnc-project-session = { path = "crates/qnc-project-session" }
 qnc-project-blocks = { path = "crates/qnc-project-blocks" }
 qnc-confirm-dialog = { path = "crates/qnc-confirm-dialog" }
 qnc-ingest-layout = { path = "crates/qnc-ingest-layout" }
+qnc-ingest-blocks = { path = "crates/qnc-ingest-blocks" }
+qnc-editorial-blocks = { path = "crates/qnc-editorial-blocks" }
 qnc-source-timecode = { path = "crates/qnc-source-timecode" }
 qnc-db-broker = { path = "crates/qnc-db-broker" }
 qnc-record-probe = { path = "crates/qnc-record-probe" }

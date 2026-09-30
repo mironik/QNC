@@ -6,11 +6,9 @@ use qnc_ingest_application::{action_ids, IngestApplication, IngestIntent};
 use crate::{
     layout_contract::IngestContracts,
     theme::{self, Theme},
-    widgets,
 };
 
 pub struct IngestApp {
-    root: PathBuf,
     contracts: IngestContracts,
     application: IngestApplication,
     player_repaint_bound: bool,
@@ -20,7 +18,6 @@ impl IngestApp {
     pub fn new(root: PathBuf) -> Result<Self, String> {
         let application = IngestApplication::with_store_root(&root)?;
         Ok(Self {
-            root,
             contracts: IngestContracts::load()?,
             application,
             player_repaint_bound: false,
@@ -49,9 +46,8 @@ impl IngestApp {
         self.dispatch_keyboard_shortcuts(ctx);
         let theme = Theme::from_contract(&self.contracts.shell);
         theme::apply(ctx, &theme);
-        ui.data_mut(|data| data.insert_temp(egui::Id::new("qnc_ingest_root"), self.root.clone()));
         // The view is borrowed, not copied: it holds every clip and the timeline data.
-        let intent = widgets::render_desktop(ui, &self.contracts, &theme, self.application.view());
+        let intent = qnc_ingest_blocks::render_desktop(ui, &self.contracts, &theme, self.application.view());
         if let Some(intent) = intent {
             self.dispatch(ctx, intent);
         }

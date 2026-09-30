@@ -7,7 +7,6 @@
 mod app;
 use qnc_editorial_layout as layout_contract;
 use qnc_editorial_layout::theme;
-mod widgets;
 
 use eframe::egui;
 
@@ -45,6 +44,6 @@ impl EditorialForm {
 
     /// Paints the whole form into `ui`; returns the intent of this frame.
     pub fn show_desktop(&self, ui: &mut egui::Ui, view: &EditorialView) -> Option<EditorialIntent> {
-        widgets::render_desktop(ui, &self.contracts, &self.theme, view)
+        qnc_editorial_blocks::render_desktop(ui, &self.contracts, &self.theme, view)
     }
 }

@@ -5,18 +5,8 @@ edition = "2021"
 description = "QNC editorial form base: Ingest layout copied 1:1 without the clip grid and directory browser (passive UI only)"
 
 [dependencies]
-qnc-board = { workspace = true }
+qnc-editorial-blocks = { workspace = true }
 eframe = { workspace = true }
-qnc-contracts = { workspace = true }
 qnc-editorial-application = { workspace = true }
-qnc-panel-focus = { workspace = true }
 qnc-editorial-layout = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
-qnc-media-card = { workspace = true }
-qnc-segment-panel = { workspace = true }
-qnc-source-dock = { workspace = true }
-qnc-monitor = { workspace = true }
-qnc-timeline = { workspace = true }
-qnc-ui-kit = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
