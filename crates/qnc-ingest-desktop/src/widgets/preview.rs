@@ -1,13 +1,5 @@
 use super::*;
 
-pub(super) fn preview_height(rect: Rect, contracts: &IngestContracts) -> f32 {
-    let preview = &contracts.ingest.preview;
-    let preview_width = (rect.width() - 32.0).max(240.0);
-    let aspect_height = preview_width / preview.aspect_ratio();
-    let available = (rect.height() - preview.reserve_below).max(preview.min_height);
-    aspect_height.clamp(preview.min_height, available)
-}
-
 pub(super) fn render_preview(
     ui: &mut Ui,
     rect: Rect,

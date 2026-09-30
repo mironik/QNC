@@ -1,40 +1,28 @@
 use super::*;
 
+/// Ingest on the one desktop board: preview in the monitor, pool head in the head row,
+/// the source browser in the body, the clip cards on the right, the source timeline in
+/// the dock.
 pub fn render_desktop(
     ui: &mut Ui,
     contracts: &IngestContracts,
     theme: &Theme,
     view: &IngestViewModel,
 ) -> Option<IngestIntent> {
-    let available = ui.available_rect_before_wrap();
-    if available.width() <= 1.0 || available.height() <= 1.0 {
-        return None;
-    }
-
-    ui.allocate_rect(available, Sense::hover());
-    ui.painter().rect_filled(available, 0.0, theme.bg);
-
-    let dock_height = contracts.dock_height().min(available.height() * 0.42);
-    let dock_rect = Rect::from_min_max(
-        egui::pos2(available.left(), available.bottom() - dock_height),
-        available.right_bottom(),
-    );
-    let content_rect = Rect::from_min_max(
-        available.left_top(),
-        egui::pos2(available.right(), dock_rect.top()),
-    );
-
-    let mut intent = None;
-
-    ui.scope_builder(egui::UiBuilder::new().max_rect(content_rect), |ui| {
-        intent = render_board(ui, contracts, theme, view);
-    });
-
-    if intent.is_none() {
-        ui.scope_builder(egui::UiBuilder::new().max_rect(dock_rect), |ui| {
-            intent = render_source_dock(ui, contracts, theme, view);
-        });
-    }
-
-    intent
+    let faces = qnc_board::BoardFaces {
+        bg: theme.bg,
+        left: theme.surface,
+        right: theme.bg,
+        divider: theme.border_soft,
+    };
+    qnc_board::show(ui, &contracts.board_sizes(), &faces, |ui, place, rect| match place {
+        qnc_board::Place::Monitor => {
+            render_preview(ui, rect, contracts, theme, view);
+            None
+        }
+        qnc_board::Place::Head => render_pool_head(ui, contracts, theme),
+        qnc_board::Place::Body => render_source_browser(ui, rect, contracts, theme, view),
+        qnc_board::Place::Right => render_clip_grid(ui, contracts, theme, view),
+        qnc_board::Place::Dock => render_source_dock(ui, contracts, theme, view),
+    })
 }

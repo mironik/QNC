@@ -75,6 +75,29 @@ impl IngestContracts {
             + self.ingest.source_dock.header_timeline_gap
             + timeline_height
     }
+
+    /// The sizes of Ingest on the one desktop board: the monitor keeps its picture
+    /// shape, the pool head is one chrome row, the dock holds the source timeline.
+    pub fn board_sizes(&self) -> qnc_board::BoardSizes {
+        let board = &self.ingest.board;
+        let preview = &self.ingest.preview;
+        qnc_board::BoardSizes {
+            left_ratio: board.left_ratio,
+            divider_width: board.divider_width,
+            left_min_width: board.left_min_width,
+            right_min_width: board.right_min_width,
+            monitor_height: preview.min_height,
+            head_height: self.shell.theme_metrics.chrome_row_height,
+            dock_height: self.dock_height(),
+            monitor_aspect: Some(qnc_board::MonitorAspect {
+                ratio: preview.aspect_ratio(),
+                reserve_below: preview.reserve_below,
+                min_height: preview.min_height,
+                width_inset: preview.width_inset,
+                min_width: preview.min_width,
+            }),
+        }
+    }
 }
 
 pub fn check_contracts_message() -> Result<String, String> {
@@ -155,6 +178,8 @@ pub struct IngestBoard {
 pub struct IngestPreviewPane {
     pub min_height: f32,
     pub reserve_below: f32,
+    pub width_inset: f32,
+    pub min_width: f32,
     pub aspect: String,
     pub empty_label: String,
 }

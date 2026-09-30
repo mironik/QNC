@@ -28,12 +28,38 @@ pub struct BoardSizes {
     pub divider_width: f32,
     pub left_min_width: f32,
     pub right_min_width: f32,
-    /// Monitor height at the top of the left column.
+    /// Monitor height at the top of the left column; see [`BoardSizes::monitor_aspect`].
     pub monitor_height: f32,
     /// The row under the monitor (tabs, transport).
     pub head_height: f32,
     /// The dock along the bottom; never more than [`DOCK_MAX_SHARE`] of the height.
     pub dock_height: f32,
+    /// When set, the monitor keeps this picture shape in the column width instead of
+    /// `monitor_height` (Ingest, Media Assist, Story).
+    #[serde(default)]
+    pub monitor_aspect: Option<MonitorAspect>,
+}
+
+/// A monitor that keeps its picture shape (from the preview block of the contract).
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub struct MonitorAspect {
+    /// Width over height, e.g. 16/9.
+    pub ratio: f32,
+    /// Height the column keeps under the monitor.
+    pub reserve_below: f32,
+    pub min_height: f32,
+    /// Picture width is the column width less this, never below `min_width`.
+    pub width_inset: f32,
+    pub min_width: f32,
+}
+
+impl MonitorAspect {
+    /// The monitor height in a left column of `width` x `height`.
+    pub fn height(&self, width: f32, height: f32) -> f32 {
+        let picture_width = (width - self.width_inset).max(self.min_width);
+        let available = (height - self.reserve_below).max(self.min_height);
+        (picture_width / self.ratio.max(0.1)).clamp(self.min_height, available)
+    }
 }
 
 /// The dock never takes more than this share of the board height.
@@ -102,7 +128,10 @@ pub fn layout(rect: Rect, sizes: &BoardSizes) -> BoardRects {
     );
     let right = Rect::from_min_max(egui::pos2(divider.right(), content.top()), content.max);
 
-    let monitor_height = sizes.monitor_height.clamp(0.0, left.height());
+    let monitor_height = sizes
+        .monitor_aspect
+        .map_or(sizes.monitor_height, |aspect| aspect.height(left.width(), left.height()))
+        .clamp(0.0, left.height());
     let monitor = Rect::from_min_size(left.min, Vec2::new(left.width(), monitor_height));
     let head_height = sizes.head_height.clamp(0.0, left.bottom() - monitor.bottom());
     let head = Rect::from_min_size(
@@ -142,10 +171,9 @@ pub fn show<R>(
                 egui::UiBuilder::new()
                     .max_rect(area)
                     .layout(egui::Layout::top_down(egui::Align::Min)),
-                |ui| {
-                    ui.set_clip_rect(area);
-                    place(ui, which, area)
-                },
+                // No clip: a place may draw its own edge half a pixel outside (the dock
+                // top line), as the forms did.
+                |ui| place(ui, which, area),
             )
             .inner;
         if answer.is_some() {
@@ -168,6 +196,7 @@ mod tests {
             monitor_height: 1.0,
             head_height: 1.0,
             dock_height: 1.0,
+            monitor_aspect: None,
         }
     }
 
@@ -191,6 +220,16 @@ mod tests {
         let rects = layout(rect, &BoardSizes { dock_height: 500.0, ..sizes() });
         assert!((rects.dock.height() - 300.0 * DOCK_MAX_SHARE).abs() < 0.01);
         assert_eq!(rects.left().width(), 280.0);
+    }
+
+    #[test]
+    fn a_monitor_with_a_picture_shape_follows_the_column_width() {
+        let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(1000.0, 900.0));
+        let aspect = MonitorAspect { ratio: 16.0 / 9.0, reserve_below: 190.0, min_height: 160.0, width_inset: 32.0, min_width: 240.0 };
+        let rects = layout(rect, &BoardSizes { left_ratio: 0.365, monitor_aspect: Some(aspect), head_height: 34.0, ..sizes() });
+        // Column 365 px: picture 333 px wide, 187.3 px high.
+        assert!((rects.monitor.height() - 333.0 * 9.0 / 16.0).abs() < 0.01);
+        assert_eq!(rects.head.top(), rects.monitor.bottom());
     }
 
     #[test]

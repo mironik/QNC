@@ -3489,6 +3489,7 @@ name = "qnc-ingest-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-contracts",
  "qnc-ingest-application",
  "qnc-keyboard-shortcut",
