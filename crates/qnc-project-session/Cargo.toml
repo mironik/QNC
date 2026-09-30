@@ -1,0 +1,12 @@
+[package]
+name = "qnc-project-session"
+version = "0.1.0"
+edition = "2021"
+description = "QNC Project piece: the state of the Project application and the work its blocks and keys ask for (open, create, delete, templates, locations), through the Project component"
+
+[dependencies]
+qnc-dir-browser = { workspace = true }
+qnc-project-application = { workspace = true }
+qnc-settings-path = { workspace = true }
+qnc-ui-kit = { workspace = true }
+serde_json = { workspace = true }

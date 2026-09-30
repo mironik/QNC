@@ -1,0 +1,41 @@
+{
+  "module_id": "qnc.module.confirm-dialog",
+  "module_name": "Confirm dialog",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "ui.dialog.confirm"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "database.read",
+    "database.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-confirm-dialog",
+  "input": "Colours and sizes from the caller layout contract, and the texts of one yes/no question.",
+  "output": "A modal question over the window; yes, no or still open. It knows no application and does nothing with the answer.",
+  "specification": "The Project delete dialogs (qnc-project-desktop delete_project_overlay / delete_template_overlay), made one public block."
+}

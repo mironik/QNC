@@ -1,0 +1,22 @@
+[package]
+name = "qnc-project-blocks"
+version = "0.1.0"
+edition = "2021"
+description = "QNC Project blocks on the desktop board: project list, settings with their sub-blocks and the delete questions; they draw and return intents"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-application-selection = { workspace = true }
+qnc-board = { workspace = true }
+qnc-confirm-dialog = { workspace = true }
+qnc-contracts = { workspace = true }
+qnc-dir-browser = { workspace = true }
+qnc-export-preset = { workspace = true }
+qnc-keyboard-shortcut = { workspace = true }
+qnc-project-application = { workspace = true }
+qnc-project-session = { workspace = true }
+qnc-settings-path = { workspace = true }
+qnc-settings-switches = { workspace = true }
+qnc-ui-kit = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

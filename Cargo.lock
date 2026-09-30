@@ -3112,6 +3112,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-confirm-dialog"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
 name = "qnc-conformance"
 version = "0.1.0"
 dependencies = [
@@ -4076,6 +4083,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-project-blocks"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-application-selection",
+ "qnc-board",
+ "qnc-confirm-dialog",
+ "qnc-contracts",
+ "qnc-dir-browser",
+ "qnc-export-preset",
+ "qnc-keyboard-shortcut",
+ "qnc-project-application",
+ "qnc-project-session",
+ "qnc-settings-path",
+ "qnc-settings-switches",
+ "qnc-ui-kit",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-project-close"
 version = "0.1.0"
 dependencies = [
@@ -4093,20 +4121,9 @@ name = "qnc-project-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "qnc-application-catalog",
- "qnc-application-selection",
- "qnc-board",
- "qnc-contracts",
- "qnc-dir-browser",
- "qnc-export-preset",
- "qnc-keyboard-shortcut",
  "qnc-project-application",
- "qnc-settings-path",
- "qnc-settings-switches",
- "qnc-transport-resolver",
- "qnc-ui-kit",
- "serde",
- "serde_json",
+ "qnc-project-blocks",
+ "qnc-project-session",
 ]
 
 [[package]]
@@ -4116,6 +4133,17 @@ dependencies = [
  "eframe",
  "qnc-project-desktop",
  "qnc-shell-desktop-api",
+]
+
+[[package]]
+name = "qnc-project-session"
+version = "0.1.0"
+dependencies = [
+ "qnc-dir-browser",
+ "qnc-project-application",
+ "qnc-settings-path",
+ "qnc-ui-kit",
+ "serde_json",
 ]
 
 [[package]]

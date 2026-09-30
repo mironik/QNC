@@ -2042,6 +2042,12 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
         ));
     }
 
+    let blocks_cargo_toml = root.join("crates").join("qnc-project-blocks").join("Cargo.toml");
+    if let Ok(contents) = fs::read_to_string(&blocks_cargo_toml) {
+        has_dir_browser_dependency |= contents.contains("qnc-dir-browser");
+        has_keyboard_dependency |= contents.contains("qnc-keyboard-shortcut");
+    }
+
     if let Ok(contents) = fs::read_to_string(&store_cargo_toml) {
         has_transport_resolver_dependency = contents.contains("qnc-transport-resolver");
         if !contents.contains("rusqlite") || !contents.contains("qnc-db-contract") {
@@ -2139,6 +2145,8 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
     collect_rs_files(&project_app_root.join("src"), &mut files);
     collect_rs_files(&project_desktop_root.join("src"), &mut files);
     collect_rs_files(&project_store_root.join("src"), &mut files);
+    collect_rs_files(&root.join("crates").join("qnc-project-blocks").join("src"), &mut files);
+    collect_rs_files(&root.join("crates").join("qnc-project-session").join("src"), &mut files);
     collect_rs_files(
         &root
             .join("crates")
@@ -2159,6 +2167,7 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
     let mut has_project_component = false;
     let mut has_project_action_dispatch = false;
     let mut has_project_location_browser = false;
+    let mut has_project_location_kinds = false;
     for file in files {
         let Ok(contents) = fs::read_to_string(&file) else {
             continue;
@@ -2167,29 +2176,34 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
         if relative == "crates/qnc-project-application/src/project_component.rs" {
             has_project_component = true;
         }
-        if relative == "crates/qnc-project-desktop/src/location_browser.rs"
+        if relative == "crates/qnc-project-blocks/src/location_browser.rs"
             && contents.contains("LocationBrowserInput")
-            && contents.contains("Računalo")
-            && contents.contains("LAN")
-            && contents.contains("Internet")
+            && contents.contains("LocationSourceKind")
             && contents.contains("BrowserState")
         {
             has_project_location_browser = true;
         }
-        if relative == "crates/qnc-project-desktop/src/location_browser.rs" {
+        if relative == "crates/qnc-project-session/src/lib.rs"
+            && contents.contains("Računalo")
+            && contents.contains("LAN")
+            && contents.contains("Internet")
+        {
+            has_project_location_kinds = true;
+        }
+        if relative == "crates/qnc-project-blocks/src/location_browser.rs" {
             for forbidden in ["confirm_label", "\"Odustani\"", "\"U redu\""] {
                 if contents.contains(forbidden) {
                     report.error(format!(
-                        "crates/qnc-project-desktop/src/location_browser.rs: confirm/cancel action bar must stay outside browser component, found '{forbidden}'"
+                        "crates/qnc-project-blocks/src/location_browser.rs: confirm/cancel action bar must stay outside browser component, found '{forbidden}'"
                     ));
                 }
             }
         }
-        if relative == "crates/qnc-project-desktop/src/location_browser.rs"
+        if relative == "crates/qnc-project-blocks/src/location_browser.rs"
             && contents.contains("clean_location_path")
         {
             report.error(
-                "crates/qnc-project-desktop/src/location_browser.rs: Project UI must use qnc-dir-browser display state instead of private path cleanup"
+                "crates/qnc-project-blocks/src/location_browser.rs: Project UI must use qnc-dir-browser display state instead of private path cleanup"
                     .to_string(),
             );
         }
@@ -2221,8 +2235,8 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
         if contents.contains("action_ids_for_event(\"project\"") {
             dispatches_project_shortcuts = true;
         }
-        if contents.contains("enum ProjectAction")
-            && contents.contains("fn dispatch_project_action")
+        if contents.contains("pub enum ProjectIntent")
+            && contents.contains("pub fn dispatch(")
             && contents.contains("action.action_id()")
         {
             has_project_action_dispatch = true;
@@ -2245,7 +2259,8 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
                     index + 1
                 ));
             }
-            if relative.starts_with("crates/qnc-project-desktop/")
+            if (relative.starts_with("crates/qnc-project-desktop/")
+                || relative.starts_with("crates/qnc-project-blocks/"))
                 && trimmed.contains("pick_directory")
             {
                 report.error(format!(
@@ -2279,11 +2294,11 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
     }
     if !has_project_action_dispatch {
         report.error(
-            "Project desktop form must dispatch click/keyboard intents through ProjectAction action_id"
+            "Project blocks must send click/keyboard intents as ProjectIntent action_ids to the session"
                 .to_string(),
         );
     }
-    if !has_project_location_browser {
+    if !has_project_location_browser || !has_project_location_kinds {
         report.error(
             "Project desktop must include embedded location browser with Local/LAN/Internet actions"
                 .to_string(),
@@ -2324,7 +2339,7 @@ fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
         )),
     }
 
-    for crate_name in ["qnc-project-desktop", "qnc-ingest-desktop"] {
+    for crate_name in ["qnc-project-blocks", "qnc-ingest-desktop"] {
         let cargo = root.join("crates").join(crate_name).join("Cargo.toml");
         match fs::read_to_string(&cargo) {
             Ok(contents) => {

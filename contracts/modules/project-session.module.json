@@ -1,0 +1,39 @@
+{
+  "module_id": "qnc.module.project-session",
+  "module_name": "Project session",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "project.session.dispatch"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "source.scan.roles",
+    "player.command",
+    "ui.paint"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-project-session",
+  "input": "ProjectIntents of the Project blocks and keys.",
+  "output": "The Project work they ask for (open, create, delete, templates, locations) through the Project component, the owner of the project registry, and the state the blocks show.",
+  "specification": "User rule 2026-09-30: the active code of the Project form moved unchanged into a public piece."
+}

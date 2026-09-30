@@ -9,23 +9,7 @@ use crate::{
 const UP_COL_W: f32 = 42.0;
 const DISKS_COL_W: f32 = 58.0;
 const NAV_GAP_W: f32 = 12.0;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum LocationSourceKind {
-    #[default]
-    Local,
-    Lan,
-    Internet,
-}
-
-impl LocationSourceKind {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Local => "Računalo",
-            Self::Lan => "LAN",
-            Self::Internet => "Internet",
-        }
-    }
-}
+pub use qnc_project_session::LocationSourceKind;
 
 pub struct LocationBrowserInput<'a> {
     pub id_salt: &'a str,
