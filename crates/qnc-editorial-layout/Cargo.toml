@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: validated model of the editorial layout contract (board, preview, pool head, source dock, group compositions)"
 
 [dependencies]
+qnc-board = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
 serde = { workspace = true }

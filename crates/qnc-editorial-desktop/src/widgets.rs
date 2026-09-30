@@ -15,141 +15,48 @@ use qnc_panel_focus::{paint_focus, Panel};
 
 use crate::{layout_contract::EditorialContracts, theme::Theme};
 
+/// Media Assist and Story on the one desktop board: preview in the monitor, pool head
+/// in the head row, the clip cards in the body, the group's right panel (Segmenti for
+/// Story) on the right, the source timeline in the dock.
 pub fn render_desktop(
     ui: &mut Ui,
     contracts: &EditorialContracts,
     theme: &Theme,
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
-    let available = ui.available_rect_before_wrap();
-    if available.width() <= 1.0 || available.height() <= 1.0 {
-        return None;
-    }
-
-    ui.allocate_rect(available, Sense::hover());
-    ui.painter().rect_filled(available, 0.0, theme.bg);
-
-    let dock_height = contracts.dock_height().min(available.height() * 0.42);
-    let dock_rect = Rect::from_min_max(
-        egui::pos2(available.left(), available.bottom() - dock_height),
-        available.right_bottom(),
-    );
-    let content_rect = Rect::from_min_max(
-        available.left_top(),
-        egui::pos2(available.right(), dock_rect.top()),
-    );
-
-    let mut intent = None;
-
-    ui.scope_builder(egui::UiBuilder::new().max_rect(content_rect), |ui| {
-        intent = render_board(ui, contracts, theme, view);
-    });
-
-    if intent.is_none() {
-        ui.scope_builder(egui::UiBuilder::new().max_rect(dock_rect), |ui| {
-            intent = render_source_dock(ui, contracts, theme, view);
-        });
-    }
-    paint_focus(
-        ui,
-        dock_rect,
-        view.focus == Panel::SourceTimeline,
-        theme.focus,
-    );
-
-    intent
-}
-
-fn render_board(
-    ui: &mut Ui,
-    contracts: &EditorialContracts,
-    theme: &Theme,
-    view: &EditorialView,
-) -> Option<EditorialIntent> {
-    let metrics = &contracts.editorial.board;
-    let rect = ui.available_rect_before_wrap();
-    ui.allocate_rect(rect, Sense::hover());
-
-    let usable_width = rect
-        .width()
-        .max(metrics.left_min_width + metrics.right_min_width);
-    let split = (usable_width * metrics.left_ratio).clamp(
-        metrics.left_min_width,
-        usable_width - metrics.right_min_width,
-    );
-    let left_rect = Rect::from_min_size(rect.left_top(), Vec2::new(split, rect.height()));
-    let divider_rect = Rect::from_min_size(
-        egui::pos2(left_rect.right(), rect.top()),
-        Vec2::new(metrics.divider_width, rect.height()),
-    );
-    let right_rect = Rect::from_min_max(
-        egui::pos2(divider_rect.right(), rect.top()),
-        rect.right_bottom(),
-    );
-
-    ui.painter().rect_filled(left_rect, 0.0, theme.surface);
-    ui.painter()
-        .rect_filled(divider_rect, 0.0, theme.border_soft);
-    // Right panel: empty, reserved for the functions of the group.
-    ui.painter().rect_filled(right_rect, 0.0, theme.bg);
-
-    let mut intent = None;
-    ui.scope_builder(egui::UiBuilder::new().max_rect(left_rect), |ui| {
-        intent = render_left_column(ui, contracts, theme, view);
-    });
-    if intent.is_none() && contracts.composition().right_panel == "segment_panel" {
-        ui.scope_builder(egui::UiBuilder::new().max_rect(right_rect), |ui| {
-            intent = qnc_segment_panel::show(ui, &view.segments, timeline_theme(theme))
+    let faces = qnc_board::BoardFaces {
+        bg: theme.bg,
+        left: theme.surface,
+        right: theme.bg,
+        divider: theme.border_soft,
+    };
+    qnc_board::show(ui, &contracts.board_sizes(), &faces, |ui, place, rect| match place {
+        qnc_board::Place::Monitor => {
+            render_preview(ui, rect, contracts, theme, view);
+            None
+        }
+        qnc_board::Place::Head => render_pool_head(ui, contracts, theme, view),
+        qnc_board::Place::Body => {
+            // Clip menu (qnc_v5 media pool): the card grid fills the column under the
+            // pool head, down to the dock, on the panel background.
+            let intent = render_clip_grid(ui, contracts, theme, view);
+            paint_focus(ui, rect, view.focus == Panel::Pool, theme.focus);
+            intent
+        }
+        qnc_board::Place::Right if contracts.composition().right_panel == "segment_panel" => {
+            let intent = qnc_segment_panel::show(ui, &view.segments, timeline_theme(theme))
                 .map(EditorialIntent::Segment);
-        });
-        paint_focus(ui, right_rect, view.focus == Panel::Segments, theme.focus);
-    }
-    intent
-}
-
-fn render_left_column(
-    ui: &mut Ui,
-    contracts: &EditorialContracts,
-    theme: &Theme,
-    view: &EditorialView,
-) -> Option<EditorialIntent> {
-    let rect = ui.available_rect_before_wrap();
-    ui.allocate_rect(rect, Sense::hover());
-
-    let preview_h = preview_height(rect, contracts);
-    let preview_rect = Rect::from_min_size(rect.left_top(), Vec2::new(rect.width(), preview_h));
-    let head_rect = Rect::from_min_size(
-        egui::pos2(rect.left(), preview_rect.bottom()),
-        Vec2::new(rect.width(), theme.chrome_row_height),
-    );
-    let browser_rect = Rect::from_min_max(
-        egui::pos2(rect.left(), head_rect.bottom()),
-        rect.right_bottom(),
-    );
-
-    render_preview(ui, preview_rect, contracts, theme, view);
-
-    let mut intent = None;
-    ui.scope_builder(egui::UiBuilder::new().max_rect(head_rect), |ui| {
-        intent = render_pool_head(ui, contracts, theme, view);
-    });
-    // Clip menu (qnc_v5 media pool): the card grid fills the column under the
-    // pool head, down to the dock, on the panel background.
-    if intent.is_none() {
-        ui.scope_builder(egui::UiBuilder::new().max_rect(browser_rect), |ui| {
-            intent = render_clip_grid(ui, contracts, theme, view);
-        });
-    }
-    paint_focus(ui, browser_rect, view.focus == Panel::Pool, theme.focus);
-    intent
-}
-
-fn preview_height(rect: Rect, contracts: &EditorialContracts) -> f32 {
-    let preview = &contracts.editorial.preview;
-    let preview_width = (rect.width() - 32.0).max(240.0);
-    let aspect_height = preview_width / preview.aspect_ratio();
-    let available = (rect.height() - preview.reserve_below).max(preview.min_height);
-    aspect_height.clamp(preview.min_height, available)
+            paint_focus(ui, rect, view.focus == Panel::Segments, theme.focus);
+            intent
+        }
+        // Right panel: empty, reserved for the functions of the group.
+        qnc_board::Place::Right => None,
+        qnc_board::Place::Dock => {
+            let intent = render_source_dock(ui, contracts, theme, view);
+            paint_focus(ui, rect, view.focus == Panel::SourceTimeline, theme.focus);
+            intent
+        }
+    })
 }
 
 fn render_preview(

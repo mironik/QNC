@@ -3286,6 +3286,7 @@ name = "qnc-editorial-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-contracts",
  "qnc-editorial-application",
  "qnc-editorial-layout",
@@ -3305,6 +3306,7 @@ dependencies = [
 name = "qnc-editorial-layout"
 version = "0.1.0"
 dependencies = [
+ "qnc-board",
  "qnc-contracts",
  "qnc-keyboard-shortcut",
  "serde",
