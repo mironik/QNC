@@ -2621,3 +2621,9 @@ izgled filmstripa, baza i ugovori isti. Verificirano na izoliranoj kopiji aktivn
 (kartica samo citana, stvarna baza nepromijenjena): 98 klipova, svaki 13 slicica i wave,
 oko 0,47 s po klipu (prije 0,83 s); ffmpeg na 60 klipova bez ijedne slicice koja nedostaje.
 Odobrenje je zatvoreno.
+Live nalaz 30. 9. (korisnik: "nema wave"): zapisnik wavea u pravom radu: prvi prolaz artefakata
+za svih 98 klipova daje "Wave treba finalni spremljeni media zapis", jer se zapisi zvuka dovrsavaju
+usporedno i kasnije (filmstrip je gotov prije njih), a radnik je artefakte prolazio samo jednom.
+Izvedeno: `tools/qnc-ingest-worker` nakon dovrsetka zapisa jos jednom pokrece artefakte; gotovi
+filmstripovi se preskacu, nastaju wave koji su cekali konacni zapis. Live provjereno na novom
+projektu: 98 filmstripova i 98 wavea.

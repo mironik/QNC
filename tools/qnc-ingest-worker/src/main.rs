@@ -128,6 +128,9 @@ fn run_once(root: &Path) -> Result<bool, String> {
         let artifacts = run_artifacts(root);
         artifacts_running.store(false, std::sync::atomic::Ordering::Relaxed);
         let _ = completion.join();
+        // Wave needs the audio facts the completion has just written; the filmstrips are
+        // already made, so this pass only makes the waves the first one had to skip.
+        let artifacts = artifacts.and_then(|()| run_artifacts(root));
         running.store(false, std::sync::atomic::Ordering::Relaxed);
         let import = import.join().map_err(|_| "Uvoz je pao.".to_string())?;
         artifacts.and(import).map(|()| true)
