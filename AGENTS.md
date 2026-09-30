@@ -2608,3 +2608,16 @@ application koristi taj javni poster loader umjesto privatnog thumbnail batch
 puta; Editorial application vise ne resetira poster servis pri obicnom zahtjevu
 za postere. Forma/layout nije diran, nema citanja globalne baze na klik, nema
 novog write puta.
+
+Zatvoreno ograniceno odobrenje 2026-09-30 (brzina filmstripa, I-frame najblizi lokaciji):
+korisnik: "još uvijek nevalja filmstrip.. presporo", "uzimaš I frame najbliži lokaciji".
+Otkljucano i izvedeno samo: `crates/qnc-filmstrip` (svi klipovi, i kratki, koriste skok na
+kljucni kadar; prije je klip do 10 s dekodirao svaki kadar: 0,80 s po klipu prema 0,36 s) i
+`crates/qnc-ffmpeg-decode` (`-copyts` uz skok na kljucni kadar: bez njega ffmpeg odbacuje
+kljucni kadar prije trazene pozicije kao negativno vrijeme i uzima tek sljedeci, a zadnja
+slicica kratkog klipa nije imala nijedan pa je nedostajala). Jedan prolaz kroz cijeli klip
+je izmjeren i odbacen (3,08 s prema 0,50 s po duljem klipu s kartice). Probe se ne uvodi,
+izgled filmstripa, baza i ugovori isti. Verificirano na izoliranoj kopiji aktivnog projekta
+(kartica samo citana, stvarna baza nepromijenjena): 98 klipova, svaki 13 slicica i wave,
+oko 0,47 s po klipu (prije 0,83 s); ffmpeg na 60 klipova bez ijedne slicice koja nedostaje.
+Odobrenje je zatvoreno.

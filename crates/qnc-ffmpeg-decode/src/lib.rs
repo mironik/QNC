@@ -247,6 +247,11 @@ fn filmstrip_seek_args(
         OsString::from("-y"),
         OsString::from("-noautorotate"),
     ];
+    if keyframes_only {
+        // Source timestamps: a keyframe just before the seek point is kept instead of
+        // dropped as negative time (the last frame of a short clip had none after it).
+        args.push(OsString::from("-copyts"));
+    }
     for frame in frames {
         args.push(OsString::from("-ss"));
         args.push(OsString::from(format_decimal(frame.seek_sec, 6)));
