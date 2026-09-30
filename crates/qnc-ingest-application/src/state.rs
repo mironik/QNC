@@ -31,7 +31,6 @@ impl IngestApplication {
             || self.selection_writer.is_busy()
             || self.posters.has_pending_work()
             || self.selection_session.has_pending_work()
-            || self.artifacts.has_pending_work()
             || self.preview.play_when_ready()
     }
 

@@ -15,17 +15,11 @@ impl IngestApplication {
         if !self.playback_guard_active() {
             changed |= self.poll_thumbnails();
         }
-        self.apply_playback_guard();
-        if !self.playback_guard_active() && self.artifacts.sync_deferred() {
-            self.sync_timeline_artifact_content_db();
-            changed = true;
-        }
         changed |= self.poll_timeline_artifacts();
         if let Some(result) = self.selection_writer.poll() {
             match result {
                 Ok(_) => match self.begin_import() {
                     Ok(()) => {
-                        self.sync_timeline_artifact_content_db();
                         self.view.command_busy = false;
                         self.view.message = "Uvoz je predan pozadinskoj aplikaciji.".into();
                         self.request_navigation_after_import();
@@ -70,8 +64,8 @@ impl IngestApplication {
             if outcome.finished {
                 self.view.command_busy = false;
                 if outcome.finished_ok {
-                    self.sync_timeline_artifact_content_db();
-                    // The background completes the card records playback still lacks (v5).
+                    // The background completes the card records playback still lacks (v5)
+                    // and makes the filmstrip and wave: one generator.
                     self.view.message = self.begin_import().err().unwrap_or_default();
                 }
             }

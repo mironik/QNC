@@ -420,6 +420,8 @@ pub struct ProjectArtifacts {
     artifacts: Artifacts,
     assets: TimelineAssetReader,
     host_root: Option<PathBuf>,
+    /// When the clip on screen may be read again while its artifacts are made elsewhere.
+    refresh_at: Option<std::time::Instant>,
 }
 
 #[derive(Debug, Default)]
@@ -511,6 +513,20 @@ impl ProjectArtifacts {
     ) -> Result<SourceTimelineAssets, String> {
         self.configure_assets(reader, settings)?;
         self.assets.load_clip(clip_id)
+    }
+
+    /// Whether the clip on screen should be read again: its filmstrip or wave is still
+    /// missing (the background worker makes them), at most once a second.
+    pub fn refresh_due(&mut self, shown: &SourceTimelineAssets) -> bool {
+        if shown.clip_id.is_empty() || (shown.filmstrip_background.is_some() && shown.wave.is_some()) {
+            return false;
+        }
+        let now = std::time::Instant::now();
+        if self.refresh_at.is_some_and(|at| now < at) {
+            return false;
+        }
+        self.refresh_at = Some(now + std::time::Duration::from_secs(1));
+        true
     }
 
     pub fn remove_clips(&mut self, clip_ids: &[String]) {

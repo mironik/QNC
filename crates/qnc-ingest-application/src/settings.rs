@@ -172,10 +172,7 @@ impl IngestApplication {
                         self.view.selected_source_volume_name.clear();
                     }
                 }
-                if let Err(error) = self.refresh_timeline_artifact_context() {
-                    self.view.message = error;
-                }
-                self.sync_timeline_artifact_content_db();
+                self.wake_artifact_worker();
                 if let Some(uri) = self.pending_source.take() {
                     if self.playback_guard_active() {
                         self.view.message = playback_guard_message().to_string();

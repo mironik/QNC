@@ -1,5 +1,6 @@
-//! The application only decides *when*; the neutral project content artifact
-//! adapter feeds the timeline artifact host from the active project database.
+//! Filmstrip and wave are made by one generator, the background worker (its lease in
+//! the project database keeps it single); the application only wakes it and reads the
+//! artifacts of the clip on screen from the active project database.
 
 use super::*;
 
@@ -9,31 +10,13 @@ impl IngestApplication {
         self.view.timeline_assets = qnc_timeline_assets::SourceTimelineAssets::empty();
     }
 
-    pub(super) fn refresh_timeline_artifact_context(&mut self) -> Result<(), String> {
-        let (Some(reader), Some(plan), Some(target)) = (
-            self.settings_reader.as_ref(),
-            self.work_plan().cloned(),
-            self.select_target.as_ref().map(|target| target.content.clone()),
-        ) else {
-            return Ok(());
-        };
-        self.artifacts.configure(reader, &plan.settings, target)
-    }
-
-    pub(super) fn sync_timeline_artifact_content_db(&mut self) {
-        let (Some(reader), Some(plan), Some(target)) = (
-            self.settings_reader.as_ref(),
-            self.work_plan().cloned(),
-            self.select_target.as_ref().map(|target| target.content.clone()),
-        ) else {
-            if self.playback_guard_active() {
-                self.artifacts.defer_sync();
+    /// The artifacts of the active project are the background worker's: it is woken,
+    /// never duplicated in this process (two generators on one card halve the pace).
+    pub(super) fn wake_artifact_worker(&mut self) {
+        if self.root.is_some() {
+            if let Err(error) = self.begin_import() {
+                self.view.message = error;
             }
-            return;
-        };
-        let defer = self.playback_guard_active();
-        if let Err(error) = self.artifacts.sync(reader, &plan.settings, target, defer) {
-            self.view.message = error;
         }
     }
 
@@ -65,15 +48,14 @@ impl IngestApplication {
         }
     }
 
+    /// The clip on screen is read again while the worker still makes its artifacts.
     pub(super) fn poll_timeline_artifacts(&mut self) -> bool {
-        let polled = self.artifacts.poll(self.view.preview_clip_id.as_deref());
-        if let Some(error) = polled.error {
-            self.view.message = error;
+        if !self.artifacts.refresh_due(&self.view.timeline_assets) {
+            return false;
         }
-        if let Some(assets) = polled.assets {
-            self.view.timeline_assets = assets;
-        }
-        polled.changed
+        let clip_id = self.view.timeline_assets.clip_id.clone();
+        self.focus_timeline_assets(&clip_id);
+        true
     }
 
     pub(super) fn set_timeline_artifact_playback_priority(&mut self, active: bool) {

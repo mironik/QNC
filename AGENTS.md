@@ -2353,6 +2353,13 @@ citaju karticu, dovrsava se samo klip koji preview trazi, ostali odmah nakon nji
 `tools/qnc-ingest-worker` javlja zauzetost dok radi `run_artifacts`; test da dok je kartica
 zauzeta probe cita samo medije trazenog klipa. Uz to worker cita red uvoza iz baze svake
 sekunde i jos jednom nakon otpustanja najma (Uvezi dok radi worker Selecta vise ne propada).
+Mjerenje na izoliranoj kopiji (30. 9.): isti release worker bez aplikacije napravi filmstrip 0,83 s po
+klipu i wave uz njega; u pravom radu 1,5-1,6 s i bez wavea. Uzrok: nakon Selecta Ingest je generirao
+filmstrip/wave i u svom procesu (`sync_timeline_artifact_content_db`) i pokretao worker (od `3489103`),
+dva generatora i 4 ffmpega na istoj kartici. Izvedeno: jedan generator, pozadinski worker (najam ga
+drzi jednim); Ingest ga samo budi (`wake_artifact_worker`, i pri ucitavanju projekta), ne konfigurira
+generatore u svom procesu, a prikazani klip ponovno cita iz baze jednom u sekundi dok mu nedostaje
+filmstrip ili wave (`qnc-content-artifacts::ProjectArtifacts::refresh_due`). C10 Ingest 1717.
 
 Otvoreno ograniceno odobrenje 2026-09-26 (zapisi medija u bazi projekta, v5): korisnik je
 otkljucao Ingest lanac uz pravila: Ingest nije vlasnik ni baze ni klipova; projektne

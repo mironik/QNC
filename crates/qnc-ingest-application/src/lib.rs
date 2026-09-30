@@ -269,14 +269,11 @@ mod tests {
     }
 
     #[test]
-    fn playback_guard_defers_timeline_artifact_sync() {
+    fn ingest_never_makes_artifacts_in_its_own_process() {
         let mut component = IngestApplication::default();
-        component.view.playback.preparing = true;
-
-        component.sync_timeline_artifact_content_db();
-
-        assert!(component.artifacts.sync_deferred());
+        component.wake_artifact_worker();
         assert!(!component.artifacts.has_pending_work());
+        assert!(!component.artifacts.sync_deferred());
     }
 
     #[test]
