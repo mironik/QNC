@@ -125,6 +125,20 @@ impl PanelFocus {
             "activate_focused_item" if segments.sync_holds_enter() => {
                 segments.apply_action(action_id)
             }
+            // v5 navigate_adjacent_source_object: start, IN and OUT in order on the source.
+            "navigate_prev_object" | "navigate_next_object" if panel == Panel::SourceTimeline => {
+                let key = qnc_source_mark_focus::adjacent(timeline, action_id == "navigate_prev_object");
+                self.mark_taken = qnc_source_mark_focus::is_taken(timeline);
+                mark_cue(preview, key)
+            }
+            // v5 mark_in_fit_duration: IN at the playhead, OUT the length of the slot.
+            "mark_in_fit_duration" if panel == Panel::SourceTimeline => match segments.fit_slot() {
+                Some(frames) => {
+                    self.mark_taken = false;
+                    mark_cue(preview, qnc_source_mark_focus::fit(timeline, frames))
+                }
+                None => false,
+            },
             // v5 select_mark_in / select_mark_out: Ctrl+I, Ctrl+O take the source IN, OUT; the
             // arrows move the taken mark, Escape gives the keys back to the playhead.
             "select_mark_in" | "select_mark_out" if panel == Panel::SourceTimeline => {

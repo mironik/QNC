@@ -2685,6 +2685,13 @@ uzme IN/OUT i playhead ide na njega, strelice ga pomicu za frame, Esc vraca tipk
 `qnc-panel-focus` ga poziva kad je fokus na source timelineu (aplikacija predaje svoj timeline,
 bez novih redaka). Preview klipa ciji zapis jos ceka pozadinski dovrsetak (`NotFinal`) pise
 "Podaci klipa se pripremaju..." i sam ponovno otvara klip (`qnc-player-input::is_incomplete_media`).
+Dopuna 2026-10-01 (korisnik: "sve funkcije" iz kataloga koje kod nije obradjivao), po v5:
+Ctrl+S `select_current_marker_slot`, Shift+S `focus_empty_slot`, Alt+strelice
+`navigate_prev/next_object` (Segmenti: marker, slot ili segment; source: pocetak, IN, OUT),
+Shift+I `mark_in_fit_duration` (IN na playhead, OUT za duljinu odabranog ili prvog praznog slota).
+`qnc-program-segments` (modul `nav.rs`), `qnc-source-mark-focus` (`adjacent`, `fit`),
+`qnc-panel-focus`. Shift+W `toggle_source_wrap` i F1 `toggle_cheatsheet` nemaju postupak ni u v5
+kodu; OFF snimanje (`record_toggle`, `save_off`) nije dio ovog koraka.
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

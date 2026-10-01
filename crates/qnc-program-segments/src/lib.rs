@@ -11,6 +11,7 @@
 //! form and no application, and never plays, probes or opens media.
 
 mod edit;
+mod nav;
 mod marker_edit;
 mod markers;
 mod sync;
@@ -456,6 +457,13 @@ pub enum SegmentCommand {
     Edit(String),
     /// Escape while a segment is edited.
     CancelEdit,
+    /// Ctrl+S (v5 `select_current_marker_slot`): the M-M slot under the playhead.
+    SelectSlotAtPlayhead,
+    /// Shift+S (v5 `focus_empty_marker_slot`): the first slot without a cover.
+    FocusEmptySlot,
+    /// Alt+arrows (v5 `navigate_adjacent_program_object`): the next or previous marker
+    /// when one is selected, else slot when one is selected, else segment.
+    NavigateObject { up: bool },
     /// The Delete key (user rule 2026-09-25): only what was taken with Ctrl+
     /// before (Ctrl+M: the marker) is deleted; a click never arms Delete.
     DeleteFocused,
@@ -500,6 +508,10 @@ impl SegmentCommand {
             "overwrite_cover" => Self::Cover { overwrite: true },
             "activate_focused_item" => Self::CommitSync,
             "select_marker" => Self::EditMarker,
+            "select_current_marker_slot" => Self::SelectSlotAtPlayhead,
+            "focus_empty_slot" => Self::FocusEmptySlot,
+            "navigate_prev_object" => Self::NavigateObject { up: true },
+            "navigate_next_object" => Self::NavigateObject { up: false },
             "undo_object" => Self::Undo,
             "redo_object" => Self::Redo,
             _ => return None,
@@ -820,6 +832,9 @@ impl ProgramSegments {
                     self.set_marker_draft(frame);
                 }
             }
+            SegmentCommand::SelectSlotAtPlayhead => self.select_slot_at_playhead(),
+            SegmentCommand::FocusEmptySlot => self.focus_empty_slot(),
+            SegmentCommand::NavigateObject { up } => self.navigate_object(up),
             SegmentCommand::Edit(segment_id) => self.edit(segment_id),
             SegmentCommand::CancelEdit => {
                 self.editing = None;

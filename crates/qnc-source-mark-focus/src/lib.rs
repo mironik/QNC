@@ -68,6 +68,51 @@ pub fn release(timeline: &mut TimelineProjection) -> MarkKey {
     MarkKey::Changed
 }
 
+/// Alt+arrows on the source (v5 `adjacent_source_navigation_target`): the start, IN
+/// and OUT in order; from a taken mark to the next one, else from the playhead.
+/// The start releases the mark and cues frame 0; IN or OUT is taken.
+pub fn adjacent(timeline: &mut TimelineProjection, up: bool) -> MarkKey {
+    // (frame, order, target): 0 start, 1 IN, 2 OUT.
+    let mut items = vec![(0u64, 0u8)];
+    items.extend(timeline.source_in_frame.map(|frame| (frame, 1)));
+    items.extend(timeline.source_out_frame.map(|frame| (frame, 2)));
+    items.sort();
+    let taken = match timeline.source_mark_focus {
+        TimelineSourceMarkFocus::In => items.iter().position(|item| item.1 == 1),
+        TimelineSourceMarkFocus::Out => items.iter().position(|item| item.1 == 2),
+        TimelineSourceMarkFocus::Playhead => None,
+    };
+    let playhead = timeline.playhead_frame.unwrap_or(0).saturating_sub(timeline.range_start_frame);
+    let target = match taken {
+        Some(index) if up => index.checked_sub(1).and_then(|next| items.get(next)),
+        Some(index) => items.get(index + 1),
+        None if up => items.iter().rev().find(|item| item.0 < playhead),
+        None => items.iter().find(|item| item.0 > playhead),
+    };
+    match target.map(|item| item.1) {
+        Some(0) => {
+            timeline.source_mark_focus = TimelineSourceMarkFocus::Playhead;
+            MarkKey::Cue(timeline.range_start_frame)
+        }
+        Some(order) => take(timeline, order == 1),
+        None => MarkKey::Refused,
+    }
+}
+
+/// Shift+I (v5 `mark_in_fit_duration`): IN at the playhead, OUT `frames` later, inside
+/// the clip; the keys stay with the playhead.
+pub fn fit(timeline: &mut TimelineProjection, frames: u64) -> MarkKey {
+    let duration = timeline.duration_frames.max(1);
+    let Some(playhead) = timeline.playhead_frame else {
+        return MarkKey::Refused; // v5: the source FPS is not confirmed yet
+    };
+    let in_frame = playhead.saturating_sub(timeline.range_start_frame).min(duration - 1);
+    timeline.source_in_frame = Some(in_frame);
+    timeline.source_out_frame = Some((in_frame + frames.max(1)).clamp(in_frame + 1, duration));
+    timeline.source_mark_focus = TimelineSourceMarkFocus::Playhead;
+    MarkKey::Changed
+}
+
 /// The source frame the player shows for a mark: OUT is exclusive, so its last frame.
 fn cue_frame(timeline: &TimelineProjection, frame: u64, out: bool) -> u64 {
     let frame = if out { frame.saturating_sub(1) } else { frame };
@@ -112,5 +157,18 @@ mod tests {
         assert_eq!(nudge(&mut t, 1), MarkKey::Refused, "IN never reaches OUT");
         let mut unset = TimelineProjection { duration_frames: 100, ..Default::default() };
         assert_eq!(take(&mut unset, true), MarkKey::Refused, "v5: set IN first");
+    }
+
+    #[test]
+    fn alt_arrows_walk_start_in_out_and_shift_i_fits_a_slot() {
+        let mut t = timeline();
+        t.playhead_frame = Some(20);
+        assert_eq!(adjacent(&mut t, false), MarkKey::Cue(39), "from the playhead to OUT");
+        assert_eq!(adjacent(&mut t, true), MarkKey::Cue(10), "OUT -> IN");
+        assert_eq!(adjacent(&mut t, true), MarkKey::Cue(0), "IN -> start");
+        assert!(!is_taken(&t));
+        t.playhead_frame = Some(90);
+        assert_eq!(fit(&mut t, 25), MarkKey::Changed);
+        assert_eq!((t.source_in_frame, t.source_out_frame), (Some(90), Some(100)), "inside the clip");
     }
 }

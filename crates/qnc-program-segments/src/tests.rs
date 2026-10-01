@@ -516,3 +516,18 @@ fn edit_opens_the_segment_on_its_clip_and_escape_drops_it() {
     segments.apply_action("clear_focus");
     assert_eq!(segments.view().editing, None, "Escape drops it");
 }
+
+#[test]
+fn ctrl_s_takes_the_slot_under_the_playhead_and_shift_s_the_first_empty_one() {
+    let mut segments = component();
+    let Some(first) = segments.view().slots.first().cloned() else {
+        return; // the test program has no slots
+    };
+    segments.set_playhead(Some(first.start_frame));
+    segments.apply(SegmentCommand::SelectSlotAtPlayhead);
+    assert_eq!(segments.view().selected_slot().map(|slot| slot.slot_id.clone()), Some(first.slot_id.clone()));
+    segments.apply(SegmentCommand::FocusEmptySlot);
+    let empty = segments.view().slots.iter().find(|slot| !slot.has_cover).map(|slot| slot.slot_id.clone());
+    assert_eq!(segments.view().selected_slot().map(|slot| slot.slot_id.clone()), empty);
+    assert!(segments.fit_slot().is_some(), "Shift+I takes the length of the selected slot");
+}
