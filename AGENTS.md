@@ -2751,3 +2751,10 @@ strelice, Enter, Esc, Delete, fokus; grupe akcija). `crates/qnc-keyboard-shortcu
 (`ShortcutCatalog.help`, nepoznata akcija u grupi je greska) i daje `chord_help` (svaka tipka jednom,
 strelice i brojke citljivo). Prozor "Tipke" prvo pokazuje pravila, zatim tablice "Po grupama" ili
 "Po akciji" (abecedno). Tekstovi su u katalogu, ne u kodu.
+Popravak 2026-10-01 (korisnik: "playback programa zastajkuje na prelasku s pokrivalice na pokrivalicu"):
+`player.log` pokazuje `audio_underrun` tocno na rezovima pokrivalica (frame 148, 302). Zvuk programa
+otvarao je dekoder pokrivalice tek kad je trebao njezin prvi frame (slika ga je vec otvarala unaprijed),
+pa se audio red ispraznio. `crates/qnc-broadcast-engine` (`program.rs`): traka zvuka je kanal klipa s
+jednim pomakom program-izvor (isti kanal s drugog mjesta je druga traka), a trake stavki koje pocinju
+u sljedece 2 s otvaraju se unaprijed; trake koje vise nitko ne treba se zatvaraju. Sat, red i Play se
+ne mijenjaju. Test `a_cover_has_its_own_lane_so_its_sound_opens_before_the_cut`.

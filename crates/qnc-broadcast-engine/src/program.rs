@@ -446,6 +446,25 @@ impl VideoDecodeAdapter for ProgramVideo {
     }
 }
 
+/// A lane is one channel of a clip played with one offset between program and source
+/// frames: the same channel in a later item with another offset is another lane, so it
+/// can be opened before its cut while the current one still plays.
+type LaneKey = (usize, u32, u16, i128);
+
+/// How far ahead (seconds of program) the sound of the next items is opened, so the
+/// decoder of a cover has started before its cut instead of on it (a cut used to
+/// empty the audio queue: `audio_underrun` on every cover).
+const LANE_LOOKAHEAD_SECONDS: u64 = 2;
+
+fn lane_key(span: &AudioSpan, bus: &Bus) -> LaneKey {
+    (
+        bus.clip,
+        bus.stream_index,
+        bus.channel_index,
+        i128::from(bus.source_in) - i128::from(span.record_in),
+    )
+}
+
 struct Lane {
     clip: usize,
     decoder: Option<Decoder>,
@@ -459,7 +478,7 @@ pub(crate) struct ProgramAudio {
     source: SourceRuntime,
     spans: Vec<AudioSpan>,
     clips: Vec<(InputPlan, Rc<DecodeInput>)>,
-    lanes: BTreeMap<(usize, u32, u16), Lane>,
+    lanes: BTreeMap<LaneKey, Lane>,
     channels: u16,
     rate: u32,
 }
@@ -501,23 +520,20 @@ impl ProgramAudio {
 
     /// Makes the lane of a bus hold the samples of its source frame; false while
     /// the decoder still prepares them.
-    fn fill_lane(&mut self, bus: &Bus, source_frame: u64) -> Result<bool> {
+    fn fill_lane(&mut self, key: LaneKey, bus: &Bus, source_frame: u64) -> Result<bool> {
         let (plan, input) = &self.clips[bus.clip];
         let start = sample_boundary(source_frame, plan.source.timebase, self.rate)?;
         let end = sample_boundary(source_frame + 1, plan.source.timebase, self.rate)?;
-        let lane = self
-            .lanes
-            .entry((bus.clip, bus.stream_index, bus.channel_index))
-            .or_insert_with(|| Lane {
-                clip: bus.clip,
-                decoder: None,
-                track: PcmTrack::new(&AudioStreamPlan {
-                    stream_index: bus.stream_index,
-                    source_channels: bus.stream_channels,
-                    selected_channels: vec![bus.channel_index],
-                }),
-                consumed_through: None,
-            });
+        let lane = self.lanes.entry(key).or_insert_with(|| Lane {
+            clip: bus.clip,
+            decoder: None,
+            track: PcmTrack::new(&AudioStreamPlan {
+                stream_index: bus.stream_index,
+                source_channels: bus.stream_channels,
+                selected_channels: vec![bus.channel_index],
+            }),
+            consumed_through: None,
+        });
         if lane.consumed_through != Some(start) {
             lane.decoder =
                 Some(input.open(bus.stream_index, seek_start(&plan.source, source_frame)?)?);
@@ -547,6 +563,38 @@ impl ProgramAudio {
             }
         }
         Ok(lane.track.samples.len() >= needed)
+    }
+
+    /// Opens the lanes of the items starting within the lookahead (each one at its
+    /// first frame) and drops the lanes no item near the playhead uses.
+    fn open_next_lanes(&mut self, current: &AudioSpan, frame: u64) -> Result<()> {
+        let timebase = self.source.timebase;
+        let seconds = i64::try_from(LANE_LOOKAHEAD_SECONDS).map_err(error)?;
+        let lookahead = u64::try_from(seconds * timebase.fps_num / timebase.fps_den.max(1)).unwrap_or(0);
+        let horizon = frame.saturating_add(lookahead);
+        let current_keys: Vec<LaneKey> = current
+            .buses
+            .iter()
+            .map(|bus| lane_key(current, bus))
+            .collect();
+        let next: Vec<(LaneKey, Bus)> = self
+            .spans
+            .iter()
+            .filter(|span| span.record_in > frame && span.record_in <= horizon)
+            .flat_map(|span| {
+                span.buses
+                    .iter()
+                    .map(move |bus| (lane_key(span, bus), *bus))
+            })
+            .filter(|(key, _)| !current_keys.contains(key))
+            .collect();
+        self.lanes.retain(|key, _| {
+            current_keys.contains(key) || next.iter().any(|(next_key, _)| next_key == key)
+        });
+        for (key, bus) in next {
+            self.fill_lane(key, &bus, bus.source_in)?;
+        }
+        Ok(())
     }
 }
 
@@ -583,15 +631,16 @@ impl AudioOutputAdapter for ProgramAudio {
         let mut ready = true;
         for bus in &span.buses {
             let source_frame = bus.source_in + (frame - span.record_in);
-            ready &= self.fill_lane(bus, source_frame)?;
+            ready &= self.fill_lane(lane_key(&span, bus), bus, source_frame)?;
         }
+        self.open_next_lanes(&span, frame)?;
         if !ready {
             return Err(pending());
         }
         let mut samples = vec![0.0f32; frames * channels];
-        let mut taken: BTreeMap<(usize, u32, u16), Vec<f32>> = BTreeMap::new();
+        let mut taken: BTreeMap<LaneKey, Vec<f32>> = BTreeMap::new();
         for bus in &span.buses {
-            let key = (bus.clip, bus.stream_index, bus.channel_index);
+            let key = lane_key(&span, bus);
             if !taken.contains_key(&key) {
                 let source_frame = bus.source_in + (frame - span.record_in);
                 let timebase = self.clips[bus.clip].0.source.timebase;

@@ -201,3 +201,32 @@ fn another_rate_or_a_missing_channel_is_an_error_not_a_guess() {
     assert!(program_spans(&wide, &["a", "b", "c"], |clip| sound(clip, 48_000), 48_000).is_err());
     assert!(program_spans(&playlist(), &["a", "b"], |clip| sound(clip, 48_000), 48_000).is_err());
 }
+
+#[test]
+fn a_cover_has_its_own_lane_so_its_sound_opens_before_the_cut() {
+    let bus = |clip, source_in| Bus {
+        output: 1,
+        clip,
+        source_in,
+        stream_index: 1,
+        channel_index: 0,
+        stream_channels: 4,
+    };
+    let span = |record_in, bus| AudioSpan {
+        record_in,
+        record_out: record_in + 50,
+        buses: vec![bus],
+    };
+    let (first, next_cover) = (span(100, bus(2, 400)), span(150, bus(2, 900)));
+    assert_ne!(
+        lane_key(&first, &first.buses[0]),
+        lane_key(&next_cover, &next_cover.buses[0]),
+        "the same channel of the same clip from another place is another lane"
+    );
+    let continued = span(150, bus(2, 450));
+    assert_eq!(
+        lane_key(&first, &first.buses[0]),
+        lane_key(&continued, &continued.buses[0]),
+        "a cut that continues the same source keeps its lane, no reopen"
+    );
+}
