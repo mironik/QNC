@@ -109,6 +109,10 @@ pub enum Operation {
         out_frame: u64,
         fps_num: u32,
         fps_den: u32,
+        /// Source channel (zero based) heard on A1, chosen on the source timeline;
+        /// channel 1 when not given (v5).
+        #[serde(default)]
+        a1_source_channel: u16,
     },
     /// Takes a segment out of the program (v5 `delete_part`: `active = 0`); it stays
     /// listed where it was.

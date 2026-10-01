@@ -2642,6 +2642,17 @@ reda), `crates/qnc-editorial-application` (dva postojeca retka; C10 nije narasta
 Forma i layout nisu dirani. Sljedeci korak (odobren, nije izveden): u source timelineu klik na oznaku A1
 otvara tanki izbornik desno od nje, visine audio trake, s kucicama 1-4 za kanal koji ide na A1 (jedan
 kanal). Odobrenje za wave u segmentima je zatvoreno.
+Izvedeno 2026-10-01 (korisnik "da, dodaj"; grana `desktop-blocks`): novi javni pasivni
+`crates/qnc-channel-picker` (red kucica 1..N visine trake, jedna izabrana) i novi javni
+`crates/qnc-source-channels` (broj audio kanala originala iz spremljenog zapisa, kao sto ih
+broji player; bez probea i bez izmisljenog broja), oba s ugovorima modula. `qnc-timeline`
+(polje `a1_channel`, namjera `ChooseA1Channel`, klik na oznaku A1 otvara izbornik samo kad ga
+pozivatelj da), `qnc-source-dock` (`with_a1_channel`), `qnc-program-segments` (izbor uz
+oznaceni izvor: kanal 1 za novi klip, samo postojeci kanali; Talking Head / Voice over pise ga
+kao `a1_source_channel`), `qnc-program-db` (`CreateSegment.a1_source_channel`, zadano 0),
+`qnc-editorial-blocks` (jedan poziv), `qnc-editorial-application` (dva retka, C10 nije
+narastao), `qnc-ingest-application` (samo krak `ChooseA1Channel => None`; Ingest izbornik nema).
+Forme i layout nisu dirani. Izbornik ima samo Story (grupa o); MA ga nema jer nema segmente.
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

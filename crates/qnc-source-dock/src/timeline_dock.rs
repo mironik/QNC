@@ -29,6 +29,8 @@ pub struct SourceTimeline<'a> {
     pub peaks: [&'a [f32]; 4],
     /// Original source timecode of the clip: IN/OUT as camera timecode (v5 source dock).
     pub timecode: Option<qnc_source_timecode::SourceTimecode>,
+    /// The source channel heard on A1, when the form lets the user choose it.
+    pub a1_channel: Option<qnc_timeline::ChannelChoice>,
 }
 
 impl<'a> SourceTimeline<'a> {
@@ -48,12 +50,19 @@ impl<'a> SourceTimeline<'a> {
                 assets.a4_peaks(),
             ],
             timecode: None,
+            a1_channel: None,
         }
     }
 
     /// IN, OUT and length in the timecode of the source clip.
     pub fn with_timecode(mut self, timecode: Option<qnc_source_timecode::SourceTimecode>) -> Self {
         self.timecode = timecode;
+        self
+    }
+
+    /// A click on the A1 label opens the channel picker with this choice.
+    pub fn with_a1_channel(mut self, choice: Option<qnc_timeline::ChannelChoice>) -> Self {
+        self.a1_channel = choice;
         self
     }
 }
@@ -162,15 +171,13 @@ pub fn show_timeline_dock(
         }
         add_header(ui);
     });
-    qnc_timeline::show_source_player_timeline_with_artifacts(
+    qnc_timeline::show_source_player_timeline_with_channel(
         ui,
         timeline_rect,
         timeline.projection,
         timeline.theme,
         timeline.filmstrip,
-        timeline.peaks[0],
-        timeline.peaks[1],
-        timeline.peaks[2],
-        timeline.peaks[3],
+        timeline.peaks,
+        timeline.a1_channel,
     )
 }

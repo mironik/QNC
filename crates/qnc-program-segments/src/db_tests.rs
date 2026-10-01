@@ -49,6 +49,7 @@ fn store_with_story(file: &std::path::Path) -> Vec<String> {
                 out_frame: start + 50,
                 fps_num: 50,
                 fps_den: 1,
+                a1_source_channel: 0,
             })
             .unwrap()
         else {

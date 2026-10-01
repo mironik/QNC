@@ -3108,6 +3108,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-channel-picker"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
 name = "qnc-clip-posters"
 version = "0.1.0"
 dependencies = [
@@ -4132,6 +4139,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-program-db",
  "qnc-program-waveform",
+ "qnc-source-channels",
  "qnc-source-timecode",
  "qnc-sync-cover",
  "qnc-virtual-shots",
@@ -4368,6 +4376,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-source-channels"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+ "qnc-media-metadata",
+]
+
+[[package]]
 name = "qnc-source-contract"
 version = "0.1.0"
 dependencies = [
@@ -4517,6 +4533,7 @@ name = "qnc-timeline"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-channel-picker",
  "qnc-filmstrip",
  "qnc-ui-kit",
  "qnc-wave-view",

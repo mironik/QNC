@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.channel-picker",
+  "module_name": "Channel picker",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": ["ui.channel_picker.choose_one"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["application.start", "business.db.write", "database.read", "workflow.run", "media.process", "filesystem.write", "player.command"],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-channel-picker",
+  "input": "The chosen channel (zero based) and how many channels there are, a rectangle as high as the audio lane and colours.",
+  "output": "A thin row of checkboxes 1..N with the chosen one filled; answers with the channel clicked. It keeps no state and knows no application.",
+  "specification": "User rule 2026-09-30: a click on the A1 label of the source timeline opens a thin menu right of the label, as high as the audio lane, with checkboxes for the channel heard on A1; one channel only."
+}

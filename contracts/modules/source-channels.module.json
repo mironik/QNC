@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.source-channels",
+  "module_name": "Source audio channels",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["media.source_channels.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "source.scan.roles", "business.db.write", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-source-channels",
+  "input": "The project content target and a clip id.",
+  "output": "How many audio channels the stored original of the clip has (every channel of every audio stream, as the player counts them); none when the record has no channel counts. Read-only, no probe, no guessed count.",
+  "specification": "User rule 2026-09-30: the channel heard on A1 is chosen only from the real channels of the clip (a channel the clip lacks would be refused by the player)."
+}

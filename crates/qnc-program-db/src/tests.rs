@@ -227,6 +227,7 @@ fn create_segment(
             out_frame: range.1,
             fps_num: fps.0,
             fps_den: fps.1,
+            a1_source_channel: 0,
         },
     )
 }
@@ -1289,3 +1290,25 @@ fn undo_puts_the_story_back_step_by_step_and_redo_replays_it() {
     assert!(run(&mut store, Operation::UndoStory).is_err());
 }
 
+
+#[test]
+fn a_new_segment_keeps_the_source_channel_chosen_for_a1() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    run(
+        &mut store,
+        Operation::CreateSegment {
+            project_id: "p1".into(),
+            kind: "tonovi".into(),
+            clip_id: "c1".into(),
+            in_frame: 0,
+            out_frame: 50,
+            fps_num: 50,
+            fps_den: 1,
+            a1_source_channel: 1,
+        },
+    )
+    .unwrap();
+    assert_eq!(segments(&mut store)[0].a1_source_channel, 1, "channel 2 of the source on A1");
+}

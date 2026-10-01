@@ -106,12 +106,14 @@ impl Store {
                 out_frame,
                 fps_num,
                 fps_den,
+                a1_source_channel,
             } => self.create_segment(
                 project_id,
                 kind,
                 clip_id,
                 (*in_frame, *out_frame),
                 (*fps_num, *fps_den),
+                *a1_source_channel,
             ),
             Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
             Operation::IncludeSegment { segment_id } => self.include_segment(segment_id),
@@ -176,6 +178,7 @@ impl Store {
         clip_id: &str,
         (in_frame, out_frame): (u64, u64),
         (fps_num, fps_den): (u32, u32),
+        a1_source_channel: u16,
     ) -> Result<Data> {
         let kind = story_kind(kind)?;
         qnc_media_records::valid_id(clip_id).map_err(err)?;
@@ -240,9 +243,9 @@ impl Store {
                 part_id, kind, sort_index, title, text, clip_id, virtual_shot_id,
                 in_tc, out_tc, in_seconds, out_seconds, fps, source_fps_num, source_fps_den,
                 in_frame, out_frame, duration_frames, duration_label, duration_color_key,
-                active, created_at, updated_at
+                active, created_at, updated_at, a1_source_channel
              ) VALUES (?1, ?2, ?3, '', '', ?4, '', ?5, ?6, ?7, ?8, ?9, ?10, ?11,
-                       ?12, ?13, ?14, ?15, ?16, 1, ?17, ?17)",
+                       ?12, ?13, ?14, ?15, ?16, 1, ?17, ?17, ?18)",
             params![
                 segment_id,
                 kind,
@@ -260,7 +263,8 @@ impl Store {
                 duration,
                 frames_label(duration, fps),
                 duration_color_key(duration, fps),
-                now
+                now,
+                a1_source_channel
             ],
         )
         .map_err(err)?;

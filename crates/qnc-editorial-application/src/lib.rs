@@ -261,7 +261,7 @@ impl EditorialApplication {
             self.view.preview.timeline.visible_source_marks(),
             (timeline.source_in_frame, timeline.duration_frames),
             timebase.map(|timebase| (timebase.fps_num, timebase.fps_den)),
-        ));
+        ), self.content_target.as_ref().map(|targets| &targets.0)); // and its audio channels
         // Source and Wrap stay apart (v5): the Wrap timeline plays the program in the same player.
         let seek = self.segments.take_seek();
         let total = self.segments.view().total_frames;
@@ -439,7 +439,7 @@ impl EditorialApplication {
                     self.focus.to_source(&mut self.wrap); // the Source view
                     self.preview.timeline_intent(&intent)
                 }
-                _ => false,
+                other => matches!(other, TimelineIntent::ChooseA1Channel(channel) if self.segments.choose_a1_channel(channel)),
             },
         };
         self.sync_preview_view();

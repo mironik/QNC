@@ -208,7 +208,8 @@ fn render_source_dock(
             });
         },
         SourceTimeline::from_assets(&view.preview.timeline, timeline_theme(theme), &view.preview.assets)
-            .with_timecode(view.source_timecode),
+            .with_timecode(view.source_timecode)
+            .with_a1_channel(view.segments.a1_choice.map(|(selected, count)| qnc_timeline::ChannelChoice { selected, count })),
     );
     match intent {
         TimelineIntent::None => header_intent,

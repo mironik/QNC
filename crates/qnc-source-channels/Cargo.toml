@@ -1,0 +1,9 @@
+[package]
+name = "qnc-source-channels"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: how many audio channels the original of a clip has, from its stored record (the channels A1 can be chosen from); read-only, no probe"
+
+[dependencies]
+qnc-content-store = { workspace = true }
+qnc-media-metadata = { workspace = true }

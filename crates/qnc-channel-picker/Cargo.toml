@@ -1,0 +1,8 @@
+[package]
+name = "qnc-channel-picker"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive UI block: a thin row of checkboxes, one per source audio channel, of which exactly one is chosen (the channel heard on A1)"
+
+[dependencies]
+eframe = { workspace = true }

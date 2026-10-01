@@ -191,6 +191,9 @@ pub struct SegmentsView {
     pub message: String,
     /// The program wave (A1 segments, A2 covers) from the stored clip waves.
     pub peaks: qnc_program_waveform::ProgramPeaks,
+    /// The source channel (zero based) heard on A1 in the next Talking Head / Voice
+    /// over and how many channels the marked clip has; `None` without a count.
+    pub a1_choice: Option<(u16, u16)>,
 }
 
 impl SegmentsView {
@@ -501,6 +504,8 @@ pub struct NewSegment {
     pub out_frame: u64,
     pub fps_num: u32,
     pub fps_den: u32,
+    /// Source channel (zero based) heard on A1.
+    pub a1_source_channel: u16,
 }
 
 /// The program of the active project: read, written and turned into a view.
@@ -528,6 +533,11 @@ pub struct ProgramSegments {
     selected_cover: Option<String>,
     /// What Talking Head, Voice over and covers take from the source view.
     source: SourcePick,
+    /// The source channel chosen for A1 (user rule 2026-09-30, channel 1 by default)
+    /// and the channel count of the marked clip from its stored record.
+    a1_channel: u16,
+    source_channels: Option<u16>,
+    channels: qnc_source_channels::SourceChannels,
     sync: qnc_sync_cover::SyncCover,
     /// IN was pressed since the last source (arms Sync).
     sync_in_pressed: bool,
@@ -611,12 +621,20 @@ impl ProgramSegments {
     }
 
     /// The source the user marked, given by the caller each repaint.
-    pub fn set_source(&mut self, source: SourcePick) {
+    /// `content` is the project content of the clip: its stored record gives the audio
+    /// channels A1 is chosen from.
+    pub fn set_source(&mut self, source: SourcePick, content: Option<&qnc_source_channels::ContentTarget>) {
+        let count = self.channels.for_clip(content, source.clip_id.as_deref());
         let previous_in = (self.source.clip_id == source.clip_id)
             .then_some(self.source.in_mark)
             .flatten();
+        if self.source.clip_id != source.clip_id {
+            self.a1_channel = 0; // another clip starts on channel 1 (v5)
+            self.view.a1_choice = self.a1_choice();
+        }
         self.source = source;
         self.arm_sync_on_new_in(previous_in);
+        self.set_source_channels(count);
     }
 
     /// Whether the playable program (segments or covers) changed since the last
@@ -954,6 +972,7 @@ impl ProgramSegments {
             out_frame: segment.out_frame,
             fps_num: segment.fps_num,
             fps_den: segment.fps_den,
+            a1_source_channel: segment.a1_source_channel,
         });
         if key.is_some() {
             self.pending_create = key;
@@ -975,6 +994,7 @@ impl ProgramSegments {
             out_frame,
             fps_num,
             fps_den,
+            a1_source_channel: self.a1_channel,
         });
     }
 
@@ -1268,7 +1288,34 @@ impl ProgramSegments {
         view.sync_enabled = self.sync.enabled();
         view.playhead = self.playhead;
         view.message = message;
+        view.a1_choice = self.a1_choice();
         self.view = view;
+    }
+
+    /// How many audio channels the marked clip has (its stored record); a chosen
+    /// channel the clip does not have goes back to channel 1.
+    pub fn set_source_channels(&mut self, count: Option<u16>) {
+        if self.source_channels != count {
+            self.source_channels = count;
+            if count.is_none_or(|count| self.a1_channel >= count) {
+                self.a1_channel = 0;
+            }
+            self.view.a1_choice = self.a1_choice();
+        }
+    }
+
+    /// The channel picker of the source timeline chose the channel heard on A1.
+    pub fn choose_a1_channel(&mut self, channel: u16) -> bool {
+        if !self.source_channels.is_some_and(|count| channel < count) {
+            return false;
+        }
+        self.a1_channel = channel;
+        self.view.a1_choice = self.a1_choice();
+        true
+    }
+
+    fn a1_choice(&self) -> Option<(u16, u16)> {
+        self.source_channels.filter(|count| *count > 0).map(|count| (self.a1_channel, count))
     }
 }
 
