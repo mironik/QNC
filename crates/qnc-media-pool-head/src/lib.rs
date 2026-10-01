@@ -5,9 +5,6 @@
 
 use eframe::egui::{self, Color32, RichText, Sense, Vec2};
 
-mod row;
-pub use row::{show_row, RowColors, RowCommand, RowTab};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LibraryTab {
     #[default]

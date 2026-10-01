@@ -10,7 +10,6 @@ qnc-board = { workspace = true }
 qnc-editorial-application = { workspace = true }
 qnc-editorial-layout = { workspace = true }
 qnc-media-card = { workspace = true }
-qnc-media-pool-head = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-panel-focus = { workspace = true }
 qnc-segment-panel = { workspace = true }

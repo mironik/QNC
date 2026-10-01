@@ -5,13 +5,12 @@
 // right clip grid and the directory browser (its area stays empty and is
 // filled by later group functions). Painting, metrics and helpers are unchanged.
 use eframe::egui::{
-    self, Align, Button, Color32, CornerRadius, Layout, Rect, RichText, Stroke, Ui,
+    self, Align, Button, Color32, CornerRadius, Label, Layout, Rect, RichText, Sense, Stroke, Ui,
     Vec2,
 };
 
-use qnc_media_pool_head::{RowColors, RowCommand, RowTab};
 use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
-use qnc_source_dock::{show_timeline_dock, SourceTimeline, TimelineDockStyle};
+use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
 use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
@@ -121,25 +120,47 @@ fn render_pool_head(
     theme: &Theme,
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
-    // The pool head is the public row; tab state and enabled actions come from the view.
-    let tabs: Vec<RowTab> = contracts
-        .pool_tabs()
-        .iter()
-        .map(|tab| RowTab {
-            label: tab.label(),
-            selected: tab.action_id().is_some_and(|id| view.tab_selected(id)),
-            action_id: tab.action_id(),
-            enabled: tab.action_id().is_some_and(|id| view.action_enabled(id)),
-        })
-        .collect();
-    let transport: Vec<RowCommand> = contracts
-        .pool_transport()
-        .iter()
-        .filter_map(|command| Some(RowCommand { label: command.label(), action_id: command.action_id()? }))
-        .collect();
-    let colors = RowColors { fill: theme.surface, muted: theme.text_muted, accent: theme.accent };
-    qnc_media_pool_head::show_row(ui, &dock_style(contracts, theme), colors, &tabs, &transport)
-        .map(EditorialIntent::action)
+    let rect = ui.available_rect_before_wrap();
+
+    let mut intent = None;
+    show_chrome_row(
+        ui,
+        rect,
+        &dock_style(contracts, theme),
+        theme.surface,
+        true,
+        |ui| {
+            ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
+            ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
+            for tab in contracts.pool_tabs() {
+                let Some(action_id) = tab.action_id() else {
+                    let _ = text_tab(ui, tab.label(), false, theme);
+                    ui.add_space(10.0);
+                    continue;
+                };
+                let selected = view.tab_selected(action_id);
+                if text_tab(ui, tab.label(), selected, theme).clicked()
+                    && view.action_enabled(action_id)
+                {
+                    intent = Some(EditorialIntent::action(action_id));
+                }
+                ui.add_space(10.0);
+            }
+
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                for command in contracts.pool_transport().iter().rev() {
+                    let Some(action_id) = command.action_id() else {
+                        continue;
+                    };
+                    if small_button(ui, command.label(), true, theme).clicked() {
+                        intent = Some(EditorialIntent::action(action_id));
+                    }
+                }
+            });
+        },
+    );
+
+    intent
 }
 
 fn dock_style(contracts: &EditorialContracts, theme: &Theme) -> TimelineDockStyle {
@@ -383,6 +404,45 @@ fn format_duration(seconds: f64) -> String {
     let minutes = total / 60;
     let secs = total % 60;
     format!("{minutes:02}:{secs:02}")
+}
+
+fn text_tab(ui: &mut Ui, text: &str, selected: bool, theme: &Theme) -> egui::Response {
+    let color = if selected {
+        theme.text
+    } else {
+        theme.text_muted
+    };
+    let label = if selected {
+        RichText::new(text)
+            .color(color)
+            .strong()
+            .size(theme.font_ui)
+    } else {
+        RichText::new(text).color(color).size(theme.font_ui)
+    };
+    let response = ui.add(Label::new(label).sense(Sense::click()).selectable(false));
+    if selected {
+        let y = response.rect.bottom() + 2.0;
+        ui.painter().line_segment(
+            [
+                egui::pos2(response.rect.left(), y),
+                egui::pos2(response.rect.right(), y),
+            ],
+            Stroke::new(2.0, theme.accent),
+        );
+    }
+    response
+}
+
+fn small_button(ui: &mut Ui, text: &str, enabled: bool, theme: &Theme) -> egui::Response {
+    ui.add_enabled(
+        enabled,
+        Button::new(RichText::new(text).color(theme.text))
+            .fill(Color32::TRANSPARENT)
+            .stroke(Stroke::new(1.0, theme.border))
+            .corner_radius(CornerRadius::same(0))
+            .min_size(Vec2::new(40.0, theme.chrome_control_height)),
+    )
 }
 
 fn action_button(ui: &mut Ui, text: &str, enabled: bool, theme: &Theme) -> egui::Response {

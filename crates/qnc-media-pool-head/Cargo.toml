@@ -6,4 +6,3 @@ description = "QNC public passive module: media pool head (library tabs and comp
 
 [dependencies]
 eframe = { workspace = true }
-qnc-source-dock = { workspace = true }
