@@ -46,33 +46,19 @@ pub(crate) fn open(
         host.default_output_device()
             .ok_or_else(|| Error::new(Code::Device, "no default audio output device"))?
     };
-    let ranges: Vec<_> = device
-        .supported_output_configs()
-        .map_err(failure)?
-        .collect();
-    let supported = ranges.iter()
-        .find(|range| supports(range, config.format))
-        .ok_or_else(|| {
-            let mut counts: Vec<_> = ranges.iter()
-                .filter(|r| r.sample_format() == cpal::SampleFormat::F32
-                    && r.min_sample_rate() <= config.format.sample_rate_hz
-                    && config.format.sample_rate_hz <= r.max_sample_rate())
-                .map(|r| r.channels()).collect();
-            counts.sort_unstable();
-            counts.dedup();
-            Error::new(
-                Code::Unsupported,
-                format!(
-                    "Audio output '{}' cannot open {} discrete channels at {} Hz (f32); supported channel counts at this rate: {:?}. No stereo fallback or downmix.",
-                    info(&device).map(|d| d.name).unwrap_or_else(|_| "selected device".into()),
-                    config.format.channels, config.format.sample_rate_hz, counts,
-                ),
-            )
-        })?;
-    let stream_config = supported
-        .clone()
-        .with_sample_rate(config.format.sample_rate_hz)
-        .config();
+    // The device already runs the asked format (channels, rate, f32): it is opened as it
+    // is, without listing every format the device supports (that asks Windows for about
+    // 250 ms on every open). Any other format goes through the full check below.
+    let stream_config = match device.default_output_config() {
+        Ok(current)
+            if current.channels() == config.format.channels
+                && current.sample_rate() == config.format.sample_rate_hz
+                && current.sample_format() == cpal::SampleFormat::F32 =>
+        {
+            current.config()
+        }
+        _ => checked_config(&device, config)?,
+    };
     let errors = shared.clone();
     let stream = device
         .build_output_stream(
@@ -94,6 +80,38 @@ pub(crate) fn open(
     // Backend callbacks are warmed with silence; Start later changes only the atomic gate.
     stream.play().map_err(failure)?;
     Ok((stream, info(&device)?))
+}
+/// The asked format checked against every format the device lists: exactly the
+/// channel count at the rate in f32, no stereo fallback or downmix.
+fn checked_config(device: &cpal::Device, config: &Config) -> Result<cpal::StreamConfig> {
+    let ranges: Vec<_> = device
+        .supported_output_configs()
+        .map_err(failure)?
+        .collect();
+    let supported = ranges.iter()
+        .find(|range| supports(range, config.format))
+        .ok_or_else(|| {
+            let mut counts: Vec<_> = ranges.iter()
+                .filter(|r| r.sample_format() == cpal::SampleFormat::F32
+                    && r.min_sample_rate() <= config.format.sample_rate_hz
+                    && config.format.sample_rate_hz <= r.max_sample_rate())
+                .map(|r| r.channels()).collect();
+            counts.sort_unstable();
+            counts.dedup();
+            Error::new(
+                Code::Unsupported,
+                format!(
+                    "Audio output '{}' cannot open {} discrete channels at {} Hz (f32); supported channel counts at this rate: {:?}. No stereo fallback or downmix.",
+                    info(device).map(|d| d.name).unwrap_or_else(|_| "selected device".into()),
+                    config.format.channels, config.format.sample_rate_hz, counts,
+                ),
+            )
+        })?;
+    let stream_config = supported
+        .clone()
+        .with_sample_rate(config.format.sample_rate_hz)
+        .config();
+    Ok(stream_config)
 }
 fn supports(range: &cpal::SupportedStreamConfigRange, format: Format) -> bool {
     range.channels() == format.channels

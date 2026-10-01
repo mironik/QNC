@@ -2795,3 +2795,10 @@ klikom"): nakon Synca (ili Wrapa) player drzi program, a klik na source timeline
 `qnc-source-preview::open_at` je odbijao ponovno otvaranje jer je isti klip vec bio prikazan; sada dok
 player drzi program klip se otvara ponovno. Mjerenje iz `player-timing` (isti dan): citanje iz baze
 23-65 ms, pokretanje procesa playera 0,7-1,9 s, do "spreman" ukupno 1,5-2,5 s.
+Ubrzanje 2026-10-01 (korisnik: "i dalje se sporo pokrece play i sync/b-roll"; "ok nastavi"): mjerenje
+(`player-stage`, `player-open-timing`, `player-timing`) pokazuje: baza 22 ms (Sync 230 ms), proces ~70 ms,
+GPU pretvarac 140-200 ms, audio uredaj ~450-500 ms, do "spreman" jos 0,45-1,1 s. Audio: Windows je pri
+svakom otvaranju popisivao sve formate uredaja (~250 ms). `crates/qnc-audio-output`: kad uredaj vec radi
+u trazenom formatu (kanali, frekvencija, f32) otvara se takav (~1 ms provjere); svaki drugi format i dalje
+prolazi punu provjeru bez downmixa. `crates/qnc-broadcast-engine`: GPU pretvarac se priprema usporedno s
+otvaranjem audio uredaja. Ponasanje playera se ne mijenja.

@@ -258,25 +258,15 @@ impl Runtime {
                 .map_err(error)?;
         }
         let opened = Instant::now();
-        let converter = if video_output.is_none() {
-            conversion::Raster::Gpu(
-                qnc_gpu_raster::GpuRasterConverter::prepare(
-                    plan.spec.clone(),
-                    input::preview_raster_bounds(plan.spec.width, plan.spec.height),
-                )
-                .map_err(error)?,
-            )
-        } else {
-            let converter =
-                Converter::prepare(plan.spec.clone(), plan.spec.scratch_bytes().map_err(error)?)
-                    .map_err(error)?;
-            conversion::Raster::Cpu(RasterConverter::prepare(converter, None).map_err(error)?)
-        };
-        let converter_ms = opened.elapsed().as_millis();
-        let raster_size = converter.size();
-        let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4) + STEP_BACK_FRAMES as usize + 8)
-            .map(|_| Some(std::sync::Arc::from(vec![0; converter.output_bytes()])))
-            .collect();
+        // The GPU converter is prepared while the audio device opens (both take a
+        // while and need nothing of each other).
+        let gpu_converter = video_output.is_none().then(|| {
+            let (spec, bounds) = (
+                plan.spec.clone(),
+                input::preview_raster_bounds(plan.spec.width, plan.spec.height),
+            );
+            std::thread::spawn(move || qnc_gpu_raster::GpuRasterConverter::prepare(spec, bounds))
+        });
         let decode_input = Rc::new(DecodeInput::new_access(
             plan.media.clone(),
             decoder_config,
@@ -291,6 +281,27 @@ impl Runtime {
             prebuffer_frames,
         )?;
         let audio_ms = opened.elapsed().as_millis();
+        let converter = match gpu_converter {
+            Some(prepared) => conversion::Raster::Gpu(
+                prepared
+                    .join()
+                    .map_err(|_| error("GPU converter preparation panicked"))?
+                    .map_err(error)?,
+            ),
+            None => {
+                let converter = Converter::prepare(
+                    plan.spec.clone(),
+                    plan.spec.scratch_bytes().map_err(error)?,
+                )
+                .map_err(error)?;
+                conversion::Raster::Cpu(RasterConverter::prepare(converter, None).map_err(error)?)
+            }
+        };
+        let converter_ms = opened.elapsed().as_millis();
+        let raster_size = converter.size();
+        let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4) + STEP_BACK_FRAMES as usize + 8)
+            .map(|_| Some(std::sync::Arc::from(vec![0; converter.output_bytes()])))
+            .collect();
         let video_decoder = decode_input.open(plan.video_index, None)?;
         let device = audio.sink.device.clone();
         let gpu = Rc::new(RefCell::new(VideoSink {
