@@ -1,0 +1,9 @@
+[package]
+name = "qnc-key-cheatsheet"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive UI block: the keyboard overview (F1) - every key of the active preset for the scopes of a board, with its catalog label"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-keyboard-shortcut = { workspace = true }

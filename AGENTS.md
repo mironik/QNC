@@ -2736,3 +2736,11 @@ modula), `apps/qnc-project`, `crates/qnc-project-desktop`, `crates/qnc-project-a
 `contracts/ui/project.layout.json` (samo mjere mjesta ploce, bez promjene izgleda), `apps/qnc-app`,
 nove kocke Projecta i njihovi ugovori, `tools/qnc-conformance`, root Cargo. Zatim redom Ingest, MA,
 Story, uz isto odobrenje za njihove forme i ugovore rasporeda.
+
+Zatvoreno ograniceno odobrenje 2026-10-01 (F1 pregled tipki): korisnik je trazio da F1 radi kako je
+zapisano u katalogu (`toggle_cheatsheet`, F1 i Shift+/). Izvedeno: novi javni `crates/qnc-key-cheatsheet`
+(+ `contracts/modules/key-cheatsheet.module.json`): prozor "Tipke" s tipkama aktivnog preseta i
+oznakama akcija iz istog kataloga, za scopeove ploce; nista ne mijenja i ne zna za aplikaciju.
+Poziva ga `crates/qnc-key-intents`, pa ga dobiva svaka ploca koja cita tipke, bez rasta formi.
+Ingest scope u katalogu nema `toggle_cheatsheet` (Ingest dio kataloga je zamrznut), pa u Ingestu
+F1 za sada ne otvara pregled. Odobrenje je zatvoreno.

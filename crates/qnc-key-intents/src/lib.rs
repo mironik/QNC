@@ -8,7 +8,8 @@ use qnc_keyboard_shortcut::ShortcutCatalog;
 
 /// The action ids of this frame's keys, in order: first every press of `play_action`
 /// in the first scope (taken out of the input, so nothing else sees it), then for every
-/// key the actions of `scopes`, each action once per key.
+/// key the actions of `scopes`, each action once per key. The keyboard overview
+/// (`toggle_cheatsheet`) is opened and drawn here, so every board has it.
 pub fn action_ids(
     ctx: &egui::Context,
     catalog: &ShortcutCatalog,
@@ -31,5 +32,8 @@ pub fn action_ids(
         }
         ids.extend(this_key);
     }
+    let toggled = ids.iter().any(|id| id == qnc_key_cheatsheet::TOGGLE_ACTION);
+    ids.retain(|id| id != qnc_key_cheatsheet::TOGGLE_ACTION);
+    qnc_key_cheatsheet::show(ctx, catalog, scopes, toggled);
     ids
 }

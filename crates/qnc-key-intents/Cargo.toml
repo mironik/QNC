@@ -7,3 +7,4 @@ description = "QNC public component: the keys of one frame turned into catalog a
 [dependencies]
 eframe = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
+qnc-key-cheatsheet = { workspace = true }

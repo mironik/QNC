@@ -3733,10 +3733,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-key-cheatsheet"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-keyboard-shortcut",
+]
+
+[[package]]
 name = "qnc-key-intents"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-key-cheatsheet",
  "qnc-keyboard-shortcut",
 ]
 
