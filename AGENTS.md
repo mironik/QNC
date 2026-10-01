@@ -2785,3 +2785,8 @@ prijelaz na sljedecu grupu najprije ponovno cita bazu), test zatvaranja promijen
 Kao v5 (`footer_project_only`): bez aktivnog projekta ni dugme Close project se ne prikazuje
 (`crates/qnc-shell-footer` `project_open`).
 Project nije diran.
+Popravak 2026-10-01 (korisnik: "nakon zatvaranja i ponovnog otvaranja projekta u Ingestu se vise ne
+prikazuju posteri s kartice"): Ingest je pri zatvaranju projekta ispraznio popis klipova, ali je
+`qnc-clip-posters` i dalje pamtio koje je postere ucitao, pa ih za ponovno otvoreni projekt nije trazio.
+`crates/qnc-ingest-application/src/settings.rs`: kad se popis klipova prazni (nema projekta ili drugi
+projekt) poster loader se resetira (`posters.reset()`), kao sto vec radi Editorial. Bez novih redaka.

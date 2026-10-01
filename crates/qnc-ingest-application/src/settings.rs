@@ -3,7 +3,7 @@ use super::*;
 impl IngestApplication {
     pub(crate) fn settings_failed(&mut self, error: String) {
         self.stop_player();
-        self.cancel_thumbnail_load();
+        self.posters.reset(); // the clips go: a reopened project loads its posters again
         self.work_plan = None;
         self.catalog_target = None;
         self.select_target = None;
@@ -115,7 +115,7 @@ impl IngestApplication {
                 if self.work_plan.as_ref().map(|p| &p.settings.project_id)
                     != Some(&plan.settings.project_id)
                 {
-                    self.cancel_thumbnail_load();
+                    self.posters.reset();
                     self.view.clips.clear();
                     self.view.clip_filter = ClipFilter::All;
                     self.view.preview_clip_id = None;
