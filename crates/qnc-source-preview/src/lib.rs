@@ -151,6 +151,9 @@ pub struct SourcePreview {
     /// so the player command queue never fills.
     cue_in_flight: Option<(u64, std::time::Instant)>,
     cue_next: Option<u64>,
+    /// The frame last asked for, until the player confirms it: the next arrow press
+    /// counts from it even when the cue in flight was released on its timeout.
+    cue_asked: Option<u64>,
     /// Every preview tells the project database while its player prepares or plays,
     /// so background generators of any process give way.
     activity: qnc_playback_activity::PlaybackReporter,
@@ -173,6 +176,7 @@ impl Default for SourcePreview {
             record_wait: None,
             cue_in_flight: None,
             cue_next: None,
+            cue_asked: None,
             activity: qnc_playback_activity::PlaybackReporter::new(),
             activity_target: None,
             program: false,
@@ -261,7 +265,7 @@ impl SourcePreview {
 
     /// Cuts the current session and clears everything shown.
     pub fn close(&mut self) {
-        (self.cue_in_flight, self.cue_next) = (None, None);
+        (self.cue_in_flight, self.cue_next, self.cue_asked) = (None, None, None);
         self.play_when_ready = false;
         self.program = false;
         if let Some(player) = &self.player {
@@ -361,7 +365,7 @@ impl SourcePreview {
             return true;
         };
         let clip_id = clip_id.to_string();
-        (self.cue_in_flight, self.cue_next) = (None, None);
+        (self.cue_in_flight, self.cue_next, self.cue_asked) = (None, None, None);
         player.prepare_at(first_frame, move || {
             let sources = transport_bindings(&context)?;
             let executable = qnc_player_launcher::sibling_executable("qnc-broadcast-player")?;
@@ -400,7 +404,7 @@ impl SourcePreview {
     /// latest frame goes to the player (as a scrub does).
     pub fn step(&mut self, frames: i64) -> bool {
         let timeline = &self.view.timeline;
-        let pending = self.cue_next.or(self.cue_in_flight.map(|(frame, _)| frame));
+        let pending = self.cue_next.or(self.cue_in_flight.map(|(frame, _)| frame)).or(self.cue_asked);
         let base = pending.or_else(|| self.player_view.confirmed_source_frame());
         let (Some(base), true) = (base, timeline.duration_frames > 1) else {
             return self.send(Action::Step(frames));
@@ -415,6 +419,7 @@ impl SourcePreview {
             return true;
         }
         self.cue_in_flight = Some((frame, std::time::Instant::now()));
+        self.cue_asked = Some(frame);
         self.send(Action::Cue(frame))
     }
 
@@ -424,6 +429,9 @@ impl SourcePreview {
             return;
         };
         let landed = self.player_view.confirmed_source_frame() == Some(frame);
+        if landed {
+            self.cue_asked = None;
+        }
         if landed || sent.elapsed() >= std::time::Duration::from_millis(300) {
             self.cue_in_flight = None;
             if let Some(next) = self.cue_next.take() {
@@ -470,7 +478,7 @@ impl SourcePreview {
         };
         self.program = true;
         self.play_when_ready = false;
-        (self.cue_in_flight, self.cue_next) = (None, None);
+        (self.cue_in_flight, self.cue_next, self.cue_asked) = (None, None, None);
         player.prepare_at(first_frame, move || {
             let sources = transport_bindings(&context)?;
             let executable = qnc_player_launcher::sibling_executable("qnc-broadcast-player")?;
