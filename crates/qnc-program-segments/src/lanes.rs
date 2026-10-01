@@ -38,14 +38,16 @@ impl ProgramSegments {
         true
     }
 
-    /// Up opens the wave of the taken lane over the video row, down closes it.
+    /// Up opens the wave of the taken lane over the video row, down closes it; the lane
+    /// is let go with its channel unchanged, so the arrows move the playhead again and
+    /// cutting goes by the large wave (user rule 2026-10-01).
     pub fn lane_zoom(&mut self, delta: i8) -> bool {
-        let Some((lane, _)) = self.lane_taken else {
+        let Some((lane, _)) = self.lane_taken.take() else {
             return false;
         };
         let level = &mut self.wave_zoom[usize::from(lane)];
         *level = level.saturating_add_signed(delta).min(MAX_WAVE_ZOOM);
-        self.view.wave_zoom = self.wave_zoom;
+        self.refresh_view(String::new());
         true
     }
 
@@ -89,8 +91,11 @@ mod tests {
         segments.lane_draft(5);
         assert_eq!(segments.view().lane_taken, Some((1, 3)), "never past the last channel");
         segments.lane_zoom(1);
-        segments.lane_zoom(1);
         assert_eq!(segments.view().wave_zoom, [0, 1], "one press opens it fully");
+        assert_eq!(segments.view().lane_taken, None, "and lets the lane go: the arrows move the playhead");
+        assert!(!segments.lane_zoom(1), "nothing taken any more");
+        segments.take_lane(1);
+        segments.lane_draft(5);
         assert!(segments.sync_holds_enter(), "Enter belongs to the taken lane");
         segments.commit_lane();
         assert!(segments.sync_holds_enter(), "the same Enter does not also save a short");
