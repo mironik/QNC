@@ -2909,6 +2909,7 @@ name = "qnc-app"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-contracts",
  "qnc-ingest-desktop-adapter",
  "qnc-media-assist-audio-ai-desktop-adapter",
@@ -2917,6 +2918,7 @@ dependencies = [
  "qnc-project-close",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
+ "qnc-shell-footer",
  "qnc-story-desktop-adapter",
  "rusqlite",
  "serde",
@@ -4281,6 +4283,13 @@ dependencies = [
 
 [[package]]
 name = "qnc-shell-desktop-api"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
+name = "qnc-shell-footer"
 version = "0.1.0"
 dependencies = [
  "eframe",

@@ -11,6 +11,7 @@ use qnc_project_close::CloseProjectComponent;
 use qnc_shell_desktop_api::{
     next_group_tab, DesktopApplicationRef, DesktopNavigation, EmbeddedAppFactory, ShellDesktopApp,
 };
+use qnc_shell_footer::{FooterInput, FooterIntent, FooterStyle, Palette, ThemeId};
 use serde::Deserialize;
 
 const SHELL_LAYOUT_JSON: &str = include_str!("../../../contracts/ui/shell.layout.json");
@@ -476,7 +477,7 @@ impl QncShell {
     }
 
     fn placeholder(&self, ui: &mut egui::Ui, label: &str) {
-        let theme = self.theme();
+        let theme = self.palette();
         let rect = ui.available_rect_before_wrap();
         ui.allocate_exact_size(rect.size(), Sense::hover());
         ui.painter().rect_filled(rect, 0.0, theme.bg);
@@ -519,208 +520,63 @@ impl QncShell {
         }
     }
 
-    fn footer(&mut self, ctx: &egui::Context) {
-        let theme = self.theme();
-        egui::TopBottomPanel::bottom("footer")
-            .exact_height(self.layout.shell_metrics.footer_height)
-            .frame(
-                egui::Frame::NONE
-                    .fill(theme.bg)
-                    .inner_margin(egui::Margin::symmetric(
-                        self.layout.theme_metrics.chrome_pad_x,
-                        0,
-                    )),
-            )
-            .show(ctx, |ui| {
-                let h = ui.available_height();
-                let columns = self.layout.shell_metrics.workspace_footer_columns.max(3);
-                let apps = self.app_registry.entries().to_vec();
-                let mut tab_to_activate = None;
-                let mut close_project = false;
-                let status = self.footer_status().to_string();
-                ui.columns(columns, |cols| {
-                    cols[0].with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        ui.set_min_height(h);
-                        self.theme_picker(ui);
-                    });
-
-                    cols[1].with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-                        ui.set_min_height(h);
-                        ui.horizontal_centered(|ui| {
-                            ui.spacing_mut().item_spacing.x = 12.0;
-                            for app in &apps {
-                                let selected = self.active_tab == app.tab_id;
-                                if self.link_tab(ui, &app.label, selected).clicked() {
-                                    tab_to_activate = Some(app.tab_id.clone());
-                                }
-                            }
-                        });
-                    });
-
-                    cols[2].with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.set_min_height(h);
-                        let close_button = egui::Button::new(
-                            RichText::new("Close project")
-                                .size(self.layout.theme_metrics.font_ui)
-                                .color(theme.text),
-                        )
-                        .min_size(Vec2::new(118.0, 24.0));
-                        if ui
-                            .add(close_button)
-                            .on_hover_text("Zatvori aktivni projekt")
-                            .clicked()
-                        {
-                            close_project = true;
-                        }
-                        ui.add(
-                            egui::Label::new(
-                                RichText::new(&status)
-                                    .size(self.layout.theme_metrics.font_ui)
-                                    .color(theme.muted),
-                            )
-                            .truncate(),
-                        )
-                        .on_hover_text(status.clone());
-                    });
-                });
-
-                if let Some(tab_id) = tab_to_activate {
-                    self.activate_tab(&tab_id);
-                }
-                if close_project {
-                    self.close_active_project();
-                }
-            });
+    /// The shell palette of the chosen theme.
+    fn palette(&self) -> Palette {
+        self.theme_id.palette(contract_palette(&self.layout.colors))
     }
 
-    fn theme_picker(&mut self, ui: &mut egui::Ui) {
-        let theme = self.theme();
-        ui.label(
-            RichText::new("Tema")
-                .size(self.layout.theme_metrics.font_ui)
-                .color(theme.muted),
-        );
-        let mut selected = self.theme_id;
-        egui::ComboBox::from_id_salt("qnc_shell_theme")
-            .selected_text(selected.label())
-            .width(110.0)
-            .show_ui(ui, |ui| {
-                for id in ThemeId::ALL {
-                    ui.selectable_value(&mut selected, id, id.label());
-                }
-            });
-        if selected != self.theme_id {
-            self.theme_id = selected;
-            apply_visuals(ui.ctx(), &self.layout);
-            self.status = format!("Tema: {}", selected.label());
-        }
-    }
-
-    fn link_tab(&self, ui: &mut egui::Ui, label: &str, selected: bool) -> egui::Response {
-        let theme = self.theme();
-        let text = if selected {
-            RichText::new(label)
-                .size(self.layout.theme_metrics.font_ui)
-                .strong()
-                .color(theme.text)
-        } else {
-            RichText::new(label)
-                .size(self.layout.theme_metrics.font_ui)
-                .color(theme.muted)
+    /// The footer block in its place of the desktop layout.
+    fn footer(&self, ui: &mut egui::Ui, rect: egui::Rect) -> Option<FooterIntent> {
+        let style = FooterStyle {
+            font_ui: self.layout.theme_metrics.font_ui,
+            pad_x: self.layout.theme_metrics.chrome_pad_x,
+            columns: self.layout.shell_metrics.workspace_footer_columns,
         };
-        let response = ui.add(
-            egui::Label::new(text)
-                .sense(Sense::click())
-                .selectable(false),
-        );
-        if selected {
-            ui.painter().hline(
-                response.rect.left()..=response.rect.right(),
-                response.rect.bottom() + 1.0,
-                egui::Stroke::new(2.0, theme.accent),
-            );
-        }
-        response
+        let entries = self.app_registry.entries();
+        let tabs: Vec<(&str, &str)> =
+            entries.iter().map(|app| (app.tab_id.as_str(), app.label.as_str())).collect();
+        let input = FooterInput {
+            tabs: &tabs,
+            active_tab: &self.active_tab,
+            theme: self.theme_id,
+            status: self.footer_status(),
+        };
+        qnc_shell_footer::show(ui, rect, &style, &self.palette(), input)
     }
 
-    fn theme(&self) -> Theme {
-        match self.theme_id {
-            ThemeId::Dark => Theme::from_contract(&self.layout.colors),
-            ThemeId::Soft => Theme {
-                bg: Color32::from_rgb(22, 27, 38),
-                surface: Color32::from_rgb(32, 40, 56),
-                raised: Color32::from_rgb(45, 55, 74),
-                border: Color32::from_rgb(75, 88, 110),
-                text: Color32::from_rgb(236, 239, 244),
-                muted: Color32::from_rgb(168, 178, 194),
-                accent: Color32::from_rgb(52, 199, 148),
-                focus: Color32::from_rgb(255, 196, 90),
-            },
-            ThemeId::HighContrast => Theme {
-                bg: Color32::BLACK,
-                surface: Color32::from_rgb(18, 18, 18),
-                raised: Color32::from_rgb(36, 36, 36),
-                border: Color32::from_rgb(180, 180, 180),
-                text: Color32::WHITE,
-                muted: Color32::from_rgb(200, 200, 200),
-                accent: Color32::from_rgb(0, 255, 170),
-                focus: Color32::from_rgb(255, 200, 0),
-            },
+    fn apply_footer(&mut self, ctx: &egui::Context, intent: FooterIntent) {
+        match intent {
+            FooterIntent::Activate(tab_id) => self.activate_tab(&tab_id),
+            FooterIntent::CloseProject => self.close_active_project(),
+            FooterIntent::Theme(theme) => {
+                self.theme_id = theme;
+                apply_visuals(ctx, &self.layout);
+                self.status = format!("Tema: {}", theme.label());
+            }
         }
     }
 }
 
 impl eframe::App for QncShell {
+    /// The desktop: the surface of the active application over the footer, one layout
+    /// (user rule 2026-09-30: the footer is a place of every board).
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.footer(ctx);
-        egui::CentralPanel::default()
-            .frame(egui::Frame::NONE.fill(self.theme().bg))
-            .show(ctx, |ui| self.body(ui));
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Theme {
-    bg: Color32,
-    surface: Color32,
-    raised: Color32,
-    border: Color32,
-    text: Color32,
-    muted: Color32,
-    accent: Color32,
-    focus: Color32,
-}
-
-impl Theme {
-    fn from_contract(colors: &ThemeColors) -> Self {
-        Self {
-            bg: rgb(colors.bg),
-            surface: rgb(colors.surface),
-            raised: rgb(colors.raised),
-            border: rgb(colors.border),
-            text: rgb(colors.text),
-            muted: rgb(colors.muted),
-            accent: rgb(colors.accent),
-            focus: rgb(colors.focus),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ThemeId {
-    Dark,
-    Soft,
-    HighContrast,
-}
-
-impl ThemeId {
-    const ALL: [ThemeId; 3] = [ThemeId::Dark, ThemeId::Soft, ThemeId::HighContrast];
-
-    fn label(self) -> &'static str {
-        match self {
-            ThemeId::Dark => "Dark",
-            ThemeId::Soft => "Soft",
-            ThemeId::HighContrast => "High contrast",
+        let layout = qnc_board::surface_with_footer(self.layout.shell_metrics.footer_height);
+        let intent = egui::CentralPanel::default()
+            .frame(egui::Frame::NONE.fill(self.palette().bg))
+            .show(ctx, |ui| {
+                qnc_board::show_layout(ui, &layout, |_| None, |ui, block, rect| match block {
+                    "surface" => {
+                        self.body(ui);
+                        None
+                    }
+                    "footer" => self.footer(ui, rect),
+                    _ => None,
+                })
+            })
+            .inner;
+        if let Some(intent) = intent {
+            self.apply_footer(ctx, intent);
         }
     }
 }
@@ -754,7 +610,7 @@ fn apply_app_fonts(ctx: &egui::Context, shell: &ShellLayoutContract) {
 }
 
 fn apply_visuals(ctx: &egui::Context, shell: &ShellLayoutContract) {
-    let theme = Theme::from_contract(&shell.colors);
+    let theme = contract_palette(&shell.colors);
     let mut style = (*ctx.style()).clone();
     style.spacing.button_padding = Vec2::new(10.0, 6.0);
     style.spacing.item_spacing = Vec2::new(8.0, 6.0);
@@ -784,6 +640,20 @@ fn apply_visuals(ctx: &egui::Context, shell: &ShellLayoutContract) {
     style.visuals.selection.stroke = egui::Stroke::new(1.0, theme.focus);
     style.visuals.hyperlink_color = theme.accent;
     ctx.set_style(style);
+}
+
+/// The palette of the shell layout contract (the Dark theme).
+fn contract_palette(colors: &ThemeColors) -> Palette {
+    Palette {
+        bg: rgb(colors.bg),
+        surface: rgb(colors.surface),
+        raised: rgb(colors.raised),
+        border: rgb(colors.border),
+        text: rgb(colors.text),
+        muted: rgb(colors.muted),
+        accent: rgb(colors.accent),
+        focus: rgb(colors.focus),
+    }
 }
 
 fn rgb(value: [u8; 3]) -> Color32 {

@@ -10,6 +10,8 @@ path = "src/main.rs"
 
 [dependencies]
 eframe = { workspace = true }
+qnc-board = { workspace = true }
+qnc-shell-footer = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-ingest-desktop-adapter = { workspace = true }
 qnc-media-assist-audio-ai-desktop-adapter = { workspace = true }

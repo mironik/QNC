@@ -206,6 +206,22 @@ impl BoardSizes {
     }
 }
 
+/// The desktop: the surface of the active application (block `surface`) over the
+/// footer (block `footer`), so the footer is a place of every board.
+pub fn surface_with_footer(footer_height: f32) -> Layout {
+    let block = |name: &str| Some(Node::Block { name: name.to_string() });
+    Layout {
+        face: None,
+        root: Node::Split {
+            axis: Axis::Vertical,
+            parts: vec![
+                Part { size: Size::Rest, face: None, node: block("surface") },
+                Part { size: Size::Px { px: footer_height, max_share: None }, face: None, node: block("footer") },
+            ],
+        },
+    }
+}
+
 /// What a layout puts in a rectangle: faces (in paint order) and blocks (in draw order).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Solved {

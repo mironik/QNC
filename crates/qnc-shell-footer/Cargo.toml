@@ -1,0 +1,8 @@
+[package]
+name = "qnc-shell-footer"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive UI component: the shell footer block (theme picker, application tabs, Close project, status)"
+
+[dependencies]
+eframe = { workspace = true }
