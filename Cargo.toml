@@ -103,6 +103,7 @@ members = [
     "crates/qnc-board",
     "crates/qnc-channel-picker",
     "crates/qnc-pending-marks",
+    "crates/qnc-source-mark-focus",
     "crates/qnc-source-channels",
     "crates/qnc-desktop-theme",
     "crates/qnc-shell-footer",
@@ -248,6 +249,7 @@ qnc-program-waveform = { path = "crates/qnc-program-waveform" }
 qnc-board = { path = "crates/qnc-board" }
 qnc-channel-picker = { path = "crates/qnc-channel-picker" }
 qnc-pending-marks = { path = "crates/qnc-pending-marks" }
+qnc-source-mark-focus = { path = "crates/qnc-source-mark-focus" }
 qnc-source-channels = { path = "crates/qnc-source-channels" }
 qnc-desktop-theme = { path = "crates/qnc-desktop-theme" }
 qnc-shell-footer = { path = "crates/qnc-shell-footer" }

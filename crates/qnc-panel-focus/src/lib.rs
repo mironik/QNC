@@ -11,7 +11,8 @@
 use eframe::egui;
 use qnc_program_segments::{ProgramSegments, SyncSpace};
 use qnc_source_preview::{SourcePreview, TransientCover};
-use qnc_timeline::TimelineIntent;
+use qnc_source_mark_focus::MarkKey;
+use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_wrap_session::WrapSession;
 
 pub const MODULE_ID: &str = "qnc.module.panel-focus";
@@ -67,7 +68,12 @@ impl PanelFocus {
     pub fn route(
         &mut self,
         action_id: &str,
-        (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments),
+        (preview, wrap, segments, timeline): (
+            &mut SourcePreview,
+            &mut WrapSession,
+            &mut ProgramSegments,
+            &mut TimelineProjection,
+        ),
     ) -> Option<bool> {
         let panel = self.panel;
         Some(match action_id {
@@ -105,6 +111,20 @@ impl PanelFocus {
             // Enter belongs to a closed Sync slot or a marker draft wherever it runs.
             "activate_focused_item" if segments.sync_holds_enter() => {
                 segments.apply_action(action_id)
+            }
+            // v5 select_mark_in / select_mark_out: Ctrl+I, Ctrl+O take the source IN, OUT; the
+            // arrows move the taken mark, Escape gives the keys back to the playhead.
+            "select_mark_in" | "select_mark_out" if panel == Panel::SourceTimeline => {
+                mark_cue(preview, qnc_source_mark_focus::take(timeline, action_id == "select_mark_in"))
+            }
+            "step_back_frame" | "step_forward_frame"
+                if panel == Panel::SourceTimeline && qnc_source_mark_focus::is_taken(timeline) =>
+            {
+                let frames = if action_id == "step_back_frame" { -1 } else { 1 };
+                mark_cue(preview, qnc_source_mark_focus::nudge(timeline, frames))
+            }
+            "clear_focus" | "close_player" if qnc_source_mark_focus::is_taken(timeline) => {
+                mark_cue(preview, qnc_source_mark_focus::release(timeline))
             }
             // Escape drops the edit of a segment wherever the keyboard is.
             "clear_focus" | "close_player" if segments.view().editing.is_some() => {
@@ -202,27 +222,36 @@ mod tests {
         let mut segments = ProgramSegments::new();
         focus.set(Panel::Segments);
         assert_eq!(
-            focus.route("mark_in", (&mut preview, &mut wrap, &mut segments)),
+            focus.route("mark_in", (&mut preview, &mut wrap, &mut segments, &mut TimelineProjection::default())),
             Some(false),
             "I does nothing on the segment panel"
         );
         focus.set(Panel::SourceTimeline);
         assert_eq!(
-            focus.route("mark_in", (&mut preview, &mut wrap, &mut segments)),
+            focus.route("mark_in", (&mut preview, &mut wrap, &mut segments, &mut TimelineProjection::default())),
             None,
             "the application marks IN"
         );
         assert_eq!(
-            focus.route("add_marker", (&mut preview, &mut wrap, &mut segments)),
+            focus.route("add_marker", (&mut preview, &mut wrap, &mut segments, &mut TimelineProjection::default())),
             Some(false),
             "M belongs to the segment panel"
         );
         assert_eq!(
             focus.route(
                 "editorial_tab_all",
-                (&mut preview, &mut wrap, &mut segments)
+                (&mut preview, &mut wrap, &mut segments, &mut TimelineProjection::default())
             ),
             None
         );
+    }
+}
+
+/// A taken source mark moves the source playhead with it.
+fn mark_cue(preview: &mut SourcePreview, key: MarkKey) -> bool {
+    match key {
+        MarkKey::Cue(frame) => preview.cue(frame),
+        MarkKey::Changed => true,
+        MarkKey::Refused => false,
     }
 }

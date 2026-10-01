@@ -403,7 +403,7 @@ impl EditorialApplication {
                 true
             }
             EditorialIntent::Action(action_id) => {
-                let pieces = (&mut self.preview, &mut self.wrap, &mut self.segments);
+                let pieces = (&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline);
                 match self.focus.route(&action_id, pieces) {
                     Some(changed) => changed, // the keyboard acts on the panel in focus
                     None => self.application_action(&action_id),

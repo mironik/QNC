@@ -8,5 +8,6 @@ description = "QNC public component: the keyboard map acts on the editorial pane
 eframe = { workspace = true }
 qnc-program-segments = { workspace = true }
 qnc-source-preview = { workspace = true }
+qnc-source-mark-focus = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-wrap-session = { workspace = true }

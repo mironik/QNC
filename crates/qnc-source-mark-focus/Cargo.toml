@@ -1,0 +1,8 @@
+[package]
+name = "qnc-source-mark-focus"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: Ctrl+I / Ctrl+O take the source IN or OUT, the arrows move it one frame, Escape gives the keys back to the playhead (v5 select_mark_in / nudge_in)"
+
+[dependencies]
+qnc-timeline = { workspace = true }

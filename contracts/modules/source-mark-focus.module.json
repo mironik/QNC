@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.source-mark-focus",
+  "module_name": "Source mark focus",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.source_marks.take", "ui.source_marks.nudge"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-source-mark-focus",
+  "input": "The source timeline projection of the caller and a key: take IN or OUT, move the taken mark by frames, release.",
+  "output": "The changed IN/OUT and focus of that projection and the source frame the player should cue; it plays nothing.",
+  "specification": "v5 story.rs select_mark_in, select_mark_out, nudge_in, nudge_out (catalog select_mark_in Ctrl+I, select_mark_out Ctrl+O); user rule 2026-09-25: Ctrl+key selects."
+}

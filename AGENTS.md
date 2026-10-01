@@ -2678,6 +2678,13 @@ idu sa slotom i pokrivalicom, markeri iza se pomicu za razliku duljine; Undo je 
 odustaje (`qnc-panel-focus`). Novi javni `crates/qnc-pending-marks` (+ ugovor modula): IN/OUT s
 kojim se klip otvara, izdvojeno iz `qnc-editorial-application` (virtualni short ga koristi kao
 prije, sada se otvara na svom IN-u); aplikacijski sloj je manji (C10 737 -> 718).
+Dopuna 2026-10-01 (korisnik: "kod edita segmenta Ctrl+I i Ctrl+O ne selektiraju IN i OUT"):
+katalog je imao `select_mark_in`/`select_mark_out`, ali ih QNC kod nikad nije obradjivao (samo v5).
+Novi javni `crates/qnc-source-mark-focus` (+ ugovor; v5 `select_mark_in`, `nudge_in`): Ctrl+I/O
+uzme IN/OUT i playhead ide na njega, strelice ga pomicu za frame, Esc vraca tipke playheadu;
+`qnc-panel-focus` ga poziva kad je fokus na source timelineu (aplikacija predaje svoj timeline,
+bez novih redaka). Preview klipa ciji zapis jos ceka pozadinski dovrsetak (`NotFinal`) pise
+"Podaci klipa se pripremaju..." i sam ponovno otvara klip (`qnc-player-input::is_incomplete_media`).
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

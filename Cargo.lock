@@ -3949,6 +3949,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-program-segments",
+ "qnc-source-mark-focus",
  "qnc-source-preview",
  "qnc-timeline",
  "qnc-wrap-session",
@@ -4464,6 +4465,13 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-source-bindings",
  "qnc-source-reader",
+]
+
+[[package]]
+name = "qnc-source-mark-focus"
+version = "0.1.0"
+dependencies = [
+ "qnc-timeline",
 ]
 
 [[package]]
