@@ -296,6 +296,7 @@ fn paint_program(
             video_background: None,
             a1_channel: None,
             a2_channel: None,
+            wave_over_video: None,
         },
     );
     // Story rows only: a dragged M marker follows the pointer as a draft (Enter confirms).

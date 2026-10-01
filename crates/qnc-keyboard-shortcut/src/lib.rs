@@ -505,6 +505,8 @@ fn egui_catalog_key_code(key: &egui::Key) -> Option<String> {
         Key::Home => "Home",
         Key::OpenBracket => "BracketLeft",
         Key::CloseBracket => "BracketRight",
+        Key::Num1 => "Digit1",
+        Key::Num2 => "Digit2",
         _ => return None,
     };
     Some(code.to_string())
@@ -652,6 +654,8 @@ mod tests {
             Key::Y,
             Key::W,
             Key::Slash,
+            Key::Num1,
+            Key::Num2,
         ];
         let known: Vec<(Option<String>, Option<String>)> = keys
             .iter()

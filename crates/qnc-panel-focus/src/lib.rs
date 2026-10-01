@@ -125,6 +125,23 @@ impl PanelFocus {
             "activate_focused_item" if segments.sync_holds_enter() => {
                 segments.apply_action(action_id)
             }
+            // A1/A2 by keyboard (user rule 2026-10-01): Ctrl+1, Ctrl+2 take the lane; while it is
+            // taken, left/right pick its channel, up/down show or hide its wave over the
+            // video row, Enter keeps the channel (heard at once), Escape lets go.
+            "select_audio_a1" | "select_audio_a2" if panel != Panel::Segments => {
+                segments.take_lane(u8::from(action_id == "select_audio_a2"))
+            }
+            "step_back_frame" | "step_forward_frame" if segments.lane_is_taken() => {
+                segments.lane_draft(if action_id == "step_back_frame" { -1 } else { 1 })
+            }
+            "step_prev_part" if segments.lane_is_taken() => segments.lane_zoom(1),
+            "step_next_part" if segments.lane_is_taken() => segments.lane_zoom(-1),
+            "activate_focused_item" if segments.lane_is_taken() => {
+                let kept = segments.commit_lane();
+                preview.hear_channels(segments.heard_channels());
+                kept
+            }
+            "clear_focus" | "close_player" if segments.lane_is_taken() => segments.release_lane(),
             // v5 navigate_adjacent_source_object: start, IN and OUT in order on the source.
             "navigate_prev_object" | "navigate_next_object" if panel == Panel::SourceTimeline => {
                 let key = qnc_source_mark_focus::adjacent(timeline, action_id == "navigate_prev_object");

@@ -3332,6 +3332,7 @@ dependencies = [
  "qnc-media-card",
  "qnc-monitor",
  "qnc-panel-focus",
+ "qnc-program-segments",
  "qnc-segment-panel",
  "qnc-source-dock",
  "qnc-timeline",

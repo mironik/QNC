@@ -11,6 +11,7 @@
 //! form and no application, and never plays, probes or opens media.
 
 mod edit;
+mod lanes;
 mod nav;
 mod marker_edit;
 mod markers;
@@ -202,6 +203,10 @@ pub struct SegmentsView {
     pub a1_choice: Option<(u16, u16)>,
     /// The same for A2 in the next cover, its own choice.
     pub a2_choice: Option<(u16, u16)>,
+    /// A1 (0) or A2 (1) taken with the keyboard and its draft channel (zero based).
+    pub lane_taken: Option<(u8, u16)>,
+    /// Display gain level of the A1 and A2 wave over the video row (0: not shown).
+    pub wave_zoom: [u8; 2],
 }
 
 impl SegmentsView {
@@ -564,6 +569,8 @@ pub struct ProgramSegments {
     /// 2026-10-01), channel 1 for a clip with one channel.
     a2_channel: u16,
     source_channels: Option<u16>,
+    lane_taken: Option<(u8, u16)>,
+    wave_zoom: [u8; 2],
     channels: qnc_source_channels::SourceChannels,
     sync: qnc_sync_cover::SyncCover,
     /// IN was pressed since the last source (arms Sync).
@@ -664,6 +671,8 @@ impl ProgramSegments {
         if self.source.clip_id != source.clip_id {
             self.a1_channel = 0; // another clip: A1 on channel 1, A2 on channel 2 (user rule)
             self.a2_channel = 1;
+            self.lane_taken = None;
+            self.view.lane_taken = None;
             self.view.a1_choice = self.a1_choice();
             self.view.a2_choice = self.a2_choice();
         }
@@ -1341,6 +1350,7 @@ impl ProgramSegments {
         view.editing = self.editing.clone();
         view.a1_choice = self.a1_choice();
         view.a2_choice = self.a2_choice();
+        (view.lane_taken, view.wave_zoom) = (self.lane_taken, self.wave_zoom);
         self.view = view;
     }
 

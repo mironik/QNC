@@ -2701,6 +2701,17 @@ uredaj svira samo dok su vrata reprodukcije zatvorena i odbacuje cim krene Play;
 pripremljeni Play se ne diraju. `qnc-broadcast-engine` (`DeviceSink::audition_at` iz
 `cue_audio`) nakon cuea pusti tocno uzorke tog jednog framea. Program (Wrap) jos nema korak sa
 zvukom. Strelice: koraci se zbrajaju od zadnjeg trazenog framea (`qnc-source-preview::step`).
+Dopuna 2026-10-01 (korisnik: "dekoder treba pauzirati, ne zatvarati pa ponovo otvarati"):
+`qnc-broadcast-engine` drzi dekoder otvoren; korak naprijed cita dalje, slike oko zadnjeg cuea
+(25 iza) ostaju u memoriji, korak unatrag koji ipak otvara dekoder zadrzi i 25 slika prije;
+svaka predana slika dobiva redni broj pri predaji (monitor vise ne odbacuje "stale").
+Dopuna 2026-10-01 (korisnik: A1/A2 bez misa; "lijevo-desno izbor kanala, Enter zatvara i sprema,
+gore-dolje prosirenje prikaza, prikazi preko video trake, jednim pritiskom maksimum"): katalog
+`select_audio_a1` (Ctrl+1) i `select_audio_a2` (Ctrl+2) u svim presetima, tablica tipki zna 1 i 2;
+dok je traka uzeta lijevo/desno biraju kanal (nacrt u izborniku), Enter sprema i odmah se cuje,
+Esc odustaje, gore pokaze val te trake preko cijele video trake, dolje ga skrije. `qnc-program-segments`
+(`lanes.rs`), `qnc-timeline` (`wave_over_video`, izbornik otvoren dok je traka uzeta),
+`qnc-channel-picker` (`open`), `qnc-source-dock`, `qnc-editorial-blocks`, `qnc-panel-focus`.
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

@@ -556,6 +556,9 @@ pub struct TimelineInput<'a> {
     pub a1_channel: Option<ChannelChoice>,
     /// The same for A2 (the channel heard on A2 in covers), its own choice.
     pub a2_channel: Option<ChannelChoice>,
+    /// An audio lane drawn over the video row, at a display gain of 2^(level-1)
+    /// (user rule 2026-10-01: a closer look at the wave without a taller dock).
+    pub wave_over_video: Option<(AudioLane, u8)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -628,7 +631,7 @@ pub fn show_source_player_timeline_with_artifacts(
     a4_peaks: &[f32],
 ) -> TimelineIntent {
     let peaks = [a1_peaks, a2_peaks, a3_peaks, a4_peaks];
-    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None, None)
+    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None, None, None)
 }
 
 /// The source timeline with the A1 and A2 channel pickers, when the caller has a
@@ -642,6 +645,7 @@ pub fn show_source_player_timeline_with_channel(
     [a1_peaks, a2_peaks, a3_peaks, a4_peaks]: [&[f32]; 4],
     a1_channel: Option<ChannelChoice>,
     a2_channel: Option<ChannelChoice>,
+    wave_over_video: Option<(AudioLane, u8)>,
 ) -> TimelineIntent {
     let duration = state.duration_frames();
     let (draft_in, draft_out, in_active, out_active) = match state.visible_source_marks() {
@@ -679,6 +683,7 @@ pub fn show_source_player_timeline_with_channel(
                 video_background: None,
                 a1_channel,
                 a2_channel,
+                wave_over_video,
             },
         );
     });
@@ -704,6 +709,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     let left = outer.left() + input.metrics.border_width;
     let right = outer.right() - input.metrics.border_width;
     let mut intent = TimelineIntent::None;
+    let mut video_row = None;
 
     if input.layers.audio_a1 {
         let row = next_row(
@@ -736,6 +742,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
             input.metrics.video_height,
             input.metrics.row_gap,
         );
+        video_row = Some(row);
         keep_first_intent(&mut intent, paint_video_row(ui, row, &input));
     }
     if input.layers.audio_a2 {
@@ -807,6 +814,9 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
             ),
         );
     }
+    if let (Some(row), Some((lane, level))) = (video_row, input.wave_over_video) {
+        paint_wave_over_video(ui, row, lane, level, &input);
+    }
 
     intent
 }
@@ -876,8 +886,9 @@ fn paint_audio_row(
     qnc_wave_view::paint_wave_peaks(ui.painter(), track_rect, peaks, wave);
     paint_ranges_and_playhead(ui, track_rect, input);
     if let Some(choice) = picker {
-        if ui.data(|data| data.get_temp::<bool>(picker_open).unwrap_or(false)) {
+        if choice.open || ui.data(|data| data.get_temp::<bool>(picker_open).unwrap_or(false)) {
             // Right of the label, as high as the lane, over the start of the track.
+            // Open also while the lane is taken with the keyboard (its draft is shown).
             let rect = qnc_channel_picker::row_rect(track_rect, track_rect.left(), choice);
             let style = qnc_channel_picker::PickerStyle {
                 fill: input.theme.background,
@@ -1884,4 +1895,26 @@ mod tests {
         assert_eq!(last.local_marker_frame(100), None);
         assert_eq!(last.local_marker_frame(125), Some(25));
     }
+}
+
+/// The wave of one audio lane over the video row (user rule 2026-10-01): as high as
+/// that row, its peaks at a display gain of 2^(level-1); the sound is not changed.
+fn paint_wave_over_video(ui: &mut egui::Ui, row: Rect, lane: AudioLane, level: u8, input: &TimelineInput<'_>) {
+    let (peaks, wave) = match lane {
+        AudioLane::A1 => (input.a1_peaks, input.theme.wave_a1),
+        AudioLane::A2 => (input.a2_peaks, input.theme.wave_a2),
+        AudioLane::A3 => (input.a3_peaks, input.theme.wave_a3),
+        AudioLane::A4 => (input.a4_peaks, input.theme.wave_a4),
+        AudioLane::None => return,
+    };
+    if level == 0 {
+        return;
+    }
+    let (_, track) = split_label_track(row, input.metrics.label_width);
+    let gain = f32::from(1u16 << (level - 1).min(6));
+    let scaled: Vec<f32> = peaks.iter().map(|peak| (peak * gain).clamp(-1.0, 1.0)).collect();
+    let painter = ui.painter().with_clip_rect(track);
+    painter.rect_filled(track, 0.0, input.theme.audio_primary_background.gamma_multiply(0.92));
+    qnc_wave_view::paint_wave_peaks(&painter, track, &scaled, wave);
+    paint_ranges_and_playhead(ui, track, input);
 }

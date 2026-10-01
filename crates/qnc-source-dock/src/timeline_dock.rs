@@ -33,6 +33,8 @@ pub struct SourceTimeline<'a> {
     pub a1_channel: Option<qnc_timeline::ChannelChoice>,
     /// The source channel heard on A2 (covers), its own choice.
     pub a2_channel: Option<qnc_timeline::ChannelChoice>,
+    /// An audio lane drawn over the video row and its display gain level.
+    pub wave_over_video: Option<(qnc_timeline::AudioLane, u8)>,
 }
 
 impl<'a> SourceTimeline<'a> {
@@ -54,6 +56,7 @@ impl<'a> SourceTimeline<'a> {
             timecode: None,
             a1_channel: None,
             a2_channel: None,
+            wave_over_video: None,
         }
     }
 
@@ -66,6 +69,12 @@ impl<'a> SourceTimeline<'a> {
     /// A click on the A1 label opens the channel picker with this choice.
     pub fn with_a1_channel(mut self, choice: Option<qnc_timeline::ChannelChoice>) -> Self {
         self.a1_channel = choice;
+        self
+    }
+
+    /// The wave of `lane` over the video row at a display gain level (0: not shown).
+    pub fn with_wave_over_video(mut self, wave: Option<(qnc_timeline::AudioLane, u8)>) -> Self {
+        self.wave_over_video = wave;
         self
     }
 
@@ -189,5 +198,6 @@ pub fn show_timeline_dock(
         timeline.peaks,
         timeline.a1_channel,
         timeline.a2_channel,
+        timeline.wave_over_video,
     )
 }

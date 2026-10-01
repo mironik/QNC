@@ -10,6 +10,8 @@ use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKin
 pub struct ChannelChoice {
     pub selected: u16,
     pub count: u16,
+    /// Taken with the keyboard: the row is shown, `selected` is the draft.
+    pub open: bool,
 }
 
 /// Colours of the row.
@@ -75,7 +77,7 @@ mod tests {
     #[test]
     fn the_row_is_as_high_as_the_lane_and_one_cell_per_channel() {
         let lane = Rect::from_min_size(egui::pos2(10.0, 50.0), Vec2::new(500.0, 15.0));
-        let rect = row_rect(lane, 40.0, ChannelChoice { selected: 1, count: 4 });
+        let rect = row_rect(lane, 40.0, ChannelChoice { selected: 1, count: 4, open: false });
         assert_eq!(rect.height(), 15.0);
         assert_eq!(rect.top(), 50.0);
         assert_eq!(rect.left(), 40.0);

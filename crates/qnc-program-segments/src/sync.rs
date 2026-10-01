@@ -117,6 +117,7 @@ impl ProgramSegments {
             || self.marker_edit.is_some()
             || self.marker_committing
             || self.editing.is_some()
+            || self.lane_taken.is_some()
     }
 
     pub(crate) fn toggle_sync(&mut self) {
