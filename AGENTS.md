@@ -2716,6 +2716,12 @@ Klik na oznaku A1/A2 salje istu akciju kao Ctrl+1/Ctrl+2 (stari prekidac izborni
 Enter po fokusu (korisnik: "veži funkciju entera prema fokusu"): jedan Enter radi jednu stvar
 redom: uzeta traka sprema kanal; Ctrl+M marker, Edit segmenta ili Sync se potvrduju; inace
 virtualni kadar samo iz source timelinea ili poola; na panelu Segmenti bez cekanja nista.
+Zamijenjeno 2026-10-01 (korisnik: "ako je source timeline u fokusu tada se samo na njega odnose
+sortkat komande... enter je potvrda u svim layout panelima"; "korisnik ne mora pamtiti nebrojeno
+sortkatova"): tipke djeluju strogo samo na panel u fokusu. Source timeline: Enter potvrduje uzetu
+traku, Edit segmenta ili Sync, inace sprema virtualni kadar; O zatvara Sync samo tamo; strelice,
+gore/dolje i Esc za traku samo tamo. Segmenti: Enter potvrduje samo marker uzet s Ctrl+M. Pool:
+Enter i strelice ne rade nista. `qnc-program-segments` (`confirm.rs`), `qnc-panel-focus`.
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

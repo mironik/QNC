@@ -85,6 +85,7 @@ impl PanelFocus {
         ),
     ) -> Option<bool> {
         let panel = self.panel;
+        let on_source = panel == Panel::SourceTimeline;
         Some(match action_id {
             // A1/A2 by keyboard (user rule 2026-10-01): Ctrl+1, Ctrl+2 take the lane; while it is
             // taken, left/right pick its channel, up/down show or hide its wave over the
@@ -93,19 +94,27 @@ impl PanelFocus {
                 self.panel = Panel::SourceTimeline; // the lane is on the source timeline
                 segments.take_lane(u8::from(action_id == "select_audio_a2"))
             }
-            "step_back_frame" | "step_forward_frame" if segments.lane_is_taken() => {
+            "step_back_frame" | "step_forward_frame" if on_source && segments.lane_is_taken() => {
                 segments.lane_draft(if action_id == "step_back_frame" { -1 } else { 1 })
             }
-            "step_prev_part" if segments.lane_is_taken() => segments.lane_zoom(1),
-            "step_next_part" if segments.lane_is_taken() => segments.lane_zoom(-1),
-            "activate_focused_item" if segments.lane_is_taken() => {
-                let kept = segments.commit_lane();
-                preview.hear_channels(segments.heard_channels());
-                kept
+            "step_prev_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(1),
+            "step_next_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(-1),
+            // Enter is the confirmation of the panel in focus only.
+            "activate_focused_item" if on_source => {
+                let lane = segments.lane_is_taken();
+                let confirmed = segments.confirm_source();
+                if lane {
+                    preview.hear_channels(segments.heard_channels());
+                }
+                confirmed
             }
-            "clear_focus" | "close_player" if segments.lane_is_taken() => segments.release_lane(),
+            "activate_focused_item" if panel == Panel::Segments => segments.confirm_program(),
+            "activate_focused_item" => false,
+            // A virtual shot only from the source timeline, and not by an Enter that confirmed.
+            "save_virtual_shot" if !on_source || segments.source_waits_enter() => false,
+            "clear_focus" | "close_player" if on_source && segments.lane_is_taken() => segments.release_lane(),
             // Down closes an open large wave off the segment panel (there down is the next segment).
-            "step_next_part" if panel != Panel::Segments && segments.view().wave_zoom != [0, 0] => segments.close_wave(),
+            "step_next_part" if on_source && segments.view().wave_zoom != [0, 0] => segments.close_wave(),
             "focus_next" | "focus_prev" => {
                 let next = cycle(
                     panel,
@@ -129,7 +138,7 @@ impl PanelFocus {
                 SyncSpace::Play => preview.toggle_play(),
             },
             // O closes a running Sync slot wherever the keyboard is (v5).
-            "mark_out" if segments.finish_sync() => true,
+            "mark_out" if on_source && segments.finish_sync() => true,
             // The source timeline takes only I/O; the application marks them.
             "mark_in" | "mark_out" if panel != Panel::SourceTimeline => false,
             "mark_in" => {
@@ -141,14 +150,6 @@ impl PanelFocus {
                 self.mark_taken = false;
                 return None;
             }
-            // Enter belongs to a closed Sync slot or a marker draft wherever it runs.
-            "activate_focused_item" if segments.sync_holds_enter() => {
-                segments.apply_action(action_id)
-            }
-            // Enter by focus (user rule 2026-10-01): one Enter does one thing. With nothing
-            // waiting, it saves a virtual shot only from the source timeline or the pool
-            // (the application does it); on the segment panel it does nothing.
-            "save_virtual_shot" if panel == Panel::Segments || segments.sync_holds_enter() => false,
             // v5 navigate_adjacent_source_object: start, IN and OUT in order on the source.
             "navigate_prev_object" | "navigate_next_object" if panel == Panel::SourceTimeline => {
                 let key = qnc_source_mark_focus::adjacent(timeline, action_id == "navigate_prev_object");
@@ -181,7 +182,7 @@ impl PanelFocus {
                 mark_cue(preview, qnc_source_mark_focus::release(timeline))
             }
             // Escape drops the edit of a segment wherever the keyboard is.
-            "clear_focus" | "close_player" if segments.view().editing.is_some() => {
+            "clear_focus" | "close_player" if on_source && segments.view().editing.is_some() => {
                 segments.apply_action(action_id)
             }
             "step_back_frame" | "step_forward_frame" => {
@@ -197,7 +198,8 @@ impl PanelFocus {
                     Panel::Segments => wrap.step(frames),
                     // The pool has no arrow keys: they step the source playhead (user rule
                     // 2026-10-01: the arrows move the playhead one frame, no other key needed).
-                    Panel::SourceTimeline | Panel::Pool => preview.step(frames),
+                    Panel::SourceTimeline => preview.step(frames),
+                    Panel::Pool => false, // the keys act on the panel in focus only
                 }
             }
             action if SOURCE_TO_PROGRAM.contains(&action) => segments.apply_action(action),
@@ -299,6 +301,21 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn keys_act_on_the_panel_in_focus_only() {
+        let mut focus = PanelFocus::new();
+        let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
+        let mut timeline = TimelineProjection::default();
+        focus.set(Panel::Pool);
+        for action in ["activate_focused_item", "step_forward_frame", "save_virtual_shot"] {
+            assert_eq!(
+                focus.route(action, (&mut preview, &mut wrap, &mut segments, &mut timeline)),
+                Some(false),
+                "{action} does nothing on the pool"
+            );
+        }
     }
 
     #[test]

@@ -10,6 +10,7 @@
 //! the Wrap view (`qnc-wrap-session`); navigation only asks for a program frame. It knows no
 //! form and no application, and never plays, probes or opens media.
 
+mod confirm;
 mod edit;
 mod lanes;
 mod nav;
