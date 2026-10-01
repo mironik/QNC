@@ -190,6 +190,7 @@ impl ProgramSegments {
                 out_frame: slot.source_out,
                 fps_num: slot.source.timebase.0,
                 fps_den: slot.source.timebase.1,
+                a2_source_channel: self.a2_channel,
             },
             slot.source.clip_name,
         );

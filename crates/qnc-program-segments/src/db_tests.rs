@@ -221,6 +221,7 @@ fn a_cover_is_deleted_only_after_ctrl_click_took_it() {
             out_frame: 30,
             fps_num: 50,
             fps_den: 1,
+            a2_source_channel: 0,
         },
         "C1".into(),
     );

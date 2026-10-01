@@ -167,6 +167,10 @@ pub enum Operation {
         out_frame: u64,
         fps_num: u32,
         fps_den: u32,
+        /// Source channel (zero based) heard on A2, chosen on the source timeline;
+        /// channel 1 when not given (v5).
+        #[serde(default)]
+        a2_source_channel: u16,
     },
     /// v5 `delete_cover`; its B-roll virtual shot stays.
     DeleteCover { cover_id: String },

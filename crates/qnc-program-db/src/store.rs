@@ -157,12 +157,14 @@ impl Store {
                 out_frame,
                 fps_num,
                 fps_den,
+                a2_source_channel,
             } => self.create_cover(
                 project_id,
                 slot_id,
                 (clip_id, virtual_shot_id),
                 (*in_frame, *out_frame),
                 (*fps_num, *fps_den),
+                *a2_source_channel,
             ),
             Operation::DeleteCover { cover_id } => self.delete_cover(cover_id),
             Operation::SelectCover { cover_id } => self.select_cover(cover_id),
@@ -1012,6 +1014,7 @@ impl Store {
         (clip_id, shot_id): (&str, &str),
         (in_frame, out_frame): (u64, u64),
         (fps_num, fps_den): (u32, u32),
+        a2_source_channel: u16,
     ) -> Result<Data> {
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         qnc_media_records::valid_id(shot_id).map_err(err)?;
@@ -1094,7 +1097,7 @@ impl Store {
                 source_in_frame, source_out_frame, source_fps, source_fps_num, source_fps_den,
                 sort_index, a2_source_channel, created_at, updated_at
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '', '', ?11, ?12, ?13, ?14,
-                       ?15, ?16, ?17, ?18, ?19, 0, 0, ?20, ?20)",
+                       ?15, ?16, ?17, ?18, ?19, 0, ?21, ?20, ?20)",
             params![
                 cover_id,
                 slot_id,
@@ -1115,7 +1118,8 @@ impl Store {
                 fps,
                 fps_num,
                 fps_den,
-                now
+                now,
+                a2_source_channel
             ],
         )
         .map_err(err)?;

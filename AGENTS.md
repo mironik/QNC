@@ -2653,6 +2653,11 @@ kao `a1_source_channel`), `qnc-program-db` (`CreateSegment.a1_source_channel`, z
 `qnc-editorial-blocks` (jedan poziv), `qnc-editorial-application` (dva retka, C10 nije
 narastao), `qnc-ingest-application` (samo krak `ChooseA1Channel => None`; Ingest izbornik nema).
 Forme i layout nisu dirani. Izbornik ima samo Story (grupa o); MA ga nema jer nema segmente.
+Dopuna 2026-10-01 (korisnik: "istu opciju treba dodati i za A2, ne trpaj to u zajednicke kocke,
+svaka svoja"): A2 ima svoje polje (`a2_channel`), svoju namjeru (`ChooseA2Channel`) i svoj izbor
+u `qnc-program-segments` (`a2_choice`, `choose_a2_channel`), odvojeno od A1; crta ga ista
+pasivna kocka `qnc-channel-picker`. Cover slot, Overwrite i Sync pisu izabrani kanal kao
+`a2_source_channel` nove pokrivalice (`qnc-program-db` `CreateCover`, zadano 0).
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

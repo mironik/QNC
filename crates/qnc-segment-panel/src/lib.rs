@@ -295,6 +295,7 @@ fn paint_program(
             filmstrip_background: None,
             video_background: None,
             a1_channel: None,
+            a2_channel: None,
         },
     );
     // Story rows only: a dragged M marker follows the pointer as a draft (Enter confirms).

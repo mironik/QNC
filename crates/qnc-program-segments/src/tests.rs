@@ -480,3 +480,20 @@ fn a1_is_chosen_from_the_real_channels_of_the_marked_clip_and_starts_on_channel_
     segments.set_source_channels(Some(2));
     assert_eq!(segments.view().a1_choice, Some((0, 2)), "back to 1 when the clip has fewer");
 }
+
+#[test]
+fn a2_has_its_own_choice_from_the_same_real_channels() {
+    let mut segments = component();
+    segments.set_source(marked(10), None);
+    segments.set_source_channels(Some(3));
+    assert_eq!(segments.view().a2_choice, Some((0, 3)), "v5: channel 1 first");
+    assert!(segments.choose_a2_channel(2));
+    assert_eq!(segments.view().a2_choice, Some((2, 3)));
+    assert_eq!(segments.view().a1_choice, Some((0, 3)), "A1 keeps its own choice");
+    assert!(!segments.choose_a2_channel(3), "a channel the clip does not have");
+    let mut other = marked(10);
+    other.clip_id = Some("clip-y".into());
+    segments.set_source(other, None);
+    segments.set_source_channels(Some(3));
+    assert_eq!(segments.view().a2_choice, Some((0, 3)), "another clip starts on channel 1");
+}

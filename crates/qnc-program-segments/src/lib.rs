@@ -41,6 +41,8 @@ struct NewCover {
     out_frame: u64,
     fps_num: u32,
     fps_den: u32,
+    /// Source channel (zero based) heard on A2.
+    a2_source_channel: u16,
 }
 
 pub const MODULE_ID: &str = "qnc.module.program-segments";
@@ -194,6 +196,8 @@ pub struct SegmentsView {
     /// The source channel (zero based) heard on A1 in the next Talking Head / Voice
     /// over and how many channels the marked clip has; `None` without a count.
     pub a1_choice: Option<(u16, u16)>,
+    /// The same for A2 in the next cover, its own choice.
+    pub a2_choice: Option<(u16, u16)>,
 }
 
 impl SegmentsView {
@@ -536,6 +540,8 @@ pub struct ProgramSegments {
     /// The source channel chosen for A1 (user rule 2026-09-30, channel 1 by default)
     /// and the channel count of the marked clip from its stored record.
     a1_channel: u16,
+    /// The source channel chosen for A2 (covers), channel 1 by default.
+    a2_channel: u16,
     source_channels: Option<u16>,
     channels: qnc_source_channels::SourceChannels,
     sync: qnc_sync_cover::SyncCover,
@@ -630,7 +636,9 @@ impl ProgramSegments {
             .flatten();
         if self.source.clip_id != source.clip_id {
             self.a1_channel = 0; // another clip starts on channel 1 (v5)
+            self.a2_channel = 0;
             self.view.a1_choice = self.a1_choice();
+            self.view.a2_choice = self.a2_choice();
         }
         self.source = source;
         self.arm_sync_on_new_in(previous_in);
@@ -1025,6 +1033,7 @@ impl ProgramSegments {
                 out_frame,
                 fps_num,
                 fps_den,
+                a2_source_channel: self.a2_channel,
             },
             clip_name,
         );
@@ -1178,6 +1187,7 @@ impl ProgramSegments {
                 out_frame: cover.out_frame,
                 fps_num: cover.fps_num,
                 fps_den: cover.fps_den,
+                a2_source_channel: cover.a2_source_channel,
             });
         }
         let mut created = None;
@@ -1289,6 +1299,7 @@ impl ProgramSegments {
         view.playhead = self.playhead;
         view.message = message;
         view.a1_choice = self.a1_choice();
+        view.a2_choice = self.a2_choice();
         self.view = view;
     }
 
@@ -1301,6 +1312,10 @@ impl ProgramSegments {
                 self.a1_channel = 0;
             }
             self.view.a1_choice = self.a1_choice();
+            if count.is_none_or(|count| self.a2_channel >= count) {
+                self.a2_channel = 0;
+            }
+            self.view.a2_choice = self.a2_choice();
         }
     }
 
@@ -1314,8 +1329,22 @@ impl ProgramSegments {
         true
     }
 
+    /// The channel picker of the source timeline chose the channel heard on A2.
+    pub fn choose_a2_channel(&mut self, channel: u16) -> bool {
+        if !self.source_channels.is_some_and(|count| channel < count) {
+            return false;
+        }
+        self.a2_channel = channel;
+        self.view.a2_choice = self.a2_choice();
+        true
+    }
+
     fn a1_choice(&self) -> Option<(u16, u16)> {
         self.source_channels.filter(|count| *count > 0).map(|count| (self.a1_channel, count))
+    }
+
+    fn a2_choice(&self) -> Option<(u16, u16)> {
+        self.source_channels.filter(|count| *count > 0).map(|count| (self.a2_channel, count))
     }
 }
 

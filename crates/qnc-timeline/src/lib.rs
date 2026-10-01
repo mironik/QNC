@@ -554,6 +554,8 @@ pub struct TimelineInput<'a> {
     /// The source channel heard on A1 and how many there are; when given, a click on
     /// the A1 label opens the channel picker right of it (user rule 2026-09-30).
     pub a1_channel: Option<ChannelChoice>,
+    /// The same for A2 (the channel heard on A2 in covers), its own choice.
+    pub a2_channel: Option<ChannelChoice>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -567,6 +569,8 @@ pub enum TimelineIntent {
     SelectMarker { id: String, frame: u64 },
     /// The source channel (zero based) chosen for A1 in the channel picker.
     ChooseA1Channel(u16),
+    /// The source channel (zero based) chosen for A2 in its channel picker.
+    ChooseA2Channel(u16),
 }
 
 impl Default for TimelineIntent {
@@ -624,10 +628,10 @@ pub fn show_source_player_timeline_with_artifacts(
     a4_peaks: &[f32],
 ) -> TimelineIntent {
     let peaks = [a1_peaks, a2_peaks, a3_peaks, a4_peaks];
-    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None)
+    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None, None)
 }
 
-/// The source timeline with the A1 channel picker (`a1_channel`), when the caller has a
+/// The source timeline with the A1 and A2 channel pickers, when the caller has a
 /// choice to make; the same timeline otherwise.
 pub fn show_source_player_timeline_with_channel(
     ui: &mut egui::Ui,
@@ -637,6 +641,7 @@ pub fn show_source_player_timeline_with_channel(
     filmstrip_background: Option<&FilmstripBackground>,
     [a1_peaks, a2_peaks, a3_peaks, a4_peaks]: [&[f32]; 4],
     a1_channel: Option<ChannelChoice>,
+    a2_channel: Option<ChannelChoice>,
 ) -> TimelineIntent {
     let duration = state.duration_frames();
     let (draft_in, draft_out, in_active, out_active) = match state.visible_source_marks() {
@@ -673,6 +678,7 @@ pub fn show_source_player_timeline_with_channel(
                 filmstrip_background,
                 video_background: None,
                 a1_channel,
+                a2_channel,
             },
         );
     });
@@ -846,7 +852,12 @@ fn paint_audio_row(
         ui.make_persistent_id(("qnc_timeline_audio_label", lane.label())),
         Sense::click(),
     );
-    let picker = input.a1_channel.filter(|_| lane == AudioLane::A1 && input.show_lane_labels);
+    let picker = match lane {
+        AudioLane::A1 => input.a1_channel,
+        AudioLane::A2 => input.a2_channel,
+        _ => None,
+    }
+    .filter(|_| input.show_lane_labels);
     let picker_open = label_response.id.with("picker_open");
     if input.show_lane_labels && label_response.clicked() {
         if picker.is_none() {
@@ -876,7 +887,10 @@ fn paint_audio_row(
             };
             if let Some(channel) = qnc_channel_picker::show(ui, picker_open, rect, style, choice) {
                 ui.data_mut(|data| data.insert_temp(picker_open, false));
-                return TimelineIntent::ChooseA1Channel(channel);
+                return match lane {
+                    AudioLane::A2 => TimelineIntent::ChooseA2Channel(channel),
+                    _ => TimelineIntent::ChooseA1Channel(channel),
+                };
             }
             if ui.rect_contains_pointer(rect) {
                 return TimelineIntent::None; // the click belongs to the picker

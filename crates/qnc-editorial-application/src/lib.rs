@@ -434,13 +434,13 @@ impl EditorialApplication {
                 self.focus.set(Panel::Segments);
                 self.segments.apply(command)
             }
-            EditorialIntent::Timeline(intent) => match intent {
-                TimelineIntent::CueFrame(_) => {
-                    self.focus.to_source(&mut self.wrap); // the Source view
-                    self.preview.timeline_intent(&intent)
-                }
-                other => matches!(other, TimelineIntent::ChooseA1Channel(channel) if self.segments.choose_a1_channel(channel)),
-            },
+            EditorialIntent::Timeline(intent @ TimelineIntent::CueFrame(_)) => {
+                self.focus.to_source(&mut self.wrap); // the Source view
+                self.preview.timeline_intent(&intent)
+            }
+            EditorialIntent::Timeline(TimelineIntent::ChooseA1Channel(channel)) => self.segments.choose_a1_channel(channel),
+            EditorialIntent::Timeline(TimelineIntent::ChooseA2Channel(channel)) => self.segments.choose_a2_channel(channel),
+            EditorialIntent::Timeline(_) => false,
         };
         self.sync_preview_view();
         changed

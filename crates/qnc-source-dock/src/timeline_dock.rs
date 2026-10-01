@@ -31,6 +31,8 @@ pub struct SourceTimeline<'a> {
     pub timecode: Option<qnc_source_timecode::SourceTimecode>,
     /// The source channel heard on A1, when the form lets the user choose it.
     pub a1_channel: Option<qnc_timeline::ChannelChoice>,
+    /// The source channel heard on A2 (covers), its own choice.
+    pub a2_channel: Option<qnc_timeline::ChannelChoice>,
 }
 
 impl<'a> SourceTimeline<'a> {
@@ -51,6 +53,7 @@ impl<'a> SourceTimeline<'a> {
             ],
             timecode: None,
             a1_channel: None,
+            a2_channel: None,
         }
     }
 
@@ -63,6 +66,12 @@ impl<'a> SourceTimeline<'a> {
     /// A click on the A1 label opens the channel picker with this choice.
     pub fn with_a1_channel(mut self, choice: Option<qnc_timeline::ChannelChoice>) -> Self {
         self.a1_channel = choice;
+        self
+    }
+
+    /// A click on the A2 label opens the channel picker with this choice.
+    pub fn with_a2_channel(mut self, choice: Option<qnc_timeline::ChannelChoice>) -> Self {
+        self.a2_channel = choice;
         self
     }
 }
@@ -179,5 +188,6 @@ pub fn show_timeline_dock(
         timeline.filmstrip,
         timeline.peaks,
         timeline.a1_channel,
+        timeline.a2_channel,
     )
 }

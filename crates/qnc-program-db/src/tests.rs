@@ -207,6 +207,7 @@ fn create_cover(store: &mut Story, slot_id: &str, range: (u64, u64)) -> Result<D
             out_frame: range.1,
             fps_num: 50,
             fps_den: 1,
+            a2_source_channel: 0,
         },
     )
 }
@@ -1107,6 +1108,7 @@ fn a_cover_needs_a_slot_the_story_rate_and_one_frame() {
             out_frame: 10,
             fps_num: 25,
             fps_den: 1,
+            a2_source_channel: 0,
         },
     );
     assert!(mixed.is_err(), "mixed fps is refused");
@@ -1311,4 +1313,44 @@ fn a_new_segment_keeps_the_source_channel_chosen_for_a1() {
     )
     .unwrap();
     assert_eq!(segments(&mut store)[0].a1_source_channel, 1, "channel 2 of the source on A1");
+}
+
+#[test]
+fn a_new_cover_keeps_the_source_channel_chosen_for_a2() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    marker(&mut store, 14).unwrap();
+    let slot = slot_at_frame(&path, 20);
+    let qnc_virtual_shots::Data::Created(shot_id) = shots(
+        &path,
+        qnc_virtual_shots::Operation::CreateCoverShot {
+            project_id: "p1".into(),
+            clip_id: "c1".into(),
+            clip_name: "Clip".into(),
+            in_frame: 40,
+            out_frame: 90,
+        },
+    )
+    .unwrap()
+    else {
+        panic!()
+    };
+    run(
+        &mut store,
+        Operation::CreateCover {
+            project_id: "p1".into(),
+            slot_id: slot,
+            clip_id: "c1".into(),
+            virtual_shot_id: shot_id,
+            in_frame: 40,
+            out_frame: 90,
+            fps_num: 50,
+            fps_den: 1,
+            a2_source_channel: 2,
+        },
+    )
+    .unwrap();
+    assert_eq!(covers(&mut store)[0].a2_source_channel, 2, "channel 3 of the source on A2");
 }
