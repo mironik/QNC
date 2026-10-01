@@ -3240,6 +3240,7 @@ dependencies = [
  "qnc-app-registry",
  "qnc-board",
  "qnc-contracts",
+ "qnc-desktop-tabs",
  "qnc-project-close",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
@@ -3247,6 +3248,15 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "qnc-desktop-tabs"
+version = "0.1.0"
+dependencies = [
+ "qnc-active-project-read",
+ "qnc-application-sequence",
+ "qnc-shell-desktop-api",
 ]
 
 [[package]]

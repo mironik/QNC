@@ -2769,3 +2769,19 @@ frameovima). `crates/qnc-program-input` ga puni iz spremljenog zapisa i odbija p
 proxyja ciji je pocetni TC razlicit od originala (kontrolirana greska, bez pogadanja pomaka).
 Testni literali u `qnc-player-input` i `qnc-broadcast-engine` dobili su novo polje. Export jos nije izveden
 (ceka odluku o formatu).
+
+Promjena pravila 2026-10-01 (korisnik: "dugme Close project mora zatvoriti projekt i vratiti na projekt
+formu kako bi korisnik mogao kreirati novi ili otvoriti drugi projekt"; "desktop launch bar nije vezan na
+projektne postavke"): zamjenjuje recenicu iz odjeljka 3 da shell nakon zatvaranja ne smije prebacivati
+tab. Close project i dalje zatvara samo kroz `qnc-project-close` (nista se ne brise, nijedna povrsina se
+ne unistava, workflow se ne pokrece), a zatim desktop prikaze aplikaciju prve prioritetne grupe
+(Project), kao v5 `close_project` (`Screen::Project`). Launch bar (v5 `workspace.tabs`): bez aktivnog
+projekta samo prva grupa, s aktivnim projektom samo aplikacije njegova templatea, redom slijeda iz baze.
+Audit: u QNC-u launch bar nikad nije bio vezan na projekt (13.9. `0ab6021` i kasnije uvijek svi
+registrirani), postojalo je samo u v5. Izvedeno: novi javni `crates/qnc-desktop-tabs` (+ ugovor;
+`qnc-active-project-read` + `qnc-application-sequence`, cita bazu ponovno svake sekunde, nista ne pamti),
+`crates/qnc-desktop` (bar iz tog bloka; prikazana aplikacija koja vise nije u projektu ustupa prvoj;
+prijelaz na sljedecu grupu najprije ponovno cita bazu), test zatvaranja promijenjen prema novom pravilu.
+Kao v5 (`footer_project_only`): bez aktivnog projekta ni dugme Close project se ne prikazuje
+(`crates/qnc-shell-footer` `project_open`).
+Project nije diran.

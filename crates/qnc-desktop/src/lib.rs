@@ -7,6 +7,7 @@ use std::{
     collections::HashMap,
     env,
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 
 use eframe::egui::{self, Color32, FontFamily, FontId, RichText, Sense, TextStyle, Vec2};
@@ -93,7 +94,13 @@ pub struct QncShell {
     active_tab: String,
     theme_id: ThemeId,
     status: String,
+    /// The launch bar: the applications of the active project, re-read from its database.
+    tabs: qnc_desktop_tabs::Tabs,
+    tabs_read: Option<Instant>,
 }
+
+/// How often the launch bar reads the active project again (the database is the truth).
+const TABS_REREAD: Duration = Duration::from_secs(1);
 
 impl QncShell {
     /// `factories` maps a registered `desktop_entry` to the public surface of its application.
@@ -119,6 +126,8 @@ impl QncShell {
             active_tab,
             theme_id: ThemeId::Dark,
             status: "Spreman.".to_string(),
+            tabs: qnc_desktop_tabs::Tabs { tab_ids: Vec::new(), project_open: false, error: None },
+            tabs_read: None,
         }
     }
 
@@ -190,6 +199,7 @@ impl QncShell {
             DesktopNavigation::NextGroup => sequence
                 .and_then(|sequence| next_group_tab(&source.application_id, &sequence, &available)),
         };
+        self.refresh_tabs(true);
         match result {
             Ok(Some(tab)) => self.activate_tab(&tab),
             Ok(None) => self.status = "Nema sljedece odabrane grupe.".into(),
@@ -287,6 +297,9 @@ impl QncShell {
         let result = CloseProjectComponent::from_root(&self.qnc_root).close_active_project();
         match result {
             Ok(outcome) => {
+                // Closing the project returns to the project application (user rule
+                // 2026-10-01): the bar shows only the first group again.
+                self.refresh_tabs(true);
                 self.status = if outcome.closed {
                     "Aktivni projekt zatvoren.".into()
                 } else {
@@ -295,6 +308,24 @@ impl QncShell {
             }
             Err(error) => {
                 self.status = format!("Close project: {error}");
+            }
+        }
+    }
+
+    /// Reads the applications of the active project (once a second, or `now`); when the
+    /// shown application is not one of them, the first one is shown.
+    fn refresh_tabs(&mut self, now: bool) {
+        if !now && self.tabs_read.is_some_and(|at| at.elapsed() < TABS_REREAD) {
+            return;
+        }
+        self.tabs_read = Some(Instant::now());
+        self.tabs = qnc_desktop_tabs::read(&self.qnc_root, &self.shell_available_apps());
+        if let Some(error) = &self.tabs.error {
+            self.status = error.clone();
+        }
+        if !self.tabs.tab_ids.contains(&self.active_tab) {
+            if let Some(first) = self.tabs.tab_ids.first().cloned() {
+                self.activate_tab(&first);
             }
         }
     }
@@ -314,14 +345,16 @@ impl QncShell {
             },
             palette: self.palette(),
             tabs: self
-                .app_registry
-                .entries()
+                .tabs
+                .tab_ids
                 .iter()
+                .filter_map(|tab| self.app_registry.find(tab))
                 .map(|app| (app.tab_id.clone(), app.label.clone()))
                 .collect(),
             active_tab: self.active_tab.clone(),
             theme: self.theme_id,
             status: self.footer_status().to_string(),
+            project_open: self.tabs.project_open,
             intent: None,
         }
     }
@@ -344,6 +377,8 @@ impl eframe::App for QncShell {
     /// one layout tree (user rules 2026-09-30 and 2026-10-01: the footer is a place of
     /// every board; the layout is the frame).
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.refresh_tabs(false);
+        ctx.request_repaint_after(TABS_REREAD);
         let mut footer = self.footer();
         let mut frame = qnc_board::Frame::desktop(self.layout.shell_metrics.footer_height, &mut footer);
         egui::CentralPanel::default()
@@ -364,6 +399,7 @@ struct FooterBlock {
     active_tab: String,
     theme: ThemeId,
     status: String,
+    project_open: bool,
     intent: Option<FooterIntent>,
 }
 
@@ -373,7 +409,7 @@ impl qnc_board::FrameBlocks for FooterBlock {
             return;
         }
         let tabs: Vec<(&str, &str)> = self.tabs.iter().map(|(id, label)| (id.as_str(), label.as_str())).collect();
-        let input = FooterInput { tabs: &tabs, active_tab: &self.active_tab, theme: self.theme, status: &self.status };
+        let input = FooterInput { tabs: &tabs, active_tab: &self.active_tab, theme: self.theme, status: &self.status, project_open: self.project_open };
         self.intent = qnc_shell_footer::show(ui, rect, &self.style, &self.palette, input);
     }
 }
@@ -800,7 +836,7 @@ mod tests {
     }
 
     #[test]
-    fn close_active_project_only_calls_public_module_without_changing_shell_surfaces() {
+    fn close_active_project_calls_the_public_module_and_returns_to_the_first_group() {
         let mut shell = navigation_shell();
         let data = shell.qnc_root.join("data");
         fs::create_dir_all(&data).unwrap();
@@ -837,8 +873,9 @@ mod tests {
             .unwrap();
         assert!(active.is_empty());
         assert!(project_dir.join("project.db").is_file());
-        assert_eq!(shell.active_tab, "variant");
-        assert!(shell.embedded_apps.contains_key("variant"));
+        assert_eq!(shell.active_tab, "project", "back to the project application");
+        assert!(shell.embedded_apps.contains_key("variant"), "no surface is destroyed");
+        assert_eq!(shell.tabs.tab_ids, ["project"], "the bar shows only the first group");
         assert_eq!(shell.status, "Aktivni projekt zatvoren.");
         drop(conn);
         fs::remove_dir_all(shell.qnc_root).unwrap();

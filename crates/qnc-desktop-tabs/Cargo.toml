@@ -1,0 +1,10 @@
+[package]
+name = "qnc-desktop-tabs"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: which applications the desktop launch bar shows, from the active project database (v5 workspace tabs): without an active project only the first group, with one only the applications of its template"
+
+[dependencies]
+qnc-active-project-read = { workspace = true }
+qnc-application-sequence = { workspace = true }
+qnc-shell-desktop-api = { workspace = true }

@@ -104,6 +104,7 @@ members = [
     "crates/qnc-channel-picker",
     "crates/qnc-pending-marks",
     "crates/qnc-key-cheatsheet",
+    "crates/qnc-desktop-tabs",
     "crates/qnc-source-mark-focus",
     "crates/qnc-source-channels",
     "crates/qnc-desktop-theme",
@@ -251,6 +252,7 @@ qnc-board = { path = "crates/qnc-board" }
 qnc-channel-picker = { path = "crates/qnc-channel-picker" }
 qnc-pending-marks = { path = "crates/qnc-pending-marks" }
 qnc-key-cheatsheet = { path = "crates/qnc-key-cheatsheet" }
+qnc-desktop-tabs = { path = "crates/qnc-desktop-tabs" }
 qnc-source-mark-focus = { path = "crates/qnc-source-mark-focus" }
 qnc-source-channels = { path = "crates/qnc-source-channels" }
 qnc-desktop-theme = { path = "crates/qnc-desktop-theme" }

@@ -80,6 +80,8 @@ pub struct FooterInput<'a> {
     pub active_tab: &'a str,
     pub theme: ThemeId,
     pub status: &'a str,
+    /// A project is open: Close project is shown (v5: not without a project).
+    pub project_open: bool,
 }
 
 /// What a click in the footer asks for.
@@ -129,14 +131,16 @@ pub fn show(
             });
             cols[2].with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.set_min_height(h);
-                let close_button = egui::Button::new(
-                    RichText::new("Close project")
-                        .size(style.font_ui)
-                        .color(palette.text),
-                )
-                .min_size(Vec2::new(118.0, 24.0));
-                if ui.add(close_button).on_hover_text("Zatvori aktivni projekt").clicked() {
-                    intent = Some(FooterIntent::CloseProject);
+                if input.project_open {
+                    let close_button = egui::Button::new(
+                        RichText::new("Close project")
+                            .size(style.font_ui)
+                            .color(palette.text),
+                    )
+                    .min_size(Vec2::new(118.0, 24.0));
+                    if ui.add(close_button).on_hover_text("Zatvori aktivni projekt").clicked() {
+                        intent = Some(FooterIntent::CloseProject);
+                    }
                 }
                 ui.add(
                     egui::Label::new(
