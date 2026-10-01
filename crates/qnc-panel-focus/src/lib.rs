@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(timeline.source_in_frame, Some(10), "the arrow stepped the playhead");
         focus.route("select_mark_in", (&mut preview, &mut wrap, &mut segments, &mut timeline));
         focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
-        assert_eq!(timeline.source_in_frame, Some(11), "Ctrl+I took IN");
+        assert_eq!(timeline.source_in_frame, Some(11), "select_mark_in took IN");
         focus.route("clear_focus", (&mut preview, &mut wrap, &mut segments, &mut timeline));
         focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
         assert_eq!(timeline.source_in_frame, Some(11), "Escape gave the arrows back");
