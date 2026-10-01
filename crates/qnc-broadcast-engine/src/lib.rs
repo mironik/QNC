@@ -272,7 +272,7 @@ impl Runtime {
             conversion::Raster::Cpu(RasterConverter::prepare(converter, None).map_err(error)?)
         };
         let raster_size = converter.size();
-        let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4))
+        let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4) + STEP_BACK_FRAMES as usize)
             .map(|_| Some(std::sync::Arc::from(vec![0; converter.output_bytes()])))
             .collect();
         let decode_input = Rc::new(DecodeInput::new_access(
@@ -323,6 +323,7 @@ impl Runtime {
                 next_decode_frame: 0,
                 prefetch_frames: prebuffer_frames,
                 gpu: gpu.clone(),
+                kept: BTreeMap::new(),
             }),
             AudioPath::Clip(audio),
             Presenter(gpu.clone()),
@@ -608,7 +609,14 @@ struct Video {
     next_decode_frame: u64,
     prefetch_frames: usize,
     gpu: SharedVideo,
+    /// Pictures this decoder already made (user rule 2026-10-01: the decoder pauses, it
+    /// is not closed and opened again for a frame step). A step to a kept picture or
+    /// just ahead of the decoder needs no new decoder.
+    kept: BTreeMap<u64, DecodedVideoFrame<Picture>>,
 }
+
+/// Pictures kept behind the last asked frame, so frame steps back need no new decoder.
+const STEP_BACK_FRAMES: u64 = 25;
 impl VideoDecodeAdapter for Video {
     type VideoFrame = Picture;
     fn cue_video(&mut self, request: EngineFrameRequest) -> Result<()> {
@@ -632,6 +640,13 @@ impl VideoDecodeAdapter for Video {
             if request.frame != frame {
                 return Err(error("seek target mismatch"));
             }
+            if self.reached_without_reopen(frame) {
+                // The decoder stays open and paused: a kept picture, or read on.
+                self.pending_seek = None;
+                self.ready.retain(|kept, _| *kept >= frame);
+            }
+        }
+        if let Some(frame) = self.pending_seek {
             let mut gpu = self.gpu.borrow_mut();
             let generation = gpu
                 .config
@@ -655,12 +670,23 @@ impl VideoDecodeAdapter for Video {
                 .open(self.plan.video_index, seek_start(&self.plan.source, frame)?)?;
             self.discard_before = Some(frame);
             self.ready.clear();
+            self.kept.clear();
             self.next_decode_frame = frame;
             self.pending_seek = None;
         }
         self.drain_conversions()?;
         if let Some(frame) = self.ready.remove(&request.frame) {
+            self.forget_far_from(request.frame);
             return Ok(frame);
+        }
+        if let Some(frame) = self.kept_again(request.frame) {
+            self.forget_far_from(request.frame);
+            return Ok(frame);
+        }
+        if request.frame < self.next_decode_frame && self.pending_seek.is_none() && !self.converter.busy() {
+            // Behind the open decoder and no longer kept: only then a new decoder.
+            self.pending_seek = Some(request.frame);
+            return self.decode_video_frame(request);
         }
         self.fill_conversion_queue(&request)?;
         self.drain_conversions()?;
@@ -672,6 +698,33 @@ impl VideoDecodeAdapter for Video {
 }
 
 impl Video {
+    /// A cue the open decoder reaches: a kept picture, or a frame not far ahead of it.
+    fn reached_without_reopen(&self, frame: u64) -> bool {
+        let reusable = self.gpu.borrow().output.is_none();
+        reusable
+            && (self.kept.contains_key(&frame)
+                || (self.discard_before.is_none()
+                    && frame >= self.next_decode_frame
+                    && frame < self.next_decode_frame + self.prefetch_frames as u64))
+    }
+
+    /// A kept picture shown again, with a new sequence so the monitor takes it as new.
+    fn kept_again(&mut self, frame: u64) -> Option<DecodedVideoFrame<Picture>> {
+        let kept = self.kept.get(&frame)?.clone();
+        let mut gpu = self.gpu.borrow_mut();
+        let mut header = kept.payload.header.clone();
+        gpu.sequence = gpu.sequence.checked_add(1)?;
+        header.sequence = gpu.sequence;
+        let rgba = kept.payload.rgba.clone();
+        Some(DecodedVideoFrame { payload: Rc::new(PictureData { token: None, header, rgba }), ..kept })
+    }
+
+    /// Keeps the pictures near the asked frame only.
+    fn forget_far_from(&mut self, frame: u64) {
+        let (back, ahead) = (frame.saturating_sub(STEP_BACK_FRAMES), frame + self.prefetch_frames as u64);
+        self.kept.retain(|kept, _| *kept >= back && *kept <= ahead);
+    }
+
     fn drain_conversions(&mut self) -> Result<()> {
         while self.converter.busy() {
             let completed = match self.converter.poll().map_err(error)? {
@@ -799,15 +852,14 @@ impl Video {
         gpu.images.insert(frame, token.clone());
         gpu.upload_us += upload_start.elapsed().as_micros();
         gpu.converted += 1;
-        self.ready.insert(
+        let picture = DecodedVideoFrame {
+            source_id: self.plan.source.source_id.clone(),
             frame,
-            DecodedVideoFrame {
-                source_id: self.plan.source.source_id.clone(),
-                frame,
-                video_format: self.plan.source.video_format.clone(),
-                payload: token,
-            },
-        );
+            video_format: self.plan.source.video_format.clone(),
+            payload: token,
+        };
+        self.kept.insert(frame, picture.clone());
+        self.ready.insert(frame, picture);
         Ok(())
     }
 }
