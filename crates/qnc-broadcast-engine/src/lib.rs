@@ -257,6 +257,7 @@ impl Runtime {
                 .validate(&decoder_config)
                 .map_err(error)?;
         }
+        let opened = Instant::now();
         let converter = if video_output.is_none() {
             conversion::Raster::Gpu(
                 qnc_gpu_raster::GpuRasterConverter::prepare(
@@ -271,6 +272,7 @@ impl Runtime {
                     .map_err(error)?;
             conversion::Raster::Cpu(RasterConverter::prepare(converter, None).map_err(error)?)
         };
+        let converter_ms = opened.elapsed().as_millis();
         let raster_size = converter.size();
         let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4) + STEP_BACK_FRAMES as usize + 8)
             .map(|_| Some(std::sync::Arc::from(vec![0; converter.output_bytes()])))
@@ -288,6 +290,7 @@ impl Runtime {
             plan.audio_channels.clone(),
             prebuffer_frames,
         )?;
+        let audio_ms = opened.elapsed().as_millis();
         let video_decoder = decode_input.open(plan.video_index, None)?;
         let device = audio.sink.device.clone();
         let gpu = Rc::new(RefCell::new(VideoSink {
@@ -333,6 +336,15 @@ impl Runtime {
         .with_decode_burst_frames(4)
         .with_min_prebuffer_frames(prebuffer_frames);
         engine.load_source(&source, None)?;
+        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!(
+                    "player-open-timing converter_ms={converter_ms} audio_ms={audio_ms} loaded_ms={}",
+                    opened.elapsed().as_millis()
+                ),
+            );
+        }
         Ok(Self {
             engine,
             gpu,

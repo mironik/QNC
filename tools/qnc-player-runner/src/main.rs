@@ -43,6 +43,7 @@ fn run(
         .transpose()?;
     let output_scope = output_scope(native.is_some(), monitor_post.is_some())?;
     let plan = boot.plan()?;
+    stage("plan");
     if qnc_dev_diagnostics::player_diagnostics_enabled() {
         let source = match &plan {
             Plan::Clip(plan) => plan.source(),
@@ -90,6 +91,7 @@ fn run(
             return Err("a story program plays on the preview monitor only".into());
         }
     };
+    stage("runtime");
     let control = control::Control::open(
         boot.listen_port,
         Credentials::new(&boot.read_token, &boot.command_token)?,
@@ -107,6 +109,7 @@ fn run(
         })
     );
     io::stdout().flush()?;
+    stage("listening");
     let mut last_contact = Instant::now();
     let mut last_report = Instant::now();
     let mut last_av_report = Instant::now();
@@ -419,6 +422,8 @@ impl ApplicationHandler for NativeHost {
     }
 }
 fn main() -> Result<()> {
+    let process_start = Instant::now();
+    let _ = PROCESS_START.set(process_start);
     let args = std::env::args_os().skip(1).collect::<Vec<_>>();
     if args != ["--native-output"] && args != ["--monitor-output"] {
         return Err(
@@ -426,6 +431,7 @@ fn main() -> Result<()> {
         );
     }
     let boot = Boot::read(io::stdin().lock())?;
+    stage("boot_read");
     if args == ["--monitor-output"] {
         return run(boot, None, Arc::new(AtomicBool::new(false)));
     }
@@ -460,6 +466,20 @@ mod tests {
         assert_eq!(
             output_scope(true, false).unwrap(),
             "native_host_window_and_device"
+        );
+    }
+}
+
+/// When the process started (diagnostics only).
+static PROCESS_START: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+
+/// Milliseconds from the process start to a stage of opening (diagnostics only).
+fn stage(name: &str) {
+    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+        let ms = PROCESS_START.get().map_or(0, |start| start.elapsed().as_millis());
+        qnc_dev_diagnostics::log_line(
+            qnc_dev_diagnostics::DiagnosticsStream::Player,
+            format!("player-stage {name} ms={ms}"),
         );
     }
 }
