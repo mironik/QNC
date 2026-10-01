@@ -100,6 +100,29 @@ pub struct ShortcutCatalog {
     pub active_preset: String,
     pub actions: HashMap<String, ShortcutAction>,
     pub presets: HashMap<String, ShortcutPreset>,
+    /// The keyboard overview of the catalog (`help`): what the modifiers mean and which
+    /// actions belong together. Empty when the catalog has none.
+    pub help: ShortcutHelp,
+}
+
+/// One rule of the overview: a kind of key and what it means everywhere.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HelpRule {
+    pub keys: String,
+    pub meaning: String,
+}
+
+/// One table of the overview: a title and its actions, in order.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HelpGroup {
+    pub title: String,
+    pub actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShortcutHelp {
+    pub rules: Vec<HelpRule>,
+    pub groups: Vec<HelpGroup>,
 }
 
 impl ShortcutCatalog {
@@ -158,12 +181,14 @@ impl ShortcutCatalog {
         if !presets.contains_key(&active_preset) {
             return Err(format!("active preset '{active_preset}' is not defined"));
         }
+        let help = parse_help(object.get("help"), &actions)?;
 
         Ok(Self {
             version,
             active_preset,
             actions,
             presets,
+            help,
         })
     }
 
@@ -252,6 +277,32 @@ impl ShortcutCatalog {
                 .collect::<Vec<_>>()
                 .join(" / "),
         )
+    }
+
+    /// The keys of an action for a person to read: each key once (no `m / M`), the space
+    /// bar and digits by name.
+    pub fn chord_help(&self, scope: &str, action_id: &str) -> Option<String> {
+        let chords = self.scope_bindings(scope)?.get(action_id)?;
+        let mut shown: Vec<String> = Vec::new();
+        for chord in chords {
+            let text = chord
+                .display()
+                .replace("Digit", "")
+                .replace("ArrowLeft", "←")
+                .replace("ArrowRight", "→")
+                .replace("ArrowUp", "↑")
+                .replace("ArrowDown", "↓");
+            let text = match text.rsplit_once('+') {
+                Some((mods, key)) if key.chars().count() == 1 => format!("{mods}+{}", key.to_uppercase()),
+                _ if text.chars().count() == 1 => text.to_uppercase(),
+                _ => text,
+            };
+            let text = if text.ends_with(' ') { format!("{}Space", text.trim_end()) } else { text };
+            if !shown.iter().any(|seen| seen.eq_ignore_ascii_case(&text)) {
+                shown.push(text);
+            }
+        }
+        (!shown.is_empty()).then(|| shown.join(" / "))
     }
 
     fn scope_bindings(&self, scope: &str) -> Option<&HashMap<String, Vec<KeyChord>>> {
@@ -353,6 +404,31 @@ fn required_str<'a>(
         .and_then(Value::as_str)
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| format!("missing string field '{field}'"))
+}
+
+fn parse_help(value: Option<&Value>, actions: &HashMap<String, ShortcutAction>) -> Result<ShortcutHelp, String> {
+    let Some(value) = value else {
+        return Ok(ShortcutHelp::default());
+    };
+    let text = |item: &Value, field: &str| item.get(field).and_then(Value::as_str).unwrap_or_default().to_string();
+    let list = |field: &str| value.get(field).and_then(Value::as_array).cloned().unwrap_or_default();
+    let rules = list("rules")
+        .iter()
+        .map(|rule| HelpRule { keys: text(rule, "keys"), meaning: text(rule, "meaning") })
+        .collect();
+    let mut groups = Vec::new();
+    for group in list("groups") {
+        let mut ids = Vec::new();
+        for id in group.get("actions").and_then(Value::as_array).into_iter().flatten() {
+            let id = id.as_str().unwrap_or_default();
+            if !actions.contains_key(id) {
+                return Err(format!("help group references unknown action '{id}'"));
+            }
+            ids.push(id.to_string());
+        }
+        groups.push(HelpGroup { title: text(&group, "title"), actions: ids });
+    }
+    Ok(ShortcutHelp { rules, groups })
 }
 
 fn code_to_label(code: &str) -> &str {

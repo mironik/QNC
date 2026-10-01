@@ -2744,3 +2744,10 @@ oznakama akcija iz istog kataloga, za scopeove ploce; nista ne mijenja i ne zna 
 Poziva ga `crates/qnc-key-intents`, pa ga dobiva svaka ploca koja cita tipke, bez rasta formi.
 Ingest scope u katalogu nema `toggle_cheatsheet` (Ingest dio kataloga je zamrznut), pa u Ingestu
 F1 za sada ne otvara pregled. Odobrenje je zatvoreno.
+Dopuna 2026-10-01 (korisnik: "help bi koncipirao da najprije objasnim sto koja komanda + tipka znaci...
+zatim tablice po grupama ili po akciji"): katalog tipki dobio je blok `help` (pravila: tipka radi odmah,
+Ctrl+ uzima kontrolu nad necim sto postoji, Shift+ dodaje novo, Alt+strelice skacu po objektima,
+strelice, Enter, Esc, Delete, fokus; grupe akcija). `crates/qnc-keyboard-shortcut` ga cita
+(`ShortcutCatalog.help`, nepoznata akcija u grupi je greska) i daje `chord_help` (svaka tipka jednom,
+strelice i brojke citljivo). Prozor "Tipke" prvo pokazuje pravila, zatim tablice "Po grupama" ili
+"Po akciji" (abecedno). Tekstovi su u katalogu, ne u kodu.
