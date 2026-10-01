@@ -2669,6 +2669,15 @@ zapisuje pokrivalicu kad Sync dode do M markera ili OUT-a izvora, ili na Enter z
 Synca (slot se zatvara na Wrap playheadu); O i dalje zatvara slot i ceka Enter. Privremena
 pokrivalica Synca pusta izvor na kanalu izabranom za A2 (`TransientCover.a2_source_channel`),
 ne vise uvijek kanal 1. `qnc-program-segments`, `qnc-program-input`, `qnc-panel-focus`.
+Dopuna 2026-10-01 (korisnik: Edit segmenta, "skracivanje ili produljivanje s pocetka i kraja";
+odluke: markeri prate sliku, Enter sprema / Esc odustaje; v5 to nema): tab Segment dobio je gumb
+Edit (`qnc-segment-panel`) koji otvara klip segmenta u source timelineu s njegovim IN/OUT; I/O ih
+pomicu unutar klipa, Enter zapisuje novu `TrimSegment` operaciju (`qnc-program-db`: isti klip,
+vrsta i A1 kanal; markeri unutar segmenta ostaju na istom mjestu slike, oni u odrezanom dijelu
+idu sa slotom i pokrivalicom, markeri iza se pomicu za razliku duljine; Undo je vraca), Esc
+odustaje (`qnc-panel-focus`). Novi javni `crates/qnc-pending-marks` (+ ugovor modula): IN/OUT s
+kojim se klip otvara, izdvojeno iz `qnc-editorial-application` (virtualni short ga koristi kao
+prije, sada se otvara na svom IN-u); aplikacijski sloj je manji (C10 737 -> 718).
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

@@ -18,6 +18,7 @@ qnc-content-artifacts = { workspace = true }
 qnc-wrap-session = { workspace = true }
 qnc-panel-focus = { workspace = true }
 qnc-source-timecode = { workspace = true, features = ["read"] }
+qnc-pending-marks = { workspace = true }
 
 qnc-source-bindings = { workspace = true }
 qnc-source-preview = { workspace = true }

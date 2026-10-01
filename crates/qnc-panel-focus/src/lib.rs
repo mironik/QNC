@@ -106,6 +106,10 @@ impl PanelFocus {
             "activate_focused_item" if segments.sync_holds_enter() => {
                 segments.apply_action(action_id)
             }
+            // Escape drops the edit of a segment wherever the keyboard is.
+            "clear_focus" | "close_player" if segments.view().editing.is_some() => {
+                segments.apply_action(action_id)
+            }
             "step_back_frame" | "step_forward_frame" => {
                 let frames = if action_id == "step_back_frame" {
                     -1

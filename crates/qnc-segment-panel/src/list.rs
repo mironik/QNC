@@ -1,5 +1,5 @@
 //! The Segment tab of the clip menu (v5 `media_pool::segment_cards`): kind, id and
-//! duration per row. The selected active row carries Replace, Up, Down and Isključi; an
+//! duration per row. The selected active row carries Edit, Replace, Up, Down and Isključi; an
 //! excluded segment stays listed greyed where it was with Uključi and Izbriši
 //! (user rule 2026-09-25) and cannot be picked.
 
@@ -58,7 +58,7 @@ pub fn show_segment_list(
                             if row.selected || !row.active {
                                 let layout = egui::Layout::right_to_left(egui::Align::Center);
                                 ui.with_layout(layout, |ui| {
-                                    buttons = Some(row_buttons(ui, row, &mut command));
+                                    buttons = Some(row_buttons(ui, row, segments.editing.as_deref() == Some(row.segment_id.as_str()), &mut command));
                                 });
                             }
                         });
@@ -88,6 +88,7 @@ pub fn show_segment_list(
 fn row_buttons(
     ui: &mut egui::Ui,
     row: &qnc_program_segments::SegmentPart,
+    editing: bool,
     command: &mut Option<SegmentCommand>,
 ) -> egui::Rect {
     let mut area = egui::Rect::NOTHING;
@@ -125,6 +126,12 @@ fn row_buttons(
         "Zamijeni bazni sloj označenim izvorom (IN/OUT)",
     ) {
         *command = Some(SegmentCommand::Replace(id()));
+    }
+    // Edit (user rule 2026-10-01): IN/OUT of the segment on the source timeline.
+    let edit = ui.add(egui::Button::new(RichText::new("Edit").small()).selected(editing));
+    area = area.union(edit.rect);
+    if edit.on_hover_text("Uredi IN/OUT segmenta na source timelineu (Enter sprema, Esc odustaje)").clicked() {
+        *command = Some(SegmentCommand::Edit(id()));
     }
     area
 }

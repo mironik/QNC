@@ -10,6 +10,7 @@
 //! the Wrap view (`qnc-wrap-session`); navigation only asks for a program frame. It knows no
 //! form and no application, and never plays, probes or opens media.
 
+mod edit;
 mod marker_edit;
 mod markers;
 mod sync;
@@ -191,6 +192,8 @@ pub struct SegmentsView {
     pub redo_depth: u64,
     /// Last controlled error of a read or write; empty otherwise.
     pub message: String,
+    /// The segment being edited (Edit in the Segment tab), until Enter or Escape.
+    pub editing: Option<String>,
     /// The program wave (A1 segments, A2 covers) from the stored clip waves.
     pub peaks: qnc_program_waveform::ProgramPeaks,
     /// The source channel (zero based) heard on A1 in the next Talking Head / Voice
@@ -448,6 +451,11 @@ pub enum SegmentCommand {
     },
     /// Escape while a marker is edited.
     CancelMarkerEdit,
+    /// Edit (user rule 2026-10-01): the segment opens in the source timeline with its
+    /// IN/OUT; I/O move them, Enter writes them, Escape drops the edit.
+    Edit(String),
+    /// Escape while a segment is edited.
+    CancelEdit,
     /// The Delete key (user rule 2026-09-25): only what was taken with Ctrl+
     /// before (Ctrl+M: the marker) is deleted; a click never arms Delete.
     DeleteFocused,
@@ -551,6 +559,9 @@ pub struct ProgramSegments {
     /// The closed Sync slot writes its cover as soon as it is stored (Enter during the
     /// play, or the play reached an M marker or the source OUT).
     sync_commit: bool,
+    /// The segment being edited and the clip with IN/OUT the source view should open.
+    editing: Option<String>,
+    source_request: Option<(String, u64, u64)>,
     /// The marker being moved and its draft program frame (Enter writes it).
     marker_edit: Option<(String, u64)>,
     /// A cover taken with Ctrl+click; Delete removes it.
@@ -706,6 +717,9 @@ impl ProgramSegments {
         if self.cover_taken.is_some() && matches!(action_id, "clear_focus" | "close_player") {
             return Some(SegmentCommand::CancelMarkerEdit);
         }
+        if self.editing.is_some() && matches!(action_id, "clear_focus" | "close_player") {
+            return Some(SegmentCommand::CancelEdit);
+        }
         if self.marker_edit.is_some() {
             match action_id {
                 "step_back_frame" => return Some(SegmentCommand::NudgeMarker(-1)),
@@ -787,7 +801,7 @@ impl ProgramSegments {
             }
             SegmentCommand::ToggleSync => self.toggle_sync(),
             SegmentCommand::CommitSync => {
-                if !self.commit_marker_edit() {
+                if !self.commit_marker_edit() && !self.commit_edit() {
                     if !self.finish_sync_with_cover() {
                         self.commit_sync(true);
                     }
@@ -805,6 +819,11 @@ impl ProgramSegments {
                 if self.marker_edit.as_ref().map(|(id, _)| id) == Some(&marker_id) {
                     self.set_marker_draft(frame);
                 }
+            }
+            SegmentCommand::Edit(segment_id) => self.edit(segment_id),
+            SegmentCommand::CancelEdit => {
+                self.editing = None;
+                self.refresh_view("Uredivanje segmenta odustano.".into());
             }
             SegmentCommand::CancelMarkerEdit => {
                 if self.cover_taken.take().is_some() {
@@ -1304,6 +1323,7 @@ impl ProgramSegments {
         view.sync_enabled = self.sync.enabled();
         view.playhead = self.playhead;
         view.message = message;
+        view.editing = self.editing.clone();
         view.a1_choice = self.a1_choice();
         view.a2_choice = self.a2_choice();
         self.view = view;

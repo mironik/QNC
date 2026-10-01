@@ -130,6 +130,11 @@ impl Store {
                 (*in_frame, *out_frame),
                 (*fps_num, *fps_den),
             ),
+            Operation::TrimSegment {
+                segment_id,
+                in_frame,
+                out_frame,
+            } => self.trim_segment(segment_id, (*in_frame, *out_frame)),
             Operation::PurgeSegment { segment_id } => self.purge_segment(segment_id),
             Operation::MoveSegment { segment_id, up } => self.move_segment(segment_id, *up),
             Operation::ListSegments => self.list_segments(),
@@ -535,6 +540,78 @@ impl Store {
                 frames_label(length, fps),
                 duration_color_key(length, fps),
                 now
+            ],
+        )
+        .map_err(err)?;
+        finalize_story(&tx)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// Edit (user rule 2026-10-01): a new source IN/OUT of the same clip. Markers
+    /// inside the segment keep their place in the picture (program frame = start +
+    /// source frame - new IN); those outside the new range go with their slots and
+    /// covers; the markers after the segment move by the change of length.
+    fn trim_segment(&mut self, segment_id: &str, (in_frame, out_frame): (u64, u64)) -> Result<Data> {
+        if out_frame <= in_frame {
+            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+        }
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let (old_in, fps_num, fps_den): (i64, u32, u32) = tx
+            .query_row(
+                "SELECT in_frame, source_fps_num, source_fps_den FROM story_parts
+                 WHERE part_id = ?1 AND active = 1",
+                [segment_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .map_err(err)?
+            .ok_or_else(|| format!("part not found: {segment_id}"))?;
+        let (start, end) = segment_window(&tx, segment_id)?
+            .ok_or_else(|| format!("part not found: {segment_id}"))?;
+        let (start, end) = (start as i64, end as i64);
+        let (in_frame, out_frame) = (in_frame as i64, out_frame as i64);
+        let length = out_frame - in_frame;
+        let fps = f64::from(fps_num) / f64::from(fps_den);
+        let markers = user_markers_from(&tx, start + 1)?;
+        let mut cut = Vec::new();
+        let mut moved = Vec::new();
+        for (marker_id, frame) in markers {
+            if frame >= end {
+                moved.push((marker_id, frame + start + length - end));
+                continue;
+            }
+            let source = old_in + frame - start;
+            if source <= in_frame || source >= out_frame {
+                cut.push(marker_id);
+            } else {
+                moved.push((marker_id, start + source - in_frame));
+            }
+        }
+        delete_markers_with_slots(&tx, &cut)?;
+        for (marker_id, frame) in moved {
+            set_marker_frame(&tx, &marker_id, frame, fps)?;
+        }
+        tx.execute(
+            "UPDATE story_parts SET in_tc = ?2, out_tc = ?3, in_seconds = ?4, out_seconds = ?5,
+                in_frame = ?6, out_frame = ?7, duration_frames = ?8, duration_label = ?9,
+                duration_color_key = ?10, updated_at = ?11
+             WHERE part_id = ?1 AND active = 1",
+            params![
+                segment_id,
+                frame_timecode(in_frame, fps),
+                frame_timecode(out_frame, fps),
+                in_frame as f64 / fps,
+                out_frame as f64 / fps,
+                in_frame,
+                out_frame,
+                length,
+                frames_label(length, fps),
+                duration_color_key(length, fps),
+                story_now()
             ],
         )
         .map_err(err)?;
@@ -1855,6 +1932,34 @@ fn segment_window(conn: &Connection, segment_id: &str) -> Result<Option<(u64, u6
         start = end;
     }
     Ok(None)
+}
+
+/// The user markers at or after a program frame, with their frames.
+fn user_markers_from(conn: &Connection, from: i64) -> Result<Vec<(String, i64)>> {
+    let mut statement = conn
+        .prepare(
+            "SELECT marker_id, timeline_frame FROM story_markers
+             WHERE timeline_frame >= ?1 AND system_role = ''",
+        )
+        .map_err(err)?;
+    let rows = statement
+        .query_map([from], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+        .map_err(err)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(err);
+    rows
+}
+
+/// Puts one marker on a program frame.
+fn set_marker_frame(conn: &Connection, marker_id: &str, frame: i64, fps: f64) -> Result<()> {
+    let frame = frame.max(0);
+    conn.execute(
+        "UPDATE story_markers SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3, updated_at = ?4
+         WHERE marker_id = ?5",
+        params![frame, timeline_sec(frame, fps), frame_timecode(frame, fps), story_now(), marker_id],
+    )
+    .map_err(err)?;
+    Ok(())
 }
 
 /// Moves the user markers at or after a program frame by `delta` frames.

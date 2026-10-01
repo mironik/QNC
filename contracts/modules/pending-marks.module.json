@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.pending-marks",
+  "module_name": "Pending source marks",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.source_marks.open_with"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-pending-marks",
+  "input": "A clip and the IN/OUT it opens with (a virtual short, an edited segment); the shown clip and its source timeline projection every frame.",
+  "output": "The IN/OUT put once on the source timeline of that clip when the player has confirmed a picture of a long enough timeline. Local UI state only; the database stays the truth.",
+  "specification": "User rule 2026-10-01: one block per responsibility; moved out of qnc-editorial-application (virtual short) so the Edit of a segment uses it too."
+}

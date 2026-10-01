@@ -86,8 +86,8 @@ pub struct EditorialApplication {
     content_target: Option<(qnc_content_store::ContentTarget, qnc_db_broker::ProjectDbTarget)>,
     current_settings: Option<WorkSettings>,
     project_dir: Option<std::path::PathBuf>,
-    /// Shot range to paint once the parent clip's timeline is ready.
-    pending_shot: Option<PendingShot>,
+    /// IN/OUT a clip opens with (a short, an edited segment) once its timeline is ready.
+    pending_marks: qnc_pending_marks::PendingMarks,
     short_stills: VirtualShortStillCache,
     segments: qnc_program_segments::ProgramSegments,
     wrap: qnc_wrap_session::WrapSession,
@@ -109,7 +109,7 @@ impl Default for EditorialApplication {
             content_target: None,
             current_settings: None,
             project_dir: None,
-            pending_shot: None,
+            pending_marks: qnc_pending_marks::PendingMarks::new(),
             short_stills: VirtualShortStillCache::default(),
             segments: qnc_program_segments::ProgramSegments::new(),
             wrap: qnc_wrap_session::WrapSession::new(),
@@ -117,13 +117,6 @@ impl Default for EditorialApplication {
             timecodes: qnc_source_timecode::SourceTimecodes::new(),
         }
     }
-}
-
-#[derive(Clone)]
-struct PendingShot {
-    clip_id: String,
-    in_frame: u64,
-    out_frame: u64,
 }
 
 impl EditorialApplication {
@@ -250,7 +243,10 @@ impl EditorialApplication {
             self.short_stills
                 .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
-        self.apply_pending_shot();
+        if let Some((clip_id, in_frame, out_frame)) = self.segments.take_source_request() {
+            self.open_marked(&clip_id, in_frame, out_frame); // Edit of a segment
+        }
+        self.pending_marks.apply(self.view.preview.clip_id.as_deref(), &mut self.view.preview.timeline);
         let timebase = self.preview.player_view().source_timebase();
         let timeline = self.view.preview.timeline;
         // The original source timecode of the chosen clip, from its stored record.
@@ -281,23 +277,6 @@ impl EditorialApplication {
         self.view.segments = self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames)));
     }
 
-    fn apply_pending_shot(&mut self) {
-        let Some(pending) = self.pending_shot.clone() else {
-            return;
-        };
-        if self.view.preview.clip_id.as_deref() != Some(pending.clip_id.as_str()) {
-            return;
-        }
-        let duration = self.view.preview.timeline.duration_frames;
-        if duration < pending.out_frame || self.view.preview.timeline.playhead_frame.is_none() {
-            return;
-        }
-        // Both lie inside the clip: the timeline is at least as long as the shot.
-        let out_frame = pending.out_frame.max(pending.in_frame.saturating_add(1));
-        self.view.preview.timeline.source_in_frame = Some(pending.in_frame);
-        self.view.preview.timeline.source_out_frame = Some(out_frame);
-        self.pending_shot = None;
-    }
 
     fn poll_catalog(&mut self) -> bool {
         let Some(receiver) = self.load_result.as_ref() else {
@@ -405,7 +384,7 @@ impl EditorialApplication {
             EditorialIntent::PreviewClip(clip_id) => {
                 self.focus.to_source(&mut self.wrap); // v5 select_shot
                 self.view.chosen_shot_id = None;
-                self.pending_shot = None;
+                self.pending_marks.clear();
                 self.short_stills.clear_if_clip_changed(Some(&clip_id));
                 if self.view.clips.iter().any(|clip| clip.clip_id == clip_id) {
                     self.posters.prioritize(&clip_id);
@@ -567,13 +546,15 @@ impl EditorialApplication {
             return true;
         }
         self.view.chosen_shot_id = Some(shot.shot_id);
-        self.pending_shot = Some(PendingShot {
-            clip_id: shot.clip_id.clone(),
-            in_frame: shot.in_frame,
-            out_frame: shot.out_frame,
-        });
-        self.posters.prioritize(&shot.clip_id);
-        self.preview.open(&shot.clip_id);
+        self.open_marked(&shot.clip_id, shot.in_frame, shot.out_frame)
+    }
+
+    /// Opens a clip in the source view with IN/OUT (a short, an edited segment).
+    fn open_marked(&mut self, clip_id: &str, in_frame: u64, out_frame: u64) -> bool {
+        self.focus.to_source(&mut self.wrap);
+        self.pending_marks.set(clip_id, in_frame, out_frame);
+        self.posters.prioritize(clip_id);
+        self.preview.open_at(clip_id, in_frame);
         true
     }
 

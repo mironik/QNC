@@ -1354,3 +1354,34 @@ fn a_new_cover_keeps_the_source_channel_chosen_for_a2() {
     .unwrap();
     assert_eq!(covers(&mut store)[0].a2_source_channel, 2, "channel 3 of the source on A2");
 }
+
+#[test]
+fn an_edited_segment_takes_a_new_range_and_its_markers_follow_the_picture() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = imported_store(&dir.path().join("db"));
+    let ids = three_segments(&mut store);
+    for frame in [3, 14, 17, 25] {
+        marker(&mut store, frame).unwrap();
+    }
+    // The middle segment (source 100..110 at program 10..20): 5 frames off its
+    // start, 10 more at its end.
+    run(
+        &mut store,
+        Operation::TrimSegment { segment_id: ids[1].clone(), in_frame: 105, out_frame: 120 },
+    )
+    .unwrap();
+    let rows = segments(&mut store);
+    assert_eq!((rows[1].in_frame, rows[1].out_frame), (105, 120));
+    assert_eq!((rows[0].in_frame, rows[2].in_frame), (0, 200), "the others keep their range");
+    assert_eq!(
+        markers(&mut store),
+        vec![3, 12, 30],
+        "14 was on source 104 (cut off), 17 on source 107 stays on it, 25 moves by +5"
+    );
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!((segments(&mut store)[1].in_frame, markers(&mut store)), (100, vec![3, 14, 17, 25]));
+    assert!(
+        run(&mut store, Operation::TrimSegment { segment_id: ids[1].clone(), in_frame: 9, out_frame: 9 }).is_err(),
+        "OUT after IN"
+    );
+}

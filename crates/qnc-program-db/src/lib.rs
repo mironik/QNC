@@ -131,6 +131,15 @@ pub enum Operation {
         fps_num: u32,
         fps_den: u32,
     },
+    /// Edit (user rule 2026-10-01): the segment keeps its clip, kind and A1 channel
+    /// and takes a new source IN/OUT, shorter or longer at either end. Its M markers
+    /// follow the picture; those in a cut part go with their slots and covers; the
+    /// markers after it move by the change of length.
+    TrimSegment {
+        segment_id: String,
+        in_frame: u64,
+        out_frame: u64,
+    },
     /// The story as it was before the last edit comes back (UNDO).
     UndoStory,
     /// The last undone story edit comes back (REDO).
@@ -187,6 +196,7 @@ impl Operation {
                 | Self::DeleteSegment { .. }
                 | Self::IncludeSegment { .. }
                 | Self::ReplaceSegment { .. }
+                | Self::TrimSegment { .. }
                 | Self::PurgeSegment { .. }
                 | Self::MoveSegment { .. }
                 | Self::CreateMarker { .. }

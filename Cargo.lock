@@ -3305,6 +3305,7 @@ dependencies = [
  "qnc-image-assets",
  "qnc-media-thumbnail",
  "qnc-panel-focus",
+ "qnc-pending-marks",
  "qnc-program-segments",
  "qnc-program-waveform",
  "qnc-source-bindings",
@@ -3951,6 +3952,13 @@ dependencies = [
  "qnc-source-preview",
  "qnc-timeline",
  "qnc-wrap-session",
+]
+
+[[package]]
+name = "qnc-pending-marks"
+version = "0.1.0"
+dependencies = [
+ "qnc-timeline",
 ]
 
 [[package]]

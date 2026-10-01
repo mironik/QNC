@@ -1,0 +1,8 @@
+[package]
+name = "qnc-pending-marks"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public UI-state block: the IN/OUT a clip opens with (a virtual short, an edited segment), put on its source timeline once the player confirmed it"
+
+[dependencies]
+qnc-timeline = { workspace = true }

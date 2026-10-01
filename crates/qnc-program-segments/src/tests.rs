@@ -500,3 +500,19 @@ fn a2_has_its_own_choice_from_the_same_real_channels() {
     segments.set_source_channels(Some(1));
     assert_eq!(segments.view().a2_choice, Some((0, 1)), "one channel: A2 on channel 1");
 }
+
+#[test]
+fn edit_opens_the_segment_on_its_clip_and_escape_drops_it() {
+    let mut segments = component();
+    let id = segments.view().rows[0].segment_id.clone();
+    let clip = segments.view().rows[0].clip_id.clone();
+    assert!(segments.apply(SegmentCommand::Edit(id.clone())));
+    assert_eq!(segments.view().editing.as_deref(), Some(id.as_str()));
+    let (asked_clip, ..) = segments.take_source_request().expect("the source view opens the clip");
+    assert_eq!(asked_clip, clip);
+    assert!(segments.take_source_request().is_none(), "asked once");
+    assert!(segments.sync_holds_enter(), "Enter writes the edit");
+    assert!(segments.handles("clear_focus"));
+    segments.apply_action("clear_focus");
+    assert_eq!(segments.view().editing, None, "Escape drops it");
+}
