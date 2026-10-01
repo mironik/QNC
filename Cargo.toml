@@ -103,6 +103,8 @@ members = [
     "crates/qnc-board",
     "crates/qnc-desktop-theme",
     "crates/qnc-shell-footer",
+    "crates/qnc-app-registry",
+    "crates/qnc-desktop",
     "crates/qnc-project-session",
     "crates/qnc-project-blocks",
     "crates/qnc-confirm-dialog",
@@ -242,6 +244,8 @@ qnc-program-waveform = { path = "crates/qnc-program-waveform" }
 qnc-board = { path = "crates/qnc-board" }
 qnc-desktop-theme = { path = "crates/qnc-desktop-theme" }
 qnc-shell-footer = { path = "crates/qnc-shell-footer" }
+qnc-app-registry = { path = "crates/qnc-app-registry" }
+qnc-desktop = { path = "crates/qnc-desktop" }
 qnc-project-session = { path = "crates/qnc-project-session" }
 qnc-project-blocks = { path = "crates/qnc-project-blocks" }
 qnc-confirm-dialog = { path = "crates/qnc-confirm-dialog" }

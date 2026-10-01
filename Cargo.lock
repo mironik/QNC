@@ -2909,20 +2909,15 @@ name = "qnc-app"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "qnc-board",
- "qnc-contracts",
+ "qnc-app-registry",
+ "qnc-desktop",
  "qnc-ingest-desktop-adapter",
  "qnc-media-assist-audio-ai-desktop-adapter",
  "qnc-media-assist-audio-desktop-adapter",
  "qnc-media-assist-video-desktop-adapter",
- "qnc-project-close",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
- "qnc-shell-footer",
  "qnc-story-desktop-adapter",
- "rusqlite",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -2935,6 +2930,14 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-app-registry"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3220,6 +3223,23 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-desktop"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-app-registry",
+ "qnc-board",
+ "qnc-contracts",
+ "qnc-project-close",
+ "qnc-project-desktop-adapter",
+ "qnc-shell-desktop-api",
+ "qnc-shell-footer",
+ "rusqlite",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

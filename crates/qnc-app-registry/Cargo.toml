@@ -1,0 +1,9 @@
+[package]
+name = "qnc-app-registry"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: the registry of QNC applications (apps/*/qnc-app.json), loaded, validated and ordered by priority group"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
