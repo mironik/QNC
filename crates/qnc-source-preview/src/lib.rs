@@ -386,6 +386,7 @@ impl SourcePreview {
     }
 
     pub fn toggle_play(&mut self) -> bool {
+        self.cue_asked = None; // Play moves the playhead: arrows count from where it stops
         let Some(player) = &self.player else {
             self.view.message = "Broadcast Player nije povezan.".into();
             return true;
@@ -624,6 +625,10 @@ impl SourcePreview {
                 changed = true;
             }
         }
+        // The asked frame is done once the player shows it or plays on from anywhere.
+        if self.player_view.playing() || self.player_view.confirmed_source_frame() == self.cue_asked {
+            self.cue_asked = None;
+        }
         self.release_cue();
         if self.play_when_ready {
             if self.player_view.error.is_some() {
@@ -728,6 +733,10 @@ mod tests {
         preview.cue_next = Some(0);
         preview.step(-1);
         assert_eq!(preview.cue_next, Some(0), "never before the clip");
+        preview.cue_next = None;
+        preview.cue_in_flight = None;
+        preview.toggle_play();
+        assert_eq!(preview.cue_asked, None, "after Play the arrows count from where it stops");
     }
 
     #[test]
