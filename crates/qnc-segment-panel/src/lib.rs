@@ -325,6 +325,8 @@ fn paint_program(
             Some(SegmentCommand::Cue(start + frame.min(duration)))
         }
         TimelineIntent::CueFrame(frame) => Some(SegmentCommand::Cue(start + frame.min(duration))),
+        // V on a segment or the program row is Home: the start of the program.
+        TimelineIntent::GoHome => Some(SegmentCommand::ProgramStart),
         _ => None,
     }
 }

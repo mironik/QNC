@@ -450,6 +450,7 @@ impl SourcePreview {
                 None => false,
             },
             TimelineIntent::CueFrame(frame) => self.cue(*frame),
+            TimelineIntent::GoHome => self.timeline_intent(&TimelineIntent::CueFrame(self.view.timeline.range_start_frame)),
             _ => false,
         }
     }

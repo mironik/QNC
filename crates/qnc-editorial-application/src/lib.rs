@@ -413,7 +413,7 @@ impl EditorialApplication {
                 self.focus.set(Panel::Segments);
                 self.segments.apply(command)
             }
-            EditorialIntent::Timeline(intent @ TimelineIntent::CueFrame(_)) => {
+            EditorialIntent::Timeline(intent @ (TimelineIntent::CueFrame(_) | TimelineIntent::GoHome)) => {
                 self.focus.to_source(&mut self.wrap); // the Source view
                 self.preview.timeline_intent(&intent)
             }

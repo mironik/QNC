@@ -115,6 +115,8 @@ impl PanelFocus {
             "clear_focus" | "close_player" if on_source && segments.lane_is_taken() => segments.release_lane(),
             // Down closes an open large wave off the segment panel (there down is the next segment).
             "step_next_part" if on_source && segments.view().wave_zoom != [0, 0] => segments.close_wave(),
+            // Home on the source timeline: the start of the clip (the V label does the same).
+            "playlist_input_start" if on_source => preview.cue(timeline.range_start_frame),
             "focus_next" | "focus_prev" => {
                 let next = cycle(
                     panel,

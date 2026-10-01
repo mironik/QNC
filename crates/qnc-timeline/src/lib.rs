@@ -576,6 +576,8 @@ pub enum TimelineIntent {
     ChooseA2Channel(u16),
     /// A click on the A1 or A2 label: the lane is taken (as Ctrl+1, Ctrl+2).
     TakeAudioLane(AudioLane),
+    /// A click on the V label: Home of the panel (start of the clip or of the program).
+    GoHome,
 }
 
 impl Default for TimelineIntent {
@@ -916,6 +918,15 @@ fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> T
     let (label_rect, track_rect) = split_label_track(row, input.metrics.label_width);
     let label = if input.show_lane_labels { "V" } else { "" };
     paint_lane_label(ui, label_rect, label, input);
+    // A click on V is Home: the playhead goes to the start (user rule 2026-10-01).
+    let label_response = ui.interact(
+        label_rect,
+        ui.make_persistent_id("qnc_timeline_video_label"),
+        Sense::click(),
+    );
+    if input.show_lane_labels && label_response.clicked() {
+        return TimelineIntent::GoHome;
+    }
     let response = ui.interact(
         track_rect,
         ui.make_persistent_id("qnc_timeline_video"),
