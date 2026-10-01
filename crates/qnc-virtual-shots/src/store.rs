@@ -252,7 +252,7 @@ impl Store {
                      in_still_uri = COALESCE(?3, in_still_uri),
                      out_still_uri = COALESCE(?4, out_still_uri),
                      still_error = ?5
-                 WHERE shot_id = ?1 AND class = 'short'",
+                 WHERE shot_id = ?1 AND class IN ('short', 'b_roll')",
                 params![shot_id, status, in_uri, out_uri, error_message],
             )
             .map_err(err)?;

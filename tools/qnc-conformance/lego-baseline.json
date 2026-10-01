@@ -1,7 +1,7 @@
 {
   "note": "Known violations of the target picture rules C1-C13 (docs/89-qnc-target-lego-catalog.md), recorded 2026-09-23 at commit 9fd8b07. Counts may only go down; a higher count or a new key fails conformance. Print the current counts with: cargo run -p qnc-conformance -- --print-lego-counts",
   "exceptions": {
-    "C10 size ceiling (runtime lines)|qnc-editorial-application": 718,
+    "C10 size ceiling (runtime lines)|qnc-editorial-application": 709,
     "C10 size ceiling (runtime lines)|qnc-editorial-desktop": 96,
     "C10 size ceiling (runtime lines)|qnc-ingest-application": 1717,
     "C10 size ceiling (runtime lines)|qnc-ingest-desktop": 89,

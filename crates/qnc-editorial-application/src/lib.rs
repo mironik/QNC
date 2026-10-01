@@ -25,7 +25,7 @@ use qnc_source_reader::SourceReader;
 use qnc_timeline::TimelineIntent;
 use qnc_virtual_short_cards::ParentClip;
 use qnc_virtual_short_stills::VirtualShortStillCache;
-use qnc_work_settings::{ProductArea, WorkSettings};
+use qnc_work_settings::WorkSettings;
 
 pub use view::{
     action_ids, EditorialClip, EditorialIntent, EditorialShort, EditorialView, LibraryTab,
@@ -229,7 +229,7 @@ impl EditorialApplication {
     }
 
     fn sync_preview_view(&mut self) {
-        self.segments.poll();
+        if self.segments.poll() { self.store_short_stills(None) } // posters of the covers just saved
         let previous_clip_id = self.view.preview.clip_id.clone();
         let previous_timeline = self.view.preview.timeline;
         self.view.preview = self.preview.view().clone();
@@ -449,7 +449,7 @@ impl EditorialApplication {
                 }
                 true
             }
-            action_ids::SAVE_VIRTUAL_SHOT if self.segments.sync_holds_enter() => true,
+            action_ids::SAVE_VIRTUAL_SHOT if self.segments.sync_holds_enter() || self.segments.marks_used_by_cover(self.view.preview.clip_id.as_deref(), self.view.preview.timeline.source_in_frame) => true,
             action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
             _ => false,
         }
@@ -491,7 +491,7 @@ impl EditorialApplication {
             out_frame,
         ) {
             Ok(shot) => {
-                self.store_short_stills(&shot.shot_id, &clip_id, in_frame, out_frame);
+                self.store_short_stills(Some((&shot.shot_id, &clip_id, (in_frame, out_frame))));
                 self.reload_shorts();
                 self.view.library_tab = LibraryTab::Virtual;
                 self.view.chosen_shot_id = Some(shot.shot_id.clone());
@@ -502,25 +502,17 @@ impl EditorialApplication {
         true
     }
 
-    fn store_short_stills(&mut self, shot_id: &str, clip_id: &str, in_frame: u64, out_frame: u64) {
+    /// The stills of a saved short (`Some`) or the posters of the covers just saved.
+    fn store_short_stills(&mut self, short: Option<(&str, &str, (u64, u64))>) {
         let (Some((_, target)), Some(settings)) = (&self.content_target, &self.current_settings) else {
             return;
         };
-        let stills = match self.project_dir.as_deref() {
-            None => Err("Lokalni direktorij projekta nije dostupan.".to_string()),
-            Some(dir) => self
-                .short_stills
-                .store_for_short(
-                    &settings.product_local_dir(dir, ProductArea::VirtualShorts),
-                    &settings.product_uri(ProductArea::VirtualShorts),
-                    shot_id,
-                    clip_id,
-                    in_frame,
-                    out_frame,
-                )
-                .map(|stills| (stills.in_uri, stills.out_uri)),
+        let place = qnc_shot_stills::Place { target, settings, project_dir: self.project_dir.as_deref() };
+        let stored = match short {
+            Some((shot, clip, marks)) => place.short(&self.short_stills, shot, clip, marks),
+            None => place.covers(&self.short_stills, self.segments.take_created_cover_shots()),
         };
-        if let Err(error) = qnc_virtual_shots::publish_stills_now(target, shot_id, stills) {
+        if let Err(error) = stored {
             self.view.preview.message = error;
         }
     }

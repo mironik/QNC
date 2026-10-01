@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.shot-stills",
+  "module_name": "Virtual shot stills",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["virtual_shots.stills.store"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "public_db_write_transports_only",
+  "runtime_crate": "qnc-shot-stills",
+  "input": "A saved virtual shot (short: IN/OUT; B-roll shot of a cover: IN), the stills captured from confirmed player frames, the project settings and project folder.",
+  "output": "The JPEG stills under the project product folder (virtual_shorts or b_roll_virtual_clips) and their URIs published through qnc-virtual-shots.",
+  "specification": "User rules 2026-09-22 (short stills) and 2026-10-01 (a cover gets a poster so the B-roll tab shows a picture)."
+}

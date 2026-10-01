@@ -2802,3 +2802,12 @@ svakom otvaranju popisivao sve formate uredaja (~250 ms). `crates/qnc-audio-outp
 u trazenom formatu (kanali, frekvencija, f32) otvara se takav (~1 ms provjere); svaki drugi format i dalje
 prolazi punu provjeru bez downmixa. `crates/qnc-broadcast-engine`: GPU pretvarac se priprema usporedno s
 otvaranjem audio uredaja. Ponasanje playera se ne mijenja.
+Dopuna 2026-10-01 (korisnik: "prilikom kreiranja pokrivalica treba kreirati i poster da u B-roll tabu
+imamo poster"; "B-roll ne bi smjela ici u virtual klip nego u B-roll tab"; "ako je ukljucen Sync/B-roll
+virtualni klip se ne kreira, samo B-roll"): nalaz u bazi: nakon Synca koji je zapisao M marker, sljedeci
+Enter na source timelineu spremio je i short istog IN-a do kraja klipa. Izvedeno: `qnc-program-segments`
+pamti IN od kojeg je pokrivalica nastala (`marks_used_by_cover`); dok je on prikazan, Enter ne sprema
+virtualni klip. Poster pokrivalice: uhvacena IN slika (`qnc-virtual-short-stills::store_poster`) pod
+`products/b_roll_virtual_clips/<shot>/in.jpg`, upisana kroz `qnc-virtual-shots::publish_poster_now`
+(zapis slika sada dopusta i klasu `b_roll`). Novi javni `crates/qnc-shot-stills` (+ ugovor) slaze
+slike shorta i postere pokrivalica; `qnc-editorial-application` ga samo poziva (C10 718 -> 709).

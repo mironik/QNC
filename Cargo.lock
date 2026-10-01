@@ -3318,6 +3318,7 @@ dependencies = [
  "qnc-pending-marks",
  "qnc-program-segments",
  "qnc-program-waveform",
+ "qnc-shot-stills",
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-source-reader",
@@ -4371,6 +4372,16 @@ name = "qnc-shell-footer"
 version = "0.1.0"
 dependencies = [
  "eframe",
+]
+
+[[package]]
+name = "qnc-shot-stills"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-virtual-short-stills",
+ "qnc-virtual-shots",
+ "qnc-work-settings",
 ]
 
 [[package]]

@@ -110,6 +110,32 @@ impl VirtualShortStillCache {
     }
 }
 
+impl VirtualShortStillCache {
+    /// The poster of a B-roll shot made for a cover (user rule 2026-10-01): the IN still
+    /// captured when its IN was set, written as `<shot_id>/in.jpg`; returns its URI.
+    pub fn store_poster(
+        &self,
+        stills_dir: &Path,
+        stills_root_uri: &str,
+        shot_id: &str,
+        clip_id: &str,
+        in_frame: u64,
+    ) -> Result<String, String> {
+        let input = self
+            .in_still
+            .as_ref()
+            .filter(|still| still.clip_id == clip_id && still.frame == in_frame)
+            .ok_or_else(|| "IN slika pokrivalice nije uhvacena.".to_string())?;
+        if shot_id.is_empty() || shot_id.contains(['/', '\\']) {
+            return Err("Neispravan identitet virtualnog kadra.".into());
+        }
+        let dir = stills_dir.join(shot_id);
+        fs::create_dir_all(&dir).map_err(|error| format!("B-roll poster directory: {error}"))?;
+        write_still(input, &dir.join("in.jpg"))?;
+        Ok(format!("{}/{shot_id}/in.jpg", stills_root_uri.trim_end_matches('/')))
+    }
+}
+
 fn candidate_from_preview(preview: &PreviewView) -> Result<CandidateStill, String> {
     let clip_id = preview
         .clip_id
@@ -221,6 +247,19 @@ mod tests {
             .capture_out(&preview("clip-b", 20, [0, 255, 0, 255]))
             .unwrap();
         assert!(!cache.has_pair_for("clip-a", 10, 20));
+    }
+
+    #[test]
+    fn a_cover_poster_is_its_in_still_under_b_roll() {
+        let dir = tempfile::tempdir().unwrap();
+        let stills_dir = dir.path().join("products").join("b_roll_virtual_clips");
+        let mut cache = VirtualShortStillCache::default();
+        cache.capture_in(&preview("clip-a", 10, [255, 0, 0, 255])).unwrap();
+        let root = "qnc://local/project/p1/products/b_roll_virtual_clips";
+        let uri = cache.store_poster(&stills_dir, root, "clip-a_broll_001", "clip-a", 10).unwrap();
+        assert_eq!(uri, format!("{root}/clip-a_broll_001/in.jpg"));
+        assert!(stills_dir.join("clip-a_broll_001").join("in.jpg").is_file());
+        assert!(cache.store_poster(&stills_dir, root, "x", "clip-a", 11).is_err(), "another IN has no picture");
     }
 
     #[test]

@@ -247,5 +247,28 @@ pub fn publish_stills_now(
     }
 }
 
+
+/// The poster of a B-roll shot (its IN still) published in the database, or why it is missing.
+pub fn publish_poster_now(
+    target: &ProjectDbTarget,
+    shot_id: &str,
+    poster: std::result::Result<String, String>,
+) -> Result<()> {
+    let (status, in_uri, error) = match poster {
+        Ok(uri) => ("ready", Some(uri), None),
+        Err(error) => ("failed", None, Some(error)),
+    };
+    let operation = Operation::MarkShortStills {
+        shot_id: shot_id.into(),
+        status: status.into(),
+        in_uri,
+        out_uri: None,
+        error,
+    };
+    match VirtualShotsWriter::start(target.clone())?.call(&operation)? {
+        Data::Changed => Ok(()),
+        _ => Err(wrong()),
+    }
+}
 #[cfg(test)]
 mod tests;

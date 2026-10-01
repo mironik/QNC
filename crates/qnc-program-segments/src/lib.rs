@@ -601,6 +601,10 @@ pub struct ProgramSegments {
     /// The B-roll virtual shots of covers, and the cover each one waits to place.
     shots: Option<VirtualShotsWriter>,
     covers_waiting: Vec<(VirtualShotsPending, NewCover)>,
+    /// B-roll shots saved for covers: (shot, clip, IN frame), for their posters.
+    created_cover_shots: Vec<(String, String, u64)>,
+    /// The source IN (clip, frame) a cover was made from: used, it makes no short.
+    cover_marks: Option<(String, u64)>,
     /// Write whose completion selects the new segment.
     pending_create: Option<String>,
     sequence: u64,
@@ -1205,7 +1209,10 @@ impl ProgramSegments {
             })
         });
         match sent {
-            Some(Ok(pending)) => self.covers_waiting.push((pending, cover)),
+            Some(Ok(pending)) => {
+                self.cover_marks = Some((cover.clip_id.clone(), cover.in_frame));
+                self.covers_waiting.push((pending, cover));
+            }
             Some(Err(error)) => self.refresh_view(error),
             None => {}
         }
@@ -1231,6 +1238,7 @@ impl ProgramSegments {
             }
         }
         for (cover, virtual_shot_id) in place {
+            self.created_cover_shots.push((virtual_shot_id.clone(), cover.clip_id.clone(), cover.in_frame));
             self.write(Operation::CreateCover {
                 project_id: self.project_id.clone(),
                 slot_id: cover.slot_id,
@@ -1420,3 +1428,23 @@ mod tests;
 
 #[cfg(test)]
 mod db_tests;
+
+impl ProgramSegments {
+    /// The B-roll shots saved for covers since the last call: (shot, clip, IN frame).
+    /// The caller gives each its poster (user rule 2026-10-01).
+    pub fn take_created_cover_shots(&mut self) -> Vec<(String, String, u64)> {
+        std::mem::take(&mut self.created_cover_shots)
+    }
+}
+
+impl ProgramSegments {
+    /// Whether the source IN shown now is the one a cover was just made from (user rule
+    /// 2026-10-01: a cover goes to the B-roll tab and its IN/OUT makes no virtual short;
+    /// an Enter after a Sync that ended on a marker is that Sync's confirmation).
+    pub fn marks_used_by_cover(&self, clip_id: Option<&str>, in_frame: Option<u64>) -> bool {
+        match (&self.cover_marks, clip_id, in_frame) {
+            (Some((clip, used)), Some(shown), Some(frame)) => clip == shown && *used == frame,
+            _ => false,
+        }
+    }
+}

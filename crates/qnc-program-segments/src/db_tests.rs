@@ -232,6 +232,12 @@ fn a_cover_is_deleted_only_after_ctrl_click_took_it() {
         segments.stored_covers[0].virtual_shot_id.starts_with("c1_broll_"),
         "the cover plays its B-roll virtual shot"
     );
+    let made = segments.take_created_cover_shots();
+    assert_eq!(made.len(), 1, "the caller gets the B-roll shot for its poster");
+    assert_eq!((made[0].1.as_str(), made[0].2), ("c1", 10));
+    assert!(segments.take_created_cover_shots().is_empty(), "once");
+    assert!(segments.marks_used_by_cover(Some("c1"), Some(10)), "its IN makes no short");
+    assert!(!segments.marks_used_by_cover(Some("c1"), Some(11)), "a new IN does");
 
     segments.apply(SegmentCommand::SelectCover { cover_id: cover_id.clone(), frame: 5 });
     segments.apply_action("delete_marker");
