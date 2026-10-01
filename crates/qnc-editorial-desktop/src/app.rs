@@ -65,34 +65,9 @@ impl EditorialApp {
     }
 
     fn dispatch_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
-        let play_presses = qnc_keyboard_shortcut::consume_egui_action_presses(
-            ctx,
-            self.form.shortcuts(),
-            "storyboard",
-            action_ids::PLAY_PAUSE,
-        );
-        for _ in 0..play_presses {
-            self.dispatch(ctx, EditorialIntent::action(action_ids::PLAY_PAUSE));
-        }
-
-        for event in qnc_keyboard_shortcut::egui_shortcut_events(ctx) {
-            let mut handled_actions = Vec::new();
-            for scope in EDITORIAL_SHORTCUT_SCOPES {
-                let actions = self
-                    .form
-                    .shortcuts()
-                    .action_ids_for_event(scope, &event)
-                    .into_iter()
-                    .map(str::to_string)
-                    .collect::<Vec<_>>();
-                for action_id in actions {
-                    if handled_actions.contains(&action_id) {
-                        continue;
-                    }
-                    handled_actions.push(action_id.clone());
-                    self.dispatch(ctx, EditorialIntent::action(action_id));
-                }
-            }
+        let ids = qnc_key_intents::action_ids(ctx, self.form.shortcuts(), &EDITORIAL_SHORTCUT_SCOPES, action_ids::PLAY_PAUSE);
+        for action_id in ids {
+            self.dispatch(ctx, EditorialIntent::action(action_id));
         }
     }
 }

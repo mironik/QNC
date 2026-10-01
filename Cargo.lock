@@ -3338,7 +3338,9 @@ dependencies = [
  "qnc-editorial-application",
  "qnc-editorial-blocks",
  "qnc-editorial-layout",
+ "qnc-key-intents",
  "qnc-keyboard-shortcut",
+ "qnc-timeline",
 ]
 
 [[package]]
@@ -3550,6 +3552,7 @@ dependencies = [
  "qnc-ingest-application",
  "qnc-ingest-blocks",
  "qnc-ingest-layout",
+ "qnc-key-intents",
  "qnc-keyboard-shortcut",
 ]
 
@@ -3715,6 +3718,14 @@ dependencies = [
  "tiny_http",
  "ureq",
  "url",
+]
+
+[[package]]
+name = "qnc-key-intents"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-keyboard-shortcut",
 ]
 
 [[package]]

@@ -1,0 +1,9 @@
+[package]
+name = "qnc-key-intents"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: the keys of one frame turned into catalog action ids for the scopes of a board"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-keyboard-shortcut = { workspace = true }

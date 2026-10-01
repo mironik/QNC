@@ -9,4 +9,5 @@ eframe = { workspace = true }
 qnc-ingest-application = { workspace = true }
 qnc-ingest-blocks = { workspace = true }
 qnc-ingest-layout = { workspace = true }
+qnc-key-intents = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }

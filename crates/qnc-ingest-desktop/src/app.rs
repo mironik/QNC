@@ -79,26 +79,9 @@ impl IngestApp {
     }
 
     fn dispatch_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
-        let play_presses = qnc_keyboard_shortcut::consume_egui_action_presses(
-            ctx,
-            &self.contracts.shortcuts,
-            "ingest",
-            action_ids::PLAY_PAUSE,
-        );
-        for _ in 0..play_presses {
-            self.dispatch(ctx, IngestIntent::empty(action_ids::PLAY_PAUSE));
-        }
-        for event in qnc_keyboard_shortcut::egui_shortcut_events(ctx) {
-            let actions = self
-                .contracts
-                .shortcuts
-                .action_ids_for_event("ingest", &event)
-                .into_iter()
-                .map(str::to_string)
-                .collect::<Vec<_>>();
-            for action_id in actions {
-                self.dispatch(ctx, IngestIntent::empty(action_id));
-            }
+        let catalog = &self.contracts.shortcuts;
+        for action_id in qnc_key_intents::action_ids(ctx, catalog, &["ingest"], action_ids::PLAY_PAUSE) {
+            self.dispatch(ctx, IngestIntent::empty(action_id));
         }
     }
 }
