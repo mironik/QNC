@@ -55,22 +55,6 @@ pub(super) fn fixed_text_link(
     .inner
 }
 
-pub(super) fn small_button(
-    ui: &mut Ui,
-    text: &str,
-    enabled: bool,
-    theme: &Theme,
-) -> egui::Response {
-    ui.add_enabled(
-        enabled,
-        Button::new(RichText::new(text).color(theme.text))
-            .fill(Color32::TRANSPARENT)
-            .stroke(Stroke::new(1.0, theme.border))
-            .corner_radius(CornerRadius::same(0))
-            .min_size(Vec2::new(40.0, theme.chrome_control_height)),
-    )
-}
-
 pub(super) fn action_button(
     ui: &mut Ui,
     text: &str,

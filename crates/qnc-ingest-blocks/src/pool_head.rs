@@ -1,40 +1,26 @@
 use super::*;
+use qnc_media_pool_head::{RowColors, RowCommand, RowTab};
 
+/// The pool head is the public row: the first contract tab is selected and only names
+/// the pool; the transport buttons carry their action ids.
 pub(super) fn render_pool_head(
     ui: &mut Ui,
     contracts: &IngestContracts,
     theme: &Theme,
 ) -> Option<IngestIntent> {
-    let rect = ui.available_rect_before_wrap();
-
-    let mut intent = None;
-    qnc_source_dock::show_chrome_row(
-        ui,
-        rect,
-        &dock_style(contracts, theme),
-        theme.surface,
-        true,
-        |ui| {
-            ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
-            ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
-            for (index, tab) in contracts.ingest.pool_head.tabs_left.iter().enumerate() {
-                let selected = index == 0;
-                let _ = text_tab(ui, tab, selected, theme);
-                ui.add_space(10.0);
-            }
-
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                for command in contracts.ingest.pool_head.transport_right.iter().rev() {
-                    let Some(action_id) = command.action_id() else {
-                        continue;
-                    };
-                    if small_button(ui, command.label(), true, theme).clicked() {
-                        intent = Some(IngestIntent::empty(action_id));
-                    }
-                }
-            });
-        },
-    );
-
-    intent
+    let head = &contracts.ingest.pool_head;
+    let tabs: Vec<RowTab> = head
+        .tabs_left
+        .iter()
+        .enumerate()
+        .map(|(index, tab)| RowTab { label: tab, selected: index == 0, action_id: None, enabled: true })
+        .collect();
+    let transport: Vec<RowCommand> = head
+        .transport_right
+        .iter()
+        .filter_map(|command| Some(RowCommand { label: command.label(), action_id: command.action_id()? }))
+        .collect();
+    let colors = RowColors { fill: theme.surface, muted: theme.text_muted, accent: theme.accent };
+    qnc_media_pool_head::show_row(ui, &dock_style(contracts, theme), colors, &tabs, &transport)
+        .map(IngestIntent::empty)
 }

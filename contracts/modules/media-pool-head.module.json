@@ -3,7 +3,7 @@
   "module_name": "Media pool head (library tabs and compact transport strip)",
   "module_version": "0.1.0",
   "module_kind": "ui_widget",
-  "capabilities": ["ui.pool_head.tabs", "ui.pool_head.transport"],
+  "capabilities": ["ui.pool_head.tabs", "ui.pool_head.transport", "ui.pool_head.row"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],
@@ -12,5 +12,7 @@
   "forbidden_calls": ["application.start", "business.db.write", "workflow.run", "media.process", "filesystem.write", "player.command"],
   "forbidden_dependencies": [],
   "state_policy": "stateless",
-  "database_write_policy": "no_db_writes"
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-media-pool-head",
+  "specification": "The pool head of every board (user rule 2026-10-01: one block per responsibility). show_row draws the tabs of the layout contract on the left and the transport buttons on the right in the public chrome row of the dock and answers with the action id of the click; Ingest and Media Assist/Story use it. show_head is the qnc_v4 strip, kept as it was."
 }

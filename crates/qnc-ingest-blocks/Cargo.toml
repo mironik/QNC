@@ -10,6 +10,7 @@ qnc-board = { workspace = true }
 qnc-ingest-application = { workspace = true }
 qnc-ingest-layout = { workspace = true }
 qnc-media-card = { workspace = true }
+qnc-media-pool-head = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-source-dock = { workspace = true }
 qnc-timeline = { workspace = true }

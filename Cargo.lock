@@ -3322,6 +3322,7 @@ dependencies = [
  "qnc-editorial-application",
  "qnc-editorial-layout",
  "qnc-media-card",
+ "qnc-media-pool-head",
  "qnc-monitor",
  "qnc-panel-focus",
  "qnc-segment-panel",
@@ -3513,6 +3514,7 @@ dependencies = [
  "qnc-ingest-application",
  "qnc-ingest-layout",
  "qnc-media-card",
+ "qnc-media-pool-head",
  "qnc-monitor",
  "qnc-source-dock",
  "qnc-timeline",
@@ -3840,6 +3842,7 @@ name = "qnc-media-pool-head"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-source-dock",
 ]
 
 [[package]]
