@@ -486,7 +486,7 @@ fn a2_has_its_own_choice_from_the_same_real_channels() {
     let mut segments = component();
     segments.set_source(marked(10), None);
     segments.set_source_channels(Some(3));
-    assert_eq!(segments.view().a2_choice, Some((0, 3)), "v5: channel 1 first");
+    assert_eq!(segments.view().a2_choice, Some((1, 3)), "A2 starts on channel 2 (user rule)");
     assert!(segments.choose_a2_channel(2));
     assert_eq!(segments.view().a2_choice, Some((2, 3)));
     assert_eq!(segments.view().a1_choice, Some((0, 3)), "A1 keeps its own choice");
@@ -495,5 +495,7 @@ fn a2_has_its_own_choice_from_the_same_real_channels() {
     other.clip_id = Some("clip-y".into());
     segments.set_source(other, None);
     segments.set_source_channels(Some(3));
-    assert_eq!(segments.view().a2_choice, Some((0, 3)), "another clip starts on channel 1");
+    assert_eq!(segments.view().a2_choice, Some((1, 3)), "another clip starts on channel 2");
+    segments.set_source_channels(Some(1));
+    assert_eq!(segments.view().a2_choice, Some((0, 1)), "one channel: A2 on channel 1");
 }

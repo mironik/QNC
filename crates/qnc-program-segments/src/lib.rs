@@ -540,7 +540,8 @@ pub struct ProgramSegments {
     /// The source channel chosen for A1 (user rule 2026-09-30, channel 1 by default)
     /// and the channel count of the marked clip from its stored record.
     a1_channel: u16,
-    /// The source channel chosen for A2 (covers), channel 1 by default.
+    /// The source channel chosen for A2 (covers): channel 2 by default (user rule
+    /// 2026-10-01), channel 1 for a clip with one channel.
     a2_channel: u16,
     source_channels: Option<u16>,
     channels: qnc_source_channels::SourceChannels,
@@ -635,8 +636,8 @@ impl ProgramSegments {
             .then_some(self.source.in_mark)
             .flatten();
         if self.source.clip_id != source.clip_id {
-            self.a1_channel = 0; // another clip starts on channel 1 (v5)
-            self.a2_channel = 0;
+            self.a1_channel = 0; // another clip: A1 on channel 1, A2 on channel 2 (user rule)
+            self.a2_channel = 1;
             self.view.a1_choice = self.a1_choice();
             self.view.a2_choice = self.a2_choice();
         }
@@ -1312,8 +1313,8 @@ impl ProgramSegments {
                 self.a1_channel = 0;
             }
             self.view.a1_choice = self.a1_choice();
-            if count.is_none_or(|count| self.a2_channel >= count) {
-                self.a2_channel = 0;
+            if let Some(count) = count.filter(|count| self.a2_channel >= *count) {
+                self.a2_channel = u16::from(count >= 2); // channel 2 when there is one
             }
             self.view.a2_choice = self.a2_choice();
         }
