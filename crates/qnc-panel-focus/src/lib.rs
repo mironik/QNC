@@ -40,11 +40,20 @@ const SOURCE_TO_PROGRAM: [&str; 4] = [
 #[derive(Debug, Default)]
 pub struct PanelFocus {
     panel: Panel,
+    /// Ctrl+I or Ctrl+O took a source mark: the arrows move it, not the playhead
+    /// (an I or O press only marks; the playhead keeps the arrows, v5).
+    mark_taken: bool,
 }
 
 impl PanelFocus {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A mark taken with Ctrl+I/O that the source timeline still has in focus.
+    fn taken(&mut self, timeline: &TimelineProjection) -> bool {
+        self.mark_taken &= qnc_source_mark_focus::is_taken(timeline);
+        self.mark_taken
     }
 
     pub fn panel(&self) -> Panel {
@@ -104,10 +113,14 @@ impl PanelFocus {
             // The source timeline takes only I/O; the application marks them.
             "mark_in" | "mark_out" if panel != Panel::SourceTimeline => false,
             "mark_in" => {
+                self.mark_taken = false;
                 segments.arm_sync(); // v5: every IN arms Sync/B-roll
                 return None;
             }
-            "mark_out" => return None,
+            "mark_out" => {
+                self.mark_taken = false;
+                return None;
+            }
             // Enter belongs to a closed Sync slot or a marker draft wherever it runs.
             "activate_focused_item" if segments.sync_holds_enter() => {
                 segments.apply_action(action_id)
@@ -115,15 +128,18 @@ impl PanelFocus {
             // v5 select_mark_in / select_mark_out: Ctrl+I, Ctrl+O take the source IN, OUT; the
             // arrows move the taken mark, Escape gives the keys back to the playhead.
             "select_mark_in" | "select_mark_out" if panel == Panel::SourceTimeline => {
-                mark_cue(preview, qnc_source_mark_focus::take(timeline, action_id == "select_mark_in"))
+                let key = qnc_source_mark_focus::take(timeline, action_id == "select_mark_in");
+                self.mark_taken = key != MarkKey::Refused;
+                mark_cue(preview, key)
             }
             "step_back_frame" | "step_forward_frame"
-                if panel == Panel::SourceTimeline && qnc_source_mark_focus::is_taken(timeline) =>
+                if panel == Panel::SourceTimeline && self.taken(timeline) =>
             {
                 let frames = if action_id == "step_back_frame" { -1 } else { 1 };
                 mark_cue(preview, qnc_source_mark_focus::nudge(timeline, frames))
             }
-            "clear_focus" | "close_player" if qnc_source_mark_focus::is_taken(timeline) => {
+            "clear_focus" | "close_player" if self.taken(timeline) => {
+                self.mark_taken = false;
                 mark_cue(preview, qnc_source_mark_focus::release(timeline))
             }
             // Escape drops the edit of a segment wherever the keyboard is.
@@ -244,6 +260,23 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn the_arrows_move_the_playhead_until_ctrl_i_or_ctrl_o_takes_a_mark() {
+        let mut focus = PanelFocus::new();
+        let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
+        focus.set(Panel::SourceTimeline);
+        // I marked IN: the timeline paints its focus on IN, the arrows stay the playhead's.
+        let mut timeline = TimelineProjection { duration_frames: 100, playhead_frame: Some(0), source_in_frame: Some(10), ..Default::default() }.focus_source_in();
+        focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(timeline.source_in_frame, Some(10), "the arrow stepped the playhead");
+        focus.route("select_mark_in", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(timeline.source_in_frame, Some(11), "Ctrl+I took IN");
+        focus.route("clear_focus", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(timeline.source_in_frame, Some(11), "Escape gave the arrows back");
     }
 }
 
