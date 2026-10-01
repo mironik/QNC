@@ -900,3 +900,18 @@ fn a_program_input_names_the_playback_picture_and_the_original_sound_of_its_clip
         Err(InputError::WrongWorkspace)
     );
 }
+
+#[test]
+fn lead_channels_go_first_to_the_outputs_and_the_saved_layout_stays() {
+    let mut clip = stored("qnc://local");
+    clip.clip.snapshot.metadata.original.streams.truncate(3);
+    refresh(&mut clip);
+    let input = prepare(&settings("qnc://local", "proxy"), &clip).unwrap();
+    let saved = input.layout.clone();
+    let led = input.clone().with_lead_channels(&[1, 1]).unwrap();
+    assert_eq!(led.layout, saved, "the saved layout never changes");
+    let outputs = led.output_audio_channels();
+    assert_eq!((outputs[0].stream_index, outputs[1].stream_index), (2, 2), "channel 2 on A1 and A2");
+    led.validate_for(&led.workspace_db_uri, "c1").unwrap();
+    assert!(input.with_lead_channels(&[0, 2]).is_err(), "a channel the clip lacks");
+}

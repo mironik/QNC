@@ -438,8 +438,8 @@ impl EditorialApplication {
                 self.focus.to_source(&mut self.wrap); // the Source view
                 self.preview.timeline_intent(&intent)
             }
-            EditorialIntent::Timeline(TimelineIntent::ChooseA1Channel(channel)) => self.segments.choose_a1_channel(channel),
-            EditorialIntent::Timeline(TimelineIntent::ChooseA2Channel(channel)) => self.segments.choose_a2_channel(channel),
+            EditorialIntent::Timeline(TimelineIntent::ChooseA1Channel(channel)) => self.segments.choose_a1_channel(channel) && self.preview.hear_channels(self.segments.heard_channels()),
+            EditorialIntent::Timeline(TimelineIntent::ChooseA2Channel(channel)) => self.segments.choose_a2_channel(channel) && self.preview.hear_channels(self.segments.heard_channels()),
             EditorialIntent::Timeline(_) => false,
         };
         self.sync_preview_view();

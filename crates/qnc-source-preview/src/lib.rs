@@ -157,6 +157,8 @@ pub struct SourcePreview {
     activity_target: Option<qnc_content_store::ContentTarget>,
     /// The player plays a story program; the view keeps the source clip.
     program: bool,
+    /// The channels of the shown clip heard on output 1 and 2 (A1, A2), when chosen.
+    lead: Option<(String, [u16; 2])>,
 }
 
 impl Default for SourcePreview {
@@ -174,6 +176,7 @@ impl Default for SourcePreview {
             activity: qnc_playback_activity::PlaybackReporter::new(),
             activity_target: None,
             program: false,
+            lead: None,
         }
     }
 }
@@ -303,8 +306,35 @@ impl SourcePreview {
         {
             return false;
         }
+        self.prepare_clip(clip_id, first_frame)
+    }
+
+    /// The channels of the shown clip heard on output 1 (A1) and 2 (A2) (user rule
+    /// 2026-10-01): the clip is prepared again on its confirmed frame. In a story
+    /// program the choice waits for the clip.
+    pub fn hear_channels(&mut self, (a1, a2): (u16, u16)) -> bool {
+        let Some(clip_id) = self.view.clip_id.clone() else {
+            return false;
+        };
+        let lead = Some((clip_id.clone(), [a1, a2]));
+        if self.lead == lead {
+            return false;
+        }
+        self.lead = lead;
+        if self.program {
+            return false;
+        }
+        let frame = self.player_view.confirmed_source_frame().unwrap_or(0);
+        self.prepare_clip(&clip_id, frame)
+    }
+
+    fn prepare_clip(&mut self, clip_id: &str, first_frame: u64) -> bool {
         self.close();
         self.view.clip_id = Some(clip_id.to_string());
+        if self.lead.as_ref().is_some_and(|(id, _)| id != clip_id) {
+            self.lead = None; // another clip starts on its own channels
+        }
+        let lead = self.lead.as_ref().map(|(_, lead)| *lead);
         // Whoever completes records in the background takes this clip first.
         self.activity.clip(self.activity_target.as_ref(), clip_id);
         let Some(context) = self.context.clone() else {
@@ -341,6 +371,10 @@ impl SourcePreview {
             )
             .load(&context.settings.workspace_db_uri, &clip_id)
             .map_err(|error| error.to_string())?;
+            let input = match lead {
+                Some(lead) => input.with_lead_channels(&lead).map_err(|error| error.to_string())?,
+                None => input,
+            };
             qnc_player_launcher::prepare_launch(input, &sources, executable)
         });
         self.apply_player_view(player.view());

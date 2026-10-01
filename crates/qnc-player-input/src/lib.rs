@@ -193,8 +193,31 @@ pub struct PreparedInput {
     /// Preserve the full saved codec/container/timing/color/audio evidence, not only core AV fields.
     pub snapshot: Snapshot,
     pub layout: StreamLayout,
+    /// Channels of the inventory (zero based) the first outputs play, in this order,
+    /// before the inventory; empty plays the inventory as it is. The source preview
+    /// plays the channel chosen for A1 on output 1 and for A2 on output 2 (user rule
+    /// 2026-10-01). The saved layout itself never changes.
+    #[serde(default)]
+    pub lead_audio_channels: Vec<u16>,
 }
 impl PreparedInput {
+    /// The same input with `lead` channels first; a channel the clip lacks is refused.
+    pub fn with_lead_channels(mut self, lead: &[u16]) -> Result<Self> {
+        let count = self.layout.audio_channels.len();
+        if let Some(missing) = lead.iter().find(|channel| usize::from(**channel) >= count) {
+            return Err(InputError::UnsupportedMedia(format!("Klip nema audio kanal {}.", missing + 1)));
+        }
+        self.lead_audio_channels = lead.to_vec();
+        Ok(self)
+    }
+
+    /// The channels the outputs play in order: the lead channels, then the inventory.
+    pub fn output_audio_channels(&self) -> Vec<AudioChannel> {
+        let inventory = &self.layout.audio_channels;
+        let lead = self.lead_audio_channels.iter().filter_map(|channel| inventory.get(usize::from(*channel)));
+        lead.chain(inventory).cloned().collect()
+    }
+
     /// Saved representation selected for the picture, not the audio inventory.
     pub fn media(&self) -> Result<&MediaRepresentation> {
         match self.representation {
@@ -227,6 +250,9 @@ impl PreparedInput {
             return Err(InputError::InvalidDescriptor);
         }
         if self.layout != layout(&self.snapshot, self.representation)? {
+            return Err(InputError::InvalidDescriptor);
+        }
+        if self.lead_audio_channels.iter().any(|channel| usize::from(*channel) >= self.layout.audio_channels.len()) {
             return Err(InputError::InvalidDescriptor);
         }
         Ok(())
@@ -311,6 +337,7 @@ fn prepare(settings: &WorkSettings, stored: &impl PlayerClipSource) -> Result<Pr
         representation,
         layout: layout(snapshot, representation)?,
         snapshot: snapshot.clone(),
+        lead_audio_channels: Vec::new(),
     })
 }
 

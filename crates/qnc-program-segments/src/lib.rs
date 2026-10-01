@@ -1330,6 +1330,11 @@ impl ProgramSegments {
         true
     }
 
+    /// The source channels heard on A1 and A2 now (zero based).
+    pub fn heard_channels(&self) -> (u16, u16) {
+        (self.a1_channel, self.a2_channel)
+    }
+
     /// The channel picker of the source timeline chose the channel heard on A2.
     pub fn choose_a2_channel(&mut self, channel: u16) -> bool {
         if !self.source_channels.is_some_and(|count| channel < count) {

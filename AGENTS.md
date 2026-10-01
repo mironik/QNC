@@ -2658,6 +2658,12 @@ svaka svoja"): A2 ima svoje polje (`a2_channel`), svoju namjeru (`ChooseA2Channe
 u `qnc-program-segments` (`a2_choice`, `choose_a2_channel`), odvojeno od A1; crta ga ista
 pasivna kocka `qnc-channel-picker`. Cover slot, Overwrite i Sync pisu izabrani kanal kao
 `a2_source_channel` nove pokrivalice (`qnc-program-db` `CreateCover`, zadano 0).
+Dopuna 2026-10-01 (korisnik: "A2 mora po defaultu biti 2. kanal, A1 1. kanal"; "preview prati
+izbor"; glasnoca ostaje kako je snimljeno, kao v5): novi klip ima A1 na kanalu 1, A2 na kanalu 2
+(klip s jednim kanalom: A2 na kanalu 1). Source preview pusta izabrani A1 kanal na izlazu 1 i
+A2 na izlazu 2: `qnc-player-input` dobio polje `lead_audio_channels` (spremljeni raspored se ne
+mijenja, provjera ostaje), `qnc-broadcast-engine` izlaze slaze iz `output_audio_channels()`,
+`qnc-source-preview::hear_channels` ponovno priprema isti klip na potvrdjenom frameu.
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

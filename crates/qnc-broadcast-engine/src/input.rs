@@ -182,7 +182,7 @@ impl InputPlan {
             project_audio_layout(
                 &native_audio_streams,
                 native_audio_format.as_ref(),
-                &input.layout.audio_channels,
+                &input.output_audio_channels(),
                 &input.project_audio,
             )?
         } else {
