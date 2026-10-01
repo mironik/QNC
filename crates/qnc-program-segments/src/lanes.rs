@@ -51,6 +51,16 @@ impl ProgramSegments {
         true
     }
 
+    /// Down with no lane taken: the open large wave closes.
+    pub fn close_wave(&mut self) -> bool {
+        if self.wave_zoom == [0, 0] {
+            return false;
+        }
+        self.wave_zoom = [0, 0];
+        self.refresh_view(String::new());
+        true
+    }
+
     /// Enter: the draft becomes the lane's channel; the lane is let go.
     pub fn commit_lane(&mut self) -> bool {
         let Some((lane, draft)) = self.lane_taken.take() else {
@@ -94,6 +104,8 @@ mod tests {
         assert_eq!(segments.view().wave_zoom, [0, 1], "one press opens it fully");
         assert_eq!(segments.view().lane_taken, None, "and lets the lane go: the arrows move the playhead");
         assert!(!segments.lane_zoom(1), "nothing taken any more");
+        assert!(segments.close_wave(), "down closes it without taking the lane");
+        assert_eq!(segments.view().wave_zoom, [0, 0]);
         segments.take_lane(1);
         segments.lane_draft(5);
         assert!(segments.sync_holds_enter(), "Enter belongs to the taken lane");
@@ -104,6 +116,6 @@ mod tests {
         segments.lane_draft(-3);
         segments.release_lane();
         assert_eq!(segments.view().a2_choice, Some((3, 4)), "Escape keeps the channel");
-        assert_eq!(segments.view().wave_zoom, [0, 1], "the wave view stays");
+        assert_eq!(segments.view().wave_zoom, [0, 0], "Escape does not touch the wave view");
     }
 }

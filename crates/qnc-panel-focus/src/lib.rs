@@ -104,6 +104,8 @@ impl PanelFocus {
                 kept
             }
             "clear_focus" | "close_player" if segments.lane_is_taken() => segments.release_lane(),
+            // Down closes an open large wave off the segment panel (there down is the next segment).
+            "step_next_part" if panel != Panel::Segments && segments.view().wave_zoom != [0, 0] => segments.close_wave(),
             "focus_next" | "focus_prev" => {
                 let next = cycle(
                     panel,
