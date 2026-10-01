@@ -324,6 +324,7 @@ impl Runtime {
                 prefetch_frames: prebuffer_frames,
                 gpu: gpu.clone(),
                 kept: BTreeMap::new(),
+                last_asked: 0,
             }),
             AudioPath::Clip(audio),
             Presenter(gpu.clone()),
@@ -613,6 +614,8 @@ struct Video {
     /// is not closed and opened again for a frame step). A step to a kept picture or
     /// just ahead of the decoder needs no new decoder.
     kept: BTreeMap<u64, DecodedVideoFrame<Picture>>,
+    /// The frame asked last: a new decoder behind it was stepped back to.
+    last_asked: u64,
 }
 
 /// Pictures kept behind the last asked frame, so frame steps back need no new decoder.
@@ -664,14 +667,17 @@ impl VideoDecodeAdapter for Video {
             gpu.sequence = 0;
             gpu.images.clear();
             drop(gpu);
+            // Stepping back: the new decoder also keeps the pictures before the frame, so
+            // the next steps back come from them.
+            let from = if frame < self.last_asked { frame.saturating_sub(STEP_BACK_FRAMES) } else { frame };
             self.decoder.cancel();
             self.decoder = self
                 .input
-                .open(self.plan.video_index, seek_start(&self.plan.source, frame)?)?;
-            self.discard_before = Some(frame);
+                .open(self.plan.video_index, seek_start(&self.plan.source, from)?)?;
+            self.discard_before = Some(from);
             self.ready.clear();
             self.kept.clear();
-            self.next_decode_frame = frame;
+            self.next_decode_frame = from;
             self.pending_seek = None;
         }
         self.drain_conversions()?;
@@ -691,6 +697,7 @@ impl VideoDecodeAdapter for Video {
         self.fill_conversion_queue(&request)?;
         self.drain_conversions()?;
         if let Some(frame) = self.ready.remove(&request.frame) {
+            self.forget_far_from(request.frame);
             return Ok(frame);
         }
         Err(pending())
@@ -721,6 +728,7 @@ impl Video {
 
     /// Keeps the pictures near the asked frame only.
     fn forget_far_from(&mut self, frame: u64) {
+        self.last_asked = frame;
         let (back, ahead) = (frame.saturating_sub(STEP_BACK_FRAMES), frame + self.prefetch_frames as u64);
         self.kept.retain(|kept, _| *kept >= back && *kept <= ahead);
     }
