@@ -324,7 +324,7 @@ impl Runtime {
                 prefetch_frames: prebuffer_frames,
                 gpu: gpu.clone(),
                 kept: BTreeMap::new(),
-                last_asked: 0,
+                cue_anchor: 0,
             }),
             AudioPath::Clip(audio),
             Presenter(gpu.clone()),
@@ -614,8 +614,9 @@ struct Video {
     /// is not closed and opened again for a frame step). A step to a kept picture or
     /// just ahead of the decoder needs no new decoder.
     kept: BTreeMap<u64, DecodedVideoFrame<Picture>>,
-    /// The frame asked last: a new decoder behind it was stepped back to.
-    last_asked: u64,
+    /// The frame the last cue went to: the kept pictures are the ones around it, and a
+    /// cue before it is a step back.
+    cue_anchor: u64,
 }
 
 /// Pictures kept behind the last asked frame, so frame steps back need no new decoder.
@@ -639,10 +640,14 @@ impl VideoDecodeAdapter for Video {
         &mut self,
         request: EngineFrameRequest,
     ) -> Result<DecodedVideoFrame<Picture>> {
+        let mut stepping_back = false;
         if let Some(frame) = self.pending_seek {
             if request.frame != frame {
                 return Err(error("seek target mismatch"));
             }
+            stepping_back = frame < self.cue_anchor;
+            self.cue_anchor = frame;
+            self.forget_far_from(frame);
             if self.reached_without_reopen(frame) {
                 // The decoder stays open and paused: a kept picture, or read on.
                 self.pending_seek = None;
@@ -669,7 +674,7 @@ impl VideoDecodeAdapter for Video {
             drop(gpu);
             // Stepping back: the new decoder also keeps the pictures before the frame, so
             // the next steps back come from them.
-            let from = if frame < self.last_asked { frame.saturating_sub(STEP_BACK_FRAMES) } else { frame };
+            let from = if stepping_back { frame.saturating_sub(STEP_BACK_FRAMES) } else { frame };
             self.decoder.cancel();
             self.decoder = self
                 .input
@@ -735,10 +740,10 @@ impl Video {
         Some(DecodedVideoFrame { payload: Rc::new(PictureData { token: None, header, rgba }), ..kept })
     }
 
-    /// Keeps the pictures near the asked frame only.
-    fn forget_far_from(&mut self, frame: u64) {
-        self.last_asked = frame;
-        let (back, ahead) = (frame.saturating_sub(STEP_BACK_FRAMES), frame + self.prefetch_frames as u64);
+    /// Keeps the pictures around the frame the last cue went to only.
+    fn forget_far_from(&mut self, _served: u64) {
+        let frame = self.cue_anchor;
+        let (back, ahead) = (frame.saturating_sub(STEP_BACK_FRAMES), frame + 2 * self.prefetch_frames as u64);
         self.kept.retain(|kept, _| *kept >= back && *kept <= ahead);
     }
 
