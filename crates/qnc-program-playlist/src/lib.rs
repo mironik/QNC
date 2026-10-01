@@ -48,6 +48,8 @@ pub struct ResolvedProgramMedia {
     pub has_audio: bool,
     pub audio_channels: u16,
     pub audio_format: Option<ProbedAudioFormat>,
+    /// Original timecode of frame 0 of the clip (frames at its nominal rate).
+    pub timecode_start: Option<i64>,
 }
 
 pub trait ProgramMediaResolver {
@@ -453,6 +455,7 @@ impl BaseSegment<'_> {
             ),
             source_audio_channels: if has_audio { media.audio_channels } else { 0 },
             source_audio_format: has_audio.then_some(media.audio_format).flatten(),
+            source_timecode_start: media.timecode_start,
         })
     }
 }
@@ -499,6 +502,7 @@ fn cover_sources(
         audio_routes: Vec::new(),
         source_audio_channels: 0,
         source_audio_format: None,
+        source_timecode_start: media.timecode_start,
     };
     if !media.has_audio {
         return Ok(vec![picture]);

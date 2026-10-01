@@ -840,6 +840,7 @@ fn program_of(
                 channel_count: 4,
             }),
             audio_routes: routes,
+            source_timecode_start: None,
         }
     };
     p::FlatProgramPlaylist {

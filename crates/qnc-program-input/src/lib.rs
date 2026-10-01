@@ -348,7 +348,43 @@ pub fn resolved_media(
         has_audio: audio_channels > 0,
         audio_channels,
         audio_format,
+        timecode_start: None,
     })
+}
+
+/// The original timecode of frame 0 of a clip from its stored record (user rule
+/// 2026-10-01: proxy and original are linked by timecode). When the picture is the
+/// proxy, its stored timecode must be the one of the original, or frame N of the proxy
+/// would not be frame N of the original: that is a controlled error, never a guess.
+pub fn timecode_start(clip_id: &str, input: &PreparedInput) -> Result<Option<i64>, String> {
+    let Some(video) = input.layout.video.as_ref() else {
+        return Ok(None);
+    };
+    let (Ok(num), Ok(den)) = (u64::try_from(video.timebase.fps_num), u64::try_from(video.timebase.fps_den)) else {
+        return Ok(None);
+    };
+    let tags = |media: &MediaRepresentation| -> Vec<(String, String)> {
+        media.tags.iter().map(|(key, fact)| (key.clone(), fact.value.clone())).collect()
+    };
+    let original = tags(input.audio_media());
+    let Some(timecode) = qnc_source_timecode::SourceTimecode::from_tags(
+        original.iter().map(|(key, value)| (key.as_str(), value.as_str())),
+        (num, den),
+    ) else {
+        return Ok(None);
+    };
+    if input.representation == qnc_player_input::Representation::Proxy {
+        let proxy = tags(input.media().map_err(|error| error.to_string())?);
+        if timecode.proxy_matches(proxy.iter().map(|(key, value)| (key.as_str(), value.as_str()))) == Some(false) {
+            return Err(format!(
+                "Klip '{clip_id}': proxy i original nemaju isti pocetni timecode, slika proxyja ne odgovara originalu."
+            ));
+        }
+    }
+    timecode
+        .start_frame
+        .map(|frames| i64::try_from(frames).map_err(|_| "Timecode je izvan raspona.".to_string()))
+        .transpose()
 }
 
 struct PreparedResolver<'a, C> {
@@ -372,7 +408,10 @@ impl<C: ClipInputs> ProgramMediaResolver for PreparedResolver<'_, C> {
     fn resolve(&mut self, clip_id: &str) -> Result<ResolvedProgramMedia, String> {
         let input = self.prepared(clip_id)?;
         let picture = input.media().map_err(|error| error.to_string())?;
-        resolved_media(clip_id, picture, input.audio_media(), &input.layout)
+        let timecode = timecode_start(clip_id, input)?;
+        let mut media = resolved_media(clip_id, picture, input.audio_media(), &input.layout)?;
+        media.timecode_start = timecode;
+        Ok(media)
     }
 }
 

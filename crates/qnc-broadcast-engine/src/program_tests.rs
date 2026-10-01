@@ -45,6 +45,7 @@ fn source(
             sample_rate_hz: 48_000,
             channel_count: 2,
         }),
+        source_timecode_start: None,
     }
 }
 

@@ -188,6 +188,12 @@ pub struct FlatProgramSource {
     pub source_audio_channels: u16,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_audio_format: Option<ProbedAudioFormat>,
+    /// Original timecode of frame 0 of the source, as frames at its nominal rate, from
+    /// the stored record (camera XML, the Ingest probe only without XML). The source
+    /// range stays in frames; an export or a timecode output adds this. `None`: the
+    /// record has no timecode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_timecode_start: Option<i64>,
 }
 
 impl FlatProgramSource {

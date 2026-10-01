@@ -22,11 +22,15 @@ pub use read::{read_clip, SourceTimecodes};
 /// No timecode known.
 pub const UNKNOWN: &str = "--:--:--:--";
 
-/// The timecode of a source clip: its start and nominal frame rate.
+/// The timecode of a source clip: its start, the timecode of its last recorded frame
+/// and the nominal frame rate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceTimecode {
     /// Frames from 00:00:00:00 to the first frame of the clip, at `fps`.
     pub start_frame: Option<u64>,
+    /// The last change of the camera table: its timecode (frames at `fps`) and the frame
+    /// of the clip it belongs to; `None` without a camera table.
+    pub end: Option<(u64, u64)>,
     /// Nominal frames per second of the source clip (50 for 50p, 30 for 29.97).
     pub fps: u32,
 }
@@ -41,8 +45,32 @@ impl SourceTimecode {
         let tags: Vec<(&str, &str)> = tags.into_iter().collect();
         Some(Self {
             start_frame: start_frame(&tags, fps),
+            end: has_camera_record(&tags)
+                .then(|| camera_ltc_end(&tags, fps))
+                .flatten(),
             fps,
         })
+    }
+
+    /// Whether the timecode runs without a break from the first frame to the last one
+    /// the camera table records. A clip without a camera table counts as continuous.
+    pub fn continuous(&self) -> bool {
+        match (self.start_frame, self.end) {
+            (Some(start), Some((end, frame))) => start + frame == end,
+            _ => true,
+        }
+    }
+
+    /// Whether the proxy starts on the same timecode as the original, so frame N of the
+    /// proxy is frame N of the original (user rule 2026-10-01). The proxy timecode is
+    /// the one of its stored record; `None` when either timecode is not known.
+    pub fn proxy_matches<'a>(&self, proxy_tags: impl IntoIterator<Item = (&'a str, &'a str)>) -> Option<bool> {
+        let tags: Vec<(&str, &str)> = proxy_tags.into_iter().collect();
+        let proxy = tags
+            .iter()
+            .find(|(key, _)| *key == "timecode" || key.ends_with("/tags/timecode"))
+            .and_then(|(_, value)| timecode_frames(value, self.fps));
+        Some(self.start_frame? == proxy?)
     }
 
     /// Timecode of a frame of the clip (0 is its first frame).
@@ -100,29 +128,51 @@ fn tag<'a>(tags: &[(&str, &'a str)], suffix: &str) -> Option<&'a str> {
         .map(|(_, value)| *value)
 }
 
-/// Sony `LtcChangeTable`: the change at frame 0 holds the start as BCD bytes
-/// FF SS MM HH at `tcFps`.
-fn camera_ltc_start(tags: &[(&str, &str)], fps: u32) -> Option<u64> {
-    let tc_fps: u32 = tag(tags, "/LtcChangeTable[1]/@tcFps")?.trim().parse().ok()?;
-    let change = tags
+/// The changes of the Sony `LtcChangeTable`, in order: (frame of the clip, value).
+fn ltc_changes<'a>(tags: &[(&str, &'a str)]) -> Vec<(u64, &'a str)> {
+    let mut changes: Vec<(u64, &str)> = tags
         .iter()
-        .filter(|(key, value)| key.ends_with("/@frameCount") && value.trim() == "0")
-        .find_map(|(key, _)| {
+        .filter_map(|(key, value)| {
             let prefix = key.strip_suffix("/@frameCount")?;
-            prefix.contains("/LtcChangeTable[1]/LtcChange[").then_some(prefix)
-        })?;
-    let value = tag(tags, &format!("{change}/@value"))?;
-    let bytes = hex_bytes(value.trim())?;
-    let [ff, ss, mm, hh] = bytes;
+            if !prefix.contains("/LtcChangeTable[1]/LtcChange[") {
+                return None;
+            }
+            Some((value.trim().parse().ok()?, tag(tags, &format!("{prefix}/@value"))?))
+        })
+        .collect();
+    changes.sort_unstable_by_key(|(frame, _)| *frame);
+    changes
+}
+
+/// Sony `LtcChangeTable`: the change at frame 0 holds the start.
+fn camera_ltc_start(tags: &[(&str, &str)], fps: u32) -> Option<u64> {
+    let (_, value) = ltc_changes(tags).into_iter().find(|(frame, _)| *frame == 0)?;
+    ltc_frames(tags, value, fps)
+}
+
+/// The last change of the table: the timecode of the last recorded frame.
+fn camera_ltc_end(tags: &[(&str, &str)], fps: u32) -> Option<(u64, u64)> {
+    let (frame, value) = ltc_changes(tags).into_iter().last()?;
+    Some((ltc_frames(tags, value, fps)?, frame))
+}
+
+/// A Sony LTC value: BCD bytes FF SS MM HH at `tcFps`. With `halfStep` (LTC at half
+/// the clip rate, 25 on 50p) the second clip frame of each LTC frame is marked by the
+/// top bit of the hours byte.
+fn ltc_frames(tags: &[(&str, &str)], value: &str, fps: u32) -> Option<u64> {
+    let tc_fps: u32 = tag(tags, "/LtcChangeTable[1]/@tcFps")?.trim().parse().ok()?;
+    let half_step = tag(tags, "/LtcChangeTable[1]/@halfStep").is_some_and(|v| v.trim() == "true");
+    let [ff, ss, mm, hh] = hex_bytes(value.trim())?;
     if ff & 0x40 != 0 {
         return None; // drop-frame flag
     }
+    let second = u32::from(half_step && hh & 0x80 != 0);
     let (ff, ss, mm, hh) = (bcd(ff & 0x3F)?, bcd(ss & 0x7F)?, bcd(mm & 0x7F)?, bcd(hh & 0x3F)?);
     if tc_fps == 0 || fps % tc_fps != 0 || ff >= tc_fps {
         return None;
     }
     let seconds = (u64::from(hh) * 60 + u64::from(mm)) * 60 + u64::from(ss);
-    Some(seconds * u64::from(fps) + u64::from(ff * (fps / tc_fps)))
+    Some(seconds * u64::from(fps) + u64::from(ff * (fps / tc_fps) + second))
 }
 
 /// Timecode of the one Ingest probe, only for a clip without camera XML.
@@ -130,7 +180,13 @@ fn probe_start(tags: &[(&str, &str)], fps: u32) -> Option<u64> {
     let value = tags
         .iter()
         .find(|(key, _)| *key == "timecode" || key.ends_with("/format/tags/timecode"))
-        .map(|(_, value)| value.trim())?;
+        .map(|(_, value)| *value)?;
+    timecode_frames(value, fps)
+}
+
+/// HH:MM:SS:FF at the clip rate as frames; drop-frame is not supported.
+fn timecode_frames(value: &str, fps: u32) -> Option<u64> {
+    let value = value.trim();
     if value.contains(';') || value.contains('.') {
         return None; // drop-frame
     }
@@ -195,6 +251,26 @@ mod tests {
         assert_eq!(tc.label(34), "00:14:38:00");
         let tc = of(&sony("13421700"), (50, 1));
         assert_eq!(tc.label(0), "00:17:42:26");
+    }
+
+    #[test]
+    fn the_end_of_the_table_and_the_second_field_on_50p() {
+        // Mironik 1483 (stored record): start 16375113 at frame 0, end 21445193 at frame
+        // 361; the top bit of the hours byte marks the second 50p frame of an LTC frame.
+        let mut tags = sony("16375113");
+        tags.retain(|(key, _)| !key.contains("LtcChange[2]"));
+        tags.push((format!("{TABLE}/LtcChange[2]/@frameCount"), "361".into()));
+        tags.push((format!("{TABLE}/LtcChange[2]/@value"), "21445193".into()));
+        let tc = of(&tags, (50, 1));
+        assert_eq!(tc.label(0), "13:51:37:32");
+        assert_eq!(tc.label(361), "13:51:44:43");
+        assert_eq!(tc.end.map(|(end, frame)| (format_frames(end, 50), frame)), Some(("13:51:44:43".into(), 361)));
+        assert!(tc.continuous());
+        assert!(!of(&sony("16375113"), (50, 1)).continuous(), "a table that jumps is a break");
+        let proxy = [("ffprobe:/streams/2/tags/timecode", "13:51:37:32")];
+        assert_eq!(tc.proxy_matches(proxy), Some(true));
+        assert_eq!(tc.proxy_matches([("ffprobe:/streams/2/tags/timecode", "13:51:37:33")]), Some(false));
+        assert_eq!(tc.proxy_matches([]), None, "a proxy without timecode cannot be checked");
     }
 
     #[test]

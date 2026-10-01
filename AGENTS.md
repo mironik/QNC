@@ -2758,3 +2758,14 @@ pa se audio red ispraznio. `crates/qnc-broadcast-engine` (`program.rs`): traka z
 jednim pomakom program-izvor (isti kanal s drugog mjesta je druga traka), a trake stavki koje pocinju
 u sljedece 2 s otvaraju se unaprijed; trake koje vise nitko ne treba se zatvaraju. Sat, red i Play se
 ne mijenjaju. Test `a_cover_has_its_own_lane_so_its_sound_opens_before_the_cut`.
+Dopuna 2026-10-01 (korisnik: "sve bi trebalo biti zapisano u bazi"; "ok, napravi"): provjera baze aktivnog
+projekta (samo citanje, 98 klipova): pocetni TC originala iz XML-a = TC probea originala = TC proxyja; kraj
+iz XML tablice = pocetak + frameovi (bez prekida); XML `Duration` = `clips.duration_frames`. Duljina se ne
+pise kao TC, racuna se. `crates/qnc-source-timecode`: Sony vrijednost na 50p (`halfStep`) nosi drugi
+frame u gornjem bitu bajta sati (prije se ignorirao: krajevi su bili frame krivo, poceci na ovoj kartici
+ga nemaju); `end` (TC zadnjeg zapisanog framea), `continuous()`, `proxy_matches()`. `crates/qnc-program-playlist`:
+svaki izvor ravne playliste nosi `source_timecode_start` (TC framea 0 izvora iz baze; raspon ostaje u
+frameovima). `crates/qnc-program-input` ga puni iz spremljenog zapisa i odbija program kad slika ide s
+proxyja ciji je pocetni TC razlicit od originala (kontrolirana greska, bez pogadanja pomaka).
+Testni literali u `qnc-player-input` i `qnc-broadcast-engine` dobili su novo polje. Export jos nije izveden
+(ceka odluku o formatu).

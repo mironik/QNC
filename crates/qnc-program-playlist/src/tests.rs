@@ -47,6 +47,7 @@ fn media(clip_id: &str, timebase: FrameTimebase) -> ResolvedProgramMedia {
             sample_rate_hz: 48_000,
             channel_count: 2,
         }),
+        timecode_start: Some(50 * 3600),
     }
 }
 
@@ -308,6 +309,7 @@ fn transient_overlay_replaces_video_and_a2_but_keeps_a1() {
             }],
             source_audio_channels: 2,
             source_audio_format: new_cover.audio_format,
+            source_timecode_start: None,
         },
     };
 

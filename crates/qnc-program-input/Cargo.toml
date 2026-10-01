@@ -11,3 +11,4 @@ qnc-frame-timebase = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-player-input = { workspace = true }
 qnc-program-playlist = { workspace = true }
+qnc-source-timecode = { workspace = true }

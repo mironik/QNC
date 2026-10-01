@@ -4139,6 +4139,7 @@ dependencies = [
  "qnc-player-input",
  "qnc-program-db",
  "qnc-program-playlist",
+ "qnc-source-timecode",
 ]
 
 [[package]]
