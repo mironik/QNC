@@ -395,8 +395,18 @@ impl SourcePreview {
         self.send(Action::TogglePlayPause)
     }
 
+    /// One frame per arrow press, counted from the frame last asked for, so presses
+    /// made while the player still prepares the previous one are not lost; the
+    /// latest frame goes to the player (as a scrub does).
     pub fn step(&mut self, frames: i64) -> bool {
-        self.send(Action::Step(frames))
+        let timeline = &self.view.timeline;
+        let pending = self.cue_next.or(self.cue_in_flight.map(|(frame, _)| frame));
+        let base = pending.or_else(|| self.player_view.confirmed_source_frame());
+        let (Some(base), true) = (base, timeline.duration_frames > 1) else {
+            return self.send(Action::Step(frames));
+        };
+        let last = timeline.range_start_frame + timeline.duration_frames - 1;
+        self.cue(base.saturating_add_signed(frames).clamp(timeline.range_start_frame, last))
     }
 
     pub fn cue(&mut self, frame: u64) -> bool {
@@ -695,6 +705,21 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn arrow_presses_add_up_from_the_frame_last_asked_for() {
+        let mut preview = SourcePreview::new();
+        preview.view.timeline.duration_frames = 100;
+        preview.cue_in_flight = Some((50, std::time::Instant::now()));
+        preview.step(-1);
+        preview.step(-1);
+        assert_eq!(preview.cue_next, Some(48), "two presses, two frames, while 50 is prepared");
+        preview.step(1);
+        assert_eq!(preview.cue_next, Some(49));
+        preview.cue_next = Some(0);
+        preview.step(-1);
+        assert_eq!(preview.cue_next, Some(0), "never before the clip");
     }
 
     #[test]

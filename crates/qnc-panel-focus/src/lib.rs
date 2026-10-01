@@ -171,8 +171,9 @@ impl PanelFocus {
                         segments.apply_action(action_id)
                     }
                     Panel::Segments => wrap.step(frames),
-                    Panel::SourceTimeline => preview.step(frames),
-                    Panel::Pool => false,
+                    // The pool has no arrow keys: they step the source playhead (user rule
+                    // 2026-10-01: the arrows move the playhead one frame, no other key needed).
+                    Panel::SourceTimeline | Panel::Pool => preview.step(frames),
                 }
             }
             action if SOURCE_TO_PROGRAM.contains(&action) => segments.apply_action(action),

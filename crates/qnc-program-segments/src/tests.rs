@@ -529,5 +529,5 @@ fn ctrl_s_takes_the_slot_under_the_playhead_and_shift_s_the_first_empty_one() {
     segments.apply(SegmentCommand::FocusEmptySlot);
     let empty = segments.view().slots.iter().find(|slot| !slot.has_cover).map(|slot| slot.slot_id.clone());
     assert_eq!(segments.view().selected_slot().map(|slot| slot.slot_id.clone()), empty);
-    assert!(segments.fit_slot().is_some(), "Shift+I takes the length of the selected slot");
+    assert!(segments.fit_slot().is_some(), "mark_in_fit_duration takes the length of the selected slot");
 }
