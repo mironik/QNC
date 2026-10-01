@@ -1377,6 +1377,7 @@ impl ProgramSegments {
         }
         self.a1_channel = channel;
         self.view.a1_choice = self.a1_choice();
+        (self.lane_taken, self.view.lane_taken) = (None, None); // a chosen channel lets the lane go
         true
     }
 
@@ -1392,6 +1393,7 @@ impl ProgramSegments {
         }
         self.a2_channel = channel;
         self.view.a2_choice = self.a2_choice();
+        (self.lane_taken, self.view.lane_taken) = (None, None);
         true
     }
 

@@ -128,7 +128,8 @@ impl PanelFocus {
             // A1/A2 by keyboard (user rule 2026-10-01): Ctrl+1, Ctrl+2 take the lane; while it is
             // taken, left/right pick its channel, up/down show or hide its wave over the
             // video row, Enter keeps the channel (heard at once), Escape lets go.
-            "select_audio_a1" | "select_audio_a2" if panel != Panel::Segments => {
+            "select_audio_a1" | "select_audio_a2" => {
+                self.panel = Panel::SourceTimeline; // the lane is on the source timeline
                 segments.take_lane(u8::from(action_id == "select_audio_a2"))
             }
             "step_back_frame" | "step_forward_frame" if segments.lane_is_taken() => {

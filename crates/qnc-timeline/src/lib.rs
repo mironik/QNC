@@ -574,6 +574,8 @@ pub enum TimelineIntent {
     ChooseA1Channel(u16),
     /// The source channel (zero based) chosen for A2 in its channel picker.
     ChooseA2Channel(u16),
+    /// A click on the A1 or A2 label: the lane is taken (as Ctrl+1, Ctrl+2).
+    TakeAudioLane(AudioLane),
 }
 
 impl Default for TimelineIntent {
@@ -868,13 +870,13 @@ fn paint_audio_row(
         _ => None,
     }
     .filter(|_| input.show_lane_labels);
-    let picker_open = label_response.id.with("picker_open");
+    let picker_id = label_response.id.with("picker");
     if input.show_lane_labels && label_response.clicked() {
-        if picker.is_none() {
-            return TimelineIntent::ToggleAudioExpand(lane);
-        }
-        let open = ui.data(|data| data.get_temp::<bool>(picker_open).unwrap_or(false));
-        ui.data_mut(|data| data.insert_temp(picker_open, !open));
+        // A click on A1/A2 takes the lane as Ctrl+1/Ctrl+2 does (user rule 2026-10-01).
+        return match picker {
+            Some(_) => TimelineIntent::TakeAudioLane(lane),
+            None => TimelineIntent::ToggleAudioExpand(lane),
+        };
     }
     ui.painter().rect_filled(track_rect, 0.0, fill);
     ui.painter().rect_stroke(
@@ -886,9 +888,9 @@ fn paint_audio_row(
     qnc_wave_view::paint_wave_peaks(ui.painter(), track_rect, peaks, wave);
     paint_ranges_and_playhead(ui, track_rect, input);
     if let Some(choice) = picker {
-        if choice.open || ui.data(|data| data.get_temp::<bool>(picker_open).unwrap_or(false)) {
-            // Right of the label, as high as the lane, over the start of the track.
-            // Open also while the lane is taken with the keyboard (its draft is shown).
+        if choice.open {
+            // Right of the label, as high as the lane, over the start of the track, while
+            // the lane is taken (its draft is shown); a click on a channel keeps it.
             let rect = qnc_channel_picker::row_rect(track_rect, track_rect.left(), choice);
             let style = qnc_channel_picker::PickerStyle {
                 fill: input.theme.background,
@@ -896,8 +898,7 @@ fn paint_audio_row(
                 text: input.theme.text,
                 accent: input.theme.playhead,
             };
-            if let Some(channel) = qnc_channel_picker::show(ui, picker_open, rect, style, choice) {
-                ui.data_mut(|data| data.insert_temp(picker_open, false));
+            if let Some(channel) = qnc_channel_picker::show(ui, picker_id, rect, style, choice) {
                 return match lane {
                     AudioLane::A2 => TimelineIntent::ChooseA2Channel(channel),
                     _ => TimelineIntent::ChooseA1Channel(channel),

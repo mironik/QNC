@@ -215,6 +215,9 @@ fn render_source_dock(
     );
     match intent {
         TimelineIntent::None => header_intent,
+        // A click on A1/A2 is the same catalog action as Ctrl+1/Ctrl+2.
+        TimelineIntent::TakeAudioLane(qnc_timeline::AudioLane::A2) => Some(EditorialIntent::action("select_audio_a2")),
+        TimelineIntent::TakeAudioLane(_) => Some(EditorialIntent::action("select_audio_a1")),
         other => Some(EditorialIntent::Timeline(other)),
     }
 }
