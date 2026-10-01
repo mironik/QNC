@@ -302,9 +302,11 @@ impl SourcePreview {
     }
 
     /// Like [`Self::open`], but the session prepares `first_frame` as its first
-    /// picture instead of frame 0. An already open clip is not reopened.
+    /// picture instead of frame 0. An already open clip is not reopened; while the
+    /// player holds a story program (Wrap, Sync) the clip is opened again.
     pub fn open_at(&mut self, clip_id: &str, first_frame: u64) -> bool {
-        if self.view.clip_id.as_deref() == Some(clip_id)
+        if !self.program
+            && self.view.clip_id.as_deref() == Some(clip_id)
             && self.player_view.error.is_none()
             && (self.player_view.preparing || self.player_view.reply.is_some())
         {

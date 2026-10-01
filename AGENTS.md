@@ -2790,3 +2790,8 @@ prikazuju posteri s kartice"): Ingest je pri zatvaranju projekta ispraznio popis
 `qnc-clip-posters` i dalje pamtio koje je postere ucitao, pa ih za ponovno otvoreni projekt nije trazio.
 `crates/qnc-ingest-application/src/settings.rs`: kad se popis klipova prazni (nema projekta ili drugi
 projekt) poster loader se resetira (`posters.reset()`), kao sto vec radi Editorial. Bez novih redaka.
+Popravak 2026-10-01 (korisnik: "ne radi play na source timeline niti se playhead moze premjestiti
+klikom"): nakon Synca (ili Wrapa) player drzi program, a klik na source timeline treba vratiti klip.
+`qnc-source-preview::open_at` je odbijao ponovno otvaranje jer je isti klip vec bio prikazan; sada dok
+player drzi program klip se otvara ponovno. Mjerenje iz `player-timing` (isti dan): citanje iz baze
+23-65 ms, pokretanje procesa playera 0,7-1,9 s, do "spreman" ukupno 1,5-2,5 s.
