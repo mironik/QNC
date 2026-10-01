@@ -434,6 +434,7 @@ fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
     assert_eq!(segments.sync_frame(Some(0)), Some(15));
     assert_eq!(segments.sync_frame(Some(8)), Some(23));
     segments.set_playhead(Some(23));
+    assert!(segments.sync_holds_enter(), "Enter belongs to the running Sync play");
     assert!(segments.finish_sync(), "O closes the slot");
     assert!(
         segments.take_program_changed(),

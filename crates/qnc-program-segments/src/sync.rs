@@ -85,7 +85,8 @@ impl ProgramSegments {
         let was_active = self.sync.is_active();
         let frame = self.sync.program_frame(confirmed);
         if was_active && !self.sync.is_active() {
-            self.after_sync_finish("Sync slot zatvoren · Enter dodaje pokrivalicu");
+            self.sync_commit = true; // reaching an M marker or the source OUT writes it (user rule)
+            self.after_sync_finish("Sync slot zatvoren · spremam pokrivalicu");
         }
         frame
     }
@@ -109,9 +110,9 @@ impl ProgramSegments {
         self.sync.source_view()
     }
 
-    /// Enter is taken by a closed Sync slot or its cover write.
+    /// Enter is taken by a running Sync play, a closed Sync slot or its cover write.
     pub fn sync_holds_enter(&self) -> bool {
-        self.sync.holds_enter() || self.marker_edit.is_some() || self.marker_committing
+        self.sync.is_active() || self.sync.holds_enter() || self.marker_edit.is_some() || self.marker_committing
     }
 
     pub(crate) fn toggle_sync(&mut self) {
@@ -165,7 +166,8 @@ impl ProgramSegments {
         self.selected_cover = None;
         self.write(Operation::SelectSlot { slot_id });
         self.refresh_view("Sync slot odabran · Enter dodaje pokrivalicu".into());
-        self.commit_sync(false);
+        let commit = std::mem::take(&mut self.sync_commit);
+        self.commit_sync(commit);
     }
 
     /// Enter: the cover of the closed slot (v5
@@ -195,5 +197,15 @@ impl ProgramSegments {
             slot.source.clip_name,
         );
         self.refresh_view("Sync pokrivalica dodana u slot · spremam...".into());
+    }
+}
+
+impl ProgramSegments {
+    /// Enter during a Sync play closes the slot at the Wrap playhead and writes its
+    /// cover once the slot is stored (user rule 2026-10-01: Enter or reaching an M
+    /// marker writes it). False when no Sync play runs.
+    pub(crate) fn finish_sync_with_cover(&mut self) -> bool {
+        self.sync_commit = self.sync.is_active();
+        self.finish_sync() || std::mem::take(&mut self.sync_commit)
     }
 }

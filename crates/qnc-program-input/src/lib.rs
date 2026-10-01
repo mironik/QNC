@@ -45,13 +45,15 @@ impl ClipInputs for PlayerClipInputs<'_> {
 }
 
 /// A cover played over a program window only (v5 Sync/B-roll preview): the
-/// source from its IN as cover picture and A2 (source channel 1); the stored
+/// source from its IN as cover picture and A2 (the channel chosen for A2); the stored
 /// covers of the window give way to it. It is never written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransientCover {
     pub clip_id: String,
     pub source_in: u64,
     pub timebase: (u32, u32),
+    /// Source channel (zero based) heard on A2, the one chosen for covers.
+    pub a2_source_channel: u16,
 }
 
 const TRANSIENT_COVER_ID: &str = "sync-cover-preview";
@@ -99,7 +101,7 @@ pub fn with_transient_cover(
             source_out_frame: cover.source_in + end.saturating_sub(start),
             fps_num: cover.timebase.0,
             fps_den: cover.timebase.1,
-            a2_source_channel: 0,
+            a2_source_channel: cover.a2_source_channel,
         }))
         .collect()
 }

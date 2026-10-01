@@ -86,6 +86,7 @@ impl PanelFocus {
                         clip_id: sync.clip_id,
                         source_in: sync.source_in,
                         timebase: sync.timebase,
+                        a2_source_channel: segments.heard_channels().1,
                     };
                     preview.open_program_window(sync.window, cover)
                 }

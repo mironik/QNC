@@ -662,6 +662,41 @@ impl Drop for SourcePreview {
 mod tests {
     use super::*;
 
+    /// Diagnostics on an isolated copy only (never the project itself): prints the
+    /// sources of every item of a Sync window. QNC_DIAG_ROOT=<copy root>
+    /// QNC_DIAG_CLIP=<cover clip> QNC_DIAG_IN=<source in> QNC_DIAG_END=<window end>.
+    #[test]
+    #[ignore = "reads an isolated copy of a real project"]
+    fn prints_the_items_of_a_sync_window() {
+        let var = |name| std::env::var(name).unwrap();
+        let reader = SettingsReader::from_root(std::path::Path::new(&var("QNC_DIAG_ROOT"))).unwrap();
+        let settings = reader.read().unwrap();
+        let target = qnc_db_broker::ProjectDbTarget::for_project(&reader, &settings).unwrap();
+        let content = Arc::new(content::PlayerContent {
+            target: qnc_content_store::ContentTarget::for_project(&reader, &settings),
+        });
+        let inputs = InputReader::with_content_reader(reader, content);
+        let cover = TransientCover {
+            clip_id: var("QNC_DIAG_CLIP"),
+            source_in: var("QNC_DIAG_IN").parse().unwrap(),
+            timebase: (50, 1),
+            a2_source_channel: 1,
+        };
+        let end: u64 = var("QNC_DIAG_END").parse().unwrap();
+        let load = qnc_program_input::window_loader(target, settings.project_id.clone(), (0, end), cover);
+        let program = load(&inputs, &settings.workspace_db_uri).unwrap();
+        for item in &program.playlist.items {
+            println!("item {:?}", item.record_range);
+            for source in &item.sources {
+                println!(
+                    "  {} clip={} layer={:?} in={} routes={:?} media={:?}",
+                    source.source_id, source.clip_id, source.video_layer,
+                    source.source_range.source_in, source.audio_routes, source.media
+                );
+            }
+        }
+    }
+
     #[test]
     fn starts_passive_and_empty() {
         let preview = SourcePreview::new();

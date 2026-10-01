@@ -548,6 +548,9 @@ pub struct ProgramSegments {
     sync: qnc_sync_cover::SyncCover,
     /// IN was pressed since the last source (arms Sync).
     sync_in_pressed: bool,
+    /// The closed Sync slot writes its cover as soon as it is stored (Enter during the
+    /// play, or the play reached an M marker or the source OUT).
+    sync_commit: bool,
     /// The marker being moved and its draft program frame (Enter writes it).
     marker_edit: Option<(String, u64)>,
     /// A cover taken with Ctrl+click; Delete removes it.
@@ -785,7 +788,9 @@ impl ProgramSegments {
             SegmentCommand::ToggleSync => self.toggle_sync(),
             SegmentCommand::CommitSync => {
                 if !self.commit_marker_edit() {
-                    self.commit_sync(true);
+                    if !self.finish_sync_with_cover() {
+                        self.commit_sync(true);
+                    }
                 }
             }
             SegmentCommand::EditMarker => self.edit_marker(),

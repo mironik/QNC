@@ -2664,6 +2664,11 @@ izbor"; glasnoca ostaje kako je snimljeno, kao v5): novi klip ima A1 na kanalu 1
 A2 na izlazu 2: `qnc-player-input` dobio polje `lead_audio_channels` (spremljeni raspored se ne
 mijenja, provjera ostaje), `qnc-broadcast-engine` izlaze slaze iz `output_audio_channels()`,
 `qnc-source-preview::hear_channels` ponovno priprema isti klip na potvrdjenom frameu.
+Dopuna 2026-10-01 (korisnik: "postoji opcija, Enter ili nailazak na M marker"): Sync/B-roll
+zapisuje pokrivalicu kad Sync dode do M markera ili OUT-a izvora, ili na Enter za vrijeme
+Synca (slot se zatvara na Wrap playheadu); O i dalje zatvara slot i ceka Enter. Privremena
+pokrivalica Synca pusta izvor na kanalu izabranom za A2 (`TransientCover.a2_source_channel`),
+ne vise uvijek kanal 1. `qnc-program-segments`, `qnc-program-input`, `qnc-panel-focus`.
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav
