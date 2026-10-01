@@ -43,7 +43,7 @@ impl EditorialForm {
     }
 
     /// Paints the whole form into `ui`; returns the intent of this frame.
-    pub fn show_desktop(&self, ui: &mut egui::Ui, view: &EditorialView) -> Option<EditorialIntent> {
-        qnc_editorial_blocks::render_desktop(ui, &self.contracts, &self.theme, view)
+    pub fn show_desktop(&self, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>, view: &EditorialView) -> Option<EditorialIntent> {
+        qnc_editorial_blocks::render_desktop(ui, frame, &self.contracts, &self.theme, view)
     }
 }

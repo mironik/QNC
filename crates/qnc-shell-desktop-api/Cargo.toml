@@ -6,3 +6,4 @@ description = "QNC shell desktop public adapter API"
 
 [dependencies]
 eframe = { workspace = true }
+qnc-board = { workspace = true }

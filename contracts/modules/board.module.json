@@ -6,7 +6,8 @@
   "capabilities": [
     "ui.board.layout_tree",
     "ui.board.places",
-    "ui.board.paint"
+    "ui.board.paint",
+    "ui.board.frame"
   ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
@@ -38,6 +39,6 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-board",
   "input": "A layout: a tree of splits whose parts have a size (pixels with a largest share, a share with minimum widths, a picture shape or the rest), a face and a further split or one block by name. The standard layout of every application is built from the measures of its layout contract.",
-  "output": "The rectangles of the faces and blocks of the layout; it paints the faces and calls the caller once per block by name. It knows no application, keeps no state and never reads or writes the database. Saved layouts, dragged dividers and a layout chosen per project are added here later without changing the forms.",
-  "specification": "User rule 2026-09-30: every application uses the same layout, only the sizes of its places and the blocks in them differ; geometry from qnc-editorial-desktop render_desktop/render_board and qnc-project-desktop project_board."
+  "output": "The rectangles of the faces and blocks of the layout; it paints the faces and calls the caller once per block by name. It knows no application, keeps no state and never reads or writes the database. A frame is a layout with one slot for a board (the desktop: board over the footer); the board is nested into the slot and frame and board are drawn as one tree, the frame owner drawing its own places, which are never skipped. Saved layouts, dragged dividers and a layout chosen per project are added here later without changing the forms.",
+  "specification": "User rule 2026-09-30: every application uses the same layout, only the sizes of its places and the blocks in them differ; geometry from qnc-editorial-desktop render_desktop/render_board and qnc-project-desktop project_board. User rule 2026-10-01: the layout is the frame and the guide of the display, not pixels."
 }

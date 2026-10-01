@@ -111,3 +111,23 @@ fn a_layout_is_data_that_round_trips_and_can_place_a_monitor_on_the_right() {
     assert_eq!(s.block("monitor").unwrap().left(), 600.0);
     assert_eq!(s.block("body").unwrap().width(), 600.0);
 }
+
+#[test]
+fn a_board_in_the_desktop_frame_is_one_tree_over_the_footer() {
+    let board = sizes().standard_layout(&NAMES);
+    let whole = surface_with_footer(30.0).nest("surface", &board);
+    assert_eq!(whole.block_names(), ["monitor", "head", "body", "right", "dock", "footer"]);
+    let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(1000.0, 730.0));
+    let s = solve(&whole, rect);
+    assert_eq!(s.block("footer").unwrap().top(), 700.0);
+    assert_eq!(s.block("body").unwrap().height(), 700.0 - 3.0);
+    // The board's own face paints the place it takes in the frame.
+    assert_eq!(face(&s, "bg"), Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(1000.0, 700.0)));
+}
+
+#[test]
+fn a_bare_frame_leaves_the_board_as_it_is() {
+    let board = sizes().standard_layout(&NAMES);
+    let frame = Frame::bare();
+    assert_eq!(frame.layout.nest(&frame.slot, &board), board);
+}

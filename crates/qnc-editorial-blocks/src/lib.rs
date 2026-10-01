@@ -20,15 +20,18 @@ use qnc_editorial_layout::{theme::Theme, EditorialContracts};
 
 /// Media Assist and Story on the one desktop board: preview in the monitor, pool head
 /// in the head row, the clip cards in the body, the group's right panel (Segmenti for
-/// Story) on the right, the source timeline in the dock.
+/// Story) on the right, the source timeline in the dock; drawn in `frame` as one layout
+/// tree with it.
 pub fn render_desktop(
     ui: &mut Ui,
+    frame: &mut qnc_board::Frame<'_>,
     contracts: &EditorialContracts,
     theme: &Theme,
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
     let (sizes, faces, names) = (contracts.board_sizes(), theme.board_faces(), contracts.board_names());
-    qnc_board::show(ui, &sizes, &faces, &names, |ui, block, rect| match block {
+    let board = sizes.standard_layout(&names);
+    qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| match block {
         "preview" => {
             render_preview(ui, rect, contracts, theme, view);
             None

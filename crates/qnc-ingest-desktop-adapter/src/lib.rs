@@ -24,7 +24,11 @@ struct IngestDesktopAdapter {
 
 impl ShellDesktopApp for IngestDesktopAdapter {
     fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
-        self.app.show_desktop(ctx, ui);
+        self.app.show_desktop(ctx, ui, &mut qnc_board::Frame::bare());
+    }
+
+    fn show_in_frame(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
+        self.app.show_desktop(ctx, ui, frame);
     }
 
     fn footer_status(&self) -> Option<&str> {

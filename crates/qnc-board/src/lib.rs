@@ -327,24 +327,36 @@ pub fn show_layout<R>(
     ui: &mut egui::Ui,
     layout: &Layout,
     face: impl Fn(&str) -> Option<Color32>,
-    mut block: impl FnMut(&mut egui::Ui, &str, Rect) -> Option<R>,
+    block: impl FnMut(&mut egui::Ui, &str, Rect) -> Option<R>,
 ) -> Option<R> {
     let rect = ui.available_rect_before_wrap();
     if rect.width() <= 1.0 || rect.height() <= 1.0 {
         return None;
     }
     ui.allocate_rect(rect, Sense::hover());
-    let solved = solve(layout, rect);
+    draw(ui, &solve(layout, rect), face, block, |_| false)
+}
+
+/// Faces first, then blocks in tree order. After the first answer only the blocks
+/// `always` names are still drawn (the frame's own places are never skipped).
+fn draw<R>(
+    ui: &mut egui::Ui,
+    solved: &Solved,
+    face: impl Fn(&str) -> Option<Color32>,
+    mut block: impl FnMut(&mut egui::Ui, &str, Rect) -> Option<R>,
+    always: impl Fn(&str) -> bool,
+) -> Option<R> {
     for (name, area) in &solved.faces {
         if let Some(color) = face(name) {
             ui.painter().rect_filled(*area, 0.0, color);
         }
     }
+    let mut answer = None;
     for (name, area) in &solved.blocks {
-        if area.width() < 1.0 || area.height() < 1.0 {
+        if area.width() < 1.0 || area.height() < 1.0 || (answer.is_some() && !always(name)) {
             continue;
         }
-        let answer = ui
+        let this = ui
             .scope_builder(
                 egui::UiBuilder::new()
                     .max_rect(*area)
@@ -354,12 +366,15 @@ pub fn show_layout<R>(
                 |ui| block(ui, name, *area),
             )
             .inner;
-        if answer.is_some() {
-            return answer;
+        if answer.is_none() {
+            answer = this;
         }
     }
-    None
+    answer
 }
+
+mod frame;
+pub use frame::{show_in_frame, show_surface_in_frame, Frame, FrameBlocks};
 
 #[cfg(test)]
 mod tests;

@@ -3335,6 +3335,7 @@ name = "qnc-editorial-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-editorial-application",
  "qnc-editorial-blocks",
  "qnc-editorial-layout",
@@ -3549,6 +3550,7 @@ name = "qnc-ingest-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-ingest-application",
  "qnc-ingest-blocks",
  "qnc-ingest-layout",
@@ -3561,6 +3563,7 @@ name = "qnc-ingest-desktop-adapter"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-ingest-desktop",
  "qnc-shell-desktop-api",
 ]
@@ -3757,6 +3760,7 @@ name = "qnc-media-assist-audio-ai-desktop-adapter"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
 ]
@@ -3766,6 +3770,7 @@ name = "qnc-media-assist-audio-desktop-adapter"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
 ]
@@ -3783,6 +3788,7 @@ name = "qnc-media-assist-video-desktop-adapter"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
 ]
@@ -4197,6 +4203,7 @@ name = "qnc-project-desktop"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-project-application",
  "qnc-project-blocks",
  "qnc-project-session",
@@ -4207,6 +4214,7 @@ name = "qnc-project-desktop-adapter"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-project-desktop",
  "qnc-shell-desktop-api",
 ]
@@ -4317,6 +4325,7 @@ name = "qnc-shell-desktop-api"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
 ]
 
 [[package]]
@@ -4494,6 +4503,7 @@ name = "qnc-story-desktop-adapter"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-board",
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
 ]

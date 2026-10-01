@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC Project public desktop surface: the Project blocks on the desktop board over the Project session"
 
 [dependencies]
+qnc-board = { workspace = true }
 eframe = { workspace = true }
 qnc-project-application = { workspace = true }
 qnc-project-blocks = { workspace = true }

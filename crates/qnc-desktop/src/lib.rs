@@ -232,14 +232,15 @@ impl QncShell {
         })
     }
 
-    fn body(&mut self, ui: &mut egui::Ui) {
+    /// The surface of the active application in the desktop frame.
+    fn body(&mut self, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
         let app = self.app_registry.find(&self.active_tab).cloned();
         if let Some(app) = app {
             if app.host_mode == "embedded_public_api" {
                 self.ensure_embedded_component(&app);
                 if let Some(component) = self.embedded_apps.get_mut(&app.tab_id) {
                     let ctx = ui.ctx().clone();
-                    component.show_desktop(&ctx, ui);
+                    component.show_in_frame(&ctx, ui, frame);
                     if self.consume_navigation(&app) {
                         ui.ctx().request_repaint();
                     }
@@ -247,11 +248,11 @@ impl QncShell {
                 }
             }
 
-            self.placeholder(ui, &app.label);
+            qnc_board::show_surface_in_frame(ui, frame, |ui| self.placeholder(ui, &app.label));
             return;
         }
 
-        self.placeholder(ui, "Nema registrirane aplikacije");
+        qnc_board::show_surface_in_frame(ui, frame, |ui| self.placeholder(ui, "Nema registrirane aplikacije"));
     }
 
     fn placeholder(&self, ui: &mut egui::Ui, label: &str) {
@@ -303,23 +304,26 @@ impl QncShell {
         self.theme_id.palette(contract_palette(&self.layout.colors))
     }
 
-    /// The footer block in its place of the desktop layout.
-    fn footer(&self, ui: &mut egui::Ui, rect: egui::Rect) -> Option<FooterIntent> {
-        let style = FooterStyle {
-            font_ui: self.layout.theme_metrics.font_ui,
-            pad_x: self.layout.theme_metrics.chrome_pad_x,
-            columns: self.layout.shell_metrics.workspace_footer_columns,
-        };
-        let entries = self.app_registry.entries();
-        let tabs: Vec<(&str, &str)> =
-            entries.iter().map(|app| (app.tab_id.as_str(), app.label.as_str())).collect();
-        let input = FooterInput {
-            tabs: &tabs,
-            active_tab: &self.active_tab,
+    /// What the footer place of the desktop frame shows this frame.
+    fn footer(&self) -> FooterBlock {
+        FooterBlock {
+            style: FooterStyle {
+                font_ui: self.layout.theme_metrics.font_ui,
+                pad_x: self.layout.theme_metrics.chrome_pad_x,
+                columns: self.layout.shell_metrics.workspace_footer_columns,
+            },
+            palette: self.palette(),
+            tabs: self
+                .app_registry
+                .entries()
+                .iter()
+                .map(|app| (app.tab_id.clone(), app.label.clone()))
+                .collect(),
+            active_tab: self.active_tab.clone(),
             theme: self.theme_id,
-            status: self.footer_status(),
-        };
-        qnc_shell_footer::show(ui, rect, &style, &self.palette(), input)
+            status: self.footer_status().to_string(),
+            intent: None,
+        }
     }
 
     fn apply_footer(&mut self, ctx: &egui::Context, intent: FooterIntent) {
@@ -336,26 +340,41 @@ impl QncShell {
 }
 
 impl eframe::App for QncShell {
-    /// The desktop: the surface of the active application over the footer, one layout
-    /// (user rule 2026-09-30: the footer is a place of every board).
+    /// The desktop frame: the board of the active application over the footer, drawn as
+    /// one layout tree (user rules 2026-09-30 and 2026-10-01: the footer is a place of
+    /// every board; the layout is the frame).
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let layout = qnc_board::surface_with_footer(self.layout.shell_metrics.footer_height);
-        let intent = egui::CentralPanel::default()
+        let mut footer = self.footer();
+        let mut frame = qnc_board::Frame::desktop(self.layout.shell_metrics.footer_height, &mut footer);
+        egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(self.palette().bg))
-            .show(ctx, |ui| {
-                qnc_board::show_layout(ui, &layout, |_| None, |ui, block, rect| match block {
-                    "surface" => {
-                        self.body(ui);
-                        None
-                    }
-                    "footer" => self.footer(ui, rect),
-                    _ => None,
-                })
-            })
-            .inner;
-        if let Some(intent) = intent {
+            .show(ctx, |ui| self.body(ui, &mut frame));
+        drop(frame);
+        if let Some(intent) = footer.intent {
             self.apply_footer(ctx, intent);
         }
+    }
+}
+
+/// The footer place of the desktop frame.
+struct FooterBlock {
+    style: FooterStyle,
+    palette: Palette,
+    tabs: Vec<(String, String)>,
+    active_tab: String,
+    theme: ThemeId,
+    status: String,
+    intent: Option<FooterIntent>,
+}
+
+impl qnc_board::FrameBlocks for FooterBlock {
+    fn block(&mut self, ui: &mut egui::Ui, name: &str, rect: egui::Rect) {
+        if name != "footer" {
+            return;
+        }
+        let tabs: Vec<(&str, &str)> = self.tabs.iter().map(|(id, label)| (id.as_str(), label.as_str())).collect();
+        let input = FooterInput { tabs: &tabs, active_tab: &self.active_tab, theme: self.theme, status: &self.status };
+        self.intent = qnc_shell_footer::show(ui, rect, &self.style, &self.palette, input);
     }
 }
 

@@ -25,6 +25,12 @@ pub struct DesktopApplicationRef {
 pub trait ShellDesktopApp {
     fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui);
 
+    /// The surface in the desktop frame, as one layout tree (user rule 2026-10-01: the
+    /// layout is the frame). A surface whose board is not a layout yet is one place.
+    fn show_in_frame(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
+        qnc_board::show_surface_in_frame(ui, frame, |ui| self.show_desktop(ctx, ui));
+    }
+
     /// Display-only text from the active surface, never a workflow payload.
     fn footer_status(&self) -> Option<&str> {
         None

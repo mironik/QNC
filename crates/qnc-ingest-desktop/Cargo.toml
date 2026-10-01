@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC Ingest public desktop surface: the Ingest blocks on the desktop board over the Ingest application"
 
 [dependencies]
+qnc-board = { workspace = true }
 eframe = { workspace = true }
 qnc-ingest-application = { workspace = true }
 qnc-ingest-blocks = { workspace = true }

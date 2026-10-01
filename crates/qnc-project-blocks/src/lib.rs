@@ -30,12 +30,13 @@ struct Blocks<'a> {
 pub fn show(
     ctx: &egui::Context,
     ui: &mut egui::Ui,
+    frame: &mut qnc_board::Frame<'_>,
     contracts: &AppContracts,
     session: &mut ProjectSession,
 ) -> Vec<ProjectIntent> {
     let intents = key_intents(ctx, contracts, session);
     let mut blocks = Blocks { contracts, session, intents };
-    blocks.board(ui);
+    blocks.board(ui, frame);
     blocks.delete_questions(ctx);
     blocks.intents
 }
@@ -60,7 +61,7 @@ fn key_intents(ctx: &egui::Context, contracts: &AppContracts, session: &ProjectS
 impl Blocks<'_> {
     /// The one desktop board: the project list in the body of the left column, the
     /// settings in the right panel; monitor, head row and dock are one pixel.
-    fn board(&mut self, ui: &mut egui::Ui) {
+    fn board(&mut self, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
         let t = Theme::from_contract(&self.contracts.shell.colors);
         let faces = qnc_board::BoardFaces { bg: t.bg, left: t.bg, right: t.bg, divider: t.border };
         let sizes = self.contracts.project.board;
@@ -71,7 +72,7 @@ impl Blocks<'_> {
             right: "project-settings",
             dock: "",
         };
-        qnc_board::show(ui, &sizes, &faces, &names, |ui, block, rect| {
+        qnc_board::show_in_frame(ui, frame, &sizes.standard_layout(&names), |name| faces.named(name), |ui, block, rect| {
             match block {
                 "project-list" => self.project_list(ui, rect.width(), rect.height()),
                 "project-settings" => self.settings_panel(ui, rect.width(), rect.height()),

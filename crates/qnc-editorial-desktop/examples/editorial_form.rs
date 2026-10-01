@@ -21,7 +21,7 @@ impl eframe::App for Host {
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(ctx, |ui| {
-                if let Some(intent) = self.form.show_desktop(ui, &self.view) {
+                if let Some(intent) = self.form.show_desktop(ui, &mut qnc_board::Frame::bare(), &self.view) {
                     eprintln!("intent: {intent:?}");
                     match intent {
                         EditorialIntent::PreviewClip(id) => self.view.preview.clip_id = Some(id),

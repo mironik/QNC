@@ -24,7 +24,7 @@ impl IngestApp {
         })
     }
 
-    pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+    pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
         if !self.player_repaint_bound
             && (self.application.view().playback.preparing
                 || self.application.view().playback.reply.is_some())
@@ -47,7 +47,7 @@ impl IngestApp {
         let theme = Theme::from_contract(&self.contracts.shell);
         theme::apply(ctx, &theme);
         // The view is borrowed, not copied: it holds every clip and the timeline data.
-        let intent = qnc_ingest_blocks::render_desktop(ui, &self.contracts, &theme, self.application.view());
+        let intent = qnc_ingest_blocks::render_desktop(ui, frame, &self.contracts, &theme, self.application.view());
         if let Some(intent) = intent {
             self.dispatch(ctx, intent);
         }
@@ -92,6 +92,6 @@ impl eframe::App for IngestApp {
         theme::apply(ctx, &theme);
         CentralPanel::default()
             .frame(Frame::NONE.fill(theme.bg))
-            .show(ctx, |ui| self.show_desktop(ctx, ui));
+            .show(ctx, |ui| self.show_desktop(ctx, ui, &mut qnc_board::Frame::bare()));
     }
 }

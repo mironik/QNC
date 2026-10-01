@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC Project public shell desktop adapter"
 
 [dependencies]
+qnc-board = { workspace = true }
 eframe = { workspace = true }
 qnc-project-desktop = { workspace = true }
 qnc-shell-desktop-api = { workspace = true }

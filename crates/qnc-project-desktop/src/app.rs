@@ -28,11 +28,11 @@ impl ProjectApp {
         self.session.navigation_sequence()
     }
 
-    pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+    pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
         if self.session.component.applications.poll() {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
-        for intent in qnc_project_blocks::show(ctx, ui, &self.contracts, &mut self.session) {
+        for intent in qnc_project_blocks::show(ctx, ui, frame, &self.contracts, &mut self.session) {
             self.session.dispatch(intent);
         }
     }
@@ -43,6 +43,6 @@ impl eframe::App for ProjectApp {
         let t = Theme::from_contract(&self.contracts.shell.colors);
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(t.bg))
-            .show(ctx, |ui| self.show_desktop(ctx, ui));
+            .show(ctx, |ui| self.show_desktop(ctx, ui, &mut qnc_board::Frame::bare()));
     }
 }

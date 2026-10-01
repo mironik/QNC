@@ -25,7 +25,7 @@ impl EditorialApp {
         })
     }
 
-    pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+    pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
         if !self.player_repaint_bound && self.application.has_player() {
             let repaint = ctx.clone();
             self.application.notify_on_player_change(move || {
@@ -43,7 +43,7 @@ impl EditorialApp {
         }
         self.dispatch_keyboard_shortcuts(ctx);
         self.form.apply_theme(ctx);
-        let intent = self.form.show_desktop(ui, self.application.view());
+        let intent = self.form.show_desktop(ui, frame, self.application.view());
         if let Some(intent) = intent {
             self.dispatch(ctx, intent);
         }
@@ -76,6 +76,6 @@ impl eframe::App for EditorialApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         CentralPanel::default()
             .frame(Frame::NONE)
-            .show(ctx, |ui| self.show_desktop(ctx, ui));
+            .show(ctx, |ui| self.show_desktop(ctx, ui, &mut qnc_board::Frame::bare()));
     }
 }
