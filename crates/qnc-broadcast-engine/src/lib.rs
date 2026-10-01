@@ -683,7 +683,7 @@ impl VideoDecodeAdapter for Video {
         self.drain_conversions()?;
         if let Some(frame) = self.ready.remove(&request.frame) {
             self.forget_far_from(request.frame);
-            return Ok(frame);
+            return self.stamped(frame).ok_or_else(|| error("frame sequence exhausted"));
         }
         if let Some(frame) = self.kept_again(request.frame) {
             self.forget_far_from(request.frame);
@@ -698,7 +698,7 @@ impl VideoDecodeAdapter for Video {
         self.drain_conversions()?;
         if let Some(frame) = self.ready.remove(&request.frame) {
             self.forget_far_from(request.frame);
-            return Ok(frame);
+            return self.stamped(frame).ok_or_else(|| error("frame sequence exhausted"));
         }
         Err(pending())
     }
@@ -715,9 +715,18 @@ impl Video {
                     && frame < self.next_decode_frame + self.prefetch_frames as u64))
     }
 
-    /// A kept picture shown again, with a new sequence so the monitor takes it as new.
+    /// A kept picture shown again.
     fn kept_again(&mut self, frame: u64) -> Option<DecodedVideoFrame<Picture>> {
         let kept = self.kept.get(&frame)?.clone();
+        self.stamped(kept)
+    }
+
+    /// Every picture handed out takes the next sequence when it is handed out, so the
+    /// monitor never sees a lower one after a step back (it drops those as stale).
+    fn stamped(&mut self, kept: DecodedVideoFrame<Picture>) -> Option<DecodedVideoFrame<Picture>> {
+        if kept.payload.token.is_some() {
+            return Some(kept); // an output token keeps its own sequence
+        }
         let mut gpu = self.gpu.borrow_mut();
         let mut header = kept.payload.header.clone();
         gpu.sequence = gpu.sequence.checked_add(1)?;
