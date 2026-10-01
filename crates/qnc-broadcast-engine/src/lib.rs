@@ -272,7 +272,7 @@ impl Runtime {
             conversion::Raster::Cpu(RasterConverter::prepare(converter, None).map_err(error)?)
         };
         let raster_size = converter.size();
-        let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4) + STEP_BACK_FRAMES as usize)
+        let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4) + STEP_BACK_FRAMES as usize + 8)
             .map(|_| Some(std::sync::Arc::from(vec![0; converter.output_bytes()])))
             .collect();
         let decode_input = Rc::new(DecodeInput::new_access(
@@ -740,10 +740,13 @@ impl Video {
         Some(DecodedVideoFrame { payload: Rc::new(PictureData { token: None, header, rgba }), ..kept })
     }
 
-    /// Keeps the pictures around the frame the last cue went to only.
-    fn forget_far_from(&mut self, _served: u64) {
-        let frame = self.cue_anchor;
-        let (back, ahead) = (frame.saturating_sub(STEP_BACK_FRAMES), frame + 2 * self.prefetch_frames as u64);
+    /// Keeps the pictures behind the frame on screen only: the last served one is the
+    /// prefetch ahead of it, so 25 behind the screen stay kept and nothing far behind
+    /// holds a buffer while playing (that starved the decoder).
+    fn forget_far_from(&mut self, served: u64) {
+        let prefetch = self.prefetch_frames as u64;
+        let screen = served.saturating_sub(prefetch).max(self.cue_anchor.min(served));
+        let (back, ahead) = (screen.saturating_sub(STEP_BACK_FRAMES), served + prefetch);
         self.kept.retain(|kept, _| *kept >= back && *kept <= ahead);
     }
 
@@ -784,6 +787,11 @@ impl Video {
                     .as_ref()
                     .is_some_and(|b| std::sync::Arc::strong_count(b) == 1)
             }) else {
+                // Pictures kept for steps never starve the decoder: the oldest one goes.
+                if self.kept.first_key_value().is_some_and(|(frame, _)| *frame < request.frame) {
+                    self.kept.pop_first();
+                    continue;
+                }
                 break;
             };
             let packet = match self.decoder.try_next_packet().map_err(error)? {
