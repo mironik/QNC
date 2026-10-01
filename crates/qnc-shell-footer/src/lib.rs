@@ -121,6 +121,12 @@ pub fn show(
                 ui.set_min_height(h);
                 ui.horizontal_centered(|ui| {
                     ui.spacing_mut().item_spacing.x = 12.0;
+                    // The tabs sit in the middle of the footer however many the project has.
+                    let gap = ui.spacing().item_spacing.x;
+                    let space = (ui.available_width() - tabs_width(ui, style, input.tabs, gap)) / 2.0 - gap;
+                    if space > 0.0 {
+                        ui.add_space(space);
+                    }
                     for (tab_id, label) in input.tabs {
                         let selected = input.active_tab == *tab_id;
                         if link_tab(ui, style, palette, label, selected).clicked() {
@@ -172,6 +178,16 @@ fn theme_picker(
             }
         });
     (selected != current).then_some(selected)
+}
+
+/// The width the tabs take in a row, with `gap` between them.
+fn tabs_width(ui: &egui::Ui, style: &FooterStyle, tabs: &[(&str, &str)], gap: f32) -> f32 {
+    let font = egui::FontId::proportional(style.font_ui);
+    let labels: f32 = tabs
+        .iter()
+        .map(|(_, label)| ui.fonts(|fonts| fonts.layout_no_wrap(label.to_string(), font.clone(), egui::Color32::WHITE).size().x))
+        .sum();
+    labels + gap * tabs.len().saturating_sub(1) as f32
 }
 
 fn link_tab(
