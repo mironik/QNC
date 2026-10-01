@@ -14,7 +14,7 @@ use std::{
         mpsc::{self, SyncSender},
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -184,6 +184,8 @@ impl Player {
             .spawn(move || {
                 let mut active: Option<(u64, connection::Connection)> = None;
                 let mut initial_preview: Option<(u64, u64)> = None;
+                // Diagnostics only: when a selection was taken, to time its way to Ready.
+                let mut timing: Option<(u64, Instant)> = None;
                 loop {
                     if state.stop.load(Ordering::Acquire) {
                         break;
@@ -200,25 +202,39 @@ impl Player {
                     if let Some((generation, first_frame, load)) = pending {
                         // Selection may arrive after the generation check above.
                         // Reap the preceding process before reading/preparing its replacement.
+                        let started = Instant::now();
                         active = None;
                         initial_preview = None;
+                        let stopped = started.elapsed();
                         let result = load().and_then(|launch| {
+                            let loaded = started.elapsed();
                             if state.generation.load(Ordering::Acquire) != generation
                                 || state.stop.load(Ordering::Acquire)
                             {
                                 return Err("superseded player selection".into());
                             }
-                            connection::Connection::launch(launch, generation, {
+                            let connection = connection::Connection::launch(launch, generation, {
                                 let state = state.clone();
                                 Arc::new(move |picture| {
                                     publish_picture(&state, generation, picture)
                                 })
-                            })
+                            });
+                            timing_line(
+                                generation,
+                                &format!(
+                                    "stop_ms={} load_ms={} launch_ms={}",
+                                    stopped.as_millis(),
+                                    loaded.as_millis(),
+                                    started.elapsed().as_millis()
+                                ),
+                            );
+                            connection
                         });
                         if state.generation.load(Ordering::Acquire) == generation {
                             match result {
                                 Ok(connection) => {
                                     active = Some((generation, connection));
+                                    timing = Some((generation, started));
                                     initial_preview = Some((generation, first_frame));
                                 }
                                 Err(error) => publish(
@@ -246,7 +262,16 @@ impl Player {
                             initial_preview_action(&mut initial_preview, *generation, &view)
                         });
                         match connection.poll(action) {
-                            Ok(view) => publish(&state, *generation, view),
+                            Ok(view) => {
+                                if let Some((_, started)) =
+                                    timing.filter(|(g, _)| g == generation && view.ready())
+                                {
+                                    let ready = started.elapsed().as_millis();
+                                    timing_line(*generation, &format!("ready_ms={ready}"));
+                                    timing = None;
+                                }
+                                publish(&state, *generation, view)
+                            }
                             Err(error) => {
                                 publish(
                                     &state,
@@ -668,5 +693,16 @@ mod tests {
         player.close();
         assert_eq!(player.view(), View::default());
         assert!(player.send(Action::TogglePlayPause).is_err());
+    }
+}
+
+/// One timing line of a player selection (diagnostics only): stopping the preceding
+/// player, building the input from the database, starting the process, ready.
+fn timing_line(generation: u64, text: &str) {
+    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+        qnc_dev_diagnostics::log_line(
+            qnc_dev_diagnostics::DiagnosticsStream::Player,
+            format!("player-timing generation={generation} {text}"),
+        );
     }
 }
