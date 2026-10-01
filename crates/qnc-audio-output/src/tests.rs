@@ -337,3 +337,20 @@ fn real_device_preroll_start_pause_resume_and_drain() {
         }
     }
 }
+
+#[test]
+fn a_frame_step_is_heard_once_while_paused_and_play_drops_what_is_left() {
+    let (mut q, mut c, g) = prepared(2);
+    q.audition(&[0.5, -0.5, 0.25, -0.25]);
+    let mut out = [0.0; 4];
+    c.render(&mut out, 100, None);
+    assert_eq!(out, [0.5, -0.5, 0.25, -0.25], "the one frame of the step");
+    c.render(&mut out, 200, None);
+    assert_eq!(out, [0.0; 4], "heard once");
+    q.push(g, 10, &[0.1; 8]).unwrap();
+    q.commit(g).unwrap();
+    q.audition(&[0.9, 0.9]);
+    q.start(g).unwrap();
+    c.render(&mut out, 300, None);
+    assert_eq!(out, [0.1; 4], "Play plays the playout queue, not the step");
+}

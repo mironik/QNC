@@ -2692,6 +2692,15 @@ Shift+I `mark_in_fit_duration` (IN na playhead, OUT za duljinu odabranog ili prv
 `qnc-program-segments` (modul `nav.rs`), `qnc-source-mark-focus` (`adjacent`, `fit`),
 `qnc-panel-focus`. Shift+W `toggle_source_wrap` i F1 `toggle_cheatsheet` nemaju postupak ni u v5
 kodu; OFF snimanje (`record_toggle`, `save_off`) nije dio ovog koraka.
+Otkljucano 2026-10-01 (korisnik: "odmrzni i sredi"; "samo slika po slika, inace nije broadcast
+player"): Broadcast Player za zvuk pri koraku. Audit 22.9./sada: ni QNC 13.9. i 22.9., ni v5 ni
+v4 nisu imali zvuk pri koraku u pauzi (ugovor: priprema u pauzi je necujna); strelice su do
+25.9. uvijek isle playheadu, a fokus panela ih je od 25.9. gasio nakon klika u poolu (vraceno).
+Izvedeno: `qnc-audio-output` ima zaseban kanal preslusavanja (`AudioOutput::audition`) koji
+uredaj svira samo dok su vrata reprodukcije zatvorena i odbacuje cim krene Play; red, sat i
+pripremljeni Play se ne diraju. `qnc-broadcast-engine` (`DeviceSink::audition_at` iz
+`cue_audio`) nakon cuea pusti tocno uzorke tog jednog framea. Program (Wrap) jos nema korak sa
+zvukom. Strelice: koraci se zbrajaju od zadnjeg trazenog framea (`qnc-source-preview::step`).
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

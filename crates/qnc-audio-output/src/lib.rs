@@ -93,6 +93,11 @@ impl AudioOutput {
     pub fn commit(&mut self, generation: u64) -> Result<()> {
         self.queue.commit(generation)
     }
+    /// Plays one frame step while paused (interleaved device samples); playout and its
+    /// clock are untouched and Play drops what is left of it.
+    pub fn audition(&mut self, samples: &[f32]) {
+        self.queue.audition(samples);
+    }
     pub fn start(&mut self, generation: u64) -> Result<()> {
         self.queue.start(generation)
     }

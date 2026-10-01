@@ -112,6 +112,9 @@ pub(crate) struct DeviceSink {
     generation: Option<u64>,
     channel_map: Option<ChannelMap>,
     routed: Vec<f32>,
+    /// The frame a cue went to: its sound is heard once, frame by frame (user rule
+    /// 2026-10-01: stepping by frames is cut by ear).
+    audition_frame: Option<u64>,
 }
 impl DeviceSink {
     pub fn open(
@@ -154,7 +157,13 @@ impl DeviceSink {
             generation: None,
             channel_map,
             routed: Vec::new(),
+            audition_frame: None,
         })
+    }
+
+    /// The next packet of `frame` is also heard once while paused, one frame long.
+    pub(crate) fn audition_at(&mut self, frame: u64) {
+        self.audition_frame = Some(frame);
     }
 
     pub(crate) fn submit(
@@ -192,6 +201,14 @@ impl DeviceSink {
         device
             .queue(generation, start, &self.routed)
             .map_err(error)?;
+        if self.audition_frame == Some(packet.start_frame) {
+            self.audition_frame = None;
+            // Exactly the samples of this one frame, no more.
+            let end = sample_boundary(packet.start_frame + 1, self.source.timebase, format.sample_rate_hz)?;
+            let width = self.channel_map.as_ref().map_or(1, |map| map.output_channels().len());
+            let samples = (end - start) as usize * width;
+            device.audition(&self.routed[..samples.min(self.routed.len())]);
+        }
         if packet.start_frame + 1 == self.source.duration_frames {
             device.finish(generation).map_err(error)?;
         }
@@ -302,6 +319,7 @@ impl AudioOutputAdapter for Audio {
         }
         seek_start(&self.source, request.frame)?;
         self.pending_seek = Some(request.frame);
+        self.sink.audition_at(request.frame);
         Ok(())
     }
     fn prepare_audio(&mut self, _: &EngineSourceHandle) -> Result<Vec<BroadcastEvent>> {

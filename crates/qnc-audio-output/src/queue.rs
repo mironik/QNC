@@ -60,6 +60,8 @@ impl Shared {
 
 pub(crate) struct Queue {
     producer: Producer<f32>,
+    /// One frame of sound heard while the transport is paused (a frame step).
+    audition: Producer<f32>,
     pub shared: Arc<Shared>,
     pub config: Config,
     pub generation: u64,
@@ -70,6 +72,7 @@ pub(crate) struct Queue {
 }
 pub(crate) struct Callback {
     consumer: Consumer<f32>,
+    audition: Consumer<f32>,
     shared: Arc<Shared>,
     channels: usize,
     generation: u64,
@@ -79,9 +82,11 @@ impl Queue {
     pub fn new(config: Config) -> Result<(Self, Callback)> {
         let capacity = config.validate()?;
         let (producer, consumer) = RingBuffer::new(capacity);
+        let (audition, audition_out) = RingBuffer::new(capacity);
         let shared = Arc::new(Shared::new());
         let callback = Callback {
             consumer,
+            audition: audition_out,
             shared: shared.clone(),
             channels: config.format.channels as usize,
             generation: 0,
@@ -90,6 +95,7 @@ impl Queue {
         Ok((
             Self {
                 producer,
+                audition,
                 shared,
                 config,
                 generation: 1,
@@ -101,6 +107,18 @@ impl Queue {
             callback,
         ))
     }
+    /// Sound of one frame step, heard only while the gate is closed (paused); what
+    /// does not fit is dropped. It never touches the playout queue or its clock.
+    pub fn audition(&mut self, samples: &[f32]) {
+        let channels = self.config.format.channels as usize;
+        let fit = self.audition.slots().min(samples.len());
+        let fit = fit - fit % channels.max(1);
+        if let Ok(chunk) = self.audition.write_chunk_uninit(fit) {
+            let written = chunk.fill_from_iter(samples[..fit].iter().copied());
+            debug_assert_eq!(written, fit);
+        }
+    }
+
     pub fn health(&self) -> Result<()> {
         if self.shared.callback_frames.load(Ordering::Acquire) > self.config.capacity_frames as u64
         {
@@ -367,8 +385,25 @@ impl Callback {
             self.shared.ack.store(generation, Ordering::Release);
             return;
         }
-        if gate & 1 == 0 || self.shared.device_failed.load(Ordering::Acquire) {
+        if self.shared.device_failed.load(Ordering::Acquire) {
             return;
+        }
+        if gate & 1 == 0 {
+            // Paused: a frame step may be heard; nothing else plays.
+            let count = self.audition.slots().min(output.len());
+            let count = count - count % self.channels;
+            if let Ok(chunk) = self.audition.read_chunk(count) {
+                let (a, b) = chunk.as_slices();
+                output[..a.len()].copy_from_slice(a);
+                output[a.len()..a.len() + b.len()].copy_from_slice(b);
+                chunk.commit_all();
+            }
+            return;
+        }
+        // Playing: a step heard before Play is not heard over it.
+        let stale = self.audition.slots();
+        if let Ok(chunk) = self.audition.read_chunk(stale) {
+            chunk.commit_all();
         }
         if !output.len().is_multiple_of(self.channels) {
             self.shared.device_failed.store(true, Ordering::Release);
