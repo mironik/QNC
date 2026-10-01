@@ -54,6 +54,7 @@ impl ProgramSegments {
         let Some((lane, draft)) = self.lane_taken.take() else {
             return false;
         };
+        self.lane_committed = Some(std::time::Instant::now());
         if lane == 0 {
             self.choose_a1_channel(draft);
         } else {
@@ -92,6 +93,7 @@ mod tests {
         assert_eq!(segments.view().wave_zoom, [0, 1], "one press opens it fully");
         assert!(segments.sync_holds_enter(), "Enter belongs to the taken lane");
         segments.commit_lane();
+        assert!(segments.sync_holds_enter(), "the same Enter does not also save a short");
         assert_eq!((segments.view().a2_choice, segments.view().lane_taken), (Some((3, 4)), None));
         segments.take_lane(1);
         segments.lane_draft(-3);

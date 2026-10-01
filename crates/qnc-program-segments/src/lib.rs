@@ -571,6 +571,9 @@ pub struct ProgramSegments {
     source_channels: Option<u16>,
     lane_taken: Option<(u8, u16)>,
     wave_zoom: [u8; 2],
+    /// When Enter last kept a lane channel: the same Enter (its other catalog actions)
+    /// does nothing else.
+    lane_committed: Option<std::time::Instant>,
     channels: qnc_source_channels::SourceChannels,
     sync: qnc_sync_cover::SyncCover,
     /// IN was pressed since the last source (arms Sync).

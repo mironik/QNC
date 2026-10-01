@@ -2712,6 +2712,10 @@ dok je traka uzeta lijevo/desno biraju kanal (nacrt u izborniku), Enter sprema i
 Esc odustaje, gore pokaze val te trake preko cijele video trake, dolje ga skrije. `qnc-program-segments`
 (`lanes.rs`), `qnc-timeline` (`wave_over_video`, izbornik otvoren dok je traka uzeta),
 `qnc-channel-picker` (`open`), `qnc-source-dock`, `qnc-editorial-blocks`, `qnc-panel-focus`.
+Klik na oznaku A1/A2 salje istu akciju kao Ctrl+1/Ctrl+2 (stari prekidac izbornika uklonjen).
+Enter po fokusu (korisnik: "veži funkciju entera prema fokusu"): jedan Enter radi jednu stvar
+redom: uzeta traka sprema kanal; Ctrl+M marker, Edit segmenta ili Sync se potvrduju; inace
+virtualni kadar samo iz source timelinea ili poola; na panelu Segmenti bez cekanja nista.
 
 Otvoreno ograniceno odobrenje 2026-09-30 (jedna radna povrsina od kocaka, grana `desktop-blocks`):
 korisnik je odbacio samostalne programe (grana `shell-standalone-apps` ostaje kao zapis: spor i trzav

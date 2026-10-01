@@ -118,6 +118,7 @@ impl ProgramSegments {
             || self.marker_committing
             || self.editing.is_some()
             || self.lane_taken.is_some()
+            || self.lane_committed.is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(150))
     }
 
     pub(crate) fn toggle_sync(&mut self) {
