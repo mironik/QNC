@@ -323,6 +323,7 @@ impl ProgramVideo {
         if self.upcoming.as_ref().is_some_and(|up| up.clip == clip && up.next_source == source_in) {
             return Ok(());
         }
+        diag(format!("program-video upcoming clip={clip} source={source_in} at_frame={frame}"));
         self.upcoming = Some(self.open_decoder(clip, source_in)?);
         Ok(())
     }
@@ -368,6 +369,7 @@ impl ProgramVideo {
                 } else {
                     None
                 };
+                diag(format!("program-video cut frame={next} clip={clip} opened_ahead={}", ahead.is_some()));
                 self.active = match ahead {
                     Some(up) => Some(up),
                     None => Some(self.open_decoder(clip, source_frame)?),
@@ -476,7 +478,11 @@ impl VideoDecodeAdapter for ProgramVideo {
         }
         self.fill(request.frame)?;
         self.drain()?;
-        self.ready.remove(&request.frame).ok_or_else(pending)
+        let picture = self.ready.remove(&request.frame);
+        if picture.is_none() {
+            diag(format!("program-video pending frame={} next_decode={}", request.frame, self.next_decode_frame));
+        }
+        picture.ok_or_else(pending)
     }
 }
 
@@ -500,6 +506,13 @@ fn lane_key(span: &AudioSpan, bus: &Bus) -> LaneKey {
         bus.channel_index,
         i128::from(bus.source_in) - i128::from(span.record_in),
     )
+}
+
+/// A diagnostics line of program playback (only with player diagnostics on).
+fn diag(text: String) {
+    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, text);
+    }
 }
 
 /// The first cut within `(frame, frame + lookahead]` to a picture that does not continue
@@ -588,6 +601,7 @@ impl ProgramAudio {
             consumed_through: None,
         });
         if lane.consumed_through != Some(start) {
+            diag(format!("program-audio open clip={} stream={} source={source_frame}", bus.clip, bus.stream_index));
             lane.decoder =
                 Some(input.open(bus.stream_index, seek_start(&plan.source, source_frame)?)?);
             lane.track.samples.clear();
@@ -688,6 +702,7 @@ impl AudioOutputAdapter for ProgramAudio {
         }
         self.open_next_lanes(&span, frame)?;
         if !ready {
+            diag(format!("program-audio pending frame={frame}"));
             return Err(pending());
         }
         let mut samples = vec![0.0f32; frames * channels];
