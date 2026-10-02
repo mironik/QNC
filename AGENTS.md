@@ -2824,3 +2824,10 @@ klik vraca indeks. `qnc-ingest-blocks` i `qnc-editorial-blocks` ga koriste; njih
 `dispatch_pool_head`): klik samo bira tab, tijelo ostaje preglednik lokacija. `contracts/ui/ingest.layout.json`
 tabovi dobili `action_id` (`ingest_tab_all`, `ingest_tab_virtual`, upisani u katalog tipki bez tipke),
 `qnc-ingest-layout` (`tabs_left` kao naredbe, `tab_gap`), `qnc-ingest-application` (`pool_tab`, C10 1714).
+Popravak 2026-10-02 (korisnik: "novi projekt, nakon Uvezi na Storyju bljeska monitor, a izmedu bljeskanja
+pise player input: NotFinal"; "to je bilo dok je pravio filmstrip i wave"): klip je bio uvezen dok je
+pozadinski dovrsetak zapisa jos radio (dok filmstrip/wave citaju karticu, dovrsava se samo klip koji
+preview trazi). Preview ga svake sekunde ponovno otvara; svaki pokusaj je praznio monitor pa pokazivao
+sirovu gresku. `crates/qnc-source-preview`: dok zapis prikazanog klipa ceka dovrsetak, monitor i status
+stalno pokazuju "Podaci klipa se pripremaju..." (i dok se novi pokusaj priprema); kad je zapis gotov,
+poruka nestaje. Ponovni pokusaj i granica od 3 minute ostaju isti.

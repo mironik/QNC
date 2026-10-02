@@ -589,13 +589,18 @@ impl SourcePreview {
     /// A clip whose saved record is still completed in the background opens again
     /// once a second, for up to three minutes (v5 waits for the media probe).
     fn retry_incomplete_record(&mut self) -> bool {
+        // A new attempt that is still preparing keeps the wait: the monitor stays on the
+        // same message instead of flashing between attempts.
         let incomplete = self
             .player_view
             .error
             .as_deref()
-            .is_some_and(qnc_player_input::is_incomplete_media);
+            .is_some_and(qnc_player_input::is_incomplete_media)
+            || (self.player_view.preparing && self.waits_for_record());
         let Some(clip_id) = self.view.clip_id.clone().filter(|_| incomplete) else {
-            self.record_wait = None;
+            if self.record_wait.take().is_some() && self.view.message == RECORD_WAIT {
+                self.view.message.clear(); // the record is complete: the wait is over
+            }
             return false;
         };
         let now = std::time::Instant::now();
@@ -604,7 +609,7 @@ impl SourcePreview {
             _ => (now, now),
         };
         self.record_wait = Some((clip_id.clone(), since, last));
-        self.view.message = "Podaci klipa se pripremaju...".into();
+        self.view.message = RECORD_WAIT.into();
         if now.duration_since(since) > std::time::Duration::from_secs(180)
             || now.duration_since(last) < std::time::Duration::from_secs(1)
         {
@@ -614,6 +619,11 @@ impl SourcePreview {
         self.open_at(&clip_id, 0)
     }
 
+    /// The shown clip is waiting for its record to be completed in the background.
+    fn waits_for_record(&self) -> bool {
+        matches!((&self.record_wait, &self.view.clip_id), (Some((waiting, ..)), Some(shown)) if waiting == shown)
+    }
+
     /// Applies the player state. Returns whether the view changed.
     pub fn poll(&mut self) -> bool {
         let mut changed = self.retry_incomplete_record();
@@ -621,7 +631,9 @@ impl SourcePreview {
             let playback = player.view();
             if playback != self.player_view {
                 if let Some(error) = &playback.error {
-                    self.view.message = error.clone();
+                    if !self.waits_for_record() && !qnc_player_input::is_incomplete_media(error) {
+                        self.view.message = error.clone();
+                    }
                     self.play_when_ready = false;
                 }
                 self.apply_player_view(playback);
@@ -658,7 +670,9 @@ impl SourcePreview {
 
     fn apply_player_view(&mut self, playback: PlayerView) {
         self.view.video_visible = playback.video_visible;
-        self.view.monitor_message = playback.error.clone();
+        // While the record of the shown clip is completed, one steady message, no flashing.
+        let waiting = self.waits_for_record() || playback.error.as_deref().is_some_and(qnc_player_input::is_incomplete_media);
+        self.view.monitor_message = if waiting { Some(RECORD_WAIT.into()) } else { playback.error.clone() };
         self.view.monitor_frame = playback.picture.as_ref().map(|picture| MonitorFrame {
             session_id: picture.header.session_id.to_string(),
             generation: picture.header.output_generation,
@@ -820,3 +834,6 @@ fn transport_bindings(context: &PreviewContext) -> Result<Vec<SourceTransportBin
         })
         .collect()
 }
+
+/// What the preview shows while the record of the clip is completed in the background.
+const RECORD_WAIT: &str = "Podaci klipa se pripremaju...";
