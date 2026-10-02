@@ -2843,3 +2843,11 @@ granicu segmenta na 2961, pa je u playlisti u dva dijela s istom audio trakom (i
 Predotvaranje traka otvaralo ju je za oba dijela, svaki je ponistavao drugi (oko 50 otvaranja ffmpega u
 sekundi), pa zvuk pokrivalice nikad nije bio spreman na rezu. `qnc-broadcast-engine` (`next_lanes`): svaka
 traka otvara se jednom, na prvom dijelu koji je koristi. Test.
+Audit playera 2026-10-02 (korisnik: "stabiliziraj player, napravi dubinski audit"; "nesigurno od 22. 9."):
+pregledane sve izmjene playera od 30. 9. (24 commita), `player.log` (zastoji po danima, prikazane slike) i svi
+testovi playera. Popravljeno: (1) traka zvuka pokrivalice podijeljene granicom segmenta otvarala se 50 puta
+u sekundi (regresija iz `ee4d5e6`, popravak `ae18a0b`); (2) kod klipa svaka predana slika trosila je novi
+redni broj (od `d593471`), pa je monitor brojao svaku drugu kao preskocenu i mjerenje glatkoce nije
+vrijedilo; sada novi broj dobiva samo slika ponovno pokazana nakon koraka unatrag; (3) dijagnostika
+"pending" pise se jednom po frameu, a ponovno otvaranje dekodera slike klipa biljezi se (`player-video
+reopen`). Otvoreno: automatska provjera playa (§8.3 tocka 6) jos ne postoji.

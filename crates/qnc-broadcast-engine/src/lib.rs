@@ -339,6 +339,7 @@ impl Runtime {
                 gpu: gpu.clone(),
                 kept: BTreeMap::new(),
                 cue_anchor: 0,
+                handed: None,
             }),
             AudioPath::Clip(audio),
             Presenter(gpu.clone()),
@@ -640,6 +641,8 @@ struct Video {
     /// The frame the last cue went to: the kept pictures are the ones around it, and a
     /// cue before it is a step back.
     cue_anchor: u64,
+    /// The (generation, sequence) of the last picture handed out.
+    handed: Option<(u64, u64)>,
 }
 
 /// Pictures kept behind the last asked frame, so frame steps back need no new decoder.
@@ -698,6 +701,12 @@ impl VideoDecodeAdapter for Video {
             // Stepping back: the new decoder also keeps the pictures before the frame, so
             // the next steps back come from them.
             let from = if stepping_back { frame.saturating_sub(STEP_BACK_FRAMES) } else { frame };
+            if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                qnc_dev_diagnostics::log_line(
+                    qnc_dev_diagnostics::DiagnosticsStream::Player,
+                    format!("player-video reopen frame={frame} from={from} back={stepping_back}"),
+                );
+            }
             self.decoder.cancel();
             self.decoder = self
                 .input
@@ -749,16 +758,26 @@ impl Video {
         self.stamped(kept)
     }
 
-    /// Every picture handed out takes the next sequence when it is handed out, so the
-    /// monitor never sees a lower one after a step back (it drops those as stale).
+    /// A picture handed out keeps the sequence it was made with while that is higher than
+    /// the last one handed out (playing forward); only a picture shown again after a step
+    /// back takes a new one, so the monitor never sees a lower sequence (it drops those as
+    /// stale). Taking a new sequence for every picture made the monitor count every other
+    /// one as skipped.
     fn stamped(&mut self, kept: DecodedVideoFrame<Picture>) -> Option<DecodedVideoFrame<Picture>> {
         if kept.payload.token.is_some() {
             return Some(kept); // an output token keeps its own sequence
+        }
+        let made = (kept.payload.header.generation, kept.payload.header.sequence);
+        let newer = self.handed.is_none_or(|(generation, sequence)| made.0 != generation || made.1 > sequence);
+        if newer {
+            self.handed = Some(made);
+            return Some(kept);
         }
         let mut gpu = self.gpu.borrow_mut();
         let mut header = kept.payload.header.clone();
         gpu.sequence = gpu.sequence.checked_add(1)?;
         header.sequence = gpu.sequence;
+        self.handed = Some((header.generation, header.sequence));
         let rgba = kept.payload.rgba.clone();
         Some(DecodedVideoFrame { payload: Rc::new(PictureData { token: None, header, rgba }), ..kept })
     }

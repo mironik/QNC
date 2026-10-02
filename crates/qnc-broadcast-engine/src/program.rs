@@ -479,7 +479,7 @@ impl VideoDecodeAdapter for ProgramVideo {
         self.fill(request.frame)?;
         self.drain()?;
         let picture = self.ready.remove(&request.frame);
-        if picture.is_none() {
+        if picture.is_none() && first_wait(&VIDEO_WAIT, request.frame) {
             diag(format!("program-video pending frame={} next_decode={}", request.frame, self.next_decode_frame));
         }
         picture.ok_or_else(pending)
@@ -523,6 +523,15 @@ fn next_lanes(spans: &[AudioSpan], current: &[LaneKey], frame: u64, horizon: u64
         }
     }
     next
+}
+
+/// The frame last reported as waiting, picture and sound: a wait is written once, not on
+/// every poll of the engine.
+static VIDEO_WAIT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
+static AUDIO_WAIT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
+
+fn first_wait(last: &std::sync::atomic::AtomicU64, frame: u64) -> bool {
+    last.swap(frame, std::sync::atomic::Ordering::Relaxed) != frame
 }
 
 /// A diagnostics line of program playback (only with player diagnostics on).
@@ -709,7 +718,9 @@ impl AudioOutputAdapter for ProgramAudio {
         }
         self.open_next_lanes(&span, frame)?;
         if !ready {
-            diag(format!("program-audio pending frame={frame}"));
+            if first_wait(&AUDIO_WAIT, frame) {
+                diag(format!("program-audio pending frame={frame}"));
+            }
             return Err(pending());
         }
         let mut samples = vec![0.0f32; frames * channels];
