@@ -82,17 +82,11 @@ impl From<catalog::CatalogClipRow> for ClipView {
 }
 
 impl catalog::CatalogClipItem for ClipView {
-    fn catalog_clip_id(&self) -> &str {
-        &self.clip_id
-    }
-
+    fn catalog_clip_id(&self) -> &str { &self.clip_id }
     fn catalog_selected(&self) -> bool {
         self.selected
     }
-
-    fn catalog_new(&self) -> bool {
-        !self.previously_seen
-    }
+    fn catalog_new(&self) -> bool { !self.previously_seen } // new for this Select, kept on reload
 
     fn from_catalog_row(row: catalog::CatalogClipRow) -> Self {
         Self::from(row)
