@@ -90,6 +90,10 @@ impl catalog::CatalogClipItem for ClipView {
         self.selected
     }
 
+    fn catalog_new(&self) -> bool {
+        !self.previously_seen
+    }
+
     fn from_catalog_row(row: catalog::CatalogClipRow) -> Self {
         Self::from(row)
     }

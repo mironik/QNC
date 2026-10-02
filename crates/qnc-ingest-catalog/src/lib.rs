@@ -60,6 +60,11 @@ pub struct AppliedCatalogClips<T> {
 pub trait CatalogClipItem: Sized {
     fn catalog_clip_id(&self) -> &str;
     fn catalog_selected(&self) -> bool;
+    /// The current Select found this clip new (it was not in the database before):
+    /// a reload of the catalog keeps it new until the next Select decides again.
+    fn catalog_new(&self) -> bool {
+        false
+    }
     fn from_catalog_row(row: CatalogClipRow) -> Self;
 }
 
@@ -69,14 +74,15 @@ pub fn apply_catalog_rows<T: CatalogClipItem>(
 ) -> AppliedCatalogClips<T> {
     let selected = current
         .iter()
-        .map(|clip| (clip.catalog_clip_id().to_string(), clip.catalog_selected()))
+        .map(|clip| (clip.catalog_clip_id().to_string(), (clip.catalog_selected(), clip.catalog_new())))
         .collect::<std::collections::HashMap<_, _>>();
     let mut thumbnail_requests = Vec::new();
     let clips = rows
         .into_iter()
         .map(|mut row| {
-            if let Some(marked) = selected.get(row.clip_id.as_str()) {
+            if let Some((marked, new)) = selected.get(row.clip_id.as_str()) {
                 row.selected = *marked;
+                row.previously_seen &= !new;
             }
             if let Some(uri) = row.thumb_uri.as_ref() {
                 thumbnail_requests.push(ThumbnailRequest {
@@ -341,4 +347,55 @@ pub fn project_folder_for_settings(
         root_uri: settings.output_root_uri.clone(),
         dir,
     })
+}
+
+#[cfg(test)]
+mod new_after_reload_tests {
+    use super::*;
+
+    /// A clip as a view keeps it: whether it was seen before the current Select.
+    struct Shown {
+        clip_id: String,
+        seen: bool,
+    }
+
+    impl CatalogClipItem for Shown {
+        fn catalog_clip_id(&self) -> &str {
+            &self.clip_id
+        }
+        fn catalog_selected(&self) -> bool {
+            false
+        }
+        fn catalog_new(&self) -> bool {
+            !self.seen
+        }
+        fn from_catalog_row(row: CatalogClipRow) -> Self {
+            Self { clip_id: row.clip_id, seen: row.previously_seen }
+        }
+    }
+
+    fn row(clip_id: &str) -> CatalogClipRow {
+        CatalogClipRow {
+            clip_id: clip_id.into(),
+            name: clip_id.into(),
+            duration_seconds: 1.0,
+            selected: false,
+            imported: false,
+            previously_seen: true,
+            metadata_revision: 1,
+            thumb_uri: None,
+            thumb_status: CatalogThumbStatus::Missing,
+        }
+    }
+
+    #[test]
+    fn a_reload_after_select_keeps_the_new_clips_new() {
+        let shown = vec![
+            Shown { clip_id: "old".into(), seen: true },
+            Shown { clip_id: "new".into(), seen: false },
+        ];
+        let applied = apply_catalog_rows(&shown, vec![row("old"), row("new"), row("other")]);
+        let seen: Vec<_> = applied.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.seen)).collect();
+        assert_eq!(seen, [("old", true), ("new", false), ("other", true)], "the New filter still shows it");
+    }
 }
