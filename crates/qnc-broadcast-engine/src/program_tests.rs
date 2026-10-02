@@ -243,3 +243,20 @@ fn the_picture_decoder_of_the_next_cover_opens_two_seconds_ahead() {
     let continuing = [span(0, 100, Some((0, 10))), span(100, 200, Some((0, 110)))];
     assert_eq!(next_picture_cut(&continuing, 50, 100), None, "a cut that continues needs no decoder");
 }
+
+#[test]
+fn a_cover_cut_in_two_opens_its_sound_once_at_its_first_part() {
+    let bus = |clip, source_in| Bus { output: 1, clip, source_in, stream_index: 2, channel_index: 0, stream_channels: 1 };
+    let span = |record_in, record_out, buses| AudioSpan { record_in, record_out, buses };
+    // The cover 2878..3088 over the end of a segment (2961): two items, the same lane.
+    let spans = vec![
+        span(2800, 2878, vec![]),
+        span(2878, 2961, vec![bus(4, 19)]),
+        span(2961, 3088, vec![bus(4, 102)]),
+    ];
+    let next = next_lanes(&spans, &[], 2800, 2900);
+    assert_eq!(next.len(), 1, "one lane, not one per item");
+    assert_eq!(next[0].1.source_in, 19, "opened where the cover starts");
+    let both = next_lanes(&spans, &[], 2800, 3000);
+    assert_eq!(both.len(), 1, "the second part continues the same lane");
+}

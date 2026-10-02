@@ -508,6 +508,23 @@ fn lane_key(span: &AudioSpan, bus: &Bus) -> LaneKey {
     )
 }
 
+/// The lanes of the items starting in `(frame, horizon]` that are not playing now, each
+/// once, at the first item that uses it. An item cut in two (a cover over the end of a
+/// segment) gives the same lane twice; opening it at both starts made each undo the
+/// other on every frame, so the sound of the cover was never ready at its cut.
+fn next_lanes(spans: &[AudioSpan], current: &[LaneKey], frame: u64, horizon: u64) -> Vec<(LaneKey, Bus)> {
+    let mut next: Vec<(LaneKey, Bus)> = Vec::new();
+    for span in spans.iter().filter(|span| span.record_in > frame && span.record_in <= horizon) {
+        for bus in &span.buses {
+            let key = lane_key(span, bus);
+            if !current.contains(&key) && !next.iter().any(|(seen, _)| *seen == key) {
+                next.push((key, *bus));
+            }
+        }
+    }
+    next
+}
+
 /// A diagnostics line of program playback (only with player diagnostics on).
 fn diag(text: String) {
     if qnc_dev_diagnostics::player_diagnostics_enabled() {
@@ -644,17 +661,7 @@ impl ProgramAudio {
             .iter()
             .map(|bus| lane_key(current, bus))
             .collect();
-        let next: Vec<(LaneKey, Bus)> = self
-            .spans
-            .iter()
-            .filter(|span| span.record_in > frame && span.record_in <= horizon)
-            .flat_map(|span| {
-                span.buses
-                    .iter()
-                    .map(move |bus| (lane_key(span, bus), *bus))
-            })
-            .filter(|(key, _)| !current_keys.contains(key))
-            .collect();
+        let next = next_lanes(&self.spans, &current_keys, frame, horizon);
         self.lanes.retain(|key, _| {
             current_keys.contains(key) || next.iter().any(|(next_key, _)| next_key == key)
         });

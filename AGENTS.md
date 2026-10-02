@@ -2838,3 +2838,8 @@ klipa otvarao se tek kad je predcitanje (~0,5 s) doslo do reza; pokretanje ffmpe
 pa je player ostao bez slike. `crates/qnc-broadcast-engine` (`program.rs`): dekoder slike sljedeceg reza
 na drugi izvor otvara se 2 s unaprijed (`next_picture_cut`, `upcoming`) i preuzima kad rez dode; rez koji
 nastavlja isti izvor ne treba novi dekoder. Sat, red i Play se ne mijenjaju. Test.
+Popravak 2026-10-02 (isti zastoj na 2877, dijagnostika `program-audio open`): pokrivalica 2878-3088 prelazi
+granicu segmenta na 2961, pa je u playlisti u dva dijela s istom audio trakom (izvor od 19 i od 102).
+Predotvaranje traka otvaralo ju je za oba dijela, svaki je ponistavao drugi (oko 50 otvaranja ffmpega u
+sekundi), pa zvuk pokrivalice nikad nije bio spreman na rezu. `qnc-broadcast-engine` (`next_lanes`): svaka
+traka otvara se jednom, na prvom dijelu koji je koristi. Test.
