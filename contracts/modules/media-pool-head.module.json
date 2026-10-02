@@ -3,7 +3,7 @@
   "module_name": "Media pool head (library tabs and compact transport strip)",
   "module_version": "0.1.0",
   "module_kind": "ui_widget",
-  "capabilities": ["ui.pool_head.tabs", "ui.pool_head.transport"],
+  "capabilities": ["ui.pool_head.tabs", "ui.pool_head.transport", "ui.pool_head.contract_row"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],

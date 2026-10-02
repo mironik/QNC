@@ -180,7 +180,8 @@ impl IngestPreviewPane {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct IngestPoolHead {
-    pub tabs_left: Vec<String>,
+    pub tabs_left: Vec<TransportCommand>,
+    pub tab_gap: f32,
     pub transport_right: Vec<TransportCommand>,
 }
 

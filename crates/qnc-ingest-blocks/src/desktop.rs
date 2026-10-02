@@ -17,7 +17,7 @@ pub fn render_desktop(
             render_preview(ui, rect, contracts, theme, view);
             None
         }
-        "pool-head" => render_pool_head(ui, contracts, theme),
+        "pool-head" => render_pool_head(ui, contracts, theme, view),
         "source-browser" => render_source_browser(ui, rect, contracts, theme, view),
         "clip-cards" => render_clip_grid(ui, contracts, theme, view),
         "source-dock" => render_source_dock(ui, contracts, theme, view),

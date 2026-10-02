@@ -233,6 +233,12 @@
     "ingest_select_all": {
       "label": "Odaberi sve Ingest klipove"
     },
+    "ingest_tab_all": {
+      "label": "Ingest pool: tab All"
+    },
+    "ingest_tab_virtual": {
+      "label": "Ingest pool: tab Virtual"
+    },
     "ingest_clear_selection": {
       "label": "Očisti Ingest izbor"
     },

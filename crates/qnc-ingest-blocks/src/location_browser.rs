@@ -50,7 +50,7 @@ pub(super) fn render_location_browser(
                 for kind in [SourceKind::Local, SourceKind::Lan, SourceKind::Internet] {
                     let selected = view.source_kind == kind;
                     let label = source_kind_label(&contracts.ingest.dir_browser, kind);
-                    if text_tab(ui, label, selected, theme).clicked() && !selected {
+                    if qnc_media_pool_head::tab(ui, label, selected, &row_style(theme, 0.0)).clicked() && !selected {
                         intent = Some(IngestIntent::new(
                             kind.action_id(),
                             IngestPayload::SourceKind(kind),

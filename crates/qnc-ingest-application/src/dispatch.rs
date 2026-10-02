@@ -27,16 +27,10 @@ impl IngestApplication {
             action_ids::INGEST_SET_AI_MINING => self.on_set_ai_mining(),
             action_ids::INGEST_APPROVE_PROXY_POSTERS => self.on_approve_proxy_posters(),
             action_ids::INGEST_IMPORT_SELECTED => self.start_import(),
-            action_ids::PLAY_PAUSE
-            | action_ids::STEP_BACK_FRAME
-            | action_ids::STEP_FORWARD_FRAME
-            | action_ids::MARK_IN
-            | action_ids::MARK_OUT
-            | action_ids::INGEST_CUE_FRAME => self.player_action(intent),
-            _ => IngestDispatchResult::accepted(
-                Some("Akcija je zapisana, komponenta za izvršenje još nije spojena.".to_string()),
-                true,
-            ),
+            action_ids::PLAY_PAUSE | action_ids::STEP_BACK_FRAME | action_ids::STEP_FORWARD_FRAME
+            | action_ids::MARK_IN | action_ids::MARK_OUT | action_ids::INGEST_CUE_FRAME => self.player_action(intent),
+            tab @ (action_ids::INGEST_TAB_ALL | action_ids::INGEST_TAB_VIRTUAL) => { self.view.pool_tab = Some(tab.to_string()); IngestDispatchResult::accepted(None, true) } // v5: only the chosen tab changes
+            _ => IngestDispatchResult::accepted(Some("Akcija je zapisana, komponenta za izvršenje još nije spojena.".to_string()), true),
         }
     }
 

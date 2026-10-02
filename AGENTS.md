@@ -2811,3 +2811,16 @@ virtualni klip. Poster pokrivalice: uhvacena IN slika (`qnc-virtual-short-stills
 `products/b_roll_virtual_clips/<shot>/in.jpg`, upisana kroz `qnc-virtual-shots::publish_poster_now`
 (zapis slika sada dopusta i klasu `b_roll`). Novi javni `crates/qnc-shot-stills` (+ ugovor) slaze
 slike shorta i postere pokrivalica; `qnc-editorial-application` ga samo poziva (C10 718 -> 709).
+
+Otkljucano i izvedeno 2026-10-02 (korisnik: "odmrzni i rijesi" na nalaze audita grane `desktop-blocks`):
+(1) Ingest filter `Novi / Sve`: `qnc-ingest-catalog::apply_catalog_rows` je pri ponovnom ucitavanju kataloga
+zadrzavao odabir, ali je svaki klip oznacio vidjenim, pa je "Novi" nakon Selecta ostajao prazan. Sada
+zadrzava i oznaku "nov" koju je dao tekuci Select (`CatalogClipItem::catalog_new`, test). Oznaka
+`previously_seen: true` za klip iz baze ostaje ispravna (klip koji je bio u bazi prije Selecta nije nov).
+(2) Glava poola je javna kocka: `qnc-media-pool-head` dobio je red iz layout ugovora (`show_row`, `tab`,
+`RowStyle`, `RowTab`, `RowClick`): tabovi lijevo, naredbe desno, oznake iz ugovora, odabrani tab iz viewa,
+klik vraca indeks. `qnc-ingest-blocks` i `qnc-editorial-blocks` ga koriste; njihove privatne kopije
+`text_tab` i `small_button` su uklonjene (isti izgled). Ingest tabovi rade kao v5 (`ingest/mod.rs`
+`dispatch_pool_head`): klik samo bira tab, tijelo ostaje preglednik lokacija. `contracts/ui/ingest.layout.json`
+tabovi dobili `action_id` (`ingest_tab_all`, `ingest_tab_virtual`, upisani u katalog tipki bez tipke),
+`qnc-ingest-layout` (`tabs_left` kao naredbe, `tab_gap`), `qnc-ingest-application` (`pool_tab`, C10 1714).

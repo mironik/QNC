@@ -48,7 +48,10 @@
     "chrome_pad_y": 2.0,
     "chrome_ctrl_height": 24.0,
     "font_ui": 14.0,
-    "tabs_left": ["All", "Virtual"],
+    "tabs_left": [
+      { "label": "All", "action_id": "ingest_tab_all" },
+      { "label": "Virtual", "action_id": "ingest_tab_virtual" }
+    ],
     "hidden_tabs": ["B-roll", "Segment"],
     "tab_gap": 10.0,
     "transport_right": [

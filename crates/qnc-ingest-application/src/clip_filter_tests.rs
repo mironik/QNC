@@ -112,3 +112,14 @@ fn filter_action_is_declared_in_external_catalog_without_hardcoded_key() {
         .get(action_ids::INGEST_SET_CLIP_FILTER)
         .is_some());
 }
+
+#[test]
+fn a_pool_head_tab_click_only_chooses_the_tab() {
+    let mut component = IngestApplication::default();
+    component.view.clips = vec![clip("old", true, false)];
+    assert_eq!(component.view.pool_tab, None, "the first tab is chosen at the start");
+    let result = component.dispatch(IngestIntent::empty(action_ids::INGEST_TAB_VIRTUAL));
+    assert!(result.accepted);
+    assert_eq!(component.view.pool_tab.as_deref(), Some(action_ids::INGEST_TAB_VIRTUAL));
+    assert_eq!(component.view.clips.len(), 1, "the body stays as it was (v5)");
+}

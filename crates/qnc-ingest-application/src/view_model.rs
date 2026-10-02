@@ -25,6 +25,7 @@ pub struct IngestViewModel {
     pub selected_source_volume_name: String,
     pub clips: Vec<ClipView>,
     pub clip_filter: ClipFilter,
+    pub pool_tab: Option<String>, // chosen pool head tab (action id); None = the first
     pub preview_clip_id: Option<String>,
     pub archive_original: bool,
     pub archive_original_available: bool,
@@ -58,6 +59,7 @@ impl Default for IngestViewModel {
             selected_source_volume_name: String::new(),
             clips: Vec::new(),
             clip_filter: ClipFilter::All,
+            pool_tab: None,
             preview_clip_id: None,
             archive_original: false,
             archive_original_available: false,
