@@ -149,6 +149,8 @@ pub(crate) struct ProgramVideo {
     clips: Vec<(InputPlan, Rc<DecodeInput>, usize)>,
     workers: Vec<Worker>,
     active: Option<ActiveDecoder>,
+    /// The decoder of the next cut to another picture, opened ahead of it.
+    upcoming: Option<ActiveDecoder>,
     next_decode_frame: u64,
     ready: BTreeMap<u64, DecodedVideoFrame<Picture>>,
     pending_seek: Option<u64>,
@@ -201,6 +203,7 @@ impl ProgramVideo {
             clips,
             workers,
             active: None,
+            upcoming: None,
             next_decode_frame: 0,
             ready: BTreeMap::new(),
             pending_seek: None,
@@ -297,11 +300,39 @@ impl ProgramVideo {
         Ok(())
     }
 
+    fn open_decoder(&self, clip: usize, source_frame: u64) -> Result<ActiveDecoder> {
+        let (plan, input, _) = &self.clips[clip];
+        Ok(ActiveDecoder {
+            clip,
+            decoder: input.open(plan.video_index, seek_start(&plan.source, source_frame)?)?,
+            next_source: source_frame,
+            discard_before: Some(source_frame),
+        })
+    }
+
+    /// Opens the decoder of the next cut to another picture source within the lookahead
+    /// (user report 2026-10-02: the picture stalled just before a cover, its decoder
+    /// started only half a second ahead). A cut that continues the same source needs none.
+    fn open_upcoming(&mut self, frame: u64) -> Result<()> {
+        let timebase = self.source.timebase;
+        let seconds = i64::try_from(PICTURE_LOOKAHEAD_SECONDS).map_err(error)?;
+        let lookahead = u64::try_from(seconds * timebase.fps_num / timebase.fps_den.max(1)).unwrap_or(0);
+        let Some((clip, source_in)) = next_picture_cut(&self.spans, frame, lookahead) else {
+            return Ok(());
+        };
+        if self.upcoming.as_ref().is_some_and(|up| up.clip == clip && up.next_source == source_in) {
+            return Ok(());
+        }
+        self.upcoming = Some(self.open_decoder(clip, source_in)?);
+        Ok(())
+    }
+
     fn fill(&mut self, frame: u64) -> Result<()> {
         let target_end = frame
             .saturating_add(self.prefetch_frames as u64)
             .min(self.source.duration_frames);
         self.next_decode_frame = self.next_decode_frame.max(frame);
+        self.open_upcoming(frame)?;
         while self.next_decode_frame < target_end {
             let next = self.next_decode_frame;
             if self.ready.contains_key(&next) {
@@ -331,14 +362,16 @@ impl ProgramVideo {
                 .as_ref()
                 .is_some_and(|a| a.clip == clip && a.next_source == source_frame);
             if !continues {
-                let (plan, input, _) = &self.clips[clip];
-                self.active = Some(ActiveDecoder {
-                    clip,
-                    decoder: input
-                        .open(plan.video_index, seek_start(&plan.source, source_frame)?)?,
-                    next_source: source_frame,
-                    discard_before: Some(source_frame),
-                });
+                // The decoder opened ahead for this cut takes over; else one opens now.
+                let ahead = if self.upcoming.as_ref().is_some_and(|up| up.clip == clip && up.next_source == source_frame) {
+                    self.upcoming.take()
+                } else {
+                    None
+                };
+                self.active = match ahead {
+                    Some(up) => Some(up),
+                    None => Some(self.open_decoder(clip, source_frame)?),
+                };
             }
             let active = self.active.as_mut().expect("decoder just opened");
             let packet = match active.decoder.try_next_packet().map_err(error)? {
@@ -431,6 +464,7 @@ impl VideoDecodeAdapter for ProgramVideo {
             gpu.images.clear();
             drop(gpu);
             self.active = None;
+            self.upcoming = None;
             self.ready.clear();
             self.next_decode_frame = frame;
             self.pending_seek = None;
@@ -456,6 +490,9 @@ type LaneKey = (usize, u32, u16, i128);
 /// empty the audio queue: `audio_underrun` on every cover).
 const LANE_LOOKAHEAD_SECONDS: u64 = 2;
 
+/// How far ahead (seconds of program) the picture decoder of the next cut is opened.
+const PICTURE_LOOKAHEAD_SECONDS: u64 = 2;
+
 fn lane_key(span: &AudioSpan, bus: &Bus) -> LaneKey {
     (
         bus.clip,
@@ -463,6 +500,22 @@ fn lane_key(span: &AudioSpan, bus: &Bus) -> LaneKey {
         bus.channel_index,
         i128::from(bus.source_in) - i128::from(span.record_in),
     )
+}
+
+/// The first cut within `(frame, frame + lookahead]` to a picture that does not continue
+/// the one before it: (clip, its source frame at the cut).
+fn next_picture_cut(spans: &[VideoSpan], frame: u64, lookahead: u64) -> Option<(usize, u64)> {
+    spans.windows(2).find_map(|pair| {
+        let (before, after) = (pair[0], pair[1]);
+        if after.record_in <= frame || after.record_in > frame.saturating_add(lookahead) {
+            return None;
+        }
+        let (clip, source_in) = after.video?;
+        let continues = before.video.is_some_and(|(prev, prev_in)| {
+            prev == clip && prev_in + (after.record_in - before.record_in) == source_in
+        });
+        (!continues).then_some((clip, source_in))
+    })
 }
 
 struct Lane {

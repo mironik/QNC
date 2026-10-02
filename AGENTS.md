@@ -2831,3 +2831,10 @@ preview trazi). Preview ga svake sekunde ponovno otvara; svaki pokusaj je prazni
 sirovu gresku. `crates/qnc-source-preview`: dok zapis prikazanog klipa ceka dovrsetak, monitor i status
 stalno pokazuju "Podaci klipa se pripremaju..." (i dok se novi pokusaj priprema); kad je zapis gotov,
 poruka nestaje. Ponovni pokusaj i granica od 3 minute ostaju isti.
+Popravak 2026-10-02 (korisnik: "u play segmentu u nekim situacijama pred kraj pocne zastajkivati klip prije
+prelaska na novi klip"): `player.log` dvaput `audio_underrun` na frameu 2877, a u prici na 2878 pocinje
+pokrivalica drugog klipa. Zvuk pokrivalice vec se otvara 2 s unaprijed, ali dekoder slike sljedeceg
+klipa otvarao se tek kad je predcitanje (~0,5 s) doslo do reza; pokretanje ffmpega i skok traju toliko,
+pa je player ostao bez slike. `crates/qnc-broadcast-engine` (`program.rs`): dekoder slike sljedeceg reza
+na drugi izvor otvara se 2 s unaprijed (`next_picture_cut`, `upcoming`) i preuzima kad rez dode; rez koji
+nastavlja isti izvor ne treba novi dekoder. Sat, red i Play se ne mijenjaju. Test.

@@ -231,3 +231,15 @@ fn a_cover_has_its_own_lane_so_its_sound_opens_before_the_cut() {
         "a cut that continues the same source keeps its lane, no reopen"
     );
 }
+
+#[test]
+fn the_picture_decoder_of_the_next_cover_opens_two_seconds_ahead() {
+    let span = |record_in, record_out, video| VideoSpan { record_in, record_out, video };
+    // Ton segment of clip 0, a cover of clip 1 at 2878, the segment again at 3088.
+    let spans = [span(0, 2878, Some((0, 1197))), span(2878, 3088, Some((1, 19))), span(3088, 3200, Some((0, 4285)))];
+    assert_eq!(next_picture_cut(&spans, 2700, 100), None, "too far yet");
+    assert_eq!(next_picture_cut(&spans, 2800, 100), Some((1, 19)), "the cover opens ahead");
+    assert_eq!(next_picture_cut(&spans, 3000, 100), Some((0, 4285)), "back to the segment, another place");
+    let continuing = [span(0, 100, Some((0, 10))), span(100, 200, Some((0, 110)))];
+    assert_eq!(next_picture_cut(&continuing, 50, 100), None, "a cut that continues needs no decoder");
+}
