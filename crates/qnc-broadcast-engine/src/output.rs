@@ -348,7 +348,7 @@ impl AudioOutputAdapter for Audio {
                 return Err(error("audio seek target mismatch"));
             }
             let seek = seek_start(&self.source, frame)?;
-            self.decoders.clear();
+            retire(std::mem::take(&mut self.decoders));
             for track in &mut self.tracks {
                 track.samples.clear();
                 track.decoded_through = None;

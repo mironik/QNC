@@ -179,7 +179,11 @@ impl ProgramVideo {
                         .map_err(error)?,
                     );
                     let raster = converter.size();
-                    let rgba = (0..prefetch_frames + 4)
+                    // Room for the prefetch, the pictures in conversion and the ones the
+                    // presenter and monitor still hold: with only prefetch + 4 the decoder
+                    // waited for every presented picture and ran in real time, so a cut
+                    // left a gap of half a second (player acceptance 2026-10-02).
+                    let rgba = (0..program_picture_buffers(prefetch_frames))
                         .map(|_| Some(Arc::from(vec![0; converter.output_bytes()])))
                         .collect();
                     workers.push(Worker {
@@ -221,22 +225,20 @@ impl ProgramVideo {
     }
 
     fn header(&mut self, frame: u64, raster: [u32; 2], generation: u64) -> Result<FrameHeader> {
-        let mut gpu = self.gpu.borrow_mut();
+        let gpu = self.gpu.borrow();
         let header = FrameHeader {
             version: qnc_video_output::VERSION.into(),
             session_id: gpu.config.session_id.clone(),
             generation,
-            sequence: gpu.sequence,
+            // The sequence is given when the picture is handed out (`handed`), in the order
+            // it is shown.
+            sequence: 0,
             source_id: self.source.source_id.clone(),
             frame_number: frame,
             width: raster[0],
             height: raster[1],
             pixel_format: PixelFormat::Rgba8Srgb,
         };
-        gpu.sequence = gpu
-            .sequence
-            .checked_add(1)
-            .ok_or_else(|| error("frame sequence exhausted"))?;
         Ok(header)
     }
 
@@ -304,7 +306,7 @@ impl ProgramVideo {
         let (plan, input, _) = &self.clips[clip];
         Ok(ActiveDecoder {
             clip,
-            decoder: input.open(plan.video_index, seek_start(&plan.source, source_frame)?)?,
+            decoder: timed_open("video", || input.open(plan.video_index, seek_start(&plan.source, source_frame)?))?,
             next_source: source_frame,
             discard_before: Some(source_frame),
         })
@@ -324,7 +326,7 @@ impl ProgramVideo {
             return Ok(());
         }
         diag(format!("program-video upcoming clip={clip} source={source_in} at_frame={frame}"));
-        self.upcoming = Some(self.open_decoder(clip, source_in)?);
+        retire(self.upcoming.replace(self.open_decoder(clip, source_in)?));
         Ok(())
     }
 
@@ -349,6 +351,7 @@ impl ProgramVideo {
             let source_frame = source_in + (next - span.record_in);
             let worker = self.clips[clip].2;
             if !self.workers[worker].conversion.can_accept() {
+                stopped(next, "converter full");
                 break;
             }
             let Some(slot) = self.workers[worker]
@@ -356,6 +359,7 @@ impl ProgramVideo {
                 .iter()
                 .position(|b| b.as_ref().is_some_and(|b| Arc::strong_count(b) == 1))
             else {
+                stopped(next, "no free picture buffer");
                 break;
             };
             let continues = self
@@ -370,14 +374,18 @@ impl ProgramVideo {
                     None
                 };
                 diag(format!("program-video cut frame={next} clip={clip} opened_ahead={}", ahead.is_some()));
-                self.active = match ahead {
-                    Some(up) => Some(up),
-                    None => Some(self.open_decoder(clip, source_frame)?),
+                let decoder = match ahead {
+                    Some(up) => up,
+                    None => self.open_decoder(clip, source_frame)?,
                 };
+                retire(self.active.replace(decoder));
             }
             let active = self.active.as_mut().expect("decoder just opened");
             let packet = match active.decoder.try_next_packet().map_err(error)? {
-                Poll::Pending => break,
+                Poll::Pending => {
+                    stopped(next, "decoder has no picture yet");
+                    break;
+                }
                 Poll::Ready(None) => return Err(error("video ended before saved frame boundary")),
                 Poll::Ready(Some(packet)) => packet,
             };
@@ -465,8 +473,7 @@ impl VideoDecodeAdapter for ProgramVideo {
             gpu.sequence = 0;
             gpu.images.clear();
             drop(gpu);
-            self.active = None;
-            self.upcoming = None;
+            retire((self.active.take(), self.upcoming.take()));
             self.ready.clear();
             self.next_decode_frame = frame;
             self.pending_seek = None;
@@ -474,7 +481,7 @@ impl VideoDecodeAdapter for ProgramVideo {
         self.ready.retain(|frame, _| *frame >= request.frame);
         self.drain()?;
         if let Some(frame) = self.ready.remove(&request.frame) {
-            return Ok(frame);
+            return self.handed(frame);
         }
         self.fill(request.frame)?;
         self.drain()?;
@@ -482,7 +489,22 @@ impl VideoDecodeAdapter for ProgramVideo {
         if picture.is_none() && first_wait(&VIDEO_WAIT, request.frame) {
             diag(format!("program-video pending frame={} next_decode={}", request.frame, self.next_decode_frame));
         }
-        picture.ok_or_else(pending)
+        self.handed(picture.ok_or_else(pending)?)
+    }
+}
+
+impl ProgramVideo {
+    /// A picture takes its monitor sequence when it is handed out, in the order it is
+    /// shown. Given when made, a black Off picture (made at once) got a higher one than
+    /// the converted pictures shown before it, and the monitor dropped those as stale
+    /// for about half a second (player acceptance 2026-10-02).
+    fn handed(&mut self, picture: DecodedVideoFrame<Picture>) -> Result<DecodedVideoFrame<Picture>> {
+        let mut gpu = self.gpu.borrow_mut();
+        gpu.sequence = gpu.sequence.checked_add(1).ok_or_else(|| error("frame sequence exhausted"))?;
+        let mut header = picture.payload.header.clone();
+        header.sequence = gpu.sequence;
+        let rgba = picture.payload.rgba.clone();
+        Ok(DecodedVideoFrame { payload: Rc::new(PictureData { token: None, header, rgba }), ..picture })
     }
 }
 
@@ -628,8 +650,8 @@ impl ProgramAudio {
         });
         if lane.consumed_through != Some(start) {
             diag(format!("program-audio open clip={} stream={} source={source_frame}", bus.clip, bus.stream_index));
-            lane.decoder =
-                Some(input.open(bus.stream_index, seek_start(&plan.source, source_frame)?)?);
+            let decoder = timed_open("audio", || input.open(bus.stream_index, seek_start(&plan.source, source_frame)?))?;
+            retire(lane.decoder.replace(decoder));
             lane.track.samples.clear();
             lane.track.decoded_through = None;
             lane.track.discard_before = start;
@@ -671,9 +693,16 @@ impl ProgramAudio {
             .map(|bus| lane_key(current, bus))
             .collect();
         let next = next_lanes(&self.spans, &current_keys, frame, horizon);
-        self.lanes.retain(|key, _| {
-            current_keys.contains(key) || next.iter().any(|(next_key, _)| next_key == key)
-        });
+        let unused: Vec<LaneKey> = self
+            .lanes
+            .keys()
+            .filter(|key| !current_keys.contains(key) && !next.iter().any(|(next_key, _)| next_key == *key))
+            .copied()
+            .collect();
+        let gone: Vec<Lane> = unused.iter().filter_map(|key| self.lanes.remove(key)).collect();
+        if !gone.is_empty() {
+            retire(gone);
+        }
         for (key, bus) in next {
             self.fill_lane(key, &bus, bus.source_in)?;
         }
@@ -841,3 +870,24 @@ fn program_spans(
 #[cfg(test)]
 #[path = "program_tests.rs"]
 mod tests;
+
+/// Why the program decode loop stopped ahead of the screen (once per frame).
+fn stopped(frame: u64, why: &str) {
+    static LAST: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
+    if first_wait(&LAST, frame) {
+        diag(format!("program-video stopped next={frame} why={why}"));
+    }
+}
+
+/// Opens a decoder and logs how long the playback thread waited for it.
+fn timed_open<T>(what: &str, open: impl FnOnce() -> Result<T>) -> Result<T> {
+    let start = std::time::Instant::now();
+    let opened = open();
+    diag(format!("program-{what} open_ms={}", start.elapsed().as_millis()));
+    opened
+}
+
+/// Picture buffers of a program converter: twice the prefetch and the conversions in flight.
+fn program_picture_buffers(prefetch_frames: usize) -> usize {
+    prefetch_frames * 2 + input::CONVERT_IN_FLIGHT + 4
+}

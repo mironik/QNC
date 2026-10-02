@@ -645,6 +645,15 @@ struct Video {
     handed: Option<(u64, u64)>,
 }
 
+/// A decoder (or lane) no longer needed is shut down on a thread of its own: stopping
+/// ffmpeg and joining its readers took up to 0.9 s, and on the playback thread that
+/// emptied the audio queue and stopped the player (player acceptance 2026-10-02).
+pub(crate) fn retire<T: Send + 'static>(old: T) {
+    let _ = std::thread::Builder::new()
+        .name("qnc-decoder-retire".into())
+        .spawn(move || drop(old));
+}
+
 /// Pictures kept behind the last asked frame, so frame steps back need no new decoder.
 const STEP_BACK_FRAMES: u64 = 25;
 impl VideoDecodeAdapter for Video {
@@ -707,10 +716,8 @@ impl VideoDecodeAdapter for Video {
                     format!("player-video reopen frame={frame} from={from} back={stepping_back}"),
                 );
             }
-            self.decoder.cancel();
-            self.decoder = self
-                .input
-                .open(self.plan.video_index, seek_start(&self.plan.source, from)?)?;
+            let decoder = self.input.open(self.plan.video_index, seek_start(&self.plan.source, from)?)?;
+            retire(std::mem::replace(&mut self.decoder, decoder));
             self.discard_before = Some(from);
             self.ready.clear();
             self.kept.clear();

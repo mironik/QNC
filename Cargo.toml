@@ -151,6 +151,7 @@ members = [
     "tools/qnc-dev-diagnostics-app",
     "tools/qnc-ingest-worker",
     "tools/qnc-player-runner",
+    "tools/qnc-player-acceptance",
     "tools/qnc-camera-catalog",
     "tools/qnc-app-catalog",
 ]

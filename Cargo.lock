@@ -4020,6 +4020,18 @@ name = "qnc-playback-priority"
 version = "0.1.0"
 
 [[package]]
+name = "qnc-player-acceptance"
+version = "0.1.0"
+dependencies = [
+ "qnc-active-project-read",
+ "qnc-content-read",
+ "qnc-dev-diagnostics",
+ "qnc-source-bindings",
+ "qnc-source-preview",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-player-client"
 version = "0.1.0"
 dependencies = [

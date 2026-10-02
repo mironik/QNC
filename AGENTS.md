@@ -2851,3 +2851,15 @@ redni broj (od `d593471`), pa je monitor brojao svaku drugu kao preskocenu i mje
 vrijedilo; sada novi broj dobiva samo slika ponovno pokazana nakon koraka unatrag; (3) dijagnostika
 "pending" pise se jednom po frameu, a ponovno otvaranje dekodera slike klipa biljezi se (`player-video
 reopen`). Otvoreno: automatska provjera playa (§8.3 tocka 6) jos ne postoji.
+Stabilizacija playera 2026-10-02 (korisnik: "da" na plan audita): novi alat `tools/qnc-player-acceptance`
+(§8.3 tocka 6): na izoliranoj kopiji aktivnog projekta (odbija projekt izvan zadanog korijena) pusta klipove i
+pricu kroz isti `qnc-source-preview` kao forme i mjeri spremnost, Play do prve slike, udio slika koje stignu do
+monitora, najvecu rupu, trzaje (> 3 slike), zastoje i ponovna otvaranja dekodera iz loga; izvjestaj
+`player-acceptance.json`. Alat je nasao i potvrdio tri uzroka nesigurnog playa: (1) program je imao premalo
+medjuspremnika za slike (prefetch + 4), dekoder je radio u realnom vremenu; sada 2 x prefetch + 8; (2) redni broj
+slike programa davao se pri nastanku, crne Off slike dobile su veci broj od slika pokrivalice prikazanih prije
+njih, monitor ih je odbacivao kao stare (~0,45 s smrznuta slika); sada se daje pri predaji; (3) dekoder koji vise
+ne treba gasio se u niti reprodukcije (ffmpeg kill + join do 0,9 s), sto je praznilo zvuk i zaustavljalo player
+("explicit preparation required"); sada se gasi u pozadini (`retire`). Prije: program 97-98 % slika, rupe
+440-500 ms, tvrdi zastoj u ~1/6 pustanja; poslije: 8/8 bez zastoja, 100 % slika, klipovi 2002/2679/2676 PASS.
+Uz to dijagnostika razloga zastoja dekodera programa i trajanja otvaranja dekodera.

@@ -1,0 +1,13 @@
+[package]
+name = "qnc-player-acceptance"
+version = "0.1.0"
+edition = "2021"
+description = "QNC tool: automatic acceptance of the Broadcast Player (AGENTS 8.3 point 6) on an isolated copy of the active project, through the same source preview the forms use"
+
+[dependencies]
+qnc-active-project-read = { workspace = true }
+qnc-content-read = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-source-bindings = { workspace = true }
+qnc-source-preview = { workspace = true }
+serde_json = { workspace = true }
