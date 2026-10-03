@@ -54,6 +54,14 @@ struct Run {
     error: Option<String>,
     started: u128,
     ended: u128,
+    /// Each new picture on the monitor: when it came (unix ns) and its frame.
+    pictures_at: Vec<(u128, u64)>,
+    /// Frames per second of the played source (num, den).
+    rate: (u64, u64),
+}
+
+fn unix_ns() -> u128 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos())
 }
 
 fn unix_ms() -> u128 {
@@ -85,6 +93,9 @@ fn play(preview: &mut SourcePreview, run: &mut Run, seconds: u64) {
         .source_timebase()
         .map_or(40.0, |tb| 1000.0 * tb.fps_den as f64 / tb.fps_num as f64);
     let first_frame = preview.player_view().confirmed_source_frame().unwrap_or(0);
+    if let Some(tb) = preview.player_view().source_timebase() {
+        run.rate = (tb.fps_num as u64, tb.fps_den as u64);
+    }
     let mut last_key = preview.view().monitor_frame.as_ref().map(|f| (f.generation, f.sequence));
     preview.toggle_play();
     let start = Instant::now();
@@ -100,6 +111,9 @@ fn play(preview: &mut SourcePreview, run: &mut Run, seconds: u64) {
         if key.is_some() && key != last_key {
             last_key = key;
             run.pictures += 1;
+            if let Some(picture) = preview.player_view().picture.as_ref() {
+                run.pictures_at.push((unix_ns(), picture.header.frame));
+            }
             if run.first_picture_ms.is_none() {
                 run.first_picture_ms = Some(now.duration_since(start).as_millis());
             } else {
@@ -146,6 +160,58 @@ fn logged(root: &Path, from: u128, to: u128) -> (u64, u64) {
         }
     }
     (stalls, reopens)
+}
+
+/// Picture minus sound, in frames, over a run.
+struct AvOffsets {
+    median: f64,
+    lag_worst: f64,
+    lead_worst: f64,
+    points: usize,
+}
+
+/// For every picture that reached the monitor, the frame being heard at that moment:
+/// from the `AV_A` lines of the player (the sample the audio device plays and when),
+/// carried to the picture's time at the sample rate. Positive: picture ahead of sound.
+fn av_offsets(root: &Path, run: &Run) -> Option<AvOffsets> {
+    let (num, den) = run.rate;
+    if num == 0 || den == 0 || run.pictures_at.is_empty() {
+        return None;
+    }
+    let log = qnc_dev_diagnostics::log_path(root, qnc_dev_diagnostics::DiagnosticsStream::Player);
+    let text = std::fs::read_to_string(log).ok()?;
+    let field = |line: &str, key: &str| -> Option<u128> {
+        line.split_whitespace().find_map(|part| part.strip_prefix(key)?.parse().ok())
+    };
+    let audio: Vec<(u128, u128, u128)> = text
+        .lines()
+        .filter(|line| line.contains(" AV_A "))
+        .filter_map(|line| Some((field(line, "unix_ns=")?, field(line, "sample=")?, field(line, "rate=")?)))
+        .filter(|(at, _, _)| *at / 1_000_000 >= run.started && *at / 1_000_000 <= run.ended)
+        .collect();
+    let mut offsets: Vec<f64> = run
+        .pictures_at
+        .iter()
+        .filter_map(|(at, frame)| {
+            let (heard_at, sample, rate) = audio.iter().min_by_key(|(t, _, _)| t.abs_diff(*at))?;
+            if heard_at.abs_diff(*at) > 300_000_000 || *rate == 0 {
+                return None;
+            }
+            let now = *sample as f64 + (*at as f64 - *heard_at as f64) * *rate as f64 / 1e9;
+            let heard_frame = now * num as f64 / (*rate as f64 * den as f64);
+            Some(*frame as f64 - heard_frame)
+        })
+        .collect();
+    if offsets.is_empty() {
+        return None;
+    }
+    offsets.sort_by(f64::total_cmp);
+    Some(AvOffsets {
+        median: offsets[offsets.len() / 2],
+        lag_worst: offsets[offsets.len() / 100],
+        lead_worst: offsets[offsets.len() - 1 - offsets.len() / 100],
+        points: offsets.len(),
+    })
 }
 
 fn measure(preview: &mut SourcePreview, run: &mut Run, seconds: u64) {
@@ -216,10 +282,14 @@ fn main() -> Result<(), String> {
         } else {
             0.0
         };
-        let ok = run.error.is_none() && stalls == 0 && run.stutters == 0 && shown >= 99.0;
+        let av = av_offsets(&args.root, run);
+        // Picture vs sound: the median within one frame, and no point where the picture
+        // lags the sound by more than two frames (AGENTS 8.3 point 6).
+        let av_ok = av.as_ref().is_none_or(|a| a.median.abs() <= 1.0 && a.lag_worst >= -2.0);
+        let ok = run.error.is_none() && stalls == 0 && run.stutters == 0 && shown >= 99.0 && av_ok;
         failed |= !ok;
         println!(
-            "{} {:<24} ready {:>5} ms | first picture {:>4} ms | frames {:>5} | shown {:>5.1}% | longest gap {:>4} ms at {} | stutters {:>3} | stalls {} | decoder reopens {}{}",
+            "{} {:<24} ready {:>5} ms | first picture {:>4} ms | frames {:>5} | shown {:>5.1}% | longest gap {:>4} ms at {} | stutters {:>3} | stalls {} | decoder reopens {} | A/V {}{}",
             if ok { "PASS" } else { "FAIL" },
             run.name,
             run.prepare_ms.map_or("-".into(), |v| v.to_string()),
@@ -231,6 +301,7 @@ fn main() -> Result<(), String> {
             run.stutters,
             stalls,
             reopens,
+            av.as_ref().map_or("-".to_string(), |a| format!("median {:+.1} f, picture behind sound up to {:.1} f, ahead up to {:.1} f ({} points)", a.median, -a.lag_worst.min(0.0), a.lead_worst.max(0.0), a.points)),
             run.error.as_ref().map_or(String::new(), |e| format!(" | error {e}")),
         );
         report.push(serde_json::json!({
@@ -238,6 +309,8 @@ fn main() -> Result<(), String> {
             "first_picture_ms": run.first_picture_ms, "frames_advanced": run.frames_advanced,
             "pictures": run.pictures, "shown_percent": shown, "longest_gap_ms": run.longest_gap_ms,
             "stutters": run.stutters, "stalls": stalls, "decoder_reopens": reopens, "error": run.error,
+            "av_median_frames": av.as_ref().map(|a| a.median), "av_picture_behind_frames": av.as_ref().map(|a| -a.lag_worst.min(0.0)),
+            "av_picture_ahead_frames": av.as_ref().map(|a| a.lead_worst.max(0.0)),
         }));
     }
     let out = qnc_dev_diagnostics::log_dir(&args.root).join("player-acceptance.json");

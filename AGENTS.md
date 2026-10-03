@@ -2870,3 +2870,8 @@ spremna vracala se bez dopune, pa je dekoder radio u paketima od 4 slike tocno n
 `fill`): zaliha se dopunjuje pri svakoj predanoj slici. Provjera `qnc-player-acceptance`: cekanja na sliku
 tijekom playa ~240 -> ~19 po pustanju (vecinom pri pripremi), program 3/4 i klipovi PASS (jedan trzaj 77 ms
 na hladnoj kartici, priprema 3 s samo prvi put).
+Dopuna 2026-10-03 ("nastavi"): `qnc-player-acceptance` mjeri i pomak zvuka i slike: za svaku sliku koja stigne
+na monitor racuna frame koji se u tom trenutku cuje (iz `AV_A`: uzorak koji audio uredaj svira i kada);
+prolaz trazi medijan unutar 1 slike i da slika nigdje ne kasni za zvukom vise od 2 slike (1. percentil).
+Izmjereno: klipovi 2002/2679 i program od 2513 medijan -0,2 slike (slika najvise 0,8 slike iza zvuka).
+Program uz istodobni rad druge aplikacije na istoj kartici ima 1-6 kratkih trzaja (44-62 ms), sam prolazi.
