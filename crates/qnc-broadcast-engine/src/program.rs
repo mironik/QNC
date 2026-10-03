@@ -481,6 +481,9 @@ impl VideoDecodeAdapter for ProgramVideo {
         self.ready.retain(|frame, _| *frame >= request.frame);
         self.drain()?;
         if let Some(frame) = self.ready.remove(&request.frame) {
+            // The read-ahead is topped up on every frame, not only when one is missing:
+            // else it worked in batches of four, just in time, with no reserve.
+            self.fill(request.frame)?;
             return self.handed(frame);
         }
         self.fill(request.frame)?;

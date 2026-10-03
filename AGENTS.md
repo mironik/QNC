@@ -2863,3 +2863,10 @@ ne treba gasio se u niti reprodukcije (ffmpeg kill + join do 0,9 s), sto je praz
 ("explicit preparation required"); sada se gasi u pozadini (`retire`). Prije: program 97-98 % slika, rupe
 440-500 ms, tvrdi zastoj u ~1/6 pustanja; poslije: 8/8 bez zastoja, 100 % slika, klipovi 2002/2679/2676 PASS.
 Uz to dijagnostika razloga zastoja dekodera programa i trajanja otvaranja dekodera.
+Dopuna 2026-10-03 (korisnik nakon live probe: "sad je jos gore"; log: dekoder slike radi tocno u realnom
+vremenu, bez rezerve): zaliha slika unaprijed dopunjavala se samo kad trazena slika nedostaje, a kad je bila
+spremna vracala se bez dopune, pa je dekoder radio u paketima od 4 slike tocno na vrijeme; u pravoj aplikaciji
+(GPU dijeli i sucelje) to je trzalo. `crates/qnc-broadcast-engine` (klip `fill_conversion_queue`, program
+`fill`): zaliha se dopunjuje pri svakoj predanoj slici. Provjera `qnc-player-acceptance`: cekanja na sliku
+tijekom playa ~240 -> ~19 po pustanju (vecinom pri pripremi), program 3/4 i klipovi PASS (jedan trzaj 77 ms
+na hladnoj kartici, priprema 3 s samo prvi put).

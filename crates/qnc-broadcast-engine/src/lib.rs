@@ -727,6 +727,8 @@ impl VideoDecodeAdapter for Video {
         self.drain_conversions()?;
         if let Some(frame) = self.ready.remove(&request.frame) {
             self.forget_far_from(request.frame);
+            // Keep the read-ahead full on every frame (it was filled only when one was missing).
+            self.fill_conversion_queue(&request)?;
             return self.stamped(frame).ok_or_else(|| error("frame sequence exhausted"));
         }
         if let Some(frame) = self.kept_again(request.frame) {
