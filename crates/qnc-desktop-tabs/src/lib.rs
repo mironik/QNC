@@ -29,6 +29,57 @@ pub fn read(root: &Path, available: &[DesktopApplicationRef]) -> Tabs {
     }
 }
 
+/// Reads the tabs again on a thread of its own, every `every` or when woken, so the
+/// desktop never waits on the database (a reader waits while a background job writes
+/// the project database, up to its busy timeout). It keeps only the last read, as a
+/// mailbox; the database stays the truth.
+pub struct Watcher {
+    latest: std::sync::Arc<std::sync::Mutex<Option<Tabs>>>,
+    wake: Option<std::sync::mpsc::Sender<()>>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Drop for Watcher {
+    /// Stops the reading thread and waits for it, so nothing keeps the database open.
+    fn drop(&mut self) {
+        self.wake.take();
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+impl Watcher {
+    pub fn start(root: std::path::PathBuf, available: Vec<DesktopApplicationRef>, every: std::time::Duration) -> Self {
+        let latest = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let (wake, woken) = std::sync::mpsc::channel::<()>();
+        let mailbox = latest.clone();
+        let thread = std::thread::Builder::new().name("qnc-desktop-tabs".into()).spawn(move || loop {
+            let tabs = read(&root, &available);
+            if let Ok(mut slot) = mailbox.lock() {
+                *slot = Some(tabs);
+            }
+            match woken.recv_timeout(every) {
+                Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        });
+        Self { latest, wake: Some(wake), thread: thread.ok() }
+    }
+
+    /// The tabs read since the last call, if any.
+    pub fn take(&self) -> Option<Tabs> {
+        self.latest.lock().ok()?.take()
+    }
+
+    /// Read again now.
+    pub fn reread(&self) {
+        if let Some(wake) = &self.wake {
+            let _ = wake.send(());
+        }
+    }
+}
+
 /// The application ids of the active project's sequence; `None` without an active
 /// project.
 fn project_sequence(root: &Path) -> Result<Option<Vec<String>>, String> {
@@ -94,6 +145,26 @@ mod tests {
     fn with_a_project_only_its_applications_in_its_order() {
         let sequence = ["qnc.project", "qnc.ingest", "qnc.story", "qnc.not-installed"].map(String::from);
         assert_eq!(of_sequence(&sequence, &available()), ["project", "ingest", "storyboard"]);
+    }
+
+    #[test]
+    fn the_watcher_reads_on_its_own_thread_and_again_when_woken() {
+        let root = std::env::temp_dir().join(format!("qnc_desktop_tabs_watch_{}", std::process::id()));
+        let watcher = Watcher::start(root, available(), std::time::Duration::from_secs(60));
+        let wait = |watcher: &Watcher| {
+            let start = std::time::Instant::now();
+            loop {
+                if let Some(tabs) = watcher.take() {
+                    return tabs;
+                }
+                assert!(start.elapsed() < std::time::Duration::from_secs(5), "no read");
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+        };
+        assert_eq!(wait(&watcher).tab_ids, ["project"]);
+        assert!(watcher.take().is_none(), "a read is taken once");
+        watcher.reread();
+        assert_eq!(wait(&watcher).tab_ids, ["project"]);
     }
 
     #[test]

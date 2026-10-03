@@ -172,8 +172,8 @@ impl EditorialApplication {
         }
         (self.load_result.is_some()
             || self.posters.has_pending_work()
-            || self.segments.has_pending_work())
-        .then(|| Duration::from_millis(100))
+            || self.segments.has_pending_work() || self.segments.reading())
+        .then(|| Duration::from_millis(15)) // a written story shows within a frame or two
     }
 
     fn fail(&mut self, error: String) {

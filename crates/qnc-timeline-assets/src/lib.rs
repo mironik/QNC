@@ -96,6 +96,10 @@ impl SourceTimelineAssets {
 pub struct TimelineAssetReader {
     context: Option<TimelineAssetContext>,
     cache: BTreeMap<String, SourceTimelineAssets>,
+    /// Reads running on their own thread (cache keys), and their finished results:
+    /// the form's thread never waits on the database or decodes the filmstrip.
+    asked: std::collections::BTreeSet<String>,
+    loaded: Arc<std::sync::Mutex<Vec<(String, Result<SourceTimelineAssets, String>)>>>,
 }
 
 impl TimelineAssetReader {
@@ -106,13 +110,74 @@ impl TimelineAssetReader {
             .is_some_and(|old| old.project_id() != context.project_id());
         if changed {
             self.cache.clear();
+            self.asked.clear();
+            self.loaded = Arc::default(); // reads of the old project land nowhere
         }
         self.context = Some(context);
+    }
+
+    /// The project the reader is set up for.
+    pub fn project_id(&self) -> Option<&str> {
+        self.context.as_ref().map(TimelineAssetContext::project_id)
     }
 
     pub fn reset(&mut self) {
         self.context = None;
         self.cache.clear();
+        self.asked.clear();
+        self.loaded = Arc::default(); // reads of the old project land nowhere
+    }
+
+    /// The assets of `clip_id` read on a thread of their own; `take_loaded` gives them.
+    /// Returns what the cache already has (shown meanwhile); `fresh` reads again even
+    /// then (artifacts may have appeared since).
+    pub fn request(&mut self, clip_id: &str, fresh: bool) -> Option<SourceTimelineAssets> {
+        qnc_media_records::valid_id(clip_id).ok()?;
+        let context = self.context.clone()?;
+        let key = cache_key(context.project_id(), clip_id);
+        let cached = self.cache.get(&key).cloned();
+        if (cached.is_some() && !fresh) || self.asked.contains(&key) {
+            return cached;
+        }
+        self.asked.insert(key.clone());
+        let mailbox = self.loaded.clone();
+        let clip = clip_id.to_string();
+        let started = std::thread::Builder::new().name("qnc-timeline-assets".into()).spawn(move || {
+            let read = read_assets(&context, &clip);
+            if let Ok(mut loaded) = mailbox.lock() {
+                loaded.push((key, read));
+            }
+        });
+        if started.is_err() {
+            self.asked.remove(&cache_key(self.context.as_ref()?.project_id(), clip_id));
+        }
+        cached
+    }
+
+    /// Reads finished since the last call: the assets, or an empty set for that clip
+    /// when the read failed (and the error).
+    pub fn take_loaded(&mut self) -> Vec<(SourceTimelineAssets, Option<String>)> {
+        let finished = self.loaded.lock().map(|mut loaded| std::mem::take(&mut *loaded)).unwrap_or_default();
+        let mut taken = Vec::new();
+        for (key, read) in finished {
+            self.asked.remove(&key);
+            let clip_id = key.rsplit("::").next().unwrap_or_default().to_string();
+            match read {
+                Ok(assets) => {
+                    if assets.filmstrip_background.is_some() || assets.wave.is_some() {
+                        self.cache.insert(key, assets.clone());
+                    }
+                    taken.push((assets, None));
+                }
+                Err(error) => taken.push((SourceTimelineAssets::empty_for(clip_id), Some(error))),
+            }
+        }
+        taken
+    }
+
+    /// Whether a read is still running.
+    pub fn loading(&self) -> bool {
+        !self.asked.is_empty()
     }
 
     pub fn remove_clips(&mut self, clip_ids: &[String]) {
@@ -353,5 +418,23 @@ mod tests {
             .is_none());
 
         assert_eq!(*reader.calls.lock().unwrap(), 2);
+
+        // Read on its own thread: the request returns at once, the result comes later,
+        // and a second request while one runs reads nothing more.
+        assert!(assets.request("clip-2", true).is_none());
+        assert!(assets.request("clip-2", true).is_none());
+        let start = std::time::Instant::now();
+        let taken = loop {
+            let taken = assets.take_loaded();
+            if !taken.is_empty() {
+                break taken;
+            }
+            assert!(start.elapsed() < std::time::Duration::from_secs(5), "no read");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        };
+        assert_eq!(taken.len(), 1);
+        assert_eq!(taken[0].0.clip_id, "clip-2");
+        assert!(!assets.loading());
+        assert_eq!(*reader.calls.lock().unwrap(), 3);
     }
 }

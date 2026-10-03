@@ -609,7 +609,21 @@ pub struct ProgramSegments {
     pending_create: Option<String>,
     sequence: u64,
     view: SegmentsView,
+    /// The read of the story running on its own thread, and whether another is asked
+    /// meanwhile: the form's thread never waits on the database (a reader waits while a
+    /// background job writes the project database).
+    reading: Option<std::sync::mpsc::Receiver<qnc_program_db::Result<StoryRead>>>,
+    read_again: bool,
 }
+
+/// One read of the story: segments, markers, slots, covers and the stored selection.
+type StoryRead = (
+    Vec<ProgramSegment>,
+    Vec<ProgramMarker>,
+    Vec<ProgramSlot>,
+    Vec<ProgramCover>,
+    qnc_program_db::StorySelection,
+);
 
 impl ProgramSegments {
     pub fn new() -> Self {
@@ -695,20 +709,59 @@ impl ProgramSegments {
         std::mem::take(&mut self.program_changed)
     }
 
-    /// Rereads the program from the database.
+    /// Rereads the program from the database, on a thread of its own; `poll` takes the
+    /// result. A reload asked while one runs reads once more after it.
     pub fn reload(&mut self) {
-        let Some(target) = &self.target else {
+        let Some(target) = self.target.clone() else {
             return;
         };
-        let read = StoryReader::open(target).and_then(|mut client| {
-            Ok((
-                client.list_segments()?,
-                client.list_markers()?,
-                client.list_slots()?,
-                client.list_covers()?,
-                client.read_story_selection()?,
-            ))
+        if self.reading.is_some() {
+            self.read_again = true;
+            return;
+        }
+        let (send, receive) = std::sync::mpsc::channel();
+        let started = std::thread::Builder::new().name("qnc-story-read".into()).spawn(move || {
+            let read = StoryReader::open(&target).and_then(|mut client| {
+                Ok((
+                    client.list_segments()?,
+                    client.list_markers()?,
+                    client.list_slots()?,
+                    client.list_covers()?,
+                    client.read_story_selection()?,
+                ))
+            });
+            let _ = send.send(read);
         });
+        match started {
+            Ok(_) => self.reading = Some(receive),
+            Err(error) => self.refresh_view(error.to_string()),
+        }
+    }
+
+    /// Whether a read of the story or of its waves is still running.
+    pub fn reading(&self) -> bool {
+        self.reading.is_some() || self.waves.reading()
+    }
+
+    /// Takes a finished read of the story; true if one was applied.
+    fn take_read(&mut self) -> bool {
+        let Some(receive) = &self.reading else {
+            return false;
+        };
+        let read = match receive.try_recv() {
+            Ok(read) => read,
+            Err(std::sync::mpsc::TryRecvError::Empty) => return false,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => Err("story read stopped".into()),
+        };
+        self.reading = None;
+        self.apply_read(read);
+        if std::mem::take(&mut self.read_again) {
+            self.reload();
+        }
+        true
+    }
+
+    fn apply_read(&mut self, read: qnc_program_db::Result<StoryRead>) {
         match read {
             Ok((stored, markers, slots, covers, selection)) => {
                 self.program_changed |= stored != self.stored || covers != self.stored_covers;
@@ -1220,6 +1273,7 @@ impl ProgramSegments {
 
     /// Applies finished writes and rereads the program. Returns whether it changed.
     pub fn poll(&mut self) -> bool {
+        let read = self.take_read();
         let mut message = String::new();
         let mut landed = false;
         // Covers whose B-roll virtual shot is saved go into their slot.
@@ -1272,7 +1326,7 @@ impl ProgramSegments {
         }
         self.pending = waiting;
         if !landed {
-            return false;
+            return read;
         }
         if let Some(segment_id) = created {
             // A new segment becomes the selection, in the database too.

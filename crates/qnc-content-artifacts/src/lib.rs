@@ -446,6 +446,16 @@ pub struct ProjectArtifacts {
     refresh_at: Option<std::time::Instant>,
 }
 
+/// What `ProjectArtifacts::poll_shown` gave for the clip on screen.
+#[derive(Debug, Default)]
+pub struct ShownArtifacts {
+    /// Its artifacts, read since the last poll.
+    pub assets: Option<SourceTimelineAssets>,
+    pub error: Option<String>,
+    /// A read is still running (repaint to show it).
+    pub loading: bool,
+}
+
 #[derive(Debug, Default)]
 pub struct ProjectArtifactsPoll {
     pub changed: bool,
@@ -527,14 +537,55 @@ impl ProjectArtifacts {
         let _ = self.artifacts.sync(true);
     }
 
+    /// Asks the published artifacts of `clip_id`, read on a thread of their own (the
+    /// form's thread never waits on the database); returns what is cached meanwhile.
+    /// `take_loaded` gives the read.
     pub fn focus(
         &mut self,
         reader: &SettingsReader,
         settings: &WorkSettings,
         clip_id: &str,
-    ) -> Result<SourceTimelineAssets, String> {
-        self.configure_assets(reader, settings)?;
-        self.assets.load_clip(clip_id)
+    ) -> Result<Option<SourceTimelineAssets>, String> {
+        // Set up once per project: building the reader reads the project binding.
+        if self.assets.project_id() != Some(settings.project_id.as_str()) {
+            self.configure_assets(reader, settings)?;
+        }
+        Ok(self.assets.request(clip_id, true))
+    }
+
+    /// Artifacts read since the last call, with the error of a failed read.
+    pub fn take_loaded(&mut self) -> Vec<(SourceTimelineAssets, Option<String>)> {
+        self.assets.take_loaded()
+    }
+
+    /// For the clip on screen (`shown`): the artifacts read for it since the last call,
+    /// and a new read once a second while its filmstrip or wave is still missing (the
+    /// background worker makes them). Never waits on the database.
+    pub fn poll_shown(
+        &mut self,
+        reader: &SettingsReader,
+        settings: &WorkSettings,
+        shown: &SourceTimelineAssets,
+    ) -> ShownArtifacts {
+        let mut polled = ShownArtifacts::default();
+        for (found, error) in self.take_loaded() {
+            if found.clip_id == shown.clip_id {
+                polled.assets = Some(found);
+            }
+            polled.error = error.or(polled.error);
+        }
+        if self.refresh_due(polled.assets.as_ref().unwrap_or(shown)) {
+            if let Err(error) = self.focus(reader, settings, &shown.clip_id) {
+                polled.error = Some(error);
+            }
+        }
+        polled.loading = self.loading();
+        polled
+    }
+
+    /// Whether a read of artifacts is still running.
+    pub fn loading(&self) -> bool {
+        self.assets.loading()
     }
 
     /// Whether the clip on screen should be read again: its filmstrip or wave is still

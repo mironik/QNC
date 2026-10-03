@@ -27,13 +27,17 @@ impl IngestApplication {
                 qnc_timeline_assets::SourceTimelineAssets::empty_for(clip_id);
             return;
         };
-        let posters = self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.thumb_image.as_deref()));
+        // Read on a thread of their own; the cached ones show meanwhile, the same clip keeps its own.
         match self.artifacts.focus(reader, &plan.settings, clip_id) {
-            Ok(found) => {
-                self.view.timeline_assets = qnc_timeline_assets::with_clip_poster(found, Some(&plan.settings), posters)
-            }
+            Ok(found) if found.is_some() || self.view.timeline_assets.clip_id != clip_id => self.show_timeline_assets(found.unwrap_or_else(|| qnc_timeline_assets::SourceTimelineAssets::empty_for(clip_id)), &plan.settings),
+            Ok(_) => {}
             Err(error) => self.view.message = error,
         }
+    }
+
+    fn show_timeline_assets(&mut self, found: qnc_timeline_assets::SourceTimelineAssets, settings: &qnc_work_settings::WorkSettings) {
+        let posters = self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.thumb_image.as_deref()));
+        self.view.timeline_assets = qnc_timeline_assets::with_clip_poster(found, Some(settings), posters);
     }
 
     pub(super) fn remove_timeline_artifact_clips(&mut self, clip_ids: &[String]) {
@@ -50,12 +54,10 @@ impl IngestApplication {
 
     /// The clip on screen is read again while the worker still makes its artifacts.
     pub(super) fn poll_timeline_artifacts(&mut self) -> bool {
-        if !self.artifacts.refresh_due(&self.view.timeline_assets) {
-            return false;
-        }
-        let clip_id = self.view.timeline_assets.clip_id.clone();
-        self.focus_timeline_assets(&clip_id);
-        true
+        let (Some(reader), Some(plan)) = (self.settings_reader.as_ref(), self.work_plan().cloned()) else { return false };
+        let shown = self.artifacts.poll_shown(reader, &plan.settings, &self.view.timeline_assets);
+        shown.error.into_iter().for_each(|error| self.view.message = error);
+        shown.assets.map(|found| self.show_timeline_assets(found, &plan.settings)).is_some() || shown.loading
     }
 
     pub(super) fn set_timeline_artifact_playback_priority(&mut self, active: bool) {

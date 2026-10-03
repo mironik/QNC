@@ -10,6 +10,7 @@ qnc-app-registry = { workspace = true }
 qnc-board = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-desktop-tabs = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
 qnc-project-close = { workspace = true }
 qnc-shell-desktop-api = { workspace = true }
 qnc-shell-footer = { workspace = true }

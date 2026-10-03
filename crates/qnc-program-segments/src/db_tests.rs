@@ -12,6 +12,7 @@ fn story_target(file: &std::path::Path) -> ProjectDbTarget {
 
 fn configure(segments: &mut ProgramSegments, file: &std::path::Path) {
     segments.configure(story_target(file), "p1", None);
+    settle(segments);
 }
 
 const URI: &str = "qnc://local/db/ingest_content/p1";
@@ -63,8 +64,7 @@ fn store_with_story(file: &std::path::Path) -> Vec<String> {
 fn settle(segments: &mut ProgramSegments) {
     for _ in 0..400 {
         segments.poll();
-        if !segments.has_pending_work() {
-            segments.poll();
+        if !segments.has_pending_work() && !segments.reading() {
             return;
         }
         std::thread::sleep(std::time::Duration::from_millis(5));

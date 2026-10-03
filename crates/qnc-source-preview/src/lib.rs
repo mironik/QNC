@@ -229,7 +229,7 @@ impl SourcePreview {
         if self.player.is_some() && (self.player_view.preparing || self.player_view.playing()) {
             return self.player_view.source_frame_interval();
         }
-        None
+        self.timeline_assets.loading().then(|| Duration::from_millis(15))
     }
 
     /// Sets the project. A different project never inherits the previous clip.
@@ -279,20 +279,25 @@ impl SourcePreview {
         self.report_activity();
     }
 
-    /// Rereads the published filmstrip/wave artifacts for the shown clip.
+    /// Rereads the published filmstrip/wave artifacts for the shown clip, on a thread
+    /// of their own; `poll` shows them when they come.
     pub fn refresh_assets(&mut self) -> bool {
-        let Some(clip_id) = self.view.clip_id.clone() else {
-            return false;
-        };
-        let assets = self
-            .timeline_assets
-            .refresh_clip(&clip_id)
-            .unwrap_or_else(|_| SourceTimelineAssets::empty_for(&clip_id));
-        if assets == self.view.assets {
-            return false;
+        if let Some(clip_id) = self.view.clip_id.clone() {
+            self.timeline_assets.request(&clip_id, true);
         }
-        self.view.assets = assets;
-        true
+        false
+    }
+
+    /// Shows the artifacts read for the clip on screen.
+    fn take_assets(&mut self) -> bool {
+        let mut changed = false;
+        for (assets, _) in self.timeline_assets.take_loaded() {
+            if Some(&assets.clip_id) == self.view.clip_id.as_ref() && assets != self.view.assets {
+                self.view.assets = assets;
+                changed = true;
+            }
+        }
+        changed
     }
 
     /// Prepares the preview of `clip_id`: cuts the old session first, even when
@@ -349,10 +354,12 @@ impl SourcePreview {
         };
         // Published artifacts are read again on every choice: they may have
         // appeared since the clip was last shown.
+        // Read on a thread of their own (the click never waits on the database or the
+        // filmstrip decode); what the cache has shows meanwhile.
         self.view.assets = self
             .timeline_assets
-            .refresh_clip(clip_id)
-            .unwrap_or_else(|_| SourceTimelineAssets::empty_for(clip_id));
+            .request(clip_id, true)
+            .unwrap_or_else(|| SourceTimelineAssets::empty_for(clip_id));
 
         if self.player.is_none() {
             match Player::new() {
@@ -627,6 +634,7 @@ impl SourcePreview {
     /// Applies the player state. Returns whether the view changed.
     pub fn poll(&mut self) -> bool {
         let mut changed = self.retry_incomplete_record();
+        changed |= self.take_assets();
         if let Some(player) = &self.player {
             let playback = player.view();
             if playback != self.player_view {

@@ -2899,3 +2899,18 @@ unaprijed se ne izbacuju, spremnika ima i za njih (+ prefetch). Izmjereno na izo
 slike prije medijan 38 ms / najgore 1039 ms, 6 od 10 slika u nizu; poslije 34-36 ms / najgore 52 ms, 10 od 10,
 bez ijednog ponovnog otvaranja dekodera; klipovi 2002/2679 i program od 2513 100 % slika, bez zastoja, A/V
 -0,1 do -0,2 slike.
+Izvedeno 2): nijedno citanje baze ni dekodiranje filmstripa na niti sucelja. Naredbe playeru vec idu iz
+niti klijenta (poziv iz forme 5-30 us), pa tu nema promjene. `qnc-desktop-tabs::Watcher` cita launch bar u
+pozadini svake sekunde (desktop ga samo preuzima; odmah se cita samo pri pokretanju, Close project i
+prijelazu na sljedecu grupu; nit se pri gasenju ceka). `qnc-program-segments` ponovno cita pricu nakon upisa
+u pozadini (`reading`, jos jedno citanje ako je trazeno usred citanja), `qnc-program-waveform` cita valove
+klipova programa u pozadini. `qnc-timeline-assets::TimelineAssetReader::request`/`take_loaded`: filmstrip i
+val klipa citaju se i dekodiraju u pozadini; `qnc-source-preview` pri kliku na klip pokaze sto ima u
+memoriji i preuzme procitano u `poll`; `qnc-content-artifacts::poll_shown` (Ingest: prikazani klip se cita
+ponovno dok mu artefakti nedostaju) i citac se slaze jednom po projektu (prije pri svakom citanju, s
+citanjem veze projekta). Forme se osvjezavaju svakih 15 ms dok citanje traje. `qnc-desktop` biljezi svaki
+frame sucelja dulji od 25 ms (`ui-frame-slow`, samo uz dijagnostiku playera). C10 granice nisu podignute
+(Ingest application 1714, Editorial application 709). Provjereno: testovi `qnc-desktop`, `qnc-desktop-tabs`,
+`qnc-program-segments`, `qnc-program-waveform`, `qnc-timeline-assets`, `qnc-source-preview`,
+`qnc-content-artifacts`, `qnc-ingest-application`, conformance, `qnc-player-acceptance` (klipovi i program
+100 %, bez zastoja, koraci 37-39 ms medijan, najgore 58 ms, 10 od 10).

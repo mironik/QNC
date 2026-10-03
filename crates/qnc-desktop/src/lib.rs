@@ -7,7 +7,7 @@ use std::{
     collections::HashMap,
     env,
     path::{Path, PathBuf},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use eframe::egui::{self, Color32, FontFamily, FontId, RichText, Sense, TextStyle, Vec2};
@@ -96,7 +96,8 @@ pub struct QncShell {
     status: String,
     /// The launch bar: the applications of the active project, re-read from its database.
     tabs: qnc_desktop_tabs::Tabs,
-    tabs_read: Option<Instant>,
+    /// Reads the launch bar on its own thread (the desktop never waits on the database).
+    tabs_watch: Option<qnc_desktop_tabs::Watcher>,
 }
 
 /// How often the launch bar reads the active project again (the database is the truth).
@@ -127,7 +128,7 @@ impl QncShell {
             theme_id: ThemeId::Dark,
             status: "Spreman.".to_string(),
             tabs: qnc_desktop_tabs::Tabs { tab_ids: Vec::new(), project_open: false, error: None },
-            tabs_read: None,
+            tabs_watch: None,
         }
     }
 
@@ -312,14 +313,23 @@ impl QncShell {
         }
     }
 
-    /// Reads the applications of the active project (once a second, or `now`); when the
-    /// shown application is not one of them, the first one is shown.
+    /// The applications of the active project: `now` (startup, close, next group) reads
+    /// them at once, otherwise the last read of the background watcher (once a second);
+    /// when the shown application is not one of them, the first one is shown.
     fn refresh_tabs(&mut self, now: bool) {
-        if !now && self.tabs_read.is_some_and(|at| at.elapsed() < TABS_REREAD) {
+        if self.tabs_watch.is_none() {
+            let watch = qnc_desktop_tabs::Watcher::start(self.qnc_root.clone(), self.shell_available_apps(), TABS_REREAD);
+            self.tabs_watch = Some(watch);
+        }
+        let watch = self.tabs_watch.as_ref().expect("started above");
+        if now {
+            watch.reread();
+            self.tabs = qnc_desktop_tabs::read(&self.qnc_root, &self.shell_available_apps());
+        } else if let Some(tabs) = watch.take() {
+            self.tabs = tabs;
+        } else {
             return;
         }
-        self.tabs_read = Some(Instant::now());
-        self.tabs = qnc_desktop_tabs::read(&self.qnc_root, &self.shell_available_apps());
         if let Some(error) = &self.tabs.error {
             self.status = error.clone();
         }
@@ -377,6 +387,22 @@ impl eframe::App for QncShell {
     /// one layout tree (user rules 2026-09-30 and 2026-10-01: the footer is a place of
     /// every board; the layout is the frame).
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let started = std::time::Instant::now();
+        self.draw(ctx);
+        // A frame of the desktop longer than 25 ms is a moment the hand waits: logged with
+        // the application on screen, so a slow piece can be found (diagnostics only).
+        let spent = started.elapsed();
+        if spent > Duration::from_millis(25) && qnc_dev_diagnostics::player_diagnostics_enabled() {
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!("ui-frame-slow ms={} tab={}", spent.as_millis(), self.active_tab),
+            );
+        }
+    }
+}
+
+impl QncShell {
+    fn draw(&mut self, ctx: &egui::Context) {
         self.refresh_tabs(false);
         ctx.request_repaint_after(TABS_REREAD);
         let mut footer = self.footer();
@@ -726,6 +752,7 @@ mod tests {
         shell.activate_tab("project");
         assert!(!shell.consume_navigation(&source));
         assert_eq!(shell.active_tab, "project");
+        drop(shell.tabs_watch.take()); // its reading thread holds the database
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 
@@ -740,6 +767,7 @@ mod tests {
         assert!(error.contains("nije dostupna"));
         assert!(shell.ensure_embedded_component(&source));
         assert_eq!(shell.status, error);
+        drop(shell.tabs_watch.take()); // its reading thread holds the database
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 
@@ -756,6 +784,7 @@ mod tests {
         shell.consume_navigation(&source);
         assert_eq!(shell.active_tab, "variant");
         assert!(shell.embedded_apps.contains_key("variant"));
+        drop(shell.tabs_watch.take()); // its reading thread holds the database
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 
@@ -806,6 +835,7 @@ mod tests {
         );
         shell.activate_tab("project");
         assert_eq!(status(&shell), "Deactivated after 2");
+        drop(shell.tabs_watch.take()); // its reading thread holds the database
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 
@@ -832,6 +862,7 @@ mod tests {
         shell.activate_tab("project");
         shell.activate_tab("variant");
         assert_eq!(shell.footer_status(), "Activation 2");
+        drop(shell.tabs_watch.take()); // its reading thread holds the database
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 
@@ -878,6 +909,7 @@ mod tests {
         assert_eq!(shell.tabs.tab_ids, ["project"], "the bar shows only the first group");
         assert_eq!(shell.status, "Aktivni projekt zatvoren.");
         drop(conn);
+        drop(shell.tabs_watch.take()); // its reading thread holds the database
         fs::remove_dir_all(shell.qnc_root).unwrap();
     }
 

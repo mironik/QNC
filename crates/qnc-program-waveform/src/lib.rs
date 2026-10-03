@@ -147,12 +147,16 @@ pub fn row_peaks(program: &[f32], total_frames: u64, start: u64, end: u64) -> Ve
 /// The waves of the clips a program uses, read from the project database through the
 /// public timeline artifact reader (v5 `ProgramWaveformAssets`): a clip whose wave is
 /// not there yet is asked again after two seconds, the composed program is kept until
-/// its placements or waves change.
+/// its placements or waves change. The reads run on a thread of their own, so the
+/// form's thread never waits on the database while a background job writes it.
 #[derive(Default)]
 pub struct ProgramWaves {
     reader: Option<Arc<dyn TimelineArtifactRead>>,
     waves: HashMap<String, ClipWave>,
     retry_after: HashMap<String, Instant>,
+    /// Waves read on the reading thread, by clip (None: not there yet), until taken.
+    read: Arc<std::sync::Mutex<Vec<(String, Option<Vec<Vec<f32>>>)>>>,
+    asked: std::collections::HashSet<String>,
     composed: Option<(u64, Vec<Placement>, Vec<Placement>, usize, ProgramPeaks)>,
 }
 
@@ -176,18 +180,29 @@ impl ProgramWaves {
         duration_frames: impl Fn(&str) -> Option<u64>,
     ) -> ProgramPeaks {
         let now = Instant::now();
-        for placement in segments.iter().chain(covers) {
-            let clip_id = placement.clip_id.as_str();
-            if self.waves.contains_key(clip_id) || self.retry_after.get(clip_id).is_some_and(|at| *at > now) {
-                continue;
-            }
-            match (self.read(clip_id), duration_frames(clip_id)) {
+        let read = self.read.lock().map(|mut read| std::mem::take(&mut *read)).unwrap_or_default();
+        for (clip_id, lanes) in read {
+            self.asked.remove(&clip_id);
+            match (lanes, duration_frames(&clip_id)) {
                 (Some(lanes), Some(duration_frames)) if duration_frames > 0 => {
-                    self.waves.insert(clip_id.to_string(), ClipWave { lanes, duration_frames });
+                    self.waves.insert(clip_id, ClipWave { lanes, duration_frames });
                 }
-                _ => _ = self.retry_after.insert(clip_id.to_string(), now + WAVE_RETRY_DELAY),
+                _ => _ = self.retry_after.insert(clip_id, now + WAVE_RETRY_DELAY),
             }
         }
+        let mut wanted = Vec::new();
+        for placement in segments.iter().chain(covers) {
+            let clip_id = placement.clip_id.as_str();
+            if self.waves.contains_key(clip_id)
+                || self.asked.contains(clip_id)
+                || self.retry_after.get(clip_id).is_some_and(|at| *at > now)
+            {
+                continue;
+            }
+            self.asked.insert(clip_id.to_string());
+            wanted.push(clip_id.to_string());
+        }
+        self.ask(wanted);
         let loaded = self.waves.len();
         if let Some((total, a1, a2, count, peaks)) = &self.composed {
             if *total == total_frames && a1 == segments && a2 == covers && *count == loaded {
@@ -199,13 +214,41 @@ impl ProgramWaves {
         peaks
     }
 
-    fn read(&self, clip_id: &str) -> Option<Vec<Vec<f32>>> {
-        let record = self.reader.as_ref()?.read_wave(clip_id).ok()??;
-        let peaks = record.peaks()?;
-        let lanes = [peaks.a1_peaks, peaks.a2_peaks, peaks.a3_peaks, peaks.a4_peaks];
-        let lanes: Vec<Vec<f32>> = lanes.into_iter().collect();
-        lanes.iter().any(|lane| !lane.is_empty()).then_some(lanes)
+    /// Whether waves are still being read.
+    pub fn reading(&self) -> bool {
+        !self.asked.is_empty()
     }
+
+    /// Reads the waves of these clips on a thread of its own.
+    fn ask(&mut self, clips: Vec<String>) {
+        if clips.is_empty() {
+            return;
+        }
+        let Some(reader) = self.reader.clone() else {
+            self.asked.clear();
+            return;
+        };
+        let mailbox = self.read.clone();
+        let started = std::thread::Builder::new().name("qnc-program-waves".into()).spawn(move || {
+            for clip_id in clips {
+                let lanes = read_wave(reader.as_ref(), &clip_id);
+                if let Ok(mut read) = mailbox.lock() {
+                    read.push((clip_id, lanes));
+                }
+            }
+        });
+        if started.is_err() {
+            self.asked.clear();
+        }
+    }
+}
+
+fn read_wave(reader: &dyn TimelineArtifactRead, clip_id: &str) -> Option<Vec<Vec<f32>>> {
+    let record = reader.read_wave(clip_id).ok()??;
+    let peaks = record.peaks()?;
+    let lanes = [peaks.a1_peaks, peaks.a2_peaks, peaks.a3_peaks, peaks.a4_peaks];
+    let lanes: Vec<Vec<f32>> = lanes.into_iter().collect();
+    lanes.iter().any(|lane| !lane.is_empty()).then_some(lanes)
 }
 
 #[cfg(test)]

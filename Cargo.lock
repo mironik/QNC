@@ -3241,6 +3241,7 @@ dependencies = [
  "qnc-board",
  "qnc-contracts",
  "qnc-desktop-tabs",
+ "qnc-dev-diagnostics",
  "qnc-project-close",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
