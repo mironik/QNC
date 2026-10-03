@@ -299,7 +299,13 @@ impl Runtime {
         };
         let converter_ms = opened.elapsed().as_millis();
         let raster_size = converter.size();
-        let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4) + STEP_BACK_FRAMES as usize + 8)
+        // Room for the read-ahead, the pictures kept behind a step and the ones the
+        // paused read-ahead made past the prepared frames: kept pictures that did not fit
+        // were evicted and every few frame steps reopened the decoder (acceptance 2026-10-03).
+        let rgba = (0..usize::from(output_config.slots).max(prebuffer_frames + 4)
+            + STEP_BACK_FRAMES as usize
+            + prebuffer_frames
+            + 8)
             .map(|_| Some(std::sync::Arc::from(vec![0; converter.output_bytes()])))
             .collect();
         let video_decoder = decode_input.open(plan.video_index, None)?;
@@ -690,38 +696,10 @@ impl VideoDecodeAdapter for Video {
             }
         }
         if let Some(frame) = self.pending_seek {
-            let mut gpu = self.gpu.borrow_mut();
-            let generation = gpu
-                .config
-                .generation
-                .checked_add(1)
-                .ok_or_else(|| error("GPU generation exhausted"))?;
-            if let Some(output) = &mut gpu.output {
-                match output.reset(generation) {
-                    Ok(()) => (),
-                    Err(qnc_video_output::OutputError::Busy) => return Err(pending()),
-                    Err(e) => return Err(error(e)),
-                }
-            }
-            gpu.config.generation = generation;
-            gpu.sequence = 0;
-            gpu.images.clear();
-            drop(gpu);
             // Stepping back: the new decoder also keeps the pictures before the frame, so
             // the next steps back come from them.
             let from = if stepping_back { frame.saturating_sub(STEP_BACK_FRAMES) } else { frame };
-            if qnc_dev_diagnostics::player_diagnostics_enabled() {
-                qnc_dev_diagnostics::log_line(
-                    qnc_dev_diagnostics::DiagnosticsStream::Player,
-                    format!("player-video reopen frame={frame} from={from} back={stepping_back}"),
-                );
-            }
-            let decoder = self.input.open(self.plan.video_index, seek_start(&self.plan.source, from)?)?;
-            retire(std::mem::replace(&mut self.decoder, decoder));
-            self.discard_before = Some(from);
-            self.ready.clear();
-            self.kept.clear();
-            self.next_decode_frame = from;
+            self.reopen(frame, from, stepping_back)?;
             self.pending_seek = None;
         }
         self.drain_conversions()?;
@@ -736,9 +714,10 @@ impl VideoDecodeAdapter for Video {
             return Ok(frame);
         }
         if request.frame < self.next_decode_frame && self.pending_seek.is_none() && !self.converter.busy() {
-            // Behind the open decoder and no longer kept: only then a new decoder.
-            self.pending_seek = Some(request.frame);
-            return self.decode_video_frame(request);
+            // Behind the open decoder and no longer kept: only then a new decoder. It is
+            // not a cue: the frame last asked for and the kept pictures stay, or the next
+            // step forward counted as a step back and reopened 25 frames earlier.
+            self.reopen(request.frame, request.frame, false)?;
         }
         self.fill_conversion_queue(&request)?;
         self.drain_conversions()?;
@@ -751,6 +730,47 @@ impl VideoDecodeAdapter for Video {
 }
 
 impl Video {
+    /// A new decoder from `from` for `frame`. A new generation drops conversions of the
+    /// old decoder still running; kept pictures before `from` stay (they are given the
+    /// new generation when shown again), unless an output holds tokens of the old one.
+    fn reopen(&mut self, frame: u64, from: u64, stepping_back: bool) -> Result<()> {
+        let mut gpu = self.gpu.borrow_mut();
+        let generation = gpu
+            .config
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| error("GPU generation exhausted"))?;
+        let has_output = gpu.output.is_some();
+        if let Some(output) = &mut gpu.output {
+            match output.reset(generation) {
+                Ok(()) => (),
+                Err(qnc_video_output::OutputError::Busy) => return Err(pending()),
+                Err(e) => return Err(error(e)),
+            }
+        }
+        gpu.config.generation = generation;
+        gpu.sequence = 0;
+        gpu.images.clear();
+        drop(gpu);
+        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!("player-video reopen frame={frame} from={from} back={stepping_back}"),
+            );
+        }
+        let decoder = self.input.open(self.plan.video_index, seek_start(&self.plan.source, from)?)?;
+        retire(std::mem::replace(&mut self.decoder, decoder));
+        self.discard_before = Some(from);
+        self.ready.clear();
+        if has_output {
+            self.kept.clear();
+        } else {
+            self.kept.retain(|kept, _| *kept < from);
+        }
+        self.next_decode_frame = from;
+        Ok(())
+    }
+
     /// A cue the open decoder reaches: a kept picture, or a frame not far ahead of it.
     fn reached_without_reopen(&self, frame: u64) -> bool {
         let reusable = self.gpu.borrow().output.is_none();
@@ -777,13 +797,18 @@ impl Video {
             return Some(kept); // an output token keeps its own sequence
         }
         let made = (kept.payload.header.generation, kept.payload.header.sequence);
-        let newer = self.handed.is_none_or(|(generation, sequence)| made.0 != generation || made.1 > sequence);
+        let current = self.gpu.borrow().config.generation;
+        let newer = made.0 == current
+            && self.handed.is_none_or(|(generation, sequence)| made.0 != generation || made.1 > sequence);
         if newer {
             self.handed = Some(made);
             return Some(kept);
         }
+        // Shown again after a step back, or kept from before a new decoder: the current
+        // generation and the next sequence, so the monitor never takes it for stale.
         let mut gpu = self.gpu.borrow_mut();
         let mut header = kept.payload.header.clone();
+        header.generation = current;
         gpu.sequence = gpu.sequence.checked_add(1)?;
         header.sequence = gpu.sequence;
         self.handed = Some((header.generation, header.sequence));
@@ -797,7 +822,9 @@ impl Video {
     fn forget_far_from(&mut self, served: u64) {
         let prefetch = self.prefetch_frames as u64;
         let screen = served.saturating_sub(prefetch).max(self.cue_anchor.min(served));
-        let (back, ahead) = (screen.saturating_sub(STEP_BACK_FRAMES), served + prefetch);
+        // Pictures the decoder already made ahead stay: dropping them while it read on
+        // made the paused preparation reopen it to make them again.
+        let (back, ahead) = (screen.saturating_sub(STEP_BACK_FRAMES), (served + prefetch).max(self.next_decode_frame));
         self.kept.retain(|kept, _| *kept >= back && *kept <= ahead);
     }
 

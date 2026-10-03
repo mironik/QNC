@@ -2875,3 +2875,27 @@ na monitor racuna frame koji se u tom trenutku cuje (iz `AV_A`: uzorak koji audi
 prolaz trazi medijan unutar 1 slike i da slika nigdje ne kasni za zvukom vise od 2 slike (1. percentil).
 Izmjereno: klipovi 2002/2679 i program od 2513 medijan -0,2 slike (slika najvise 0,8 slike iza zvuka).
 Program uz istodobni rad druge aplikacije na istoj kartici ima 1-6 kratkih trzaja (44-62 ms), sam prolazi.
+
+Otvoreno ograniceno odobrenje 2026-10-03 (odziv koraka i sucelja, pa HDMI): korisnik: "nisam zadovoljan s
+trenutnim rjesenjem rada u Storyju.. editiranje IN/OUT i M je djelovalo bolje, pomak za slicice naprijed nazad
+je reagirao na svaki klik"; "odkljucaj sve sto treba". Audit `player.log` (1. 10.): korak strelicom do nove
+slike medijan 859 ms, najgore 2,9 s; pet pritisaka dalo je jedan frame pomaka. QNC je news cutter: laptop na
+terenu i HDMI monitor, bez 4K (odluka korisnika); HDMI izlaz je postojao samo na sporednim granama 17. 9.
+(`wip/gpu-shared-texture-attempt`, `gpu/from-2026-09-14`), nikad na mainu. Otkljucano: `qnc-broadcast-player`,
+`qnc-broadcast-engine`, `qnc-source-preview`, `qnc-player-client`, `qnc-desktop`, `qnc-desktop-tabs`,
+`qnc-program-segments`, `qnc-program-waveform`, `qnc-db-broker`, `qnc-player-acceptance`, zatim za HDMI novi
+`qnc-program-output`, `tools/qnc-player-runner`, `qnc-video-output`, root Cargo. Forme i layout se ne diraju.
+Redoslijed: 1) mjerenje i korak bez punog skoka, 2) naredbe playeru i citanje baze izvan niti sucelja,
+3) HDMI programski izlaz kao samostalna kocka (izbor vanjskog ekrana, nije obavezan, ne drzi sat).
+Izvedeno 1): `qnc-player-acceptance --steps NAME` mjeri korak do slike (10 naprijed, 10 nazad) i niz od 10
+brzih pritisaka; alat cita log tamo gdje ga player stvarno pise (`locate_qnc_root`: izolirana kopija bez
+datoteka korijena pise u QNC iz kojeg je player izgraden; prije je alat citao prazan log i zastoje i A/V nije
+vidio). Uzrok sporih koraka u `qnc-broadcast-engine`: priprema u pauzi trazi 25 slika unaprijed, slike koje
+nisu stale u spremnike su izbacivane, interno ponovno otvaranje dekodera na kraju pripreme pomicalo je zadnji
+trazeni frame i brisalo zadrzane slike, pa je sljedeci korak naprijed bio "korak unatrag" i otvarao dekoder
+25 slika ranije (~400 ms, unatrag ~1 s). Sada: interno otvaranje nije cue (zadnji trazeni frame i zadrzane
+slike prije njega ostaju, dobivaju novu generaciju kad se ponovno pokazu), slike koje je dekoder vec napravio
+unaprijed se ne izbacuju, spremnika ima i za njih (+ prefetch). Izmjereno na izoliranoj kopiji: korak do
+slike prije medijan 38 ms / najgore 1039 ms, 6 od 10 slika u nizu; poslije 34-36 ms / najgore 52 ms, 10 od 10,
+bez ijednog ponovnog otvaranja dekodera; klipovi 2002/2679 i program od 2513 100 % slika, bez zastoja, A/V
+-0,1 do -0,2 slike.
