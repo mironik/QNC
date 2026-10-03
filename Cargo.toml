@@ -31,6 +31,7 @@ members = [
     "crates/qnc-player-client",
     "crates/qnc-player-timeline",
     "crates/qnc-monitor",
+    "crates/qnc-program-output",
     "crates/qnc-filmstrip",
     "crates/qnc-filmstrip-worker",
     "crates/qnc-wave",
@@ -180,6 +181,7 @@ qnc-player-launcher = { path = "crates/qnc-player-launcher" }
 qnc-player-client = { path = "crates/qnc-player-client" }
 qnc-player-timeline = { path = "crates/qnc-player-timeline" }
 qnc-monitor = { path = "crates/qnc-monitor" }
+qnc-program-output = { path = "crates/qnc-program-output" }
 qnc-filmstrip = { path = "crates/qnc-filmstrip" }
 qnc-filmstrip-worker = { path = "crates/qnc-filmstrip-worker" }
 qnc-wave = { path = "crates/qnc-wave" }

@@ -60,6 +60,14 @@ pub fn paint_monitor(ui: &mut Ui, rect: Rect, surface: MonitorSurface<'_>) -> Mo
             picture.size,
             picture.rgba,
         ) {
+            // The same picture goes to the program output on an external screen, when one is there.
+            qnc_program_output::offer(ui.ctx(), || qnc_program_output::ProgramPicture {
+                session_id: picture.session_id.to_string(),
+                generation: picture.generation,
+                sequence: picture.sequence,
+                size: picture.size,
+                rgba: picture.rgba.into(),
+            });
             return MonitorPaint::Picture;
         }
     }

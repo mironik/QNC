@@ -389,6 +389,8 @@ impl eframe::App for QncShell {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let started = std::time::Instant::now();
         self.draw(ctx);
+        // The program on an external screen (laptop + HDMI), after the forms painted.
+        qnc_program_output::show(ctx);
         // A frame of the desktop longer than 25 ms is a moment the hand waits: logged with
         // the application on screen, so a slow piece can be found (diagnostics only).
         let spent = started.elapsed();

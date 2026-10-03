@@ -6,4 +6,5 @@ description = "Passive public player preview surface for any QNC application"
 
 [dependencies]
 eframe = { workspace = true }
+qnc-program-output = { workspace = true }
 qnc-ui-kit = { workspace = true }

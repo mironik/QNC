@@ -3242,6 +3242,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-desktop-tabs",
  "qnc-dev-diagnostics",
+ "qnc-program-output",
  "qnc-project-close",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
@@ -3964,6 +3965,7 @@ name = "qnc-monitor"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-program-output",
  "qnc-ui-kit",
 ]
 
@@ -4166,6 +4168,15 @@ dependencies = [
  "qnc-program-db",
  "qnc-program-playlist",
  "qnc-source-timecode",
+]
+
+[[package]]
+name = "qnc-program-output"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-ui-kit",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

@@ -2914,3 +2914,17 @@ frame sucelja dulji od 25 ms (`ui-frame-slow`, samo uz dijagnostiku playera). C1
 `qnc-program-segments`, `qnc-program-waveform`, `qnc-timeline-assets`, `qnc-source-preview`,
 `qnc-content-artifacts`, `qnc-ingest-application`, conformance, `qnc-player-acceptance` (klipovi i program
 100 %, bez zastoja, koraci 37-39 ms medijan, najgore 58 ms, 10 od 10).
+Izvedeno 3): novi javni `crates/qnc-program-output` (+ `contracts/modules/program-output.module.json`): kad je
+spojen ekran osim glavnog (laptop + HDMI), na najvecem takvom ekranu je prozor bez okvira tocno preko cijelog
+ekrana sa slikom koju pokazuje preview monitor, crno kad slike nema; bez drugog ekrana nema prozora ni greske,
+ekrani se ponovno gledaju svake 2 s (ukljucen ili iskljucen monitor). `qnc-monitor` ponudi sliku koju crta
+(`offer`, kopija samo kad izlaz radi), `qnc-desktop` jednom po frameu pozove `show` nakon formi; forme i layout
+nisu dirani. Ne drzi sat, ne dekodira, ne cita bazu, ne zna aplikaciju; prati potvrdjene slike monitora u
+ritmu crtanja desktopa (izlaz na sat playera, SDI/NDI i genlock su kasniji adapter istog ugovora). Popis
+ekrana ide kroz adapter po OS-u: Windows `EnumDisplayMonitors`; ostali OS-ovi daju kontroliranu poruku da
+popis jos nije podrzan i izlaz ostaje iskljucen (bez nagadjanja). Grane 17. 9. nisu prenesene (GPU/DMA put
+koji je zamrzavao sucelje); uzet je samo izbor ekrana. Provjereno: testovi izbora ekrana, probni program
+`cargo run -p qnc-program-output --example on_main_screen` (bez drugog ekrana na glavnom ekranu: prozor
+1920x1080 preko cijelog ekrana, slika razvucena tocno), conformance. Nije provjereno: pravi HDMI monitor
+(nije bio spojen), dva prozora uz vsync (moguce manje slika u sekundi; `ui-frame-slow` u logu to pokazuje),
+slika je pola rezolucije previewa (960x540 za 1080 izvor).
