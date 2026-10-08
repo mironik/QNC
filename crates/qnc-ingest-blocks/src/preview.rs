@@ -27,6 +27,7 @@ pub(super) fn render_preview(
                 picture.header.height as usize,
             ],
             rgba: &picture.rgba,
+            frame_map: Some(&picture.frame_map),
         });
     let poster = view
         .clips

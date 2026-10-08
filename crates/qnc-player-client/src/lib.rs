@@ -56,6 +56,9 @@ pub enum LaunchInput {
 pub struct MonitorFrame {
     pub header: MonitorHeader,
     pub rgba: Arc<[u8]>,
+    /// The shared-memory frame map the player writes this session's pictures to: a
+    /// program output on an external screen reads the same map at its own refresh.
+    pub frame_map: Arc<std::path::Path>,
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct View {
@@ -664,6 +667,7 @@ mod tests {
                 height: 2,
             },
             rgba: vec![0; 16].into(),
+            frame_map: std::path::Path::new("map").into(),
         });
         publish_picture(&shared, 1, Some(picture.clone()));
         let view = shared.view.lock().unwrap();

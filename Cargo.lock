@@ -2915,7 +2915,6 @@ dependencies = [
  "qnc-media-assist-audio-ai-desktop-adapter",
  "qnc-media-assist-audio-desktop-adapter",
  "qnc-media-assist-video-desktop-adapter",
- "qnc-program-output",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
  "qnc-story-desktop-adapter",
@@ -4176,8 +4175,21 @@ name = "qnc-program-output"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "qnc-ui-kit",
+ "qnc-player-contract",
+ "qnc-player-frame-transport",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "qnc-program-output-host"
+version = "0.1.0"
+dependencies = [
+ "pollster",
+ "qnc-dev-diagnostics",
+ "qnc-player-frame-transport",
+ "wgpu",
+ "windows 0.58.0",
+ "winit",
 ]
 
 [[package]]

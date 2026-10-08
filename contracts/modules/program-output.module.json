@@ -3,12 +3,23 @@
   "module_name": "Program Output",
   "module_version": "0.1.0",
   "module_kind": "ui_widget",
-  "implementation_stage": "external_screen_from_preview_monitor",
-  "capabilities": ["program.output.external_screen", "program.output.screens"],
+  "implementation_stage": "own_process_on_external_screen_refresh",
+  "capabilities": [
+    "program.output.external_screen",
+    "program.output.screens",
+    "program.output.screen_mode"
+  ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
-  "supported_os": ["windows", "linux", "macos"],
-  "supported_cpu": ["x86_64", "aarch64"],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
   "transport_protocol_version": "0.1.0",
   "forbidden_calls": [
     "ffprobe",
@@ -32,5 +43,5 @@
   ],
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
-  "boundary": "QNC is a news cutter: a laptop in the field with an HDMI monitor (user rule 2026-10-03). When a screen other than the main one is connected, this block shows on it, full screen, the confirmed picture the preview monitor paints (the monitor offers it), black when there is none; without one there is no window and no error, and a screen plugged in or out is followed every two seconds. The output screen is the largest screen that is not the main one, found through one adapter per OS (Windows: EnumDisplayMonitors; other OS: a controlled 'not supported yet', the output stays off). It owns no clock, decodes nothing, reads no database and does not know the application on screen; it follows the pictures the monitor gets at the pace the desktop paints. An output driven by the player clock (SDI/NDI, genlock) is a later adapter of the same contract."
+  "boundary": "QNC is a news cutter: a laptop in the field with an HDMI monitor that may run 50p, 60p, 50i, 60i, 24p or else (user rules 2026-10-03, 2026-10-08). When a screen other than the main one is connected, this block runs the program output process qnc-program-output-host full screen on it and tells it on stdin which shared-memory frame map (qnc-player-frame-transport) the preview monitor shows; without one the process is not running and there is no error; screens are looked at every two seconds. The process draws on every refresh of that screen (vsync, FIFO) the newest picture the Broadcast Player wrote to the map, so pictures follow the player clock at the screen's cadence and never pass through the desktop's drawing. It ends when stdin closes, so it never outlives the desktop. Screens, their refresh and interlacing come through one adapter per OS (Windows EnumDisplayMonitors and EnumDisplaySettings; other OS a controlled not-supported, output off); a refresh that is not a whole multiple of the source rate is reported (diagnostics), the OS mode is never changed. No clock, no decode, no database, no knowledge of the application on screen."
 }

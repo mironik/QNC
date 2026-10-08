@@ -2948,3 +2948,17 @@ prolazu, svaki ceka vsync svog ekrana. `qnc-program-output::wgpu_configuration` 
 na Windowsima DX12 i mailbox (predaja slike bez cekanja i bez kidanja), ostali OS zadano. Uz to naredba za
 puni ekran salje se jednom po ekranu (svaki frame ju je slao i bez vsynca aplikacija je u mirovanju trosila
 63 % jezgre, sada 5,5 %).
+Live 2026-10-08 (korisnik: "ima kao duhove"; "putanja vertikalne linije nije fluidna, iza sebe ostavlja
+duhove, ili ima kao nepravilan field"; "HDMI moze biti i50, i60, p60, p24 ili neki drugi"; "da" na vlastiti
+proces izlaza): crtanje drugog prozora u prolazu sucelja (i s vsyncom i s mailboxom) davalo je dvostruke i
+preskocene slike. Mailbox za sucelje je vracen na zadano. Novi `tools/qnc-program-output-host`: proces s
+prozorom preko cijelog vanjskog ekrana; vlastita nit ceka osvjezavanje bas tog ekrana (Windows DXGI
+`WaitForVBlank`, inace FIFO), uzme najnoviju sliku iz playerove zajednicke memorije (`qnc-player-frame-transport`,
+samo citanje) i preda je (mailbox uz cekanje osvjezavanja). Sucelje ne nosi slike: `qnc-player-client` i
+`qnc-source-preview` uz sliku nose adresu frame mape, `qnc-monitor` je nudi, `qnc-program-output` pokrece proces
+kad postoji drugi ekran, salje mu `map <put>`/`clear` na stdin i gasi ga (proces zavrsava i kad mu stdin
+zatvori nestala aplikacija). `qnc-program-output::screens` cita i osvjezavanje i isprepletenost moda (Windows
+`EnumDisplaySettings`); proces u log pise `mode screen_hz=.. source_fps=.. even|uneven`, mod ekrana nikad ne
+mijenja. Izmjereno probnim izvorom 50p na HDMI 50p (`examples/output_test`): prije 257 osvjezavanja i 211 novih
+slika u 5 s (petlja kroz winit propustala osvjezavanja), sada 248/248 i 249/249, nijedna preskocena.
+Ceka probu korisnika s pravim klipom.

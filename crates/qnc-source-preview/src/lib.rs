@@ -35,6 +35,9 @@ pub struct MonitorFrame {
     pub width: usize,
     pub height: usize,
     pub rgba: Arc<[u8]>,
+    /// Where the player writes the pictures of this session (a program output on an
+    /// external screen reads the same map at its own refresh).
+    pub frame_map: Option<Arc<std::path::Path>>,
 }
 
 /// Everything a form needs to paint the preview.
@@ -688,6 +691,7 @@ impl SourcePreview {
             width: picture.header.width as usize,
             height: picture.header.height as usize,
             rgba: picture.rgba.clone(),
+            frame_map: Some(picture.frame_map.clone()),
         });
         // A program keeps the source timeline of the chosen clip (v5 Wrap).
         if !self.program {

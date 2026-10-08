@@ -214,6 +214,7 @@ pub(super) type PictureSink = Arc<dyn Fn(Option<Arc<MonitorFrame>>) + Send + Syn
 impl FramePump {
     fn start(
         mut reader: LatestFrameReader,
+        frame_map: Arc<std::path::Path>,
         query: SessionQuery,
         source: String,
         source_timebase: qnc_player_contract::Timebase,
@@ -284,6 +285,7 @@ impl FramePump {
                                     Ok(Arc::new(MonitorFrame {
                                         header: frame.header,
                                         rgba: frame.rgba,
+                                        frame_map: frame_map.clone(),
                                     }))
                                 })() {
                                 Ok(picture) => {
@@ -535,6 +537,7 @@ impl Connection {
             control,
             frames: FramePump::start(
                 frame_reader,
+                frame_map_path.as_path().into(),
                 query.clone(),
                 source,
                 source_timebase,

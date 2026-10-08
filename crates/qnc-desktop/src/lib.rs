@@ -98,6 +98,8 @@ pub struct QncShell {
     tabs: qnc_desktop_tabs::Tabs,
     /// Reads the launch bar on its own thread (the desktop never waits on the database).
     tabs_watch: Option<qnc_desktop_tabs::Watcher>,
+    /// The program on an external screen (laptop + HDMI), its own process.
+    program_output: qnc_program_output::ProgramOutput,
 }
 
 /// How often the launch bar reads the active project again (the database is the truth).
@@ -129,6 +131,7 @@ impl QncShell {
             status: "Spreman.".to_string(),
             tabs: qnc_desktop_tabs::Tabs { tab_ids: Vec::new(), project_open: false, error: None },
             tabs_watch: None,
+            program_output: qnc_program_output::ProgramOutput::default(),
         }
     }
 
@@ -390,7 +393,7 @@ impl eframe::App for QncShell {
         let started = std::time::Instant::now();
         self.draw(ctx);
         // The program on an external screen (laptop + HDMI), after the forms painted.
-        qnc_program_output::show(ctx);
+        self.program_output.show(ctx);
         // A frame of the desktop longer than 25 ms is a moment the hand waits: logged with
         // the application on screen, so a slow piece can be found (diagnostics only).
         let spent = started.elapsed();

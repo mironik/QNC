@@ -219,6 +219,7 @@ mod tests {
             width: 2,
             height: 1,
             rgba: Arc::from([rgba, rgba].concat()),
+            frame_map: None,
         });
         view
     }

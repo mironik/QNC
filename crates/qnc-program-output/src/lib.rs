@@ -1,20 +1,26 @@
 //! The program picture on an external screen (user rule 2026-10-03: QNC is a news
-//! cutter, a laptop in the field with an HDMI monitor). When a second screen is
-//! connected, it shows full screen the picture the preview monitor shows, black when
-//! there is none; without one there is no window and no error, and a screen plugged in
-//! or out while working is followed.
+//! cutter, a laptop in the field with an HDMI monitor; 2026-10-08: that screen may run
+//! 50p, 60p, 50i, 60i, 24p or else).
 //!
-//! It is a passive interface of the Broadcast Player (AGENTS 0.9): the preview monitor
-//! offers the picture it paints (`offer`), the desktop host shows the output once a
-//! frame (`show`). It owns no clock, decodes nothing, reads no database and does not
-//! know which application is on screen. It follows the confirmed pictures the monitor
-//! gets, at the pace the desktop paints them; an output driven by the player clock
-//! (SDI/NDI, genlock) is a later adapter of the same contract.
+//! When a screen other than the main one is connected, this block runs the program
+//! output process (`qnc-program-output-host`) full screen on it and tells it which
+//! shared-memory frame map the preview monitor shows; without one the process is not
+//! running and there is no error, and a screen plugged in or out is followed every two
+//! seconds. The pictures go from the Broadcast Player to that process directly and are
+//! drawn on every refresh of that screen: the desktop's own drawing (its timer, its
+//! vsync, a second window in its pass) is not on their way. Drawing them in the
+//! desktop's pass gave ghosts and stutter on both screens (live 2026-10-08).
+//!
+//! It is a passive interface of the Broadcast Player (AGENTS 0.9): no clock, no decode,
+//! no database, no knowledge of the application on screen.
 
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use eframe::egui::{self, Color32, Context, Id, ViewportBuilder, ViewportId};
+use eframe::egui::{Context, Id};
 
 mod screens;
 pub use screens::{output_screen, screens, Screen};
@@ -24,150 +30,123 @@ pub const MODULE_ID: &str = "qnc.module.program-output";
 /// How often the screens are looked at again (a monitor plugged in or out).
 const SCREENS_EVERY: Duration = Duration::from_secs(2);
 
-/// How the desktop shows its windows. With the program output there are two windows
-/// drawn in one pass; each one waiting for its own screen's refresh (vsync) halved the
-/// pictures (live 2026-10-08: frames of 25-56 ms while a 50p source needs 20 ms, on the
-/// monitor and on HDMI alike). On Windows, DX12 mailbox hands the picture over without
-/// waiting and without tearing (the compositor shows the newest one); other OS keep the
-/// default until they get their own adapter.
-pub fn wgpu_configuration() -> eframe::egui_wgpu::WgpuConfiguration {
-    #[cfg(windows)]
-    {
-        use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
-        use eframe::wgpu;
-        WgpuConfiguration {
-            present_mode: wgpu::PresentMode::Mailbox,
-            wgpu_setup: WgpuSetup::CreateNew(WgpuSetupCreateNew {
-                instance_descriptor: wgpu::InstanceDescriptor {
-                    backends: wgpu::Backends::DX12,
-                    ..Default::default()
-                },
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
-    }
-    #[cfg(not(windows))]
-    {
-        eframe::egui_wgpu::WgpuConfiguration::default()
-    }
-}
+/// The program output process, next to the desktop's executable.
+const HOST: &str = "qnc-program-output-host";
 
-/// The picture the preview monitor painted, as it was given to it.
-#[derive(Clone)]
-pub struct ProgramPicture {
-    pub session_id: String,
-    pub generation: u64,
-    pub sequence: u64,
-    pub size: [usize; 2],
-    pub rgba: Arc<[u8]>,
-}
-
-/// The picture offered in a pass, with that pass.
+/// The frame map offered in a pass, with that pass.
 #[derive(Clone)]
 struct Offered {
     pass: u64,
-    picture: ProgramPicture,
-}
-
-/// Which screen the output uses, looked at every two seconds.
-#[derive(Clone, Default)]
-struct Output {
-    screen: Option<Screen>,
-    looked: Option<Instant>,
-    error: Option<String>,
+    frame_map: Arc<Path>,
 }
 
 fn offered_id() -> Id {
-    Id::new("qnc-program-output-picture")
+    Id::new("qnc-program-output-frame-map")
 }
 
-fn output_id() -> Id {
-    Id::new("qnc-program-output-screen")
-}
-
-/// Whether an external screen takes the program now: the monitor offers its picture
-/// only then (a copy of the picture is not made for nothing).
-pub fn active(ctx: &Context) -> bool {
-    ctx.data(|data| data.get_temp::<Output>(output_id())).is_some_and(|output| output.screen.is_some())
-}
-
-/// The preview monitor gives the picture it paints in this pass.
-pub fn offer(ctx: &Context, picture: impl FnOnce() -> ProgramPicture) {
-    if !active(ctx) {
-        return;
-    }
-    let offered = Offered { pass: ctx.cumulative_pass_nr(), picture: picture() };
+/// The preview monitor gives the frame map of the picture it paints in this pass.
+pub fn offer(ctx: &Context, frame_map: &Arc<Path>) {
+    let offered = Offered { pass: ctx.cumulative_pass_nr(), frame_map: frame_map.clone() };
     ctx.data_mut(|data| data.insert_temp(offered_id(), offered));
 }
 
-/// Shows the output on the external screen, once a pass, after the forms painted: the
-/// picture the monitor offered in this pass, else black. No external screen, no window.
-pub fn show(ctx: &Context) {
-    let mut output = ctx.data(|data| data.get_temp::<Output>(output_id())).unwrap_or_default();
-    if output.looked.is_none_or(|at| at.elapsed() >= SCREENS_EVERY) {
-        output.looked = Some(Instant::now());
-        match screens() {
-            Ok(found) => (output.screen, output.error) = (output_screen(&found), None),
-            Err(error) => (output.screen, output.error) = (None, Some(error)),
-        }
-    }
-    ctx.data_mut(|data| data.insert_temp(output_id(), output.clone()));
-    if let Some(screen) = output.screen {
-        present(ctx, screen);
+/// The running output process: it ends when its stdin closes (dropped here, or the
+/// desktop is gone), so it never outlives the desktop.
+struct Host {
+    child: Child,
+    stdin: ChildStdin,
+    screen: Screen,
+    sent: Option<Option<PathBuf>>,
+}
+
+impl Drop for Host {
+    fn drop(&mut self) {
+        let _ = self.stdin.write_all(b"\n");
+        let _ = self.child.kill();
+        let _ = self.child.wait();
     }
 }
 
-/// The output window full screen on `screen`, with the picture offered in this pass.
-pub fn present(ctx: &Context, screen: Screen) {
-    let pass = ctx.cumulative_pass_nr();
-    let picture = ctx
-        .data(|data| data.get_temp::<Offered>(offered_id()))
-        .filter(|offered| offered.pass == pass)
-        .map(|offered| offered.picture);
-    present_picture(ctx, screen, picture);
+/// The program output of one desktop.
+#[derive(Default)]
+pub struct ProgramOutput {
+    screen: Option<Screen>,
+    looked: Option<Instant>,
+    host: Option<Host>,
+    /// Why the output is off, once (no host executable, no screen list on this OS).
+    pub problem: Option<String>,
 }
 
-/// The output window full screen on `screen` with `picture` (black without one).
-pub fn present_picture(ctx: &Context, screen: Screen, picture: Option<ProgramPicture>) {
-    // Opened inside the external screen, then full screen on that screen: the OS gives it
-    // the whole screen whatever its scale (an HDMI screen at 100 % beside a laptop at
-    // 125 % got a window sized by the laptop's scale, live 2026-10-08). The desktop gives
-    // screens in pixels; egui turns points into pixels by the main screen's scale.
-    let scale = ctx.pixels_per_point().max(0.1);
-    let builder = ViewportBuilder::default()
-        .with_title("QNC Program")
-        .with_decorations(false)
-        .with_position([
-            (screen.x as f32 + screen.width as f32 / 4.0) / scale,
-            (screen.y as f32 + screen.height as f32 / 4.0) / scale,
-        ])
-        .with_inner_size([screen.width as f32 / scale / 2.0, screen.height as f32 / scale / 2.0])
-        .with_taskbar(false)
-        .with_active(false)
-        .with_mouse_passthrough(true);
-    // Full screen is asked once per screen: a command every frame made the desktop paint
-    // without pause (63 % of a core while idle, live 2026-10-08).
-    let asked_id = Id::new("qnc-program-output-fullscreen");
-    let asked = ctx.data(|data| data.get_temp::<Screen>(asked_id)) == Some(screen);
-    ctx.data_mut(|data| data.insert_temp(asked_id, screen));
-    ctx.show_viewport_immediate(ViewportId::from_hash_of("qnc-program-output"), builder, |ctx, _| {
-        if !asked {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
+impl ProgramOutput {
+    /// Once a pass, after the forms painted: the output follows the screen and shows the
+    /// frame map the monitor offered in this pass, black when it offered none.
+    pub fn show(&mut self, ctx: &Context) {
+        if self.looked.is_none_or(|at| at.elapsed() >= SCREENS_EVERY) {
+            self.looked = Some(Instant::now());
+            match screens() {
+                Ok(found) => (self.screen, self.problem) = (output_screen(&found), None),
+                Err(error) => (self.screen, self.problem) = (None, Some(error)),
+            }
+            if self.host.as_mut().is_some_and(|host| host.child.try_wait().ok().flatten().is_some()) {
+                self.host = None; // ended by itself: started again on this look
+            }
         }
-        egui::CentralPanel::default()
-            .frame(egui::Frame::NONE.fill(Color32::BLACK))
-            .show(ctx, |ui| {
-                if let Some(picture) = &picture {
-                    qnc_ui_kit::paint_stream_frame(
-                        ui,
-                        ui.max_rect(),
-                        Id::new("qnc-program-output-surface"),
-                        (&picture.session_id, picture.generation, picture.sequence),
-                        picture.size,
-                        &picture.rgba,
-                    );
+        let Some(screen) = self.screen else {
+            self.host = None;
+            return;
+        };
+        if self.host.as_ref().is_none_or(|host| host.screen != screen) {
+            self.host = None;
+            match start(screen) {
+                Ok(host) => self.host = Some(host),
+                Err(error) => {
+                    self.problem = Some(error);
+                    self.screen = None; // tried again on the next look
+                    return;
                 }
-            });
-    });
+            }
+        }
+        let pass = ctx.cumulative_pass_nr();
+        let current = ctx
+            .data(|data| data.get_temp::<Offered>(offered_id()))
+            .filter(|offered| offered.pass == pass)
+            .map(|offered| offered.frame_map.to_path_buf());
+        let Some(host) = &mut self.host else { return };
+        if host.sent.as_ref() != Some(&current) {
+            let line = match &current {
+                Some(path) => format!("map {}\n", path.display()),
+                None => "clear\n".to_string(),
+            };
+            if host.stdin.write_all(line.as_bytes()).and_then(|()| host.stdin.flush()).is_ok() {
+                host.sent = Some(current);
+            } else {
+                self.host = None;
+            }
+        }
+    }
+}
+
+fn start(screen: Screen) -> Result<Host, String> {
+    let executable = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join(format!("{HOST}{}", std::env::consts::EXE_SUFFIX))))
+        .filter(|path| path.is_file())
+        .ok_or_else(|| format!("Program izlaz: nema programa {HOST}."))?;
+    let mut command = Command::new(executable);
+    command
+        .args(["--x", &screen.x.to_string(), "--y", &screen.y.to_string()])
+        .args(["--width", &screen.width.to_string(), "--height", &screen.height.to_string()])
+        .args(["--refresh-hz", &screen.refresh_hz.unwrap_or(0).to_string()])
+        .args(["--interlaced", if screen.interlaced { "1" } else { "0" }])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000); // no console window
+    }
+    let mut child = command.spawn().map_err(|error| format!("Program izlaz: {error}"))?;
+    let stdin = child.stdin.take().ok_or("Program izlaz: nema ulaza procesa.")?;
+    Ok(Host { child, stdin, screen, sent: None })
 }

@@ -23,6 +23,9 @@ pub struct MonitorPicture<'a> {
     pub sequence: u64,
     pub size: [usize; 2],
     pub rgba: &'a [u8],
+    /// Where the player writes these pictures: the program output on an external
+    /// screen reads the same map at its own refresh.
+    pub frame_map: Option<&'a std::sync::Arc<std::path::Path>>,
 }
 
 #[derive(Clone, Copy)]
@@ -60,14 +63,10 @@ pub fn paint_monitor(ui: &mut Ui, rect: Rect, surface: MonitorSurface<'_>) -> Mo
             picture.size,
             picture.rgba,
         ) {
-            // The same picture goes to the program output on an external screen, when one is there.
-            qnc_program_output::offer(ui.ctx(), || qnc_program_output::ProgramPicture {
-                session_id: picture.session_id.to_string(),
-                generation: picture.generation,
-                sequence: picture.sequence,
-                size: picture.size,
-                rgba: picture.rgba.into(),
-            });
+            // The same pictures go to the program output on an external screen, when one is there.
+            if let Some(frame_map) = picture.frame_map {
+                qnc_program_output::offer(ui.ctx(), frame_map);
+            }
             return MonitorPaint::Picture;
         }
     }
@@ -194,6 +193,7 @@ mod tests {
                                 sequence: 4,
                                 size: [2, 1],
                                 rgba: &[255; 8],
+                                frame_map: None,
                             }),
                             message: Some("must not hide a confirmed frame"),
                         },
@@ -228,6 +228,7 @@ mod tests {
                                 sequence: 1,
                                 size: [2, 2],
                                 rgba: &[255, 0, 0],
+                                frame_map: None,
                             }),
                             message: Some("decoder error"),
                         },

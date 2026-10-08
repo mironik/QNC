@@ -2,11 +2,14 @@
 name = "qnc-program-output"
 version = "0.1.0"
 edition = "2021"
-description = "QNC public block: the program picture on an external screen (laptop + HDMI monitor), full screen, the same picture the preview monitor shows; optional, no clock, no decode, no database"
+description = "QNC public block: the program picture on an external screen (laptop + HDMI monitor). Runs the program output process full screen on that screen and tells it which shared-memory frame map the preview monitor shows; optional, no clock, no decode, no database"
 
 [dependencies]
 eframe = { workspace = true }
-qnc-ui-kit = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Gdi"] }
+
+[dev-dependencies]
+qnc-player-contract = { workspace = true }
+qnc-player-frame-transport = { workspace = true }

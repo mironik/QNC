@@ -1,0 +1,19 @@
+[package]
+name = "qnc-program-output-host"
+version = "0.1.0"
+edition = "2024"
+description = "QNC program output process: one full-screen window on the external screen (laptop + HDMI) that shows, on every refresh of that screen, the newest picture the Broadcast Player wrote to its shared-memory frame map; told which map by the desktop on stdin, ends when the desktop is gone"
+
+[[bin]]
+name = "qnc-program-output-host"
+path = "src/main.rs"
+
+[dependencies]
+qnc-player-frame-transport.workspace = true
+qnc-dev-diagnostics.workspace = true
+wgpu = "24.0.5"
+winit = "0.30.13"
+pollster = "0.4.0"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Foundation"] }

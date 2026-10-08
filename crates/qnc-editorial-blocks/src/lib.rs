@@ -84,6 +84,7 @@ fn render_preview(
             sequence: frame.sequence,
             size: [frame.width, frame.height],
             rgba: &frame.rgba,
+            frame_map: frame.frame_map.as_ref(),
         });
     let poster = view
         .chosen_clip_id()

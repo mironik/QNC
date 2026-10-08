@@ -39,8 +39,6 @@ fn main() -> eframe::Result<()> {
             .with_maximized(true)
             .with_title("QNC"),
         persist_window: false,
-        // Two windows with the program output on an external screen: no vsync wait each (live 2026-10-08).
-        wgpu_options: qnc_program_output::wgpu_configuration(),
         ..Default::default()
     };
 
