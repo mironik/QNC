@@ -339,7 +339,7 @@ mod tests {
                 "media_records":{"uri":"qnc://local/db/media_records","file":"ingest_media_records.db"},
                 "sources":[{"location":{"uri":"qnc://local/source/volume-de666c9f","file":"G:/"},
                     "name":"G:","serial_number":"de666c9f","volume_name":"","scope":"card_relative",
-                    "probe":{"kind":"local","executable":"C:/ffmpeg.exe","probe_size_bytes":1}}]}"#,
+                    "probe":{"kind":"local","executable":"C:/ffmpeg.exe","probe_size_bytes":1,"analyze_duration_us":1}}]}"#,
             Path::new(BASE),
         )
         .unwrap();

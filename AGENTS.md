@@ -2928,3 +2928,11 @@ koji je zamrzavao sucelje); uzet je samo izbor ekrana. Provjereno: testovi izbor
 1920x1080 preko cijelog ekrana, slika razvucena tocno), conformance. Nije provjereno: pravi HDMI monitor
 (nije bio spojen), dva prozora uz vsync (moguce manje slika u sekundi; `ui-frame-slow` u logu to pokazuje),
 slika je pola rezolucije previewa (960x540 za 1080 izvor).
+Audit 2026-10-08 (korisnik: "napravi audit da budemo sigurni do kuda smo dosli"): grana `desktop-blocks` na
+`ec183fa`, bez nespremljenih izmjena; gradnja workspacea, conformance i `qnc-player-acceptance` na izoliranoj
+kopiji (klipovi 2002/2679 i program od 2513 100 % slika, bez zastoja, A/V -0,1 do -0,2 slike; koraci 31-36 ms
+medijan, 10 od 10; program na hladnoj kartici jednom 2 trzaja od 74 ms na rezu pokrivalice, ponovljeno 3/3
+PASS). Popravljeno (korisnik "da"): zastarjeli test `qnc-source-bindings` (probni podaci bez obaveznog
+`analyze_duration_us`) i probni primjer `qnc-editorial-shell/examples/editorial_demo.rs` (nova polja kartice
+od 23. 9.: `top_right_marker`, `overlay_label`, kao MA/Story bez njih). Testovi: 1081 prolazi, 0 pada.
+Nije provjereno: HDMI na pravom monitoru, Sync/B-roll uzivo, Story kroz sucelje.

@@ -208,6 +208,7 @@ impl Demo {
             },
             features: MediaCardFeatures {
                 selection_check: card["selection_check"].as_bool().unwrap(),
+                top_right_marker: false,
                 status_dots: StatusDotsMode::from_contract(card["status_dots"].as_str().unwrap())
                     .expect("status_dots value"),
             },
@@ -353,6 +354,8 @@ impl eframe::App for Demo {
                             "ready"
                         },
                         status_original: "ready",
+                        overlay_label: "",
+                        top_right_marker: None,
                         checked: self.checked.contains(&row.id),
                         rgba_thumb: None,
                     })
