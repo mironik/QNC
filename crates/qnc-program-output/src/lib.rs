@@ -45,6 +45,17 @@ fn offered_id() -> Id {
 }
 
 /// The preview monitor gives the frame map of the picture it paints in this pass.
+/// Whether the program output is on an external screen now (it was in the last pass):
+/// a preview monitor may then leave the picture to it (Monitor Auto, user 2026-10-08).
+pub fn showing(ctx: &Context) -> bool {
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data(|data| data.get_temp::<u64>(showing_id())).is_some_and(|shown| shown + 1 >= pass)
+}
+
+fn showing_id() -> Id {
+    Id::new("qnc-program-output-showing")
+}
+
 pub fn offer(ctx: &Context, frame_map: &Arc<Path>) {
     let offered = Offered { pass: ctx.cumulative_pass_nr(), frame_map: frame_map.clone() };
     ctx.data_mut(|data| data.insert_temp(offered_id(), offered));
@@ -107,6 +118,7 @@ impl ProgramOutput {
             }
         }
         let pass = ctx.cumulative_pass_nr();
+        ctx.data_mut(|data| data.insert_temp(showing_id(), pass));
         let current = ctx
             .data(|data| data.get_temp::<Offered>(offered_id()))
             .filter(|offered| offered.pass == pass)

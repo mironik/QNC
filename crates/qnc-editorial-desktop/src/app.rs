@@ -38,8 +38,7 @@ impl EditorialApp {
         // this paint found (the playhead moved) waits for that picture instead of asking for
         // another paint at once, which painted at the screen rate (60 for 50p) and took the
         // graphics card from the HDMI output (live 2026-10-08).
-        let playing = self.application.view().preview.playing;
-        if changed && !playing {
+        if changed && !self.application.view().preview.playing {
             ctx.request_repaint();
         } else if let Some(delay) = self.application.next_repaint_delay() {
             // Cadence only when this paint had no new picture; scheduling it

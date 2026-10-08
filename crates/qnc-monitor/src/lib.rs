@@ -42,7 +42,13 @@ pub struct MonitorSurface<'a> {
     pub chrome: MonitorChrome,
     pub picture: Option<MonitorPicture<'a>>,
     pub message: Option<&'a str>,
+    /// Monitor Auto (user 2026-10-08): while the program is on an external screen the
+    /// picture is left to it, so a weaker laptop does not draw it twice.
+    pub yield_to_external: bool,
 }
+
+/// What a monitor that leaves its picture to the external screen shows.
+const EXTERNAL_PICTURE: &str = "Slika je na HDMI izlazu";
 
 pub fn paint_monitor(ui: &mut Ui, rect: Rect, surface: MonitorSurface<'_>) -> MonitorPaint {
     ui.allocate_rect(rect, Sense::hover());
@@ -55,6 +61,13 @@ pub fn paint_monitor(ui: &mut Ui, rect: Rect, surface: MonitorSurface<'_>) -> Mo
     );
 
     if let Some(picture) = surface.picture {
+        if surface.yield_to_external && qnc_program_output::showing(ui.ctx()) {
+            if let Some(frame_map) = picture.frame_map {
+                qnc_program_output::offer(ui.ctx(), frame_map);
+            }
+            paint_placeholder(ui, rect, surface.chrome, EXTERNAL_PICTURE);
+            return MonitorPaint::Message;
+        }
         if qnc_ui_kit::paint_stream_frame(
             ui,
             rect.shrink(1.0),
@@ -161,6 +174,7 @@ mod tests {
                             },
                             picture: None,
                             message: None,
+                            yield_to_external: false,
                         },
                     ),
                     MonitorPaint::Empty
@@ -196,6 +210,7 @@ mod tests {
                                 frame_map: None,
                             }),
                             message: Some("must not hide a confirmed frame"),
+                            yield_to_external: false,
                         },
                     ),
                     MonitorPaint::Picture
@@ -231,6 +246,7 @@ mod tests {
                                 frame_map: None,
                             }),
                             message: Some("decoder error"),
+                            yield_to_external: false,
                         },
                     ),
                     MonitorPaint::Message

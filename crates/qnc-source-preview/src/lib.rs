@@ -52,7 +52,24 @@ pub struct PreviewView {
     pub playing: bool,
     /// Controlled error text of the last failed command; empty otherwise.
     pub message: String,
+    /// Monitor Auto (user 2026-10-08, the default): while the program is on an external
+    /// screen the monitor leaves the picture to it; Monitor On keeps showing it.
+    pub monitor_auto: bool,
 }
+
+impl PreviewView {
+    /// The switch Auto | On under the monitor: which one is on.
+    pub fn monitor_mode_on(&self, action_id: &str) -> bool {
+        match action_id {
+            MONITOR_AUTO => self.monitor_auto,
+            MONITOR_ON => !self.monitor_auto,
+            _ => false,
+        }
+    }
+}
+
+pub const MONITOR_AUTO: &str = "monitor_auto";
+pub const MONITOR_ON: &str = "monitor_on";
 
 impl Default for PreviewView {
     fn default() -> Self {
@@ -65,6 +82,7 @@ impl Default for PreviewView {
             assets: SourceTimelineAssets::empty(),
             playing: false,
             message: String::new(),
+            monitor_auto: true,
         }
     }
 }
@@ -193,6 +211,17 @@ impl SourcePreview {
         Self::default()
     }
 
+    /// Monitor Auto or On (the switch under the monitor); false for any other action.
+    pub fn set_monitor_mode(&mut self, action_id: &str) -> bool {
+        let auto = match action_id {
+            MONITOR_AUTO => true,
+            MONITOR_ON => false,
+            _ => return false,
+        };
+        self.view.monitor_auto = auto;
+        true
+    }
+
     pub fn view(&self) -> &PreviewView {
         &self.view
     }
@@ -277,6 +306,7 @@ impl SourcePreview {
         self.player_view = PlayerView::default();
         self.view = PreviewView {
             assets: SourceTimelineAssets::empty(),
+            monitor_auto: self.view.monitor_auto, // a choice of this laptop, not of a clip
             ..PreviewView::default()
         };
         self.report_activity();

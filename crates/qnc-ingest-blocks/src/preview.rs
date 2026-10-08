@@ -55,6 +55,7 @@ pub(super) fn render_preview(
             chrome,
             picture,
             message: view.playback.error.as_deref(),
+            yield_to_external: false,
         },
         poster,
         label,

@@ -30,11 +30,14 @@ pub enum Panel {
 
 /// Actions of the segment panel that also run from the other panels: they use
 /// the source the user marked (v5 dispatches them whatever the focus).
-const SOURCE_TO_PROGRAM: [&str; 4] = [
+const SOURCE_TO_PROGRAM: [&str; 6] = [
     "add_ton_segment",
     "add_off_segment",
     "quick_overwrite_cover",
     "overwrite_cover",
+    // The switch Pokrivalice | Sync/B-roll sits on the source dock (user 2026-10-08).
+    "cover_mode_covers",
+    "cover_mode_sync",
 ];
 
 #[derive(Debug, Default)]
@@ -87,6 +90,8 @@ impl PanelFocus {
         let panel = self.panel;
         let on_source = panel == Panel::SourceTimeline;
         Some(match action_id {
+            // Monitor Auto | On under the monitor: whatever the focus.
+            qnc_source_preview::MONITOR_AUTO | qnc_source_preview::MONITOR_ON => preview.set_monitor_mode(action_id),
             // A1/A2 by keyboard (user rule 2026-10-01): Ctrl+1, Ctrl+2 take the lane; while it is
             // taken, left/right pick its channel, up/down show or hide its wave over the
             // video row, Enter keeps the channel (heard at once), Escape lets go.

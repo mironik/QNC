@@ -3043,3 +3043,16 @@ sucelje za novo stanje koje je samo pomak pozicije (pauza, kraj, greska i dalje 
 HDMI, cijela prica 108 s, stvarni projekt, proxy): HDMI 251 od 251 osvjezavanja u gotovo svakih 5 s,
 ukupno preskoceno oko 11 slika (prije 32-67 u svakih 5 s druge polovice), bez prekida zvuka; sucelje
 ~417 ms procesora u sekundi (prije ~605).
+Izmjena rasporeda 2026-10-08 (korisnik je izricito trazio i potvrdio u zasticenoj kopiji): Story (grupa o)
+- ispod monitora uklonjeni `[`, `]`, `B` i "Export HI-res"; "Export HI-res" je u traci panela Segmenti na
+mjestu "Sync/B-roll" (jos neaktivan, export ne postoji); u source docku desno od "Pokrivalice" je
+"Sync/B-roll", par radi kao prekidac (katalog `cover_mode_covers`, `cover_mode_sync`; `qnc-program-segments`
+`CoverMode`, `action_selected`; `qnc-panel-focus` ih pusta iz svakog panela; `qnc-editorial-blocks`
+`switch_button`). Ispod monitora novi prekidac Monitor Auto | On (katalog `monitor_auto`, `monitor_on`):
+Auto (zadano) dok radi HDMI izlaz monitor ne crta sliku ("Slika je na HDMI izlazu"), HDMI i dalje dobiva
+svaku sliku; On crta i uz HDMI (`qnc-program-output::showing`, `qnc-monitor`
+`MonitorSurface::yield_to_external`, `qnc-source-preview` `PreviewView::monitor_auto` i `set_monitor_mode`,
+`qnc-media-pool-head` `RowCommand` s oznakom ukljucenog). Izbor vrijedi dok aplikacija radi (postavka
+laptopa, ne projekta). Ingest nema prekidac i uvijek crta. Probano u zasticenoj kopiji korijena (kopija
+programa, ugovora i baze projekata s jednim projektom preusmjerenim na kopiju). Usput: C10 granice Story i
+Ingest forme vracene ispod baselinea (popravak iz 69953d8 ih je prekoracio za po jedan redak).

@@ -53,6 +53,18 @@
     "overwrite_cover": {
       "label": "Pokrivalice"
     },
+    "cover_mode_covers": {
+      "label": "Pokrivalice (Cover slot, B, Overwrite)"
+    },
+    "cover_mode_sync": {
+      "label": "Sync/B-roll pokrivalice"
+    },
+    "monitor_auto": {
+      "label": "Monitor Auto (bez slike dok radi HDMI izlaz)"
+    },
+    "monitor_on": {
+      "label": "Monitor On (slika i uz HDMI izlaz)"
+    },
     "delete_part": {
       "label": "Obriši story segment"
     },

@@ -1,9 +1,9 @@
 //! The navigation and edit bar under the segment rows (v5 `marker_cover_panel.rs`):
 //! M marker, Cover slot, Overwrite on the left; previous/next segment, slot and
-//! marker around the program start in the middle; Sync/B-roll on the right.
+//! marker around the program start in the middle; Undo, Redo and Export HI-res on the right.
 //! Cover slot needs a selected empty slot, Overwrite a selected slot or cover (v5
-//! `quick_cover_target`, `overwrite_cover_target`); Sync/B-roll switches the Sync
-//! capture on and off and shows when it is on.
+//! `quick_cover_target`, `overwrite_cover_target`). Sync/B-roll is a switch with
+//! Pokrivalice on the source dock.
 
 use eframe::egui::{self, PointerButton, Pos2, Rect, RichText, Sense, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentsView};
@@ -122,20 +122,11 @@ pub(crate) fn show(
             egui::Layout::right_to_left(egui::Align::Center),
             |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(6.0, 1.0);
-                let on = segments.sync_enabled;
-                let text = if on { theme.focus } else { theme.text };
-                let button =
-                    egui::Button::new(RichText::new("Sync/B-roll").color(text).size(FONT_UI))
-                        .min_size(Vec2::new(0.0, COMPACT_CTRL_H))
-                        .fill(egui::Color32::TRANSPARENT)
-                        .stroke(egui::Stroke::new(
-                            1.0,
-                            if on { theme.focus } else { theme.border },
-                        ));
-                if clicked(ui.add(button).on_hover_text("Sync pokrivalica")) {
-                    command = Some(SegmentCommand::ToggleSync);
-                }
-                // Right to left: Redo, then Undo, left of Sync/B-roll.
+                // Export of the story (user 2026-10-08: moved here from under the monitor, where
+                // Sync/B-roll was; that went to the source dock as a switch with Pokrivalice).
+                // Not done yet, so offered disabled.
+                let _ = action_button(ui, "Export HI-res", false, theme);
+                // Right to left: Redo, then Undo, left of Export HI-res.
                 for (label, target) in [("Redo", SegmentCommand::Redo), ("Undo", SegmentCommand::Undo)] {
                     let enabled = segments.action_enabled(match target {
                         SegmentCommand::Undo => "undo_object",

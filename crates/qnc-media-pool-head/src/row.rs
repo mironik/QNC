@@ -26,6 +26,14 @@ pub struct RowTab<'a> {
     pub enabled: bool,
 }
 
+/// A command button: its label and whether it is the one on of a switch (Monitor
+/// Auto | On); a plain command is never on.
+#[derive(Debug, Clone, Copy)]
+pub struct RowCommand<'a> {
+    pub label: &'a str,
+    pub on: bool,
+}
+
 /// What was clicked: the index of a tab or of a command, in the order given.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RowClick {
@@ -34,7 +42,7 @@ pub enum RowClick {
 }
 
 /// Draws the row contents in `ui` (inside the caller's chrome row).
-pub fn show_row(ui: &mut Ui, style: &RowStyle, tabs: &[RowTab<'_>], commands: &[&str]) -> Option<RowClick> {
+pub fn show_row(ui: &mut Ui, style: &RowStyle, tabs: &[RowTab<'_>], commands: &[RowCommand<'_>]) -> Option<RowClick> {
     ui.spacing_mut().button_padding = Vec2::new(8.0, 2.0);
     ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
     let mut click = None;
@@ -45,8 +53,8 @@ pub fn show_row(ui: &mut Ui, style: &RowStyle, tabs: &[RowTab<'_>], commands: &[
         ui.add_space(style.tab_gap);
     }
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        for (index, label) in commands.iter().enumerate().rev() {
-            if command(ui, label, style).clicked() {
+        for (index, row_command) in commands.iter().enumerate().rev() {
+            if command(ui, row_command.label, row_command.on, style).clicked() {
                 click = Some(RowClick::Command(index));
             }
         }
@@ -72,11 +80,12 @@ pub fn tab(ui: &mut Ui, text: &str, selected: bool, style: &RowStyle) -> egui::R
     response
 }
 
-fn command(ui: &mut Ui, text: &str, style: &RowStyle) -> egui::Response {
+fn command(ui: &mut Ui, text: &str, on: bool, style: &RowStyle) -> egui::Response {
+    let colour = if on { style.accent } else { style.text };
     ui.add(
-        Button::new(RichText::new(text).color(style.text))
+        Button::new(RichText::new(text).color(colour))
             .fill(Color32::TRANSPARENT)
-            .stroke(Stroke::new(1.0, style.border))
+            .stroke(Stroke::new(1.0, if on { style.accent } else { style.border }))
             .corner_radius(CornerRadius::same(0))
             .min_size(Vec2::new(40.0, style.control_height)),
     )

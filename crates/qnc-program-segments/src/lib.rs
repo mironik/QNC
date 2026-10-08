@@ -264,6 +264,14 @@ impl SegmentsView {
         }
     }
 
+    /// Which of the two ways to make covers is on: Pokrivalice or Sync/B-roll.
+    pub fn action_selected(&self, action_id: &str) -> bool {
+        match SegmentCommand::from_action(action_id) {
+            Some(SegmentCommand::CoverMode { sync }) => self.sync_enabled == sync,
+            _ => false,
+        }
+    }
+
     /// Whether an action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
         SegmentCommand::from_action(action_id).is_some()
@@ -475,6 +483,9 @@ pub enum SegmentCommand {
     DeleteFocused,
     /// Sync/B-roll on or off.
     ToggleSync,
+    /// How covers are made, one of two (user 2026-10-08): `sync: false` Pokrivalice
+    /// (Cover slot, B, Overwrite), `sync: true` Sync/B-roll.
+    CoverMode { sync: bool },
     /// Enter: the cover of a closed Sync slot (v5 `sync_cover_enter_or_activate_focused_item`).
     CommitSync,
     /// A click on a cover: select it, playhead at the clicked program frame.
@@ -520,6 +531,8 @@ impl SegmentCommand {
             "navigate_next_object" => Self::NavigateObject { up: false },
             "undo_object" => Self::Undo,
             "redo_object" => Self::Redo,
+            "cover_mode_covers" => Self::CoverMode { sync: false },
+            "cover_mode_sync" => Self::CoverMode { sync: true },
             _ => return None,
         })
     }
@@ -882,6 +895,11 @@ impl ProgramSegments {
                 }
             }
             SegmentCommand::ToggleSync => self.toggle_sync(),
+            SegmentCommand::CoverMode { sync } => {
+                if self.sync.enabled() != sync {
+                    self.toggle_sync();
+                }
+            }
             SegmentCommand::CommitSync => {
                 if !self.commit_marker_edit() && !self.commit_edit() {
                     if !self.finish_sync_with_cover() {

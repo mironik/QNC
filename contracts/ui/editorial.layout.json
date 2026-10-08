@@ -147,10 +147,8 @@
         ],
         "transport_right": [
           { "label": ">", "action_id": "play_pause" },
-          { "label": "[", "action_id": "mark_in" },
-          { "label": "]", "action_id": "mark_out" },
-          { "label": "B", "action_id": "quick_overwrite_cover" },
-          { "label": "Export HI-res", "action_id": "export_hires" }
+          { "label": "Auto", "action_id": "monitor_auto" },
+          { "label": "On", "action_id": "monitor_on" }
         ]
       },
       "right_panel": "segment_panel",
@@ -159,7 +157,7 @@
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": ["Pokrivalice", { "label": "Voice over", "action_id": "add_off_segment" }, { "label": "Talking Head", "action_id": "add_ton_segment" }, { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
+        "actions_rtl": [{ "label": "Sync/B-roll", "action_id": "cover_mode_sync" }, { "label": "Pokrivalice", "action_id": "cover_mode_covers" }, { "label": "Voice over", "action_id": "add_off_segment" }, { "label": "Talking Head", "action_id": "add_ton_segment" }, { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
       },
       "media_card": {
         "selection_check": false,

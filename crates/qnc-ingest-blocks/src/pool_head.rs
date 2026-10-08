@@ -22,7 +22,7 @@ pub(super) fn render_pool_head(
         })
         .collect();
     let commands: Vec<_> = head.transport_right.iter().filter(|c| c.action_id().is_some()).collect();
-    let labels: Vec<_> = commands.iter().map(|command| command.label()).collect();
+    let labels: Vec<_> = commands.iter().map(|command| qnc_media_pool_head::RowCommand { label: command.label(), on: false }).collect();
     let style = row_style(theme, head.tab_gap);
     let mut intent = None;
     qnc_source_dock::show_chrome_row(ui, rect, &dock_style(contracts, theme), theme.surface, true, |ui| {

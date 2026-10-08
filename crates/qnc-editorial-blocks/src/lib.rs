@@ -140,6 +140,7 @@ fn render_preview(
             chrome,
             picture,
             message: view.preview.monitor_message.as_deref(),
+            yield_to_external: view.preview.monitor_auto,
         },
         poster,
         label,
@@ -163,7 +164,13 @@ fn render_pool_head(
         })
         .collect();
     let commands: Vec<_> = contracts.pool_transport().iter().filter(|c| c.action_id().is_some()).collect();
-    let labels: Vec<_> = commands.iter().map(|command| command.label()).collect();
+    let labels: Vec<_> = commands
+        .iter()
+        .map(|command| qnc_media_pool_head::RowCommand {
+            label: command.label(),
+            on: command.action_id().is_some_and(|id| view.preview.monitor_mode_on(id)),
+        })
+        .collect();
     let style = qnc_media_pool_head::RowStyle {
         text: theme.text,
         muted: theme.text_muted,
@@ -221,7 +228,8 @@ fn render_source_dock(
                     let enabled = action
                         .action_id()
                         .is_some_and(|action_id| view.action_enabled(action_id));
-                    if action_button(ui, action.label(), enabled, theme).clicked() {
+                    let on = action.action_id().is_some_and(|action_id| view.segments.action_selected(action_id));
+                    if switch_button(ui, action.label(), enabled, on, theme).clicked() {
                         if let Some(action_id) = action.action_id() {
                             header_intent = Some(EditorialIntent::action(action_id));
                         }
@@ -432,6 +440,22 @@ fn format_duration(seconds: f64) -> String {
     let minutes = total / 60;
     let secs = total % 60;
     format!("{minutes:02}:{secs:02}")
+}
+
+/// A button that may be on (the switch Pokrivalice | Sync/B-roll): on, its text and
+/// border take the focus colour, as the Sync/B-roll button did in the segment bar.
+fn switch_button(ui: &mut Ui, text: &str, enabled: bool, on: bool, theme: &Theme) -> egui::Response {
+    if !on {
+        return action_button(ui, text, enabled, theme);
+    }
+    ui.add_enabled(
+        enabled,
+        Button::new(RichText::new(text).color(theme.focus))
+            .fill(Color32::TRANSPARENT)
+            .stroke(Stroke::new(1.0, theme.focus))
+            .corner_radius(CornerRadius::same(0))
+            .min_size(Vec2::new(0.0, theme.chrome_control_height)),
+    )
 }
 
 fn action_button(ui: &mut Ui, text: &str, enabled: bool, theme: &Theme) -> egui::Response {

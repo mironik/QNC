@@ -38,8 +38,7 @@ impl IngestApp {
         let changed = self.application.poll();
         // While the player plays, its new picture wakes the paint (the source rate); a change
         // this paint found waits for that picture instead of painting at the screen rate.
-        let playing = self.application.view().playback.playing();
-        if changed && !playing {
+        if changed && !self.application.view().playback.playing() {
             ctx.request_repaint();
         } else if let Some(delay) = self.application.next_repaint_delay() {
             // Cadence only when this paint had no new picture. Scheduling it
