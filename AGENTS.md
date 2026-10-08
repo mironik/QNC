@@ -2936,3 +2936,9 @@ PASS). Popravljeno (korisnik "da"): zastarjeli test `qnc-source-bindings` (probn
 `analyze_duration_us`) i probni primjer `qnc-editorial-shell/examples/editorial_demo.rs` (nova polja kartice
 od 23. 9.: `top_right_marker`, `overlay_label`, kao MA/Story bez njih). Testovi: 1081 prolazi, 0 pada.
 Nije provjereno: HDMI na pravom monitoru, Sync/B-roll uzivo, Story kroz sucelje.
+Live 2026-10-08 (HDMI spojen): HDMI ekran 1920x1080 na 100 % desno od laptopa (125 %); prozor izlaza dobio je
+velicinu po mjerilu laptopa i nije pokrivao cijeli HDMI ekran. Ispravak u `qnc-program-output`: prozor se
+otvori unutar vanjskog ekrana i odmah prebaci u puni ekran (`ViewportCommand::Fullscreen`), pa OS sam daje
+cijeli ekran bez obzira na mjerilo. Provjereno snimkom oba ekrana: probni program pokriva cijeli HDMI ekran,
+aplikacija na tabu Project daje crni HDMI ekran (nema preview monitora). Reprodukcija na HDMI kroz Ingest i
+Story ceka probu korisnika.

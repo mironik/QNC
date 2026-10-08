@@ -101,20 +101,26 @@ pub fn present(ctx: &Context, screen: Screen) {
 
 /// The output window full screen on `screen` with `picture` (black without one).
 pub fn present_picture(ctx: &Context, screen: Screen, picture: Option<ProgramPicture>) {
-    // Exactly the external screen, without a frame. The desktop gives screens in pixels;
-    // egui turns points into pixels by the scale of the main screen, the same one the
-    // desktop's own window uses.
+    // Opened inside the external screen, then full screen on that screen: the OS gives it
+    // the whole screen whatever its scale (an HDMI screen at 100 % beside a laptop at
+    // 125 % got a window sized by the laptop's scale, live 2026-10-08). The desktop gives
+    // screens in pixels; egui turns points into pixels by the main screen's scale.
     let scale = ctx.pixels_per_point().max(0.1);
     let builder = ViewportBuilder::default()
         .with_title("QNC Program")
         .with_decorations(false)
-        .with_resizable(false)
-        .with_position([screen.x as f32 / scale, screen.y as f32 / scale])
-        .with_inner_size([screen.width as f32 / scale, screen.height as f32 / scale])
+        .with_position([
+            (screen.x as f32 + screen.width as f32 / 4.0) / scale,
+            (screen.y as f32 + screen.height as f32 / 4.0) / scale,
+        ])
+        .with_inner_size([screen.width as f32 / scale / 2.0, screen.height as f32 / scale / 2.0])
         .with_taskbar(false)
         .with_active(false)
         .with_mouse_passthrough(true);
     ctx.show_viewport_immediate(ViewportId::from_hash_of("qnc-program-output"), builder, |ctx, _| {
+        if ctx.input(|input| input.viewport().fullscreen) != Some(true) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
+        }
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(Color32::BLACK))
             .show(ctx, |ui| {
