@@ -387,11 +387,14 @@ fn publish(state: &Shared, generation: u64, view: View) {
             (None, None) => true,
             _ => false,
         };
+        // While it keeps playing, a new state only moves the position: the next picture
+        // shows it (a wake for each state painted the desktop at the screen rate).
+        let still_playing = current.playing() && view.playing();
         let changed = !same_picture
             || current.preparing != view.preparing
             || current.video_visible != view.video_visible
             || current.error != view.error
-            || !same_state(current.reply.as_ref(), view.reply.as_ref());
+            || (!still_playing && !same_state(current.reply.as_ref(), view.reply.as_ref()));
         *current = view;
         drop(current);
         if changed && let Some(notify) = state.notify.get() {

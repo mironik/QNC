@@ -3036,3 +3036,10 @@ monitor istu sliku ne kopira niti ne salje ponovno grafickoj. Dijagnostika: `qnc
 (i `ui_cpu_ms`), `qnc-editorial-blocks` `ui-block-ms` po dijelu ploce. Izmjereno (izolirana kopija stvarnog
 projekta, proxy i zvuk s kartice, cijela prica 5363 slike, HDMI): do kraja, 99,8 % slika, HDMI 4
 preskocene, 3 trzaja 64-94 ms; uz dvije umjetno zauzete jezgre do kraja, 99,6 %. Ceka probu u aplikaciji.
+Popravak 2026-10-08 (korisnik "moze" na blazu varijantu: sucelje dok svira crta samo uz novu sliku):
+`qnc-editorial-desktop` i `qnc-ingest-desktop` dok player svira ne traze novo crtanje zbog promjene koju je
+crtanje naslo (pomaknut playhead), nego cekaju sljedecu sliku playera; `qnc-player-client` dok svira ne budi
+sucelje za novo stanje koje je samo pomak pozicije (pauza, kraj, greska i dalje bude odmah). Live (Story,
+HDMI, cijela prica 108 s, stvarni projekt, proxy): HDMI 251 od 251 osvjezavanja u gotovo svakih 5 s,
+ukupno preskoceno oko 11 slika (prije 32-67 u svakih 5 s druge polovice), bez prekida zvuka; sucelje
+~417 ms procesora u sekundi (prije ~605).
