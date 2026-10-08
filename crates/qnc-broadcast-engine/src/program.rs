@@ -523,6 +523,9 @@ type LaneKey = (usize, u32, u16, i128);
 /// decoder of a cover has started before its cut instead of on it (a cut used to
 /// empty the audio queue: `audio_underrun` on every cover).
 const LANE_LOOKAHEAD_SECONDS: u64 = 2;
+/// Packets a lane takes from its decoder in one call at most (non-blocking; keeps one
+/// call short while the lane fills its seconds ahead).
+const LANE_PACKETS_PER_CALL: usize = 32;
 
 /// How far ahead (seconds of program) the picture decoder of the next cut is opened.
 const PICTURE_LOOKAHEAD_SECONDS: u64 = 2;
@@ -664,16 +667,27 @@ impl ProgramAudio {
             lane.consumed_through = Some(start);
         }
         let needed = usize::try_from(end - start).map_err(error)?;
+        // Everything the decoder has ready is taken, up to a few seconds ahead: the decoder
+        // keeps reading the media ahead, and a short stall of the card (or of the processor)
+        // is ridden out from memory instead of emptying the sound (live 2026-10-08: the
+        // sound of an original on a card ran dry with only this frame taken each time).
+        let frames_ahead = u64::try_from(LANE_LOOKAHEAD_SECONDS * plan.source.timebase.fps_num.max(0) as u64)
+            .unwrap_or(0)
+            / u64::try_from(plan.source.timebase.fps_den.max(1)).unwrap_or(1);
+        let ahead = needed.saturating_mul(usize::try_from(frames_ahead).unwrap_or(0).max(1));
         let decoder = lane
             .decoder
             .as_mut()
             .ok_or_else(|| error("audio lane without decoder"))?;
-        for _ in 0..2 {
-            if lane.track.samples.len() >= needed {
+        for _ in 0..LANE_PACKETS_PER_CALL {
+            if lane.track.samples.len() >= needed.saturating_add(ahead) {
                 break;
             }
             match decoder.try_next_packet().map_err(error)? {
                 Poll::Pending => break,
+                // Reading ahead reaches the end of the source: an error only when the frame
+                // played now is not there.
+                Poll::Ready(None) if lane.track.samples.len() >= needed => break,
                 Poll::Ready(None) => return Err(error("audio ended before saved video boundary")),
                 Poll::Ready(Some(packet)) => lane.track.push(
                     packet,

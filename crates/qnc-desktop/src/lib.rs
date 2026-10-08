@@ -393,9 +393,9 @@ impl eframe::App for QncShell {
     /// The desktop frame: the board of the active application over the footer, drawn as
     /// one layout tree (user rules 2026-09-30 and 2026-10-01: the footer is a place of
     /// every board; the layout is the frame).
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let started = std::time::Instant::now();
-        self.paint_rate.count(ctx, &self.active_tab);
+        self.paint_rate.count(ctx, frame, &self.active_tab);
         self.draw(ctx);
         // The program on an external screen (laptop + HDMI), after the forms painted.
         self.program_output.show(ctx);

@@ -31,7 +31,7 @@ pub fn render_desktop(
 ) -> Option<EditorialIntent> {
     let (sizes, faces, names) = (contracts.board_sizes(), theme.board_faces(), contracts.board_names());
     let board = sizes.standard_layout(&names);
-    qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| match block {
+    qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| block_time::timed(block, || match block {
         "preview" => {
             render_preview(ui, rect, contracts, theme, view);
             None
@@ -57,7 +57,38 @@ pub fn render_desktop(
         }
         // Right panel of the other groups: empty, reserved for their functions.
         _ => None,
-    })
+    }))
+}
+
+/// Diagnostics only: what each block of the board costs, written once a second.
+mod block_time {
+    use std::{cell::RefCell, collections::BTreeMap, time::Instant};
+    thread_local! {
+        static TIMES: RefCell<(Option<Instant>, BTreeMap<String, f64>)> = RefCell::new((None, BTreeMap::new()));
+    }
+    pub(super) fn timed<T>(block: &str, draw: impl FnOnce() -> T) -> T {
+        if !qnc_dev_diagnostics::player_diagnostics_enabled() {
+            return draw();
+        }
+        let started = Instant::now();
+        let result = draw();
+        let spent = started.elapsed().as_secs_f64() * 1000.0;
+        TIMES.with(|times| {
+            let (since, sums) = &mut *times.borrow_mut();
+            *sums.entry(block.to_string()).or_default() += spent;
+            let since = since.get_or_insert_with(Instant::now);
+            if since.elapsed().as_secs_f32() >= 1.0 {
+                let parts: Vec<String> = sums.iter().map(|(name, ms)| format!("{name}={ms:.0}")).collect();
+                qnc_dev_diagnostics::log_line(
+                    qnc_dev_diagnostics::DiagnosticsStream::Player,
+                    format!("ui-block-ms {}", parts.join(" ")),
+                );
+                sums.clear();
+                *since = Instant::now();
+            }
+        });
+        result
+    }
 }
 
 fn render_preview(

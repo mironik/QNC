@@ -418,6 +418,10 @@ pub(crate) fn validate_channel_map(
     }
 }
 
+/// Seconds of decoded sound a track may hold: a program lane reads up to two seconds
+/// ahead of the frame it plays (`program.rs`), with room for the frame itself.
+const PCM_TRACK_SECONDS: usize = 4;
+
 pub(crate) struct PcmTrack {
     stream_index: u32,
     source_channels: u16,
@@ -476,7 +480,7 @@ impl PcmTrack {
             self.discard_before.saturating_sub(position).min(count) as usize * source_channels * 4;
         let sample_frames_after_skip = (packet.bytes.len() - skip) / (source_channels * 4);
         if self.samples.len() + sample_frames_after_skip * self.output_channels()
-            > rate as usize * self.output_channels() * 2
+            > rate as usize * self.output_channels() * PCM_TRACK_SECONDS
         {
             return Err(error("PCM slice buffer limit exceeded"));
         }

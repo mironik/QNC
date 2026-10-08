@@ -423,6 +423,16 @@ impl ApplicationHandler for NativeHost {
 }
 fn main() -> Result<()> {
     let process_start = Instant::now();
+    // Playback before the desktop: when the processor is full the desktop may skip a paint,
+    // sound and pictures may not wait (live 2026-10-08: the Story desktop took more than a
+    // core and the sound ran dry). The decoders this player starts take the same priority.
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::System::Threading::{
+            ABOVE_NORMAL_PRIORITY_CLASS, GetCurrentProcess, SetPriorityClass,
+        };
+        SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
+    }
     let _ = PROCESS_START.set(process_start);
     let args = std::env::args_os().skip(1).collect::<Vec<_>>();
     if args != ["--native-output"] && args != ["--monitor-output"] {

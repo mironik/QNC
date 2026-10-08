@@ -109,7 +109,15 @@ impl Decoder {
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x08000000);
+            // Windows starts a child at normal priority unless told: a decoder runs at the
+            // priority of the process that needs its pictures (the player above the desktop,
+            // a background worker at normal).
+            let priority = unsafe {
+                windows_sys::Win32::System::Threading::GetPriorityClass(
+                    windows_sys::Win32::System::Threading::GetCurrentProcess(),
+                )
+            };
+            cmd.creation_flags(0x08000000 | priority);
         }
         let mut child = cmd.spawn().map_err(|_| {
             DecodeError::new(

@@ -3022,3 +3022,17 @@ skok na isto mjesto) otvarao jos jednom tocno na svakom rezu. Sada se trazi od m
 1/3 PASS, ostali 1-5 trzaja (98,6-98,7 %); original s diska s HDMI-jem 96-98 %, 2-6 trzaja; original bez
 HDMI-ja 98-99 %, 0-4 trzaja. Preostali trzaji padaju kad se dekoder sljedeceg reza otvara unaprijed
 (skok na kljucni kadar i dekodiranje do trazene slike).
+Popravak 2026-10-08 (korisnik: "prekida i zastajkuje... sada nemamo ni play cijelog projekta"): play price
+u aplikaciji s HDMI-jem stajao je na praznom zvuku (`audio underrun`, pa "explicit preparation required").
+Mjereno po procesu tijekom playa: sucelje Storyja 100-138 % jezgre, player 65-97 %, ffmpeg slike ~100 %,
+HDMI izlaz 30-42 %; zvuk se cita iz originala na kartici. Bez HDMI-ja (20:36) cijela prica je svirala.
+Izvedeno: `qnc-broadcast-engine` (`program.rs` `fill_lane`): traka zvuka uzima sve sto je dekoder vec
+pripremio, do 2 s unaprijed (prije samo zvuk tekuce slike, najvise 2 paketa), pa kratki zastoj kartice ili
+procesora ne prazni zvuk; kraj izvora tijekom citanja unaprijed nije greska; `output.rs` traka smije drzati
+4 s (prije 2 s). `tools/qnc-player-runner` na Windowsima postavlja playeru prioritet AboveNormal, a
+`qnc-media-decode` dekoder pokrece s prioritetom procesa koji ga pokrece (player iznad sucelja; pozadinski
+radnici normalno; Linux i macOS bez promjene, tamo obican korisnik ne smije dici prioritet). `qnc-ui-kit`
+monitor istu sliku ne kopira niti ne salje ponovno grafickoj. Dijagnostika: `qnc-desktop` `ui-paint-rate`
+(i `ui_cpu_ms`), `qnc-editorial-blocks` `ui-block-ms` po dijelu ploce. Izmjereno (izolirana kopija stvarnog
+projekta, proxy i zvuk s kartice, cijela prica 5363 slike, HDMI): do kraja, 99,8 % slika, HDMI 4
+preskocene, 3 trzaja 64-94 ms; uz dvije umjetno zauzete jezgre do kraja, 99,6 %. Ceka probu u aplikaciji.

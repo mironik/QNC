@@ -30,12 +30,30 @@ pub fn paint_stream_frame(
     let width = rect.width().min(rect.height() * aspect);
     let fitted = Rect::from_center_size(rect.center(), Vec2::new(width, width / aspect));
     let diagnostic_key = (key.0.to_string(), key.1, key.2);
+    // The desktop paints more often than the player gives pictures (60 a second for 50):
+    // the same picture is neither copied again nor sent to the graphics card again.
+    let picture = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut hasher);
+        hasher.finish()
+    };
+    let held = egui::Id::new(("qnc-stream-frame-pixels", surface));
+    let rgba = match ui.data(|data| data.get_temp::<(u64, Arc<[u8]>)>(held)) {
+        Some((same, pixels)) if same == picture && pixels.len() == rgba.len() => pixels,
+        _ => {
+            let pixels = Arc::<[u8]>::from(rgba);
+            ui.data_mut(|data| data.insert_temp(held, (picture, pixels.clone())));
+            pixels
+        }
+    };
     ui.painter().add(egui_wgpu::Callback::new_paint_callback(
         fitted,
         StreamFrameCallback {
             surface: surface.value(),
+            picture,
             size: [size[0] as u32, size[1] as u32],
-            rgba: Arc::<[u8]>::from(rgba),
+            rgba,
             fitted,
         },
     ));
@@ -45,6 +63,8 @@ pub fn paint_stream_frame(
 
 struct StreamFrameCallback {
     surface: u64,
+    /// Identity of the picture: an upload is skipped when the slot already holds it.
+    picture: u64,
     size: [u32; 2],
     rgba: Arc<[u8]>,
     fitted: Rect,
@@ -87,6 +107,7 @@ impl egui_wgpu::CallbackTrait for StreamFrameCallback {
 
 struct MonitorSlot {
     size: [u32; 2],
+    picture: Option<u64>,
     texture: wgpu::Texture,
     bind_group: wgpu::BindGroup,
     uniform: wgpu::Buffer,
@@ -238,22 +259,19 @@ impl MonitorBlit {
                 frame.surface,
                 MonitorSlot {
                     size: frame.size,
+                    picture: None,
                     texture,
                     bind_group,
                     uniform,
                 },
             );
         }
-        let slot = self.slots.get(&frame.surface).unwrap();
-        let bytes_per_row = padded_bytes_per_row(width);
-        write_rgba_texture(
-            queue,
-            &slot.texture,
-            width,
-            height,
-            bytes_per_row,
-            &frame.rgba,
-        );
+        let slot = self.slots.get_mut(&frame.surface).unwrap();
+        if slot.picture != Some(frame.picture) {
+            let bytes_per_row = padded_bytes_per_row(width);
+            write_rgba_texture(queue, &slot.texture, width, height, bytes_per_row, &frame.rgba);
+            slot.picture = Some(frame.picture);
+        }
         let ppp = screen.pixels_per_point;
         let sw = screen.size_in_pixels[0] as f32;
         let sh = screen.size_in_pixels[1] as f32;
