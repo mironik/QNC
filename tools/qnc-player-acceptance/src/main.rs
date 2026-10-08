@@ -22,10 +22,12 @@ struct Args {
     seconds: u64,
     /// Also run the program output on the external screen and measure what it showed.
     hdmi: bool,
+    /// Clips play from this frame (a pan where the user saw it).
+    start: u64,
 }
 
 fn args() -> Result<Args, String> {
-    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), seconds: 10, hdmi: false };
+    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), seconds: 10, hdmi: false, start: 0 };
     let mut list = std::env::args().skip(1);
     while let Some(arg) = list.next() {
         if arg == "--hdmi" {
@@ -38,6 +40,7 @@ fn args() -> Result<Args, String> {
             "--clip" => parsed.clips.push(value),
             "--program" => parsed.program_from.push(value.parse().map_err(|_| "--program FRAME")?),
             "--steps" => parsed.steps.push(value),
+            "--start" => parsed.start = value.parse().map_err(|_| "--start FRAME")?,
             "--seconds" => parsed.seconds = value.parse().map_err(|_| "--seconds N")?,
             other => return Err(format!("unknown argument {other}")),
         }
@@ -435,7 +438,7 @@ fn main() -> Result<(), String> {
         let mut run = Run { name: format!("clip {wanted}"), ..Run::default() };
         match clips.iter().find(|clip| clip.name.contains(wanted.as_str())) {
             Some(clip) => {
-                preview.open(&clip.clip_id);
+                preview.open_at(&clip.clip_id, args.start);
                 measure(&mut preview, &mut run, args.seconds, hdmi.as_mut());
             }
             None => run.error = Some("no such clip".into()),
@@ -481,6 +484,9 @@ fn main() -> Result<(), String> {
         // (it looks like ghosts or a wrong field on motion); repeats are counted apart.
         let (mut backwards, mut repeats) = (0u64, 0u64);
         for pair in run.pictures_at.windows(2) {
+            if pair[1].1 < pair[0].1 {
+                println!("     backwards: frame {} after {}", pair[1].1, pair[0].1);
+            }
             backwards += u64::from(pair[1].1 < pair[0].1);
             repeats += u64::from(pair[1].1 == pair[0].1);
         }
