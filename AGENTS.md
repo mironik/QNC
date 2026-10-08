@@ -2977,3 +2977,13 @@ iz prstena od 8 mjesta (`qnc-player-frame-transport::LatestFrameReader::backlog`
 zaostane vise od 3 slike; nit crtanja ima najvisi prioritet (Windows). `qnc-player-acceptance --hdmi`
 pokrece izlaz uz pravi player i zbraja njegove brojke. Izmjereno (klipovi 1492 i 2002 po 15 s): tijekom
 reprodukcije 251 osvjezavanje, 251 nova slika, 0 preskocenih, 0 zakasnjelih u svakih 5 s.
+Live 2026-10-08 (korisnik usporedio ffplayom na HDMI-ju: "original je puno bolji"): duhovi i "krivi field"
+na svenku su u proxy datoteci kamere (2002S03.MP4), ne u QNC-u. Original (H.264 4:2:2 10-bit 1080p50) kroz
+player je bio na granici laptopa (i5-1135G7): kroz cijev dekodera 8 MB po slici. `qnc-media-decode`
+`DecodeRequest::output_pixel_format` (samo `yuv420p`, ista velicina; izbor dekodera i dalje po spremljenom
+formatu), `qnc-ffmpeg-decode` tada izricito pretvara (`scale,format`), `qnc-broadcast-engine` `InputPlan`
+trazi 4:2:0 kad je izvor tezi i pretvarac dobiva taj format (opis izvora ostaje iz baze). Izmjereno na
+izoliranoj kopiji s `playback.input = original`, 2002 od frame 1500 s HDMI-jem: 3/3 prolaza, 100 %, rupa
+najvise 45 ms, HDMI 0 preskocenih (prije 1 od 3 s rupom 191 ms). Program (prica) s originalima jos ne
+prolazi: 1 od 4, 1-5 trzaja 78-154 ms oko rezova (dva dekodera originala istodobno). Stvarni projekt i dalje
+pusta proxy; izbor je postavka projekta `playback.input`.

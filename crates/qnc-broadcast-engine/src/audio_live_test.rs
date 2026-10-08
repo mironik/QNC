@@ -84,6 +84,7 @@ fn real_saved_original_mono_tracks() {
             stream.time_base.as_ref().unwrap().value,
         ),
         spec: qnc_pixel_convert::ConversionSpec::from_saved(video).unwrap(),
+        output_pixel_format: None,
         audio_streams: audio_stream_plans,
         audio_channels: Some(ChannelMap::new(format.channel_count, vec![2, 3]).unwrap()),
         audio_origin: (

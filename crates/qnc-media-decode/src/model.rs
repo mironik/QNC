@@ -10,6 +10,13 @@ pub struct DecodeRequest {
     pub stream_index: u32,
     /// Relative input timestamp, NOT a promised source frame index. None starts at the beginning.
     pub start: Option<Rational>,
+    /// The picture layout the caller asks delivered instead of the saved one, the same
+    /// size (the adapter converts after decoding): only `yuv420p`, a lighter picture of a
+    /// heavier source (a 4:2:2 10-bit original sent 8 MB a frame through the pipe and
+    /// could not hold 50 fps on a laptop, live 2026-10-08). The decoder is still chosen
+    /// by the saved format; audio streams ignore it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_pixel_format: Option<String>,
 }
 
 #[derive(Debug, Clone)]

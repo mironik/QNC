@@ -13,6 +13,7 @@ pub(crate) fn fixture() -> DecodeRequest {
         version: VERSION.into(),
         stream_index: 0,
         start: None,
+        output_pixel_format: None,
         media: MediaRepresentation {
             media_uri: "qnc://local/source/test/file/clip%2Emkv".into(),
             container: Some(fact("matroska".into())),
@@ -78,6 +79,26 @@ fn preserves_unknown_frame_rate_and_native_10_bit_packet_size() {
         FrameRateMode::Unknown
     );
 }
+#[test]
+fn a_heavier_source_can_be_delivered_as_8_bit_4_2_0_of_the_same_size() {
+    let mut request = fixture();
+    let StreamDetails::Video(v) = &mut request.media.streams[0].details else {
+        unreachable!()
+    };
+    v.pixel_format = Some(fact("yuv422p10le".into()));
+    v.width = Some(fact(1920));
+    v.height = Some(fact(1080));
+    request.output_pixel_format = Some("yuv420p".into());
+    let plan = DecodePlan::new(&request, &config()).unwrap();
+    assert_eq!(plan.exact_packet, Some(1920 * 1080 * 3 / 2), "3 MB instead of 8 MB a frame");
+    assert_eq!(
+        plan.format,
+        DecodedFormat::Video { width: 1920, height: 1080, pixel_format: "yuv420p".into() }
+    );
+    request.output_pixel_format = Some("rgba".into());
+    assert!(DecodePlan::new(&request, &config()).is_err(), "only yuv420p is offered");
+}
+
 #[test]
 fn dimensions_planar_rounding_and_unsupported_formats() {
     assert_eq!(crate::plan::video_bytes(3, 3, "yuv420p").unwrap(), 17);

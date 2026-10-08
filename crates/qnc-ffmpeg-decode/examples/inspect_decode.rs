@@ -27,6 +27,7 @@ fn decode(
         media: media.clone(),
         stream_index: index,
         start,
+        output_pixel_format: None,
     };
     let mut decoder = Decoder::open(
         request,

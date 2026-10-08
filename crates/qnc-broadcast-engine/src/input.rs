@@ -5,7 +5,7 @@ use qnc_broadcast_player::{
 use qnc_media_metadata::{
     FrameRateMode, MediaRepresentation, Rational, ScanMode, Signal, StreamDetails,
 };
-use qnc_pixel_convert::{ConversionSpec, Transfer};
+use qnc_pixel_convert::{ConversionSpec, PixelLayout, Transfer};
 use qnc_player_input::{AudioChannel, PreparedInput};
 use qnc_video_output::{OutputConfig, PixelFormat};
 
@@ -94,7 +94,10 @@ pub struct InputPlan {
     pub(crate) origin: (i64, Rational),
     pub(crate) audio_media: MediaRepresentation,
     pub(crate) audio_origin: (i64, Rational),
+    /// The pictures as the decoder delivers them and the GPU converts them.
     pub(crate) spec: ConversionSpec,
+    /// Asked of the decoder when the saved layout is heavier than 8-bit 4:2:0.
+    pub(crate) output_pixel_format: Option<String>,
     pub(crate) audio_streams: Vec<AudioStreamPlan>,
     pub(crate) audio_channels: Option<qnc_audio_output::ChannelMap>,
 }
@@ -142,7 +145,8 @@ impl InputPlan {
         let StreamDetails::Video(video) = &stream.details else {
             return Err(error("invalid video map"));
         };
-        let spec = ConversionSpec::from_saved(video).map_err(error)?;
+        let saved = ConversionSpec::from_saved(video).map_err(error)?;
+        let (spec, output_pixel_format) = delivered(&saved);
         let sar = video
             .sample_aspect_ratio
             .as_ref()
@@ -169,10 +173,10 @@ impl InputPlan {
         .map_err(error)?
         .with_video_format(
             VideoFormat::new(
-                spec.width,
-                spec.height,
-                field_mode_from_saved(spec.scan_mode),
-                color_space_from_saved(&spec)?,
+                saved.width,
+                saved.height,
+                field_mode_from_saved(saved.scan_mode),
+                color_space_from_saved(&saved)?,
             )
             .map_err(error)?,
         );
@@ -215,6 +219,7 @@ impl InputPlan {
             audio_media: audio_media.clone(),
             audio_origin,
             spec,
+            output_pixel_format,
             audio_streams,
             audio_channels,
         })
@@ -254,6 +259,21 @@ fn field_mode_from_saved(scan_mode: ScanMode) -> FieldMode {
         ScanMode::InterlacedTopFieldFirst => FieldMode::InterlacedUpperFirst,
         ScanMode::InterlacedBottomFieldFirst => FieldMode::InterlacedLowerFirst,
     }
+}
+
+/// The pictures as the player takes them: a source heavier than 8-bit 4:2:0 (a 4:2:2
+/// 10-bit camera original) is asked of the decoder as 8-bit 4:2:0 of the same size, its
+/// range, colour and scan unchanged. Through the decoder's pipe a 1080p 4:2:2 10-bit
+/// frame is 8 MB (415 MB/s at 50 fps) and the laptop could not hold it (live
+/// 2026-10-08: a pan of the original stuttered); 4:2:0 8-bit is 3 MB. The preview and
+/// the program output are 8-bit sRGB pictures, so nothing they show is lost.
+pub(crate) fn delivered(saved: &ConversionSpec) -> (ConversionSpec, Option<String>) {
+    if saved.layout == PixelLayout::Yuv420p {
+        return (saved.clone(), None);
+    }
+    let mut spec = saved.clone();
+    spec.layout = PixelLayout::Yuv420p;
+    (spec, Some("yuv420p".into()))
 }
 
 fn color_space_from_saved(spec: &ConversionSpec) -> Result<ColorSpace> {

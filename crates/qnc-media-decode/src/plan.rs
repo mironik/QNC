@@ -126,6 +126,11 @@ impl DecodePlan {
                 {
                     return Err(invalid("missing saved video timing"));
                 }
+                let pix = match request.output_pixel_format.as_deref() {
+                    None => pix,
+                    Some("yuv420p") => "yuv420p".to_string(),
+                    Some(_) => return Err(unsupported("delivered pixel format other than yuv420p")),
+                };
                 let size = video_bytes(w, h, &pix)?;
                 (
                     DecodedFormat::Video {

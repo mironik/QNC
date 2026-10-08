@@ -747,6 +747,7 @@ fn open_decoder(
         media: media.clone(),
         stream_index,
         start: None,
+        output_pixel_format: None,
     };
     request
         .validate(&decoder_config)

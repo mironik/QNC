@@ -17,6 +17,8 @@ pub enum DecodeMediaAccess {
 pub(crate) struct DecodeInput {
     media: MediaRepresentation,
     config: DecoderConfig,
+    /// The picture layout asked of the decoder instead of the saved one (video only).
+    output_pixel_format: Option<String>,
     opener: Rc<RefCell<Box<Opener>>>,
 }
 impl DecodeInput {
@@ -28,14 +30,21 @@ impl DecodeInput {
         Self {
             media,
             config,
+            output_pixel_format: None,
             opener: Rc::new(RefCell::new(Box::new(opener))),
         }
+    }
+    /// The same input, its pictures delivered in `format` (see `InputPlan`).
+    pub fn with_output_pixel_format(mut self, format: Option<String>) -> Self {
+        self.output_pixel_format = format;
+        self
     }
     /// A second saved representation through the same session transport binding.
     pub fn for_media(&self, media: MediaRepresentation) -> Self {
         Self {
             media,
             config: self.config.clone(),
+            output_pixel_format: self.output_pixel_format.clone(),
             opener: self.opener.clone(),
         }
     }
@@ -46,6 +55,7 @@ impl DecodeInput {
             media: self.media.clone(),
             stream_index,
             start: None,
+            output_pixel_format: self.output_pixel_format.clone(),
         }
         .validate(&self.config)
         .map_err(error)
@@ -56,6 +66,7 @@ impl DecodeInput {
             media: self.media.clone(),
             stream_index,
             start,
+            output_pixel_format: self.output_pixel_format.clone(),
         };
         request.validate(&self.config).map_err(error)?;
         let context = decode_open_context(&request);

@@ -968,6 +968,7 @@ impl DecoderFilmstripGenerator {
             media: media.clone(),
             stream_index,
             start,
+            output_pixel_format: None,
         };
         request
             .validate(&self.decoder_config)

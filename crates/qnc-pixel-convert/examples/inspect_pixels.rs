@@ -88,6 +88,7 @@ fn load(args: &[std::ffi::OsString]) -> Result<Sample> {
         media: media.clone(),
         stream_index: index,
         start: None,
+        output_pixel_format: None,
     };
     let mut decoder = Decoder::open(
         request,

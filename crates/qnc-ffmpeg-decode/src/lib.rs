@@ -74,10 +74,13 @@ impl FfmpegAdapter {
         ]);
         match &plan.format {
             DecodedFormat::Video { pixel_format, .. } => {
+                // A delivered layout other than the saved one is converted explicitly
+                // here (the graph never converts on its own); otherwise none is done.
+                let convert = if request.output_pixel_format.is_some() { "scale," } else { "" };
                 cmd.args([
                     "-an",
                     "-vf",
-                    &format!("setfield=prog,format={pixel_format}"),
+                    &format!("setfield=prog,{convert}format={pixel_format}"),
                     "-c:v",
                     "rawvideo",
                     "-pix_fmt",
