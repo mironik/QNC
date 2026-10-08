@@ -24,6 +24,35 @@ pub const MODULE_ID: &str = "qnc.module.program-output";
 /// How often the screens are looked at again (a monitor plugged in or out).
 const SCREENS_EVERY: Duration = Duration::from_secs(2);
 
+/// How the desktop shows its windows. With the program output there are two windows
+/// drawn in one pass; each one waiting for its own screen's refresh (vsync) halved the
+/// pictures (live 2026-10-08: frames of 25-56 ms while a 50p source needs 20 ms, on the
+/// monitor and on HDMI alike). On Windows, DX12 mailbox hands the picture over without
+/// waiting and without tearing (the compositor shows the newest one); other OS keep the
+/// default until they get their own adapter.
+pub fn wgpu_configuration() -> eframe::egui_wgpu::WgpuConfiguration {
+    #[cfg(windows)]
+    {
+        use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
+        use eframe::wgpu;
+        WgpuConfiguration {
+            present_mode: wgpu::PresentMode::Mailbox,
+            wgpu_setup: WgpuSetup::CreateNew(WgpuSetupCreateNew {
+                instance_descriptor: wgpu::InstanceDescriptor {
+                    backends: wgpu::Backends::DX12,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        eframe::egui_wgpu::WgpuConfiguration::default()
+    }
+}
+
 /// The picture the preview monitor painted, as it was given to it.
 #[derive(Clone)]
 pub struct ProgramPicture {
@@ -117,8 +146,13 @@ pub fn present_picture(ctx: &Context, screen: Screen, picture: Option<ProgramPic
         .with_taskbar(false)
         .with_active(false)
         .with_mouse_passthrough(true);
+    // Full screen is asked once per screen: a command every frame made the desktop paint
+    // without pause (63 % of a core while idle, live 2026-10-08).
+    let asked_id = Id::new("qnc-program-output-fullscreen");
+    let asked = ctx.data(|data| data.get_temp::<Screen>(asked_id)) == Some(screen);
+    ctx.data_mut(|data| data.insert_temp(asked_id, screen));
     ctx.show_viewport_immediate(ViewportId::from_hash_of("qnc-program-output"), builder, |ctx, _| {
-        if ctx.input(|input| input.viewport().fullscreen) != Some(true) {
+        if !asked {
             ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
         }
         egui::CentralPanel::default()

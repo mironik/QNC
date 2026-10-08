@@ -2942,3 +2942,9 @@ otvori unutar vanjskog ekrana i odmah prebaci u puni ekran (`ViewportCommand::Fu
 cijeli ekran bez obzira na mjerilo. Provjereno snimkom oba ekrana: probni program pokriva cijeli HDMI ekran,
 aplikacija na tabu Project daje crni HDMI ekran (nema preview monitora). Reprodukcija na HDMI kroz Ingest i
 Story ceka probu korisnika.
+Live 2026-10-08 (korisnik: "video nije fluidan ni na monitoru ni na HDMI"): log probe s HDMI-jem 107 frameova
+sucelja od 25-56 ms tijekom playa (izvor 50p treba 20 ms; 3. 10. bez HDMI-ja 7). Uzrok: dva prozora u istom
+prolazu, svaki ceka vsync svog ekrana. `qnc-program-output::wgpu_configuration` (koristi ga `apps/qnc-app`):
+na Windowsima DX12 i mailbox (predaja slike bez cekanja i bez kidanja), ostali OS zadano. Uz to naredba za
+puni ekran salje se jednom po ekranu (svaki frame ju je slao i bez vsynca aplikacija je u mirovanju trosila
+63 % jezgre, sada 5,5 %).

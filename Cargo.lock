@@ -2915,6 +2915,7 @@ dependencies = [
  "qnc-media-assist-audio-ai-desktop-adapter",
  "qnc-media-assist-audio-desktop-adapter",
  "qnc-media-assist-video-desktop-adapter",
+ "qnc-program-output",
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
  "qnc-story-desktop-adapter",
