@@ -225,14 +225,18 @@ fn original_mode_copies_the_original_into_the_project_and_records_the_outcome() 
     .unwrap()
     .unwrap();
     let uri = outcome.result.unwrap();
-    assert!(uri.starts_with("qnc://local/project/p1/original/"));
-    let file = project
-        .join("original")
-        .join(uri.rsplit('/').next().unwrap());
+    assert!(uri.starts_with("qnc://local/source/project-p1/file/original/"));
+    let reference = qnc_source_reader::SourceReference::from_uri(&uri).unwrap();
+    let file = project.join(reference.relative_path());
     assert!(std::fs::read(&file).unwrap().starts_with(b"original of"));
     let stored = f.client.read(&outcome.clip_id).unwrap().unwrap();
     assert_eq!(stored.import_status, ImportStatus::Imported);
     assert_eq!(stored.imported_media_uri.as_deref(), Some(uri.as_str()));
+    assert_eq!(
+        stored.imported_copy_of,
+        Some(qnc_ingest_store::content::ImportedCopy::Original),
+        "the copy says which representation it copies"
+    );
 }
 
 #[test]
@@ -251,7 +255,7 @@ fn proxy_mode_copies_the_proxy_and_link_mode_copies_nothing() {
     .unwrap()
     .result
     .unwrap();
-    assert!(proxy.starts_with("qnc://local/project/p1/proxy/"));
+    assert!(proxy.starts_with("qnc://local/source/project-p1/file/proxy/"));
     assert!(project.join("proxy").is_dir());
     let linked = run_next(
         &mut f.client,
@@ -341,6 +345,16 @@ fn file_names_are_safe_on_every_operating_system() {
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')));
     assert!(name.starts_with("clip-1_"));
     assert!(name.len() <= 120);
+    assert_eq!(
+        safe_name(
+            "clip-1",
+            "qnc://local/source/card/file/PRIVATE/XDROOT/Clip/Mironik%202002%2EMXF"
+        ),
+        "clip-1_Mironik_2002.MXF",
+        "readable, with its extension"
+    );
+    let long = safe_name("clip-1", &format!("qnc://local/source/card/file/{}.MXF", "a".repeat(200)));
+    assert!(long.len() == 120 && long.ends_with(".MXF"));
 }
 
 #[test]
@@ -376,7 +390,7 @@ fn the_write_transport_queues_the_selected_clips_and_hands_them_out_once() {
         "each clip is handed out once"
     );
     queue
-        .finish_import(first.clip.id().into(), Some(f.original.clone()), None, None)
+        .finish_import(first.clip.id().into(), Some(f.original.clone()), None, None, None)
         .unwrap();
     let stored = f.client.read(first.clip.id()).unwrap().unwrap();
     assert_eq!(stored.import_status, ImportStatus::Imported);

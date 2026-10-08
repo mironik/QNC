@@ -16,6 +16,10 @@ impl PlayerContentRead for StorePlayerContentReader {
             name: stored.clip.name,
             snapshot: stored.clip.snapshot,
             imported_media_uri: stored.imported_media_uri,
+            imported_copy_of: stored.imported_copy_of.map(|copy| match copy {
+                qnc_ingest_store::content::ImportedCopy::Original => qnc_player_input::Representation::Original,
+                qnc_ingest_store::content::ImportedCopy::Proxy => qnc_player_input::Representation::Proxy,
+            }),
         }))
     }
 }

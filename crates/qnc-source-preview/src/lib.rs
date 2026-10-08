@@ -826,9 +826,18 @@ impl std::fmt::Debug for SourcePreview {
     }
 }
 
-/// Transport bindings of the host's media sources, for the player launch.
+/// Transport bindings for the player launch: the sources of the host, and the project
+/// folder of this machine as one more source, where media the import copied is read.
 fn transport_bindings(context: &PreviewContext) -> Result<Vec<SourceTransportBinding>, String> {
-    context
+    // Without it only copied media fails (no binding), never media on a card.
+    let project = context
+        .reader
+        .local_workspace_dir(&context.settings)
+        .ok()
+        .flatten()
+        .zip(context.settings.project_media_source_uri().ok())
+        .map(|(dir, uri)| SourceTransportBinding::local(uri, dir));
+    let mut bindings = context
         .sources
         .iter()
         .map(|binding| {
@@ -844,7 +853,9 @@ fn transport_bindings(context: &PreviewContext) -> Result<Vec<SourceTransportBin
                 binding.token()?.ok_or("Source credential missing.")?,
             )
         })
-        .collect()
+        .collect::<Result<Vec<_>, String>>()?;
+    bindings.extend(project);
+    Ok(bindings)
 }
 
 /// What the preview shows while the record of the clip is completed in the background.

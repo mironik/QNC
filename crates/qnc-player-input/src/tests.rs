@@ -20,6 +20,13 @@ impl PlayerClipSource for StoredClip {
         self.imported_media_uri.as_ref()
     }
 
+    fn imported_copy_of(&self) -> Option<Representation> {
+        self.imported_copy_of.map(|copy| match copy {
+            qnc_ingest_store::content::ImportedCopy::Original => Representation::Original,
+            qnc_ingest_store::content::ImportedCopy::Proxy => Representation::Proxy,
+        })
+    }
+
     fn validate_clip(&self) -> Result<()> {
         self.clip.validate().map_err(InputError::InvalidRecord)
     }
@@ -37,6 +44,10 @@ impl PlayerContentRead for StorePlayerContentReader {
             name: stored.clip.name,
             snapshot: stored.clip.snapshot,
             imported_media_uri: stored.imported_media_uri,
+            imported_copy_of: stored.imported_copy_of.map(|copy| match copy {
+                qnc_ingest_store::content::ImportedCopy::Original => crate::Representation::Original,
+                qnc_ingest_store::content::ImportedCopy::Proxy => crate::Representation::Proxy,
+            }),
         }))
     }
 }
@@ -176,6 +187,7 @@ fn stored(context: &str) -> StoredClip {
         import_status: ImportStatus::Detected,
         import_error: None,
         imported_media_uri: None,
+        imported_copy_of: None,
     };
     refresh(&mut result);
     assert!(
@@ -505,6 +517,29 @@ fn relocated_import_without_representation_binding_is_not_guessed() {
     ));
     clip.imported_media_uri = clip.clip.snapshot.binding.proxy_uri.clone();
     assert!(prepare(&settings("qnc://local", "proxy"), &clip).is_ok());
+}
+
+#[test]
+fn an_imported_copy_of_the_original_plays_from_the_copy_with_the_saved_record() {
+    let mut clip = stored("qnc://local");
+    let card = clip.clip.snapshot.binding.original_uri.clone();
+    let copy = "qnc://local/source/project-p1/file/original/c1_clip.mxf".to_string();
+    clip.import_status = ImportStatus::Imported;
+    clip.imported_media_uri = Some(copy.clone());
+    clip.imported_copy_of = Some(qnc_ingest_store::content::ImportedCopy::Original);
+    let input = prepare(&settings("qnc://local", "original"), &clip).unwrap();
+    assert_eq!(input.media().unwrap().media_uri, copy, "picture from the copy");
+    assert_eq!(input.audio_media().media_uri, copy, "sound from the copy");
+    assert_eq!(
+        input.media().unwrap().streams,
+        clip.clip.snapshot.metadata.original.streams,
+        "the saved description of the original, not a new probe"
+    );
+    // Proxy picture keeps the card proxy, the sound of the original comes from the copy.
+    let input = prepare(&settings("qnc://local", "proxy_if_available"), &clip).unwrap();
+    assert_eq!(input.representation, Representation::Proxy);
+    assert_eq!(input.audio_media().media_uri, copy);
+    assert_ne!(input.media().unwrap().media_uri, card);
 }
 #[test]
 fn unfinished_missing_and_estimated_metadata_never_trigger_repair() {

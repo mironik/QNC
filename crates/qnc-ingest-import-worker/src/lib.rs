@@ -22,7 +22,7 @@ mod process;
 
 pub use process::{launch_worker, run_import, run_service, ImportSummary, WORKER_EXECUTABLE};
 
-use qnc_ingest_store::content::{ContentClient, StoredClip};
+use qnc_ingest_store::content::{ContentClient, ImportedCopy, StoredClip};
 use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
 use qnc_work_settings::ProductArea;
 use std::{
@@ -68,6 +68,7 @@ pub trait ImportQueue {
         clip_id: String,
         media_uri: Option<String>,
         thumbnail_uri: Option<String>,
+        copy_of: Option<ImportedCopy>,
         error: Option<String>,
     ) -> Result<(), String>;
 }
@@ -86,9 +87,10 @@ impl ImportQueue for ContentClient {
         clip_id: String,
         media_uri: Option<String>,
         thumbnail_uri: Option<String>,
+        copy_of: Option<ImportedCopy>,
         error: Option<String>,
     ) -> Result<(), String> {
-        ContentClient::finish_import(self, clip_id, media_uri, thumbnail_uri, error)
+        ContentClient::finish_import(self, clip_id, media_uri, thumbnail_uri, copy_of, error)
             .map_err(|e| e.to_string())
     }
 }
@@ -104,6 +106,13 @@ impl Folder {
         match self {
             Folder::Original => "original",
             Folder::Proxy => "proxy",
+        }
+    }
+
+    fn copy(self) -> ImportedCopy {
+        match self {
+            Folder::Original => ImportedCopy::Original,
+            Folder::Proxy => ImportedCopy::Proxy,
         }
     }
 }
@@ -146,10 +155,13 @@ pub fn action_for(clip: &StoredClip, plan: &IngestWorkPlan) -> Result<Action, St
 }
 
 /// A file name that is safe on every operating system and inside a QNC URI.
+/// The name of the source file is kept readable (decoded from the URI) with its extension.
 fn safe_name(clip_id: &str, source_uri: &str) -> String {
-    let last = source_uri.rsplit('/').next().unwrap_or("media");
-    let mut name = format!("{clip_id}_{last}");
-    name = name
+    let decoded = qnc_source_reader::SourceReference::from_uri(source_uri)
+        .ok()
+        .and_then(|reference| reference.relative_path().rsplit('/').next().map(str::to_owned));
+    let last = decoded.unwrap_or_else(|| source_uri.rsplit('/').next().unwrap_or("media").to_owned());
+    let name: String = format!("{clip_id}_{last}")
         .chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
@@ -159,8 +171,12 @@ fn safe_name(clip_id: &str, source_uri: &str) -> String {
             }
         })
         .collect();
-    name.truncate(120);
-    name
+    if name.len() <= 120 {
+        return name;
+    }
+    let extension = name.rfind('.').map(|dot| name[dot..].to_owned()).filter(|e| e.len() <= 16);
+    let extension = extension.unwrap_or_default();
+    format!("{}{extension}", &name[..120 - extension.len()])
 }
 
 /// Well inside the store lease, so a slow copy never loses its clip.
@@ -231,13 +247,17 @@ pub fn import_clip_beating(
             inside_project(project_dir, &directory.join(&name))?;
             fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
             copy_into(opener, &source_uri, &directory.join(&name), cancel, beat)?;
-            let root = match folder {
-                Folder::Original => &plan.original_uri,
-                Folder::Proxy => &plan.proxy_uri,
-            };
-            let uri = format!("{}/{name}", root.trim_end_matches('/'));
-            qnc_contracts::parse_qnc_uri(&uri).map_err(|e| e.to_string())?;
-            Ok(uri)
+            // The copy is read like media on a card: through the project folder as a source.
+            let source = plan
+                .settings
+                .project_media_source_uri()
+                .map_err(|e| e.to_string())?;
+            let reference = qnc_source_reader::SourceReference::new(
+                &source,
+                &format!("{}/{name}", folder.name()),
+            )
+            .map_err(|e| e.to_string())?;
+            Ok(reference.uri())
         }
     }
 }
@@ -345,16 +365,21 @@ pub fn run_next(
     match &result {
         Ok(uri) => {
             thumbnail_uri = import_poster(&clip, plan, project_dir, opener, cancel);
+            let copy_of = match action_for(&clip, plan)? {
+                Action::Copy { folder, .. } => Some(folder.copy()),
+                Action::Link { .. } => None,
+            };
             queue.finish_import(
                 clip_id.clone(),
                 Some(uri.clone()),
                 thumbnail_uri.clone(),
+                copy_of,
                 None,
             )?
         }
         Err(error) => {
             let message: String = error.chars().take(4000).collect();
-            queue.finish_import(clip_id.clone(), None, None, Some(message))?
+            queue.finish_import(clip_id.clone(), None, None, None, Some(message))?
         }
     }
     Ok(Some(Outcome {
@@ -456,11 +481,12 @@ impl ImportQueue for TransportQueue {
         clip_id: String,
         media_uri: Option<String>,
         thumbnail_uri: Option<String>,
+        copy_of: Option<ImportedCopy>,
         error: Option<String>,
     ) -> Result<(), String> {
         let key = self.next_key("finish");
         self.transport
-            .finish_import(key.clone(), clip_id, media_uri, thumbnail_uri, error)
+            .finish_import(key.clone(), clip_id, media_uri, thumbnail_uri, copy_of, error)
             .map_err(|e| e.to_string())?;
         self.wait(&key).map(|_| ())
     }

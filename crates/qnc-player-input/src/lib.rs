@@ -76,6 +76,10 @@ pub struct PlayerClipRecord {
     pub name: String,
     pub snapshot: Snapshot,
     pub imported_media_uri: Option<String>,
+    /// What the imported file is a byte copy of, when the import copied it into the
+    /// project; the saved record of that representation then describes the copy.
+    #[serde(default)]
+    pub imported_copy_of: Option<Representation>,
 }
 
 impl PlayerClipRecord {
@@ -98,6 +102,7 @@ pub trait PlayerContentRead: Send + Sync {
 trait PlayerClipSource {
     fn snapshot(&self) -> &Snapshot;
     fn imported_media_uri(&self) -> Option<&String>;
+    fn imported_copy_of(&self) -> Option<Representation>;
     fn validate_clip(&self) -> Result<()>;
 }
 
@@ -108,6 +113,10 @@ impl PlayerClipSource for PlayerClipRecord {
 
     fn imported_media_uri(&self) -> Option<&String> {
         self.imported_media_uri.as_ref()
+    }
+
+    fn imported_copy_of(&self) -> Option<Representation> {
+        self.imported_copy_of
     }
 
     fn validate_clip(&self) -> Result<()> {
@@ -320,15 +329,9 @@ impl InputReader {
 fn prepare(settings: &WorkSettings, stored: &impl PlayerClipSource) -> Result<PreparedInput> {
     let mode = playback_input(settings)?;
     stored.validate_clip()?;
-    let snapshot = stored.snapshot();
-    validate_snapshot(snapshot)?;
-    if stored.imported_media_uri().is_some_and(|uri| {
-        uri != &snapshot.binding.original_uri && Some(uri) != snapshot.binding.proxy_uri.as_ref()
-    }) {
-        return Err(InputError::UnsupportedMedia(
-            "Imported media URI has no saved original/proxy representation binding.".into(),
-        ));
-    }
+    validate_snapshot(stored.snapshot())?;
+    let relocated = imported_snapshot(stored)?;
+    let snapshot = &relocated;
     let representation = choose(mode, snapshot)?;
     Ok(PreparedInput {
         contract_version: VERSION.into(),
@@ -340,6 +343,54 @@ fn prepare(settings: &WorkSettings, stored: &impl PlayerClipSource) -> Result<Pr
         snapshot: snapshot.clone(),
         lead_audio_channels: Vec::new(),
     })
+}
+
+/// The record the player works from. Media linked where it is (the imported URI is the
+/// original or proxy itself) uses the saved record as it is. A byte copy in the project uses
+/// the saved record of the representation it copies, with the copy as that representation's
+/// media: same streams, timing and channels, nothing probed again. Any other imported URI
+/// has no saved description and is refused.
+fn imported_snapshot(stored: &impl PlayerClipSource) -> Result<Snapshot> {
+    let saved = stored.snapshot();
+    let Some(imported) = stored.imported_media_uri() else {
+        return Ok(saved.clone());
+    };
+    if imported == &saved.binding.original_uri
+        || Some(imported) == saved.binding.proxy_uri.as_ref()
+    {
+        return Ok(saved.clone());
+    }
+    let copied = match stored.imported_copy_of() {
+        Some(Representation::Original) => saved.binding.original_uri.clone(),
+        Some(Representation::Proxy) => saved
+            .binding
+            .proxy_uri
+            .clone()
+            .ok_or(InputError::MissingProxy)?,
+        None => {
+            return Err(InputError::UnsupportedMedia(
+                "Imported media URI has no saved original/proxy representation binding.".into(),
+            ))
+        }
+    };
+    let mut snapshot = saved.clone();
+    let metadata = &mut snapshot.metadata;
+    for uri in [
+        Some(&mut snapshot.binding.original_uri),
+        snapshot.binding.proxy_uri.as_mut(),
+        Some(&mut metadata.original.media_uri),
+        metadata.proxy.as_mut().map(|proxy| &mut proxy.media_uri),
+    ]
+    .into_iter()
+    .flatten()
+    .chain(metadata.evidence.iter_mut().map(|evidence| &mut evidence.media_uri))
+    {
+        if *uri == copied {
+            *uri = imported.clone();
+        }
+    }
+    validate_snapshot(&snapshot)?;
+    Ok(snapshot)
 }
 
 fn validate_workspace(uri: &str) -> Result<()> {

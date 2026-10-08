@@ -57,5 +57,6 @@
   },
   "migration_policy": "owner_application_only",
   "created_at": "2026-09-04T00:00:00Z",
-  "updated_at": "2026-09-27T00:00:00Z"
+  "updated_at": "2026-09-27T00:00:00Z",
+  "imported_copy_rule": "clips.imported_copy_of (original | proxy | NULL), added to an existing database by the owner on a read-write open: the imported file is a byte copy, made by the import, of that representation of the clip, so the saved record of that representation describes it and no new probe is run. The copy URI is qnc://<environment>[/<authority>]/source/project-<project_id>/file/<original|proxy>/<name>: the project folder of the machine read as a media source. NULL: the imported media is linked where it is (imported_media_uri is the original or proxy itself)."
 }

@@ -13,6 +13,7 @@ pub struct ContentStore {
     access: Access,
     schema_ready: bool,
     has_thumbnail_uri: bool,
+    has_copy_of: bool,
 }
 
 impl ContentStore {
@@ -125,10 +126,12 @@ impl ContentStore {
                 .map_err(err)?;
             ensure_summary_columns(&tx)?;
             ensure_lease_column(&tx)?;
+            ensure_copy_column(&tx)?;
             ensure_runtime_table(&tx)?;
             tx.commit().map_err(err)?;
         }
         let has_thumbnail_uri = schema && has_column(&conn, "clips", "thumbnail_uri")?;
+        let has_copy_of = schema && has_column(&conn, "clips", "imported_copy_of")?;
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
@@ -157,6 +160,7 @@ impl ContentStore {
             access,
             schema_ready: schema,
             has_thumbnail_uri,
+            has_copy_of,
         })
     }
 
@@ -269,7 +273,7 @@ impl ContentStore {
             Operation::Read { clip_id } => {
                 qnc_media_records::valid_id(clip_id).map_err(err)?;
                 let clip = self.conn.query_row(
-                    "SELECT catalog_json,selected,import_status,import_error,imported_media_uri,thumbnail_uri FROM clips WHERE clip_id=?1",
+                    &format!("SELECT {} FROM clips WHERE clip_id=?1", stored_columns(self.has_copy_of)),
                     [clip_id], row,
                 ).optional().map_err(err)?;
                 Ok(Data::Clip(clip.map(Box::new)))
@@ -278,8 +282,8 @@ impl ContentStore {
                 let mut statement = self
                     .conn
                     .prepare(
-                        "SELECT catalog_json,selected,import_status,import_error,imported_media_uri,thumbnail_uri
-                     FROM clips WHERE clip_id > ?1 ORDER BY clip_id LIMIT ?2",
+                        &format!("SELECT {}
+                     FROM clips WHERE clip_id > ?1 ORDER BY clip_id LIMIT ?2", stored_columns(self.has_copy_of)),
                     )
                     .map_err(err)?;
                 let rows = statement
@@ -345,7 +349,7 @@ impl ContentStore {
                     .conn
                     .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
                     .map_err(err)?;
-                let mut stmt = tx.prepare("SELECT catalog_json,selected,import_status,import_error,imported_media_uri,thumbnail_uri FROM clips WHERE selected != 0").map_err(err)?;
+                let mut stmt = tx.prepare(&format!("SELECT {} FROM clips WHERE selected != 0", stored_columns(self.has_copy_of))).map_err(err)?;
                 let clips = stmt
                     .query_map([], row)
                     .map_err(err)?
@@ -377,7 +381,7 @@ impl ContentStore {
                 )
                 .map_err(err)?;
                 let mut clip = tx.query_row(
-                    "SELECT catalog_json,selected,import_status,import_error,imported_media_uri,thumbnail_uri FROM clips WHERE import_status='queued' ORDER BY clip_id LIMIT 1",
+                    &format!("SELECT {} FROM clips WHERE import_status='queued' ORDER BY clip_id LIMIT 1", stored_columns(self.has_copy_of)),
                     [], row).optional().map_err(err)?;
                 if let Some(clip) = &mut clip {
                     tx.execute(
@@ -451,11 +455,19 @@ impl ContentStore {
                 clip_id,
                 media_uri,
                 thumbnail_uri,
+                copy_of,
                 error,
             } => {
                 if media_uri.is_some() == error.is_some() {
                     return Err("Nedostaje ishod importa.".into());
                 }
+                if copy_of.is_some() && media_uri.is_none() {
+                    return Err("Kopija bez uvezenog medija.".into());
+                }
+                if copy_of.is_some() && !self.has_copy_of {
+                    return Err("Baza nema zapis o kopiji uvezenog medija.".into());
+                }
+                let copy_of = copy_of.map(ImportedCopy::as_str);
                 if let Some(uri) = media_uri {
                     qnc_contracts::parse_qnc_uri(uri).map_err(err)?;
                 }
@@ -467,9 +479,16 @@ impl ContentStore {
                 } else {
                     "imported"
                 };
-                let n = self.conn.execute(
-                    "UPDATE clips SET import_status=?1,imported_media_uri=?2,import_error=?3,thumbnail_uri=COALESCE(?5,thumbnail_uri) WHERE clip_id=?4 AND import_status='processing'",
-                    params![status,media_uri,error,clip_id,thumbnail_uri]).map_err(err)?;
+                let n = if self.has_copy_of {
+                    self.conn.execute(
+                        "UPDATE clips SET import_status=?1,imported_media_uri=?2,import_error=?3,thumbnail_uri=COALESCE(?5,thumbnail_uri),imported_copy_of=?6 WHERE clip_id=?4 AND import_status='processing'",
+                        params![status,media_uri,error,clip_id,thumbnail_uri,copy_of])
+                } else {
+                    self.conn.execute(
+                        "UPDATE clips SET import_status=?1,imported_media_uri=?2,import_error=?3,thumbnail_uri=COALESCE(?5,thumbnail_uri) WHERE clip_id=?4 AND import_status='processing'",
+                        params![status,media_uri,error,clip_id,thumbnail_uri])
+                }
+                .map_err(err)?;
                 if n != 1 {
                     return Err("Import posao nije preuzet ili je vec zavrsen.".into());
                 }
@@ -534,7 +553,7 @@ impl ContentStore {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
         Self::write_clip(&tx, clip)?;
-        let saved = tx.query_row("SELECT catalog_json,selected,import_status,import_error,imported_media_uri,thumbnail_uri FROM clips WHERE clip_id=?1",[clip.id()],row).map_err(err)?;
+        let saved = tx.query_row(&format!("SELECT {} FROM clips WHERE clip_id=?1", stored_columns(self.has_copy_of)),[clip.id()],row).map_err(err)?;
         tx.commit().map_err(err)?;
         Ok(Data::Saved(Box::new(saved)))
     }
@@ -780,6 +799,24 @@ fn codec(media: &MediaRepresentation) -> Option<&str> {
 /// its clip over (an importer that died or lost its connection).
 const IMPORT_LEASE_SECONDS: i64 = 120;
 
+/// What an imported file in the project is a byte copy of (`original` or `proxy`).
+fn ensure_copy_column(conn: &Connection) -> Result<()> {
+    if !has_column(conn, "clips", "imported_copy_of")? {
+        conn.execute(
+            "ALTER TABLE clips ADD COLUMN imported_copy_of TEXT CHECK (imported_copy_of IN ('original','proxy'))",
+            [],
+        )
+        .map_err(err)?;
+    }
+    Ok(())
+}
+
+/// The columns `row` reads; an older catalog without the copy column reads it as NULL.
+fn stored_columns(has_copy_of: bool) -> String {
+    let copy = if has_copy_of { "imported_copy_of" } else { "NULL" };
+    format!("catalog_json,selected,import_status,import_error,imported_media_uri,thumbnail_uri,{copy}")
+}
+
 fn ensure_lease_column(conn: &Connection) -> Result<()> {
     if !has_column(conn, "clips", "import_claimed_at")? {
         conn.execute("ALTER TABLE clips ADD COLUMN import_claimed_at INTEGER", [])
@@ -849,7 +886,20 @@ fn row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredClip> {
         import_status,
         import_error: row.get(3)?,
         imported_media_uri: row.get(4)?,
+        imported_copy_of: imported_copy(row.get(6)?)?,
     })
+}
+fn imported_copy(value: Option<String>) -> rusqlite::Result<Option<ImportedCopy>> {
+    match value.as_deref() {
+        None => Ok(None),
+        Some("original") => Ok(Some(ImportedCopy::Original)),
+        Some("proxy") => Ok(Some(ImportedCopy::Proxy)),
+        Some(_) => Err(rusqlite::Error::InvalidColumnType(
+            6,
+            "imported_copy_of".into(),
+            rusqlite::types::Type::Text,
+        )),
+    }
 }
 fn summary_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredClipSummary> {
     Ok(StoredClipSummary {

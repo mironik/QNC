@@ -276,6 +276,18 @@ impl WorkSettings {
     pub fn product_local_dir(&self, project_dir: &Path, area: ProductArea) -> PathBuf {
         project_dir.join(self.products.relative_path(area))
     }
+
+    /// The project folder as a media source: media copied into the project (an imported
+    /// original or proxy) is read through it like media on a card, by `<this>/file/<path>`.
+    /// Same environment and authority as the project.
+    pub fn project_media_source_uri(&self) -> Result<String, ReadError> {
+        let root = qnc_contracts::parse_qnc_uri(&self.output_root_uri).map_err(|_| incomplete())?;
+        let authority = root.authority.map(|a| format!("{a}/")).unwrap_or_default();
+        Ok(format!(
+            "qnc://{}/{authority}source/project-{}",
+            root.environment, self.project_id
+        ))
+    }
 }
 
 impl ProductLocations {

@@ -81,6 +81,10 @@ fn active_selection_is_read_from_database_not_cached_or_supplied_by_ui() {
     assert_eq!(first.project_id, "p1");
     assert_eq!(first.storage.ingest_media, "link");
     assert_eq!(first.output_root_uri, "qnc://local/project/p1");
+    assert_eq!(
+        first.project_media_source_uri().unwrap(),
+        "qnc://local/source/project-p1"
+    );
     let conn = Connection::open(&path).unwrap();
     conn.execute(
         "UPDATE app_settings SET value='p2' WHERE key='active_project_id'",

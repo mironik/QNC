@@ -2987,3 +2987,19 @@ izoliranoj kopiji s `playback.input = original`, 2002 od frame 1500 s HDMI-jem: 
 najvise 45 ms, HDMI 0 preskocenih (prije 1 od 3 s rupom 191 ms). Program (prica) s originalima jos ne
 prolazi: 1 od 4, 1-5 trzaja 78-154 ms oko rezova (dva dekodera originala istodobno). Stvarni projekt i dalje
 pusta proxy; izbor je postavka projekta `playback.input`.
+Otkljucano i izvedeno 2026-10-08 (korisnik: "ako bi koristio original" i "ok" na prijedlog: popravak kopije
+originala): opcija Project postavki "Ingest media = Original" vec je kopirala original u projekt, ali player
+je kopiju odbijao (baza nije znala da je kopija isti medij kao original), pa se klip nije pustao. Izvedeno:
+`qnc-content-store` stupac `clips.imported_copy_of` (`original` | `proxy` | NULL; vlasnik ga dodaje pri
+otvaranju za pisanje, stari katalog ga cita kao NULL), `FinishImport.copy_of`, `StoredClip.imported_copy_of`;
+`qnc-work-settings::project_media_source_uri` (mapa projekta kao izvor medija:
+`qnc://<okruzenje>[/<authority>]/source/project-<project_id>`); `qnc-ingest-import-worker` kopiju zapisuje kao
+`.../source/project-<id>/file/<original|proxy>/<naziv>` s oznakom kopije, naziv datoteke je citljiv s
+ekstenzijom (prije `Mironik_202002_2EMXF`); `qnc-player-input` za kopiju koristi spremljeni zapis te
+reprezentacije s adresom kopije (bez probea; link i nepoznata adresa kao prije); `qnc-source-preview` playeru
+daje i vezu mape projekta ove masine (bez nje ne radi samo kopirani medij). Izmjereno na izoliranoj kopiji
+(karticu samo citam, stvarni projekt nije diran): kopiranje s kartice 28 MB/s (sat materijala oko 13-14 min);
+uvoz 9 originala price (4,6 GB) kroz `qnc-ingest-worker`; s nedostupnom karticom prica od 2513 prolazi 7 od 8
+(jednom trzaj 69 ms), s kartice 0 od 4 (trzaji 60-150 ms); 2002 od 1500 PASS, koraci 36 ms. Moguce je da su
+svjeze kopirane datoteke bile u memoriji sustava. Nije izvedeno: izrada montaznog proxyja, NVDEC adapter,
+filmstrip/wave/probe i dalje citaju medij s kartice dok ih rade (jednom nakon Odaberi).

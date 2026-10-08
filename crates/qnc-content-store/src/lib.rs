@@ -78,6 +78,28 @@ pub struct StoredClip {
     pub import_status: ImportStatus,
     pub import_error: Option<String>,
     pub imported_media_uri: Option<String>,
+    /// What the imported file in the project is a byte copy of; `None` when the media is
+    /// linked where it is (the imported URI is then the original or proxy itself).
+    #[serde(default)]
+    pub imported_copy_of: Option<ImportedCopy>,
+}
+
+/// An imported media file in the project that is a byte for byte copy of one representation
+/// of the clip, so the saved record of that representation describes it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportedCopy {
+    Original,
+    Proxy,
+}
+
+impl ImportedCopy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Original => "original",
+            Self::Proxy => "proxy",
+        }
+    }
 }
 
 /// Lightweight UI/catalog row. This is intentionally not enough for playback.
@@ -189,6 +211,9 @@ pub enum Operation {
         /// The poster copied into the project together with the media, if any.
         #[serde(default)]
         thumbnail_uri: Option<String>,
+        /// What the imported file is a byte copy of, when it was copied into the project.
+        #[serde(default)]
+        copy_of: Option<ImportedCopy>,
         error: Option<String>,
     },
 }
