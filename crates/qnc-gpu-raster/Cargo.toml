@@ -6,8 +6,7 @@ publish = false
 
 [dependencies]
 qnc-pixel-convert.workspace = true
+qnc-media-metadata.workspace = true
 wgpu = "=24.0.5"
 pollster = "=0.4.0"
 
-[dev-dependencies]
-qnc-media-metadata.workspace = true

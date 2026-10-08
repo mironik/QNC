@@ -2,7 +2,7 @@
 struct Spec {
     sw: u32, sh: u32, cw: u32, ch: u32,
     dw: u32, dh: u32, depth: u32, limited: u32,
-    transfer: u32, u_start: u32, v_start: u32, reserved: u32,
+    transfer: u32, u_start: u32, v_start: u32, average: u32,
 }
 @group(0) @binding(0) var<uniform> spec: Spec;
 @group(0) @binding(1) var<storage, read> source: array<u32>;
@@ -18,12 +18,27 @@ fn sample_at(start: u32, size: vec2<u32>, pos: vec2<i32>) -> f32 {
 }
 
 fn plane(start: u32, size: vec2<u32>, dest: vec2<u32>) -> f32 {
-    // Integer decimation, no vertical blend. 1080p50 -> 540 must keep even
-    // lines together; bilinear 2:1 averages adjacent lines and looks like a
-    // wrong field weave on progressive (and on PsF) content.
     let sx = (dest.x * size.x) / spec.dw;
     let sy = (dest.y * size.y) / spec.dh;
-    return sample_at(start, size, vec2<i32>(i32(sx), i32(sy)));
+    if spec.average == 0u {
+        // Interlaced: integer decimation, no vertical blend (averaging adjacent lines
+        // would mix the two fields).
+        return sample_at(start, size, vec2<i32>(i32(sx), i32(sy)));
+    }
+    // Progressive: the mean of the source block under this pixel (2x2 at 2:1). Taking
+    // every second line and column of a progressive frame made thin lines and edges
+    // jump between lines on motion, like a wrong field (live 2026-10-08).
+    let ex = max(((dest.x + 1u) * size.x) / spec.dw, sx + 1u);
+    let ey = max(((dest.y + 1u) * size.y) / spec.dh, sy + 1u);
+    var total = 0.0;
+    var count = 0.0;
+    for (var y = sy; y < min(ey, sy + 4u); y = y + 1u) {
+        for (var x = sx; x < min(ex, sx + 4u); x = x + 1u) {
+            total = total + sample_at(start, size, vec2<i32>(i32(x), i32(y)));
+            count = count + 1.0;
+        }
+    }
+    return total / count;
 }
 
 fn to_srgb(value: f32) -> f32 {

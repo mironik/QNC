@@ -2962,3 +2962,11 @@ zatvori nestala aplikacija). `qnc-program-output::screens` cita i osvjezavanje i
 mijenja. Izmjereno probnim izvorom 50p na HDMI 50p (`examples/output_test`): prije 257 osvjezavanja i 211 novih
 slika u 5 s (petlja kroz winit propustala osvjezavanja), sada 248/248 i 249/249, nijedna preskocena.
 Ceka probu korisnika s pravim klipom.
+Live 2026-10-08 (korisnik: "i dalje su duhovi i kao krivi field, iako znam da u progresivu nema fielda"): log
+pokazuje da HDMI izlaz dobiva svaku sliku (251/251 u 5 s), a izvor 2002 je progresivni 50p (XML kamere i
+probe); `qnc-player-acceptance` sada broji i slike izvan reda (0 unatrag, 0 ponovljenih). Uzrok je u
+`qnc-gpu-raster`: smanjivanje 1080 -> 540 za preview uzimalo je svaki drugi redak i stupac (namjerno, da ne
+mijesa fieldove), pa su tanke crte i rubovi u pokretu skakali izmedu redaka kao krivi field. Sada se za
+progresivni izvor uzima srednja vrijednost bloka 2x2; isprepleteni izvor i dalje ide bez mijesanja redaka
+(pretvarac ga i inace odbija). Test na GPU-u (`half_size_averages_a_progressive_frame`), pretvorba ~6 ms po
+slici, provjera playera prolazi.

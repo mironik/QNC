@@ -39,7 +39,8 @@ fn main() -> Result<(), String> {
     let (width, height) = (960usize, 540usize);
     let started = Instant::now();
     let mut frame = 0u64;
-    while started.elapsed() < Duration::from_secs(8) {
+    let seconds = std::env::args().nth(1).and_then(|value| value.parse().ok()).unwrap_or(8);
+    while started.elapsed() < Duration::from_secs(seconds) {
         // Exactly every 20 ms, as the player clock: the OS sleep alone is late by up
         // to 15 ms, which itself makes pictures repeat and drop.
         let due = started + Duration::from_millis(frame * 20);

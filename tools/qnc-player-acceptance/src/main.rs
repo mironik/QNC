@@ -402,7 +402,15 @@ fn main() -> Result<(), String> {
         // Picture vs sound: the median within one frame, and no point where the picture
         // lags the sound by more than two frames (AGENTS 8.3 point 6).
         let av_ok = av.as_ref().is_none_or(|a| a.median.abs() <= 1.0 && a.lag_worst >= -2.0);
-        let ok = run.error.is_none() && stalls == 0 && run.stutters == 0 && shown >= 99.0 && av_ok;
+        // Pictures in their order: a frame lower than the one before is shown out of order
+        // (it looks like ghosts or a wrong field on motion); repeats are counted apart.
+        let (mut backwards, mut repeats) = (0u64, 0u64);
+        for pair in run.pictures_at.windows(2) {
+            backwards += u64::from(pair[1].1 < pair[0].1);
+            repeats += u64::from(pair[1].1 == pair[0].1);
+        }
+        println!("     order: {} pictures, {backwards} backwards, {repeats} repeated", run.pictures_at.len());
+        let ok = run.error.is_none() && stalls == 0 && run.stutters == 0 && shown >= 99.0 && av_ok && backwards == 0;
         failed |= !ok;
         println!(
             "{} {:<24} ready {:>5} ms | first picture {:>4} ms | frames {:>5} | shown {:>5.1}% | longest gap {:>4} ms at {} | stutters {:>3} | stalls {} | decoder reopens {} | A/V {}{}",

@@ -141,6 +141,37 @@ mod tests {
 
     #[test]
     #[ignore = "requires a real GPU; explicitly run during pixel/output verification"]
+    fn half_size_averages_a_progressive_frame() {
+        // Lines black and white in turn: a progressive frame halves to the middle grey of
+        // each 2x2 block (taking every second line gave black only, and on motion lines
+        // jumped like a wrong field). Interlaced sources are refused before the GPU.
+        let luma = |s: &ConversionSpec| -> u8 {
+            let mut input = gray(s, 128);
+            for y in 0..s.height as usize {
+                for x in 0..s.width as usize {
+                    input[y * s.width as usize + x] = if y % 2 == 0 { 16 } else { 235 };
+                }
+            }
+            let mut gpu = GpuRasterConverter::prepare(s.clone(), [s.width / 2, s.height / 2]).unwrap();
+            let mut output = vec![0; gpu.output_bytes()];
+            gpu.convert(&input, &mut output).unwrap();
+            output[0]
+        };
+        let mut progressive = spec(PixelLayout::Yuv444p);
+        progressive.range = Range::Limited;
+        progressive.transfer = Transfer::Srgb;
+        let mut interlaced = progressive.clone();
+        interlaced.scan_mode = qnc_media_metadata::ScanMode::InterlacedTopFieldFirst;
+        let averaged = luma(&progressive);
+        assert!((100..=160).contains(&averaged), "progressive 2x2 mean, got {averaged}");
+        assert!(matches!(
+            GpuRasterConverter::prepare(interlaced, [2, 1]),
+            Err(ConversionError::Unsupported("scan_mode"))
+        ));
+    }
+
+    #[test]
+    #[ignore = "requires a real GPU; explicitly run during pixel/output verification"]
     fn gpu_scales_color_bars_without_flipping_or_changing_range() {
         let mut s = spec(PixelLayout::Yuv444p);
         s.width = 64;
@@ -277,7 +308,9 @@ impl GpuRasterConverter {
             u32::from(spec.transfer == Transfer::Bt709),
             y_len,
             y_len + cw * ch,
-            0,
+            // A progressive frame is one instant: the smaller raster averages each block
+            // of it. Interlaced keeps the line decimation (averaging lines mixes fields).
+            u32::from(spec.scan_mode == qnc_media_metadata::ScanMode::Progressive),
         ]
         .into_iter()
         .flat_map(u32::to_le_bytes)
