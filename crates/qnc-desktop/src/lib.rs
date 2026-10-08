@@ -3,6 +3,8 @@
 //! activation and navigation, and one layout with the surface of the active application
 //! over the footer block.
 
+mod paint_rate;
+
 use std::{
     collections::HashMap,
     env,
@@ -100,6 +102,7 @@ pub struct QncShell {
     tabs_watch: Option<qnc_desktop_tabs::Watcher>,
     /// The program on an external screen (laptop + HDMI), its own process.
     program_output: qnc_program_output::ProgramOutput,
+    paint_rate: paint_rate::PaintRate,
 }
 
 /// How often the launch bar reads the active project again (the database is the truth).
@@ -132,6 +135,7 @@ impl QncShell {
             tabs: qnc_desktop_tabs::Tabs { tab_ids: Vec::new(), project_open: false, error: None },
             tabs_watch: None,
             program_output: qnc_program_output::ProgramOutput::default(),
+            paint_rate: Default::default(),
         }
     }
 
@@ -391,6 +395,7 @@ impl eframe::App for QncShell {
     /// every board; the layout is the frame).
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let started = std::time::Instant::now();
+        self.paint_rate.count(ctx, &self.active_tab);
         self.draw(ctx);
         // The program on an external screen (laptop + HDMI), after the forms painted.
         self.program_output.show(ctx);

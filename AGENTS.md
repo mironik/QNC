@@ -3003,3 +3003,13 @@ uvoz 9 originala price (4,6 GB) kroz `qnc-ingest-worker`; s nedostupnom karticom
 (jednom trzaj 69 ms), s kartice 0 od 4 (trzaji 60-150 ms); 2002 od 1500 PASS, koraci 36 ms. Moguce je da su
 svjeze kopirane datoteke bile u memoriji sustava. Nije izvedeno: izrada montaznog proxyja, NVDEC adapter,
 filmstrip/wave/probe i dalje citaju medij s kartice dok ih rade (jednom nakon Odaberi).
+Popravak 2026-10-08 (korisnik: "na HDMI slika nije fluidna"; "da" na istragu potrosnje aplikacije u
+mirovanju): aplikacija na Storyju u pauzi trosila je 57 % jezgre i crtala 61 puta u sekundi. Uzrok:
+`qnc-player-client` u pauzi pita player za stanje jednom po slici, svaki odgovor ima novi `sequence`, a
+`publish` je to brojao kao promjenu i budio sucelje. Sada budi samo novo stanje (`same_state`: sesija,
+generacija i dogadjaji), test. Nova dijagnostika `qnc-desktop` `ui-paint-rate` (jednom u sekundi: broj
+crtanja i tko ga je trazio, samo uz dijagnostiku playera). Poslije: aplikacija u mirovanju 2 crtanja u
+sekundi i oko 2 % jezgre. Izmjereno (izolirana kopija, prica od 2513, 20 s, aplikacija otvorena), prije ->
+poslije: proxy s HDMI-jem 90-94 % slika i 42-65 preskocenih na HDMI-ju -> 99,4-100 % i 0-6; proxy bez
+HDMI-ja 95-97 % -> 100 %; original s diska s HDMI-jem 60-66 % -> 95-96 %; original s diska bez HDMI-ja
+71-76 % -> 98-99 %. Original s HDMI-jem jos ima 7-11 kratkih trzaja na rezovima pokrivalica.

@@ -364,6 +364,21 @@ fn publish_picture(state: &Shared, generation: u64, picture: Option<Arc<MonitorF
     }
 }
 
+/// The same player state: a newer reply that says the same thing (only its sequence is new)
+/// wakes nobody. A paused player is asked for its state every frame interval; waking the
+/// display for each answer painted an idle desktop ~50 times a second (live 2026-10-08).
+fn same_state(a: Option<&EventEnvelope>, b: Option<&EventEnvelope>) -> bool {
+    match (a, b) {
+        (Some(a), Some(b)) => {
+            a.session_id == b.session_id
+                && a.source_generation == b.source_generation
+                && a.events == b.events
+        }
+        (None, None) => true,
+        _ => false,
+    }
+}
+
 fn publish(state: &Shared, generation: u64, view: View) {
     let mut current = state.view.lock().unwrap();
     if state.generation.load(Ordering::Acquire) == generation {
@@ -376,7 +391,7 @@ fn publish(state: &Shared, generation: u64, view: View) {
             || current.preparing != view.preparing
             || current.video_visible != view.video_visible
             || current.error != view.error
-            || current.reply != view.reply;
+            || !same_state(current.reply.as_ref(), view.reply.as_ref());
         *current = view;
         drop(current);
         if changed && let Some(notify) = state.notify.get() {
