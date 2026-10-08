@@ -16,4 +16,4 @@ winit = "0.30.13"
 pollster = "0.4.0"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Foundation"] }
+windows = { version = "0.58", features = ["Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Foundation", "Win32_System_Threading"] }

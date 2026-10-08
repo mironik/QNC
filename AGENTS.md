@@ -2970,3 +2970,10 @@ mijesa fieldove), pa su tanke crte i rubovi u pokretu skakali izmedu redaka kao 
 progresivni izvor uzima srednja vrijednost bloka 2x2; isprepleteni izvor i dalje ide bez mijesanja redaka
 (pretvarac ga i inace odbija). Test na GPU-u (`half_size_averages_a_progressive_frame`), pretvorba ~6 ms po
 slici, provjera playera prolazi.
+Live 2026-10-08 (korisnik: "svenk ne valja"): u pravom radu HDMI izlaz je povremeno preskakao 5-15 slika u 5 s
+(player preda dvije slike unutar jednog osvjezavanja, a izlaz je uzimao samo najnoviju) i nit crtanja je
+kasnila na osvjezavanje (do 43 u 5 s). `tools/qnc-program-output-host`: slike redom, jedna po osvjezavanju,
+iz prstena od 8 mjesta (`qnc-player-frame-transport::LatestFrameReader::backlog`); na najnoviju skace tek kad
+zaostane vise od 3 slike; nit crtanja ima najvisi prioritet (Windows). `qnc-player-acceptance --hdmi`
+pokrece izlaz uz pravi player i zbraja njegove brojke. Izmjereno (klipovi 1492 i 2002 po 15 s): tijekom
+reprodukcije 251 osvjezavanje, 251 nova slika, 0 preskocenih, 0 zakasnjelih u svakih 5 s.

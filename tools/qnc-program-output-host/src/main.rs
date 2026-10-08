@@ -111,6 +111,12 @@ struct Output {
 
 impl Output {
     fn run(mut self) {
+        // The output must not miss a refresh because other work took the processor.
+        #[cfg(windows)]
+        unsafe {
+            use windows::Win32::System::Threading::{GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_TIME_CRITICAL};
+            let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+        }
         let mut reported = Instant::now();
         let mut last_draw: Option<Instant> = None;
         loop {
@@ -172,10 +178,16 @@ impl Output {
         }
     }
 
-    /// The newest picture of the map, if newer than the one shown.
+    /// The next picture of the map in order, one per refresh: two pictures the player
+    /// handed in one refresh interval are shown on two refreshes instead of the first
+    /// being dropped (a pan showed every drop, live 2026-10-08). Only when the output
+    /// falls more than a few pictures behind does it jump to the newest.
     fn take_picture(&mut self) {
+        const MAX_BEHIND: u64 = 3;
         let Some(reader) = &mut self.reader else { return };
-        let update = match reader.read_newest() {
+        let behind = reader.backlog();
+        let next = if behind > MAX_BEHIND { reader.read_newest() } else { reader.read_latest() };
+        let update = match next {
             Ok(update) => update,
             Err(error) => {
                 log(format!("read error={error}"));

@@ -269,6 +269,12 @@ impl LatestFrameReader {
         })))
     }
 
+    /// How many published records this reader has not taken yet (a reader that shows
+    /// them in order, one per refresh, keeps this small).
+    pub fn backlog(&self) -> u64 {
+        read_u64(&self.mmap[PUBLISHED_OFFSET..PUBLISHED_OFFSET + 8]).saturating_sub(self.observed)
+    }
+
     pub fn read_newest(&mut self) -> Result<Option<LatestFrameUpdate>, String> {
         let published = read_u64(&self.mmap[PUBLISHED_OFFSET..PUBLISHED_OFFSET + 8]);
         if published == 0 || published <= self.observed {

@@ -20,12 +20,18 @@ struct Args {
     program_from: Vec<u64>,
     steps: Vec<String>,
     seconds: u64,
+    /// Also run the program output on the external screen and measure what it showed.
+    hdmi: bool,
 }
 
 fn args() -> Result<Args, String> {
-    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), seconds: 10 };
+    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), seconds: 10, hdmi: false };
     let mut list = std::env::args().skip(1);
     while let Some(arg) = list.next() {
+        if arg == "--hdmi" {
+            parsed.hdmi = true;
+            continue;
+        }
         let value = list.next().ok_or(format!("{arg} needs a value"))?;
         match arg.as_str() {
             "--root" => parsed.root = PathBuf::from(value),
@@ -37,7 +43,7 @@ fn args() -> Result<Args, String> {
         }
     }
     if parsed.root.as_os_str().is_empty() {
-        return Err("usage: qnc-player-acceptance --root <isolated QNC root> [--clip NAME]... [--program FRAME]... [--steps NAME]... [--seconds N]".into());
+        return Err("usage: qnc-player-acceptance --root <isolated QNC root> [--clip NAME]... [--program FRAME]... [--steps NAME]... [--seconds N] [--hdmi]".into());
     }
     Ok(parsed)
 }
@@ -88,8 +94,72 @@ fn wait_ready(preview: &mut SourcePreview, timeout: Duration) -> Result<u128, St
     Err(format!("not ready in {} s", timeout.as_secs()))
 }
 
+/// The program output process on the external screen, fed the frame map of the player
+/// the preview runs, as the desktop does; its own counts land in the player log.
+struct Hdmi {
+    child: std::process::Child,
+    stdin: std::process::ChildStdin,
+    map: Option<PathBuf>,
+}
+
+impl Hdmi {
+    fn start() -> Result<Self, String> {
+        let screens = qnc_program_output::screens()?;
+        let screen = qnc_program_output::output_screen(&screens).ok_or("no external screen")?;
+        let host = std::env::current_exe()
+            .map_err(|e| e.to_string())?
+            .with_file_name(format!("qnc-program-output-host{}", std::env::consts::EXE_SUFFIX));
+        let mut child = std::process::Command::new(host)
+            .args(["--x", &screen.x.to_string(), "--y", &screen.y.to_string()])
+            .args(["--width", &screen.width.to_string(), "--height", &screen.height.to_string()])
+            .args(["--refresh-hz", &screen.refresh_hz.unwrap_or(0).to_string()])
+            .args(["--interlaced", if screen.interlaced { "1" } else { "0" }])
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        let stdin = child.stdin.take().ok_or("no stdin")?;
+        Ok(Self { child, stdin, map: None })
+    }
+
+    fn follow(&mut self, preview: &SourcePreview) {
+        use std::io::Write;
+        let map = preview.player_view().picture.as_ref().map(|picture| picture.frame_map.to_path_buf());
+        if map.is_some() && map != self.map {
+            if let Some(path) = &map {
+                let _ = writeln!(self.stdin, "map {}", path.display());
+            }
+            self.map = map;
+        }
+    }
+}
+
+impl Drop for Hdmi {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// What the output reported between two moments: refreshes, new pictures, skipped.
+fn hdmi_counts(root: &Path, from: u128, to: u128) -> Option<(u64, u64, u64)> {
+    let text = std::fs::read_to_string(qnc_dev_diagnostics::log_path(root, qnc_dev_diagnostics::DiagnosticsStream::Player)).ok()?;
+    let field = |line: &str, key: &str| -> u64 {
+        line.split_whitespace().find_map(|part| part.strip_prefix(key)?.parse().ok()).unwrap_or(0)
+    };
+    let mut total = None;
+    for line in text.lines().filter(|line| line.contains(" program-output refreshes=")) {
+        let Some(stamp) = line.split(' ').next().and_then(|s| s.parse::<u128>().ok()) else { continue };
+        if stamp < from || stamp > to {
+            continue;
+        }
+        let (r, n, s) = total.unwrap_or((0, 0, 0));
+        total = Some((r + field(line, "refreshes="), n + field(line, "new_pictures="), s + field(line, "skipped=")));
+    }
+    total
+}
+
 /// Plays for `seconds` from where the player stands and measures the pictures.
-fn play(preview: &mut SourcePreview, run: &mut Run, seconds: u64) {
+fn play(preview: &mut SourcePreview, run: &mut Run, seconds: u64, mut hdmi: Option<&mut Hdmi>) {
     let frame_ms = preview
         .player_view()
         .source_timebase()
@@ -105,6 +175,9 @@ fn play(preview: &mut SourcePreview, run: &mut Run, seconds: u64) {
     let mut last_frame = first_frame;
     while start.elapsed() < Duration::from_secs(seconds) {
         preview.poll();
+        if let Some(hdmi) = hdmi.as_deref_mut() {
+            hdmi.follow(preview);
+        }
         let now = Instant::now();
         if let Some(frame) = preview.player_view().confirmed_source_frame() {
             last_frame = last_frame.max(frame);
@@ -216,12 +289,12 @@ fn av_offsets(root: &Path, run: &Run) -> Option<AvOffsets> {
     })
 }
 
-fn measure(preview: &mut SourcePreview, run: &mut Run, seconds: u64) {
+fn measure(preview: &mut SourcePreview, run: &mut Run, seconds: u64, hdmi: Option<&mut Hdmi>) {
     run.started = unix_ms();
     match wait_ready(preview, Duration::from_secs(20)) {
         Ok(ms) => {
             run.prepare_ms = Some(ms);
-            play(preview, run, seconds);
+            play(preview, run, seconds, hdmi);
         }
         Err(error) => run.error = Some(error),
     }
@@ -356,13 +429,14 @@ fn main() -> Result<(), String> {
     let mut preview = SourcePreview::new();
     preview.configure(PreviewContext::new(settings.clone(), snapshot.settings.clone(), content, bindings));
 
+    let mut hdmi = if args.hdmi { Some(Hdmi::start()?) } else { None };
     let mut runs = Vec::new();
     for wanted in &args.clips {
         let mut run = Run { name: format!("clip {wanted}"), ..Run::default() };
         match clips.iter().find(|clip| clip.name.contains(wanted.as_str())) {
             Some(clip) => {
                 preview.open(&clip.clip_id);
-                measure(&mut preview, &mut run, args.seconds);
+                measure(&mut preview, &mut run, args.seconds, hdmi.as_mut());
             }
             None => run.error = Some("no such clip".into()),
         }
@@ -371,7 +445,7 @@ fn main() -> Result<(), String> {
     for from in &args.program_from {
         let mut run = Run { name: format!("program from {from}"), ..Run::default() };
         preview.show_program_frame(*from, true);
-        measure(&mut preview, &mut run, args.seconds);
+        measure(&mut preview, &mut run, args.seconds, hdmi.as_mut());
         runs.push(run);
     }
     let mut step_runs = Vec::new();
@@ -388,6 +462,7 @@ fn main() -> Result<(), String> {
     }
     preview.close();
     std::thread::sleep(Duration::from_millis(300));
+    drop(hdmi);
 
     let mut failed = false;
     let mut report = Vec::new();
@@ -410,6 +485,9 @@ fn main() -> Result<(), String> {
             repeats += u64::from(pair[1].1 == pair[0].1);
         }
         println!("     order: {} pictures, {backwards} backwards, {repeats} repeated", run.pictures_at.len());
+        if let Some((refreshes, new, skipped)) = hdmi_counts(&log_root, run.started, run.ended + 6000) {
+            println!("     hdmi: {refreshes} refreshes, {new} new pictures, {skipped} skipped (reports of 5 s within the play)");
+        }
         let ok = run.error.is_none() && stalls == 0 && run.stutters == 0 && shown >= 99.0 && av_ok && backwards == 0;
         failed |= !ok;
         println!(

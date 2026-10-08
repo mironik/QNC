@@ -4029,6 +4029,7 @@ dependencies = [
  "qnc-active-project-read",
  "qnc-content-read",
  "qnc-dev-diagnostics",
+ "qnc-program-output",
  "qnc-source-bindings",
  "qnc-source-preview",
  "serde_json",

@@ -10,4 +10,5 @@ qnc-content-read = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-source-bindings = { workspace = true }
 qnc-source-preview = { workspace = true }
+qnc-program-output = { workspace = true }
 serde_json = { workspace = true }
