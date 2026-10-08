@@ -62,6 +62,8 @@ struct Run {
     longest_gap_ms: u128,
     longest_gap_at: u64,
     stutters: u64,
+    /// Each stutter: when the late picture came (unix ms), the gap and the frame before it.
+    stutters_at: Vec<(u128, u128, u64)>,
     error: Option<String>,
     started: u128,
     ended: u128,
@@ -204,6 +206,7 @@ fn play(preview: &mut SourcePreview, run: &mut Run, seconds: u64, mut hdmi: Opti
                 // Windows can itself be late by about 15 ms).
                 if gap as f64 > 3.0 * frame_ms {
                     run.stutters += 1;
+                    run.stutters_at.push((unix_ms(), gap, last_frame));
                 }
             }
             last_picture = now;
@@ -493,6 +496,9 @@ fn main() -> Result<(), String> {
         println!("     order: {} pictures, {backwards} backwards, {repeats} repeated", run.pictures_at.len());
         if let Some((refreshes, new, skipped)) = hdmi_counts(&log_root, run.started, run.ended + 6000) {
             println!("     hdmi: {refreshes} refreshes, {new} new pictures, {skipped} skipped (reports of 5 s within the play)");
+        }
+        for (at, gap, frame) in &run.stutters_at {
+            println!("     stutter at_ms={at} gap_ms={gap} after_frame={frame}");
         }
         let ok = run.error.is_none() && stalls == 0 && run.stutters == 0 && shown >= 99.0 && av_ok && backwards == 0;
         failed |= !ok;

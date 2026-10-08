@@ -3013,3 +3013,12 @@ sekundi i oko 2 % jezgre. Izmjereno (izolirana kopija, prica od 2513, 20 s, apli
 poslije: proxy s HDMI-jem 90-94 % slika i 42-65 preskocenih na HDMI-ju -> 99,4-100 % i 0-6; proxy bez
 HDMI-ja 95-97 % -> 100 %; original s diska s HDMI-jem 60-66 % -> 95-96 %; original s diska bez HDMI-ja
 71-76 % -> 98-99 %. Original s HDMI-jem jos ima 7-11 kratkih trzaja na rezovima pokrivalica.
+Popravak 2026-10-08 (korisnik "ok" na smanjenje tereta na rezovima): `qnc-broadcast-engine` (`program.rs`
+`fill`) trazio je sljedeci rez od playheada, a dekodiranje je ~0,5 s ispred njega: kad je dekodiranje proslo
+rez i preuzelo dekoder otvoren unaprijed, isti rez je jos bio ispred playheada pa se isti dekoder (ffmpeg,
+skok na isto mjesto) otvarao jos jednom tocno na svakom rezu. Sada se trazi od mjesta dekodiranja; test.
+`qnc-player-acceptance` ispisuje svaki trzaj (vrijeme, rupa, frame). Izmjereno (izolirana kopija, prica od
+2513, 20 s, aplikacija otvorena na Projectu): proxy bez HDMI-ja 3/3 PASS, rupe do 30 ms; proxy s HDMI-jem
+1/3 PASS, ostali 1-5 trzaja (98,6-98,7 %); original s diska s HDMI-jem 96-98 %, 2-6 trzaja; original bez
+HDMI-ja 98-99 %, 0-4 trzaja. Preostali trzaji padaju kad se dekoder sljedeceg reza otvara unaprijed
+(skok na kljucni kadar i dekodiranje do trazene slike).

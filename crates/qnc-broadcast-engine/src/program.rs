@@ -335,7 +335,10 @@ impl ProgramVideo {
             .saturating_add(self.prefetch_frames as u64)
             .min(self.source.duration_frames);
         self.next_decode_frame = self.next_decode_frame.max(frame);
-        self.open_upcoming(frame)?;
+        // From where the decoding is, not the playhead: decoding runs ahead of the playhead,
+        // so a cut it has passed still lies ahead of the playhead and searching from there
+        // opened the decoder of that cut a second time at every cut (live 2026-10-08).
+        self.open_upcoming(self.next_decode_frame)?;
         while self.next_decode_frame < target_end {
             let next = self.next_decode_frame;
             if self.ready.contains_key(&next) {
