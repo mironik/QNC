@@ -23,6 +23,9 @@ pub struct Boot {
     pub input: Option<PreparedInput>,
     #[serde(default)]
     pub media_binding: Option<Binding>,
+    /// The source of the sound of the clip when it is not the source of its picture.
+    #[serde(default)]
+    pub sound_binding: Option<Binding>,
     #[serde(default)]
     pub program: Option<ProgramInput>,
     #[serde(default)]
@@ -193,7 +196,9 @@ impl Boot {
                 )?))
             }
             (None, Some(program))
-                if self.media_binding.is_none() && !self.program_bindings.is_empty() =>
+                if self.media_binding.is_none()
+                    && self.sound_binding.is_none()
+                    && !self.program_bindings.is_empty() =>
             {
                 Ok(Plan::Program(ProgramPlan::new(program)?))
             }
@@ -207,7 +212,11 @@ impl Boot {
     /// The media opener of the session, taken once.
     pub fn take_opener(&mut self) -> crate::Result<MediaOpener> {
         if let (Some(input), Some(binding)) = (&self.input, self.media_binding.take()) {
-            return binding.opener(&input.media()?.media_uri);
+            let Some(sound) = self.sound_binding.take() else {
+                return binding.opener(&input.media()?.media_uri);
+            };
+            // Picture and sound from two sources: each URI goes to its own binding.
+            return program_opener(vec![binding, sound]);
         }
         program_opener(std::mem::take(&mut self.program_bindings))
     }

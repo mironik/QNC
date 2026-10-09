@@ -92,15 +92,25 @@ pub fn prepare_launch(
     sources: &[SourceTransportBinding],
     executable: PathBuf,
 ) -> Result<Launch, String> {
-    let media_binding = binding_for(
-        &input.media().map_err(|e| e.to_string())?.media_uri,
-        sources,
-    )?;
+    let picture = input.media().map_err(|e| e.to_string())?.media_uri.clone();
+    let media_binding = binding_for(&picture, sources)?;
+    let sound = &input.audio_media().media_uri;
+    let source_of = |uri: &str| {
+        qnc_source_reader::SourceReference::from_uri(uri)
+            .map(|reference| reference.source_uri().to_string())
+            .map_err(|e| e.to_string())
+    };
+    let sound_binding = if source_of(sound)? == source_of(&picture)? {
+        None
+    } else {
+        Some(binding_for(sound, sources)?)
+    };
     Ok(Launch {
         executable,
         input: LaunchInput::Clip {
             input,
             media_binding,
+            sound_binding,
         },
     })
 }

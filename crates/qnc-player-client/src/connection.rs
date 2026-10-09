@@ -405,6 +405,7 @@ impl Connection {
             LaunchInput::Clip {
                 input,
                 media_binding,
+                sound_binding,
             } => {
                 input
                     .validate_for(&input.workspace_db_uri, &input.snapshot.metadata.clip_id)
@@ -418,7 +419,7 @@ impl Connection {
                 (
                     input.snapshot.metadata.clip_id.clone(),
                     timebase,
-                    serde_json::json!({ "input": input, "media_binding": media_binding }),
+                    serde_json::json!({ "input": input, "media_binding": media_binding, "sound_binding": sound_binding }),
                 )
             }
             LaunchInput::Program {

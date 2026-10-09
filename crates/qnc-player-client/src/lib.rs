@@ -45,6 +45,9 @@ pub enum LaunchInput {
     Clip {
         input: PreparedInput,
         media_binding: MediaBinding,
+        /// The source of the sound when it is not the source of the picture (an optimized
+        /// copy in the project with the sound of the original on the card).
+        sound_binding: Option<MediaBinding>,
     },
     Program {
         program: ProgramInput,

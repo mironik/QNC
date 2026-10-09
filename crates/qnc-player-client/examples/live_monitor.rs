@@ -76,6 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         source_uri: source,
                         root: source_root,
                     },
+                    sound_binding: None,
                 },
             })
         }

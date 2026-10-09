@@ -3089,3 +3089,9 @@ brojem slika se odbija. `qnc-work-settings` `PlaybackInput::OptimizedIfAvailable
 `IngestMedia::Optimized`. Izmjereno (klip 1492, 34 s): QSV kodiranje 13,5-15,2 s; dekodiranje originala 40,4 s
 procesora, optimizirane kopije softverski 28,5 s, s QSV 1,2 s. Nije izvedeno: GPU (QSV) adapter dekodera
 (sljedeci korak, bez njega player optimiziranu kopiju dekodira procesorom), XDCAM 1080i50, export.
+Dopuna 2026-10-09: player klipa dobio je drugu vezu izvora za zvuk (`sound_binding`: `qnc-player-launcher`,
+`qnc-player-client`, `tools/qnc-player-runner`) kad zvuk nije na izvoru slike (optimizirana kopija u
+projektu, zvuk originala na kartici); svaki URI ide vezi svog izvora, kao u programu. Proba na zasticenoj
+kopiji (kartica samo citana, stvarni projekt nediran): uvoz 2002 i 1492 s `optimized` napravio je, opisao i
+provjerio obje kopije (MOV 169 MB i 1 GB); play s kopije 2002/1492 PASS 100 %, A/V -0,1 do -0,2 slike, koraci
+32-36 ms, 10 od 10.
