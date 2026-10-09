@@ -453,6 +453,19 @@ impl ContentStore {
                 }
                 Ok(Data::Changed)
             }
+            Operation::SetPoster { clip_id, thumbnail_uri } => {
+                qnc_contracts::parse_qnc_uri(thumbnail_uri).map_err(err)?;
+                if !self.has_thumbnail_uri {
+                    return Err("Baza nema zapis postera.".into());
+                }
+                self.conn
+                    .execute(
+                        "UPDATE clips SET thumbnail_uri=?2 WHERE clip_id=?1 AND thumbnail_uri IS NULL",
+                        params![clip_id, thumbnail_uri],
+                    )
+                    .map_err(err)?;
+                Ok(Data::Changed)
+            }
             Operation::FinishImport {
                 clip_id,
                 media_uri,
@@ -628,7 +641,7 @@ impl ContentStore {
             ON CONFLICT(clip_id) DO UPDATE SET name=excluded.name,catalog_json=excluded.catalog_json,revision=excluded.revision,final=excluded.final,
             duration_seconds=excluded.duration_seconds,duration_frames=excluded.duration_frames,fps_num=excluded.fps_num,fps_den=excluded.fps_den,
             created_at_utc=excluded.created_at_utc,
-            thumbnail_uri=CASE WHEN clips.import_status='imported' THEN clips.thumbnail_uri ELSE excluded.thumbnail_uri END",
+            thumbnail_uri=CASE WHEN clips.import_status='imported' THEN clips.thumbnail_uri ELSE COALESCE(excluded.thumbnail_uri,clips.thumbnail_uri) END",
             params![clip.id(),clip.source_uri,original.media_uri,clip.name,original.tags.get("creation_time").map(|f| &f.value),duration,
                 video.and_then(|v|v.exact_frame_count()),fps.map(|f|f.fps_num),fps.map(|f|f.fps_den),clip.thumbnail_uri.as_deref(),json,
                 clip.snapshot.revision,clip.snapshot.phase == Phase::Final]).map_err(err)?;

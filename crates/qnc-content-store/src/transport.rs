@@ -235,6 +235,9 @@ impl ContentClient {
     pub fn heartbeat(&mut self, clip_id: String) -> Result<()> {
         self.execute(Operation::Heartbeat { clip_id }).map(|_| ())
     }
+    pub fn set_poster(&mut self, clip_id: String, thumbnail_uri: String) -> Result<()> {
+        self.execute(Operation::SetPoster { clip_id, thumbnail_uri }).map(|_| ())
+    }
     pub fn finish_import(
         &mut self,
         clip_id: String,
@@ -381,6 +384,11 @@ impl ContentWriteTransport {
     /// Tells the other processes and forms something through the serialized transport.
     pub fn set_runtime(&mut self, key: String, name: String, value: String) -> Result<()> {
         self.send_operation(key, Operation::SetRuntime { key: name, value })
+    }
+
+    /// The poster made in the project for a clip that has none.
+    pub fn set_poster(&mut self, key: String, clip_id: String, thumbnail_uri: String) -> Result<()> {
+        self.send_operation(key, Operation::SetPoster { clip_id, thumbnail_uri })
     }
 
     /// Renews the lease of the clip an importer is working on.
@@ -531,6 +539,10 @@ fn execute_write_command(
             error,
         } => {
             client.finish_import(clip_id, media_uri, thumbnail_uri, copy_of, optimized, error)?;
+            Ok(ContentWriteData::Changed)
+        }
+        Operation::SetPoster { clip_id, thumbnail_uri } => {
+            client.set_poster(clip_id, thumbnail_uri)?;
             Ok(ContentWriteData::Changed)
         }
         _ => Err("Nepodrzana content write transport operacija.".into()),

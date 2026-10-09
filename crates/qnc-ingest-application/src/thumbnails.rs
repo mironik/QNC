@@ -19,17 +19,7 @@ impl IngestApplication {
         if clips.is_empty() {
             return;
         }
-        let sources = self
-            .selection_config
-            .as_ref()
-            .map(|config| {
-                config
-                    .sources
-                    .iter()
-                    .filter_map(|source| source.reader().ok())
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+        let sources = self.selection_config.as_ref().map(|c| c.source_readers()).unwrap_or_default();
         let project = self
             .settings_reader
             .as_ref()
@@ -48,6 +38,11 @@ impl IngestApplication {
     }
 
     pub(crate) fn poll_thumbnails(&mut self) -> bool {
+        // A background process makes posters for clips whose source has none: the list
+        // is read again (its signature only) while some clip still waits for one.
+        if self.posters.missing_due(self.view.clips.iter().any(|clip| clip.thumb_uri.is_none())) {
+            let _ = self.refresh_active_project();
+        }
         let mut changed = false;
         for poster in self.posters.poll() {
             if let Some(clip) = self

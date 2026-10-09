@@ -120,6 +120,27 @@ impl ContentReader {
         Ok(conn)
     }
 
+    /// Clips of the catalog that have no poster and are not imported yet (a single file
+    /// without a card picture): what a background process makes posters for. Empty when
+    /// the catalog keeps no posters at all.
+    pub fn clips_without_poster(&self) -> Result<Vec<String>, String> {
+        let conn = self.open()?;
+        if !has_view(&conn, "public_clips")? || !has_column(&conn, "public_clips", "thumbnail_uri")? {
+            return Ok(Vec::new());
+        }
+        let mut statement = conn
+            .prepare(
+                "SELECT clip_id FROM public_clips WHERE thumbnail_uri IS NULL
+                 AND import_status NOT IN ('imported', 'done') ORDER BY clip_id LIMIT ?1",
+            )
+            .map_err(|error| error.to_string())?;
+        let rows = statement
+            .query_map([MAX_CLIPS as i64], |row| row.get(0))
+            .map_err(|error| error.to_string())?;
+        rows.collect::<rusqlite::Result<Vec<String>>>()
+            .map_err(|error| error.to_string())
+    }
+
     /// The clips chosen for work in the project, by name: what Uvezi wrote as selected and
     /// whatever the import has taken over since (queued, being copied, imported). A clip that
     /// is only detected on a card is not shown. (Procedure of QNC v5, `story/db.rs`.)
@@ -421,6 +442,18 @@ mod tests {
             clips[0].thumbnail_uri.as_deref(),
             Some("qnc://local/source/card/file/Thmbnl/b.JPG")
         );
+        // Every clip without a poster that is not imported, also one only detected.
+        let without = reader.clips_without_poster().unwrap();
+        assert!(!without.contains(&"clip-b".to_string()));
+        let imported: Vec<String> = conn
+            .prepare("SELECT clip_id FROM clips WHERE import_status IN ('imported','done')")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert!(without.iter().all(|id| !imported.contains(id)));
+        assert!(!without.is_empty());
     }
 
     #[test]

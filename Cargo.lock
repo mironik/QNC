@@ -3612,6 +3612,7 @@ dependencies = [
  "qnc-active-project-read",
  "qnc-camera-adapter",
  "qnc-camera-sony-fx6-v6",
+ "qnc-content-read",
  "qnc-contracts",
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",

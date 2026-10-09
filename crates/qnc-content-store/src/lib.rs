@@ -209,6 +209,12 @@ pub enum Operation {
     GetRuntime {
         key: String,
     },
+    /// The poster made in the project folder for a clip whose source has none; kept
+    /// only when the clip has no poster yet.
+    SetPoster {
+        clip_id: String,
+        thumbnail_uri: String,
+    },
     FinishImport {
         clip_id: String,
         media_uri: Option<String>,

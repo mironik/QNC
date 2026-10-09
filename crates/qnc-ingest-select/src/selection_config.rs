@@ -179,6 +179,11 @@ pub struct SelectionConfig {
     pub parallelism: usize,
 }
 impl SelectionConfig {
+    /// Readers of the sources this computer can open now (an absent card is left out).
+    pub fn source_readers(&self) -> Vec<SourceReader> {
+        self.sources.iter().filter_map(|source| source.reader().ok()).collect()
+    }
+
     pub fn load(root: &Path) -> Result<Self> {
         Self::from_transport_bindings(qnc_source_bindings::load(root)?)
     }

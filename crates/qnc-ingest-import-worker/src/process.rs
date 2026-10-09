@@ -155,3 +155,45 @@ pub fn launch_worker(root: &Path, target: &ContentTarget) -> Result<(), String> 
     });
     Ok(())
 }
+
+/// Posters for clips whose source has none (a single file without a card picture): made
+/// after Select, before Uvezi, so Ingest shows the clip with a picture (user 2026-10-09;
+/// v5 shows a coloured card instead). The poster is the start of the clip, written in the
+/// project thumbnails folder (never into the source) and recorded through the write
+/// transport only for a clip that has no poster yet. Returns how many were made.
+pub fn make_missing_posters(root: &Path) -> Result<usize, String> {
+    use qnc_ingest_store::content::Access;
+    let active_project = ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
+    let snapshot = active_project.read().map_err(|e| e.to_string())?;
+    let reader = active_project.settings_reader().clone();
+    let plan = IngestWorkPlan::from_settings(snapshot.settings)?;
+    let target = ContentTarget::for_project(&reader, &plan.settings)?;
+    // The catalog is read through its one public reader.
+    let wanted =
+        qnc_content_read::ContentReader::for_project(&reader, &plan.settings)?.clips_without_poster()?;
+    let mut client = target.open(Access::ReadOnly)?;
+    if wanted.is_empty() {
+        return Ok(0);
+    }
+    let mut project = Project::open(root, &reader, &plan, &target)?;
+    let cancel = AtomicBool::new(false);
+    let mut made = 0;
+    for clip_id in wanted {
+        let Some(clip) = client.read(&clip_id)? else { continue };
+        let output = plan
+            .settings
+            .product_local_dir(&project.dir, qnc_work_settings::ProductArea::Thumbnails)
+            .join(&clip_id)
+            .join("poster.jpg");
+        crate::inside_project(&project.dir, &output)?;
+        match crate::create_missing_poster(&clip, &plan, &output, &project.opener, &cancel) {
+            Ok(()) => {
+                let uri = format!("{}/{clip_id}/poster.jpg", plan.thumbnails_uri.trim_end_matches('/'));
+                project.queue.set_poster(clip_id, uri)?;
+                made += 1;
+            }
+            Err(error) => eprintln!("poster {clip_id}: {error}"),
+        }
+    }
+    Ok(made)
+}

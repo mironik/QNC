@@ -9,7 +9,11 @@
 use qnc_image_assets::RgbaImage;
 use qnc_media_thumbnail::{ProjectFolder, ThumbnailBatchService, ThumbnailEvent, ThumbnailRequest};
 use qnc_source_reader::SourceReader;
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 pub const MODULE_ID: &str = "qnc.module.clip-posters";
 pub const VERSION: &str = "0.1.0";
@@ -30,7 +34,14 @@ pub struct ClipPosters {
     wanted: Vec<(String, String)>,
     loaded: HashSet<(String, String)>,
     active_requests: Vec<(String, String)>,
+    /// Since when and when last the list was looked at again for posters still to come.
+    watch: Option<(Instant, Instant)>,
 }
+
+/// How often and how long a list with clips that have no poster is looked at again (a
+/// background process makes posters for clips whose source has none).
+const WATCH_EVERY: Duration = Duration::from_secs(2);
+const WATCH_FOR: Duration = Duration::from_secs(180);
 
 impl ClipPosters {
     pub fn new() -> Self {
@@ -43,9 +54,31 @@ impl ClipPosters {
         self.project = project;
     }
 
+    /// Whether the caller should read its clip list again now: every 2 s while some clip
+    /// has no poster address yet, for 3 minutes after the last change of `missing`.
+    pub fn missing_due(&mut self, missing: bool) -> bool {
+        let now = Instant::now();
+        let Some((since, last)) = self.watch.as_mut() else {
+            if missing {
+                self.watch = Some((now, now));
+            }
+            return false;
+        };
+        if !missing {
+            self.watch = None;
+            return false;
+        }
+        if now.duration_since(*since) > WATCH_FOR || now.duration_since(*last) < WATCH_EVERY {
+            return false;
+        }
+        *last = now;
+        true
+    }
+
     /// Forgets everything loaded (another project).
     pub fn reset(&mut self) {
         self.service.cancel();
+        self.watch = None;
         self.wanted.clear();
         self.loaded.clear();
         self.active_requests.clear();
@@ -307,5 +340,23 @@ mod tests {
         assert_eq!(posters.wanted[0].0, "c");
         assert_eq!(posters.wanted.len(), 3);
         wait_for(&mut posters, 3);
+    }
+}
+
+#[cfg(test)]
+mod missing_tests {
+    use super::*;
+
+    #[test]
+    fn a_list_without_missing_posters_is_never_read_again() {
+        let mut posters = ClipPosters::new();
+        assert!(!posters.missing_due(false));
+        assert!(!posters.missing_due(true), "the first look starts the watch");
+        assert!(!posters.missing_due(true), "not before two seconds");
+        posters.watch = Some((Instant::now(), Instant::now() - WATCH_EVERY));
+        assert!(posters.missing_due(true));
+        assert!(!posters.missing_due(false));
+        posters.watch = Some((Instant::now() - WATCH_FOR - WATCH_EVERY, Instant::now() - WATCH_EVERY));
+        assert!(!posters.missing_due(true), "it gives up after three minutes");
     }
 }

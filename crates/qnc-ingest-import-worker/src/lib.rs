@@ -21,7 +21,9 @@ mod optimize;
 pub use config::ConfigMediaOpener;
 mod process;
 
-pub use process::{launch_worker, run_import, run_service, ImportSummary, WORKER_EXECUTABLE};
+pub use process::{
+    launch_worker, make_missing_posters, run_import, run_service, ImportSummary, WORKER_EXECUTABLE,
+};
 
 use qnc_ingest_store::content::{ContentClient, ImportedCopy, StoredClip};
 use qnc_media_metadata::MediaRepresentation;
@@ -360,45 +362,41 @@ pub fn import_poster(
         .join(clip_id);
     let output = directory.join("poster.jpg");
     inside_project(project_dir, &output).ok()?;
+    let made = format!("{}/{clip_id}/poster.jpg", plan.thumbnails_uri.trim_end_matches('/'));
     match clip.clip.thumbnail_uri.as_deref() {
+        // Already made in the project (a single file without a card poster): kept.
+        Some(uri) if uri == made => {}
         Some(source_uri) => {
             fs::create_dir_all(&directory).ok()?;
             copy_into(opener, source_uri, &output, cancel, &mut || {}).ok()?;
         }
-        None => create_missing_poster(clip, plan, &output, opener, cancel)?,
+        None => create_missing_poster(clip, plan, &output, opener, cancel).ok()?,
     }
-    Some(format!(
-        "{}/{clip_id}/poster.jpg",
-        plan.thumbnails_uri.trim_end_matches('/')
-    ))
+    Some(made)
 }
 
-/// The frame comes from the middle of the clip, chosen from the length the project
-/// database already holds; the media is never probed.
-fn create_missing_poster(
+/// The frame is the start of the clip (user 2026-10-09: not the middle), the first key
+/// frame; the source (proxy when there is one) and its timing come from what the project
+/// database already holds, the media is never probed.
+pub(crate) fn create_missing_poster(
     clip: &StoredClip,
     plan: &IngestWorkPlan,
     output: &Path,
     opener: &dyn MediaOpener,
     cancel: &AtomicBool,
-) -> Option<()> {
+) -> Result<(), String> {
     let filmstrip = qnc_filmstrip::plan_from_snapshot_with_artifact_name(
         &clip.clip.snapshot,
         &plan.filmstrip_uri,
         Some(&clip.clip.name),
-    )
-    .ok()?;
-    let frame = filmstrip.frames.get(filmstrip.frames.len() / 2)?;
-    let source = opener.local_path(&filmstrip.source_uri)?;
-    qnc_poster_create::create_poster(
-        &source,
-        frame.seek_sec,
-        filmstrip.source_timebase,
-        output,
-        cancel,
-    )
-    .ok()?
-    .then_some(())
+    )?;
+    let source = opener
+        .local_path(&filmstrip.source_uri)
+        .ok_or("Izvor klipa nije dostupan na ovom racunalu.")?;
+    match qnc_poster_create::create_poster(&source, 0.0, filmstrip.source_timebase, output, cancel)? {
+        true => Ok(()),
+        false => Err("Ovo racunalo nema lokalni izvlakac slike.".into()),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -507,6 +505,15 @@ impl TransportQueue {
             }
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
+    }
+
+    /// Records the poster made in the project for a clip that has none.
+    pub fn set_poster(&mut self, clip_id: String, thumbnail_uri: String) -> Result<(), String> {
+        let key = self.next_key("poster");
+        self.transport
+            .set_poster(key.clone(), clip_id, thumbnail_uri)
+            .map_err(|e| e.to_string())?;
+        self.wait(&key).map(|_| ())
     }
 
     /// Puts the selected, ready clips into the queue.

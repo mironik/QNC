@@ -128,6 +128,13 @@ fn run_once(root: &Path) -> Result<bool, String> {
         let artifacts = run_artifacts(root);
         artifacts_running.store(false, std::sync::atomic::Ordering::Relaxed);
         let _ = completion.join();
+        // Posters for clips whose source has none (a single file): their records are
+        // final now, so the start of the clip is known.
+        match qnc_ingest_import_worker::make_missing_posters(root) {
+            Ok(0) => {}
+            Ok(made) => eprintln!("posteri napravljeni: {made}"),
+            Err(error) => eprintln!("posteri nisu napravljeni: {error}"),
+        }
         // Wave needs the audio facts the completion has just written; the filmstrips are
         // already made, so this pass only makes the waves the first one had to skip.
         let artifacts = artifacts.and_then(|()| run_artifacts(root));

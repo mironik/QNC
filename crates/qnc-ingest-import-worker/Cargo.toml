@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: executes the import of a claimed clip by the project settings (link, copy proxy, copy original); reads media through the media stream transport, writes the outcome through the content transport"
 
 [dependencies]
+qnc-content-read = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }

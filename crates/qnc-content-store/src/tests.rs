@@ -1000,3 +1000,30 @@ fn an_optimized_copy_is_kept_with_its_description() {
     assert_eq!(read.imported_media_uri.as_deref(), Some(card.as_str()), "the original stays linked");
     assert_eq!(read.imported_optimized, Some(optimized));
 }
+
+#[test]
+fn a_poster_made_for_a_clip_without_one_is_kept_and_survives_a_new_select() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    database(&path);
+    let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+    let mut no_poster = clip("c1");
+    no_poster.thumbnail_uri = None;
+    run(&mut store, Operation::Publish(Box::new(no_poster.clone()))).unwrap();
+    let poster = |path: &std::path::Path| {
+        Connection::open(path)
+            .unwrap()
+            .query_row::<Option<String>, _, _>("SELECT thumbnail_uri FROM public_clips", [], |r| r.get(0))
+            .unwrap()
+    };
+    assert_eq!(poster(&path), None);
+    let set = |store: &mut ContentStore, uri: &str| {
+        run(store, Operation::SetPoster { clip_id: "c1".into(), thumbnail_uri: uri.into() }).unwrap()
+    };
+    set(&mut store, &poster_uri());
+    assert_eq!(poster(&path), Some(poster_uri()));
+    set(&mut store, "qnc://local/project/p1/products/thumbnails/other.jpg");
+    assert_eq!(poster(&path), Some(poster_uri()), "a poster is never replaced");
+    run(&mut store, Operation::Publish(Box::new(no_poster))).unwrap();
+    assert_eq!(poster(&path), Some(poster_uri()), "a new Select without a card poster keeps it");
+}

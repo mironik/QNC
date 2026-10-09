@@ -3135,3 +3135,15 @@ Proba na zasticenoj kopiji (korisnikov Catalyst export `Mironik 2002.MXF`, XDCAM
 `incoming/ftp` kopije; original u Videos samo citan): Select 0,5-2,8 s, jedan probe, zapis konacan i potpun, 5097
 tocnih slika, isprepleten tff, TC 17:35:04:21; Uvezi (link); play 2 x PASS 100 % slika, A/V -0,1 slike, koraci 35 ms,
 10 od 10, dekoder `yadif=mode=send_frame:parity=tff`. Nije provjereno: kroz sucelje Ingesta i Storyja, uz HDMI.
+Dopuna 2026-10-09 (korisnik: "treba jedino dodati kreiranje postera"; "ne iz sredine klipa nego s pocetka"): klip
+ciji izvor nema poster (pojedinacna datoteka) dobiva poster odmah nakon Selecta, prije Uvezi (v5 tu pokazuje samo
+obojeni okvir). Pozadinski `tools/qnc-ingest-worker` nakon dovrsetka zapisa poziva
+`qnc_ingest_import_worker::make_missing_posters`: popis iz jedinog citaca kataloga
+(`qnc-content-read::clips_without_poster`, klipovi bez postera koji nisu uvezeni), prva kljucna slika klipa (pocetak,
+i pri Uvezi; prije sredina) kroz `qnc-poster-create`, datoteka u `products/thumbnails/<klip>/poster.jpg` projekta
+(nikad u izvor), upis kroz pisca baze novom operacijom `qnc-content-store` `SetPoster` (samo za klip bez postera).
+Ponovni Select vise ne brise poster koji klip vec ima (bez postera kartice ostaje postojeci); Uvezi ne kopira poster
+koji je vec u projektu. Ingest dok neki klip nema poster svake 2 s (najvise 3 min) cita potpis kataloga
+(`qnc-clip-posters::missing_due`), pa se poster pojavi sam; citanje izvora za postere premjesteno u
+`qnc-ingest-select::SelectionConfig::source_readers` (C10 Ingest application 1714 -> 1707). Greska postera ide u
+log radnika. Proba na zasticenoj kopiji: dva klipa bez postera, oba napravljena, prva slika klipa.
