@@ -3685,6 +3685,7 @@ dependencies = [
  "qnc-camera-sony-fx6-v6",
  "qnc-contracts",
  "qnc-db-broker",
+ "qnc-decoder-catalog",
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-image-assets",

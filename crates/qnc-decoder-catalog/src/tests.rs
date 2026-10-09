@@ -170,3 +170,31 @@ fn a_gpu_decoder_takes_only_the_saved_formats_it_declares_and_the_rest_goes_to_t
     c.prefer = vec!["missing".into()];
     assert!(c.validate().is_err());
 }
+
+fn saved_media(container: &str, video: (&str, &str), sound: &str) -> qnc_media_metadata::MediaRepresentation {
+    let fact = |value: &str| serde_json::json!({"value": value, "evidence_id": "e", "locator": "/"});
+    let codec = |value: &str| serde_json::json!({"value": {"state": "known", "value": value}, "evidence_id": "e", "locator": "/"});
+    serde_json::from_value(serde_json::json!({
+        "media_uri": "qnc://local/source/test/file/clip", "container": fact(container),
+        "duration_seconds": null, "streams_complete": null, "tags": {}, "streams": [
+            {"index": null, "codec": codec(video.0), "time_base": null,
+             "details": {"kind": "video", "metadata": {"color": {}, "pixel_format": fact(video.1)}}},
+            {"index": null, "codec": codec(sound), "time_base": null,
+             "details": {"kind": "audio", "metadata": {}}}
+        ]
+    }))
+    .unwrap()
+}
+
+#[test]
+fn a_saved_medium_no_decoder_declares_is_refused_with_its_format() {
+    let (dir, c) = local_catalog();
+    let xdcam = saved_media("mxf", ("mpeg2video", "yuv422p"), "pcm_s24le");
+    assert_eq!(c.refusal(dir.path(), &xdcam), None);
+    // An Edius render: Canopus HQX 4:2:2 16-bit in AVI.
+    let edius = saved_media("avi", ("hqx", "yuv422p16le"), "pcm_s16le");
+    let reason = c.refusal(dir.path(), &edius).unwrap();
+    assert!(reason.contains("avi") && reason.contains("hqx"), "{reason}");
+    let mp3 = saved_media("mxf", ("mpeg2video", "yuv422p"), "mp3");
+    assert!(c.refusal(dir.path(), &mp3).is_some(), "sound no decoder declares");
+}

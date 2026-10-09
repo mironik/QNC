@@ -213,6 +213,55 @@ impl Catalog {
         }
         Ok(())
     }
+    /// Why no decoder of this host can play a saved medium, or `None` when one declares
+    /// its container, its picture (codec and pixel format) and every sound codec: the same
+    /// declared formats a play request is held to before it starts. Ingest asks it once,
+    /// after its probe, so a file no decoder can play never becomes a clip (user 2026-10-09).
+    pub fn refusal(&self, directory: &Path, media: &qnc_media_metadata::MediaRepresentation) -> Option<String> {
+        use qnc_media_metadata::{Signal, StreamDetails};
+        let container = media.container.as_ref().map(|fact| fact.value.as_str());
+        let Some(container) = container else {
+            return Some("spremnik nije poznat".into());
+        };
+        let codec = |stream: &qnc_media_metadata::MediaStream| match stream.codec.as_ref().map(|fact| &fact.value) {
+            Some(Signal::Known(codec)) => Some(codec.clone()),
+            _ => None,
+        };
+        let mut picture = None;
+        let mut sounds = Vec::new();
+        for stream in &media.streams {
+            match &stream.details {
+                StreamDetails::Video(video) if picture.is_none() => {
+                    let pixel = video.pixel_format.as_ref().map(|fact| fact.value.clone());
+                    picture = Some((codec(stream), pixel));
+                }
+                StreamDetails::Audio(_) => sounds.push(codec(stream)),
+                _ => {}
+            }
+        }
+        let Some((Some(video_codec), Some(pixel_format))) = picture else {
+            return Some("nema sliku poznatog formata".into());
+        };
+        if sounds.iter().any(Option::is_none) {
+            return Some("zvuk nepoznatog formata".into());
+        }
+        let declares = |a: &&Registration| {
+            a.containers.iter().any(|c| c == container)
+                && a.codecs.contains(&video_codec)
+                && a.pixel_formats.contains(&pixel_format)
+                && sounds.iter().flatten().all(|sound| a.codecs.contains(sound))
+        };
+        if self.validate().is_ok() && self.available(directory).iter().any(declares) {
+            return None;
+        }
+        let sounds: Vec<&str> = sounds.iter().flatten().map(String::as_str).collect();
+        Some(format!(
+            "format nije podrzan ({container}, {video_codec} {pixel_format}{}{})",
+            if sounds.is_empty() { "" } else { ", zvuk " },
+            sounds.join(" ")
+        ))
+    }
+
     pub fn available<'a>(&'a self, directory: &Path) -> Vec<&'a Registration> {
         self.adapters
             .iter()
@@ -387,6 +436,12 @@ impl DecoderAdapter for SelectedAdapter {
 pub fn installed_config() -> Result<DecoderConfig> {
     let (catalog, directory) = installed_catalog()?;
     catalog.selected_config(&directory)
+}
+
+/// [`Catalog::refusal`] with the catalog of this host.
+pub fn installed_refusal(media: &qnc_media_metadata::MediaRepresentation) -> Result<Option<String>> {
+    let (catalog, directory) = installed_catalog()?;
+    Ok(catalog.refusal(&directory, media))
 }
 
 pub fn installed_deployment() -> Result<SelectedDeployment> {

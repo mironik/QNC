@@ -55,8 +55,15 @@ fn import_waiting(root: &Path) -> Result<bool, String> {
 /// The import queue as the project database has it, looked at every second while the
 /// other work of this run goes on (Uvezi may come at any time) and once more when it
 /// has ended; an import runs only when clips wait, so its result stays the last real one.
-fn import_while(root: &Path, running: &std::sync::atomic::AtomicBool) -> Result<(), String> {
+fn import_while(
+    root: &Path,
+    running: &std::sync::atomic::AtomicBool,
+    closed: &std::sync::atomic::AtomicBool,
+) -> Result<(), String> {
     loop {
+        if closed.load(std::sync::atomic::Ordering::Relaxed) {
+            return Ok(());
+        }
         let last = !running.load(std::sync::atomic::Ordering::Relaxed);
         if import_waiting(root)? {
             qnc_ingest_import_worker::run_import(root)?;
@@ -73,6 +80,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
     let active_project = qnc_active_project_read::ActiveProjectReader::from_root(root)
         .map_err(|error| error.to_string())?;
     let snapshot = active_project.read().map_err(|error| error.to_string())?;
+    let started = snapshot.settings.project_id.clone();
     let reader = active_project.settings_reader().clone();
     let target = qnc_content_store::ContentTarget::for_project(&reader, &snapshot.settings)?;
     // One worker per project: the lease covers the import and the artifacts, so a
@@ -105,8 +113,22 @@ fn run_once(root: &Path) -> Result<bool, String> {
     // only the clip a preview wants, the rest right after them.
     let artifacts_running = std::sync::atomic::AtomicBool::new(true);
     let card_busy = || artifacts_running.load(std::sync::atomic::Ordering::Relaxed);
+    // The project database is the truth: once its active project is no longer the one
+    // this run started for (closed, or another opened), the run stops and lets its
+    // database go, so the closed project can be deleted.
+    let closed = std::sync::atomic::AtomicBool::new(false);
     std::thread::scope(|scope| {
-        let import = scope.spawn(|| import_while(root, &running));
+        scope.spawn(|| {
+            while running.load(std::sync::atomic::Ordering::Relaxed) {
+                if !still_active(&active_project, &started) {
+                    closed.store(true, std::sync::atomic::Ordering::Relaxed);
+                    cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+                    return;
+                }
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        });
+        let import = scope.spawn(|| import_while(root, &running, &closed));
         let completion = scope.spawn(|| {
             let done = qnc_record_completion::complete_active_project(
                 root,
@@ -125,9 +147,15 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 Err(error) => eprintln!("dovrsetak zapisa nije uspio: {error}"),
             }
         });
-        let artifacts = run_artifacts(root);
+        let artifacts = run_artifacts(root, &closed);
         artifacts_running.store(false, std::sync::atomic::Ordering::Relaxed);
         let _ = completion.join();
+        if closed.load(std::sync::atomic::Ordering::Relaxed) {
+            running.store(false, std::sync::atomic::Ordering::Relaxed);
+            let _ = import.join();
+            eprintln!("projekt je zatvoren: pozadinski proces staje");
+            return Ok(false);
+        }
         // Posters for clips whose source has none (a single file): their records are
         // final now, so the start of the clip is known.
         match qnc_ingest_import_worker::make_missing_posters(root) {
@@ -137,14 +165,21 @@ fn run_once(root: &Path) -> Result<bool, String> {
         }
         // Wave needs the audio facts the completion has just written; the filmstrips are
         // already made, so this pass only makes the waves the first one had to skip.
-        let artifacts = artifacts.and_then(|()| run_artifacts(root));
+        let artifacts = artifacts.and_then(|()| run_artifacts(root, &closed));
         running.store(false, std::sync::atomic::Ordering::Relaxed);
         let import = import.join().map_err(|_| "Uvoz je pao.".to_string())?;
         artifacts.and(import).map(|()| true)
     })
 }
 
-fn run_artifacts(root: &Path) -> Result<(), String> {
+/// Whether the active project in the database is still the one a run started for.
+fn still_active(active_project: &qnc_active_project_read::ActiveProjectReader, started: &str) -> bool {
+    active_project
+        .read()
+        .is_ok_and(|snapshot| snapshot.settings.project_id == started)
+}
+
+fn run_artifacts(root: &Path, closed: &std::sync::atomic::AtomicBool) -> Result<(), String> {
     let active_project = qnc_active_project_read::ActiveProjectReader::from_root(root)
         .map_err(|error| error.to_string())?;
     let snapshot = active_project.read().map_err(|error| error.to_string())?;
@@ -160,6 +195,9 @@ fn run_artifacts(root: &Path) -> Result<(), String> {
     artifacts.sync(&reader, &settings, target, false)?;
     let deadline = std::time::Instant::now() + Duration::from_secs(60 * 60);
     while artifacts.has_pending_work() {
+        if closed.load(std::sync::atomic::Ordering::Relaxed) {
+            return Ok(()); // dropping the artifacts cancels their workers
+        }
         artifacts.set_playback_priority(player_works());
         let polled = artifacts.poll(None);
         if let Some(error) = polled.error {

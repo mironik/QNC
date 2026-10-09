@@ -111,6 +111,11 @@ impl Worker<'_> {
                 Ok(())
             },
         );
+        if let Ok(Some(reason)) = &result {
+            // Not a clip: no decoder of this host plays it (filter by format).
+            send.send(Event::Removed(vec![clip_id.clone()]))?;
+            send.send(Event::Warning(format!("{name}: preskoceno, {reason}")))?;
+        }
         if let Err(error) = result {
             // Revision zero exists only in the immediate, uncommitted preview.
             send.send(Event::Saved {
@@ -158,7 +163,7 @@ fn process_record(
     cancel: &AtomicBool,
     registry: &CameraRegistry,
     mut publish: impl FnMut(&Snapshot) -> Result<()>,
-) -> Result<()> {
+) -> Result<Option<String>> {
     let clip_id = format!("clip-{}", record.record_id);
     let adapter = registry
         .for_reader(&record.group.proposal.evidence.reader_id)
@@ -207,25 +212,42 @@ fn process_record(
         db.read(&clip_id, None)?
             .ok_or("camera snapshot missing after commit")?
     };
-    publish(&snapshot)?;
     let declared = adapter.sufficiency(&snapshot.metadata) == MetadataSufficiency::Declared;
-    if snapshot.phase == Phase::Final {
-        // A declared record is final by itself; an incomplete one is complete
-        // enough by definition and is never probed.
-        if snapshot.completeness == Completeness::Partial && !declared {
-            return Err("Baza sadrzi nepotpune metapodatke. Nema ponovnog probea.".into());
-        }
-        return Ok(());
-    }
     if declared {
         // The card record stays a camera record; what playback still lacks is
         // completed in the background after Select (v5 media probe job), never here.
-        return Ok(());
+        // A declared record is final by itself; an incomplete one is complete enough
+        // by definition and is never probed.
+        publish(&snapshot)?;
+        return Ok(None);
     }
-    let snapshot = qnc_record_probe::complete(db, record, snapshot, backend, cancel)?;
+    // A record the card does not declare becomes a clip only once its probe shows a
+    // format a decoder of this host can play (user 2026-10-09: filter by format).
+    let snapshot = if snapshot.phase == Phase::Final {
+        if snapshot.completeness == Completeness::Partial {
+            return Err("Baza sadrzi nepotpune metapodatke. Nema ponovnog probea.".into());
+        }
+        snapshot
+    } else {
+        let probed = match qnc_record_probe::complete(db, record, snapshot, backend, cancel) {
+            Ok(probed) => probed,
+            // A file the probe cannot read (a container the probe does not allow, a broken
+            // file) is no clip either; an interrupted probe stays an error for a new Select.
+            Err(qnc_record_probe::Error::Unreadable(message)) => {
+                return Ok(Some(format!("format nije podrzan ({message})")));
+            }
+            Err(error) => return Err(error.to_string().into()),
+        };
+        if probed.completeness == Completeness::Partial {
+            return Err("Nepotpuni metapodaci spremljeni; ponovni probe nije dopusten.".into());
+        }
+        probed
+    };
+    if let Some(reason) = qnc_decoder_catalog::installed_refusal(&snapshot.metadata.original)
+        .map_err(|error| error.to_string())?
+    {
+        return Ok(Some(reason));
+    }
     publish(&snapshot)?;
-    if snapshot.completeness == Completeness::Partial {
-        return Err("Nepotpuni metapodaci spremljeni; ponovni probe nije dopusten.".into());
-    }
-    Ok(())
+    Ok(None)
 }

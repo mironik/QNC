@@ -3186,3 +3186,20 @@ pusti, a preslikavanje frame programa <-> slika izvora segmenta ide omjerom dulj
 (prica FX6 + XDCAM + FX6, XDCAM pokrivalica u FX6 segmentu i FX6 pokrivalica u XDCAM segmentu, pisane kroz
 `qnc-program-db`): 2 od 3 PASS, prvi prolaz 93 % s trzajima 62-140 ms (hladan disk), A/V -0,2 slike, zvuk XDCAM
 pokrivalice od izvora 2000 (= 1000 x 2). Sync/B-roll uzivo kroz sucelje nije proban (alat pusta samo pricu).
+Popravak 2026-10-09 (korisnik: "ako se odabere krivi folder, onda zablokira i neda brisati projekt.. treba uvesti
+filter dozvoljenih datoteka"; odluka "po formatu"): izbor mape Videos pokupio je i Edius render datoteke
+(`RenderAndPaste/*.avi`, HQX 4:2:2 16-bit). Select je klip objavljivao prije probea, pa su nepodrzane datoteke ostale
+u katalogu, a `tools/qnc-ingest-worker` je radio i nakon zatvaranja projekta i drzao njegovu bazu. Izvedeno:
+(1) worker svake sekunde cita aktivni projekt iz baze; kad vise nije onaj za koji je krenuo (zatvoren ili drugi),
+staje (dovrsetak zapisa, artefakti i uvoz se prekidaju, radnici filmstripa/wavea se otkazuju) i pusta bazu.
+(2) Filtar po formatu: zapis koji kartica ne opisuje (pojedinacna datoteka, kamera bez XML-a) postaje klip tek nakon
+jedinog probea u Ingestu i samo ako ga dekoder ovog racunala moze pustiti: `qnc-decoder-catalog`
+(`Catalog::refusal`, `installed_refusal`: spremnik, kodek i pixel format slike i kodek svakog zvuka moraju biti u
+izjavi nekog dekodera kataloga, iste izjave koje provjerava play), `qnc-record-probe` (`Error::Unreadable`: probe
+koji nije procitao medij, npr. spremnik izvan dopustenih, i ponovni Select istog medija), `qnc-ingest-select`
+(`metadata.rs`: takav zapis se ne objavljuje, Ingest dobiva `Removed` i upozorenje "preskoceno, format nije
+podrzan (...)"; zapis kartice koju kartica opisuje i dalje se objavljuje odmah). Provjereno: testovi
+(`qnc-decoder-catalog` novi test: XDCAM MXF prolazi, HQX AVI i zvuk mp3 se odbijaju), conformance, izolirana kopija
+(mapa s HQX AVI, VP9 MKV, ProRes 4444 12-bit MOV, H.264 MOV i XDCAM MXF: klipovi su samo H.264 i MXF, ostali
+"preskoceno" s razlogom). Nalaz za kasnije: ponovni Select mape u kojoj je datoteka istog imena zamijenjena novom
+daje "Izvorni indeks: Conflict" i Select ne prolazi.

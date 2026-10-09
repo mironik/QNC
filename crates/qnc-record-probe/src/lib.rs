@@ -32,6 +32,9 @@ pub enum Error {
     /// A probe never read its medium (did not start or ran out of time): nothing was
     /// learned, and the record may be completed again later.
     Interrupted(String),
+    /// The probe ran and could not read its medium (a container the probe does not
+    /// allow, a broken file): the result is final, the medium is not playable.
+    Unreadable(String),
     /// Anything else: the record stays as it is.
     Failed(String),
 }
@@ -45,7 +48,9 @@ impl Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Interrupted(message) | Self::Failed(message) => f.write_str(message),
+            Self::Interrupted(message) | Self::Unreadable(message) | Self::Failed(message) => {
+                f.write_str(message)
+            }
         }
     }
 }
@@ -164,6 +169,10 @@ fn probe_once(
             Some(AcquisitionOutcome::Stored { document_uri }) => records
                 .document(&document_uri)?
                 .ok_or_else(|| "Spremljeni probe dokaz nedostaje.".into()),
+            // The medium was probed before and could not be read: the same answer again.
+            Some(AcquisitionOutcome::Failed { code }) => {
+                Err(Error::Unreadable(format!("Probe nije uspio: {code}")))
+            }
             _ => Err("Probe je vec pokusan ili je u tijeku. Nema ponovnog pokretanja.".into()),
         };
     }
@@ -211,8 +220,10 @@ fn probe_once(
             let message = format!("Probe nije uspio: {code}");
             Err(if interrupted {
                 Error::Interrupted(message)
-            } else {
+            } else if matches!(error, qnc_media_probe::Error::TransportUncertain) {
                 Error::Failed(message)
+            } else {
+                Error::Unreadable(message)
             })
         }
     }
