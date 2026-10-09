@@ -102,6 +102,9 @@ pub struct InputPlan {
     /// preview: both fields of a frame in one picture, the same frames), so the GPU
     /// converter, the monitor and the HDMI output take progressive pictures only.
     pub(crate) progressive: bool,
+    /// Asked of the decoder for a clip of twice or half the program rate: its pictures
+    /// at the program rate (fields or repeated frames, or every other frame).
+    pub(crate) delivered_rate: Option<qnc_media_metadata::FrameTimebase>,
     pub(crate) audio_streams: Vec<AudioStreamPlan>,
     pub(crate) audio_channels: Option<qnc_audio_output::ChannelMap>,
 }
@@ -114,13 +117,19 @@ pub(crate) struct AudioStreamPlan {
 }
 impl InputPlan {
     pub fn new(input: &PreparedInput, workspace_uri: &str, clip_id: &str) -> Result<Self> {
-        Self::build(input, workspace_uri, clip_id, true)
+        Self::build(input, workspace_uri, clip_id, true, None)
     }
 
     /// A clip inside a story program: the same saved picture and sound, but the
-    /// program chooses the channels (A1/A2), so no project channel layout here.
-    pub fn for_program(input: &PreparedInput, workspace_uri: &str, clip_id: &str) -> Result<Self> {
-        Self::build(input, workspace_uri, clip_id, false)
+    /// program chooses the channels (A1/A2), so no project channel layout here. A clip
+    /// of twice or half the program rate plays at the program rate (`at_program_rate`).
+    pub fn for_program(
+        input: &PreparedInput,
+        workspace_uri: &str,
+        clip_id: &str,
+        program_rate: qnc_media_metadata::FrameTimebase,
+    ) -> Result<Self> {
+        Self::build(input, workspace_uri, clip_id, false, Some(program_rate))
     }
 
     fn build(
@@ -128,6 +137,7 @@ impl InputPlan {
         workspace_uri: &str,
         clip_id: &str,
         project_layout: bool,
+        program_rate: Option<qnc_media_metadata::FrameTimebase>,
     ) -> Result<Self> {
         input.validate_for(workspace_uri, clip_id).map_err(error)?;
         let media = input.media().map_err(error)?;
@@ -179,10 +189,12 @@ impl InputPlan {
                 .ok_or_else(|| error("missing video time base"))?
                 .value,
         );
+        let (timebase, duration_frames, delivered_rate) =
+            at_program_rate(layout.timebase, layout.duration_frames, program_rate)?;
         let mut source = SourceRuntime::new(
             clip_id,
-            layout.duration_frames,
-            Timebase::new(layout.timebase.fps_num, layout.timebase.fps_den).map_err(error)?,
+            duration_frames,
+            Timebase::new(timebase.fps_num, timebase.fps_den).map_err(error)?,
         )
         .map_err(error)?
         .with_video_format(
@@ -235,6 +247,7 @@ impl InputPlan {
             spec,
             output_pixel_format,
             progressive,
+            delivered_rate,
             audio_streams,
             audio_channels,
         })
@@ -267,6 +280,31 @@ type ProjectAudioLayout = (
     Option<AudioFormat>,
     Option<qnc_audio_output::ChannelMap>,
 );
+
+/// A clip in a story of twice or half its rate plays as a source of the story rate (user
+/// 2026-10-09: 2:1 only): counted at that rate its frames are fields or repeated frames
+/// (twice as many) or every other frame (half), and the decoder delivers them so. The
+/// clock, the timestamps of the sound and the program axis stay the program's.
+fn at_program_rate(
+    own: qnc_media_metadata::FrameTimebase,
+    frames: u64,
+    program: Option<qnc_media_metadata::FrameTimebase>,
+) -> Result<(qnc_media_metadata::FrameTimebase, u64, Option<qnc_media_metadata::FrameTimebase>)> {
+    let Some(program) = program else {
+        return Ok((own, frames, None));
+    };
+    let program_rate = i128::from(program.fps_num) * i128::from(own.fps_den);
+    let own_rate = i128::from(own.fps_num) * i128::from(program.fps_den);
+    if program_rate == own_rate {
+        Ok((own, frames, None))
+    } else if program_rate == 2 * own_rate {
+        Ok((program, frames * 2, Some(program)))
+    } else if 2 * program_rate == own_rate {
+        Ok((program, frames / 2, Some(program)))
+    } else {
+        Err(error("program clip rate is neither the program rate nor twice or half of it"))
+    }
+}
 
 fn field_mode_from_saved(scan_mode: ScanMode) -> FieldMode {
     match scan_mode {

@@ -59,7 +59,9 @@ impl ProgramPlan {
         let clips = input
             .clips
             .iter()
-            .map(|(id, clip)| InputPlan::for_program(clip, &input.workspace_db_uri, id))
+            .map(|(id, clip)| {
+                InputPlan::for_program(clip, &input.workspace_db_uri, id, input.playlist.program_timebase)
+            })
             .collect::<Result<Vec<_>>>()?;
         let playlist = &input.playlist;
         let timebase = Timebase::new(

@@ -6,6 +6,7 @@
 //! knows no form, no application and no player.
 
 mod store;
+pub use store::story_per_source;
 mod undo;
 
 use std::sync::Arc;
@@ -41,6 +42,10 @@ pub struct ProgramSegment {
     /// channel 1 (0) unless the user picks another one.
     #[serde(default)]
     pub a1_source_channel: u16,
+    /// Length in story frames: the source range times story frames per source frame
+    /// (2 for a source of half the story rate, 1/2 for twice; user 2026-10-09).
+    #[serde(default)]
+    pub duration_frames: u64,
 }
 
 /// An M marker on the program axis (v5 `story_markers`). `system_role` is
@@ -95,6 +100,10 @@ pub struct StorySelection {
     pub undo_depth: u64,
     #[serde(default)]
     pub redo_depth: u64,
+    /// The rate of the story (set by its first segment); `None` without segments.
+    /// Sources of the same, twice or half that rate make it (user 2026-10-09).
+    #[serde(default)]
+    pub story_fps: Option<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

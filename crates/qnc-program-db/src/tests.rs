@@ -277,8 +277,8 @@ fn a_segment_needs_a_real_range_a_known_kind_an_imported_clip_and_the_story_rate
     assert!(create_segment(&mut store, "voice", (0, 10), (50, 1)).is_err());
     assert!(create_segment(&mut store, "tonovi", (0, 10), (0, 1)).is_err());
     create_segment(&mut store, "tonovi", (0, 10), (50, 1)).unwrap();
-    let mixed = create_segment(&mut store, "offovi", (0, 10), (25, 1)).unwrap_err();
-    assert!(mixed.contains("mijesani fps"), "{mixed}");
+    let mixed = create_segment(&mut store, "offovi", (0, 10), (30, 1)).unwrap_err();
+    assert!(mixed.contains("dvostruki ili upola manji"), "{mixed}");
     assert_eq!(segments(&mut store).len(), 1);
 }
 
@@ -1108,12 +1108,12 @@ fn a_cover_needs_a_slot_the_story_rate_and_one_frame() {
             virtual_shot_id: "c1_broll_001".into(),
             in_frame: 0,
             out_frame: 10,
-            fps_num: 25,
+            fps_num: 30,
             fps_den: 1,
             a2_source_channel: 0,
         },
     );
-    assert!(mixed.is_err(), "mixed fps is refused");
+    assert!(mixed.is_err(), "a rate not 2:1 is refused");
     assert!(covers(&mut store).is_empty());
 }
 
@@ -1242,12 +1242,12 @@ fn replace_takes_the_source_length_and_the_program_around_follows() {
                 clip_id: "c1".into(),
                 in_frame: 0,
                 out_frame: 10,
-                fps_num: 25,
+                fps_num: 30,
                 fps_den: 1,
             },
         )
         .is_err(),
-        "mixed fps is refused"
+        "a rate not 2:1 is refused"
     );
 }
 
@@ -1386,4 +1386,38 @@ fn an_edited_segment_takes_a_new_range_and_its_markers_follow_the_picture() {
         run(&mut store, Operation::TrimSegment { segment_id: ids[1].clone(), in_frame: 9, out_frame: 9 }).is_err(),
         "OUT after IN"
     );
+}
+
+/// The end marker of the program: its length in story frames.
+fn program_length(store: &mut Story) -> u64 {
+    let Data::Markers(rows) = run(store, Operation::ListMarkers).unwrap() else {
+        panic!()
+    };
+    rows.iter().find(|m| m.system_role == "program_end").unwrap().program_frame
+}
+
+#[test]
+fn a_source_of_half_or_twice_the_story_rate_joins_with_its_length_in_story_frames() {
+    // A 50p story: a 1080i50 source (25 frames) is two story frames per frame.
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = imported_store(&dir.path().join("db"));
+    create_segment(&mut store, "tonovi", (0, 10), (50, 1)).unwrap();
+    create_segment(&mut store, "offovi", (5, 15), (25, 1)).unwrap();
+    let rows = segments(&mut store);
+    assert_eq!((rows[1].in_frame, rows[1].out_frame, rows[1].duration_frames), (5, 15, 20));
+    assert_eq!(program_length(&mut store), 30);
+    // The rate stays the story's when its first segment goes.
+    let first = rows[0].segment_id.clone();
+    run(&mut store, Operation::DeleteSegment { segment_id: first }).unwrap();
+    create_segment(&mut store, "tonovi", (0, 4), (50, 1)).unwrap();
+    assert_eq!(program_length(&mut store), 24);
+    // A 25 story: a 50p source is one story frame per two, its range ends on a pair.
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = imported_store(&dir.path().join("db"));
+    create_segment(&mut store, "tonovi", (0, 10), (25, 1)).unwrap();
+    create_segment(&mut store, "offovi", (0, 11), (50, 1)).unwrap();
+    let rows = segments(&mut store);
+    assert_eq!((rows[1].out_frame, rows[1].duration_frames), (10, 5), "11 ends on the pair at 10");
+    assert_eq!(program_length(&mut store), 15);
+    assert!(create_segment(&mut store, "offovi", (0, 1), (50, 1)).is_err(), "shorter than a story frame");
 }

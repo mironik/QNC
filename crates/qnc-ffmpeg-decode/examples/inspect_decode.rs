@@ -29,6 +29,7 @@ fn decode(
         start,
         output_pixel_format: None,
         progressive: false,
+        delivered_rate: None,
     };
     let mut decoder = Decoder::open(
         request,

@@ -141,6 +141,18 @@ impl DecodePlan {
                 if request.progressive && v.scan_mode.is_none() {
                     return Err(invalid("missing saved scan mode for progressive delivery"));
                 }
+                if let (Some(delivered), Some(saved)) = (request.delivered_rate, v.frame_rate.as_ref()) {
+                    let (d, s) = (
+                        i128::from(delivered.fps_num) * i128::from(saved.value.fps_den),
+                        i128::from(saved.value.fps_num) * i128::from(delivered.fps_den),
+                    );
+                    if d != 2 * s && 2 * d != s {
+                        return Err(unsupported("delivered rate other than twice or half the saved one"));
+                    }
+                    if d == 2 * s && v.scan_mode.is_none() {
+                        return Err(invalid("missing saved scan mode for a doubled rate"));
+                    }
+                }
                 let pix = match request.output_pixel_format.as_deref() {
                     None => pix,
                     Some("yuv420p") => "yuv420p".to_string(),

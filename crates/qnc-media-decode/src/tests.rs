@@ -15,6 +15,7 @@ pub(crate) fn fixture() -> DecodeRequest {
         start: None,
         output_pixel_format: None,
         progressive: false,
+        delivered_rate: None,
         media: MediaRepresentation {
             media_uri: "qnc://local/source/test/file/clip%2Emkv".into(),
             container: Some(fact("matroska".into())),

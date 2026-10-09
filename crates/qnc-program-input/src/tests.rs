@@ -14,6 +14,7 @@ fn part(id: &str, kind: &str, clip: &str, range: (u64, u64), active: bool) -> Pr
         fps_den: 1,
         active,
         a1_source_channel: 0,
+        duration_frames: range.1 - range.0,
     }
 }
 
@@ -46,7 +47,7 @@ fn active_segments_follow_each_other_and_keep_their_covers_and_channels() {
         cover("inside-off", (40, 60), "shot"),
         cover("no-shot", (0, 10), ""),
     ];
-    let input = build_input("p1", &segments, &covers, 2).unwrap();
+    let input = build_input("p1", (50, 1), &segments, &covers, 2).unwrap();
 
     assert_eq!(input.playlist_id, "program:p1");
     assert_eq!(input.duration_frames, 70);
@@ -74,7 +75,7 @@ fn active_segments_follow_each_other_and_keep_their_covers_and_channels() {
         "only covers over the segment, and only with their virtual shot (v5 streamable)"
     );
     assert_eq!(off.covers[0].a2_source_channel, 1);
-    assert!(build_input("p1", &[], &[], 2).is_err());
+    assert!(build_input("p1", (50, 1), &[], &[], 2).is_err());
 }
 
 fn fact<T>(value: T) -> Option<m::Fact<T>> {
@@ -236,10 +237,31 @@ fn a_transient_cover_takes_the_window_and_the_stored_covers_there_give_way() {
     assert_eq!((sync.source_in_frame, sync.source_out_frame), (40, 58));
     assert_eq!(sync.a2_source_channel, 1, "the channel chosen for A2");
     let segments = vec![part("off", "offovi", "b", (0, 40), true)];
-    let input = build_input("p1", &segments, &covers, 2).unwrap();
+    let input = build_input("p1", (50, 1), &segments, &covers, 2).unwrap();
     assert_eq!(
         input.segments[0].covers.len(),
         2,
         "played like a stored cover"
     );
+}
+
+#[test]
+fn a_source_of_half_the_story_rate_is_counted_in_story_frames() {
+    // A 50p story: a 1080i50 segment (25 frames) 10..20 is 20 story frames (its fields),
+    // its source counted at the story rate from 20; a 25 cover over it likewise.
+    let mut xdcam = part("xdcam", "tonovi", "x", (10, 20), true);
+    (xdcam.fps_num, xdcam.duration_frames) = (25, 20);
+    let mut over = cover("over", (2, 8), "shot");
+    (over.fps_num, over.source_in_frame) = (25, 5);
+    let input = build_input("p1", (50, 1), &[xdcam], &[over], 2).unwrap();
+    let segment = &input.segments[0];
+    assert_eq!(segment.record_range, ProgramFrameRange::new(0, 20).unwrap());
+    assert_eq!((segment.source_range.source_in, segment.source_range.source_out), (20, 40));
+    assert_eq!(segment.source_range.timebase, FrameTimebase::new(50, 1).unwrap());
+    let cover = &segment.covers[0];
+    assert_eq!((cover.source_range.source_in, cover.source_range.source_out), (10, 16));
+    // A rate not 2:1 is refused.
+    let mut other = part("other", "tonovi", "y", (0, 10), true);
+    other.fps_num = 30;
+    assert!(build_input("p1", (50, 1), &[other], &[], 2).is_err());
 }

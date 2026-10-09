@@ -537,7 +537,20 @@ fn read_packets(
                         .is_some_and(|i| i.value == request.stream_index)
                 })
                 .and_then(|s| match &s.details {
-                    qnc_media_metadata::StreamDetails::Video(v) => v.exact_frame_count(),
+                    qnc_media_metadata::StreamDetails::Video(v) => v.exact_frame_count().map(|count| {
+                        // At a delivered rate of twice or half the saved one, twice or half
+                        // as many pictures (a half of an odd count rounds up: frame 0 is one).
+                        match (request.delivered_rate, v.frame_rate.as_ref()) {
+                            (Some(delivered), Some(saved))
+                                if i128::from(delivered.fps_num) * i128::from(saved.value.fps_den)
+                                    > i128::from(saved.value.fps_num) * i128::from(delivered.fps_den) =>
+                            {
+                                count * 2
+                            }
+                            (Some(_), Some(_)) => count.div_ceil(2),
+                            _ => count,
+                        }
+                    }),
                     _ => None,
                 });
             if expected != Some(ordinal) {

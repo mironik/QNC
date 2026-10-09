@@ -21,6 +21,8 @@ pub(crate) struct DecodeInput {
     output_pixel_format: Option<String>,
     /// Progressive pictures of an interlaced saved source (see `InputPlan`).
     progressive: bool,
+    /// Pictures at the program rate of a clip of twice or half it (see `InputPlan`).
+    delivered_rate: Option<qnc_media_metadata::FrameTimebase>,
     opener: Rc<RefCell<Box<Opener>>>,
 }
 impl DecodeInput {
@@ -34,6 +36,7 @@ impl DecodeInput {
             config,
             output_pixel_format: None,
             progressive: false,
+            delivered_rate: None,
             opener: Rc::new(RefCell::new(Box::new(opener))),
         }
     }
@@ -43,6 +46,12 @@ impl DecodeInput {
         self.progressive = progressive;
         self
     }
+    /// The same input, its pictures delivered at `rate` (a program clip of twice or half
+    /// the program rate, see `InputPlan`).
+    pub fn at_rate(mut self, rate: Option<qnc_media_metadata::FrameTimebase>) -> Self {
+        self.delivered_rate = rate;
+        self
+    }
     /// A second saved representation through the same session transport binding.
     pub fn for_media(&self, media: MediaRepresentation) -> Self {
         Self {
@@ -50,6 +59,7 @@ impl DecodeInput {
             config: self.config.clone(),
             output_pixel_format: self.output_pixel_format.clone(),
             progressive: self.progressive,
+            delivered_rate: self.delivered_rate,
             opener: self.opener.clone(),
         }
     }
@@ -62,6 +72,7 @@ impl DecodeInput {
             start: None,
             output_pixel_format: self.output_pixel_format.clone(),
             progressive: self.progressive,
+            delivered_rate: self.delivered_rate,
         }
         .validate(&self.config)
         .map_err(error)
@@ -74,6 +85,7 @@ impl DecodeInput {
             start,
             output_pixel_format: self.output_pixel_format.clone(),
             progressive: self.progressive,
+            delivered_rate: self.delivered_rate,
         };
         request.validate(&self.config).map_err(error)?;
         let context = decode_open_context(&request);

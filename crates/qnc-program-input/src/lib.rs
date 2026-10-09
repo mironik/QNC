@@ -115,6 +115,7 @@ fn load(
     let mut client = StoryReader::open(target)?;
     let segments = client.list_segments()?;
     let mut covers = client.list_covers()?;
+    let story_rate = client.read_story_selection()?.story_fps.ok_or("Program je prazan.")?;
     drop(client);
     if let Some((range, cover)) = window {
         covers = with_transient_cover(&covers, range, cover);
@@ -126,9 +127,10 @@ fn load(
     let mut resolver = PreparedResolver {
         clips,
         prepared: BTreeMap::new(),
+        story_rate,
     };
     let channels = resolver.prepared(&first.clip_id)?.project_audio.channels;
-    let input = build_input(project_id, &segments, &covers, channels)?;
+    let input = build_input(project_id, story_rate, &segments, &covers, channels)?;
     let mut playlist = build_flat_program_playlist(&input, &mut resolver)?;
     if let Some(((start, end), _)) = window {
         let range =
@@ -184,15 +186,19 @@ pub fn window_loader(
 /// without its virtual shot or timebase is not played (v5 `streamable`).
 pub fn build_input(
     project_id: &str,
+    story_rate: (u32, u32),
     segments: &[ProgramSegment],
     covers: &[ProgramCover],
     audio_channels: u16,
 ) -> Result<ProgramPlaylistBuildInput, String> {
+    let program_timebase = timebase(story_rate.0, story_rate.1, "prica")?;
     let mut start = 0i64;
     let mut inputs = Vec::new();
     for segment in segments.iter().filter(|segment| segment.active) {
-        let timebase = timebase(segment.fps_num, segment.fps_den, &segment.segment_id)?;
-        let frames = frame(segment.out_frame)? - frame(segment.in_frame)?;
+        // A source of twice or half the story rate is counted at the story rate (fields
+        // or repeated frames, or every other frame; user 2026-10-09).
+        let (num, den) = qnc_program_db::story_per_source(story_rate, (segment.fps_num, segment.fps_den))?;
+        let frames = frame(segment.duration_frames)?;
         let record_range =
             ProgramFrameRange::new(start, start + frames).map_err(|error| error.message)?;
         let covers = covers
@@ -202,8 +208,9 @@ pub fn build_input(
                     && (cover.program_start_frame as i64) < record_range.out_frame
                     && (cover.program_end_frame as i64) > record_range.in_frame
             })
-            .map(cover_input)
+            .map(|cover| cover_input(cover, story_rate))
             .collect::<Result<Vec<_>, _>>()?;
+        let source_in = frame(segment.in_frame)? * num / den;
         inputs.push(ProgramSegmentInput {
             segment_id: segment.segment_id.clone(),
             kind: segment.kind.clone(),
@@ -211,24 +218,23 @@ pub fn build_input(
             virtual_shot_id: String::new(),
             record_range,
             source_range: FrameRange {
-                source_in: frame(segment.in_frame)?,
-                source_out: frame(segment.out_frame)?,
-                timebase,
+                source_in,
+                source_out: source_in + frames,
+                timebase: program_timebase,
             },
             a1_source_channel: segment.a1_source_channel,
             covers,
         });
         start += frames;
     }
-    let first = segments
-        .iter()
-        .find(|segment| segment.active)
-        .ok_or("Program je prazan.")?;
+    if inputs.is_empty() {
+        return Err("Program je prazan.".into());
+    }
     Ok(ProgramPlaylistBuildInput {
         playlist_id: format!("program:{project_id}"),
         project_id: project_id.to_string(),
         revision: 0,
-        program_timebase: timebase(first.fps_num, first.fps_den, &first.segment_id)?,
+        program_timebase,
         audio_layout: ProgramAudioLayout::discrete(audio_channels)
             .map_err(|error| error.message)?,
         duration_frames: start,
@@ -236,21 +242,25 @@ pub fn build_input(
     })
 }
 
-fn cover_input(cover: &ProgramCover) -> Result<ProgramCoverInput, String> {
+/// A cover over its slot; its source counted at the story rate, as long as the slot.
+fn cover_input(cover: &ProgramCover, story_rate: (u32, u32)) -> Result<ProgramCoverInput, String> {
+    let (num, den) = qnc_program_db::story_per_source(story_rate, (cover.fps_num, cover.fps_den))?;
+    let record_range = ProgramFrameRange::new(
+        frame(cover.program_start_frame)?,
+        frame(cover.program_end_frame)?,
+    )
+    .map_err(|error| error.message)?;
+    let source_in = frame(cover.source_in_frame)? * num / den;
     Ok(ProgramCoverInput {
         cover_id: cover.cover_id.clone(),
         clip_id: cover.clip_id.clone(),
         virtual_shot_id: cover.virtual_shot_id.clone(),
-        record_range: ProgramFrameRange::new(
-            frame(cover.program_start_frame)?,
-            frame(cover.program_end_frame)?,
-        )
-        .map_err(|error| error.message)?,
         source_range: FrameRange {
-            source_in: frame(cover.source_in_frame)?,
-            source_out: frame(cover.source_out_frame)?,
-            timebase: timebase(cover.fps_num, cover.fps_den, &cover.cover_id)?,
+            source_in,
+            source_out: source_in + (record_range.out_frame - record_range.in_frame),
+            timebase: timebase(story_rate.0, story_rate.1, &cover.cover_id)?,
         },
+        record_range,
         a2_source_channel: cover.a2_source_channel,
         active: true,
     })
@@ -390,6 +400,7 @@ pub fn timecode_start(clip_id: &str, input: &PreparedInput) -> Result<Option<i64
 struct PreparedResolver<'a, C> {
     clips: &'a C,
     prepared: BTreeMap<String, PreparedInput>,
+    story_rate: (u32, u32),
 }
 
 impl<C: ClipInputs> PreparedResolver<'_, C> {
@@ -411,8 +422,26 @@ impl<C: ClipInputs> ProgramMediaResolver for PreparedResolver<'_, C> {
         let timecode = timecode_start(clip_id, input)?;
         let mut media = resolved_media(clip_id, picture, input.audio_media(), &input.layout)?;
         media.timecode_start = timecode;
+        at_story_rate(&mut media, self.story_rate)?;
         Ok(media)
     }
+}
+
+/// A clip of twice or half the story rate described at the story rate, as the player
+/// plays it (user 2026-10-09: 2:1 only): its frames and the timecode of its frame 0 are
+/// counted in story frames.
+pub fn at_story_rate(media: &mut ResolvedProgramMedia, story_rate: (u32, u32)) -> Result<(), String> {
+    let own = (
+        u32::try_from(media.timebase.fps_num).map_err(|_| "Neispravan timebase klipa.")?,
+        u32::try_from(media.timebase.fps_den).map_err(|_| "Neispravan timebase klipa.")?,
+    );
+    let (num, den) = qnc_program_db::story_per_source(story_rate, own)?;
+    if (num, den) != (1, 1) {
+        media.timebase = timebase(story_rate.0, story_rate.1, &media.media.clip_id)?;
+        media.duration_frames = media.duration_frames * num / den;
+        media.timecode_start = media.timecode_start.map(|start| start * num / den);
+    }
+    Ok(())
 }
 
 fn timebase(num: u32, den: u32, label: &str) -> Result<FrameTimebase, String> {

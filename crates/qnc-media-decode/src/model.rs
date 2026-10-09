@@ -23,6 +23,12 @@ pub struct DecodeRequest {
     /// progressive source and for audio.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub progressive: bool,
+    /// Deliver the pictures at this rate instead of the saved one: twice the saved rate
+    /// (an interlaced source gives each field as a picture, a progressive one each frame
+    /// twice) or half of it (every other frame). A source in a story of twice or half its
+    /// rate (user 2026-10-09: 2:1 only). The timestamps are those of the delivered rate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivered_rate: Option<qnc_media_metadata::FrameTimebase>,
 }
 
 #[derive(Debug, Clone)]

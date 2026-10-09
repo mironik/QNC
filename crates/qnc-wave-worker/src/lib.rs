@@ -749,6 +749,7 @@ fn open_decoder(
         start: None,
         output_pixel_format: None,
         progressive: false,
+        delivered_rate: None,
     };
     request
         .validate(&decoder_config)

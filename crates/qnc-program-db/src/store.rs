@@ -211,23 +211,16 @@ impl Store {
             .conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
-        let story_timebase: Option<(u32, u32)> = tx
-            .query_row(
-                "SELECT source_fps_num, source_fps_den FROM story_parts
-                 WHERE active = 1 ORDER BY sort_index LIMIT 1",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()
-            .map_err(err)?;
-        if let Some((num, den)) = story_timebase {
-            // Same rate even when written differently (50/1 and 100/2).
-            if u64::from(num) * u64::from(fps_den) != u64::from(fps_num) * u64::from(den) {
-                return Err(format!(
-                    "Klip ima {fps_num}/{fps_den} fps, a prica {num}/{den}; mijesani fps nije dopusten."
-                ));
+        // The first segment sets the rate of the story; later ones keep it.
+        let rate = match story_rate(&tx)? {
+            Some(rate) => rate,
+            None => {
+                keep_story_rate(&tx, (fps_num, fps_den))?;
+                (fps_num, fps_den)
             }
-        }
+        };
+        let per_source = story_per_source(rate, (fps_num, fps_den))?;
+        let story_fps = f64::from(rate.0) / f64::from(rate.1);
         let next: i64 = tx
             .query_row(
                 "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM story_parts",
@@ -241,9 +234,9 @@ impl Store {
             .unwrap_or(0);
         let segment_id = format!("part_{created:x}");
         let now = story_now();
-        // v5 `segment_source_from_clip_frames`.
-        let (in_frame, out_frame) = (in_frame as i64, out_frame as i64);
-        let duration = out_frame - in_frame;
+        // v5 `segment_source_from_clip_frames`; the length is in story frames.
+        let in_frame = in_frame as i64;
+        let (out_frame, duration) = story_length(in_frame, out_frame as i64, per_source)?;
         let fps = f64::from(fps_num) / f64::from(fps_den);
         tx.execute(
             "INSERT INTO story_parts (
@@ -268,8 +261,8 @@ impl Store {
                 in_frame,
                 out_frame,
                 duration,
-                frames_label(duration, fps),
-                duration_color_key(duration, fps),
+                frames_label(duration, story_fps),
+                duration_color_key(duration, story_fps),
                 now,
                 a1_source_channel
             ],
@@ -472,27 +465,29 @@ impl Store {
             .conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
-        let other_rate: Option<(u32, u32)> = tx
+        // The story keeps its rate while other segments have it; the only segment of a
+        // story gives it the rate of its new source.
+        let others: bool = tx
             .query_row(
-                "SELECT source_fps_num, source_fps_den FROM story_parts
-                 WHERE active = 1 AND part_id != ?1 ORDER BY sort_index LIMIT 1",
+                "SELECT EXISTS(SELECT 1 FROM story_parts WHERE active = 1 AND part_id != ?1)",
                 [segment_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| row.get(0),
             )
-            .optional()
             .map_err(err)?;
-        if let Some((num, den)) = other_rate {
-            if u64::from(num) * u64::from(fps_den) != u64::from(fps_num) * u64::from(den) {
-                return Err(format!(
-                    "Klip ima {fps_num}/{fps_den} fps, a prica {num}/{den}; mijesani fps nije dopusten."
-                ));
+        let rate = match story_rate(&tx)? {
+            Some(rate) if others => rate,
+            _ => {
+                keep_story_rate(&tx, (fps_num, fps_den))?;
+                (fps_num, fps_den)
             }
-        }
+        };
+        let per_source = story_per_source(rate, (fps_num, fps_den))?;
+        let story_fps = f64::from(rate.0) / f64::from(rate.1);
         let (start, end) = segment_window(&tx, segment_id)?
             .ok_or_else(|| format!("part not found: {segment_id}"))?;
         let (start, end) = (start as i64, end as i64);
-        let (in_frame, out_frame) = (in_frame as i64, out_frame as i64);
-        let length = out_frame - in_frame;
+        let in_frame = in_frame as i64;
+        let (out_frame, length) = story_length(in_frame, out_frame as i64, per_source)?;
         let new_end = start + length;
         let fps = f64::from(fps_num) / f64::from(fps_den);
         if new_end < end {
@@ -514,7 +509,7 @@ impl Store {
             delete_markers_with_slots(&tx, &cut)?;
         }
         if new_end != end {
-            shift_markers_from(&tx, end, new_end - end, fps)?;
+            shift_markers_from(&tx, end, new_end - end, story_fps)?;
         }
         let now = story_now();
         tx.execute(
@@ -537,8 +532,8 @@ impl Store {
                 in_frame,
                 out_frame,
                 length,
-                frames_label(length, fps),
-                duration_color_key(length, fps),
+                frames_label(length, story_fps),
+                duration_color_key(length, story_fps),
                 now
             ],
         )
@@ -573,8 +568,11 @@ impl Store {
         let (start, end) = segment_window(&tx, segment_id)?
             .ok_or_else(|| format!("part not found: {segment_id}"))?;
         let (start, end) = (start as i64, end as i64);
-        let (in_frame, out_frame) = (in_frame as i64, out_frame as i64);
-        let length = out_frame - in_frame;
+        let rate = story_rate(&tx)?.ok_or("Prica nema segmenata.")?;
+        let (num, den) = story_per_source(rate, (fps_num, fps_den))?;
+        let story_fps = f64::from(rate.0) / f64::from(rate.1);
+        let in_frame = in_frame as i64;
+        let (out_frame, length) = story_length(in_frame, out_frame as i64, (num, den))?;
         let fps = f64::from(fps_num) / f64::from(fps_den);
         let markers = user_markers_from(&tx, start + 1)?;
         let mut cut = Vec::new();
@@ -584,16 +582,17 @@ impl Store {
                 moved.push((marker_id, frame + start + length - end));
                 continue;
             }
-            let source = old_in + frame - start;
+            // The picture under the marker, in source frames, stays under it.
+            let source = old_in + (frame - start) * den / num;
             if source <= in_frame || source >= out_frame {
                 cut.push(marker_id);
             } else {
-                moved.push((marker_id, start + source - in_frame));
+                moved.push((marker_id, start + (source - in_frame) * num / den));
             }
         }
         delete_markers_with_slots(&tx, &cut)?;
         for (marker_id, frame) in moved {
-            set_marker_frame(&tx, &marker_id, frame, fps)?;
+            set_marker_frame(&tx, &marker_id, frame, story_fps)?;
         }
         tx.execute(
             "UPDATE story_parts SET in_tc = ?2, out_tc = ?3, in_seconds = ?4, out_seconds = ?5,
@@ -609,8 +608,8 @@ impl Store {
                 in_frame,
                 out_frame,
                 length,
-                frames_label(length, fps),
-                duration_color_key(length, fps),
+                frames_label(length, story_fps),
+                duration_color_key(length, story_fps),
                 story_now()
             ],
         )
@@ -851,23 +850,27 @@ impl Store {
             .conn
             .prepare(
                 "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num,
-                        fps_den, active, a1_source_channel
+                        fps_den, active, a1_source_channel, duration_frames
                  FROM public_story_parts ORDER BY sort_index, segment_id",
             )
             .map_err(err)?;
         let rows = statement
             .query_map([], |row| {
+                let (in_frame, out_frame) = (row.get::<_, i64>(4)?.max(0) as u64, row.get::<_, i64>(5)?.max(0) as u64);
+                let duration = row.get::<_, i64>(10)?.max(0) as u64;
                 Ok(ProgramSegment {
                     segment_id: row.get(0)?,
                     kind: row.get(1)?,
                     sort_index: row.get::<_, i64>(2)?.max(0) as u32,
                     clip_id: row.get(3)?,
-                    in_frame: row.get::<_, i64>(4)?.max(0) as u64,
-                    out_frame: row.get::<_, i64>(5)?.max(0) as u64,
+                    in_frame,
+                    out_frame,
                     fps_num: row.get(6)?,
                     fps_den: row.get(7)?,
                     active: row.get::<_, i64>(8)? != 0,
                     a1_source_channel: channel(row.get(9)?),
+                    // A story written before the length was kept in story frames: its range.
+                    duration_frames: if duration > 0 { duration } else { out_frame.saturating_sub(in_frame) },
                 })
             })
             .map_err(err)?
@@ -972,6 +975,7 @@ impl Store {
         Ok(Data::StorySelection(StorySelection {
             undo_depth,
             redo_depth,
+            story_fps: story_rate(&self.conn)?,
             ..selection
         }))
     }
@@ -1117,23 +1121,8 @@ impl Store {
             .conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
-        let story_timebase: Option<(u32, u32)> = tx
-            .query_row(
-                "SELECT source_fps_num, source_fps_den FROM story_parts
-                 WHERE active = 1 ORDER BY sort_index LIMIT 1",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()
-            .map_err(err)?;
-        let Some((num, den)) = story_timebase else {
-            return Err("Prica nema segmenata.".into());
-        };
-        if u64::from(num) * u64::from(fps_den) != u64::from(fps_num) * u64::from(den) {
-            return Err(format!(
-                "Klip ima {fps_num}/{fps_den} fps, a prica {num}/{den}; mijesani fps nije dopusten."
-            ));
-        }
+        let rate = story_rate(&tx)?.ok_or("Prica nema segmenata.")?;
+        story_per_source(rate, (fps_num, fps_den))?;
         type SlotRow = (i64, i64, f64, f64, String, i64);
         let slot: Option<SlotRow> = tx
             .query_row(
@@ -1231,6 +1220,16 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
         )
         .map_err(err)?;
     }
+    // The rate of the story (2026-10-09) is added to an existing state; its old stories
+    // take their first segment until a new first segment sets it.
+    let state_columns = table_columns(conn, "story_state")?;
+    if !state_columns.is_empty() && !state_columns.iter().any(|column| column == "story_fps_num") {
+        conn.execute_batch(
+            "ALTER TABLE story_state ADD COLUMN story_fps_num INTEGER NOT NULL DEFAULT 0;
+             ALTER TABLE story_state ADD COLUMN story_fps_den INTEGER NOT NULL DEFAULT 1;",
+        )
+        .map_err(err)?;
+    }
     let cover_columns = table_columns(conn, "story_covers")?;
     if !cover_columns.is_empty()
         && !["slot_id", "a2_source_channel"]
@@ -1253,7 +1252,9 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
             selected_cover_id TEXT NOT NULL DEFAULT '',
             draft_updated_at TEXT,
             committed_at TEXT,
-            updated_at TEXT
+            updated_at TEXT,
+            story_fps_num INTEGER NOT NULL DEFAULT 0,
+            story_fps_den INTEGER NOT NULL DEFAULT 1
          );
          CREATE TABLE IF NOT EXISTS story_parts (
             part_id TEXT PRIMARY KEY,
@@ -1358,7 +1359,7 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
          DROP VIEW IF EXISTS public_story_state;
          CREATE VIEW public_story_state AS
          SELECT selected_part_id, selected_shot_id, selected_slot_id, selected_cover_id,
-                draft_updated_at, committed_at, updated_at
+                draft_updated_at, committed_at, updated_at, story_fps_num, story_fps_den
          FROM story_state;
          DROP VIEW IF EXISTS public_story_marker_slots;
          CREATE VIEW public_story_marker_slots AS
@@ -1411,21 +1412,83 @@ fn new_marker_id() -> String {
     format!("marker_{nanos:x}")
 }
 
-/// v5 `require_current_story_program_source_fps`: the source rate of the first
-/// active segment; markers and slots need it.
+/// v5 `require_current_story_program_source_fps`: the rate of the story; markers and
+/// slots need it.
 fn require_story_fps(conn: &Connection) -> Result<f64> {
-    let rate: Option<(i64, i64)> = conn
-        .query_row(
-            "SELECT source_fps_num, source_fps_den FROM story_parts
-             WHERE active = 1 AND source_fps_num > 0 AND source_fps_den > 0
-             ORDER BY sort_index LIMIT 1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()
-        .map_err(err)?;
-    rate.map(|(num, den)| num as f64 / den as f64)
+    story_rate(conn)?
+        .map(|(num, den)| f64::from(num) / f64::from(den))
         .ok_or_else(|| "timeline_fps_invalid: story program nema valjan source FPS".into())
+}
+
+/// The rate of the story: set by its first segment and kept while the story has segments
+/// (user 2026-10-09: sources of twice or half that rate may join, so a later first segment
+/// must not change it). A story written before the rate was kept takes its first segment,
+/// as v5. `None` for a story without segments.
+pub(crate) fn story_rate(conn: &Connection) -> Result<Option<(u32, u32)>> {
+    let any: bool = conn
+        .query_row("SELECT EXISTS(SELECT 1 FROM story_parts WHERE active = 1)", [], |row| row.get(0))
+        .map_err(err)?;
+    if !any {
+        return Ok(None);
+    }
+    let kept: (u32, u32) = conn
+        .query_row("SELECT story_fps_num, story_fps_den FROM story_state WHERE id = 1", [], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .map_err(err)?;
+    if kept.0 > 0 && kept.1 > 0 {
+        return Ok(Some(kept));
+    }
+    conn.query_row(
+        "SELECT source_fps_num, source_fps_den FROM story_parts
+         WHERE active = 1 AND source_fps_num > 0 AND source_fps_den > 0
+         ORDER BY sort_index LIMIT 1",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )
+    .optional()
+    .map_err(err)
+}
+
+/// Keeps `rate` as the rate of the story (its first segment).
+fn keep_story_rate(conn: &Connection, (num, den): (u32, u32)) -> Result<()> {
+    conn.execute(
+        "UPDATE story_state SET story_fps_num = ?1, story_fps_den = ?2 WHERE id = 1",
+        params![num, den],
+    )
+    .map_err(err)?;
+    Ok(())
+}
+
+/// Story frames per source frame as (num, den): 1/1 the same rate; 2/1 a source of half
+/// the story rate (1080i50 in a 50p story: each field is a story frame); 1/2 a source of
+/// twice the story rate (a 50p source in a 25 story: two source frames are one story
+/// frame). Any other rate is refused (user 2026-10-09: 2:1 only; v5 refuses any mix).
+pub fn story_per_source(story: (u32, u32), source: (u32, u32)) -> Result<(i64, i64)> {
+    let story_rate = u64::from(story.0) * u64::from(source.1);
+    let source_rate = u64::from(source.0) * u64::from(story.1);
+    if story_rate == source_rate {
+        Ok((1, 1))
+    } else if story_rate == 2 * source_rate {
+        Ok((2, 1))
+    } else if 2 * story_rate == source_rate {
+        Ok((1, 2))
+    } else {
+        Err(format!(
+            "Klip ima {}/{} fps, a prica {}/{}; dopusten je isti, dvostruki ili upola manji fps.",
+            source.0, source.1, story.0, story.1
+        ))
+    }
+}
+
+/// The source range trimmed to whole story frames (a 50p source in a 25 story ends on a
+/// pair) and its length in story frames.
+fn story_length(in_frame: i64, out_frame: i64, (num, den): (i64, i64)) -> Result<(i64, i64)> {
+    let out_frame = out_frame - (out_frame - in_frame) % den;
+    if out_frame <= in_frame {
+        return Err("Raspon je kraci od jedne slike price.".into());
+    }
+    Ok((out_frame, (out_frame - in_frame) * num / den))
 }
 
 /// v5 `round3(frame_to_seconds(frame, fps))`.

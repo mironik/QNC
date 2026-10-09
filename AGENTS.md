@@ -3158,3 +3158,19 @@ Story/MA aplikacija bez sucelja otvori klip, projekt se zatvori kroz `qnc-projec
 se dati preimenovati. Prije: baza zauzeta; sada otpustena. Testovi: posrednik i pisac nakon mirovanja otpustaju bazu
 i ponovno je otvaraju; dijeljena veza se otpusta, a nadzornik zavrsava s njom. Ingest koristi iste kocke; zivo nije
 provjeren (alat ne smije ovisiti o Ingest aplikaciji, C6).
+
+Otkljucano i izvedeno 2026-10-09 (korisnik: "montaza u originalu, a export u formatu za predaju"; "ok, kreni s
+2:1"; odluka korisnika mijenja v5 pravilo jednog fps-a u prici): stopa price je stopa prvog segmenta, zapisana u
+`story_state.story_fps_num/den` i zadrzana dok postoje aktivni segmenti (jedini segment je smije promijeniti). U
+pricu smije izvor iste, dvostruke ili upola manje stope: 1080i50 XDCAM (25) u 50p prici daje svaki field kao sliku
+price, 50p u 25 prici svaku drugu sliku, 25p u 50p svaku sliku dvaput; svaka druga stopa daje jasnu poruku.
+`qnc-program-db` (`story_rate`, `story_per_source`; `story_parts.duration_frames` je duljina u slikama price,
+`in_frame`/`out_frame` ostaju slike izvora; 50p u 25 prici zaokruzuje se na par; pokrivalica prolazi istu provjeru),
+`qnc-program-segments` i `qnc-program-input` (izvor se racuna kao virtualni izvor na stopi price; ugovor playliste
+nije mijenjan), `qnc-broadcast-engine` (`InputPlan` sa stopom price i `delivered_rate`), `qnc-media-decode`
+(`DecodeRequest::delivered_rate`, samo 2x ili 1/2; 2x trazi spremljeni nacin snimanja), `qnc-ffmpeg-decode`
+(`yadif` send_field po spremljenom redoslijedu fieldova, `fps=` za ponavljanje/izostavljanje, vremenske oznake iz
+filtra). Ugovor `story.database.json` (`story_rate`). Sync/B-roll i dalje odbija razlicitu stopu. Provjereno:
+testovi navedenih crateova, conformance, izolirana kopija (priča FX6 50p 5 s + XDCAM 1080i50 5 s = 250 slika price +
+FX6 50p 5 s; XDCAM je kopiran u scratchpad, izvor se samo cita): 1 od 3 PASS, ostali 100 % i 95 % slika s 1-3
+trzaja 63-79 ms, A/V -0,2 slike, zvuk XDCAM-a od izvora 200 (= 100 x 2). Export u format za predaju nije izveden.

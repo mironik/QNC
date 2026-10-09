@@ -116,7 +116,9 @@ impl FfmpegAdapter {
                     "-fps_mode",
                     "passthrough",
                     "-enc_time_base",
-                    "demux",
+                    // At a delivered rate the timestamps are those of the filter (fields or
+                    // repeated frames would round onto the frames of the source).
+                    if request.delivered_rate.is_some() { "filter" } else { "demux" },
                     "-f",
                     "rawvideo",
                 ]);
@@ -343,15 +345,36 @@ fn format_decimal(value: f64, precision: usize) -> String {
 /// v5/v4 `video_decode_filter`: an interlaced saved source delivered progressive gets both
 /// fields of each frame into one picture (`send_frame`: same frame count and rate), field
 /// order from the saved stream. Nothing for a progressive source or without the request.
-fn deinterlace(request: &DecodeRequest) -> &'static str {
+fn deinterlace(request: &DecodeRequest) -> String {
     use qnc_media_metadata::ScanMode;
-    if !request.progressive {
-        return "";
-    }
-    match request.saved_video().and_then(|video| video.scan_mode.as_ref()).map(|scan| scan.value) {
-        Some(ScanMode::InterlacedTopFieldFirst) => "yadif=mode=send_frame:parity=tff:deint=all,",
-        Some(ScanMode::InterlacedBottomFieldFirst) => "yadif=mode=send_frame:parity=bff:deint=all,",
-        Some(ScanMode::Progressive) | None => "",
+    let video = request.saved_video();
+    let parity = match video.and_then(|video| video.scan_mode.as_ref()).map(|scan| scan.value) {
+        Some(ScanMode::InterlacedTopFieldFirst) => Some("tff"),
+        Some(ScanMode::InterlacedBottomFieldFirst) => Some("bff"),
+        Some(ScanMode::Progressive) | None => None,
+    };
+    let saved = video.and_then(|video| video.frame_rate.as_ref()).map(|rate| rate.value);
+    let Some(delivered) = request.delivered_rate else {
+        return match (request.progressive, parity) {
+            (true, Some(parity)) => format!("yadif=mode=send_frame:parity={parity}:deint=all,"),
+            _ => String::new(),
+        };
+    };
+    let doubled = saved.is_some_and(|saved| {
+        i128::from(delivered.fps_num) * i128::from(saved.fps_den)
+            == 2 * i128::from(saved.fps_num) * i128::from(delivered.fps_den)
+    });
+    match (doubled, parity) {
+        // Twice the rate of an interlaced source: each field is a picture.
+        (true, Some(parity)) => format!("yadif=mode=send_field:parity={parity}:deint=all,"),
+        // Otherwise each frame twice, or every other frame, at the delivered rate.
+        (_, parity) => {
+            let fields = match (request.progressive, parity) {
+                (true, Some(parity)) => format!("yadif=mode=send_frame:parity={parity}:deint=all,"),
+                _ => String::new(),
+            };
+            format!("{fields}fps={}/{},", delivered.fps_num, delivered.fps_den)
+        }
     }
 }
 

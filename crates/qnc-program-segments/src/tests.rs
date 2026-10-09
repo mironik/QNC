@@ -12,6 +12,7 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         fps_den: 1,
         active: true,
         a1_source_channel: 0,
+        duration_frames: range.1 - range.0,
     }
 }
 
@@ -66,6 +67,7 @@ fn segments_follow_each_other_on_one_program_axis() {
             stored("b", "offovi", (0, 60)),
         ],
         Some("b"),
+        None,
     );
     assert_eq!(view.total_frames, 310);
     assert_eq!(view.timebase, Some((50, 1)));
@@ -94,6 +96,7 @@ fn deleted_segments_stay_in_the_segment_tab_but_not_in_the_program() {
             stored("c", "tonovi", (0, 5)),
         ],
         Some("b"),
+        None,
     );
     assert_eq!(view.total_frames, 15);
     assert_eq!(view.rows.len(), 2);
@@ -115,11 +118,12 @@ fn the_segment_at_a_frame_and_at_the_end_is_found() {
             stored("b", "tonovi", (0, 5)),
         ],
         None,
+        None,
     );
     assert_eq!(view.segment_at(9).unwrap().segment_id, "a");
     assert_eq!(view.segment_at(10).unwrap().segment_id, "b");
     assert_eq!(view.segment_at(99).unwrap().segment_id, "b");
-    assert!(program(&[], None).segment_at(0).is_none());
+    assert!(program(&[], None, None).segment_at(0).is_none());
 }
 
 #[test]
@@ -134,7 +138,7 @@ fn duration_marks_are_three_five_and_seven_seconds() {
 
 #[test]
 fn unknown_kinds_in_the_database_are_not_shown() {
-    let view = program(&[stored("a", "voice", (0, 10))], None);
+    let view = program(&[stored("a", "voice", (0, 10))], None, None);
     assert!(view.is_empty());
     assert_eq!(view.label(10), "--");
 }
@@ -530,4 +534,14 @@ fn ctrl_s_takes_the_slot_under_the_playhead_and_shift_s_the_first_empty_one() {
     let empty = segments.view().slots.iter().find(|slot| !slot.has_cover).map(|slot| slot.slot_id.clone());
     assert_eq!(segments.view().selected_slot().map(|slot| slot.slot_id.clone()), empty);
     assert!(segments.fit_slot().is_some(), "mark_in_fit_duration takes the length of the selected slot");
+}
+
+#[test]
+fn a_segment_of_half_the_story_rate_takes_its_length_in_story_frames() {
+    let mut xdcam = stored("x", "offovi", (10, 20));
+    (xdcam.fps_num, xdcam.duration_frames) = (25, 20);
+    let view = program(&[stored("a", "tonovi", (0, 10)), xdcam], None, Some((50, 1)));
+    assert_eq!(view.timebase, Some((50, 1)));
+    assert_eq!((view.rows[1].start_frame, view.rows[1].end_frame), (10, 30));
+    assert_eq!(view.total_frames, 30);
 }

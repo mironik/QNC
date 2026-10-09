@@ -246,6 +246,7 @@ impl Runtime {
             start: None,
             output_pixel_format,
             progressive,
+            delivered_rate: None,
         };
         request(&plan.media, plan.video_index, plan.output_pixel_format.clone(), plan.progressive)
             .validate(&decoder_config)
@@ -392,7 +393,7 @@ impl Runtime {
         let inputs: Vec<_> = plan
             .clips
             .iter()
-            .map(|clip| Rc::new(root.for_media(clip.media.clone()).with_delivery(clip.output_pixel_format.clone(), clip.progressive)))
+            .map(|clip| Rc::new(root.for_media(clip.media.clone()).with_delivery(clip.output_pixel_format.clone(), clip.progressive).at_rate(clip.delivered_rate)))
             .collect();
         // The decoder refuses an unsupported saved clip before playback, never mid-program.
         for (clip, input) in plan.clips.iter().zip(&inputs) {

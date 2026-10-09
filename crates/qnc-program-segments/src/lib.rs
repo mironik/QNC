@@ -326,8 +326,20 @@ impl SegmentsView {
     }
 }
 
-/// Builds the program: the stored order, one window after another.
-pub fn program(segments: &[ProgramSegment], selected: Option<&str>) -> SegmentsView {
+/// Builds the program: the stored order, one window after another, in story frames at
+/// the story rate (a source of twice or half that rate is counted in story frames).
+pub fn program(
+    segments: &[ProgramSegment],
+    selected: Option<&str>,
+    story_rate: Option<(u32, u32)>,
+) -> SegmentsView {
+    let timebase = story_rate.or_else(|| {
+        segments
+            .iter()
+            .find(|segment| segment.active && SegmentKind::from_db(&segment.kind).is_some())
+            .map(|first| (first.fps_num, first.fps_den))
+    });
+    let (rate_num, rate_den) = timebase.unwrap_or((0, 1));
     let mut start = 0u64;
     let mut rows = Vec::with_capacity(segments.len());
     let mut parts = Vec::with_capacity(segments.len());
@@ -335,11 +347,11 @@ pub fn program(segments: &[ProgramSegment], selected: Option<&str>) -> SegmentsV
         let Some(kind) = SegmentKind::from_db(&segment.kind) else {
             continue;
         };
-        let frames = segment.out_frame.saturating_sub(segment.in_frame);
+        let frames = segment.duration_frames;
         parts.push(SegmentPart {
             segment_id: segment.segment_id.clone(),
             kind,
-            duration_label: duration_label(frames, segment.fps_num, segment.fps_den),
+            duration_label: duration_label(frames, rate_num, rate_den),
             active: segment.active,
             selected: segment.active && selected == Some(segment.segment_id.as_str()),
         });
@@ -355,18 +367,15 @@ pub fn program(segments: &[ProgramSegment], selected: Option<&str>) -> SegmentsV
             a1_source_channel: segment.a1_source_channel,
             start_frame: start,
             end_frame: start + frames,
-            duration_label: duration_label(frames, segment.fps_num, segment.fps_den),
-            duration_color_key: duration_color_key(frames, segment.fps_num, segment.fps_den),
+            duration_label: duration_label(frames, rate_num, rate_den),
+            duration_color_key: duration_color_key(frames, rate_num, rate_den),
             selected: selected == Some(segment.segment_id.as_str()),
         });
         start += frames;
     }
     SegmentsView {
         parts,
-        timebase: segments
-            .iter()
-            .find(|segment| segment.active && SegmentKind::from_db(&segment.kind).is_some())
-            .map(|first| (first.fps_num, first.fps_den)),
+        timebase,
         total_frames: start,
         rows,
         ..SegmentsView::default()
@@ -570,6 +579,8 @@ pub struct ProgramSegments {
     adopt_selection: bool,
     /// Undo and redo steps kept in the database, from the last read.
     history: (u64, u64),
+    /// The rate of the story from the last read (set by its first segment).
+    story_rate: Option<(u32, u32)>,
     selected: Option<String>,
     selected_marker: Option<String>,
     selected_slot: Option<String>,
@@ -783,6 +794,7 @@ impl ProgramSegments {
                 self.stored_markers = markers;
                 self.stored_slots = slots;
                 self.history = (selection.undo_depth, selection.redo_depth);
+                self.story_rate = selection.story_fps;
                 if std::mem::take(&mut self.adopt_selection) {
                     let some = |id: String| (!id.is_empty()).then_some(id);
                     self.selected = some(selection.selected_part_id);
@@ -1379,7 +1391,7 @@ impl ProgramSegments {
         ) {
             self.selected = None;
         }
-        let mut view = program(&self.stored, self.selected.as_deref());
+        let mut view = program(&self.stored, self.selected.as_deref(), self.story_rate);
         (view.undo_depth, view.redo_depth) = self.history;
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());
         if let Some((marker_id, draft)) = &self.marker_edit {

@@ -970,6 +970,7 @@ impl DecoderFilmstripGenerator {
             start,
             output_pixel_format: None,
             progressive: false,
+            delivered_rate: None,
         };
         request
             .validate(&self.decoder_config)
