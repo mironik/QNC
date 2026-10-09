@@ -12,6 +12,8 @@ fn local_catalog() -> (tempfile::TempDir, Catalog) {
     )
     .unwrap();
     let mut c = catalog();
+    c.adapters.truncate(1);
+    c.prefer.clear();
     c.adapters[0].executable = Executable::Path {
         path: "decoder".into(),
     };
@@ -116,4 +118,55 @@ fn saved_format_must_match_selected_capabilities_before_launch() {
         pixel_format: "unregistered_pixels".into(),
     };
     assert!(config.adapter.validate(&request, &plan).is_err());
+}
+
+fn saved_video(pixel_format: &str) -> DecodeRequest {
+    serde_json::from_value(serde_json::json!({
+        "version": qnc_media_decode::VERSION, "stream_index": 0, "start": null,
+        "media": {"media_uri": "qnc://local/source/test/file/clip", "container": null,
+            "duration_seconds": null, "streams_complete": null, "tags": {}, "streams": [
+            {"index": {"value": 0, "evidence_id": "e", "locator": "/"}, "codec": null, "time_base": null,
+             "details": {"kind": "video", "metadata": {"color": {}, "pixel_format": {"value": pixel_format, "evidence_id": "e", "locator": "/"}}}}
+        ]}
+    }))
+    .unwrap()
+}
+
+#[test]
+fn a_gpu_decoder_takes_only_the_saved_formats_it_declares_and_the_rest_goes_to_the_selected() {
+    let (dir, mut c) = local_catalog();
+    let mut gpu = c.adapters[0].clone();
+    gpu.id = "qnc.ffmpeg.d3d11va".into();
+    gpu.driver = Driver::FfmpegHwaccelV1 { hwaccel: "d3d11va".into() };
+    gpu.codecs = vec!["h264".into()];
+    gpu.pixel_formats = vec!["yuv420p".into(), "nv12".into()];
+    c.adapters.push(gpu);
+    c.prefer = vec!["qnc.ffmpeg.d3d11va".into()];
+    let config = c.selected_config(dir.path()).unwrap();
+    let plan = |codec: &str| DecodePlan {
+        format: DecodedFormat::Video { width: 16, height: 16, pixel_format: "yuv420p".into() },
+        max_packet: 384,
+        exact_packet: Some(384),
+        container: "mov".into(),
+        codec: codec.into(),
+    };
+    let chain = format!("{:?}", config.adapter);
+    assert!(chain.contains("qnc.ffmpeg.d3d11va") && chain.contains("\"qnc.ffmpeg\""), "{chain}");
+    let program = |request: &DecodeRequest, codec: &str| {
+        let endpoint = qnc_media_stream::CodecEndpoint::for_local_file(
+            dir.path().join("decoder"),
+            "qnc://local/source/test/file/clip",
+        )
+        .unwrap();
+        let launch = config.adapter.launch(request, &plan(codec), &endpoint, "stamp").unwrap();
+        launch.command.get_args().map(|a| a.to_string_lossy().into_owned()).collect::<Vec<_>>().join(" ")
+    };
+    assert!(program(&saved_video("yuv420p"), "h264").contains("-hwaccel d3d11va"));
+    // A 4:2:2 10-bit original delivered as 4:2:0 is not 4:2:0 for the GPU.
+    assert!(!program(&saved_video("yuv422p10le"), "h264").contains("-hwaccel"));
+    assert!(!program(&saved_video("yuv420p"), "ffv1").contains("-hwaccel"));
+    c.prefer = vec!["qnc.ffmpeg".into()];
+    assert!(c.validate().is_err(), "the selected decoder is not also preferred");
+    c.prefer = vec!["missing".into()];
+    assert!(c.validate().is_err());
 }

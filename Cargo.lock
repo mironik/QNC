@@ -3226,6 +3226,7 @@ dependencies = [
  "qnc-ffmpeg-decode",
  "qnc-frame-timebase",
  "qnc-media-decode",
+ "qnc-media-metadata",
  "qnc-media-stream",
  "serde",
  "serde_json",

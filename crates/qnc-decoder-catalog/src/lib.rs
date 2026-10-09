@@ -18,6 +18,11 @@ const MAX_CATALOG_BYTES: u64 = 256 * 1024;
 pub struct Catalog {
     pub version: String,
     pub selected: String,
+    /// GPU decoders of this host tried before `selected`, in this order: a request goes to
+    /// the first one that declares its saved format (codec, container, pixel format), else
+    /// to `selected`. The choice is made before decoding starts, never after a failure.
+    #[serde(default)]
+    pub prefer: Vec<String>,
     pub adapters: Vec<Registration>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,7 +94,7 @@ impl LocalFilmstripExtractor {
         cancel: &AtomicBool,
     ) -> std::result::Result<(), String> {
         match &self.deployment.driver {
-            Driver::FfmpegCliV1 => qnc_ffmpeg_decode::extract_filmstrip_frames_with_cancel(
+            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } => qnc_ffmpeg_decode::extract_filmstrip_frames_with_cancel(
                 &self.deployment.executable,
                 source,
                 &frames
@@ -121,6 +126,8 @@ impl LocalFilmstripExtractor {
 #[serde(tag = "protocol", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Driver {
     FfmpegCliV1,
+    /// The ffmpeg CLI with a GPU decoder of this host (`-hwaccel`).
+    FfmpegHwaccelV1 { hwaccel: String },
     QncPacketsV1 { args: Vec<String> },
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +191,11 @@ impl Catalog {
             {
                 return Err(bad("invalid or duplicate decoder registration"));
             }
+            if let Driver::FfmpegHwaccelV1 { hwaccel } = &a.driver
+                && !qnc_ffmpeg_decode::HWACCELS.contains(&hwaccel.as_str())
+            {
+                return Err(bad("unknown GPU decoder"));
+            }
             if let Driver::QncPacketsV1 { args } = &a.driver
                 && (args.len() > 32 || args.iter().any(|s| s.len() > 4096 || s.contains('\0')))
             {
@@ -192,6 +204,12 @@ impl Catalog {
         }
         if !ids.contains(&self.selected) {
             return Err(bad("selected decoder is not registered"));
+        }
+        if self.prefer.len() > 16
+            || self.prefer.iter().collect::<BTreeSet<_>>().len() != self.prefer.len()
+            || self.prefer.iter().any(|id| id == &self.selected || !ids.contains(id))
+        {
+            return Err(bad("invalid preferred decoder list"));
         }
         Ok(())
     }
@@ -202,27 +220,22 @@ impl Catalog {
             .collect()
     }
     pub fn selected_config(&self, directory: &Path) -> Result<DecoderConfig> {
-        let deployment = self.selected_deployment(directory)?;
+        let selected = self.selected_deployment(directory)?;
+        // A preferred GPU decoder this OS/CPU cannot run is left out; the selected one must run.
+        let mut chain = Vec::new();
+        for id in &self.prefer {
+            let registration = self.adapters.iter().find(|a| &a.id == id).ok_or_else(|| bad("missing decoder"))?;
+            if let Ok(executable) = registration.executable_path(directory) {
+                chain.push(SelectedAdapter::new(registration, executable)?);
+            }
+        }
         let registration = self
             .adapters
             .iter()
-            .find(|a| a.id == deployment.id)
-            .ok_or_else(|| bad("missing decoder selection"))?
-            .clone();
-        let adapter: Arc<dyn DecoderAdapter> = match &registration.driver {
-            Driver::FfmpegCliV1 => {
-                Arc::new(qnc_ffmpeg_decode::FfmpegAdapter::new(deployment.executable))
-            }
-            Driver::QncPacketsV1 { args } => Arc::new(ExternalAdapter {
-                adapter_id: registration.id.clone(),
-                executable: deployment.executable,
-                args: args.clone(),
-            }),
-        };
-        Ok(DecoderConfig::new(SelectedAdapter {
-            registration: registration.clone(),
-            adapter,
-        }))
+            .find(|a| a.id == selected.id)
+            .ok_or_else(|| bad("missing decoder selection"))?;
+        chain.push(SelectedAdapter::new(registration, selected.executable)?);
+        Ok(DecoderConfig::new(Chain(chain)))
     }
 
     pub fn selected_deployment(&self, directory: &Path) -> Result<SelectedDeployment> {
@@ -289,12 +302,65 @@ struct SelectedAdapter {
     registration: Registration,
     adapter: Arc<dyn DecoderAdapter>,
 }
+impl SelectedAdapter {
+    fn new(registration: &Registration, executable: PathBuf) -> Result<Self> {
+        let adapter: Arc<dyn DecoderAdapter> = match &registration.driver {
+            Driver::FfmpegCliV1 => Arc::new(qnc_ffmpeg_decode::FfmpegAdapter::new(executable)),
+            Driver::FfmpegHwaccelV1 { hwaccel } => {
+                Arc::new(qnc_ffmpeg_decode::FfmpegAdapter::with_hwaccel(executable, hwaccel)?)
+            }
+            Driver::QncPacketsV1 { args } => Arc::new(ExternalAdapter {
+                adapter_id: registration.id.clone(),
+                executable,
+                args: args.clone(),
+            }),
+        };
+        Ok(Self { registration: registration.clone(), adapter })
+    }
+}
+
+/// The decoders of this host in catalog order; each request is decoded by the first one
+/// that declares its saved format, decided before the decoder starts.
+#[derive(Debug)]
+struct Chain(Vec<SelectedAdapter>);
+
+impl Chain {
+    fn choose(&self, request: &DecodeRequest, plan: &DecodePlan) -> Result<&SelectedAdapter> {
+        let mut refusal = None;
+        for adapter in &self.0 {
+            match adapter.validate(request, plan) {
+                Ok(()) => return Ok(adapter),
+                Err(error) => refusal = Some(error),
+            }
+        }
+        Err(refusal.unwrap_or_else(|| bad("no decoder registered")))
+    }
+}
+
+impl DecoderAdapter for Chain {
+    fn validate(&self, request: &DecodeRequest, plan: &DecodePlan) -> Result<()> {
+        self.choose(request, plan).map(|_| ())
+    }
+    fn launch(
+        &self,
+        request: &DecodeRequest,
+        plan: &DecodePlan,
+        ep: &CodecEndpoint,
+        stamp: &str,
+    ) -> Result<ProcessLaunch> {
+        self.choose(request, plan)?.launch(request, plan, ep, stamp)
+    }
+}
+
 impl DecoderAdapter for SelectedAdapter {
     fn validate(&self, request: &DecodeRequest, plan: &DecodePlan) -> Result<()> {
         let a = &self.registration;
         if !a.containers.contains(&plan.container)
             || !a.codecs.contains(&plan.codec)
             || matches!(&plan.format, DecodedFormat::Video { pixel_format, .. } if !a.pixel_formats.contains(pixel_format))
+            // The saved picture itself, not only the delivered layout: a 4:2:2 10-bit source
+            // delivered as 4:2:0 is still decoded as 4:2:2 10-bit.
+            || saved_pixel_format(request).is_some_and(|saved| !a.pixel_formats.contains(&saved))
         {
             return Err(DecodeError::new(
                 ErrorKind::Unsupported,
@@ -331,7 +397,9 @@ pub fn installed_deployment() -> Result<SelectedDeployment> {
 pub fn installed_filmstrip_extractor() -> Result<Option<LocalFilmstripExtractor>> {
     let deployment = installed_deployment()?;
     Ok(match deployment.driver {
-        Driver::FfmpegCliV1 => Some(LocalFilmstripExtractor { deployment }),
+        Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } => {
+            Some(LocalFilmstripExtractor { deployment })
+        }
         Driver::QncPacketsV1 { .. } => None,
     })
 }
@@ -360,3 +428,15 @@ fn installed_catalog() -> Result<(Catalog, PathBuf)> {
 
 #[cfg(test)]
 mod tests;
+
+/// The saved pixel format of the requested video stream.
+fn saved_pixel_format(request: &DecodeRequest) -> Option<String> {
+    request.media.streams.iter().find_map(|stream| match &stream.details {
+        qnc_media_metadata::StreamDetails::Video(video)
+            if stream.index.as_ref().map(|i| i.value) == Some(request.stream_index) =>
+        {
+            video.pixel_format.as_ref().map(|p| p.value.clone())
+        }
+        _ => None,
+    })
+}

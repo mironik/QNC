@@ -15,12 +15,33 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct FfmpegAdapter {
     executable: PathBuf,
+    /// The GPU decoder of this host (`-hwaccel`), when the catalog registers one; the
+    /// decoded picture is downloaded and converted to the delivered layout.
+    hwaccel: Option<String>,
 }
+
+/// The `-hwaccel` names a catalog may register: the standard GPU decoders of each OS that
+/// work with the native decoder of the saved codec (Windows D3D11VA/DXVA2 on any GPU, NVIDIA
+/// CUDA, Linux VA-API, Apple VideoToolbox).
+pub const HWACCELS: [&str; 5] = ["d3d11va", "dxva2", "cuda", "vaapi", "videotoolbox"];
+
 impl FfmpegAdapter {
     pub fn new(executable: impl Into<PathBuf>) -> Self {
         Self {
             executable: executable.into(),
+            hwaccel: None,
         }
+    }
+
+    /// The same adapter decoding the picture on the GPU with `hwaccel` (one of `HWACCELS`).
+    pub fn with_hwaccel(executable: impl Into<PathBuf>, hwaccel: &str) -> Result<Self> {
+        if !HWACCELS.contains(&hwaccel) {
+            return Err(invalid("unknown GPU decoder"));
+        }
+        Ok(Self {
+            executable: executable.into(),
+            hwaccel: Some(hwaccel.into()),
+        })
     }
     fn command(
         &self,
@@ -45,6 +66,9 @@ impl FfmpegAdapter {
             "-noautorotate",
             "-copyts",
         ]);
+        if let (Some(hwaccel), DecodedFormat::Video { .. }) = (&self.hwaccel, &plan.format) {
+            cmd.args(["-hwaccel", hwaccel]);
+        }
         cmd.args([
             "-protocol_whitelist",
             ep.protocol_whitelist(),
@@ -76,7 +100,11 @@ impl FfmpegAdapter {
             DecodedFormat::Video { pixel_format, .. } => {
                 // A delivered layout other than the saved one is converted explicitly
                 // here (the graph never converts on its own); otherwise none is done.
-                let convert = if request.output_pixel_format.is_some() { "scale," } else { "" };
+                let convert = if request.output_pixel_format.is_some() || self.hwaccel.is_some() {
+                    "scale,"
+                } else {
+                    ""
+                };
                 cmd.args([
                     "-an",
                     "-vf",

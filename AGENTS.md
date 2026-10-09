@@ -3095,3 +3095,15 @@ projektu, zvuk originala na kartici); svaki URI ide vezi svog izvora, kao u prog
 kopiji (kartica samo citana, stvarni projekt nediran): uvoz 2002 i 1492 s `optimized` napravio je, opisao i
 provjerio obje kopije (MOV 169 MB i 1 GB); play s kopije 2002/1492 PASS 100 %, A/V -0,1 do -0,2 slike, koraci
 32-36 ms, 10 od 10.
+Otkljucano i izvedeno 2026-10-09 (korisnik "da" na GPU dekoder nakon optimizirane kopije): katalog dekodera
+(`catalogs/decoders/catalog.json`) dobio je popis `prefer`: GPU dekoderi ovog racunala koji se pokusavaju prije
+odabranog (`selected`, ffmpeg na procesoru). Zahtjev dekodira prvi koji izjavljuje spremljeni format (kodek,
+spremnik, pixel format), odluka se donosi prije pokretanja dekodera, nikad nakon greske. GPU provjerava i spremljeni
+format izvora, ne samo isporuceni (4:2:2 10-bit original isporucen kao 4:2:0 ide procesoru, jer bi ffmpeg na GPU-u
+tiho presao na procesor). `qnc-decoder-catalog` (`Chain`, `Driver::FfmpegHwaccelV1`, provjera popisa),
+`qnc-ffmpeg-decode` (`FfmpegAdapter::with_hwaccel`, `HWACCELS`: d3d11va, dxva2, cuda, vaapi, videotoolbox; slika se
+spusta i pretvara u isporuceni format). Prvi unos: `qnc.ffmpeg.d3d11va` (Windows, svaki GPU; samo H.264 8-bit 4:2:0).
+Provjera uredaja pri pokretanju nije uvedena (~150 ms po procesu playera); ako uredaj ne radi, ffmpeg javlja gresku.
+Izmjereno (1492, 34 s, optimizirana kopija, isporuka yuv420p): procesor 20,0 s CPU, D3D11VA 11,7 s, QSV 11,8 s;
+uz isporuku nv12 D3D11VA 8,0 s, DXVA2 7,7 s. Zasticena kopija: play 2002/1492 PASS 100 % (slika D3D11VA, zvuk
+procesor), koraci 33 ms, 10 od 10.
