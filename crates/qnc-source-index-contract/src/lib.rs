@@ -70,9 +70,12 @@ impl Record {
         valid_id(&self.record_id)?;
         let p = &self.group.proposal;
         p.validate(&self.source_uri).map_err(|_| Error::Protocol)?;
+        // A single file is its own evidence: each file is one fact.
+        let mut seen = std::collections::BTreeSet::new();
         let mut facts: Vec<_> = std::iter::once(&p.original)
             .chain(&p.proxies)
             .chain(std::iter::once(&p.evidence.document))
+            .filter(|reference| seen.insert(reference.uri()))
             .map(|reference| FileFact {
                 reference: reference.clone(),
                 state: FileState::File,

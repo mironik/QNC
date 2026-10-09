@@ -232,3 +232,25 @@ fn pure_grouping_manifest_has_no_io_app_or_camera_dependency() {
         assert!(!cargo.contains(forbidden));
     }
 }
+
+#[test]
+fn a_single_file_is_its_own_evidence_but_never_shares_media_with_another_group() {
+    let root = reference("incoming/ftp");
+    let a = single_file("generic", &root, &reference("incoming/ftp/A.MXF"));
+    let b = single_file("generic", &root, &reference("incoming/ftp/day/B.MOV"));
+    assert!(a.is_single_file());
+    let report = assemble(SOURCE, vec![a.clone(), b.clone()], &facts(&[a.clone(), b])).unwrap();
+    assert_eq!((report.groups.len(), report.blocked.len()), (2, 0));
+    // The same file proposed twice is blocked, as any shared media.
+    let report = assemble(SOURCE, vec![a.clone(), a.clone()], &facts(&[a.clone()])).unwrap();
+    assert!(report.groups.is_empty());
+    // A file with an index proposal elsewhere: the self-evidence never hides a conflict.
+    let mut indexed = proposal();
+    indexed.original = reference("incoming/ftp/A.MXF");
+    indexed.root = root;
+    indexed.evidence.document = reference("incoming/ftp/MEDIAPRO.XML");
+    indexed.proxies.clear();
+    indexed.related.clear();
+    let report = assemble(SOURCE, vec![a.clone(), indexed.clone()], &facts(&[a, indexed])).unwrap();
+    assert!(report.groups.is_empty());
+}

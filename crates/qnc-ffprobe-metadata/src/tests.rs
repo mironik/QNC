@@ -284,3 +284,27 @@ fn rotation_is_explicit_and_malformed_or_conflicting_side_data_is_rejected() {
         assert!(read(&f.to_string(), URI, DOC, "p").is_err());
     }
 }
+#[test]
+fn mxf_edit_units_at_a_constant_rate_are_an_exact_frame_count() {
+    let mut f = fixture();
+    let video = f["streams"][0].as_object_mut().unwrap();
+    video.remove("nb_frames");
+    video.insert("time_base".into(), "1/25".into());
+    video.insert("duration_ts".into(), 5097.into());
+    video.insert("duration".into(), "203.880000".into());
+    let frames = |f: &Value| {
+        let p = parse(f);
+        let StreamDetails::Video(v) = &p.media.streams[0].details else {
+            panic!()
+        };
+        v.frame_count.as_ref().unwrap().value
+    };
+    assert_eq!(frames(&f), FrameCount::Exact(5097));
+    // A rate that is not constant, or a time base that is not one frame, stays estimated.
+    f["streams"][0]["avg_frame_rate"] = "24/1".into();
+    assert!(matches!(frames(&f), FrameCount::Estimated(_)));
+    f["streams"][0]["avg_frame_rate"] = "25/1".into();
+    f["streams"][0]["time_base"] = "1/50".into();
+    f["streams"][0]["duration_ts"] = 10194.into();
+    assert!(matches!(frames(&f), FrameCount::Estimated(_)));
+}

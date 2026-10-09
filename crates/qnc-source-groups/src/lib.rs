@@ -26,6 +26,44 @@ pub trait IndexReader: Send + Sync {
     ) -> Result<Vec<GroupProposal>, String>;
 }
 
+/// Takes one media file that no recording index describes as one clip (v5 `scan_media_files`:
+/// a file in an incoming or FTP folder). Stateless; it receives a reference, never an I/O handle.
+pub trait FileReader: Send + Sync {
+    fn reader_id(&self) -> &str;
+    /// Whether this file is media this reader takes as one clip.
+    fn accepts(&self, file: &SourceReference) -> bool;
+}
+
+/// The group of one file under `root`: the file is the original and its own evidence
+/// (there is no index), its path the recording identity.
+pub fn single_file(reader_id: &str, root: &SourceReference, file: &SourceReference) -> GroupProposal {
+    GroupProposal {
+        root: root.clone(),
+        recording_identity: file.relative_path().to_string(),
+        evidence: GroupEvidence {
+            reader_id: reader_id.into(),
+            document: file.clone(),
+            locator: SINGLE_FILE_LOCATOR.into(),
+        },
+        original: file.clone(),
+        proxies: vec![],
+        related: vec![],
+    }
+}
+
+/// Evidence locator of a group that is one file and its own evidence.
+pub const SINGLE_FILE_LOCATOR: &str = "single-file";
+
+impl GroupProposal {
+    /// One file that is its own evidence (no index document).
+    pub fn is_single_file(&self) -> bool {
+        self.evidence.locator == SINGLE_FILE_LOCATOR
+            && self.evidence.document == self.original
+            && self.proxies.is_empty()
+            && self.related.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GroupEvidence {
@@ -176,7 +214,9 @@ pub fn assemble(
         for file in std::iter::once(&p.original).chain(&p.proxies) {
             media_owners.entry(file.uri()).or_default().insert(i);
         }
-        support.insert(p.evidence.document.uri());
+        if !p.is_single_file() {
+            support.insert(p.evidence.document.uri());
+        }
         support.extend(p.related.iter().map(|r| r.reference.uri()));
     }
     let state = |r: &SourceReference| {
@@ -207,7 +247,7 @@ pub fn assemble(
             || related.len() != p.related.len()
             || media.iter().any(|r| support.contains(&r.uri()))
             || related.iter().any(|r| media_owners.contains_key(r))
-            || media_owners.contains_key(&p.evidence.document.uri())
+            || (!p.is_single_file() && media_owners.contains_key(&p.evidence.document.uri()))
         {
             issues.push(GroupIssue::ConflictingRoles);
         }

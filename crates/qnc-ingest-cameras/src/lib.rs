@@ -10,6 +10,8 @@ pub const VERSION: &str = "0.1.0";
 pub fn registry() -> Result<CameraRegistry, String> {
     let mut registry = CameraRegistry::new();
     registry.register(Arc::new(qnc_camera_sony_fx6_v6::SonyFx6V6::new()))?;
+    // Single files in a folder that is no card of a known camera (incoming / FTP).
+    registry.register(Arc::new(qnc_camera_generic_file::GenericFile::new()))?;
     Ok(registry)
 }
 

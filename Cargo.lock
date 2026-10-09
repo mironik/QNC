@@ -3082,6 +3082,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-camera-generic-file"
+version = "0.1.0"
+dependencies = [
+ "qnc-camera-adapter",
+ "qnc-media-metadata",
+ "qnc-source-contract",
+ "qnc-source-groups",
+]
+
+[[package]]
 name = "qnc-camera-patterns"
 version = "0.1.0"
 dependencies = [
@@ -3550,6 +3560,7 @@ name = "qnc-ingest-cameras"
 version = "0.1.0"
 dependencies = [
  "qnc-camera-adapter",
+ "qnc-camera-generic-file",
  "qnc-camera-sony-fx6-v6",
 ]
 
@@ -3664,9 +3675,11 @@ name = "qnc-ingest-select"
 version = "0.1.0"
 dependencies = [
  "image",
+ "qnc-active-project-read",
  "qnc-artifact-db",
  "qnc-camera-adapter",
  "qnc-camera-detector",
+ "qnc-camera-generic-file",
  "qnc-camera-patterns",
  "qnc-camera-sony-fx6-v6",
  "qnc-contracts",
@@ -3674,6 +3687,7 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-image-assets",
+ "qnc-ingest-cameras",
  "qnc-ingest-store",
  "qnc-media-metadata",
  "qnc-media-metadata-compose",

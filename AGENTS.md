@@ -3118,3 +3118,20 @@ s archive.org je XDCAM HD 1440x1080i59.94 4:2:0 s anamorfnim pikselima, koji pla
 i bez pretvorbe i s njom, "cesalj" polja 3,44 -> 0,96 (test `real_interlaced_xdcam_hd422_...`). Nije izvedeno:
 adapter kamere za XDCAM karticu (`sony-xdcam-mxf`: MEDIAPRO.XML + Clip/*.MXF), pa XDCAM klip jos ne ulazi
 kroz Select u projekt i nije probani kroz player i monitor; anamorfni 1440x1080.
+Otkljucano i izvedeno 2026-10-09 (korisnik "odkljucaj": pojedinacne datoteke iz `incoming/ftp`, v5 izvor "Kamera / FTP
+incoming" i `scan_media_files`): kad u izabranoj mapi nema kartice poznate kamere (nalaz s datotekama klipa u mapi),
+Select uzima svaku video datoteku kao jedan klip, samo original. `qnc-source-groups` (`FileReader`, `single_file`:
+datoteka je sama sebi dokaz, bez proxyja; dijeljeni medij i dalje blokira), `qnc-scanner` (`scan_files`: samo izabrana
+mapa, dubina 8, samo citanje, linkovi se ne slijede), `qnc-camera-adapter` (`files()`, `file_readers()`), novi javni
+`crates/qnc-camera-generic-file` (+ ugovor `contracts/modules/camera-generic-file.module.json`; nastavci v5 bez
+audio-only, zapis zna samo URI, uvijek jedan probe u Ingestu, nista iz imena datoteke), `qnc-ingest-cameras`
+(registrira ga), `qnc-ingest-select` (`scan.rs`). Uz to, nuzno i javljeno korisniku: `qnc-source-index-contract`
+(zapis s dokazom = original broji datoteku jednom), `qnc-media-metadata` (prazan popis streamova prije probea je
+"nedostaje", ne "neispravno"; konacni nepotpun zapis Select i dalje odbija), `qnc-ffprobe-metadata` (MXF: kad je
+vremenska baza tocno 1/fps i brzina stalna, `duration_ts` je tocan broj slika; inace i dalje procjena). Probni
+program `crates/qnc-ingest-select/examples/select_folder.rs` pokrece isti Select na mapi izolirane kopije (odbija
+projekt izvan zadanog korijena). Mapa izvora nikad se ne pise (indeks u mapi odbijen: izvor je samo za citanje).
+Proba na zasticenoj kopiji (korisnikov Catalyst export `Mironik 2002.MXF`, XDCAM HD422 1080i50, kopiran u
+`incoming/ftp` kopije; original u Videos samo citan): Select 0,5-2,8 s, jedan probe, zapis konacan i potpun, 5097
+tocnih slika, isprepleten tff, TC 17:35:04:21; Uvezi (link); play 2 x PASS 100 % slika, A/V -0,1 slike, koraci 35 ms,
+10 od 10, dekoder `yadif=mode=send_frame:parity=tff`. Nije provjereno: kroz sucelje Ingesta i Storyja, uz HDMI.

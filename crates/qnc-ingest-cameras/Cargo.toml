@@ -7,3 +7,4 @@ description = "QNC public composition: the camera adapters Ingest reads. A new c
 [dependencies]
 qnc-camera-adapter = { workspace = true }
 qnc-camera-sony-fx6-v6 = { workspace = true }
+qnc-camera-generic-file = { workspace = true }

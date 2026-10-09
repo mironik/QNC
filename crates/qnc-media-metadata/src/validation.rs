@@ -218,14 +218,21 @@ impl Check<'_> {
                 "stream inventory is not complete",
             );
         }
-        self.valid(
-            &format!("{path}.streams"),
-            media
-                .streams
-                .iter()
-                .any(|s| matches!(s.details, StreamDetails::Audio(_) | StreamDetails::Video(_))),
-            "clip must contain audio or video",
-        );
+        // No stream yet is a record still waiting for its probe (a single file without a
+        // card record): missing, so the record is incomplete, never final. Streams without
+        // audio or video are invalid.
+        if media.streams.is_empty() {
+            self.issue(&format!("{path}.streams"), IssueCode::Missing, "stream map is not known yet");
+        } else {
+            self.valid(
+                &format!("{path}.streams"),
+                media
+                    .streams
+                    .iter()
+                    .any(|s| matches!(s.details, StreamDetails::Audio(_) | StreamDetails::Video(_))),
+                "clip must contain audio or video",
+            );
+        }
         let mut indices = BTreeSet::new();
         for (i, stream) in media.streams.iter().enumerate() {
             let prefix = format!("{path}.streams[{i}]");

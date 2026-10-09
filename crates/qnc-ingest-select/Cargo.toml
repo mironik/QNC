@@ -38,7 +38,11 @@ tempfile = { version = "3", optional = true }
 qnc-sony-metadata = { workspace = true, optional = true }
 
 [dev-dependencies]
+qnc-active-project-read = { workspace = true }
+qnc-ingest-cameras = { workspace = true }
+qnc-source-reader = { workspace = true }
 rusqlite = { workspace = true }
+qnc-camera-generic-file = { workspace = true }
 qnc-camera-sony-fx6-v6 = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-sony-metadata = { workspace = true }

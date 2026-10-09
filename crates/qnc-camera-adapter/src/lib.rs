@@ -11,7 +11,7 @@
 
 use qnc_media_metadata::ClipMetadata;
 use qnc_source_contract::SourceReference;
-use qnc_source_groups::{GroupProposal, IndexDocument, IndexReader};
+use qnc_source_groups::{FileReader, GroupProposal, IndexDocument, IndexReader};
 use std::{collections::BTreeSet, sync::Arc};
 
 pub const MODULE_ID: &str = "qnc.module.camera-adapter";
@@ -47,6 +47,11 @@ pub trait CameraAdapter: Send + Sync {
     /// whose record carries no probe facts is probed once even if the camera
     /// usually declares them (for example a missing sidecar).
     fn sufficiency(&self, metadata: &ClipMetadata) -> MetadataSufficiency;
+    /// Single files this adapter takes as clips where no card index exists (an incoming
+    /// or FTP folder). Its `reader_id` must be the reader id of `index()`.
+    fn files(&self) -> Option<&dyn FileReader> {
+        None
+    }
 }
 
 /// Does the record of the original carry the facts a probe would state: for video
@@ -123,6 +128,9 @@ impl CameraRegistry {
                 "catalog pattern '{pattern}' already has an adapter"
             ));
         }
+        if adapter.files().is_some_and(|files| files.reader_id() != reader) {
+            return Err(format!("camera adapter '{id}' has a file reader with another id"));
+        }
         if self
             .adapters
             .iter()
@@ -145,6 +153,11 @@ impl CameraRegistry {
     /// Index parsers for the scanner.
     pub fn indexes(&self) -> Vec<&dyn IndexReader> {
         self.adapters.iter().map(|a| a.index()).collect()
+    }
+
+    /// Single-file readers for folders without a card index.
+    pub fn file_readers(&self) -> Vec<&dyn FileReader> {
+        self.adapters.iter().filter_map(|a| a.files()).collect()
     }
 
     /// The adapter whose index reader produced a group.

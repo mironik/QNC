@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.camera-generic-file",
+  "module_name": "Camera adapter: single media file (incoming / FTP folder)",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["camera.adapter.generic-single-file"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.2.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "ffmpeg", "media.probe.full", "source.scan.roles", "filesystem", "db.write", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-camera-generic-file",
+  "input": "One media file that no card index describes, under a selected folder that is no card of a known camera (v5 'Kamera / FTP incoming', scan_media_files). Video extensions of v5 MEDIA_EXTENSIONS without audio-only ones.",
+  "output": "One group (the file is the original and its own evidence, no proxy) and a camera record that knows only the media URI; sufficiency is always NeedsProbe, so the record is completed by one probe in Ingest. Nothing is taken from the file name.",
+  "specification": "AGENTS.md section 18 (2026-10-09 single files); QNC_v5 qnc-host/src/ingest/scanner.rs scan_media_files, media/resolve.rs MEDIA_EXTENSIONS",
+  "catalog_pattern": "generic-single-file"
+}

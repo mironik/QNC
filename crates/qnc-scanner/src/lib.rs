@@ -2,8 +2,8 @@
 use qnc_camera_detector::{detect, DetectionReport, Limits, SourceScope};
 use qnc_camera_patterns::Catalog;
 use qnc_source_groups::{
-    assemble, FileFact, FileState, GroupProposal, GroupReport, IndexDocument, IndexReader,
-    MAX_FILES, MAX_GROUPS,
+    assemble, single_file, FileFact, FileReader, FileState, GroupProposal, GroupReport,
+    IndexDocument, IndexReader, MAX_FILES, MAX_GROUPS,
 };
 use qnc_source_reader::{EntryKind, ReadError, SourceReader, SourceReference, MAX_TEXT_BYTES};
 use serde::{Deserialize, Serialize};
@@ -286,6 +286,93 @@ pub fn scan_roles(
         issues,
         unresolved_files,
         indexes_read,
+    })
+}
+
+/// Depth of the folders searched for single files under the selected folder (v5
+/// `DEFAULT_SCAN_DEPTH`).
+pub const FILE_SCAN_DEPTH: usize = 8;
+
+/// Single media files under `selected` that no recording index describes (an incoming or
+/// FTP folder, v5 `scan_media_files`): each file a `FileReader` accepts is one clip. Only
+/// read; links and special entries are skipped with an issue, never followed.
+#[derive(Debug, Clone)]
+pub struct FileScan {
+    pub grouping: GroupReport,
+    pub file_facts: Vec<FileFact>,
+    pub issues: Vec<ScanIssue>,
+}
+
+impl FileScan {
+    pub fn complete(&self) -> bool {
+        self.issues.is_empty() && self.grouping.blocked.is_empty()
+    }
+}
+
+pub fn scan_files(
+    source: &SourceReader,
+    selected: &SourceReference,
+    readers: &[&dyn FileReader],
+    limits: ScanLimits,
+) -> Result<FileScan, String> {
+    let mut ids = BTreeSet::new();
+    if readers
+        .iter()
+        .any(|r| r.reader_id().trim().is_empty() || !ids.insert(r.reader_id()))
+    {
+        return Err("invalid or duplicate file reader identity".into());
+    }
+    let (mut proposals, mut facts, mut issues) = (vec![], vec![], vec![]);
+    let mut folders = vec![(selected.clone(), 0usize)];
+    let mut listed = 0;
+    while let Some((folder, depth)) = folders.pop() {
+        listed += 1;
+        if listed > limits.detection.max_directories {
+            return Err("directory traversal limit exceeded".into());
+        }
+        let listing = match source.list(&folder, limits.detection.max_entries_per_directory) {
+            Ok(listing) => listing,
+            Err(error) => {
+                issues.push(ScanIssue {
+                    code: ScanIssueCode::FileUnavailable,
+                    reference: folder.clone(),
+                    message: error.to_string(),
+                });
+                continue;
+            }
+        };
+        for entry in listing.entries {
+            match entry.kind {
+                EntryKind::Directory if depth < FILE_SCAN_DEPTH => {
+                    folders.push((entry.reference, depth + 1))
+                }
+                EntryKind::File => {
+                    let Some(reader) = readers.iter().find(|r| r.accepts(&entry.reference)) else {
+                        continue;
+                    };
+                    if proposals.len() >= limits.max_groups || facts.len() >= limits.max_file_checks {
+                        return Err("file scan limit exceeded; no grouping result published".into());
+                    }
+                    proposals.push(single_file(reader.reader_id(), selected, &entry.reference));
+                    facts.push(FileFact {
+                        reference: entry.reference,
+                        state: FileState::File,
+                    });
+                }
+                EntryKind::Link | EntryKind::Other => issues.push(ScanIssue {
+                    code: ScanIssueCode::FileUnavailable,
+                    reference: entry.reference,
+                    message: "link or special entry is not followed".into(),
+                }),
+                EntryKind::Directory => {}
+            }
+        }
+    }
+    let grouping = assemble(source.source_uri(), proposals, &facts)?;
+    Ok(FileScan {
+        grouping,
+        file_facts: facts,
+        issues,
     })
 }
 

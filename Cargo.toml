@@ -16,6 +16,7 @@ members = [
     "crates/qnc-camera-adapter",
     "crates/qnc-camera-detector",
     "crates/qnc-camera-sony-fx6-v6",
+    "crates/qnc-camera-generic-file",
     "crates/qnc-db-contract",
     "crates/qnc-content-read",
     "crates/qnc-dev-diagnostics",
@@ -169,6 +170,7 @@ qnc-camera-patterns = { path = "crates/qnc-camera-patterns" }
 qnc-camera-adapter = { path = "crates/qnc-camera-adapter" }
 qnc-camera-detector = { path = "crates/qnc-camera-detector" }
 qnc-camera-sony-fx6-v6 = { path = "crates/qnc-camera-sony-fx6-v6" }
+qnc-camera-generic-file = { path = "crates/qnc-camera-generic-file" }
 qnc-db-contract = { path = "crates/qnc-db-contract" }
 qnc-content-read = { path = "crates/qnc-content-read" }
 qnc-dev-diagnostics = { path = "crates/qnc-dev-diagnostics" }

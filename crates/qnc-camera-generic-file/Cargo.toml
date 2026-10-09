@@ -1,0 +1,11 @@
+[package]
+name = "qnc-camera-generic-file"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public camera adapter for single media files without a card index (incoming / FTP folder): one file is one clip, probed once in Ingest; no I/O, no DB, no UI"
+
+[dependencies]
+qnc-camera-adapter = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-source-contract = { workspace = true }
+qnc-source-groups = { workspace = true }

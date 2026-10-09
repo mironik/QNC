@@ -844,3 +844,45 @@ fn media_db(config: &SelectionConfig) -> qnc_media_record_db::project::ProjectMe
         .unwrap(),
     )
 }
+
+fn with_single_files() -> CameraRegistry {
+    let mut registry = crate::test_support::registry(MetadataSufficiency::NeedsProbe);
+    registry
+        .register(Arc::new(qnc_camera_generic_file::GenericFile::new()))
+        .unwrap();
+    registry
+}
+
+fn clip_names(events: &[Event]) -> std::collections::BTreeSet<String> {
+    events
+        .iter()
+        .filter_map(|e| match e {
+            Event::Clip(clip) => Some(clip.name.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_single_file_in_a_folder_without_a_card_is_one_clip_probed_once() {
+    let (_dir, config) = fixture();
+    let card = config.sources[0].location.file.clone().unwrap();
+    std::fs::create_dir_all(card.join("incoming/ftp")).unwrap();
+    std::fs::write(card.join("incoming/ftp/Mironik 2002.MXF"), "not media; fixture backend only")
+        .unwrap();
+    std::fs::write(card.join("incoming/ftp/notes.txt"), "not media").unwrap();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let registry = with_single_files();
+    let events =
+        crate::test_support::execute_with(&config, &calls, false, false, "incoming/ftp", &registry);
+    assert_eq!(clip_names(&events), ["Mironik 2002.MXF".to_string()].into());
+    assert_eq!(calls.load(Ordering::SeqCst), 1, "one probe of the one file");
+    assert!(!events.iter().any(|e| matches!(e, Event::Saved { error: Some(_), .. })), "{events:?}");
+    crate::test_support::execute_with(&config, &calls, false, false, "incoming/ftp", &registry);
+    assert_eq!(calls.load(Ordering::SeqCst), 1, "never a second probe");
+    // The card beside it is still read as a card: its loose files are not single clips.
+    let calls = Arc::new(AtomicUsize::new(0));
+    let events = crate::test_support::execute_with(&config, &calls, false, false, ".", &registry);
+    assert!(!clip_names(&events).contains("Mironik 2002.MXF"));
+    assert_eq!(calls.load(Ordering::SeqCst), 4, "the two card clips only");
+}

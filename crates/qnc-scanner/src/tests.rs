@@ -415,3 +415,37 @@ fn public_modules_have_no_app_store_probe_or_built_in_camera_dependency() {
         assert!(!production.contains(forbidden));
     }
 }
+
+struct Media;
+impl FileReader for Media {
+    fn reader_id(&self) -> &str {
+        "test.single-file"
+    }
+    fn accepts(&self, file: &SourceReference) -> bool {
+        file.relative_path().to_ascii_lowercase().ends_with(".mxf")
+    }
+}
+
+#[test]
+fn single_files_under_the_selected_folder_are_one_clip_each_and_nothing_else_is_read() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "incoming/ftp/A.MXF", "placeholder; never decoded");
+    write(dir.path(), "incoming/ftp/day/B.mxf", "placeholder; never decoded");
+    write(dir.path(), "incoming/ftp/notes.txt", "not media");
+    write(dir.path(), "incoming/card/C.MXF", "outside the selected folder");
+    let source = SourceReader::local(SOURCE, dir.path()).unwrap();
+    let selected = source.reference("incoming/ftp").unwrap();
+    let scan = scan_files(&source, &selected, &[&Media], ScanLimits::default()).unwrap();
+    assert!(scan.complete());
+    let mut files: Vec<_> = scan
+        .grouping
+        .groups
+        .iter()
+        .map(|g| g.proposal.original.relative_path().to_string())
+        .collect();
+    files.sort();
+    assert_eq!(files, ["incoming/ftp/A.MXF", "incoming/ftp/day/B.mxf"]);
+    assert!(scan.grouping.groups.iter().all(|g| g.proposal.is_single_file()
+        && g.proposal.root == selected
+        && g.proposal.evidence.reader_id == "test.single-file"));
+}

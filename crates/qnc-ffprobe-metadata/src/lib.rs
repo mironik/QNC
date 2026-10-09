@@ -224,6 +224,25 @@ impl Reader<'_> {
             .filter(|f| f.value > 0)
             .map(|f| self.fact(&f.locator, FrameCount::Exact(f.value)));
         if frame_count.is_none() {
+            // A stream whose time base is one frame at a constant rate (MXF edit units)
+            // counts its frames in `duration_ts`: exact, not estimated from seconds.
+            let constant = self.ratio(stream, "avg_frame_rate", path)?.zip(self.ratio(stream, "r_frame_rate", path)?)
+                .is_some_and(|(avg, r)| avg.value == r.value);
+            if let (true, Some(tb), Some(rate), Some(ticks)) = (
+                constant,
+                self.ratio(stream, "time_base", path)?,
+                rate.as_ref(),
+                self.integer::<u64>(stream, "duration_ts", path)?,
+            ) {
+                if ticks.value > 0
+                    && i128::from(tb.value.numerator) * i128::from(rate.value.numerator)
+                        == i128::from(tb.value.denominator) * i128::from(rate.value.denominator)
+                {
+                    frame_count = Some(self.fact(&ticks.locator, FrameCount::Exact(ticks.value)));
+                }
+            }
+        }
+        if frame_count.is_none() {
             if let (Some(duration), Some(rate)) =
                 (self.ratio(stream, "duration", path)?, rate.as_ref())
             {

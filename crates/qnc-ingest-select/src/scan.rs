@@ -49,14 +49,44 @@ pub(crate) fn scan_source(
             scan.grouping.blocked.len()
         )))?;
     }
-    let scan_complete = scan.detection.traversal_complete && scan.issues.is_empty();
-    let groups: Vec<_> = scan
+    let mut scan_complete = scan.detection.traversal_complete && scan.issues.is_empty();
+    let mut file_facts = scan.file_facts;
+    let mut groups: Vec<_> = scan
         .grouping
         .groups
         .into_iter()
         .filter(|g| g.proposal.original.is_within(selected) || g.proposal.root.is_within(selected))
         .map(|g| g.proposal)
         .collect();
+    // A folder that is no card of a known camera (incoming / FTP, an export): each media
+    // file in it is one clip (v5 `scan_media_files`).
+    let card = scan
+        .detection
+        .roots
+        .iter()
+        .filter(|r| r.has_original_candidates())
+        .any(|r| {
+            r.root.is_within(selected)
+                || r.files
+                    .iter()
+                    .any(|f| f.role == "original_candidate" && f.reference.is_within(selected))
+        });
+    if !card {
+        let readers = registry.file_readers();
+        if !readers.is_empty() {
+            let files = qnc_scanner::scan_files(source, selected, &readers, Default::default())?;
+            if !files.complete() {
+                send.send(Event::Warning(format!(
+                    "Pojedinacne datoteke: greske citanja {}, blokirane {}.",
+                    files.issues.len(),
+                    files.grouping.blocked.len()
+                )))?;
+            }
+            scan_complete = files.issues.is_empty();
+            groups = files.grouping.groups.into_iter().map(|g| g.proposal).collect();
+            file_facts = files.file_facts;
+        }
+    }
     let missing = if scan_complete {
         confirm_missing(&existing, &groups, selected, source, send)?
     } else {
@@ -65,7 +95,7 @@ pub(crate) fn scan_source(
     Ok(Scanned {
         existing,
         groups,
-        file_facts: scan.file_facts,
+        file_facts,
         missing,
     })
 }
