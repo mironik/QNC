@@ -28,6 +28,7 @@ fn decode(
         stream_index: index,
         start,
         output_pixel_format: None,
+        progressive: false,
     };
     let mut decoder = Decoder::open(
         request,

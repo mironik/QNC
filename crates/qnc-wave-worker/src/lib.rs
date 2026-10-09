@@ -748,6 +748,7 @@ fn open_decoder(
         stream_index,
         start: None,
         output_pixel_format: None,
+        progressive: false,
     };
     request
         .validate(&decoder_config)

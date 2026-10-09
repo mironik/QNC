@@ -17,6 +17,12 @@ pub struct DecodeRequest {
     /// by the saved format; audio streams ignore it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_pixel_format: Option<String>,
+    /// Deliver progressive pictures of an interlaced saved source: one picture per frame
+    /// (both fields), the same frame count and rate, field order from the saved stream
+    /// (v5/v4 preview procedure). The original stays interlaced for export. Ignored for a
+    /// progressive source and for audio.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub progressive: bool,
 }
 
 #[derive(Debug, Clone)]

@@ -89,6 +89,7 @@ fn load(args: &[std::ffi::OsString]) -> Result<Sample> {
         stream_index: index,
         start: None,
         output_pixel_format: None,
+        progressive: false,
     };
     let mut decoder = Decoder::open(
         request,

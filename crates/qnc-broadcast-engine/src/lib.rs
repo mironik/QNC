@@ -239,14 +239,15 @@ impl Runtime {
                 "output configuration differs from saved input or required pool",
             ));
         }
-        let request = |media: &qnc_media_metadata::MediaRepresentation, index, output_pixel_format| DecodeRequest {
+        let request = |media: &qnc_media_metadata::MediaRepresentation, index, output_pixel_format, progressive| DecodeRequest {
             version: qnc_media_decode::VERSION.into(),
             media: media.clone(),
             stream_index: index,
             start: None,
             output_pixel_format,
+            progressive,
         };
-        request(&plan.media, plan.video_index, plan.output_pixel_format.clone())
+        request(&plan.media, plan.video_index, plan.output_pixel_format.clone(), plan.progressive)
             .validate(&decoder_config)
             .map_err(error)?;
         output::validate_channel_map(
@@ -254,7 +255,7 @@ impl Runtime {
             plan.audio_channels.as_ref(),
         )?;
         for stream in &plan.audio_streams {
-            request(&plan.audio_media, stream.stream_index, None)
+            request(&plan.audio_media, stream.stream_index, None, false)
                 .validate(&decoder_config)
                 .map_err(error)?;
         }
@@ -270,7 +271,7 @@ impl Runtime {
         });
         let decode_input = Rc::new(
             DecodeInput::new_access(plan.media.clone(), decoder_config, open_media)
-                .with_output_pixel_format(plan.output_pixel_format.clone()),
+                .with_delivery(plan.output_pixel_format.clone(), plan.progressive),
         );
         let audio_input = Rc::new(decode_input.for_media(plan.audio_media.clone()));
         let audio = Audio::open(
@@ -391,7 +392,7 @@ impl Runtime {
         let inputs: Vec<_> = plan
             .clips
             .iter()
-            .map(|clip| Rc::new(root.for_media(clip.media.clone()).with_output_pixel_format(clip.output_pixel_format.clone())))
+            .map(|clip| Rc::new(root.for_media(clip.media.clone()).with_delivery(clip.output_pixel_format.clone(), clip.progressive)))
             .collect();
         // The decoder refuses an unsupported saved clip before playback, never mid-program.
         for (clip, input) in plan.clips.iter().zip(&inputs) {

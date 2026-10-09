@@ -98,6 +98,10 @@ pub struct InputPlan {
     pub(crate) spec: ConversionSpec,
     /// Asked of the decoder when the saved layout is heavier than 8-bit 4:2:0.
     pub(crate) output_pixel_format: Option<String>,
+    /// Asked of the decoder for an interlaced saved source: progressive pictures (v5/v4
+    /// preview: both fields of a frame in one picture, the same frames), so the GPU
+    /// converter, the monitor and the HDMI output take progressive pictures only.
+    pub(crate) progressive: bool,
     pub(crate) audio_streams: Vec<AudioStreamPlan>,
     pub(crate) audio_channels: Option<qnc_audio_output::ChannelMap>,
 }
@@ -145,7 +149,17 @@ impl InputPlan {
         let StreamDetails::Video(video) = &stream.details else {
             return Err(error("invalid video map"));
         };
-        let saved = ConversionSpec::from_saved(video).map_err(error)?;
+        let scan_mode = video
+            .scan_mode
+            .as_ref()
+            .ok_or_else(|| error("missing saved scan mode"))?
+            .value;
+        let progressive = scan_mode != ScanMode::Progressive;
+        let mut as_delivered = (**video).clone();
+        if let Some(scan) = as_delivered.scan_mode.as_mut() {
+            scan.value = ScanMode::Progressive;
+        }
+        let saved = ConversionSpec::from_saved(&as_delivered).map_err(error)?;
         let (spec, output_pixel_format) = delivered(&saved);
         let sar = video
             .sample_aspect_ratio
@@ -175,7 +189,7 @@ impl InputPlan {
             VideoFormat::new(
                 saved.width,
                 saved.height,
-                field_mode_from_saved(saved.scan_mode),
+                field_mode_from_saved(scan_mode),
                 color_space_from_saved(&saved)?,
             )
             .map_err(error)?,
@@ -220,6 +234,7 @@ impl InputPlan {
             audio_origin,
             spec,
             output_pixel_format,
+            progressive,
             audio_streams,
             audio_channels,
         })

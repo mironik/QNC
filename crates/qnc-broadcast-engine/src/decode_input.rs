@@ -19,6 +19,8 @@ pub(crate) struct DecodeInput {
     config: DecoderConfig,
     /// The picture layout asked of the decoder instead of the saved one (video only).
     output_pixel_format: Option<String>,
+    /// Progressive pictures of an interlaced saved source (see `InputPlan`).
+    progressive: bool,
     opener: Rc<RefCell<Box<Opener>>>,
 }
 impl DecodeInput {
@@ -31,12 +33,14 @@ impl DecodeInput {
             media,
             config,
             output_pixel_format: None,
+            progressive: false,
             opener: Rc::new(RefCell::new(Box::new(opener))),
         }
     }
     /// The same input, its pictures delivered in `format` (see `InputPlan`).
-    pub fn with_output_pixel_format(mut self, format: Option<String>) -> Self {
+    pub fn with_delivery(mut self, format: Option<String>, progressive: bool) -> Self {
         self.output_pixel_format = format;
+        self.progressive = progressive;
         self
     }
     /// A second saved representation through the same session transport binding.
@@ -45,6 +49,7 @@ impl DecodeInput {
             media,
             config: self.config.clone(),
             output_pixel_format: self.output_pixel_format.clone(),
+            progressive: self.progressive,
             opener: self.opener.clone(),
         }
     }
@@ -56,6 +61,7 @@ impl DecodeInput {
             stream_index,
             start: None,
             output_pixel_format: self.output_pixel_format.clone(),
+            progressive: self.progressive,
         }
         .validate(&self.config)
         .map_err(error)
@@ -67,6 +73,7 @@ impl DecodeInput {
             stream_index,
             start,
             output_pixel_format: self.output_pixel_format.clone(),
+            progressive: self.progressive,
         };
         request.validate(&self.config).map_err(error)?;
         let context = decode_open_context(&request);

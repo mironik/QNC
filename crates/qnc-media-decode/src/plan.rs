@@ -21,6 +21,18 @@ impl DecodeRequest {
         let plan = DecodePlan::new(self, config)?;
         config.adapter.validate(self, &plan)
     }
+
+    /// The saved video description of the requested stream, if it is a video stream.
+    pub fn saved_video(&self) -> Option<&qnc_media_metadata::VideoMetadata> {
+        self.media.streams.iter().find_map(|stream| match &stream.details {
+            StreamDetails::Video(video)
+                if stream.index.as_ref().map(|i| i.value) == Some(self.stream_index) =>
+            {
+                Some(video.as_ref())
+            }
+            _ => None,
+        })
+    }
 }
 impl DecodePlan {
     pub fn new(request: &DecodeRequest, config: &DecoderConfig) -> Result<Self> {
@@ -125,6 +137,9 @@ impl DecodePlan {
                         .is_none_or(|f| f.value.fps_num <= 0 || f.value.fps_den <= 0)
                 {
                     return Err(invalid("missing saved video timing"));
+                }
+                if request.progressive && v.scan_mode.is_none() {
+                    return Err(invalid("missing saved scan mode for progressive delivery"));
                 }
                 let pix = match request.output_pixel_format.as_deref() {
                     None => pix,

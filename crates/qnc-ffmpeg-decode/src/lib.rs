@@ -108,7 +108,7 @@ impl FfmpegAdapter {
                 cmd.args([
                     "-an",
                     "-vf",
-                    &format!("setfield=prog,{convert}format={pixel_format}"),
+                    &format!("{}setfield=prog,{convert}format={pixel_format}", deinterlace(request)),
                     "-c:v",
                     "rawvideo",
                     "-pix_fmt",
@@ -338,6 +338,21 @@ fn format_decimal(value: f64, precision: usize) -> String {
         0.0
     };
     format!("{value:.precision$}").replace(',', ".")
+}
+
+/// v5/v4 `video_decode_filter`: an interlaced saved source delivered progressive gets both
+/// fields of each frame into one picture (`send_frame`: same frame count and rate), field
+/// order from the saved stream. Nothing for a progressive source or without the request.
+fn deinterlace(request: &DecodeRequest) -> &'static str {
+    use qnc_media_metadata::ScanMode;
+    if !request.progressive {
+        return "";
+    }
+    match request.saved_video().and_then(|video| video.scan_mode.as_ref()).map(|scan| scan.value) {
+        Some(ScanMode::InterlacedTopFieldFirst) => "yadif=mode=send_frame:parity=tff:deint=all,",
+        Some(ScanMode::InterlacedBottomFieldFirst) => "yadif=mode=send_frame:parity=bff:deint=all,",
+        Some(ScanMode::Progressive) | None => "",
+    }
 }
 
 fn seconds(t: Rational) -> Result<String> {

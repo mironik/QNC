@@ -15,6 +15,7 @@ pub(crate) fn fixture() -> DecodeRequest {
         stream_index: 0,
         start: None,
         output_pixel_format: None,
+        progressive: false,
         media: MediaRepresentation {
             media_uri: "qnc://local/source/test/file/clip%2Emkv".into(),
             container: Some(fact("matroska".into())),
@@ -478,4 +479,107 @@ fn real_corrupt_media_is_error_not_clean_eof() {
     let mut d = open(dir.path(), fixture());
     assert!(d.next_packet().is_err());
     assert_eq!(d.process_id(), None);
+}
+
+#[test]
+fn an_interlaced_source_delivered_progressive_gets_both_fields_per_frame_in_saved_order() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("clip.mkv");
+    std::fs::write(&path, b"fixture").unwrap();
+    let filter = |scan: ScanMode, progressive: bool| {
+        let mut r = fixture();
+        r.progressive = progressive;
+        if let StreamDetails::Video(video) = &mut r.media.streams[0].details {
+            video.scan_mode = Some(fact(scan));
+        }
+        let c = DecoderConfig::new(FfmpegAdapter::new("ffmpeg"));
+        let plan = DecodePlan::new(&r, &c).unwrap();
+        let ep = qnc_media_stream::CodecEndpoint::for_local_file(&path, &r.media.media_uri).unwrap();
+        let args: Vec<_> = FfmpegAdapter::new("ffmpeg")
+            .command(&r, &plan, &ep, "8-abc")
+            .unwrap()
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        args.windows(2).find(|w| w[0] == "-vf").unwrap()[1].clone()
+    };
+    assert_eq!(
+        filter(ScanMode::InterlacedTopFieldFirst, true),
+        "yadif=mode=send_frame:parity=tff:deint=all,setfield=prog,format=yuv420p"
+    );
+    assert!(filter(ScanMode::InterlacedBottomFieldFirst, true).starts_with("yadif=mode=send_frame:parity=bff"));
+    assert_eq!(filter(ScanMode::Progressive, true), "setfield=prog,format=yuv420p");
+    assert_eq!(filter(ScanMode::InterlacedTopFieldFirst, false), "setfield=prog,format=yuv420p");
+}
+
+/// Luma comb: how much each line differs from the mean of its neighbours (high where the
+/// two fields of a moving picture are woven together).
+fn comb(luma: &[u8], width: usize, height: usize) -> f64 {
+    let mut sum = 0u64;
+    for y in 1..height - 1 {
+        for x in 0..width {
+            let up = u64::from(luma[(y - 1) * width + x]);
+            let down = u64::from(luma[(y + 1) * width + x]);
+            sum += (2 * u64::from(luma[y * width + x])).abs_diff(up + down);
+        }
+    }
+    sum as f64 / ((height - 2) * width) as f64
+}
+
+#[test]
+#[ignore = "requires FFmpeg; explicit integration run"]
+fn real_interlaced_xdcam_hd422_is_delivered_as_progressive_frames_without_combing() {
+    let dir = tempfile::tempdir().unwrap();
+    let status = std::process::Command::new("ffmpeg")
+        .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-f", "lavfi", "-i"])
+        .arg("testsrc2=size=1920x1080:rate=50:duration=1")
+        .args(["-vf", "tinterlace=mode=interleave_top,setfield=tff", "-c:v", "mpeg2video"])
+        .args(["-pix_fmt", "yuv422p", "-b:v", "50M", "-flags", "+ildct+ilme", "-top", "1", "-f", "mxf"])
+        .arg(dir.path().join("clip.mxf"))
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let mut request = fixture();
+    request.media.media_uri = "qnc://local/source/test/file/clip%2Emxf".into();
+    request.media.container = Some(fact("mxf".into()));
+    request.media.duration_seconds = Some(fact(Rational { numerator: 1, denominator: 1 }));
+    let stream = &mut request.media.streams[0];
+    stream.codec = Some(fact(Signal::Known("mpeg2video".into())));
+    stream.time_base = Some(fact(Rational { numerator: 1, denominator: 25 }));
+    if let StreamDetails::Video(video) = &mut stream.details {
+        video.width = Some(fact(1920));
+        video.height = Some(fact(1080));
+        video.frame_count = Some(fact(FrameCount::Exact(25)));
+        video.scan_mode = Some(fact(ScanMode::InterlacedTopFieldFirst));
+        video.pixel_format = Some(fact("yuv422p".into()));
+    }
+    request.output_pixel_format = Some("yuv420p".into());
+    let decode = |progressive: bool| {
+        let mut request = request.clone();
+        request.progressive = progressive;
+        let endpoint = qnc_media_stream::CodecEndpoint::for_local_file(
+            dir.path().join("clip.mxf"),
+            &request.media.media_uri,
+        )
+        .unwrap();
+        let mut decoder = Decoder::open_endpoint(
+            request,
+            endpoint,
+            "stamp".into(),
+            DecoderConfig::new(FfmpegAdapter::new("ffmpeg")),
+        )
+        .unwrap();
+        let (mut frames, mut combs) = (0, Vec::new());
+        while let Some(packet) = decoder.next_packet().unwrap() {
+            assert_eq!(packet.bytes.len(), 1920 * 1080 * 3 / 2);
+            combs.push(comb(&packet.bytes[..1920 * 1080], 1920, 1080));
+            frames += 1;
+        }
+        (frames, combs.iter().sum::<f64>() / combs.len() as f64)
+    };
+    let (woven_frames, woven) = decode(false);
+    let (frames, progressive) = decode(true);
+    println!("woven comb {woven:.2} progressive comb {progressive:.2}");
+    assert_eq!((woven_frames, frames), (25, 25), "one picture per frame, the same frames");
+    assert!(progressive * 2.0 < woven, "the fields are no longer woven: {progressive} vs {woven}");
 }

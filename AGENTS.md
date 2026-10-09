@@ -3107,3 +3107,14 @@ Provjera uredaja pri pokretanju nije uvedena (~150 ms po procesu playera); ako u
 Izmjereno (1492, 34 s, optimizirana kopija, isporuka yuv420p): procesor 20,0 s CPU, D3D11VA 11,7 s, QSV 11,8 s;
 uz isporuku nv12 D3D11VA 8,0 s, DXVA2 7,7 s. Zasticena kopija: play 2002/1492 PASS 100 % (slika D3D11VA, zvuk
 procesor), koraci 33 ms, 10 od 10.
+Otkljucano i izvedeno 2026-10-09 (korisnik "da" na plan XDCAM 1080i50; v5/v4 `video_decode_filter`):
+isprepleteni izvor (spremljeni `scan_mode` tff/bff) player trazi od dekodera kao progresivne slike:
+`qnc-media-decode` `DecodeRequest.progressive` (i `saved_video`), `qnc-ffmpeg-decode` tada dodaje
+`yadif=mode=send_frame:parity=tff|bff:deint=all` (oba polja u jednu sliku, isti broj slika i fps, redoslijed
+polja iz baze), `qnc-broadcast-engine` (`InputPlan.progressive`, pretvarac slike dobiva progresivni opis;
+opis izvora ostaje isprepleten). Original za export ostaje netaknut. GPU katalog takav izvor ne preuzima
+(MPEG-2 4:2:2 ne izjavljuje). Proba (umjetni XDCAM HD422 1080i50 MXF iz ffmpeg testnog uzorka; javni uzorak
+s archive.org je XDCAM HD 1440x1080i59.94 4:2:0 s anamorfnim pikselima, koji player i inace odbija): 25 slika
+i bez pretvorbe i s njom, "cesalj" polja 3,44 -> 0,96 (test `real_interlaced_xdcam_hd422_...`). Nije izvedeno:
+adapter kamere za XDCAM karticu (`sony-xdcam-mxf`: MEDIAPRO.XML + Clip/*.MXF), pa XDCAM klip jos ne ulazi
+kroz Select u projekt i nije probani kroz player i monitor; anamorfni 1440x1080.
