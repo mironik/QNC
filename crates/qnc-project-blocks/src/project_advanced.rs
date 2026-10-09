@@ -65,6 +65,10 @@ pub struct AdvancedDraft<'a> {
     pub draft_settings: &'a mut Value,
     pub export_preset_draft_name: &'a mut String,
     pub applications: &'a qnc_application_selection::ApplicationSelectionView,
+    /// The keyboard presets of the catalog (id, name) and the one used when the project
+    /// chooses none: a choice of the project, not of its template (user 2026-10-09).
+    pub keyboard_presets: &'a [(String, String)],
+    pub keyboard_default: &'a str,
 }
 
 pub fn show(
@@ -80,6 +84,8 @@ pub fn show(
         draft_settings,
         export_preset_draft_name,
         applications,
+        keyboard_presets,
+        keyboard_default,
     } = draft;
     let t = Theme::from_contract(&shell.colors);
     ui.set_max_width(content_w);
@@ -188,6 +194,10 @@ pub fn show(
                 ],
             );
         }
+    });
+
+    widgets::section(ui, content_w, "Tipkovnica", settings, shell, |ui| {
+        changed |= keyboard_preset_cell(ui, ui.available_width(), draft_settings, keyboard_presets, keyboard_default, t.muted);
     });
 
     widgets::section(ui, content_w, "Export", settings, shell, |ui| {
@@ -541,6 +551,47 @@ fn number_cell(
     } else {
         false
     }
+}
+
+/// The keyboard preset of the project (`keyboard_shortcuts.active_preset`).
+fn keyboard_preset_cell(
+    ui: &mut egui::Ui,
+    grid_w: f32,
+    settings: &mut Value,
+    presets: &[(String, String)],
+    default: &str,
+    label_color: Color32,
+) -> bool {
+    let before = path_string(settings, "keyboard_shortcuts.active_preset", default);
+    let mut selected = before.clone();
+    let display = presets
+        .iter()
+        .find(|(id, _)| id == &selected)
+        .map(|(_, name)| name.clone())
+        .unwrap_or_else(|| selected.clone());
+    let cell_w = field_cell_width(grid_w, 1);
+    ui.allocate_ui_with_layout(
+        Vec2::new(cell_w, 52.0),
+        egui::Layout::top_down(egui::Align::Min),
+        |ui| {
+            ui.set_width(cell_w);
+            ui.label(RichText::new("Preset tipki").size(12.0).color(label_color));
+            ui.add_space(6.0);
+            egui::ComboBox::from_id_salt("pts_kbd_preset")
+                .selected_text(display)
+                .width(cell_w)
+                .show_ui(ui, |ui| {
+                    for (id, name) in presets {
+                        ui.selectable_value(&mut selected, id.clone(), name);
+                    }
+                });
+        },
+    );
+    if selected == before {
+        return false;
+    }
+    set_string_path(settings, "keyboard_shortcuts.active_preset", selected);
+    true
 }
 
 fn export_preset_cell(

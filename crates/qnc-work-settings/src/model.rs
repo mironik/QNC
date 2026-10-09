@@ -261,6 +261,12 @@ impl WorkSettings {
         Ok(())
     }
 
+    /// The keyboard preset the project chose (Project, Advanced); `None` leaves the
+    /// catalog's own preset.
+    pub fn keyboard_preset(&self) -> Option<&str> {
+        self.keyboard_shortcuts.get("active_preset").and_then(Value::as_str)
+    }
+
     pub fn ai_enabled(&self) -> bool {
         self.ai.get("enabled").and_then(Value::as_bool) == Some(true)
     }

@@ -192,7 +192,7 @@
           "wave": "auto"
         },
         "keyboard_shortcuts": {
-          "active_preset": "resolve"
+          "active_preset": "default"
         },
         "workspace": {
           "tabs": ["project", "ingest", "media_assist", "storyboard"],
@@ -344,7 +344,7 @@
           "wave": "auto"
         },
         "keyboard_shortcuts": {
-          "active_preset": "resolve"
+          "active_preset": "default"
         },
         "workspace": {
           "tabs": ["project", "ingest", "media_assist", "storyboard"],

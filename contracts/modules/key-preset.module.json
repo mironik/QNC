@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.key-preset",
+  "module_name": "Keyboard preset of the active project",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["keyboard.preset.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-key-preset",
+  "input": "The QNC root.",
+  "output": "The keyboard preset the active project chose (keyboard_shortcuts.active_preset of its settings, set in Project, Advanced), read again once a second in the background; none without an active project.",
+  "specification": "User rule 2026-10-09: the keyboard preset is a choice of the project, not of its template, and holds for every present and future form."
+}

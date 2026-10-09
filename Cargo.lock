@@ -3761,8 +3761,17 @@ name = "qnc-key-intents"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-dev-diagnostics",
  "qnc-key-cheatsheet",
+ "qnc-key-preset",
  "qnc-keyboard-shortcut",
+]
+
+[[package]]
+name = "qnc-key-preset"
+version = "0.1.0"
+dependencies = [
+ "qnc-active-project-read",
 ]
 
 [[package]]

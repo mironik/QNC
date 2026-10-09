@@ -1,0 +1,8 @@
+[package]
+name = "qnc-key-preset"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the keyboard preset the active project chose (Project, Advanced settings), read in the background from the project database for the keys of every form"
+
+[dependencies]
+qnc-active-project-read = { workspace = true }

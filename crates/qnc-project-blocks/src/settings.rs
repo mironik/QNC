@@ -496,6 +496,7 @@ impl Blocks<'_> {
 
     fn advanced(&mut self, ui: &mut egui::Ui, content_w: f32, settings: &SettingsPanelMetrics) {
         let applications = self.session.component.applications.view();
+        let keyboard_presets = self.keyboard_preset_options();
         let mut application_action = None;
         if project_advanced::show(
             ui,
@@ -507,6 +508,8 @@ impl Blocks<'_> {
                 draft_settings: &mut self.session.draft_settings,
                 export_preset_draft_name: &mut self.session.export_preset_draft_name,
                 applications: &applications,
+                keyboard_presets: &keyboard_presets,
+                keyboard_default: &self.contracts.shortcuts.active_preset,
             },
             &mut application_action,
         ) {
@@ -535,15 +538,8 @@ impl Blocks<'_> {
         let can_save =
             !self.session.template_draft_name.trim().is_empty() && !self.session.selected_template_id.is_empty();
         let mut should_save = false;
-        let mut keyboard_changed = None;
         let shell = self.contracts.shell.clone();
         let base_name = self.session.selected_template_name();
-        let mut shortcut_preset = qnc_settings_path::path_string(
-            &self.session.draft_settings,
-            "keyboard_shortcuts.active_preset",
-            &self.contracts.shortcuts.active_preset,
-        );
-        let keyboard_options = self.keyboard_preset_options();
         widgets::section(ui, content_w, "Novi template", settings, &shell, |ui| {
             let t = Theme::from_contract(&shell.colors);
             ui.label(
@@ -578,45 +574,7 @@ impl Blocks<'_> {
                     .desired_rows(2)
                     .hint_text("Kratki opis"),
             );
-            ui.add_space(6.0);
-            ui.allocate_ui_with_layout(
-                Vec2::new((content_w - settings.inner_pad_x * 2.0).max(160.0), 52.0),
-                egui::Layout::top_down(egui::Align::Min),
-                |ui| {
-                    ui.label(
-                        RichText::new("Tipkovnica")
-                            .size(settings.label_font_size)
-                            .color(t.muted),
-                    );
-                    ui.add_space(6.0);
-                    let display = keyboard_options
-                        .iter()
-                        .find(|(id, _)| id == &shortcut_preset)
-                        .map(|(_, label)| label.clone())
-                        .unwrap_or_else(|| shortcut_preset.clone());
-                    let before = shortcut_preset.clone();
-                    egui::ComboBox::from_id_salt("pts_kbd_preset")
-                        .selected_text(display)
-                        .width(ui.available_width().max(160.0))
-                        .show_ui(ui, |ui| {
-                            for (id, label) in &keyboard_options {
-                                ui.selectable_value(&mut shortcut_preset, id.clone(), label);
-                            }
-                        });
-                    if shortcut_preset != before {
-                        keyboard_changed = Some(shortcut_preset.clone());
-                    }
-                },
-            );
         });
-        if let Some(preset) = keyboard_changed {
-            qnc_settings_path::set_string_path(
-                &mut self.session.draft_settings,
-                "keyboard_shortcuts.active_preset",
-                preset,
-            );
-            self.session.status = "Postavke promijenjene.".to_string();
-        }
         if should_save {
             self.intents.push(ProjectIntent::SaveUserTemplate);
         }

@@ -8,3 +8,5 @@ description = "QNC public component: the keys of one frame turned into catalog a
 eframe = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
 qnc-key-cheatsheet = { workspace = true }
+qnc-key-preset = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }

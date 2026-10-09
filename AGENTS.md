@@ -3056,3 +3056,16 @@ svaku sliku; On crta i uz HDMI (`qnc-program-output::showing`, `qnc-monitor`
 laptopa, ne projekta). Ingest nema prekidac i uvijek crta. Probano u zasticenoj kopiji korijena (kopija
 programa, ugovora i baze projekata s jednim projektom preusmjerenim na kopiju). Usput: C10 granice Story i
 Ingest forme vracene ispod baselinea (popravak iz 69953d8 ih je prekoracio za po jedan redak).
+Otkljucano i izvedeno 2026-10-09 (korisnik: "izbor tipkovnice prebaciti iz New template u Project Advanced,
+jer na istom templateu vise korisnika moze imati razlicite tipke"; "otkljucaj"; "to se odnosi na sve
+sadasnje i buduce forme"; "default postavka QNC keyboard map"): Project (`qnc-project-blocks`) izbornik
+"Tipkovnica" iz bloka "Novi template" u Advanced postavke (blok "Tipkovnica", "Preset tipki"), zapis
+ostaje `keyboard_shortcuts.active_preset` u postavkama projekta; template i dalje nosi zadanu vrijednost
+(radne postavke traze taj blok). Nalaz: postavku do sada nije citala nijedna forma. Izvedeno:
+`qnc-work-settings::keyboard_preset`, novi javni `crates/qnc-key-preset` (+ ugovor
+`contracts/modules/key-preset.module.json`; u pozadini jednom u sekundi cita preset aktivnog projekta,
+samo citanje), `qnc-key-intents` ga sam primjenjuje (i u pregledu tipki F1), pa vrijedi za svaku formu koja
+tipke cita kroz tu kocku (Ingest, sve Media Assist, Story i buduce) bez izmjene forme. Project forma ga ne
+koristi. `seed/system_seed.json`: svi sistemski templatei imaju zadani preset `default` (QNC; dva su bila
+Resolve). Naziv preseta ostaje "QNC" (conformance: isto kao qnc_v4). Provjereno: testovi, conformance,
+zasticena kopija (preset `resolve` u kopiji projekta procitan iz baze).
