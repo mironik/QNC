@@ -131,7 +131,9 @@ impl ContentStore {
             tx.commit().map_err(err)?;
         }
         let has_thumbnail_uri = schema && has_column(&conn, "clips", "thumbnail_uri")?;
-        let has_copy_of = schema && has_column(&conn, "clips", "imported_copy_of")?;
+        let has_copy_of = schema
+            && has_column(&conn, "clips", "imported_copy_of")?
+            && has_column(&conn, "clips", "optimized_json")?;
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
@@ -456,11 +458,22 @@ impl ContentStore {
                 media_uri,
                 thumbnail_uri,
                 copy_of,
+                optimized,
                 error,
             } => {
                 if media_uri.is_some() == error.is_some() {
                     return Err("Nedostaje ishod importa.".into());
                 }
+                if optimized.is_some() && media_uri.is_none() {
+                    return Err("Optimizirana kopija bez uvezenog medija.".into());
+                }
+                if optimized.as_ref().is_some_and(|media| qnc_contracts::parse_qnc_uri(&media.media_uri).is_err()) {
+                    return Err("Neispravna adresa optimizirane kopije.".into());
+                }
+                if (copy_of.is_some() || optimized.is_some()) && !self.has_copy_of {
+                    return Err("Baza nema zapis o kopiji uvezenog medija.".into());
+                }
+                let optimized = optimized.as_ref().map(serde_json::to_string).transpose().map_err(err)?;
                 if copy_of.is_some() && media_uri.is_none() {
                     return Err("Kopija bez uvezenog medija.".into());
                 }
@@ -481,8 +494,8 @@ impl ContentStore {
                 };
                 let n = if self.has_copy_of {
                     self.conn.execute(
-                        "UPDATE clips SET import_status=?1,imported_media_uri=?2,import_error=?3,thumbnail_uri=COALESCE(?5,thumbnail_uri),imported_copy_of=?6 WHERE clip_id=?4 AND import_status='processing'",
-                        params![status,media_uri,error,clip_id,thumbnail_uri,copy_of])
+                        "UPDATE clips SET import_status=?1,imported_media_uri=?2,import_error=?3,thumbnail_uri=COALESCE(?5,thumbnail_uri),imported_copy_of=?6,optimized_json=?7 WHERE clip_id=?4 AND import_status='processing'",
+                        params![status,media_uri,error,clip_id,thumbnail_uri,copy_of,optimized])
                 } else {
                     self.conn.execute(
                         "UPDATE clips SET import_status=?1,imported_media_uri=?2,import_error=?3,thumbnail_uri=COALESCE(?5,thumbnail_uri) WHERE clip_id=?4 AND import_status='processing'",
@@ -808,12 +821,16 @@ fn ensure_copy_column(conn: &Connection) -> Result<()> {
         )
         .map_err(err)?;
     }
+    // The optimized copy the import made (its probed description, JSON), user 2026-10-09.
+    if !has_column(conn, "clips", "optimized_json")? {
+        conn.execute("ALTER TABLE clips ADD COLUMN optimized_json TEXT", []).map_err(err)?;
+    }
     Ok(())
 }
 
 /// The columns `row` reads; an older catalog without the copy column reads it as NULL.
 fn stored_columns(has_copy_of: bool) -> String {
-    let copy = if has_copy_of { "imported_copy_of" } else { "NULL" };
+    let copy = if has_copy_of { "imported_copy_of,optimized_json" } else { "NULL,NULL" };
     format!("catalog_json,selected,import_status,import_error,imported_media_uri,thumbnail_uri,{copy}")
 }
 
@@ -887,8 +904,16 @@ fn row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredClip> {
         import_error: row.get(3)?,
         imported_media_uri: row.get(4)?,
         imported_copy_of: imported_copy(row.get(6)?)?,
+        imported_optimized: optimized(row.get(7)?)?,
     })
 }
+fn optimized(value: Option<String>) -> rusqlite::Result<Option<MediaRepresentation>> {
+    value
+        .map(|json| serde_json::from_str(&json))
+        .transpose()
+        .map_err(|e| rusqlite::Error::FromSqlConversionFailure(7, rusqlite::types::Type::Text, Box::new(e)))
+}
+
 fn imported_copy(value: Option<String>) -> rusqlite::Result<Option<ImportedCopy>> {
     match value.as_deref() {
         None => Ok(None),

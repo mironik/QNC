@@ -16,6 +16,7 @@
 //! With the media the poster is copied too. Not done here: proxy generation (transcode).
 
 mod config;
+mod optimize;
 
 pub use config::ConfigMediaOpener;
 mod process;
@@ -23,6 +24,7 @@ mod process;
 pub use process::{launch_worker, run_import, run_service, ImportSummary, WORKER_EXECUTABLE};
 
 use qnc_ingest_store::content::{ContentClient, ImportedCopy, StoredClip};
+use qnc_media_metadata::MediaRepresentation;
 use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
 use qnc_work_settings::ProductArea;
 use std::{
@@ -54,6 +56,11 @@ pub trait MediaOpener: Send + Sync {
     fn local_path(&self, _media_uri: &str) -> Option<std::path::PathBuf> {
         None
     }
+    /// The description of a file the import made in the project (one probe of the new
+    /// file, still the Ingest process), recorded under `media_uri`.
+    fn describe(&self, _media_uri: &str, _file: &Path) -> Result<MediaRepresentation, String> {
+        Err("Opis nove datoteke nije dostupan na ovom racunalu.".into())
+    }
 }
 
 /// The queue of the content database seen by the executor.
@@ -69,6 +76,7 @@ pub trait ImportQueue {
         media_uri: Option<String>,
         thumbnail_uri: Option<String>,
         copy_of: Option<ImportedCopy>,
+        optimized: Option<MediaRepresentation>,
         error: Option<String>,
     ) -> Result<(), String>;
 }
@@ -88,9 +96,10 @@ impl ImportQueue for ContentClient {
         media_uri: Option<String>,
         thumbnail_uri: Option<String>,
         copy_of: Option<ImportedCopy>,
+        optimized: Option<MediaRepresentation>,
         error: Option<String>,
     ) -> Result<(), String> {
-        ContentClient::finish_import(self, clip_id, media_uri, thumbnail_uri, copy_of, error)
+        ContentClient::finish_import(self, clip_id, media_uri, thumbnail_uri, copy_of, optimized, error)
             .map_err(|e| e.to_string())
     }
 }
@@ -124,6 +133,9 @@ pub enum Action {
     Link { media_uri: String },
     /// Copy this source medium into the project folder.
     Copy { source_uri: String, folder: Folder },
+    /// Make the optimized copy of the original into the project; with the original
+    /// copied too, else the original stays linked where it is.
+    Optimize { with_original: bool },
 }
 
 pub fn action_for(clip: &StoredClip, plan: &IngestWorkPlan) -> Result<Action, String> {
@@ -137,6 +149,8 @@ pub fn action_for(clip: &StoredClip, plan: &IngestWorkPlan) -> Result<Action, St
                 PlaybackInput::Proxy => proxy
                     .ok_or_else(|| "playback.input=proxy, ali kamera nema proxy.".to_string())?,
                 PlaybackInput::ProxyIfAvailable => proxy.unwrap_or(original),
+                // A link makes no optimized copy, so the original plays.
+                PlaybackInput::OptimizedIfAvailable => original,
             };
             Ok(Action::Link { media_uri })
         }
@@ -151,6 +165,7 @@ pub fn action_for(clip: &StoredClip, plan: &IngestWorkPlan) -> Result<Action, St
             source_uri: original,
             folder: Folder::Original,
         }),
+        IngestMedia::Optimized { with_original } => Ok(Action::Optimize { with_original }),
     }
 }
 
@@ -239,14 +254,64 @@ pub fn import_clip_beating(
     cancel: &AtomicBool,
     beat: &mut dyn FnMut(),
 ) -> Result<String, String> {
+    import_media(clip, plan, project_dir, opener, cancel, beat).map(|imported| imported.media_uri)
+}
+
+/// What one import made: the imported media (linked or copied), what it is a copy of,
+/// and the optimized copy when the project asks for one.
+struct Imported {
+    media_uri: String,
+    copy_of: Option<ImportedCopy>,
+    optimized: Option<MediaRepresentation>,
+}
+
+fn import_media(
+    clip: &StoredClip,
+    plan: &IngestWorkPlan,
+    project_dir: &Path,
+    opener: &dyn MediaOpener,
+    cancel: &AtomicBool,
+    beat: &mut dyn FnMut(),
+) -> Result<Imported, String> {
+    let plain = |media_uri, copy_of| Imported { media_uri, copy_of, optimized: None };
     match action_for(clip, plan)? {
-        Action::Link { media_uri } => Ok(media_uri),
+        Action::Link { media_uri } => Ok(plain(media_uri, None)),
+        Action::Optimize { with_original } => {
+            let original = clip.clip.snapshot.binding.original_uri.clone();
+            let optimized = optimize::make(clip, plan, project_dir, opener, cancel)?;
+            let (media_uri, copy_of) = if with_original {
+                (copy_media(clip, plan, project_dir, opener, cancel, beat, &original, Folder::Original)?, Some(ImportedCopy::Original))
+            } else {
+                (original, None)
+            };
+            Ok(Imported { media_uri, copy_of, optimized: Some(optimized) })
+        }
         Action::Copy { source_uri, folder } => {
-            let name = safe_name(clip.clip.id(), &source_uri);
+            copy_media(clip, plan, project_dir, opener, cancel, beat, &source_uri, folder)
+                .map(|uri| plain(uri, Some(folder.copy())))
+        }
+    }
+}
+
+/// Copies one source medium into the project folder and returns its project URI.
+#[allow(clippy::too_many_arguments)]
+fn copy_media(
+    clip: &StoredClip,
+    plan: &IngestWorkPlan,
+    project_dir: &Path,
+    opener: &dyn MediaOpener,
+    cancel: &AtomicBool,
+    beat: &mut dyn FnMut(),
+    source_uri: &str,
+    folder: Folder,
+) -> Result<String, String> {
+    {
+        {
+            let name = safe_name(clip.clip.id(), source_uri);
             let directory = project_dir.join(folder.name());
             inside_project(project_dir, &directory.join(&name))?;
             fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-            copy_into(opener, &source_uri, &directory.join(&name), cancel, beat)?;
+            copy_into(opener, source_uri, &directory.join(&name), cancel, beat)?;
             // The copy is read like media on a card: through the project folder as a source.
             let source = plan
                 .settings
@@ -358,30 +423,29 @@ pub fn run_next(
         return Ok(None);
     };
     let clip_id = clip.clip.id().to_string();
-    let result = import_clip_beating(&clip, plan, project_dir, opener, cancel, &mut || {
+    let imported = import_media(&clip, plan, project_dir, opener, cancel, &mut || {
         let _ = queue.heartbeat(&clip_id);
     });
     let mut thumbnail_uri = None;
-    match &result {
-        Ok(uri) => {
+    let result = match imported {
+        Ok(imported) => {
             thumbnail_uri = import_poster(&clip, plan, project_dir, opener, cancel);
-            let copy_of = match action_for(&clip, plan)? {
-                Action::Copy { folder, .. } => Some(folder.copy()),
-                Action::Link { .. } => None,
-            };
             queue.finish_import(
                 clip_id.clone(),
-                Some(uri.clone()),
+                Some(imported.media_uri.clone()),
                 thumbnail_uri.clone(),
-                copy_of,
+                imported.copy_of,
+                imported.optimized,
                 None,
-            )?
+            )?;
+            Ok(imported.media_uri)
         }
         Err(error) => {
             let message: String = error.chars().take(4000).collect();
-            queue.finish_import(clip_id.clone(), None, None, None, Some(message))?
+            queue.finish_import(clip_id.clone(), None, None, None, None, Some(message))?;
+            Err(error)
         }
-    }
+    };
     Ok(Some(Outcome {
         clip_id,
         result,
@@ -482,11 +546,12 @@ impl ImportQueue for TransportQueue {
         media_uri: Option<String>,
         thumbnail_uri: Option<String>,
         copy_of: Option<ImportedCopy>,
+        optimized: Option<MediaRepresentation>,
         error: Option<String>,
     ) -> Result<(), String> {
         let key = self.next_key("finish");
         self.transport
-            .finish_import(key.clone(), clip_id, media_uri, thumbnail_uri, copy_of, error)
+            .finish_import(key.clone(), clip_id, media_uri, thumbnail_uri, copy_of, optimized, error)
             .map_err(|e| e.to_string())?;
         self.wait(&key).map(|_| ())
     }

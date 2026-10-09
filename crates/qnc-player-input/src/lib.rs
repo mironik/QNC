@@ -53,12 +53,16 @@ fn playback_input(settings: &WorkSettings) -> Result<PlaybackInput> {
         .map_err(|e| InputError::Settings(e.to_string()))
 }
 
-fn choose(mode: PlaybackInput, snapshot: &Snapshot) -> Result<Representation> {
+fn choose(mode: PlaybackInput, snapshot: &Snapshot, optimized: bool) -> Result<Representation> {
+    if mode == PlaybackInput::OptimizedIfAvailable {
+        return Ok(if optimized { Representation::Optimized } else { Representation::Original });
+    }
     match (mode, snapshot.metadata.proxy.is_some()) {
         (PlaybackInput::Original, _) | (PlaybackInput::ProxyIfAvailable, false) => {
             Ok(Representation::Original)
         }
         (PlaybackInput::Proxy, false) => Err(InputError::MissingProxy),
+        (PlaybackInput::OptimizedIfAvailable, _) => Ok(Representation::Original),
         (_, true) => Ok(Representation::Proxy),
     }
 }
@@ -68,6 +72,8 @@ fn choose(mode: PlaybackInput, snapshot: &Snapshot) -> Result<Representation> {
 pub enum Representation {
     Original,
     Proxy,
+    /// The optimized copy the import made (same frames as the original; user 2026-10-09).
+    Optimized,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,6 +86,9 @@ pub struct PlayerClipRecord {
     /// project; the saved record of that representation then describes the copy.
     #[serde(default)]
     pub imported_copy_of: Option<Representation>,
+    /// The optimized copy the import made and described (one probe of the new file).
+    #[serde(default)]
+    pub imported_optimized: Option<MediaRepresentation>,
 }
 
 impl PlayerClipRecord {
@@ -103,6 +112,7 @@ trait PlayerClipSource {
     fn snapshot(&self) -> &Snapshot;
     fn imported_media_uri(&self) -> Option<&String>;
     fn imported_copy_of(&self) -> Option<Representation>;
+    fn imported_optimized(&self) -> Option<&MediaRepresentation>;
     fn validate_clip(&self) -> Result<()>;
 }
 
@@ -117,6 +127,10 @@ impl PlayerClipSource for PlayerClipRecord {
 
     fn imported_copy_of(&self) -> Option<Representation> {
         self.imported_copy_of
+    }
+
+    fn imported_optimized(&self) -> Option<&MediaRepresentation> {
+        self.imported_optimized.as_ref()
     }
 
     fn validate_clip(&self) -> Result<()> {
@@ -209,6 +223,10 @@ pub struct PreparedInput {
     /// 2026-10-01). The saved layout itself never changes.
     #[serde(default)]
     pub lead_audio_channels: Vec<u16>,
+    /// The optimized copy of the clip when the import made one; the picture plays from it
+    /// when `representation` is `Optimized`.
+    #[serde(default)]
+    pub optimized: Option<MediaRepresentation>,
 }
 impl PreparedInput {
     /// The same input with `lead` channels first; a channel the clip lacks is refused.
@@ -238,6 +256,7 @@ impl PreparedInput {
                 .proxy
                 .as_ref()
                 .ok_or(InputError::MissingProxy),
+            Representation::Optimized => self.optimized.as_ref().ok_or(InputError::InvalidDescriptor),
         }
     }
 
@@ -256,10 +275,10 @@ impl PreparedInput {
         }
         validate_snapshot(&self.snapshot)?;
         self.project_audio.validate()?;
-        if self.representation != choose(self.playback_input, &self.snapshot)? {
+        if self.representation != choose(self.playback_input, &self.snapshot, self.optimized.is_some())? {
             return Err(InputError::InvalidDescriptor);
         }
-        if self.layout != layout(&self.snapshot, self.representation)? {
+        if self.layout != layout(&self.snapshot, self.optimized.as_ref(), self.representation)? {
             return Err(InputError::InvalidDescriptor);
         }
         if self.lead_audio_channels.iter().any(|channel| usize::from(*channel) >= self.layout.audio_channels.len()) {
@@ -332,16 +351,18 @@ fn prepare(settings: &WorkSettings, stored: &impl PlayerClipSource) -> Result<Pr
     validate_snapshot(stored.snapshot())?;
     let relocated = imported_snapshot(stored)?;
     let snapshot = &relocated;
-    let representation = choose(mode, snapshot)?;
+    let optimized = stored.imported_optimized().cloned();
+    let representation = choose(mode, snapshot, optimized.is_some())?;
     Ok(PreparedInput {
         contract_version: VERSION.into(),
         workspace_db_uri: settings.workspace_db_uri.clone(),
         playback_input: mode,
         project_audio: ProjectAudio::read(settings)?,
         representation,
-        layout: layout(snapshot, representation)?,
+        layout: layout(snapshot, optimized.as_ref(), representation)?,
         snapshot: snapshot.clone(),
         lead_audio_channels: Vec::new(),
+        optimized,
     })
 }
 
@@ -367,7 +388,7 @@ fn imported_snapshot(stored: &impl PlayerClipSource) -> Result<Snapshot> {
             .proxy_uri
             .clone()
             .ok_or(InputError::MissingProxy)?,
-        None => {
+        Some(Representation::Optimized) | None => {
             return Err(InputError::UnsupportedMedia(
                 "Imported media URI has no saved original/proxy representation binding.".into(),
             ))
@@ -415,12 +436,16 @@ fn validate_snapshot(snapshot: &Snapshot) -> Result<()> {
     Ok(())
 }
 
-fn layout(snapshot: &Snapshot, representation: Representation) -> Result<StreamLayout> {
-    let original = representation_layout(snapshot, Representation::Original)?;
+fn layout(
+    snapshot: &Snapshot,
+    optimized: Option<&MediaRepresentation>,
+    representation: Representation,
+) -> Result<StreamLayout> {
+    let original = representation_layout(snapshot, optimized, Representation::Original)?;
     if representation == Representation::Original {
         return Ok(original);
     }
-    let mut selected = representation_layout(snapshot, representation)?;
+    let mut selected = representation_layout(snapshot, optimized, representation)?;
     match (&original.video, &selected.video) {
         (Some(a), Some(b))
             if a.timebase == b.timebase
@@ -442,6 +467,7 @@ fn layout(snapshot: &Snapshot, representation: Representation) -> Result<StreamL
 
 fn representation_layout(
     snapshot: &Snapshot,
+    optimized: Option<&MediaRepresentation>,
     representation: Representation,
 ) -> Result<StreamLayout> {
     let (prefix, media) = match representation {
@@ -454,6 +480,7 @@ fn representation_layout(
                 .as_ref()
                 .ok_or(InputError::MissingProxy)?,
         ),
+        Representation::Optimized => ("optimized", optimized.ok_or(InputError::InvalidDescriptor)?),
     };
     let missing: Vec<_> = snapshot
         .report

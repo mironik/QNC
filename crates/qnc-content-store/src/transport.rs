@@ -241,6 +241,7 @@ impl ContentClient {
         media_uri: Option<String>,
         thumbnail_uri: Option<String>,
         copy_of: Option<ImportedCopy>,
+        optimized: Option<qnc_media_metadata::MediaRepresentation>,
         error: Option<String>,
     ) -> Result<()> {
         self.execute(Operation::FinishImport {
@@ -248,6 +249,7 @@ impl ContentClient {
             media_uri,
             thumbnail_uri,
             copy_of,
+            optimized,
             error,
         })
         .map(|_| ())
@@ -394,6 +396,7 @@ impl ContentWriteTransport {
         media_uri: Option<String>,
         thumbnail_uri: Option<String>,
         copy_of: Option<ImportedCopy>,
+        optimized: Option<qnc_media_metadata::MediaRepresentation>,
         error: Option<String>,
     ) -> Result<()> {
         self.send_operation(
@@ -403,6 +406,7 @@ impl ContentWriteTransport {
                 media_uri,
                 thumbnail_uri,
                 copy_of,
+                optimized,
                 error,
             },
         )
@@ -523,9 +527,10 @@ fn execute_write_command(
             media_uri,
             thumbnail_uri,
             copy_of,
+            optimized,
             error,
         } => {
-            client.finish_import(clip_id, media_uri, thumbnail_uri, copy_of, error)?;
+            client.finish_import(clip_id, media_uri, thumbnail_uri, copy_of, optimized, error)?;
             Ok(ContentWriteData::Changed)
         }
         _ => Err("Nepodrzana content write transport operacija.".into()),

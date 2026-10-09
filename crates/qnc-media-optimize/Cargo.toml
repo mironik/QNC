@@ -1,0 +1,8 @@
+[package]
+name = "qnc-media-optimize"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: makes the optimized copy of an original (H.264 8-bit 4:2:0, same frames, timecode and sound) with the encoder this computer has"
+
+[dependencies]
+qnc-decoder-catalog = { workspace = true }

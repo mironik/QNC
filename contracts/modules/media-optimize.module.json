@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.media-optimize",
+  "module_name": "Optimized copy of an original",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["media.optimize.h264_8bit"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "database.write", "player.command", "business.workflow", "source.write"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-media-optimize",
+  "input": "A local original file (read only) and the destination file in the project folder.",
+  "output": "An H.264 High 8-bit 4:2:0 QuickTime copy: same size, every frame (passthrough), key frame every 10 pictures, no B frames, about 35 Mbit/s; every sound stream copied bit for bit; timecode and metadata from the original. Encoder: the first of this OS that passes a test encode (Windows: Intel QSV, NVIDIA NVENC, AMD AMF, libx264; macOS: VideoToolbox, libx264; Linux: NVENC, QSV, libx264); no other encoder is tried after a failure. Runs below normal priority.",
+  "specification": "User decisions 2026-10-09 (XAVC 4:2:2 on laptops without RTX 50; standard formats only; export from the original); v5 qnc-media-ffmpeg/src/proxy.rs."
+}

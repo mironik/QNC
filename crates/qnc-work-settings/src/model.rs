@@ -10,6 +10,9 @@ pub enum PlaybackInput {
     Original,
     Proxy,
     ProxyIfAvailable,
+    /// The optimized copy the import made (H.264 8-bit 4:2:0 of the original, same frames,
+    /// timecode and sound), else the original (user 2026-10-09).
+    OptimizedIfAvailable,
 }
 
 /// Whether a timeline artifact of the project is made in the background after Select
@@ -106,6 +109,7 @@ impl WorkSettings {
             Some("original") => Ok(PlaybackInput::Original),
             Some("proxy") => Ok(PlaybackInput::Proxy),
             Some("proxy_if_available") => Ok(PlaybackInput::ProxyIfAvailable),
+            Some("optimized_if_available") => Ok(PlaybackInput::OptimizedIfAvailable),
             _ => Err(ReadError::new(
                 "playback_input",
                 "Baza sadrzi nepodrzani playback.input.",

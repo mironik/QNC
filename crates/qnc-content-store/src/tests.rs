@@ -141,6 +141,7 @@ fn read_rejects_wrong_remote_clip_version_and_database_without_fallback() {
                         import_error: None,
                         imported_media_uri: None,
                         imported_copy_of: None,
+                        imported_optimized: None,
                     })))
                 }),
             };
@@ -465,6 +466,7 @@ fn reselection_preserves_import_and_never_replaces_final_metadata() {
             media_uri: Some(clip("c1").snapshot.binding.original_uri),
             thumbnail_uri: None,
             copy_of: None,
+            optimized: None,
             error: None,
         },
     )
@@ -823,6 +825,7 @@ fn a_heartbeat_keeps_the_lease_alive_and_needs_a_running_import() {
             media_uri: Some(clip("c1").snapshot.binding.original_uri),
             thumbnail_uri: None,
             copy_of: None,
+            optimized: None,
             error: None,
         },
     )
@@ -852,6 +855,7 @@ fn an_imported_poster_replaces_the_card_poster_and_survives_a_new_select() {
             media_uri: Some(clip("c1").snapshot.binding.original_uri),
             thumbnail_uri: Some(poster_uri()),
             copy_of: None,
+            optimized: None,
             error: None,
         },
     )
@@ -944,6 +948,7 @@ fn an_imported_copy_records_which_representation_it_copies() {
             media_uri: None,
             thumbnail_uri: None,
             copy_of: Some(ImportedCopy::Original),
+            optimized: None,
             error: Some("x".into()),
         },
     )
@@ -955,6 +960,7 @@ fn an_imported_copy_records_which_representation_it_copies() {
             media_uri: Some(copy.clone()),
             thumbnail_uri: None,
             copy_of: Some(ImportedCopy::Original),
+            optimized: None,
             error: None,
         },
     )
@@ -965,4 +971,32 @@ fn an_imported_copy_records_which_representation_it_copies() {
     };
     assert_eq!(read.imported_media_uri.as_deref(), Some(copy.as_str()));
     assert_eq!(read.imported_copy_of, Some(ImportedCopy::Original));
+}
+
+#[test]
+fn an_optimized_copy_is_kept_with_its_description() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = claimed_store(&path);
+    let mut optimized = clip("c1").snapshot.metadata.original.clone();
+    optimized.media_uri = "qnc://local/source/project-p1/file/optimized/c1_a.mov".into();
+    let card = clip("c1").snapshot.binding.original_uri;
+    run(
+        &mut store,
+        Operation::FinishImport {
+            clip_id: "c1".into(),
+            media_uri: Some(card.clone()),
+            thumbnail_uri: None,
+            copy_of: None,
+            optimized: Some(optimized.clone()),
+            error: None,
+        },
+    )
+    .unwrap();
+    let Data::Clip(Some(read)) = run(&mut store, Operation::Read { clip_id: "c1".into() }).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(read.imported_media_uri.as_deref(), Some(card.as_str()), "the original stays linked");
+    assert_eq!(read.imported_optimized, Some(optimized));
 }

@@ -209,6 +209,19 @@ fn settings_decide_the_action_for_every_media_mode() {
             media_uri: f.proxy.clone()
         }
     );
+    assert_eq!(
+        action_for(&clip, &plan("optimized", "optimized_if_available")).unwrap(),
+        Action::Optimize { with_original: false }
+    );
+    assert_eq!(
+        action_for(&clip, &plan("optimized_original", "optimized_if_available")).unwrap(),
+        Action::Optimize { with_original: true }
+    );
+    assert_eq!(
+        action_for(&clip, &plan("link", "optimized_if_available")).unwrap(),
+        Action::Link { media_uri: f.original.clone() },
+        "a link makes no optimized copy"
+    );
 }
 
 #[test]
@@ -390,7 +403,7 @@ fn the_write_transport_queues_the_selected_clips_and_hands_them_out_once() {
         "each clip is handed out once"
     );
     queue
-        .finish_import(first.clip.id().into(), Some(f.original.clone()), None, None, None)
+        .finish_import(first.clip.id().into(), Some(f.original.clone()), None, None, None, None)
         .unwrap();
     let stored = f.client.read(first.clip.id()).unwrap().unwrap();
     assert_eq!(stored.import_status, ImportStatus::Imported);
@@ -633,4 +646,40 @@ fn writing_is_allowed_only_below_the_project_folder() {
     assert!(inside_project(project, &project.join("original").join("a.mxf")).is_ok());
     assert!(inside_project(project, std::path::Path::new("card/Clip/a.mxf")).is_err());
     assert!(inside_project(project, &project.join("..").join("card").join("a")).is_err());
+}
+
+#[test]
+fn an_optimized_copy_needs_the_original_on_this_computer_and_records_a_failed_import() {
+    let mut f = fixture();
+    let project = f.project.path().to_path_buf();
+    let outcome = run_next(
+        &mut f.client,
+        &plan("optimized", "optimized_if_available"),
+        &project,
+        &opener(&f.media, false),
+        &nothing(),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(outcome.result.is_err());
+    let stored = f.client.read(&outcome.clip_id).unwrap().unwrap();
+    assert_eq!(stored.import_status, ImportStatus::Failed);
+    assert!(stored.imported_optimized.is_none());
+    assert!(!project.join("optimized").exists() || std::fs::read_dir(project.join("optimized")).unwrap().next().is_none());
+}
+
+#[test]
+fn an_optimized_copy_must_be_the_original_frame_for_frame() {
+    let mut f = fixture();
+    let clip = f.client.claim_next().unwrap().unwrap();
+    let original = clip.clip.snapshot.metadata.original.clone();
+    let mut copy = original.clone();
+    copy.media_uri = "qnc://local/source/project-p1/file/optimized/c.mov".into();
+    crate::optimize::same_frames(&original, &copy).unwrap();
+    for stream in &mut copy.streams {
+        if let qnc_media_metadata::StreamDetails::Video(video) = &mut stream.details {
+            video.frame_count.as_mut().unwrap().value = qnc_media_metadata::FrameCount::Exact(1);
+        }
+    }
+    assert!(crate::optimize::same_frames(&original, &copy).is_err());
 }

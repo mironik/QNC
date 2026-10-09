@@ -52,6 +52,7 @@ impl PlayerContentRead for IngestPlayerContent {
                 qnc_ingest_store::content::ImportedCopy::Original => qnc_player_input::Representation::Original,
                 qnc_ingest_store::content::ImportedCopy::Proxy => qnc_player_input::Representation::Proxy,
             }),
+            imported_optimized: stored.imported_optimized,
         }))
     }
 }

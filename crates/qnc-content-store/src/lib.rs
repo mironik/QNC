@@ -82,6 +82,10 @@ pub struct StoredClip {
     /// linked where it is (the imported URI is then the original or proxy itself).
     #[serde(default)]
     pub imported_copy_of: Option<ImportedCopy>,
+    /// The optimized copy the import made in the project (H.264 8-bit 4:2:0 of the
+    /// original, same frames, timecode and sound), described by its one probe.
+    #[serde(default)]
+    pub imported_optimized: Option<qnc_media_metadata::MediaRepresentation>,
 }
 
 /// An imported media file in the project that is a byte for byte copy of one representation
@@ -214,6 +218,9 @@ pub enum Operation {
         /// What the imported file is a byte copy of, when it was copied into the project.
         #[serde(default)]
         copy_of: Option<ImportedCopy>,
+        /// The optimized copy the import made, with its probed description.
+        #[serde(default)]
+        optimized: Option<qnc_media_metadata::MediaRepresentation>,
         error: Option<String>,
     },
 }

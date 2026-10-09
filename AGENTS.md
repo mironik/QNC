@@ -3069,3 +3069,23 @@ tipke cita kroz tu kocku (Ingest, sve Media Assist, Story i buduce) bez izmjene 
 koristi. `seed/system_seed.json`: svi sistemski templatei imaju zadani preset `default` (QNC; dva su bila
 Resolve). Naziv preseta ostaje "QNC" (conformance: isto kao qnc_v4). Provjereno: testovi, conformance,
 zasticena kopija (preset `resolve` u kopiji projekta procitan iz baze).
+Otkljucano i izvedeno 2026-10-09 (korisnik: "u project formi trebali bi dodati i optimizirani source media u
+ingest i play media... 8 bitna verzija kako bi se mogao koristiti GPU kod laptopa koji nemaju Nvidia RTX 50";
+"najprije xavc 4:2:2"; nestandardni formati odbijeni, XDCAM 1080i50 original kasnije): Project Advanced
+"Ingest media" dobio je "Optimizirani (H.264 8-bit)" (`optimized`) i "Optimizirani + original"
+(`optimized_original`), "Playback input" "Optimizirani ako postoji" (`optimized_if_available`); stvarni
+projekt se ne mijenja (bira korisnik). Novi javni `crates/qnc-media-optimize` (+ ugovor modula): H.264 High
+8-bit 4:2:0 iste velicine, sve slike, GOP 10, bez B slika, ~35 Mbit/s, svi audio streamovi kopirani bit za bit
+(`-c:a copy`), metapodaci i timecode zadrzani, QuickTime; enkoder po OS-u probnim kodiranjem (Windows QSV,
+NVENC, AMF, libx264; macOS VideoToolbox, libx264; Linux NVENC, QSV, libx264), ffmpeg iz kataloga dekodera,
+ispod normalnog prioriteta. `qnc-ingest-import-worker` (`optimize.rs`, `Action::Optimize`): kopija ide u
+`optimized/<naziv>.mov` projekta kroz `.partial`, opisuje je jedan probe nove datoteke (Ingest proces, isti
+lokalni ffprobe; original se ne probe-a ponovno) i provjerava prema spremljenom originalu (tocan broj slika,
+fps, pocetni TC); inace se brise i uvoz je neuspio. `optimized_original` kopira i original, `optimized` ga
+ostavlja vezanog na izvoru. `qnc-content-store` stupac `clips.optimized_json` (`FinishImport.optimized`,
+`StoredClip.imported_optimized`). `qnc-player-input` `Representation::Optimized`: uz `optimized_if_available`
+slika iz optimizirane kopije, zvuk i export ostaju iz originala; bez kopije svira original; kopija s drugim
+brojem slika se odbija. `qnc-work-settings` `PlaybackInput::OptimizedIfAvailable`, `qnc-ingest-work-plan`
+`IngestMedia::Optimized`. Izmjereno (klip 1492, 34 s): QSV kodiranje 13,5-15,2 s; dekodiranje originala 40,4 s
+procesora, optimizirane kopije softverski 28,5 s, s QSV 1,2 s. Nije izvedeno: GPU (QSV) adapter dekodera
+(sljedeci korak, bez njega player optimiziranu kopiju dekodira procesorom), XDCAM 1080i50, export.

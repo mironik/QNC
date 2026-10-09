@@ -27,6 +27,10 @@ impl PlayerClipSource for StoredClip {
         })
     }
 
+    fn imported_optimized(&self) -> Option<&m::MediaRepresentation> {
+        self.imported_optimized.as_ref()
+    }
+
     fn validate_clip(&self) -> Result<()> {
         self.clip.validate().map_err(InputError::InvalidRecord)
     }
@@ -48,6 +52,7 @@ impl PlayerContentRead for StorePlayerContentReader {
                 qnc_ingest_store::content::ImportedCopy::Original => crate::Representation::Original,
                 qnc_ingest_store::content::ImportedCopy::Proxy => crate::Representation::Proxy,
             }),
+            imported_optimized: stored.imported_optimized,
         }))
     }
 }
@@ -188,6 +193,7 @@ fn stored(context: &str) -> StoredClip {
         import_error: None,
         imported_media_uri: None,
         imported_copy_of: None,
+        imported_optimized: None,
     };
     refresh(&mut result);
     assert!(
@@ -540,6 +546,34 @@ fn an_imported_copy_of_the_original_plays_from_the_copy_with_the_saved_record() 
     assert_eq!(input.representation, Representation::Proxy);
     assert_eq!(input.audio_media().media_uri, copy);
     assert_ne!(input.media().unwrap().media_uri, card);
+}
+
+#[test]
+fn the_optimized_copy_plays_the_picture_and_the_original_keeps_the_sound() {
+    let mut clip = stored("qnc://local");
+    let mut optimized = clip.clip.snapshot.metadata.original.clone();
+    optimized.media_uri = "qnc://local/source/project-p1/file/optimized/c1_clip.mov".into();
+    // Without an optimized copy the original plays.
+    let input = prepare(&settings("qnc://local", "optimized_if_available"), &clip).unwrap();
+    assert_eq!(input.representation, Representation::Original);
+    clip.import_status = ImportStatus::Imported;
+    clip.imported_media_uri = Some(clip.clip.snapshot.binding.original_uri.clone());
+    clip.imported_optimized = Some(optimized.clone());
+    let input = prepare(&settings("qnc://local", "optimized_if_available"), &clip).unwrap();
+    assert_eq!(input.representation, Representation::Optimized);
+    assert_eq!(input.media().unwrap().media_uri, optimized.media_uri, "picture from the copy");
+    assert_eq!(input.audio_media().media_uri, clip.clip.snapshot.binding.original_uri, "sound of the original");
+    input.validate_for(&input.workspace_db_uri.clone(), "c1").unwrap();
+    // Other modes ignore the copy.
+    let input = prepare(&settings("qnc://local", "proxy"), &clip).unwrap();
+    assert_eq!(input.representation, Representation::Proxy);
+    // A copy with other frames is refused, not played out of step.
+    let m::StreamDetails::Video(video) = &mut clip.imported_optimized.as_mut().unwrap().streams[0].details else { panic!() };
+    video.frame_count = fact(m::FrameCount::Exact(7), "optimized");
+    assert!(matches!(
+        prepare(&settings("qnc://local", "optimized_if_available"), &clip),
+        Err(InputError::UnsupportedMedia(_))
+    ));
 }
 #[test]
 fn unfinished_missing_and_estimated_metadata_never_trigger_repair() {

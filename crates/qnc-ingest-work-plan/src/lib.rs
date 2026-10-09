@@ -10,6 +10,10 @@ pub enum IngestMedia {
     Link,
     Proxy,
     Original,
+    /// An optimized copy of the original (H.264 8-bit 4:2:0, same frames, timecode and
+    /// sound) is made into the project; `with_original` also copies the original, so
+    /// the export needs no card (user 2026-10-09).
+    Optimized { with_original: bool },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,6 +36,8 @@ impl IngestWorkPlan {
             "link" => IngestMedia::Link,
             "proxy" => IngestMedia::Proxy,
             "original" => IngestMedia::Original,
+            "optimized" => IngestMedia::Optimized { with_original: false },
+            "optimized_original" => IngestMedia::Optimized { with_original: true },
             _ => return Err("Baza sadrzi nepodrzani storage.ingest_media.".into()),
         };
         let playback_input = settings.playback_input().map_err(|e| e.to_string())?;

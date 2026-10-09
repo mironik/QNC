@@ -3602,14 +3602,19 @@ dependencies = [
  "qnc-camera-sony-fx6-v6",
  "qnc-contracts",
  "qnc-dir-browser",
+ "qnc-ffprobe-metadata",
  "qnc-filmstrip",
  "qnc-ingest-runtime",
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
+ "qnc-media-metadata",
+ "qnc-media-optimize",
+ "qnc-media-probe",
  "qnc-media-stream",
  "qnc-poster-create",
  "qnc-source-reader",
+ "qnc-source-timecode",
  "qnc-work-settings",
  "serde_json",
  "tempfile",
@@ -3877,6 +3882,13 @@ dependencies = [
  "qnc-media-records",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "qnc-media-optimize"
+version = "0.1.0"
+dependencies = [
+ "qnc-decoder-catalog",
 ]
 
 [[package]]

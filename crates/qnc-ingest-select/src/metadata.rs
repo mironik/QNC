@@ -97,6 +97,7 @@ impl Worker<'_> {
                     import_error: None,
                     imported_media_uri: None,
                     imported_copy_of: None,
+                    imported_optimized: None,
                 });
                 clip.previously_seen = self.existing.contains_key(&clip.clip_id);
                 clip.save_state = SelectSaveState::Pending;

@@ -34,11 +34,14 @@ const INGEST_MEDIA_MODES: &[(&str, &str)] = &[
     ("link", "Samo link"),
     ("proxy", "Proxy"),
     ("original", "Original"),
+    ("optimized", "Optimizirani (H.264 8-bit)"),
+    ("optimized_original", "Optimizirani + original"),
 ];
 const PLAYBACK_INPUTS: &[(&str, &str)] = &[
     ("proxy_if_available", "Proxy ako postoji"),
     ("original", "Original"),
     ("proxy", "Proxy"),
+    ("optimized_if_available", "Optimizirani ako postoji"),
 ];
 const EXPORT_MODES: &[(&str, &str)] = &[
     ("xml_master", "XML master"),

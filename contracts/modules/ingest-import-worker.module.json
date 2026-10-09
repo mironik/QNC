@@ -31,6 +31,6 @@
   "database_write_policy": "public_ingest_content_write_transport_only",
   "runtime_crate": "qnc-ingest-import-worker",
   "input": "A clip claimed from the content database queue, the work plan of the project settings, the project directory of the machine that runs the worker, and a media opener (local, LAN or intranet transport).",
-  "output": "The imported media URI (link: the source URI chosen by playback.input; proxy/original: the copy in the project, qnc://.../source/project-<project_id>/file/<original|proxy>/<name>) and what it is a byte copy of (copy_of), written with finish_import; a failed import is recorded as failed with a message.",
+  "output": "The imported media URI (link: the source URI chosen by playback.input; proxy/original: the copy in the project, qnc://.../source/project-<project_id>/file/<original|proxy>/<name>) and what it is a byte copy of (copy_of), and for storage.ingest_media optimized | optimized_original the optimized copy (qnc-media-optimize, then one probe of the new file and a frame, fps and timecode check against the saved original; with optimized_original the original is copied too, else linked), written with finish_import; a failed import is recorded as failed with a message.",
   "specification": "docs/v5-book/02-ingest.md (I2.7, I2.8), docs/96-v5-ingest-db-and-workers.md; not done: proxy generation, card poster copy"
 }

@@ -167,6 +167,8 @@ fn imported_store(path: &Path) -> Story {
             clip_id: "c1".into(),
             media_uri: Some(clip("c1").snapshot.binding.original_uri),
             thumbnail_uri: None,
+            copy_of: None,
+            optimized: None,
             error: None,
         },
     )
