@@ -1406,6 +1406,13 @@ fn a_source_of_half_or_twice_the_story_rate_joins_with_its_length_in_story_frame
     let rows = segments(&mut store);
     assert_eq!((rows[1].in_frame, rows[1].out_frame, rows[1].duration_frames), (5, 15, 20));
     assert_eq!(program_length(&mut store), 30);
+    // A marker inside it counts its story frames, not its source frames.
+    let second = rows[1].segment_id.clone();
+    run(&mut store, Operation::CreateMarker { part_id: second, local_frame: 15 }).unwrap();
+    let Data::Markers(markers) = run(&mut store, Operation::ListMarkers).unwrap() else {
+        panic!("markers")
+    };
+    assert!(markers.iter().any(|marker| marker.program_frame == 25), "{markers:?}");
     // The rate stays the story's when its first segment goes.
     let first = rows[0].segment_id.clone();
     run(&mut store, Operation::DeleteSegment { segment_id: first }).unwrap();

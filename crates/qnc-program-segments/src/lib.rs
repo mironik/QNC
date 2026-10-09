@@ -382,6 +382,18 @@ pub fn program(
     }
 }
 
+/// The source frame after the last one a cover plays: its slot length counted in its
+/// source rate (the story rate, twice it or half it); the stored OUT when the rates
+/// do not fit.
+fn played_source_out(cover: &ProgramCover, story_rate: Option<(u32, u32)>) -> u64 {
+    let slot = cover.program_end_frame.saturating_sub(cover.program_start_frame);
+    story_rate
+        .and_then(|rate| qnc_program_db::story_per_source(rate, (cover.fps_num, cover.fps_den)).ok())
+        .map_or(cover.source_out_frame, |(num, den)| {
+            cover.source_in_frame + (slot * den as u64).div_ceil(num as u64)
+        })
+}
+
 /// `seconds:frames` with the frame rate rounded to whole frames per second (v5).
 pub fn duration_label(frames: u64, fps_num: u32, fps_den: u32) -> String {
     let fps = whole_fps(fps_num, fps_den);
@@ -1425,6 +1437,7 @@ impl ProgramSegments {
         ) {
             self.selected_cover = None;
         }
+        let story_rate = view.timebase;
         view.covers = self
             .stored_covers
             .iter()
@@ -1436,7 +1449,7 @@ impl ProgramSegments {
                 selected: self.selected_cover.as_deref() == Some(cover.cover_id.as_str()),
                 clip_id: cover.clip_id.clone(),
                 source_in_frame: cover.source_in_frame,
-                source_out_frame: cover.source_out_frame,
+                source_out_frame: played_source_out(cover, story_rate),
                 a2_source_channel: cover.a2_source_channel,
             })
             .collect();

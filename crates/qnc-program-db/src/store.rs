@@ -1964,7 +1964,8 @@ fn normalize_story_selection(conn: &Connection) -> Result<()> {
 /// Program length in frames: the segments one after another.
 fn program_length(conn: &Connection) -> Result<i64> {
     conn.query_row(
-        "SELECT COALESCE(SUM(out_frame - in_frame), 0) FROM story_parts WHERE active = 1",
+        "SELECT COALESCE(SUM(CASE WHEN duration_frames > 0 THEN duration_frames ELSE out_frame - in_frame END), 0)
+         FROM story_parts WHERE active = 1",
         [],
         |row| row.get(0),
     )
@@ -1975,7 +1976,8 @@ fn program_length(conn: &Connection) -> Result<i64> {
 fn segment_window(conn: &Connection, segment_id: &str) -> Result<Option<(u64, u64)>> {
     let mut statement = conn
         .prepare(
-            "SELECT part_id, out_frame - in_frame FROM story_parts
+            "SELECT part_id, CASE WHEN duration_frames > 0 THEN duration_frames ELSE out_frame - in_frame END
+             FROM story_parts
              WHERE active = 1 ORDER BY sort_index",
         )
         .map_err(err)?;

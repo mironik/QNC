@@ -55,6 +55,8 @@ struct Session {
     auto_finish: u64,
     total_frames: u64,
     source: SyncSource,
+    /// Story frames per source frames (`1:1`, `2:1` or `1:2`).
+    per_source: (u64, u64),
     /// Last window frame seen: the player returns to the window start at its
     /// end, so a frame going back means the end was reached between repaints.
     last: u64,
@@ -117,25 +119,32 @@ impl SyncCover {
         self.enabled && self.armed.is_some() && self.active.is_none()
     }
 
+    /// The rate of the armed source, for the caller to tell how its frames count in
+    /// the story.
+    pub fn armed_timebase(&self) -> Option<(u32, u32)> {
+        self.armed.as_ref().map(|source| source.timebase)
+    }
+
     /// Space: the program window from the marker at or before the playhead to
     /// where the source runs out (v5 `build_preview`). `markers` are the program
-    /// frames of the M markers.
+    /// frames of the M markers. `per_source` is story frames per source frames:
+    /// `(1, 1)`, or `(2, 1)` / `(1, 2)` for a source of half or twice the story rate
+    /// (user 2026-10-09); the caller decides it from the story rule.
     pub fn start(
         &mut self,
         markers: &[u64],
         playhead: u64,
         total_frames: u64,
-        program_timebase: Option<(u32, u32)>,
+        per_source: (u64, u64),
     ) -> Result<SyncPreview, String> {
         let source = self
             .armed
             .clone()
             .ok_or("Source IN nije postavljen za Sync.")?;
-        let (num, den) = program_timebase.ok_or("Playlist input je prazan")?;
-        let (src_num, src_den) = source.timebase;
-        if u64::from(num) * u64::from(src_den) != u64::from(src_num) * u64::from(den) {
-            return Err("Sync ne miješa program/source timebase".into());
+        if !matches!(per_source, (1, 1) | (2, 1) | (1, 2)) {
+            return Err("Sync: izvor mora imati isti, dvostruki ili upola manji fps od priče.".into());
         }
+        let (num, den) = per_source;
         if total_frames == 0 {
             return Err("Playlist input je prazan".into());
         }
@@ -150,13 +159,14 @@ impl SyncCover {
         let source_in = source.source_in.min(duration - 1);
         // User rule (2026-09-25): Sync runs from the source IN to the source OUT or
         // to the first M marker after the anchor, whichever comes first.
-        let available = (source.source_out.min(duration).max(source_in + 1)) - source_in;
+        let available =
+            ((source.source_out.min(duration).max(source_in + 1)) - source_in) * num / den;
         let next_marker = markers
             .iter()
             .copied()
             .filter(|frame| *frame > anchor)
             .min();
-        let end = (anchor + available)
+        let end = (anchor + available.max(1))
             .min(next_marker.unwrap_or(u64::MAX))
             .min(total_frames)
             .max(anchor + 1);
@@ -178,6 +188,7 @@ impl SyncCover {
                 source_in,
                 ..source
             },
+            per_source,
             last: 0,
         });
         Ok(preview)
@@ -195,7 +206,8 @@ impl SyncCover {
         let wrapped = frame < session.last;
         session.last = frame;
         let program = (session.anchor + frame).min(session.auto_finish);
-        self.source_frame = Some(session.source.source_in + (program - session.anchor));
+        let (num, den) = session.per_source;
+        self.source_frame = Some(session.source.source_in + (program - session.anchor) * den / num);
         if program + 1 >= session.auto_finish || wrapped {
             let end = session.auto_finish;
             // User rule: it stops there; Enter confirms the cover.
@@ -211,8 +223,9 @@ impl SyncCover {
         let session = self.active.take().ok_or("Sync play nije aktivan.")?;
         let start = session.anchor;
         let end = end.max(start + 1).min(session.total_frames.max(start + 1));
-        let source_out =
-            (session.source.source_in + (end - start)).min(session.source.duration_frames);
+        let (num, den) = session.per_source;
+        let source_out = (session.source.source_in + ((end - start) * den).div_ceil(num))
+            .min(session.source.duration_frames);
         if source_out <= session.source.source_in {
             return Err("Sync OUT mora biti poslije Source IN".into());
         }
@@ -317,7 +330,7 @@ mod tests {
     fn space_plays_from_the_marker_before_the_playhead_to_the_end_of_the_source() {
         let mut sync = armed();
         assert!(sync.wants_space());
-        let preview = sync.start(&[0, 20, 60], 25, 100, Some((50, 1))).unwrap();
+        let preview = sync.start(&[0, 20, 60], 25, 100, (1, 1)).unwrap();
         assert_eq!(preview.window, (20, 50), "anchor 20, 30 source frames left");
         assert_eq!(preview.source_in, 10);
         assert!(!sync.wants_space(), "IN is used once (v5 set_active)");
@@ -326,7 +339,7 @@ mod tests {
     #[test]
     fn sync_stops_at_the_source_out_or_the_next_marker_whichever_comes_first() {
         let mut sync = armed();
-        let preview = sync.start(&[0, 20, 35], 25, 100, Some((50, 1))).unwrap();
+        let preview = sync.start(&[0, 20, 35], 25, 100, (1, 1)).unwrap();
         assert_eq!(preview.window, (20, 35), "the next marker closes it");
         let mut sync = SyncCover::new();
         sync.toggle();
@@ -334,15 +347,15 @@ mod tests {
             source_out: 18,
             ..source(10, 40)
         });
-        let preview = sync.start(&[0, 20, 35], 25, 100, Some((50, 1))).unwrap();
+        let preview = sync.start(&[0, 20, 35], 25, 100, (1, 1)).unwrap();
         assert_eq!(preview.window, (20, 28), "the source OUT closes it");
     }
 
     #[test]
     fn sync_needs_a_marker_before_the_playhead_and_one_timebase() {
         let mut sync = armed();
-        assert!(sync.start(&[30], 25, 100, Some((50, 1))).is_err());
-        assert!(sync.start(&[0], 25, 100, Some((25, 1))).is_err());
+        assert!(sync.start(&[30], 25, 100, (1, 1)).is_err());
+        assert!(sync.start(&[0], 25, 100, (3, 1)).is_err());
         let mut off = SyncCover::new();
         off.arm(source(0, 10));
         assert!(!off.wants_space(), "IN arms only while Sync is on");
@@ -351,7 +364,7 @@ mod tests {
     #[test]
     fn frames_follow_the_window_and_o_closes_the_slot() {
         let mut sync = armed();
-        sync.start(&[0, 20], 25, 100, Some((50, 1))).unwrap();
+        sync.start(&[0, 20], 25, 100, (1, 1)).unwrap();
         assert_eq!(
             sync.program_frame(Some(1)),
             Some(21),
@@ -390,7 +403,7 @@ mod tests {
     #[test]
     fn the_end_of_the_source_stops_and_waits_for_enter() {
         let mut sync = armed();
-        sync.start(&[0, 20], 25, 100, Some((50, 1))).unwrap();
+        sync.start(&[0, 20], 25, 100, (1, 1)).unwrap();
         assert_eq!(sync.program_frame(Some(29)), Some(50));
         assert!(!sync.is_active());
         sync.resolve([("b|c", 20, 50)].into_iter());
@@ -404,7 +417,7 @@ mod tests {
     #[test]
     fn a_window_end_missed_between_repaints_still_closes_the_slot() {
         let mut sync = armed();
-        sync.start(&[0, 20, 35], 25, 100, Some((50, 1))).unwrap();
+        sync.start(&[0, 20, 35], 25, 100, (1, 1)).unwrap();
         assert_eq!(sync.program_frame(Some(5)), Some(25));
         assert_eq!(
             sync.program_frame(Some(0)),
@@ -419,9 +432,27 @@ mod tests {
     }
 
     #[test]
+    fn a_source_of_half_or_twice_the_story_rate_counts_in_story_frames() {
+        // XDCAM 1080i50 (25) in a 50p story: every field is a story frame.
+        let mut sync = armed();
+        let preview = sync.start(&[0, 20], 25, 200, (2, 1)).unwrap();
+        assert_eq!(preview.window, (20, 80), "30 source frames are 60 story frames");
+        assert_eq!(sync.program_frame(Some(11)), Some(31));
+        assert_eq!(sync.source_view(), Some((15, None)));
+        let slot = sync.finish(31).unwrap().clone();
+        assert_eq!(slot.source_out, 16, "11 story frames need 6 source pictures");
+        // 50p in a 25 story: every other picture.
+        let mut sync = armed();
+        let preview = sync.start(&[0, 20], 25, 200, (1, 2)).unwrap();
+        assert_eq!(preview.window, (20, 35), "30 source frames are 15 story frames");
+        let slot = sync.finish(30).unwrap().clone();
+        assert_eq!(slot.source_out, 30);
+    }
+
+    #[test]
     fn switching_sync_off_drops_everything() {
         let mut sync = armed();
-        sync.start(&[0], 5, 100, Some((50, 1))).unwrap();
+        sync.start(&[0], 5, 100, (1, 1)).unwrap();
         assert!(sync.toggle(), "a running play was stopped");
         assert!(!sync.enabled() && !sync.is_active() && !sync.holds_enter());
     }

@@ -64,18 +64,28 @@ pub fn slots(stored: &[ProgramSlot], selected: Option<&str>) -> Vec<Slot> {
         .collect()
 }
 
+/// Story frames and source frames of a segment: equal, or 2:1 either way when its
+/// source has twice or half the story rate (user 2026-10-09).
+fn lengths(segment: &SegmentRow) -> (u64, u64) {
+    let story = segment.end_frame.saturating_sub(segment.start_frame).max(1);
+    let source = segment.source_out_frame.saturating_sub(segment.source_in_frame).max(1);
+    (story, source)
+}
+
 /// Program frame of a picture of a segment, if the picture is inside it.
 pub fn program_frame(segment: &SegmentRow, source_frame: u64) -> Option<u64> {
+    let (story, source) = lengths(segment);
     (segment.source_in_frame..segment.source_out_frame)
         .contains(&source_frame)
-        .then(|| segment.start_frame + (source_frame - segment.source_in_frame))
+        .then(|| segment.start_frame + (source_frame - segment.source_in_frame) * story / source)
 }
 
 /// The segment and picture at a program frame; the last frame belongs to the last segment.
 pub fn source_at(view: &SegmentsView, frame: u64) -> Option<(&SegmentRow, u64)> {
     let segment = view.segment_at(frame)?;
     let local = frame.min(segment.end_frame.saturating_sub(1)) - segment.start_frame;
-    Some((segment, segment.source_in_frame + local))
+    let (story, source) = lengths(segment);
+    Some((segment, segment.source_in_frame + local * source / story))
 }
 
 /// v5 `marker_slot_at_program_frame`: `[start, end)`, and the last slot also at its end.

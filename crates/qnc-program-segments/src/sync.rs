@@ -60,10 +60,14 @@ impl ProgramSegments {
         let markers: Vec<u64> = self.view.markers.iter().map(|pin| pin.frame).collect();
         let playhead = self.playhead.unwrap_or(0);
         let total = self.view.total_frames;
-        match self
-            .sync
-            .start(&markers, playhead, total, self.view.timebase)
-        {
+        // The story rule decides how the source counts: the same, twice or half the
+        // story rate (user 2026-10-09).
+        let per_source = match (self.view.timebase, self.sync.armed_timebase()) {
+            (Some(story), Some(source)) => qnc_program_db::story_per_source(story, source)
+                .map(|(num, den)| (num as u64, den as u64)),
+            _ => Err("Playlist input je prazan".into()),
+        };
+        match per_source.and_then(|per_source| self.sync.start(&markers, playhead, total, per_source)) {
             Ok(preview) => {
                 self.selected_marker = None;
                 self.selected_slot = None;

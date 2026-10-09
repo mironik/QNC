@@ -3174,3 +3174,15 @@ filtra). Ugovor `story.database.json` (`story_rate`). Sync/B-roll i dalje odbija
 testovi navedenih crateova, conformance, izolirana kopija (priča FX6 50p 5 s + XDCAM 1080i50 5 s = 250 slika price +
 FX6 50p 5 s; XDCAM je kopiran u scratchpad, izvor se samo cita): 1 od 3 PASS, ostali 100 % i 95 % slika s 1-3
 trzaja 63-79 ms, A/V -0,2 slike, zvuk XDCAM-a od izvora 200 (= 100 x 2). Export u format za predaju nije izveden.
+Dopuna 2026-10-09 (korisnik: "rijesi pokrivalice i sync/b-roll"): pokrivalica i Sync/B-roll primaju izvor iste,
+dvostruke ili upola manje stope od price. `qnc-sync-cover`: `start` prima omjer slika price i izvora (1:1, 2:1,
+1:2; odlucuje ga pozivatelj po pravilu price), prozor programa, slika izvora pod Syncom i OUT izvora zatvorenog
+slota racunaju se tim omjerom (prije je odbijao svaku drugu stopu); `qnc-program-segments` omjer uzima iz
+`qnc_program_db::story_per_source`, prikaz pokrivalice (val na A2) ide do slike izvora koju pokrivalica stvarno
+pusti, a preslikavanje frame programa <-> slika izvora segmenta ide omjerom duljina. Nalaz i popravak u
+`qnc-program-db`: polozaj segmenta (marker u segmentu) i duljina programa racunali su se iz slika izvora
+(`out_frame - in_frame`), pa je marker u XDCAM segmentu 50p price padao na krivi frame; sada iz
+`duration_frames` (test). Ugovor `sync-cover.module.json`. Provjereno: testovi, conformance, izolirana kopija
+(prica FX6 + XDCAM + FX6, XDCAM pokrivalica u FX6 segmentu i FX6 pokrivalica u XDCAM segmentu, pisane kroz
+`qnc-program-db`): 2 od 3 PASS, prvi prolaz 93 % s trzajima 62-140 ms (hladan disk), A/V -0,2 slike, zvuk XDCAM
+pokrivalice od izvora 2000 (= 1000 x 2). Sync/B-roll uzivo kroz sucelje nije proban (alat pusta samo pricu).
