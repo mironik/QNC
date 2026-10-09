@@ -3147,3 +3147,14 @@ koji je vec u projektu. Ingest dok neki klip nema poster svake 2 s (najvise 3 mi
 (`qnc-clip-posters::missing_due`), pa se poster pojavi sam; citanje izvora za postere premjesteno u
 `qnc-ingest-select::SelectionConfig::source_readers` (C10 Ingest application 1714 -> 1707). Greska postera ide u
 log radnika. Proba na zasticenoj kopiji: dva klipa bez postera, oba napravljena, prva slika klipa.
+Popravak 2026-10-09 (korisnik: "ne moze obrisati bazu projekta" dok QNC radi; "radimo u lego kockama"): bazu
+zatvorenog projekta drzale su kocke, ne forme: nit pisca baze sadrzaja (`qnc-content-store` `ContentWriteTransport`,
+preko nje i prijavljivac "player radi"), nit posrednika baze projekta (`qnc-db-broker` `ProjectDbWriter`: prica,
+virtualni kadrovi, artefakti) i dijeljene veze za citanje u `qnc-content-artifacts`. Sve tri sada nakon 2 s
+mirovanja zatvaraju vezu (`IDLE_RELEASE`) i otvaraju je pri sljedecem poslu; vrijedi za zatvoren projekt, drugi
+otvoren projekt i skrivenu aplikaciju. Forme i aplikacijski slojevi nisu dirani (pokusaj da Ingest i Story sami
+"zaborave" projekt je vracen jer je to logika u formi). Novi alat `tools/qnc-release-check` (samo izolirana kopija):
+Story/MA aplikacija bez sucelja otvori klip, projekt se zatvori kroz `qnc-project-close`, i nakon 3 s baza kopije mora
+se dati preimenovati. Prije: baza zauzeta; sada otpustena. Testovi: posrednik i pisac nakon mirovanja otpustaju bazu
+i ponovno je otvaraju; dijeljena veza se otpusta, a nadzornik zavrsava s njom. Ingest koristi iste kocke; zivo nije
+provjeren (alat ne smije ovisiti o Ingest aplikaciji, C6).

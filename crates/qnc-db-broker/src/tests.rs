@@ -117,3 +117,19 @@ fn uris_come_from_the_workspace_of_the_project() {
     assert!(project_id("qnc://local/db/ingest_content/p1").is_err());
     assert!(project_db_uri("qnc://local/db/other/p1").is_err());
 }
+
+/// An idle writer lets the project database go, so a closed project can be deleted while
+/// the application keeps its writer; the next request opens it again.
+#[test]
+fn an_idle_writer_releases_the_project_database_and_reopens_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = project(dir.path(), "p1");
+    let target = ProjectDbTarget::from_owner_binding(&file, URI).unwrap();
+    let writer = ProjectDbWriter::start(target, modules()).unwrap();
+    writer.call("test.counter", Value::from("add")).unwrap();
+    std::thread::sleep(crate::transport::IDLE_RELEASE + std::time::Duration::from_millis(500));
+    let moved = dir.path().join("moved.db");
+    std::fs::rename(&file, &moved).expect("an idle writer holds no handle");
+    std::fs::rename(&moved, &file).unwrap();
+    assert_eq!(writer.call("test.counter", Value::from("add")).unwrap(), Value::from(2));
+}

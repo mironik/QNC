@@ -156,6 +156,7 @@ members = [
     "tools/qnc-ingest-worker",
     "tools/qnc-player-runner",
     "tools/qnc-player-acceptance",
+    "tools/qnc-release-check",
     "tools/qnc-program-output-host",
     "tools/qnc-camera-catalog",
     "tools/qnc-app-catalog",

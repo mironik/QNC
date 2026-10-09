@@ -21,6 +21,11 @@ use crate::{
 
 pub const ENDPOINT: &str = "/v1/project-db";
 
+/// How long a writer keeps the project database open without a request. A form keeps
+/// its writer for the whole project; the open file must not outlive the work, or a
+/// closed project could not be deleted while the application runs.
+pub const IDLE_RELEASE: std::time::Duration = std::time::Duration::from_secs(2);
+
 /// The project database of the active project: its public URI and the private
 /// binding the project gives (a local file or a LAN/intranet endpoint).
 #[derive(Clone)]
@@ -165,13 +170,30 @@ impl ProjectDbWriter {
         target: ProjectDbTarget,
         factories: Vec<Arc<dyn TableModuleFactory>>,
     ) -> Result<Self> {
-        let mut client = target.open(Access::ReadWrite, factories)?;
+        // Opened at once, so a database this writer cannot use is an error of `start`.
+        let mut client = Some(target.open(Access::ReadWrite, factories.clone())?);
         let (requests, receive) = mpsc::channel::<(String, Value, Sender<Result<Value>>)>();
         std::thread::Builder::new()
             .name("qnc-db-broker-writer".into())
-            .spawn(move || {
-                for (module, payload, reply) in receive {
-                    let _ = reply.send(client.execute(&module, payload));
+            .spawn(move || loop {
+                match receive.recv_timeout(IDLE_RELEASE) {
+                    Ok((module, payload, reply)) => {
+                        if client.is_none() {
+                            match target.open(Access::ReadWrite, factories.clone()) {
+                                Ok(opened) => client = Some(opened),
+                                Err(error) => {
+                                    let _ = reply.send(Err(error));
+                                    continue;
+                                }
+                            }
+                        }
+                        let open = client.as_mut().expect("opened above");
+                        let _ = reply.send(open.execute(&module, payload));
+                    }
+                    // Idle: the database is let go (a closed project can be deleted, user
+                    // 2026-10-09); the next request opens it again.
+                    Err(mpsc::RecvTimeoutError::Timeout) => client = None,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 }
             })
             .map_err(|e| e.to_string())?;

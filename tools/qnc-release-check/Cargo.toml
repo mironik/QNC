@@ -1,0 +1,10 @@
+[package]
+name = "qnc-release-check"
+version = "0.1.0"
+edition = "2021"
+description = "QNC tool: does an application let go of the project database after Close project? Runs the Ingest and editorial applications headless on an isolated copy, opens a clip, closes the project and tries to rename the database"
+
+[dependencies]
+qnc-active-project-read = { workspace = true }
+qnc-editorial-application = { workspace = true }
+qnc-project-close = { workspace = true }

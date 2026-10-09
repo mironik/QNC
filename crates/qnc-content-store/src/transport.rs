@@ -91,6 +91,9 @@ impl ContentTarget {
 }
 
 pub const ENDPOINT: &str = "/v1/ingest-content";
+
+/// How long a write transport keeps the project database open without a command.
+pub const IDLE_RELEASE: std::time::Duration = std::time::Duration::from_secs(2);
 enum Endpoint {
     Local(ContentStore),
     Remote(JsonClient),
@@ -473,7 +476,17 @@ fn run_content_write_transport(
     send: Sender<ContentWriteCompletion>,
 ) {
     let mut client = None;
-    while let Ok(command) = receive.recv() {
+    loop {
+        let command = match receive.recv_timeout(IDLE_RELEASE) {
+            Ok(command) => command,
+            // Idle: the database is let go (a closed project can be deleted while the
+            // application keeps its transport); the next command opens it again.
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                client = None;
+                continue;
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        };
         let started = Instant::now();
         let result = execute_write_command(&target, &mut client, command.operation).map(|data| {
             ContentWriteResult {

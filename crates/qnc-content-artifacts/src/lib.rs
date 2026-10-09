@@ -20,17 +20,48 @@ use std::{path::PathBuf, sync::Arc};
 pub const MODULE_ID: &str = "qnc.module.content-artifacts";
 pub const VERSION: &str = "0.1.0";
 
+/// How long a shared read connection stays open without use. A form keeps its readers for
+/// the whole project; the open file must not outlive the work, or a closed project could
+/// not be deleted while the application runs (user 2026-10-09).
+const IDLE_RELEASE: std::time::Duration = std::time::Duration::from_secs(2);
+const IDLE_CHECK: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// A shared connection, opened on use and let go after `IDLE_RELEASE` without use.
+struct IdleSlot<T> {
+    open: Option<T>,
+    used: std::time::Instant,
+}
+
+type Shared<T> = Arc<std::sync::Mutex<IdleSlot<T>>>;
+
+/// A slot and its watcher; the watcher ends with the last holder of the slot.
+fn idle_shared<T: Send + 'static>() -> Shared<T> {
+    let shared = Arc::new(std::sync::Mutex::new(IdleSlot { open: None, used: std::time::Instant::now() }));
+    let watched = Arc::downgrade(&shared);
+    let _ = std::thread::Builder::new()
+        .name("content-artifacts-idle".into())
+        .spawn(move || loop {
+            std::thread::sleep(IDLE_CHECK);
+            let Some(shared) = watched.upgrade() else { break };
+            let Ok(mut slot) = shared.lock() else { break };
+            if slot.open.is_some() && slot.used.elapsed() >= IDLE_RELEASE {
+                slot.open = None;
+            }
+        });
+    shared
+}
+
 #[derive(Clone)]
 struct SharedRead {
     target: ContentTarget,
-    client: Arc<std::sync::Mutex<Option<qnc_content_store::ContentClient>>>,
+    client: Shared<qnc_content_store::ContentClient>,
 }
 
 impl SharedRead {
     fn new(target: ContentTarget) -> Self {
         Self {
             target,
-            client: Arc::new(std::sync::Mutex::new(None)),
+            client: idle_shared(),
         }
     }
 
@@ -39,40 +70,47 @@ impl SharedRead {
             .client
             .lock()
             .map_err(|_| "Veza prema projektnoj bazi nije dostupna.".to_string())?;
-        if guard.is_none() {
-            *guard = Some(self.target.open(qnc_content_store::Access::ReadOnly)?);
+        if guard.open.is_none() {
+            guard.open = Some(self.target.open(qnc_content_store::Access::ReadOnly)?);
         }
+        guard.used = std::time::Instant::now();
         Ok(ReadGuard(guard))
     }
 }
 
-struct ReadGuard<'a>(std::sync::MutexGuard<'a, Option<qnc_content_store::ContentClient>>);
+struct ReadGuard<'a>(std::sync::MutexGuard<'a, IdleSlot<qnc_content_store::ContentClient>>);
 
 impl std::ops::Deref for ReadGuard<'_> {
     type Target = qnc_content_store::ContentClient;
     fn deref(&self) -> &Self::Target {
-        self.0.as_ref().expect("opened by SharedRead::open")
+        self.0.open.as_ref().expect("opened by SharedRead::open")
     }
 }
 
 impl std::ops::DerefMut for ReadGuard<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.as_mut().expect("opened by SharedRead::open")
+        self.0.open.as_mut().expect("opened by SharedRead::open")
     }
 }
 
-/// One read-only client of the artifact tables, opened on first use and shared.
+impl Drop for ReadGuard<'_> {
+    fn drop(&mut self) {
+        self.0.used = std::time::Instant::now();
+    }
+}
+
+/// One read-only client of the artifact tables, opened on use, shared, and let go when idle.
 #[derive(Clone)]
 struct SharedArtifacts {
     target: ProjectDbTarget,
-    client: Arc<std::sync::Mutex<Option<ArtifactReader>>>,
+    client: Shared<ArtifactReader>,
 }
 
 impl SharedArtifacts {
     fn new(target: ProjectDbTarget) -> Self {
         Self {
             target,
-            client: Arc::new(std::sync::Mutex::new(None)),
+            client: idle_shared(),
         }
     }
 
@@ -81,10 +119,12 @@ impl SharedArtifacts {
             .client
             .lock()
             .map_err(|_| "Veza prema projektnoj bazi nije dostupna.".to_string())?;
-        if guard.is_none() {
-            *guard = Some(ArtifactReader::open(&self.target)?);
+        if guard.open.is_none() {
+            guard.open = Some(ArtifactReader::open(&self.target)?);
         }
-        read(guard.as_mut().expect("opened above"))
+        let result = read(guard.open.as_mut().expect("opened above"));
+        guard.used = std::time::Instant::now();
+        result
     }
 }
 
@@ -627,5 +667,24 @@ impl ProjectArtifacts {
 
     pub fn has_pending_work(&self) -> bool {
         self.artifacts.has_pending_work()
+    }
+}
+
+#[cfg(test)]
+mod idle_tests {
+    use super::*;
+
+    #[test]
+    fn a_shared_connection_is_let_go_when_idle_and_its_watcher_ends_with_it() {
+        let shared = idle_shared::<u32>();
+        shared.lock().unwrap().open = Some(7);
+        shared.lock().unwrap().used = std::time::Instant::now();
+        std::thread::sleep(IDLE_CHECK);
+        assert_eq!(shared.lock().unwrap().open, Some(7), "still in use");
+        std::thread::sleep(IDLE_RELEASE + IDLE_CHECK * 2);
+        assert_eq!(shared.lock().unwrap().open, None, "let go when idle");
+        let watched = Arc::downgrade(&shared);
+        drop(shared);
+        assert!(watched.upgrade().is_none());
     }
 }

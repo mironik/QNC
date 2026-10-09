@@ -4396,6 +4396,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-release-check"
+version = "0.1.0"
+dependencies = [
+ "qnc-active-project-read",
+ "qnc-editorial-application",
+ "qnc-project-close",
+]
+
+[[package]]
 name = "qnc-scanner"
 version = "0.1.0"
 dependencies = [

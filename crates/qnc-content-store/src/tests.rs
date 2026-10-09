@@ -1027,3 +1027,29 @@ fn a_poster_made_for_a_clip_without_one_is_kept_and_survives_a_new_select() {
     run(&mut store, Operation::Publish(Box::new(no_poster))).unwrap();
     assert_eq!(poster(&path), Some(poster_uri()), "a new Select without a card poster keeps it");
 }
+
+/// An idle write transport lets the project database go, so a closed project can be
+/// deleted while a form keeps its transport; the next command opens it again.
+#[test]
+fn an_idle_write_transport_releases_the_project_database_and_reopens_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("project.db");
+    database(&path);
+    let target = ContentTarget::from_owner_binding(&path, URI).unwrap();
+    let mut transport = ContentWriteTransport::start(target).unwrap();
+    let write = |transport: &mut ContentWriteTransport, key: &str| {
+        transport.set_runtime(key.into(), "playback_active".into(), "on".into()).unwrap();
+        loop {
+            if let Some(done) = transport.poll().into_iter().find(|c| c.key == key) {
+                return done.result.map(|_| ());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    };
+    write(&mut transport, "a").unwrap();
+    std::thread::sleep(crate::transport::IDLE_RELEASE + std::time::Duration::from_millis(500));
+    let moved = dir.path().join("moved.db");
+    std::fs::rename(&path, &moved).expect("an idle transport holds no handle");
+    std::fs::rename(&moved, &path).unwrap();
+    write(&mut transport, "b").unwrap();
+}
