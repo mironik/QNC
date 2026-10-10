@@ -666,9 +666,9 @@ fn a_moved_slot_takes_its_cover_with_it_in_the_edit_pictures() {
         .iter()
         .map(|still| still.picture.as_ref().map(|p| (p.clip_id.clone(), p.source_frame)))
         .collect();
-    // The slot is 17..35 now: the slot before ends on the Off segment (its cover is 15 long).
+    // The slot is 17..35 now: the cover of the slot before fills it to 17 (its source plays on).
     assert_eq!(
         pictures,
-        vec![None, Some(("own".into(), 1000)), Some(("own".into(), 1017)), Some(("next".into(), 1000))]
+        vec![Some(("prev".into(), 1016)), Some(("own".into(), 1000)), Some(("own".into(), 1017)), Some(("next".into(), 1000))]
     );
 }

@@ -92,16 +92,17 @@ fn picture_at(view: &SegmentsView, slots: &[Slot], moved: &dyn Fn(u64) -> u64, f
     segment.kind.has_base_video().then(|| StillPicture { clip_id: segment.clip_id.clone(), source_frame })
 }
 
-/// A cover starts at its slot's start marker and keeps its length within the slot.
+/// A cover covers its whole slot, from its start marker to its end marker.
 fn cover_picture(cover: &CoverSpan, slots: &[Slot], moved: &dyn Fn(u64) -> u64, frame: u64) -> Option<StillPicture> {
     let slot = slots.iter().find(|slot| slot.slot_id == cover.slot_id);
     let (start, slot_end) = match slot {
         Some(slot) => (moved(slot.start_frame), moved(slot.end_frame)),
         None => (moved(cover.start_frame), moved(cover.end_frame)),
     };
+    // A cover fills its whole slot and plays its source from IN for the slot's length
+    // (the store binds it so), at the story's ratio to its source (the stored span).
     let length = cover.end_frame.saturating_sub(cover.start_frame).max(1);
-    let end = (start + length).min(slot_end);
-    if !(start..end).contains(&frame) {
+    if !(start..slot_end).contains(&frame) {
         return None;
     }
     let source = cover.source_out_frame.saturating_sub(cover.source_in_frame);
@@ -163,7 +164,7 @@ mod tests {
             vec![
                 Some(("clip-a".into(), 116)), // the slot before ends on the Ton segment
                 Some(("clip-cover".into(), 500)), // the cover's first picture, at 17 now
-                None,                             // the slot's last picture is on Off
+                Some(("clip-cover".into(), 517)), // the cover fills the slot: its last picture
                 None,                             // and so is the first of the slot after
             ]
         );

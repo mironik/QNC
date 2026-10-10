@@ -3348,3 +3348,7 @@ lokacija klipa se cita jednom po klipu; jedan prolaz dekodera izvlaci 17 uzastop
 koraci strelicom unutar +-8 slika iz memorije (cache 160); posao dulji od 8 s se prekida (ffmpeg se gasi) i krece
 sljedeci; log biljezi trazene slike i trajanje svakog prolaza. Izmjereno s kartice: 17 slika 1,2 s, slika 196 klipa
 2686 jednaka referenci.
+Popravak 2026-10-10 (korisnik: slike izvan slota nisu dobre na strelicama): nacrt je pokrivalicu susjednog slota
+drzao na staroj duljini, a baza (`rebind_covers`) pokrivalicu uvijek vezuje na cijeli slot i ona pusta izvor od IN
+koliko je slot dug. Sada i nacrt (`qnc-program-view` `cover_picture`): pokrivalica pokriva cijeli pomaknuti slot,
+pa zadnja slika produljenog prethodnog slota je nastavak njegove pokrivalice, a ne segment ispod. Testovi.
