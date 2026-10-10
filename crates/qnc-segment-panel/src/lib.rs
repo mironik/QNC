@@ -11,6 +11,8 @@ mod bar;
 mod list;
 
 pub use list::show_segment_list;
+mod source_lanes;
+pub use source_lanes::{source_lane_choice, source_wave_over_video};
 
 use eframe::egui::{self, Color32, RichText, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentRow, SegmentsView};

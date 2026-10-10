@@ -44,7 +44,9 @@
     "card_text_height": 34.0,
     "grid_gap": 10.0,
     "empty_message": "Nema klipova — prvo Ingest import.",
-    "broll_empty_message": "Nema B-roll kadrova — dodaj pokrivalicu."
+    "broll_empty_message": "Nema B-roll kadrova — dodaj pokrivalicu.",
+    "virtual_empty_message": "Nema virtualnih — Spremi virtualni kadar.",
+    "loading_message": "Citam projektni katalog..."
   },
   "pool_head": {
     "tabs_left": [

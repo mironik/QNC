@@ -5,8 +5,7 @@
 // right clip grid and the directory browser (its area stays empty and is
 // filled by later group functions). Painting, metrics and helpers are unchanged.
 use eframe::egui::{
-    self, Align, Button, Color32, CornerRadius, Layout, Rect, RichText, Stroke, Ui,
-    Vec2,
+    self, Align, Layout, Rect, Ui,
 };
 
 use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
@@ -31,7 +30,7 @@ pub fn render_desktop(
 ) -> Option<EditorialIntent> {
     let (sizes, faces, names) = (contracts.board_sizes(), theme.board_faces(), contracts.board_names());
     let board = sizes.standard_layout(&names);
-    qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| block_time::timed(block, || match block {
+    qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| qnc_dev_diagnostics::timed_block(block, || match block {
         "preview" => {
             render_preview(ui, rect, contracts, theme, view);
             None
@@ -58,37 +57,6 @@ pub fn render_desktop(
         // Right panel of the other groups: empty, reserved for their functions.
         _ => None,
     }))
-}
-
-/// Diagnostics only: what each block of the board costs, written once a second.
-mod block_time {
-    use std::{cell::RefCell, collections::BTreeMap, time::Instant};
-    thread_local! {
-        static TIMES: RefCell<(Option<Instant>, BTreeMap<String, f64>)> = RefCell::new((None, BTreeMap::new()));
-    }
-    pub(super) fn timed<T>(block: &str, draw: impl FnOnce() -> T) -> T {
-        if !qnc_dev_diagnostics::player_diagnostics_enabled() {
-            return draw();
-        }
-        let started = Instant::now();
-        let result = draw();
-        let spent = started.elapsed().as_secs_f64() * 1000.0;
-        TIMES.with(|times| {
-            let (since, sums) = &mut *times.borrow_mut();
-            *sums.entry(block.to_string()).or_default() += spent;
-            let since = since.get_or_insert_with(Instant::now);
-            if since.elapsed().as_secs_f32() >= 1.0 {
-                let parts: Vec<String> = sums.iter().map(|(name, ms)| format!("{name}={ms:.0}")).collect();
-                qnc_dev_diagnostics::log_line(
-                    qnc_dev_diagnostics::DiagnosticsStream::Player,
-                    format!("ui-block-ms {}", parts.join(" ")),
-                );
-                sums.clear();
-                *since = Instant::now();
-            }
-        });
-        result
-    }
 }
 
 fn render_preview(
@@ -229,7 +197,7 @@ fn render_source_dock(
                         .action_id()
                         .is_some_and(|action_id| view.action_enabled(action_id));
                     let on = action.action_id().is_some_and(|action_id| view.segments.action_selected(action_id));
-                    if switch_button(ui, action.label(), enabled, on, theme).clicked() {
+                    if qnc_ui_kit::chrome_button(ui, action.label(), enabled, on, button_style(theme)).clicked() {
                         if let Some(action_id) = action.action_id() {
                             header_intent = Some(EditorialIntent::action(action_id));
                         }
@@ -239,9 +207,9 @@ fn render_source_dock(
         },
         SourceTimeline::from_assets(&view.preview.timeline, timeline_theme(theme), &view.preview.assets)
             .with_timecode(view.source_timecode)
-            .with_a1_channel(lane_choice(&view.segments, 0))
-            .with_a2_channel(lane_choice(&view.segments, 1))
-            .with_wave_over_video(wave_over_video(&view.segments)),
+            .with_a1_channel(qnc_segment_panel::source_lane_choice(&view.segments, 0))
+            .with_a2_channel(qnc_segment_panel::source_lane_choice(&view.segments, 1))
+            .with_wave_over_video(qnc_segment_panel::source_wave_over_video(&view.segments)),
     );
     match intent {
         TimelineIntent::None => header_intent,
@@ -287,9 +255,9 @@ fn render_clip_grid(
         return command.map(EditorialIntent::Segment);
     }
     let empty_message = if view.loading {
-        "Citam projektni katalog..."
+        contracts.editorial.media_card.loading_message.as_str()
     } else if view.library_tab == LibraryTab::Virtual {
-        "Nema virtualnih — Spremi virtualni kadar."
+        contracts.editorial.media_card.virtual_empty_message.as_str()
     } else if view.library_tab == LibraryTab::Broll {
         contracts.editorial.media_card.broll_empty_message.as_str()
     } else if !view.message.is_empty() {
@@ -412,7 +380,7 @@ fn render_clip_grid(
                 panel_focused: false,
                 cards: &rows,
                 thumb_textures: &no_textures,
-                tc: &format_duration,
+                tc: &qnc_media_card::minutes_seconds,
                 features,
                 empty_message,
                 id_salt: "editorial_clip_grid",
@@ -432,58 +400,13 @@ fn render_clip_grid(
     }
 }
 
-fn format_duration(seconds: f64) -> String {
-    if !seconds.is_finite() || seconds <= 0.0 {
-        return "00:00".to_string();
+
+fn button_style(theme: &Theme) -> qnc_ui_kit::ChromeButtonStyle {
+    qnc_ui_kit::ChromeButtonStyle {
+        text: theme.text,
+        border: theme.border,
+        focus: theme.focus,
+        height: theme.chrome_control_height,
     }
-    let total = seconds.round() as i64;
-    let minutes = total / 60;
-    let secs = total % 60;
-    format!("{minutes:02}:{secs:02}")
 }
 
-/// A button that may be on (the switch Pokrivalice | Sync/B-roll): on, its text and
-/// border take the focus colour, as the Sync/B-roll button did in the segment bar.
-fn switch_button(ui: &mut Ui, text: &str, enabled: bool, on: bool, theme: &Theme) -> egui::Response {
-    if !on {
-        return action_button(ui, text, enabled, theme);
-    }
-    ui.add_enabled(
-        enabled,
-        Button::new(RichText::new(text).color(theme.focus))
-            .fill(Color32::TRANSPARENT)
-            .stroke(Stroke::new(1.0, theme.focus))
-            .corner_radius(CornerRadius::same(0))
-            .min_size(Vec2::new(0.0, theme.chrome_control_height)),
-    )
-}
-
-fn action_button(ui: &mut Ui, text: &str, enabled: bool, theme: &Theme) -> egui::Response {
-    ui.add_enabled(
-        enabled,
-        Button::new(RichText::new(text).color(theme.text))
-            .fill(Color32::TRANSPARENT)
-            .stroke(Stroke::new(1.0, theme.border))
-            .corner_radius(CornerRadius::same(0))
-            .min_size(Vec2::new(0.0, theme.chrome_control_height)),
-    )
-}
-
-/// The channel picker of A1 (lane 0) or A2: a lane taken with the keyboard shows its
-/// draft with the picker open.
-fn lane_choice(segments: &qnc_program_segments::SegmentsView, lane: u8) -> Option<qnc_timeline::ChannelChoice> {
-    let (selected, count) = if lane == 0 { segments.a1_choice } else { segments.a2_choice }?;
-    let draft = segments.lane_taken.filter(|(taken, _)| *taken == lane).map(|(_, draft)| draft);
-    Some(qnc_timeline::ChannelChoice { selected: draft.unwrap_or(selected), count, open: draft.is_some() })
-}
-
-/// The wave shown over the video row: the taken lane's, else A1's, else A2's.
-fn wave_over_video(segments: &qnc_program_segments::SegmentsView) -> Option<(qnc_timeline::AudioLane, u8)> {
-    let lanes = [qnc_timeline::AudioLane::A1, qnc_timeline::AudioLane::A2];
-    let taken = segments.lane_taken.map(|(lane, _)| usize::from(lane));
-    taken
-        .into_iter()
-        .chain([0, 1])
-        .find(|lane| segments.wave_zoom[*lane] > 0)
-        .map(|lane| (lanes[lane], segments.wave_zoom[lane]))
-}

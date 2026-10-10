@@ -1,8 +1,10 @@
 use eframe::egui::{self, Button, Color32, CornerRadius, RichText, Stroke, Vec2};
 
+mod chrome_button;
 mod option_columns;
 mod raster;
 mod two_way_switch;
+pub use chrome_button::{chrome_button, ChromeButtonStyle};
 pub use option_columns::*;
 pub use raster::paint_rgba_image;
 pub use raster::paint_stream_frame;

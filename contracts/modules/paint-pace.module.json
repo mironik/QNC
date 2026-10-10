@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.paint-pace",
+  "module_name": "Paint pace",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.paint.pace"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-paint-pace",
+  "input": "After the application of a form polled: whether its view changed, whether its player plays and the cadence it asks for; once a player exists, a way to hand it a wake.",
+  "output": "A paint now, a paint later or none: a change paints at once except while the player plays (its new picture wakes the paint at the source rate); the cadence only when this paint had no new picture.",
+  "specification": "Audit 2026-10-10: the rule lived in the forms' app.rs (Ingest and Story/MA); live 2026-10-08: painting at the screen rate while playing took the graphics card from the HDMI output."
+}

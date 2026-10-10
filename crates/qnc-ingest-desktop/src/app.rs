@@ -11,7 +11,7 @@ use crate::{
 pub struct IngestApp {
     contracts: IngestContracts,
     application: IngestApplication,
-    player_repaint_bound: bool,
+    pace: qnc_paint_pace::PaintPace,
 }
 
 impl IngestApp {
@@ -20,31 +20,17 @@ impl IngestApp {
         Ok(Self {
             contracts: IngestContracts::load()?,
             application,
-            player_repaint_bound: false,
+            pace: qnc_paint_pace::PaintPace::new(),
         })
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
-        if !self.player_repaint_bound
-            && (self.application.view().playback.preparing
-                || self.application.view().playback.reply.is_some())
-        {
-            let repaint = ctx.clone();
-            self.application.notify_on_player_change(move || {
-                repaint.request_repaint();
-            });
-            self.player_repaint_bound = true;
-        }
+        let application = &self.application;
+        let player_exists = application.view().playback.preparing || application.view().playback.reply.is_some();
+        self.pace.bind_player(ctx, player_exists, |wake| application.notify_on_player_change(wake));
         let changed = self.application.poll();
-        // While the player plays, its new picture wakes the paint (the source rate); a change
-        // this paint found waits for that picture instead of painting at the screen rate.
-        if changed && !self.application.view().playback.playing() {
-            ctx.request_repaint();
-        } else if let Some(delay) = self.application.next_repaint_delay() {
-            // Cadence only when this paint had no new picture. Scheduling it
-            // after a notify wake postpones the next source frame.
-            ctx.request_repaint_after(delay);
-        }
+        let playing = self.application.view().playback.playing();
+        self.pace.after_poll(ctx, changed, playing, self.application.next_repaint_delay());
         self.dispatch_keyboard_shortcuts(ctx);
         let theme = Theme::from_contract(&self.contracts.shell);
         theme::apply(ctx, &theme);

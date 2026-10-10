@@ -1,0 +1,8 @@
+[package]
+name = "qnc-paint-pace"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: when a form paints. A change paints at once, except while the player plays (its new picture wakes the paint at the source rate); a cadence asked by the application paints later; the player's pictures and states wake the paint once a player exists. It knows no application, player or form."
+
+[dependencies]
+eframe = { workspace = true }

@@ -11,6 +11,7 @@ eframe = { workspace = true }
 qnc-editorial-application = { workspace = true }
 qnc-editorial-layout = { workspace = true }
 qnc-key-intents = { workspace = true }
+qnc-paint-pace = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
 
 [dev-dependencies]

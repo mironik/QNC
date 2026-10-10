@@ -447,6 +447,15 @@ fn import_started(import_status: &str) -> bool {
     )
 }
 
+/// The duration a card shows: `mm:ss`, `00:00` when unknown.
+pub fn minutes_seconds(seconds: f64) -> String {
+    if !seconds.is_finite() || seconds <= 0.0 {
+        return "00:00".to_string();
+    }
+    let total = seconds.round() as i64;
+    format!("{:02}:{:02}", total / 60, total % 60)
+}
+
 /// Cuts `s` to `max` characters and appends an ellipsis when it was longer.
 pub fn truncate(s: &str, max: usize) -> String {
     let mut chars = s.chars();

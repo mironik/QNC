@@ -13,7 +13,7 @@ const EDITORIAL_SHORTCUT_SCOPES: [&str; 2] = ["storyboard", "off"];
 pub struct EditorialApp {
     form: EditorialForm,
     application: EditorialApplication,
-    player_repaint_bound: bool,
+    pace: qnc_paint_pace::PaintPace,
 }
 
 impl EditorialApp {
@@ -21,30 +21,16 @@ impl EditorialApp {
         Ok(Self {
             form: EditorialForm::new(group)?,
             application: EditorialApplication::new(root),
-            player_repaint_bound: false,
+            pace: qnc_paint_pace::PaintPace::new(),
         })
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
-        if !self.player_repaint_bound && self.application.has_player() {
-            let repaint = ctx.clone();
-            self.application.notify_on_player_change(move || {
-                repaint.request_repaint();
-            });
-            self.player_repaint_bound = true;
-        }
+        let application = &self.application;
+        self.pace.bind_player(ctx, application.has_player(), |wake| application.notify_on_player_change(wake));
         let changed = self.application.poll();
-        // While the player plays, its new picture wakes the paint (the source rate); a change
-        // this paint found (the playhead moved) waits for that picture instead of asking for
-        // another paint at once, which painted at the screen rate (60 for 50p) and took the
-        // graphics card from the HDMI output (live 2026-10-08).
-        if changed && !self.application.view().preview.playing {
-            ctx.request_repaint();
-        } else if let Some(delay) = self.application.next_repaint_delay() {
-            // Cadence only when this paint had no new picture; scheduling it
-            // after a notify wake would postpone the next source frame.
-            ctx.request_repaint_after(delay);
-        }
+        let playing = self.application.view().preview.playing;
+        self.pace.after_poll(ctx, changed, playing, self.application.next_repaint_delay());
         self.dispatch_keyboard_shortcuts(ctx);
         self.form.apply_theme(ctx);
         let intent = self.form.show_desktop(ui, frame, self.application.view());

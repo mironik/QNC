@@ -263,6 +263,8 @@ pub struct EditorialMediaCard {
     pub grid_gap: f32,
     pub empty_message: String,
     pub broll_empty_message: String,
+    pub virtual_empty_message: String,
+    pub loading_message: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

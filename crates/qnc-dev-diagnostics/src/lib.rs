@@ -704,6 +704,9 @@ fn unix_ms() -> u64 {
         .unwrap_or(0)
 }
 
+mod block_time;
+pub use block_time::timed_block;
+
 #[cfg(test)]
 mod tests {
     use super::*;

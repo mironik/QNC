@@ -21,10 +21,16 @@ use super::{
 
 pub(crate) const BASELINE: &str = "tools/qnc-conformance/lego-baseline.json";
 
-const FORM_CRATES: [&str; 3] = [
+/// The forms and their boards: since the desktop of blocks (2026-09-30) a form's
+/// drawing lives in its `*-blocks` crate, which is the form as much as `*-desktop`
+/// (audit 2026-10-10: the rules saw only `*-desktop`).
+const FORM_CRATES: [&str; 6] = [
     "qnc-ingest-desktop",
     "qnc-editorial-desktop",
     "qnc-project-desktop",
+    "qnc-ingest-blocks",
+    "qnc-editorial-blocks",
+    "qnc-project-blocks",
 ];
 const APPLICATION_CRATES: [&str; 3] = [
     "qnc-ingest-application",
@@ -253,6 +259,7 @@ fn form_rules(root: &Path, packages: &BTreeMap<String, Package>, counts: &mut BT
             add(counts, format!("C1 form paints primitives|{file}"), occurrences(&text, &["painter()"]));
             add(counts, format!("C2 form colour outside contract|{file}"), occurrences(&text, &["from_rgb"]));
             add(counts, format!("C2 form user text outside contract|{file}"), user_text_literals(&text));
+            add(counts, format!("C2 form private widget|{file}"), occurrences(&text, &["Button::new"]));
             add(
                 counts,
                 format!("C3 form builds piece input from domain data|{file}"),

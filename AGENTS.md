@@ -3226,3 +3226,18 @@ dobiva svoj jedan probe; probe koji jos traje i dalje se ne preuzima. Ugovor `so
 zasticenoj kopiji projekta `testllll`: zamjena 3 s -> 9 s daje novi klip s 225 slika i uklanja stari, ponovni Select
 bez promjene ne dira nista, uvezeni klip ostaje uz upozorenje i novi klip; Select mape Videos: uvezeni
 `Mironik 2002.MXF` ostaje isti klip bez duplikata, Edius datoteke su preskocene.
+Audit 2026-10-10 (korisnik: "cini mi se da si napustio Lego kocke sistem i da ti je previse koda uslo u forme"):
+forme `*-desktop` su tanke (Project 67, Ingest 89, Story/MA 96 redaka), ali je njihov kod 30. 9. preseljen u ploce
+`*-blocks` (Project 2365, Ingest 903, Story/MA 450), koje pravila C1-C10 nisu gledala; `qnc-program-segments` je
+narastao u upravljac cijele price (`lib.rs` 1547 redaka). Izvedeno (korisnik "ok, kreni s 1 i 2"):
+(1) `tools/qnc-conformance` (`lego.rs`): ploce `qnc-*-blocks` su forme za C1-C4 i C10, novo pravilo "C2 form private
+widget" (`Button::new` u formi); baseline dobio njihove kljuceve sa stanjem tog dana (smiju samo padati).
+(2) Story ploca i pravilo crtanja u kocke: mjerenje blokova u `qnc-dev-diagnostics` (`timed_block`), prijevod A1/A2
+trake i vala za source timeline u `qnc-segment-panel` (`source_lane_choice`, `source_wave_over_video`), gumb u
+`qnc-ui-kit` (`chrome_button`, `ChromeButtonStyle`), trajanje kartice u `qnc-media-card` (`minutes_seconds`), tekstovi
+praznog Virtual taba i ucitavanja u `contracts/ui/editorial.layout.json` (`virtual_empty_message`, `loading_message`;
+`qnc-editorial-layout`), pravilo "dok player svira crtaj uz njegovu sliku" iz `app.rs` Ingest i Story forme u novu
+javnu kocku `crates/qnc-paint-pace` (+ `contracts/modules/paint-pace.module.json`). Izgled i ponasanje isti.
+Brojke: Story ploca 450 -> 382 redaka, Story forma 96 -> 88, Ingest forma 89 -> 79, C4 u obje forme 2 -> 1.
+Nije izvedeno (sljedeci koraci 3 i 4): podjela `qnc-program-segments`, ciscenje Ingest ploce (tekstovi, gumbi,
+`format_duration`) i Project ploce (uredjivanje postavki, 101 tekst u kodu; trazi otkljucavanje Projecta).
