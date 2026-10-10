@@ -446,6 +446,20 @@ fn single_files_under_the_selected_folder_are_one_clip_each_and_nothing_else_is_
     files.sort();
     assert_eq!(files, ["incoming/ftp/A.MXF", "incoming/ftp/day/B.mxf"]);
     assert!(scan.grouping.groups.iter().all(|g| g.proposal.is_single_file()
-        && g.proposal.root == selected
         && g.proposal.evidence.reader_id == "test.single-file"));
+    // The root is the folder holding the file, so a parent or a child folder picked
+    // later gives the same record (it gave a source index conflict).
+    let from_parent = scan_files(&source, &source.reference("incoming").unwrap(), &[&Media], ScanLimits::default())
+        .unwrap();
+    let from_day = scan_files(&source, &source.reference("incoming/ftp/day").unwrap(), &[&Media], ScanLimits::default())
+        .unwrap();
+    for group in &scan.grouping.groups {
+        let same = |other: &FileScan| other.grouping.groups.iter().any(|g| g.proposal == group.proposal);
+        assert!(same(&from_parent), "{:?}", group.proposal.original);
+        if group.proposal.original.relative_path().contains("/day/") {
+            assert!(same(&from_day));
+        }
+    }
+    let day = scan.grouping.groups.iter().find(|g| g.proposal.original.relative_path().ends_with("B.mxf")).unwrap();
+    assert_eq!(day.proposal.root, source.reference("incoming/ftp/day").unwrap());
 }

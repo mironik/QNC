@@ -3203,3 +3203,11 @@ podrzan (...)"; zapis kartice koju kartica opisuje i dalje se objavljuje odmah).
 (mapa s HQX AVI, VP9 MKV, ProRes 4444 12-bit MOV, H.264 MOV i XDCAM MXF: klipovi su samo H.264 i MXF, ostali
 "preskoceno" s razlogom). Nalaz za kasnije: ponovni Select mape u kojoj je datoteka istog imena zamijenjena novom
 daje "Izvorni indeks: Conflict" i Select ne prolazi.
+Popravak 2026-10-10 (korisnik: "rijesi Conflict kod zamjene datoteke"): proba na zasticenoj kopiji pokazala je da
+`Conflict` ne dolazi od zamjene datoteke nego od izbora druge mape: zapis pojedinacne datoteke za korijen je uzimao
+mapu koju je korisnik izabrao, pa je ista datoteka iz roditeljske ili podmape bila drugi zapis s istim medijem i
+izvorni indeks ga je odbijao. `qnc-scanner` (`scan_files`): korijen je mapa u kojoj datoteka stoji, pa je zapis isti
+bez obzira na izabranu mapu (postojeci zapisi napravljeni iz izravne mape datoteke ostaju isti). Test u
+`qnc-scanner`. Proba: Select roditeljske mape, podmape pa opet roditeljske prolazi, postojeci klip ostaje isti.
+Nalaz (nije popravljen, ceka odluku): datoteka zamijenjena drugom istog imena prolazi kao nepromijenjena i zadrzava
+stari zapis i probe, jer izvor daje samo velicinu datoteke, a izvorni indeks ne pamti ni velicinu.

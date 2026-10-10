@@ -353,7 +353,9 @@ pub fn scan_files(
                     if proposals.len() >= limits.max_groups || facts.len() >= limits.max_file_checks {
                         return Err("file scan limit exceeded; no grouping result published".into());
                     }
-                    proposals.push(single_file(reader.reader_id(), selected, &entry.reference));
+                    // The folder holding the file is its root, not the folder the user picked:
+                    // the same file reached from a parent or child folder is the same record.
+                    proposals.push(single_file(reader.reader_id(), &folder, &entry.reference));
                     facts.push(FileFact {
                         reference: entry.reference,
                         state: FileState::File,
