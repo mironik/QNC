@@ -3282,3 +3282,11 @@ citali timecode i broj audio kanala klipa iz baze sadrzaja (`qnc-source-timecode
 novi klip citaju u zasebnoj niti i do odgovora vracaju "nepoznato"; vrijednost se pojavi cim stigne. Ingest i Story
 isto. Ostaje: priprema playera (`load_ms`) za vrijeme filmstripa traje 1,4-2,4 s umjesto ~50 ms (cita u pozadini,
 ne blokira sucelje; uzrok je isto cekanje na bazu).
+Otkljucano i izvedeno 2026-10-10 (korisnik: "pomicanje selektiranih IN/OUT/Marker je sporo"; "da" na otkljucavanje
+`qnc-broadcast-engine`): u Wrapu svaki korak strelicom salje playeru programa cue, a slika programa
+(`program.rs` `ProgramVideo`) je pri svakom cueu gasila oba dekodera, praznila gotove slike i otvarala dekoder od
+kljucnog kadra (log: Cue do slike na monitoru 0,5-1,5 s). Sada kao korak klipa (3. 10.): cue na sliku koja je u
+memoriji ili unutar dosega otvorenog dekodiranja ne dira dekoder; slike do 25 iza zadnjeg cuea ostaju (`cue_anchor`,
+`kept_from`, `forget_far_from`, +25 spremnika slika), korak unatrag izvan njih otvara dekodiranje 25 slika ranije
+(`restart`), a predana slika uvijek dobiva tekucu generaciju i sljedeci redni broj. Zvuk programa se pri koraku i
+dalje ponovno otvara (~50 ms). Provjereno: testovi `qnc-broadcast-engine`, conformance, release build.

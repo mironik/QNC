@@ -156,6 +156,11 @@ pub(crate) struct ProgramVideo {
     next_decode_frame: u64,
     ready: BTreeMap<u64, DecodedVideoFrame<Picture>>,
     pending_seek: Option<u64>,
+    /// The frame of the last cue: pictures up to `STEP_BACK_FRAMES` behind it stay, so a
+    /// frame step needs no new decoder (user 2026-10-10: a step in Wrap took 0.5-1.5 s).
+    cue_anchor: u64,
+    /// Every frame from here up to `next_decode_frame` is in `ready` or in conversion.
+    kept_from: u64,
     prefetch_frames: usize,
     gpu: SharedVideo,
 }
@@ -213,6 +218,8 @@ impl ProgramVideo {
             next_decode_frame: 0,
             ready: BTreeMap::new(),
             pending_seek: None,
+            cue_anchor: 0,
+            kept_from: 0,
             prefetch_frames,
             gpu,
         })
@@ -336,7 +343,12 @@ impl ProgramVideo {
         let target_end = frame
             .saturating_add(self.prefetch_frames as u64)
             .min(self.source.duration_frames);
-        self.next_decode_frame = self.next_decode_frame.max(frame);
+        // A frame far ahead of the decoding (late while playing) is jumped to; one within
+        // the prefetch is decoded to, so the pictures before it stay for steps back.
+        if frame > self.next_decode_frame.saturating_add(self.prefetch_frames as u64) {
+            self.next_decode_frame = frame;
+            self.kept_from = frame;
+        }
         // From where the decoding is, not the playhead: decoding runs ahead of the playhead,
         // so a cut it has passed still lies ahead of the playhead and searching from there
         // opened the decoder of that cut a second time at every cut (live 2026-10-08).
@@ -469,23 +481,24 @@ impl VideoDecodeAdapter for ProgramVideo {
             if request.frame != frame {
                 return Err(error("seek target mismatch"));
             }
-            let mut gpu = self.gpu.borrow_mut();
-            gpu.config.generation = gpu
-                .config
-                .generation
-                .checked_add(1)
-                .ok_or_else(|| error("GPU generation exhausted"))?;
-            gpu.sequence = 0;
-            gpu.images.clear();
-            drop(gpu);
-            retire((self.active.take(), self.upcoming.take()));
-            self.ready.clear();
-            self.next_decode_frame = frame;
             self.pending_seek = None;
+            let stepping_back = frame < self.cue_anchor;
+            self.cue_anchor = frame;
+            self.drain()?;
+            // A frame kept, or within reach of the open decoding: the decoder stays open and
+            // paused (a frame step, like a clip's). Else a new decoding; stepping back it
+            // starts 25 frames earlier, so the next steps back come from memory.
+            let reached = self.ready.contains_key(&frame)
+                || (frame >= self.kept_from
+                    && frame <= self.next_decode_frame.saturating_add(self.prefetch_frames as u64));
+            if !reached {
+                let from = if stepping_back { frame.saturating_sub(STEP_BACK_FRAMES) } else { frame };
+                self.restart(from)?;
+            }
         }
-        self.ready.retain(|frame, _| *frame >= request.frame);
         self.drain()?;
-        if let Some(frame) = self.ready.remove(&request.frame) {
+        self.forget_far_from(request.frame);
+        if let Some(frame) = self.ready.get(&request.frame).cloned() {
             // The read-ahead is topped up on every frame, not only when one is missing:
             // else it worked in batches of four, just in time, with no reserve.
             self.fill(request.frame)?;
@@ -493,7 +506,7 @@ impl VideoDecodeAdapter for ProgramVideo {
         }
         self.fill(request.frame)?;
         self.drain()?;
-        let picture = self.ready.remove(&request.frame);
+        let picture = self.ready.get(&request.frame).cloned();
         if picture.is_none() && first_wait(&VIDEO_WAIT, request.frame) {
             diag(format!("program-video pending frame={} next_decode={}", request.frame, self.next_decode_frame));
         }
@@ -506,15 +519,52 @@ impl ProgramVideo {
     /// shown. Given when made, a black Off picture (made at once) got a higher one than
     /// the converted pictures shown before it, and the monitor dropped those as stale
     /// for about half a second (player acceptance 2026-10-02).
+    /// A picture shown again after a step back takes the next sequence too, so the monitor
+    /// never takes it for stale.
     fn handed(&mut self, picture: DecodedVideoFrame<Picture>) -> Result<DecodedVideoFrame<Picture>> {
         let mut gpu = self.gpu.borrow_mut();
         gpu.sequence = gpu.sequence.checked_add(1).ok_or_else(|| error("frame sequence exhausted"))?;
         let mut header = picture.payload.header.clone();
+        header.generation = gpu.config.generation;
         header.sequence = gpu.sequence;
         let rgba = picture.payload.rgba.clone();
         Ok(DecodedVideoFrame { payload: Rc::new(PictureData { token: None, header, rgba }), ..picture })
     }
 }
+
+impl ProgramVideo {
+    /// A new decoding from `from`: a new generation drops the conversions still running.
+    fn restart(&mut self, from: u64) -> Result<()> {
+        let mut gpu = self.gpu.borrow_mut();
+        gpu.config.generation = gpu
+            .config
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| error("GPU generation exhausted"))?;
+        gpu.sequence = 0;
+        gpu.images.clear();
+        drop(gpu);
+        diag(format!("program-video restart from={from}"));
+        retire((self.active.take(), self.upcoming.take()));
+        self.ready.clear();
+        self.next_decode_frame = from;
+        self.kept_from = from;
+        Ok(())
+    }
+
+    /// Keeps the pictures from 25 behind the frame on screen (the served one is the
+    /// prefetch ahead of it); nothing far behind holds a buffer while playing.
+    fn forget_far_from(&mut self, served: u64) {
+        let prefetch = self.prefetch_frames as u64;
+        let screen = served.saturating_sub(prefetch).max(self.cue_anchor.min(served));
+        let back = screen.saturating_sub(STEP_BACK_FRAMES);
+        self.ready.retain(|kept, _| *kept >= back);
+        self.kept_from = self.kept_from.max(back);
+    }
+}
+
+/// Pictures kept behind the last cue, so frame steps back need no new decoder.
+const STEP_BACK_FRAMES: u64 = 25;
 
 /// A lane is one channel of a clip played with one offset between program and source
 /// frames: the same channel in a later item with another offset is another lane, so it
@@ -909,7 +959,8 @@ fn timed_open<T>(what: &str, open: impl FnOnce() -> Result<T>) -> Result<T> {
     opened
 }
 
-/// Picture buffers of a program converter: twice the prefetch and the conversions in flight.
+/// Picture buffers of a program converter: twice the prefetch, the conversions in flight
+/// and the pictures kept for steps back.
 fn program_picture_buffers(prefetch_frames: usize) -> usize {
-    prefetch_frames * 2 + input::CONVERT_IN_FLIGHT + 4
+    prefetch_frames * 2 + input::CONVERT_IN_FLIGHT + 4 + STEP_BACK_FRAMES as usize
 }
