@@ -32,7 +32,7 @@ impl ProgramSegments {
 
     /// Enter on the segment panel: the marker taken with Ctrl+M.
     pub fn confirm_program(&mut self) -> bool {
-        self.commit_marker_edit()
+        self.commit_marker_edit() || self.commit_slot_move()
     }
 
     /// Something on the source timeline waits for Enter, or this Enter confirmed it:

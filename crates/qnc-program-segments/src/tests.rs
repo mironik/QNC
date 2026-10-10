@@ -577,3 +577,23 @@ fn covers_and_sync_wait_for_segments_and_neither_is_chosen_at_first() {
     segments.apply(SegmentCommand::CoverMode { sync: true });
     assert!(segments.view().action_selected("cover_mode_sync") && !segments.view().action_selected("cover_mode_covers"));
 }
+
+#[test]
+fn ctrl_s_takes_the_slot_and_the_arrows_move_it_with_both_markers_up_to_the_next_marker() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::SelectSlotAtPlayhead);
+    let frames = |segments: &ProgramSegments| segments.view().markers.iter().map(|pin| pin.frame).collect::<Vec<_>>();
+    assert!(segments.handles("step_forward_frame"), "the arrows belong to the taken slot");
+    segments.apply_action("step_forward_frame");
+    assert_eq!(frames(&segments), vec![0, 16, 34, 40], "both markers move, the slot keeps its length");
+    for _ in 0..10 {
+        segments.apply_action("step_forward_frame");
+    }
+    assert_eq!(frames(&segments), vec![0, 21, 39, 40], "it stops before the end marker");
+    let neighbour = segments.view().slots.iter().find(|slot| slot.start_frame == 0).map(|slot| slot.end_frame);
+    assert_eq!(neighbour, Some(21), "the slot before grows");
+    segments.apply_action("clear_focus");
+    assert_eq!(frames(&segments), vec![0, 15, 33, 40], "Escape drops the move");
+    assert!(!segments.handles("step_forward_frame"), "the arrows go back to the playhead");
+}

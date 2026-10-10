@@ -163,6 +163,8 @@ pub enum Operation {
     /// already on that program frame is refreshed, not duplicated.
     CreateMarker { part_id: String, local_frame: u64 },
     MoveMarker { marker_id: String, program_frame: u64 },
+    /// Both markers of the slot move so it starts at `start_frame` (user 2026-10-10).
+    MoveSlot { slot_id: String, start_frame: u64 },
     DeleteMarker { marker_id: String },
     ListMarkers,
     ListSlots,
@@ -210,6 +212,7 @@ impl Operation {
                 | Self::MoveSegment { .. }
                 | Self::CreateMarker { .. }
                 | Self::MoveMarker { .. }
+                | Self::MoveSlot { .. }
                 | Self::DeleteMarker { .. }
                 | Self::CreateCover { .. }
                 | Self::DeleteCover { .. }

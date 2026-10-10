@@ -15,7 +15,10 @@ impl ProgramSegments {
             frame >= slot.start_frame && (frame < slot.end_frame || (index + 1 == count && frame == slot.end_frame))
         });
         match found.map(|(_, slot)| slot.slot_id.clone()) {
-            Some(slot_id) => self.take_slot(&slot_id),
+            Some(slot_id) => {
+                self.take_slot(&slot_id);
+                self.take_slot_move(&slot_id);
+            }
             None => self.refresh_view("Nema M-M slota pod playheadom".into()),
         }
     }

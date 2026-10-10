@@ -14,6 +14,7 @@ mod confirm;
 mod edit;
 mod lanes;
 mod nav;
+mod slot_move;
 mod marker_edit;
 mod sync;
 
@@ -149,6 +150,8 @@ pub struct ProgramSegments {
     wrap_return: Option<u64>,
     /// The marker being moved and its draft program frame (Enter writes it).
     marker_edit: Option<(String, u64)>,
+    /// The slot taken with Ctrl+S and its draft shift (`slot_move.rs`).
+    slot_move: Option<slot_move::SlotMove>,
     /// A cover taken with Ctrl+click; Delete removes it.
     cover_taken: Option<String>,
     /// A marker move was confirmed; Enter stays taken until it lands.
@@ -347,10 +350,15 @@ impl ProgramSegments {
     /// Whether a keyboard catalog action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
         self.command_for(action_id).is_some()
+            || (self.slot_move.is_some()
+                && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus" | "close_player"))
     }
 
     /// Applies a keyboard catalog action of the program; false if it is not one.
     pub fn apply_action(&mut self, action_id: &str) -> bool {
+        if let Some(done) = self.slot_key(action_id) {
+            return done; // a taken slot (select_current_marker_slot)
+        }
         self.command_for(action_id)
             .is_some_and(|command| self.apply(command))
     }
@@ -952,6 +960,16 @@ impl ProgramSegments {
             view.slots.iter().map(|slot| slot.slot_id.as_str()),
         ) {
             self.selected_slot = None;
+        }
+        if self.slot_move.as_ref().map(|slot| &slot.slot_id) != self.selected_slot.as_ref() {
+            self.slot_move = None; // another selection lets the slot go
+        }
+        if let Some(slot) = &self.slot_move {
+            // The draft is drawn where the slot and its two markers are going.
+            view.markers.iter_mut().for_each(|pin| pin.frame = slot.moved(pin.frame));
+            for drawn in &mut view.slots {
+                (drawn.start_frame, drawn.end_frame) = (slot.moved(drawn.start_frame), slot.moved(drawn.end_frame));
+            }
         }
         if !known(
             &self.selected_cover,

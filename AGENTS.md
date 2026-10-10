@@ -3303,3 +3303,11 @@ defaultu ni Pokrivalice ni Sync/B-roll nisu odabrani"): prekidac u source docku 
 odabrano, zatim Pokrivalice ili Sync/B-roll. Bez segmenata oba gumba (i tipka Sync) su nedostupni, a kad nestane
 zadnji segment izbor se ponistava i Sync se gasi. `qnc-program-view` (`covers_chosen`, `action_enabled`,
 `action_selected`), `qnc-program-segments` (`CoverMode`, `toggle_sync`). Ploca i layout nisu dirani. Test.
+Dopuna 2026-10-10 (korisnik: "Ctrl+S selektira slot, trebao bi mogucnost pomicanja slota strelicama"; "pomicanje
+slota pomice marker, ako slot ulazi u susjedni slot, marker putuje sa slotom"; "otkljucaj"; v5 to nema): nakon
+Ctrl+S strelice pomicu slot za sliku zajedno s oba njegova M markera; slot zadrzava duljinu i pokrivalicu, susjedni
+slot se produljuje ili skracuje; slot staje prije susjednog markera, a slot uz zakljucani pocetni ili zavrsni marker
+se ne pomice. Wrap playhead pokazuje prvu sliku slota. Enter zapisuje novu operaciju `MoveSlot` (oba markera u
+jednoj transakciji, jedan Undo korak), Esc odustaje. `qnc-program-db` (`MoveSlot`, test), `qnc-program-segments`
+(`slot_move.rs`, nacrt markera i slotova u prikazu, test), ugovor `story.database.json` (`slot_move`). Katalog
+tipki, forme i layout nisu dirani. Conformance.

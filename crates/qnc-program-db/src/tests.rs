@@ -1428,3 +1428,33 @@ fn a_source_of_half_or_twice_the_story_rate_joins_with_its_length_in_story_frame
     assert_eq!(program_length(&mut store), 15);
     assert!(create_segment(&mut store, "offovi", (0, 1), (50, 1)).is_err(), "shorter than a story frame");
 }
+
+#[test]
+fn a_slot_moves_with_both_its_markers_up_to_its_neighbours() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(first) = marker(&mut store, 10).unwrap() else {
+        panic!()
+    };
+    marker(&mut store, 16).unwrap();
+    marker(&mut store, 25).unwrap();
+    let slot_of = |marker_id: &str| -> String {
+        Connection::open(&path)
+            .unwrap()
+            .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [marker_id], |row| row.get(0))
+            .unwrap()
+    };
+    let slot = slot_of(&first);
+    let move_to = |store: &mut Story, slot_id: &str, frame| {
+        run(store, Operation::MoveSlot { slot_id: slot_id.into(), start_frame: frame })
+    };
+    move_to(&mut store, &slot, 12).unwrap();
+    assert_eq!(markers(&mut store), vec![12, 18, 25], "both markers moved, the length stays");
+    assert_eq!(slot_of(&first), slot, "the same slot: its marker pair");
+    assert!(move_to(&mut store, &slot, 20).unwrap_err().contains("susjednog"), "its end would pass 25");
+    move_to(&mut store, &slot, 1).unwrap();
+    assert_eq!(markers(&mut store), vec![1, 7, 25]);
+    assert!(move_to(&mut store, &slot, 0).unwrap_err().contains("susjednog"), "the locked start");
+}

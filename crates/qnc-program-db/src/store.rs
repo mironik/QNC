@@ -146,6 +146,7 @@ impl Store {
                 marker_id,
                 program_frame,
             } => self.move_marker(marker_id, *program_frame),
+            Operation::MoveSlot { slot_id, start_frame } => self.move_slot(slot_id, *start_frame),
             Operation::DeleteMarker { marker_id } => self.delete_marker(marker_id),
             Operation::ListMarkers => self.list_markers(),
             Operation::ListSlots => self.list_slots(),
@@ -788,6 +789,61 @@ impl Store {
             ],
         )
         .map_err(err)?;
+        finalize_story(&tx)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// A slot moved (user 2026-10-10, not in v5): both its markers move by the same
+    /// frames, so it keeps its length and its cover; a neighbouring slot grows or
+    /// shrinks. The markers may not reach a neighbouring marker; the start and the end
+    /// marker are locked. One edit, one UNDO step.
+    fn move_slot(&mut self, slot_id: &str, start_frame: u64) -> Result<Data> {
+        let fps = require_story_fps(&self.conn)?;
+        let duration = program_length(&self.conn)?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let (start_id, end_id): (String, String) = tx
+            .query_row(
+                "SELECT start_marker_id, end_marker_id FROM story_marker_slots WHERE slot_id = ?1",
+                [slot_id.trim()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(err)?
+            .ok_or_else(|| format!("slot not found: {slot_id}"))?;
+        locked_check(&tx, &start_id, duration)?;
+        locked_check(&tx, &end_id, duration)?;
+        let frame_of = |id: &str| -> Result<i64> {
+            tx.query_row("SELECT timeline_frame FROM story_markers WHERE marker_id = ?1", [id], |row| row.get(0))
+                .map_err(err)
+        };
+        let (start, end) = (frame_of(&start_id)?, frame_of(&end_id)?);
+        let new_start = start_frame as i64;
+        let new_end = end + (new_start - start);
+        let (low, high) = (new_start.min(start), new_end.max(end));
+        let blocked: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM story_markers
+                 WHERE marker_id NOT IN (?1, ?2) AND timeline_frame BETWEEN ?3 AND ?4)",
+                params![start_id, end_id, low, high],
+                |row| row.get(0),
+            )
+            .map_err(err)?;
+        if blocked || new_start <= 0 || new_end >= duration {
+            return Err("Slot se pomice samo do susjednog M markera.".into());
+        }
+        for (id, frame) in [(&start_id, new_start), (&end_id, new_end)] {
+            tx.execute(
+                "UPDATE story_markers SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3,
+                    updated_at = ?4
+                 WHERE marker_id = ?5",
+                params![frame, timeline_sec(frame, fps), frame_timecode(frame, fps), story_now(), id],
+            )
+            .map_err(err)?;
+        }
         finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
