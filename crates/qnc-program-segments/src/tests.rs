@@ -610,3 +610,26 @@ fn a_taken_slot_shows_the_four_edit_pictures_and_a_taken_marker_two() {
     segments.apply_action("clear_focus");
     assert!(segments.view().edit_stills.is_empty());
 }
+
+#[test]
+fn a_taken_segment_edge_shows_its_pictures_on_the_source_timeline() {
+    let mut segments = component();
+    segments.set_playhead(Some(32));
+    assert!(segments.take_edge(true), "the start of segment c (program 30..40, source 500..510)");
+    let pick = |marks| SourcePick::new(Some("clip-c"), Some("C"), Some(marks), (Some(marks.0), 600), Some((50, 1)));
+    segments.set_source(pick((498, 510)), None);
+    let stills: Vec<_> = segments
+        .view()
+        .source_edit_stills
+        .iter()
+        .map(|still| (still.marker_frame, still.after, still.picture.as_ref().map(|p| (p.clip_id.clone(), p.source_frame))))
+        .collect();
+    assert_eq!(
+        stills,
+        vec![(498, false, None), (498, true, Some(("clip-c".into(), 498)))],
+        "the Off segment before is black, the new first picture is source frame 498"
+    );
+    segments.apply_action("clear_focus");
+    segments.set_source(pick((498, 510)), None);
+    assert!(segments.view().source_edit_stills.is_empty(), "Escape drops the edge");
+}

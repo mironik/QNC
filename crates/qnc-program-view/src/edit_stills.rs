@@ -28,6 +28,8 @@ pub struct EditStill {
     pub picture: Option<StillPicture>,
     /// The decoded picture, once it is there.
     pub image: Option<Arc<qnc_image_assets::RgbaImage>>,
+    /// Texture identity of the picture.
+    pub id: String,
 }
 
 /// The pictures beside markers moved from `old` to `new` (`moves`), with the stored
@@ -46,9 +48,25 @@ pub fn edit_stills(view: &SegmentsView, slots: &[Slot], moves: &[(u64, u64)]) ->
     stills
 }
 
+impl EditStill {
+    /// A picture beside the edit at `marker_frame`; `None` is drawn black.
+    pub fn new(marker_frame: u64, after: bool, picture: Option<StillPicture>) -> Self {
+        let id = picture
+            .as_ref()
+            .map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame));
+        Self { marker_frame, after, picture, image: None, id }
+    }
+}
+
+/// The picture the stored program shows at a program frame (a cover, else the segment;
+/// `None` on Off or outside the program).
+pub fn program_picture(view: &SegmentsView, frame: u64) -> Option<StillPicture> {
+    (frame < view.total_frames).then(|| picture_at(view, &view.slots, &|frame| frame, frame)).flatten()
+}
+
 fn still(view: &SegmentsView, slots: &[Slot], moved: &dyn Fn(u64) -> u64, marker: u64, after: bool) -> EditStill {
     let frame = if after { marker } else { marker - 1 };
-    EditStill { marker_frame: marker, after, picture: picture_at(view, slots, moved, frame), image: None }
+    EditStill::new(marker, after, picture_at(view, slots, moved, frame))
 }
 
 /// The picture at a program frame of the draft: a cover there, else the segment.

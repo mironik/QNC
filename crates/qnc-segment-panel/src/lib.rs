@@ -12,12 +12,12 @@ mod list;
 
 pub use list::show_segment_list;
 mod source_lanes;
-pub use source_lanes::{source_lane_choice, source_wave_over_video};
+pub use source_lanes::{source_edit_stills, source_lane_choice, source_wave_over_video, StorySourceTimeline};
 
 use eframe::egui::{self, Color32, RichText, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentRow, SegmentsView};
 use qnc_timeline::{
-    AudioLane, TimelineCoverSpan, TimelineEditStill, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineStillImage,
+    AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent,
     TimelineLayerFlags, TimelineMarkerPin, TimelineMetrics, TimelineProjection, TimelineSlotSpan,
     TimelineTheme, TimelineVirtualSpan,
 };
@@ -269,30 +269,14 @@ fn paint_program(
     // The edit pictures of a moved slot or marker, on the segment rows: the one before a
     // marker on the row it ends, the one after on the row it starts (a border marker
     // has one on each).
-    let still_ids: Vec<String> = segments
-        .edit_stills
-        .iter()
-        .map(|still| still.picture.as_ref().map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame)))
-        .collect();
     let stills = segments
         .edit_stills
         .iter()
-        .zip(&still_ids)
-        .filter(|(still, _)| {
+        .filter(|still| {
             let frame = still.marker_frame;
             with_stills && if still.after { start <= frame && frame < end } else { start < frame && frame <= end }
         })
-        .map(|(still, id)| TimelineEditStill {
-            frame: local(still.marker_frame),
-            after: still.after,
-            black: still.picture.is_none(),
-            image: still.image.as_deref().map(|image| TimelineStillImage {
-                id,
-                content_key: image.content_key,
-                size: image.size,
-                pixels: &image.pixels,
-            }),
-        })
+        .map(|still| source_lanes::timeline_still(still, local(still.marker_frame)))
         .collect::<Vec<_>>();
     let no_picture = segments
         .segment_at(start)

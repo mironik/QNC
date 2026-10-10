@@ -274,7 +274,7 @@ impl EditorialApplication {
         self.segments.set_playhead(Some(self.wrap.playhead()));
         self.view.focus = self.focus.panel();
         self.view.segments = self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames)));
-        self.trim_stills.fill(&mut self.view.segments.edit_stills, self.preview.still_locator()); // edit pictures
+        self.trim_stills.fill(&mut self.view.segments, self.preview.still_locator()); // edit pictures
     }
 
 

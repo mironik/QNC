@@ -4462,6 +4462,7 @@ dependencies = [
  "eframe",
  "qnc-program-segments",
  "qnc-program-waveform",
+ "qnc-source-dock",
  "qnc-timeline",
 ]
 

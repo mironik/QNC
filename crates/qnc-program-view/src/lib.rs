@@ -6,7 +6,7 @@
 mod edit_stills;
 mod markers;
 
-pub use edit_stills::{edit_stills, EditStill, StillPicture};
+pub use edit_stills::{edit_stills, program_picture, EditStill, StillPicture};
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
@@ -82,6 +82,9 @@ pub struct SegmentsView {
     /// The pictures on both sides of an edit being moved (a slot, a marker), from the
     /// draft; their images are filled in by whoever decodes them (user 2026-10-10).
     pub edit_stills: Vec<EditStill>,
+    /// The same for a segment edge taken with Ctrl+I/O, on the source timeline: the
+    /// marker frame is the source frame of the moved IN or OUT.
+    pub source_edit_stills: Vec<EditStill>,
     /// Sync/B-roll is on.
     pub sync_enabled: bool,
     /// Pokrivalice was chosen (user 2026-10-10: at first neither way is chosen).

@@ -35,6 +35,8 @@ pub struct SourceTimeline<'a> {
     pub a2_channel: Option<qnc_timeline::ChannelChoice>,
     /// An audio lane drawn over the video row and its display gain level.
     pub wave_over_video: Option<(qnc_timeline::AudioLane, u8)>,
+    /// The pictures beside a moved IN or OUT (a segment edge being trimmed).
+    pub edit_stills: Vec<qnc_timeline::TimelineEditStill<'a>>,
 }
 
 impl<'a> SourceTimeline<'a> {
@@ -57,6 +59,7 @@ impl<'a> SourceTimeline<'a> {
             a1_channel: None,
             a2_channel: None,
             wave_over_video: None,
+            edit_stills: Vec::new(),
         }
     }
 
@@ -75,6 +78,12 @@ impl<'a> SourceTimeline<'a> {
     /// The wave of `lane` over the video row at a display gain level (0: not shown).
     pub fn with_wave_over_video(mut self, wave: Option<(qnc_timeline::AudioLane, u8)>) -> Self {
         self.wave_over_video = wave;
+        self
+    }
+
+    /// The pictures beside a moved IN or OUT (user 2026-10-10: a segment edge trim).
+    pub fn with_edit_stills(mut self, stills: Vec<qnc_timeline::TimelineEditStill<'a>>) -> Self {
+        self.edit_stills = stills;
         self
     }
 
@@ -199,5 +208,6 @@ pub fn show_timeline_dock(
         timeline.a1_channel,
         timeline.a2_channel,
         timeline.wave_over_video,
+        &timeline.edit_stills,
     )
 }

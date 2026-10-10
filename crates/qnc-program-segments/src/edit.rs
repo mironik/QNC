@@ -73,6 +73,38 @@ impl ProgramSegments {
         true
     }
 
+    /// The edit pictures of a taken edge on the source timeline (user 2026-10-10): the
+    /// start shows the last picture of the program before the segment and the segment's
+    /// new first one, the end its new last one and the first picture after the segment.
+    /// They follow the IN/OUT on the source timeline of the segment's clip.
+    pub(crate) fn edge_stills(&self) -> Vec<qnc_program_view::EditStill> {
+        use qnc_program_view::{program_picture, EditStill, StillPicture};
+        let (Some(edge), Some(segment_id)) = (self.edge.as_ref(), self.editing.as_ref()) else {
+            return Vec::new();
+        };
+        let row = self.view.rows.iter().find(|row| &row.segment_id == segment_id);
+        let Some(row) = row.filter(|row| self.source.clip_id.as_deref() == Some(row.clip_id.as_str())) else {
+            return Vec::new();
+        };
+        let Some((in_frame, out_frame)) = self.source.marks else {
+            return Vec::new();
+        };
+        let own = |frame: u64| row.kind.has_base_video().then(|| StillPicture { clip_id: row.clip_id.clone(), source_frame: frame });
+        let mut stills = Vec::new();
+        if edge.start {
+            if row.start_frame > 0 {
+                stills.push(EditStill::new(in_frame, false, program_picture(&self.view, row.start_frame - 1)));
+            }
+            stills.push(EditStill::new(in_frame, true, own(in_frame)));
+        } else {
+            stills.push(EditStill::new(out_frame, false, own(out_frame.saturating_sub(1))));
+            if row.end_frame < self.view.total_frames {
+                stills.push(EditStill::new(out_frame, true, program_picture(&self.view, row.end_frame)));
+            }
+        }
+        stills
+    }
+
     /// Whether a segment edge taken from the segment panel waits for Enter or Escape.
     pub fn trimming_edge(&self) -> bool {
         self.edge.is_some() && self.editing.is_some()

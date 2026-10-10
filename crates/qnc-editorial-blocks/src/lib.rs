@@ -9,6 +9,7 @@ use eframe::egui::{
 };
 
 use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
+use qnc_segment_panel::StorySourceTimeline as _;
 use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
 use qnc_timeline::{TimelineIntent, TimelineTheme};
 
@@ -207,9 +208,7 @@ fn render_source_dock(
         },
         SourceTimeline::from_assets(&view.preview.timeline, timeline_theme(theme), &view.preview.assets)
             .with_timecode(view.source_timecode)
-            .with_a1_channel(qnc_segment_panel::source_lane_choice(&view.segments, 0))
-            .with_a2_channel(qnc_segment_panel::source_lane_choice(&view.segments, 1))
-            .with_wave_over_video(qnc_segment_panel::source_wave_over_video(&view.segments)),
+            .story(&view.segments),
     );
     match intent {
         TimelineIntent::None => header_intent,

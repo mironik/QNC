@@ -24,7 +24,7 @@ pub use qnc_program_commands::{SegmentCommand, SegmentKind};
 pub use qnc_program_view::{
     check_move, cover_spans, duration_color_key, duration_label, first_empty_slot,
     neighbour_marker, neighbour_segment, neighbour_slot, program, program_frame, resolve,
-    slot_at, slots, source_at, CoverSpan, MarkerPin, SegmentPart, SegmentRow, SegmentsView, Slot,
+    slot_at, slots, source_at, CoverSpan, EditStill, MarkerPin, SegmentPart, SegmentRow, SegmentsView, Slot,
 };
 
 pub use qnc_sync_cover::SyncPreview;
@@ -262,6 +262,7 @@ impl ProgramSegments {
             self.view.a2_choice = self.lanes.choice(1);
         }
         self.source = source;
+        self.view.source_edit_stills = self.edge_stills();
         self.arm_sync_on_new_in(previous_in);
         self.set_source_channels(count);
     }
@@ -993,6 +994,7 @@ impl ProgramSegments {
         view.message = message;
         view.editing = self.editing.clone();
         view.edit_stills = qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves());
+        view.source_edit_stills = self.edge_stills();
         self.lane_view(&mut view);
         self.view = view;
     }

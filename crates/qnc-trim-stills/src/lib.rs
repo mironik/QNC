@@ -15,7 +15,7 @@ use std::{
 
 use qnc_decoder_catalog::{FilmstripExtractFrame, FilmstripExtractMode};
 use qnc_image_assets::RgbaImage;
-use qnc_program_view::{EditStill, StillPicture};
+use qnc_program_view::{SegmentsView, StillPicture};
 use qnc_source_preview::StillLocator;
 
 pub const MODULE_ID: &str = "qnc.module.trim-stills";
@@ -42,9 +42,9 @@ impl TrimStills {
         Self::default()
     }
 
-    /// Puts the decoded pictures on `stills` and starts decoding the missing ones.
-    /// Returns whether a picture arrived (the view changed).
-    pub fn fill(&mut self, stills: &mut [EditStill], locator: Option<StillLocator>) -> bool {
+    /// Puts the decoded pictures on the edit pictures of `view` (Wrap rows and source
+    /// timeline) and starts decoding the missing ones. Returns whether a picture arrived.
+    pub fn fill(&mut self, view: &mut SegmentsView, locator: Option<StillLocator>) -> bool {
         let Some(locator) = locator else {
             return false;
         };
@@ -52,12 +52,13 @@ impl TrimStills {
             *self = Self { project_id: Some(locator.project_id().to_string()), ..Self::default() };
         }
         let arrived = self.take_finished();
-        for still in stills.iter_mut() {
+        for still in view.edit_stills.iter_mut().chain(view.source_edit_stills.iter_mut()) {
             still.image = still.picture.as_ref().and_then(|picture| self.cache.get(picture).cloned());
         }
         if self.job.is_none() {
             let mut missing: Vec<StillPicture> = Vec::new();
-            for picture in stills.iter().filter_map(|still| still.picture.as_ref()) {
+            let stills = view.edit_stills.iter().chain(&view.source_edit_stills);
+            for picture in stills.filter_map(|still| still.picture.as_ref()) {
                 if !self.cache.contains_key(picture) && !self.failed.contains(picture) && !missing.contains(picture) {
                     missing.push(picture.clone());
                 }
@@ -189,14 +190,13 @@ mod tests {
     #[test]
     fn without_a_project_nothing_is_decoded() {
         let mut stills = TrimStills::new();
-        let mut wanted = vec![EditStill {
-            marker_frame: 10,
-            after: true,
-            picture: Some(StillPicture { clip_id: "c".into(), source_frame: 3 }),
-            image: None,
-        }];
-        assert!(!stills.fill(&mut wanted, None));
+        let picture = StillPicture { clip_id: "c".into(), source_frame: 3 };
+        let mut view = SegmentsView {
+            edit_stills: vec![qnc_program_view::EditStill::new(10, true, Some(picture))],
+            ..Default::default()
+        };
+        assert!(!stills.fill(&mut view, None));
         assert!(!stills.loading());
-        assert!(wanted[0].image.is_none());
+        assert!(view.edit_stills[0].image.is_none());
     }
 }

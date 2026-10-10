@@ -661,7 +661,7 @@ pub fn show_source_player_timeline_with_artifacts(
     a4_peaks: &[f32],
 ) -> TimelineIntent {
     let peaks = [a1_peaks, a2_peaks, a3_peaks, a4_peaks];
-    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None, None, None)
+    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None, None, None, &[])
 }
 
 /// The source timeline with the A1 and A2 channel pickers, when the caller has a
@@ -676,6 +676,7 @@ pub fn show_source_player_timeline_with_channel(
     a1_channel: Option<ChannelChoice>,
     a2_channel: Option<ChannelChoice>,
     wave_over_video: Option<(AudioLane, u8)>,
+    edit_stills: &[TimelineEditStill<'_>],
 ) -> TimelineIntent {
     let duration = state.duration_frames();
     let (draft_in, draft_out, in_active, out_active) = match state.visible_source_marks() {
@@ -714,7 +715,7 @@ pub fn show_source_player_timeline_with_channel(
                 a1_channel,
                 a2_channel,
                 wave_over_video,
-                edit_stills: &[],
+                edit_stills,
             },
         );
     });

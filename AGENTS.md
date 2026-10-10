@@ -3325,3 +3325,10 @@ kroz katalog dekodera, jedan posao, najnoviji nacrt, cache 64), `qnc-decoder-cat
 `ExactSeek`: tocan pomak bez `-noaccurate_seek`; provjereno na `Mironik 2002.MXF`, frameovi 100, 101, 437 jednaki
 referenci dekodiranoj od pocetka), `qnc-editorial-application` (jedan poziv; C10 708, baseline spusten).
 Nije izvedeno: rub segmenta (Ctrl+I/O) na source timelineu jos nema slicica.
+Dopuna 2026-10-10 ("nastavi"): i rub segmenta uzet s Ctrl+I/O ima slicice, na source timelineu uz IN ili OUT koji se
+pomice: pocetak pokazuje zadnju sliku programa prije segmenta i novu prvu sliku segmenta, kraj novu zadnju sliku i
+prvu sliku programa poslije segmenta. `qnc-program-view` (`program_picture`, `EditStill::new` s identitetom slike,
+`SegmentsView.source_edit_stills`), `qnc-program-segments` (`edge_stills`, test), `qnc-trim-stills` (puni obje
+liste), `qnc-timeline` (`show_source_player_timeline_with_channel` prima slicice), `qnc-source-dock`
+(`with_edit_stills`), `qnc-segment-panel` (`source_edit_stills`, `StorySourceTimeline::story`: dio source timelinea
+koji daje prica u jednom pozivu ploce; C10 `qnc-editorial-blocks` 381 -> 380). Ingest nije diran.
