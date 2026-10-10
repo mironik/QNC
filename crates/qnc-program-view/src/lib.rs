@@ -85,6 +85,9 @@ pub struct SegmentsView {
     /// The same for a segment edge taken with Ctrl+I/O, on the source timeline: the
     /// marker frame is the source frame of the moved IN or OUT.
     pub source_edit_stills: Vec<EditStill>,
+    /// Program frames of the edits being moved (a taken slot's two markers, a taken
+    /// marker): the trim playheads, drawn beside the player's own.
+    pub trim_frames: Vec<u64>,
     /// Sync/B-roll is on.
     pub sync_enabled: bool,
     /// Pokrivalice was chosen (user 2026-10-10: at first neither way is chosen).

@@ -3354,3 +3354,10 @@ koliko je slot dug. Sada i nacrt (`qnc-program-view` `cover_picture`): pokrivali
 pa zadnja slika produljenog prethodnog slota je nastavak njegove pokrivalice, a ne segment ispod. Testovi.
 Popravak 2026-10-10 (korisnik: "kad selektiram slot i pomaknem strelicu, playhead uvijek skoci na pocetak slota"):
 pomak slota vise ne pomice Wrap playhead (`qnc-program-segments` `slot_move.rs`); slike reza su u trim prozoru.
+Dopuna 2026-10-11 (korisnik: "nema nikakvog pomaka ni promjene slicica... mozemo li imati dva playheada"): pomak
+slota za jednu sliku na redu od nekoliko tisuca slika manji je od piksela, a pokrivalica putuje sa slotom, pa se
+pomak nije vidio. Uz playhead playera (ostaje gdje je, monitor ga prati) sada je drugi, trim playhead: bijela crta
+na svakom pomaknutom markeru (slot 2, marker 1) s TC-om nacrta, samo dok je nesto uzeto. `qnc-program-view`
+(`SegmentsView.trim_frames`), `qnc-program-segments` (iz `edit_moves`, test), `qnc-timeline` (`trim_playheads`,
+crtanje preko svih traka), `qnc-segment-panel` (na redu koji crta marker). Rub segmenta to vec ima na source
+timelineu (playhead prati IN/OUT).

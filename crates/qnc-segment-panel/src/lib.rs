@@ -266,6 +266,14 @@ fn paint_program(
     // v5 `local_peaks_for_row`: this row's part of the program wave.
     let row_wave = |program: &[f32]| qnc_program_waveform::row_peaks(program, segments.total_frames, start, end);
     let (a1, a2) = (row_wave(&segments.peaks.a1), row_wave(&segments.peaks.a2));
+    // The trim playheads of the edits being moved, on the row that draws their marker.
+    let trim_labels: Vec<(u64, String)> = segments
+        .trim_frames
+        .iter()
+        .filter(|frame| (start..=end).contains(*frame) && (**frame != start || start == 0))
+        .map(|frame| (local(*frame), segments.timecode(*frame)))
+        .collect();
+    let trim_playheads: Vec<(u64, &str)> = trim_labels.iter().map(|(frame, label)| (*frame, label.as_str())).collect();
     let no_picture = segments
         .segment_at(start)
         .is_some_and(|row| !row.kind.has_base_video() && row.end_frame >= end);
@@ -299,6 +307,7 @@ fn paint_program(
             a1_channel: None,
             a2_channel: None,
             wave_over_video: None,
+            trim_playheads: &trim_playheads,
         },
     );
     // Story rows only: a dragged M marker follows the pointer as a draft (Enter confirms).

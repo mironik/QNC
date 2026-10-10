@@ -672,3 +672,16 @@ fn a_moved_slot_takes_its_cover_with_it_in_the_edit_pictures() {
         vec![Some(("prev".into(), 1016)), Some(("own".into(), 1000)), Some(("own".into(), 1017)), Some(("next".into(), 1000))]
     );
 }
+
+#[test]
+fn a_taken_slot_has_trim_playheads_on_its_moved_markers_and_the_playhead_stays() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::SelectSlotAtPlayhead);
+    assert_eq!(segments.view().trim_frames, vec![15, 33]);
+    segments.apply_action("step_forward_frame");
+    assert_eq!(segments.view().trim_frames, vec![16, 34], "the trim playheads follow the draft");
+    assert_eq!(segments.take_seek(), None, "the player's playhead is not moved");
+    segments.apply_action("clear_focus");
+    assert!(segments.view().trim_frames.is_empty());
+}

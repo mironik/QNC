@@ -559,6 +559,9 @@ pub struct TimelineInput<'a> {
     /// An audio lane drawn over the video row, at a display gain of 2^(level-1)
     /// (user rule 2026-10-01: a closer look at the wave without a taller dock).
     pub wave_over_video: Option<(AudioLane, u8)>,
+    /// Trim playheads: the local frames of the edits being moved and their labels; the
+    /// player's playhead stays where it is.
+    pub trim_playheads: &'a [(u64, &'a str)],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -688,6 +691,7 @@ pub fn show_source_player_timeline_with_channel(
                 a1_channel,
                 a2_channel,
                 wave_over_video,
+                trim_playheads: &[],
             },
         );
     });
@@ -821,8 +825,31 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     if let (Some(row), Some((lane, level))) = (video_row, input.wave_over_video) {
         paint_wave_over_video(ui, row, lane, level, &input);
     }
+    paint_trim_playheads(ui, outer, &input);
 
     intent
+}
+
+/// The trim playheads (user 2026-10-10: a second playhead on the edit being moved, the
+/// player's own stays where it is): a line over every lane with its label at the top.
+fn paint_trim_playheads(ui: &mut egui::Ui, outer: Rect, input: &TimelineInput<'_>) {
+    let border = input.metrics.border_width;
+    let row = Rect::from_min_max(
+        egui::pos2(outer.left() + border, outer.top() + border),
+        egui::pos2(outer.right() - border, outer.bottom() - border),
+    );
+    let (_, track) = split_label_track(row, input.metrics.label_width);
+    let duration = input.state.duration_frames();
+    for (frame, label) in input.trim_playheads {
+        let x = x_for_local_frame(track, duration, *frame);
+        let color = input.theme.text;
+        ui.painter().line_segment([egui::pos2(x, track.top()), egui::pos2(x, track.bottom())], Stroke::new(2.0, color));
+        let text = ui.painter().layout_no_wrap(label.to_string(), FontId::proportional(11.0), color);
+        let left = (x + 3.0).min(track.right() - text.size().x - 2.0).max(track.left());
+        let rect = Rect::from_min_size(egui::pos2(left, track.top() + 1.0), text.size() + Vec2::new(4.0, 0.0));
+        ui.painter().rect_filled(rect, 2.0, input.theme.background);
+        ui.painter().galley(egui::pos2(left + 2.0, track.top() + 1.0), text, color);
+    }
 }
 
 fn next_row(next_top: &mut f32, left: f32, right: f32, height: f32, gap: f32) -> Rect {

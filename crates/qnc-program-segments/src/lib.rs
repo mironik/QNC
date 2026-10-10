@@ -995,6 +995,7 @@ impl ProgramSegments {
         view.editing = self.editing.clone();
         view.edit_stills = qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves());
         view.source_edit_stills = self.edge_stills();
+        view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
         self.lane_view(&mut view);
         self.view = view;
     }
