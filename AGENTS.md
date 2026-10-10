@@ -3298,3 +3298,8 @@ Enter zapisuje `TrimSegment` (markeri prate sliku), Esc odustaje; oboje vraca ti
 rub, odnosno gdje je bio. `qnc-program-segments` (`edit.rs`: `take_edge`, `trimming_edge`, `take_wrap_return`),
 `qnc-panel-focus`, `qnc-pending-marks` (oznaka koju treba uzeti i frame otvaranja), `qnc-editorial-application`
 (isti broj redaka), ugovori triju modula. Katalog tipki nije mijenjan. Testovi, conformance.
+Popravak 2026-10-10 (korisnik: "dok ne postoje segmenti, Pokrivalice i Sync/B-roll trebaju biti nedostupni; po
+defaultu ni Pokrivalice ni Sync/B-roll nisu odabrani"): prekidac u source docku ima tri stanja: na pocetku nista
+odabrano, zatim Pokrivalice ili Sync/B-roll. Bez segmenata oba gumba (i tipka Sync) su nedostupni, a kad nestane
+zadnji segment izbor se ponistava i Sync se gasi. `qnc-program-view` (`covers_chosen`, `action_enabled`,
+`action_selected`), `qnc-program-segments` (`CoverMode`, `toggle_sync`). Ploca i layout nisu dirani. Test.

@@ -78,6 +78,8 @@ pub struct SegmentsView {
     pub covers: Vec<CoverSpan>,
     /// Sync/B-roll is on.
     pub sync_enabled: bool,
+    /// Pokrivalice was chosen (user 2026-10-10: at first neither way is chosen).
+    pub covers_chosen: bool,
     /// Story timebase (`num`, `den`); `None` while the program is empty.
     pub timebase: Option<(u32, u32)>,
     pub total_frames: u64,
@@ -153,14 +155,18 @@ impl SegmentsView {
             Some(SegmentCommand::Cover { overwrite: true }) => self.overwrite_cover_slot().is_ok(),
             Some(SegmentCommand::Undo) => self.undo_depth > 0,
             Some(SegmentCommand::Redo) => self.redo_depth > 0,
+            // Covers need segments (user 2026-10-10).
+            Some(SegmentCommand::CoverMode { .. } | SegmentCommand::ToggleSync) => !self.rows.is_empty(),
             _ => true,
         }
     }
 
-    /// Which of the two ways to make covers is on: Pokrivalice or Sync/B-roll.
+    /// Which of the two ways to make covers is on: Pokrivalice, Sync/B-roll or, at
+    /// first, neither (user 2026-10-10).
     pub fn action_selected(&self, action_id: &str) -> bool {
         match SegmentCommand::from_action(action_id) {
-            Some(SegmentCommand::CoverMode { sync }) => self.sync_enabled == sync,
+            Some(SegmentCommand::CoverMode { sync: true }) => self.sync_enabled,
+            Some(SegmentCommand::CoverMode { sync: false }) => self.covers_chosen && !self.sync_enabled,
             _ => false,
         }
     }

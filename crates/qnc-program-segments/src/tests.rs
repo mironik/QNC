@@ -560,3 +560,20 @@ fn ctrl_o_takes_the_end_of_the_segment_under_the_playhead_and_escape_goes_back_t
     assert!(!segments.trimming_edge());
     assert_eq!(segments.take_wrap_return(), Some(row.start_frame + 3), "Escape goes back where Wrap was");
 }
+
+#[test]
+fn covers_and_sync_wait_for_segments_and_neither_is_chosen_at_first() {
+    let mut empty = ProgramSegments::new();
+    empty.apply(SegmentCommand::CoverMode { sync: true });
+    empty.apply(SegmentCommand::CoverMode { sync: false });
+    let view = empty.view();
+    assert!(!view.action_enabled("cover_mode_covers") && !view.action_enabled("cover_mode_sync"), "no segments");
+    assert!(!view.action_selected("cover_mode_covers") && !view.action_selected("cover_mode_sync"));
+    let mut segments = component();
+    assert!(segments.view().action_enabled("cover_mode_sync"));
+    assert!(!segments.view().action_selected("cover_mode_covers") && !segments.view().action_selected("cover_mode_sync"), "neither at first");
+    segments.apply(SegmentCommand::CoverMode { sync: false });
+    assert!(segments.view().action_selected("cover_mode_covers"));
+    segments.apply(SegmentCommand::CoverMode { sync: true });
+    assert!(segments.view().action_selected("cover_mode_sync") && !segments.view().action_selected("cover_mode_covers"));
+}

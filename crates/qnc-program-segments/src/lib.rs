@@ -137,6 +137,8 @@ pub struct ProgramSegments {
     /// The closed Sync slot writes its cover as soon as it is stored (Enter during the
     /// play, or the play reached an M marker or the source OUT).
     sync_commit: bool,
+    /// Pokrivalice was chosen; at first neither way of making covers is (user 2026-10-10).
+    covers_chosen: bool,
     /// The segment being edited and the clip with IN/OUT the source view should open.
     editing: Option<String>,
     /// The clip, its IN/OUT and the mark to take (`Some(true)` IN, `Some(false)` OUT).
@@ -442,8 +444,11 @@ impl ProgramSegments {
             }
             SegmentCommand::ToggleSync => self.toggle_sync(),
             SegmentCommand::CoverMode { sync } => {
+                self.covers_chosen = !sync && !self.view.rows.is_empty();
                 if self.sync.enabled() != sync {
                     self.toggle_sync();
+                } else {
+                    self.refresh_view(String::new());
                 }
             }
             SegmentCommand::CommitSync => {
@@ -957,7 +962,15 @@ impl ProgramSegments {
             self.selected_cover = None;
         }
         view.covers = cover_spans(&self.stored_covers, self.selected_cover.as_deref(), view.timebase);
+        if view.rows.is_empty() {
+            // No segments: neither way of making covers is chosen (user 2026-10-10).
+            self.covers_chosen = false;
+            if self.sync.enabled() {
+                self.program_changed |= self.sync.toggle();
+            }
+        }
         view.sync_enabled = self.sync.enabled();
+        view.covers_chosen = self.covers_chosen;
         view.playhead = self.playhead;
         view.message = message;
         view.editing = self.editing.clone();

@@ -126,6 +126,9 @@ impl ProgramSegments {
     }
 
     pub(crate) fn toggle_sync(&mut self) {
+        if self.view.rows.is_empty() && !self.sync.enabled() {
+            return self.refresh_view("Pokrivalice i Sync/B-roll trebaju segmente.".into());
+        }
         // A running Sync play gives the player back to the whole program.
         self.program_changed |= self.sync.toggle();
         let message = if self.sync.enabled() {
