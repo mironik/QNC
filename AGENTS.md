@@ -3270,3 +3270,8 @@ Ostaje (u baselineu): slaganje kartica iz podataka klipa u Ingest i Story ploci 
 preglednika u Project ploci (C1), gumb X za brisanje templatea, pretvorba boja ugovora u `theme.rs`. Provjereno:
 testovi `qnc-settings-form`, `qnc-keyboard-shortcut`, `qnc-ui-kit`, `qnc-ingest-layout`, `qnc-project-blocks`,
 `qnc-contracts`, conformance, `cargo check -p qnc-app`. Uzivo nije provjereno.
+Popravak 2026-10-10 (korisnik: posteri se u Storyju "prikazuju, ali ne dok se kreira filmstrip"; "otkljucaj"
+`crates/qnc-monitor`): dok pozadinski proces radi filmstrip, zapisi klipova dovrsavaju se kasnije i preview javlja
+"Podaci klipa se pripremaju..."; monitor je imao redoslijed slika -> poruka -> poster, pa je poruka skrivala poster.
+`qnc-monitor::paint_source_monitor`: slika playera, inace poster s porukom kao natpisom pri dnu (tamna traka), inace
+sama poruka, inace naziv klipa. Vrijedi za sve forme. Testovi `qnc-monitor`, conformance. Monitor je ponovno zakljucan.

@@ -122,8 +122,10 @@ pub struct MonitorPoster<'a> {
     pub rgba: &'a [u8],
 }
 
-/// The preview of any form, in one order: the player frame, else the player message, else the
-/// poster of the shown clip, else the label. The caller only passes what it knows.
+/// The preview of any form, in one order: the player frame, else the poster of the shown clip
+/// with the player message as a caption, else the message alone, else the label. A message
+/// (e.g. the clip's data is still being prepared while the filmstrip is made) never hides the
+/// poster (user 2026-10-10). The caller only passes what it knows.
 pub fn paint_source_monitor(
     ui: &mut Ui,
     rect: Rect,
@@ -131,7 +133,12 @@ pub fn paint_source_monitor(
     poster: Option<MonitorPoster<'_>>,
     label: &str,
 ) {
-    match paint_monitor(ui, rect, surface) {
+    let message = surface.message.filter(|text| !text.is_empty());
+    let picture_only = MonitorSurface {
+        message: if poster.is_some() { None } else { surface.message },
+        ..surface
+    };
+    match paint_monitor(ui, rect, picture_only) {
         MonitorPaint::Picture | MonitorPaint::Message => return,
         MonitorPaint::Empty => {}
     }
@@ -144,10 +151,36 @@ pub fn paint_source_monitor(
             poster.size,
             poster.rgba,
         ) {
+            if let Some(message) = message {
+                paint_caption(ui, rect, surface.chrome, message);
+            }
             return;
         }
     }
-    paint_placeholder(ui, rect, surface.chrome, label);
+    match message {
+        Some(message) => paint_placeholder(ui, rect, surface.chrome, message),
+        None => paint_placeholder(ui, rect, surface.chrome, label),
+    }
+}
+
+/// A message over the bottom of a poster, on a dark band so it stays readable.
+fn paint_caption(ui: &mut Ui, rect: Rect, chrome: MonitorChrome, message: &str) {
+    let galley = ui.painter().layout(
+        message.to_string(),
+        FontId::proportional(chrome.font_size),
+        chrome.muted,
+        (rect.width() - 24.0).max(1.0),
+    );
+    let band = Rect::from_min_max(
+        egui::pos2(rect.left() + 1.0, rect.bottom() - galley.size().y - 13.0),
+        egui::pos2(rect.right() - 1.0, rect.bottom() - 1.0),
+    );
+    ui.painter().rect_filled(band, 0.0, chrome.fill.gamma_multiply(0.75));
+    ui.painter().galley(
+        egui::pos2(rect.center().x - galley.size().x * 0.5, band.top() + 6.0),
+        galley,
+        chrome.muted,
+    );
 }
 
 #[cfg(test)]
