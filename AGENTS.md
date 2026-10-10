@@ -3275,3 +3275,10 @@ Popravak 2026-10-10 (korisnik: posteri se u Storyju "prikazuju, ali ne dok se kr
 "Podaci klipa se pripremaju..."; monitor je imao redoslijed slika -> poruka -> poster, pa je poruka skrivala poster.
 `qnc-monitor::paint_source_monitor`: slika playera, inace poster s porukom kao natpisom pri dnu (tamna traka), inace
 sama poruka, inace naziv klipa. Vrijedi za sve forme. Testovi `qnc-monitor`, conformance. Monitor je ponovno zakljucan.
+Popravak 2026-10-10 (korisnik: "sporo reagira na klik misem"): dijagnostika je pokazala da se nit sucelja na klik
+na klip blokira 1,5-1,7 s (`ui-frame-slow`) dok pozadinski proces radi filmstrip. Na klik su se na niti sucelja
+citali timecode i broj audio kanala klipa iz baze sadrzaja (`qnc-source-timecode::SourceTimecodes`,
+`qnc-source-channels::SourceChannels`), a citanje ceka dok pozadinski proces upisuje u istu bazu. Obje kocke sada
+novi klip citaju u zasebnoj niti i do odgovora vracaju "nepoznato"; vrijednost se pojavi cim stigne. Ingest i Story
+isto. Ostaje: priprema playera (`load_ms`) za vrijeme filmstripa traje 1,4-2,4 s umjesto ~50 ms (cita u pozadini,
+ne blokira sucelje; uzrok je isto cekanje na bazu).

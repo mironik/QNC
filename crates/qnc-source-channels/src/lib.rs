@@ -31,6 +31,9 @@ pub fn read_clip(target: &ContentTarget, clip_id: &str) -> Result<Option<u16>, S
 #[derive(Debug, Default)]
 pub struct SourceChannels {
     current: Option<(String, String, Option<u16>)>,
+    /// The read of another clip on its own thread: the form's thread never waits on the
+    /// database (a background job writing it, e.g. the filmstrip, made a click wait 1.5 s).
+    reading: Option<(String, String, std::sync::mpsc::Receiver<Option<u16>>)>,
 }
 
 impl SourceChannels {
@@ -41,14 +44,25 @@ impl SourceChannels {
     /// The channel count of `clip_id` in the project behind `target`.
     pub fn for_clip(&mut self, target: Option<&ContentTarget>, clip_id: Option<&str>) -> Option<u16> {
         let (target, clip_id) = (target?, clip_id?);
-        let same = self
-            .current
-            .as_ref()
-            .is_some_and(|(uri, id, _)| uri == target.uri() && id == clip_id);
-        if !same {
-            let count = read_clip(target, clip_id).ok().flatten();
-            self.current = Some((target.uri().to_string(), clip_id.to_string(), count));
+        if let Some((uri, id, done)) = &self.reading {
+            if let Ok(count) = done.try_recv() {
+                self.current = Some((uri.clone(), id.clone(), count));
+                self.reading = None;
+            }
         }
-        self.current.as_ref().and_then(|(_, _, count)| *count)
+        let is = |uri: &str, id: &str| uri == target.uri() && id == clip_id;
+        if let Some((_, _, count)) = self.current.as_ref().filter(|(uri, id, _)| is(uri, id)) {
+            return *count;
+        }
+        // `None` while the clip is read (in the background, once per clip).
+        if !self.reading.as_ref().is_some_and(|(uri, id, _)| is(uri, id)) {
+            let (send, done) = std::sync::mpsc::channel();
+            let (owned, clip) = (target.clone(), clip_id.to_string());
+            std::thread::spawn(move || {
+                let _ = send.send(read_clip(&owned, &clip).ok().flatten());
+            });
+            self.reading = Some((target.uri().to_string(), clip_id.to_string(), done));
+        }
+        None
     }
 }
