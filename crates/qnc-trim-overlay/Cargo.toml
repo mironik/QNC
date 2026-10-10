@@ -1,0 +1,10 @@
+[package]
+name = "qnc-trim-overlay"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the trim zoom, a window in the centre of the screen with the edit pictures of what is taken (a slot, a marker or a segment edge), large, each named; passive paint only"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-program-view = { workspace = true }
+qnc-ui-kit = { workspace = true }

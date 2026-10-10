@@ -3332,3 +3332,11 @@ prvu sliku programa poslije segmenta. `qnc-program-view` (`program_picture`, `Ed
 liste), `qnc-timeline` (`show_source_player_timeline_with_channel` prima slicice), `qnc-source-dock`
 (`with_edit_stills`), `qnc-segment-panel` (`source_edit_stills`, `StorySourceTimeline::story`: dio source timelinea
 koji daje prica u jednom pozivu ploce; C10 `qnc-editorial-blocks` 381 -> 380). Ingest nije diran.
+Izmjena 2026-10-10 (korisnik: "nema dovoljno prostora na timeline za prikaz 4 slicice... overlay prozor"; "ne bi
+dodavao novo slovo, koristimo vec postojeca vezana za Ctrl"; "na centru ekrana"; "kao nekakav kvazi zum"): slicice
+vise nisu na timelineu (`qnc-timeline`, `qnc-source-dock` i Wrap redovi vraceni na stanje prije njih). Nova pasivna
+kocka `crates/qnc-trim-overlay` (+ ugovor modula): dok je nesto uzeto postojecim Ctrl tipkama (Ctrl+S slot, Ctrl+M
+marker, Ctrl+I/O rub segmenta), u sredini ekrana je prozor s tim slikama velikima u jednom redu (do 480x270), svaka s
+nazivom, crta na mjestu markera; Enter/Esc ga zatvara. Nazivi slika dolaze iz `qnc-program-view`
+(`EditStill::labelled`) i `qnc-program-segments`. Ploca Storyja ga zove jednim retkom (C10 379). Nova tipka nije
+dodana.

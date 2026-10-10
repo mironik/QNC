@@ -559,32 +559,6 @@ pub struct TimelineInput<'a> {
     /// An audio lane drawn over the video row, at a display gain of 2^(level-1)
     /// (user rule 2026-10-01: a closer look at the wave without a taller dock).
     pub wave_over_video: Option<(AudioLane, u8)>,
-    /// The pictures on both sides of the edit being moved (user 2026-10-10), drawn in
-    /// the video row beside their marker.
-    pub edit_stills: &'a [TimelineEditStill<'a>],
-}
-
-/// One picture beside an edit being moved: the last picture before the marker at `frame`
-/// (`after` false) or the first one from it. `image` is `None` while it is decoded (an
-/// empty frame is drawn) or when there is no picture (Off: black).
-#[derive(Debug, Clone, Copy)]
-pub struct TimelineEditStill<'a> {
-    /// Local frame of the marker on this row.
-    pub frame: u64,
-    pub after: bool,
-    pub image: Option<TimelineStillImage<'a>>,
-    /// Nothing to show there (an Off segment): drawn black.
-    pub black: bool,
-}
-
-/// The pixels of an edit picture (RGBA, top row first).
-#[derive(Debug, Clone, Copy)]
-pub struct TimelineStillImage<'a> {
-    /// Texture identity of the picture.
-    pub id: &'a str,
-    pub content_key: u64,
-    pub size: [usize; 2],
-    pub pixels: &'a [u8],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -661,7 +635,7 @@ pub fn show_source_player_timeline_with_artifacts(
     a4_peaks: &[f32],
 ) -> TimelineIntent {
     let peaks = [a1_peaks, a2_peaks, a3_peaks, a4_peaks];
-    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None, None, None, &[])
+    show_source_player_timeline_with_channel(ui, rect, state, theme, filmstrip_background, peaks, None, None, None)
 }
 
 /// The source timeline with the A1 and A2 channel pickers, when the caller has a
@@ -676,7 +650,6 @@ pub fn show_source_player_timeline_with_channel(
     a1_channel: Option<ChannelChoice>,
     a2_channel: Option<ChannelChoice>,
     wave_over_video: Option<(AudioLane, u8)>,
-    edit_stills: &[TimelineEditStill<'_>],
 ) -> TimelineIntent {
     let duration = state.duration_frames();
     let (draft_in, draft_out, in_active, out_active) = match state.visible_source_marks() {
@@ -715,7 +688,6 @@ pub fn show_source_player_timeline_with_channel(
                 a1_channel,
                 a2_channel,
                 wave_over_video,
-                edit_stills,
             },
         );
     });
@@ -975,27 +947,7 @@ fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> T
         paint_background(ui, track_rect);
     }
     paint_video_layers(ui, track_rect, input);
-    paint_edit_stills(ui, track_rect, input);
     video_intent_from_response(&response, track_rect, input)
-}
-
-/// The pictures beside an edit being moved, 16:9 in the height of the video row: the
-/// last one before ends at the marker, the first one after starts at it.
-fn paint_edit_stills(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>) {
-    let height = (track.height() - 6.0).max(1.0);
-    let size = Vec2::new(height * 16.0 / 9.0, height);
-    let duration = input.state.duration_frames();
-    for still in input.edit_stills {
-        let x = x_for_local_frame(track, duration, still.frame);
-        let left = if still.after { x + 2.0 } else { x - 2.0 - size.x };
-        let left = left.clamp(track.left(), (track.right() - size.x).max(track.left()));
-        let rect = Rect::from_min_size(egui::pos2(left, track.center().y - size.y / 2.0), size);
-        ui.painter().rect_filled(rect, 0.0, Color32::BLACK);
-        if let Some(image) = still.image.filter(|_| !still.black) {
-            let _ = qnc_ui_kit::paint_rgba_image(ui, rect, image.id, image.content_key, image.size, image.pixels);
-        }
-        ui.painter().rect_stroke(rect, 0.0, Stroke::new(1.5, input.theme.focus), StrokeKind::Inside);
-    }
 }
 
 fn paint_filmstrip_background(ui: &mut egui::Ui, track: Rect, background: &FilmstripBackground) {

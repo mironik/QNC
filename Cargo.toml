@@ -97,6 +97,7 @@ members = [
     "crates/qnc-clip-posters",
     "crates/qnc-poster-create",
     "crates/qnc-trim-stills",
+    "crates/qnc-trim-overlay",
     "crates/qnc-ingest-runtime",
     "crates/qnc-playback-activity",
     "crates/qnc-program-segments",
@@ -259,6 +260,7 @@ qnc-application-sequence = { path = "crates/qnc-application-sequence" }
 qnc-clip-posters = { path = "crates/qnc-clip-posters" }
 qnc-poster-create = { path = "crates/qnc-poster-create" }
 qnc-trim-stills = { path = "crates/qnc-trim-stills" }
+qnc-trim-overlay = { path = "crates/qnc-trim-overlay" }
 qnc-ingest-runtime = { path = "crates/qnc-ingest-runtime" }
 qnc-playback-activity = { path = "crates/qnc-playback-activity" }
 qnc-program-segments = { path = "crates/qnc-program-segments" }

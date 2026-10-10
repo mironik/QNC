@@ -16,5 +16,5 @@
   "runtime_crate": "qnc-trim-stills",
   "input": "The edit pictures a program view names (clip and source frame beside a moved slot or marker) and the preview's StillLocator (the media the project plays on this machine).",
   "output": "The exact pictures, decoded in the background through the decoder catalog's extractor (exact seek) at 256x144, kept in memory (64), put on the view's edit pictures. One job at a time, the newest draft first. A passive aid: the program and the player are not touched.",
-  "specification": "User 2026-10-10: a professional trim shows the last picture of the slot before, the first and last of the moved slot and the first of the slot after; on the timeline, not the monitor."
+  "specification": "User 2026-10-10: a professional trim shows the last picture of the slot before, the first and last of the moved slot and the first of the slot after; shown by qnc-trim-overlay in the centre of the screen."
 }

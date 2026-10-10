@@ -30,19 +30,27 @@ pub struct EditStill {
     pub image: Option<Arc<qnc_image_assets::RgbaImage>>,
     /// Texture identity of the picture.
     pub id: String,
+    /// What the picture is, e.g. "Slot - prva" (shown under it).
+    pub label: String,
 }
 
 /// The pictures beside markers moved from `old` to `new` (`moves`), with the stored
 /// slots (not the drafted ones).
 pub fn edit_stills(view: &SegmentsView, slots: &[Slot], moves: &[(u64, u64)]) -> Vec<EditStill> {
     let moved = |frame: u64| moves.iter().find(|(old, _)| *old == frame).map_or(frame, |(_, new)| *new);
+    // A slot moves two markers: the slot before, the slot itself, the slot after.
+    let labels: &[[&str; 2]] = if moves.len() == 2 {
+        &[["Prethodni slot - zadnja", "Slot - prva"], ["Slot - zadnja", "Sljedeci slot - prva"]]
+    } else {
+        &[["Prije markera - zadnja", "Poslije markera - prva"]]
+    };
     let mut stills = Vec::new();
-    for &(_, new) in moves {
+    for (&(_, new), [before, after]) in moves.iter().zip(labels.iter().chain(std::iter::repeat(&labels[0]))) {
         if new > 0 {
-            stills.push(still(view, slots, &moved, new, false));
+            stills.push(still(view, slots, &moved, new, false).labelled(before));
         }
         if new < view.total_frames {
-            stills.push(still(view, slots, &moved, new, true));
+            stills.push(still(view, slots, &moved, new, true).labelled(after));
         }
     }
     stills
@@ -54,7 +62,13 @@ impl EditStill {
         let id = picture
             .as_ref()
             .map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame));
-        Self { marker_frame, after, picture, image: None, id }
+        Self { marker_frame, after, picture, image: None, id, label: String::new() }
+    }
+
+    /// The same picture with what it is.
+    pub fn labelled(mut self, label: &str) -> Self {
+        self.label = label.to_string();
+        self
     }
 }
 

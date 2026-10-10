@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.trim-overlay",
+  "module_name": "Trim zoom",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.trim.zoom"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-trim-overlay",
+  "input": "The program view: its edit pictures (a taken slot or marker) or source edit pictures (a taken segment edge), each with its name and decoded image.",
+  "output": "A window in the centre of the screen with those pictures large in one row, named, a line where the marker is; nothing when nothing is taken.",
+  "specification": "User 2026-10-10: the timeline has no room for four pictures; a window in the centre of the screen, a kind of quasi zoom, opened by the existing Ctrl keys (Ctrl+S, Ctrl+M, Ctrl+I/O), no new key."
+}

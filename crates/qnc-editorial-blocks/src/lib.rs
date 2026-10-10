@@ -98,9 +98,8 @@ fn render_preview(
             }),
             _ => None,
         });
-    let label = view
-        .current_clip_label()
-        .unwrap_or(contracts.editorial.preview.empty_label.as_str());
+    let label = view.current_clip_label().unwrap_or(contracts.editorial.preview.empty_label.as_str());
+    qnc_trim_overlay::show(ui.ctx(), &view.segments); // the trim zoom, while something is taken
     qnc_monitor::paint_source_monitor(
         ui,
         rect,

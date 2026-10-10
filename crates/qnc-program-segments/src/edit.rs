@@ -93,13 +93,13 @@ impl ProgramSegments {
         let mut stills = Vec::new();
         if edge.start {
             if row.start_frame > 0 {
-                stills.push(EditStill::new(in_frame, false, program_picture(&self.view, row.start_frame - 1)));
+                stills.push(EditStill::new(in_frame, false, program_picture(&self.view, row.start_frame - 1)).labelled("Prije segmenta - zadnja"));
             }
-            stills.push(EditStill::new(in_frame, true, own(in_frame)));
+            stills.push(EditStill::new(in_frame, true, own(in_frame)).labelled("Segment - nova prva"));
         } else {
-            stills.push(EditStill::new(out_frame, false, own(out_frame.saturating_sub(1))));
+            stills.push(EditStill::new(out_frame, false, own(out_frame.saturating_sub(1))).labelled("Segment - nova zadnja"));
             if row.end_frame < self.view.total_frames {
-                stills.push(EditStill::new(out_frame, true, program_picture(&self.view, row.end_frame)));
+                stills.push(EditStill::new(out_frame, true, program_picture(&self.view, row.end_frame)).labelled("Poslije segmenta - prva"));
             }
         }
         stills
