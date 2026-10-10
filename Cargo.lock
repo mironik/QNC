@@ -3338,6 +3338,7 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-trim-stills",
  "qnc-virtual-short-cards",
  "qnc-virtual-short-stills",
  "qnc-virtual-shots",
@@ -4283,6 +4284,7 @@ dependencies = [
 name = "qnc-program-view"
 version = "0.1.0"
 dependencies = [
+ "qnc-image-assets",
  "qnc-program-commands",
  "qnc-program-db",
  "qnc-program-waveform",
@@ -4645,6 +4647,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-filmstrip",
+ "qnc-media-metadata",
  "qnc-media-records",
  "qnc-playback-activity",
  "qnc-player-client",
@@ -4653,6 +4656,7 @@ dependencies = [
  "qnc-player-timeline",
  "qnc-program-input",
  "qnc-source-bindings",
+ "qnc-source-contract",
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-wave",
@@ -4743,6 +4747,18 @@ name = "qnc-transport-resolver"
 version = "0.1.0"
 dependencies = [
  "qnc-contracts",
+]
+
+[[package]]
+name = "qnc-trim-stills"
+version = "0.1.0"
+dependencies = [
+ "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
+ "qnc-frame-timebase",
+ "qnc-image-assets",
+ "qnc-program-view",
+ "qnc-source-preview",
 ]
 
 [[package]]

@@ -3311,3 +3311,17 @@ se ne pomice. Wrap playhead pokazuje prvu sliku slota. Enter zapisuje novu opera
 jednoj transakciji, jedan Undo korak), Esc odustaje. `qnc-program-db` (`MoveSlot`, test), `qnc-program-segments`
 (`slot_move.rs`, nacrt markera i slotova u prikazu, test), ugovor `story.database.json` (`slot_move`). Katalog
 tipki, forme i layout nisu dirani. Conformance.
+Dopuna 2026-10-10 (korisnik: "nije dovoljna prva slika slota... monitor bi trebao prikazivati sve kljucne slicice:
+zadnju sliku prethodnog slota, prvu i zadnju slota kojeg pomicemo i prvu sljedeceg"; "moze to biti i na timeline";
+"super bi bilo da bude univerzalna"; "ok"): dok je slot uzet (Ctrl+S) ili marker (Ctrl+M), Wrap redovi u panelu
+Segmenti pokazuju uz svaki pomaknuti marker zadnju sliku prije i prvu poslije njega (slot 4, marker 2), iz nacrta:
+pokrivalica pomaknutog slota ide s njim, susjedni slot pokazuje svoju pokrivalicu ili sliku segmenta, Off je crn.
+Monitor i Broadcast Player nisu dirani. `qnc-program-view` (`edit_stills`, `EditStill`, `StillPicture`, polje
+`SegmentsView.edit_stills`, testovi), `qnc-program-segments` (`edit_moves`, test), `qnc-timeline`
+(`TimelineEditStill`, `TimelineStillImage`, polje `edit_stills`, crtanje u video traci), `qnc-segment-panel`
+(sličice na redovima segmenata), `qnc-source-preview` (`StillLocator`: isti zapis, `playback.input` i veze izvora kao
+player, lokalna datoteka; bez probea), nova kocka `crates/qnc-trim-stills` (+ ugovor modula; izvlacenje u pozadini
+kroz katalog dekodera, jedan posao, najnoviji nacrt, cache 64), `qnc-decoder-catalog` i `qnc-ffmpeg-decode` (nacin
+`ExactSeek`: tocan pomak bez `-noaccurate_seek`; provjereno na `Mironik 2002.MXF`, frameovi 100, 101, 437 jednaki
+referenci dekodiranoj od pocetka), `qnc-editorial-application` (jedan poziv; C10 708, baseline spusten).
+Nije izvedeno: rub segmenta (Ctrl+I/O) na source timelineu jos nema slicica.

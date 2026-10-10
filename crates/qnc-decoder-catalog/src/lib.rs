@@ -54,6 +54,8 @@ pub struct FilmstripExtractFrame {
 pub enum FilmstripExtractMode {
     RandomSeek,
     KeyframeSeek,
+    /// The exact picture at the seek point (the edit pictures of a trim).
+    ExactSeek,
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +110,7 @@ impl LocalFilmstripExtractor {
                     FilmstripExtractMode::RandomSeek => {
                         qnc_ffmpeg_decode::FfmpegFilmstripMode::RandomSeek
                     }
+                    FilmstripExtractMode::ExactSeek => qnc_ffmpeg_decode::FfmpegFilmstripMode::ExactSeek,
                     FilmstripExtractMode::KeyframeSeek => {
                         qnc_ffmpeg_decode::FfmpegFilmstripMode::KeyframeSeek
                     }

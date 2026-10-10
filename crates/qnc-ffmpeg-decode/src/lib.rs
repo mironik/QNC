@@ -137,6 +137,8 @@ impl FfmpegAdapter {
 pub enum FfmpegFilmstripMode {
     RandomSeek,
     KeyframeSeek,
+    /// The exact picture at the seek point (accurate seek), e.g. the edit pictures of a trim.
+    ExactSeek,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -192,6 +194,7 @@ pub fn extract_filmstrip_frames_with_cancel(
         FfmpegFilmstripMode::KeyframeSeek => {
             filmstrip_keyframe_seek_args(source, frames, thumb_size, temp_dir)
         }
+        FfmpegFilmstripMode::ExactSeek => filmstrip_seek_args(source, frames, thumb_size, temp_dir, false, true),
     };
     run_filmstrip_command(executable, args, cancel)
 }
@@ -253,7 +256,7 @@ fn filmstrip_random_seek_args(
     thumb_size: [u32; 2],
     temp_dir: &Path,
 ) -> Vec<OsString> {
-    filmstrip_seek_args(source, frames, thumb_size, temp_dir, false)
+    filmstrip_seek_args(source, frames, thumb_size, temp_dir, false, false)
 }
 
 fn filmstrip_keyframe_seek_args(
@@ -262,7 +265,7 @@ fn filmstrip_keyframe_seek_args(
     thumb_size: [u32; 2],
     temp_dir: &Path,
 ) -> Vec<OsString> {
-    filmstrip_seek_args(source, frames, thumb_size, temp_dir, true)
+    filmstrip_seek_args(source, frames, thumb_size, temp_dir, true, false)
 }
 
 fn filmstrip_seek_args(
@@ -271,6 +274,9 @@ fn filmstrip_seek_args(
     thumb_size: [u32; 2],
     temp_dir: &Path,
     keyframes_only: bool,
+    // The exact picture: every frame before the seek point is decoded and dropped
+    // (accurate seek); a filmstrip takes the nearest one instead.
+    accurate: bool,
 ) -> Vec<OsString> {
     let mut args = vec![
         OsString::from("-hide_banner"),
@@ -288,7 +294,9 @@ fn filmstrip_seek_args(
     for frame in frames {
         args.push(OsString::from("-ss"));
         args.push(OsString::from(format_decimal(frame.seek_sec, 6)));
-        args.push(OsString::from("-noaccurate_seek"));
+        if !accurate {
+            args.push(OsString::from("-noaccurate_seek"));
+        }
         if keyframes_only {
             args.push(OsString::from("-skip_frame"));
             args.push(OsString::from("nokey"));

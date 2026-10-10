@@ -1,0 +1,13 @@
+[package]
+name = "qnc-trim-stills"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: decodes the edit pictures of a trim (the exact frames beside a moved slot or marker) in the background through the decoder catalog, from the media the project plays; cached, the newest draft first; no player, no probe, no database write"
+
+[dependencies]
+qnc-decoder-catalog = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-frame-timebase = { workspace = true }
+qnc-image-assets = { workspace = true }
+qnc-program-view = { workspace = true }
+qnc-source-preview = { workspace = true }

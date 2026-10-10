@@ -597,3 +597,16 @@ fn ctrl_s_takes_the_slot_and_the_arrows_move_it_with_both_markers_up_to_the_next
     assert_eq!(frames(&segments), vec![0, 15, 33, 40], "Escape drops the move");
     assert!(!segments.handles("step_forward_frame"), "the arrows go back to the playhead");
 }
+
+#[test]
+fn a_taken_slot_shows_the_four_edit_pictures_and_a_taken_marker_two() {
+    let mut segments = component();
+    assert!(segments.view().edit_stills.is_empty(), "nothing taken, no pictures");
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::SelectSlotAtPlayhead);
+    segments.apply_action("step_forward_frame");
+    let marks: Vec<_> = segments.view().edit_stills.iter().map(|still| (still.marker_frame, still.after)).collect();
+    assert_eq!(marks, vec![(16, false), (16, true), (34, false), (34, true)]);
+    segments.apply_action("clear_focus");
+    assert!(segments.view().edit_stills.is_empty());
+}

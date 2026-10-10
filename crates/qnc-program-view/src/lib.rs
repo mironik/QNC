@@ -3,7 +3,10 @@
 //! or a piece asks of it. Pure: it reads nothing and writes nothing; the program model
 //! (`qnc-program-segments`) gives it the stored rows (split out of it, audit 2026-10-10).
 
+mod edit_stills;
 mod markers;
+
+pub use edit_stills::{edit_stills, EditStill, StillPicture};
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
@@ -76,6 +79,9 @@ pub struct SegmentsView {
     pub slots: Vec<Slot>,
     /// Covers by program frame.
     pub covers: Vec<CoverSpan>,
+    /// The pictures on both sides of an edit being moved (a slot, a marker), from the
+    /// draft; their images are filled in by whoever decodes them (user 2026-10-10).
+    pub edit_stills: Vec<EditStill>,
     /// Sync/B-roll is on.
     pub sync_enabled: bool,
     /// Pokrivalice was chosen (user 2026-10-10: at first neither way is chosen).

@@ -8,6 +8,8 @@
 //! project content (public views), media record, player launch.
 
 mod content;
+mod still_media;
+pub use still_media::{LocatedPicture, StillLocator};
 
 use std::{sync::Arc, time::Duration};
 

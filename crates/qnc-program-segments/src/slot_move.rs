@@ -29,6 +29,19 @@ impl SlotMove {
 }
 
 impl ProgramSegments {
+    /// The markers a draft moves, (stored frame, draft frame): both of a taken slot, or
+    /// the marker taken with Ctrl+M. The edit pictures are shown beside them.
+    pub(crate) fn edit_moves(&self) -> Vec<(u64, u64)> {
+        if let Some(slot) = &self.slot_move {
+            return [slot.start, slot.end].iter().map(|frame| (*frame, slot.moved(*frame))).collect();
+        }
+        let marker = self.marker_edit.as_ref().and_then(|(id, draft)| {
+            let stored = self.stored_markers.iter().find(|marker| &marker.marker_id == id)?;
+            Some((stored.program_frame, *draft))
+        });
+        marker.into_iter().collect()
+    }
+
     /// Ctrl+S took this slot: the arrows move it from now on.
     pub(crate) fn take_slot_move(&mut self, slot_id: &str) {
         self.slot_move = self

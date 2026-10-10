@@ -17,7 +17,7 @@ pub use source_lanes::{source_lane_choice, source_wave_over_video};
 use eframe::egui::{self, Color32, RichText, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentRow, SegmentsView};
 use qnc_timeline::{
-    AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent,
+    AudioLane, TimelineCoverSpan, TimelineEditStill, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineStillImage,
     TimelineLayerFlags, TimelineMarkerPin, TimelineMetrics, TimelineProjection, TimelineSlotSpan,
     TimelineTheme, TimelineVirtualSpan,
 };
@@ -125,7 +125,7 @@ pub fn show(
                 // click area, so rows sharing one id would lose their clicks.
                 let overview = ui
                     .push_id("qnc_segment_program_overview", |ui| {
-                        paint_program(ui, segments, (0, total), timeline_theme, true)
+                        paint_program(ui, segments, (0, total), timeline_theme, (true, false))
                     })
                     .inner;
                 command = command.take().or(overview);
@@ -187,7 +187,7 @@ fn paint_row(
 ) -> Option<SegmentCommand> {
     let window = (row.start_frame, row.end_frame);
     ui.push_id(("qnc_segment_row", &row.segment_id), |ui| {
-        paint_program(ui, segments, window, theme, row.start_frame == 0)
+        paint_program(ui, segments, window, theme, (row.start_frame == 0, true))
     })
     .inner
 }
@@ -198,7 +198,7 @@ fn paint_program(
     segments: &SegmentsView,
     (start, end): (u64, u64),
     theme: TimelineTheme,
-    lane_labels: bool,
+    (lane_labels, with_stills): (bool, bool),
 ) -> Option<SegmentCommand> {
     let duration = end.saturating_sub(start).max(1);
     let local = |frame: u64| frame.clamp(start, end) - start;
@@ -266,6 +266,34 @@ fn paint_program(
     // v5 `local_peaks_for_row`: this row's part of the program wave.
     let row_wave = |program: &[f32]| qnc_program_waveform::row_peaks(program, segments.total_frames, start, end);
     let (a1, a2) = (row_wave(&segments.peaks.a1), row_wave(&segments.peaks.a2));
+    // The edit pictures of a moved slot or marker, on the segment rows: the one before a
+    // marker on the row it ends, the one after on the row it starts (a border marker
+    // has one on each).
+    let still_ids: Vec<String> = segments
+        .edit_stills
+        .iter()
+        .map(|still| still.picture.as_ref().map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame)))
+        .collect();
+    let stills = segments
+        .edit_stills
+        .iter()
+        .zip(&still_ids)
+        .filter(|(still, _)| {
+            let frame = still.marker_frame;
+            with_stills && if still.after { start <= frame && frame < end } else { start < frame && frame <= end }
+        })
+        .map(|(still, id)| TimelineEditStill {
+            frame: local(still.marker_frame),
+            after: still.after,
+            black: still.picture.is_none(),
+            image: still.image.as_deref().map(|image| TimelineStillImage {
+                id,
+                content_key: image.content_key,
+                size: image.size,
+                pixels: &image.pixels,
+            }),
+        })
+        .collect::<Vec<_>>();
     let no_picture = segments
         .segment_at(start)
         .is_some_and(|row| !row.kind.has_base_video() && row.end_frame >= end);
@@ -299,6 +327,7 @@ fn paint_program(
             a1_channel: None,
             a2_channel: None,
             wave_over_video: None,
+            edit_stills: &stills,
         },
     );
     // Story rows only: a dragged M marker follows the pointer as a draft (Enter confirms).

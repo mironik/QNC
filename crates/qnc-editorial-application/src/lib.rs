@@ -88,6 +88,7 @@ pub struct EditorialApplication {
     project_dir: Option<std::path::PathBuf>,
     /// IN/OUT a clip opens with (a short, an edited segment) once its timeline is ready.
     pending_marks: qnc_pending_marks::PendingMarks,
+    trim_stills: qnc_trim_stills::TrimStills,
     short_stills: VirtualShortStillCache,
     segments: qnc_program_segments::ProgramSegments,
     wrap: qnc_wrap_session::WrapSession,
@@ -110,6 +111,7 @@ impl Default for EditorialApplication {
             current_settings: None,
             project_dir: None,
             pending_marks: qnc_pending_marks::PendingMarks::new(),
+            trim_stills: qnc_trim_stills::TrimStills::new(),
             short_stills: VirtualShortStillCache::default(),
             segments: qnc_program_segments::ProgramSegments::new(),
             wrap: qnc_wrap_session::WrapSession::new(),
@@ -167,13 +169,10 @@ impl EditorialApplication {
 
     /// Delay until the next repaint that this surface needs, if any.
     pub fn next_repaint_delay(&self) -> Option<Duration> {
-        if let Some(delay) = self.preview.next_repaint_delay() {
-            return Some(delay);
-        }
-        (self.load_result.is_some()
-            || self.posters.has_pending_work()
-            || self.segments.has_pending_work() || self.segments.reading())
-        .then(|| Duration::from_millis(15)) // a written story shows within a frame or two
+        let busy = self.load_result.is_some() || self.posters.has_pending_work() || self.trim_stills.loading();
+        let busy = busy || self.segments.has_pending_work() || self.segments.reading();
+        // A written story or an edit picture shows within a frame or two.
+        self.preview.next_repaint_delay().or_else(|| busy.then(|| Duration::from_millis(15)))
     }
 
     fn fail(&mut self, error: String) {
@@ -275,6 +274,7 @@ impl EditorialApplication {
         self.segments.set_playhead(Some(self.wrap.playhead()));
         self.view.focus = self.focus.panel();
         self.view.segments = self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames)));
+        self.trim_stills.fill(&mut self.view.segments.edit_stills, self.preview.still_locator()); // edit pictures
     }
 
 

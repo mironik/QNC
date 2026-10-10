@@ -992,6 +992,7 @@ impl ProgramSegments {
         view.playhead = self.playhead;
         view.message = message;
         view.editing = self.editing.clone();
+        view.edit_stills = qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves());
         self.lane_view(&mut view);
         self.view = view;
     }
