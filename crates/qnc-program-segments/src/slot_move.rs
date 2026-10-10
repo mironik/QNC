@@ -1,8 +1,9 @@
 //! Moving a slot (user 2026-10-10, not in v5): Ctrl+S takes the slot under the Wrap
 //! playhead; the arrows move it a frame, with both its M markers, so it keeps its
 //! length and its cover and a neighbouring slot grows or shrinks; it stops before a
-//! neighbouring marker and never moves the locked start or end. The Wrap playhead
-//! shows the slot's first frame. Enter writes it (`MoveSlot`), Escape drops it.
+//! neighbouring marker and never moves the locked start or end. The Wrap playhead stays
+//! where it is (user 2026-10-10): the trim zoom shows the edit pictures. Enter writes it
+//! (`MoveSlot`), Escape drops it.
 
 use qnc_program_db::Operation;
 
@@ -95,7 +96,6 @@ impl ProgramSegments {
         }
         self.slot_move = Some(SlotMove { shift, ..slot });
         self.refresh_view("Slot: strelice lijevo/desno pomak, Enter potvrda, Esc odustani".into());
-        self.cue_program(start);
         true
     }
 

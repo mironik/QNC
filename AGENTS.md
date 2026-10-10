@@ -3352,3 +3352,5 @@ Popravak 2026-10-10 (korisnik: slike izvan slota nisu dobre na strelicama): nacr
 drzao na staroj duljini, a baza (`rebind_covers`) pokrivalicu uvijek vezuje na cijeli slot i ona pusta izvor od IN
 koliko je slot dug. Sada i nacrt (`qnc-program-view` `cover_picture`): pokrivalica pokriva cijeli pomaknuti slot,
 pa zadnja slika produljenog prethodnog slota je nastavak njegove pokrivalice, a ne segment ispod. Testovi.
+Popravak 2026-10-10 (korisnik: "kad selektiram slot i pomaknem strelicu, playhead uvijek skoci na pocetak slota"):
+pomak slota vise ne pomice Wrap playhead (`qnc-program-segments` `slot_move.rs`); slike reza su u trim prozoru.
