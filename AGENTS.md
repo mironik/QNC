@@ -3340,3 +3340,11 @@ marker, Ctrl+I/O rub segmenta), u sredini ekrana je prozor s tim slikama velikim
 nazivom, crta na mjestu markera; Enter/Esc ga zatvara. Nazivi slika dolaze iz `qnc-program-view`
 (`EditStill::labelled`) i `qnc-program-segments`. Ploca Storyja ga zove jednim retkom (C10 379). Nova tipka nije
 dodana.
+Popravak 2026-10-10 (korisnik: "ne generiraju se slicice"; "prilikom rada strelicama ne mijenjaju se slike"): log je
+pokazao da su trazene slike tocne, ali je svaka nova trebala 0,5-1 s (svaki posao ponovno je citao bazu za klip i
+pokretao ffmpeg za jednu sliku), a zapeli posao (bez ffmpega) je zauvijek blokirao sljedece. `qnc-trim-stills`:
+lokacija klipa se cita jednom po klipu; jedan prolaz dekodera izvlaci 17 uzastopnih slika oko trazene
+(`extract_run_with_cancel` u `qnc-decoder-catalog`, `extract_frame_run_with_cancel` u `qnc-ffmpeg-decode`), pa su
+koraci strelicom unutar +-8 slika iz memorije (cache 160); posao dulji od 8 s se prekida (ffmpeg se gasi) i krece
+sljedeci; log biljezi trazene slike i trajanje svakog prolaza. Izmjereno s kartice: 17 slika 1,2 s, slika 196 klipa
+2686 jednaka referenci.

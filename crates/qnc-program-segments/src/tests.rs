@@ -633,3 +633,42 @@ fn a_taken_segment_edge_shows_its_pictures_on_the_source_timeline() {
     segments.set_source(pick((498, 510)), None);
     assert!(segments.view().source_edit_stills.is_empty(), "Escape drops the edge");
 }
+
+#[test]
+fn a_moved_slot_takes_its_cover_with_it_in_the_edit_pictures() {
+    let mut segments = component();
+    let cover = |id: &str, slot: &str, (start, end): (u64, u64), clip: &str| qnc_program_db::ProgramCover {
+        cover_id: id.into(),
+        slot_id: slot.into(),
+        clip_id: clip.into(),
+        virtual_shot_id: format!("{clip}_broll"),
+        program_start_frame: start,
+        program_end_frame: end,
+        source_in_frame: 1000,
+        source_out_frame: 1000 + (end - start),
+        fps_num: 50,
+        fps_den: 1,
+        a2_source_channel: 1,
+    };
+    segments.stored_covers = vec![
+        cover("c0", "S|m1", (0, 15), "prev"),
+        cover("c1", "m1|m2", (15, 33), "own"),
+        cover("c2", "m2|E", (33, 40), "next"),
+    ];
+    segments.refresh_view(String::new());
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::SelectSlotAtPlayhead);
+    segments.apply_action("step_forward_frame");
+    segments.apply_action("step_forward_frame");
+    let pictures: Vec<_> = segments
+        .view()
+        .edit_stills
+        .iter()
+        .map(|still| still.picture.as_ref().map(|p| (p.clip_id.clone(), p.source_frame)))
+        .collect();
+    // The slot is 17..35 now: the slot before ends on the Off segment (its cover is 15 long).
+    assert_eq!(
+        pictures,
+        vec![None, Some(("own".into(), 1000)), Some(("own".into(), 1017)), Some(("next".into(), 1000))]
+    );
+}

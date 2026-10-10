@@ -85,6 +85,31 @@ impl LocalFilmstripExtractor {
         )
     }
 
+    /// `count` consecutive pictures from the exact picture at `start_sec` (one decoder
+    /// pass), as `000.jpg`, `001.jpg`... in `temp_dir`: the edit pictures around a trim.
+    pub fn extract_run_with_cancel(
+        &self,
+        source: &Path,
+        start_sec: f64,
+        count: u32,
+        thumb_size: [u32; 2],
+        temp_dir: &Path,
+        cancel: &AtomicBool,
+    ) -> std::result::Result<(), String> {
+        match &self.deployment.driver {
+            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } => qnc_ffmpeg_decode::extract_frame_run_with_cancel(
+                &self.deployment.executable,
+                source,
+                start_sec,
+                count,
+                thumb_size,
+                temp_dir,
+                cancel,
+            ),
+            Driver::QncPacketsV1 { .. } => Err("selected decoder does not provide local picture extraction".into()),
+        }
+    }
+
     pub fn extract_frames_with_cancel(
         &self,
         source: &Path,

@@ -199,6 +199,53 @@ pub fn extract_filmstrip_frames_with_cancel(
     run_filmstrip_command(executable, args, cancel)
 }
 
+/// `count` consecutive pictures from the exact picture at `start_sec` in one decoder
+/// pass (accurate seek), as `000.jpg`... in `temp_dir`; fewer at the end of the media.
+pub fn extract_frame_run_with_cancel(
+    executable: &Path,
+    source: &Path,
+    start_sec: f64,
+    count: u32,
+    thumb_size: [u32; 2],
+    temp_dir: &Path,
+    cancel: &AtomicBool,
+) -> std::result::Result<(), String> {
+    if !source.is_file() {
+        return Err(format!("media does not exist: {}", source.display()));
+    }
+    let args: Vec<OsString> = vec![
+        "-hide_banner".into(),
+        "-loglevel".into(),
+        "error".into(),
+        "-nostdin".into(),
+        "-y".into(),
+        "-noautorotate".into(),
+        "-ss".into(),
+        format_decimal(start_sec.max(0.0), 6).into(),
+        "-i".into(),
+        source.as_os_str().to_owned(),
+        "-map".into(),
+        "0:v:0".into(),
+        "-an".into(),
+        "-sn".into(),
+        "-dn".into(),
+        "-frames:v".into(),
+        count.max(1).to_string().into(),
+        "-vf".into(),
+        filmstrip_scale_filter(thumb_size).into(),
+        "-q:v".into(),
+        "3".into(),
+        "-pix_fmt".into(),
+        "yuvj420p".into(),
+        "-strict".into(),
+        "unofficial".into(),
+        "-start_number".into(),
+        "0".into(),
+        temp_dir.join("%03d.jpg").into_os_string(),
+    ];
+    run_filmstrip_command(executable, args, cancel)
+}
+
 fn run_filmstrip_command(
     executable: &Path,
     args: Vec<OsString>,
