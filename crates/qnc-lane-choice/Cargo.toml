@@ -1,0 +1,7 @@
+[package]
+name = "qnc-lane-choice"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the source channel heard on A1 and on A2 of the next segment or cover, a lane taken with the keyboard and its draft, and the large wave over the video row. Its own state only: no database, no player, no form."
+
+[dependencies]

@@ -3241,3 +3241,13 @@ javnu kocku `crates/qnc-paint-pace` (+ `contracts/modules/paint-pace.module.json
 Brojke: Story ploca 450 -> 382 redaka, Story forma 96 -> 88, Ingest forma 89 -> 79, C4 u obje forme 2 -> 1.
 Nije izvedeno (sljedeci koraci 3 i 4): podjela `qnc-program-segments`, ciscenje Ingest ploce (tekstovi, gumbi,
 `format_duration`) i Project ploce (uredjivanje postavki, 101 tekst u kodu; trazi otkljucavanje Projecta).
+Korak 3 audita 2026-10-10 (korisnik "ok, kreni s 3"): `qnc-program-segments` (`lib.rs` 1547 redaka, upravljac cijele
+price) podijeljen je po odgovornostima u tri nove javne kocke, s ugovorima modula: `crates/qnc-program-commands`
+(naredbe price, vrsta segmenta Ton/Off i jedino preslikavanje `action_id` -> naredba; bez stanja),
+`crates/qnc-program-view` (prikaz price iz zapisa baze: redovi, dijelovi taba Segment, markeri i slotovi (`markers.rs`
+preseljen), pokrivalice s izvornim slikama koje pustaju (`cover_spans`), oznake trajanja, pitanja nad prikazom; bez
+stanja, bez baze) i `crates/qnc-lane-choice` (kanal na A1 i A2, uzeta traka i nacrt, veliki val; svoje stanje, bez
+baze). `qnc-program-segments` ostaje upravljac (stanje, citanje i upis price kroz posrednika baze, slaganje) i
+izvozi sve pod istim imenima, pa forme i ostale kocke nisu mijenjane. `lib.rs` 1547 -> 1039 redaka. Ponasanje isto:
+testovi `qnc-program-segments` (27, ukljucujuci A1/A2 tipkovnicu), `qnc-program-view` (11), `qnc-lane-choice`,
+`qnc-segment-panel`, `qnc-editorial-application`, `qnc-panel-focus`, conformance, `cargo check -p qnc-app`.

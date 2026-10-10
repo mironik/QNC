@@ -1,88 +1,67 @@
-//! A1 and A2 by keyboard (user rule 2026-10-01, no mouse needed): Ctrl+1 or Ctrl+2
-//! takes the lane and opens its channel picker; left/right choose the source channel
-//! (a draft), Enter keeps it, Escape drops it; up shows the lane's wave over the whole
-//! video row at once, down hides it (display only, the sound is not changed).
+//! A1 and A2 by keyboard (user rule 2026-10-01, no mouse needed): the lane state and its
+//! rules are the piece `qnc-lane-choice`; here the program model tells the user what a
+//! taken lane does and refreshes its view.
 
 use crate::ProgramSegments;
-
-/// One press opens the wave over the whole video row, one press closes it (user rule
-/// 2026-10-01: not step by step, at once to the maximum).
-const MAX_WAVE_ZOOM: u8 = 1;
 
 impl ProgramSegments {
     /// Ctrl+1 (lane 0) or Ctrl+2 (lane 1): the lane is taken with its channel as draft.
     pub fn take_lane(&mut self, lane: u8) -> bool {
-        let Some(count) = self.source_channels.filter(|count| *count > 0) else {
+        if !self.lanes.take(lane) {
             self.refresh_view("Klip nema poznate audio kanale.".into());
             return false;
-        };
-        let current = if lane == 0 { self.a1_channel } else { self.a2_channel };
-        self.lane_taken = Some((lane, current.min(count - 1)));
+        }
         let name = if lane == 0 { "A1" } else { "A2" };
         self.refresh_view(format!("{name}: lijevo/desno kanal, gore/dolje prikaz vala, Enter sprema, Esc odustaje"));
         true
     }
 
     pub fn lane_is_taken(&self) -> bool {
-        self.lane_taken.is_some()
+        self.lanes.taken().is_some()
     }
 
     /// Left/right: the draft channel of the taken lane, within the clip's channels.
     pub fn lane_draft(&mut self, delta: i64) -> bool {
-        let (Some((lane, draft)), Some(count)) = (self.lane_taken, self.source_channels) else {
-            return false;
-        };
-        let next = (i64::from(draft) + delta).clamp(0, i64::from(count) - 1) as u16;
-        self.lane_taken = Some((lane, next));
-        self.view.lane_taken = self.lane_taken;
-        true
+        let moved = self.lanes.draft(delta);
+        self.view.lane_taken = self.lanes.taken();
+        moved
     }
 
     /// Up opens the wave of the taken lane over the video row, down closes it; the lane
-    /// is let go with its channel unchanged, so the arrows move the playhead again and
-    /// cutting goes by the large wave (user rule 2026-10-01).
+    /// is let go with its channel unchanged (user rule 2026-10-01).
     pub fn lane_zoom(&mut self, delta: i8) -> bool {
-        let Some((lane, _)) = self.lane_taken.take() else {
-            return false;
-        };
-        let level = &mut self.wave_zoom[usize::from(lane)];
-        *level = level.saturating_add_signed(delta).min(MAX_WAVE_ZOOM);
-        self.refresh_view(String::new());
-        true
+        let zoomed = self.lanes.zoom(delta);
+        if zoomed {
+            self.refresh_view(String::new());
+        }
+        zoomed
     }
 
     /// Down with no lane taken: the open large wave closes.
     pub fn close_wave(&mut self) -> bool {
-        if self.wave_zoom == [0, 0] {
-            return false;
+        let closed = self.lanes.close_wave();
+        if closed {
+            self.refresh_view(String::new());
         }
-        self.wave_zoom = [0, 0];
-        self.refresh_view(String::new());
-        true
+        closed
     }
 
     /// Enter: the draft becomes the lane's channel; the lane is let go.
     pub fn commit_lane(&mut self) -> bool {
-        let Some((lane, draft)) = self.lane_taken.take() else {
-            return false;
-        };
-        self.lane_committed = Some(std::time::Instant::now());
-        if lane == 0 {
-            self.choose_a1_channel(draft);
-        } else {
-            self.choose_a2_channel(draft);
+        let committed = self.lanes.commit();
+        if committed {
+            self.refresh_view(String::new());
         }
-        self.refresh_view(String::new());
-        true
+        committed
     }
 
     /// Escape: the lane is let go, its channel unchanged.
     pub fn release_lane(&mut self) -> bool {
-        if self.lane_taken.take().is_none() {
-            return false;
+        let released = self.lanes.release();
+        if released {
+            self.refresh_view(String::new());
         }
-        self.refresh_view(String::new());
-        true
+        released
     }
 }
 

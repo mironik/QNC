@@ -12,7 +12,7 @@ const SAME_ENTER: std::time::Duration = std::time::Duration::from_millis(150);
 impl ProgramSegments {
     /// Enter on the source timeline: the lane, the segment edit or Sync, in that order.
     pub fn confirm_source(&mut self) -> bool {
-        let confirmed = if self.lane_taken.is_some() {
+        let confirmed = if self.lanes.taken().is_some() {
             self.commit_lane()
         } else if self.editing.is_some() {
             self.commit_edit()
@@ -25,7 +25,7 @@ impl ProgramSegments {
             false
         };
         if confirmed {
-            self.lane_committed = Some(std::time::Instant::now());
+            self.lanes.mark_committed();
         }
         confirmed
     }
@@ -38,10 +38,10 @@ impl ProgramSegments {
     /// Something on the source timeline waits for Enter, or this Enter confirmed it:
     /// the same Enter saves no virtual shot.
     pub fn source_waits_enter(&self) -> bool {
-        self.lane_taken.is_some()
+        self.lanes.taken().is_some()
             || self.editing.is_some()
             || self.sync.is_active()
             || self.sync.holds_enter()
-            || self.lane_committed.is_some_and(|at| at.elapsed() < SAME_ENTER)
+            || self.lanes.committed_within(SAME_ENTER)
     }
 }

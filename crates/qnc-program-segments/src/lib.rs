@@ -15,12 +15,15 @@ mod edit;
 mod lanes;
 mod nav;
 mod marker_edit;
-mod markers;
 mod sync;
 
-pub use markers::{
-    check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
-    program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot,
+// The view and the commands are their own pieces (audit 2026-10-10); this model keeps
+// the state, reads and writes the story and composes them.
+pub use qnc_program_commands::{SegmentCommand, SegmentKind};
+pub use qnc_program_view::{
+    check_move, cover_spans, duration_color_key, duration_label, first_empty_slot,
+    neighbour_marker, neighbour_segment, neighbour_slot, program, program_frame, resolve,
+    slot_at, slots, source_at, CoverSpan, MarkerPin, SegmentPart, SegmentRow, SegmentsView, Slot,
 };
 
 pub use qnc_sync_cover::SyncPreview;
@@ -52,94 +55,6 @@ struct NewCover {
 pub const MODULE_ID: &str = "qnc.module.program-segments";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Ton carries its picture and sound; Off only its sound (the picture comes later
-/// from covers, black until then). Both are heard on A1; covers on A2.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SegmentKind {
-    Ton,
-    Off,
-}
-
-impl SegmentKind {
-    fn db(self) -> &'static str {
-        match self {
-            Self::Ton => "tonovi",
-            Self::Off => "offovi",
-        }
-    }
-
-    fn from_db(value: &str) -> Option<Self> {
-        match value {
-            "tonovi" => Some(Self::Ton),
-            "offovi" => Some(Self::Off),
-            _ => None,
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Ton => "Ton",
-            Self::Off => "Off",
-        }
-    }
-
-    pub fn has_base_video(self) -> bool {
-        self == Self::Ton
-    }
-}
-
-/// A segment placed on the program axis.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SegmentRow {
-    pub segment_id: String,
-    pub kind: SegmentKind,
-    pub clip_id: String,
-    pub source_in_frame: u64,
-    pub source_out_frame: u64,
-    /// Source channel heard on A1 (zero based).
-    pub a1_source_channel: u16,
-    /// Program frames `[start, end)`: segments follow each other without gaps.
-    pub start_frame: u64,
-    pub end_frame: u64,
-    /// Seconds and frames, e.g. `12:07`.
-    pub duration_label: String,
-    /// `under_3`, `under_5`, `under_7` or `over_7` seconds (v5 duration marks).
-    pub duration_color_key: &'static str,
-    pub selected: bool,
-}
-
-impl SegmentRow {
-    pub fn duration_frames(&self) -> u64 {
-        self.end_frame - self.start_frame
-    }
-}
-
-/// One row of the Segment tab (v5 `segment_parts`): every segment in stored
-/// order, deleted ones greyed (`active` false) and not clickable.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SegmentPart {
-    pub segment_id: String,
-    pub kind: SegmentKind,
-    pub duration_label: String,
-    pub active: bool,
-    pub selected: bool,
-}
-
-/// A cover on the program axis: drawn over its slot (v5 `segment_timeline_covers`).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CoverSpan {
-    pub cover_id: String,
-    pub slot_id: String,
-    pub start_frame: u64,
-    pub end_frame: u64,
-    pub selected: bool,
-    /// The clip the cover plays, its source IN/OUT and the channel heard on A2.
-    pub clip_id: String,
-    pub source_in_frame: u64,
-    pub source_out_frame: u64,
-    pub a2_source_channel: u16,
-}
-
 /// The source the user marked for Talking Head, Voice over and covers: the chosen
 /// clip, its confirmed IN/OUT and the timebase the player confirmed.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -169,393 +84,6 @@ impl SourcePick {
             duration_frames,
             timebase,
         }
-    }
-}
-
-/// What a form shows: the program in order, its markers and slots, timebase,
-/// length and the program playhead confirmed by the player.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SegmentsView {
-    pub rows: Vec<SegmentRow>,
-    /// The Segment tab list, deleted segments included.
-    pub parts: Vec<SegmentPart>,
-    pub markers: Vec<MarkerPin>,
-    pub slots: Vec<Slot>,
-    /// Covers by program frame.
-    pub covers: Vec<CoverSpan>,
-    /// Sync/B-roll is on.
-    pub sync_enabled: bool,
-    /// Story timebase (`num`, `den`); `None` while the program is empty.
-    pub timebase: Option<(u32, u32)>,
-    pub total_frames: u64,
-    /// Program frame of the confirmed player picture in the Wrap view.
-    pub playhead: Option<u64>,
-    /// Story edits that UNDO and REDO can take back and replay (from the database).
-    pub undo_depth: u64,
-    pub redo_depth: u64,
-    /// Last controlled error of a read or write; empty otherwise.
-    pub message: String,
-    /// The segment being edited (Edit in the Segment tab), until Enter or Escape.
-    pub editing: Option<String>,
-    /// The program wave (A1 segments, A2 covers) from the stored clip waves.
-    pub peaks: qnc_program_waveform::ProgramPeaks,
-    /// The source channel (zero based) heard on A1 in the next Talking Head / Voice
-    /// over and how many channels the marked clip has; `None` without a count.
-    pub a1_choice: Option<(u16, u16)>,
-    /// The same for A2 in the next cover, its own choice.
-    pub a2_choice: Option<(u16, u16)>,
-    /// A1 (0) or A2 (1) taken with the keyboard and its draft channel (zero based).
-    pub lane_taken: Option<(u8, u16)>,
-    /// Display gain level of the A1 and A2 wave over the video row (0: not shown).
-    pub wave_zoom: [u8; 2],
-}
-
-impl SegmentsView {
-    pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
-    }
-
-    /// Where each clip sounds in the program: segments on A1, covers on A2.
-    pub fn wave_placements(&self) -> (Vec<qnc_program_waveform::Placement>, Vec<qnc_program_waveform::Placement>) {
-        let segments = self.rows.iter().map(|row| qnc_program_waveform::Placement {
-            clip_id: row.clip_id.clone(),
-            channel: row.a1_source_channel,
-            program_start: row.start_frame,
-            program_end: row.end_frame,
-            source_in: row.source_in_frame,
-            source_out: row.source_out_frame,
-        });
-        let covers = self.covers.iter().map(|cover| qnc_program_waveform::Placement {
-            clip_id: cover.clip_id.clone(),
-            channel: cover.a2_source_channel,
-            program_start: cover.start_frame,
-            program_end: cover.end_frame,
-            source_in: cover.source_in_frame,
-            source_out: cover.source_out_frame,
-        });
-        (segments.collect(), covers.collect())
-    }
-
-    pub fn selected(&self) -> Option<&SegmentRow> {
-        self.rows.iter().find(|row| row.selected)
-    }
-
-    pub fn selected_marker(&self) -> Option<&MarkerPin> {
-        self.markers.iter().find(|pin| pin.selected)
-    }
-
-    pub fn selected_slot(&self) -> Option<&Slot> {
-        self.slots.iter().find(|slot| slot.selected)
-    }
-
-    pub fn selected_cover(&self) -> Option<&CoverSpan> {
-        self.covers.iter().find(|cover| cover.selected)
-    }
-
-    /// Whether a program action can run now: B needs an empty selected slot,
-    /// Overwrite a selected slot or cover; the others are always offered.
-    pub fn action_enabled(&self, action_id: &str) -> bool {
-        match SegmentCommand::from_action(action_id) {
-            Some(SegmentCommand::Cover { overwrite: false }) => self.quick_cover_slot().is_ok(),
-            Some(SegmentCommand::Cover { overwrite: true }) => self.overwrite_cover_slot().is_ok(),
-            Some(SegmentCommand::Undo) => self.undo_depth > 0,
-            Some(SegmentCommand::Redo) => self.redo_depth > 0,
-            _ => true,
-        }
-    }
-
-    /// Which of the two ways to make covers is on: Pokrivalice or Sync/B-roll.
-    pub fn action_selected(&self, action_id: &str) -> bool {
-        match SegmentCommand::from_action(action_id) {
-            Some(SegmentCommand::CoverMode { sync }) => self.sync_enabled == sync,
-            _ => false,
-        }
-    }
-
-    /// Whether an action belongs to the program.
-    pub fn handles(&self, action_id: &str) -> bool {
-        SegmentCommand::from_action(action_id).is_some()
-    }
-
-    /// v5 `quick_cover_target`: the selected slot, while it has no cover.
-    pub fn quick_cover_slot(&self) -> Result<&Slot, String> {
-        let slot = self
-            .selected_slot()
-            .ok_or("Odaberi marker slot za pokrivalicu")?;
-        if slot.has_cover {
-            return Err("Odabrani marker slot već ima pokrivalicu".into());
-        }
-        Ok(slot)
-    }
-
-    /// v5 `overwrite_cover_target`: the selected slot, else the selected cover's slot.
-    pub fn overwrite_cover_slot(&self) -> Result<&str, String> {
-        self.selected_slot()
-            .map(|slot| slot.slot_id.as_str())
-            .or_else(|| self.selected_cover().map(|cover| cover.slot_id.as_str()))
-            .ok_or_else(|| "Odaberi marker slot za pokrivalicu".into())
-    }
-
-    /// The segment that holds a program frame; at or after the end, the last one.
-    pub fn segment_at(&self, program_frame: u64) -> Option<&SegmentRow> {
-        self.rows
-            .iter()
-            .find(|row| (row.start_frame..row.end_frame).contains(&program_frame))
-            .or_else(|| {
-                self.rows
-                    .last()
-                    .filter(|_| program_frame >= self.total_frames)
-            })
-    }
-
-    /// `seconds:frames` of a program length in the story timebase.
-    pub fn label(&self, frames: u64) -> String {
-        self.timebase
-            .map(|(num, den)| duration_label(frames, num, den))
-            .unwrap_or_else(|| "--".into())
-    }
-
-    /// Program time as HH:MM:SS:FF from 00:00:00:00 (v5 segment panel header): the
-    /// internal timecode of the program; exports use the original source timecodes.
-    pub fn timecode(&self, frames: u64) -> String {
-        self.timebase
-            .map(|(num, den)| whole_fps(num, den))
-            .filter(|fps| *fps > 0)
-            .map(|fps| qnc_source_timecode::format_frames(frames, fps as u32))
-            .unwrap_or_else(|| qnc_source_timecode::UNKNOWN.into())
-    }
-}
-
-/// Builds the program: the stored order, one window after another, in story frames at
-/// the story rate (a source of twice or half that rate is counted in story frames).
-pub fn program(
-    segments: &[ProgramSegment],
-    selected: Option<&str>,
-    story_rate: Option<(u32, u32)>,
-) -> SegmentsView {
-    let timebase = story_rate.or_else(|| {
-        segments
-            .iter()
-            .find(|segment| segment.active && SegmentKind::from_db(&segment.kind).is_some())
-            .map(|first| (first.fps_num, first.fps_den))
-    });
-    let (rate_num, rate_den) = timebase.unwrap_or((0, 1));
-    let mut start = 0u64;
-    let mut rows = Vec::with_capacity(segments.len());
-    let mut parts = Vec::with_capacity(segments.len());
-    for segment in segments {
-        let Some(kind) = SegmentKind::from_db(&segment.kind) else {
-            continue;
-        };
-        let frames = segment.duration_frames;
-        parts.push(SegmentPart {
-            segment_id: segment.segment_id.clone(),
-            kind,
-            duration_label: duration_label(frames, rate_num, rate_den),
-            active: segment.active,
-            selected: segment.active && selected == Some(segment.segment_id.as_str()),
-        });
-        if !segment.active {
-            continue;
-        }
-        rows.push(SegmentRow {
-            segment_id: segment.segment_id.clone(),
-            kind,
-            clip_id: segment.clip_id.clone(),
-            source_in_frame: segment.in_frame,
-            source_out_frame: segment.out_frame,
-            a1_source_channel: segment.a1_source_channel,
-            start_frame: start,
-            end_frame: start + frames,
-            duration_label: duration_label(frames, rate_num, rate_den),
-            duration_color_key: duration_color_key(frames, rate_num, rate_den),
-            selected: selected == Some(segment.segment_id.as_str()),
-        });
-        start += frames;
-    }
-    SegmentsView {
-        parts,
-        timebase,
-        total_frames: start,
-        rows,
-        ..SegmentsView::default()
-    }
-}
-
-/// The source frame after the last one a cover plays: its slot length counted in its
-/// source rate (the story rate, twice it or half it); the stored OUT when the rates
-/// do not fit.
-fn played_source_out(cover: &ProgramCover, story_rate: Option<(u32, u32)>) -> u64 {
-    let slot = cover.program_end_frame.saturating_sub(cover.program_start_frame);
-    story_rate
-        .and_then(|rate| qnc_program_db::story_per_source(rate, (cover.fps_num, cover.fps_den)).ok())
-        .map_or(cover.source_out_frame, |(num, den)| {
-            cover.source_in_frame + (slot * den as u64).div_ceil(num as u64)
-        })
-}
-
-/// `seconds:frames` with the frame rate rounded to whole frames per second (v5).
-pub fn duration_label(frames: u64, fps_num: u32, fps_den: u32) -> String {
-    let fps = whole_fps(fps_num, fps_den);
-    if fps == 0 {
-        return "0:00".into();
-    }
-    format!("{}:{:02}", frames / fps, frames % fps)
-}
-
-/// v5 duration marks: 3, 5 and 7 seconds.
-pub fn duration_color_key(frames: u64, fps_num: u32, fps_den: u32) -> &'static str {
-    if fps_num == 0 || fps_den == 0 {
-        return "over_7";
-    }
-    let seconds = frames as f64 * f64::from(fps_den) / f64::from(fps_num);
-    match seconds {
-        s if s < 3.0 => "under_3",
-        s if s < 5.0 => "under_5",
-        s if s < 7.0 => "under_7",
-        _ => "over_7",
-    }
-}
-
-fn whole_fps(fps_num: u32, fps_den: u32) -> u64 {
-    if fps_den == 0 {
-        return 0;
-    }
-    (f64::from(fps_num) / f64::from(fps_den)).round().max(0.0) as u64
-}
-
-/// What a form, the navigation bar or the keyboard asks of the program.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SegmentCommand {
-    Select(String),
-    /// Previous (`up`) or next segment: select it and cue its start (arrows, ⏮ ⏭).
-    Step {
-        up: bool,
-    },
-    /// Isključi: the segment leaves the program and stays listed where it was.
-    Exclude(String),
-    /// Uključi: an excluded segment comes back where it was.
-    Include(String),
-    /// Izbriši: an excluded segment is removed for good.
-    Purge(String),
-    /// Replace: the segment takes the marked source (clip, IN/OUT) as its base
-    /// layer and its length; its kind stays (user rule 2026-09-25).
-    Replace(String),
-    /// Swap the selected segment with its neighbour (Up / Down).
-    Move {
-        up: bool,
-    },
-    /// The selected marker first, otherwise the selected segment (docs/94 section 2).
-    DeleteSelected,
-    SelectMarker(String),
-    /// A click on a slot: select it, playhead at the clicked program frame (v5
-    /// `SelectMarkerSlot { frame }`).
-    SelectSlot {
-        slot_id: String,
-        frame: u64,
-    },
-    /// Previous or next M marker from the playhead.
-    StepMarker {
-        up: bool,
-    },
-    /// Previous or next M-M slot.
-    StepSlot {
-        up: bool,
-    },
-    /// Cue the start of the program (🏠).
-    ProgramStart,
-    /// A program frame the user pointed at.
-    Cue(u64),
-    /// M: a new marker at the playhead, or the selected marker moved there (docs/94 7a).
-    Marker,
-    /// Talking Head (Ton) or Voice over (Off) from the marked source.
-    AddSegment(SegmentKind),
-    /// Cover slot / B (empty selected slot) or Overwrite / Shift+B from the marked source.
-    Cover {
-        overwrite: bool,
-    },
-    /// Ctrl+M: the selected (or nearest) marker into editing.
-    EditMarker,
-    /// Shift+M: always a new marker at the playhead, whatever is selected.
-    AddMarker,
-    /// Arrows while a marker is edited: its draft by frames.
-    NudgeMarker(i64),
-    /// A mouse drag of a marker: its draft on this program frame.
-    DragMarker {
-        marker_id: String,
-        frame: u64,
-    },
-    /// Escape while a marker is edited.
-    CancelMarkerEdit,
-    /// Edit (user rule 2026-10-01): the segment opens in the source timeline with its
-    /// IN/OUT; I/O move them, Enter writes them, Escape drops the edit.
-    Edit(String),
-    /// Escape while a segment is edited.
-    CancelEdit,
-    /// Ctrl+S (v5 `select_current_marker_slot`): the M-M slot under the playhead.
-    SelectSlotAtPlayhead,
-    /// Shift+S (v5 `focus_empty_marker_slot`): the first slot without a cover.
-    FocusEmptySlot,
-    /// Alt+arrows (v5 `navigate_adjacent_program_object`): the next or previous marker
-    /// when one is selected, else slot when one is selected, else segment.
-    NavigateObject { up: bool },
-    /// The Delete key (user rule 2026-09-25): only what was taken with Ctrl+
-    /// before (Ctrl+M: the marker) is deleted; a click never arms Delete.
-    DeleteFocused,
-    /// Sync/B-roll on or off.
-    ToggleSync,
-    /// How covers are made, one of two (user 2026-10-08): `sync: false` Pokrivalice
-    /// (Cover slot, B, Overwrite), `sync: true` Sync/B-roll.
-    CoverMode { sync: bool },
-    /// Enter: the cover of a closed Sync slot (v5 `sync_cover_enter_or_activate_focused_item`).
-    CommitSync,
-    /// A click on a cover: select it, playhead at the clicked program frame.
-    SelectCover {
-        cover_id: String,
-        frame: u64,
-    },
-    /// Ctrl+click on a cover (user rule 2026-09-25: Ctrl+ selects): the cover is
-    /// taken, Delete then removes it and Escape lets it go.
-    TakeCover {
-        cover_id: String,
-        frame: u64,
-    },
-    /// UNDO: the story as it was before the last edit (segments, markers, covers).
-    Undo,
-    /// REDO: the last undone story edit again.
-    Redo,
-}
-
-impl SegmentCommand {
-    /// The command behind a keyboard catalog `action_id`.
-    pub fn from_action(action_id: &str) -> Option<Self> {
-        Some(match action_id {
-            "add_marker" => Self::Marker,
-            // User rule (2026-09-25): Ctrl+key selects, Shift+key adds.
-            "add_marker_continue" => Self::AddMarker,
-            // One Delete press sends delete_part, delete_marker and delete_segment (both
-            // scopes); delete_marker holds every delete key in every preset, so only it
-            // deletes: one press, one delete (the marker, else the cover, else the segment).
-            "delete_marker" => Self::DeleteFocused,
-            "playlist_input_start" => Self::ProgramStart,
-            "step_prev_part" => Self::Step { up: true },
-            "step_next_part" => Self::Step { up: false },
-            "add_ton_segment" => Self::AddSegment(SegmentKind::Ton),
-            "add_off_segment" => Self::AddSegment(SegmentKind::Off),
-            "quick_overwrite_cover" => Self::Cover { overwrite: false },
-            "overwrite_cover" => Self::Cover { overwrite: true },
-            "activate_focused_item" => Self::CommitSync,
-            "select_marker" => Self::EditMarker,
-            "select_current_marker_slot" => Self::SelectSlotAtPlayhead,
-            "focus_empty_slot" => Self::FocusEmptySlot,
-            "navigate_prev_object" => Self::NavigateObject { up: true },
-            "navigate_next_object" => Self::NavigateObject { up: false },
-            "undo_object" => Self::Undo,
-            "redo_object" => Self::Redo,
-            "cover_mode_covers" => Self::CoverMode { sync: false },
-            "cover_mode_sync" => Self::CoverMode { sync: true },
-            _ => return None,
-        })
     }
 }
 
@@ -599,18 +127,9 @@ pub struct ProgramSegments {
     selected_cover: Option<String>,
     /// What Talking Head, Voice over and covers take from the source view.
     source: SourcePick,
-    /// The source channel chosen for A1 (user rule 2026-09-30, channel 1 by default)
-    /// and the channel count of the marked clip from its stored record.
-    a1_channel: u16,
-    /// The source channel chosen for A2 (covers): channel 2 by default (user rule
-    /// 2026-10-01), channel 1 for a clip with one channel.
-    a2_channel: u16,
-    source_channels: Option<u16>,
-    lane_taken: Option<(u8, u16)>,
-    wave_zoom: [u8; 2],
-    /// When Enter last kept a lane channel: the same Enter (its other catalog actions)
-    /// does nothing else.
-    lane_committed: Option<std::time::Instant>,
+    /// The channels heard on A1 and A2, a lane taken with the keyboard and the large
+    /// wave (piece `qnc-lane-choice`).
+    lanes: qnc_lane_choice::LaneChoice,
     channels: qnc_source_channels::SourceChannels,
     sync: qnc_sync_cover::SyncCover,
     /// IN was pressed since the last source (arms Sync).
@@ -727,12 +246,10 @@ impl ProgramSegments {
             .then_some(self.source.in_mark)
             .flatten();
         if self.source.clip_id != source.clip_id {
-            self.a1_channel = 0; // another clip: A1 on channel 1, A2 on channel 2 (user rule)
-            self.a2_channel = 1;
-            self.lane_taken = None;
+            self.lanes.new_clip(); // another clip: A1 on channel 1, A2 on channel 2 (user rule)
             self.view.lane_taken = None;
-            self.view.a1_choice = self.a1_choice();
-            self.view.a2_choice = self.a2_choice();
+            self.view.a1_choice = self.lanes.choice(0);
+            self.view.a2_choice = self.lanes.choice(1);
         }
         self.source = source;
         self.arm_sync_on_new_in(previous_in);
@@ -1154,7 +671,7 @@ impl ProgramSegments {
             out_frame,
             fps_num,
             fps_den,
-            a1_source_channel: self.a1_channel,
+            a1_source_channel: self.lanes.heard().0,
         });
     }
 
@@ -1185,7 +702,7 @@ impl ProgramSegments {
                 out_frame,
                 fps_num,
                 fps_den,
-                a2_source_channel: self.a2_channel,
+                a2_source_channel: self.lanes.heard().1,
             },
             clip_name,
         );
@@ -1437,81 +954,56 @@ impl ProgramSegments {
         ) {
             self.selected_cover = None;
         }
-        let story_rate = view.timebase;
-        view.covers = self
-            .stored_covers
-            .iter()
-            .map(|cover| CoverSpan {
-                cover_id: cover.cover_id.clone(),
-                slot_id: cover.slot_id.clone(),
-                start_frame: cover.program_start_frame,
-                end_frame: cover.program_end_frame,
-                selected: self.selected_cover.as_deref() == Some(cover.cover_id.as_str()),
-                clip_id: cover.clip_id.clone(),
-                source_in_frame: cover.source_in_frame,
-                source_out_frame: played_source_out(cover, story_rate),
-                a2_source_channel: cover.a2_source_channel,
-            })
-            .collect();
+        view.covers = cover_spans(&self.stored_covers, self.selected_cover.as_deref(), view.timebase);
         view.sync_enabled = self.sync.enabled();
         view.playhead = self.playhead;
         view.message = message;
         view.editing = self.editing.clone();
-        view.a1_choice = self.a1_choice();
-        view.a2_choice = self.a2_choice();
-        (view.lane_taken, view.wave_zoom) = (self.lane_taken, self.wave_zoom);
+        self.lane_view(&mut view);
         self.view = view;
+    }
+
+    /// What the view shows of the A1/A2 lanes.
+    fn lane_view(&self, view: &mut SegmentsView) {
+        view.a1_choice = self.lanes.choice(0);
+        view.a2_choice = self.lanes.choice(1);
+        (view.lane_taken, view.wave_zoom) = (self.lanes.taken(), self.lanes.wave_zoom());
     }
 
     /// How many audio channels the marked clip has (its stored record); a chosen
     /// channel the clip does not have goes back to channel 1.
     pub fn set_source_channels(&mut self, count: Option<u16>) {
-        if self.source_channels != count {
-            self.source_channels = count;
-            if count.is_none_or(|count| self.a1_channel >= count) {
-                self.a1_channel = 0;
-            }
-            self.view.a1_choice = self.a1_choice();
-            if let Some(count) = count.filter(|count| self.a2_channel >= *count) {
-                self.a2_channel = u16::from(count >= 2); // channel 2 when there is one
-            }
-            self.view.a2_choice = self.a2_choice();
+        if self.lanes.set_channels(count) {
+            let mut view = std::mem::take(&mut self.view);
+            self.lane_view(&mut view);
+            self.view = view;
         }
     }
 
     /// The channel picker of the source timeline chose the channel heard on A1.
     pub fn choose_a1_channel(&mut self, channel: u16) -> bool {
-        if !self.source_channels.is_some_and(|count| channel < count) {
-            return false;
-        }
-        self.a1_channel = channel;
-        self.view.a1_choice = self.a1_choice();
-        (self.lane_taken, self.view.lane_taken) = (None, None); // a chosen channel lets the lane go
-        true
+        self.choose_channel(0, channel)
     }
 
     /// The source channels heard on A1 and A2 now (zero based).
     pub fn heard_channels(&self) -> (u16, u16) {
-        (self.a1_channel, self.a2_channel)
+        self.lanes.heard()
     }
 
     /// The channel picker of the source timeline chose the channel heard on A2.
     pub fn choose_a2_channel(&mut self, channel: u16) -> bool {
-        if !self.source_channels.is_some_and(|count| channel < count) {
+        self.choose_channel(1, channel)
+    }
+
+    /// A chosen channel lets the lane go.
+    fn choose_channel(&mut self, lane: u8, channel: u16) -> bool {
+        if !self.lanes.choose(lane, channel) {
             return false;
         }
-        self.a2_channel = channel;
-        self.view.a2_choice = self.a2_choice();
-        (self.lane_taken, self.view.lane_taken) = (None, None);
+        let mut view = std::mem::take(&mut self.view);
+        self.lane_view(&mut view);
+        self.view = view;
         true
-    }
-
-    fn a1_choice(&self) -> Option<(u16, u16)> {
-        self.source_channels.filter(|count| *count > 0).map(|count| (self.a1_channel, count))
-    }
-
-    fn a2_choice(&self) -> Option<(u16, u16)> {
-        self.source_channels.filter(|count| *count > 0).map(|count| (self.a2_channel, count))
     }
 }
 

@@ -3807,6 +3807,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-lane-choice"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-media-assist-audio"
 version = "0.1.0"
 dependencies = [
@@ -4193,6 +4197,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-program-commands"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-program-db"
 version = "0.1.0"
 dependencies = [
@@ -4258,7 +4266,10 @@ version = "0.1.0"
 dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
+ "qnc-lane-choice",
+ "qnc-program-commands",
  "qnc-program-db",
+ "qnc-program-view",
  "qnc-program-waveform",
  "qnc-source-channels",
  "qnc-source-timecode",
@@ -4266,6 +4277,16 @@ dependencies = [
  "qnc-virtual-shots",
  "rusqlite",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-program-view"
+version = "0.1.0"
+dependencies = [
+ "qnc-program-commands",
+ "qnc-program-db",
+ "qnc-program-waveform",
+ "qnc-source-timecode",
 ]
 
 [[package]]

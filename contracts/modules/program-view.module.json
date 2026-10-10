@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.program-view",
+  "module_name": "Program view",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["story.program.view"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-program-view",
+  "input": "The stored segments, markers, slots and covers of a story (rows of qnc-program-db), the selection and the story rate.",
+  "output": "The program on one frame axis: rows, the Segment tab parts, markers, slots, covers with the source frames they play, duration labels and marks, and the questions asked of it (enabled actions, cover slot, segment at a frame, timecode).",
+  "specification": "Audit 2026-10-10: split out of qnc-program-segments (one piece per responsibility; v5 qnc-story-segment-timeline.mdc and docs/93-94 stay the procedure)."
+}

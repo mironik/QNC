@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.program-commands",
+  "module_name": "Program commands",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["story.program.commands"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-program-commands",
+  "input": "A keyboard catalog action_id, or a command a form or the navigation bar sends.",
+  "output": "The story program command (segments, markers, slots, covers, Sync, undo) and the Ton/Off segment kinds with their stored names.",
+  "specification": "Audit 2026-10-10: split out of qnc-program-segments (one piece per responsibility; v5 qnc-story-segment-timeline.mdc and docs/93-94 stay the procedure)."
+}

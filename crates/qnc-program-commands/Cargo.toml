@@ -1,0 +1,7 @@
+[package]
+name = "qnc-program-commands"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the commands of a story program (Ton/Off segments, markers, slots, covers, Sync, undo) and the map from keyboard catalog action ids to them. Pure: no state, no database, no form."
+
+[dependencies]

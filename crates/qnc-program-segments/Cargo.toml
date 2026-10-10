@@ -7,6 +7,9 @@ description = "QNC public component: Ton/Off program segments of an edited story
 [dependencies]
 qnc-db-broker = { workspace = true }
 qnc-program-db = { workspace = true }
+qnc-program-commands = { workspace = true }
+qnc-program-view = { workspace = true }
+qnc-lane-choice = { workspace = true }
 qnc-virtual-shots = { workspace = true }
 qnc-sync-cover = { workspace = true }
 qnc-program-waveform = { workspace = true }
