@@ -3211,3 +3211,18 @@ bez obzira na izabranu mapu (postojeci zapisi napravljeni iz izravne mape datote
 `qnc-scanner`. Proba: Select roditeljske mape, podmape pa opet roditeljske prolazi, postojeci klip ostaje isti.
 Nalaz (nije popravljen, ceka odluku): datoteka zamijenjena drugom istog imena prolazi kao nepromijenjena i zadrzava
 stari zapis i probe, jer izvor daje samo velicinu datoteke, a izvorni indeks ne pamti ni velicinu.
+Popravak 2026-10-10 (korisnik "ok" na plan: zamijenjena datoteka istog imena): `qnc-source-contract` `FileInfo`
+dobio je vrijeme izmjene (`modified_unix_ms`, neobavezno), lokalni citac ga daje (isti ugovor ide i preko mreze);
+`qnc-source-groups` `GroupProposal.stamp` (`FileStamp`: duljina i vrijeme izmjene, samo pojedinacna datoteka; zapisi
+kartica ga nemaju i ne mijenjaju se); `qnc-scanner` cita pecat svake prihvacene datoteke (samo citanje).
+`qnc-source-index-db`: pojedinacna datoteka trazi se po samoj datoteci; ista datoteka s ranijim korijenom ili bez
+pecata zadrzava zapis i dobiva korijen i pecat ovog skena; drugi pecat na istom mjestu je zamijenjena datoteka:
+stari zapis se povlaci, nova datoteka dobiva novi zapis; kartica i dalje daje `Conflict` na svaku promjenu.
+`qnc-ingest-select` (`records.rs`, `publish.rs`): klip na mjestu zamijenjene datoteke uklanja se kao nestao ako nije
+uvezen, a za uvezeni Ingest javlja upozorenje (uvezeni klip ostaje; uvezen kao link vise ne odgovara datoteci).
+`qnc-media-record-db`: zavrseni probe drugog klipa na istoj adresi pripada datoteci koja je tamo bila, pa novi klip
+dobiva svoj jedan probe; probe koji jos traje i dalje se ne preuzima. Ugovor `source-index.database.json`
+(`single_file_rule`). Testovi `qnc-source-index-db`, `qnc-media-record-db`, `qnc-scanner`, conformance. Proba na
+zasticenoj kopiji projekta `testllll`: zamjena 3 s -> 9 s daje novi klip s 225 slika i uklanja stari, ponovni Select
+bez promjene ne dira nista, uvezeni klip ostaje uz upozorenje i novi klip; Select mape Videos: uvezeni
+`Mironik 2002.MXF` ostaje isti klip bez duplikata, Edius datoteke su preskocene.

@@ -232,6 +232,7 @@ impl IndexReader for AlternativeReader {
             root,
             proxies: vec![],
             related: vec![],
+            stamp: None,
         }])
     }
 }

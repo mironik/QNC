@@ -307,7 +307,7 @@ fn run_inner(
             qnc_artifact_db::ArtifactsModule::factory(),
         ],
     )?;
-    let records = records::register_groups(
+    let (records, replaced) = records::register_groups(
         &project,
         &source,
         &scanned.groups,
@@ -345,7 +345,10 @@ fn run_inner(
     if cancel.load(Ordering::Relaxed) {
         return Err("Select je prekinut.".into());
     }
-    let removed = publish::remove_missing(content_target, &project, &scanned.missing, send)?;
+    let gone: Vec<_> = scanned.missing.iter().chain(&replaced).cloned().collect();
+    let removed = publish::remove_missing(content_target, &project, &gone, send)?;
+    publish::warn_kept_replaced(&replaced, &removed, send)?;
+    let removed = removed.len();
     Ok(Summary {
         unchanged: scanned.groups.len() - records.len(),
         processed: records.len(),

@@ -2,7 +2,7 @@
 use qnc_camera_detector::{detect, DetectionReport, Limits, SourceScope};
 use qnc_camera_patterns::Catalog;
 use qnc_source_groups::{
-    assemble, single_file, FileFact, FileReader, FileState, GroupProposal, GroupReport,
+    assemble, single_file, FileFact, FileStamp, FileReader, FileState, GroupProposal, GroupReport,
     IndexDocument, IndexReader, MAX_FILES, MAX_GROUPS,
 };
 use qnc_source_reader::{EntryKind, ReadError, SourceReader, SourceReference, MAX_TEXT_BYTES};
@@ -355,7 +355,21 @@ pub fn scan_files(
                     }
                     // The folder holding the file is its root, not the folder the user picked:
                     // the same file reached from a parent or child folder is the same record.
-                    proposals.push(single_file(reader.reader_id(), &folder, &entry.reference));
+                    // Length and last write tell a file replaced under the same name.
+                    let stamp = match source.stat(&entry.reference) {
+                        Ok(info) => info.byte_len.zip(info.modified_unix_ms).map(
+                            |(byte_len, modified_unix_ms)| FileStamp { byte_len, modified_unix_ms },
+                        ),
+                        Err(error) => {
+                            issues.push(ScanIssue {
+                                code: ScanIssueCode::FileUnavailable,
+                                reference: entry.reference,
+                                message: error.to_string(),
+                            });
+                            continue;
+                        }
+                    };
+                    proposals.push(single_file(reader.reader_id(), &folder, &entry.reference, stamp));
                     facts.push(FileFact {
                         reference: entry.reference,
                         state: FileState::File,

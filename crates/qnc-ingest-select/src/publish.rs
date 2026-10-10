@@ -60,8 +60,9 @@ pub(crate) fn remove_missing(
     project: &qnc_db_broker::ProjectDbWriter,
     missing: &[InventoryClip],
     send: &SyncSender<Event>,
-) -> Result<usize> {
+) -> Result<Vec<String>> {
     let mut removed_count = 0;
+    let mut all_removed = Vec::new();
     let mut writer = ContentWriteTransport::start(content_target)?;
     for chunk in missing.chunks(4096) {
         let forget = qnc_artifact_db::Operation::ForgetClips {
@@ -77,9 +78,29 @@ pub(crate) fn remove_missing(
             }
         };
         removed_count += removed.len();
+        all_removed.extend(removed.iter().cloned());
         send.send(Event::Removed(removed))?;
     }
-    Ok(removed_count)
+    Ok(all_removed)
+}
+
+/// A replaced file whose clip was imported keeps that clip (only clips not imported are
+/// removed); the user is told the file on the source is another one now.
+pub(crate) fn warn_kept_replaced(
+    replaced: &[InventoryClip],
+    removed: &[String],
+    send: &SyncSender<Event>,
+) -> Result<()> {
+    for clip in replaced.iter().filter(|clip| !removed.contains(&clip.clip_id)) {
+        let name = SourceReference::from_uri(&clip.original_uri)
+            .map(|r| r.relative_path().rsplit('/').next().unwrap_or_default().to_string())
+            .unwrap_or_else(|_| clip.clip_id.clone());
+        send.send(Event::Warning(format!(
+            "{name}: datoteka na izvoru zamijenjena je novom (novi klip). Uvezeni klip ostaje; \
+             ako je uvezen kao link, njegova datoteka vise nije ista."
+        )))?;
+    }
+    Ok(())
 }
 
 fn wait_write_completion(

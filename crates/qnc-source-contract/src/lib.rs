@@ -245,6 +245,10 @@ pub struct FileInfo {
     pub uri: String,
     pub kind: EntryKind,
     pub byte_len: Option<u64>,
+    /// When the file was last written (ms since the Unix epoch), when the source tells:
+    /// with the length it tells a file replaced under the same name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modified_unix_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

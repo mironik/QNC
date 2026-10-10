@@ -70,6 +70,7 @@ fn empty_and_oversized_batches_are_not_accepted() {
         original: root.descendant("A.MXF").unwrap(),
         proxies: vec![],
         related: vec![],
+        stamp: None,
         evidence: qnc_source_groups::GroupEvidence {
             reader_id: "test".into(),
             document: root.descendant("INDEX.XML").unwrap(),

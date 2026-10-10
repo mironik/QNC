@@ -34,6 +34,7 @@ fn proposal(id: &str) -> GroupProposal {
         },
         root,
         recording_identity: id.into(),
+        stamp: None,
     }
 }
 fn batch(id: &str, proposals: Vec<GroupProposal>) -> Batch {
@@ -481,4 +482,49 @@ fn the_source_index_lives_in_the_project_database_behind_its_intermediary() {
         .pragma_query_value(None, "application_id", |r| r.get(0))
         .unwrap();
     assert_eq!(app, 77);
+}
+
+#[test]
+fn a_single_file_replaced_under_its_name_is_a_new_record_and_the_old_one_retires() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("index.sqlite");
+    let mut client = local(&path, true, Access::ReadWrite);
+    let root = SourceReference::new(SOURCE, "incoming/ftp").unwrap();
+    let file = root.descendant("A.MOV").unwrap();
+    let stamp = |byte_len| {
+        Some(qnc_source_groups::FileStamp {
+            byte_len,
+            modified_unix_ms: 1_000 + byte_len,
+        })
+    };
+    let first = qnc_source_groups::single_file("generic", &root, &file, stamp(10));
+    let old = client.write(batch("one", vec![first.clone()])).unwrap();
+    assert_eq!(client.write(batch("two", vec![first])).unwrap(), Receipt { batch_id: "two".into(), ..old.clone() });
+    let replaced = qnc_source_groups::single_file("generic", &root, &file, stamp(20));
+    let new = client.write(batch("three", vec![replaced.clone()])).unwrap();
+    assert_ne!(new.record_ids, old.record_ids, "another file at the same place");
+    assert_eq!(client.read(&old.record_ids[0]).unwrap(), None, "the old record retired");
+    assert_eq!(client.read(&new.record_ids[0]).unwrap().unwrap().group.proposal, replaced);
+    // A record written before files had a stamp takes the stamp and stays the same record.
+    let other = root.descendant("B.MOV").unwrap();
+    let legacy = qnc_source_groups::single_file("generic", &root, &other, None);
+    let before = client.write(batch("four", vec![legacy])).unwrap();
+    let stamped = qnc_source_groups::single_file("generic", &root, &other, stamp(30));
+    let after = client.write(batch("five", vec![stamped.clone()])).unwrap();
+    assert_eq!(after.record_ids, before.record_ids);
+    assert_eq!(client.read(&after.record_ids[0]).unwrap().unwrap().group.proposal, stamped);
+    // A record written with the folder picked then as its root is the same file too.
+    let deeper = root.descendant("day/C.MOV").unwrap();
+    let picked = SourceReference::new(SOURCE, "incoming").unwrap();
+    let before = client
+        .write(batch("six", vec![qnc_source_groups::single_file("generic", &picked, &deeper, None)]))
+        .unwrap();
+    let own = root.descendant("day").unwrap();
+    let after = client
+        .write(batch("seven", vec![qnc_source_groups::single_file("generic", &own, &deeper, stamp(40))]))
+        .unwrap();
+    assert_eq!(after.record_ids, before.record_ids);
+    drop(client);
+    assert_eq!(row_count(&path, "public_source_records"), 3);
+    assert_eq!(row_count(&path, "public_source_media"), 3);
 }

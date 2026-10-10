@@ -337,6 +337,7 @@ fn remote_rejects_wrong_identity_version_operation_and_lengths() {
                 uri: reference.uri(),
                 kind: EntryKind::File,
                 byte_len: Some(4),
+                modified_unix_ms: None,
             },
             text: "test".into(),
         })),

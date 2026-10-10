@@ -136,7 +136,7 @@ mod tests {
         assert!(!adapter.accepts(&file("incoming/ftp/sound.wav")));
         assert!(!adapter.accepts(&file("incoming/ftp/._hidden.mov")));
         let root = file("incoming/ftp");
-        let group = qnc_source_groups::single_file(READER_ID, &root, &file("incoming/ftp/A.MXF"));
+        let group = qnc_source_groups::single_file(READER_ID, &root, &file("incoming/ftp/A.MXF"), None);
         let record = adapter.metadata("clip-1", &group, &[]).unwrap();
         assert_eq!(record.original.media_uri, group.original.uri());
         assert!(record.original.streams.is_empty() && record.proxy.is_none());

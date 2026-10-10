@@ -3,6 +3,7 @@
   "database_owner": "project",
   "owner_application": "qnc.module.content-store",
   "ownership_rule": "User rules 2026-09-25/26 and QNC v5 (ingest_assets, probe_json, metadata_json in the project database, every write through ProjectDbBroker): the project owns this database and Ingest owns neither the database nor the clips. Its tables live in the project database of the active project, never in a database of the computer shared by projects, so a new project never inherits records of another. Every write goes through the one intermediary of the project database, qnc.module.content-store.",
+  "single_file_rule": "user decision 2026-10-10: a card recording never changes (a changed group is a conflict); a single file (incoming/FTP) carries its length and last write (stamp) and is found by its file, not by the folder picked: the same file with an earlier root or no stamp keeps its record and takes the root and stamp of the scan; another stamp at the same place is a replaced file, its record retires and the new file gets a new record (Select removes the old clip unless it was imported, and the new clip gets its own probe)",
   "implementation_private_files": [
     "{project_directory}/project.db"
   ],

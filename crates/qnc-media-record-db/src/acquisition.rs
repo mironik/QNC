@@ -17,8 +17,13 @@ impl Store {
             .map_err(db_error)?;
         if let Some(existing) = read(&tx, &begin.media_uri)? {
             // An interrupted attempt learned nothing about the medium: it gives way to a
-            // new attempt. Stored, failed and uncertain attempts are final.
-            if !matches!(existing.outcome, Some(AcquisitionOutcome::Interrupted { .. })) {
+            // new attempt. Stored, failed and uncertain attempts are final for their clip.
+            // An attempt of another clip at the same place is of the file that was there
+            // before: a new clip at that place comes only from a new source record (the
+            // file was replaced under its name), so it is another medium and gets its probe.
+            // A running attempt is never taken over.
+            let earlier_file = existing.request.clip_id != begin.clip_id && existing.outcome.is_some();
+            if !earlier_file && !matches!(existing.outcome, Some(AcquisitionOutcome::Interrupted { .. })) {
                 return Ok(AcquisitionClaim {
                     granted: false,
                     acquisition: existing,
@@ -49,8 +54,8 @@ impl Store {
         }
         // A prior final record or stored probe document is not a new acquisition opportunity.
         let already_recorded: bool = tx.query_row(
-            "SELECT EXISTS(SELECT 1 FROM media_heads h JOIN media_snapshots s ON s.clip_id=h.clip_id AND s.revision=h.revision WHERE s.phase='final' AND (json_extract(h.binding_json,'$.original_uri')=?1 OR json_extract(h.binding_json,'$.proxy_uri')=?1)) OR EXISTS(SELECT 1 FROM evidence_documents WHERE document_uri=?2)",
-            params![begin.media_uri, begin.document_uri], |r| r.get(0)).map_err(db_error)?;
+            "SELECT EXISTS(SELECT 1 FROM media_heads h JOIN media_snapshots s ON s.clip_id=h.clip_id AND s.revision=h.revision WHERE h.clip_id=?3 AND s.phase='final' AND (json_extract(h.binding_json,'$.original_uri')=?1 OR json_extract(h.binding_json,'$.proxy_uri')=?1)) OR EXISTS(SELECT 1 FROM evidence_documents WHERE document_uri=?2)",
+            params![begin.media_uri, begin.document_uri, begin.clip_id], |r| r.get(0)).map_err(db_error)?;
         if already_recorded {
             return Err(Error::Finalized);
         }

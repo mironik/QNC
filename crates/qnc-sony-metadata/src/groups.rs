@@ -161,6 +161,7 @@ impl IndexReader for SonyIndexReader {
                             })
                         })
                         .collect::<Result<_, String>>()?,
+                    stamp: None,
                 };
                 proposal.validate(root.source_uri())?;
                 Ok(proposal)

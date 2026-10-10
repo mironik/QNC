@@ -167,15 +167,55 @@ impl Store {
         let mut record_ids = Vec::with_capacity(groups.len());
         for (group, json) in groups.iter().zip(encoded) {
             let p = &group.proposal;
-            let previous: Option<(String, String)> = tx.query_row(
-                "SELECT record_id, group_json FROM source_records WHERE recording_root_uri=?1 AND recording_identity=?2",
-                params![p.root.uri(), p.recording_identity], |r| Ok((r.get(0)?, r.get(1)?))).optional().map_err(db_error)?;
+            // A single file is found by the file itself: its record may have been written
+            // with another root (the folder picked then) or before files had a stamp.
+            let previous: Option<(String, String)> = if p.is_single_file() {
+                tx.query_row(
+                    "SELECT r.record_id, r.group_json FROM source_records r
+                     JOIN media_references m ON m.record_id = r.record_id
+                     WHERE m.media_uri = ?1 AND m.role = 'original'",
+                    [p.original.uri()], |r| Ok((r.get(0)?, r.get(1)?))).optional().map_err(db_error)?
+            } else {
+                tx.query_row(
+                    "SELECT record_id, group_json FROM source_records WHERE recording_root_uri=?1 AND recording_identity=?2",
+                    params![p.root.uri(), p.recording_identity], |r| Ok((r.get(0)?, r.get(1)?))).optional().map_err(db_error)?
+            };
             if let Some((id, previous)) = previous {
-                if previous != json {
+                if previous == json {
+                    record_ids.push(id);
+                    continue;
+                }
+                // A single file replaced under the same name (another length or last write)
+                // is another recording: the record of the file that was there is retired and
+                // the new one gets its own id. Recordings a card index describes never change.
+                let old = serde_json::from_str::<qnc_source_index_contract::SourceGroup>(&previous).ok();
+                // The same file with an earlier root or no stamp yet stays the same record and
+                // takes the root and stamp of this scan (nothing tells it was replaced).
+                let same_file = old.as_ref().is_some_and(|old| {
+                    let mut now = old.clone();
+                    now.proposal.root = p.root.clone();
+                    now.proposal.stamp = p.stamp;
+                    old.proposal.is_single_file()
+                        && (old.proposal.stamp.is_none() || old.proposal.stamp == p.stamp)
+                        && &now == group
+                });
+                if same_file {
+                    tx.execute(
+                        "UPDATE source_records SET recording_root_uri = ?1, group_json = ?2 WHERE record_id = ?3",
+                        params![p.root.uri(), json, id],
+                    )
+                    .map_err(db_error)?;
+                    record_ids.push(id);
+                    continue;
+                }
+                let was_single = old.is_some_and(|old| old.proposal.is_single_file());
+                if !(was_single && p.is_single_file()) {
                     return Err(Error::Conflict);
                 }
-                record_ids.push(id);
-                continue;
+                for table in ["support_references", "media_references", "source_records"] {
+                    tx.execute(&format!("DELETE FROM {table} WHERE record_id = ?1"), [&id])
+                        .map_err(db_error)?;
+                }
             }
             // The transaction also protects conflicts with records from earlier batches.
             for media in std::iter::once(&p.original).chain(&p.proxies) {

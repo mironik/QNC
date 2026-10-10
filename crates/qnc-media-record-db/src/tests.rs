@@ -82,6 +82,7 @@ fn input(id: &str) -> Write {
         },
         recording_identity: id.into(),
         root,
+        stamp: None,
     };
     let facts: Vec<_> = p
         .references()

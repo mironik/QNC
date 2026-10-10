@@ -19,6 +19,7 @@ fn proposal() -> GroupProposal {
             reference: reference("PRIVATE/XDROOT/Thmbnl/A.JPG"),
             kind: "JPG".into(),
         }],
+        stamp: None,
     }
 }
 fn facts(groups: &[GroupProposal]) -> Vec<FileFact> {
@@ -236,8 +237,8 @@ fn pure_grouping_manifest_has_no_io_app_or_camera_dependency() {
 #[test]
 fn a_single_file_is_its_own_evidence_but_never_shares_media_with_another_group() {
     let root = reference("incoming/ftp");
-    let a = single_file("generic", &root, &reference("incoming/ftp/A.MXF"));
-    let b = single_file("generic", &root, &reference("incoming/ftp/day/B.MOV"));
+    let a = single_file("generic", &root, &reference("incoming/ftp/A.MXF"), None);
+    let b = single_file("generic", &root, &reference("incoming/ftp/day/B.MOV"), None);
     assert!(a.is_single_file());
     let report = assemble(SOURCE, vec![a.clone(), b.clone()], &facts(&[a.clone(), b])).unwrap();
     assert_eq!((report.groups.len(), report.blocked.len()), (2, 0));

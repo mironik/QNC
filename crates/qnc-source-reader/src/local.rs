@@ -217,10 +217,17 @@ fn file_info(reference: &SourceReference, metadata: &Metadata) -> Result<FileInf
     } else {
         return Err(ReadError::UnsupportedType);
     };
+    let modified_unix_ms = metadata
+        .is_file()
+        .then(|| metadata.modified().ok())
+        .flatten()
+        .and_then(|time| time.into_std().duration_since(std::time::UNIX_EPOCH).ok())
+        .and_then(|since| u64::try_from(since.as_millis()).ok());
     Ok(FileInfo {
         uri: reference.uri(),
         kind,
         byte_len,
+        modified_unix_ms,
     })
 }
 

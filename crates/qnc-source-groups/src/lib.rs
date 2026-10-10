@@ -36,7 +36,12 @@ pub trait FileReader: Send + Sync {
 
 /// The group of one file under `root`: the file is the original and its own evidence
 /// (there is no index), its path the recording identity.
-pub fn single_file(reader_id: &str, root: &SourceReference, file: &SourceReference) -> GroupProposal {
+pub fn single_file(
+    reader_id: &str,
+    root: &SourceReference,
+    file: &SourceReference,
+    stamp: Option<FileStamp>,
+) -> GroupProposal {
     GroupProposal {
         root: root.clone(),
         recording_identity: file.relative_path().to_string(),
@@ -48,6 +53,7 @@ pub fn single_file(reader_id: &str, root: &SourceReference, file: &SourceReferen
         original: file.clone(),
         proxies: vec![],
         related: vec![],
+        stamp,
     }
 }
 
@@ -88,6 +94,18 @@ pub struct GroupProposal {
     pub original: SourceReference,
     pub proxies: Vec<SourceReference>,
     pub related: Vec<RelatedReference>,
+    /// A single file only: its length and last write as the source told them at the scan.
+    /// A file replaced under the same name has another stamp, so it is another recording.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stamp: Option<FileStamp>,
+}
+
+/// Length and last write of a file (ms since the Unix epoch).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileStamp {
+    pub byte_len: u64,
+    pub modified_unix_ms: u64,
 }
 
 impl GroupProposal {
