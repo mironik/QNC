@@ -13,31 +13,45 @@ pub fn primary_btn(
     shell: &ShellLayoutContract,
 ) -> egui::Response {
     let t = Theme::from_contract(&shell.colors);
-    ui.add_enabled(
-        enabled,
-        egui::Button::new(
-            RichText::new(label)
-                .color(Color32::WHITE)
-                .strong()
-                .size(shell.theme_metrics.font_ui),
-        )
-        .min_size(Vec2::new(0.0, shell.theme_metrics.chrome_control_height))
-        .fill(t.accent),
-    )
+    let look = qnc_ui_kit::ButtonLook {
+        text: Color32::WHITE,
+        fill: t.accent,
+        border: None,
+        font_size: Some(shell.theme_metrics.font_ui),
+        strong: true,
+        square: false,
+        min_size: Vec2::new(0.0, shell.theme_metrics.chrome_control_height),
+    };
+    qnc_ui_kit::look_button(ui, label, enabled, look)
 }
 
 pub fn action_btn(ui: &mut egui::Ui, label: &str, shell: &ShellLayoutContract) -> egui::Response {
     let t = Theme::from_contract(&shell.colors);
-    ui.add(
-        egui::Button::new(
-            RichText::new(label)
-                .color(t.text)
-                .size(shell.theme_metrics.font_ui),
-        )
-        .min_size(Vec2::new(0.0, shell.theme_metrics.chrome_control_height))
-        .fill(Color32::TRANSPARENT)
-        .stroke(egui::Stroke::new(1.0, t.border)),
-    )
+    let look = qnc_ui_kit::ButtonLook {
+        text: t.text,
+        fill: Color32::TRANSPARENT,
+        border: Some(t.border),
+        font_size: Some(shell.theme_metrics.font_ui),
+        strong: false,
+        square: false,
+        min_size: Vec2::new(0.0, shell.theme_metrics.chrome_control_height),
+    };
+    qnc_ui_kit::look_button(ui, label, true, look)
+}
+
+/// The accent button of a settings row (e.g. Spremi u template): no minimum height.
+pub fn accent_btn(ui: &mut egui::Ui, label: &str, enabled: bool, shell: &ShellLayoutContract) -> egui::Response {
+    let t = Theme::from_contract(&shell.colors);
+    let look = qnc_ui_kit::ButtonLook {
+        text: Color32::WHITE,
+        fill: t.accent,
+        border: None,
+        font_size: Some(shell.theme_metrics.font_ui),
+        strong: false,
+        square: false,
+        min_size: Vec2::ZERO,
+    };
+    qnc_ui_kit::look_button(ui, label, enabled, look)
 }
 
 pub fn form_action_bar(

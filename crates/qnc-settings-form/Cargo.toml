@@ -1,0 +1,11 @@
+[package]
+name = "qnc-settings-form"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: settings fields drawn from a schema (a layout contract): choice and number cells in a grid, shown when a condition holds, written into a JSON settings draft. It knows no application and no meaning of a field."
+
+[dependencies]
+eframe = { workspace = true }
+qnc-settings-path = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

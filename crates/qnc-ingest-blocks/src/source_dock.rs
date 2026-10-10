@@ -10,6 +10,7 @@ pub(super) fn render_source_dock(
 ) -> Option<IngestIntent> {
     let rect = ui.available_rect_before_wrap();
     let mut intent = None;
+    let dock = &contracts.ingest.source_dock;
     let timeline_intent = show_timeline_dock(
         ui,
         rect,
@@ -44,7 +45,7 @@ pub(super) fn render_source_dock(
                             .ingest
                             .source_dock
                             .clip_filter_colors
-                            .map(|[r, g, b]| Color32::from_rgb(r, g, b)),
+                            .map(qnc_ingest_layout::rgb),
                         &style,
                     ) {
                         intent = Some(IngestIntent::new(
@@ -54,14 +55,9 @@ pub(super) fn render_source_dock(
                     }
                     let poster_count = view.proxy_poster_approval_count();
                     if poster_count > 0 {
-                        let label = format!(
-                            "{} ({poster_count})",
-                            action_label(
-                                contracts,
-                                action_ids::INGEST_APPROVE_PROXY_POSTERS,
-                                "Generiraj postere",
-                            )
-                        );
+                        let label = dock
+                            .generate_posters_label
+                            .replace("{count}", &poster_count.to_string());
                         if action_button(
                             ui,
                             &label,
@@ -75,11 +71,11 @@ pub(super) fn render_source_dock(
                             ));
                         }
                     } else {
-                        ui.label(muted("Nema postera na kartici", theme));
+                        ui.label(muted(&dock.no_card_thumb_hint, theme));
                     }
                     if primary_button(
                         ui,
-                        action_label(contracts, action_ids::INGEST_IMPORT_SELECTED, "Uvezi"),
+                        action_label(contracts, action_ids::INGEST_IMPORT_SELECTED),
                         view.action_enabled(action_ids::INGEST_IMPORT_SELECTED),
                         theme,
                     )
@@ -89,7 +85,7 @@ pub(super) fn render_source_dock(
                     }
                     if action_button(
                         ui,
-                        action_label(contracts, action_ids::INGEST_SELECT_ALL, "Odaberi sve"),
+                        action_label(contracts, action_ids::INGEST_SELECT_ALL),
                         view.action_enabled(action_ids::INGEST_SELECT_ALL),
                         theme,
                     )
@@ -99,7 +95,7 @@ pub(super) fn render_source_dock(
                     }
                     if action_button(
                         ui,
-                        action_label(contracts, action_ids::INGEST_CLEAR_SELECTION, "Očisti"),
+                        action_label(contracts, action_ids::INGEST_CLEAR_SELECTION),
                         view.action_enabled(action_ids::INGEST_CLEAR_SELECTION),
                         theme,
                     )
@@ -109,15 +105,16 @@ pub(super) fn render_source_dock(
                     }
                 }
                 if contracts.ingest.source_dock.show_edit_actions {
-                    let _ = action_button(ui, "Export", false, theme);
-                    let _ = action_button(ui, "B", false, theme);
+                    for label in &dock.edit_actions {
+                        let _ = action_button(ui, label, false, theme);
+                    }
                 }
                 if view.archive_original_available {
                     let mut archive = view.archive_original;
                     if ui
                         .checkbox(
                             &mut archive,
-                            RichText::new("Kopiraj original")
+                            RichText::new(&dock.archive_original_label)
                                 .color(theme.text)
                                 .size(theme.font_ui),
                         )
@@ -135,7 +132,7 @@ pub(super) fn render_source_dock(
                         false,
                         egui::Checkbox::new(
                             &mut ai,
-                            RichText::new("AI mining")
+                            RichText::new(&dock.ai_mining_label)
                                 .color(theme.text)
                                 .size(theme.font_ui),
                         ),
@@ -157,7 +154,8 @@ pub(super) fn render_source_dock(
     intent
 }
 
-fn action_label<'a>(contracts: &'a IngestContracts, action_id: &str, fallback: &'a str) -> &'a str {
+/// The label of a dock action from the layout contract (its action id when missing).
+fn action_label<'a>(contracts: &'a IngestContracts, action_id: &'a str) -> &'a str {
     contracts
         .ingest
         .source_dock
@@ -165,5 +163,5 @@ fn action_label<'a>(contracts: &'a IngestContracts, action_id: &str, fallback: &
         .iter()
         .find(|action| action.action_id() == Some(action_id))
         .map(|action| action.label())
-        .unwrap_or(fallback)
+        .unwrap_or(action_id)
 }

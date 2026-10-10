@@ -33,14 +33,13 @@ pub(super) fn action_button(
     enabled: bool,
     theme: &Theme,
 ) -> egui::Response {
-    ui.add_enabled(
-        enabled,
-        Button::new(RichText::new(text).color(theme.text))
-            .fill(Color32::TRANSPARENT)
-            .stroke(Stroke::new(1.0, theme.border))
-            .corner_radius(CornerRadius::same(0))
-            .min_size(Vec2::new(0.0, theme.chrome_control_height)),
-    )
+    let style = qnc_ui_kit::ChromeButtonStyle {
+        text: theme.text,
+        border: theme.border,
+        focus: theme.focus,
+        height: theme.chrome_control_height,
+    };
+    qnc_ui_kit::chrome_button(ui, text, enabled, false, style)
 }
 
 pub(super) fn primary_button(
@@ -49,14 +48,7 @@ pub(super) fn primary_button(
     enabled: bool,
     theme: &Theme,
 ) -> egui::Response {
-    ui.add_enabled(
-        enabled,
-        Button::new(RichText::new(text).color(Color32::WHITE).strong())
-            .fill(theme.accent)
-            .stroke(Stroke::new(0.0, Color32::TRANSPARENT))
-            .corner_radius(CornerRadius::same(0))
-            .min_size(Vec2::new(0.0, theme.chrome_control_height)),
-    )
+    qnc_ui_kit::strong_button(ui, text, enabled, theme.accent, theme.chrome_control_height)
 }
 
 pub(super) fn form_action_bar_style(theme: &Theme) -> FormActionBarStyle {

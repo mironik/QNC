@@ -4328,6 +4328,7 @@ dependencies = [
  "qnc-keyboard-shortcut",
  "qnc-project-application",
  "qnc-project-session",
+ "qnc-settings-form",
  "qnc-settings-path",
  "qnc-settings-switches",
  "qnc-ui-kit",
@@ -4460,6 +4461,16 @@ dependencies = [
  "qnc-program-segments",
  "qnc-program-waveform",
  "qnc-timeline",
+]
+
+[[package]]
+name = "qnc-settings-form"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-settings-path",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

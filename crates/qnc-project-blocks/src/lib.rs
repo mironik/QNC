@@ -94,7 +94,7 @@ impl Blocks<'_> {
             button_height: self.contracts.shell.theme_metrics.chrome_control_height,
         };
         if let Some(project) = self.session.delete_candidate.clone() {
-            let asked = question("delete_project", "Želite ukloniti projekt?", &project.name);
+            let asked = question("delete_project", &self.contracts.project.texts.delete_project_question, &project.name);
             match qnc_confirm_dialog::show(ctx, &style, asked) {
                 Some(true) => self.intents.push(ProjectIntent::ConfirmDeleteProject),
                 Some(false) => self.intents.push(ProjectIntent::CancelDeleteProject),
@@ -102,7 +102,7 @@ impl Blocks<'_> {
             }
         }
         if let Some(template) = self.session.delete_template_candidate.clone() {
-            let asked = question("delete_template", "Želite ukloniti template?", &template.name);
+            let asked = question("delete_template", &self.contracts.project.texts.delete_template_question, &template.name);
             match qnc_confirm_dialog::show(ctx, &style, asked) {
                 Some(true) => self.intents.push(ProjectIntent::ConfirmDeleteTemplate),
                 Some(false) => self.intents.push(ProjectIntent::CancelDeleteTemplate),

@@ -11,7 +11,7 @@ pub(super) fn render_browser_head_entries(
         _ if view.browser_roots => {
             if view.browser_entries.is_empty() {
                 let empty = match view.source_kind {
-                    SourceKind::Local => "Nema diskova.",
+                    SourceKind::Local => &labels.empty_local,
                     SourceKind::Lan => &labels.empty_lan,
                     SourceKind::Internet => &labels.empty_internet,
                 };
@@ -28,13 +28,13 @@ pub(super) fn render_browser_head_entries(
 
 pub(super) fn render_browser_body(
     ui: &mut Ui,
-    _labels: &IngestDirBrowser,
+    labels: &IngestDirBrowser,
     theme: &Theme,
     view: &IngestViewModel,
     intent: &mut Option<IngestIntent>,
 ) {
     if view.browser_busy {
-        ui.label(muted("Učitavam...", theme));
+        ui.label(muted(&labels.loading_label, theme));
         return;
     }
     if let Some(error) = &view.browser_error {
@@ -47,7 +47,7 @@ pub(super) fn render_browser_body(
             if view.browser_entries.is_empty() {
                 ui.horizontal(|ui| {
                     ui.add_space(path_tree_offset());
-                    ui.label(muted("Nema podmapa.", theme));
+                    ui.label(muted(&labels.empty_folder, theme));
                 });
             } else {
                 ScrollArea::vertical().show(ui, |ui| {

@@ -18,6 +18,7 @@ pub struct LocationBrowserInput<'a> {
     pub error: Option<&'a str>,
     pub max_tree_height: Option<f32>,
     pub shell: &'a ShellLayoutContract,
+    pub texts: &'a crate::layout_contract::ProjectTexts,
 }
 
 pub enum LocationBrowserAction {
@@ -34,7 +35,7 @@ pub fn show(ui: &mut egui::Ui, input: LocationBrowserInput<'_>) -> LocationBrows
     let font_ui = input.shell.theme_metrics.font_ui;
 
     ui.horizontal(|ui| {
-        theme::label(ui, "Izvori", font_ui, t.muted);
+        theme::label(ui, &input.texts.sources, font_ui, t.muted);
         ui.add_space(12.0);
         for kind in [
             LocationSourceKind::Local,
@@ -56,12 +57,12 @@ pub fn show(ui: &mut egui::Ui, input: LocationBrowserInput<'_>) -> LocationBrows
         let can_up = matches!(input.kind, LocationSourceKind::Local)
             && !input.browser.roots
             && input.browser.parent_available;
-        if fixed_text_link(ui, "Gore", can_up, UP_COL_W, input.shell).clicked() {
+        if fixed_text_link(ui, &input.texts.up, can_up, UP_COL_W, input.shell).clicked() {
             action = LocationBrowserAction::OpenParent;
         }
         ui.add_space(NAV_GAP_W);
         let can_disks = matches!(input.kind, LocationSourceKind::Local);
-        if fixed_text_link(ui, "Diskovi", can_disks, DISKS_COL_W, input.shell).clicked() {
+        if fixed_text_link(ui, &input.texts.disks, can_disks, DISKS_COL_W, input.shell).clicked() {
             action = LocationBrowserAction::OpenRoots;
         }
         ui.add_space(NAV_GAP_W);
@@ -91,10 +92,10 @@ pub fn show(ui: &mut egui::Ui, input: LocationBrowserInput<'_>) -> LocationBrows
                     show_local_tree(ui, &input, &mut action);
                 }
                 LocationSourceKind::Lan => {
-                    theme::label(ui, "Nema konfiguriranih LAN izvora.", font_ui, t.muted);
+                    theme::label(ui, &input.texts.empty_lan, font_ui, t.muted);
                 }
                 LocationSourceKind::Internet => {
-                    theme::label(ui, "Nema konfiguriranih Internet izvora.", font_ui, t.muted);
+                    theme::label(ui, &input.texts.empty_internet, font_ui, t.muted);
                 }
             }
         });
@@ -179,7 +180,7 @@ fn show_local_tree(
             ui.add_space(path_tree_offset());
             theme::label(
                 ui,
-                "Nema podmapa.",
+                &input.texts.empty_folder,
                 input.shell.theme_metrics.font_ui,
                 t.muted,
             );
@@ -264,7 +265,7 @@ fn show_root_disks_table(
     if input.browser.entries.is_empty() {
         theme::label(
             ui,
-            "Nema diskova.",
+            &input.texts.empty_disks,
             input.shell.theme_metrics.font_ui,
             t.muted,
         );
@@ -304,12 +305,12 @@ fn root_disk_cell(ui: &mut egui::Ui, text: &str, shell: &ShellLayoutContract) ->
 
 fn location_label(input: &LocationBrowserInput<'_>) -> String {
     match input.kind {
-        LocationSourceKind::Local if input.browser.roots => "Diskovi".to_string(),
+        LocationSourceKind::Local if input.browser.roots => input.texts.disks.clone(),
         LocationSourceKind::Local if !input.browser.path_label.trim().is_empty() => {
             short_path(&input.browser.path_label)
         }
         LocationSourceKind::Lan => "LAN".to_string(),
-        LocationSourceKind::Internet => "Internet".to_string(),
+        LocationSourceKind::Internet => input.texts.internet.clone(),
         _ => "-".to_string(),
     }
 }

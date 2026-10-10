@@ -238,8 +238,7 @@ fn render_clip_grid(
     theme: &Theme,
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
-    let outer = ui.available_rect_before_wrap();
-    ui.painter().rect_filled(outer, 0.0, theme.bg);
+    let outer = qnc_ui_kit::fill_block(ui, theme.bg);
     let rect = outer.shrink(contracts.editorial.board.block_pad);
     if view.library_tab == LibraryTab::Segment {
         let mut command = None;

@@ -3,8 +3,7 @@
 //! clip cards and source dock. They draw the Ingest view and return intents.
 
 pub(crate) use eframe::egui::{
-    self, Align, Button, Color32, CornerRadius, Label, Layout, Rect, RichText, ScrollArea, Sense,
-    Stroke, Ui, Vec2,
+    self, Align, Label, Layout, Rect, RichText, ScrollArea, Sense, Ui, Vec2,
 };
 
 pub(crate) use qnc_ingest_application::{

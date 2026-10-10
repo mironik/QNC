@@ -94,10 +94,10 @@ impl Blocks<'_> {
                         "ProjectCreate" => self.project_create(ui, width, settings),
                         "AiSettings" => self.ai_settings(ui, width, settings),
                         "ProjectsRoot" => {
-                            self.path_row(ui, width, settings, "Lokacija projekata:", true)
+                            self.path_row(ui, width, settings, true)
                         }
                         "ExportDirectory" => {
-                            self.path_row(ui, width, settings, "Export direktorij:", false)
+                            self.path_row(ui, width, settings, false)
                         }
                         "TemplateActions" => self.template_actions(ui, width, settings),
                         _ => {}
@@ -207,7 +207,7 @@ impl Blocks<'_> {
             if self.session.templates.is_empty() {
                 theme::label(
                     ui,
-                    "Nema templatea.",
+                    &self.contracts.project.texts.templates_empty,
                     self.contracts.shell.theme_metrics.font_ui,
                     t.muted,
                 );
@@ -249,7 +249,7 @@ impl Blocks<'_> {
                                                     )
                                                     .frame(false),
                                                 )
-                                                .on_hover_text("Obriši template")
+                                                .on_hover_text(&self.contracts.project.texts.delete_template_hint)
                                                 .clicked()
                                         {
                                             delete_requested = true;
@@ -288,18 +288,18 @@ impl Blocks<'_> {
         widgets::inline_row(
             ui,
             content_w,
-            "Naziv projekta:",
+            &self.contracts.project.texts.project_name_label,
             settings,
             &shell,
             |ui, width| {
                 ui.add(
                     egui::TextEdit::singleline(&mut self.session.project_name)
                         .desired_width(width.max(40.0))
-                        .hint_text("Naziv novog projekta"),
+                        .hint_text(&self.contracts.project.texts.project_name_hint),
                 );
             },
             |ui, _| {
-                if widgets::primary_btn(ui, "Novi projekt", can_create, &shell).clicked() {
+                if widgets::primary_btn(ui, &self.contracts.project.texts.new_project, can_create, &shell).clicked() {
                     should_create = true;
                 }
             },
@@ -314,7 +314,7 @@ impl Blocks<'_> {
             ui.spacing_mut().item_spacing.y = 8.0;
             let switches = &self.contracts.project.ai_switches;
             if qnc_settings_switches::show(ui, &mut self.session.draft_settings, switches) {
-                self.session.status = "Postavke promijenjene.".to_string();
+                self.session.status = self.contracts.project.texts.settings_changed.clone();
             }
         });
     }
@@ -324,16 +324,17 @@ impl Blocks<'_> {
         ui: &mut egui::Ui,
         content_w: f32,
         settings: &SettingsPanelMetrics,
-        label: &str,
         project_root: bool,
     ) {
         let shell = self.contracts.shell.clone();
+        let texts = &self.contracts.project.texts;
+        let label = if project_root { texts.projects_root_label.clone() } else { texts.export_directory_label.clone() };
         let mut should_pick = false;
         let mut text_changed = false;
         widgets::inline_row(
             ui,
             content_w,
-            label,
+            label.as_str(),
             settings,
             &shell,
             |ui, width| {
@@ -345,14 +346,14 @@ impl Blocks<'_> {
                 let response = ui.add(
                     egui::TextEdit::singleline(draft)
                         .desired_width(width.max(40.0))
-                        .hint_text("Putanja"),
+                        .hint_text(&self.contracts.project.texts.path_hint),
                 );
                 if response.changed() {
                     text_changed = true;
                 }
             },
             |ui, _| {
-                if widgets::primary_btn(ui, "Odaberi…", true, &shell).clicked() {
+                if widgets::primary_btn(ui, &self.contracts.project.texts.choose, true, &shell).clicked() {
                     should_pick = true;
                 }
             },
@@ -373,7 +374,7 @@ impl Blocks<'_> {
                     self.session.export_dir.clone(),
                 );
             }
-            self.session.status = "Postavke promijenjene.".to_string();
+            self.session.status = self.contracts.project.texts.settings_changed.clone();
         }
         if should_pick {
             let action = if project_root {
@@ -413,6 +414,7 @@ impl Blocks<'_> {
                     error: browser.error.as_deref(),
                     max_tree_height: Some(if project_root { 170.0 } else { 150.0 }),
                     shell: &shell,
+                    texts: &self.contracts.project.texts,
                 },
             )
         };
@@ -429,7 +431,7 @@ impl Blocks<'_> {
                 && browser.browser.current_uri.is_some()
                 && !browser.busy
         };
-        let form_actions = widgets::form_action_bar(ui, &shell, "U redu", can_confirm, "Odustani");
+        let form_actions = widgets::form_action_bar(ui, &shell, &self.contracts.project.texts.confirm, can_confirm, &self.contracts.project.texts.cancel);
 
         let mut action = match browser_action {
             LocationBrowserAction::None => None,
@@ -484,11 +486,11 @@ impl Blocks<'_> {
     ) {
         widgets::trailing_actions(ui, content_w, settings, |ui| {
             if self.session.template_create_open
-                && widgets::action_btn(ui, "Odustani", &self.contracts.shell).clicked()
+                && widgets::action_btn(ui, &self.contracts.project.texts.cancel, &self.contracts.shell).clicked()
             {
                 self.intents.push(ProjectIntent::CancelTemplateCreate);
             }
-            if widgets::action_btn(ui, "Novi template", &self.contracts.shell).clicked() {
+            if widgets::action_btn(ui, &self.contracts.project.texts.new_template, &self.contracts.shell).clicked() {
                 self.intents.push(ProjectIntent::BeginTemplateCreate);
             }
         });
@@ -496,12 +498,13 @@ impl Blocks<'_> {
 
     fn advanced(&mut self, ui: &mut egui::Ui, content_w: f32, settings: &SettingsPanelMetrics) {
         let applications = self.session.component.applications.view();
-        let keyboard_presets = self.keyboard_preset_options();
+        let keyboard_presets = self.contracts.shortcuts.preset_choices(&self.contracts.project.advanced_settings.keyboard_preset_order);
         let mut application_action = None;
         if project_advanced::show(
             ui,
             content_w,
             settings,
+            &self.contracts.project.advanced_settings,
             &self.contracts.shell,
             &mut self.session.advanced_open,
             project_advanced::AdvancedDraft {
@@ -513,7 +516,7 @@ impl Blocks<'_> {
             },
             &mut application_action,
         ) {
-            self.session.status = "Postavke promijenjene.".to_string();
+            self.session.status = self.contracts.project.texts.settings_changed.clone();
         }
         if let Some(action) = application_action {
             use project_advanced::ApplicationSelectionAction;
@@ -540,10 +543,10 @@ impl Blocks<'_> {
         let mut should_save = false;
         let shell = self.contracts.shell.clone();
         let base_name = self.session.selected_template_name();
-        widgets::section(ui, content_w, "Novi template", settings, &shell, |ui| {
+        widgets::section(ui, content_w, &self.contracts.project.texts.new_template, settings, &shell, |ui| {
             let t = Theme::from_contract(&shell.colors);
             ui.label(
-                RichText::new(format!("Baza: {base_name}"))
+                RichText::new(self.contracts.project.texts.template_base.replace("{base}", &base_name))
                     .size(12.0)
                     .color(t.muted),
             );
@@ -551,18 +554,18 @@ impl Blocks<'_> {
             widgets::inline_row(
                 ui,
                 content_w,
-                "Naziv templatea:",
+                &self.contracts.project.texts.template_name_label,
                 settings,
                 &shell,
                 |ui, width| {
                     ui.add(
                         egui::TextEdit::singleline(&mut self.session.template_draft_name)
                             .desired_width(width.max(40.0))
-                            .hint_text("Naziv novog templatea"),
+                            .hint_text(&self.contracts.project.texts.template_name_hint),
                     );
                 },
                 |ui, _| {
-                    if widgets::primary_btn(ui, "Spremi", can_save, &shell).clicked() {
+                    if widgets::primary_btn(ui, &self.contracts.project.texts.save, can_save, &shell).clicked() {
                         should_save = true;
                     }
                 },
@@ -572,50 +575,11 @@ impl Blocks<'_> {
                 egui::TextEdit::multiline(&mut self.session.template_draft_description)
                     .desired_width((content_w - settings.inner_pad_x * 2.0).max(80.0))
                     .desired_rows(2)
-                    .hint_text("Kratki opis"),
+                    .hint_text(&self.contracts.project.texts.short_description_hint),
             );
         });
         if should_save {
             self.intents.push(ProjectIntent::SaveUserTemplate);
         }
-    }
-
-    fn keyboard_preset_options(&self) -> Vec<(String, String)> {
-        let preferred = [
-            "default", "resolve", "premiere", "finalcut", "edius", "avid",
-        ];
-        let mut options = Vec::new();
-        for id in preferred {
-            if let Some(preset) = self.contracts.shortcuts.presets.get(id) {
-                options.push((
-                    id.to_string(),
-                    if preset.name.trim().is_empty() {
-                        id.to_string()
-                    } else {
-                        preset.name.clone()
-                    },
-                ));
-            }
-        }
-        let mut extra = self
-            .contracts
-            .shortcuts
-            .presets
-            .iter()
-            .filter(|(id, _)| !preferred.iter().any(|preferred| preferred == &id.as_str()))
-            .map(|(id, preset)| {
-                (
-                    id.clone(),
-                    if preset.name.trim().is_empty() {
-                        id.clone()
-                    } else {
-                        preset.name.clone()
-                    },
-                )
-            })
-            .collect::<Vec<_>>();
-        extra.sort_by(|a, b| a.0.cmp(&b.0));
-        options.extend(extra);
-        options
     }
 }

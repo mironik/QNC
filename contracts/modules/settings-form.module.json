@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.settings-form",
+  "module_name": "Settings form",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.settings.fields"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-settings-form",
+  "input": "A schema of settings fields from a layout contract (label, widget id, settings path, named choices or a number, default, a condition to show under) and the JSON settings draft of the owner.",
+  "output": "The fields drawn in a grid; what the user changed written into the draft (choices as text, numbers parsed with a comma as decimal point). The owner writes the draft; this piece never stores anything.",
+  "specification": "Audit 2026-10-10: the Project Advanced fields lived as code in the form (qnc-project-blocks); they are now a schema in contracts/ui/project.layout.json drawn by this piece."
+}

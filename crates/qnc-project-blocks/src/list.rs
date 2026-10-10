@@ -208,7 +208,7 @@ impl Blocks<'_> {
                 ui.id().with(("project_list_row_delete", index)),
                 Sense::click(),
             )
-            .on_hover_text("Ukloni projekt");
+            .on_hover_text(&self.contracts.project.texts.remove_project_hint);
         let delete_color = if delete_response.hovered() {
             t.text
         } else {

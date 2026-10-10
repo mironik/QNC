@@ -6,8 +6,7 @@ pub(super) fn render_clip_grid(
     theme: &Theme,
     view: &IngestViewModel,
 ) -> Option<IngestIntent> {
-    let outer = ui.available_rect_before_wrap();
-    ui.painter().rect_filled(outer, 0.0, theme.bg);
+    let outer = qnc_ui_kit::fill_block(ui, theme.bg);
     let rect = outer.shrink(contracts.ingest.board.block_pad);
 
     let empty_message = empty_grid_message(contracts, view);
@@ -16,7 +15,7 @@ pub(super) fn render_clip_grid(
         .iter()
         .map(|clip| {
             let marker = if clip.imported {
-                Color32::from_rgb(55, 210, 145)
+                qnc_ingest_layout::rgb(contracts.ingest.clip_grid.imported_marker_rgb)
             } else {
                 theme.text_muted
             };
@@ -29,7 +28,7 @@ pub(super) fn render_clip_grid(
                 import_status: if clip.imported { "imported" } else { "" },
                 status_proxy: "",
                 status_original: "",
-                overlay_label: save_state_label(clip),
+                overlay_label: save_state_label(contracts, clip),
                 top_right_marker: Some(marker),
                 checked: clip.selected,
                 rgba_thumb: clip
@@ -77,7 +76,7 @@ pub(super) fn render_clip_grid(
                 panel_focused: true,
                 cards: &rows,
                 thumb_textures: &no_textures,
-                tc: &format_duration,
+                tc: &qnc_media_card::minutes_seconds,
                 features,
                 empty_message,
                 id_salt: if view.clip_filter == ClipFilter::New {
@@ -104,7 +103,7 @@ pub(super) fn render_clip_grid(
 fn empty_grid_message<'a>(contracts: &'a IngestContracts, view: &'a IngestViewModel) -> &'a str {
     view.work_settings_error.as_deref().unwrap_or_else(|| {
         if view.work_settings_loading {
-            "Citanje radnih postavki..."
+            &contracts.ingest.clip_grid.loading_settings_message
         } else if view.clip_filter == ClipFilter::New {
             &contracts.ingest.clip_grid.empty_new_message
         } else if view.command_busy || view.selected_source_uri.is_some() {
@@ -115,10 +114,11 @@ fn empty_grid_message<'a>(contracts: &'a IngestContracts, view: &'a IngestViewMo
     })
 }
 
-fn save_state_label(clip: &ClipView) -> &'static str {
+fn save_state_label<'a>(contracts: &'a IngestContracts, clip: &ClipView) -> &'a str {
+    let grid = &contracts.ingest.clip_grid;
     match clip.save_state {
-        qnc_ingest_application::SaveState::Pending => "Spremanje...",
-        qnc_ingest_application::SaveState::Failed => "Upis nije uspio",
+        qnc_ingest_application::SaveState::Pending => &grid.saving_label,
+        qnc_ingest_application::SaveState::Failed => &grid.save_failed_label,
         _ => "",
     }
 }

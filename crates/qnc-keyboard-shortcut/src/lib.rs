@@ -126,6 +126,28 @@ pub struct ShortcutHelp {
 }
 
 impl ShortcutCatalog {
+    /// The presets to choose from, `(id, name)`: the ones named in `order` first in that
+    /// order, then the rest by id; a preset without a name shows its id.
+    pub fn preset_choices(&self, order: &[String]) -> Vec<(String, String)> {
+        let named = |id: &String, preset: &ShortcutPreset| {
+            let name = if preset.name.trim().is_empty() { id.clone() } else { preset.name.clone() };
+            (id.clone(), name)
+        };
+        let mut choices: Vec<_> = order
+            .iter()
+            .filter_map(|id| self.presets.get(id).map(|preset| named(id, preset)))
+            .collect();
+        let mut rest: Vec<_> = self
+            .presets
+            .iter()
+            .filter(|(id, _)| !order.contains(id))
+            .map(|(id, preset)| named(id, preset))
+            .collect();
+        rest.sort_by(|a, b| a.0.cmp(&b.0));
+        choices.extend(rest);
+        choices
+    }
+
     pub fn from_json_str(contents: &str) -> Result<Self, String> {
         let value = serde_json::from_str::<Value>(contents)
             .map_err(|err| format!("invalid keyboard shortcut JSON: {err}"))?;

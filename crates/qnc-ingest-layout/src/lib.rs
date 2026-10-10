@@ -217,6 +217,9 @@ pub struct IngestDirBrowser {
     pub cancel_label: String,
     pub empty_lan: String,
     pub empty_internet: String,
+    pub empty_local: String,
+    pub empty_folder: String,
+    pub loading_label: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -226,6 +229,10 @@ pub struct IngestClipGrid {
     pub grid_gap: f32,
     pub empty_message: String,
     pub empty_new_message: String,
+    pub loading_settings_message: String,
+    pub saving_label: String,
+    pub save_failed_label: String,
+    pub imported_marker_rgb: [u8; 3],
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -238,9 +245,19 @@ pub struct IngestSourceDock {
     pub header_timeline_gap: f32,
     pub show_edit_actions: bool,
     pub show_import_actions: bool,
+    pub no_card_thumb_hint: String,
+    pub generate_posters_label: String,
+    pub archive_original_label: String,
+    pub edit_actions: Vec<String>,
+    pub ai_mining_label: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct ApplicationManifest {
     application_id: String,
+}
+
+/// A colour of the layout contract (`[r, g, b]`).
+pub fn rgb([r, g, b]: [u8; 3]) -> eframe::egui::Color32 {
+    eframe::egui::Color32::from_rgb(r, g, b)
 }

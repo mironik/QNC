@@ -3251,3 +3251,22 @@ baze). `qnc-program-segments` ostaje upravljac (stanje, citanje i upis price kro
 izvozi sve pod istim imenima, pa forme i ostale kocke nisu mijenjane. `lib.rs` 1547 -> 1039 redaka. Ponasanje isto:
 testovi `qnc-program-segments` (27, ukljucujuci A1/A2 tipkovnicu), `qnc-program-view` (11), `qnc-lane-choice`,
 `qnc-segment-panel`, `qnc-editorial-application`, `qnc-panel-focus`, conformance, `cargo check -p qnc-app`.
+Korak 4 audita 2026-10-10 (korisnik "ok, kreni s 4"; time i otkljucavanje Project ploce `qnc-project-blocks` i
+njezina layout ugovora samo za ciscenje, bez promjene izgleda i ponasanja): Ingest i Project ploca daju aktivni kod
+i tekstove kockama i ugovoru. Ingest (`qnc-ingest-blocks`): tekstovi preglednika, mreze i docka u
+`contracts/ui/ingest.layout.json` (+ `qnc-ingest-layout`; vec postojeci `no_card_thumb_hint` i
+`generate_posters_label` sada se i koriste), boje kroz `qnc_ingest_layout::rgb`, gumbi kroz `qnc-ui-kit`
+(`chrome_button`, novi `strong_button`, `fill_block`), trajanje kartice `qnc_media_card::minutes_seconds`; zamjenski
+tekstovi gumba vise nisu u kodu (bez oznake u ugovoru gumb pokazuje svoj action_id). Project (`qnc-project-blocks`):
+Advanced postavke su obrazac u `contracts/ui/project.layout.json` (`advanced_settings`: sekcije, polja, izbori,
+uvjeti prikaza, tekstovi) koji crta nova javna kocka `crates/qnc-settings-form` (+ `contracts/modules/settings-form.module.json`;
+polja, izbor, broj s decimalnim zarezom, upis u nacrt postavki); ploca slaze samo tri bloka koji su vise od polja
+(preset tipki, izvozni preset, izbor aplikacija). Ostali tekstovi ploce u `texts` istog ugovora; gumbi kroz
+`qnc_ui_kit::look_button` (`ButtonLook`, isti izgled kao prije); redoslijed preseta tipki u ugovoru
+(`keyboard_preset_order`), slaganje izbora u `qnc-keyboard-shortcut` (`ShortcutCatalog::preset_choices`).
+Brojke: Ingest ploca 903 -> 882 redaka, tekstovi 14 -> 0, privatni gumbi 2 -> 0, boje 2 -> 0; Project ploca
+2365 -> 1932 redaka, tekstovi 113 -> 8 (preostali su kljucevi mjesta iz ugovora), privatni gumbi 4 -> 1.
+Ostaje (u baselineu): slaganje kartica iz podataka klipa u Ingest i Story ploci (C3), bojanje redaka popisa i
+preglednika u Project ploci (C1), gumb X za brisanje templatea, pretvorba boja ugovora u `theme.rs`. Provjereno:
+testovi `qnc-settings-form`, `qnc-keyboard-shortcut`, `qnc-ui-kit`, `qnc-ingest-layout`, `qnc-project-blocks`,
+`qnc-contracts`, conformance, `cargo check -p qnc-app`. Uzivo nije provjereno.

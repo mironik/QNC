@@ -16,6 +16,7 @@ qnc-keyboard-shortcut = { workspace = true }
 qnc-project-application = { workspace = true }
 qnc-project-session = { workspace = true }
 qnc-settings-path = { workspace = true }
+qnc-settings-form = { workspace = true }
 qnc-settings-switches = { workspace = true }
 qnc-ui-kit = { workspace = true }
 serde = { workspace = true }

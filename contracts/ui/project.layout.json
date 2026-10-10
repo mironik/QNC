@@ -79,6 +79,497 @@
     ],
     "scroll_order": ["Advanced", "CustomTemplate"]
   },
+  "advanced_settings": {
+    "title": "Advanced postavke",
+    "grid": {
+      "label_size": 12,
+      "min_cell_width": 160,
+      "gap": 8,
+      "cell_height": 52
+    },
+    "options": {
+      "input_modes": [
+        [
+          "auto",
+          "AUTO"
+        ],
+        [
+          "manual",
+          "Ručno"
+        ]
+      ],
+      "formats": [
+        [
+          "HD 1080p50",
+          "HD 1080p50 (PAL)"
+        ],
+        [
+          "HD 1080i50",
+          "HD 1080i50 (PAL)"
+        ],
+        [
+          "HD 1080p30",
+          "HD 1080p29.97 (NTSC)"
+        ],
+        [
+          "HD 1080p60",
+          "HD 1080p59.94 (NTSC)"
+        ],
+        [
+          "HD 1080i60",
+          "HD 1080i59.94 (NTSC)"
+        ],
+        [
+          "UHD 2160p",
+          "UHD 2160p"
+        ]
+      ],
+      "fps": [
+        [
+          "25",
+          "25"
+        ],
+        [
+          "50",
+          "50"
+        ],
+        [
+          "29.97",
+          "29.97"
+        ],
+        [
+          "30",
+          "30"
+        ],
+        [
+          "59.94",
+          "59.94"
+        ],
+        [
+          "60",
+          "60"
+        ]
+      ],
+      "field_order": [
+        [
+          "progressive",
+          "Progressive"
+        ],
+        [
+          "upper_first",
+          "Upper first (i)"
+        ]
+      ],
+      "color_space": [
+        [
+          "rec709",
+          "rec709"
+        ],
+        [
+          "rec2020",
+          "rec2020"
+        ]
+      ],
+      "containers": [
+        [
+          "mxf_op1a",
+          "MXF OP1a"
+        ],
+        [
+          "mp4",
+          "MP4"
+        ],
+        [
+          "mov",
+          "MOV"
+        ]
+      ],
+      "video_codecs": [
+        [
+          "mpeg2_422_50mbit",
+          "MPEG-2 422 50 Mbit"
+        ],
+        [
+          "h264",
+          "H.264"
+        ],
+        [
+          "prores_422",
+          "ProRes 422"
+        ],
+        [
+          "dnxhd_hq",
+          "DNxHD HQ"
+        ]
+      ],
+      "ingest_profiles": [
+        [
+          "field",
+          "Teren"
+        ],
+        [
+          "house",
+          "TV kuca"
+        ]
+      ],
+      "ingest_media": [
+        [
+          "link",
+          "Samo link"
+        ],
+        [
+          "proxy",
+          "Proxy"
+        ],
+        [
+          "original",
+          "Original"
+        ],
+        [
+          "optimized",
+          "Optimizirani (H.264 8-bit)"
+        ],
+        [
+          "optimized_original",
+          "Optimizirani + original"
+        ]
+      ],
+      "playback_inputs": [
+        [
+          "proxy_if_available",
+          "Proxy ako postoji"
+        ],
+        [
+          "original",
+          "Original"
+        ],
+        [
+          "proxy",
+          "Proxy"
+        ],
+        [
+          "optimized_if_available",
+          "Optimizirani ako postoji"
+        ]
+      ],
+      "export_modes": [
+        [
+          "xml_master",
+          "XML master"
+        ],
+        [
+          "xdcam",
+          "XDCAM"
+        ],
+        [
+          "original",
+          "Original"
+        ],
+        [
+          "avid",
+          "Avid"
+        ]
+      ],
+      "original_policies": [
+        [
+          "link_when_available",
+          "Link"
+        ],
+        [
+          "copy_background",
+          "Kopiraj u pozadini"
+        ],
+        [
+          "ignore_for_fast_news",
+          "Ignoriraj (brze vijesti)"
+        ]
+      ],
+      "audio_rates": [
+        [
+          "48000",
+          "48000"
+        ],
+        [
+          "44100",
+          "44100"
+        ]
+      ],
+      "audio_channels": [
+        [
+          "2",
+          "2"
+        ],
+        [
+          "4",
+          "4"
+        ],
+        [
+          "6",
+          "6"
+        ],
+        [
+          "8",
+          "8"
+        ]
+      ]
+    },
+    "sections": [
+      {
+        "title": "Input source",
+        "fields": [
+          {
+            "kind": "choice",
+            "label": "Mode",
+            "id": "pts_input_mode",
+            "path": "input.mode",
+            "options": "input_modes",
+            "default": "auto"
+          },
+          {
+            "kind": "choice",
+            "label": "Ingest profil",
+            "id": "pts_ingest_profile",
+            "path": "storage.ingest_profile",
+            "options": "ingest_profiles",
+            "default": "field"
+          },
+          {
+            "kind": "choice",
+            "label": "Ingest media",
+            "id": "pts_ingest_media",
+            "path": "storage.ingest_media",
+            "options": "ingest_media",
+            "default": ""
+          },
+          {
+            "kind": "choice",
+            "label": "Playback input",
+            "id": "pts_playback_input",
+            "path": "playback.input",
+            "options": "playback_inputs",
+            "default": ""
+          }
+        ],
+        "then": {
+          "when": {
+            "path": "input.mode",
+            "equals": "manual",
+            "default": "auto"
+          },
+          "fields": [
+            {
+              "kind": "choice",
+              "label": "Format",
+              "id": "pts_input_format",
+              "path": "input.format",
+              "options": "formats",
+              "default": ""
+            },
+            {
+              "kind": "number",
+              "label": "Frame rate",
+              "id": "pts_input_fps",
+              "path": "input.fps",
+              "options": "fps"
+            },
+            {
+              "kind": "integer",
+              "label": "Width",
+              "id": "pts_input_width",
+              "path": "input.width"
+            },
+            {
+              "kind": "integer",
+              "label": "Height",
+              "id": "pts_input_height",
+              "path": "input.height"
+            },
+            {
+              "kind": "choice",
+              "label": "Field order",
+              "id": "pts_input_field",
+              "path": "input.field_order",
+              "options": "field_order",
+              "default": ""
+            },
+            {
+              "kind": "choice",
+              "label": "Color space",
+              "id": "pts_input_cs",
+              "path": "input.color_space",
+              "options": "color_space",
+              "default": ""
+            }
+          ]
+        }
+      },
+      {
+        "title": "Tipkovnica",
+        "block": "keyboard_preset",
+        "label": "Preset tipki"
+      },
+      {
+        "title": "Export",
+        "fields": [
+          {
+            "kind": "choice",
+            "label": "Mode",
+            "id": "pts_export_mode",
+            "path": "export.default_mode",
+            "options": "export_modes",
+            "default": "xml_master"
+          },
+          {
+            "kind": "choice",
+            "label": "Original policy",
+            "id": "pts_orig_policy",
+            "path": "storage.original_policy",
+            "options": "original_policies",
+            "default": "link_when_available"
+          }
+        ]
+      },
+      {
+        "title": "Export format",
+        "block": "export_preset",
+        "label": "Preset",
+        "then": {
+          "when": {
+            "path": "export.preset",
+            "equals": "manual",
+            "default": "manual"
+          },
+          "fields": [
+            {
+              "kind": "choice",
+              "label": "Format",
+              "id": "pts_export_format",
+              "path": "export.format",
+              "options": "formats",
+              "default": ""
+            },
+            {
+              "kind": "number",
+              "label": "Frame rate",
+              "id": "pts_export_fps",
+              "path": "export.fps",
+              "options": "fps"
+            },
+            {
+              "kind": "integer",
+              "label": "Width",
+              "id": "pts_export_width",
+              "path": "export.width"
+            },
+            {
+              "kind": "integer",
+              "label": "Height",
+              "id": "pts_export_height",
+              "path": "export.height"
+            },
+            {
+              "kind": "choice",
+              "label": "Field order",
+              "id": "pts_export_field",
+              "path": "export.field_order",
+              "options": "field_order",
+              "default": ""
+            },
+            {
+              "kind": "choice",
+              "label": "Color space",
+              "id": "pts_export_cs",
+              "path": "export.color_space",
+              "options": "color_space",
+              "default": ""
+            },
+            {
+              "kind": "choice",
+              "label": "Container",
+              "id": "pts_export_container",
+              "path": "export.container",
+              "options": "containers",
+              "default": ""
+            },
+            {
+              "kind": "choice",
+              "label": "Video codec",
+              "id": "pts_export_codec",
+              "path": "export.video_codec",
+              "options": "video_codecs",
+              "default": ""
+            },
+            {
+              "kind": "integer",
+              "label": "Audio",
+              "id": "pts_export_arate",
+              "path": "export.audio_sample_rate",
+              "options": "audio_rates"
+            },
+            {
+              "kind": "integer",
+              "label": "Channels",
+              "id": "pts_export_ach",
+              "path": "export.audio_channels",
+              "options": "audio_channels"
+            }
+          ],
+          "save_preset": true
+        }
+      },
+      {
+        "title": "Plugin tabovi u workflowu",
+        "block": "applications"
+      }
+    ],
+    "keyboard_preset_order": [
+      "default",
+      "resolve",
+      "premiere",
+      "finalcut",
+      "edius",
+      "avid"
+    ],
+    "texts": {
+      "manual_preset": "Ručno",
+      "new_preset_hint": "Naziv novog preseta",
+      "save_preset": "Spremi u template",
+      "no_selection": "Bez odabira",
+      "group": "Grupa {group}",
+      "loading_catalog": "Ucitavanje kataloga..."
+    }
+  },
+  "texts": {
+    "templates_empty": "Nema templatea.",
+    "delete_template_hint": "Obriši template",
+    "project_name_label": "Naziv projekta:",
+    "project_name_hint": "Naziv novog projekta",
+    "new_project": "Novi projekt",
+    "settings_changed": "Postavke promijenjene.",
+    "path_hint": "Putanja",
+    "choose": "Odaberi…",
+    "confirm": "U redu",
+    "cancel": "Odustani",
+    "new_template": "Novi template",
+    "template_base": "Baza: {base}",
+    "template_name_label": "Naziv templatea:",
+    "template_name_hint": "Naziv novog templatea",
+    "save": "Spremi",
+    "short_description_hint": "Kratki opis",
+    "projects_root_label": "Lokacija projekata:",
+    "export_directory_label": "Export direktorij:",
+    "sources": "Izvori",
+    "up": "Gore",
+    "disks": "Diskovi",
+    "internet": "Internet",
+    "empty_lan": "Nema konfiguriranih LAN izvora.",
+    "empty_internet": "Nema konfiguriranih Internet izvora.",
+    "empty_folder": "Nema podmapa.",
+    "empty_disks": "Nema diskova.",
+    "remove_project_hint": "Ukloni projekt",
+    "delete_project_question": "Želite ukloniti projekt?",
+    "delete_template_question": "Želite ukloniti template?"
+  },
   "labels": [
     "Project",
     "Projekti",

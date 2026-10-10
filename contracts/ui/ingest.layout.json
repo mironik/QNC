@@ -80,7 +80,10 @@
     "cancel_label": "Odustani",
     "footer_item_gap": 8.0,
     "empty_lan": "Nema konfiguriranih LAN izvora.",
-    "empty_internet": "Nema konfiguriranih Internet izvora."
+    "empty_internet": "Nema konfiguriranih Internet izvora.",
+    "empty_local": "Nema diskova.",
+    "empty_folder": "Nema podmapa.",
+    "loading_label": "Učitavam..."
   },
   "clip_grid": {
     "id_salt": "ingest_media_grid",
@@ -91,7 +94,11 @@
     "outline": "preview_focus_only",
     "status_dots": "imported_only",
     "empty_message": "Nema klipova — lijevo odaberi mapu → U redu.",
-    "empty_new_message": "Nema novih klipova."
+    "empty_new_message": "Nema novih klipova.",
+    "loading_settings_message": "Citanje radnih postavki...",
+    "saving_label": "Spremanje...",
+    "save_failed_label": "Upis nije uspio",
+    "imported_marker_rgb": [55, 210, 145]
   },
   "source_dock": {
     "show_header": true,
@@ -119,6 +126,9 @@
     "status_pending": "{imported} uvezeno · {pending} u tijeku · {selected}/{total}",
     "no_card_thumb_hint": "Nema postera na kartici",
     "generate_posters_label": "Generiraj postere ({count})",
+    "archive_original_label": "Kopiraj original",
+    "edit_actions": ["Export", "B"],
+    "ai_mining_label": "AI mining",
     "v4_placeholder_filmstrip_tiles": 12
   },
   "labels": [

@@ -4,7 +4,7 @@ mod chrome_button;
 mod option_columns;
 mod raster;
 mod two_way_switch;
-pub use chrome_button::{chrome_button, ChromeButtonStyle};
+pub use chrome_button::{chrome_button, fill_block, look_button, strong_button, ButtonLook, ChromeButtonStyle};
 pub use option_columns::*;
 pub use raster::paint_rgba_image;
 pub use raster::paint_stream_frame;
