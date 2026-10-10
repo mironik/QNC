@@ -14,7 +14,7 @@
   "state_policy": "owned_by_calling_application",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-pending-marks",
-  "input": "A clip and the IN/OUT it opens with (a virtual short, an edited segment); the shown clip and its source timeline projection every frame.",
+  "input": "A clip, the IN/OUT it opens with (a virtual short, an edited segment) and optionally the mark to take (a segment edge); the shown clip and its source timeline projection every frame.",
   "output": "The IN/OUT put once on the source timeline of that clip when the player has confirmed a picture of a long enough timeline. Local UI state only; the database stays the truth.",
   "specification": "User rule 2026-10-01: one block per responsibility; moved out of qnc-editorial-application (virtual short) so the Edit of a segment uses it too."
 }

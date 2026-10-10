@@ -243,8 +243,8 @@ impl EditorialApplication {
             self.short_stills
                 .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
-        if let Some((clip_id, in_frame, out_frame)) = self.segments.take_source_request() {
-            self.open_marked(&clip_id, in_frame, out_frame); // Edit of a segment
+        if let Some((clip_id, in_frame, out_frame, edge)) = self.segments.take_source_request() {
+            self.open_marked(&clip_id, (in_frame, out_frame), edge); // Edit of a segment, or its edge
         }
         self.pending_marks.apply(self.view.preview.clip_id.as_deref(), &mut self.view.preview.timeline);
         let timebase = self.preview.player_view().source_timebase();
@@ -538,15 +538,15 @@ impl EditorialApplication {
             return true;
         }
         self.view.chosen_shot_id = Some(shot.shot_id);
-        self.open_marked(&shot.clip_id, shot.in_frame, shot.out_frame)
+        self.open_marked(&shot.clip_id, (shot.in_frame, shot.out_frame), None)
     }
 
     /// Opens a clip in the source view with IN/OUT (a short, an edited segment).
-    fn open_marked(&mut self, clip_id: &str, in_frame: u64, out_frame: u64) -> bool {
+    fn open_marked(&mut self, clip_id: &str, marks: (u64, u64), edge: Option<bool>) -> bool {
         self.focus.to_source(&mut self.wrap);
-        self.pending_marks.set(clip_id, in_frame, out_frame);
+        let at = self.pending_marks.set(clip_id, marks, edge);
         self.posters.prioritize(clip_id);
-        self.preview.open_at(clip_id, in_frame);
+        self.preview.open_at(clip_id, at);
         true
     }
 

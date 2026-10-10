@@ -2,26 +2,99 @@
 //! the segment's clip in the source timeline with its IN/OUT; I/O move them, Enter
 //! writes the new range (`TrimSegment`, the markers follow the picture), Escape drops
 //! the edit. Nothing here plays or opens media: the source view is asked to.
+//!
+//! A segment edge (user 2026-10-10): on the segment panel Ctrl+I takes the start and
+//! Ctrl+O the end of the segment under the Wrap playhead (else the selected one). Its
+//! clip opens on that edge with the mark taken, so the arrows trim or extend it frame
+//! by frame and the monitor shows the new first or last picture, also beyond the
+//! segment. Enter writes it the same way, Escape drops it; both go back to Wrap.
 
 use qnc_program_db::Operation;
 
 use crate::ProgramSegments;
 
+/// A segment edge taken from the segment panel.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct EdgeTrim {
+    start: bool,
+    /// The Wrap playhead when the edge was taken (Escape goes back there).
+    wrap_from: u64,
+    /// The segment's first program frame and length, its source length.
+    program_start: u64,
+    program_frames: u64,
+    source_frames: u64,
+}
+
 impl ProgramSegments {
     /// Edit: the source view opens the segment's clip with its IN/OUT.
     pub(crate) fn edit(&mut self, segment_id: String) {
+        self.edge = None;
+        self.open_for_edit(segment_id, None);
+        if self.editing.is_some() {
+            self.refresh_view("Uredivanje segmenta: I/O na source timelineu, Enter sprema, Esc odustaje".into());
+        }
+    }
+
+    fn open_for_edit(&mut self, segment_id: String, take: Option<bool>) {
         let Some(segment) = self.stored.iter().find(|row| row.segment_id == segment_id && row.active) else {
             return self.refresh_view("Ureduje se samo segment u programu.".into());
         };
-        self.source_request = Some((segment.clip_id.clone(), segment.in_frame, segment.out_frame));
+        self.source_request = Some((segment.clip_id.clone(), segment.in_frame, segment.out_frame, take));
         self.selected = Some(segment_id.clone());
         self.editing = Some(segment_id);
-        self.refresh_view("Uredivanje segmenta: I/O na source timelineu, Enter sprema, Esc odustaje".into());
     }
 
-    /// The clip and IN/OUT the source view should open, once.
-    pub fn take_source_request(&mut self) -> Option<(String, u64, u64)> {
+    /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the segment under
+    /// the Wrap playhead, else of the selected one, is taken on the source timeline.
+    pub fn take_edge(&mut self, start: bool) -> bool {
+        let playhead = self.playhead.unwrap_or(0);
+        let row = self
+            .view
+            .segment_at(playhead)
+            .or_else(|| self.view.rows.iter().find(|row| self.selected.as_ref() == Some(&row.segment_id)))
+            .cloned();
+        let Some(row) = row else {
+            self.refresh_view("Nema segmenta za skracivanje ili produljivanje.".into());
+            return false;
+        };
+        self.open_for_edit(row.segment_id.clone(), Some(start));
+        if self.editing.is_none() {
+            return false;
+        }
+        self.edge = Some(EdgeTrim {
+            start,
+            wrap_from: playhead,
+            program_start: row.start_frame,
+            program_frames: row.duration_frames(),
+            source_frames: row.source_out_frame.saturating_sub(row.source_in_frame).max(1),
+        });
+        let edge = if start { "Pocetak" } else { "Kraj" };
+        self.refresh_view(format!("{edge} segmenta: strelice pomicu za sliku, Enter sprema, Esc odustaje"));
+        true
+    }
+
+    /// Whether a segment edge taken from the segment panel waits for Enter or Escape.
+    pub fn trimming_edge(&self) -> bool {
+        self.edge.is_some() && self.editing.is_some()
+    }
+
+    /// The Wrap frame to go back to after an edge was written or dropped, once.
+    pub fn take_wrap_return(&mut self) -> Option<u64> {
+        self.wrap_return.take()
+    }
+
+    /// The clip, its IN/OUT and the mark to take that the source view should open, once.
+    pub fn take_source_request(&mut self) -> Option<(String, u64, u64, Option<bool>)> {
         self.source_request.take()
+    }
+
+    /// Escape: the edit is dropped; an edge goes back to where Wrap was.
+    pub(crate) fn cancel_edit(&mut self) {
+        self.editing = None;
+        if let Some(edge) = self.edge.take() {
+            self.wrap_return = Some(edge.wrap_from);
+        }
+        self.refresh_view("Uredivanje segmenta odustano.".into());
     }
 
     /// Enter while a segment is edited: its new IN/OUT from the source marks of the
@@ -40,7 +113,37 @@ impl ProgramSegments {
         }
         self.editing = None;
         self.adopt_selection = true;
+        if let Some(edge) = self.edge.take() {
+            self.wrap_return = Some(edge.wrap_frame(out_frame.saturating_sub(in_frame)));
+        }
         self.write(Operation::TrimSegment { segment_id, in_frame, out_frame });
         true
+    }
+}
+
+impl EdgeTrim {
+    /// The Wrap frame on the written edge: the segment's first frame, or its last one
+    /// with the new length in story frames (the story may play its source at 2:1 or 1:2).
+    fn wrap_frame(&self, source_frames: u64) -> u64 {
+        if self.start {
+            return self.program_start;
+        }
+        let frames = (source_frames * self.program_frames + self.source_frames / 2) / self.source_frames;
+        self.program_start + frames.max(1) - 1
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EdgeTrim;
+
+    #[test]
+    fn the_end_edge_goes_back_to_the_new_last_frame_of_the_segment() {
+        let edge = EdgeTrim { start: false, wrap_from: 7, program_start: 100, program_frames: 50, source_frames: 50 };
+        assert_eq!(edge.wrap_frame(40), 139, "shortened by ten");
+        assert_eq!(edge.wrap_frame(60), 159, "extended by ten");
+        let half = EdgeTrim { program_frames: 100, ..edge };
+        assert_eq!(half.wrap_frame(60), 219, "a 25 source in a 50 story: two story frames each");
+        assert_eq!(EdgeTrim { start: true, ..edge }.wrap_frame(10), 100, "the start stays on the segment's first frame");
     }
 }

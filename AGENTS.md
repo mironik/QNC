@@ -3290,3 +3290,11 @@ memoriji ili unutar dosega otvorenog dekodiranja ne dira dekoder; slike do 25 iz
 `kept_from`, `forget_far_from`, +25 spremnika slika), korak unatrag izvan njih otvara dekodiranje 25 slika ranije
 (`restart`), a predana slika uvijek dobiva tekucu generaciju i sljedeci redni broj. Zvuk programa se pri koraku i
 dalje ponovno otvara (~50 ms). Provjereno: testovi `qnc-broadcast-engine`, conformance, release build.
+Dopuna 2026-10-10 (korisnik: "ovu mogucnost dodao i pocetku i kraju segmenta, ako korisnik pozeli skratiti ili
+produziti segment"; "ok" na plan; v5 to nema): u panelu Segmenti Ctrl+I uzme pocetak, a Ctrl+O kraj segmenta pod
+Wrap playheadom (inace odabranog). Klip segmenta otvara se na tom rubu s uzetom oznakom (isti put kao Edit), pa
+strelice pomicu rub za sliku i monitor pokazuje novu prvu ili zadnju sliku, i izvan segmenta kod produljivanja;
+Enter zapisuje `TrimSegment` (markeri prate sliku), Esc odustaje; oboje vraca tipke panelu Segmenti i Wrap na novi
+rub, odnosno gdje je bio. `qnc-program-segments` (`edit.rs`: `take_edge`, `trimming_edge`, `take_wrap_return`),
+`qnc-panel-focus`, `qnc-pending-marks` (oznaka koju treba uzeti i frame otvaranja), `qnc-editorial-application`
+(isti broj redaka), ugovori triju modula. Katalog tipki nije mijenjan. Testovi, conformance.

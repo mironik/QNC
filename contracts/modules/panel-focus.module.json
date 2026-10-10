@@ -36,5 +36,5 @@
   "runtime_crate": "qnc-panel-focus",
   "input": "A catalog action_id, the panel a click focused (pool, source timeline, segments), Tab/Shift+Tab (focus_next/focus_prev).",
   "output": "The QNC keyboard map acts on the panel in focus (user rule 2026-09-25, v5 story/focus.rs PanelFocus): source timeline only left/right frame and I/O; segment panel Wrap, markers (Ctrl+M select, Shift+M add, arrows/M/drag draft, Enter confirm, Delete only what Ctrl+ took), covers; Talking Head/Voice over/B/Shift+B from any panel; Enter of a Sync slot or marker draft from any panel. Tab into the source timeline brings the Source view back, into the segments the program. paint_focus draws a passive thin frame on the focused panel. It routes to the public source preview, Wrap session and program model; it owns no player, database or form.",
-  "specification": "QNC_v5 qnc-app/src/story/focus.rs (PanelFocus, next_panel_focus), story.rs (handle_shortcuts, activate_source_keyboard_panel)"
+  "specification": "QNC_v5 qnc-app/src/story/focus.rs (PanelFocus, next_panel_focus), story.rs (handle_shortcuts, activate_source_keyboard_panel); user 2026-10-10: select_mark_in/select_mark_out on the segment panel take a segment edge, the arrows move it on the source timeline, Enter/Escape go back to the segment panel and Wrap."
 }

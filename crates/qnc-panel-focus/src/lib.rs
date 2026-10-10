@@ -111,6 +111,7 @@ impl PanelFocus {
                 if lane {
                     preview.hear_channels(segments.heard_channels());
                 }
+                self.back_to_wrap(segments, wrap, timeline);
                 confirmed
             }
             "activate_focused_item" if panel == Panel::Segments => segments.confirm_program(),
@@ -173,13 +174,25 @@ impl PanelFocus {
             },
             // v5 select_mark_in / select_mark_out: Ctrl+I, Ctrl+O take the source IN, OUT; the
             // arrows move the taken mark, Escape gives the keys back to the playhead.
+            // On the segment panel Ctrl+I, Ctrl+O take the start, the end of the segment
+            // (user 2026-10-10): its clip opens on that edge with the mark taken.
+            "select_mark_in" | "select_mark_out" if panel == Panel::Segments => {
+                self.mark_taken = segments.take_edge(action_id == "select_mark_in");
+                self.mark_taken
+            }
+            // Escape drops a taken segment edge at once and goes back to Wrap.
+            "clear_focus" | "close_player" if on_source && segments.trimming_edge() => {
+                segments.apply_action(action_id);
+                self.back_to_wrap(segments, wrap, timeline)
+            }
             "select_mark_in" | "select_mark_out" if panel == Panel::SourceTimeline => {
                 let key = qnc_source_mark_focus::take(timeline, action_id == "select_mark_in");
                 self.mark_taken = key != MarkKey::Refused;
                 mark_cue(preview, key)
             }
             "step_back_frame" | "step_forward_frame"
-                if panel == Panel::SourceTimeline && self.taken(timeline) =>
+                if panel == Panel::SourceTimeline
+                    && (self.taken(timeline) || (segments.trimming_edge() && qnc_source_mark_focus::is_taken(timeline))) =>
             {
                 let frames = if action_id == "step_back_frame" { -1 } else { 1 };
                 mark_cue(preview, qnc_source_mark_focus::nudge(timeline, frames))
@@ -215,6 +228,19 @@ impl PanelFocus {
             }
             _ => return None,
         })
+    }
+
+    /// A segment edge written or dropped: the mark is let go and the keyboard and
+    /// the Wrap playhead go back to the segment panel.
+    fn back_to_wrap(&mut self, segments: &mut ProgramSegments, wrap: &mut WrapSession, timeline: &mut TimelineProjection) -> bool {
+        let Some(frame) = segments.take_wrap_return() else {
+            return false;
+        };
+        self.mark_taken = false;
+        qnc_source_mark_focus::release(timeline);
+        self.panel = Panel::Segments;
+        wrap.seek(frame);
+        true
     }
 
     /// Tab into a panel: the source timeline shows the source clip again (v5

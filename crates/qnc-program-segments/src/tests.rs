@@ -545,3 +545,18 @@ fn a_segment_of_half_the_story_rate_takes_its_length_in_story_frames() {
     assert_eq!((view.rows[1].start_frame, view.rows[1].end_frame), (10, 30));
     assert_eq!(view.total_frames, 30);
 }
+
+#[test]
+fn ctrl_o_takes_the_end_of_the_segment_under_the_playhead_and_escape_goes_back_to_wrap() {
+    let mut segments = component();
+    let row = segments.view().rows[1].clone();
+    segments.set_playhead(Some(row.start_frame + 3));
+    assert!(segments.take_edge(false));
+    assert!(segments.trimming_edge());
+    let (clip, in_frame, out_frame, take) = segments.take_source_request().expect("the clip opens");
+    assert_eq!((clip, in_frame, out_frame, take), (row.clip_id.clone(), row.source_in_frame, row.source_out_frame, Some(false)));
+    assert_eq!(segments.take_wrap_return(), None, "nothing to go back to while the edge is taken");
+    segments.apply_action("clear_focus");
+    assert!(!segments.trimming_edge());
+    assert_eq!(segments.take_wrap_return(), Some(row.start_frame + 3), "Escape goes back where Wrap was");
+}

@@ -139,7 +139,12 @@ pub struct ProgramSegments {
     sync_commit: bool,
     /// The segment being edited and the clip with IN/OUT the source view should open.
     editing: Option<String>,
-    source_request: Option<(String, u64, u64)>,
+    /// The clip, its IN/OUT and the mark to take (`Some(true)` IN, `Some(false)` OUT).
+    source_request: Option<(String, u64, u64, Option<bool>)>,
+    /// A segment edge taken with Ctrl+I/O on the segment panel (`edit.rs`).
+    edge: Option<edit::EdgeTrim>,
+    /// The Wrap frame to go back to once that edge is written or dropped.
+    wrap_return: Option<u64>,
     /// The marker being moved and its draft program frame (Enter writes it).
     marker_edit: Option<(String, u64)>,
     /// A cover taken with Ctrl+click; Delete removes it.
@@ -465,10 +470,7 @@ impl ProgramSegments {
             SegmentCommand::FocusEmptySlot => self.focus_empty_slot(),
             SegmentCommand::NavigateObject { up } => self.navigate_object(up),
             SegmentCommand::Edit(segment_id) => self.edit(segment_id),
-            SegmentCommand::CancelEdit => {
-                self.editing = None;
-                self.refresh_view("Uredivanje segmenta odustano.".into());
-            }
+            SegmentCommand::CancelEdit => self.cancel_edit(),
             SegmentCommand::CancelMarkerEdit => {
                 if self.cover_taken.take().is_some() {
                     self.refresh_view("Brisanje pokrivalice odustano.".into());
