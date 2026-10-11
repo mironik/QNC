@@ -3392,3 +3392,17 @@ unatrag po prici kako ih salje Wrap. Izmjereno na izoliranoj kopiji (prica 2002 
 originali s kartice; sa i bez pozadine naizmjenicno, 2x): unatrag od 1500 najgore 50-59 ms (bez 0,68-0,78 s), p90 32 ms
 (86-93 ms); unatrag od 300 preko reza pokrivalica najgore 71-96 ms (1,00-1,13 s), p90 47-49 ms (135-140 ms); Play price
 99,2 % slika (99,8-100,2 %), prva slika 164-181 ms (56-90 ms).
+Otvoreno ograniceno odobrenje 2026-10-11 (jedan izvor slika; korisnik: "odkljucaj"): proba na zasticenoj kopiji
+pokazala je da original istodobno dekodiraju player, zasebni izvlakac slika prozora reza (`qnc-trim-stills`, ffmpeg
+prolazi po 17 slika, 0,6-2,5 s, okviri crni dok ne zavrsi) i ingest-worker; pozadina playera zato kasni (7 s umjesto
+1,8 s) i koraci skacu. Plan: prozor reza trazi slike prije i poslije markera/slota od playera (slike koje player vec
+drzi u memoriji), bez drugog dekodiranja; pozadina playera krece odmah kad je rez uzet i pokriva i iza polozaja.
+Pikseli ne idu upravljackim kanalom nego zasebnom frame-mapom sesije. Otkljucano: `qnc-player-contract`,
+`qnc-player-client`, `qnc-player-frame-transport`, `tools/qnc-player-runner`, `qnc-broadcast-engine`,
+`qnc-source-preview`, `qnc-trim-stills`, po potrebi `qnc-editorial-application` (samo poziv), ugovori, testovi,
+`tools/qnc-player-acceptance`. Forme i layout se ne diraju. Probe samo na zasticenoj kopiji (`scratchpad/proba` s
+vlastitom kopijom programa; stvarne baze se provjeravaju prije i poslije).
+Usput zapis: prvo pokretanje probe 2026-10-11 u 20:45 (aplikacija iz `QNC/target/release` uz `QNC_ROOT` zasticene
+kopije) otvorilo je stvarne baze, jer dio aplikacije trazi korijen po mjestu programa; upisano je samo vrijeme
+otvaranja projekta i sistemskih predlozaka u `data/qnc-projects.db` i `worker_lease = off` u `project.db` projekta
+`novi test11`, bez promjene sadrzaja. Zasticena proba od tada radi s kopijom programa unutar zasticenog korijena.
