@@ -48,6 +48,11 @@ pub struct ProcessLaunch {
 pub trait PictureSource: Send {
     /// The next decoded packet, `None` at the end of the request.
     fn next(&mut self) -> Result<Option<(PacketHeader, Vec<u8>)>>;
+    /// Continues as a request starting at `start` would, without opening the media again
+    /// (user 2026-10-11: the decoder stays open and jumps); `false` when it cannot.
+    fn seek(&mut self, _start: Rational) -> Result<bool> {
+        Ok(false)
+    }
 }
 
 /// A decode adapter has no presentation clock, project policy or DB access.

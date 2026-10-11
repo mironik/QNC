@@ -194,6 +194,11 @@ impl VideoSource {
             return Ok(None);
         };
         let mut sink = graph.get("out").ok_or_else(|| stream_error("no graph output"))?;
+        // The sink moves its picture in without freeing what the frame holds (unlike the
+        // decoder's receive), so the last picture is let go first, else every picture
+        // stays in memory (2026-10-12: about 3 MB per picture).
+        // SAFETY: a frame this source owns; unref only drops its buffer references.
+        unsafe { ffi::av_frame_unref(self.filtered.as_mut_ptr()) };
         match sink.sink().frame(&mut self.filtered) {
             Ok(()) => {}
             Err(ff::Error::Eof) => return Ok(None),
@@ -244,6 +249,20 @@ impl VideoSource {
 }
 
 impl PictureSource for VideoSource {
+    /// The same seek as opening at `start`, on the open media and decoder: the decoder is
+    /// emptied, the filter graph made again from the next picture (deinterlace keeps no
+    /// picture of before), the count starts again.
+    fn seek(&mut self, start: Rational) -> Result<bool> {
+        self.trim = Some(seek(&mut self.input, start, self.stream_tb)?);
+        self.decoder.flush();
+        self.graph = None;
+        self.sent_eof = false;
+        self.flushed_graph = false;
+        self.finished = false;
+        self.ordinal = 0;
+        Ok(true)
+    }
+
     fn next(&mut self) -> Result<Option<(PacketHeader, Vec<u8>)>> {
         loop {
             if let Some(picture) = self.take_filtered()? {

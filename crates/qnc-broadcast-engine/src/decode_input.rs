@@ -118,8 +118,11 @@ pub(crate) fn seek_start(source: &SourceRuntime, frame: u64) -> Result<Option<Ra
     if frame >= source.duration_frames {
         return Err(error("seek outside saved duration"));
     }
-    // v4's short decode preroll. Source PTS, never the output ordinal, confirms the target.
-    let start = frame.saturating_sub(25);
+    // A short decode preroll (v4 had 25 pictures): the decoders seek accurately and drop
+    // the pictures before the start themselves, so 2 only cover timestamp rounding; every
+    // preroll picture is still decoded, converted and handed over, then dropped (25 cost a
+    // jump about 200 ms, 2026-10-12). Source PTS, never the output ordinal, confirms the target.
+    let start = frame.saturating_sub(2);
     if start == 0 {
         return Ok(None);
     }
@@ -142,7 +145,7 @@ mod tests {
         assert_eq!(
             seek_start(&source, 3000).unwrap(),
             Some(Rational {
-                numerator: 2975 * 1001,
+                numerator: 2998 * 1001,
                 denominator: 30000
             })
         );

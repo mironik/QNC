@@ -31,14 +31,19 @@ pub struct Decoder {
     state: State,
     child: Option<Child>,
     cancelled: Arc<AtomicBool>,
-    events: Option<Receiver<Event>>,
+    events: Option<Receiver<(u64, Event)>>,
     workers: Vec<thread::JoinHandle<()>>,
     bridge: Option<LoopbackBridge>,
     poll_deadline: Option<Instant>,
     eof_deadline: Option<Instant>,
     /// Asked to work below normal priority (a decoder in this process lowers its thread).
     background: Arc<AtomicBool>,
+    /// The jump the packets belong to (a decoder process has one: 0).
+    generation: u64,
+    /// A decoder in this process takes a jump here: (generation, start).
+    seek_control: Option<SeekControl>,
 }
+type SeekControl = Arc<Mutex<Option<(u64, qnc_media_metadata::Rational)>>>;
 impl Decoder {
     pub fn open(request: DecodeRequest, media: MediaStream, config: DecoderConfig) -> Result<Self> {
         let plan = DecodePlan::new(&request, &config)?;
@@ -149,6 +154,8 @@ impl Decoder {
             poll_deadline: None,
             eof_deadline: None,
             background: Arc::new(AtomicBool::new(false)),
+            generation: 0,
+            seek_control: None,
         };
         if let Some(mut stdin) = stdin {
             let worker = thread::Builder::new()
@@ -249,7 +256,14 @@ impl Decoder {
                     )),
                 };
             }
-            match self.events.as_ref().expect("running receiver").try_recv() {
+            // What a decoder made before its last jump (`seek`) is no longer asked for.
+            let received = loop {
+                match self.events.as_ref().expect("running receiver").try_recv() {
+                    Ok((generation, _)) if generation != self.generation => continue,
+                    other => break other.map(|(_, event)| event),
+                }
+            };
+            match received {
                 Ok(Event::Packet(packet)) => {
                     self.poll_deadline = None;
                     Ok(Poll::Ready(Some(packet)))
@@ -299,10 +313,17 @@ impl Decoder {
         let event = if self.eof_deadline.is_some() {
             Ok(Event::End)
         } else {
-            self.events
-                .as_ref()
-                .expect("running receiver")
-                .recv_timeout(self.config.read_timeout)
+            loop {
+                match self
+                    .events
+                    .as_ref()
+                    .expect("running receiver")
+                    .recv_timeout(self.config.read_timeout)
+                {
+                    Ok((generation, _)) if generation != self.generation => continue,
+                    other => break other.map(|(_, event)| event),
+                }
+            }
         };
         let result = match event {
             Ok(Event::Packet(packet)) => {
@@ -324,7 +345,10 @@ impl Decoder {
             Ok(()) => self.state = State::Finished,
             Err(e) => self.state = State::Failed(e.clone()),
         }
-        self.shutdown();
+        // A decoder in this process stays at the end of its stream for a jump.
+        if self.seek_control.is_none() || result.is_err() {
+            self.shutdown();
+        }
         result.map(|_| None)
     }
     fn finish(&mut self) -> Result<()> {
@@ -485,7 +509,7 @@ fn read_headers(
 fn read_packets(
     mut stdout: impl Read,
     headers: Receiver<Result<PacketHeader>>,
-    tx: Sender<Event>,
+    tx: Sender<(u64, Event)>,
     stop: Arc<AtomicBool>,
     request: DecodeRequest,
     plan: DecodePlan,
@@ -526,7 +550,7 @@ fn read_packets(
             }
         }
     };
-    pump(next, &tx, &stop, &request, &plan, || no_packets_error(&stderr_capture));
+    pump(next, &tx, &stop, &request, &plan, || no_packets_error(&stderr_capture), 0);
 }
 
 /// The decoded packets of one request, from a decoder process or a decoder inside this
@@ -534,11 +558,12 @@ fn read_packets(
 /// and the saved frame count when the whole stream is decoded) and queued.
 fn pump(
     mut next: impl FnMut() -> Result<Option<(PacketHeader, Vec<u8>)>>,
-    tx: &Sender<Event>,
+    tx: &Sender<(u64, Event)>,
     stop: &AtomicBool,
     request: &DecodeRequest,
     plan: &DecodePlan,
     no_packets: impl Fn() -> DecodeError,
+    generation: u64,
 ) {
     let result = (|| -> Result<()> {
         let mut ordinal = 0;
@@ -586,7 +611,7 @@ fn pump(
                 format: plan.format.clone(),
                 bytes,
             };
-            if !send(tx, Event::Packet(packet), stop) {
+            if !send(tx, (generation, Event::Packet(packet)), stop) {
                 return Ok(());
             }
             ordinal += 1;
@@ -635,10 +660,13 @@ fn pump(
     if !stop.load(Ordering::Acquire) {
         send(
             tx,
-            match result {
-                Ok(()) => Event::End,
-                Err(e) => Event::Failed(e),
-            },
+            (
+                generation,
+                match result {
+                    Ok(()) => Event::End,
+                    Err(e) => Event::Failed(e),
+                },
+            ),
             stop,
         );
     }
@@ -646,7 +674,8 @@ fn pump(
 
 impl Decoder {
     /// A decoder inside this process: one thread takes its packets and queues them like
-    /// the readers of a decoder process; cancel and drop stop it the same way.
+    /// the readers of a decoder process; cancel and drop stop it the same way. It stays
+    /// after the end of its stream for a jump (`seek`).
     fn in_process(
         request: DecodeRequest,
         mut source: Box<dyn PictureSource>,
@@ -656,20 +685,51 @@ impl Decoder {
     ) -> Result<Self> {
         let cancelled = Arc::new(AtomicBool::new(false));
         let background = Arc::new(AtomicBool::new(false));
+        let control: SeekControl = Arc::new(Mutex::new(None));
         let (events_tx, events_rx) = crossbeam_channel::bounded(config.queued_packets);
-        let (stop, lower, asked) = (cancelled.clone(), background.clone(), request.clone());
+        let (stop, lower, jumps, mut asked) = (cancelled.clone(), background.clone(), control.clone(), request.clone());
         let worker = thread::Builder::new()
             .name("qnc-decode-in-process".into())
             .spawn(move || {
                 let mut lowered = false;
-                let next = || {
-                    if !lowered && lower.load(Ordering::Acquire) {
-                        lower_this_thread();
-                        lowered = true;
+                let mut generation = 0;
+                loop {
+                    let next = || {
+                        if !lowered && lower.load(Ordering::Acquire) {
+                            lower_this_thread();
+                            lowered = true;
+                        }
+                        // A jump ends this pass; its end is of an old generation.
+                        if jumps.lock().map(|jump| jump.is_some()).unwrap_or(true) {
+                            return Ok(None);
+                        }
+                        source.next()
+                    };
+                    pump(next, &events_tx, &stop, &asked, &plan, || stream_error("decoder returned no packets"), generation);
+                    // The next jump, or the end of the decoder.
+                    loop {
+                        if stop.load(Ordering::Acquire) {
+                            return;
+                        }
+                        let jump = jumps.lock().ok().and_then(|mut jump| jump.take());
+                        let Some((next_generation, start)) = jump else {
+                            thread::sleep(Duration::from_millis(2));
+                            continue;
+                        };
+                        generation = next_generation;
+                        asked.start = Some(start);
+                        match source.seek(start) {
+                            Ok(true) => break,
+                            Ok(false) => {
+                                let failed = DecodeError::new(ErrorKind::Unsupported, "decoder cannot jump");
+                                send(&events_tx, (generation, Event::Failed(failed)), &stop);
+                            }
+                            Err(error) => {
+                                send(&events_tx, (generation, Event::Failed(error)), &stop);
+                            }
+                        }
                     }
-                    source.next()
-                };
-                pump(next, &events_tx, &stop, &asked, &plan, || stream_error("decoder returned no packets"));
+                }
             })
             .map_err(|_| DecodeError::new(ErrorKind::Process, "cannot start decoder thread"))?;
         Ok(Self {
@@ -684,7 +744,32 @@ impl Decoder {
             poll_deadline: None,
             eof_deadline: None,
             background,
+            generation: 0,
+            seek_control: Some(control),
         })
+    }
+
+    /// Continues as a decoder opened at `start` would, without opening the media again
+    /// (user 2026-10-11: the decoder stays open and jumps): the packets made before are
+    /// dropped. `false` when this decoder cannot (a decoder process, or one that failed
+    /// or was shut down); the caller opens a new one then.
+    pub fn seek(&mut self, start: qnc_media_metadata::Rational) -> Result<bool> {
+        let (Some(control), Some(events)) = (&self.seek_control, &self.events) else {
+            return Ok(false);
+        };
+        if matches!(self.state, State::Failed(_)) {
+            return Ok(false);
+        }
+        self.generation += 1;
+        *control
+            .lock()
+            .map_err(|_| DecodeError::new(ErrorKind::Process, "decoder control poisoned"))? = Some((self.generation, start));
+        while events.try_recv().is_ok() {} // the queue of the old pass frees at once
+        self.request.start = Some(start);
+        self.state = State::Running;
+        self.poll_deadline = None;
+        self.eof_deadline = None;
+        Ok(true)
     }
 }
 

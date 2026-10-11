@@ -3495,3 +3495,16 @@ deinterlace, svaki field, pola brzine, stvarni original s kartice od cetiri mjes
 prve slike 170-260 ms (otvaranje MXF-a 65 ms), `ffmpeg` naredba 240-310 ms; u playeru skok koji ponovno otvara
 dekoder 385 ms prema 460 ms. Katalog u repozitoriju nije promijenjen (mjereno s kopijom kataloga u scratchpadu).
 Sljedeci korak: dekoder ostaje otvoren i skace unutar sebe (bez novog otvaranja), dijeljenje po dijelovima slike.
+Izvedeno 2026-10-12 (korak 2, grana `libav-decoder`; korisnik "nastavi"): dekoder u procesu ostaje otvoren i skace
+unutar sebe. `qnc-media-decode`: `PictureSource::seek`, `Decoder::seek(start) -> bool` (nova generacija, paketi starog
+prolaza se odbacuju; dekoder procesa vraca `false` i engine otvara novi kao prije), dekoder u procesu ostaje nakon
+kraja toka. `qnc-libav-decode` `VideoSource::seek` (isti skok kao otvaranje na `start`: flush dekodera, filter graf
+iznova). `qnc-broadcast-engine`: `reopen` prvo trazi skok u otvorenom dekoderu; predhod skoka 2 slike umjesto 25
+(dekoderi skacu tocno i sami odbacuju slike prije pocetka; 25 je kostalo ~200 ms po skoku). Popravljeno curenje
+memorije u kocki: izlaz filter grafa premjesta sliku u okvir bez oslobadjanja prethodne, pa je svaka predana slika
+(~3 MB) ostajala u memoriji (120 skokova: 1,6 GB -> najvise 122 MB); zbog toga je CLI usporedba u punom skupu testova
+povremeno padala bez memorije. Dokaz: 40 skokova na originalu s kartice daju bajt za bajt iste slike kao svjeze
+otvaranje `ffmpeg` naredbom; svih 6 testova kocke prolazi zajedno. Izmjereno u playeru (izolirana kopija, original
+2002): najgori skok 207-260 ms (CLI 456-490 ms), skok +40 73-81 ms (153-225 ms); play klipa 2/2 PASS. Repozitorijski
+katalog nije promijenjen. Nije izvedeno: dekoderi price (Wrap) jos otvaraju novi dekoder, zvuk ostaje na `ffmpeg`
+naredbi, kocka nije u zasticenoj kopiji aplikacije za zivu probu.

@@ -789,14 +789,23 @@ impl Video {
         gpu.sequence = 0;
         gpu.images.clear();
         drop(gpu);
+        // A decoder that stays open jumps (user 2026-10-11: no new process and no new
+        // open of the media); one that cannot is replaced by a new one opened at `from`.
+        let start = seek_start(&self.plan.source, from)?;
+        let jumped = self
+            .decoder
+            .seek(start.unwrap_or(qnc_media_metadata::Rational { numerator: 0, denominator: 1 }))
+            .map_err(error)?;
         if qnc_dev_diagnostics::player_diagnostics_enabled() {
             qnc_dev_diagnostics::log_line(
                 qnc_dev_diagnostics::DiagnosticsStream::Player,
-                format!("player-video reopen frame={frame} from={from} back={stepping_back}"),
+                format!("player-video reopen frame={frame} from={from} back={stepping_back} jumped={jumped}"),
             );
         }
-        let decoder = self.input.open(self.plan.video_index, seek_start(&self.plan.source, from)?)?;
-        retire(std::mem::replace(&mut self.decoder, decoder));
+        if !jumped {
+            let decoder = self.input.open(self.plan.video_index, start)?;
+            retire(std::mem::replace(&mut self.decoder, decoder));
+        }
         self.discard_before = Some(from);
         self.ready.clear();
         if has_output {
