@@ -3373,3 +3373,19 @@ spremljenog pocetnog PTS-a kao u playeru; intra se pamti po klipu. `qnc-ffmpeg-d
 `say`), `qnc-panel-focus` (gore/dolje na uzetom rezu, `poll` primjenjuje odgovor), `qnc-editorial-application` (isti
 broj redaka). Provjereno na proxyju 2686 (GOP 24): od 30 naprijed +18, unatrag -6, od 48 naprijed +24. Omjer 2:1
 price i izvora pri skoku slota/markera nije uzet u obzir (skok je u slikama izvora).
+Spremljena verzija 2026-10-11 (korisnik: "spremi trenutno stanje kao verziju, kompletnu, kako bi se mogli vratiti
+na nju ako nesto krene krivo, pa tek onda otkljucaj"): git oznaka `v-2026-10-11-pre-intra-preview` (commit `c0f2a82`)
+i kompletna kopija u `C:\Users\miron\Projects\QNC-versions\2026-10-11-pre-intra` (git bundle svih grana, release
+programi, sigurne kopije baza i konfiguracije iz `data/`, baza aktivnog projekta, upute `VRATI.md`).
+Mjerenje 2026-10-11 (izolirana kopija, prica 2002/2676/2677/2686 pustena iz originala kao da proxyja nema): original
+s kartice FAIL 3/3 (98,2-99,3 % slika, 6-7 trzaja do 141 ms, procesor 35 %); danasnja optimizirana kopija (H.264
+1920 GOP 10) 2/4 cisto, procesor 21-23 %, 17 GB/h; H.264 All-Intra 960x540 (postavke QIC-a) PASS 3/3 (rupe 22-23 ms,
+procesor 12 %, 17 slika za trim 0,17-0,19 s, 6,5 GB/h, izrada 400 s za 144 s).
+Otvoreno ograniceno odobrenje 2026-10-11 (intra pregled, faza 1; korisnik: "dosta snimatelja ne snima proxy u
+kameri", "otkljucaj"): nova opcija uvoza u Project postavkama koja pravi kopiju za pregled kao H.264 All-Intra 960x540
+(GOP 1), sa svim audio tokovima i timecodeom originala, kroz postojeci red uvoza i postojeci opis kopije; player je
+pusta kroz postojeci "Optimizirani ako postoji"; export i dalje iz originala. Otkljucano: Project (`qnc-project-blocks`,
+`contracts/ui/project.layout.json` samo izbori Advanced postavki, po potrebi `seed/system_seed.json`),
+`qnc-work-settings`, `qnc-ingest-work-plan`, `qnc-media-optimize`, `qnc-ingest-import-worker`, `qnc-player-input` samo
+ako je nuzno, ugovori tih modula, testovi, root Cargo. Player, monitor, forme i layout ostalo ne diraju se.
+Faza 2 (izrada segmenata oko playheada dok kopija nije gotova, QIC) nije dio ovog odobrenja.
