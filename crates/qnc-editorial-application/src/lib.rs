@@ -90,6 +90,7 @@ pub struct EditorialApplication {
     pending_marks: qnc_pending_marks::PendingMarks,
     trim_stills: qnc_trim_stills::TrimStills,
     short_stills: VirtualShortStillCache,
+    pool_shots: qnc_virtual_shots::PoolShotsReader,
     segments: qnc_program_segments::ProgramSegments,
     wrap: qnc_wrap_session::WrapSession,
     focus: PanelFocus,
@@ -113,6 +114,7 @@ impl Default for EditorialApplication {
             pending_marks: qnc_pending_marks::PendingMarks::new(),
             trim_stills: qnc_trim_stills::TrimStills::new(),
             short_stills: VirtualShortStillCache::default(),
+            pool_shots: Default::default(),
             segments: qnc_program_segments::ProgramSegments::new(),
             wrap: qnc_wrap_session::WrapSession::new(),
             focus: PanelFocus::new(),
@@ -223,6 +225,7 @@ impl EditorialApplication {
                 ),
             };
         }
+        changed |= self.pool_shots.take().map(|rows| self.apply_shorts(rows)).is_some();
         self.sync_preview_view();
         changed
     }
@@ -551,23 +554,19 @@ impl EditorialApplication {
     }
 
     fn reload_shorts(&mut self) {
-        let Some((_, target)) = self.content_target.as_ref() else {
-            self.view.shorts.clear();
-            return;
-        };
-        match qnc_virtual_shots::list_pool_shots(target) {
+        let Some((_, target)) = self.content_target.as_ref() else { return self.view.shorts.clear() };
+        self.pool_shots.request(target); // read off the form thread
+    }
+
+    fn apply_shorts(&mut self, rows: Result<Vec<qnc_virtual_shots::ShortClip>, String>) {
+        match rows {
             Ok(rows) => {
-                let previous = std::mem::take(&mut self.view.shorts);
-                let mut shorts: Vec<EditorialShort> =
-                    rows.into_iter().map(|row| self.short_card(row)).collect();
-                qnc_virtual_short_cards::preserve_loaded_posters(&mut shorts, &previous);
+                let mut shorts: Vec<EditorialShort> = rows.into_iter().map(|row| self.short_card(row)).collect();
+                qnc_virtual_short_cards::preserve_loaded_posters(&mut shorts, &self.view.shorts);
                 self.view.shorts = shorts;
                 self.request_posters();
             }
-            Err(error) => {
-                self.view.shorts.clear();
-                self.view.message = error;
-            }
+            Err(error) => { self.view.shorts.clear(); self.view.message = error }
         }
     }
 

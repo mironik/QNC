@@ -3455,3 +3455,10 @@ izvor dopusta (IN ne ide ispod 0, pokrivalica se tada samo produlji), a pomak se
 provjera kraja klipa iz prethodnog popravka je uklonjena (pokrivalica koja prelazi kraj klipa pusta se do kraja,
 `qnc-program-input` `fit_covers`), a s njom i `qnc-content-read` `duration_frames_on`. `qnc-program-db`,
 `qnc-program-view` (nacrt isto), testovi, ugovor `story.database.json` (`roll_edit`).
+Popravak 2026-10-11 (korisnik: "puno se ceka pojava playheada na source timeline i nekih filmstrip"): privremeno
+mjerenje koraka sucelja Storyja (uklonjeno) pokazalo je 2,9 s u ponovnom citanju virtualnih kadrova nakon promjene
+price (`list_pool_shots` na niti sucelja ceka bazu dok pozadinski proces upisuje filmstrip/wave). Novi
+`qnc-virtual-shots::PoolShotsReader` cita ih u pozadini (zahtjev usred citanja cita se jos jednom poslije), a
+`qnc-editorial-application` ih samo trazi i preuzima (C10 708 -> 706). Priprema playera za vrijeme tog upisa i dalje
+traje do ~3 s (citanje klipa ceka bazu, izvan sucelja). Svenk: na jednom rezu price (slika 1259) dekoder otvoren
+unaprijed nije dao prvu sliku na vrijeme, player je cekao ~10 slika, HDMI je preskocio 4; ostalo 251/251. Otvoreno.

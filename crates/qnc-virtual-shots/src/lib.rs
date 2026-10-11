@@ -162,6 +162,44 @@ pub fn list_pool_shots(target: &ProjectDbTarget) -> Result<Vec<ShortClip>> {
     Ok(shots)
 }
 
+/// `list_pool_shots` off the caller's thread (user 2026-10-11: the form stood 2.9 s
+/// while the read waited for a background write to the project database). A request
+/// while one reads is read again after it; `take` gives the newest finished read once.
+#[derive(Default)]
+pub struct PoolShotsReader {
+    reading: Option<std::sync::mpsc::Receiver<Result<Vec<ShortClip>>>>,
+    again: Option<ProjectDbTarget>,
+}
+
+impl PoolShotsReader {
+    pub fn request(&mut self, target: &ProjectDbTarget) {
+        if self.reading.is_some() {
+            self.again = Some(target.clone());
+            return;
+        }
+        let (send, receive) = std::sync::mpsc::channel();
+        let target = target.clone();
+        let spawned = std::thread::Builder::new()
+            .name("qnc-pool-shots".into())
+            .spawn(move || _ = send.send(list_pool_shots(&target)));
+        self.reading = spawned.is_ok().then_some(receive);
+    }
+
+    pub fn take(&mut self) -> Option<Result<Vec<ShortClip>>> {
+        let result = match self.reading.as_ref()?.try_recv() {
+            Ok(result) => result,
+            Err(std::sync::mpsc::TryRecvError::Empty) => return None,
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => Err("Citanje virtualnih kadrova je prekinuto.".into()),
+        };
+        self.reading = None;
+        if let Some(target) = self.again.take() {
+            self.request(&target);
+            return None; // a newer read follows
+        }
+        Some(result)
+    }
+}
+
 /// Writes of the virtual shots of the active project, through the one serial
 /// writer of its database in this process.
 #[derive(Debug, Clone)]
