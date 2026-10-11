@@ -3423,3 +3423,10 @@ Izvedeno: `qnc-trim-stills` ima jednog pozadinskog radnika koji uvijek uzima sli
 nacrtu, svaki prolaz se pokaze cim je gotov, prolaz koji zapne prekida se nakon 8 s; ne ceka se 250 ms na player
 (i dalje ga pita, prva stigla slika se pokaze); prolaz izvlaci 25 slika (12 sa svake strane); dok nova slika ne
 stigne, mjesto u prozoru drzi zadnju sliku koju je pokazalo.
+Live 2026-10-11 (korisnik: GOP skokovi slota rade, "pomicanje po sliku nije dobro"; "pomicanje markera pokazuje samo
+slicicu prethodnog klipa, a novu granicnu slicicu sljedeceg slota ne mijenja"): log pokazuje tocne trazene slike;
+prolaz izvlacenja s kartice traje 0,75-1 s za 25 slika, pa strelica po slici stigne prolaz. `qnc-trim-stills` sada
+nakon slika koje nedostaju izvlaci i sljedece slike u smjeru zadnjeg pomaka (prolaz pocinje od prve neizvucene,
+do dva prolaza ispred). Marker: slika poslije markera ostaje ista jer sljedeci slot ima pokrivalicu, a baza
+(`qnc-program-db` `rebind_covers`) pokrivalicu uvijek pusta od njezina IN-a; prikaz to tocno pokazuje. Promjena
+tog pravila (pomak markera pomice i IN pokrivalice sljedeceg slota) ceka odluku korisnika.

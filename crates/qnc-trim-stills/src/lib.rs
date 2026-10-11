@@ -43,12 +43,14 @@ const STUCK: Duration = Duration::from_secs(8);
 
 type Decoded = Vec<(StillPicture, Result<Arc<RgbaImage>, String>)>;
 type Located = Arc<Mutex<HashMap<String, LocatedPicture>>>;
+/// A picture to make and the first frame of the pass that makes it.
+type Want = (StillPicture, u64);
 
 /// The background worker: it takes the first of `wanted` (the newest draft, kept up to
 /// date by `fill`), sends each pass when made and ends when nothing is wanted.
 struct Job {
     receiver: mpsc::Receiver<Decoded>,
-    wanted: Arc<Mutex<Vec<StillPicture>>>,
+    wanted: Arc<Mutex<Vec<Want>>>,
     /// When the pass being made started.
     pass: Arc<Mutex<Option<Instant>>>,
     cancel: Arc<AtomicBool>,
@@ -68,6 +70,9 @@ pub struct TrimStills {
     asked_player: HashSet<StillPicture>,
     /// The last picture each place of the zoom (by its name) showed.
     shown: HashMap<String, Arc<RgbaImage>>,
+    /// Each place's last picture and the way its frame last moved (+1, -1), for making
+    /// the next pictures ahead of the arrow.
+    moving: HashMap<String, (StillPicture, i8)>,
 }
 
 impl TrimStills {
@@ -125,17 +130,62 @@ impl TrimStills {
             }
         }
         // The player holds only the pictures around where it stands; the others are
-        // decoded here at once, whichever comes first is shown.
+        // decoded here at once, whichever comes first is shown. Then the pictures the
+        // arrow reaches next, so stepping frame by frame finds them made.
+        let mut wants: Vec<Want> =
+            missing.iter().map(|picture| (picture.clone(), picture.source_frame.saturating_sub(RUN_BACK))).collect();
+        for (picture, first) in self.ahead(view) {
+            if !wants.iter().any(|(want, _)| *want == picture) {
+                wants.push((picture, first));
+            }
+        }
         match &self.job {
             Some(job) => {
                 if let Ok(mut wanted) = job.wanted.lock() {
-                    *wanted = missing;
+                    *wanted = wants;
                 }
             }
-            None if !missing.is_empty() => self.start(missing, locator),
+            None if !wants.is_empty() => self.start(wants, locator),
             None => {}
         }
         arrived
+    }
+
+    /// For each place whose picture moves frame by frame, the first picture not yet made
+    /// in that direction within two passes, with a pass that starts there.
+    fn ahead(&mut self, view: &SegmentsView) -> Vec<Want> {
+        let mut ahead = Vec::new();
+        let mut seen = HashSet::new();
+        for still in view.edit_stills.iter().chain(&view.source_edit_stills) {
+            let Some(picture) = &still.picture else { continue };
+            seen.insert(still.label.clone());
+            let way = match self.moving.get(&still.label) {
+                Some((last, way)) if last.clip_id == picture.clip_id && last.source_frame != picture.source_frame => {
+                    if picture.source_frame > last.source_frame { 1 } else { -1 }
+                }
+                Some((last, way)) if last == picture => *way,
+                _ => 0,
+            };
+            self.moving.insert(still.label.clone(), (picture.clone(), way));
+            if way == 0 {
+                continue;
+            }
+            let next = (1..=2 * u64::from(RUN))
+                .filter_map(|step| match way {
+                    1 => picture.source_frame.checked_add(step),
+                    _ => picture.source_frame.checked_sub(step),
+                })
+                .map(|frame| StillPicture { clip_id: picture.clip_id.clone(), source_frame: frame })
+                .find(|frame| !self.cache.contains_key(frame) && !self.failed.contains(frame));
+            if let Some(next) = next {
+                let first = if way > 0 { next.source_frame } else { next.source_frame.saturating_sub(u64::from(RUN) - 1) };
+                if !ahead.iter().any(|(want, _)| *want == next) {
+                    ahead.push((next, first));
+                }
+            }
+        }
+        self.moving.retain(|label, _| seen.contains(label));
+        ahead
     }
 
     /// The pictures the player sent, into the cache.
@@ -212,7 +262,7 @@ impl TrimStills {
         arrived
     }
 
-    fn start(&mut self, pictures: Vec<StillPicture>, locator: StillLocator) {
+    fn start(&mut self, pictures: Vec<Want>, locator: StillLocator) {
         let (send, receiver) = mpsc::channel();
         let cancel = Arc::new(AtomicBool::new(false));
         let wanted = Arc::new(Mutex::new(pictures));
@@ -232,21 +282,21 @@ impl TrimStills {
 /// one, until nothing is wanted (or the job is cancelled or let go).
 fn work(
     send: &mpsc::Sender<Decoded>,
-    wanted: &Mutex<Vec<StillPicture>>,
+    wanted: &Mutex<Vec<Want>>,
     pass: &Mutex<Option<Instant>>,
     locator: &StillLocator,
     located: &Located,
     cancel: &AtomicBool,
 ) {
     while !cancel.load(Ordering::Acquire) {
-        let Some(picture) = wanted.lock().ok().and_then(|wanted| wanted.first().cloned()) else {
+        let Some((picture, first)) = wanted.lock().ok().and_then(|wanted| wanted.first().cloned()) else {
             return;
         };
         let started = Instant::now();
         if let Ok(mut pass) = pass.lock() {
             *pass = Some(started);
         }
-        let made: Decoded = match decode_run(&picture, locator, located, cancel) {
+        let made: Decoded = match decode_run(&picture, first, locator, located, cancel) {
             Ok(run) => {
                 log(&format!(
                     "trim-stills run {}:{} pictures={} ms={}",
@@ -263,7 +313,7 @@ fn work(
         };
         // Until `fill` brings the next draft, what this pass made is not wanted again.
         if let Ok(mut wanted) = wanted.lock() {
-            wanted.retain(|want| !made.iter().any(|(done, _)| done == want));
+            wanted.retain(|(want, _)| !made.iter().any(|(done, _)| done == want));
         }
         if send.send(made).is_err() {
             return;
@@ -271,9 +321,10 @@ fn work(
     }
 }
 
-/// `RUN` pictures of the clip around `picture`, as decoded.
+/// `RUN` pictures of the clip from `first` (the pass that makes `picture`), as decoded.
 fn decode_run(
     picture: &StillPicture,
+    first: u64,
     locator: &StillLocator,
     located: &Located,
     cancel: &AtomicBool,
@@ -293,7 +344,6 @@ fn decode_run(
         .map_err(|error| error.to_string())?
         .ok_or("Ovo racunalo nema izvlakac slika u katalogu dekodera.")?;
     let (num, den) = place.fps;
-    let first = picture.source_frame.saturating_sub(RUN_BACK);
     // A quarter of a frame early: the first picture at or after it is the frame itself.
     let seek = ((first as f64 - 0.25) * f64::from(den) / f64::from(num.max(1))).max(0.0);
     let scratch = scratch_dir();
@@ -362,6 +412,26 @@ mod tests {
         assert!(!stills.fill(&mut view, None, None));
         assert!(!stills.loading());
         assert!(view.edit_stills[0].image.is_none());
+    }
+
+    #[test]
+    fn the_pictures_ahead_of_the_arrow_are_wanted_in_its_direction() {
+        let mut stills = TrimStills::new();
+        let at = |frame| SegmentsView {
+            edit_stills: vec![qnc_program_view::EditStill::new(
+                10,
+                true,
+                Some(StillPicture { clip_id: "c".into(), source_frame: frame }),
+            )],
+            ..Default::default()
+        };
+        assert!(stills.ahead(&at(100)).is_empty(), "no direction before a move");
+        let right = stills.ahead(&at(101));
+        assert_eq!(right, vec![(StillPicture { clip_id: "c".into(), source_frame: 102 }, 102)]);
+        let left = stills.ahead(&at(100));
+        assert_eq!(left, vec![(StillPicture { clip_id: "c".into(), source_frame: 99 }, 99 - u64::from(RUN) + 1)]);
+        // Standing still keeps the direction of the last move.
+        assert_eq!(stills.ahead(&at(100)), left);
     }
 
     /// QNC_TRIM_FILE=<a local 50p media file, read only> QNC_TRIM_OUT=<scratch dir>.
