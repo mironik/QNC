@@ -331,7 +331,7 @@ impl Runtime {
             back: None,
         }));
         let back = has_monitor
-            .then(|| Rc::new(RefCell::new(backfill::BackFill::new(&plan, decode_input.clone()))));
+            .then(|| Rc::new(RefCell::new(backfill::BackFill::for_clip(&plan, decode_input.clone()))));
         gpu.borrow_mut().back = back.clone();
         let source = plan.source.clone();
         let mut engine = TransportEngine::new(
@@ -830,7 +830,7 @@ impl Video {
 
     /// A picture the background made, shown like a kept one.
     fn back_picture(&mut self, frame: u64) -> Option<DecodedVideoFrame<Picture>> {
-        let rgba = self.back.as_ref()?.borrow().picture(frame)?;
+        let (raster, rgba) = self.back.as_ref()?.borrow().picture(frame)?;
         let header = FrameHeader {
             version: qnc_video_output::VERSION.into(),
             session_id: self.gpu.borrow().config.session_id.clone(),
@@ -838,8 +838,8 @@ impl Video {
             sequence: 0,
             source_id: self.plan.source.source_id.clone(),
             frame_number: frame,
-            width: self.raster_size[0],
-            height: self.raster_size[1],
+            width: raster[0],
+            height: raster[1],
             pixel_format: PixelFormat::Rgba8Srgb,
         };
         let picture = DecodedVideoFrame {

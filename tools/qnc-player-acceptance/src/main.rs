@@ -21,6 +21,7 @@ struct Args {
     steps: Vec<String>,
     jumps: Vec<String>,
     back: Vec<String>,
+    program_back: Vec<u64>,
     seconds: u64,
     /// Also run the program output on the external screen and measure what it showed.
     hdmi: bool,
@@ -29,7 +30,7 @@ struct Args {
 }
 
 fn args() -> Result<Args, String> {
-    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), jumps: Vec::new(), back: Vec::new(), seconds: 10, hdmi: false, start: 0 };
+    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), jumps: Vec::new(), back: Vec::new(), program_back: Vec::new(), seconds: 10, hdmi: false, start: 0 };
     let mut list = std::env::args().skip(1);
     while let Some(arg) = list.next() {
         if arg == "--hdmi" {
@@ -44,13 +45,14 @@ fn args() -> Result<Args, String> {
             "--steps" => parsed.steps.push(value),
             "--jumps" => parsed.jumps.push(value),
             "--back" => parsed.back.push(value),
+            "--program-back" => parsed.program_back.push(value.parse().map_err(|_| "--program-back FRAME")?),
             "--start" => parsed.start = value.parse().map_err(|_| "--start FRAME")?,
             "--seconds" => parsed.seconds = value.parse().map_err(|_| "--seconds N")?,
             other => return Err(format!("unknown argument {other}")),
         }
     }
     if parsed.root.as_os_str().is_empty() {
-        return Err("usage: qnc-player-acceptance --root <isolated QNC root> [--clip NAME]... [--program FRAME]... [--steps NAME]... [--jumps NAME]... [--back NAME]... [--seconds N] [--hdmi]".into());
+        return Err("usage: qnc-player-acceptance --root <isolated QNC root> [--clip NAME]... [--program FRAME]... [--steps NAME]... [--jumps NAME]... [--back NAME]... [--program-back FRAME]... [--seconds N] [--hdmi]".into());
     }
     Ok(parsed)
 }
@@ -461,6 +463,34 @@ fn back(preview: &mut SourcePreview, run: &mut Steps, start: u64) {
     run.burst_ms = Some(0);
 }
 
+/// The same steps back on the story program, as Wrap makes them (a cue per step on the
+/// program's own frames).
+fn program_back(preview: &mut SourcePreview, run: &mut Steps, start: u64) {
+    preview.show_program_frame(start, true);
+    if let Err(error) = wait_ready(preview, Duration::from_secs(20)) {
+        run.error = Some(error);
+        return;
+    }
+    if wait_shown(preview, start, Duration::from_secs(10)).is_none() {
+        run.error = Some("the start frame did not show".into());
+        return;
+    }
+    std::thread::sleep(Duration::from_secs(4));
+    let mut at = start;
+    for _ in 0..60 {
+        at -= 1;
+        let call = Instant::now();
+        preview.show_program_frame(at, false);
+        run.call_us.push(call.elapsed().as_micros());
+        match wait_shown(preview, at, Duration::from_secs(5)) {
+            Some(_) => run.single_ms.push(call.elapsed().as_millis()),
+            None => run.missed += 1,
+        }
+        std::thread::sleep(Duration::from_millis(80));
+    }
+    run.burst_ms = Some(0);
+}
+
 fn percentile(values: &[u128], p: f64) -> u128 {
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
@@ -526,6 +556,11 @@ fn main() -> Result<(), String> {
             }
             None => run.error = Some("no such clip".into()),
         }
+        step_runs.push(run);
+    }
+    for start in &args.program_back {
+        let mut run = Steps { name: format!("program back {start}"), ..Steps::default() };
+        program_back(&mut preview, &mut run, *start);
         step_runs.push(run);
     }
     for wanted in &args.back {

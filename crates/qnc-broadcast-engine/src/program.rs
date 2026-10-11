@@ -163,6 +163,8 @@ pub(crate) struct ProgramVideo {
     kept_from: u64,
     prefetch_frames: usize,
     gpu: SharedVideo,
+    /// The pictures before where the program stands, made in the background.
+    back: Option<Rc<RefCell<crate::backfill::BackFill>>>,
 }
 
 impl ProgramVideo {
@@ -208,6 +210,19 @@ impl ProgramVideo {
             };
             clips.push((clip.clone(), input.clone(), worker));
         }
+        // The pieces of the program for the background: each picture item from its clip,
+        // an Off item without a picture.
+        let pieces = plan
+            .video
+            .iter()
+            .map(|span| crate::backfill::Piece {
+                record: (span.record_in, span.record_out),
+                picture: span.video.map(|(clip, source_in)| (plan.clips[clip].clone(), inputs[clip].clone(), source_in)),
+            })
+            .collect();
+        let per_second = plan.source.timebase.fps_num as f64 / plan.source.timebase.fps_den.max(1) as f64;
+        let back = Rc::new(RefCell::new(crate::backfill::BackFill::new(pieces, per_second)));
+        gpu.borrow_mut().back = Some(back.clone());
         Ok(Self {
             source: plan.source.clone(),
             spans: plan.video.clone(),
@@ -222,6 +237,7 @@ impl ProgramVideo {
             kept_from: 0,
             prefetch_frames,
             gpu,
+            back: Some(back),
         })
     }
 
@@ -477,6 +493,13 @@ impl VideoDecodeAdapter for ProgramVideo {
         if request.source_id != self.source.source_id || request.timebase != self.source.timebase {
             return Err(error("video request differs from the program"));
         }
+        if self.gpu.borrow().playing {
+            // Playing: the background gives way to the playing decoder.
+            if let Some(back) = &self.back {
+                back.borrow_mut().pause();
+            }
+        }
+        let cued = self.pending_seek.is_some();
         if let Some(frame) = self.pending_seek {
             if request.frame != frame {
                 return Err(error("seek target mismatch"));
@@ -485,10 +508,11 @@ impl VideoDecodeAdapter for ProgramVideo {
             let stepping_back = frame < self.cue_anchor;
             self.cue_anchor = frame;
             self.drain()?;
-            // A frame kept, or within reach of the open decoding: the decoder stays open and
-            // paused (a frame step, like a clip's). Else a new decoding; stepping back it
-            // starts 25 frames earlier, so the next steps back come from memory.
+            // A frame kept, made in the background, or within reach of the open decoding:
+            // the decoder stays open and paused (a frame step, like a clip's). Else a new
+            // decoding; stepping back it starts 25 frames earlier.
             let reached = self.ready.contains_key(&frame)
+                || self.back.as_ref().is_some_and(|back| back.borrow().picture(frame).is_some())
                 || (frame >= self.kept_from
                     && frame <= self.next_decode_frame.saturating_add(self.prefetch_frames as u64));
             if !reached {
@@ -498,6 +522,18 @@ impl VideoDecodeAdapter for ProgramVideo {
         }
         self.drain()?;
         self.forget_far_from(request.frame);
+        if cued && let Some(back) = self.back.clone() {
+            let (ready, kept_from, decoding) = (&self.ready, self.kept_from, self.next_decode_frame);
+            back.borrow_mut().stand(request.frame, |f| ready.contains_key(&f) || (f >= kept_from && f < decoding));
+        }
+        if !self.ready.contains_key(&request.frame)
+            && let Some((raster, rgba)) = self.back.as_ref().and_then(|back| back.borrow().picture(request.frame))
+        {
+            let generation = self.gpu.borrow().config.generation;
+            let header = self.header(request.frame, raster, generation)?;
+            let picture = self.picture(request.frame, header, rgba);
+            return self.handed(picture);
+        }
         if let Some(frame) = self.ready.get(&request.frame).cloned() {
             // The read-ahead is topped up on every frame, not only when one is missing:
             // else it worked in batches of four, just in time, with no reserve.

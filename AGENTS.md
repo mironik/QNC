@@ -3384,3 +3384,11 @@ ispravak veze playera (`control.rs`) i alat za mjerenje (`--back`, `--jumps`). I
 (original 2002 s kartice, XAVC 4:2:2 10-bit, od 1500; ista verzija s pozadinom i bez nje, naizmjenicno, 3x):
 koraci unatrag najgore 45-49 ms (bez 0,72-0,75 s), p90 43-44 ms (57-69 ms); koraci naprijed isti (40-43 ms);
 skokovi +-50 slika medijan 0,52-0,55 s (0,68-0,70 s); Play originala 98,8-99,8 % slika (98,2-100 %).
+Izvedeno 2026-10-11 (korisnik: "napravi isto i za Wrap"): pozadina je opcenita (`backfill.rs`: dijelovi u slikama
+onoga sto player pusta; segment i pokrivalica citaju svoj klip od izvorne slike, Off nema sliku i player ga crni
+odmah), pa je ima i player price (`ProgramVideo`, Wrap): isti uvjeti (600 ms mirovanja, nizi prioritet, staje kad
+krene Play), pretvarac po formatu slike svakog klipa. `qnc-player-acceptance --program-back FRAME` mjeri korake
+unatrag po prici kako ih salje Wrap. Izmjereno na izoliranoj kopiji (prica 2002 + 2676 s pokrivalicama 2677/2686,
+originali s kartice; sa i bez pozadine naizmjenicno, 2x): unatrag od 1500 najgore 50-59 ms (bez 0,68-0,78 s), p90 32 ms
+(86-93 ms); unatrag od 300 preko reza pokrivalica najgore 71-96 ms (1,00-1,13 s), p90 47-49 ms (135-140 ms); Play price
+99,2 % slika (99,8-100,2 %), prva slika 164-181 ms (56-90 ms).
