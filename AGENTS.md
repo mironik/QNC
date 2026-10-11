@@ -3444,3 +3444,7 @@ pokrivalicu pomaknuo dalje u izvoru, pa je za svoj slot trazila slike iza kraja 
 zavrsava na pomaknutom markeru mora stati u svoj klip (IN + duljina slota omjerom price i izvora <= broj slika
 klipa), inace se pomak odbija i nista se ne upisuje; vrijedi i za slot ispred markera koji se produljuje.
 `qnc-content-read` `duration_frames_on` (jedini citac kataloga). Test.
+Popravak 2026-10-11 (ista greska i nakon provjere u bazi: pokrivalica s izvorom 0..196 u slotu od 221 slike, nastala
+prije provjere kraja): `qnc-program-input` (`fit_covers`): pokrivalica ciji klip zavrsi prije njezina slota pusta
+se do kraja klipa, ostatak slota pokazuje segment ispod nje; pokrivalica bez preostale slike se ne pusta. Jedna
+pokrivalica vise ne sprjecava otvaranje cijele price. Test.

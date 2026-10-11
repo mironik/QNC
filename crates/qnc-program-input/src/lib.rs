@@ -130,6 +130,7 @@ fn load(
         story_rate,
     };
     let channels = resolver.prepared(&first.clip_id)?.project_audio.channels;
+    let covers = fit_covers(covers, &mut resolver, story_rate)?;
     let input = build_input(project_id, story_rate, &segments, &covers, channels)?;
     let mut playlist = build_flat_program_playlist(&input, &mut resolver)?;
     if let Some(((start, end), _)) = window {
@@ -240,6 +241,34 @@ pub fn build_input(
         duration_frames: start,
         segments: inputs,
     })
+}
+
+/// A cover plays its source from its IN for its slot's length; where its clip ends first
+/// (a slot made longer than the cover's source), the cover ends with its clip and the
+/// segment under it shows the rest of the slot (user 2026-10-11: one cover may not keep
+/// the whole story from opening). A cover with no picture left is not played.
+fn fit_covers<R: ProgramMediaResolver>(
+    covers: Vec<ProgramCover>,
+    resolver: &mut R,
+    story_rate: (u32, u32),
+) -> Result<Vec<ProgramCover>, String> {
+    let mut fitted = Vec::with_capacity(covers.len());
+    for mut cover in covers {
+        if cover.virtual_shot_id.trim().is_empty() || cover.fps_num == 0 || cover.fps_den == 0 {
+            fitted.push(cover);
+            continue;
+        }
+        let (num, den) = qnc_program_db::story_per_source(story_rate, (cover.fps_num, cover.fps_den))?;
+        let length = u64::try_from(resolver.resolve(&cover.clip_id)?.duration_frames).unwrap_or(0);
+        let source_in = cover.source_in_frame * num as u64 / den as u64;
+        let left = length.saturating_sub(source_in);
+        if left == 0 {
+            continue;
+        }
+        cover.program_end_frame = cover.program_end_frame.min(cover.program_start_frame + left);
+        fitted.push(cover);
+    }
+    Ok(fitted)
 }
 
 /// A cover over its slot; its source counted at the story rate, as long as the slot.

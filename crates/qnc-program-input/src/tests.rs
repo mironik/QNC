@@ -265,3 +265,30 @@ fn a_source_of_half_the_story_rate_is_counted_in_story_frames() {
     other.fps_num = 30;
     assert!(build_input("p1", (50, 1), &[other], &[], 2).is_err());
 }
+
+#[test]
+fn a_cover_longer_than_its_clip_ends_with_its_clip() {
+    struct Lengths;
+    impl ProgramMediaResolver for Lengths {
+        fn resolve(&mut self, clip_id: &str) -> Result<ResolvedProgramMedia, String> {
+            let media = qnc_program_playlist::MediaRef { clip_id: clip_id.into(), media_uri: "qnc://local/source/s/file/a".into() };
+            Ok(ResolvedProgramMedia {
+                media: media.clone(),
+                audio_media: media,
+                duration_frames: 320,
+                timebase: FrameTimebase::new(50, 1).unwrap(),
+                video_format: None,
+                has_audio: false,
+                audio_channels: 0,
+                audio_format: None,
+                timecode_start: None,
+            })
+        }
+    }
+    // The clip has 320 frames, the cover starts at 300: 20 are left for its 40-frame slot.
+    let fitted = fit_covers(vec![cover("c", (100, 140), "shot"), cover("d", (200, 240), "shot")], &mut Lengths, (50, 1)).unwrap();
+    assert_eq!(fitted.iter().map(|c| (c.program_start_frame, c.program_end_frame)).collect::<Vec<_>>(), vec![(100, 120), (200, 220)]);
+    let mut late = cover("e", (0, 10), "shot");
+    late.source_in_frame = 320;
+    assert!(fit_covers(vec![late], &mut Lengths, (50, 1)).unwrap().is_empty(), "nothing left to play");
+}
