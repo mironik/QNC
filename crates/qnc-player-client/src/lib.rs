@@ -163,6 +163,9 @@ struct Shared {
     load: Mutex<Option<PendingLoad>>,
     view: Mutex<View>,
     notify: OnceLock<Box<dyn Fn() + Send + Sync>>,
+    /// Pictures asked of the player for the stills map, and the ones it sent.
+    stills_wanted: Mutex<Option<Vec<(String, u64)>>>,
+    stills: Mutex<Vec<StillPicture>>,
 }
 pub struct Player {
     shared: Arc<Shared>,
@@ -182,6 +185,8 @@ impl Player {
             load: Mutex::new(None),
             view: Mutex::new(View::default()),
             notify: OnceLock::new(),
+            stills_wanted: Mutex::new(None),
+            stills: Mutex::new(Vec::new()),
         });
         let (commands, receiver) = mpsc::sync_channel(16);
         let state = shared.clone();
@@ -267,6 +272,21 @@ impl Player {
                             let view = state.view.lock().unwrap().clone();
                             initial_preview_action(&mut initial_preview, *generation, &view)
                         });
+                        let wanted = state.stills_wanted.lock().ok().and_then(|mut wanted| wanted.take());
+                        if let Some(wanted) = wanted {
+                            let _ = connection.publish_stills(wanted);
+                        }
+                        let arrived = connection.take_stills();
+                        if !arrived.is_empty() {
+                            if let Ok(mut stills) = state.stills.lock() {
+                                stills.extend(arrived);
+                                let extra = stills.len().saturating_sub(MAX_HELD_STILLS);
+                                stills.drain(..extra);
+                            }
+                            if let Some(notify) = state.notify.get() {
+                                notify();
+                            }
+                        }
                         match connection.poll(action) {
                             Ok(view) => {
                                 if let Some((_, started)) =
@@ -669,6 +689,8 @@ mod tests {
                 ..View::default()
             }),
             notify: OnceLock::new(),
+            stills_wanted: Mutex::new(None),
+            stills: Mutex::new(Vec::new()),
         };
         let calls = Arc::new(AtomicU64::new(0));
         let count = calls.clone();
@@ -730,5 +752,35 @@ fn timing_line(generation: u64, text: &str) {
             qnc_dev_diagnostics::DiagnosticsStream::Player,
             format!("player-timing generation={generation} {text}"),
         );
+    }
+}
+
+/// A picture the player sent on the stills map: of frame `frame` of its media
+/// `source_id`, RGBA `width` x `height`.
+#[derive(Clone, Debug)]
+pub struct StillPicture {
+    pub source_id: String,
+    pub frame: u64,
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Arc<[u8]>,
+}
+
+/// Pictures waiting to be taken at most (older ones go).
+const MAX_HELD_STILLS: usize = 32;
+
+impl Player {
+    /// Asks the player for the pictures it holds of these frames of its media (at most
+    /// `qnc_player_contract::MAX_STILLS`); they arrive in `take_stills`. Nothing is decoded
+    /// for them: a picture the player does not hold does not come.
+    pub fn publish_stills(&self, pictures: Vec<(String, u64)>) {
+        if let Ok(mut wanted) = self.shared.stills_wanted.lock() {
+            *wanted = Some(pictures);
+        }
+    }
+
+    /// The pictures the player sent since the last call.
+    pub fn take_stills(&self) -> Vec<StillPicture> {
+        self.shared.stills.lock().map(|mut stills| std::mem::take(&mut *stills)).unwrap_or_default()
     }
 }

@@ -1041,3 +1041,38 @@ impl Video {
         Ok(())
     }
 }
+
+/// A picture the player holds in memory: raster size and pixels.
+pub type HeldPicture = ([u32; 2], std::sync::Arc<[u8]>);
+
+impl Runtime {
+    /// The pictures of these frames of its media the player already holds in memory
+    /// (made for the monitor or in the background), each with its request; nothing is
+    /// decoded for them (user 2026-10-11: the trim overlay takes its pictures from the player).
+    pub fn held_pictures(&self, wanted: &[(String, u64)]) -> Vec<((String, u64), HeldPicture)> {
+        wanted
+            .iter()
+            .filter_map(|(source_id, frame)| self.engine.video().held(source_id, *frame).map(|held| ((source_id.clone(), *frame), held)))
+            .collect()
+    }
+}
+
+impl VideoPath {
+    fn held(&self, source_id: &str, frame: u64) -> Option<HeldPicture> {
+        match self {
+            Self::Clip(video) => video.held(source_id, frame),
+            Self::Program(video) => video.held(source_id, frame),
+        }
+    }
+}
+
+impl Video {
+    fn held(&self, source_id: &str, frame: u64) -> Option<HeldPicture> {
+        if source_id != self.plan.source.source_id {
+            return None;
+        }
+        let made = self.ready.get(&frame).or_else(|| self.kept.get(&frame));
+        made.map(|picture| ([picture.payload.header.width, picture.payload.header.height], picture.payload.rgba.clone()))
+            .or_else(|| self.back.as_ref()?.borrow().picture(frame))
+    }
+}

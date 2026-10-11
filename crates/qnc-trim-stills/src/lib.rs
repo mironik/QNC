@@ -23,7 +23,7 @@ use std::{
 
 use qnc_image_assets::RgbaImage;
 use qnc_program_view::{SegmentsView, StillPicture};
-use qnc_source_preview::{LocatedPicture, StillLocator};
+use qnc_source_preview::{LocatedPicture, SourcePreview, StillLocator};
 
 pub const MODULE_ID: &str = "qnc.module.trim-stills";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -57,23 +57,32 @@ pub struct TrimStills {
     job: Option<Job>,
     /// The pictures last asked for, as logged (diagnostics only).
     asked: String,
+    /// When each missing picture was asked of the player.
+    asked_player: HashMap<StillPicture, Instant>,
 }
+
+/// How long a picture asked of the player is waited for before it is decoded here.
+const PLAYER_WAIT: Duration = Duration::from_millis(250);
 
 impl TrimStills {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Puts the decoded pictures on the edit pictures of `view` (Wrap rows and source
-    /// timeline) and starts decoding the missing ones. Returns whether a picture arrived.
-    pub fn fill(&mut self, view: &mut SegmentsView, locator: Option<StillLocator>) -> bool {
+    /// Puts the pictures on the edit pictures of `view` (Wrap rows and source timeline):
+    /// first the ones the player holds in memory (user 2026-10-11: one picture source,
+    /// nothing decoded twice), the others decoded here. Returns whether a picture arrived.
+    pub fn fill(&mut self, view: &mut SegmentsView, locator: Option<StillLocator>, player: Option<&SourcePreview>) -> bool {
         let Some(locator) = locator else {
             return false;
         };
         if self.project_id.as_deref() != Some(locator.project_id()) {
             *self = Self { project_id: Some(locator.project_id().to_string()), ..Self::default() };
         }
-        let arrived = self.take_finished();
+        let mut arrived = self.take_finished();
+        if let Some(player) = player {
+            arrived |= self.take_from_player(player);
+        }
         let asked = describe(view);
         if asked != self.asked {
             log(&format!("trim-stills asked {asked}"));
@@ -82,24 +91,65 @@ impl TrimStills {
         for still in view.edit_stills.iter_mut().chain(view.source_edit_stills.iter_mut()) {
             still.image = still.picture.as_ref().and_then(|picture| self.cache.get(picture).cloned());
         }
-        if self.job.is_none() {
-            let mut missing: Vec<StillPicture> = Vec::new();
-            let stills = view.edit_stills.iter().chain(&view.source_edit_stills);
-            for picture in stills.filter_map(|still| still.picture.as_ref()) {
-                if !self.cache.contains_key(picture) && !self.failed.contains(picture) && !missing.contains(picture) {
-                    missing.push(picture.clone());
+        let mut missing: Vec<StillPicture> = Vec::new();
+        let stills = view.edit_stills.iter().chain(&view.source_edit_stills);
+        for picture in stills.filter_map(|still| still.picture.as_ref()) {
+            if !self.cache.contains_key(picture) && !self.failed.contains(picture) && !missing.contains(picture) {
+                missing.push(picture.clone());
+            }
+        }
+        self.asked_player.retain(|picture, _| missing.contains(picture));
+        if let Some(player) = player {
+            let new: Vec<(String, u64)> = missing
+                .iter()
+                .filter(|picture| !self.asked_player.contains_key(*picture))
+                .map(|picture| (picture.clip_id.clone(), picture.source_frame))
+                .collect();
+            if !new.is_empty() {
+                player.ask_stills(missing.iter().map(|p| (p.clip_id.clone(), p.source_frame)).collect());
+                let now = Instant::now();
+                for picture in &missing {
+                    self.asked_player.entry(picture.clone()).or_insert(now);
                 }
             }
-            if !missing.is_empty() {
-                self.start(missing, locator);
+        }
+        // Decoded here only what the player did not give in time.
+        let waited = |picture: &StillPicture| player.is_none() || self.asked_player.get(picture).is_none_or(|at| at.elapsed() >= PLAYER_WAIT);
+        let decode: Vec<StillPicture> = missing.iter().filter(|picture| waited(picture)).cloned().collect();
+        if self.job.is_none() && !decode.is_empty() {
+            self.start(decode, locator);
+        }
+        arrived
+    }
+
+    /// The pictures the player sent, into the cache.
+    fn take_from_player(&mut self, player: &SourcePreview) -> bool {
+        let stills = player.take_stills();
+        let arrived = !stills.is_empty();
+        for still in stills {
+            let picture = StillPicture { clip_id: still.source_id, source_frame: still.frame };
+            let content_key = {
+                use std::hash::{Hash, Hasher};
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                picture.hash(&mut hasher);
+                hasher.finish()
+            };
+            let image = RgbaImage { size: [still.width as usize, still.height as usize], pixels: still.rgba.to_vec(), content_key };
+            self.asked_player.remove(&picture);
+            self.failed.remove(&picture);
+            if self.cache.insert(picture.clone(), Arc::new(image)).is_none() {
+                self.order.push_back(picture);
             }
+        }
+        if arrived {
+            log("trim-stills from player");
         }
         arrived
     }
 
     /// Whether a job is decoding (the caller repaints soon).
     pub fn loading(&self) -> bool {
-        self.job.is_some()
+        self.job.is_some() || !self.asked_player.is_empty()
     }
 
     fn take_finished(&mut self) -> bool {
@@ -267,7 +317,7 @@ mod tests {
             edit_stills: vec![qnc_program_view::EditStill::new(10, true, Some(picture))],
             ..Default::default()
         };
-        assert!(!stills.fill(&mut view, None));
+        assert!(!stills.fill(&mut view, None, None));
         assert!(!stills.loading());
         assert!(view.edit_stills[0].image.is_none());
     }

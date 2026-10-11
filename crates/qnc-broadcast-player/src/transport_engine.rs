@@ -230,6 +230,12 @@ where
     V: VideoDecodeAdapter,
     O: PlayoutOutput<VideoFrame = V::VideoFrame>,
 {
+    /// The picture adapter, read only: e.g. a picture it already holds (no decode, the
+    /// transport is not touched).
+    pub fn video(&self) -> &V {
+        &self.video_decode
+    }
+
     pub fn with_playout_output(source_open: S, video_decode: V, playout_output: O) -> Self {
         Self {
             source_open,

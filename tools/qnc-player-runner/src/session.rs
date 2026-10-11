@@ -17,6 +17,8 @@ pub struct Session {
     failure_reported: bool,
     last_tick: std::time::Instant,
     max_tick_gap_us: u128,
+    /// Pictures asked for the stills frame map, written by the loop.
+    pub stills: Option<Vec<(String, u64)>>,
 }
 impl Session {
     pub fn new(player: Runtime, id: String, generation: u64) -> Self {
@@ -31,6 +33,7 @@ impl Session {
             failure_reported: false,
             last_tick: std::time::Instant::now(),
             max_tick_gap_us: 0,
+            stills: None,
         }
     }
     pub fn keeps_process_alive(&self) -> bool {
@@ -107,6 +110,11 @@ impl Session {
                         frame,
                         present_frame,
                     } => self.player.cue_frame(frame, present_frame),
+                    Command::PublishStills { pictures } => {
+                        // Taken by the loop, which writes them to the stills frame map.
+                        self.stills = Some(pictures.into_iter().map(|p| (p.source_id, p.frame)).collect());
+                        Ok(Vec::new())
+                    }
                     _ => {
                         return self.rejected(
                             sequence,

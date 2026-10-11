@@ -3406,3 +3406,12 @@ Usput zapis: prvo pokretanje probe 2026-10-11 u 20:45 (aplikacija iz `QNC/target
 kopije) otvorilo je stvarne baze, jer dio aplikacije trazi korijen po mjestu programa; upisano je samo vrijeme
 otvaranja projekta i sistemskih predlozaka u `data/qnc-projects.db` i `worker_lease = off` u `project.db` projekta
 `novi test11`, bez promjene sadrzaja. Zasticena proba od tada radi s kopijom programa unutar zasticenog korijena.
+Izvedeno 2026-10-11 (jedan izvor slika): `qnc-player-contract` naredba `PublishStills { pictures: [StillRef] }`
+(najvise 8; slike koje player vec drzi u memoriji idu u zasebnu frame-mapu sesije `stills`, nista se ne dekodira),
+`qnc-broadcast-player` `TransportEngine::video()` (samo citanje adaptera slike), `qnc-broadcast-engine`
+`Runtime::held_pictures` (klip: pripremljene, zadrzane i pozadinske slike; prica: slika programa koja pusta tu
+izvornu sliku), `tools/qnc-player-runner` (frama-mapa `stills_frame_map`, zapis nadenih slika), `qnc-player-client`
+(`publish_stills`, `take_stills`), `qnc-source-preview` (`ask_stills`, `take_stills`), `qnc-trim-stills` (prvo pita
+player; dekodira sam samo sliku koju player ne da u 250 ms), `qnc-editorial-application` (isti redak poziva).
+Provjereno: testovi, conformance, `qnc-player-acceptance` (play klipa 100 %, koraci unatrag po prici najvise 73 ms,
+po klipu 48 ms). Uzivo jos nije probano.
