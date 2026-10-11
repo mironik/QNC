@@ -3471,3 +3471,11 @@ trazi daleke slike). Vraceni na stanje prije njega: `qnc-player-contract` (nared
 redak poziva. Pozadinsko dekodiranje unatrag (`backfill.rs`) ostaje. Odobrenje "jedan izvor slika" je zatvoreno.
 Sljedece (plan korisnika): mjerenje ugradenog dekodera (ffmpeg kao biblioteka, trajan, skok bez novog procesa) na
 originalu u zasebnoj grani; QGS (`qgs-h264-422p10`) dijelovi slike u vise niti kasnije, zasebno.
+Mjerenje 2026-10-11 (korisnik "nastavi"; plan: ugradeni dekoder prije integracije): probni program izvan
+repozitorija (scratchpad `libav-spike`, `ffmpeg-next` 8 uz FFmpeg 8.1 shared, BtbN, i LLVM za veze; preuzeto uz
+dozvolu korisnika u `C:\Users\miron\tools`), jedan dekoder ostaje otvoren na originalu Mironik 2679 s kartice (H.264
+4:2:2 10-bit 1080p50, GOP 24, 8 dijelova slike), samo citanje. Proizvoljna slika (skok na kljucnu sliku i
+dekodiranje do nje, bez novog procesa): medijan 107-119 ms, najgore 165-200 ms, najbolje 38-88 ms (danas kroz
+`ffmpeg` naredbu oko 400 ms). Korak unatrag bez slika u memoriji 123-172 ms. Dekodiranje u nizu: 1 nit 71 slika/s,
+4 niti 169-198 slika/s. Mjereno samo dekodiranje do YUV-a (bez pretvorbe i prikaza). Integracija u QNC nije
+napravljena.
