@@ -3448,3 +3448,10 @@ Popravak 2026-10-11 (ista greska i nakon provjere u bazi: pokrivalica s izvorom 
 prije provjere kraja): `qnc-program-input` (`fit_covers`): pokrivalica ciji klip zavrsi prije njezina slota pusta
 se do kraja klipa, ostatak slota pokazuje segment ispod nje; pokrivalica bez preostale slike se ne pusta. Jedna
 pokrivalica vise ne sprjecava otvaranje cijele price. Test.
+Popravak 2026-10-11 (korisnik: "pomaknuti slotovi enterom se vracaju na pocetni polozaj, a ne snimaju novu poziciju"):
+u novom projektu sve pokrivalice pocinju od prve slike svog klipa (IN 0), pa je pomak slota ulijevo trazio roll
+prije prve slike i baza je odbijala cijeli pomak (poruka samo u statusu, nacrt se vratio). Sada roll ide koliko
+izvor dopusta (IN ne ide ispod 0, pokrivalica se tada samo produlji), a pomak se nikad ne odbija zbog pokrivalice;
+provjera kraja klipa iz prethodnog popravka je uklonjena (pokrivalica koja prelazi kraj klipa pusta se do kraja,
+`qnc-program-input` `fit_covers`), a s njom i `qnc-content-read` `duration_frames_on`. `qnc-program-db`,
+`qnc-program-view` (nacrt isto), testovi, ugovor `story.database.json` (`roll_edit`).

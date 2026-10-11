@@ -107,8 +107,10 @@ fn cover_picture(cover: &CoverSpan, slots: &[Slot], moved: &dyn Fn(u64) -> u64, 
     // starts that much later or earlier in its source; a slot moved whole keeps it.
     let roll = if start != old_start && slot_end == old_end { start as i64 - old_start as i64 } else { 0 };
     let source = cover.source_out_frame.saturating_sub(cover.source_in_frame) as i64;
-    let source_frame = cover.source_in_frame as i64 + roll * source / length + (frame - start) as i64 * source / length;
-    Some(StillPicture { clip_id: cover.clip_id.clone(), source_frame: source_frame.max(0) as u64 })
+    // As far as its source allows: a cover never starts before its first picture.
+    let source_in = (cover.source_in_frame as i64 + roll * source / length).max(0);
+    let source_frame = source_in + (frame - start) as i64 * source / length;
+    Some(StillPicture { clip_id: cover.clip_id.clone(), source_frame: source_frame as u64 })
 }
 
 #[cfg(test)]

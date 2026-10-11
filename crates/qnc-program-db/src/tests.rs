@@ -1464,7 +1464,7 @@ fn moving_the_start_marker_of_a_covered_slot_rolls_its_cover() {
     // The covered slot itself moves: its cover keeps its pictures.
     run(&mut store, Operation::MoveSlot { slot_id: slot_of(&m16), start_frame: 20 }).unwrap();
     assert_eq!(source_in(&mut store), (505, 525));
-    // A cover cannot start before its source.
+    // A cover at the start of its source rolls as far as it can: its IN stays 0, it grows.
     let dir = tempfile::tempdir().unwrap();
     let mut store = imported_store(&dir.path().join("db"));
     three_segments(&mut store);
@@ -1476,38 +1476,9 @@ fn moving_the_start_marker_of_a_covered_slot_rolls_its_cover() {
         .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [&m16], |row| row.get(0))
         .unwrap();
     create_cover(&mut store, &slot, (2, 20)).unwrap();
-    assert!(run(&mut store, Operation::MoveMarker { marker_id: m16, program_frame: 13 })
-        .unwrap_err()
-        .contains("prije svog IN-a"));
-}
-
-#[test]
-fn a_cover_never_runs_past_the_end_of_its_clip() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("db");
-    let mut store = imported_store(&path);
-    three_segments(&mut store);
-    let Data::Created(m16) = marker(&mut store, 16).unwrap() else {
-        panic!()
-    };
-    let Data::Created(m25) = marker(&mut store, 25).unwrap() else {
-        panic!()
-    };
-    let slot: String = Connection::open(&path)
-        .unwrap()
-        .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [&m16], |row| row.get(0))
-        .unwrap();
-    create_cover(&mut store, &slot, (500, 509)).unwrap();
-    // The clip has 512 frames.
-    drop(store);
-    Connection::open(&path).unwrap().execute("UPDATE clips SET duration_frames = 512 WHERE clip_id = 'c1'", []).unwrap();
-    let mut store = reopen(&path);
-    // Roll: the slot 19..25 plays 503..509, inside the clip.
-    run(&mut store, Operation::MoveMarker { marker_id: m16, program_frame: 19 }).unwrap();
-    // A longer slot 19..29 would need 503..513, past the clip's end.
-    let error = run(&mut store, Operation::MoveMarker { marker_id: m25, program_frame: 29 }).unwrap_err();
-    assert!(error.contains("klip ima 512"), "{error}");
-    assert_eq!(markers(&mut store), vec![19, 25], "nothing was written");
+    run(&mut store, Operation::MoveMarker { marker_id: m16, program_frame: 13 }).unwrap();
+    assert_eq!(markers(&mut store), vec![13], "the move is written");
+    assert_eq!((covers(&mut store)[0].source_in_frame, covers(&mut store)[0].source_out_frame), (0, 18));
 }
 
 #[test]

@@ -794,7 +794,6 @@ impl Store {
         )
         .map_err(err)?;
         finalize_story(&tx)?;
-        check_covers_fit(&tx, &[marker_id])?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
@@ -852,7 +851,6 @@ impl Store {
             .map_err(err)?;
         }
         finalize_story(&tx)?;
-        check_covers_fit(&tx, &[&start_id, &end_id])?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
@@ -1903,7 +1901,8 @@ fn delete_markers_with_slots(conn: &Connection, marker_ids: &[String]) -> Result
 /// Roll edit (user 2026-10-11, not in v5): the start marker of a slot moved by `shift`
 /// story frames while its end marker stays, so the slot's cover starts that much later
 /// (or earlier) in its source: the picture after the marker changes, as the picture
-/// before it does. A cover cannot start before its source; a 1080i source in a 50p
+/// before it does, as far as its source allows (it never starts before its first
+/// picture; a cover running past its clip plays to its end, `qnc-program-input`); a 1080i source in a 50p
 /// story moves by whole source frames (an odd shift is rounded toward zero).
 fn roll_cover(conn: &Connection, start_marker_id: &str, shift: i64) -> Result<()> {
     if shift == 0 {
@@ -1928,12 +1927,14 @@ fn roll_cover(conn: &Connection, start_marker_id: &str, shift: i64) -> Result<()
         rows
     };
     for (cover_id, source_in, source_out, fps_num, fps_den) in covers {
-        let (num, den) = story_per_source(rate, (fps_num, fps_den))?;
-        let source_shift = shift * den / num;
-        let (new_in, new_out) = (source_in + source_shift, source_out + source_shift);
-        if new_in < 0 {
-            return Err("Pokrivalica sljedeceg slota nema toliko slike prije svog IN-a.".into());
+        if fps_num == 0 || fps_den == 0 {
+            continue;
         }
+        let (num, den) = story_per_source(rate, (fps_num, fps_den))?;
+        // As far as the source allows: a cover already at its clip's first picture keeps
+        // it and only grows (user 2026-10-11: a move is never refused for a cover).
+        let new_in = (source_in + shift * den / num).max(0);
+        let new_out = new_in + (source_out - source_in);
         let fps = f64::from(fps_num) / f64::from(fps_den.max(1));
         conn.execute(
             "UPDATE story_covers
@@ -1952,48 +1953,6 @@ fn roll_cover(conn: &Connection, start_marker_id: &str, shift: i64) -> Result<()
             ],
         )
         .map_err(err)?;
-    }
-    Ok(())
-}
-
-/// After a marker moved: every cover of a slot that starts or ends on it must still find
-/// its pictures in its clip (a cover plays from its IN for its slot's length, so a roll
-/// or a longer slot can run past the clip's end; the program would not open).
-fn check_covers_fit(conn: &Connection, marker_ids: &[&str]) -> Result<()> {
-    let Some(rate) = story_rate(conn)? else {
-        return Ok(());
-    };
-    type Row = (String, String, i64, i64, u32, u32);
-    let rows = {
-        let mut statement = conn
-            .prepare(
-                "SELECT c.slot_id, c.clip_id, c.source_in_frame, s.end_frame - s.start_frame,
-                        c.source_fps_num, c.source_fps_den
-                 FROM story_covers c JOIN story_marker_slots s ON s.slot_id = c.slot_id",
-            )
-            .map_err(err)?;
-        let rows = statement
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)))
-            .map_err(err)?
-            .collect::<rusqlite::Result<Vec<Row>>>()
-            .map_err(err)?;
-        rows
-    };
-    for (slot_id, clip_id, source_in, slot_frames, fps_num, fps_den) in rows {
-        let (start, end) = slot_id.split_once('|').unwrap_or(("", ""));
-        // A cover without its source rate (not made by CreateCover) cannot be measured.
-        if !marker_ids.iter().any(|id| *id == start || *id == end) || fps_num == 0 || fps_den == 0 {
-            continue;
-        }
-        let (num, den) = story_per_source(rate, (fps_num, fps_den))?;
-        let source_end = source_in + (slot_frames * den + num - 1) / num;
-        if let Some(frames) = qnc_content_read::duration_frames_on(conn, &clip_id)? {
-            if source_end > frames as i64 {
-                return Err(format!(
-                    "Pokrivalica bi trazila sliku {source_end}, a njezin klip ima {frames}; marker se ne moze toliko pomaknuti."
-                ));
-            }
-        }
     }
     Ok(())
 }
