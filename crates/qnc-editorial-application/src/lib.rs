@@ -170,7 +170,7 @@ impl EditorialApplication {
     /// Delay until the next repaint that this surface needs, if any.
     pub fn next_repaint_delay(&self) -> Option<Duration> {
         let busy = self.load_result.is_some() || self.posters.has_pending_work() || self.trim_stills.loading();
-        let busy = busy || self.segments.has_pending_work() || self.segments.reading();
+        let busy = busy || self.segments.has_pending_work() || self.segments.reading() || self.focus.busy();
         // A written story or an edit picture shows within a frame or two.
         self.preview.next_repaint_delay().or_else(|| busy.then(|| Duration::from_millis(15)))
     }
@@ -272,7 +272,7 @@ impl EditorialApplication {
             None => self.wrap.follow_program(confirmed),
         }
         self.segments.set_playhead(Some(self.wrap.playhead()));
-        self.view.focus = self.focus.panel();
+        self.view.focus = self.focus.poll((&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline));
         self.view.segments = self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames)));
         self.trim_stills.fill(&mut self.view.segments, self.preview.still_locator()); // edit pictures
     }

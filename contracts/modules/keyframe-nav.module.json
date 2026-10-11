@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.keyframe-nav",
+  "module_name": "Key picture step",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.trim.key_picture_step"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-keyframe-nav",
+  "input": "A clip, the frame of the picture beside a taken edit and the direction; the preview's StillLocator (the media the project plays, its saved frame rate and video start PTS).",
+  "output": "The frames to the previous or next key picture, or half a second when every picture is a key picture (intra codec). Key pictures are read from the packets (stream copy, key packets only, framecrc) through the decoder catalog in the background; whether a clip is intra is remembered per clip; a search over 8 s is cancelled.",
+  "specification": "User 2026-10-11: with Ctrl active, arrow up and down move the taken edit by a GOP, or to the nearest intra picture; half a second for an intra codec."
+}

@@ -40,12 +40,22 @@ const SOURCE_TO_PROGRAM: [&str; 6] = [
     "cover_mode_sync",
 ];
 
+/// What the answer of a key picture search moves.
+#[derive(Debug, Clone, Copy)]
+enum Jump {
+    SourceMark,
+    Program,
+}
+
 #[derive(Debug, Default)]
 pub struct PanelFocus {
     panel: Panel,
     /// Ctrl+I or Ctrl+O took a source mark: the arrows move it, not the playhead
     /// (an I or O press only marks; the playhead keeps the arrows, v5).
     mark_taken: bool,
+    /// Up/Down on a taken edit: the key picture search and what its answer moves.
+    keyframes: qnc_keyframe_nav::KeyframeNav,
+    jump: Option<Jump>,
 }
 
 impl PanelFocus {
@@ -61,6 +71,32 @@ impl PanelFocus {
 
     pub fn panel(&self) -> Panel {
         self.panel
+    }
+
+    /// Applies the answer of an Up/Down key picture search to the edit it was asked
+    /// for (the taken source mark, or the taken slot or marker); returns the panel.
+    pub fn poll(
+        &mut self,
+        (preview, _wrap, segments, timeline): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection),
+    ) -> Panel {
+        if let Some(answer) = self.keyframes.take() {
+            match (self.jump.take(), answer) {
+                (Some(Jump::SourceMark), Ok(frames)) => {
+                    mark_cue(preview, qnc_source_mark_focus::nudge(timeline, frames));
+                }
+                (Some(Jump::Program), Ok(frames)) => {
+                    segments.jump_edit(frames);
+                }
+                (_, Err(message)) => segments.say(message),
+                (None, Ok(_)) => {}
+            }
+        }
+        self.panel
+    }
+
+    /// Whether a key picture search runs (the caller repaints soon).
+    pub fn busy(&self) -> bool {
+        self.keyframes.busy()
     }
 
     /// A clip chosen or a click on the source timeline: the keyboard goes to the
@@ -104,6 +140,21 @@ impl PanelFocus {
             }
             "step_prev_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(1),
             "step_next_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(-1),
+            // Up/Down on a taken edit (user 2026-10-11): to the key picture before or after it,
+            // half a second when every picture is one (intra). The answer comes in `poll`.
+            "step_prev_part" | "step_next_part"
+                if on_source && (self.taken(timeline) || (segments.trimming_edge() && qnc_source_mark_focus::is_taken(timeline))) =>
+            {
+                let (clip, frame) = (preview.view().clip_id.clone(), qnc_source_mark_focus::taken_picture(timeline));
+                self.jump = Some(Jump::SourceMark);
+                let forward = action_id == "step_next_part";
+                clip.zip(frame).is_some_and(|(clip, frame)| self.keyframes.request(&clip, frame, forward, preview.still_locator()))
+            }
+            "step_prev_part" | "step_next_part" if panel == Panel::Segments && segments.keyframe_reference().is_some() => {
+                let (clip, frame) = segments.keyframe_reference().unwrap_or_default();
+                self.jump = Some(Jump::Program);
+                self.keyframes.request(&clip, frame, action_id == "step_next_part", preview.still_locator())
+            }
             // Enter is the confirmation of the panel in focus only.
             "activate_focused_item" if on_source => {
                 let lane = segments.lane_is_taken();

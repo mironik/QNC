@@ -1,0 +1,10 @@
+[package]
+name = "qnc-keyframe-nav"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the step of a taken edit to the previous or next key (intra) picture of the media the project plays, half a second when every picture is a key picture; read from the packets in the background through the decoder catalog; no probe, no database write"
+
+[dependencies]
+qnc-decoder-catalog = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-source-preview = { workspace = true }

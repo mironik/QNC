@@ -62,6 +62,17 @@ pub fn nudge(timeline: &mut TimelineProjection, frames: i64) -> MarkKey {
     }
 }
 
+/// The source frame of the picture at the taken mark: IN itself, the last frame before
+/// OUT (OUT is exclusive); `None` when no mark is taken.
+pub fn taken_picture(timeline: &TimelineProjection) -> Option<u64> {
+    let start = timeline.range_start_frame;
+    match timeline.source_mark_focus {
+        TimelineSourceMarkFocus::In => timeline.source_in_frame.map(|frame| start + frame),
+        TimelineSourceMarkFocus::Out => timeline.source_out_frame.map(|frame| start + frame.saturating_sub(1)),
+        TimelineSourceMarkFocus::Playhead => None,
+    }
+}
+
 /// Escape: the keys go back to the playhead.
 pub fn release(timeline: &mut TimelineProjection) -> MarkKey {
     timeline.source_mark_focus = TimelineSourceMarkFocus::Playhead;

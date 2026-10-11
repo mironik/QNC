@@ -110,6 +110,27 @@ impl LocalFilmstripExtractor {
         }
     }
 
+    /// The presentation times (seconds of the media's timestamps) of the key pictures
+    /// from about `start_sec` for `duration_sec`; packets only, nothing decoded.
+    pub fn key_pictures_with_cancel(
+        &self,
+        source: &Path,
+        start_sec: f64,
+        duration_sec: f64,
+        cancel: &AtomicBool,
+    ) -> std::result::Result<Vec<f64>, String> {
+        match &self.deployment.driver {
+            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } => qnc_ffmpeg_decode::key_pictures_with_cancel(
+                &self.deployment.executable,
+                source,
+                start_sec,
+                duration_sec,
+                cancel,
+            ),
+            Driver::QncPacketsV1 { .. } => Err("selected decoder does not list key pictures".into()),
+        }
+    }
+
     pub fn extract_frames_with_cancel(
         &self,
         source: &Path,

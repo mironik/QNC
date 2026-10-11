@@ -9,5 +9,6 @@ eframe = { workspace = true }
 qnc-program-segments = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-mark-focus = { workspace = true }
+qnc-keyframe-nav = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-wrap-session = { workspace = true }

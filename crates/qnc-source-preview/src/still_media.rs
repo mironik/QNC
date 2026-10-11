@@ -18,6 +18,24 @@ use crate::{PreviewContext, SourcePreview};
 pub struct LocatedPicture {
     pub file: PathBuf,
     pub fps: (u32, u32),
+    /// The saved start of the video stream, `(start_pts, time_base)`: a picture's frame is
+    /// counted from it, as the player counts them.
+    pub start: (i64, (i64, i64)),
+}
+
+impl LocatedPicture {
+    /// The frame of the clip at a presentation time (seconds of the media timestamps).
+    pub fn frame_at(&self, seconds: f64) -> Option<u64> {
+        let (pts, (num, den)) = self.start;
+        let start = pts as f64 * num as f64 / den.max(1) as f64;
+        let frame = ((seconds - start) * f64::from(self.fps.0) / f64::from(self.fps.1.max(1))).round();
+        (frame >= 0.0).then_some(frame as u64)
+    }
+
+    /// The seek position (seconds from the media start) of a frame.
+    pub fn seek_of(&self, frame: u64) -> f64 {
+        frame as f64 * f64::from(self.fps.1) / f64::from(self.fps.0.max(1))
+    }
 }
 
 /// Finds the picture of a clip of the project the preview works in; cheap to clone and
@@ -41,19 +59,20 @@ impl StillLocator {
             .load(&self.settings.workspace_db_uri, clip_id)
             .map_err(|error| error.to_string())?;
         let media = input.media().map_err(|error| error.to_string())?;
-        let rate = media
-            .streams
-            .iter()
-            .find_map(|stream| match &stream.details {
-                StreamDetails::Video(video) => video.frame_rate.as_ref().map(|rate| rate.value),
-                _ => None,
-            })
-            .ok_or("Klip nema spremljeni frame rate.")?;
+        let video = media.streams.iter().find_map(|stream| match &stream.details {
+            StreamDetails::Video(video) => Some((stream, video)),
+            _ => None,
+        });
+        let (stream, video) = video.ok_or("Klip nema spremljeni video tok.")?;
+        let rate = video.frame_rate.as_ref().map(|rate| rate.value).ok_or("Klip nema spremljeni frame rate.")?;
         let fps = (
             u32::try_from(rate.fps_num).map_err(|_| "Neispravan frame rate.")?,
             u32::try_from(rate.fps_den).map_err(|_| "Neispravan frame rate.")?,
         );
-        Ok(LocatedPicture { file: self.local_file(&media.media_uri)?, fps })
+        let start_pts = stream.start_pts.as_ref().map(|pts| pts.value).ok_or("Klip nema spremljeni pocetni PTS.")?;
+        let base = stream.time_base.as_ref().map(|tb| tb.value).ok_or("Klip nema spremljenu vremensku bazu.")?;
+        let start = (start_pts, (base.numerator, base.denominator));
+        Ok(LocatedPicture { file: self.local_file(&media.media_uri)?, fps, start })
     }
 
     /// The media URI on a local binding of this machine: a source or the project folder.

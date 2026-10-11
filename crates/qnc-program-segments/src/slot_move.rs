@@ -32,6 +32,38 @@ impl SlotMove {
 impl ProgramSegments {
     /// The markers a draft moves, (stored frame, draft frame): both of a taken slot, or
     /// the marker taken with Ctrl+M. The edit pictures are shown beside them.
+    /// The picture whose key pictures Up/Down on a taken slot or marker follow (user
+    /// 2026-10-11): the one before the first moved marker, which changes as the edit
+    /// moves (a cover starts at its marker), else the one after it. `None` when nothing
+    /// is taken or there is no picture (Off).
+    pub fn keyframe_reference(&self) -> Option<(String, u64)> {
+        if self.slot_move.is_none() && self.marker_edit.is_none() {
+            return None;
+        }
+        let stills = &self.view.edit_stills;
+        let before = stills.iter().filter(|still| !still.after);
+        let picture = before.chain(stills.iter().filter(|still| still.after)).find_map(|still| still.picture.as_ref());
+        picture.map(|picture| (picture.clip_id.clone(), picture.source_frame))
+    }
+
+    /// Moves the taken slot or marker by `frames` (a key picture step); false when
+    /// nothing is taken.
+    pub fn jump_edit(&mut self, frames: i64) -> bool {
+        if self.slot_move.is_some() {
+            return self.nudge_slot(frames);
+        }
+        if self.marker_edit.is_some() {
+            self.nudge_marker(frames);
+            return true;
+        }
+        false
+    }
+
+    /// A message of the program panel (e.g. why a step could not be done).
+    pub fn say(&mut self, message: String) {
+        self.refresh_view(message);
+    }
+
     pub(crate) fn edit_moves(&self) -> Vec<(u64, u64)> {
         if let Some(slot) = &self.slot_move {
             return [slot.start, slot.end].iter().map(|frame| (*frame, slot.moved(*frame))).collect();

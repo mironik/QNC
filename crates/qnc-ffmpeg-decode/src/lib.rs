@@ -246,6 +246,90 @@ pub fn extract_frame_run_with_cancel(
     run_filmstrip_command(executable, args, cancel)
 }
 
+/// The key pictures of the video from about `start_sec` for `duration_sec` (seconds from
+/// the media start, as a seek), as their presentation time in seconds of the media's own
+/// timestamps: the trim navigation to the nearest intra picture. Only the packets are
+/// read (stream copy, the key packets kept); nothing is decoded, probed or written.
+pub fn key_pictures_with_cancel(
+    executable: &Path,
+    source: &Path,
+    start_sec: f64,
+    duration_sec: f64,
+    cancel: &AtomicBool,
+) -> std::result::Result<Vec<f64>, String> {
+    if !source.is_file() {
+        return Err(format!("media does not exist: {}", source.display()));
+    }
+    let mut command = Command::new(executable);
+    command
+        .args(["-hide_banner", "-nostdin", "-loglevel", "error", "-copyts", "-ss"])
+        .arg(format_decimal(start_sec.max(0.0), 6))
+        .arg("-t")
+        .arg(format_decimal(duration_sec.max(0.0), 6))
+        .arg("-i")
+        .arg(source)
+        .args(["-map", "0:v:0", "-c", "copy", "-bsf:v", "noise=drop=not(key)", "-f", "framecrc", "-"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    let mut child = command.spawn().map_err(|error| format!("key pictures ffmpeg start: {error}"))?;
+    // Both pipes are read while ffmpeg runs, so a full pipe never stops it.
+    let mut stdout = child.stdout.take().ok_or("key pictures ffmpeg stdout")?;
+    let mut stderr = child.stderr.take().ok_or("key pictures ffmpeg stderr")?;
+    let out = thread::spawn(move || {
+        let mut text = String::new();
+        let _ = stdout.read_to_string(&mut text);
+        text
+    });
+    let err = thread::spawn(move || {
+        let mut text = Vec::new();
+        let _ = stderr.read_to_end(&mut text);
+        text
+    });
+    loop {
+        if cancel.load(Ordering::Acquire) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("key picture search cancelled".into());
+        }
+        match child.try_wait().map_err(|error| format!("key pictures ffmpeg wait: {error}"))? {
+            Some(status) => {
+                let (text, errors) = (out.join().unwrap_or_default(), err.join().unwrap_or_default());
+                if !status.success() {
+                    return Err(stderr_text_or_default(&errors, "key pictures ffmpeg failed"));
+                }
+                return parse_key_packets(&text);
+            }
+            None => thread::sleep(Duration::from_millis(5)),
+        }
+    }
+}
+
+/// `framecrc` lines: `#tb 0: num/den`, then `stream, dts, pts, duration, size, crc`.
+fn parse_key_packets(text: &str) -> std::result::Result<Vec<f64>, String> {
+    let mut time_base = None;
+    let mut times = Vec::new();
+    for line in text.lines() {
+        if let Some(tb) = line.strip_prefix("#tb 0:") {
+            let (num, den) = tb.trim().split_once('/').ok_or("key pictures: bad time base")?;
+            let (num, den) = (num.trim().parse::<f64>(), den.trim().parse::<f64>());
+            time_base = Some(num.map_err(|e| e.to_string())? / den.map_err(|e| e.to_string())?);
+        } else if !line.starts_with('#') {
+            let fields: Vec<&str> = line.split(',').map(str::trim).collect();
+            let pts = fields.get(2).and_then(|pts| pts.parse::<i64>().ok());
+            if let (Some(pts), Some(tb)) = (pts, time_base) {
+                times.push(pts as f64 * tb);
+            }
+        }
+    }
+    Ok(times)
+}
+
 fn run_filmstrip_command(
     executable: &Path,
     args: Vec<OsString>,

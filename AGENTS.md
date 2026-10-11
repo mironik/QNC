@@ -3361,3 +3361,15 @@ na svakom pomaknutom markeru (slot 2, marker 1) s TC-om nacrta, samo dok je nest
 (`SegmentsView.trim_frames`), `qnc-program-segments` (iz `edit_moves`, test), `qnc-timeline` (`trim_playheads`,
 crtanje preko svih traka), `qnc-segment-panel` (na redu koji crta marker). Rub segmenta to vec ima na source
 timelineu (playhead prati IN/OUT).
+Dopuna 2026-10-11 (korisnik: "kada je aktivan Ctrl+ dodao bi strelicu gore i dolje: pomak za jedan GOP ako je LongGop,
+ako je Intra pola sekunde"; "ako je GOP komplikacija, onda na sljedecu najblizu intra slicicu"): dok je rez uzet
+(Ctrl+S slot, Ctrl+M marker, Ctrl+I/O IN/OUT ili rub segmenta), strelica gore skace na prethodnu, a dolje na sljedecu
+kljucnu sliku medija koji se pusta; kad su sve slike kljucne (intra), skok je pola sekunde. Trake A1/A2 zadrzavaju
+gore/dolje za val. Nova kocka `crates/qnc-keyframe-nav` (+ ugovor): kljucne slike cita iz paketa (kopija toka, samo
+kljucni paketi, `framecrc`) kroz katalog dekodera u pozadini, nista ne dekodira ni zapisuje; slika se broji od
+spremljenog pocetnog PTS-a kao u playeru; intra se pamti po klipu. `qnc-ffmpeg-decode` (`key_pictures_with_cancel`),
+`qnc-decoder-catalog`, `qnc-source-preview` (`LocatedPicture.start`, `frame_at`, `seek_of`), `qnc-source-mark-focus`
+(`taken_picture`), `qnc-program-segments` (`keyframe_reference`: slika prije prvog pomaknutog markera; `jump_edit`,
+`say`), `qnc-panel-focus` (gore/dolje na uzetom rezu, `poll` primjenjuje odgovor), `qnc-editorial-application` (isti
+broj redaka). Provjereno na proxyju 2686 (GOP 24): od 30 naprijed +18, unatrag -6, od 48 naprijed +24. Omjer 2:1
+price i izvora pri skoku slota/markera nije uzet u obzir (skok je u slikama izvora).
