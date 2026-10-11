@@ -3438,3 +3438,9 @@ prije svog izvora (pomak se odbija); slot pomaknut u cijelosti zadrzava svoju po
 `qnc-program-segments` test prilagoden), ugovor `story.database.json` (`roll_edit`). B-roll kadar pokrivalice u
 tabu B-roll zadrzava svoj izvorni raspon. Kod izvora 1080i u 50p prici neparan pomak zaokruzuje se na cijelu
 sliku izvora.
+Popravak 2026-10-11 (live: "Program source 'cover:...' range ends at 221, outside probed source duration 196"): roll je
+pokrivalicu pomaknuo dalje u izvoru, pa je za svoj slot trazila slike iza kraja klipa i program se nije otvarao.
+`qnc-program-db` (`check_covers_fit`): nakon pomaka markera ili slota svaka pokrivalica slota koji pocinje ili
+zavrsava na pomaknutom markeru mora stati u svoj klip (IN + duljina slota omjerom price i izvora <= broj slika
+klipa), inace se pomak odbija i nista se ne upisuje; vrijedi i za slot ispred markera koji se produljuje.
+`qnc-content-read` `duration_frames_on` (jedini citac kataloga). Test.

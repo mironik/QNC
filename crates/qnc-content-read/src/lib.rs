@@ -327,6 +327,19 @@ pub fn import_status_on(conn: &Connection, clip_id: &str) -> Result<Option<Strin
     .map_err(|error| error.to_string())
 }
 
+/// The length in frames of clip `clip_id` of the catalog, on a connection another public
+/// module holds. `None`: not in it, or its length is not stored.
+pub fn duration_frames_on(conn: &Connection, clip_id: &str) -> Result<Option<u64>, String> {
+    if !has_view(conn, "public_clips")? {
+        return Ok(None);
+    }
+    let frames: Option<Option<i64>> = conn
+        .query_row("SELECT duration_frames FROM public_clips WHERE clip_id = ?1", [clip_id], |row| row.get(0))
+        .optional()
+        .map_err(|error| error.to_string())?;
+    Ok(frames.flatten().filter(|frames| *frames > 0).map(|frames| frames as u64))
+}
+
 /// The stored media of clip `clip_id`: its original and, when it has one, its proxy
 /// (QNC URIs), on a connection another public module holds. `None`: not in it.
 pub fn media_uris_on(
