@@ -95,18 +95,20 @@ fn picture_at(view: &SegmentsView, slots: &[Slot], moved: &dyn Fn(u64) -> u64, f
 /// A cover covers its whole slot, from its start marker to its end marker.
 fn cover_picture(cover: &CoverSpan, slots: &[Slot], moved: &dyn Fn(u64) -> u64, frame: u64) -> Option<StillPicture> {
     let slot = slots.iter().find(|slot| slot.slot_id == cover.slot_id);
-    let (start, slot_end) = match slot {
-        Some(slot) => (moved(slot.start_frame), moved(slot.end_frame)),
-        None => (moved(cover.start_frame), moved(cover.end_frame)),
-    };
+    let (old_start, old_end) = slot.map_or((cover.start_frame, cover.end_frame), |slot| (slot.start_frame, slot.end_frame));
+    let (start, slot_end) = (moved(old_start), moved(old_end));
     // A cover fills its whole slot and plays its source from IN for the slot's length
     // (the store binds it so), at the story's ratio to its source (the stored span).
-    let length = cover.end_frame.saturating_sub(cover.start_frame).max(1);
+    let length = cover.end_frame.saturating_sub(cover.start_frame).max(1) as i64;
     if !(start..slot_end).contains(&frame) {
         return None;
     }
-    let source = cover.source_out_frame.saturating_sub(cover.source_in_frame);
-    Some(StillPicture { clip_id: cover.clip_id.clone(), source_frame: cover.source_in_frame + (frame - start) * source / length })
+    // Roll edit (the store's `roll_cover`): only the start marker moved, so the cover
+    // starts that much later or earlier in its source; a slot moved whole keeps it.
+    let roll = if start != old_start && slot_end == old_end { start as i64 - old_start as i64 } else { 0 };
+    let source = cover.source_out_frame.saturating_sub(cover.source_in_frame) as i64;
+    let source_frame = cover.source_in_frame as i64 + roll * source / length + (frame - start) as i64 * source / length;
+    Some(StillPicture { clip_id: cover.clip_id.clone(), source_frame: source_frame.max(0) as u64 })
 }
 
 #[cfg(test)]
@@ -175,6 +177,9 @@ mod tests {
     fn a_moved_marker_shows_the_picture_before_and_after_it() {
         let (view, slots) = view();
         let stills = edit_stills(&view, &slots, &[(15, 12)]);
-        assert_eq!(pictures(&stills), vec![Some(("clip-a".into(), 111)), Some(("clip-cover".into(), 500))]);
+        // Roll edit: the covered slot starts 3 earlier, so does its cover in its source.
+        assert_eq!(pictures(&stills), vec![Some(("clip-a".into(), 111)), Some(("clip-cover".into(), 497))]);
+        let stills = edit_stills(&view, &slots, &[(15, 18)]);
+        assert_eq!(pictures(&stills), vec![Some(("clip-a".into(), 117)), Some(("clip-cover".into(), 503))]);
     }
 }

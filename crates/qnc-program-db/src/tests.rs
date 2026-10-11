@@ -1430,6 +1430,58 @@ fn a_source_of_half_or_twice_the_story_rate_joins_with_its_length_in_story_frame
 }
 
 #[test]
+fn moving_the_start_marker_of_a_covered_slot_rolls_its_cover() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m10) = marker(&mut store, 10).unwrap() else {
+        panic!()
+    };
+    let Data::Created(m16) = marker(&mut store, 16).unwrap() else {
+        panic!()
+    };
+    marker(&mut store, 25).unwrap();
+    let slot_of = |marker_id: &str| -> String {
+        Connection::open(&path)
+            .unwrap()
+            .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [marker_id], |row| row.get(0))
+            .unwrap()
+    };
+    create_cover(&mut store, &slot_of(&m16), (500, 520)).unwrap();
+    let source_in = |store: &mut Story| (covers(store)[0].source_in_frame, covers(store)[0].source_out_frame);
+    // The marker at 16 starts the covered slot: 3 frames later, the cover starts 3 later.
+    run(&mut store, Operation::MoveMarker { marker_id: m16.clone(), program_frame: 19 }).unwrap();
+    assert_eq!(source_in(&mut store), (503, 523));
+    run(&mut store, Operation::MoveMarker { marker_id: m16.clone(), program_frame: 14 }).unwrap();
+    assert_eq!(source_in(&mut store), (498, 518), "earlier: the cover starts earlier");
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(source_in(&mut store), (503, 523), "undo takes the roll back");
+    // The slot before moves with its markers: the covered slot after it rolls.
+    run(&mut store, Operation::MoveSlot { slot_id: slot_of(&m10), start_frame: 12 }).unwrap();
+    assert_eq!(markers(&mut store), vec![12, 21, 25]);
+    assert_eq!(source_in(&mut store), (505, 525));
+    // The covered slot itself moves: its cover keeps its pictures.
+    run(&mut store, Operation::MoveSlot { slot_id: slot_of(&m16), start_frame: 20 }).unwrap();
+    assert_eq!(source_in(&mut store), (505, 525));
+    // A cover cannot start before its source.
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = imported_store(&dir.path().join("db"));
+    three_segments(&mut store);
+    let Data::Created(m16) = marker(&mut store, 16).unwrap() else {
+        panic!()
+    };
+    let slot: String = Connection::open(dir.path().join("db"))
+        .unwrap()
+        .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [&m16], |row| row.get(0))
+        .unwrap();
+    create_cover(&mut store, &slot, (2, 20)).unwrap();
+    assert!(run(&mut store, Operation::MoveMarker { marker_id: m16, program_frame: 13 })
+        .unwrap_err()
+        .contains("prije svog IN-a"));
+}
+
+#[test]
 fn a_slot_moves_with_both_its_markers_up_to_its_neighbours() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");

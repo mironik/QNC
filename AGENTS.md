@@ -3430,3 +3430,11 @@ nakon slika koje nedostaju izvlaci i sljedece slike u smjeru zadnjeg pomaka (pro
 do dva prolaza ispred). Marker: slika poslije markera ostaje ista jer sljedeci slot ima pokrivalicu, a baza
 (`qnc-program-db` `rebind_covers`) pokrivalicu uvijek pusta od njezina IN-a; prikaz to tocno pokazuje. Promjena
 tog pravila (pomak markera pomice i IN pokrivalice sljedeceg slota) ceka odluku korisnika.
+Otkljucano i izvedeno 2026-10-11 (korisnik: "da, roll rez, otkljucaj qnc-program-db"): pomak pocetnog markera slota
+s pokrivalicom (`MoveMarker`, ili slot iza pomaknutog slota kod `MoveSlot`) pomice i IN/OUT pokrivalice tog slota za
+isti broj slika (omjerom price i izvora), pa se mijenja i prva slika poslije markera; pokrivalica ne moze poceti
+prije svog izvora (pomak se odbija); slot pomaknut u cijelosti zadrzava svoju pokrivalicu. `qnc-program-db`
+(`roll_cover`, test; Undo ga vraca), nacrt prikaza isto pravilo (`qnc-program-view` `cover_picture`, test;
+`qnc-program-segments` test prilagoden), ugovor `story.database.json` (`roll_edit`). B-roll kadar pokrivalice u
+tabu B-roll zadrzava svoj izvorni raspon. Kod izvora 1080i u 50p prici neparan pomak zaokruzuje se na cijelu
+sliku izvora.

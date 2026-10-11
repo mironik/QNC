@@ -776,6 +776,10 @@ impl Store {
         if taken {
             return Err(format!("marker already exists at timeline_frame={frame}"));
         }
+        let old: i64 = tx
+            .query_row("SELECT timeline_frame FROM story_markers WHERE marker_id = ?1", [marker_id], |row| row.get(0))
+            .map_err(err)?;
+        roll_cover(&tx, marker_id, frame - old)?;
         tx.execute(
             "UPDATE story_markers SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3,
                 updated_at = ?4
@@ -835,6 +839,8 @@ impl Store {
         if blocked || new_start <= 0 || new_end >= duration {
             return Err("Slot se pomice samo do susjednog M markera.".into());
         }
+        // The slot keeps its cover as it is; the slot after it starts elsewhere (roll).
+        roll_cover(&tx, &end_id, new_start - start)?;
         for (id, frame) in [(&start_id, new_start), (&end_id, new_end)] {
             tx.execute(
                 "UPDATE story_markers SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3,
@@ -1886,6 +1892,62 @@ fn delete_markers_with_slots(conn: &Connection, marker_ids: &[String]) -> Result
         conn.execute(
             "DELETE FROM story_markers WHERE marker_id = ?1",
             [marker_id],
+        )
+        .map_err(err)?;
+    }
+    Ok(())
+}
+
+/// Roll edit (user 2026-10-11, not in v5): the start marker of a slot moved by `shift`
+/// story frames while its end marker stays, so the slot's cover starts that much later
+/// (or earlier) in its source: the picture after the marker changes, as the picture
+/// before it does. A cover cannot start before its source; a 1080i source in a 50p
+/// story moves by whole source frames (an odd shift is rounded toward zero).
+fn roll_cover(conn: &Connection, start_marker_id: &str, shift: i64) -> Result<()> {
+    if shift == 0 {
+        return Ok(());
+    }
+    let Some(rate) = story_rate(conn)? else {
+        return Ok(());
+    };
+    type CoverRow = (String, i64, i64, u32, u32);
+    let covers = {
+        let mut statement = conn
+            .prepare(
+                "SELECT cover_id, source_in_frame, source_out_frame, source_fps_num, source_fps_den
+                 FROM story_covers WHERE substr(slot_id, 1, length(?1) + 1) = ?1 || '|'",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([start_marker_id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)))
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<CoverRow>>>()
+            .map_err(err)?;
+        rows
+    };
+    for (cover_id, source_in, source_out, fps_num, fps_den) in covers {
+        let (num, den) = story_per_source(rate, (fps_num, fps_den))?;
+        let source_shift = shift * den / num;
+        let (new_in, new_out) = (source_in + source_shift, source_out + source_shift);
+        if new_in < 0 {
+            return Err("Pokrivalica sljedeceg slota nema toliko slike prije svog IN-a.".into());
+        }
+        let fps = f64::from(fps_num) / f64::from(fps_den.max(1));
+        conn.execute(
+            "UPDATE story_covers
+             SET source_in_frame = ?1, source_out_frame = ?2, in_seconds = ?3, out_seconds = ?4,
+                 in_tc = ?5, out_tc = ?6, updated_at = ?7
+             WHERE cover_id = ?8",
+            params![
+                new_in,
+                new_out,
+                timeline_sec(new_in, fps),
+                timeline_sec(new_out, fps),
+                frame_timecode(new_in, fps),
+                frame_timecode(new_out, fps),
+                story_now(),
+                cover_id
+            ],
         )
         .map_err(err)?;
     }

@@ -666,10 +666,11 @@ fn a_moved_slot_takes_its_cover_with_it_in_the_edit_pictures() {
         .iter()
         .map(|still| still.picture.as_ref().map(|p| (p.clip_id.clone(), p.source_frame)))
         .collect();
-    // The slot is 17..35 now: the cover of the slot before fills it to 17 (its source plays on).
+    // The slot is 17..35 now: the cover of the slot before fills it to 17 (its source plays on),
+    // the slot after starts 2 later and so does its cover (roll edit).
     assert_eq!(
         pictures,
-        vec![Some(("prev".into(), 1016)), Some(("own".into(), 1000)), Some(("own".into(), 1017)), Some(("next".into(), 1000))]
+        vec![Some(("prev".into(), 1016)), Some(("own".into(), 1000)), Some(("own".into(), 1017)), Some(("next".into(), 1002))]
     );
 }
 
