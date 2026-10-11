@@ -117,6 +117,13 @@ impl Control {
             while !stopping.load(Ordering::Acquire) {
                 match listener.accept() {
                     Ok((stream, _)) => {
+                        // On Windows an accepted socket inherits the listener's non-blocking
+                        // mode: the read of the next request found no data at once and the
+                        // socket ended with a protocol error the client could read as the
+                        // answer to its next request (2026-10-11). Blocking, with the idle
+                        // limit of a session as the read limit.
+                        let _ = stream.set_nonblocking(false);
+                        let _ = stream.set_read_timeout(Some(Duration::from_secs(300)));
                         let _ = stream.set_nodelay(true);
                         let _ = stream.set_write_timeout(Some(Duration::from_secs(10)));
                         let sender = sender.clone();

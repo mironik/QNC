@@ -44,7 +44,7 @@ impl Raster {
             Self::Gpu(c) => c.output_bytes(),
         }
     }
-    fn convert(&mut self, input: &[u8], rgba: &mut [u8]) -> Result<RasterTiming, ConversionError> {
+    pub(crate) fn convert(&mut self, input: &[u8], rgba: &mut [u8]) -> Result<RasterTiming, ConversionError> {
         match self {
             Self::Cpu(c) => c.convert_timed(input, rgba),
             Self::Gpu(c) => {

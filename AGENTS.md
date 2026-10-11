@@ -3373,3 +3373,14 @@ spremljenog pocetnog PTS-a kao u playeru; intra se pamti po klipu. `qnc-ffmpeg-d
 `say`), `qnc-panel-focus` (gore/dolje na uzetom rezu, `poll` primjenjuje odgovor), `qnc-editorial-application` (isti
 broj redaka). Provjereno na proxyju 2686 (GOP 24): od 30 naprijed +18, unatrag -6, od 48 naprijed +24. Omjer 2:1
 price i izvora pri skoku slota/markera nije uzet u obzir (skok je u slikama izvora).
+Izvedeno 2026-10-11 (grana `decoded-window`, od spremljene verzije `v-2026-10-11-pre-intra-preview`; korisnik: "idemo
+naci najbolje rjesenje u situaciji da ne postoji proxy koji je generirala kamera"): bez kodiranja. Dok player klipa
+stoji, `qnc-broadcast-engine` (`backfill.rs`) nakon 600 ms mirovanja vlastitom niti i vlastitim dekoderom (nizi
+prioritet procesa, `qnc-media-decode` `Decoder::set_background_priority`) dekodira 1,5 s prije pozicije (prethodni GOP)
+i drzi slike u memoriji; korak unatrag ih uzima bez ponovnog otvaranja dekodera playera; dopunjava u komadima od
+0,75 s; pozadina staje cim krene Play (oznaka `playing` u zajednickom `VideoSink` postavljaju Play/Pause/Stop/cue),
+a pokrece se iz petlje playera (`Runtime::tick`). Samo za preview monitor; nista se ne kodira ni zapisuje. Uz to
+ispravak veze playera (`control.rs`) i alat za mjerenje (`--back`, `--jumps`). Izmjereno na izoliranoj kopiji
+(original 2002 s kartice, XAVC 4:2:2 10-bit, od 1500; ista verzija s pozadinom i bez nje, naizmjenicno, 3x):
+koraci unatrag najgore 45-49 ms (bez 0,72-0,75 s), p90 43-44 ms (57-69 ms); koraci naprijed isti (40-43 ms);
+skokovi +-50 slika medijan 0,52-0,55 s (0,68-0,70 s); Play originala 98,8-99,8 % slika (98,2-100 %).

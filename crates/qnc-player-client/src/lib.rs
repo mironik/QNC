@@ -279,6 +279,7 @@ impl Player {
                                 publish(&state, *generation, view)
                             }
                             Err(error) => {
+                                timing_line(*generation, &format!("connection_error={error}"));
                                 publish(
                                     &state,
                                     *generation,

@@ -19,6 +19,8 @@ struct Args {
     clips: Vec<String>,
     program_from: Vec<u64>,
     steps: Vec<String>,
+    jumps: Vec<String>,
+    back: Vec<String>,
     seconds: u64,
     /// Also run the program output on the external screen and measure what it showed.
     hdmi: bool,
@@ -27,7 +29,7 @@ struct Args {
 }
 
 fn args() -> Result<Args, String> {
-    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), seconds: 10, hdmi: false, start: 0 };
+    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), jumps: Vec::new(), back: Vec::new(), seconds: 10, hdmi: false, start: 0 };
     let mut list = std::env::args().skip(1);
     while let Some(arg) = list.next() {
         if arg == "--hdmi" {
@@ -40,13 +42,15 @@ fn args() -> Result<Args, String> {
             "--clip" => parsed.clips.push(value),
             "--program" => parsed.program_from.push(value.parse().map_err(|_| "--program FRAME")?),
             "--steps" => parsed.steps.push(value),
+            "--jumps" => parsed.jumps.push(value),
+            "--back" => parsed.back.push(value),
             "--start" => parsed.start = value.parse().map_err(|_| "--start FRAME")?,
             "--seconds" => parsed.seconds = value.parse().map_err(|_| "--seconds N")?,
             other => return Err(format!("unknown argument {other}")),
         }
     }
     if parsed.root.as_os_str().is_empty() {
-        return Err("usage: qnc-player-acceptance --root <isolated QNC root> [--clip NAME]... [--program FRAME]... [--steps NAME]... [--seconds N] [--hdmi]".into());
+        return Err("usage: qnc-player-acceptance --root <isolated QNC root> [--clip NAME]... [--program FRAME]... [--steps NAME]... [--jumps NAME]... [--back NAME]... [--seconds N] [--hdmi]".into());
     }
     Ok(parsed)
 }
@@ -399,6 +403,64 @@ fn steps(preview: &mut SourcePreview, run: &mut Steps) {
     }
 }
 
+/// Jumps around one place, as trimming does (user 2026-10-11): cue to `start`, wait 4 s
+/// (the player may prepare the GOPs around it meanwhile), then jumps back and forth
+/// within about a second, across GOP boundaries; each waits for its picture.
+fn jumps(preview: &mut SourcePreview, run: &mut Steps, start: u64) {
+    if let Err(error) = wait_ready(preview, Duration::from_secs(20)) {
+        run.error = Some(error);
+        return;
+    }
+    preview.cue(start);
+    if wait_shown(preview, start, Duration::from_secs(10)).is_none() {
+        run.error = Some("the start frame did not show".into());
+        return;
+    }
+    std::thread::sleep(Duration::from_secs(4));
+    for delta in [-30i64, 20, -45, 10, -12, 35, -50, 5, -25, 40] {
+        let target = start.saturating_add_signed(delta);
+        let call = Instant::now();
+        preview.cue(target);
+        run.call_us.push(call.elapsed().as_micros());
+        match wait_shown(preview, target, Duration::from_secs(5)) {
+            Some(_) => run.single_ms.push(call.elapsed().as_millis()),
+            None => run.missed += 1,
+        }
+        println!("  jump {delta:+} to {target}: {} ms, shown {:?} error {:?}", call.elapsed().as_millis(), shown_frame(preview), preview.player_view().error);
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    run.burst_ms = Some(0);
+}
+
+/// Steps back through the GOPs around one place, as trimming does (user 2026-10-11): cue
+/// to `start`, wait 4 s, then 60 single steps back (past the pictures the player keeps
+/// behind a cue and across GOP boundaries), each waiting for its picture.
+fn back(preview: &mut SourcePreview, run: &mut Steps, start: u64) {
+    if let Err(error) = wait_ready(preview, Duration::from_secs(20)) {
+        run.error = Some(error);
+        return;
+    }
+    preview.cue(start);
+    if wait_shown(preview, start, Duration::from_secs(10)).is_none() {
+        run.error = Some("the start frame did not show".into());
+        return;
+    }
+    std::thread::sleep(Duration::from_secs(4));
+    let mut at = start;
+    for _ in 0..60 {
+        at -= 1;
+        let call = Instant::now();
+        preview.step(-1);
+        run.call_us.push(call.elapsed().as_micros());
+        match wait_shown(preview, at, Duration::from_secs(5)) {
+            Some(_) => run.single_ms.push(call.elapsed().as_millis()),
+            None => run.missed += 1,
+        }
+        std::thread::sleep(Duration::from_millis(80));
+    }
+    run.burst_ms = Some(0);
+}
+
 fn percentile(values: &[u128], p: f64) -> u128 {
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
@@ -461,6 +523,28 @@ fn main() -> Result<(), String> {
             Some(clip) => {
                 preview.open(&clip.clip_id);
                 steps(&mut preview, &mut run);
+            }
+            None => run.error = Some("no such clip".into()),
+        }
+        step_runs.push(run);
+    }
+    for wanted in &args.back {
+        let mut run = Steps { name: format!("back {wanted}"), ..Steps::default() };
+        match clips.iter().find(|clip| clip.name.contains(wanted.as_str())) {
+            Some(clip) => {
+                preview.open(&clip.clip_id);
+                back(&mut preview, &mut run, args.start.max(100));
+            }
+            None => run.error = Some("no such clip".into()),
+        }
+        step_runs.push(run);
+    }
+    for wanted in &args.jumps {
+        let mut run = Steps { name: format!("jumps {wanted}"), ..Steps::default() };
+        match clips.iter().find(|clip| clip.name.contains(wanted.as_str())) {
+            Some(clip) => {
+                preview.open(&clip.clip_id);
+                jumps(&mut preview, &mut run, args.start.max(60));
             }
             None => run.error = Some("no such clip".into()),
         }

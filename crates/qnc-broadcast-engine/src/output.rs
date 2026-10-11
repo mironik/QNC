@@ -16,6 +16,11 @@ pub(crate) struct VideoSink {
     pub converted: u64,
     pub monitor: Option<(FrameHeader, Arc<[u8]>)>,
     pub(crate) monitor_pending: VecDeque<(FrameHeader, Arc<[u8]>)>,
+    /// The transport plays (set by Play, cleared by Pause, Stop and a cue): background
+    /// work of the picture gives way while it plays.
+    pub(crate) playing: bool,
+    /// The pictures before where the clip stands (`backfill`), started from the player loop.
+    pub(crate) back: Option<Rc<RefCell<crate::backfill::BackFill>>>,
 }
 pub(crate) type SharedVideo = Rc<RefCell<VideoSink>>;
 impl VideoSink {

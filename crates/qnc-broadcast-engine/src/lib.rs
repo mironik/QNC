@@ -5,6 +5,7 @@ mod conversion;
 mod decode_input;
 mod input;
 mod output;
+mod backfill;
 mod program;
 pub use decode_input::DecodeMediaAccess;
 use decode_input::{DecodeInput, seek_start};
@@ -263,6 +264,8 @@ impl Runtime {
         let opened = Instant::now();
         // The GPU converter is prepared while the audio device opens (both take a
         // while and need nothing of each other).
+        // The monitor (no native output) keeps the pictures before where it stands (`backfill`).
+        let has_monitor = video_output.is_none();
         let gpu_converter = video_output.is_none().then(|| {
             let (spec, bounds) = (
                 plan.spec.clone(),
@@ -324,11 +327,17 @@ impl Runtime {
             converted: 0,
             monitor: None,
             monitor_pending: Default::default(),
+            playing: false,
+            back: None,
         }));
+        let back = has_monitor
+            .then(|| Rc::new(RefCell::new(backfill::BackFill::new(&plan, decode_input.clone()))));
+        gpu.borrow_mut().back = back.clone();
         let source = plan.source.clone();
         let mut engine = TransportEngine::new(
             Source(source.clone()),
             VideoPath::Clip(Video {
+                back: back.clone(),
                 plan,
                 decoder: video_decoder,
                 input: decode_input,
@@ -411,6 +420,8 @@ impl Runtime {
             converted: 0,
             monitor: None,
             monitor_pending: Default::default(),
+            playing: false,
+            back: None,
         }));
         let video = ProgramVideo::open(&plan, &inputs, gpu.clone(), prebuffer_frames)?;
         let audio = ProgramAudio::open(&plan, &inputs, audio_device_id, prebuffer_frames)?;
@@ -457,6 +468,7 @@ impl Runtime {
         (gpu.monitor.is_none(), frames)
     }
     pub fn play(&mut self) -> Result<Vec<BroadcastEvent>> {
+        self.gpu.borrow_mut().playing = true;
         self.engine.play(self.playback_tick())
     }
     fn playback_tick(&self) -> u128 {
@@ -466,17 +478,25 @@ impl Runtime {
         )
     }
     pub fn pause(&mut self) -> Result<Vec<BroadcastEvent>> {
+        self.gpu.borrow_mut().playing = false;
         self.engine.pause()
     }
     pub fn stop(&mut self) -> Result<Vec<BroadcastEvent>> {
+        self.gpu.borrow_mut().playing = false;
         self.engine.stop()
     }
     pub fn cue_frame(&mut self, frame: u64, present: bool) -> Result<Vec<BroadcastEvent>> {
+        self.gpu.borrow_mut().playing = false;
         let events = self.engine.cue_frame(frame, present)?;
         self.gpu.borrow_mut().clear_pending_monitor();
         Ok(events)
     }
     pub fn tick(&mut self) -> Result<Vec<BroadcastEvent>> {
+        // The pictures before where the clip stands start once it stood still a moment.
+        let back = self.gpu.borrow().back.clone();
+        if let Some(back) = back {
+            back.borrow_mut().tick();
+        }
         if let Some(device) = &self.audio
             && device.borrow().telemetry().status == qnc_audio_output::Status::Failed
         {
@@ -651,6 +671,8 @@ struct Video {
     cue_anchor: u64,
     /// The (generation, sequence) of the last picture handed out.
     handed: Option<(u64, u64)>,
+    /// The pictures before where the player stands, made in the background (monitor only).
+    back: Option<Rc<RefCell<backfill::BackFill>>>,
 }
 
 /// A decoder (or lane) no longer needed is shut down on a thread of its own: stopping
@@ -684,6 +706,13 @@ impl VideoDecodeAdapter for Video {
         request: EngineFrameRequest,
     ) -> Result<DecodedVideoFrame<Picture>> {
         let mut stepping_back = false;
+        let cued = self.pending_seek.is_some();
+        if self.gpu.borrow().playing {
+            // Playing: the background gives way to the playing decoder.
+            if let Some(back) = &self.back {
+                back.borrow_mut().pause();
+            }
+        }
         if let Some(frame) = self.pending_seek {
             if request.frame != frame {
                 return Err(error("seek target mismatch"));
@@ -691,7 +720,7 @@ impl VideoDecodeAdapter for Video {
             stepping_back = frame < self.cue_anchor;
             self.cue_anchor = frame;
             self.forget_far_from(frame);
-            if self.reached_without_reopen(frame) {
+            if self.reached_without_reopen(frame) || self.back.as_ref().is_some_and(|back| back.borrow().picture(frame).is_some()) {
                 // The decoder stays open and paused: a kept picture, or read on.
                 self.pending_seek = None;
                 self.ready.retain(|kept, _| *kept >= frame);
@@ -705,6 +734,9 @@ impl VideoDecodeAdapter for Video {
             self.pending_seek = None;
         }
         self.drain_conversions()?;
+        if cued {
+            self.stand(request.frame);
+        }
         if let Some(frame) = self.ready.remove(&request.frame) {
             self.forget_far_from(request.frame);
             // Keep the read-ahead full on every frame (it was filled only when one was missing).
@@ -713,6 +745,9 @@ impl VideoDecodeAdapter for Video {
         }
         if let Some(frame) = self.kept_again(request.frame) {
             self.forget_far_from(request.frame);
+            return Ok(frame);
+        }
+        if let Some(frame) = self.back_picture(request.frame) {
             return Ok(frame);
         }
         if request.frame < self.next_decode_frame && self.pending_seek.is_none() && !self.converter.busy() {
@@ -781,6 +816,39 @@ impl Video {
                 || (self.discard_before.is_none()
                     && frame >= self.next_decode_frame
                     && frame < self.next_decode_frame + self.prefetch_frames as u64))
+    }
+
+    /// The player stands at `frame` (a cue or a step): the background makes the pictures
+    /// before it that the player does not hold and its decoder will not make.
+    fn stand(&mut self, frame: u64) {
+        let Some(back) = self.back.clone() else { return };
+        let decoding = self.discard_before.unwrap_or(self.next_decode_frame);
+        let (kept, ready) = (&self.kept, &self.ready);
+        let held = |f: u64| kept.contains_key(&f) || ready.contains_key(&f) || (f >= decoding && f < frame);
+        back.borrow_mut().stand(frame, held);
+    }
+
+    /// A picture the background made, shown like a kept one.
+    fn back_picture(&mut self, frame: u64) -> Option<DecodedVideoFrame<Picture>> {
+        let rgba = self.back.as_ref()?.borrow().picture(frame)?;
+        let header = FrameHeader {
+            version: qnc_video_output::VERSION.into(),
+            session_id: self.gpu.borrow().config.session_id.clone(),
+            generation: 0,
+            sequence: 0,
+            source_id: self.plan.source.source_id.clone(),
+            frame_number: frame,
+            width: self.raster_size[0],
+            height: self.raster_size[1],
+            pixel_format: PixelFormat::Rgba8Srgb,
+        };
+        let picture = DecodedVideoFrame {
+            source_id: self.plan.source.source_id.clone(),
+            frame,
+            video_format: self.plan.source.video_format.clone(),
+            payload: Rc::new(PictureData { token: None, header, rgba }),
+        };
+        self.stamped(picture)
     }
 
     /// A kept picture shown again.

@@ -195,6 +195,26 @@ impl Decoder {
         self.child.as_ref().map(Child::id)
     }
 
+    /// The decoder works below normal priority: background work (the pictures before
+    /// where the player stands) gives way to the playing decoder (Windows; other OSes keep
+    /// the priority, a plain user may not raise it back).
+    pub fn set_background_priority(&self) {
+        #[cfg(windows)]
+        if let Some(pid) = self.process_id() {
+            use windows_sys::Win32::{
+                Foundation::CloseHandle,
+                System::Threading::{BELOW_NORMAL_PRIORITY_CLASS, OpenProcess, PROCESS_SET_INFORMATION, SetPriorityClass},
+            };
+            unsafe {
+                let process = OpenProcess(PROCESS_SET_INFORMATION, 0, pid);
+                if !process.is_null() {
+                    SetPriorityClass(process, BELOW_NORMAL_PRIORITY_CLASS);
+                    CloseHandle(process);
+                }
+            }
+        }
+    }
+
     /// Consume the existing bounded queue without waiting, opening or joining.
     /// Cleanup remains explicit through cancel/Drop on the owning module thread.
     pub fn try_next_packet(&mut self) -> Result<std::task::Poll<Option<DecodedPacket>>> {
