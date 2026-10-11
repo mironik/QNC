@@ -226,11 +226,18 @@ fn forbidden_dependency(owner: &str, dependency: &str) -> bool {
                 | "winit"
                 | "qnc-decoder-catalog"
                 | "qnc-ffmpeg-decode"
+                | "qnc-libav-decode"
         ) && forbidden_dependency("qnc-broadcast-engine", dependency);
     }
     if owner == "qnc-decoder-catalog" {
-        return !matches!(dependency, "qnc-decoder-catalog" | "qnc-ffmpeg-decode")
-            && forbidden_dependency("qnc-media-decode", dependency);
+        return !matches!(dependency, "qnc-decoder-catalog" | "qnc-ffmpeg-decode" | "qnc-libav-decode")
+            && forbidden_dependency("qnc-libav-decode", dependency);
+    }
+    // The in-process decoder adapter: the CLI adapter it shares its filters with and the
+    // FFmpeg libraries, else the bounds of the shared decode contract.
+    if owner == "qnc-libav-decode" {
+        return !matches!(dependency, "qnc-libav-decode" | "qnc-ffmpeg-decode" | "ffmpeg-next" | "ffmpeg-sys-next")
+            && forbidden_dependency("qnc-ffmpeg-decode", dependency);
     }
     if owner == "qnc-ffmpeg-decode" {
         return dependency != owner && forbidden_dependency("qnc-media-decode", dependency);

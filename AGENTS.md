@@ -3479,3 +3479,19 @@ dekodiranje do nje, bez novog procesa): medijan 107-119 ms, najgore 165-200 ms, 
 `ffmpeg` naredbu oko 400 ms). Korak unatrag bez slika u memoriji 123-172 ms. Dekodiranje u nizu: 1 nit 71 slika/s,
 4 niti 169-198 slika/s. Mjereno samo dekodiranje do YUV-a (bez pretvorbe i prikaza). Integracija u QNC nije
 napravljena.
+Otvoreno ograniceno odobrenje 2026-10-12 (korisnik: "da, LGPL i kreni u posebnoj grani"; "bilo bi dobro da dekoder
+bude kocka kako bi se kocke mogle mijenjati"): grana `libav-decoder`. Prvi korak: nova kocka
+`crates/qnc-libav-decode` (+ `contracts/modules/libav-decode.module.json`): video se dekodira u procesu playera kroz
+FFmpeg biblioteke (LGPL shared 8.1, BtbN; `ffmpeg-next` 8), zvuk i sve sto ne preuzme ostaje na `ffmpeg` naredbi.
+Kocka je novi adapter kataloga (`Driver::LibavV1`, `libav_v1`), pa je zamjenjiva kao i ostali dekoderi; gradi se samo
+uz znacajku `libav` programa playera (`tools/qnc-player-runner`, `qnc-decoder-catalog`) i varijable `FFMPEG_DIR` i
+`LIBCLANG_PATH`, izvan clanova workspacea (obicna gradnja i testovi ne trebaju razvojne datoteke). Program izgraden
+bez znacajke tu registraciju dekodira istom `ffmpeg` naredbom. `qnc-media-decode`: adapter moze dati dekoder u
+procesu (`PictureSource`, `DecoderAdapter::open_in_process`), a slike iz procesa i iz ugradenog dekodera prolaze iste
+provjere ugovora (`pump`); `qnc-ffmpeg-decode` dijeli opis filtara (`video_filter`) i ime demuxera. Conformance:
+nova kocka na popisu adaptera dekodera i u granici playera. Dokaz (`crates/qnc-libav-decode/tests/same_as_cli.rs`):
+bajt za bajt iste slike, vremenske oznake i broj slika kao `ffmpeg` naredba (cijeli tok, skokovi, 4:2:0,
+deinterlace, svaki field, pola brzine, stvarni original s kartice od cetiri mjesta). Izmjereno: kocka od otvaranja do
+prve slike 170-260 ms (otvaranje MXF-a 65 ms), `ffmpeg` naredba 240-310 ms; u playeru skok koji ponovno otvara
+dekoder 385 ms prema 460 ms. Katalog u repozitoriju nije promijenjen (mjereno s kopijom kataloga u scratchpadu).
+Sljedeci korak: dekoder ostaje otvoren i skace unutar sebe (bez novog otvaranja), dijeljenje po dijelovima slike.

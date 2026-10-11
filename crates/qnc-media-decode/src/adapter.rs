@@ -42,6 +42,14 @@ pub struct ProcessLaunch {
     pub records: Box<dyn PacketRecordReader>,
 }
 
+/// A decoder that works inside the calling process (no process start, no pipe): it gives
+/// the same records and bytes a decoder process gives, one decoded packet at a time, and
+/// the same checks hold for them (user 2026-10-11: the decoder kept in the player).
+pub trait PictureSource: Send {
+    /// The next decoded packet, `None` at the end of the request.
+    fn next(&mut self) -> Result<Option<(PacketHeader, Vec<u8>)>>;
+}
+
 /// A decode adapter has no presentation clock, project policy or DB access.
 pub trait DecoderAdapter: std::fmt::Debug + Send + Sync {
     fn validate(&self, request: &DecodeRequest, plan: &DecodePlan) -> Result<()>;
@@ -52,4 +60,14 @@ pub trait DecoderAdapter: std::fmt::Debug + Send + Sync {
         endpoint: &CodecEndpoint,
         storage_stamp: &str,
     ) -> Result<ProcessLaunch>;
+    /// The decoder of this request inside the calling process, when the adapter has one
+    /// for it; `None` launches the decoder process.
+    fn open_in_process(
+        &self,
+        _request: &DecodeRequest,
+        _plan: &DecodePlan,
+        _endpoint: &CodecEndpoint,
+    ) -> Option<Result<Box<dyn PictureSource>>> {
+        None
+    }
 }

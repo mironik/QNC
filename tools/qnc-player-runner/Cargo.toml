@@ -33,3 +33,7 @@ uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }
+
+[features]
+# The in-process video decoder of the catalog (build with FFMPEG_DIR and LIBCLANG_PATH).
+libav = ["qnc-decoder-catalog/libav"]

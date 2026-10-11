@@ -100,15 +100,10 @@ impl FfmpegAdapter {
             DecodedFormat::Video { pixel_format, .. } => {
                 // A delivered layout other than the saved one is converted explicitly
                 // here (the graph never converts on its own); otherwise none is done.
-                let convert = if request.output_pixel_format.is_some() || self.hwaccel.is_some() {
-                    "scale,"
-                } else {
-                    ""
-                };
                 cmd.args([
                     "-an",
                     "-vf",
-                    &format!("{}setfield=prog,{convert}format={pixel_format}", deinterlace(request)),
+                    &video_filter(request, pixel_format, request.output_pixel_format.is_some() || self.hwaccel.is_some()),
                     "-c:v",
                     "rawvideo",
                     "-pix_fmt",
@@ -484,6 +479,15 @@ fn format_decimal(value: f64, precision: usize) -> String {
 /// v5/v4 `video_decode_filter`: an interlaced saved source delivered progressive gets both
 /// fields of each frame into one picture (`send_frame`: same frame count and rate), field
 /// order from the saved stream. Nothing for a progressive source or without the request.
+/// The filters a video request is decoded through: the deinterlace and rate of the
+/// request, the progressive field flag and, when `convert`, the explicit conversion to the
+/// delivered layout (the graph never converts on its own). Shared with an in-process
+/// decoder so both give the same pictures.
+pub fn video_filter(request: &DecodeRequest, pixel_format: &str, convert: bool) -> String {
+    let convert = if convert { "scale," } else { "" };
+    format!("{}setfield=prog,{convert}format={pixel_format}", deinterlace(request))
+}
+
 fn deinterlace(request: &DecodeRequest) -> String {
     use qnc_media_metadata::ScanMode;
     let video = request.saved_video();
@@ -532,7 +536,8 @@ fn seconds(t: Rational) -> Result<String> {
 fn invalid(message: &str) -> DecodeError {
     DecodeError::new(ErrorKind::Contract, message)
 }
-fn container_name(container: &str) -> Result<&str> {
+/// The ffmpeg demuxer name of a saved container (shared with an in-process decoder).
+pub fn container_name(container: &str) -> Result<&str> {
     Ok(match container {
         "mov,mp4,m4a,3gp,3g2,mj2" | "mov" | "mp4" => "mov",
         "mxf" => "mxf",

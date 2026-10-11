@@ -1,0 +1,47 @@
+{
+  "module_id": "qnc.module.libav-decode",
+  "module_name": "FFmpeg Libraries In-Process Video Decode Adapter",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "media.decode.video.in_process"
+  ],
+  "input_contract_version": "0.2.0",
+  "output_contract_version": "0.2.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "module_dependencies": [
+    "qnc.module.media-decode",
+    "qnc.module.media-stream",
+    "qnc.module.ffmpeg-decode"
+  ],
+  "forbidden_calls": [
+    "db.read",
+    "db.write",
+    "media.probe.full",
+    "playback.clock",
+    "playback.present"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-player-core"
+  ],
+  "adapter_policy": "A replaceable decoder in the catalog chain (driver libav_v1), built only with the libav feature of a program. The FFmpeg libraries (LGPL shared build) decode the saved video stream inside the calling process and give the same pictures, timestamps and packed layout as the FFmpeg CLI adapter: the same seek (key picture before the start, earlier pictures dropped), the same filters (qnc_ffmpeg_decode::video_filter) and the same checks of the shared decode contract (qnc-media-decode pump). Proven byte for byte against the CLI (tests/same_as_cli.rs: whole stream, starts, 4:2:0 conversion, deinterlace, each field, half rate, a camera original). Audio and any request it does not take go through the FFmpeg CLI adapter with the same executable; a program built without the feature decodes the registration through that adapter. It consumes only a seekable file CodecEndpoint produced by the storage owner/resolver, never an HTTP or raw TCP endpoint, runs no probe, owns no clock and knows no application.",
+  "specification": "docs/70-replaceable-decoders.md"
+}

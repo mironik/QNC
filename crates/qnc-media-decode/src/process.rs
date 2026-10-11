@@ -36,6 +36,8 @@ pub struct Decoder {
     bridge: Option<LoopbackBridge>,
     poll_deadline: Option<Instant>,
     eof_deadline: Option<Instant>,
+    /// Asked to work below normal priority (a decoder in this process lowers its thread).
+    background: Arc<AtomicBool>,
 }
 impl Decoder {
     pub fn open(request: DecodeRequest, media: MediaStream, config: DecoderConfig) -> Result<Self> {
@@ -86,6 +88,9 @@ impl Decoder {
         bridge: Option<LoopbackBridge>,
     ) -> Result<Self> {
         let plan = DecodePlan::new(&request, &config)?;
+        if let Some(source) = config.adapter.open_in_process(&request, &plan, &endpoint) {
+            return Self::in_process(request, source?, plan, config, bridge);
+        }
         let ProcessLaunch {
             command: mut cmd,
             input,
@@ -143,6 +148,7 @@ impl Decoder {
             bridge,
             poll_deadline: None,
             eof_deadline: None,
+            background: Arc::new(AtomicBool::new(false)),
         };
         if let Some(mut stdin) = stdin {
             let worker = thread::Builder::new()
@@ -199,6 +205,7 @@ impl Decoder {
     /// where the player stands) gives way to the playing decoder (Windows; other OSes keep
     /// the priority, a plain user may not raise it back).
     pub fn set_background_priority(&self) {
+        self.background.store(true, Ordering::Release);
         #[cfg(windows)]
         if let Some(pid) = self.process_id() {
             use windows_sys::Win32::{
@@ -226,7 +233,10 @@ impl Decoder {
         }
         let result = (|| {
             if let Some(deadline) = self.eof_deadline {
-                return match self.child.as_mut().expect("running child").try_wait() {
+                let Some(child) = self.child.as_mut() else {
+                    return Ok(Poll::Ready(None)); // a decoder in this process ended with its stream
+                };
+                return match child.try_wait() {
                     Ok(Some(status)) if status.success() => Ok(Poll::Ready(None)),
                     Ok(Some(_)) => Err(DecodeError::new(
                         ErrorKind::Process,
@@ -321,8 +331,11 @@ impl Decoder {
         let deadline = self
             .eof_deadline
             .unwrap_or_else(|| Instant::now() + self.config.read_timeout);
+        let Some(child) = self.child.as_mut() else {
+            return Ok(()); // a decoder in this process ended with its stream
+        };
         loop {
-            match self.child.as_mut().expect("running child").try_wait() {
+            match child.try_wait() {
                 Ok(Some(status)) if status.success() => return Ok(()),
                 Ok(Some(_)) => {
                     return Err(DecodeError::new(
@@ -478,6 +491,55 @@ fn read_packets(
     plan: DecodePlan,
     stderr_capture: StderrCapture,
 ) {
+    let max_packet = plan.max_packet;
+    let next = || -> Result<Option<(PacketHeader, Vec<u8>)>> {
+        loop {
+            if stop.load(Ordering::Acquire) {
+                return Ok(None);
+            }
+            match headers.recv_timeout(Duration::from_millis(20)) {
+                Ok(header) => {
+                    let header = header?;
+                    if header.size > max_packet {
+                        return Err(stream_error(
+                            "packet sequence or size differs from saved decode contract",
+                        ));
+                    }
+                    let mut bytes = vec![0; header.size];
+                    stdout
+                        .read_exact(&mut bytes)
+                        .map_err(|_| stream_error("truncated decoder packet"))?;
+                    return Ok(Some((header, bytes)));
+                }
+                Err(RecvTimeoutError::Timeout) => continue,
+                Err(RecvTimeoutError::Disconnected) => {
+                    let mut extra = [0];
+                    if stdout
+                        .read(&mut extra)
+                        .map_err(|_| stream_error("decoder stdout error"))?
+                        != 0
+                    {
+                        return Err(stream_error("decoded bytes without packet record"));
+                    }
+                    return Ok(None);
+                }
+            }
+        }
+    };
+    pump(next, &tx, &stop, &request, &plan, || no_packets_error(&stderr_capture));
+}
+
+/// The decoded packets of one request, from a decoder process or a decoder inside this
+/// process, held to the saved decode contract (sequence, size, timestamps, sample frames,
+/// and the saved frame count when the whole stream is decoded) and queued.
+fn pump(
+    mut next: impl FnMut() -> Result<Option<(PacketHeader, Vec<u8>)>>,
+    tx: &Sender<Event>,
+    stop: &AtomicBool,
+    request: &DecodeRequest,
+    plan: &DecodePlan,
+    no_packets: impl Fn() -> DecodeError,
+) {
     let result = (|| -> Result<()> {
         let mut ordinal = 0;
         let mut previous: Option<(i64, qnc_media_metadata::Rational)> = None;
@@ -485,12 +547,10 @@ fn read_packets(
             if stop.load(Ordering::Acquire) {
                 return Ok(());
             }
-            let header = match headers.recv_timeout(Duration::from_millis(20)) {
-                Ok(header) => header?,
-                Err(RecvTimeoutError::Timeout) => continue,
-                Err(RecvTimeoutError::Disconnected) => break,
-            };
+            let Some((header, bytes)) = next()? else { break };
+            header.validate()?;
             if header.ordinal != ordinal
+                || header.size != bytes.len()
                 || header.size > plan.max_packet
                 || plan.exact_packet.is_some_and(|size| size != header.size)
             {
@@ -508,10 +568,6 @@ fn read_packets(
             {
                 return Err(stream_error("partial audio sample frame"));
             }
-            let mut bytes = vec![0; header.size];
-            stdout
-                .read_exact(&mut bytes)
-                .map_err(|_| stream_error("truncated decoder packet"))?;
             if matches!(plan.format, DecodedFormat::Audio { .. })
                 && bytes
                     .chunks_exact(4)
@@ -530,21 +586,16 @@ fn read_packets(
                 format: plan.format.clone(),
                 bytes,
             };
-            if !send(&tx, Event::Packet(packet), &stop) {
+            if !send(tx, Event::Packet(packet), stop) {
                 return Ok(());
             }
             ordinal += 1;
         }
-        let mut extra = [0];
-        if stdout
-            .read(&mut extra)
-            .map_err(|_| stream_error("decoder stdout error"))?
-            != 0
-        {
-            return Err(stream_error("decoded bytes without packet record"));
+        if stop.load(Ordering::Acquire) {
+            return Ok(());
         }
         if ordinal == 0 {
-            return Err(no_packets_error(&stderr_capture));
+            return Err(no_packets());
         }
         if request.start.is_none() && matches!(plan.format, DecodedFormat::Video { .. }) {
             let expected = request
@@ -583,13 +634,66 @@ fn read_packets(
     })();
     if !stop.load(Ordering::Acquire) {
         send(
-            &tx,
+            tx,
             match result {
                 Ok(()) => Event::End,
                 Err(e) => Event::Failed(e),
             },
-            &stop,
+            stop,
         );
+    }
+}
+
+impl Decoder {
+    /// A decoder inside this process: one thread takes its packets and queues them like
+    /// the readers of a decoder process; cancel and drop stop it the same way.
+    fn in_process(
+        request: DecodeRequest,
+        mut source: Box<dyn PictureSource>,
+        plan: DecodePlan,
+        config: DecoderConfig,
+        bridge: Option<LoopbackBridge>,
+    ) -> Result<Self> {
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let background = Arc::new(AtomicBool::new(false));
+        let (events_tx, events_rx) = crossbeam_channel::bounded(config.queued_packets);
+        let (stop, lower, asked) = (cancelled.clone(), background.clone(), request.clone());
+        let worker = thread::Builder::new()
+            .name("qnc-decode-in-process".into())
+            .spawn(move || {
+                let mut lowered = false;
+                let next = || {
+                    if !lowered && lower.load(Ordering::Acquire) {
+                        lower_this_thread();
+                        lowered = true;
+                    }
+                    source.next()
+                };
+                pump(next, &events_tx, &stop, &asked, &plan, || stream_error("decoder returned no packets"));
+            })
+            .map_err(|_| DecodeError::new(ErrorKind::Process, "cannot start decoder thread"))?;
+        Ok(Self {
+            request,
+            config,
+            state: State::Running,
+            child: None,
+            cancelled,
+            events: Some(events_rx),
+            workers: vec![worker],
+            bridge,
+            poll_deadline: None,
+            eof_deadline: None,
+            background,
+        })
+    }
+}
+
+/// The calling thread below normal priority (Windows; other OSes keep it).
+fn lower_this_thread() {
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::System::Threading::{GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL};
+        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
     }
 }
 

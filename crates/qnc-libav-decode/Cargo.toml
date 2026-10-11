@@ -1,0 +1,17 @@
+[package]
+name = "qnc-libav-decode"
+version = "0.1.0"
+edition = "2024"
+
+# Outside the workspace members: building it needs the FFmpeg development files
+# (FFMPEG_DIR, LGPL shared build) and libclang (LIBCLANG_PATH). A program takes it in with
+# its `libav` feature; the rest of the workspace builds and tests without them.
+[dependencies]
+qnc-media-decode = { path = "../qnc-media-decode" }
+qnc-media-metadata = { path = "../qnc-media-metadata" }
+qnc-media-stream = { path = "../qnc-media-stream" }
+qnc-ffmpeg-decode = { path = "../qnc-ffmpeg-decode" }
+ffmpeg-next = { version = "8.0.0", default-features = false, features = ["codec", "format", "filter"] }
+
+[dev-dependencies]
+tempfile = "3"

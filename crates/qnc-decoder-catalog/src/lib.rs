@@ -97,7 +97,7 @@ impl LocalFilmstripExtractor {
         cancel: &AtomicBool,
     ) -> std::result::Result<(), String> {
         match &self.deployment.driver {
-            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } => qnc_ffmpeg_decode::extract_frame_run_with_cancel(
+            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::extract_frame_run_with_cancel(
                 &self.deployment.executable,
                 source,
                 start_sec,
@@ -120,7 +120,7 @@ impl LocalFilmstripExtractor {
         cancel: &AtomicBool,
     ) -> std::result::Result<Vec<f64>, String> {
         match &self.deployment.driver {
-            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } => qnc_ffmpeg_decode::key_pictures_with_cancel(
+            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::key_pictures_with_cancel(
                 &self.deployment.executable,
                 source,
                 start_sec,
@@ -142,7 +142,7 @@ impl LocalFilmstripExtractor {
         cancel: &AtomicBool,
     ) -> std::result::Result<(), String> {
         match &self.deployment.driver {
-            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } => qnc_ffmpeg_decode::extract_filmstrip_frames_with_cancel(
+            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::extract_filmstrip_frames_with_cancel(
                 &self.deployment.executable,
                 source,
                 &frames
@@ -178,6 +178,10 @@ pub enum Driver {
     /// The ffmpeg CLI with a GPU decoder of this host (`-hwaccel`).
     FfmpegHwaccelV1 { hwaccel: String },
     QncPacketsV1 { args: Vec<String> },
+    /// The FFmpeg libraries inside the decoding process for video (`qnc-libav-decode`,
+    /// built with the `libav` feature); audio and the picture extraction use the ffmpeg
+    /// executable of the registration.
+    LibavV1,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -404,6 +408,12 @@ impl SelectedAdapter {
     fn new(registration: &Registration, executable: PathBuf) -> Result<Self> {
         let adapter: Arc<dyn DecoderAdapter> = match &registration.driver {
             Driver::FfmpegCliV1 => Arc::new(qnc_ffmpeg_decode::FfmpegAdapter::new(executable)),
+            #[cfg(feature = "libav")]
+            Driver::LibavV1 => Arc::new(qnc_libav_decode::LibavAdapter::new(executable)),
+            #[cfg(not(feature = "libav"))]
+            // A program built without the libraries decodes through the same ffmpeg
+            // executable: the same pictures and timestamps (qnc-libav-decode same_as_cli).
+            Driver::LibavV1 => Arc::new(qnc_ffmpeg_decode::FfmpegAdapter::new(executable)),
             Driver::FfmpegHwaccelV1 { hwaccel } => {
                 Arc::new(qnc_ffmpeg_decode::FfmpegAdapter::with_hwaccel(executable, hwaccel)?)
             }
@@ -448,6 +458,17 @@ impl DecoderAdapter for Chain {
     ) -> Result<ProcessLaunch> {
         self.choose(request, plan)?.launch(request, plan, ep, stamp)
     }
+    fn open_in_process(
+        &self,
+        request: &DecodeRequest,
+        plan: &DecodePlan,
+        ep: &CodecEndpoint,
+    ) -> Option<Result<Box<dyn PictureSource>>> {
+        match self.choose(request, plan) {
+            Ok(adapter) => adapter.open_in_process(request, plan, ep),
+            Err(error) => Some(Err(error)),
+        }
+    }
 }
 
 impl DecoderAdapter for SelectedAdapter {
@@ -479,6 +500,14 @@ impl DecoderAdapter for SelectedAdapter {
     ) -> Result<ProcessLaunch> {
         self.adapter.launch(request, plan, ep, stamp)
     }
+    fn open_in_process(
+        &self,
+        request: &DecodeRequest,
+        plan: &DecodePlan,
+        ep: &CodecEndpoint,
+    ) -> Option<Result<Box<dyn PictureSource>>> {
+        self.adapter.open_in_process(request, plan, ep)
+    }
 }
 
 /// An explicit override is authoritative: a bad override is never replaced by a default.
@@ -501,7 +530,7 @@ pub fn installed_deployment() -> Result<SelectedDeployment> {
 pub fn installed_filmstrip_extractor() -> Result<Option<LocalFilmstripExtractor>> {
     let deployment = installed_deployment()?;
     Ok(match deployment.driver {
-        Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } => {
+        Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => {
             Some(LocalFilmstripExtractor { deployment })
         }
         Driver::QncPacketsV1 { .. } => None,

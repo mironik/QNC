@@ -1747,6 +1747,8 @@ fn scan_decoder_selection_boundary(root: &Path) -> CheckResult {
         if is_test_or_example_path(&relative)
             || relative.starts_with("crates/qnc-ffmpeg-decode/")
             || relative.starts_with("crates/qnc-decoder-catalog/")
+            // The in-process decoder adapter shares the filters of the CLI adapter.
+            || relative.starts_with("crates/qnc-libav-decode/")
             || relative.starts_with("tools/qnc-conformance/")
         {
             continue;

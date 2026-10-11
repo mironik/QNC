@@ -1,5 +1,7 @@
 [workspace]
 resolver = "2"
+# Built only with the `libav` feature of a program (needs the FFmpeg development files).
+exclude = ["crates/qnc-libav-decode"]
 members = [
     "crates/qnc-application-catalog",
     "crates/qnc-application-selection",
