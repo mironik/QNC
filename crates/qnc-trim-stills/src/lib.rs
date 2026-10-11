@@ -7,9 +7,12 @@
 //!
 //! An arrow moves an edit one frame, so a wanted picture is decoded with its neighbours:
 //! one decoder pass makes `RUN` consecutive pictures around it, and the next steps come
-//! from memory. Where a clip's picture is is found once per clip. One job runs at a time
-//! and takes the newest draft; a job that hangs is cancelled after `STUCK`. No player,
-//! no probe, no database write; the pictures are a passive aid, not the program.
+//! from memory. Where a clip's picture is is found once per clip. One background worker
+//! decodes the pictures still missing in the newest draft, one pass at a time, and each
+//! pass is shown as soon as it is made; a pass that hangs is cancelled after `STUCK`.
+//! While a new picture is being made, its place keeps the last picture it showed
+//! (user 2026-10-11: "ima pa nema"), never a black hole. No probe, no database write;
+//! the pictures are a passive aid, not the program.
 
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -31,19 +34,23 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The size an edit picture is decoded at (the trim zoom draws it up to 480x270).
 const STILL_SIZE: [u32; 2] = [320, 180];
 /// Pictures decoded in one pass: the wanted one and `RUN_BACK` on each side.
-const RUN_BACK: u64 = 8;
-const RUN: u32 = 17;
+const RUN_BACK: u64 = 12;
+const RUN: u32 = 25;
 /// Pictures kept in memory (about 230 KB each).
 const KEPT: usize = 160;
-/// A job taking longer is cancelled and the next one starts.
+/// A pass taking longer is cancelled and the worker starts again.
 const STUCK: Duration = Duration::from_secs(8);
 
 type Decoded = Vec<(StillPicture, Result<Arc<RgbaImage>, String>)>;
 type Located = Arc<Mutex<HashMap<String, LocatedPicture>>>;
 
+/// The background worker: it takes the first of `wanted` (the newest draft, kept up to
+/// date by `fill`), sends each pass when made and ends when nothing is wanted.
 struct Job {
     receiver: mpsc::Receiver<Decoded>,
-    started: Instant,
+    wanted: Arc<Mutex<Vec<StillPicture>>>,
+    /// When the pass being made started.
+    pass: Arc<Mutex<Option<Instant>>>,
     cancel: Arc<AtomicBool>,
 }
 
@@ -57,12 +64,11 @@ pub struct TrimStills {
     job: Option<Job>,
     /// The pictures last asked for, as logged (diagnostics only).
     asked: String,
-    /// When each missing picture was asked of the player.
-    asked_player: HashMap<StillPicture, Instant>,
+    /// Pictures asked of the player (it gives the ones it holds in memory).
+    asked_player: HashSet<StillPicture>,
+    /// The last picture each place of the zoom (by its name) showed.
+    shown: HashMap<String, Arc<RgbaImage>>,
 }
-
-/// How long a picture asked of the player is waited for before it is decoded here.
-const PLAYER_WAIT: Duration = Duration::from_millis(250);
 
 impl TrimStills {
     pub fn new() -> Self {
@@ -88,8 +94,21 @@ impl TrimStills {
             log(&format!("trim-stills asked {asked}"));
             self.asked = asked;
         }
+        if view.edit_stills.is_empty() && view.source_edit_stills.is_empty() {
+            self.shown.clear();
+        }
         for still in view.edit_stills.iter_mut().chain(view.source_edit_stills.iter_mut()) {
             still.image = still.picture.as_ref().and_then(|picture| self.cache.get(picture).cloned());
+            match (&still.image, still.picture.is_some()) {
+                (Some(image), _) => {
+                    self.shown.insert(still.label.clone(), image.clone());
+                }
+                // Not made yet: the place keeps what it showed until the new one comes.
+                (None, true) => still.image = self.shown.get(&still.label).cloned(),
+                (None, false) => {
+                    self.shown.remove(&still.label);
+                }
+            }
         }
         let mut missing: Vec<StillPicture> = Vec::new();
         let stills = view.edit_stills.iter().chain(&view.source_edit_stills);
@@ -98,26 +117,23 @@ impl TrimStills {
                 missing.push(picture.clone());
             }
         }
-        self.asked_player.retain(|picture, _| missing.contains(picture));
+        self.asked_player.retain(|picture| missing.contains(picture));
         if let Some(player) = player {
-            let new: Vec<(String, u64)> = missing
-                .iter()
-                .filter(|picture| !self.asked_player.contains_key(*picture))
-                .map(|picture| (picture.clip_id.clone(), picture.source_frame))
-                .collect();
-            if !new.is_empty() {
+            if missing.iter().any(|picture| !self.asked_player.contains(picture)) {
                 player.ask_stills(missing.iter().map(|p| (p.clip_id.clone(), p.source_frame)).collect());
-                let now = Instant::now();
-                for picture in &missing {
-                    self.asked_player.entry(picture.clone()).or_insert(now);
-                }
+                self.asked_player.extend(missing.iter().cloned());
             }
         }
-        // Decoded here only what the player did not give in time.
-        let waited = |picture: &StillPicture| player.is_none() || self.asked_player.get(picture).is_none_or(|at| at.elapsed() >= PLAYER_WAIT);
-        let decode: Vec<StillPicture> = missing.iter().filter(|picture| waited(picture)).cloned().collect();
-        if self.job.is_none() && !decode.is_empty() {
-            self.start(decode, locator);
+        // The player holds only the pictures around where it stands; the others are
+        // decoded here at once, whichever comes first is shown.
+        match &self.job {
+            Some(job) => {
+                if let Ok(mut wanted) = job.wanted.lock() {
+                    *wanted = missing;
+                }
+            }
+            None if !missing.is_empty() => self.start(missing, locator),
+            None => {}
         }
         arrived
     }
@@ -147,7 +163,7 @@ impl TrimStills {
         arrived
     }
 
-    /// Whether a job is decoding (the caller repaints soon).
+    /// Whether a picture is being made (the caller repaints soon).
     pub fn loading(&self) -> bool {
         self.job.is_some() || !self.asked_player.is_empty()
     }
@@ -156,18 +172,26 @@ impl TrimStills {
         let Some(job) = &self.job else {
             return false;
         };
-        let decoded = match job.receiver.try_recv() {
-            Ok(decoded) => decoded,
-            Err(mpsc::TryRecvError::Empty) if job.started.elapsed() < STUCK => return false,
-            Err(mpsc::TryRecvError::Empty) => {
-                log("trim-stills job stuck, cancelled");
-                job.cancel.store(true, Ordering::Release);
-                self.job = None;
-                return false;
+        let mut decoded = Decoded::new();
+        loop {
+            match job.receiver.try_recv() {
+                Ok(pass) => decoded.extend(pass),
+                Err(mpsc::TryRecvError::Empty) => {
+                    let stuck = job.pass.lock().ok().and_then(|pass| *pass).is_some_and(|at| at.elapsed() >= STUCK);
+                    if stuck {
+                        log("trim-stills pass stuck, cancelled");
+                        job.cancel.store(true, Ordering::Release);
+                        self.job = None;
+                    }
+                    break;
+                }
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    self.job = None;
+                    break;
+                }
             }
-            Err(mpsc::TryRecvError::Disconnected) => Vec::new(),
-        };
-        self.job = None;
+        }
+        let arrived = !decoded.is_empty();
         for (picture, image) in decoded {
             match image {
                 Ok(image) => {
@@ -185,32 +209,44 @@ impl TrimStills {
                 self.cache.remove(&old);
             }
         }
-        true
+        arrived
     }
 
     fn start(&mut self, pictures: Vec<StillPicture>, locator: StillLocator) {
         let (send, receiver) = mpsc::channel();
         let cancel = Arc::new(AtomicBool::new(false));
-        let (located, stop) = (self.located.clone(), cancel.clone());
+        let wanted = Arc::new(Mutex::new(pictures));
+        let pass = Arc::new(Mutex::new(None));
+        let worker = (self.located.clone(), cancel.clone(), wanted.clone(), pass.clone());
         let spawned = std::thread::Builder::new().name("qnc-trim-stills".into()).spawn(move || {
-            let _ = send.send(decode_all(&pictures, &locator, &located, &stop));
+            let (located, cancel, wanted, pass) = worker;
+            work(&send, &wanted, &pass, &locator, &located, &cancel);
         });
         if spawned.is_ok() {
-            self.job = Some(Job { receiver, started: Instant::now(), cancel });
+            self.job = Some(Job { receiver, wanted, pass, cancel });
         }
     }
 }
 
-/// Every wanted picture with its neighbours, one decoder pass per picture not already
-/// made by an earlier pass of this job.
-fn decode_all(pictures: &[StillPicture], locator: &StillLocator, located: &Located, cancel: &AtomicBool) -> Decoded {
-    let mut decoded = Decoded::new();
-    for picture in pictures {
-        if decoded.iter().any(|(made, _)| made == picture) || cancel.load(Ordering::Acquire) {
-            continue;
-        }
+/// Makes the first wanted picture with its neighbours, sends the pass and takes the next
+/// one, until nothing is wanted (or the job is cancelled or let go).
+fn work(
+    send: &mpsc::Sender<Decoded>,
+    wanted: &Mutex<Vec<StillPicture>>,
+    pass: &Mutex<Option<Instant>>,
+    locator: &StillLocator,
+    located: &Located,
+    cancel: &AtomicBool,
+) {
+    while !cancel.load(Ordering::Acquire) {
+        let Some(picture) = wanted.lock().ok().and_then(|wanted| wanted.first().cloned()) else {
+            return;
+        };
         let started = Instant::now();
-        match decode_run(picture, locator, located, cancel) {
+        if let Ok(mut pass) = pass.lock() {
+            *pass = Some(started);
+        }
+        let made: Decoded = match decode_run(&picture, locator, located, cancel) {
             Ok(run) => {
                 log(&format!(
                     "trim-stills run {}:{} pictures={} ms={}",
@@ -219,14 +255,20 @@ fn decode_all(pictures: &[StillPicture], locator: &StillLocator, located: &Locat
                     run.len(),
                     started.elapsed().as_millis()
                 ));
-                decoded.extend(run.into_iter().map(|(frame, image)| (frame, Ok(image))));
+                run.into_iter().map(|(frame, image)| (frame, Ok(image))).collect()
             }
             // A cancelled pass is not a failure of the picture: it is asked again later.
-            Err(_) if cancel.load(Ordering::Acquire) => {}
-            Err(error) => decoded.push((picture.clone(), Err(error))),
+            Err(_) if cancel.load(Ordering::Acquire) => return,
+            Err(error) => vec![(picture.clone(), Err(error))],
+        };
+        // Until `fill` brings the next draft, what this pass made is not wanted again.
+        if let Ok(mut wanted) = wanted.lock() {
+            wanted.retain(|want| !made.iter().any(|(done, _)| done == want));
+        }
+        if send.send(made).is_err() {
+            return;
         }
     }
-    decoded
 }
 
 /// `RUN` pictures of the clip around `picture`, as decoded.

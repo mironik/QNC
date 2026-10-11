@@ -3415,3 +3415,11 @@ izvornu sliku), `tools/qnc-player-runner` (frama-mapa `stills_frame_map`, zapis 
 player; dekodira sam samo sliku koju player ne da u 250 ms), `qnc-editorial-application` (isti redak poziva).
 Provjereno: testovi, conformance, `qnc-player-acceptance` (play klipa 100 %, koraci unatrag po prici najvise 73 ms,
 po klipu 48 ms). Uzivo jos nije probano.
+Live 2026-10-11 (korisnik: "i dalje nered u prikazu slika, ima pa nema"): log zasticene probe: player nije dao
+nijednu sliku, jer drzi samo slike oko mjesta gdje stoji (1,5 s iza i malo ispred), a rubovi pomaknutog slota su
+daleko od Wrap playheada; sve je islo kroz izvlacenje u `qnc-trim-stills`, a ono je sve prolaze jednog posla
+vracalo tek na kraju (4 slike x ~0,6 s s kartice prije prve slike) i mjesto bez nove slike crtalo crno.
+Izvedeno: `qnc-trim-stills` ima jednog pozadinskog radnika koji uvijek uzima slike koje nedostaju u najnovijem
+nacrtu, svaki prolaz se pokaze cim je gotov, prolaz koji zapne prekida se nakon 8 s; ne ceka se 250 ms na player
+(i dalje ga pita, prva stigla slika se pokaze); prolaz izvlaci 25 slika (12 sa svake strane); dok nova slika ne
+stigne, mjesto u prozoru drzi zadnju sliku koju je pokazalo.
