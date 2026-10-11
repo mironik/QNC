@@ -7,7 +7,7 @@ pub mod session;
 
 pub use event::BroadcastEvent;
 pub use interface::protocol::{
-    BroadcastPlaybackRequest, BroadcastPlayerProtocolCommand, BroadcastPlayerProtocolEvent, MAX_STILLS, StillRef,
+    BroadcastPlaybackRequest, BroadcastPlayerProtocolCommand, BroadcastPlayerProtocolEvent,
     map_broadcast_player_protocol_event, validate_broadcast_player_protocol_command,
     validate_broadcast_player_protocol_event,
 };

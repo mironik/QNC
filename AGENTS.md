@@ -3462,3 +3462,12 @@ price (`list_pool_shots` na niti sucelja ceka bazu dok pozadinski proces upisuje
 `qnc-editorial-application` ih samo trazi i preuzima (C10 708 -> 706). Priprema playera za vrijeme tog upisa i dalje
 traje do ~3 s (citanje klipa ceka bazu, izvan sucelja). Svenk: na jednom rezu price (slika 1259) dekoder otvoren
 unaprijed nije dao prvu sliku na vrijeme, player je cekao ~10 slika, HDMI je preskocio 4; ostalo 251/251. Otvoreno.
+Uklonjeno 2026-10-11 (korisnik "ok, idemo po tvom planu": stabilizacija prije novog dekodera): "jedan izvor slika"
+(`PublishStills`) u zivom radu nije dao nijednu sliku (player drzi samo slike oko mjesta gdje stoji, prozor reza
+trazi daleke slike). Vraceni na stanje prije njega: `qnc-player-contract` (naredba i `StillRef`),
+`qnc-broadcast-engine` (`held_pictures`, `held`), `qnc-broadcast-player` (`TransportEngine::video`),
+`qnc-player-client` (frame-mapa `stills`, `publish_stills`, `take_stills`), `qnc-source-preview` (`ask_stills`,
+`take_stills`), `tools/qnc-player-runner`; `qnc-trim-stills` vise ne pita player, `qnc-editorial-application` isti
+redak poziva. Pozadinsko dekodiranje unatrag (`backfill.rs`) ostaje. Odobrenje "jedan izvor slika" je zatvoreno.
+Sljedece (plan korisnika): mjerenje ugradenog dekodera (ffmpeg kao biblioteka, trajan, skok bez novog procesa) na
+originalu u zasebnoj grani; QGS (`qgs-h264-422p10`) dijelovi slike u vise niti kasnije, zasebno.

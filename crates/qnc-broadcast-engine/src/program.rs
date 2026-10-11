@@ -1000,23 +1000,3 @@ fn timed_open<T>(what: &str, open: impl FnOnce() -> Result<T>) -> Result<T> {
 fn program_picture_buffers(prefetch_frames: usize) -> usize {
     prefetch_frames * 2 + input::CONVERT_IN_FLIGHT + 4 + STEP_BACK_FRAMES as usize
 }
-
-impl ProgramVideo {
-    /// The picture of `frame` of the media `source_id` when the program holds it: a
-    /// program frame that plays that source frame, made for the monitor or in the background.
-    pub(crate) fn held(&self, source_id: &str, frame: u64) -> Option<crate::HeldPicture> {
-        self.spans.iter().find_map(|span| {
-            let (clip, source_in) = span.video?;
-            let plan = &self.clips[clip].0;
-            let length = span.record_out - span.record_in;
-            if plan.source.source_id != source_id || plan.delivered_rate.is_some() || !(source_in..source_in + length).contains(&frame) {
-                return None;
-            }
-            let at = span.record_in + (frame - source_in);
-            self.ready
-                .get(&at)
-                .map(|picture| ([picture.payload.header.width, picture.payload.header.height], picture.payload.rgba.clone()))
-                .or_else(|| self.back.as_ref()?.borrow().picture(at))
-        })
-    }
-}

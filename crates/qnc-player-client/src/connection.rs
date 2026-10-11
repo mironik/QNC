@@ -386,9 +386,6 @@ pub(super) struct Connection {
     control: PlayerWireClient,
     frames: FramePump,
     frame_map_path: PathBuf,
-    /// The pictures the player sends on `PublishStills` (the trim overlay).
-    stills: LatestFrameReader,
-    stills_map_path: PathBuf,
     query: SessionQuery,
     sequence: u64,
     last_event: u64,
@@ -442,13 +439,10 @@ impl Connection {
         let frame_map_path = frame_map_path(&session);
         LatestFrameWriter::create(&frame_map_path, MONITOR_PREVIEW_FRAME_CAPACITY)?;
         let frame_reader = LatestFrameReader::open(&frame_map_path)?;
-        let stills_map_path = frame_map_path.with_extension("stills.map");
-        LatestFrameWriter::create(&stills_map_path, STILLS_FRAME_CAPACITY)?;
-        let stills = LatestFrameReader::open(&stills_map_path)?;
         let mut boot = serde_json::json!({
             "contract_version": VERSION, "session_id": session, "source_generation": generation,
             "read_token": read, "command_token": write, "idle_timeout_ms": 300000, "listen_port": 0,
-            "monitor_frame_map": frame_map_path, "stills_frame_map": stills_map_path
+            "monitor_frame_map": frame_map_path
         });
         if let (Some(boot), serde_json::Value::Object(played)) = (boot.as_object_mut(), played) {
             boot.extend(played);
@@ -551,8 +545,6 @@ impl Connection {
                 picture_sink,
             ),
             frame_map_path,
-            stills,
-            stills_map_path,
             query,
             sequence: 0,
             last_event: 0,
@@ -711,7 +703,6 @@ impl Drop for Connection {
         }
         self.frames.stop();
         let _ = fs::remove_file(&self.frame_map_path);
-        let _ = fs::remove_file(&self.stills_map_path);
     }
 }
 
@@ -997,38 +988,5 @@ mod tests {
             protocol_io_error("read header", error),
             "Player protocol: control connection closed (read header)."
         );
-    }
-}
-
-/// One picture of the stills map: big enough for the preview raster of a 4K source.
-const STILLS_FRAME_CAPACITY: usize = 4 * 1024 * 1024;
-
-impl Connection {
-    /// Asks the player for the pictures it holds of these frames of its media (the trim
-    /// overlay); they come on the stills map.
-    pub(super) fn publish_stills(&mut self, pictures: Vec<(String, u64)>) -> Result<()> {
-        let pictures = pictures
-            .into_iter()
-            .take(qnc_player_contract::MAX_STILLS)
-            .map(|(source_id, frame)| qnc_player_contract::StillRef { source_id, frame })
-            .collect();
-        self.command(Command::PublishStills { pictures }).map(|_| ())
-    }
-
-    /// The pictures the player sent on the stills map since the last call.
-    pub(super) fn take_stills(&mut self) -> Vec<crate::StillPicture> {
-        let mut taken = Vec::new();
-        while let Ok(Some(update)) = self.stills.read_latest() {
-            if let LatestFrameUpdate::Picture(frame) = update {
-                taken.push(crate::StillPicture {
-                    source_id: frame.header.source_id,
-                    frame: frame.header.frame,
-                    width: frame.header.width,
-                    height: frame.header.height,
-                    rgba: frame.rgba,
-                });
-            }
-        }
-        taken
     }
 }

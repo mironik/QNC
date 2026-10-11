@@ -2,7 +2,7 @@ mod command;
 mod event;
 mod request;
 
-pub use command::{BroadcastPlayerProtocolCommand, MAX_STILLS, StillRef, validate_broadcast_player_protocol_command};
+pub use command::{BroadcastPlayerProtocolCommand, validate_broadcast_player_protocol_command};
 pub use event::{
     BroadcastPlayerProtocolEvent, map_broadcast_player_protocol_event,
     validate_broadcast_player_protocol_event,

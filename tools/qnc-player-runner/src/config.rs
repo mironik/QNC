@@ -35,9 +35,6 @@ pub struct Boot {
     pub idle_timeout_ms: u64,
     pub listen_port: u16,
     pub monitor_frame_map: Option<PathBuf>,
-    /// The frame map of the pictures asked with `PublishStills` (the trim overlay).
-    #[serde(default)]
-    pub stills_frame_map: Option<PathBuf>,
 }
 
 // Private process launch bindings, never fields in public command/event messages.

@@ -26,7 +26,7 @@ use std::{
 
 use qnc_image_assets::RgbaImage;
 use qnc_program_view::{SegmentsView, StillPicture};
-use qnc_source_preview::{LocatedPicture, SourcePreview, StillLocator};
+use qnc_source_preview::{LocatedPicture, StillLocator};
 
 pub const MODULE_ID: &str = "qnc.module.trim-stills";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -66,8 +66,6 @@ pub struct TrimStills {
     job: Option<Job>,
     /// The pictures last asked for, as logged (diagnostics only).
     asked: String,
-    /// Pictures asked of the player (it gives the ones it holds in memory).
-    asked_player: HashSet<StillPicture>,
     /// The last picture each place of the zoom (by its name) showed.
     shown: HashMap<String, Arc<RgbaImage>>,
     /// Each place's last picture and the way its frame last moved (+1, -1), for making
@@ -80,20 +78,16 @@ impl TrimStills {
         Self::default()
     }
 
-    /// Puts the pictures on the edit pictures of `view` (Wrap rows and source timeline):
-    /// first the ones the player holds in memory (user 2026-10-11: one picture source,
-    /// nothing decoded twice), the others decoded here. Returns whether a picture arrived.
-    pub fn fill(&mut self, view: &mut SegmentsView, locator: Option<StillLocator>, player: Option<&SourcePreview>) -> bool {
+    /// Puts the pictures on the edit pictures of `view` (Wrap rows and source timeline),
+    /// decoded here. Returns whether a picture arrived.
+    pub fn fill(&mut self, view: &mut SegmentsView, locator: Option<StillLocator>) -> bool {
         let Some(locator) = locator else {
             return false;
         };
         if self.project_id.as_deref() != Some(locator.project_id()) {
             *self = Self { project_id: Some(locator.project_id().to_string()), ..Self::default() };
         }
-        let mut arrived = self.take_finished();
-        if let Some(player) = player {
-            arrived |= self.take_from_player(player);
-        }
+        let arrived = self.take_finished();
         let asked = describe(view);
         if asked != self.asked {
             log(&format!("trim-stills asked {asked}"));
@@ -122,16 +116,8 @@ impl TrimStills {
                 missing.push(picture.clone());
             }
         }
-        self.asked_player.retain(|picture| missing.contains(picture));
-        if let Some(player) = player {
-            if missing.iter().any(|picture| !self.asked_player.contains(picture)) {
-                player.ask_stills(missing.iter().map(|p| (p.clip_id.clone(), p.source_frame)).collect());
-                self.asked_player.extend(missing.iter().cloned());
-            }
-        }
-        // The player holds only the pictures around where it stands; the others are
-        // decoded here at once, whichever comes first is shown. Then the pictures the
-        // arrow reaches next, so stepping frame by frame finds them made.
+        // The missing pictures first, then the ones the arrow reaches next, so stepping
+        // frame by frame finds them made.
         let mut wants: Vec<Want> =
             missing.iter().map(|picture| (picture.clone(), picture.source_frame.saturating_sub(RUN_BACK))).collect();
         for (picture, first) in self.ahead(view) {
@@ -188,34 +174,9 @@ impl TrimStills {
         ahead
     }
 
-    /// The pictures the player sent, into the cache.
-    fn take_from_player(&mut self, player: &SourcePreview) -> bool {
-        let stills = player.take_stills();
-        let arrived = !stills.is_empty();
-        for still in stills {
-            let picture = StillPicture { clip_id: still.source_id, source_frame: still.frame };
-            let content_key = {
-                use std::hash::{Hash, Hasher};
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                picture.hash(&mut hasher);
-                hasher.finish()
-            };
-            let image = RgbaImage { size: [still.width as usize, still.height as usize], pixels: still.rgba.to_vec(), content_key };
-            self.asked_player.remove(&picture);
-            self.failed.remove(&picture);
-            if self.cache.insert(picture.clone(), Arc::new(image)).is_none() {
-                self.order.push_back(picture);
-            }
-        }
-        if arrived {
-            log("trim-stills from player");
-        }
-        arrived
-    }
-
     /// Whether a picture is being made (the caller repaints soon).
     pub fn loading(&self) -> bool {
-        self.job.is_some() || !self.asked_player.is_empty()
+        self.job.is_some()
     }
 
     fn take_finished(&mut self) -> bool {
@@ -409,7 +370,7 @@ mod tests {
             edit_stills: vec![qnc_program_view::EditStill::new(10, true, Some(picture))],
             ..Default::default()
         };
-        assert!(!stills.fill(&mut view, None, None));
+        assert!(!stills.fill(&mut view, None));
         assert!(!stills.loading());
         assert!(view.edit_stills[0].image.is_none());
     }

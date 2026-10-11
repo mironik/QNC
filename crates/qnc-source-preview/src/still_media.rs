@@ -107,20 +107,6 @@ impl SourcePreview {
     pub fn still_locator(&self) -> Option<StillLocator> {
         self.context.as_ref().map(PreviewContext::still_locator)
     }
-
-    /// Asks the player for the pictures of these frames (clip id, source frame) it holds
-    /// in memory (user 2026-10-11: the trim overlay takes its pictures from the player,
-    /// nothing is decoded twice); they come in `take_stills`. Without a player nothing comes.
-    pub fn ask_stills(&self, pictures: Vec<(String, u64)>) {
-        if let Some(player) = &self.player {
-            player.publish_stills(pictures);
-        }
-    }
-
-    /// The pictures the player sent since the last call.
-    pub fn take_stills(&self) -> Vec<qnc_player_client::StillPicture> {
-        self.player.as_ref().map(|player| player.take_stills()).unwrap_or_default()
-    }
 }
 
 impl PreviewContext {

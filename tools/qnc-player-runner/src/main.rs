@@ -41,7 +41,6 @@ fn run(
             MonitorPost::start(writer).map_err(|e| e.to_string())
         })
         .transpose()?;
-    let mut stills = boot.stills_frame_map.as_ref().map(LatestFrameWriter::open).transpose()?;
     let output_scope = output_scope(native.is_some(), monitor_post.is_some())?;
     let plan = boot.plan()?;
     stage("plan");
@@ -128,9 +127,6 @@ fn run(
                 session.handle(pending.request)
             };
             let _ = pending.response.send(reply);
-        }
-        if let Some(wanted) = session.stills.take() {
-            publish_stills(&session, stills.as_mut(), &boot, &wanted);
         }
         if !session.closed {
             session.tick();
@@ -495,35 +491,5 @@ fn stage(name: &str) {
             qnc_dev_diagnostics::DiagnosticsStream::Player,
             format!("player-stage {name} ms={ms}"),
         );
-    }
-}
-
-/// The pictures asked with `PublishStills` that the player holds in memory, written to the
-/// stills frame map of the session (pixels never go through the control channel). One it
-/// does not hold is left out; the caller makes it otherwise.
-fn publish_stills(session: &session::Session, writer: Option<&mut LatestFrameWriter>, boot: &Boot, wanted: &[(String, u64)]) {
-    let Some(writer) = writer else { return };
-    let Some(timebase) = session.player.state().source.as_ref().map(|source| source.timebase) else { return };
-    let held = session.player.held_pictures(wanted);
-    for (sequence, ((source_id, frame), (raster, rgba))) in held.into_iter().enumerate() {
-        let header = qnc_player_contract::session::MonitorHeader {
-            contract_version: qnc_player_contract::VERSION.into(),
-            session_id: boot.session_id.clone(),
-            source_generation: boot.source_generation,
-            output_generation: 0,
-            sequence: sequence as u64,
-            source_id,
-            frame,
-            timebase,
-            width: raster[0],
-            height: raster[1],
-        };
-        if let Err(error) = writer.publish(&header, &rgba) {
-            qnc_dev_diagnostics::log_line(
-                qnc_dev_diagnostics::DiagnosticsStream::Player,
-                format!("player-stills error={error}"),
-            );
-            return;
-        }
     }
 }
