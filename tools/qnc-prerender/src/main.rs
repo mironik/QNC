@@ -76,7 +76,6 @@ fn run() -> Result<()> {
         .ok_or("Projekt nema lokalni direktorij.")?;
     let (out_dir, _) = settings.prerender_location(&project_dir).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&out_dir).map_err(|e| format!("Mapa prerendera: {e}"))?;
-    let delivery = Delivery::from_export(&settings.export)?;
 
     let started = Instant::now();
     let target = qnc_db_broker::ProjectDbTarget::for_project(&reader, &settings)?;
@@ -115,6 +114,8 @@ fn run() -> Result<()> {
     let decoders = qnc_decoder_catalog::installed_config().map_err(|e| e.to_string())?;
     // The encoder is the ffmpeg of the installed decoder catalog (the player's toolchain).
     let ffmpeg = qnc_decoder_catalog::installed_deployment().map_err(|e| e.to_string())?.executable;
+    let delivery = Delivery::from_export(&settings.export)?.on(&ffmpeg);
+    println!("delivery: {} {}x{} {} fps, encoder {:?}", delivery.video_codec, delivery.width, delivery.height, delivery.fps, delivery.encoder);
     let cancel = AtomicBool::new(false);
     for unit in units.iter().take(limit) {
         let out = out_dir.join(delivery.file_name(unit));

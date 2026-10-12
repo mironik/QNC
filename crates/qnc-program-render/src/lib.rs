@@ -22,6 +22,8 @@ use qnc_media_stream::CodecEndpoint;
 use qnc_render_unit::{position, RenderUnit};
 use serde_json::Value;
 
+mod encoder;
+
 pub type Result<T> = std::result::Result<T, String>;
 
 /// The delivery format of the project (`export.*`), strictly: what this block cannot
@@ -37,6 +39,9 @@ pub struct Delivery {
     pub audio_channels: u16,
     /// The export block as saved (part of every unit's fingerprint).
     pub saved: Value,
+    /// The encoder of this computer (`on`), part of the fingerprint too: units of other
+    /// encoders are not put together.
+    pub encoder: Option<String>,
 }
 
 impl Delivery {
@@ -54,33 +59,49 @@ impl Delivery {
             audio_sample_rate: number("audio_sample_rate").map(|v| v as u32).ok_or_else(|| missing("audio_sample_rate"))?,
             audio_channels: number("audio_channels").map(|v| v as u16).ok_or_else(|| missing("audio_channels"))?,
             saved: export.clone(),
+            encoder: None,
         };
         if delivery.width == 0 || delivery.height == 0 || delivery.fps <= 0.0 || delivery.audio_channels == 0 {
             return Err("Exportne postavke imaju neispravan format.".into());
         }
-        delivery.encoder_args()?;
+        delivery.supported()?;
         Ok(delivery)
     }
 
-    /// The encoder of the delivery codec. A codec not named here is refused.
-    fn encoder_args(&self) -> Result<Vec<String>> {
+    /// The delivery codec is one this block renders (checked when the settings are read).
+    fn supported(&self) -> Result<()> {
+        match self.video_codec.as_str() {
+            "h264" | "mpeg2_422_50mbit" => Ok(()),
+            other => Err(format!("Prerender jos ne zna kodek predaje '{other}'.")),
+        }
+    }
+
+    /// The picture layout the encoder takes and its arguments: H.264 through the encoder
+    /// that works on this computer (`encoder`), XDCAM HD422 through MPEG-2.
+    fn encoder_args(&self, ffmpeg: &Path) -> Result<(String, Vec<String>)> {
+        self.supported()?;
         let gop = self.fps.round().max(1.0) as u32;
-        let args: Vec<&str> = match self.video_codec.as_str() {
-            "h264" => vec![
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-profile:v", "high",
-                "-pix_fmt", "yuv420p", "-flags", "+cgop", "-sc_threshold", "0",
-            ],
-            "mpeg2_422_50mbit" => vec![
-                "-c:v", "mpeg2video", "-profile:v", "0", "-level:v", "2", "-pix_fmt", "yuv422p",
-                "-b:v", "50M", "-minrate", "50M", "-maxrate", "50M", "-bufsize", "17825792",
-                "-flags", "+cgop", "-bf", "2", "-dc", "10", "-intra_vlc", "1", "-non_linear_quant", "1",
-                "-qmin", "1", "-qmax", "12",
-            ],
-            other => return Err(format!("Prerender jos ne zna kodek predaje '{other}'.")),
+        let (layout, args): (&str, Vec<&str>) = match self.video_codec.as_str() {
+            "h264" => encoder::H264::here(ffmpeg).args(),
+            _ => (
+                "yuv422p",
+                vec![
+                    "-c:v", "mpeg2video", "-profile:v", "0", "-level:v", "2",
+                    "-b:v", "50M", "-minrate", "50M", "-maxrate", "50M", "-bufsize", "17825792",
+                    "-flags", "+cgop", "-bf", "2", "-dc", "10", "-intra_vlc", "1", "-non_linear_quant", "1",
+                    "-qmin", "1", "-qmax", "12",
+                ],
+            ),
         };
         let mut args: Vec<String> = args.into_iter().map(str::to_string).collect();
         args.extend(["-g".to_string(), gop.to_string()]);
-        Ok(args)
+        Ok((layout.to_string(), args))
+    }
+
+    /// The layout asked of the decoder: 4:2:0 for a 4:2:0 delivery (converted in the
+    /// decoder, a third of the bytes through the encoder's pipe), else the saved one.
+    fn decode_pixel_format(&self) -> Option<String> {
+        (self.video_codec == "h264").then(|| "yuv420p".to_string())
     }
 
     /// Whether the unit's frames are the delivery's frames (same rate, progressive).
@@ -107,18 +128,30 @@ impl Delivery {
         Ok(())
     }
 
-    /// The fingerprint of a unit rendered in this delivery: its file name.
+    /// This delivery with the encoder that works with `ffmpeg` on this computer.
+    pub fn on(mut self, ffmpeg: &Path) -> Self {
+        self.encoder = Some(match self.video_codec.as_str() {
+            "h264" => format!("{:?}", encoder::H264::here(ffmpeg)),
+            other => other.to_string(),
+        });
+        self
+    }
+
+    /// The fingerprint of a unit rendered in this delivery and encoder: its file name.
     pub fn file_name(&self, unit: &RenderUnit) -> String {
-        format!("{}.mov", unit.fingerprint(&self.saved))
+        let what = serde_json::json!({"export": self.saved, "encoder": self.encoder});
+        format!("{}.mov", unit.fingerprint(&what))
     }
 }
 
 /// Where a unit's media is read: its endpoint and storage stamp (given by the host that
 /// resolves the QNC URI; a card endpoint is read only).
-pub type MediaAccess<'a> = dyn Fn(&MediaRepresentation) -> io::Result<(CodecEndpoint, String)> + 'a;
+pub type MediaAccess<'a> = dyn Fn(&MediaRepresentation) -> io::Result<(CodecEndpoint, String)> + Sync + 'a;
 
-/// Renders `unit` into `out` (a `.mov` file, overwritten). The sound of the unit waits in
-/// the system's temporary folder while the encoder reads it, and goes after.
+/// Renders `unit` into `out` (a `.mov` file, overwritten). The picture is encoded while
+/// the sound is decoded on another thread; both wait in the system's temporary folder and
+/// are put together into `out` without encoding again (measured 2026-10-12: the sound
+/// decoded first and the picture decoded on one thread made a unit slower than real time).
 pub fn render(
     unit: &RenderUnit,
     delivery: &Delivery,
@@ -132,23 +165,51 @@ pub fn render(
     if unit.frames() == 0 {
         return Err("Prazna jedinica prerendera.".into());
     }
-    let sound = sound_of(unit, delivery, decoders, access, cancel)?;
-    let audio_file = temporary_sound(out);
-    std::fs::write(&audio_file, sound).map_err(|e| format!("Zvuk prerendera se ne moze zapisati: {e}"))?;
-    let result = encode(unit, delivery, decoders, access, ffmpeg, &audio_file, out, cancel);
+    let (video_file, audio_file) = (temporary(out, "video.mov"), temporary(out, "pcm"));
+    let result = std::thread::scope(|scope| {
+        let sound = scope.spawn(|| sound_of(unit, delivery, decoders, access, cancel));
+        let picture = encode_picture(unit, delivery, decoders, access, ffmpeg, &video_file, cancel);
+        let sound = sound.join().map_err(|_| "Zvuk prerendera je pao.".to_string())?;
+        picture?;
+        std::fs::write(&audio_file, sound?).map_err(|e| format!("Zvuk prerendera se ne moze zapisati: {e}"))?;
+        mux(unit, delivery, ffmpeg, &video_file, &audio_file, out)
+    });
+    let _ = std::fs::remove_file(&video_file);
     let _ = std::fs::remove_file(&audio_file);
     result
 }
 
-fn temporary_sound(out: &Path) -> PathBuf {
+fn temporary(out: &Path, suffix: &str) -> PathBuf {
     let name = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();
-    std::env::temp_dir().join(format!("qnc-prerender-{}-{name}.pcm", std::process::id()))
+    std::env::temp_dir().join(format!("qnc-prerender-{}-{name}.{suffix}", std::process::id()))
 }
 
+/// The encoded picture and the PCM sound into the unit's file, both copied.
+fn mux(unit: &RenderUnit, delivery: &Delivery, ffmpeg: &Path, video: &Path, audio: &Path, out: &Path) -> Result<()> {
+    let output = Command::new(ffmpeg)
+        .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i"])
+        .arg(video)
+        .args(["-f", "f32le", "-ar", &unit.sample_rate.to_string(), "-ac", &delivery.audio_channels.to_string(), "-i"])
+        .arg(audio)
+        .args(["-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "pcm_s24le", "-f", "mov"])
+        .arg(out)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| format!("Spajanje prerendera se ne moze pokrenuti: {e}"))?;
+    if !output.status.success() {
+        return Err(format!("Spajanje prerendera: {}", String::from_utf8_lossy(&output.stderr).trim()));
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 fn open(
     media: &MediaRepresentation,
     stream_index: u32,
     start: Option<qnc_media_metadata::Rational>,
+    output_pixel_format: Option<String>,
     progressive: bool,
     delivered_rate: Option<qnc_media_metadata::FrameTimebase>,
     decoders: &DecoderConfig,
@@ -160,7 +221,7 @@ fn open(
         media: media.clone(),
         stream_index,
         start,
-        output_pixel_format: None,
+        output_pixel_format,
         progressive,
         delivered_rate,
     };
@@ -184,7 +245,7 @@ fn sound_of(
         if output >= channels {
             return Err(format!("Izlazni kanal {} nije u predaji.", output + 1));
         }
-        let mut decoder = open(&part.media, part.stream_index, part.start, false, None, decoders, access)?;
+        let mut decoder = open(&part.media, part.stream_index, part.start, None, false, None, decoders, access)?;
         let width = usize::from(part.stream_channels);
         let mut filled = 0usize;
         while filled < samples {
@@ -227,52 +288,57 @@ fn sound_of(
     Ok(pcm.iter().flat_map(|sample| sample.to_le_bytes()).collect())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn encode(
+/// The unit's pictures encoded into `video` (picture only).
+fn encode_picture(
     unit: &RenderUnit,
     delivery: &Delivery,
     decoders: &DecoderConfig,
     access: &MediaAccess,
     ffmpeg: &Path,
-    audio_file: &Path,
-    partial: &Path,
+    video: &Path,
     cancel: &AtomicBool,
 ) -> Result<()> {
     let rate = format!("{}/{}", unit.program_rate.fps_num, unit.program_rate.fps_den);
     let size = format!("{}x{}", delivery.width, delivery.height);
     let mut command = Command::new(ffmpeg);
     command.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"]);
-    let mut video = None;
-    let mut first = None;
+    let mut source = None;
     match &unit.video {
         Some(part) => {
-            let mut decoder = open(&part.media, part.stream_index, part.start, part.progressive, part.delivered_rate, decoders, access)?;
+            let mut decoder = open(
+                &part.media,
+                part.stream_index,
+                part.start,
+                delivery.decode_pixel_format(),
+                part.progressive,
+                part.delivered_rate,
+                decoders,
+                access,
+            )?;
             // The first picture of the unit tells the layout the encoder reads.
             let packet = next_picture(&mut decoder, part, part.first_frame, cancel)?;
             let DecodedFormat::Video { width, height, pixel_format } = &packet.format else {
                 return Err("Slika izvora nije slika.".into());
             };
             command.args(["-f", "rawvideo", "-pix_fmt", pixel_format, "-s", &format!("{width}x{height}"), "-r", &rate, "-i", "pipe:0"]);
-            first = Some(packet.bytes);
-            video = Some(decoder);
+            source = Some((part, decoder, packet.bytes));
         }
         // An Off without a picture is black, as the player shows it.
         None => {
             command.args(["-f", "lavfi", "-i", &format!("color=c=black:s={size}:r={rate}")]);
         }
     }
-    command.args(["-f", "f32le", "-ar", &unit.sample_rate.to_string(), "-ac", &delivery.audio_channels.to_string()]);
-    command.arg("-i").arg(audio_file);
-    command.args(["-map", "0:v:0", "-map", "1:a:0", "-frames:v", &unit.frames().to_string()]);
-    command.args(["-vf", &format!("scale={size}:flags=bicubic,setsar=1")]);
-    command.args(delivery.encoder_args()?);
-    command.args(["-c:a", "pcm_s24le", "-f", "mov"]);
-    command.arg(partial);
-    command.stdin(if video.is_some() { Stdio::piped() } else { Stdio::null() });
+    command.args(["-map", "0:v:0", "-frames:v", &unit.frames().to_string()]);
+    let (layout, args) = delivery.encoder_args(ffmpeg)?;
+    command.args(["-vf", &format!("scale={size}:flags=bicubic,format={layout},setsar=1")]);
+    command.args(args);
+    command.args(["-an", "-f", "mov"]);
+    command.arg(video);
+    command.stdin(if source.is_some() { Stdio::piped() } else { Stdio::null() });
     command.stdout(Stdio::null()).stderr(Stdio::piped());
     let mut child = command.spawn().map_err(|e| format!("Koder prerendera se ne moze pokrenuti: {e}"))?;
-    let fed = match (&unit.video, video, first) {
-        (Some(part), Some(mut decoder), Some(first)) => {
+    let fed = match source {
+        Some((part, mut decoder, first)) => {
             let mut stdin = child.stdin.take().expect("encoder stdin");
             let mut feed = || -> Result<()> {
                 stdin.write_all(&first).map_err(|e| e.to_string())?;
@@ -286,7 +352,7 @@ fn encode(
             drop(stdin);
             fed
         }
-        _ => Ok(()),
+        None => Ok(()),
     };
     if fed.is_err() {
         let _ = child.kill();

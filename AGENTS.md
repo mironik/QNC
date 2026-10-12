@@ -3585,3 +3585,11 @@ izoliranoj kopiji (originali s kartice): 4 jedinice, broj slika i uzoraka tocan 
 originalu 40-41 dB na tocnom mjestu, 31-38 dB uz pomak od jedne slike), zvuk bit po bit jednak izvoru od tocnog uzorka
 (oba izlaza). Brzina 0,4-0,7x stvarnog vremena (CLI dekoder, puna 4:2:2 10-bit slika kroz cijev, libx264 veryfast).
 Nije izvedeno: zapis gotovih jedinica u bazu (korak 2), puštanje jedinica, export spajanjem, ubrzanje.
+Izvedeno (prerender, ubrzanje; korisnik "prvo ubrzanje rendera"): mjereno na originalu kamere (300 slika): samo
+dekodiranje 133 slike/s, s libx264 veryfast 33, superfast 70, Intel QSV 86 (tada granica dekodiranje). `qnc-program-render`:
+H.264 predaja koristi hardverski koder koji na racunalu stvarno radi (`encoder.rs`, jednom po procesu probno kodiranje;
+Windows QSV, NVENC, AMF, zatim libx264 superfast; macOS VideoToolbox), koder je dio otiska jedinice; dekoder za 4:2:0
+predaju odmah daje 4:2:0 (trecina bajtova kroz cijev); zvuk se dekodira istodobno sa slikom, slika se kodira u
+privremenu datoteku sustava, pa se spaja bez ponovnog kodiranja. `tools/qnc-prerender` ima znacajku `libav`. Izmjereno
+(izolirana kopija, originali s kartice, 6 jedinica): 1,0-1,2x stvarnog vremena (prije 0,4-0,7x); fiksni trosak oko
+0,6-0,8 s po jedinici; slika i dalje tocna (PSNR 39,8 dB na tocnom mjestu, kao libx264 crf 16).
