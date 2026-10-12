@@ -12,11 +12,11 @@ qnc-media-records = { workspace = true }
 qnc-program-playlist = { workspace = true }
 qnc-work-settings = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 qnc-ingest-store = { workspace = true }
 qnc-transport-resolver = { workspace = true }
-serde_json = { workspace = true }
 rusqlite = { workspace = true }
 tempfile = "3"
 tiny_http = "0.12"

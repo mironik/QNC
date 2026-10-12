@@ -592,7 +592,7 @@ fn representation_layout(
 }
 
 mod program;
-pub use program::ProgramInput;
+pub use program::{PrerenderedUnit, ProgramInput};
 
 #[cfg(test)]
 mod tests;

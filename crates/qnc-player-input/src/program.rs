@@ -16,6 +16,22 @@ pub struct ProgramInput {
     pub playlist: FlatProgramPlaylist,
     /// Prepared input of every clip of the playlist, by clip id.
     pub clips: BTreeMap<String, PreparedInput>,
+    /// The rendered units of the story's prerender (user 2026-10-12): a part of the program
+    /// whose unit is here plays from that one file instead of its sources.
+    #[serde(default)]
+    pub prerendered: Vec<PrerenderedUnit>,
+}
+
+/// One rendered unit of the story's prerender, as its render described it (never probed).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrerenderedUnit {
+    pub fingerprint: String,
+    /// What the unit was fingerprinted with (the delivery key of its render).
+    pub key: serde_json::Value,
+    pub media: MediaRepresentation,
+    pub frames: u64,
+    pub samples: u64,
 }
 
 impl ProgramInput {
@@ -31,6 +47,7 @@ impl ProgramInput {
             project_audio: first.project_audio.clone(),
             playlist,
             clips,
+            prerendered: Vec::new(),
         };
         input.validate_for(&input.workspace_db_uri.clone())?;
         Ok(input)

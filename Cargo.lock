@@ -4360,6 +4360,7 @@ dependencies = [
  "qnc-render-unit",
  "qnc-source-bindings",
  "qnc-work-settings",
+ "serde_json",
 ]
 
 [[package]]
@@ -4410,9 +4411,11 @@ dependencies = [
  "qnc-frame-timebase",
  "qnc-media-metadata",
  "qnc-player-input",
+ "qnc-prerender-db",
  "qnc-program-db",
  "qnc-program-playlist",
  "qnc-source-timecode",
+ "serde_json",
 ]
 
 [[package]]

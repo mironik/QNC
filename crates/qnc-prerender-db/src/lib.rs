@@ -26,6 +26,10 @@ pub struct RenderedUnit {
     pub frames: u64,
     pub samples: u64,
     pub encoder: String,
+    /// What the unit was fingerprinted with (the delivery key of its render).
+    pub key: Value,
+    /// The description of the unit file as its render wrote it (never probed).
+    pub media: Value,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -35,6 +39,8 @@ pub enum Operation {
     Publish(RenderedUnit),
     /// The rendered units among `fingerprints`.
     Read { fingerprints: Vec<String> },
+    /// Every rendered unit of the project (the player matches its story against them).
+    ReadAll,
 }
 
 impl Operation {
@@ -104,6 +110,14 @@ impl PrerenderReader {
     /// The rendered units among `fingerprints` (in no particular order).
     pub fn rendered(&mut self, fingerprints: Vec<String>) -> Result<Vec<RenderedUnit>> {
         match decode(self.0.execute(MODULE_ID, encode(&Operation::Read { fingerprints })?)?)? {
+            Data::Units(units) => Ok(units),
+            _ => Err(wrong()),
+        }
+    }
+
+    /// Every rendered unit of the project.
+    pub fn all(&mut self) -> Result<Vec<RenderedUnit>> {
+        match decode(self.0.execute(MODULE_ID, encode(&Operation::ReadAll)?)?)? {
             Data::Units(units) => Ok(units),
             _ => Err(wrong()),
         }

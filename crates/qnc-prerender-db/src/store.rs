@@ -24,7 +24,8 @@ impl Store {
             ensure_schema(&tx)?;
             tx.commit().map_err(err)?;
         }
-        let schema_ready = object_exists(&conn, "table", "prerender_units")?;
+        // A table of an earlier development form reads as empty until a write replaces it.
+        let schema_ready = current_form(&conn)?;
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
@@ -50,10 +51,11 @@ impl Store {
 
     pub(crate) fn execute(&mut self, operation: &Operation) -> Result<Data> {
         match operation {
-            Operation::Read { .. } if !self.schema_ready => Ok(Data::Units(Vec::new())),
+            Operation::Read { .. } | Operation::ReadAll if !self.schema_ready => Ok(Data::Units(Vec::new())),
             _ if !self.schema_ready => Err("Prerender projekta nije inicijaliziran.".into()),
             Operation::Publish(unit) => self.publish(unit),
             Operation::Read { fingerprints } => self.read(fingerprints),
+            Operation::ReadAll => self.read_all(),
         }
     }
 
@@ -64,16 +66,19 @@ impl Store {
         }
         self.conn
             .execute(
-                "INSERT INTO prerender_units (fingerprint, file_uri, frames, samples, encoder, rendered_at_utc)
-                 VALUES (?1, ?2, ?3, ?4, ?5, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+                "INSERT INTO prerender_units (fingerprint, file_uri, frames, samples, encoder, key_json, media_json, rendered_at_utc)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
                  ON CONFLICT(fingerprint) DO UPDATE SET file_uri=excluded.file_uri, frames=excluded.frames,
-                   samples=excluded.samples, encoder=excluded.encoder, rendered_at_utc=excluded.rendered_at_utc",
+                   samples=excluded.samples, encoder=excluded.encoder, key_json=excluded.key_json,
+                   media_json=excluded.media_json, rendered_at_utc=excluded.rendered_at_utc",
                 params![
                     unit.fingerprint,
                     unit.file_uri,
                     i64::try_from(unit.frames).map_err(err)?,
                     i64::try_from(unit.samples).map_err(err)?,
-                    unit.encoder
+                    unit.encoder,
+                    unit.key.to_string(),
+                    unit.media.to_string()
                 ],
             )
             .map_err(err)?;
@@ -84,28 +89,43 @@ impl Store {
         if fingerprints.len() > MAX_READ {
             return Err("Previse jedinica u jednom citanju.".into());
         }
-        let mut statement = self
-            .conn
-            .prepare_cached(
-                "SELECT fingerprint, file_uri, frames, samples, encoder FROM public_prerender_units WHERE fingerprint = ?1",
-            )
-            .map_err(err)?;
+        let mut statement = self.conn.prepare_cached(&format!("{SELECT} WHERE fingerprint = ?1")).map_err(err)?;
         let mut units = Vec::new();
         for fingerprint in fingerprints {
             valid_fingerprint(fingerprint)?;
             let mut rows = statement.query(params![fingerprint]).map_err(err)?;
             if let Some(row) = rows.next().map_err(err)? {
-                units.push(RenderedUnit {
-                    fingerprint: row.get(0).map_err(err)?,
-                    file_uri: row.get(1).map_err(err)?,
-                    frames: u64::try_from(row.get::<_, i64>(2).map_err(err)?).map_err(err)?,
-                    samples: u64::try_from(row.get::<_, i64>(3).map_err(err)?).map_err(err)?,
-                    encoder: row.get(4).map_err(err)?,
-                });
+                units.push(unit_of(row)?);
             }
         }
         Ok(Data::Units(units))
     }
+
+    fn read_all(&mut self) -> Result<Data> {
+        let mut statement = self.conn.prepare_cached(&format!("{SELECT} LIMIT {MAX_READ}")).map_err(err)?;
+        let mut rows = statement.query([]).map_err(err)?;
+        let mut units = Vec::new();
+        while let Some(row) = rows.next().map_err(err)? {
+            units.push(unit_of(row)?);
+        }
+        Ok(Data::Units(units))
+    }
+}
+
+const SELECT: &str =
+    "SELECT fingerprint, file_uri, frames, samples, encoder, key_json, media_json FROM public_prerender_units";
+
+fn unit_of(row: &rusqlite::Row<'_>) -> Result<RenderedUnit> {
+    let json = |index| -> Result<Value> { serde_json::from_str(&row.get::<_, String>(index).map_err(err)?).map_err(err) };
+    Ok(RenderedUnit {
+        fingerprint: row.get(0).map_err(err)?,
+        file_uri: row.get(1).map_err(err)?,
+        frames: u64::try_from(row.get::<_, i64>(2).map_err(err)?).map_err(err)?,
+        samples: u64::try_from(row.get::<_, i64>(3).map_err(err)?).map_err(err)?,
+        encoder: row.get(4).map_err(err)?,
+        key: json(5)?,
+        media: json(6)?,
+    })
 }
 
 fn valid_fingerprint(value: &str) -> Result<()> {
@@ -117,6 +137,10 @@ fn valid_fingerprint(value: &str) -> Result<()> {
 }
 
 fn ensure_schema(conn: &Connection) -> Result<()> {
+    // A development table of an earlier form is removed, never converted (no migrations).
+    if object_exists(conn, "table", "prerender_units")? && !current_form(conn)? {
+        conn.execute_batch("DROP VIEW IF EXISTS public_prerender_units; DROP TABLE prerender_units;").map_err(err)?;
+    }
     if !object_exists(conn, "table", "prerender_units")? {
         conn.execute_batch(
             "CREATE TABLE prerender_units (
@@ -125,6 +149,8 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
                 frames INTEGER NOT NULL CHECK (frames > 0),
                 samples INTEGER NOT NULL CHECK (samples >= 0),
                 encoder TEXT NOT NULL,
+                key_json TEXT NOT NULL,
+                media_json TEXT NOT NULL,
                 rendered_at_utc TEXT NOT NULL
             );",
         )
@@ -133,11 +159,21 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
     if !object_exists(conn, "view", "public_prerender_units")? {
         conn.execute_batch(
             "CREATE VIEW public_prerender_units AS
-             SELECT fingerprint, file_uri, frames, samples, encoder, rendered_at_utc FROM prerender_units;",
+             SELECT fingerprint, file_uri, frames, samples, encoder, key_json, media_json, rendered_at_utc
+             FROM prerender_units;",
         )
         .map_err(err)?;
     }
     Ok(())
+}
+
+/// The table exists in its current form (with the unit description).
+fn current_form(conn: &Connection) -> Result<bool> {
+    Ok(object_exists(conn, "table", "prerender_units")?
+        && conn
+            .query_row("SELECT COUNT(*) FROM pragma_table_info('prerender_units') WHERE name='media_json'", [], |r| r.get::<_, i64>(0))
+            .map_err(err)?
+            == 1)
 }
 
 fn object_exists(conn: &Connection, kind: &str, name: &str) -> Result<bool> {

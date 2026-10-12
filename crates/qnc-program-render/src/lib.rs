@@ -26,6 +26,11 @@ mod encoder;
 
 pub type Result<T> = std::result::Result<T, String>;
 
+/// The format of a rendered unit: MOV, picture stream 0 without B pictures and with the
+/// time scale of the program rate, PCM stream 1, BT.709 limited range, timestamps from 0.
+/// Its description (`unit_media`) is written, never probed.
+pub const UNIT_FORMAT: u32 = 2;
+
 /// The delivery format of the project (`export.*`), strictly: what this block cannot
 /// render is refused with a reason, never replaced.
 #[derive(Debug, Clone, PartialEq)]
@@ -88,7 +93,7 @@ impl Delivery {
                 vec![
                     "-c:v", "mpeg2video", "-profile:v", "0", "-level:v", "2",
                     "-b:v", "50M", "-minrate", "50M", "-maxrate", "50M", "-bufsize", "17825792",
-                    "-flags", "+cgop", "-bf", "2", "-dc", "10", "-intra_vlc", "1", "-non_linear_quant", "1",
+                    "-flags", "+cgop", "-bf", "0", "-dc", "10", "-intra_vlc", "1", "-non_linear_quant", "1",
                     "-qmin", "1", "-qmax", "12",
                 ],
             ),
@@ -137,9 +142,16 @@ impl Delivery {
         self
     }
 
+    /// What a unit is rendered in: the export block, the encoder and the unit's own
+    /// format (a unit of another format is another file). The player matches the units
+    /// of its story by this key.
+    pub fn key(&self) -> Value {
+        serde_json::json!({"export": self.saved, "encoder": self.encoder, "unit_format": UNIT_FORMAT})
+    }
+
     /// The fingerprint of a unit rendered in this delivery and encoder.
     pub fn fingerprint(&self, unit: &RenderUnit) -> String {
-        unit.fingerprint(&serde_json::json!({"export": self.saved, "encoder": self.encoder}))
+        unit.fingerprint(&self.key())
     }
 
     /// The file name of a rendered unit: its fingerprint.
@@ -183,6 +195,80 @@ pub fn render(
     result
 }
 
+/// The colour of every unit (the player converts BT.709 limited range).
+const UNIT_TAGS: [&str; 8] = [
+    "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
+];
+
+/// The description of a rendered unit, as this block wrote it (UNIT_FORMAT): the media
+/// the player opens instead of the unit's sources. `media_uri` is the unit file's QNC URI.
+pub fn unit_media(unit: &RenderUnit, delivery: &Delivery, media_uri: &str) -> Result<MediaRepresentation> {
+    use qnc_media_metadata::*;
+    fn fact<T>(value: T) -> Fact<T> {
+        Fact { value, evidence_id: "prerender".into(), locator: "qnc-program-render".into() }
+    }
+    let rate = unit.program_rate;
+    let layout = match delivery.video_codec.as_str() {
+        "h264" => "yuv420p",
+        "mpeg2_422_50mbit" => "yuv422p",
+        other => return Err(format!("Prerender jos ne zna kodek predaje '{other}'.")),
+    };
+    let codec = if delivery.video_codec == "h264" { "h264" } else { "mpeg2video" };
+    let frames = i64::try_from(unit.frames()).map_err(|e| e.to_string())?;
+    let samples = i64::try_from(unit.samples).map_err(|e| e.to_string())?;
+    let video = VideoMetadata {
+        width: Some(fact(delivery.width)),
+        height: Some(fact(delivery.height)),
+        frame_rate: Some(fact(rate)),
+        frame_rate_mode: Some(fact(FrameRateMode::Constant)),
+        frame_count: Some(fact(FrameCount::Exact(unit.frames()))),
+        scan_mode: Some(fact(ScanMode::Progressive)),
+        pixel_format: Some(fact(layout.to_string())),
+        sample_aspect_ratio: Some(fact(Rational { numerator: 1, denominator: 1 })),
+        rotation_degrees: Some(fact(Signal::Known(0))),
+        color: ColorMetadata {
+            primaries: Some(fact(Signal::Known("bt709".into()))),
+            transfer: Some(fact(Signal::Known("bt709".into()))),
+            matrix: Some(fact(Signal::Known("bt709".into()))),
+            range: Some(fact(Signal::Known("tv".into()))),
+        },
+    };
+    let audio = AudioMetadata {
+        sample_rate_hz: Some(fact(unit.sample_rate)),
+        channels: Some(fact(u32::from(delivery.audio_channels))),
+        sample_format: Some(fact(Signal::Known("s32".into()))),
+        channel_layout: Some(fact(Signal::Unspecified)),
+        bits_per_sample: Some(fact(24)),
+    };
+    Ok(MediaRepresentation {
+        media_uri: media_uri.into(),
+        container: Some(fact("mov,mp4,m4a,3gp,3g2,mj2".into())),
+        duration_seconds: Some(fact(Rational { numerator: frames * rate.fps_den, denominator: rate.fps_num })),
+        streams_complete: Some(fact(true)),
+        streams: vec![
+            MediaStream {
+                index: Some(fact(0)),
+                codec: Some(fact(Signal::Known(codec.into()))),
+                profile: None,
+                time_base: Some(fact(Rational { numerator: 1, denominator: rate.fps_num })),
+                start_pts: Some(fact(0)),
+                duration_ts: Some(fact(frames * rate.fps_den)),
+                details: StreamDetails::Video(Box::new(video)),
+            },
+            MediaStream {
+                index: Some(fact(1)),
+                codec: Some(fact(Signal::Known("pcm_s24le".into()))),
+                profile: None,
+                time_base: Some(fact(Rational { numerator: 1, denominator: i64::from(unit.sample_rate) })),
+                start_pts: Some(fact(0)),
+                duration_ts: Some(fact(samples)),
+                details: StreamDetails::Audio(Box::new(audio)),
+            },
+        ],
+        tags: Default::default(),
+    })
+}
+
 fn temporary(out: &Path, suffix: &str) -> PathBuf {
     let name = out.file_stem().unwrap_or_default().to_string_lossy().into_owned();
     std::env::temp_dir().join(format!("qnc-prerender-{}-{name}.{suffix}", std::process::id()))
@@ -195,7 +281,9 @@ fn mux(unit: &RenderUnit, delivery: &Delivery, ffmpeg: &Path, video: &Path, audi
         .arg(video)
         .args(["-f", "f32le", "-ar", &unit.sample_rate.to_string(), "-ac", &delivery.audio_channels.to_string(), "-i"])
         .arg(audio)
-        .args(["-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "pcm_s24le", "-f", "mov"])
+        .args(["-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "pcm_s24le"])
+        .args(UNIT_TAGS)
+        .args(["-video_track_timescale", &unit.program_rate.fps_num.to_string(), "-f", "mov"])
         .arg(out)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -336,6 +424,8 @@ fn encode_picture(
     let (layout, args) = delivery.encoder_args(ffmpeg)?;
     command.args(["-vf", &format!("scale={size}:flags=bicubic,format={layout},setsar=1")]);
     command.args(args);
+    command.args(UNIT_TAGS);
+    command.args(["-video_track_timescale", &unit.program_rate.fps_num.to_string()]);
     command.args(["-an", "-f", "mov"]);
     command.arg(video);
     command.stdin(if source.is_some() { Stdio::piped() } else { Stdio::null() });

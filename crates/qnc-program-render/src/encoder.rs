@@ -32,14 +32,16 @@ impl H264 {
         }
     }
 
-    /// The picture layout the encoder takes and its arguments (delivery quality).
+    /// The picture layout the encoder takes and its arguments (delivery quality). No B
+    /// pictures: decode order is picture order, so a unit's timestamps start at 0 and its
+    /// description is known without probing it.
     pub(crate) fn args(self) -> (&'static str, Vec<&'static str>) {
         match self {
-            Self::IntelQsv => ("nv12", vec!["-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "18", "-look_ahead", "0", "-profile:v", "high"]),
-            Self::NvidiaNvenc => ("yuv420p", vec!["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "18", "-profile:v", "high"]),
-            Self::AmdAmf => ("yuv420p", vec!["-c:v", "h264_amf", "-quality", "quality", "-rc", "cqp", "-qp_i", "18", "-qp_p", "20", "-profile:v", "high"]),
-            Self::AppleVideoToolbox => ("yuv420p", vec!["-c:v", "h264_videotoolbox", "-q:v", "70", "-profile:v", "high", "-allow_sw", "0"]),
-            Self::Software => ("yuv420p", vec!["-c:v", "libx264", "-preset", "superfast", "-crf", "16", "-profile:v", "high", "-flags", "+cgop", "-sc_threshold", "0"]),
+            Self::IntelQsv => ("nv12", vec!["-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "18", "-look_ahead", "0", "-profile:v", "high", "-bf", "0"]),
+            Self::NvidiaNvenc => ("yuv420p", vec!["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "18", "-profile:v", "high", "-bf", "0"]),
+            Self::AmdAmf => ("yuv420p", vec!["-c:v", "h264_amf", "-quality", "quality", "-rc", "cqp", "-qp_i", "18", "-qp_p", "20", "-profile:v", "high", "-bf", "0"]),
+            Self::AppleVideoToolbox => ("yuv420p", vec!["-c:v", "h264_videotoolbox", "-q:v", "70", "-profile:v", "high", "-allow_sw", "0", "-bf", "0"]),
+            Self::Software => ("yuv420p", vec!["-c:v", "libx264", "-preset", "superfast", "-crf", "16", "-profile:v", "high", "-flags", "+cgop", "-sc_threshold", "0", "-bf", "0"]),
         }
     }
 

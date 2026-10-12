@@ -117,11 +117,29 @@ pub fn prepare_launch(
 
 /// A story program: one binding for every media source its clips read.
 pub fn prepare_program_launch(
-    program: qnc_player_input::ProgramInput,
+    mut program: qnc_player_input::ProgramInput,
     sources: &[SourceTransportBinding],
     executable: PathBuf,
 ) -> Result<Launch, String> {
+    // The rendered units of the story are files of the project folder: they play when
+    // this host binds it, else the story plays from its sources.
+    let unit_sources: Vec<String> = program
+        .prerendered
+        .iter()
+        .filter_map(|unit| qnc_source_reader::SourceReference::from_uri(&unit.media.media_uri).ok())
+        .map(|reference| reference.source_uri().to_string())
+        .collect();
+    if unit_sources.len() != program.prerendered.len()
+        || !unit_sources.iter().all(|uri| sources.iter().any(|binding| binding.source_uri() == uri))
+    {
+        program.prerendered.clear();
+    }
     let mut source_uris = Vec::new();
+    for source_uri in unit_sources.into_iter().take(program.prerendered.len()) {
+        if !source_uris.contains(&source_uri) {
+            source_uris.push(source_uri);
+        }
+    }
     for media in program
         .playlist
         .items

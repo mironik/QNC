@@ -200,12 +200,15 @@ fn run() -> Result<()> {
                 let file_uri = SourceReference::new(&project_source, &format!("{}/{name}", relative.trim_matches('/')))
                     .map_err(|e| e.to_string())?
                     .uri();
+                let media = qnc_program_render::unit_media(unit, &delivery, &file_uri)?;
                 writer.publish(RenderedUnit {
                     fingerprint: fingerprint.clone(),
                     file_uri,
                     frames: unit.frames(),
                     samples: unit.samples,
                     encoder: delivery.encoder.clone().unwrap_or_default(),
+                    key: delivery.key(),
+                    media: serde_json::to_value(media).map_err(|e| e.to_string())?,
                 })?;
                 done_now += 1;
                 let ms = started.elapsed().as_millis().max(1);

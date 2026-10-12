@@ -7,6 +7,8 @@ description = "QNC public component: read-only program input of an edited story 
 [dependencies]
 qnc-db-broker = { workspace = true }
 qnc-program-db = { workspace = true }
+qnc-prerender-db = { workspace = true }
+serde_json = { workspace = true }
 qnc-frame-timebase = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-player-input = { workspace = true }

@@ -252,6 +252,57 @@ impl InputPlan {
             audio_channels,
         })
     }
+    /// A rendered unit of the story's prerender (user 2026-10-12) as a source of the
+    /// program: its picture is stream 0, its sound stream 1, both timed from 0, as its
+    /// render described it (`media`, never probed). Its frames are program frames.
+    pub(crate) fn for_unit(
+        media: &qnc_media_metadata::MediaRepresentation,
+        source_id: &str,
+        frames: u64,
+        program: qnc_media_metadata::FrameTimebase,
+    ) -> Result<Self> {
+        let stream = media
+            .streams
+            .iter()
+            .find(|s| matches!(s.details, StreamDetails::Video(_)))
+            .ok_or_else(|| error("rendered unit has no picture"))?;
+        let StreamDetails::Video(video) = &stream.details else {
+            return Err(error("rendered unit has no picture"));
+        };
+        let saved = ConversionSpec::from_saved(video).map_err(error)?;
+        let (spec, output_pixel_format) = delivered(&saved);
+        let origin = (
+            stream.start_pts.as_ref().ok_or_else(|| error("rendered unit has no start"))?.value,
+            stream.time_base.as_ref().ok_or_else(|| error("rendered unit has no time base"))?.value,
+        );
+        let video_index = stream.index.as_ref().ok_or_else(|| error("rendered unit has no stream index"))?.value;
+        let source = SourceRuntime::new(
+            source_id,
+            frames,
+            Timebase::new(program.fps_num, program.fps_den).map_err(error)?,
+        )
+        .map_err(error)?
+        .with_video_format(
+            VideoFormat::new(saved.width, saved.height, FieldMode::Progressive, color_space_from_saved(&saved)?)
+                .map_err(error)?,
+        );
+        source.validate().map_err(error)?;
+        Ok(Self {
+            source,
+            media: media.clone(),
+            video_index,
+            origin,
+            audio_media: media.clone(),
+            audio_origin: origin,
+            spec,
+            output_pixel_format,
+            progressive: false,
+            delivered_rate: None,
+            audio_streams: Vec::new(),
+            audio_channels: None,
+        })
+    }
+
     pub fn source(&self) -> &SourceRuntime {
         &self.source
     }

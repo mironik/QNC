@@ -104,6 +104,7 @@ impl ProgramPlan {
         .with_video_format(picture_format)
         .with_audio_format(AudioFormat::new(rate, channels).map_err(error)?);
         source.validate().map_err(error)?;
+        let (clips, video, audio) = with_prerendered(input, clips, video, audio, channels)?;
         Ok(Self {
             source,
             clips,
@@ -131,16 +132,121 @@ impl ProgramPlan {
     }
 }
 
+/// The story's parts whose rendered unit is here play from that one file (user
+/// 2026-10-12: one stream from the project disk instead of the camera originals of a cut
+/// on the card): the plan's spans are cut at the units of the story, as its prerender
+/// fingerprints them, and a part with its unit takes the unit's picture and sound; the
+/// others keep their sources.
+fn with_prerendered(
+    input: &ProgramInput,
+    mut clips: Vec<InputPlan>,
+    video: Vec<VideoSpan>,
+    audio: Vec<AudioSpan>,
+    channels: u16,
+) -> Result<(Vec<InputPlan>, Vec<VideoSpan>, Vec<AudioSpan>)> {
+    if input.prerendered.is_empty() {
+        return Ok((clips, video, audio));
+    }
+    let units = ProgramPlan::new(&original_pictures(input))?.render_units()?;
+    let mut keys = Vec::new();
+    for unit in &input.prerendered {
+        if !keys.contains(&&unit.key) {
+            keys.push(&unit.key);
+        }
+    }
+    let rate = input.playlist.program_timebase;
+    let (mut cut_video, mut cut_audio) = (Vec::new(), Vec::new());
+    for unit in &units {
+        let (from, to) = (unit.record_in, unit.record_out);
+        let rendered = keys.iter().find_map(|key| {
+            let fingerprint = unit.fingerprint(key);
+            input
+                .prerendered
+                .iter()
+                .find(|done| done.fingerprint == fingerprint && done.frames == to - from)
+        });
+        if let Some(done) = rendered {
+            let stream = done
+                .media
+                .streams
+                .iter()
+                .find(|s| matches!(s.details, qnc_media_metadata::StreamDetails::Audio(_)))
+                .ok_or_else(|| error("rendered unit has no sound"))?;
+            let qnc_media_metadata::StreamDetails::Audio(sound) = &stream.details else {
+                return Err(error("rendered unit has no sound"));
+            };
+            let stream_index = stream.index.as_ref().ok_or_else(|| error("rendered unit has no stream index"))?.value;
+            let stream_channels = sound
+                .channels
+                .as_ref()
+                .and_then(|c| u16::try_from(c.value).ok())
+                .ok_or_else(|| error("rendered unit has no channel count"))?;
+            if stream_channels < channels {
+                return Err(error("rendered unit has fewer channels than the program"));
+            }
+            let index = clips.len();
+            clips.push(InputPlan::for_unit(&done.media, &format!("prerender-{}", done.fingerprint), done.frames, rate)?);
+            cut_video.push(VideoSpan { record_in: from, record_out: to, video: Some((index, 0)) });
+            cut_audio.push(AudioSpan {
+                record_in: from,
+                record_out: to,
+                buses: (0..channels)
+                    .map(|output| Bus { output, clip: index, source_in: 0, stream_index, channel_index: output, stream_channels })
+                    .collect(),
+            });
+            continue;
+        }
+        let piece = |span_in: u64| from - span_in;
+        let picture = video
+            .iter()
+            .find(|span| span.record_in <= from && from < span.record_out)
+            .ok_or_else(|| error("program part without a picture span"))?;
+        cut_video.push(VideoSpan {
+            record_in: from,
+            record_out: to,
+            video: picture.video.map(|(clip, source_in)| (clip, source_in + piece(picture.record_in))),
+        });
+        let sound = audio
+            .iter()
+            .find(|span| span.record_in <= from && from < span.record_out)
+            .ok_or_else(|| error("program part without a sound span"))?;
+        cut_audio.push(AudioSpan {
+            record_in: from,
+            record_out: to,
+            buses: sound
+                .buses
+                .iter()
+                .map(|bus| Bus { source_in: bus.source_in + piece(sound.record_in), ..*bus })
+                .collect(),
+        });
+    }
+    Ok((clips, cut_video, cut_audio))
+}
+
+/// The story with every picture from the clip's original (the prerender's view of it):
+/// the clips' representation and the playlist's picture media both name the original.
+fn original_pictures(input: &ProgramInput) -> ProgramInput {
+    let mut input = input.clone();
+    input.prerendered.clear();
+    for clip in input.clips.values_mut() {
+        clip.representation = qnc_player_input::Representation::Original;
+    }
+    for source in input.playlist.items.iter_mut().flat_map(|item| item.sources.iter_mut()) {
+        if source.has_video() {
+            if let Some(clip) = input.clips.get(&source.clip_id) {
+                source.media.media_uri = clip.audio_media().media_uri.clone();
+            }
+        }
+    }
+    input
+}
+
 impl ProgramPlan {
     /// The plan of the story's prerender (user 2026-10-12): the same cuts and sound as the
     /// plan that plays, every picture from the clip's camera original (the delivery is made
     /// from the original whatever the project plays).
     pub fn for_render(input: &ProgramInput) -> Result<Self> {
-        let mut input = input.clone();
-        for clip in input.clips.values_mut() {
-            clip.representation = qnc_player_input::Representation::Original;
-        }
-        Self::new(&input)
+        Self::new(&original_pictures(input))
     }
 
     /// The story as prerender units: a unit between every two cuts of picture or sound,

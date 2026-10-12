@@ -3611,3 +3611,16 @@ Wrapu (player u pauzi, pa radnik nije cekao); karticu su istodobno citali radnik
 umjesto oko 1 s) i pozadinsko dekodiranje unatrag. `qnc-source-preview` sada javlja rad playera i dok korisnik
 montira: jos 3 s nakon svakog koraka, skoka ili Playa (`touched`, `HANDS_ON`); radnik tada ceka i renderira samo u
 pravim stankama.
+Izvedeno (prerender, korak 3; korisnik "da, kreni"): player pusta gotove dijelove price. `qnc-program-render`: dio je
+format `UNIT_FORMAT = 2` (MOV, slika stream 0 bez B-slika s vremenskom bazom stope price, PCM stream 1, BT.709 tv,
+vremenske oznake od 0; provjereno: pts 0,1,2..., time_base 1/50), `unit_media` pise njegov opis (nikad probe), kljuc
+formata (`key`: export, koder, verzija formata) ulazi u otisak. `qnc-prerender-db`: uz dio cuva kljuc i opis
+(`key_json`, `media_json`; tablica starijeg razvojnog oblika cita se kao prazna i prvi upis je zamjenjuje), `all()`.
+`qnc-player-input`: `ProgramInput.prerendered` (`PrerenderedUnit`). `qnc-program-input`: cijela prica dobiva gotove
+dijelove iz baze (Sync prozor ne: privremena pokrivalica nije u prici). `qnc-player-launcher`: veze i za mapu projekta
+kad prica ima gotove dijelove (bez veze prica svira iz izvora). `qnc-broadcast-engine`: `ProgramPlan::new` racuna
+jedinice price kao prerender (`original_pictures`: slika i adrese slike iz originala, i kad projekt pusta proxy) i dio
+s gotovim dijelom istog otiska pusta iz te datoteke (`InputPlan::for_unit`: slika stream 0, zvuk po izlaznim kanalima
+iz streama 1), ostale iz izvora. Izmjereno (izolirana kopija, originali s kartice, 31 dio prerenderiran za oko 1 min
+50 s): prica od 0 99,4 % (prije 98-99 % s prekidom zvuka na pocetku), od 2300 99,6 % (prije rupa 1,8 s), od 4200 100 %;
+bez prekida zvuka; preostali kratki zastoji (do 153 ms) na prijelazima izmedju dijelova.

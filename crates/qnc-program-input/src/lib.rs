@@ -150,7 +150,33 @@ fn load(
             ProgramFrameRange::new(frame(start)?, frame(end)?).map_err(|error| error.message)?;
         playlist = build_program_frame_window(&playlist, range)?;
     }
-    ProgramInput::new(playlist, resolver.prepared).map_err(|error| error.to_string())
+    let mut input = ProgramInput::new(playlist, resolver.prepared).map_err(|error| error.to_string())?;
+    // The whole story plays its rendered units (a Sync window plays a cover not in the
+    // story: from its sources). Units that cannot be read leave the story to its sources.
+    if window.is_none() {
+        input.prerendered = prerendered(target);
+    }
+    Ok(input)
+}
+
+/// The rendered units of the story's prerender (user 2026-10-12), as their render
+/// described them; none when the project has none or they cannot be read.
+fn prerendered(target: &ProjectDbTarget) -> Vec<qnc_player_input::PrerenderedUnit> {
+    let Ok(units) = qnc_prerender_db::PrerenderReader::open(target).and_then(|mut reader| reader.all()) else {
+        return Vec::new();
+    };
+    units
+        .into_iter()
+        .filter_map(|unit| {
+            Some(qnc_player_input::PrerenderedUnit {
+                fingerprint: unit.fingerprint,
+                key: unit.key,
+                media: serde_json::from_value(unit.media).ok()?,
+                frames: unit.frames,
+                samples: unit.samples,
+            })
+        })
+        .collect()
 }
 
 /// The program of the active project, built where the player is prepared (off
