@@ -23,7 +23,7 @@
     "C12 fallback path under the QNC root|qnc-work-settings": 3,
     "C13 media folder literal|qnc-ingest-import-worker": 2,
     "C13 media folder literal|qnc-project-store": 2,
-    "C13 project layout literal|qnc-project-store": 10,
+    "C13 project layout literal|qnc-project-store": 6,
     "C2 form colour outside contract|crates/qnc-project-blocks/src/location_browser.rs": 1,
     "C2 form colour outside contract|crates/qnc-project-blocks/src/theme.rs": 1,
     "C2 form private widget|crates/qnc-project-blocks/src/settings.rs": 1,

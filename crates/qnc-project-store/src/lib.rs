@@ -36,12 +36,6 @@ const PROJECT_DIRECTORIES: &[&str] = &[
     "audio",
     "incoming/card",
     "incoming/ftp",
-    "products/thumbnails",
-    "products/filmstrip",
-    "products/virtual_shorts",
-    "products/virtual_segments",
-    "products/b_roll_virtual_clips",
-    "products/prerender",
 ];
 const PRODUCT_DIRECTORY_FIELDS: &[(&str, &str)] = &[
     ("root", "products"),
@@ -760,10 +754,19 @@ impl ProjectStore {
 
 fn ensure_project_dirs_at(base: &Path) -> Result<(), String> {
     fs::create_dir_all(base).map_err(|error| error.to_string())?;
-    for subdir in PROJECT_DIRECTORIES {
+    for subdir in project_directories() {
         fs::create_dir_all(base.join(subdir)).map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+/// The folders of a new project: the media folders and the product folders the settings
+/// name (one list of product folders, `PRODUCT_DIRECTORY_FIELDS`).
+fn project_directories() -> impl Iterator<Item = &'static str> {
+    PROJECT_DIRECTORIES
+        .iter()
+        .copied()
+        .chain(PRODUCT_DIRECTORY_FIELDS.iter().map(|(_, folder)| *folder))
 }
 
 fn project_export_directory(
@@ -2215,7 +2218,7 @@ mod tests {
             .join("project.db")
             .is_file());
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
-        for subdir in PROJECT_DIRECTORIES {
+        for subdir in project_directories() {
             assert!(
                 project_dir.join(subdir).is_dir(),
                 "missing project directory {subdir}"
