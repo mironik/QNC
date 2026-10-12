@@ -3555,3 +3555,10 @@ pokrivalicu citao zalihu punom brzinom kartice i gusio vanjski `ffmpeg` zvuka; s
 (kao `-f` u CLI-ju), analiza nakon otvaranja najvise 1 MiB / 0,1 s (prije 14-25 MB s pocetka datoteke); slike i dalje
 bajt za bajt kao CLI (svih 6 testova), prva slika 160-200 ms. Topla kartica: prica na originalima 99,9 %, 2 zastoja;
 hladna kartica: pocetak playa i dalje ceka citanje (prve sekunde trebaju >75 MB pri 29 MB/s).
+Popravak 2026-10-12 (ziva proba: "prica nije dosla do kraja"): na frameu 4348 jedan korak playera trajao je 0,5 s, zvuk
+je presusio usred koraka, a ta greska (za razliku od prekida nadjenog na pocetku koraka) zaustavljala je player.
+`qnc-broadcast-engine`: prekid zvuka usred koraka ide istim putem kao na pocetku (`rebuffer_audio`: zvuk se ponovno
+priprema i reprodukcija nastavlja). Uz to se i adresa medija (otvaranje datoteke, metadata, provjera putanje na
+kartici) razrjesava u pozadinskoj niti dekodera (`DecodeInput::open_in_background`; opener je `Send`,
+`tools/qnc-player-runner` `MediaOpener`). Izmjereno (originali s kartice, 25 s): od 4200 do kraja price 99,9 %, od
+2300 99,4 % (2 zastoja), od 0 100 % PASS.

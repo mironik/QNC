@@ -142,7 +142,7 @@ impl Runtime {
         output_config: OutputConfig,
         decoder_config: DecoderConfig,
         audio_device_id: Option<String>,
-        mut open_media: impl FnMut(&str) -> std::io::Result<MediaStream> + 'static,
+        mut open_media: impl FnMut(&str) -> std::io::Result<MediaStream> + Send + 'static,
     ) -> Result<Self> {
         Self::open_access(
             plan,
@@ -159,7 +159,7 @@ impl Runtime {
         output_config: OutputConfig,
         decoder_config: DecoderConfig,
         audio_device_id: Option<String>,
-        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
+        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + Send + 'static,
     ) -> Result<Self> {
         Self::open_output(
             plan,
@@ -176,7 +176,7 @@ impl Runtime {
         output_config: OutputConfig,
         decoder_config: DecoderConfig,
         audio_device_id: Option<String>,
-        mut open_media: impl FnMut(&str) -> std::io::Result<MediaStream> + 'static,
+        mut open_media: impl FnMut(&str) -> std::io::Result<MediaStream> + Send + 'static,
     ) -> Result<Self> {
         Self::open_monitor_access(
             plan,
@@ -191,7 +191,7 @@ impl Runtime {
         output_config: OutputConfig,
         decoder_config: DecoderConfig,
         audio_device_id: Option<String>,
-        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
+        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + Send + 'static,
     ) -> Result<Self> {
         Self::open_output(
             plan,
@@ -208,7 +208,7 @@ impl Runtime {
         output_config: OutputConfig,
         decoder_config: DecoderConfig,
         audio_device_id: Option<String>,
-        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
+        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + Send + 'static,
     ) -> Result<Self> {
         output_config.validate().map_err(error)?;
         let prebuffer_frames = if video_output.is_none() {
@@ -390,7 +390,7 @@ impl Runtime {
         output_config: OutputConfig,
         decoder_config: DecoderConfig,
         audio_device_id: Option<String>,
-        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
+        open_media: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + Send + 'static,
     ) -> Result<Self> {
         output_config.validate().map_err(error)?;
         let prebuffer_frames = input::monitor_prebuffer_frames(plan.source.timebase)?;
@@ -497,34 +497,8 @@ impl Runtime {
         if let Some(back) = back {
             back.borrow_mut().tick();
         }
-        if let Some(device) = &self.audio
-            && device.borrow().telemetry().status == qnc_audio_output::Status::Failed
-        {
-            if qnc_dev_diagnostics::player_diagnostics_enabled() {
-                let gpu = self.gpu.borrow();
-                qnc_dev_diagnostics::log_line(
-                    qnc_dev_diagnostics::DiagnosticsStream::Player,
-                    format!(
-                        "player-rebuffer reason=audio_underrun frame={} converted={} conversion_avg_us={}",
-                        self.engine.state().carrier_frame,
-                        gpu.converted,
-                        gpu.conversion_us / u128::from(gpu.converted.max(1))
-                    ),
-                );
-            }
-            match self.engine.rearm_audio_after_underrun() {
-                Ok(()) => self.audio_rearm_pending = false,
-                Err(e) => {
-                    // The preroll keeps filling while playing; finish it on a later tick.
-                    self.audio_rearm_pending = self.audio_waits_for_pcm();
-                    if qnc_dev_diagnostics::player_diagnostics_enabled() {
-                        qnc_dev_diagnostics::log_line(
-                            qnc_dev_diagnostics::DiagnosticsStream::Player,
-                            format!("player-rebuffer audio_rearm_failed={e}"),
-                        );
-                    }
-                }
-            }
+        if self.audio_failed() {
+            self.rebuffer_audio("audio_underrun");
         } else if self.audio_rearm_pending {
             match self.engine.finish_audio_rearm() {
                 Ok(()) => {
@@ -573,6 +547,13 @@ impl Runtime {
                 }
                 return Ok(Vec::new());
             }
+            // The sound ran dry within this tick (a tick that took long): the same rebuffer as
+            // one found at its start, not the end of the play (live 2026-10-12: the story
+            // stopped at a cover where a tick took 0.5 s).
+            Err(_) if self.audio_failed() => {
+                self.rebuffer_audio("audio_underrun_in_tick");
+                return Ok(Vec::new());
+            }
             Err(e) => return Err(self.enrich_tick_error(e)),
         };
         if events.iter().any(|event| {
@@ -584,6 +565,43 @@ impl Runtime {
             return Err(error(format!("player preparation failed: {events:?}")));
         }
         Ok(events)
+    }
+
+    /// The audio device stopped for lack of sound.
+    fn audio_failed(&self) -> bool {
+        self.audio
+            .as_ref()
+            .is_some_and(|device| device.borrow().telemetry().status == qnc_audio_output::Status::Failed)
+    }
+
+    /// The sound ran dry: its queue is prepared again and playing goes on once it holds
+    /// enough (a later tick finishes it).
+    fn rebuffer_audio(&mut self, reason: &str) {
+        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+            let gpu = self.gpu.borrow();
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!(
+                    "player-rebuffer reason={reason} frame={} converted={} conversion_avg_us={}",
+                    self.engine.state().carrier_frame,
+                    gpu.converted,
+                    gpu.conversion_us / u128::from(gpu.converted.max(1))
+                ),
+            );
+        }
+        match self.engine.rearm_audio_after_underrun() {
+            Ok(()) => self.audio_rearm_pending = false,
+            Err(e) => {
+                // The preroll keeps filling while playing; finish it on a later tick.
+                self.audio_rearm_pending = self.audio_waits_for_pcm();
+                if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                    qnc_dev_diagnostics::log_line(
+                        qnc_dev_diagnostics::DiagnosticsStream::Player,
+                        format!("player-rebuffer audio_rearm_failed={e}"),
+                    );
+                }
+            }
+        }
     }
 
     /// The audio queue of a rearm exists but has not been started yet.

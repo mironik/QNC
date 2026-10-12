@@ -2,7 +2,7 @@ use crate::*;
 use qnc_media_metadata::{MediaRepresentation, Rational};
 use qnc_media_stream::{CodecEndpoint, MediaStream};
 
-type Opener = dyn FnMut(&str) -> std::io::Result<DecodeMediaAccess>;
+type Opener = dyn FnMut(&str) -> std::io::Result<DecodeMediaAccess> + Send;
 
 #[derive(Debug)]
 pub enum DecodeMediaAccess {
@@ -23,13 +23,14 @@ pub(crate) struct DecodeInput {
     progressive: bool,
     /// Pictures at the program rate of a clip of twice or half it (see `InputPlan`).
     delivered_rate: Option<qnc_media_metadata::FrameTimebase>,
-    opener: Rc<RefCell<Box<Opener>>>,
+    /// Shared with the threads that open decoders in the background (see `open_in_background`).
+    opener: std::sync::Arc<std::sync::Mutex<Box<Opener>>>,
 }
 impl DecodeInput {
     pub fn new_access(
         media: MediaRepresentation,
         config: DecoderConfig,
-        opener: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + 'static,
+        opener: impl FnMut(&str) -> std::io::Result<DecodeMediaAccess> + Send + 'static,
     ) -> Self {
         Self {
             media,
@@ -37,7 +38,7 @@ impl DecodeInput {
             output_pixel_format: None,
             progressive: false,
             delivered_rate: None,
-            opener: Rc::new(RefCell::new(Box::new(opener))),
+            opener: std::sync::Arc::new(std::sync::Mutex::new(Box::new(opener))),
         }
     }
     /// The same input, its pictures delivered in `format` (see `InputPlan`).
@@ -87,19 +88,35 @@ impl DecodeInput {
     /// to 350 ms each time a cover's decoder was opened ahead of its cut, a picture gap at
     /// every cover (live 2026-10-12).
     pub fn open_in_background(&self, stream_index: u32, start: Option<Rational>) -> Result<Opening> {
-        let (request, access, context) = self.prepare(stream_index, start)?;
-        let config = self.config.clone();
+        let request = self.request(stream_index, start)?;
+        let (config, opener, uri) = (self.config.clone(), self.opener.clone(), self.media.media_uri.clone());
         let (send, receive) = std::sync::mpsc::channel();
+        // The media binding too: opening the file and reading its metadata on a busy card
+        // waited behind its reads (a playback tick of 0.5 s stopped the story, 2026-10-12).
         std::thread::Builder::new()
             .name("qnc-decoder-open".into())
             .spawn(move || {
-                let _ = send.send(open_access(request, access, config, &context));
+                let context = decode_open_context(&request);
+                let access = opener
+                    .lock()
+                    .map_err(|_| error("decoder media binding poisoned"))
+                    .and_then(|mut open| open(&uri).map_err(|err| error(format!("{context}: {err}"))));
+                let _ = send.send(access.and_then(|access| open_access(request, access, config, &context)));
             })
             .map_err(|_| error("cannot start decoder open thread"))?;
         Ok(Opening::Waiting(receive, std::time::Instant::now()))
     }
 
     fn prepare(&self, stream_index: u32, start: Option<Rational>) -> Result<(DecodeRequest, DecodeMediaAccess, String)> {
+        let request = self.request(stream_index, start)?;
+        let context = decode_open_context(&request);
+        let access = (self.opener.lock().map_err(|_| error("decoder media binding poisoned"))?)(&self.media.media_uri)
+            .map_err(|err| error(format!("{context}: {err}")))?;
+        Ok((request, access, context))
+    }
+
+    /// The validated request of a stream from `start`.
+    fn request(&self, stream_index: u32, start: Option<Rational>) -> Result<DecodeRequest> {
         let request = DecodeRequest {
             version: qnc_media_decode::VERSION.into(),
             media: self.media.clone(),
@@ -110,10 +127,7 @@ impl DecodeInput {
             delivered_rate: self.delivered_rate,
         };
         request.validate(&self.config).map_err(error)?;
-        let context = decode_open_context(&request);
-        let access = (self.opener.borrow_mut())(&self.media.media_uri)
-            .map_err(|err| error(format!("{context}: {err}")))?;
-        Ok((request, access, context))
+        Ok(request)
     }
 }
 

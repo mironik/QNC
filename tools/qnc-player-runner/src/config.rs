@@ -10,7 +10,7 @@ use std::{
 };
 
 const MAX_BOOT_BYTES: u64 = 4 * 1024 * 1024;
-type MediaOpener = Box<dyn FnMut(&str) -> io::Result<DecodeMediaAccess>>;
+type MediaOpener = Box<dyn FnMut(&str) -> io::Result<DecodeMediaAccess> + Send>;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
