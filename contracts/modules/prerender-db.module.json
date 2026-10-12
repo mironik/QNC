@@ -25,7 +25,7 @@
     "aarch64"
   ],
   "state_policy": "session_local",
-  "database_write_policy": "owner_only",
+  "database_write_policy": "public_db_owner_write_adapter_only",
   "module_dependencies": [
     "qnc.module.db-broker"
   ],
