@@ -678,7 +678,7 @@ impl Decoder {
     /// after the end of its stream for a jump (`seek`).
     fn in_process(
         request: DecodeRequest,
-        mut source: Box<dyn PictureSource>,
+        open: SourceOpener,
         plan: DecodePlan,
         config: DecoderConfig,
         bridge: Option<LoopbackBridge>,
@@ -693,6 +693,13 @@ impl Decoder {
             .spawn(move || {
                 let mut lowered = false;
                 let mut generation = 0;
+                let mut source = match open() {
+                    Ok(source) => source,
+                    Err(error) => {
+                        send(&events_tx, (generation, Event::Failed(error)), &stop);
+                        return;
+                    }
+                };
                 loop {
                     let next = || {
                         if !lowered && lower.load(Ordering::Acquire) {

@@ -463,7 +463,7 @@ impl DecoderAdapter for Chain {
         request: &DecodeRequest,
         plan: &DecodePlan,
         ep: &CodecEndpoint,
-    ) -> Option<Result<Box<dyn PictureSource>>> {
+    ) -> Option<Result<SourceOpener>> {
         match self.choose(request, plan) {
             Ok(adapter) => adapter.open_in_process(request, plan, ep),
             Err(error) => Some(Err(error)),
@@ -505,7 +505,7 @@ impl DecoderAdapter for SelectedAdapter {
         request: &DecodeRequest,
         plan: &DecodePlan,
         ep: &CodecEndpoint,
-    ) -> Option<Result<Box<dyn PictureSource>>> {
+    ) -> Option<Result<SourceOpener>> {
         self.adapter.open_in_process(request, plan, ep)
     }
 }

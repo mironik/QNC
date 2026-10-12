@@ -10,6 +10,7 @@ edition = "2024"
 qnc-media-decode = { path = "../qnc-media-decode" }
 qnc-media-metadata = { path = "../qnc-media-metadata" }
 qnc-media-stream = { path = "../qnc-media-stream" }
+qnc-media-readahead = { path = "../qnc-media-readahead" }
 qnc-ffmpeg-decode = { path = "../qnc-ffmpeg-decode" }
 ffmpeg-next = { version = "8.0.0", default-features = false, features = ["codec", "format", "filter"] }
 

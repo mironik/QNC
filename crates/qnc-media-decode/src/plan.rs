@@ -2,6 +2,7 @@ use crate::*;
 use qnc_media_metadata::{Signal, StreamDetails};
 use qnc_media_stream::SourceReference;
 
+#[derive(Debug, Clone)]
 pub struct DecodePlan {
     pub format: DecodedFormat,
     pub max_packet: usize,

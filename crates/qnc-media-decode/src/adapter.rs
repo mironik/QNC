@@ -55,6 +55,12 @@ pub trait PictureSource: Send {
     }
 }
 
+/// Opens an in-process decoder; it runs on the decoder's own thread, so opening the media
+/// (header, index, the first seek: 70-330 ms on a camera card) never stops the caller,
+/// the playback thread of a player (live 2026-10-12: a picture gap at every cover, each
+/// the moment the decoder of the next cut was opened).
+pub type SourceOpener = Box<dyn FnOnce() -> Result<Box<dyn PictureSource>> + Send>;
+
 /// A decode adapter has no presentation clock, project policy or DB access.
 pub trait DecoderAdapter: std::fmt::Debug + Send + Sync {
     fn validate(&self, request: &DecodeRequest, plan: &DecodePlan) -> Result<()>;
@@ -66,13 +72,14 @@ pub trait DecoderAdapter: std::fmt::Debug + Send + Sync {
         storage_stamp: &str,
     ) -> Result<ProcessLaunch>;
     /// The decoder of this request inside the calling process, when the adapter has one
-    /// for it; `None` launches the decoder process.
+    /// for it; `None` launches the decoder process. What it returns opens the media on the
+    /// decoder's thread; an error of opening is the decoder's first event.
     fn open_in_process(
         &self,
         _request: &DecodeRequest,
         _plan: &DecodePlan,
         _endpoint: &CodecEndpoint,
-    ) -> Option<Result<Box<dyn PictureSource>>> {
+    ) -> Option<Result<SourceOpener>> {
         None
     }
 }

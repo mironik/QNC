@@ -3940,6 +3940,7 @@ dependencies = [
  "qnc-ffmpeg-decode",
  "qnc-media-decode",
  "qnc-media-metadata",
+ "qnc-media-readahead",
  "qnc-media-stream",
 ]
 
@@ -4075,6 +4076,13 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tiny_http",
+]
+
+[[package]]
+name = "qnc-media-readahead"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]

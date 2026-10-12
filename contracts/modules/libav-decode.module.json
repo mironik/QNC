@@ -28,7 +28,8 @@
   "module_dependencies": [
     "qnc.module.media-decode",
     "qnc.module.media-stream",
-    "qnc.module.ffmpeg-decode"
+    "qnc.module.ffmpeg-decode",
+    "qnc.module.media-readahead"
   ],
   "forbidden_calls": [
     "db.read",
@@ -42,6 +43,6 @@
     "qnc.module.scanner",
     "qnc.module.broadcast-player-core"
   ],
-  "adapter_policy": "A replaceable decoder in the catalog chain (driver libav_v1), built only with the libav feature of a program. The FFmpeg libraries (LGPL shared build) decode the saved video stream inside the calling process and give the same pictures, timestamps and packed layout as the FFmpeg CLI adapter: the same seek (key picture before the start, earlier pictures dropped), the same filters (qnc_ffmpeg_decode::video_filter) and the same checks of the shared decode contract (qnc-media-decode pump). Proven byte for byte against the CLI (tests/same_as_cli.rs: whole stream, starts, 4:2:0 conversion, deinterlace, each field, half rate, a camera original). Audio and any request it does not take go through the FFmpeg CLI adapter with the same executable; a program built without the feature decodes the registration through that adapter. It consumes only a seekable file CodecEndpoint produced by the storage owner/resolver, never an HTTP or raw TCP endpoint, runs no probe, owns no clock and knows no application.",
+  "adapter_policy": "A replaceable decoder in the catalog chain (driver libav_v1), built only with the libav feature of a program. The FFmpeg libraries (LGPL shared build) decode the saved video stream inside the calling process and give the same pictures, timestamps and packed layout as the FFmpeg CLI adapter: the same seek (key picture before the start, earlier pictures dropped), the same filters (qnc_ffmpeg_decode::video_filter) and the same checks of the shared decode contract (qnc-media-decode pump). Proven byte for byte against the CLI (tests/same_as_cli.rs: whole stream, starts, 4:2:0 conversion, deinterlace, each field, half rate, a camera original). The media is read through the reader of the process (qnc-media-readahead), and the media is opened on the decoder's own thread (SourceOpener), never on the playback thread. Audio and any request it does not take go through the FFmpeg CLI adapter with the same executable; a program built without the feature decodes the registration through that adapter. It consumes only a seekable file CodecEndpoint produced by the storage owner/resolver, never an HTTP or raw TCP endpoint, runs no probe, owns no clock and knows no application.",
   "specification": "docs/70-replaceable-decoders.md"
 }

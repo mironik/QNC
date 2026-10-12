@@ -3531,3 +3531,21 @@ ponavljao je oko 3 s drzeci bazu; svi su cekali. `qnc-db-broker` i `qnc-content-
 otvara bazu bez toga, samo pri kreiranju i otvaranju projekta. Nalaz: zapinjanje price na pokrivalicama danas nije od
 koda nego od originala sa SD kartice (kopija je imala `playback.input = original`; kartica ~29 MB/s, original 15 MB/s,
 na rezu se citaju 3-6 tokova); ista prica s proxyjem i danasnjim kodom 99,7-100 % slika, 0-1 zastoj.
+Izvedeno 2026-10-12 (grana `libav-decoder`; korisnik: "potrazi neki novi nacin", "kopiranje nije opcija, za breaking
+news", "da, kreni"): montaza na originalima izravno s kartice. Nalaz: kartica je u citacu Realtek USB 2.0 (~29 MB/s),
+original XAVC 4:2:2 10-bit ~15 MB/s; zastoji price na pokrivalicama nisu bili od dekodera nego (1) od otvaranja
+dekodera sljedeceg reza na niti playera (70-350 ms; vanjski `ffmpeg` 300-500 ms): svaki zastoj poklopio se u istoj
+milisekundi s tim otvaranjem, i (2) od navala citanja kartice. Izvedeno: `qnc-media-decode` `SourceOpener` (dekoder u
+procesu otvara medij u svojoj niti; greska otvaranja je prvi dogadjaj dekodera; `DecodePlan` je `Clone`),
+`qnc-broadcast-engine` `DecodeInput::open_in_background` + `Opening` (u prici se dekoderi slike i zvuka otvaraju u
+pozadinskoj niti; dok nisu spremni, prica ceka sliku/zvuk kao i do sada, nit playera ne stoji), nova javna kocka
+`crates/qnc-media-readahead` (+ ugovor `contracts/modules/media-readahead.module.json`): jedan citac medija procesa,
+jedna nit cita blokove na koje dekoder ceka (256 KiB), druga unaprijed u nizovima (1 MiB, do 32 MiB po toku, tok s
+najmanje zalihe prvi), tokovi iste datoteke dijele blokove, memorija do 768 MiB i odlazi sa zadnjim tokom datoteke;
+samo citanje. `qnc-libav-decode` cita medij kroz taj citac (`reader_io`: vlastiti AVIO), slike i dalje bajt za bajt
+iste kao CLI (svih 6 testova). Zvuk ostaje na vanjskom `ffmpeg`-u (preskace sliku: 35 MB za 20 s zvuka; citac bi
+citao cijelu datoteku). Izmjereno (izolirana kopija, `playback.input = original`, originali s kartice, prica od 2300,
+30-40 s): prije 98 % slika i 10-11 zastoja (vanjski `ffmpeg` 94-95 %, 18-24); sada 99,4-99,9 %, 0-3 zastoja, najdulja
+rupa 50-98 ms (bez citaca, samo s otvaranjem u pozadini: 98,4-99,5 %, 1-2 zastoja do 208 ms). Prica od pocetka
+98,8-98,9 %, ostaje rupa u prvoj sekundi playa (do 183 ms). Pretvaranje u H.264 8-bit (9. 10.) ostaje kao izbor u
+Projectu kad ima vremena za Uvezi.

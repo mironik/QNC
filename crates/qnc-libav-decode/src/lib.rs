@@ -15,6 +15,8 @@ use qnc_media_decode::*;
 use qnc_media_metadata::Rational;
 use qnc_media_stream::CodecEndpoint;
 
+mod reader_io;
+
 /// Decoder threads of one video request (measured on the camera original: 4 threads
 /// 170-198 pictures/s, an arbitrary picture in about 110 ms).
 const VIDEO_THREADS: usize = 4;
@@ -49,10 +51,14 @@ impl DecoderAdapter for LibavAdapter {
         request: &DecodeRequest,
         plan: &DecodePlan,
         endpoint: &CodecEndpoint,
-    ) -> Option<Result<Box<dyn PictureSource>>> {
+    ) -> Option<Result<SourceOpener>> {
         match plan.format {
             DecodedFormat::Video { .. } => {
-                Some(VideoSource::open(request, plan, endpoint).map(|source| Box::new(source) as Box<dyn PictureSource>))
+                let (request, plan, endpoint) = (request.clone(), plan.clone(), endpoint.clone());
+                // Opened on the decoder's thread (see `SourceOpener`).
+                Some(Ok(Box::new(move || {
+                    VideoSource::open(&request, &plan, &endpoint).map(|source| Box::new(source) as Box<dyn PictureSource>)
+                })))
             }
             DecodedFormat::Audio { .. } => None,
         }
@@ -80,6 +86,8 @@ struct VideoSource {
     finished: bool,
     decoded: ff::frame::Video,
     filtered: ff::frame::Video,
+    /// The reader the media is read through; after `input`, which uses it until dropped.
+    _io: reader_io::ReaderIo,
 }
 
 // SAFETY: the source is moved once to the decoder thread of `Decoder::in_process` and only
@@ -109,7 +117,7 @@ impl VideoSource {
         };
         let demuxer = qnc_ffmpeg_decode::container_name(&plan.container)?;
         let path = Path::new(endpoint.input_arg());
-        let mut input = ff::format::input(&path).map_err(stream_error)?;
+        let (mut input, io) = reader_io::open_input(path)?;
         if !input.format().name().split(',').any(|name| name == demuxer) {
             return Err(error(ErrorKind::Contract, "opened container differs from the saved record"));
         }
@@ -147,6 +155,7 @@ impl VideoSource {
             finished: false,
             decoded: ff::frame::Video::empty(),
             filtered: ff::frame::Video::empty(),
+            _io: io,
         })
     }
 

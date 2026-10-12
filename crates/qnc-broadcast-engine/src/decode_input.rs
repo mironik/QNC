@@ -78,6 +78,28 @@ impl DecodeInput {
         .map_err(error)
     }
     pub fn open(&self, stream_index: u32, start: Option<Rational>) -> Result<Decoder> {
+        let (request, access, context) = self.prepare(stream_index, start)?;
+        open_access(request, access, self.config.clone(), &context)
+    }
+
+    /// The same decoder opened on a thread of its own: the media binding is resolved here,
+    /// the decoder process or the media itself opened there. The playback thread stood 70
+    /// to 350 ms each time a cover's decoder was opened ahead of its cut, a picture gap at
+    /// every cover (live 2026-10-12).
+    pub fn open_in_background(&self, stream_index: u32, start: Option<Rational>) -> Result<Opening> {
+        let (request, access, context) = self.prepare(stream_index, start)?;
+        let config = self.config.clone();
+        let (send, receive) = std::sync::mpsc::channel();
+        std::thread::Builder::new()
+            .name("qnc-decoder-open".into())
+            .spawn(move || {
+                let _ = send.send(open_access(request, access, config, &context));
+            })
+            .map_err(|_| error("cannot start decoder open thread"))?;
+        Ok(Opening::Waiting(receive, std::time::Instant::now()))
+    }
+
+    fn prepare(&self, stream_index: u32, start: Option<Rational>) -> Result<(DecodeRequest, DecodeMediaAccess, String)> {
         let request = DecodeRequest {
             version: qnc_media_decode::VERSION.into(),
             media: self.media.clone(),
@@ -89,16 +111,51 @@ impl DecodeInput {
         };
         request.validate(&self.config).map_err(error)?;
         let context = decode_open_context(&request);
-        match (self.opener.borrow_mut())(&self.media.media_uri)
-            .map_err(|err| error(format!("{context}: {err}")))?
-        {
-            DecodeMediaAccess::Stream(media) => Decoder::open(request, media, self.config.clone())
-                .map_err(|err| error(format!("{context}: {err}"))),
-            DecodeMediaAccess::Endpoint {
-                endpoint,
-                storage_stamp,
-            } => Decoder::open_endpoint(request, endpoint, storage_stamp, self.config.clone())
-                .map_err(|err| error(format!("{context}: {err}"))),
+        let access = (self.opener.borrow_mut())(&self.media.media_uri)
+            .map_err(|err| error(format!("{context}: {err}")))?;
+        Ok((request, access, context))
+    }
+}
+
+fn open_access(request: DecodeRequest, access: DecodeMediaAccess, config: DecoderConfig, context: &str) -> Result<Decoder> {
+    match access {
+        DecodeMediaAccess::Stream(media) => Decoder::open(request, media, config),
+        DecodeMediaAccess::Endpoint {
+            endpoint,
+            storage_stamp,
+        } => Decoder::open_endpoint(request, endpoint, storage_stamp, config),
+    }
+    .map_err(|err| error(format!("{context}: {err}")))
+}
+
+/// A decoder that is being opened on its own thread, or is open.
+pub(crate) enum Opening {
+    Waiting(std::sync::mpsc::Receiver<Result<Decoder>>, std::time::Instant),
+    Ready(Decoder),
+}
+
+impl Opening {
+    /// The decoder once it is open; `None` while it still opens (never waits).
+    pub fn ready(&mut self) -> Result<Option<&mut Decoder>> {
+        if let Opening::Waiting(receive, started) = self {
+            match receive.try_recv() {
+                Ok(opened) => {
+                    let decoder = opened?;
+                    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                        qnc_dev_diagnostics::log_line(
+                            qnc_dev_diagnostics::DiagnosticsStream::Player,
+                            format!("decoder-open background_ms={}", started.elapsed().as_millis()),
+                        );
+                    }
+                    *self = Opening::Ready(decoder);
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => return Ok(None),
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => return Err(error("decoder open thread ended")),
+            }
+        }
+        match self {
+            Opening::Ready(decoder) => Ok(Some(decoder)),
+            Opening::Waiting(..) => Ok(None),
         }
     }
 }

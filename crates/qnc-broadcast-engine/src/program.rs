@@ -13,6 +13,7 @@ use crate::decode_input::{DecodeInput, seek_start};
 use crate::input::{AudioStreamPlan, InputPlan, native_audio_layout, preview_raster_bounds};
 use crate::output::{DeviceSink, PcmTrack, SharedVideo, device_sink_adapter};
 use crate::*;
+use crate::decode_input::Opening;
 use qnc_player_input::ProgramInput;
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -139,7 +140,8 @@ struct Worker {
 
 struct ActiveDecoder {
     clip: usize,
-    decoder: Decoder,
+    /// Opened on a thread of its own (`DecodeInput::open_in_background`).
+    decoder: Opening,
     next_source: u64,
     discard_before: Option<u64>,
 }
@@ -331,7 +333,7 @@ impl ProgramVideo {
         let (plan, input, _) = &self.clips[clip];
         Ok(ActiveDecoder {
             clip,
-            decoder: timed_open("video", || input.open(plan.video_index, seek_start(&plan.source, source_frame)?))?,
+            decoder: input.open_in_background(plan.video_index, seek_start(&plan.source, source_frame)?)?,
             next_source: source_frame,
             discard_before: Some(source_frame),
         })
@@ -414,7 +416,11 @@ impl ProgramVideo {
                 retire(self.active.replace(decoder));
             }
             let active = self.active.as_mut().expect("decoder just opened");
-            let packet = match active.decoder.try_next_packet().map_err(error)? {
+            let Some(decoder) = active.decoder.ready()? else {
+                stopped(next, "decoder still opening");
+                break;
+            };
+            let packet = match decoder.try_next_packet().map_err(error)? {
                 Poll::Pending => {
                     stopped(next, "decoder has no picture yet");
                     break;
@@ -678,7 +684,8 @@ fn next_picture_cut(spans: &[VideoSpan], frame: u64, lookahead: u64) -> Option<(
 
 struct Lane {
     clip: usize,
-    decoder: Option<Decoder>,
+    /// Opened on a thread of its own (`DecodeInput::open_in_background`).
+    decoder: Option<Opening>,
     track: PcmTrack,
     consumed_through: Option<u64>,
 }
@@ -747,7 +754,7 @@ impl ProgramAudio {
         });
         if lane.consumed_through != Some(start) {
             diag(format!("program-audio open clip={} stream={} source={source_frame}", bus.clip, bus.stream_index));
-            let decoder = timed_open("audio", || input.open(bus.stream_index, seek_start(&plan.source, source_frame)?))?;
+            let decoder = input.open_in_background(bus.stream_index, seek_start(&plan.source, source_frame)?)?;
             retire(lane.decoder.replace(decoder));
             lane.track.samples.clear();
             lane.track.decoded_through = None;
@@ -763,10 +770,15 @@ impl ProgramAudio {
             .unwrap_or(0)
             / u64::try_from(plan.source.timebase.fps_den.max(1)).unwrap_or(1);
         let ahead = needed.saturating_mul(usize::try_from(frames_ahead).unwrap_or(0).max(1));
-        let decoder = lane
+        let Some(decoder) = lane
             .decoder
             .as_mut()
-            .ok_or_else(|| error("audio lane without decoder"))?;
+            .ok_or_else(|| error("audio lane without decoder"))?
+            .ready()?
+        else {
+            // Still opening: the sound waits like a decoder with no samples yet.
+            return Ok(lane.track.samples.len() >= needed);
+        };
         for _ in 0..LANE_PACKETS_PER_CALL {
             if lane.track.samples.len() >= needed.saturating_add(ahead) {
                 break;
@@ -985,14 +997,6 @@ fn stopped(frame: u64, why: &str) {
     if first_wait(&LAST, frame) {
         diag(format!("program-video stopped next={frame} why={why}"));
     }
-}
-
-/// Opens a decoder and logs how long the playback thread waited for it.
-fn timed_open<T>(what: &str, open: impl FnOnce() -> Result<T>) -> Result<T> {
-    let start = std::time::Instant::now();
-    let opened = open();
-    diag(format!("program-{what} open_ms={}", start.elapsed().as_millis()));
-    opened
 }
 
 /// Picture buffers of a program converter: twice the prefetch, the conversions in flight
