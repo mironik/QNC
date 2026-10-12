@@ -3640,3 +3640,10 @@ Popravak 2026-10-12 (proba: novi projekt na originalima "uopce nema pleya"): svi
 (`qnc-record-completion`) ceka dok player radi: cekali su se medjusobno. `qnc-source-preview` (`report_activity`):
 klip koji ceka svoj zapis ne prijavljuje rad. Rucno pokrenut `qnc-ingest-worker` na izoliranoj kopiji dovrsio je svih
 98 zapisa i napravio 98 waveova.
+Dopuna 2026-10-12 (korisnik: spremljena pokrivalica mijenja boju po trajanju, "ispod 2 s narancasta, do 3 zuta,
+3-4 zelena, do 5 cijan, iznad 5 plava"; "ili je bolje brojcano napisati trajanje"): oboje. Pravila boja su u
+`contracts/ui/editorial.layout.json` (`cover_lengths`: ispod 2, 3 i 4 s, do i ukljucivo 5 s, dulje), model u
+`qnc-editorial-layout`; javna kocka `qnc-segment-panel` (`CoverLengthBand`, `cover_fill`, test) bira boju po trajanju
+pokrivalice na stopi price i daje trajanje `sekunde:slike` (isti zapis kao trajanje segmenta); `qnc-timeline`
+(`TimelineCoverSpan.fill`, `label`) samo crta zadanu boju i broj kad stane. Privremena pokrivalica Synca ostaje u boji
+fokusa dok se ne spremi. Story ploca predaje pravila jednim argumentom postojeceg poziva.

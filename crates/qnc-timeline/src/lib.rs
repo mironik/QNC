@@ -411,6 +411,11 @@ pub struct TimelineCoverSpan<'a> {
     pub end_frame: u64,
     pub selected: bool,
     pub pending: bool,
+    /// The colour the caller gives a saved cover (e.g. by its length); the theme's
+    /// shot range colour otherwise.
+    pub fill: Option<Color32>,
+    /// A short text drawn inside a saved cover when it fits (e.g. its length).
+    pub label: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1294,7 +1299,7 @@ fn paint_covers(
         let base = if cover.pending {
             input.theme.focus
         } else {
-            input.theme.shot_range
+            cover.fill.unwrap_or(input.theme.shot_range)
         };
         let fill = if cover.selected {
             base.linear_multiply(0.85)
@@ -1302,6 +1307,15 @@ fn paint_covers(
             base.linear_multiply(0.55)
         };
         ui.painter().rect_filled(rect, 1.0, fill);
+        if let Some(label) = cover.label.filter(|_| !cover.pending && rect.width() >= 34.0) {
+            ui.painter().text(
+                rect.center(),
+                Align2::CENTER_CENTER,
+                label,
+                FontId::proportional(10.0),
+                Color32::BLACK,
+            );
+        }
         if cover.pending && rect.width() >= 56.0 {
             ui.painter().text(
                 rect.center(),
@@ -1862,6 +1876,8 @@ mod tests {
             end_frame: 80,
             selected: false,
             pending: false,
+            fill: None,
+            label: None,
         }];
         let slots = [TimelineSlotSpan {
             id: "slot_mid",

@@ -13,6 +13,8 @@ mod list;
 pub use list::show_segment_list;
 mod source_lanes;
 pub use source_lanes::{source_lane_choice, source_wave_over_video, StorySourceTimeline};
+mod cover_length;
+pub use cover_length::{cover_fill, CoverLengthBand};
 
 use eframe::egui::{self, Color32, RichText, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentRow, SegmentsView};
@@ -65,6 +67,7 @@ pub fn show(
     ui: &mut egui::Ui,
     segments: &SegmentsView,
     timeline_theme: TimelineTheme,
+    lengths: &[CoverLengthBand],
 ) -> Option<SegmentCommand> {
     let style = SegmentPanelStyle::from_timeline(timeline_theme);
     let panel_rect = ui.available_rect_before_wrap();
@@ -110,7 +113,7 @@ pub fn show(
                     .show(ui, |ui| {
                         ui.spacing_mut().item_spacing = Vec2::new(0.0, ROW_GAP);
                         for row in &segments.rows {
-                            let row_command = paint_row(ui, segments, row, timeline_theme);
+                            let row_command = paint_row(ui, segments, row, timeline_theme, lengths);
                             command = command.take().or(row_command);
                         }
                     });
@@ -125,7 +128,7 @@ pub fn show(
                 // click area, so rows sharing one id would lose their clicks.
                 let overview = ui
                     .push_id("qnc_segment_program_overview", |ui| {
-                        paint_program(ui, segments, (0, total), timeline_theme, true)
+                        paint_program(ui, segments, (0, total), timeline_theme, true, lengths)
                     })
                     .inner;
                 command = command.take().or(overview);
@@ -184,10 +187,11 @@ fn paint_row(
     segments: &SegmentsView,
     row: &SegmentRow,
     theme: TimelineTheme,
+    lengths: &[CoverLengthBand],
 ) -> Option<SegmentCommand> {
     let window = (row.start_frame, row.end_frame);
     ui.push_id(("qnc_segment_row", &row.segment_id), |ui| {
-        paint_program(ui, segments, window, theme, row.start_frame == 0)
+        paint_program(ui, segments, window, theme, row.start_frame == 0, lengths)
     })
     .inner
 }
@@ -199,6 +203,7 @@ fn paint_program(
     (start, end): (u64, u64),
     theme: TimelineTheme,
     lane_labels: bool,
+    lengths: &[CoverLengthBand],
 ) -> Option<SegmentCommand> {
     let duration = end.saturating_sub(start).max(1);
     let local = |frame: u64| frame.clamp(start, end) - start;
@@ -240,16 +245,29 @@ fn paint_program(
             selected: slot.selected,
         })
         .collect::<Vec<_>>();
-    let covers = segments
+    // A saved cover shows its whole length (colour and seconds:frames), also where a
+    // row shows only part of it (user 2026-10-12).
+    let shown = segments
         .covers
         .iter()
         .filter(|cover| cover.end_frame > start && cover.start_frame < end)
-        .map(|cover| TimelineCoverSpan {
+        .collect::<Vec<_>>();
+    let rate = segments.timebase.unwrap_or((0, 1));
+    let labels = shown
+        .iter()
+        .map(|cover| qnc_program_segments::duration_label(cover.end_frame - cover.start_frame, rate.0, rate.1))
+        .collect::<Vec<_>>();
+    let covers = shown
+        .iter()
+        .zip(&labels)
+        .map(|(cover, label)| TimelineCoverSpan {
             id: &cover.cover_id,
             start_frame: local(cover.start_frame),
             end_frame: local(cover.end_frame),
             selected: cover.selected,
             pending: false,
+            fill: cover_fill(cover.end_frame - cover.start_frame, segments.timebase, lengths),
+            label: Some(label.as_str()),
         })
         .collect::<Vec<_>>();
     let markers = segments

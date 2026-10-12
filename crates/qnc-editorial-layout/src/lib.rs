@@ -167,6 +167,11 @@ pub struct EditorialLayoutContract {
     pub media_card: EditorialMediaCard,
     pub source_dock: EditorialSourceDock,
     pub groups: HashMap<String, GroupComposition>,
+    /// The colour of a saved cover by its length, first band that holds it (user
+    /// 2026-10-12): under 2 s orange, under 3 s yellow, under 4 s green, up to 5 s cyan,
+    /// longer blue.
+    #[serde(default)]
+    pub cover_lengths: Vec<qnc_segment_panel::CoverLengthBand>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

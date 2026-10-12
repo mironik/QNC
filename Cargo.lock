@@ -3504,6 +3504,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
+ "qnc-segment-panel",
  "serde",
  "serde_json",
 ]
@@ -4673,6 +4674,7 @@ dependencies = [
  "qnc-program-waveform",
  "qnc-source-dock",
  "qnc-timeline",
+ "serde",
 ]
 
 [[package]]

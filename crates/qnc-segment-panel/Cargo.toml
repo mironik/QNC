@@ -10,3 +10,4 @@ qnc-program-segments = { workspace = true }
 qnc-program-waveform = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-source-dock = { workspace = true }
+serde = { workspace = true }
