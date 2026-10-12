@@ -1,0 +1,44 @@
+{
+  "module_id": "qnc.module.render-unit",
+  "module_name": "Prerender Unit",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "program.render.unit.describe"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "module_dependencies": [],
+  "forbidden_calls": [
+    "db.read",
+    "db.write",
+    "media.probe.full",
+    "media.decode",
+    "file.write",
+    "playback.clock"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-player-core"
+  ],
+  "adapter_policy": "The plain description of one unit of the story's prerender (user 2026-10-12): program frames between two cuts, the picture as one source run (or black) and one source channel per program output channel (or silence), each as the player's program plan plays it (the decoder's seek start, the origin and rate that place each picture and sample), and its fingerprint (what the unit is and the delivery format, not where it stands in the story). No I/O.",
+  "specification": "docs/70-replaceable-decoders.md"
+}

@@ -3572,3 +3572,16 @@ ukljucen. Otkljucano: `crates/qnc-work-settings` (samo citanje `export` i `produ
 ugovori, `qnc-broadcast-engine` (opis jedinica iz plana price), root Cargo. Izvedeno (temelj): `WorkSettings.export`
 (kako je spremljen), `ProductLocations.prerender` (neobavezno: projekt bez njega dobiva kontroliranu gresku samo za
 prerender, `prerender_location`), Project novom projektu daje `products/prerender`.
+Izvedeno (prerender, korak 1): nova javna kocka `crates/qnc-render-unit` (+ ugovor; opis jedne jedinice: slika kao
+jedan niz izvora ili crno, po izlaznom kanalu jedan kanal izvora ili tisina, kako ih plan price pusta; otisak = sto
+jedinica jest + format predaje, ne gdje stoji u prici), `qnc-broadcast-engine` `ProgramPlan::for_render` (isti plan,
+slika iz originala) i `render_units` (jedinica izmedju svaka dva reza slike ili zvuka), nova javna kocka
+`crates/qnc-program-render` (+ ugovor; dekodira kroz isti dekoderski sloj i katalog kao player, u punoj velicini,
+kodira `ffmpeg`-om iz kataloga u format iz `export.*`: zasad H.264 i XDCAM MPEG-2 422 progresivno; isprepletena
+predaja, druga stopa ili frekvencija jasna greska; zvuk PCM 24-bit; jedinica se pise pod konacnim imenom jer mapa
+projekta ne dopusta preimenovanje), alat `tools/qnc-prerender` (prica iz baze kao player -> jedinice -> render u
+`products/prerender`; `--list 1` ispis). Conformance: `qnc-render-unit` dopusten u granici enginea. Provjereno na
+izoliranoj kopiji (originali s kartice): 4 jedinice, broj slika i uzoraka tocan (960 po slici), slika tocna (PSNR prema
+originalu 40-41 dB na tocnom mjestu, 31-38 dB uz pomak od jedne slike), zvuk bit po bit jednak izvoru od tocnog uzorka
+(oba izlaza). Brzina 0,4-0,7x stvarnog vremena (CLI dekoder, puna 4:2:2 10-bit slika kroz cijev, libx264 veryfast).
+Nije izvedeno: zapis gotovih jedinica u bazu (korak 2), puštanje jedinica, export spajanjem, ubrzanje.

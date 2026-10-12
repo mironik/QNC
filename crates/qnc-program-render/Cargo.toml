@@ -1,0 +1,11 @@
+[package]
+name = "qnc-program-render"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-media-decode.workspace = true
+qnc-media-metadata.workspace = true
+qnc-media-stream.workspace = true
+qnc-render-unit.workspace = true
+serde_json.workspace = true

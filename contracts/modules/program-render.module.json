@@ -1,0 +1,46 @@
+{
+  "module_id": "qnc.module.program-render",
+  "module_name": "Program Unit Render",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "program.render.unit"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "module_dependencies": [
+    "qnc.module.render-unit",
+    "qnc.module.media-decode",
+    "qnc.module.media-stream"
+  ],
+  "forbidden_calls": [
+    "db.read",
+    "db.write",
+    "media.probe.full",
+    "playback.clock"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-player-core"
+  ],
+  "adapter_policy": "Renders one prerender unit into the project's delivery format (export.*, strictly: an unsupported codec, interlaced delivery or another rate is refused with a reason): the unit's pictures and samples decoded through the shared decode layer and decoder catalog at full size, encoded by the catalog's ffmpeg, each unit on a closed group of pictures with PCM sound so units are put together without encoding again. Written at its final name (the project folder denies renaming); whether a unit is complete is recorded in the project database by the caller. Reads media only through given endpoints (a card stays read only); no probe, no database.",
+  "specification": "docs/70-replaceable-decoders.md"
+}

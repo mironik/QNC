@@ -1,0 +1,9 @@
+[package]
+name = "qnc-render-unit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+qnc-media-metadata.workspace = true
+serde.workspace = true
+serde_json.workspace = true

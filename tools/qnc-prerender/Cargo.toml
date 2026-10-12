@@ -1,0 +1,19 @@
+[package]
+name = "qnc-prerender"
+version = "0.1.0"
+edition = "2021"
+description = "QNC tool: prerender of the active project's story into its delivery format (products/prerender); reads the project database and media only"
+
+[dependencies]
+qnc-broadcast-engine.workspace = true
+qnc-content-store.workspace = true
+qnc-db-broker.workspace = true
+qnc-decoder-catalog.workspace = true
+qnc-media-metadata.workspace = true
+qnc-media-stream.workspace = true
+qnc-player-input.workspace = true
+qnc-program-input.workspace = true
+qnc-program-render.workspace = true
+qnc-render-unit.workspace = true
+qnc-source-bindings.workspace = true
+qnc-work-settings.workspace = true

@@ -9,6 +9,7 @@ qnc-dev-diagnostics.workspace = true
 qnc-player-input.workspace = true
 qnc-program-playlist.workspace = true
 qnc-media-metadata.workspace = true
+qnc-render-unit.workspace = true
 qnc-media-decode.workspace = true
 qnc-media-stream.workspace = true
 qnc-pixel-convert.workspace = true

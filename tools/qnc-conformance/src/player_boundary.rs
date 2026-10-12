@@ -250,6 +250,8 @@ fn forbidden_dependency(owner: &str, dependency: &str) -> bool {
                     | "qnc-broadcast-player"
                     | "qnc-player-contract"
                     | "qnc-dev-diagnostics"
+                    // The plain description of a prerender unit (no I/O, no decoding).
+                    | "qnc-render-unit"
             ) && forbidden_dependency("qnc-player-input", dependency)
                 && forbidden_dependency("qnc-media-decode", dependency)
                 && forbidden_dependency("qnc-pixel-convert", dependency)

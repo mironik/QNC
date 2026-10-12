@@ -131,6 +131,96 @@ impl ProgramPlan {
     }
 }
 
+impl ProgramPlan {
+    /// The plan of the story's prerender (user 2026-10-12): the same cuts and sound as the
+    /// plan that plays, every picture from the clip's camera original (the delivery is made
+    /// from the original whatever the project plays).
+    pub fn for_render(input: &ProgramInput) -> Result<Self> {
+        let mut input = input.clone();
+        for clip in input.clips.values_mut() {
+            clip.representation = qnc_player_input::Representation::Original;
+        }
+        Self::new(&input)
+    }
+
+    /// The story as prerender units: a unit between every two cuts of picture or sound,
+    /// each described as this plan plays it (the decoder's seek start, the origin and the
+    /// rate that place each picture and sample).
+    pub fn render_units(&self) -> Result<Vec<qnc_render_unit::RenderUnit>> {
+        let rate = self
+            .source
+            .audio_format
+            .as_ref()
+            .ok_or_else(|| error("program has no audio format"))?
+            .sample_rate_hz;
+        let program = self.source.timebase;
+        let mut cuts: Vec<u64> = self
+            .video
+            .iter()
+            .flat_map(|span| [span.record_in, span.record_out])
+            .chain(self.audio.iter().flat_map(|span| [span.record_in, span.record_out]))
+            .collect();
+        cuts.sort_unstable();
+        cuts.dedup();
+        let mut units = Vec::new();
+        for pair in cuts.windows(2) {
+            let (from, to) = (pair[0], pair[1]);
+            if from >= to {
+                continue;
+            }
+            let video = match self.video.iter().find(|span| span.record_in <= from && from < span.record_out) {
+                Some(VideoSpan { record_in, video: Some((clip, source_in)), .. }) => {
+                    let plan = &self.clips[*clip];
+                    let first = source_in + (from - record_in);
+                    Some(qnc_render_unit::VideoPart {
+                        media: plan.media.clone(),
+                        stream_index: plan.video_index,
+                        start: seek_start(&plan.source, first)?,
+                        first_frame: first,
+                        origin: plan.origin,
+                        frame_rate: (plan.source.timebase.fps_num, plan.source.timebase.fps_den),
+                        progressive: plan.progressive,
+                        delivered_rate: plan.delivered_rate,
+                    })
+                }
+                _ => None,
+            };
+            let audio = match self.audio.iter().find(|span| span.record_in <= from && from < span.record_out) {
+                Some(span) => span
+                    .buses
+                    .iter()
+                    .map(|bus| {
+                        let plan = &self.clips[bus.clip];
+                        let first = bus.source_in + (from - span.record_in);
+                        Ok(qnc_render_unit::AudioPart {
+                            output: bus.output,
+                            media: plan.audio_media.clone(),
+                            stream_index: bus.stream_index,
+                            channel_index: bus.channel_index,
+                            stream_channels: bus.stream_channels,
+                            start: seek_start(&plan.source, first)?,
+                            first_sample: sample_boundary(first, plan.source.timebase, rate)?,
+                            origin: plan.audio_origin,
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                None => Vec::new(),
+            };
+            units.push(qnc_render_unit::RenderUnit {
+                record_in: from,
+                record_out: to,
+                program_rate: qnc_media_metadata::FrameTimebase { fps_num: program.fps_num, fps_den: program.fps_den },
+                sample_rate: rate,
+                channels: self.channels,
+                samples: sample_boundary(to, program, rate)? - sample_boundary(from, program, rate)?,
+                video,
+                audio,
+            });
+        }
+        Ok(units)
+    }
+}
+
 struct Worker {
     spec: qnc_pixel_convert::ConversionSpec,
     conversion: conversion::ConversionWorker,

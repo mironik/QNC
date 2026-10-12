@@ -82,6 +82,9 @@ members = [
     "crates/qnc-media-pool-head",
     "crates/qnc-media-probe",
     "crates/qnc-media-readahead",
+    "crates/qnc-render-unit",
+    "crates/qnc-program-render",
+    "tools/qnc-prerender",
     "crates/qnc-ffprobe-metadata",
     "crates/qnc-media-metadata-compose",
     "crates/qnc-project-application",
@@ -247,6 +250,8 @@ qnc-media-metadata = { path = "crates/qnc-media-metadata" }
 qnc-media-pool-head = { path = "crates/qnc-media-pool-head" }
 qnc-media-probe = { path = "crates/qnc-media-probe" }
 qnc-media-readahead = { path = "crates/qnc-media-readahead" }
+qnc-render-unit = { path = "crates/qnc-render-unit" }
+qnc-program-render = { path = "crates/qnc-program-render" }
 qnc-ffprobe-metadata = { path = "crates/qnc-ffprobe-metadata" }
 qnc-media-metadata-compose = { path = "crates/qnc-media-metadata-compose" }
 qnc-project-application = { path = "crates/qnc-project-application" }

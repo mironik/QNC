@@ -3133,6 +3133,7 @@ dependencies = [
  "qnc-pixel-convert",
  "qnc-player-input",
  "qnc-program-playlist",
+ "qnc-render-unit",
  "qnc-video-output",
  "qnc-work-settings",
  "serde_json",
@@ -4339,6 +4340,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-prerender"
+version = "0.1.0"
+dependencies = [
+ "qnc-broadcast-engine",
+ "qnc-content-store",
+ "qnc-db-broker",
+ "qnc-decoder-catalog",
+ "qnc-media-metadata",
+ "qnc-media-stream",
+ "qnc-player-input",
+ "qnc-program-input",
+ "qnc-program-render",
+ "qnc-render-unit",
+ "qnc-source-bindings",
+ "qnc-work-settings",
+]
+
+[[package]]
 name = "qnc-program-commands"
 version = "0.1.0"
 
@@ -4399,6 +4418,17 @@ version = "0.1.0"
 dependencies = [
  "qnc-frame-timebase",
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-program-render"
+version = "0.1.0"
+dependencies = [
+ "qnc-media-decode",
+ "qnc-media-metadata",
+ "qnc-media-stream",
+ "qnc-render-unit",
  "serde_json",
 ]
 
@@ -4577,6 +4607,15 @@ dependencies = [
  "qnc-active-project-read",
  "qnc-editorial-application",
  "qnc-project-close",
+]
+
+[[package]]
+name = "qnc-render-unit"
+version = "0.1.0"
+dependencies = [
+ "qnc-media-metadata",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
