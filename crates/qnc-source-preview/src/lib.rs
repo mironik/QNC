@@ -160,6 +160,9 @@ impl PreviewContext {
     }
 }
 
+/// How long after a frame step, cue or Play the user still counts as working.
+const HANDS_ON: std::time::Duration = std::time::Duration::from_secs(3);
+
 pub struct SourcePreview {
     view: PreviewView,
     context: Option<PreviewContext>,
@@ -167,6 +170,8 @@ pub struct SourcePreview {
     player_view: PlayerView,
     timeline_assets: TimelineAssetReader,
     play_when_ready: bool,
+    /// The last frame step, cue or Play of the user: the machine is theirs a while after.
+    touched: Option<std::time::Instant>,
     /// The clip whose record is still completed, since when and the last try.
     record_wait: Option<(String, std::time::Instant, std::time::Instant)>,
     /// A cue sent and not yet confirmed, when it was sent, and the latest frame
@@ -196,6 +201,7 @@ impl Default for SourcePreview {
             player_view: PlayerView::default(),
             timeline_assets: TimelineAssetReader::default(),
             play_when_ready: false,
+            touched: None,
             record_wait: None,
             cue_in_flight: None,
             cue_next: None,
@@ -292,8 +298,11 @@ impl SourcePreview {
     }
 
     fn report_activity(&mut self) {
+        // Editing frame by frame counts as working too: background work (the prerender)
+        // reading the card meanwhile made the trim pictures 4 s slow (2026-10-12).
+        let editing = self.touched.is_some_and(|at| at.elapsed() < HANDS_ON);
         let works =
-            self.play_when_ready || self.player_view.preparing || self.player_view.playing();
+            self.play_when_ready || self.player_view.preparing || self.player_view.playing() || editing;
         self.activity.update(self.activity_target.as_ref(), works);
     }
 
@@ -430,6 +439,7 @@ impl SourcePreview {
     }
 
     pub fn toggle_play(&mut self) -> bool {
+        self.touched = Some(std::time::Instant::now());
         self.cue_asked = None; // Play moves the playhead: arrows count from where it stops
         let Some(player) = &self.player else {
             self.view.message = "Broadcast Player nije povezan.".into();
@@ -459,6 +469,7 @@ impl SourcePreview {
     }
 
     pub fn cue(&mut self, frame: u64) -> bool {
+        self.touched = Some(std::time::Instant::now());
         if self.cue_in_flight.is_some() {
             self.cue_next = Some(frame);
             return true;

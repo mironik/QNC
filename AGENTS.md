@@ -3605,3 +3605,9 @@ sadrzaja; Story aplikacija samo predaje cilj u postojecem pozivu, C10 nije naras
 popisu javnih DB vlasnika. Provjereno (izolirana kopija, originali s kartice): radnik upisuje jedinice i preskace vec
 upisane; drugi primjerak odmah odustaje; uz radnika u pozadini prica od 4200 svira bez prekida zvuka (98 %, najdulja
 rupa 122 ms), radnik se povukao cim je player poceo pripremu i nije se vratio izmedju "spreman" i Play.
+Popravak 2026-10-12 (ziva proba: "nesto cudno zastaje kad sam napravio novu overwrite pokrivalicu"): nakon promjene
+price radnik prerendera ponovno je renderirao zahvacene jedinice dok je korisnik korakom po slici pomicao marker u
+Wrapu (player u pauzi, pa radnik nije cekao); karticu su istodobno citali radnik, slike prozora reza (25 slika 4,0 s
+umjesto oko 1 s) i pozadinsko dekodiranje unatrag. `qnc-source-preview` sada javlja rad playera i dok korisnik
+montira: jos 3 s nakon svakog koraka, skoka ili Playa (`touched`, `HANDS_ON`); radnik tada ceka i renderira samo u
+pravim stankama.
