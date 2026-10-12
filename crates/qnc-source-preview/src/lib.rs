@@ -301,8 +301,11 @@ impl SourcePreview {
         // Editing frame by frame counts as working too: background work (the prerender)
         // reading the card meanwhile made the trim pictures 4 s slow (2026-10-12).
         let editing = self.touched.is_some_and(|at| at.elapsed() < HANDS_ON);
-        let works =
-            self.play_when_ready || self.player_view.preparing || self.player_view.playing() || editing;
+        // A clip waiting for its record is not playing: the background completion of that
+        // record waits while a player works, so counting the wait as work kept both waiting
+        // for ever (2026-10-12: a new project on the originals never played).
+        let works = !self.waits_for_record()
+            && (self.play_when_ready || self.player_view.preparing || self.player_view.playing() || editing);
         self.activity.update(self.activity_target.as_ref(), works);
     }
 

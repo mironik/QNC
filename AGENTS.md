@@ -3634,3 +3634,9 @@ s gotovim dijelom istog otiska pusta iz te datoteke (`InputPlan::for_unit`: slik
 iz streama 1), ostale iz izvora. Izmjereno (izolirana kopija, originali s kartice, 31 dio prerenderiran za oko 1 min
 50 s): prica od 0 99,4 % (prije 98-99 % s prekidom zvuka na pocetku), od 2300 99,6 % (prije rupa 1,8 s), od 4200 100 %;
 bez prekida zvuka; preostali kratki zastoji (do 153 ms) na prijelazima izmedju dijelova.
+Popravak 2026-10-12 (proba: novi projekt na originalima "uopce nema pleya"): svih 98 zapisa ostalo je u fazi kamera
+(`final = 0`), pa preview nijednog klipa nije pokrenuo player. Preview koji ceka dovrsetak zapisa svog klipa
+(ponovno otvaranje svake sekunde, Play koji ceka spremnost) prijavljivao je rad playera, a pozadinski dovrsetak zapisa
+(`qnc-record-completion`) ceka dok player radi: cekali su se medjusobno. `qnc-source-preview` (`report_activity`):
+klip koji ceka svoj zapis ne prijavljuje rad. Rucno pokrenut `qnc-ingest-worker` na izoliranoj kopiji dovrsio je svih
+98 zapisa i napravio 98 waveova.
