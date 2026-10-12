@@ -18,6 +18,11 @@ use qnc_media_readahead::{MediaReader, Stream};
 
 /// The buffer of the FFmpeg IO context; the reader keeps the real read ahead.
 const IO_BUFFER: usize = 1 << 16;
+/// What the stream analysis after opening may read: the saved record already holds the
+/// stream's description, and the analysis read 14-25 MB from the start of the file at
+/// every cover (1.2 s on a cold card, 2026-10-12) before the decoder went to its start.
+const ANALYZE_BYTES: i64 = 1 << 20;
+const ANALYZE_MICROS: i64 = 100_000;
 
 /// The IO context and the stream it reads; freed after the format context that uses it.
 pub(crate) struct ReaderIo {
@@ -48,10 +53,12 @@ fn error(message: impl std::fmt::Display) -> DecodeError {
 }
 
 /// Opens the media as `ffmpeg_next::format::input` does (open, then the stream info),
-/// its bytes read through the reader of this process.
-pub(crate) fn open_input(path: &Path) -> Result<(ff::format::context::Input, ReaderIo)> {
+/// its bytes read through the reader of this process; the container is the saved one
+/// (`demuxer`, as the CLI adapter gives it with `-f`), and the analysis is short.
+pub(crate) fn open_input(path: &Path, demuxer: &str) -> Result<(ff::format::context::Input, ReaderIo)> {
     let stream = MediaReader::shared().open(path).map_err(error)?;
     let url = CString::new(path.to_string_lossy().as_bytes()).map_err(error)?;
+    let format_name = CString::new(demuxer).map_err(error)?;
     // SAFETY: FFmpeg allocation and open calls; every pointer is checked, and on an error
     // what was allocated is freed (`ReaderIo` drop; `avformat_open_input` frees the
     // context itself when it fails).
@@ -83,7 +90,14 @@ pub(crate) fn open_input(path: &Path) -> Result<(ff::format::context::Input, Rea
         }
         (*context).pb = io.avio;
         (*context).flags |= ffi::AVFMT_FLAG_CUSTOM_IO;
-        let opened = ffi::avformat_open_input(&mut context, url.as_ptr(), ptr::null(), ptr::null_mut());
+        (*context).probesize = ANALYZE_BYTES;
+        (*context).max_analyze_duration = ANALYZE_MICROS;
+        let format = ffi::av_find_input_format(format_name.as_ptr());
+        if format.is_null() {
+            ffi::avformat_free_context(context);
+            return Err(error("saved container has no demuxer"));
+        }
+        let opened = ffi::avformat_open_input(&mut context, url.as_ptr(), format, ptr::null_mut());
         if opened < 0 {
             return Err(error(ff::Error::from(opened)));
         }

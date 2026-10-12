@@ -3549,3 +3549,9 @@ citao cijelu datoteku). Izmjereno (izolirana kopija, `playback.input = original`
 rupa 50-98 ms (bez citaca, samo s otvaranjem u pozadini: 98,4-99,5 %, 1-2 zastoja do 208 ms). Prica od pocetka
 98,8-98,9 %, ostaje rupa u prvoj sekundi playa (do 183 ms). Pretvaranje u H.264 8-bit (9. 10.) ostaje kao izbor u
 Projectu kad ima vremena za Uvezi.
+Dopuna 2026-10-12 (ziva proba: zvuk zapeo 7 puta, slika skakala na skoro svakom rezu): citac je za tek otvorenu
+pokrivalicu citao zalihu punom brzinom kartice i gusio vanjski `ffmpeg` zvuka; sada iznad 8 MiB zalihe cita najvise
+20 MiB/s (`low_water`, `paced_rate`; pauza nakon upisa blokova, nitko ne ceka). Otvaranje u kocki libav: format iz baze
+(kao `-f` u CLI-ju), analiza nakon otvaranja najvise 1 MiB / 0,1 s (prije 14-25 MB s pocetka datoteke); slike i dalje
+bajt za bajt kao CLI (svih 6 testova), prva slika 160-200 ms. Topla kartica: prica na originalima 99,9 %, 2 zastoja;
+hladna kartica: pocetak playa i dalje ceka citanje (prve sekunde trebaju >75 MB pri 29 MB/s).

@@ -38,6 +38,13 @@ pub struct Config {
     pub behind: u64,
     /// Bytes in memory at most; blocks outside every stream's window go first.
     pub budget: u64,
+    /// Below this many bytes ahead a stream is read at the full rate of the media; above
+    /// it reading ahead is paced to `paced_rate`, so the media is shared with what reads it
+    /// beside this reader (the sound decoders: a cover's read ahead at the full rate of the
+    /// card starved them and the sound ran dry before cuts, live 2026-10-12).
+    pub low_water: u64,
+    /// Bytes per second read ahead at most while every stream has `low_water` ahead.
+    pub paced_rate: u64,
 }
 
 impl Default for Config {
@@ -48,6 +55,8 @@ impl Default for Config {
             ahead: 32 << 20,
             behind: 8 << 20,
             budget: 768 << 20,
+            low_water: 8 << 20,
+            paced_rate: 20 << 20,
         }
     }
 }
@@ -326,6 +335,8 @@ fn lock(shared: &Shared) -> MutexGuard<'_, State> {
 
 /// One read the reader thread does: `count` blocks of a file from `first`.
 struct Job {
+    /// A run ahead of a stream that already has `low_water` ahead (paced).
+    paced: bool,
     file_id: u64,
     file: Arc<File>,
     len: u64,
@@ -355,6 +366,7 @@ fn run(shared: std::sync::Weak<Shared>, alive: std::sync::Weak<()>, reads_ahead:
                 }
             }
         };
+        let started = Instant::now();
         let read = read_run(&job);
         let mut state = lock(&strong);
         for block in job.first..job.first + job.count {
@@ -390,6 +402,14 @@ fn run(shared: std::sync::Weak<Shared>, alive: std::sync::Weak<()>, reads_ahead:
         }
         drop(state);
         strong.ready.notify_all();
+        // Paced: the run takes at least as long as it would at the paced rate (after its
+        // blocks are in memory, so nobody waits for them meanwhile).
+        if job.paced && strong.config.paced_rate > 0 {
+            let due = Duration::from_secs_f64((job.count * BLOCK) as f64 / strong.config.paced_rate as f64);
+            if let Some(rest) = due.checked_sub(started.elapsed()) {
+                std::thread::sleep(rest);
+            }
+        }
     }
 }
 
@@ -431,9 +451,11 @@ fn pick(config: &Config, state: &mut State, reads_ahead: bool) -> Option<Job> {
             best = Some((ahead, stream.file, block, end));
         }
     }
-    let (_, file_id, block, end) = best?;
+    let (ahead, file_id, block, end) = best?;
     let last = end.div_ceil(BLOCK);
-    Some(job(config.run_blocks, state, file_id, block, last))
+    let mut job = job(config.run_blocks, state, file_id, block, last);
+    job.paced = ahead >= config.low_water;
+    Some(job)
 }
 
 /// A run from `first`: the following missing blocks too, up to the run length, the end
@@ -450,6 +472,7 @@ fn job(run_blocks: u64, state: &mut State, file_id: u64, first: u64, last: u64) 
         count += 1;
     }
     let job = Job {
+        paced: false,
         file_id,
         file: file.file.clone(),
         len: file.len,

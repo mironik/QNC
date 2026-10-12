@@ -117,7 +117,7 @@ impl VideoSource {
         };
         let demuxer = qnc_ffmpeg_decode::container_name(&plan.container)?;
         let path = Path::new(endpoint.input_arg());
-        let (mut input, io) = reader_io::open_input(path)?;
+        let (mut input, io) = reader_io::open_input(path, demuxer)?;
         if !input.format().name().split(',').any(|name| name == demuxer) {
             return Err(error(ErrorKind::Contract, "opened container differs from the saved record"));
         }

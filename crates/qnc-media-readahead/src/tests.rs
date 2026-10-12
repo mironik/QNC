@@ -60,7 +60,7 @@ fn the_reader_reads_ahead_so_the_next_read_waits_for_nothing() {
 #[test]
 fn memory_stays_within_the_budget_and_goes_with_the_last_stream() {
     let (_dir, path, bytes) = file_of(20 * BLOCK as usize);
-    let config = Config { ahead: 2 * BLOCK, behind: 0, budget: 4 * BLOCK, run_blocks: 2, demand_blocks: 1 };
+    let config = Config { ahead: 2 * BLOCK, behind: 0, budget: 4 * BLOCK, run_blocks: 2, demand_blocks: 1, ..Config::default() };
     let reader = MediaReader::new(config);
     let mut stream = reader.open(&path).unwrap();
     for at in (0..20).map(|block| block * BLOCK) {
