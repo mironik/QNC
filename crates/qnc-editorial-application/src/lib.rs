@@ -340,7 +340,7 @@ impl EditorialApplication {
                 let content = qnc_content_store::ContentTarget::for_project(settings, work);
                 self.content_target = match content.and_then(|target| Ok((target, story?))) {
                     Ok(targets) => {
-                        self.segments.configure(targets.1.clone(), &project_id, qnc_content_artifacts::timeline_artifact_reader(settings, work).ok());
+                        self.segments.configure(targets.1.clone(), &project_id, qnc_content_artifacts::timeline_artifact_reader(settings, work).ok(), Some(targets.0.clone()));
                         Some(targets)
                     }
                     Err(error) => {

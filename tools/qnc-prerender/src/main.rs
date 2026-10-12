@@ -3,17 +3,23 @@
 //! into units between cuts, and each unit not yet rendered is rendered from the camera
 //! originals into the project's delivery format (`export.*`) under the project's
 //! `products.prerender`, its file named by its fingerprint (the same unit wherever it
-//! stands in the story). Which units are complete goes to the project database (next step);
-//! this tool renders the units it is asked for.
+//! stands in the story); a complete unit is written into the project database
+//! (`qnc-prerender-db`), which alone says what is rendered. One prerender runs per project
+//! (its lease in the database); it waits while a player plays, leaves a unit unfinished
+//! when a player starts, and ends when the active project changes or after a minute with
+//! nothing to render.
 //! Media is only read (a card stays read only); the project database is only read.
 //!
-//! `qnc-prerender [--root <QNC root>] [--units <n>] [--list 1]`
+//! `qnc-prerender [--root <QNC root>] [--units <n> (at most n, then end)] [--list 1]`
 
 use std::{
     io,
     path::PathBuf,
-    sync::{atomic::AtomicBool, Arc},
-    time::Instant,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
 };
 
 use qnc_broadcast_engine::ProgramPlan;
@@ -21,6 +27,7 @@ use qnc_content_store::{Access, ContentTarget};
 use qnc_media_metadata::MediaRepresentation;
 use qnc_media_stream::{CodecEndpoint, LocalSource, MediaStream, SourceReference};
 use qnc_player_input::{InputReader, PlayerClipRecord, PlayerContentRead};
+use qnc_prerender_db::{PrerenderReader, PrerenderWriter, RenderedUnit};
 use qnc_program_render::Delivery;
 use qnc_work_settings::SettingsReader;
 
@@ -67,7 +74,7 @@ fn run() -> Result<()> {
             other => return Err(format!("unknown argument {other}")),
         }
     }
-    let root = root.ok_or("QNC root missing (--root or QNC_ROOT)")?;
+    let root = root.or_else(qnc_dev_diagnostics::locate_qnc_root).ok_or("QNC root missing (--root, QNC_ROOT or beside the executable)")?;
     let reader = SettingsReader::from_root(&root).map_err(|e| e.to_string())?;
     let settings = reader.read().map_err(|e| e.to_string())?;
     let project_dir = reader
@@ -79,14 +86,12 @@ fn run() -> Result<()> {
 
     let started = Instant::now();
     let target = qnc_db_broker::ProjectDbTarget::for_project(&reader, &settings)?;
-    let content = Arc::new(PlayerContent {
-        target: ContentTarget::for_project(&reader, &settings),
-    });
-    let inputs = InputReader::with_content_reader(reader.clone(), content);
-    let program = qnc_program_input::loader(target, settings.project_id.clone())(&inputs, &settings.workspace_db_uri)?;
-    let plan = ProgramPlan::for_render(&program).map_err(|e| e.to_string())?;
-    let units = plan.render_units().map_err(|e| e.to_string())?;
-    println!("story: {} units, {} frames, read in {} ms", units.len(), program.playlist.duration_frames, started.elapsed().as_millis());
+    let inputs = InputReader::with_content_reader(
+        reader.clone(),
+        Arc::new(PlayerContent { target: ContentTarget::for_project(&reader, &settings) }),
+    );
+    let units = story_units(&target, &settings, &inputs)?;
+    say(format!("story: {} units, read in {} ms", units.len(), started.elapsed().as_millis()));
 
     if list {
         for unit in &units {
@@ -107,33 +112,148 @@ fn run() -> Result<()> {
         .iter()
         .filter_map(|binding| binding.file.clone().map(|file| (binding.uri.clone(), file)))
         .collect();
-    if let Ok(uri) = settings.project_media_source_uri() {
-        roots.push((uri, project_dir.clone()));
-    }
+    let project_source = settings.project_media_source_uri().map_err(|e| e.to_string())?;
+    roots.push((project_source.clone(), project_dir.clone()));
     let access = move |media: &MediaRepresentation| media_access(&roots, media);
     let decoders = qnc_decoder_catalog::installed_config().map_err(|e| e.to_string())?;
     // The encoder is the ffmpeg of the installed decoder catalog (the player's toolchain).
     let ffmpeg = qnc_decoder_catalog::installed_deployment().map_err(|e| e.to_string())?.executable;
     let delivery = Delivery::from_export(&settings.export)?.on(&ffmpeg);
-    println!("delivery: {} {}x{} {} fps, encoder {:?}", delivery.video_codec, delivery.width, delivery.height, delivery.fps, delivery.encoder);
-    let cancel = AtomicBool::new(false);
-    for unit in units.iter().take(limit) {
-        let out = out_dir.join(delivery.file_name(unit));
-        let started = Instant::now();
-        qnc_program_render::render(unit, &delivery, &decoders, &access, &ffmpeg, &out, &cancel)
-            .map_err(|e| format!("unit {}..{}: {e}", unit.record_in, unit.record_out))?;
-        let ms = started.elapsed().as_millis().max(1);
-        println!(
-            "unit {}..{} ({} frames, picture {}) rendered in {ms} ms ({:.1}x real time) -> {}",
-            unit.record_in,
-            unit.record_out,
-            unit.frames(),
-            if unit.video.is_some() { "yes" } else { "black" },
-            unit.frames() as f64 * 1000.0 / ms as f64 / (unit.program_rate.fps_num as f64 / unit.program_rate.fps_den as f64),
-            out.display()
-        );
+    let relative = settings.products.prerender.clone().ok_or("Projekt nema products.prerender.")?;
+    say(format!("delivery {} {}x{} {} fps, encoder {:?}", delivery.video_codec, delivery.width, delivery.height, delivery.fps, delivery.encoder));
+
+    // The one prerender of the project: its lease in the project database; the player first.
+    let content = ContentTarget::for_project(&reader, &settings)?;
+    if qnc_playback_activity::is_fresh(&content, LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS) {
+        say("another prerender of this project runs".into());
+        return Ok(());
     }
-    Ok(())
+    let _lease = qnc_playback_activity::Beat::start(content.clone(), LEASE)?;
+    // Asked of the database each time (no cache): a player that starts is seen within
+    // 100 ms (with a cached answer the prerender read the card 2.7 s into a Play and the
+    // sound ran dry, 2026-10-12).
+    let playing = || qnc_playback_activity::is_fresh(&content, qnc_playback_activity::PLAYBACK, qnc_playback_activity::PLAYBACK_FRESH_SECONDS);
+    let mut quiet_since: Option<Instant> = None;
+    let writer = PrerenderWriter::start(target.clone())?;
+    let (mut idle_since, mut done_now, mut failed) = (Instant::now(), 0usize, std::collections::HashSet::new());
+    loop {
+        if reader.read().map(|now| now.project_id).ok() != Some(settings.project_id.clone()) {
+            say("the active project changed: prerender ends".into());
+            return Ok(());
+        }
+        // The player first; back to work only once it has been quiet a while (a story is
+        // prepared and then played: no work between the two).
+        if playing() {
+            quiet_since = None;
+            std::thread::sleep(Duration::from_millis(100));
+            continue;
+        }
+        if quiet_since.get_or_insert_with(Instant::now).elapsed() < SETTLE {
+            std::thread::sleep(Duration::from_millis(100));
+            continue;
+        }
+        let units = story_units(&target, &settings, &inputs)?;
+        let fingerprints: Vec<String> = units.iter().map(|unit| delivery.fingerprint(unit)).collect();
+        let rendered: std::collections::HashSet<String> = PrerenderReader::open(&target)?
+            .rendered(fingerprints.clone())?
+            .into_iter()
+            .map(|unit| unit.fingerprint)
+            .collect();
+        let next = units
+            .iter()
+            .zip(&fingerprints)
+            .find(|(_, fingerprint)| !rendered.contains(*fingerprint) && !failed.contains(*fingerprint));
+        let Some((unit, fingerprint)) = next else {
+            if idle_since.elapsed() > IDLE_END || done_now >= limit {
+                say(format!("story prerendered ({} units): prerender ends", units.len()));
+                return Ok(());
+            }
+            std::thread::sleep(Duration::from_secs(2));
+            continue;
+        };
+        if done_now >= limit {
+            return Ok(());
+        }
+        idle_since = Instant::now();
+        let name = delivery.file_name(unit);
+        let out = out_dir.join(&name);
+        let started = Instant::now();
+        let cancel = AtomicBool::new(false);
+        let rendered = std::thread::scope(|scope| {
+            // A player that starts takes the machine back: the unit is left unfinished.
+            let watch = scope.spawn(|| {
+                while !cancel.load(Ordering::Relaxed) {
+                    if playing() {
+                        cancel.store(true, Ordering::Relaxed);
+                        return true;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                false
+            });
+            let result = qnc_program_render::render(unit, &delivery, &decoders, &access, &ffmpeg, &out, &cancel);
+            cancel.store(true, Ordering::Relaxed);
+            (result, watch.join().unwrap_or(false))
+        });
+        match rendered {
+            (Ok(()), _) => {
+                let file_uri = SourceReference::new(&project_source, &format!("{}/{name}", relative.trim_matches('/')))
+                    .map_err(|e| e.to_string())?
+                    .uri();
+                writer.publish(RenderedUnit {
+                    fingerprint: fingerprint.clone(),
+                    file_uri,
+                    frames: unit.frames(),
+                    samples: unit.samples,
+                    encoder: delivery.encoder.clone().unwrap_or_default(),
+                })?;
+                done_now += 1;
+                let ms = started.elapsed().as_millis().max(1);
+                let rate = unit.program_rate.fps_num as f64 / unit.program_rate.fps_den.max(1) as f64;
+                say(format!(
+                    "unit {}..{} rendered in {ms} ms ({:.1}x real time) {fingerprint}",
+                    unit.record_in,
+                    unit.record_out,
+                    unit.frames() as f64 * 1000.0 / ms as f64 / rate
+                ));
+            }
+            (Err(_), true) => {
+                quiet_since = None;
+                say(format!("unit {}..{} left for the player", unit.record_in, unit.record_out));
+            }
+            (Err(error), false) => {
+                say(format!("unit {}..{} failed: {error}", unit.record_in, unit.record_out));
+                failed.insert(fingerprint.clone());
+            }
+        }
+    }
+}
+
+/// The lease of the one prerender of a project in its database (the waker reads it).
+use qnc_prerender_launch::LEASE;
+/// After a player stops, the prerender waits this long before it works again.
+const SETTLE: Duration = Duration::from_secs(2);
+/// With nothing to render this long the prerender ends (the story wakes it again).
+const IDLE_END: Duration = Duration::from_secs(60);
+
+/// The story of the active project as prerender units (read as the player reads it).
+fn story_units(
+    target: &qnc_db_broker::ProjectDbTarget,
+    settings: &qnc_work_settings::WorkSettings,
+    inputs: &InputReader,
+) -> Result<Vec<qnc_render_unit::RenderUnit>> {
+    let program = qnc_program_input::loader(target.clone(), settings.project_id.clone())(inputs, &settings.workspace_db_uri)?;
+    ProgramPlan::for_render(&program)
+        .and_then(|plan| plan.render_units())
+        .map_err(|e| e.to_string())
+}
+
+/// A line of what the prerender does: on its output and in the player diagnostics.
+fn say(line: String) {
+    println!("{line}");
+    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("prerender {line}"));
+    }
 }
 
 /// The endpoint of a medium of the story: its QNC URI bound to a local root of this host

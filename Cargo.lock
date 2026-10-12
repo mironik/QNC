@@ -3441,6 +3441,7 @@ dependencies = [
  "qnc-media-thumbnail",
  "qnc-panel-focus",
  "qnc-pending-marks",
+ "qnc-prerender-launch",
  "qnc-program-segments",
  "qnc-program-waveform",
  "qnc-shot-stills",
@@ -4347,14 +4348,38 @@ dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
  "qnc-media-metadata",
  "qnc-media-stream",
+ "qnc-playback-activity",
  "qnc-player-input",
+ "qnc-prerender-db",
+ "qnc-prerender-launch",
  "qnc-program-input",
  "qnc-program-render",
  "qnc-render-unit",
  "qnc-source-bindings",
  "qnc-work-settings",
+]
+
+[[package]]
+name = "qnc-prerender-db"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-prerender-launch"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+ "qnc-dev-diagnostics",
+ "qnc-playback-activity",
 ]
 
 [[package]]
@@ -4439,6 +4464,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-lane-choice",
+ "qnc-prerender-launch",
  "qnc-program-commands",
  "qnc-program-db",
  "qnc-program-view",

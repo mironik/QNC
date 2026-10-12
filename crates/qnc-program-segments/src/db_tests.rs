@@ -11,7 +11,7 @@ fn story_target(file: &std::path::Path) -> ProjectDbTarget {
 }
 
 fn configure(segments: &mut ProgramSegments, file: &std::path::Path) {
-    segments.configure(story_target(file), "p1", None);
+    segments.configure(story_target(file), "p1", None, None);
     settle(segments);
 }
 

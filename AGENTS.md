@@ -3593,3 +3593,15 @@ predaju odmah daje 4:2:0 (trecina bajtova kroz cijev); zvuk se dekodira istodobn
 privremenu datoteku sustava, pa se spaja bez ponovnog kodiranja. `tools/qnc-prerender` ima znacajku `libav`. Izmjereno
 (izolirana kopija, originali s kartice, 6 jedinica): 1,0-1,2x stvarnog vremena (prije 0,4-0,7x); fiksni trosak oko
 0,6-0,8 s po jedinici; slika i dalje tocna (PSNR 39,8 dB na tocnom mjestu, kao libx264 crf 16).
+Izvedeno (prerender, korak 2): nova javna kocka `crates/qnc-prerender-db` (+ ugovor; modul tablica posrednika:
+`prerender_units` i pogled `public_prerender_units`: otisak, URI datoteke u mapi projekta, slike, uzorci, koder;
+jedinica je gotova samo ako je ovdje), `tools/qnc-prerender` je pozadinski radnik: jedan po projektu (najam
+`prerender_lease` u bazi), cita pricu kao player, renderira prvu jedinicu koje nema u bazi i upisuje je kroz posrednika;
+dok player radi ceka (pita bazu svakih 100 ms, bez medjuspremnika), na Play prekida jedinicu i ne upisuje je, vraca se
+tek kad je player miran 2 s; zavrsava kad se aktivni projekt promijeni ili nakon minute bez posla. Nova javna kocka
+`crates/qnc-prerender-launch` (+ ugovor): budi radnika (najam i pokretanje u svojoj niti, nikad na niti suceljа);
+`qnc-program-segments` ga budi pri otvaranju projekta i kad se spremljena prica promijeni (`configure` dobiva cilj
+sadrzaja; Story aplikacija samo predaje cilj u postojecem pozivu, C10 nije narastao). Conformance: `qnc-prerender-db` na
+popisu javnih DB vlasnika. Provjereno (izolirana kopija, originali s kartice): radnik upisuje jedinice i preskace vec
+upisane; drugi primjerak odmah odustaje; uz radnika u pozadini prica od 4200 svira bez prekida zvuka (98 %, najdulja
+rupa 122 ms), radnik se povukao cim je player poceo pripremu i nije se vratio izmedju "spreman" i Play.

@@ -137,10 +137,14 @@ impl Delivery {
         self
     }
 
-    /// The fingerprint of a unit rendered in this delivery and encoder: its file name.
+    /// The fingerprint of a unit rendered in this delivery and encoder.
+    pub fn fingerprint(&self, unit: &RenderUnit) -> String {
+        unit.fingerprint(&serde_json::json!({"export": self.saved, "encoder": self.encoder}))
+    }
+
+    /// The file name of a rendered unit: its fingerprint.
     pub fn file_name(&self, unit: &RenderUnit) -> String {
-        let what = serde_json::json!({"export": self.saved, "encoder": self.encoder});
-        format!("{}.mov", unit.fingerprint(&what))
+        format!("{}.mov", self.fingerprint(unit))
     }
 }
 

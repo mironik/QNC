@@ -106,6 +106,9 @@ pub struct NewSegment {
 pub struct ProgramSegments {
     /// The project database of the active project (its story and virtual shots).
     target: Option<ProjectDbTarget>,
+    /// Where the lease of the story's prerender is read, and its waker.
+    prerender: Option<qnc_content_store::ContentTarget>,
+    waker: qnc_prerender_launch::PrerenderWaker,
     /// The stored waves of the clips the program plays (v5 program waveform).
     waves: qnc_program_waveform::ProgramWaves,
     project_id: String,
@@ -203,6 +206,7 @@ impl ProgramSegments {
         story: ProjectDbTarget,
         project_id: &str,
         waves: Option<std::sync::Arc<dyn qnc_program_waveform::TimelineArtifactRead>>,
+        prerender: Option<qnc_content_store::ContentTarget>,
     ) {
         let same = self.target.as_ref().map(ProjectDbTarget::uri) == Some(story.uri());
         if !same {
@@ -212,6 +216,10 @@ impl ProgramSegments {
         self.target = Some(story);
         self.project_id = project_id.to_string();
         self.adopt_selection = !same;
+        // The story's prerender is always on (user 2026-10-12): woken when the project
+        // opens and whenever the stored story changes.
+        self.prerender = prerender;
+        self.waker.wake(self.prerender.as_ref());
         self.reload();
     }
 
@@ -328,7 +336,10 @@ impl ProgramSegments {
     fn apply_read(&mut self, read: qnc_program_db::Result<StoryRead>) {
         match read {
             Ok((stored, markers, slots, covers, selection)) => {
-                self.program_changed |= stored != self.stored || covers != self.stored_covers;
+                if stored != self.stored || covers != self.stored_covers {
+                    self.program_changed = true;
+                    self.waker.wake(self.prerender.as_ref());
+                }
                 self.stored = stored;
                 self.stored_covers = covers;
                 self.stored_markers = markers;
