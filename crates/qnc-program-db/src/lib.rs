@@ -349,6 +349,12 @@ impl StoryWriter {
         Ok(Self(ProjectDbWriter::start(target, vec![StoryModule::factory()])?))
     }
 
+    /// Opens the database on the writer's thread: a form never waits for it; a
+    /// database it cannot use is the error of the first reply.
+    pub fn spawn(target: ProjectDbTarget) -> Result<Self> {
+        Ok(Self(ProjectDbWriter::spawn(target, vec![StoryModule::factory()])?))
+    }
+
     /// Runs a request and waits for its reply.
     pub fn call(&self, operation: &Operation) -> Result<Data> {
         decode(self.0.call(MODULE_ID, encode(operation)?)?)

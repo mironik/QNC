@@ -32,16 +32,28 @@ pub trait ClipInputs {
 
 /// `qnc-player-input` reader of the active project workspace.
 pub struct PlayerClipInputs<'a> {
-    pub reader: &'a qnc_player_input::InputReader,
-    pub workspace_db_uri: &'a str,
+    pub session: &'a qnc_player_input::ClipSession<'a>,
 }
 
 impl ClipInputs for PlayerClipInputs<'_> {
     fn prepared(&self, clip_id: &str) -> Result<PreparedInput, String> {
-        self.reader
-            .load(self.workspace_db_uri, clip_id)
+        self.session
+            .load(clip_id)
             .map_err(|error| format!("Klip '{clip_id}': {error}"))
     }
+}
+
+/// Every clip of the program under one read of the project settings, checked
+/// unchanged at the end.
+fn with_session(
+    reader: &qnc_player_input::InputReader,
+    workspace_db_uri: &str,
+    build: impl FnOnce(&PlayerClipInputs) -> Result<ProgramInput, String>,
+) -> Result<ProgramInput, String> {
+    let session = reader.session(workspace_db_uri).map_err(|error| error.to_string())?;
+    let program = build(&PlayerClipInputs { session: &session })?;
+    session.finish().map_err(|error| error.to_string())?;
+    Ok(program)
 }
 
 /// A cover played over a program window only (v5 Sync/B-roll preview): the
@@ -150,14 +162,7 @@ pub fn loader(
 ) -> impl FnOnce(&qnc_player_input::InputReader, &str) -> Result<ProgramInput, String> + Send + 'static
 {
     move |reader, workspace_db_uri| {
-        load_program(
-            &target,
-            &project_id,
-            &PlayerClipInputs {
-                reader,
-                workspace_db_uri,
-            },
-        )
+        with_session(reader, workspace_db_uri, |clips| load_program(&target, &project_id, clips))
     }
 }
 /// The program window with a transient cover, built where the player is prepared.
@@ -169,16 +174,9 @@ pub fn window_loader(
 ) -> impl FnOnce(&qnc_player_input::InputReader, &str) -> Result<ProgramInput, String> + Send + 'static
 {
     move |reader, workspace_db_uri| {
-        load_program_window(
-            &target,
-            &project_id,
-            &PlayerClipInputs {
-                reader,
-                workspace_db_uri,
-            },
-            window,
-            &cover,
-        )
+        with_session(reader, workspace_db_uri, |clips| {
+            load_program_window(&target, &project_id, clips, window, &cover)
+        })
     }
 }
 

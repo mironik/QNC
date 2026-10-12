@@ -314,9 +314,17 @@ impl InputReader {
     /// `workspace_uri` comes from the caller's existing read-only work-settings snapshot,
     /// so a stale clip click cannot silently target a different active project.
     pub fn load(&self, workspace_uri: &str, clip_id: &str) -> Result<PreparedInput> {
+        let session = self.session(workspace_uri)?;
+        let prepared = session.load(clip_id)?;
+        session.finish()?;
+        Ok(prepared)
+    }
+
+    /// Many clips of one workspace (a program) read with one read of the project
+    /// settings: reading them again for every clip cost about 30 ms a clip, a story of
+    /// twenty clips about a second before the player could start (live 2026-10-12).
+    pub fn session(&self, workspace_uri: &str) -> Result<ClipSession<'_>> {
         validate_workspace(workspace_uri)?;
-        qnc_media_records::valid_id(clip_id)
-            .map_err(|e| InputError::InvalidRecord(e.to_string()))?;
         let settings = self
             .settings
             .read()
@@ -325,23 +333,50 @@ impl InputReader {
             return Err(InputError::WrongWorkspace);
         }
         playback_input(&settings)?;
+        Ok(ClipSession {
+            reader: self,
+            workspace_uri: workspace_uri.into(),
+            settings,
+        })
+    }
+}
+
+/// Clips read under one read of the project settings; [`ClipSession::finish`] checks
+/// that the settings did not change meanwhile.
+pub struct ClipSession<'a> {
+    reader: &'a InputReader,
+    workspace_uri: String,
+    settings: WorkSettings,
+}
+
+impl ClipSession<'_> {
+    pub fn load(&self, clip_id: &str) -> Result<PreparedInput> {
+        qnc_media_records::valid_id(clip_id)
+            .map_err(|e| InputError::InvalidRecord(e.to_string()))?;
         let stored = self
+            .reader
             .content_reader
             .as_ref()
             .ok_or_else(|| InputError::Database("Nedostaje player content read port.".into()))?
             .read_clip(clip_id)
             .map_err(InputError::Database)?
             .ok_or(InputError::MissingClip)?;
-        let prepared = prepare(&settings, &stored)?;
+        let prepared = prepare(&self.settings, &stored)?;
+        prepared.validate_for(&self.workspace_uri, clip_id)?;
+        Ok(prepared)
+    }
+
+    /// The project settings are still the ones the clips were prepared with.
+    pub fn finish(self) -> Result<()> {
         let current = self
+            .reader
             .settings
             .read()
             .map_err(|e| InputError::Settings(e.to_string()))?;
-        if current != settings {
+        if current != self.settings {
             return Err(InputError::ChangedSettings);
         }
-        prepared.validate_for(workspace_uri, clip_id)?;
-        Ok(prepared)
+        Ok(())
     }
 }
 

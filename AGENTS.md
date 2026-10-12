@@ -3516,3 +3516,18 @@ noviju. Sada `publish` zadrzava noviju sliku iste sesije (`newer_picture`, test)
 cesce; ista utrka postoji i uz `ffmpeg` naredbu. Izmjereno (izolirana kopija test1234, `playback.input = original`,
 originali s kartice, 4+4 pustanja): klip 2002 od 1500 bez slika izvan reda, 2 od 4 PASS (ostali 2-4 trzaja do 126 ms),
 prica od 0 96-99 % slika s 3-6 trzaja; prije s `ffmpeg` naredbom klip 97-99 %, prica 87-93 %.
+Popravak 2026-10-12 (ziva proba Storyja na izoliranoj kopiji, korisnik "pogledaj log"): sucelje Storyja se na
+pokretanju Synca (Play) zamrzavalo 0,7-2,9 s, a na prvom Enteru pokrivalice 1,1 s; poslije su Sync i otvaranje klipa
+cekali 1,6-2,8 s. Uzroci (izmjereno privremenim mjerenjem koraka, uklonjenim): (1) `qnc-source-preview` je bazu price
+trazio na niti sucelja (`story_target`: registar i `project.db`); sada je trazi nit koja priprema player
+(`open_story`). (2) Posrednik baze otvarao je bazu u niti koja ga pozove; `ProjectDbWriter::spawn` (`StoryWriter`,
+`VirtualShotsWriter`) je otvara u svojoj niti, greska otvaranja je odgovor na prvi zahtjev; `start` ostaje za ostale.
+(3) Slaganje programa citalo je postavke projekta dvaput po klipu; `qnc-player-input` `InputReader::session` ih cita
+jednom za cijeli program i na kraju jednom provjeri da se nisu promijenile (`qnc-program-input`; Sync prozor 930 ->
+430 ms, cijela prica 1150 -> 540 ms, 27 stavki). Flat playlista je ista. (4) Zastita direktorija projekta od brisanja
+nasljedjuje se na datoteke, pa SQLite pri zatvaranju zadnje veze koja pise nije mogao obrisati `project.db-wal` i
+ponavljao je oko 3 s drzeci bazu; svi su cekali. `qnc-db-broker` i `qnc-content-store` sada drze WAL datoteku
+(`SQLITE_FCNTL_PERSIST_WAL`); zatvaranje 2926 -> 1 ms (probna baza sa istom zastitom). Project (zamrznut) i dalje
+otvara bazu bez toga, samo pri kreiranju i otvaranju projekta. Nalaz: zapinjanje price na pokrivalicama danas nije od
+koda nego od originala sa SD kartice (kopija je imala `playback.input = original`; kartica ~29 MB/s, original 15 MB/s,
+na rezu se citaju 3-6 tokova); ista prica s proxyjem i danasnjim kodom 99,7-100 % slika, 0-1 zastoj.

@@ -115,6 +115,25 @@ fn connect(file: &Path, access: Access) -> Result<Connection> {
         }
         conn.pragma_update(None, "synchronous", "FULL")
             .map_err(|e| e.to_string())?;
+        keep_wal_file(&conn);
     }
     Ok(conn)
+}
+
+/// The WAL file stays when this connection closes. The project directory denies deletion
+/// (the delete lock of the project), so SQLite's delete of the WAL file at the close of
+/// the last writing connection was refused and retried for ~3 s while it held the
+/// database; every reader and writer waited (live 2026-10-12: a Sync play and a clip
+/// waited 1.5-3 s). Closing now takes ~1 ms; the file is reused, never removed.
+fn keep_wal_file(conn: &Connection) {
+    let mut on: std::os::raw::c_int = 1;
+    // SAFETY: a file control of this open connection's main database; it only sets a flag.
+    unsafe {
+        rusqlite::ffi::sqlite3_file_control(
+            conn.handle(),
+            c"main".as_ptr(),
+            rusqlite::ffi::SQLITE_FCNTL_PERSIST_WAL,
+            (&mut on as *mut std::os::raw::c_int).cast(),
+        );
+    }
 }

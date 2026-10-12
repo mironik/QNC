@@ -793,7 +793,7 @@ impl ProgramSegments {
             return None;
         };
         if self.writer.is_none() {
-            match StoryWriter::start(target) {
+            match StoryWriter::spawn(target) { // never waits on the form thread
                 Ok(writer) => self.writer = Some(writer),
                 Err(error) => {
                     self.refresh_view(error);
@@ -822,7 +822,7 @@ impl ProgramSegments {
             return self.refresh_view("Projektna baza nije dostupna.".into());
         };
         if self.shots.is_none() {
-            match VirtualShotsWriter::start(target) {
+            match VirtualShotsWriter::spawn(target) { // never waits on the form thread
                 Ok(shots) => self.shots = Some(shots),
                 Err(error) => return self.refresh_view(error),
             }

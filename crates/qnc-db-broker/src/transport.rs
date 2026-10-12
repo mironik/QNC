@@ -171,7 +171,26 @@ impl ProjectDbWriter {
         factories: Vec<Arc<dyn TableModuleFactory>>,
     ) -> Result<Self> {
         // Opened at once, so a database this writer cannot use is an error of `start`.
-        let mut client = Some(target.open(Access::ReadWrite, factories.clone())?);
+        let client = Some(target.open(Access::ReadWrite, factories.clone())?);
+        Self::run(target, factories, client)
+    }
+
+    /// Like [`Self::start`], but the database is opened on the writer's own thread, so
+    /// the caller (a form thread) never waits for it; a database this writer cannot use
+    /// is the error of the first reply. Opening on the form thread stood it up to 1 s
+    /// while another connection wrote (live 2026-10-12).
+    pub fn spawn(
+        target: ProjectDbTarget,
+        factories: Vec<Arc<dyn TableModuleFactory>>,
+    ) -> Result<Self> {
+        Self::run(target, factories, None)
+    }
+
+    fn run(
+        target: ProjectDbTarget,
+        factories: Vec<Arc<dyn TableModuleFactory>>,
+        mut client: Option<ProjectDbClient>,
+    ) -> Result<Self> {
         let (requests, receive) = mpsc::channel::<(String, Value, Sender<Result<Value>>)>();
         std::thread::Builder::new()
             .name("qnc-db-broker-writer".into())

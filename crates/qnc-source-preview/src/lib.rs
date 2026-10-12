@@ -547,46 +547,44 @@ impl SourcePreview {
         if !reopen && self.program && self.player_view.has_confirmed_position() {
             return self.cue(frame);
         }
-        let Some(target) = self.story_target() else {
-            return true;
-        };
         let Some(context) = &self.context else {
             return true;
         };
-        let loader = qnc_program_input::loader(target, context.settings.project_id.clone());
-        self.open_program(frame, loader)
+        let project_id = context.settings.project_id.clone();
+        self.open_story(frame, move |target| qnc_program_input::loader(target, project_id))
     }
     /// Sync/B-roll (v5 `PlayProgram` of the Sync preview): the program window
     /// `[in, out)` with the source from its IN over it, opened at its first frame
     /// and played as soon as it is ready. Its frames start at 0.
     pub fn open_program_window(&mut self, window: (u64, u64), cover: TransientCover) -> bool {
-        let Some(target) = self.story_target() else {
-            return true;
-        };
         let Some(context) = &self.context else {
             return true;
         };
         let project_id = context.settings.project_id.clone();
-        let loader = qnc_program_input::window_loader(target, project_id, window, cover);
-        self.open_program(0, loader);
+        self.open_story(0, move |target| qnc_program_input::window_loader(target, project_id, window, cover));
         self.play_when_ready = true;
         true
     }
 
-    /// The project database of the active project, where its story is (the one
-    /// intermediary of the project database, `qnc-program-db`).
-    fn story_target(&mut self) -> Option<qnc_db_broker::ProjectDbTarget> {
-        let target = self.context.as_ref().map_or_else(
-            || Err("Projektna baza nije dostupna.".to_string()),
-            |context| qnc_db_broker::ProjectDbTarget::for_project(&context.reader, &context.settings),
-        );
-        match target {
-            Ok(target) => Some(target),
-            Err(error) => {
-                self.view.message = error;
-                None
-            }
-        }
+    /// The story program of the active project, its database (the one intermediary of
+    /// the project database, `qnc-program-db`) found where the player is prepared: on
+    /// the form thread reading the registry and `project.db` stood it up to 0.7 s while
+    /// another connection wrote (live 2026-10-12).
+    fn open_story<L>(
+        &mut self,
+        first_frame: u64,
+        loader: impl FnOnce(qnc_db_broker::ProjectDbTarget) -> L + Send + 'static,
+    ) -> bool
+    where
+        L: FnOnce(&InputReader, &str) -> Result<ProgramInput, String>,
+    {
+        let Some(context) = self.context.clone() else {
+            return true;
+        };
+        self.open_program(first_frame, move |reader, workspace_db_uri| {
+            let target = qnc_db_broker::ProjectDbTarget::for_project(&context.reader, &context.settings)?;
+            loader(target)(reader, workspace_db_uri)
+        })
     }
 
     /// The source timeline of a Sync play (v5 `set_source_playhead_frame`): the
