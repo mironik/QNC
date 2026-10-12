@@ -58,6 +58,10 @@ impl PlayerContentRead for PlayerContent {
 fn main() {
     if let Err(error) = run() {
         eprintln!("qnc-prerender: {error}");
+        // Woken in the background its output goes nowhere: the stop is in the diagnostics.
+        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+            qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("prerender stopped: {error}"));
+        }
         std::process::exit(1);
     }
 }

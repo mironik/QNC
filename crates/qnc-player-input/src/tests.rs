@@ -987,3 +987,17 @@ fn lead_channels_go_first_to_the_outputs_and_the_saved_layout_stays() {
     led.validate_for(&led.workspace_db_uri, "c1").unwrap();
     assert!(input.with_lead_channels(&[0, 2]).is_err(), "a channel the clip lacks");
 }
+
+#[test]
+fn a_proxy_input_switched_to_the_original_picture_validates_as_the_original() {
+    let clip = stored("qnc://local");
+    let proxy = prepare(&settings("qnc://local", "proxy_if_available"), &clip).unwrap();
+    assert_eq!(proxy.representation, Representation::Proxy);
+    // Changing the representation alone is refused (log 2026-10-12, prerender stopped).
+    let mut bare = proxy.clone();
+    bare.representation = Representation::Original;
+    assert!(bare.validate_for(&bare.workspace_db_uri.clone(), "c1").is_err());
+    let original = proxy.with_original_picture().unwrap();
+    original.validate_for(&original.workspace_db_uri.clone(), "c1").unwrap();
+    assert_eq!(original, prepare(&settings("qnc://local", "original"), &clip).unwrap());
+}

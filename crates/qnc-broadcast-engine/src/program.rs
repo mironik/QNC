@@ -147,7 +147,7 @@ fn with_prerendered(
     if input.prerendered.is_empty() {
         return Ok((clips, video, audio));
     }
-    let units = ProgramPlan::new(&original_pictures(input))?.render_units()?;
+    let units = ProgramPlan::new(&original_pictures(input)?)?.render_units()?;
     let mut keys = Vec::new();
     for unit in &input.prerendered {
         if !keys.contains(&&unit.key) {
@@ -225,11 +225,13 @@ fn with_prerendered(
 
 /// The story with every picture from the clip's original (the prerender's view of it):
 /// the clips' representation and the playlist's picture media both name the original.
-fn original_pictures(input: &ProgramInput) -> ProgramInput {
+fn original_pictures(input: &ProgramInput) -> Result<ProgramInput> {
     let mut input = input.clone();
     input.prerendered.clear();
     for clip in input.clips.values_mut() {
-        clip.representation = qnc_player_input::Representation::Original;
+        // A project playing the proxy: its clips were prepared for the proxy (log
+        // 2026-10-12: the prerender of such a project stopped on InvalidDescriptor).
+        *clip = clip.clone().with_original_picture().map_err(error)?;
     }
     for source in input.playlist.items.iter_mut().flat_map(|item| item.sources.iter_mut()) {
         if source.has_video() {
@@ -238,7 +240,7 @@ fn original_pictures(input: &ProgramInput) -> ProgramInput {
             }
         }
     }
-    input
+    Ok(input)
 }
 
 impl ProgramPlan {
@@ -246,7 +248,7 @@ impl ProgramPlan {
     /// plan that plays, every picture from the clip's camera original (the delivery is made
     /// from the original whatever the project plays).
     pub fn for_render(input: &ProgramInput) -> Result<Self> {
-        Self::new(&original_pictures(input))
+        Self::new(&original_pictures(input)?)
     }
 
     /// The story as prerender units: a unit between every two cuts of picture or sound,

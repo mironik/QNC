@@ -229,6 +229,16 @@ pub struct PreparedInput {
     pub optimized: Option<MediaRepresentation>,
 }
 impl PreparedInput {
+    /// The same clip with its picture from the camera original, as a project playing the
+    /// original prepares it (the prerender renders from the original whatever the project
+    /// plays): input, representation and layout agree, so it validates as such.
+    pub fn with_original_picture(mut self) -> Result<Self> {
+        self.playback_input = PlaybackInput::Original;
+        self.representation = Representation::Original;
+        self.layout = layout(&self.snapshot, self.optimized.as_ref(), Representation::Original)?;
+        Ok(self)
+    }
+
     /// The same input with `lead` channels first; a channel the clip lacks is refused.
     pub fn with_lead_channels(mut self, lead: &[u16]) -> Result<Self> {
         let count = self.layout.audio_channels.len();

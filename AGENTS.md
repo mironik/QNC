@@ -3495,6 +3495,16 @@ deinterlace, svaki field, pola brzine, stvarni original s kartice od cetiri mjes
 prve slike 170-260 ms (otvaranje MXF-a 65 ms), `ffmpeg` naredba 240-310 ms; u playeru skok koji ponovno otvara
 dekoder 385 ms prema 460 ms. Katalog u repozitoriju nije promijenjen (mjereno s kopijom kataloga u scratchpadu).
 Sljedeci korak: dekoder ostaje otvoren i skace unutar sebe (bez novog otvaranja), dijeljenje po dijelovima slike.
+Popravak 2026-10-12 (proba korisnika s novim projektom): (1) novi projekt pusta proxy, a prerender pricu
+prebacuje na originale mijenjajuci samo oznaku reprezentacije klipa, pa je provjera ulaza odbila program
+(`InvalidDescriptor`) i radnik je tiho stao (izlaz pozadinskog procesa ide nikamo); mapa `products/prerender`
+ostala je prazna. `qnc-player-input` `PreparedInput::with_original_picture` (ulaz, reprezentacija i raspored
+streamova uskladeni kao za projekt koji pusta original, test), `qnc-broadcast-engine` (`original_pictures` ga
+koristi; vrijedi i za slaganje jedinica u playeru), `tools/qnc-prerender` greske zapisuje u dijagnostiku
+(`prerender stopped: ...`). Na kopiji: novi projekt 10 jedinica. (2) Klip: redni broj slike trosio se i pri
+pretvorbi i pri ponovnom pokazivanju; nakon koraka unatrag svaka sljedeca slika je ponovno numerirana, pa je
+broj rastao za 2 po slici i monitor je polovicu slika brojao kao preskocene (13 od 26 u svakom izvjestaju).
+`qnc-broadcast-engine` (`stamped`): slika dobiva redni broj pri predaji, iz vlastitog brojaca (kao program).
 Izvedeno 2026-10-12 (korak 2, grana `libav-decoder`; korisnik "nastavi"): dekoder u procesu ostaje otvoren i skace
 unutar sebe. `qnc-media-decode`: `PictureSource::seek`, `Decoder::seek(start) -> bool` (nova generacija, paketi starog
 prolaza se odbacuju; dekoder procesa vraca `false` i engine otvara novi kao prije), dekoder u procesu ostaje nakon

@@ -884,31 +884,29 @@ impl Video {
         self.stamped(kept)
     }
 
-    /// A picture handed out keeps the sequence it was made with while that is higher than
-    /// the last one handed out (playing forward); only a picture shown again after a step
-    /// back takes a new one, so the monitor never sees a lower sequence (it drops those as
-    /// stale). Taking a new sequence for every picture made the monitor count every other
-    /// one as skipped.
+    /// A picture takes its monitor sequence when it is handed out, one after the other in
+    /// the order shown, from its own count (the conversions keep theirs for an output
+    /// token only). Sharing the conversion count, a picture shown again after a step back
+    /// took a number above the read-ahead already converted, so from then every picture
+    /// played was stamped again and the count rose by two a picture: the monitor counted
+    /// every other one as skipped (log 2026-10-12, 13 of 26 on every report).
     fn stamped(&mut self, kept: DecodedVideoFrame<Picture>) -> Option<DecodedVideoFrame<Picture>> {
         if kept.payload.token.is_some() {
             return Some(kept); // an output token keeps its own sequence
         }
-        let made = (kept.payload.header.generation, kept.payload.header.sequence);
         let current = self.gpu.borrow().config.generation;
-        let newer = made.0 == current
-            && self.handed.is_none_or(|(generation, sequence)| made.0 != generation || made.1 > sequence);
-        if newer {
-            self.handed = Some(made);
+        let sequence = match self.handed {
+            Some((generation, sequence)) if generation == current => sequence.checked_add(1)?,
+            _ => 0,
+        };
+        self.handed = Some((current, sequence));
+        let header = &kept.payload.header;
+        if header.generation == current && header.sequence == sequence {
             return Some(kept);
         }
-        // Shown again after a step back, or kept from before a new decoder: the current
-        // generation and the next sequence, so the monitor never takes it for stale.
-        let mut gpu = self.gpu.borrow_mut();
-        let mut header = kept.payload.header.clone();
+        let mut header = header.clone();
         header.generation = current;
-        gpu.sequence = gpu.sequence.checked_add(1)?;
-        header.sequence = gpu.sequence;
-        self.handed = Some((header.generation, header.sequence));
+        header.sequence = sequence;
         let rgba = kept.payload.rgba.clone();
         Some(DecodedVideoFrame { payload: Rc::new(PictureData { token: None, header, rgba }), ..kept })
     }
