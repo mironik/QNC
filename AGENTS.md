@@ -3508,3 +3508,11 @@ otvaranje `ffmpeg` naredbom; svih 6 testova kocke prolazi zajedno. Izmjereno u p
 2002): najgori skok 207-260 ms (CLI 456-490 ms), skok +40 73-81 ms (153-225 ms); play klipa 2/2 PASS. Repozitorijski
 katalog nije promijenjen. Nije izvedeno: dekoderi price (Wrap) jos otvaraju novi dekoder, zvuk ostaje na `ffmpeg`
 naredbi, kocka nije u zasticenoj kopiji aplikacije za zivu probu.
+Popravak 2026-10-12 (proba kocke libav na izoliranoj kopiji): `qnc-player-acceptance` je kod playa povremeno
+javljao sliku izvan reda (npr. 2199 nakon 2200), samo s kockom libav. Dekoder je bio ispravan (800 slika u redu i
+bajt za bajt kao CLI, i nakon skoka); pogled preview-a se na ~2 ms vracao na prethodnu sliku: nit stanja playera
+(`qnc-player-client` `publish`) zamijenila je cijeli pogled kopijom slike uzetom prije nego je nit slika objavila
+noviju. Sada `publish` zadrzava noviju sliku iste sesije (`newer_picture`, test). Kocka je brza pa se utrka pokazala
+cesce; ista utrka postoji i uz `ffmpeg` naredbu. Izmjereno (izolirana kopija test1234, `playback.input = original`,
+originali s kartice, 4+4 pustanja): klip 2002 od 1500 bez slika izvan reda, 2 od 4 PASS (ostali 2-4 trzaja do 126 ms),
+prica od 0 96-99 % slika s 3-6 trzaja; prije s `ffmpeg` naredbom klip 97-99 %, prica 87-93 %.

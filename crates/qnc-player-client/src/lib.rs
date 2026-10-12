@@ -383,9 +383,24 @@ fn same_state(a: Option<&EventEnvelope>, b: Option<&EventEnvelope>) -> bool {
     }
 }
 
-fn publish(state: &Shared, generation: u64, view: View) {
+/// Whether `current` is a later picture of the same session than `incoming`.
+fn newer_picture(current: Option<&Arc<MonitorFrame>>, incoming: Option<&Arc<MonitorFrame>>) -> bool {
+    let (Some(current), Some(incoming)) = (current, incoming) else {
+        return false;
+    };
+    let (a, b) = (&current.header, &incoming.header);
+    a.session_id == b.session_id && (a.output_generation, a.sequence) > (b.output_generation, b.sequence)
+}
+
+fn publish(state: &Shared, generation: u64, mut view: View) {
     let mut current = state.view.lock().unwrap();
     if state.generation.load(Ordering::Acquire) == generation {
+        // The state thread took its picture before the frame thread published a newer one:
+        // the newer one stays (else the view went back one picture for a moment, seen as a
+        // picture out of order while playing, player acceptance 2026-10-12).
+        if newer_picture(current.picture.as_ref(), view.picture.as_ref()) {
+            view.picture = current.picture.clone();
+        }
         let same_picture = match (&current.picture, &view.picture) {
             (Some(a), Some(b)) => Arc::ptr_eq(a, b),
             (None, None) => true,
@@ -696,6 +711,17 @@ mod tests {
         assert!(view.reply.is_some());
         assert!(Arc::ptr_eq(view.picture.as_ref().unwrap(), &picture));
         assert_eq!(calls.load(Ordering::Relaxed), 1);
+        drop(view);
+
+        // A state reply that took the picture before this one never puts it back.
+        let older = Arc::new(MonitorFrame {
+            header: MonitorHeader { sequence: 8, frame: 8, ..picture.header.clone() },
+            rgba: picture.rgba.clone(),
+            frame_map: picture.frame_map.clone(),
+        });
+        publish(&shared, 1, View { picture: Some(older), ..View::default() });
+        let view = shared.view.lock().unwrap();
+        assert!(Arc::ptr_eq(view.picture.as_ref().unwrap(), &picture));
     }
 
     #[test]
