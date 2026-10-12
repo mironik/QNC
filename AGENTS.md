@@ -3562,3 +3562,13 @@ priprema i reprodukcija nastavlja). Uz to se i adresa medija (otvaranje datoteke
 kartici) razrjesava u pozadinskoj niti dekodera (`DecodeInput::open_in_background`; opener je `Send`,
 `tools/qnc-player-runner` `MediaOpener`). Izmjereno (originali s kartice, 25 s): od 4200 do kraja price 99,9 %, od
 2300 99,4 % (2 zastoja), od 0 100 % PASS.
+
+Otvoreno ograniceno odobrenje 2026-10-12 (prerender price u format predaje; korisnik: "da, uvijek ukljucen, kreni",
+"da, otkljucaj oboje, nova mapa products/prerender"): dok se montira, prica se u pozadini renderira dio po dio (stavka
+flat playliste) iz originala u format iz projektnih `export.*` postavki; player pusta gotove dijelove, export ih samo
+spaja; prica u bazi ostaje istina (iz nje uvijek XML/EDL i export iz originala u bilo kojem formatu). Prerender je uvijek
+ukljucen. Otkljucano: `crates/qnc-work-settings` (samo citanje `export` i `products.prerender`),
+`crates/qnc-project-store` (samo dopuna proizvoda `products/prerender` za nove projekte), nove kocke rendera i njihovi
+ugovori, `qnc-broadcast-engine` (opis jedinica iz plana price), root Cargo. Izvedeno (temelj): `WorkSettings.export`
+(kako je spremljen), `ProductLocations.prerender` (neobavezno: projekt bez njega dobiva kontroliranu gresku samo za
+prerender, `prerender_location`), Project novom projektu daje `products/prerender`.

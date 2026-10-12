@@ -41,6 +41,7 @@ const PROJECT_DIRECTORIES: &[&str] = &[
     "products/virtual_shorts",
     "products/virtual_segments",
     "products/b_roll_virtual_clips",
+    "products/prerender",
 ];
 const PRODUCT_DIRECTORY_FIELDS: &[(&str, &str)] = &[
     ("root", "products"),
@@ -49,6 +50,8 @@ const PRODUCT_DIRECTORY_FIELDS: &[(&str, &str)] = &[
     ("virtual_shorts", "products/virtual_shorts"),
     ("virtual_segments", "products/virtual_segments"),
     ("b_roll_virtual_clips", "products/b_roll_virtual_clips"),
+    // The prerender of the story in the delivery format (user 2026-10-12).
+    ("prerender", "products/prerender"),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2279,6 +2282,7 @@ mod tests {
         assert_eq!(saved["products"]["root"], "products");
         assert_eq!(saved["products"]["thumbnails"], "products/thumbnails");
         assert_eq!(saved["products"]["filmstrip"], "products/filmstrip");
+        assert_eq!(saved["products"]["prerender"], "products/prerender");
         assert_eq!(
             saved["products"]["virtual_shorts"],
             "products/virtual_shorts"

@@ -235,6 +235,7 @@ fn settings(context: &str, mode: &str) -> WorkSettings {
             virtual_shorts: "products/virtual_shorts".into(),
             virtual_segments: "products/virtual_segments".into(),
             b_roll_virtual_clips: "products/b_roll_virtual_clips".into(),
+            prerender: None,
         },
         input: serde_json::json!({"mode":"auto"}),
         playback: serde_json::json!({"input":mode}),
@@ -243,6 +244,7 @@ fn settings(context: &str, mode: &str) -> WorkSettings {
         ai: serde_json::json!({"enabled":false}),
         keyboard_shortcuts: serde_json::json!({"active_preset":"qnc"}),
         artifacts: serde_json::json!({"filmstrip":"auto","wave":"auto"}),
+        export: serde_json::Value::Null,
     }
 }
 

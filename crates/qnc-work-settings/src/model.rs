@@ -73,6 +73,10 @@ pub struct WorkSettings {
     /// `artifact_mode`, never substituted.
     #[serde(default)]
     pub artifacts: Value,
+    /// `export` as saved (the delivery format of the project; `Null` when it has none),
+    /// read only: the prerender of the story writes this format.
+    #[serde(default)]
+    pub export: Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +96,9 @@ pub struct ProductLocations {
     pub virtual_shorts: String,
     pub virtual_segments: String,
     pub b_roll_virtual_clips: String,
+    /// The prerender of the story (user 2026-10-12); a project made before it has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prerender: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -193,6 +200,11 @@ impl WorkSettings {
                     saved.get("products").ok_or_else(incomplete)?,
                     "b_roll_virtual_clips",
                 )?,
+                prerender: saved
+                    .get("products")
+                    .and_then(|products| products.get("prerender"))
+                    .map(|_| required_text(saved.get("products").ok_or_else(incomplete)?, "prerender"))
+                    .transpose()?,
             },
             input: object(&saved, "input")?,
             playback: object(&saved, "playback")?,
@@ -201,6 +213,7 @@ impl WorkSettings {
             ai: object(&saved, "ai")?,
             keyboard_shortcuts: object(&saved, "keyboard_shortcuts")?,
             artifacts: saved.get("artifacts").cloned().unwrap_or(Value::Null),
+            export: saved.get("export").cloned().unwrap_or(Value::Null),
         };
         result.validate()?;
         Ok(result)
@@ -239,6 +252,9 @@ impl WorkSettings {
         }
         for value in self.products.all_relative_paths() {
             validate_relative_product_path(value)?;
+        }
+        if let Some(prerender) = &self.products.prerender {
+            validate_relative_product_path(prerender)?;
         }
         required_text(&self.input, "mode")?;
         required_text(&self.playback, "input")?;
@@ -285,6 +301,18 @@ impl WorkSettings {
 
     pub fn product_local_dir(&self, project_dir: &Path, area: ProductArea) -> PathBuf {
         project_dir.join(self.products.relative_path(area))
+    }
+
+    /// Where the prerender of the story is written in the project folder, and its URI;
+    /// a project made before the prerender has none (a controlled error, no default).
+    pub fn prerender_location(&self, project_dir: &Path) -> Result<(PathBuf, String), ReadError> {
+        let relative = self.products.prerender.as_deref().ok_or_else(|| {
+            ReadError::new("products_prerender", "Projekt nema mapu za prerender (products.prerender).")
+        })?;
+        Ok((
+            project_dir.join(relative),
+            format!("{}/{}", self.output_root_uri.trim_end_matches('/'), relative.trim_matches('/')),
+        ))
     }
 
     /// The project folder as a media source: media copied into the project (an imported
