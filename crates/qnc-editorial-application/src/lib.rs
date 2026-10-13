@@ -385,7 +385,7 @@ impl EditorialApplication {
     pub fn dispatch(&mut self, intent: EditorialIntent) -> bool {
         let changed = match intent {
             EditorialIntent::PreviewClip(clip_id) => {
-                self.focus.to_source(&mut self.wrap); // v5 select_shot
+                let _ = self.focus.chose_clip(&mut self.wrap); // the keyboard stays on the pool after a click
                 self.view.chosen_shot_id = None;
                 self.pending_marks.clear();
                 self.short_stills.clear_if_clip_changed(Some(&clip_id));
@@ -397,10 +397,8 @@ impl EditorialApplication {
                     true
                 }
             }
-            EditorialIntent::PreviewShort(shot_id) => {
-                self.focus.to_source(&mut self.wrap);
-                self.open_short(&shot_id)
-            }
+            // The short opens with its IN/OUT, then the keyboard is where the choice left it.
+            EditorialIntent::PreviewShort(shot_id) => self.open_short(&shot_id) && self.focus.chose_clip(&mut self.wrap),
             EditorialIntent::Action(action_id) => {
                 let pieces = (&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline);
                 match self.focus.route(&action_id, pieces) {

@@ -3811,3 +3811,8 @@ fokus za red; nove akcije kataloga `page_prev` (Page Up) i `page_next` (Page Dow
 za ekran redova (na prvi ili zadnji red u istom stupcu kad ekrana nema). Tablica tipki zna PageUp i PageDown
 (`qnc-keyboard-shortcut`), `qnc-media-card` (`GridStep::PageUp`, `PageDown`, `step_focus` s brojem redova na
 ekranu), `qnc-panel-focus`.
+Popravak 2026-10-13 (korisnik: "strelice gore dolje ne rade u media poolu... funkcije treba vezati za aktivni panel, a ne
+globalno za formu"): klik na karticu u Media poolu (kao v5) prebacivao je tipkovnicu na source timeline, pa su strelice
+radile tamo. Sada klik bira klip i tipkovnica ostaje u poolu na kliknutoj kartici; na source timeline vodi samo Enter
+(ili Tab, klik na timeline). `qnc-panel-focus` (`chose_clip`, `opening`), `qnc-media-card` (klik pomice fokus na
+kliknutu karticu; izvan fokusa pocinje od izabrane), `qnc-editorial-application` (C10 703 -> 700).

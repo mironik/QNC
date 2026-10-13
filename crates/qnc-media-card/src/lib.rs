@@ -547,10 +547,11 @@ pub fn show_card_grid_focused(
     input: &CardGridInput<'_>,
     (step, color): (Option<GridStep>, Color32),
 ) -> Option<CardGridAction> {
+    let key = egui::Id::new((input.id_salt, "qnc-card-focus"));
     if !input.panel_focused || input.cards.is_empty() {
+        ui.data_mut(|data| data.remove::<usize>(key)); // back in focus, it starts on the chosen card
         return show_card_grid(ui, style, metrics, input);
     }
-    let key = egui::Id::new((input.id_salt, "qnc-card-focus"));
     let selected = input.cards.iter().position(|card| card.id == input.selected_id);
     let from = ui.data(|data| data.get_temp::<usize>(key)).or(selected).unwrap_or(0).min(input.cards.len() - 1);
     let shape = grid_metrics(ui.available_width().max(metrics.min_card_width), input.cards.len(), metrics);
@@ -560,6 +561,11 @@ pub fn show_card_grid_focused(
     let opened = (step == Some(GridStep::Open)).then(|| CardGridAction::Activate(input.cards[focused].id.to_string()));
     let unfocused = CardGridInput { panel_focused: false, ..*input }; // the chosen clip keeps its frame
     let clicked = grid(ui, style, metrics, &unfocused, Some(KeyFocus { index: focused, scroll: step.is_some(), color }));
+    if let Some(CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id)) = &clicked {
+        // A click moves the keyboard to the clicked card.
+        let index = input.cards.iter().position(|card| card.id == id.as_str());
+        ui.data_mut(|data| data.insert_temp(key, index.unwrap_or(focused)));
+    }
     clicked.or(opened)
 }
 

@@ -120,6 +120,9 @@ pub struct PanelFocus {
     pick: Option<String>,
     /// A key on the media pool, for the card grid on the next paint.
     pool_step: Option<PoolStep>,
+    /// Enter opened the focused card: the clip it chooses puts the keyboard on its
+    /// source timeline; a click on a card keeps it on the pool.
+    opening: bool,
 }
 
 impl PanelFocus {
@@ -173,6 +176,15 @@ impl PanelFocus {
     /// Whether a key picture search runs (the caller repaints soon).
     pub fn busy(&self) -> bool {
         self.keyframes.busy()
+    }
+
+    /// A clip chosen in the media pool: the Source view; the keyboard stays on the pool
+    /// (a click), or goes on to the source timeline when Enter opened the card (user
+    /// 2026-10-13: the keys belong to the panel in use).
+    pub fn chose_clip(&mut self, wrap: &mut WrapSession) -> bool {
+        wrap.leave();
+        self.panel = if std::mem::take(&mut self.opening) { Panel::SourceTimeline } else { Panel::Pool };
+        true
     }
 
     /// A clip chosen or a click on the source timeline: the keyboard goes to the
@@ -270,7 +282,10 @@ impl PanelFocus {
                     "step_next_part" => PoolStep::Down,
                     "page_prev" => PoolStep::PageUp,
                     "page_next" => PoolStep::PageDown,
-                    _ => PoolStep::Open,
+                    _ => {
+                        self.opening = true;
+                        PoolStep::Open
+                    }
                 });
                 true
             }
