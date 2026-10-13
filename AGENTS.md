@@ -3670,3 +3670,8 @@ prva slika poslije njega; slot: njegova prva i zadnja; rub segmenta: nova prva i
 je crta s crvenim okvirom. Nalaz iz loga: dok se rub slota pomicao strelicama, prerender je citao karticu (rub slota ne
 mice playera pa se nije brojao kao montaza), slike reza 2,3-3,4 s po prolazu. `qnc-source-preview` `hands_on`, a
 `qnc-panel-focus` ga zove za svaku tipku montaze: prerender ceka jos 3 s nakon svake.
+Dopuna 2026-10-13 (korisnik: "kad klikne na slot on je oznacen; Ctrl+I ili Ctrl+O playhead skoci na te pozicije";
+izabrao "bolju verziju"): Ctrl+I/O uzimaju rub kliknutog (oznacenog) slota, inace slota pod Wrap playheadom; Wrap playhead
+skace na prvu (Ctrl+I) ili zadnju (Ctrl+O) sliku slota pa monitor odmah pokazuje rez iz playera; strelice i dalje mijenjaju
+nacrt (player svira spremljenu pricu, nacrtne slike pokazuje zoom); nakon Entera playhead stoji na novom rubu.
+`qnc-program-segments` (`slot_trim.rs`, test).

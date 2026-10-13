@@ -272,6 +272,7 @@ fn ctrl_o_on_the_segment_panel_lengthens_the_slot_under_the_playhead_and_moves_t
     // Ctrl+O on the slot 40..80: its end, the slot after moves with it.
     segments.set_playhead(Some(50));
     assert!(segments.take_slot_edge_at_playhead(false));
+    assert_eq!(segments.view().playhead, Some(79), "the playhead on the slot's last picture");
     for _ in 0..3 {
         segments.apply_action("step_forward_frame");
     }
@@ -282,14 +283,20 @@ fn ctrl_o_on_the_segment_panel_lengthens_the_slot_under_the_playhead_and_moves_t
     segments.apply_action("activate_focused_item");
     settle(&mut segments);
     assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150], "stored after Enter");
-    // Ctrl+I on the slot 0..40: a later first picture makes it shorter; Escape drops it.
-    segments.set_playhead(Some(10));
+    assert_eq!(segments.view().playhead, Some(82), "the playhead on the new last picture");
+    // Ctrl+I on the clicked slot 0..40: a later first picture makes it shorter; Escape drops it.
+    let first = segments.view().slots[0].slot_id.clone();
+    segments.apply(SegmentCommand::SelectSlot { slot_id: first, frame: 20 });
+    settle(&mut segments);
     assert!(segments.take_slot_edge_at_playhead(true));
+    assert_eq!(segments.view().playhead, Some(0), "the playhead on the slot's first picture");
     segments.apply_action("step_forward_frame");
     assert_eq!(marker_frames(&segments), vec![0, 39, 82, 150]);
     segments.apply_action("clear_focus");
     assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150]);
     // The last slot ends with the story.
-    segments.set_playhead(Some(100));
+    let last = segments.view().slots.last().unwrap().slot_id.clone();
+    segments.apply(SegmentCommand::SelectSlot { slot_id: last, frame: 100 });
+    settle(&mut segments);
     assert!(!segments.take_slot_edge_at_playhead(false));
 }

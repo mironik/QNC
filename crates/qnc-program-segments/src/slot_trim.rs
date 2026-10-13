@@ -1,5 +1,8 @@
 //! A slot longer or shorter at one edge (user 2026-10-13, not in v5): on the segment
-//! panel Ctrl+I takes the start and Ctrl+O the end of the slot under the Wrap playhead.
+//! panel Ctrl+I takes the start and Ctrl+O the end of the clicked slot, else of the slot
+//! under the Wrap playhead; the Wrap playhead goes to the slot's first or last picture,
+//! so the monitor shows the cut at once, and to the new edge after Enter (the player
+//! plays the stored story: while the arrows move the edge, the zoom shows the draft).
 //! The other slots keep their lengths: the markers after the slot move with its end and
 //! the last slot of the story takes the difference. The arrows move the picture at the
 //! taken edge a frame (at the start the slot's cover starts earlier or later in its
@@ -34,15 +37,20 @@ impl SlotTrim {
 }
 
 impl ProgramSegments {
-    /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the slot under the
-    /// Wrap playhead (the last slot also takes its end). False when there is none.
+    /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the clicked slot,
+    /// else of the slot under the Wrap playhead (the last slot also takes its end).
+    /// False when there is none.
     pub(crate) fn take_slot_edge(&mut self, start: bool) -> bool {
         let frame = self.playhead.unwrap_or(0);
         let count = self.view.slots.len();
-        let found = self.view.slots.iter().enumerate().find(|(index, slot)| {
-            frame >= slot.start_frame && (frame < slot.end_frame || (index + 1 == count && frame == slot.end_frame))
+        let clicked = self.view.slots.iter().find(|slot| self.selected_slot.as_ref() == Some(&slot.slot_id));
+        let found = clicked.or_else(|| {
+            self.view.slots.iter().enumerate().find_map(|(index, slot)| {
+                (frame >= slot.start_frame && (frame < slot.end_frame || (index + 1 == count && frame == slot.end_frame)))
+                    .then_some(slot)
+            })
         });
-        let Some(slot) = found.map(|(_, slot)| slot.clone()) else {
+        let Some(slot) = found.cloned() else {
             self.refresh_view("Nema M-M slota pod playheadom".into());
             return false;
         };
@@ -62,6 +70,8 @@ impl ProgramSegments {
             slot_end: slot.end_frame,
             frames: 0,
         });
+        // The monitor shows the cut at once: the slot's first or last picture.
+        self.cue_program(if start { slot.start_frame } else { slot.end_frame.saturating_sub(1) });
         self.refresh_view(Self::trim_message(start));
         true
     }
@@ -124,6 +134,9 @@ impl ProgramSegments {
         if trim.frames != 0 {
             self.marker_committing = true;
             self.write(Operation::TrimSlot { slot_id: trim.slot_id, start: trim.start, frames: trim.frames });
+            // The Wrap playhead on the new edge: the monitor shows the written cut.
+            let edge = if trim.start { trim.slot_start } else { trim.slot_end.saturating_add_signed(trim.frames - 1) };
+            self.cue_program(edge);
         } else {
             self.refresh_view(String::new());
         }
