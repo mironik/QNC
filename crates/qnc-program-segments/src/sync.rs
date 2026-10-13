@@ -133,7 +133,13 @@ impl ProgramSegments {
         }
         let end = self.sync.draft_end().unwrap_or(self.playhead.unwrap_or(0));
         match self.sync.finish(end) {
-            Ok(_) => self.after_sync_finish("Sync slot odabran · Enter dodaje pokrivalicu"),
+            Ok(slot) => {
+                // The Wrap playhead on the slot's end marker: the next Sync starts there,
+                // not at the slot just made (live 2026-10-13: four started at 0 in a row).
+                let end = slot.end;
+                self.after_sync_finish("Sync slot odabran · Enter dodaje pokrivalicu");
+                self.cue_program(end);
+            }
             Err(error) => self.refresh_view(error),
         }
         true

@@ -3750,3 +3750,6 @@ Delete odbacuje nacrt bez ikakvog zapisa. `qnc-sync-cover` (`draft_end`, `nudge`
 povratak na pocetak prozora tek pri skoku vecem od 3 slike; testovi), `qnc-program-segments` (`sync_nudge`,
 `discard_sync`, `sync_drafting`), `qnc-panel-focus`. Zamjenjuje pravilo od 1. 10. ("Sync zapisuje pokrivalicu kad dode
 do M markera ili OUT-a izvora").
+Popravak isti dan (korisnik: "nakon Entera sljedeca pokrivalica u Sync/B-roll vraca se na pocetak upravo kreiranog slota";
+log: cetiri Sync prozora zaredom od 0): zaustavljen Sync drzi Wrap playhead na zadnjoj slici slota, a novi Sync krece od
+markera na ili prije playheada, dakle od pocetka tog slota. Nakon Entera Wrap playhead ide na krajnji marker slota.
