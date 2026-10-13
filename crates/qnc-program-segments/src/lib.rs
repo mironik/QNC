@@ -55,6 +55,8 @@ struct NewCover {
 }
 
 pub const MODULE_ID: &str = "qnc.module.program-segments";
+/// How long a Cover slot or Overwrite is named in the status line.
+const COVER_NOTICE: std::time::Duration = std::time::Duration::from_secs(3);
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The source the user marked for Talking Head, Voice over and covers: the chosen
@@ -105,6 +107,8 @@ pub struct NewSegment {
 /// The program of the active project: read, written and turned into a view.
 #[derive(Default)]
 pub struct ProgramSegments {
+    /// The last Cover slot / Overwrite asked for (see `SegmentsView::cover_pressed`).
+    cover_pressed: Option<(bool, std::time::Instant)>,
     /// The project database of the active project (its story and virtual shots).
     target: Option<ProjectDbTarget>,
     /// Where the lease of the story's prerender is read, and its waker.
@@ -723,6 +727,7 @@ impl ProgramSegments {
     /// v5 `quick_cover` / `overwrite_cover`: the marked source becomes the cover
     /// of the target slot (a B-roll virtual shot; the store replaces a cover there).
     pub fn cover_from_source(&mut self, overwrite: bool) {
+        self.cover_pressed = Some((overwrite, std::time::Instant::now()));
         let slot = if overwrite {
             self.view.overwrite_cover_slot().map(str::to_string)
         } else {
@@ -1031,7 +1036,15 @@ impl ProgramSegments {
         view.sync_enabled = self.sync.enabled();
         view.covers_chosen = self.covers_chosen;
         view.playhead = self.playhead;
-        view.message = message;
+        view.cover_pressed = self.cover_pressed;
+        view.message = match self.cover_pressed {
+            // A Cover slot or Overwrite asked for in the last moments says so (user
+            // 2026-10-13: Overwrite gave no sign that it was taken).
+            Some((overwrite, at)) if message.is_empty() && at.elapsed() < COVER_NOTICE => {
+                if overwrite { "Overwrite: B-roll zamijenjen u slotu".into() } else { "Cover slot: B-roll spremljen u slot".into() }
+            }
+            _ => message,
+        };
         view.editing = self.editing.clone();
         view.edit_stills = match &self.slot_trim {
             Some(trim) => qnc_program_view::trim_stills(&view, &slots(&self.stored_slots, None), &trim.slot_id, trim.start, trim.frames),

@@ -872,6 +872,21 @@ fn require_reference_keyboard_subset(
     }
 }
 
+/// qnc_v4 key bindings the user explicitly replaced in the QNC catalog: (preset,
+/// scope, action). Only these may differ from or be missing against qnc_v4; every other
+/// qnc_v4 binding is still required as it is. An entry that no longer differs is an
+/// error, so the list cannot hide anything.
+/// 2026-10-13 (user: "Shift+ dodaje"; SubClip on Shift+S, Overwrite on Shift+O; the
+/// empty slot is reached with Alt+arrows and Sync/B-roll).
+const V4_KEY_EXCEPTIONS: &[(&str, &str, &str)] = &[
+    ("default", "storyboard", "overwrite_cover"),
+    ("default", "storyboard", "focus_empty_slot"),
+];
+
+fn v4_key_exception(preset_id: &str, scope_id: &str, action_id: &str) -> bool {
+    V4_KEY_EXCEPTIONS.contains(&(preset_id, scope_id, action_id))
+}
+
 fn require_reference_preset_subset(
     report: &mut ValidationReport,
     preset_id: &str,
@@ -916,8 +931,16 @@ fn require_reference_preset_subset(
         };
 
         for (action_id, reference_bindings) in reference_scope {
+            let excepted = v4_key_exception(preset_id, scope_id, action_id);
             match local_scope.get(action_id) {
-                Some(local_bindings) if local_bindings == reference_bindings => {}
+                Some(local_bindings) if local_bindings == reference_bindings => {
+                    if excepted {
+                        report.error(format!(
+                            "keyboard preset '{preset_id}' scope '{scope_id}' action '{action_id}' is listed as a qnc_v4 exception but does not differ"
+                        ));
+                    }
+                }
+                _ if excepted => {}
                 Some(_) => report.error(format!(
                     "keyboard preset '{preset_id}' scope '{scope_id}' action '{action_id}' bindings differ from qnc_v4"
                 )),
@@ -2835,5 +2858,32 @@ mod source_read_only_tests {
     fn writes_in_tests_are_ignored() {
         let code = "fn f() {}\n#[cfg(test)]\nmod tests { fn t() { fs::create_dir_all(p); } }";
         assert!(write_operations_outside_tests(code).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod v4_key_exception_tests {
+    use super::*;
+
+    fn check(local: serde_json::Value, reference: serde_json::Value) -> bool {
+        let mut report = ValidationReport::new();
+        require_reference_preset_subset(&mut report, "default", &local, &reference);
+        report.is_ok()
+    }
+
+    #[test]
+    fn only_listed_v4_bindings_may_change_and_a_listed_one_must_differ() {
+        let reference = serde_json::json!({ "storyboard": {
+            "overwrite_cover": [{ "code": "KeyB", "shift": true }],
+            "mark_out": [{ "code": "KeyO" }]
+        }});
+        let changed = serde_json::json!({ "storyboard": {
+            "overwrite_cover": [{ "code": "KeyO", "shift": true }],
+            "mark_out": [{ "code": "KeyO" }]
+        }});
+        assert!(check(changed, reference.clone()), "a listed exception may differ");
+        let missing = serde_json::json!({ "storyboard": { "overwrite_cover": [{ "code": "KeyO", "shift": true }] }});
+        assert!(!check(missing, reference.clone()), "an unlisted v4 action is still required");
+        assert!(!check(reference.clone(), reference), "a listed exception that does not differ is an error");
     }
 }

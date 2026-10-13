@@ -102,11 +102,11 @@ pub(crate) fn show(
                     command = Some(SegmentCommand::Marker);
                 }
                 let quick = segments.quick_cover_slot().is_ok();
-                if clicked(action_button(ui, "Cover slot", quick, theme)) {
+                if clicked(flash_button(ui, "Cover slot", quick, flashing(ui, segments, false), theme)) {
                     command = Some(SegmentCommand::Cover { overwrite: false });
                 }
                 let overwrite = segments.overwrite_cover_slot().is_ok();
-                if clicked(action_button(ui, "Overwrite", overwrite, theme)) {
+                if clicked(flash_button(ui, "Overwrite", overwrite, flashing(ui, segments, true), theme)) {
                     command = Some(SegmentCommand::Cover { overwrite: true });
                 }
             },
@@ -152,6 +152,33 @@ fn clicked(response: egui::Response) -> bool {
         response.surrender_focus();
     }
     response.clicked_by(PointerButton::Primary)
+}
+
+/// How long Cover slot or Overwrite stays lit after it was asked for.
+const FLASH: std::time::Duration = std::time::Duration::from_millis(400);
+
+/// Whether Cover slot (`false`) or Overwrite (`true`) was asked for a moment ago, by
+/// click or key; keeps repainting until the flash is over.
+fn flashing(ui: &egui::Ui, segments: &SegmentsView, overwrite: bool) -> bool {
+    match segments.cover_pressed {
+        Some((pressed, at)) if pressed == overwrite && at.elapsed() < FLASH => {
+            ui.ctx().request_repaint_after(FLASH.saturating_sub(at.elapsed()));
+            true
+        }
+        _ => false,
+    }
+}
+
+/// An action button lit with the focus colour while `flash`.
+fn flash_button(ui: &mut egui::Ui, label: &str, enabled: bool, flash: bool, theme: TimelineTheme) -> egui::Response {
+    if !flash {
+        return action_button(ui, label, enabled, theme);
+    }
+    let button = egui::Button::new(RichText::new(label).color(theme.text).size(FONT_UI))
+        .min_size(Vec2::new(0.0, COMPACT_CTRL_H))
+        .fill(theme.focus)
+        .stroke(egui::Stroke::new(1.0, theme.focus));
+    ui.add_enabled(enabled, button)
 }
 
 fn action_button(

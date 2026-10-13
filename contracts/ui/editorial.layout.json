@@ -150,7 +150,7 @@
         "show_quick_cover": true,
         "tabs_left": [
           { "label": "All", "action_id": "editorial_tab_all" },
-          { "label": "Virtual", "action_id": "editorial_tab_virtual" },
+          { "label": "SubClip", "action_id": "editorial_tab_virtual" },
           { "label": "B-roll", "action_id": "editorial_tab_broll" },
           { "label": "Segment", "action_id": "editorial_tab_segment" }
         ],
@@ -166,7 +166,7 @@
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": [{ "label": "Sync/B-roll", "action_id": "cover_mode_sync" }, { "label": "Pokrivalice", "action_id": "cover_mode_covers" }, { "label": "Voice over", "action_id": "add_off_segment" }, { "label": "Talking Head", "action_id": "add_ton_segment" }, { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
+        "actions_rtl": [{ "label": "Sync/B-roll", "action_id": "cover_mode_sync" }, { "label": "B-roll", "action_id": "cover_mode_covers" }, { "label": "Voice over", "action_id": "add_off_segment" }, { "label": "Talking Head", "action_id": "add_ton_segment" }, { "label": "Add SubClip", "action_id": "save_virtual_shot" }]
       },
       "media_card": {
         "selection_check": false,

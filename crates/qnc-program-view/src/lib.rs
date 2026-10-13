@@ -115,6 +115,9 @@ pub struct SegmentsView {
     pub lane_taken: Option<(u8, u16)>,
     /// Display gain level of the A1 and A2 wave over the video row (0: not shown).
     pub wave_zoom: [u8; 2],
+    /// The last Cover slot (`false`) or Overwrite (`true`) and when it was asked for,
+    /// by click or key: its button flashes for a moment (user 2026-10-13).
+    pub cover_pressed: Option<(bool, std::time::Instant)>,
 }
 
 impl SegmentsView {

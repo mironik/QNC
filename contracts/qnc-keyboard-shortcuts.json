@@ -54,7 +54,7 @@
       "label": "Pokrivalice"
     },
     "cover_mode_covers": {
-      "label": "Pokrivalice (Cover slot, B, Overwrite)"
+      "label": "B-roll (Cover slot, Overwrite)"
     },
     "cover_mode_sync": {
       "label": "Sync/B-roll pokrivalice"
@@ -257,6 +257,18 @@
     "ingest_tab_virtual": {
       "label": "Ingest pool: tab Virtual"
     },
+    "editorial_tab_all": {
+      "label": "Pool: tab All"
+    },
+    "editorial_tab_virtual": {
+      "label": "Pool: tab SubClip"
+    },
+    "editorial_tab_broll": {
+      "label": "Pool: tab B-roll"
+    },
+    "editorial_tab_segment": {
+      "label": "Pool: tab Segment"
+    },
     "ingest_clear_selection": {
       "label": "Očisti Ingest izbor"
     },
@@ -308,8 +320,9 @@
       { "title": "IN / OUT", "actions": ["mark_in", "mark_out", "select_mark_in", "select_mark_out", "mark_in_fit_duration", "save_virtual_shot"] },
       { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2"] },
       { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "select_segment_start", "select_segment_end", "delete_part"] },
-      { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "focus_empty_slot", "select_mark_in", "select_mark_out", "navigate_prev_object", "navigate_next_object"] },
-      { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover"] },
+      { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "select_mark_in", "select_mark_out", "navigate_prev_object", "navigate_next_object"] },
+      { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover", "cover_mode_covers", "cover_mode_sync"] },
+      { "title": "Pool i tabovi", "actions": ["save_virtual_shot", "editorial_tab_all", "editorial_tab_virtual", "editorial_tab_broll", "editorial_tab_segment"] },
       { "title": "Općenito", "actions": ["undo_object", "redo_object", "focus_next", "focus_prev", "toggle_cheatsheet"] }
     ]
   },
@@ -398,9 +411,54 @@
         ],
         "overwrite_cover": [
           {
-            "code": "KeyB",
+            "code": "KeyO",
             "shift": true,
             "ctrl": false
+          }
+        ],
+        "save_virtual_shot": [
+          {
+            "code": "KeyS",
+            "shift": true,
+            "ctrl": false
+          }
+        ],
+        "cover_mode_covers": [
+          {
+            "code": "KeyP",
+            "shift": false,
+            "ctrl": false
+          }
+        ],
+        "cover_mode_sync": [
+          {
+            "code": "KeyY",
+            "shift": false,
+            "ctrl": false
+          }
+        ],
+        "editorial_tab_all": [
+          {
+            "code": "KeyA",
+            "alt": true
+          }
+        ],
+        "editorial_tab_virtual": [
+          {
+            "code": "KeyS",
+            "alt": true
+          }
+        ],
+        "editorial_tab_broll": [
+          {
+            "code": "KeyB",
+            "alt": true
+          }
+        ],
+        "editorial_tab_segment": [
+          {
+            "code": "KeyG",
+            "alt": true
           }
         ],
         "delete_part": [
@@ -524,13 +582,6 @@
             "code": "KeyS",
             "ctrl": true,
             "shift": false
-          }
-        ],
-        "focus_empty_slot": [
-          {
-            "code": "KeyS",
-            "shift": true,
-            "ctrl": false
           }
         ],
         "navigate_prev_object": [

@@ -3757,3 +3757,18 @@ Dopuna 2026-10-13 (korisnik: "nepokriveni slot ne bi smio gurati slotove iza nje
 `TrimSlot` pomice markere samo do prvog slota bez pokrivalice iza uzetog slota; taj prazni slot preuzima razliku (zadrzava
 barem jednu sliku), slotovi iza njega ostaju. Bez praznog slota razliku i dalje preuzima zadnji slot price.
 `qnc-program-db` (`shift_markers_between`, testovi), `qnc-program-segments` (nacrt `SlotTrim.empty`), ugovor `slot_trim`.
+
+Dopuna 2026-10-13 (korisnik: "nema prikaza da je Overwrite kliknut"; "trebamo shortkate za Overwrite i druge koji jos
+nisu dobili"; "Shift+ je dodavanje necega"; "SubClip je razumljivije"; "otkljucaj conformance za iznimke"; "sada cemo se
+zadrzati na nasim QNC shortkatima, ostale cemo dodati na kraju"): QNC preset (Story) po univerzalnom pravilu (Ctrl+ uzima,
+Shift+ dodaje, Alt+ skace): Shift+S novi SubClip (`save_virtual_shot`), Shift+T / Shift+V Talking Head / Voice over
+(kao prije), B Cover slot, Shift+O Overwrite (`overwrite_cover`, prije Shift+B), P B-roll, Y Sync/B-roll, Alt+A / Alt+S /
+Alt+B / Alt+G tabovi All, SubClip, B-roll, Segment (nove akcije kataloga `editorial_tab_*`); Shift+S vise ne skace na
+prazni slot (do njega vode Alt+strelice i Sync/B-roll). Tablica tipki zna A, P i G (`qnc-keyboard-shortcut`). Cover slot i
+Overwrite pri kliku ili tipki bljesnu 0,4 s (`qnc-segment-panel` `flash_button`), a status 3 s kaze sto je napravljeno
+(`qnc-program-view` `SegmentsView.cover_pressed`, `qnc-program-segments`). Story layout: tab Virtual -> SubClip, gumb
+"Add virtual clip" -> "Add SubClip", prekidac "Pokrivalice | Sync/B-roll" -> "B-roll | Sync/B-roll"; Media Assist gumbi
+i poruka praznog taba nisu dirani. `tools/qnc-conformance`: iznimke od qnc_v4 tipki samo s popisa `V4_KEY_EXCEPTIONS`
+(QNC preset: `overwrite_cover`, `focus_empty_slot`); iznimka koja vise ne odstupa je greska, test. Ostali preseti
+(Edius, Resolve, Premiere, Final Cut, Avid) ostaju kako jesu; plan za kasnije: originalni preseti tih programa i kocka
+prevoditelj njihovih akcija u QNC akcije.
