@@ -34,6 +34,36 @@ pub struct EditStill {
     pub label: String,
     /// The picture at the cut being moved (user 2026-10-13: marked red in the zoom).
     pub cut: bool,
+    /// The picture is the first or the last of its clip: the edit cannot go further
+    /// that way (user 2026-10-13: a red line on that side in the zoom).
+    pub clip_edge: Option<ClipEdge>,
+}
+
+/// Which end of its clip a picture reached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipEdge {
+    Start,
+    End,
+}
+
+/// Marks the pictures at the first or the last frame of their clip and brings a picture
+/// beyond the end of its clip back to its last frame (a cover that runs past its clip
+/// plays to its end; asking a decoder for a picture that is not there only waits).
+/// `frames` gives a clip's length in its own frames.
+pub fn mark_clip_edges(stills: &mut [EditStill], frames: impl Fn(&str) -> Option<u64>) {
+    for still in stills {
+        let Some(picture) = still.picture.as_mut() else { continue };
+        let Some(length) = frames(&picture.clip_id).filter(|length| *length > 0) else { continue };
+        if picture.source_frame + 1 >= length {
+            if picture.source_frame + 1 > length {
+                picture.source_frame = length - 1;
+                still.id = format!("qnc_edit_still:{}:{}", picture.clip_id, picture.source_frame);
+            }
+            still.clip_edge = Some(ClipEdge::End);
+        } else if picture.source_frame == 0 {
+            still.clip_edge = Some(ClipEdge::Start);
+        }
+    }
 }
 
 /// The pictures beside markers moved from `old` to `new` (`moves`), with the stored
@@ -107,7 +137,7 @@ impl EditStill {
         let id = picture
             .as_ref()
             .map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame));
-        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false }
+        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false, clip_edge: None }
     }
 
     /// The same picture with what it is.
@@ -234,5 +264,20 @@ mod tests {
         assert_eq!(pictures(&stills), vec![Some(("clip-a".into(), 111)), Some(("clip-cover".into(), 497))]);
         let stills = edit_stills(&view, &slots, &[(15, 18)]);
         assert_eq!(pictures(&stills), vec![Some(("clip-a".into(), 117)), Some(("clip-cover".into(), 503))]);
+    }
+}
+
+#[cfg(test)]
+mod clip_edge_tests {
+    use super::*;
+
+    #[test]
+    fn a_picture_at_or_past_the_end_of_its_clip_is_marked_and_held_on_its_last_frame() {
+        let still = |frame| EditStill::new(10, true, Some(StillPicture { clip_id: "c".into(), source_frame: frame }));
+        let mut stills = vec![still(0), still(50), still(99), still(120)];
+        mark_clip_edges(&mut stills, |_| Some(100));
+        let edges: Vec<_> = stills.iter().map(|still| still.clip_edge).collect();
+        assert_eq!(edges, vec![Some(ClipEdge::Start), None, Some(ClipEdge::End), Some(ClipEdge::End)]);
+        assert_eq!(stills[3].picture.as_ref().unwrap().source_frame, 99, "past the end: the last frame");
     }
 }

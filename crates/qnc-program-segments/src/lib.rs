@@ -237,6 +237,9 @@ impl ProgramSegments {
         let (segments, covers) = self.view.wave_placements();
         let mut view = self.view.clone();
         view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());
+        // A zoom picture at its clip's first or last frame (user 2026-10-13).
+        qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| durations.get(id).copied());
+        qnc_program_view::mark_clip_edges(&mut view.source_edit_stills, |id| durations.get(id).copied());
         view
     }
 

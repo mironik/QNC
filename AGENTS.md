@@ -3694,3 +3694,8 @@ ne ostaje crno. `qnc-source-preview` `LocatedPicture` nosi spremljeni zapis medi
 njom. Ciscenje diska (korisnik: "izbrisi nepotrebne privremene datoteke i nepotrebnu povijest"; disk je imao 1,2 GB
 slobodno pa povezivac nije mogao pisati): `cargo clean --profile dev` (34,6 GiB), privremene datoteke starije od dana i
 stari `QNC/data/diagnostics/player.log` (do 12. 10.); izvorni kod, git povijest, projekti i `target/release` nisu dirani.
+Dopuna 2026-10-13 (korisnik: "ako je klip dosao na kraj, bilo in ili out, treba dobiti crvenu liniju na onoj strani gdje je
+dosao do kraja"): `qnc-program-view` `mark_clip_edges` / `ClipEdge`: slika zooma na prvoj ili zadnjoj slici svog klipa
+dobiva oznaku strane, a slika iza kraja klipa vraca se na zadnju (log: zoom je svakih ~0,35 s trazio sliku iza kraja
+klipa); duljine klipova daje postojeci `view_with_waves`. `qnc-trim-overlay` crta crvenu liniju na lijevoj (pocetak) ili
+desnoj (kraj) strani slike, `qnc-trim-stills` ne dekodira unaprijed iza ruba klipa. Test.

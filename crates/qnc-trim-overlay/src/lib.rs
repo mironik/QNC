@@ -7,7 +7,7 @@
 //! names come from the program view, this piece reads, decodes and decides nothing.
 
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
-use qnc_program_view::{EditStill, SegmentsView};
+use qnc_program_view::{ClipEdge, EditStill, SegmentsView};
 
 pub const MODULE_ID: &str = "qnc.module.trim-overlay";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -62,6 +62,14 @@ fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, visuals: &egui:
         let _ = qnc_ui_kit::paint_rgba_image(ui, pane, &still.id, image.content_key, image.size, &image.pixels);
     }
     ui.painter().rect_stroke(pane, 0.0, Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color), StrokeKind::Inside);
+    if let Some(edge) = still.clip_edge {
+        // The clip ends here: a red line on that side (user 2026-10-13).
+        let x = match edge {
+            ClipEdge::Start => pane.left() + 3.0,
+            ClipEdge::End => pane.right() - 3.0,
+        };
+        ui.painter().line_segment([egui::pos2(x, pane.top()), egui::pos2(x, pane.bottom())], Stroke::new(6.0, Color32::from_rgb(230, 30, 30)));
+    }
     if still.cut {
         // The picture at the cut being moved (user 2026-10-13: a red frame).
         ui.painter().rect_stroke(pane, 0.0, Stroke::new(4.0, Color32::from_rgb(230, 30, 30)), StrokeKind::Inside);

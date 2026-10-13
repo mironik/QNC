@@ -196,6 +196,9 @@ impl TrimStills {
         for still in view.edit_stills.iter().chain(&view.source_edit_stills) {
             let Some(picture) = &still.picture else { continue };
             seen.insert(still.label.clone());
+            if still.clip_edge.is_some() {
+                continue; // at the end of its clip: nothing further to make that way
+            }
             let way = match self.moving.get(&still.label) {
                 Some((last, way)) if last.clip_id == picture.clip_id && last.source_frame != picture.source_frame => {
                     if picture.source_frame > last.source_frame { 1 } else { -1 }
