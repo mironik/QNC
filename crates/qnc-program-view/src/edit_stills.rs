@@ -39,6 +39,8 @@ pub struct EditStill {
     pub clip_edge: Option<ClipEdge>,
     /// How many frames the picture's clip has, when known (nothing beyond is decoded).
     pub clip_frames: Option<u64>,
+    /// The draft asked a picture past the end of its clip (it is shown at the last one).
+    pub past_end: bool,
 }
 
 /// Which end of its clip a picture reached.
@@ -60,6 +62,7 @@ pub fn mark_clip_edges(stills: &mut [EditStill], frames: impl Fn(&str) -> Option
         if picture.source_frame + 1 >= length {
             if picture.source_frame + 1 > length {
                 picture.source_frame = length - 1;
+                still.past_end = true;
                 still.id = format!("qnc_edit_still:{}:{}", picture.clip_id, picture.source_frame);
             }
             still.clip_edge = Some(ClipEdge::End);
@@ -140,7 +143,7 @@ impl EditStill {
         let id = picture
             .as_ref()
             .map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame));
-        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false, clip_edge: None, clip_frames: None }
+        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false, clip_edge: None, clip_frames: None, past_end: false }
     }
 
     /// The same picture with what it is.

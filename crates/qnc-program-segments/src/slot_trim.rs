@@ -117,6 +117,9 @@ impl ProgramSegments {
         let Some(trim) = self.slot_trim.clone() else {
             return false;
         };
+        if self.at_clip_end(picture) {
+            return true;
+        }
         let frames = if trim.start { trim.frames - picture } else { trim.frames + picture };
         let total = self.view.total_frames;
         let length = trim.slot_end as i64 - trim.slot_start as i64 + frames;
@@ -137,6 +140,10 @@ impl ProgramSegments {
         }
         self.slot_trim = Some(SlotTrim { frames, ..trim.clone() });
         self.refresh_view(Self::trim_message(trim.start));
+        if self.past_clip_end() {
+            self.slot_trim = Some(trim);
+            self.refresh_view("Klip je na kraju: dalje u tom smjeru ne ide.".into());
+        }
         true
     }
 

@@ -300,3 +300,33 @@ fn ctrl_o_on_the_segment_panel_lengthens_the_slot_under_the_playhead_and_moves_t
     settle(&mut segments);
     assert!(!segments.take_slot_edge_at_playhead(false));
 }
+
+#[test]
+fn at_the_end_of_its_clip_a_slot_edge_does_not_go_further_that_way() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    store_with_story(&file);
+    let mut segments = ProgramSegments::new();
+    configure(&mut segments, &file);
+    for frame in [40, 80] {
+        segments.set_playhead(Some(frame));
+        segments.apply_action("add_marker");
+        settle(&mut segments);
+    }
+    // The slot 40..80 ends in the Ton segment 50..100 (clip c1 from 100): its last
+    // picture is c1:129; the clip has 131 frames, so it may end one picture later.
+    segments.view_with_waves([("c1", 131u64)].into_iter());
+    segments.set_playhead(Some(60));
+    assert!(segments.take_slot_edge_at_playhead(false));
+    segments.apply_action("step_forward_frame");
+    assert_eq!(marker_frames(&segments), vec![0, 40, 81, 150], "to the last picture of the clip");
+    segments.apply_action("step_forward_frame");
+    assert_eq!(marker_frames(&segments), vec![0, 40, 81, 150], "not past it");
+    assert!(segments.view().message.contains("na kraju"));
+    segments.apply_action("step_back_frame");
+    assert_eq!(marker_frames(&segments), vec![0, 40, 80, 150], "back is allowed");
+    // A jump to a key picture past the end of the clip goes to its end.
+    segments.set_playhead(Some(60));
+    assert!(segments.jump_edit(12));
+    assert_eq!(marker_frames(&segments), vec![0, 40, 81, 150], "the jump stops at the clip's last picture");
+}

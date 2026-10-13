@@ -3702,3 +3702,9 @@ desnoj (kraj) strani slike, `qnc-trim-stills` ne dekodira unaprijed iza ruba kli
 Popravak 2026-10-13 (log probe): zoom je i dalje dekodirao unaprijed slike iza kraja klipa (do 50 slika ispred, 302-317
 klipa od 302 slike, svaka ~0,4 s). `EditStill.clip_frames` (iz `mark_clip_edges`), `qnc-trim-stills` ne trazi slike
 od kraja klipa nadalje.
+Dopuna 2026-10-13 (korisnik: "ako je doslo do kraja, ne smije vise prihvacati strelicu u tom smjeru"; "skok moze biti do
+kraja klipa"; oznaka kraja je siroka crvena traka, 1/16 slike, najmanje 14 px): `qnc-program-segments` pamti duljine
+klipova iz `view_with_waves` i oznacava rubove u svakom `refresh_view`; strelica u smjeru ruba ne radi nista i javlja
+"Klip je na kraju" (rub slota: njegova slika; marker: obje slike uz njega; pomak slota: slike susjeda, njegova pokrivalica
+ide s njim); pomak koji bi presao kraj (skok na kljucnu sliku) se ponistava, a skok ide slika po slika do zadnje slike
+klipa. `EditStill.past_end`. Testovi.

@@ -135,6 +135,9 @@ pub struct ProgramSegments {
     /// The channels heard on A1 and A2, a lane taken with the keyboard and the large
     /// wave (piece `qnc-lane-choice`).
     lanes: qnc_lane_choice::LaneChoice,
+    /// Clip lengths in their own frames, as the form last gave them (`view_with_waves`):
+    /// the edit pictures know where their clip ends.
+    clip_frames: std::collections::HashMap<String, u64>,
     channels: qnc_source_channels::SourceChannels,
     sync: qnc_sync_cover::SyncCover,
     /// IN was pressed since the last source (arms Sync).
@@ -234,6 +237,11 @@ impl ProgramSegments {
     /// its IN/OUT use (a clip wave spans the whole clip).
     pub fn view_with_waves<'a>(&mut self, clips: impl Iterator<Item = (&'a str, u64)>) -> SegmentsView {
         let durations: std::collections::HashMap<&str, u64> = clips.collect();
+        if durations.len() != self.clip_frames.len() || durations.iter().any(|(id, frames)| self.clip_frames.get(*id) != Some(frames)) {
+            self.clip_frames = durations.iter().map(|(id, frames)| (id.to_string(), *frames)).collect();
+            let message = self.view.message.clone();
+            self.refresh_view(message);
+        }
         let (segments, covers) = self.view.wave_placements();
         let mut view = self.view.clone();
         view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());
@@ -1031,6 +1039,7 @@ impl ProgramSegments {
         };
         view.source_edit_stills = self.edge_stills();
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
+        qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);
         self.view = view;
     }

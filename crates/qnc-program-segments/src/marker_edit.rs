@@ -50,6 +50,9 @@ impl ProgramSegments {
 
     /// Arrows while editing: the draft one frame back or forward.
     pub(crate) fn nudge_marker(&mut self, frames: i64) {
+        if self.at_clip_end(frames) {
+            return;
+        }
         if let Some((_, draft)) = &self.marker_edit {
             let frame = draft.saturating_add_signed(frames);
             self.set_marker_draft(frame);
@@ -70,7 +73,13 @@ impl ProgramSegments {
         if let Err(error) = check_move(&self.stored_pins(), &marker_id, frame) {
             return self.refresh_view(error);
         }
+        let before = self.marker_edit.clone();
         self.marker_edit = Some((marker_id, frame));
+        self.refresh_view(String::new());
+        if self.past_clip_end() {
+            self.marker_edit = before;
+            return self.refresh_view("Klip je na kraju: dalje u tom smjeru ne ide.".into());
+        }
         self.refresh_view(
             "Marker: strelice lijevo/desno pomak, M na playhead, Enter potvrda, Esc odustani"
                 .into(),

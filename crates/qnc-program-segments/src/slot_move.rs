@@ -53,18 +53,80 @@ impl ProgramSegments {
 
     /// Moves the taken slot or marker by `frames` (a key picture step); false when
     /// nothing is taken.
+    /// Whether a picture that moves with the edit is at the end of its clip that way
+    /// (user 2026-10-13: at the end of the clip the arrow that way does nothing): a
+    /// trimmed slot edge moves its own picture, a marker both pictures beside it, a
+    /// moved slot the pictures of its neighbours (its own cover goes with it).
+    pub(crate) fn at_clip_end(&mut self, frames: i64) -> bool {
+        let moving = |still: &qnc_program_view::EditStill| {
+            if self.slot_trim.is_some() {
+                still.cut
+            } else if self.slot_move.is_some() {
+                !still.cut
+            } else {
+                self.marker_edit.is_some()
+            }
+        };
+        let blocked = self.view.edit_stills.iter().filter(|still| moving(still)).any(|still| {
+            matches!(
+                (still.clip_edge, frames.signum()),
+                (Some(qnc_program_view::ClipEdge::End), 1) | (Some(qnc_program_view::ClipEdge::Start), -1)
+            )
+        });
+        if blocked {
+            let message = "Klip je na kraju: dalje u tom smjeru ne ide.".to_string();
+            self.refresh_view(message);
+        }
+        blocked
+    }
+
+    /// After a move: a picture that moves with the edit went past the end of its clip
+    /// (a jump to a key picture can pass it in one step); the caller takes the move back.
+    pub(crate) fn past_clip_end(&self) -> bool {
+        let moving = |still: &&qnc_program_view::EditStill| {
+            if self.slot_trim.is_some() {
+                still.cut
+            } else if self.slot_move.is_some() {
+                !still.cut
+            } else {
+                self.marker_edit.is_some()
+            }
+        };
+        self.view.edit_stills.iter().filter(moving).any(|still| still.past_end)
+    }
+
     pub fn jump_edit(&mut self, frames: i64) -> bool {
-        if self.slot_trim.is_some() {
-            return self.nudge_trim(frames);
+        if self.slot_trim.is_none() && self.slot_move.is_none() && self.marker_edit.is_none() {
+            return false;
         }
-        if self.slot_move.is_some() {
-            return self.nudge_slot(frames);
-        }
-        if self.marker_edit.is_some() {
-            self.nudge_marker(frames);
+        if self.at_clip_end(frames) {
             return true;
         }
-        false
+        let moved = self.nudge_edit(frames);
+        // A jump past the end of a clip goes to its end (user 2026-10-13): frame by frame
+        // as far as the clip allows.
+        if moved && self.view.message.contains("na kraju") {
+            for _ in 0..frames.unsigned_abs() {
+                if self.at_clip_end(frames.signum()) || !self.nudge_edit(frames.signum()) {
+                    break;
+                }
+            }
+        }
+        true
+    }
+
+    /// The taken edit `frames` on; false when nothing moved.
+    fn nudge_edit(&mut self, frames: i64) -> bool {
+        let before = (self.slot_trim.as_ref().map(|t| t.frames), self.slot_move.as_ref().map(|s| s.shift), self.marker_edit.clone());
+        if self.slot_trim.is_some() {
+            self.nudge_trim(frames);
+        } else if self.slot_move.is_some() {
+            self.nudge_slot(frames);
+        } else if self.marker_edit.is_some() {
+            self.nudge_marker(frames);
+        }
+        let after = (self.slot_trim.as_ref().map(|t| t.frames), self.slot_move.as_ref().map(|s| s.shift), self.marker_edit.clone());
+        before != after || self.view.message.contains("na kraju")
     }
 
     /// A message of the program panel (e.g. why a step could not be done).
@@ -119,6 +181,9 @@ impl ProgramSegments {
         let Some(slot) = self.slot_move.clone() else {
             return false;
         };
+        if self.at_clip_end(frames) {
+            return true;
+        }
         let shift = slot.shift + frames;
         let pins = crate::resolve(&self.view, &self.stored_markers, None);
         let index = |frame| pins.iter().position(|pin| pin.frame == frame);
@@ -139,8 +204,12 @@ impl ProgramSegments {
             self.refresh_view("Slot se pomice samo do susjednog M markera.".into());
             return true;
         }
-        self.slot_move = Some(SlotMove { shift, ..slot });
+        self.slot_move = Some(SlotMove { shift, ..slot.clone() });
         self.refresh_view("Slot: strelice lijevo/desno pomak, Enter potvrda, Esc odustani".into());
+        if self.past_clip_end() {
+            self.slot_move = Some(slot);
+            self.refresh_view("Klip je na kraju: dalje u tom smjeru ne ide.".into());
+        }
         true
     }
 
