@@ -512,15 +512,22 @@ pub enum GridStep {
     Right,
     Up,
     Down,
+    /// A screen of rows up or down (Page Up, Page Down).
+    PageUp,
+    PageDown,
     Open,
 }
 
 /// The card focused after a move by `step` from `from` in a grid of `count` cards in
-/// `cols` columns; it stays inside the grid.
-pub fn step_focus(from: usize, step: GridStep, cols: usize, count: usize) -> usize {
+/// `cols` columns with `page_rows` rows on screen; it stays inside the grid.
+pub fn step_focus(from: usize, step: GridStep, cols: usize, count: usize, page_rows: usize) -> usize {
     let last = count.saturating_sub(1);
     let cols = cols.max(1);
+    let page = cols * page_rows.max(1);
     match step {
+        GridStep::PageUp => from.checked_sub(page).unwrap_or(from % cols),
+        GridStep::PageDown if from + page <= last => from + page,
+        GridStep::PageDown => last - (last % cols) + (from % cols).min(last % cols),
         GridStep::Left => from.saturating_sub(1),
         GridStep::Right => (from + 1).min(last),
         GridStep::Up => from.checked_sub(cols).unwrap_or(from),
@@ -546,8 +553,9 @@ pub fn show_card_grid_focused(
     let key = egui::Id::new((input.id_salt, "qnc-card-focus"));
     let selected = input.cards.iter().position(|card| card.id == input.selected_id);
     let from = ui.data(|data| data.get_temp::<usize>(key)).or(selected).unwrap_or(0).min(input.cards.len() - 1);
-    let cols = grid_metrics(ui.available_width().max(metrics.min_card_width), input.cards.len(), metrics).cols;
-    let focused = step.map_or(from, |step| step_focus(from, step, cols, input.cards.len()));
+    let shape = grid_metrics(ui.available_width().max(metrics.min_card_width), input.cards.len(), metrics);
+    let page_rows = (ui.available_height() / (shape.card_h + shape.gap)).floor() as usize;
+    let focused = step.map_or(from, |step| step_focus(from, step, shape.cols, input.cards.len(), page_rows));
     ui.data_mut(|data| data.insert_temp(key, focused));
     let opened = (step == Some(GridStep::Open)).then(|| CardGridAction::Activate(input.cards[focused].id.to_string()));
     let unfocused = CardGridInput { panel_focused: false, ..*input }; // the chosen clip keeps its frame
@@ -692,13 +700,18 @@ mod tests {
     #[test]
     fn the_focused_card_stays_inside_the_grid() {
         // 7 cards in 3 columns: 0 1 2 / 3 4 5 / 6
-        assert_eq!(step_focus(0, GridStep::Left, 3, 7), 0);
-        assert_eq!(step_focus(2, GridStep::Right, 3, 7), 3);
-        assert_eq!(step_focus(6, GridStep::Right, 3, 7), 6);
-        assert_eq!(step_focus(4, GridStep::Down, 3, 7), 4, "no card under 4");
-        assert_eq!(step_focus(3, GridStep::Down, 3, 7), 6);
-        assert_eq!(step_focus(1, GridStep::Up, 3, 7), 1);
-        assert_eq!(step_focus(5, GridStep::Up, 3, 7), 2);
+        assert_eq!(step_focus(0, GridStep::Left, 3, 7, 1), 0);
+        assert_eq!(step_focus(2, GridStep::Right, 3, 7, 1), 3);
+        assert_eq!(step_focus(6, GridStep::Right, 3, 7, 1), 6);
+        assert_eq!(step_focus(4, GridStep::Down, 3, 7, 1), 4, "no card under 4");
+        assert_eq!(step_focus(3, GridStep::Down, 3, 7, 1), 6);
+        assert_eq!(step_focus(1, GridStep::Up, 3, 7, 1), 1);
+        assert_eq!(step_focus(5, GridStep::Up, 3, 7, 1), 2);
+        // 20 cards in 2 columns, 3 rows on screen: a page is 6 cards.
+        assert_eq!(step_focus(1, GridStep::PageDown, 2, 20, 3), 7);
+        assert_eq!(step_focus(17, GridStep::PageDown, 2, 20, 3), 19, "the last row, same column");
+        assert_eq!(step_focus(7, GridStep::PageUp, 2, 20, 3), 1);
+        assert_eq!(step_focus(3, GridStep::PageUp, 2, 20, 3), 1, "the first row, same column");
     }
 
     #[test]

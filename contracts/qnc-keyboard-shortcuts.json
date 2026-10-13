@@ -257,6 +257,12 @@
     "ingest_tab_virtual": {
       "label": "Ingest pool: tab Virtual"
     },
+    "page_prev": {
+      "label": "Stranica gore (Media pool)"
+    },
+    "page_next": {
+      "label": "Stranica dolje (Media pool)"
+    },
     "editorial_tab_all": {
       "label": "Pool: tab All"
     },
@@ -322,7 +328,7 @@
       { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "select_segment_start", "select_segment_end", "delete_part"] },
       { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "select_mark_in", "select_mark_out", "navigate_prev_object", "navigate_next_object"] },
       { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover", "cover_mode_covers", "cover_mode_sync"] },
-      { "title": "Pool i tabovi", "actions": ["save_virtual_shot", "editorial_tab_all", "editorial_tab_virtual", "editorial_tab_broll", "editorial_tab_segment"] },
+      { "title": "Pool i tabovi", "actions": ["save_virtual_shot", "page_prev", "page_next", "editorial_tab_all", "editorial_tab_virtual", "editorial_tab_broll", "editorial_tab_segment"] },
       { "title": "Općenito", "actions": ["undo_object", "redo_object", "focus_next", "focus_prev", "toggle_cheatsheet"] }
     ]
   },
@@ -435,6 +441,16 @@
             "code": "KeyY",
             "shift": false,
             "ctrl": false
+          }
+        ],
+        "page_prev": [
+          {
+            "key": "PageUp"
+          }
+        ],
+        "page_next": [
+          {
+            "key": "PageDown"
           }
         ],
         "editorial_tab_all": [

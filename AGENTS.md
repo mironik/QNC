@@ -3806,3 +3806,8 @@ Dopuna 2026-10-13 (korisnik: "dodati okvir oko odabranog klipa da korisnik vidi 
 tipkovnica u Media poolu ima deblji okvir boje fokusa (3 px), a odabrani klip zadrzava svoj crveni okvir, pa se vidi i
 gdje je fokus i koji je klip izabran. `qnc-media-card` (`show_card_grid_focused` prima boju fokusa, `KeyFocus`);
 `show_card_grid` (Ingest) se ne mijenja.
+Dopuna 2026-10-13 (korisnik: "treba dodati i strelice gore dolje i UP/DOWN"): strelice gore/dolje u Media poolu vec pomicu
+fokus za red; nove akcije kataloga `page_prev` (Page Up) i `page_next` (Page Down), vezane u QNC presetu, pomicu fokus
+za ekran redova (na prvi ili zadnji red u istom stupcu kad ekrana nema). Tablica tipki zna PageUp i PageDown
+(`qnc-keyboard-shortcut`), `qnc-media-card` (`GridStep::PageUp`, `PageDown`, `step_focus` s brojem redova na
+ekranu), `qnc-panel-focus`.

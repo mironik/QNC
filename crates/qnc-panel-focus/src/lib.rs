@@ -262,12 +262,14 @@ impl PanelFocus {
             "activate_focused_item" if panel == Panel::PoolTabs => self.advance(preview, wrap, segments),
             // The media pool: the arrows move the card focus, Enter opens the card (and the
             // clip chosen puts the keyboard on its source timeline).
-            "step_back_frame" | "step_forward_frame" | "step_prev_part" | "step_next_part" | "activate_focused_item" if panel == Panel::Pool => {
+            "step_back_frame" | "step_forward_frame" | "step_prev_part" | "step_next_part" | "page_prev" | "page_next" | "activate_focused_item" if panel == Panel::Pool => {
                 self.pool_step = Some(match action_id {
                     "step_back_frame" => PoolStep::Left,
                     "step_forward_frame" => PoolStep::Right,
                     "step_prev_part" => PoolStep::Up,
                     "step_next_part" => PoolStep::Down,
+                    "page_prev" => PoolStep::PageUp,
+                    "page_next" => PoolStep::PageDown,
                     _ => PoolStep::Open,
                 });
                 true
