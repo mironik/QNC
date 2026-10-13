@@ -3699,3 +3699,6 @@ dosao do kraja"): `qnc-program-view` `mark_clip_edges` / `ClipEdge`: slika zooma
 dobiva oznaku strane, a slika iza kraja klipa vraca se na zadnju (log: zoom je svakih ~0,35 s trazio sliku iza kraja
 klipa); duljine klipova daje postojeci `view_with_waves`. `qnc-trim-overlay` crta crvenu liniju na lijevoj (pocetak) ili
 desnoj (kraj) strani slike, `qnc-trim-stills` ne dekodira unaprijed iza ruba klipa. Test.
+Popravak 2026-10-13 (log probe): zoom je i dalje dekodirao unaprijed slike iza kraja klipa (do 50 slika ispred, 302-317
+klipa od 302 slike, svaka ~0,4 s). `EditStill.clip_frames` (iz `mark_clip_edges`), `qnc-trim-stills` ne trazi slike
+od kraja klipa nadalje.

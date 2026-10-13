@@ -165,7 +165,14 @@ impl TrimStills {
                 source_frame: picture.source_frame.saturating_add_signed(step),
             };
             let lacks = |frame: &StillPicture| !self.cache.contains_key(frame) && !self.failed.contains(frame);
-            if (lacks(&near(1)) || (picture.source_frame > 0 && lacks(&near(-1))))
+            let end = view
+                .edit_stills
+                .iter()
+                .chain(&view.source_edit_stills)
+                .find(|still| still.picture.as_ref() == Some(&picture))
+                .and_then(|still| still.clip_frames)
+                .unwrap_or(u64::MAX);
+            if ((picture.source_frame + 1 < end && lacks(&near(1))) || (picture.source_frame > 0 && lacks(&near(-1))))
                 && !wants.iter().any(|(want, _, count)| *want == picture && *count == RUN)
             {
                 wants.push((picture.clone(), picture.source_frame.saturating_sub(RUN_BACK), RUN));
@@ -210,11 +217,13 @@ impl TrimStills {
             if way == 0 {
                 continue;
             }
+            let end = still.clip_frames.unwrap_or(u64::MAX);
             let next = (1..=2 * u64::from(RUN))
                 .filter_map(|step| match way {
                     1 => picture.source_frame.checked_add(step),
                     _ => picture.source_frame.checked_sub(step),
                 })
+                .filter(|frame| *frame < end) // never past the end of the clip
                 .map(|frame| StillPicture { clip_id: picture.clip_id.clone(), source_frame: frame })
                 .find(|frame| !self.cache.contains_key(frame) && !self.failed.contains(frame));
             if let Some(next) = next {

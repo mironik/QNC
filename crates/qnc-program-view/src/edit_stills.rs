@@ -37,6 +37,8 @@ pub struct EditStill {
     /// The picture is the first or the last of its clip: the edit cannot go further
     /// that way (user 2026-10-13: a red line on that side in the zoom).
     pub clip_edge: Option<ClipEdge>,
+    /// How many frames the picture's clip has, when known (nothing beyond is decoded).
+    pub clip_frames: Option<u64>,
 }
 
 /// Which end of its clip a picture reached.
@@ -54,6 +56,7 @@ pub fn mark_clip_edges(stills: &mut [EditStill], frames: impl Fn(&str) -> Option
     for still in stills {
         let Some(picture) = still.picture.as_mut() else { continue };
         let Some(length) = frames(&picture.clip_id).filter(|length| *length > 0) else { continue };
+        still.clip_frames = Some(length);
         if picture.source_frame + 1 >= length {
             if picture.source_frame + 1 > length {
                 picture.source_frame = length - 1;
@@ -137,7 +140,7 @@ impl EditStill {
         let id = picture
             .as_ref()
             .map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame));
-        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false, clip_edge: None }
+        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false, clip_edge: None, clip_frames: None }
     }
 
     /// The same picture with what it is.
