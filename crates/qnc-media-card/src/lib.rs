@@ -137,7 +137,6 @@ pub fn paint_media_card(
         },
     );
     painter.rect_filled(rect, 0.0, style.raised);
-    painter.rect_stroke(rect, 0.0, stroke, egui::StrokeKind::Inside);
 
     let thumb_rect = thumb_rect(rect, metrics);
     painter.rect_filled(thumb_rect, 0.0, style.surface);
@@ -264,6 +263,9 @@ pub fn paint_media_card(
         small,
         style.muted,
     );
+    // The frame last: the picture and the text row cover the whole card (live 2026-10-13:
+    // the red frame of the chosen clip never showed).
+    painter.rect_stroke(rect, 0.0, stroke, egui::StrokeKind::Inside);
 }
 
 /// Hit zone of the check mark (independent of the card activation zone).
