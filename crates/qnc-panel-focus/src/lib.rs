@@ -75,12 +75,13 @@ impl Default for FocusLayout {
 pub use qnc_media_card::GridStep as PoolStep;
 
 /// What a form draws of the focus: the panel, on the source dock buttons the action of
-/// the one the arrows are on, and once a key on the media pool for its card grid.
+/// the one the arrows are on, and the last key on the media pool with its number (the
+/// card grid applies each number once, however often the view is read).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FocusView {
     pub panel: Panel,
     pub button: Option<String>,
-    pub pool_step: Option<PoolStep>,
+    pub pool_step: Option<(PoolStep, u64)>,
 }
 
 /// Actions of the segment panel that also run from the other panels: they use
@@ -118,8 +119,10 @@ pub struct PanelFocus {
     /// The catalog action a key on the pool tabs or a dock button stands for; the
     /// caller runs it as its own action (`take_pick`).
     pick: Option<String>,
-    /// A key on the media pool, for the card grid on the next paint.
-    pool_step: Option<PoolStep>,
+    /// The last key on the media pool and its number, for the card grid. It is not taken
+    /// on read: one arrow fires two catalog actions (storyboard and off scope) and every
+    /// action reads the view again (live 2026-10-13: Up/Down were lost).
+    pool_step: Option<(PoolStep, u64)>,
     /// Enter opened the focused card: the clip it chooses puts the keyboard on its
     /// source timeline; a click on a card keeps it on the pool.
     opening: bool,
@@ -170,7 +173,7 @@ impl PanelFocus {
             }
         }
         let button = (self.panel == Panel::SourceButtons).then(|| self.layout.buttons.get(self.button).cloned()).flatten();
-        FocusView { panel: self.panel, button, pool_step: self.pool_step.take() }
+        FocusView { panel: self.panel, button, pool_step: self.pool_step }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).
@@ -275,7 +278,8 @@ impl PanelFocus {
             // The media pool: the arrows move the card focus, Enter opens the card (and the
             // clip chosen puts the keyboard on its source timeline).
             "step_back_frame" | "step_forward_frame" | "step_prev_part" | "step_next_part" | "page_prev" | "page_next" | "activate_focused_item" if panel == Panel::Pool => {
-                self.pool_step = Some(match action_id {
+                let number = self.pool_step.map_or(1, |(_, number)| number + 1);
+                self.pool_step = Some((match action_id {
                     "step_back_frame" => PoolStep::Left,
                     "step_forward_frame" => PoolStep::Right,
                     "step_prev_part" => PoolStep::Up,
@@ -286,7 +290,7 @@ impl PanelFocus {
                         self.opening = true;
                         PoolStep::Open
                     }
-                });
+                }, number));
                 true
             }
             "step_prev_part" | "step_next_part" if matches!(panel, Panel::PoolTabs | Panel::SourceButtons) => false,
@@ -533,7 +537,9 @@ mod tests {
         focus.route("activate_focused_item", (&mut preview, &mut wrap, &mut segments, &mut timeline));
         assert_eq!(focus.panel(), Panel::Pool);
         focus.route("step_next_part", (&mut preview, &mut wrap, &mut segments, &mut timeline));
-        assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).pool_step, Some(PoolStep::Down));
+        assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).pool_step, Some((PoolStep::Down, 1)));
+        focus.route("step_prev_segment", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).pool_step, Some((PoolStep::Down, 1)), "the second action of the same arrow keeps it");
         focus.set(Panel::SourceTimeline);
         focus.route("activate_focused_item", (&mut preview, &mut wrap, &mut segments, &mut timeline));
         assert_eq!(focus.panel(), Panel::SourceButtons, "nothing to confirm on the source: on to its buttons");

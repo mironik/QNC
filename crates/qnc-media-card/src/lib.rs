@@ -539,15 +539,22 @@ pub fn step_focus(from: usize, step: GridStep, cols: usize, count: usize, page_r
 /// The card grid in keyboard focus (`input.panel_focused`): it keeps its focused card,
 /// draws a thick frame in `color` around it (the chosen clip keeps its own frame), moves
 /// it by `step` and scrolls to it; Enter (`GridStep::Open`) opens the focused card as a
-/// click does. Without focus it is `show_card_grid`.
+/// click does. A step comes with its number and is applied once per number. Without
+/// focus it is `show_card_grid`.
 pub fn show_card_grid_focused(
     ui: &mut egui::Ui,
     style: &CardStyle,
     metrics: &CardMetrics,
     input: &CardGridInput<'_>,
-    (step, color): (Option<GridStep>, Color32),
+    (step, color): (Option<(GridStep, u64)>, Color32),
 ) -> Option<CardGridAction> {
     let key = egui::Id::new((input.id_salt, "qnc-card-focus"));
+    let applied = egui::Id::new((input.id_salt, "qnc-card-step"));
+    let fresh = step.filter(|(_, number)| ui.data(|data| data.get_temp::<u64>(applied)) != Some(*number));
+    if let Some((_, number)) = fresh {
+        ui.data_mut(|data| data.insert_temp(applied, number));
+    }
+    let step = fresh.map(|(step, _)| step);
     if !input.panel_focused || input.cards.is_empty() {
         ui.data_mut(|data| data.remove::<usize>(key)); // back in focus, it starts on the chosen card
         return show_card_grid(ui, style, metrics, input);

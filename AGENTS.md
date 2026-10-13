@@ -3816,3 +3816,8 @@ globalno za formu"): klik na karticu u Media poolu (kao v5) prebacivao je tipkov
 radile tamo. Sada klik bira klip i tipkovnica ostaje u poolu na kliknutoj kartici; na source timeline vodi samo Enter
 (ili Tab, klik na timeline). `qnc-panel-focus` (`chose_clip`, `opening`), `qnc-media-card` (klik pomice fokus na
 kliknutu karticu; izvan fokusa pocinje od izabrane), `qnc-editorial-application` (C10 703 -> 700).
+Popravak 2026-10-13 (korisnik: "i dalje ne radi strelica gore dolje"; "ocito trebas vezati na fokus panela"): strelica
+gore/dolje salje dvije akcije kataloga (`step_prev_part` iz scopea storyboard i `step_prev_segment` iz scopea off), a
+svaka akcija ponovno cita stanje fokusa; druga je brisala pomak kartice prije crtanja. Pomak u poolu sada nosi redni
+broj (`FocusView.pool_step`), ne brise se citanjem, a mreza kartica primjenjuje svaki broj jednom
+(`qnc-media-card` `show_card_grid_focused`). Audit svih tipki QNC preseta je u tijeku.
