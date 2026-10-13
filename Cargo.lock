@@ -3940,6 +3940,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
+ "qnc-media-metadata",
  "qnc-source-preview",
 ]
 

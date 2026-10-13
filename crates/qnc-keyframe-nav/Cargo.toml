@@ -8,3 +8,6 @@ description = "QNC public piece: the step of a taken edit to the previous or nex
 qnc-decoder-catalog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-source-preview = { workspace = true }
+
+[dev-dependencies]
+qnc-media-metadata = { workspace = true }

@@ -166,6 +166,17 @@ mod tests {
             file: std::env::var("QNC_KEY_FILE").unwrap().into(),
             fps: (50, 1),
             start: (0, (1, 50)),
+            // The key picture search reads only the file, its rate and its start.
+            media: qnc_media_metadata::MediaRepresentation {
+                media_uri: String::new(),
+                container: None,
+                duration_seconds: None,
+                streams_complete: None,
+                streams: Vec::new(),
+                tags: Default::default(),
+            },
+            stream_index: 0,
+            stamp: String::new(),
         };
         let (cancel, intra) = (AtomicBool::new(false), Mutex::new(HashMap::new()));
         let cancel = (&cancel, "c", &intra);
