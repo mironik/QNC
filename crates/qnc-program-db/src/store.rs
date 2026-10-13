@@ -738,6 +738,7 @@ impl Store {
                     ],
                 )
                 .map_err(err)?;
+                split_cover_at(&tx, &marker_id, frame)?;
                 marker_id
             }
         };
@@ -2055,6 +2056,75 @@ fn merge_coincident_markers(conn: &Connection) -> Result<()> {
             _ => kept = Some((marker_id, frame)),
         }
     }
+    Ok(())
+}
+
+/// A new marker inside a covered slot splits its cover in two (user 2026-10-13, not v5,
+/// which kept the cover only before the marker and left the rest empty): the cover keeps
+/// the part before the marker, a second cover of the same shot plays on from the marker
+/// in the slot after it, so the picture does not change and each part can be changed.
+fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> Result<()> {
+    let slot: Option<(String, i64, String)> = conn
+        .query_row(
+            "SELECT slot_id, start_frame, end_marker_id FROM story_marker_slots
+             WHERE start_frame < ?1 AND ?1 < end_frame",
+            [frame],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .optional()
+        .map_err(err)?;
+    let Some((covered, start, end_marker)) = slot else {
+        return Ok(());
+    };
+    let cover: Option<(String, i64, i64, u32, u32)> = conn
+        .query_row(
+            "SELECT cover_id, source_in_frame, source_out_frame, source_fps_num, source_fps_den
+             FROM story_covers WHERE slot_id = ?1",
+            [&covered],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        )
+        .optional()
+        .map_err(err)?;
+    let (Some((cover_id, source_in, source_out, fps_num, fps_den)), Some(rate)) = (cover, story_rate(conn)?) else {
+        return Ok(());
+    };
+    if fps_num == 0 || fps_den == 0 {
+        return Ok(());
+    }
+    let (num, den) = story_per_source(rate, (fps_num, fps_den))?;
+    let split = source_in + (frame - start) * den / num;
+    let fps = f64::from(fps_num) / f64::from(fps_den);
+    let created = SystemTime::now().duration_since(UNIX_EPOCH).map(|duration| duration.as_nanos()).unwrap_or(0);
+    let now = story_now();
+    conn.execute(
+        "INSERT INTO story_covers (
+            cover_id, slot_id, timeline_start_frame, timeline_end_frame, timeline_start_sec,
+            timeline_end_sec, slot_signature, slot_index, clip_id, virtual_shot_id, title, note,
+            in_tc, out_tc, in_seconds, out_seconds, source_in_frame, source_out_frame, source_fps,
+            source_fps_num, source_fps_den, sort_index, a2_source_channel, created_at, updated_at)
+         SELECT ?1, ?2, ?3, timeline_end_frame, ?4, timeline_end_sec, slot_signature, slot_index,
+            clip_id, virtual_shot_id, title, note, ?5, out_tc, ?6, out_seconds, ?7, source_out_frame,
+            source_fps, source_fps_num, source_fps_den, sort_index, a2_source_channel, ?8, ?8
+         FROM story_covers WHERE cover_id = ?9",
+        params![
+            format!("cover_{created:x}"),
+            slot_id(marker_id, &end_marker),
+            frame,
+            timeline_sec(frame, fps),
+            frame_timecode(split, fps),
+            timeline_sec(split, fps),
+            split,
+            now,
+            cover_id
+        ],
+    )
+    .map_err(err)?;
+    conn.execute(
+        "UPDATE story_covers SET source_out_frame = ?1, out_tc = ?2, out_seconds = ?3, updated_at = ?4
+         WHERE cover_id = ?5",
+        params![split.min(source_out), frame_timecode(split, fps), timeline_sec(split, fps), now, cover_id],
+    )
+    .map_err(err)?;
     Ok(())
 }
 

@@ -29,7 +29,7 @@ pub type Result<T> = std::result::Result<T, String>;
 /// The format of a rendered unit: MOV, picture stream 0 without B pictures and with the
 /// time scale of the program rate, PCM stream 1, BT.709 limited range, timestamps from 0.
 /// Its description (`unit_media`) is written, never probed.
-pub const UNIT_FORMAT: u32 = 2;
+pub const UNIT_FORMAT: u32 = 3;
 
 /// The delivery format of the project (`export.*`), strictly: what this block cannot
 /// render is refused with a reason, never replaced.
@@ -283,6 +283,9 @@ fn mux(unit: &RenderUnit, delivery: &Delivery, ffmpeg: &Path, video: &Path, audi
         .arg(audio)
         .args(["-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "pcm_s24le"])
         .args(UNIT_TAGS)
+        // The index at the start of the file (user 2026-10-13: a long unit with it at the end
+        // took 4.6 s to open, the reader had to reach its end first).
+        .args(["-movflags", "+faststart"])
         .args(["-video_track_timescale", &unit.program_rate.fps_num.to_string(), "-f", "mov"])
         .arg(out)
         .stdin(Stdio::null())

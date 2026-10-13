@@ -1588,3 +1588,27 @@ fn excluding_a_segment_with_markers_on_both_its_edges_leaves_one_marker() {
     let left: Vec<(u64, u64)> = covers(&mut store).iter().map(|c| (c.source_in_frame, c.program_start_frame)).collect();
     assert_eq!(left, vec![(500, 5), (700, 10)], "the covers around it stay, the one inside goes");
 }
+
+#[test]
+fn a_marker_inside_a_cover_splits_it_and_the_picture_plays_on() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m10) = marker(&mut store, 10).unwrap() else {
+        panic!()
+    };
+    marker(&mut store, 20).unwrap();
+    let slot: String = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [&m10], |row| row.get(0))
+        .unwrap();
+    create_cover(&mut store, &slot, (500, 510)).unwrap();
+    marker(&mut store, 14).unwrap();
+    let mut parts: Vec<(u64, u64, u64)> =
+        covers(&mut store).iter().map(|c| (c.program_start_frame, c.program_end_frame, c.source_in_frame)).collect();
+    parts.sort();
+    assert_eq!(parts, vec![(10, 14, 500), (14, 20, 504)], "two covers, the second plays on from the marker");
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(covers(&mut store).len(), 1, "undo brings the one cover back");
+}

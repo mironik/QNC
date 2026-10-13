@@ -3731,3 +3731,13 @@ skidao i ponovno postavljao na svakom registriranom projektu, a nasljedivanje je
 otvara bazu s `SQLITE_FCNTL_PERSIST_WAL` kao ostali vlasnici (zastita mape ne dopusta brisanje WAL datoteke; SQLite je
 ponavljao ~3 s i drzao bazu). Test `the_files_of_the_prerender_cache_may_be_deleted_the_rest_stays_protected`; 41 test
 `qnc-project-store`, conformance. Odobrenje je zatvoreno, Project je ponovno zamrznut.
+Popravci 2026-10-13 (korisnik: "b, i kreni s oba popravka"; probom nadjeno: player price zapne na 1901, kratak crni
+dio 1896-1922; pokrivalica "unistena"): (1) Pokrivalica nije bila unistena pri pomaku ruba: oko 12:13 marker dodan usred
+pokrivalice (v5 pravilo) ostavio ju je samo prije markera, a ostatak slota prazan; ripple pomaci su taj prazni slot
+gurnuli preko kraja Off segmenta (crno). Odluka korisnika (b): `qnc-program-db` `split_cover_at` - novi marker usred
+pokrivalice dijeli je na dvije, druga istog klipa i kadra nastavlja od markera (slika se ne mijenja), jedan Undo
+korak; ugovor `story.database.json` (`cover_split`), test. (2) `qnc-broadcast-engine` (`program.rs`): nakon skoka
+natrag na sliku koju ima samo pozadinsko dekodiranje unatrag, glavno dekodiranje ostalo je gdje je bilo (2116), pa
+slika iza pozadinskog niza nikad nije napravljena i prica je stala; sada dekodiranje krece odmah iza tog niza. (3)
+`qnc-program-render`: dijelovi s indeksom na pocetku datoteke (`+faststart`; dugi dio s indeksom na kraju otvarao se
+4,6 s), `UNIT_FORMAT` 3 (postojeci dijelovi se jednom renderiraju ponovno, stari se brisu).

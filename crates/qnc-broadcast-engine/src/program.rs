@@ -715,11 +715,22 @@ impl VideoDecodeAdapter for ProgramVideo {
             // A frame kept, made in the background, or within reach of the open decoding:
             // the decoder stays open and paused (a frame step, like a clip's). Else a new
             // decoding; stepping back it starts 25 frames earlier.
-            let reached = self.ready.contains_key(&frame)
-                || self.back.as_ref().is_some_and(|back| back.borrow().picture(frame).is_some())
+            let decoding = self.ready.contains_key(&frame)
                 || (frame >= self.kept_from
                     && frame <= self.next_decode_frame.saturating_add(self.prefetch_frames as u64));
-            if !reached {
+            let in_back = |f: u64| self.back.as_ref().is_some_and(|back| back.borrow().picture(f).is_some());
+            if !decoding && in_back(frame) {
+                // Served from the background: the decoding goes on right after its run
+                // (live 2026-10-13: it stayed where it was before the jump, the picture
+                // after the run was never made and the story stood at that frame).
+                let mut after = frame;
+                while after < self.source.duration_frames && in_back(after) {
+                    after += 1;
+                }
+                if after != self.next_decode_frame {
+                    self.restart(after)?;
+                }
+            } else if !decoding {
                 let from = if stepping_back { frame.saturating_sub(STEP_BACK_FRAMES) } else { frame };
                 self.restart(from)?;
             }
