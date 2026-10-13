@@ -47,6 +47,17 @@ const PRODUCT_DIRECTORY_FIELDS: &[(&str, &str)] = &[
     // The prerender of the story in the delivery format (user 2026-10-12).
     ("prerender", "products/prerender"),
 ];
+/// Product folders that are caches (user 2026-10-13): inside the protected project their
+/// files may be deleted and replaced (old prerender units go with their name); the
+/// folder itself stays protected.
+const CACHE_PRODUCT_FIELDS: &[&str] = &["prerender"];
+
+fn cache_product_folders() -> impl Iterator<Item = &'static str> {
+    PRODUCT_DIRECTORY_FIELDS
+        .iter()
+        .filter(|(field, _)| CACHE_PRODUCT_FIELDS.contains(field))
+        .map(|(_, folder)| *folder)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectRow {
@@ -986,8 +997,9 @@ fn unlock_projects_root_dir(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// The protection of a project folder; a folder that has it already is left as it is
+/// (user 2026-10-13: setting it again at every start walked every file of every project).
 fn lock_project_dir(path: &Path) -> Result<(), String> {
-    set_project_delete_lock(path, false)?;
     set_project_hidden(path, true)?;
     set_project_delete_lock(path, true)
 }
@@ -1096,24 +1108,58 @@ fn set_project_delete_lock(path: &Path, locked: bool) -> Result<(), String> {
         return Ok(());
     }
     let user = windows_current_user()?;
-    let mut command = Command::new("icacls");
-    command.arg(path);
-    if locked {
-        command.arg("/deny").arg(format!("{user}:(OI)(CI)(DE,DC)"));
-    } else {
-        command.arg("/remove:d").arg(user);
+    let lock = format!("{user}:(OI)(CI)(DE,DC)");
+    // An explicit allow of deleting on the children of a cache folder comes before the
+    // deny the project folder passes down (nearer first), so their files may go.
+    let cache = format!("{user}:(OI)(CI)(IO)(DE)");
+    if !locked {
+        for folder in cache_product_folders() {
+            let dir = path.join(folder);
+            if dir.is_dir() {
+                run_icacls(&dir, &["/remove:g", user.as_str()])?;
+            }
+        }
+        return run_icacls(path, &["/remove:d", user.as_str()]);
     }
-    command.stdout(Stdio::null()).stderr(Stdio::null());
-    let status = command
+    if !icacls_has(path, &format!("{user}:(OI)(CI)(DENY)(DE,DC)"))? {
+        run_icacls(path, &["/deny", lock.as_str()])?;
+    }
+    for folder in cache_product_folders() {
+        let dir = path.join(folder);
+        if dir.is_dir() && !icacls_has(&dir, &cache)? {
+            run_icacls(&dir, &["/grant", cache.as_str()])?;
+        }
+    }
+    Ok(())
+}
+
+/// Whether the explicit (not inherited) entry `entry` is in the ACL of `path`.
+#[cfg(windows)]
+fn icacls_has(path: &Path, entry: &str) -> Result<bool, String> {
+    let output = Command::new("icacls")
+        .arg(path)
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|error| format!("Ne mogu pokrenuti icacls za '{}': {error}", path.display()))?;
+    let entry = entry.to_lowercase();
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .any(|line| line.to_lowercase().contains(&entry)))
+}
+
+#[cfg(windows)]
+fn run_icacls(path: &Path, args: &[&str]) -> Result<(), String> {
+    let status = Command::new("icacls")
+        .arg(path)
+        .args(args)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .map_err(|error| format!("Ne mogu pokrenuti icacls za '{}': {error}", path.display()))?;
     if status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "Ne mogu promijeniti delete lock za '{}'.",
-            path.display()
-        ))
+        Err(format!("Ne mogu promijeniti delete lock za '{}'.", path.display()))
     }
 }
 
@@ -1233,12 +1279,30 @@ fn validate_db_contracts() -> Result<(), String> {
 fn configure_connection(conn: &Connection) -> Result<(), String> {
     conn.busy_timeout(Duration::from_millis(5_000))
         .map_err(|error| error.to_string())?;
+    keep_wal_file(conn);
     conn.pragma_update(None, "foreign_keys", true)
         .map_err(|error| error.to_string())?;
     let _ = conn.pragma_update(None, "journal_mode", "WAL");
     conn.pragma_update(None, "synchronous", "NORMAL")
         .map_err(|error| error.to_string())?;
     Ok(())
+}
+
+/// The WAL file stays when the last connection closes (`SQLITE_FCNTL_PERSIST_WAL`, as the
+/// other owners of a project database): a protected project folder lets no file be
+/// deleted, and SQLite retried deleting it for about 3 s, holding the database
+/// (2026-10-12).
+fn keep_wal_file(conn: &Connection) {
+    let mut on: std::os::raw::c_int = 1;
+    // SAFETY: a file control of this open connection's main database; it only sets a flag.
+    unsafe {
+        rusqlite::ffi::sqlite3_file_control(
+            conn.handle(),
+            c"main".as_ptr(),
+            rusqlite::ffi::SQLITE_FCNTL_PERSIST_WAL,
+            (&mut on as *mut std::os::raw::c_int).cast(),
+        );
+    }
 }
 
 fn init_registry_schema(conn: &Connection) -> Result<(), String> {
@@ -2774,6 +2838,29 @@ mod tests {
 
         assert!(!project_dir.join("proxy").exists());
         assert!(!project_dir.join("incoming").exists());
+        unlock_project_dir(&project_dir).expect("unlock cleanup");
+        cleanup_temp_root(&root);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_files_of_the_prerender_cache_may_be_deleted_the_rest_stays_protected() {
+        let root = temp_root("cache_project");
+        let store = ProjectStore::open(&root).expect("store");
+        let templates = store.list_project_templates().expect("templates");
+        let row = store
+            .create_project("Cache Project", &templates[0].template_id, None, &test_selection(&["project", "ingest"]))
+            .expect("project");
+        let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
+        let unit = project_dir.join("products/prerender/0123456789abcdef.mov");
+        let other = project_dir.join("products/other.txt");
+        std::fs::write(&unit, b"unit").unwrap();
+        std::fs::write(&other, b"other").unwrap();
+        // A second open keeps the protection as it is (nothing set again).
+        drop(ProjectStore::open(&root).expect("store again"));
+        assert!(std::fs::remove_file(&unit).is_ok(), "a cache file goes with its name");
+        assert!(std::fs::remove_file(&other).is_err(), "the rest of the project stays protected");
+        assert!(std::fs::remove_dir(project_dir.join("products/prerender")).is_err(), "the cache folder itself stays");
         unlock_project_dir(&project_dir).expect("unlock cleanup");
         cleanup_temp_root(&root);
     }

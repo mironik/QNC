@@ -3720,3 +3720,14 @@ zadrzala. Undo vec radi iz opisa price u bazi (`story_undo`), ne iz datoteka. Na
 `icacls /deny korisnik:(OI)(CI)(DE,DC)` koja se nasljeduje na sve datoteke projekta (zato se ni stari dijelovi ni WAL ne
 mogu obrisati); predlozeno je da `products/prerender` bude mapa predmemorije (sadrzaj se smije brisati, mapa ne) -
 ceka otkljucavanje Projecta.
+Zatvoreno ograniceno odobrenje 2026-10-13 (korisnik: "da" na otkljucavanje Projecta za zastitu mape prerendera; "s
+obzirom da baza usporava montazu treba pronaci bolje rjesenje"): otkljucano i izvedeno samo `crates/qnc-project-store`.
+(1) Zastita od brisanja ostaje na cijelom projektu (`icacls /deny korisnik:(OI)(CI)(DE,DC)`), a mapa predmemorije
+`products/prerender` dobiva izricitu dozvolu brisanja za svoj sadrzaj (`(OI)(CI)(IO)(DE)`; blizi predak ide prije
+naslijedene zabrane): stari dijelovi se brisu s nazivom, mapa se ne moze obrisati, ostatak projekta i sam projekt ostaju
+zasticeni (provjereno probom i testom). (2) Zastita se postavlja samo kad je nema: Project ju je pri svakom pokretanju
+skidao i ponovno postavljao na svakom registriranom projektu, a nasljedivanje je Windows prolazio kroz sve datoteke
+(prvi prikaz kartice Project 820-1045 ms, sada 155 ms; §3: otvaranje ne smije pokretati masovni ACL posao). (3) Project
+otvara bazu s `SQLITE_FCNTL_PERSIST_WAL` kao ostali vlasnici (zastita mape ne dopusta brisanje WAL datoteke; SQLite je
+ponavljao ~3 s i drzao bazu). Test `the_files_of_the_prerender_cache_may_be_deleted_the_rest_stays_protected`; 41 test
+`qnc-project-store`, conformance. Odobrenje je zatvoreno, Project je ponovno zamrznut.
