@@ -3506,6 +3506,9 @@ dependencies = [
  "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
  "qnc-segment-panel",
+ "qnc-source-dock",
+ "qnc-timeline",
+ "qnc-ui-kit",
  "serde",
  "serde_json",
 ]
@@ -3898,12 +3901,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-key-focus"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
 name = "qnc-key-intents"
 version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-dev-diagnostics",
  "qnc-key-cheatsheet",
+ "qnc-key-focus",
  "qnc-key-preset",
  "qnc-keyboard-shortcut",
 ]

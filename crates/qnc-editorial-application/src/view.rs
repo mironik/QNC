@@ -61,8 +61,8 @@ pub struct EditorialView {
     pub preview: PreviewView,
     /// Ton and Off segments of the story program.
     pub segments: qnc_program_segments::SegmentsView,
-    /// The panel the keyboard acts on.
-    pub focus: qnc_panel_focus::Panel,
+    /// The panel the keyboard acts on (and the dock button it is on).
+    pub focus: qnc_panel_focus::FocusView,
     /// Original timecode of the chosen source clip (camera XML, else the one probe).
     pub source_timecode: Option<qnc_source_timecode::SourceTimecode>,
 }
@@ -113,7 +113,6 @@ pub enum EditorialIntent {
     PreviewClip(String),
     /// Open the parent clip and show this short's IN/OUT.
     PreviewShort(String),
-    SwitchLibraryTab(LibraryTab),
     Action(String),
     Timeline(qnc_timeline::TimelineIntent),
     Segment(qnc_program_segments::SegmentCommand),

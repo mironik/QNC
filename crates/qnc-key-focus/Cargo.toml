@@ -1,0 +1,8 @@
+[package]
+name = "qnc-key-focus"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the keys stay with the QNC keyboard catalog; egui keeps keyboard focus only in a text field"
+
+[dependencies]
+eframe = { workspace = true }

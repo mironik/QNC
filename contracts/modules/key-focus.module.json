@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.key-focus",
+  "module_name": "Keys stay with the QNC keyboard catalog",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["keyboard.focus.keep"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-key-focus",
+  "input": "The egui context of the frame, before its keys are read.",
+  "output": "Keyboard focus taken away from every widget that is not a text field (button, card, tab, combo box); a text field keeps it for typing.",
+  "specification": "User rule 2026-10-13: Tab walks the panels of a form and Alt+ jumps; egui's own Tab walk over widgets must not take the keys from the QNC keyboard catalog."
+}

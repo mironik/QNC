@@ -3772,3 +3772,21 @@ i poruka praznog taba nisu dirani. `tools/qnc-conformance`: iznimke od qnc_v4 ti
 (QNC preset: `overwrite_cover`, `focus_empty_slot`); iznimka koja vise ne odstupa je greska, test. Ostali preseti
 (Edius, Resolve, Premiere, Final Cut, Avid) ostaju kako jesu; plan za kasnije: originalni preseti tih programa i kocka
 prevoditelj njihovih akcija u QNC akcije.
+Dopuna 2026-10-13 (korisnik: "moramo rijesiti TAB setnju po panelima unutar forme i izbor formi kroz QNC desktop tab";
+"imamo dva nacina, TAB i Alt+"; "TAB: Media pool tabovi -> Media pool -> source timeline -> grupa dugmadi u source timeline
+panelu -> Segment panel"; "to je vezano za forme, ne mora biti univerzalno"): audit (v5 `story/focus.rs` ima Tab kruzenje
+Media pool -> Segmenti -> Source; Ingest i Project ga nemaju; izbor formi u v5 i QNC-u samo misem) pokazao je da egui
+prvim Tabom daje fokus gumbu ili kartici, a tada su sve tipke kataloga mrtve (i u Ingestu). Izvedeno: (1) nova javna kocka
+`crates/qnc-key-focus` (+ ugovor `contracts/modules/key-focus.module.json`): svaki frame prije citanja tipki vraca egui
+fokus svakom widgetu osim polja za upis teksta; poziva je `qnc-key-intents`, pa vrijedi za Story, MA i Ingest (Project
+ne cita tipke kroz nju). (2) Redoslijed Tab-a je svojstvo forme: `contracts/ui/editorial.layout.json` svaka grupa ima
+`tab_order` (Story: pool_tabs, pool, source_timeline, source_buttons, segments; MA isto bez segmenata),
+`qnc-editorial-layout` (`focus_names`, `FOCUS_PANELS`, provjera imena). `qnc-panel-focus`: paneli `PoolTabs` i
+`SourceButtons`, `FocusLayout`, `FocusView`, Tab/Shift+Tab kruze redom forme (panel bez sadrzaja se preskace: tabovi,
+dugmad, Segmenti bez segmenata), pocetak na prvom panelu; na tabovima poola strelice lijevo/desno biraju tab, klik ili
+Alt+slovo taba stavljaju fokus na tabove; na dugmadi docka strelice biraju dugme (okvir fokusa), Enter ga pritisne kao
+njegovu akciju kataloga (`take_pick`). `qnc-editorial-application` (`new(root, FocusLayout)`, neiskoristen
+`SwitchLibraryTab` uklonjen), `qnc-editorial-desktop` (`focus_layout` umjesto neiskoristenog `group`),
+`qnc-editorial-blocks` (okvir fokusa na tabovima i dugmetu; stilovi docka, timelinea i gumba premjesteni u
+`qnc-editorial-layout`). C10 spusteno: application 706 -> 703, blocks 379 -> 354, desktop 88 -> 86. Nije izvedeno:
+strelice i Enter po karticama Media poola (fokusirana kartica, gore/dolje za red), Alt+broj za izbor forme u traci desktopa.

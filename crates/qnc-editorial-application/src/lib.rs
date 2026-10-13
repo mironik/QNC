@@ -17,7 +17,7 @@ use std::{
 use qnc_active_project_read::{ActiveProjectChange, ActiveProjectReader, ShownProject};
 use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
-use qnc_panel_focus::{Panel, PanelFocus};
+pub use qnc_panel_focus::{FocusLayout, Panel, PanelFocus};
 use qnc_program_segments::SourcePick;
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_source_preview::{PreviewContext, SourcePreview};
@@ -124,10 +124,10 @@ impl Default for EditorialApplication {
 }
 
 impl EditorialApplication {
-    /// Starts from the QNC root. Missing settings end in a controlled error,
-    /// never in an invented project.
-    pub fn new(root: impl AsRef<Path>) -> Self {
-        let mut app = Self::default();
+    /// Starts from the QNC root with the Tab walk of its form. Missing settings end in a
+    /// controlled error, never in an invented project.
+    pub fn new(root: impl AsRef<Path>, focus: FocusLayout) -> Self {
+        let mut app = Self { focus: PanelFocus::with_layout(focus), ..Self::default() };
         app.bindings = qnc_source_bindings::load(root.as_ref());
         match ActiveProjectReader::from_root(root.as_ref()) {
             Ok(reader) => {
@@ -401,10 +401,6 @@ impl EditorialApplication {
                 self.focus.to_source(&mut self.wrap);
                 self.open_short(&shot_id)
             }
-            EditorialIntent::SwitchLibraryTab(tab) => {
-                self.view.library_tab = tab;
-                true
-            }
             EditorialIntent::Action(action_id) => {
                 let pieces = (&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline);
                 match self.focus.route(&action_id, pieces) {
@@ -431,6 +427,8 @@ impl EditorialApplication {
     /// The actions of the application itself: library tabs, IN/OUT with their
     /// stills and saving a short.
     fn application_action(&mut self, action_id: &str) -> bool {
+        let picked = self.focus.take_pick(); // an arrow on the pool tabs, Enter on a dock button
+        let action_id = picked.as_deref().unwrap_or(action_id);
         match action_id {
             tab if LibraryTab::from_action(tab).is_some() => {
                 self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
@@ -695,7 +693,7 @@ mod tests {
     fn virtual_tab_is_a_separate_list_and_a_short_duration_is_seconds_and_frames() {
         let mut app = EditorialApplication::default();
         app.view.clips = vec![clip("clip-a", "Mironik")];
-        app.dispatch(EditorialIntent::SwitchLibraryTab(LibraryTab::Virtual));
+        app.dispatch(EditorialIntent::action("editorial_tab_virtual"));
         assert_eq!(app.view().library_tab, LibraryTab::Virtual);
         assert!(app.view().shorts.is_empty());
         let label = qnc_virtual_short_cards::build_card(
@@ -730,7 +728,7 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("qnc_editorial_no_project_{}", std::process::id()));
         let _ = std::fs::create_dir_all(&root);
-        let app = EditorialApplication::new(&root);
+        let app = EditorialApplication::new(&root, FocusLayout::default());
         assert!(app.view().clips.is_empty());
         assert!(app.shown_project.is_none());
         let _ = std::fs::remove_dir_all(&root);

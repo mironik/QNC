@@ -18,11 +18,9 @@ pub struct EditorialApp {
 
 impl EditorialApp {
     pub fn new(group: &str, root: PathBuf) -> Result<Self, String> {
-        Ok(Self {
-            form: EditorialForm::new(group)?,
-            application: EditorialApplication::new(root),
-            pace: qnc_paint_pace::PaintPace::new(),
-        })
+        let form = EditorialForm::new(group)?;
+        let application = EditorialApplication::new(root, form.focus_layout());
+        Ok(Self { form, application, pace: qnc_paint_pace::PaintPace::new() })
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {

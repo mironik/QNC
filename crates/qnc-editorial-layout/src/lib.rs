@@ -64,6 +64,9 @@ impl EditorialContracts {
         if composition.source_dock.actions_rtl.is_empty() {
             return Err(format!("group '{group}' source dock must declare actions"));
         }
+        if let Some(name) = composition.tab_order.iter().find(|name| !FOCUS_PANELS.contains(&name.as_str())) {
+            return Err(format!("group '{group}' tab_order has unknown panel '{name}'"));
+        }
 
         Ok(Self {
             shell,
@@ -88,6 +91,31 @@ impl EditorialContracts {
     pub fn pool_transport(&self) -> &[TransportCommand] {
         let own = self.composition().pool_head.transport_right.as_deref();
         own.unwrap_or(&self.editorial.pool_head.transport_right)
+    }
+
+    /// The Tab walk of this group (user 2026-10-13: it belongs to the form): its panels in
+    /// order, the action ids of its pool tabs, the action ids of its source dock buttons
+    /// left to right as they are drawn.
+    pub fn focus_names(&self) -> (Vec<&str>, Vec<&str>, Vec<&str>) {
+        let order = self.composition().tab_order.iter().map(String::as_str).collect();
+        let tabs = self.pool_tabs().iter().filter_map(TransportCommand::action_id).collect();
+        let buttons = self.composition().source_dock.actions_rtl.iter().rev().filter_map(TransportCommand::action_id).collect();
+        (order, tabs, buttons)
+    }
+
+    /// The look of the source dock of this layout.
+    pub fn dock_style(&self, theme: &theme::Theme) -> qnc_source_dock::TimelineDockStyle {
+        qnc_source_dock::TimelineDockStyle {
+            fill: theme.panel_alt,
+            border: theme.border,
+            text: theme.text,
+            font_ui: theme.font_ui,
+            chrome_row_height: theme.chrome_row_height,
+            chrome_control_height: theme.chrome_control_height,
+            chrome_pad_x: theme.chrome_pad_x,
+            chrome_pad_y: theme.chrome_pad_y,
+            header_timeline_gap: self.editorial.source_dock.header_timeline_gap,
+        }
     }
 
     pub fn dock_height(&self) -> f32 {
@@ -239,10 +267,25 @@ pub struct EditorialSourceDock {
     pub header_timeline_gap: f32,
 }
 
+/// The panels a group's `tab_order` may name.
+pub const FOCUS_PANELS: [&str; 5] = ["pool_tabs", "pool", "source_timeline", "source_buttons", "segments"];
+
+/// The timeline colours of the editorial theme.
+pub fn timeline_theme(theme: &theme::Theme) -> qnc_timeline::TimelineTheme {
+    qnc_timeline::TimelineTheme::from_qnc_theme(theme.bg, theme.surface, theme.surface_alt, theme.border_soft, theme.text, theme.text_muted, theme.accent)
+}
+
+/// The chrome buttons of the editorial theme.
+pub fn button_style(theme: &theme::Theme) -> qnc_ui_kit::ChromeButtonStyle {
+    qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: theme.chrome_control_height }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct GroupComposition {
     pub role: String,
     pub right_panel: String,
+    /// The panels Tab walks in this group, in order (`FOCUS_PANELS`).
+    pub tab_order: Vec<String>,
     /// Tabs and transport of this group; the shared pool head when absent.
     #[serde(default)]
     pub pool_head: GroupPoolHead,

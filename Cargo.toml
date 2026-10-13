@@ -119,6 +119,7 @@ members = [
     "crates/qnc-key-cheatsheet",
     "crates/qnc-desktop-tabs",
     "crates/qnc-key-preset",
+    "crates/qnc-key-focus",
     "crates/qnc-media-optimize",
     "crates/qnc-shot-stills",
     "crates/qnc-source-mark-focus",
@@ -288,6 +289,7 @@ qnc-pending-marks = { path = "crates/qnc-pending-marks" }
 qnc-key-cheatsheet = { path = "crates/qnc-key-cheatsheet" }
 qnc-desktop-tabs = { path = "crates/qnc-desktop-tabs" }
 qnc-key-preset = { path = "crates/qnc-key-preset" }
+qnc-key-focus = { path = "crates/qnc-key-focus" }
 qnc-media-optimize = { path = "crates/qnc-media-optimize" }
 qnc-shot-stills = { path = "crates/qnc-shot-stills" }
 qnc-source-mark-focus = { path = "crates/qnc-source-mark-focus" }

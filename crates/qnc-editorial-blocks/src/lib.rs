@@ -10,13 +10,13 @@ use eframe::egui::{
 
 use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
 use qnc_segment_panel::StorySourceTimeline as _;
-use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
-use qnc_timeline::{TimelineIntent, TimelineTheme};
+use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline};
+use qnc_timeline::TimelineIntent;
 
 use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
 use qnc_panel_focus::{paint_focus, Panel};
 
-use qnc_editorial_layout::{theme::Theme, EditorialContracts};
+use qnc_editorial_layout::{self as layout, theme::Theme, EditorialContracts};
 
 /// Media Assist and Story on the one desktop board: preview in the monitor, pool head
 /// in the head row, the clip cards in the body, the group's right panel (Segmenti for
@@ -36,23 +36,27 @@ pub fn render_desktop(
             render_preview(ui, rect, contracts, theme, view);
             None
         }
-        "pool-head" => render_pool_head(ui, contracts, theme, view),
+        "pool-head" => {
+            let intent = render_pool_head(ui, contracts, theme, view);
+            paint_focus(ui, rect, view.focus.panel == Panel::PoolTabs, theme.focus);
+            intent
+        }
         "clip-cards" => {
             // Clip menu (qnc_v5 media pool): the card grid fills the column under the
             // pool head, down to the dock, on the panel background.
             let intent = render_clip_grid(ui, contracts, theme, view);
-            paint_focus(ui, rect, view.focus == Panel::Pool, theme.focus);
+            paint_focus(ui, rect, view.focus.panel == Panel::Pool, theme.focus);
             intent
         }
         "right-panel" if contracts.composition().right_panel == "segment_panel" => {
-            let intent = qnc_segment_panel::show(ui, &view.segments, timeline_theme(theme), &contracts.editorial.cover_lengths)
+            let intent = qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths)
                 .map(EditorialIntent::Segment);
-            paint_focus(ui, rect, view.focus == Panel::Segments, theme.focus);
+            paint_focus(ui, rect, view.focus.panel == Panel::Segments, theme.focus);
             intent
         }
         "source-dock" => {
             let intent = render_source_dock(ui, contracts, theme, view);
-            paint_focus(ui, rect, view.focus == Panel::SourceTimeline, theme.focus);
+            paint_focus(ui, rect, view.focus.panel == Panel::SourceTimeline, theme.focus);
             intent
         }
         // Right panel of the other groups: empty, reserved for their functions.
@@ -149,7 +153,7 @@ fn render_pool_head(
         tab_gap: 10.0,
     };
     let mut intent = None;
-    show_chrome_row(ui, rect, &dock_style(contracts, theme), theme.surface, true, |ui| {
+    show_chrome_row(ui, rect, &contracts.dock_style(theme), theme.surface, true, |ui| {
         intent = match qnc_media_pool_head::show_row(ui, &style, &tabs, &labels) {
             Some(qnc_media_pool_head::RowClick::Tab(index)) => tabs_left[index].action_id(),
             Some(qnc_media_pool_head::RowClick::Command(index)) => commands[index].action_id(),
@@ -158,20 +162,6 @@ fn render_pool_head(
         .map(EditorialIntent::action);
     });
     intent
-}
-
-fn dock_style(contracts: &EditorialContracts, theme: &Theme) -> TimelineDockStyle {
-    TimelineDockStyle {
-        fill: theme.panel_alt,
-        border: theme.border,
-        text: theme.text,
-        font_ui: theme.font_ui,
-        chrome_row_height: theme.chrome_row_height,
-        chrome_control_height: theme.chrome_control_height,
-        chrome_pad_x: theme.chrome_pad_x,
-        chrome_pad_y: theme.chrome_pad_y,
-        header_timeline_gap: contracts.editorial.source_dock.header_timeline_gap,
-    }
 }
 
 /// The source dock is the public one; this form only says which clip it shows and which
@@ -187,17 +177,21 @@ fn render_source_dock(
     let intent = show_timeline_dock(
         ui,
         rect,
-        &dock_style(contracts, theme),
+        &contracts.dock_style(theme),
         (view.current_clip_label()).unwrap_or(&contracts.editorial.source_dock.clip_label_fallback),
         |ui| {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
-                for action in &contracts.composition().source_dock.actions_rtl {
+                let actions = &contracts.composition().source_dock.actions_rtl;
+                for (index, action) in actions.iter().enumerate() {
                     let enabled = action
                         .action_id()
                         .is_some_and(|action_id| view.action_enabled(action_id));
                     let on = action.action_id().is_some_and(|action_id| view.segments.action_selected(action_id));
-                    if qnc_ui_kit::chrome_button(ui, action.label(), enabled, on, button_style(theme)).clicked() {
+                    let response = qnc_ui_kit::chrome_button(ui, action.label(), enabled, on, layout::button_style(theme));
+                    // Drawn right to left: the focus counts the buttons left to right.
+                    paint_focus(ui, response.rect.expand(2.0), view.focus.button == Some(actions.len() - 1 - index), theme.focus);
+                    if response.clicked() {
                         if let Some(action_id) = action.action_id() {
                             header_intent = Some(EditorialIntent::action(action_id));
                         }
@@ -205,7 +199,7 @@ fn render_source_dock(
                 }
             });
         },
-        SourceTimeline::from_assets(&view.preview.timeline, timeline_theme(theme), &view.preview.assets)
+        SourceTimeline::from_assets(&view.preview.timeline, layout::timeline_theme(theme), &view.preview.assets)
             .with_timecode(view.source_timecode)
             .story(&view.segments),
     );
@@ -216,18 +210,6 @@ fn render_source_dock(
         TimelineIntent::TakeAudioLane(_) => Some(EditorialIntent::action("select_audio_a1")),
         other => Some(EditorialIntent::Timeline(other)),
     }
-}
-
-fn timeline_theme(theme: &Theme) -> TimelineTheme {
-    TimelineTheme::from_qnc_theme(
-        theme.bg,
-        theme.surface,
-        theme.surface_alt,
-        theme.border_soft,
-        theme.text,
-        theme.text_muted,
-        theme.accent,
-    )
 }
 
 fn render_clip_grid(
@@ -245,7 +227,7 @@ fn render_clip_grid(
             command = qnc_segment_panel::show_segment_list(
                 ui,
                 segments,
-                timeline_theme(theme),
+                layout::timeline_theme(theme),
                 theme.danger,
             );
         });
@@ -396,14 +378,3 @@ fn render_clip_grid(
         None => None,
     }
 }
-
-
-fn button_style(theme: &Theme) -> qnc_ui_kit::ChromeButtonStyle {
-    qnc_ui_kit::ChromeButtonStyle {
-        text: theme.text,
-        border: theme.border,
-        focus: theme.focus,
-        height: theme.chrome_control_height,
-    }
-}
-

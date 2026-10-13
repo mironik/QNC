@@ -87,6 +87,7 @@
         "show_quick_cover": false
       },
       "right_panel": "none",
+      "tab_order": ["pool_tabs", "pool", "source_timeline", "source_buttons"],
       "source_dock": {
         "show": true,
         "show_header": true,
@@ -108,6 +109,7 @@
         "show_quick_cover": false
       },
       "right_panel": "none",
+      "tab_order": ["pool_tabs", "pool", "source_timeline", "source_buttons"],
       "source_dock": {
         "show": true,
         "show_header": true,
@@ -129,6 +131,7 @@
         "show_quick_cover": false
       },
       "right_panel": "none",
+      "tab_order": ["pool_tabs", "pool", "source_timeline", "source_buttons"],
       "source_dock": {
         "show": true,
         "show_header": true,
@@ -161,6 +164,7 @@
         ]
       },
       "right_panel": "segment_panel",
+      "tab_order": ["pool_tabs", "pool", "source_timeline", "source_buttons", "segments"],
       "source_dock": {
         "show": true,
         "show_header": true,

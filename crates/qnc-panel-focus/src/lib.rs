@@ -21,11 +21,60 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// A panel of an editorial surface that takes the keyboard.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Panel {
+    /// The tabs of the pool head (All, SubClip, B-roll, Segment).
+    PoolTabs,
     Pool,
     /// v5: choosing a clip puts the keyboard on its source timeline.
     #[default]
     SourceTimeline,
+    /// The action buttons in the head of the source dock.
+    SourceButtons,
     Segments,
+}
+
+impl Panel {
+    /// The panel a layout contract names in its `tab_order`.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "pool_tabs" => Self::PoolTabs,
+            "pool" => Self::Pool,
+            "source_timeline" => Self::SourceTimeline,
+            "source_buttons" => Self::SourceButtons,
+            "segments" => Self::Segments,
+            _ => return None,
+        })
+    }
+}
+
+/// The Tab walk of one form (user 2026-10-13: it belongs to the form, from its layout
+/// contract): its panels in order, the action ids of its pool tabs and of its source
+/// dock buttons, left to right.
+#[derive(Debug, Clone)]
+pub struct FocusLayout {
+    pub order: Vec<Panel>,
+    pub tabs: Vec<String>,
+    pub buttons: Vec<String>,
+}
+
+impl FocusLayout {
+    pub fn new((order, tabs, buttons): (Vec<&str>, Vec<&str>, Vec<&str>)) -> Self {
+        let owned = |names: Vec<&str>| names.into_iter().map(str::to_string).collect();
+        Self { order: order.into_iter().filter_map(Panel::from_name).collect(), tabs: owned(tabs), buttons: owned(buttons) }
+    }
+}
+
+impl Default for FocusLayout {
+    /// The walk without a layout: pool, source timeline, segments.
+    fn default() -> Self {
+        Self { order: vec![Panel::Pool, Panel::SourceTimeline, Panel::Segments], tabs: Vec::new(), buttons: Vec::new() }
+    }
+}
+
+/// What a form draws of the focus: the panel and, on the source dock buttons, which one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FocusView {
+    pub panel: Panel,
+    pub button: Option<usize>,
 }
 
 /// Actions of the segment panel that also run from the other panels: they use
@@ -56,11 +105,29 @@ pub struct PanelFocus {
     /// Up/Down on a taken edit: the key picture search and what its answer moves.
     keyframes: qnc_keyframe_nav::KeyframeNav,
     jump: Option<Jump>,
+    layout: FocusLayout,
+    /// The pool tab and the source dock button the arrows are on.
+    tab: usize,
+    button: usize,
+    /// The catalog action a key on the pool tabs or a dock button stands for; the
+    /// caller runs it as its own action (`take_pick`).
+    pick: Option<String>,
 }
 
 impl PanelFocus {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The focus of a form with its Tab walk; it starts on the first panel of the walk.
+    pub fn with_layout(layout: FocusLayout) -> Self {
+        let panel = layout.order.first().copied().unwrap_or_default();
+        Self { panel, layout, ..Self::default() }
+    }
+
+    /// The action a key on the pool tabs or a dock button stood for, once.
+    pub fn take_pick(&mut self) -> Option<String> {
+        self.pick.take()
     }
 
     /// A mark taken with Ctrl+I/O that the source timeline still has in focus.
@@ -78,7 +145,7 @@ impl PanelFocus {
     pub fn poll(
         &mut self,
         (preview, _wrap, segments, timeline): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection),
-    ) -> Panel {
+    ) -> FocusView {
         if let Some(answer) = self.keyframes.take() {
             match (self.jump.take(), answer) {
                 (Some(Jump::SourceMark), Ok(frames)) => {
@@ -91,7 +158,7 @@ impl PanelFocus {
                 (None, Ok(_)) => {}
             }
         }
-        self.panel
+        FocusView { panel: self.panel, button: (self.panel == Panel::SourceButtons).then_some(self.button) }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).
@@ -146,6 +213,42 @@ impl PanelFocus {
             }
             "activate_focused_item" if segments.sync_drafting() => segments.confirm_source(),
             "delete_marker" if segments.sync_drafting() => segments.discard_sync(),
+            // A pool tab, by click or Alt+letter, puts the keyboard on the pool tabs.
+            tab if self.layout.tabs.iter().any(|id| id == tab) => {
+                self.tab = self.layout.tabs.iter().position(|id| id == tab).unwrap_or(0);
+                self.panel = Panel::PoolTabs;
+                return None;
+            }
+            // The arrows on the pool tabs choose the tab to the left or right.
+            "step_back_frame" | "step_forward_frame" if panel == Panel::PoolTabs => {
+                let last = self.layout.tabs.len().saturating_sub(1);
+                self.tab = if action_id == "step_back_frame" { self.tab.saturating_sub(1) } else { (self.tab + 1).min(last) };
+                self.pick = self.layout.tabs.get(self.tab).cloned();
+                return None;
+            }
+            // The arrows on the dock buttons move between them, Enter presses one.
+            "step_back_frame" | "step_forward_frame" if panel == Panel::SourceButtons => {
+                let last = self.layout.buttons.len().saturating_sub(1);
+                self.button = if action_id == "step_back_frame" { self.button.saturating_sub(1) } else { (self.button + 1).min(last) };
+                true
+            }
+            "activate_focused_item" if panel == Panel::SourceButtons => {
+                let Some(id) = self.layout.buttons.get(self.button).cloned() else { return Some(false) };
+                if !segments.view().action_enabled(&id) {
+                    return Some(false);
+                }
+                // The button acts as its catalog action from the source timeline it heads.
+                self.panel = Panel::SourceTimeline;
+                let routed = self.route(&id, (preview, wrap, segments, timeline));
+                if self.panel == Panel::SourceTimeline {
+                    self.panel = Panel::SourceButtons;
+                }
+                if routed.is_none() {
+                    self.pick = Some(id);
+                }
+                return routed;
+            }
+            "activate_focused_item" | "step_prev_part" | "step_next_part" if matches!(panel, Panel::PoolTabs | Panel::SourceButtons) => false,
             "step_prev_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(1),
             "step_next_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(-1),
             // Up/Down on a taken edit (user 2026-10-11): to the key picture before or after it,
@@ -183,11 +286,7 @@ impl PanelFocus {
             // Home on the source timeline: the start of the clip (the V label does the same).
             "playlist_input_start" if on_source => preview.cue(timeline.range_start_frame),
             "focus_next" | "focus_prev" => {
-                let next = cycle(
-                    panel,
-                    action_id == "focus_next",
-                    !segments.view().is_empty(),
-                );
+                let next = cycle(panel, action_id == "focus_next", &self.walk(!segments.view().is_empty()));
                 self.enter(next, preview, wrap)
             }
             "play_pause" => match segments.sync_space(wrap.is_active()) {
@@ -283,7 +382,7 @@ impl PanelFocus {
                     // The pool has no arrow keys: they step the source playhead (user rule
                     // 2026-10-01: the arrows move the playhead one frame, no other key needed).
                     Panel::SourceTimeline => preview.step(frames),
-                    Panel::Pool => false, // the keys act on the panel in focus only
+                    Panel::Pool | Panel::PoolTabs | Panel::SourceButtons => false, // the keys act on the panel in focus only
                 }
             }
             action if SOURCE_TO_PROGRAM.contains(&action) => segments.apply_action(action),
@@ -292,6 +391,18 @@ impl PanelFocus {
             }
             _ => return None,
         })
+    }
+
+    /// The panels Tab reaches now: those of the layout that have something to take.
+    fn walk(&self, has_segments: bool) -> Vec<Panel> {
+        let layout = &self.layout;
+        let walk = layout.order.iter().copied().filter(|panel| match panel {
+            Panel::PoolTabs => !layout.tabs.is_empty(),
+            Panel::SourceButtons => !layout.buttons.is_empty(),
+            Panel::Segments => has_segments,
+            _ => true,
+        });
+        walk.collect()
     }
 
     /// A segment edge written or dropped: the mark is let go and the keyboard and
@@ -335,14 +446,11 @@ pub fn paint_focus(ui: &egui::Ui, rect: egui::Rect, focused: bool, color: egui::
     }
 }
 
-/// v5 `next_panel_focus`: pool, source timeline, segments (when there are any).
-pub fn cycle(panel: Panel, forward: bool, has_segments: bool) -> Panel {
-    let order: &[Panel] = if has_segments {
-        &[Panel::Pool, Panel::SourceTimeline, Panel::Segments]
-    } else {
-        &[Panel::Pool, Panel::SourceTimeline]
+/// The next or previous panel of the walk, round; the first one from outside it.
+pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {
+    let Some(index) = order.iter().position(|p| *p == panel) else {
+        return order.first().copied().unwrap_or(panel);
     };
-    let index = order.iter().position(|p| *p == panel).unwrap_or(0);
     let next = if forward {
         (index + 1) % order.len()
     } else {
@@ -356,16 +464,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tab_cycles_the_panels_like_v5() {
-        assert_eq!(cycle(Panel::Pool, true, true), Panel::SourceTimeline);
-        assert_eq!(cycle(Panel::SourceTimeline, true, true), Panel::Segments);
-        assert_eq!(cycle(Panel::Segments, true, true), Panel::Pool);
-        assert_eq!(cycle(Panel::Pool, false, true), Panel::Segments);
-        assert_eq!(
-            cycle(Panel::SourceTimeline, true, false),
-            Panel::Pool,
-            "no segment panel without a story"
-        );
+    fn tab_walks_the_panels_of_the_form_and_keys_on_tabs_and_buttons_become_their_actions() {
+        let layout = FocusLayout::new((
+            vec!["pool_tabs", "pool", "source_timeline", "source_buttons", "segments"],
+            vec!["editorial_tab_all", "editorial_tab_virtual"],
+            vec!["save_virtual_shot", "add_ton_segment"],
+        ));
+        let mut focus = PanelFocus::with_layout(layout);
+        let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
+        let mut timeline = TimelineProjection::default();
+        assert_eq!(focus.panel(), Panel::PoolTabs, "the walk starts on its first panel");
+        for expected in [Panel::Pool, Panel::SourceTimeline, Panel::SourceButtons, Panel::PoolTabs] {
+            focus.route("focus_next", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+            assert_eq!(focus.panel(), expected, "no segments yet: the segment panel is skipped");
+        }
+        assert_eq!(focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline)), None);
+        assert_eq!(focus.take_pick().as_deref(), Some("editorial_tab_virtual"), "the right arrow is the next tab");
+        focus.set(Panel::SourceButtons);
+        focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).button, Some(1));
+        assert_eq!(cycle(Panel::SourceTimeline, false, &[Panel::Pool, Panel::SourceTimeline]), Panel::Pool);
     }
 
     #[test]

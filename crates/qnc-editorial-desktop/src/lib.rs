@@ -29,8 +29,9 @@ impl EditorialForm {
         Ok(Self { contracts, theme })
     }
 
-    pub fn group(&self) -> &str {
-        &self.contracts.group
+    /// The Tab walk of this group's form (its layout contract).
+    pub(crate) fn focus_layout(&self) -> qnc_editorial_application::FocusLayout {
+        qnc_editorial_application::FocusLayout::new(self.contracts.focus_names())
     }
 
     pub(crate) fn shortcuts(&self) -> &qnc_keyboard_shortcut::ShortcutCatalog {

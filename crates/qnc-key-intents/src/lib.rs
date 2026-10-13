@@ -43,6 +43,7 @@ pub fn action_ids(
     scopes: &[&str],
     play_action: &str,
 ) -> Vec<String> {
+    qnc_key_focus::keep_keys(ctx); // a focused button would take every key (Tab, Space, I/O)
     let preset = project_preset();
     let chosen = in_preset(ctx, catalog, preset.as_deref());
     let catalog = chosen.as_deref().unwrap_or(catalog);

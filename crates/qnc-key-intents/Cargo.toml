@@ -9,4 +9,5 @@ eframe = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
 qnc-key-cheatsheet = { workspace = true }
 qnc-key-preset = { workspace = true }
+qnc-key-focus = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

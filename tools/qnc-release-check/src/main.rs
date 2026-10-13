@@ -20,7 +20,7 @@ fn main() -> Result<(), String> {
     );
     std::env::set_var("QNC_ROOT", &root);
     let dir = isolated_project(&root)?;
-    let mut app = EditorialApplication::new(&root);
+    let mut app = EditorialApplication::new(&root, qnc_editorial_application::FocusLayout::default());
     let clip = wait(&mut app, Duration::from_secs(20), |app| {
         app.view().clips.first().map(|clip| clip.clip_id.clone())
     })
