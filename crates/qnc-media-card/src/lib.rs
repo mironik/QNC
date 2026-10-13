@@ -680,8 +680,9 @@ fn grid(
                             },
                         );
                         if let Some(key) = key.as_ref().filter(|key| key.index == index) {
-                            // The keyboard is here: a thick frame of the focus colour.
-                            ui.painter().rect_stroke(rect, 0.0, egui::Stroke::new(3.0, key.color), egui::StrokeKind::Inside);
+                            // The keyboard is here: a thick frame of the focus colour around the card, outside
+                            // the red frame of the chosen clip, so both show.
+                            ui.painter().rect_stroke(rect.expand(1.0), 0.0, egui::Stroke::new(3.0, key.color), egui::StrokeKind::Outside);
                         }
                         if resp.clicked() {
                             let is_checkbox_click = input.features.selection_check
