@@ -9,5 +9,8 @@ qnc-decoder-catalog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-frame-timebase = { workspace = true }
 qnc-image-assets = { workspace = true }
+qnc-media-decode = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-media-stream = { workspace = true }
 qnc-program-view = { workspace = true }
 qnc-source-preview = { workspace = true }

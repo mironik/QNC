@@ -3685,3 +3685,12 @@ dekodiranja. `qnc-source-preview` `shown_program_picture` (slika price na monito
 `qnc-program-segments` `stored_picture_at` (koju sliku klipa spremljena prica pokazuje na tom mjestu), `qnc-trim-stills`
 je uzima samo kad je zoom bas tu sliku trazi (za vrijeme playa nista se ne kopira). Aplikacija predaje to u postojecem
 pozivu (C10 isti). Korak 2: dekoder koji ostaje otvoren (libav u procesu) za ostale slike zooma.
+Dopuna 2026-10-13 (korak 2 od 2): slike zooma iz dekodera koji ostaje otvoren. `qnc-trim-stills` `open_run.rs`: jedan
+dekoder kataloga po klipu (najvise 4), u procesu aplikacije kad program ima ugradeni dekoder; slike cita redom ili skace
+unutar dekodera (bez novog ffmpeg procesa po slici), trazi `yuv420p` i sam je smanjuje na 480x270 (BT.709). Program bez
+ugradenog dekodera, ili dekoder koji javi gresku, koristi dosadasnji izvlakac (`decode_run`), pa mjesto u zoomu nikad
+ne ostaje crno. `qnc-source-preview` `LocatedPicture` nosi spremljeni zapis medija, indeks video toka i pecat datoteke.
+`apps/qnc-app` i `apps/qnc-story` imaju znacajku `libav` (kao player: `FFMPEG_DIR`, `LIBCLANG_PATH`); izdanje se gradi s
+njom. Ciscenje diska (korisnik: "izbrisi nepotrebne privremene datoteke i nepotrebnu povijest"; disk je imao 1,2 GB
+slobodno pa povezivac nije mogao pisati): `cargo clean --profile dev` (34,6 GiB), privremene datoteke starije od dana i
+stari `QNC/data/diagnostics/player.log` (do 12. 10.); izvorni kod, git povijest, projekti i `target/release` nisu dirani.

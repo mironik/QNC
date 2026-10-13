@@ -9,6 +9,7 @@ name = "qnc-app"
 path = "src/main.rs"
 
 [dependencies]
+qnc-decoder-catalog = { workspace = true }
 eframe = { workspace = true }
 qnc-app-registry = { workspace = true }
 qnc-desktop = { workspace = true }
@@ -20,3 +21,6 @@ qnc-media-assist-audio-desktop-adapter = { workspace = true }
 qnc-project-desktop-adapter = { workspace = true }
 qnc-shell-desktop-api = { workspace = true }
 
+[features]
+# The in-process decoder of the catalog for the trim zoom (FFMPEG_DIR, LIBCLANG_PATH), as the player has it.
+libav = ["qnc-decoder-catalog/libav"]

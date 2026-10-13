@@ -4,5 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-decoder-catalog = { workspace = true }
 eframe = { workspace = true }
 qnc-editorial-desktop = { workspace = true }
+
+[features]
+# The in-process decoder of the catalog for the trim zoom (FFMPEG_DIR, LIBCLANG_PATH), as the player has it.
+libav = ["qnc-decoder-catalog/libav"]

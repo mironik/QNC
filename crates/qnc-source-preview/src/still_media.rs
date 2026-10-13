@@ -14,13 +14,20 @@ use qnc_work_settings::{SettingsReader, WorkSettings};
 use crate::{PreviewContext, SourcePreview};
 
 /// The local file of a clip's picture and its saved frame rate (`num`, `den`).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LocatedPicture {
     pub file: PathBuf,
     pub fps: (u32, u32),
     /// The saved start of the video stream, `(start_pts, time_base)`: a picture's frame is
     /// counted from it, as the player counts them.
     pub start: (i64, (i64, i64)),
+    /// The saved record of the media the picture plays from and its video stream: a
+    /// decoder is opened on them as the player opens one (user 2026-10-13: a decoder that
+    /// stays open for the trim zoom).
+    pub media: qnc_media_metadata::MediaRepresentation,
+    pub stream_index: u32,
+    /// The storage stamp of the local file (the decoder checks the media is the same).
+    pub stamp: String,
 }
 
 impl LocatedPicture {
@@ -72,11 +79,14 @@ impl StillLocator {
         let start_pts = stream.start_pts.as_ref().map(|pts| pts.value).ok_or("Klip nema spremljeni pocetni PTS.")?;
         let base = stream.time_base.as_ref().map(|tb| tb.value).ok_or("Klip nema spremljenu vremensku bazu.")?;
         let start = (start_pts, (base.numerator, base.denominator));
-        Ok(LocatedPicture { file: self.local_file(&media.media_uri)?, fps, start })
+        let stream_index = stream.index.as_ref().map(|index| index.value).ok_or("Klip nema spremljeni indeks video toka.")?;
+        let (file, stamp) = self.local_file(&media.media_uri)?;
+        Ok(LocatedPicture { file, fps, start, media: media.clone(), stream_index, stamp })
     }
 
-    /// The media URI on a local binding of this machine: a source or the project folder.
-    fn local_file(&self, media_uri: &str) -> Result<PathBuf, String> {
+    /// The media URI on a local binding of this machine: a source or the project folder,
+    /// and the storage stamp of the file.
+    fn local_file(&self, media_uri: &str) -> Result<(PathBuf, String), String> {
         let reference = qnc_source_contract::SourceReference::from_uri(media_uri).map_err(|error| error.to_string())?;
         let project = self
             .reader
@@ -85,20 +95,25 @@ impl StillLocator {
             .flatten()
             .zip(self.settings.project_media_source_uri().ok())
             .map(|(dir, uri)| (uri, dir));
-        let root = self
+        let (source_uri, root) = self
             .sources
             .iter()
             .filter_map(|binding| Some((binding.uri.clone(), binding.file.clone()?)))
             .chain(project)
             .find(|(uri, _)| uri == reference.source_uri())
-            .map(|(_, root)| root)
             .ok_or("Medij klipa nije lokalno dostupan za sliku.")?;
         let root = root.canonicalize().map_err(|error| error.to_string())?;
         let file = root.join(reference.relative_path()).canonicalize().map_err(|error| error.to_string())?;
         if !file.starts_with(&root) || !file.is_file() {
             return Err("Medij klipa je izvan svog izvora.".into());
         }
-        Ok(file)
+        let source = qnc_media_stream::LocalSource::new(&source_uri, &root).map_err(|error| error.to_string())?;
+        let stamp = qnc_media_stream::MediaStream::local(&source, media_uri)
+            .map_err(|error| error.to_string())?
+            .info()
+            .storage_stamp
+            .clone();
+        Ok((file, stamp))
     }
 }
 

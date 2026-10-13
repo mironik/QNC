@@ -3020,6 +3020,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-app-registry",
+ "qnc-decoder-catalog",
  "qnc-desktop",
  "qnc-ingest-desktop-adapter",
  "qnc-media-assist-audio-ai-desktop-adapter",
@@ -4861,6 +4862,7 @@ dependencies = [
  "qnc-filmstrip",
  "qnc-media-metadata",
  "qnc-media-records",
+ "qnc-media-stream",
  "qnc-playback-activity",
  "qnc-player-client",
  "qnc-player-input",
@@ -4906,6 +4908,7 @@ name = "qnc-story"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-decoder-catalog",
  "qnc-editorial-desktop",
 ]
 
@@ -4978,6 +4981,9 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-frame-timebase",
  "qnc-image-assets",
+ "qnc-media-decode",
+ "qnc-media-metadata",
+ "qnc-media-stream",
  "qnc-program-view",
  "qnc-source-preview",
 ]

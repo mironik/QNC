@@ -27,6 +27,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod open_run;
+
 use qnc_image_assets::RgbaImage;
 use qnc_program_view::{SegmentsView, StillPicture};
 use qnc_source_preview::{LocatedPicture, StillLocator};
@@ -389,6 +391,13 @@ fn decode_run(
             place
         }
     };
+    // A decoder that stays open (in-process) first; a program without it uses the extractor.
+    match open_run::decode(picture, first, count, &place, &open_run::shared(), cancel) {
+        Some(Ok(made)) => return Ok(made),
+        // Never a black place: the extractor makes it the way it always did.
+        Some(Err(error)) => log(&format!("trim-stills open decoder {}:{} {error}", picture.clip_id, picture.source_frame)),
+        None => {}
+    }
     let extractor = qnc_decoder_catalog::installed_filmstrip_extractor()
         .map_err(|error| error.to_string())?
         .ok_or("Ovo racunalo nema izvlakac slika u katalogu dekodera.")?;
