@@ -3802,3 +3802,7 @@ akcija dugmeta), `qnc-media-card` (`show_card_grid_focused`, `step_focus`, `Grid
 mreze, pomak, pomicanje pogleda do nje, Enter = klik; `show_card_grid` isti za Ingest), `qnc-editorial-blocks` (mreza
 s fokusom). Katalog: Enter vise ne sprema virtualni kadar (QNC preset, scope `off`; iznimka od qnc_v4 na popisu
 `V4_KEY_EXCEPTIONS`); SubClip je Shift+S ili dugme Add SubClip, s bilo kojeg panela.
+Dopuna 2026-10-13 (korisnik: "dodati okvir oko odabranog klipa da korisnik vidi gdje je fokus"): kartica na kojoj je
+tipkovnica u Media poolu ima deblji okvir boje fokusa (3 px), a odabrani klip zadrzava svoj crveni okvir, pa se vidi i
+gdje je fokus i koji je klip izabran. `qnc-media-card` (`show_card_grid_focused` prima boju fokusa, `KeyFocus`);
+`show_card_grid` (Ingest) se ne mijenja.

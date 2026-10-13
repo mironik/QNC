@@ -362,7 +362,7 @@ fn render_clip_grid(
                 empty_message,
                 id_salt: "editorial_clip_grid",
             },
-            view.focus.pool_step,
+            (view.focus.pool_step, theme.focus),
         );
     });
     match action {

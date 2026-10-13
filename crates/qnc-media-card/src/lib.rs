@@ -530,14 +530,15 @@ pub fn step_focus(from: usize, step: GridStep, cols: usize, count: usize) -> usi
 }
 
 /// The card grid in keyboard focus (`input.panel_focused`): it keeps its focused card,
-/// moves it by `step` and scrolls to it; Enter (`GridStep::Open`) opens the focused card
-/// as a click does. Without focus it is `show_card_grid`.
+/// draws a thick frame in `color` around it (the chosen clip keeps its own frame), moves
+/// it by `step` and scrolls to it; Enter (`GridStep::Open`) opens the focused card as a
+/// click does. Without focus it is `show_card_grid`.
 pub fn show_card_grid_focused(
     ui: &mut egui::Ui,
     style: &CardStyle,
     metrics: &CardMetrics,
     input: &CardGridInput<'_>,
-    step: Option<GridStep>,
+    (step, color): (Option<GridStep>, Color32),
 ) -> Option<CardGridAction> {
     if !input.panel_focused || input.cards.is_empty() {
         return show_card_grid(ui, style, metrics, input);
@@ -549,8 +550,8 @@ pub fn show_card_grid_focused(
     let focused = step.map_or(from, |step| step_focus(from, step, cols, input.cards.len()));
     ui.data_mut(|data| data.insert_temp(key, focused));
     let opened = (step == Some(GridStep::Open)).then(|| CardGridAction::Activate(input.cards[focused].id.to_string()));
-    let focused_input = CardGridInput { focused_id: input.cards[focused].id, ..*input };
-    let clicked = grid(ui, style, metrics, &focused_input, step.map(|_| focused));
+    let unfocused = CardGridInput { panel_focused: false, ..*input }; // the chosen clip keeps its frame
+    let clicked = grid(ui, style, metrics, &unfocused, Some(KeyFocus { index: focused, scroll: step.is_some(), color }));
     clicked.or(opened)
 }
 
@@ -564,12 +565,19 @@ pub fn show_card_grid(
     grid(ui, style, metrics, input, None)
 }
 
+/// The card the keyboard is on: its frame, and whether to bring it into view.
+struct KeyFocus {
+    index: usize,
+    scroll: bool,
+    color: Color32,
+}
+
 fn grid(
     ui: &mut egui::Ui,
     style: &CardStyle,
     metrics: &CardMetrics,
     input: &CardGridInput<'_>,
-    scroll_to: Option<usize>,
+    key: Option<KeyFocus>,
 ) -> Option<CardGridAction> {
     let mut clicked: Option<CardGridAction> = None;
     let cards = input.cards;
@@ -602,7 +610,7 @@ fn grid(
 
             let total_rows = cards.len().div_ceil(grid.cols);
             let row_stride = grid.card_h + grid.gap;
-            if let Some(index) = scroll_to {
+            if let Some(index) = key.as_ref().filter(|key| key.scroll).map(|key| key.index) {
                 // The focused card moved: bring it into view.
                 let top = ui.cursor().min + Vec2::new(0.0, (index / grid.cols) as f32 * row_stride);
                 ui.scroll_to_rect(Rect::from_min_size(top, Vec2::new(grid.card_w, grid.card_h)), None);
@@ -621,7 +629,7 @@ fn grid(
                 let end = (start + grid.cols).min(cards.len());
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = grid.gap;
-                    for card in &cards[start..end] {
+                    for (index, card) in cards[start..end].iter().enumerate().map(|(i, card)| (start + i, card)) {
                         let focused = card.id == focus_id || card.thumb_id == focus_id;
                         let thumb = input.thumb_textures.get(card.thumb_id).cloned();
                         let (rect, resp) = ui.allocate_exact_size(
@@ -650,6 +658,10 @@ fn grid(
                                 tc: input.tc,
                             },
                         );
+                        if let Some(key) = key.as_ref().filter(|key| key.index == index) {
+                            // The keyboard is here: a thick frame of the focus colour.
+                            ui.painter().rect_stroke(rect, 0.0, egui::Stroke::new(3.0, key.color), egui::StrokeKind::Inside);
+                        }
                         if resp.clicked() {
                             let is_checkbox_click = input.features.selection_check
                                 && resp.interact_pointer_pos().is_some_and(|pos| {
