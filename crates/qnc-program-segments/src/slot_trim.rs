@@ -1,0 +1,132 @@
+//! A slot longer or shorter at one edge (user 2026-10-13, not in v5): on the segment
+//! panel Ctrl+I takes the start and Ctrl+O the end of the slot under the Wrap playhead.
+//! The other slots keep their lengths: the markers after the slot move with its end and
+//! the last slot of the story takes the difference. The arrows move the picture at the
+//! taken edge a frame (at the start the slot's cover starts earlier or later in its
+//! source, the slot keeps its place), Up/Down to a key picture; Enter writes it
+//! (`TrimSlot`), Escape drops it.
+
+use qnc_program_db::Operation;
+
+use crate::ProgramSegments;
+
+/// The slot whose edge is taken: its stored frames and the draft change of length.
+#[derive(Debug, Clone)]
+pub(crate) struct SlotTrim {
+    pub(crate) slot_id: String,
+    pub(crate) start: bool,
+    pub(crate) slot_start: u64,
+    pub(crate) slot_end: u64,
+    /// Story frames the slot is longer (negative: shorter).
+    pub(crate) frames: i64,
+}
+
+impl SlotTrim {
+    /// Where a marker frame of the program is drawn: from the slot's end on (the locked
+    /// end of the story excepted) it moves with the trim.
+    pub(crate) fn moved(&self, frame: u64, total: u64) -> u64 {
+        if frame >= self.slot_end && frame < total {
+            frame.saturating_add_signed(self.frames)
+        } else {
+            frame
+        }
+    }
+}
+
+impl ProgramSegments {
+    /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the slot under the
+    /// Wrap playhead (the last slot also takes its end). False when there is none.
+    pub(crate) fn take_slot_edge(&mut self, start: bool) -> bool {
+        let frame = self.playhead.unwrap_or(0);
+        let count = self.view.slots.len();
+        let found = self.view.slots.iter().enumerate().find(|(index, slot)| {
+            frame >= slot.start_frame && (frame < slot.end_frame || (index + 1 == count && frame == slot.end_frame))
+        });
+        let Some(slot) = found.map(|(_, slot)| slot.clone()) else {
+            self.refresh_view("Nema M-M slota pod playheadom".into());
+            return false;
+        };
+        if slot.end_frame >= self.view.total_frames {
+            self.refresh_view("Zadnji slot zavrsava s pricom: pomakni njegov pocetni M marker.".into());
+            return false;
+        }
+        self.marker_edit = None;
+        self.slot_move = None;
+        self.selected_slot = Some(slot.slot_id.clone());
+        self.selected_marker = None;
+        self.write(Operation::SelectSlot { slot_id: slot.slot_id.clone() });
+        self.slot_trim = Some(SlotTrim {
+            slot_id: slot.slot_id,
+            start,
+            slot_start: slot.start_frame,
+            slot_end: slot.end_frame,
+            frames: 0,
+        });
+        self.refresh_view(Self::trim_message(start));
+        true
+    }
+
+    fn trim_message(start: bool) -> String {
+        let edge = if start { "Pocetak" } else { "Kraj" };
+        format!("{edge} slota: strelice za sliku, gore/dolje kljucna slika, Enter sprema, Esc odustaje")
+    }
+
+    /// An arrow, Enter or Escape while a slot edge is taken; `None` for any other key.
+    pub(crate) fn trim_key(&mut self, action_id: &str) -> Option<bool> {
+        self.slot_trim.as_ref()?;
+        match action_id {
+            "step_back_frame" => Some(self.nudge_trim(-1)),
+            "step_forward_frame" => Some(self.nudge_trim(1)),
+            "activate_focused_item" => Some(self.commit_slot_trim()),
+            "clear_focus" | "close_player" => {
+                self.slot_trim = None;
+                self.refresh_view("Promjena slota odustana.".into());
+                Some(true)
+            }
+            _ => None,
+        }
+    }
+
+    /// The picture at the taken edge `picture` frames later (negative: earlier): at the
+    /// start the slot gets shorter by as much, at the end longer.
+    pub(crate) fn nudge_trim(&mut self, picture: i64) -> bool {
+        let Some(trim) = self.slot_trim.clone() else {
+            return false;
+        };
+        let frames = if trim.start { trim.frames - picture } else { trim.frames + picture };
+        let total = self.view.total_frames;
+        let length = trim.slot_end as i64 - trim.slot_start as i64 + frames;
+        let last = self
+            .stored_markers
+            .iter()
+            .filter(|marker| marker.system_role.is_empty() && marker.program_frame >= trim.slot_end)
+            .map(|marker| marker.program_frame)
+            .max()
+            .unwrap_or(trim.slot_end);
+        if length < 1 {
+            self.refresh_view("Slot mora imati barem jednu sliku.".into());
+            return true;
+        }
+        if last as i64 + frames >= total as i64 {
+            self.refresh_view("Zadnji slot price mora zadrzati barem jednu sliku.".into());
+            return true;
+        }
+        self.slot_trim = Some(SlotTrim { frames, ..trim.clone() });
+        self.refresh_view(Self::trim_message(trim.start));
+        true
+    }
+
+    /// Enter: the trimmed slot is written; false when no slot edge is taken.
+    pub(crate) fn commit_slot_trim(&mut self) -> bool {
+        let Some(trim) = self.slot_trim.take() else {
+            return false;
+        };
+        if trim.frames != 0 {
+            self.marker_committing = true;
+            self.write(Operation::TrimSlot { slot_id: trim.slot_id, start: trim.start, frames: trim.frames });
+        } else {
+            self.refresh_view(String::new());
+        }
+        true
+    }
+}

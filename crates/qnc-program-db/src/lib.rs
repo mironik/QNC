@@ -165,6 +165,12 @@ pub enum Operation {
     MoveMarker { marker_id: String, program_frame: u64 },
     /// Both markers of the slot move so it starts at `start_frame` (user 2026-10-10).
     MoveSlot { slot_id: String, start_frame: u64 },
+    /// A slot longer or shorter by `frames` story frames at its start (`start`) or its
+    /// end (user 2026-10-13, not in v5): the other slots keep their lengths, so the
+    /// markers after the slot move by as much and the last slot of the story takes the
+    /// difference. At the start the slot keeps its place and its cover starts that much
+    /// earlier or later in its source.
+    TrimSlot { slot_id: String, start: bool, frames: i64 },
     DeleteMarker { marker_id: String },
     ListMarkers,
     ListSlots,
@@ -213,6 +219,7 @@ impl Operation {
                 | Self::CreateMarker { .. }
                 | Self::MoveMarker { .. }
                 | Self::MoveSlot { .. }
+                | Self::TrimSlot { .. }
                 | Self::DeleteMarker { .. }
                 | Self::CreateCover { .. }
                 | Self::DeleteCover { .. }

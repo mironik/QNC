@@ -30,9 +30,16 @@ impl ProgramSegments {
         confirmed
     }
 
-    /// Enter on the segment panel: the marker taken with Ctrl+M.
+    /// Enter on the segment panel: the marker taken with Ctrl+M, the slot taken with
+    /// Ctrl+S or the slot edge taken with Ctrl+I/O.
     pub fn confirm_program(&mut self) -> bool {
-        self.commit_marker_edit() || self.commit_slot_move()
+        self.commit_marker_edit() || self.commit_slot_move() || self.commit_slot_trim()
+    }
+
+    /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the slot under the
+    /// Wrap playhead (user 2026-10-13).
+    pub fn take_slot_edge_at_playhead(&mut self, start: bool) -> bool {
+        self.take_slot_edge(start)
     }
 
     /// Something on the source timeline waits for Enter, or this Enter confirmed it:

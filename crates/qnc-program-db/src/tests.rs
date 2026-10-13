@@ -1510,3 +1510,81 @@ fn a_slot_moves_with_both_its_markers_up_to_its_neighbours() {
     assert_eq!(markers(&mut store), vec![1, 7, 25]);
     assert!(move_to(&mut store, &slot, 0).unwrap_err().contains("susjednog"), "the locked start");
 }
+
+#[test]
+fn a_slot_trimmed_at_an_edge_moves_the_slots_after_it_and_the_last_one_takes_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m10) = marker(&mut store, 10).unwrap() else {
+        panic!()
+    };
+    marker(&mut store, 16).unwrap();
+    marker(&mut store, 22).unwrap();
+    let slot_of = |marker_id: &str| -> String {
+        Connection::open(&path)
+            .unwrap()
+            .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [marker_id], |row| row.get(0))
+            .unwrap()
+    };
+    let slot = slot_of(&m10);
+    create_cover(&mut store, &slot, (500, 506)).unwrap();
+    let trim = |store: &mut Story, start: bool, frames: i64| {
+        run(store, Operation::TrimSlot { slot_id: slot.clone(), start, frames })
+    };
+    // The end two frames later: the slots after keep their lengths, the last one shrinks.
+    trim(&mut store, false, 2).unwrap();
+    assert_eq!(markers(&mut store), vec![10, 18, 24]);
+    assert_eq!(covers(&mut store)[0].source_in_frame, 500, "the cover plays on from its IN");
+    // The start one frame earlier: the slot keeps its place, the cover starts earlier.
+    trim(&mut store, true, 1).unwrap();
+    assert_eq!(markers(&mut store), vec![10, 19, 25]);
+    assert_eq!(covers(&mut store)[0].source_in_frame, 499);
+    trim(&mut store, true, -3).unwrap();
+    assert_eq!(markers(&mut store), vec![10, 16, 22], "shorter at the start: the cover starts later");
+    assert_eq!(covers(&mut store)[0].source_in_frame, 502);
+    assert!(trim(&mut store, false, 8).unwrap_err().contains("Zadnji slot"), "the last slot keeps a frame");
+    assert!(trim(&mut store, false, -6).unwrap_err().contains("jednu sliku"), "the slot keeps a frame");
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(markers(&mut store), vec![10, 19, 25], "one undo step per trim");
+    let last = slot_of(&markers_id(&path, 25));
+    assert!(run(&mut store, Operation::TrimSlot { slot_id: last, start: false, frames: 1 })
+        .unwrap_err()
+        .contains("pocetni M marker"));
+}
+
+fn markers_id(path: &std::path::Path, frame: i64) -> String {
+    Connection::open(path)
+        .unwrap()
+        .query_row("SELECT marker_id FROM story_markers WHERE timeline_frame = ?1", [frame], |row| row.get(0))
+        .unwrap()
+}
+
+#[test]
+fn excluding_a_segment_with_markers_on_both_its_edges_leaves_one_marker() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    let ids = three_segments(&mut store);
+    let Data::Created(m5) = marker(&mut store, 5).unwrap() else {
+        panic!()
+    };
+    let Data::Created(m10) = marker(&mut store, 10).unwrap() else {
+        panic!()
+    };
+    let Data::Created(m20) = marker(&mut store, 20).unwrap() else {
+        panic!()
+    };
+    let Data::Created(m25) = marker(&mut store, 25).unwrap() else {
+        panic!()
+    };
+    let slot = |start: &str, end: &str| format!("{start}|{end}");
+    create_cover(&mut store, &slot(&m5, &m10), (500, 505)).unwrap();
+    create_cover(&mut store, &slot(&m10, &m20), (600, 610)).unwrap();
+    create_cover(&mut store, &slot(&m20, &m25), (700, 705)).unwrap();
+    run(&mut store, Operation::DeleteSegment { segment_id: ids[1].clone() }).unwrap();
+    assert_eq!(markers(&mut store), vec![5, 10, 15], "one marker where the segment was");
+    let left: Vec<(u64, u64)> = covers(&mut store).iter().map(|c| (c.source_in_frame, c.program_start_frame)).collect();
+    assert_eq!(left, vec![(500, 5), (700, 10)], "the covers around it stay, the one inside goes");
+}

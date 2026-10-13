@@ -3647,3 +3647,20 @@ Dopuna 2026-10-12 (korisnik: spremljena pokrivalica mijenja boju po trajanju, "i
 pokrivalice na stopi price i daje trajanje `sekunde:slike` (isti zapis kao trajanje segmenta); `qnc-timeline`
 (`TimelineCoverSpan.fill`, `label`) samo crta zadanu boju i broj kad stane. Privremena pokrivalica Synca ostaje u boji
 fokusa dok se ne spremi. Story ploca predaje pravila jednim argumentom postojeceg poziva.
+Audit i dopuna 2026-10-13 (korisnik: "marker je OUT odabranog slota i IN narednog"; "duljine ostalih slotova ostaju
+iste, znaci pomicu se"; "polozaj playheada odreduje koji slot je cilj"; "direktno Ctrl+I ili Ctrl+O"; "segment se
+rjede dira, a slotovi su dio montaze"; v5 to nema): audit svih radnji s markerima i segmentima (baza `qnc-program-db`,
+upravljac `qnc-program-segments`, tipke `qnc-panel-focus` i katalog). Izvedeno: na panelu Segmenti Ctrl+I uzme
+pocetak, Ctrl+O kraj slota pod Wrap playheadom; strelice mijenjaju sliku na uzetom rubu, gore/dolje kljucna slika,
+Enter zapisuje novu operaciju `TrimSlot` (jedan Undo korak), Esc odustaje. Ostali slotovi zadrzavaju duljinu: svi
+markeri od kraja slota pomicu se za isto, zadnji slot price uzima razliku (zadrzava barem jednu sliku; zadnji slot
+sam se ne skracuje ovim putem nego pomakom svog pocetnog markera). Na pocetku slot ostaje na mjestu, a njegova
+pokrivalica pocinje ranije ili kasnije u izvoru (koliko izvor dopusta). Prozor reza pokazuje sliku prije i poslije
+uzetog ruba (`qnc-program-view` `trim_stills`). Rub segmenta preselio je na Ctrl+Shift+I / Ctrl+Shift+O (nove akcije
+kataloga `select_segment_start`, `select_segment_end` u svim presetima); gumb Edit ostaje. Popravak iz audita:
+iskljucenje segmenta s markerom na prvoj i zadnjoj slici ostavljalo je dva markera na istoj slici; sada ostaje jedan
+(`merge_coincident_markers`), pokrivalice susjednih slotova ostaju, pokrivalica iskljucenog dijela odlazi. Ugovor
+`story.database.json` (`slot_trim`, `coincident_markers`). Otvoreno iz audita: premjestanje segmenta gore/dolje ne
+pomice markere i pokrivalice (ceka odluku), baza ne provjerava susjede pri pomaku markera (provjerava upravljac),
+pomak markera pomice Wrap playhead, a pomak slota ne. Testovi `qnc-program-db` (30), `qnc-program-segments` (36),
+conformance.

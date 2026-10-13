@@ -101,6 +101,12 @@
     "select_mark_out": {
       "label": "Selektiraj OUT marker"
     },
+    "select_segment_start": {
+      "label": "Uzmi početak segmenta pod playheadom (Segmenti)"
+    },
+    "select_segment_end": {
+      "label": "Uzmi kraj segmenta pod playheadom (Segmenti)"
+    },
     "select_marker": {
       "label": "Selektiraj M marker"
     },
@@ -301,8 +307,8 @@
       { "title": "Reprodukcija i playhead", "actions": ["play_pause", "step_back_frame", "step_forward_frame", "playlist_input_start"] },
       { "title": "IN / OUT", "actions": ["mark_in", "mark_out", "select_mark_in", "select_mark_out", "mark_in_fit_duration", "save_virtual_shot"] },
       { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2"] },
-      { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "delete_part"] },
-      { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "focus_empty_slot", "navigate_prev_object", "navigate_next_object"] },
+      { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "select_segment_start", "select_segment_end", "delete_part"] },
+      { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "focus_empty_slot", "select_mark_in", "select_mark_out", "navigate_prev_object", "navigate_next_object"] },
       { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover"] },
       { "title": "Općenito", "actions": ["undo_object", "redo_object", "focus_next", "focus_prev", "toggle_cheatsheet"] }
     ]
@@ -436,6 +442,20 @@
             "code": "KeyO",
             "ctrl": true,
             "shift": false
+          }
+        ],
+        "select_segment_start": [
+          {
+            "code": "KeyI",
+            "ctrl": true,
+            "shift": true
+          }
+        ],
+        "select_segment_end": [
+          {
+            "code": "KeyO",
+            "ctrl": true,
+            "shift": true
           }
         ],
         "select_marker": [
@@ -902,6 +922,20 @@
             "shift": false
           }
         ],
+        "select_segment_start": [
+          {
+            "code": "KeyI",
+            "ctrl": true,
+            "shift": true
+          }
+        ],
+        "select_segment_end": [
+          {
+            "code": "KeyO",
+            "ctrl": true,
+            "shift": true
+          }
+        ],
         "select_marker": [
           {
             "code": "KeyM",
@@ -1320,6 +1354,20 @@
             "shift": false
           }
         ],
+        "select_segment_start": [
+          {
+            "code": "KeyI",
+            "ctrl": true,
+            "shift": true
+          }
+        ],
+        "select_segment_end": [
+          {
+            "code": "KeyO",
+            "ctrl": true,
+            "shift": true
+          }
+        ],
         "select_marker": [
           {
             "code": "KeyM",
@@ -1726,6 +1774,20 @@
             "code": "KeyO",
             "ctrl": true,
             "shift": false
+          }
+        ],
+        "select_segment_start": [
+          {
+            "code": "KeyI",
+            "ctrl": true,
+            "shift": true
+          }
+        ],
+        "select_segment_end": [
+          {
+            "code": "KeyO",
+            "ctrl": true,
+            "shift": true
           }
         ],
         "select_marker": [
@@ -2141,6 +2203,20 @@
             "code": "KeyO",
             "ctrl": true,
             "shift": false
+          }
+        ],
+        "select_segment_start": [
+          {
+            "code": "KeyI",
+            "ctrl": true,
+            "shift": true
+          }
+        ],
+        "select_segment_end": [
+          {
+            "code": "KeyO",
+            "ctrl": true,
+            "shift": true
           }
         ],
         "select_marker": [
@@ -2563,6 +2639,20 @@
             "code": "KeyO",
             "ctrl": true,
             "shift": false
+          }
+        ],
+        "select_segment_start": [
+          {
+            "code": "KeyI",
+            "ctrl": true,
+            "shift": true
+          }
+        ],
+        "select_segment_end": [
+          {
+            "code": "KeyO",
+            "ctrl": true,
+            "shift": true
           }
         ],
         "select_marker": [

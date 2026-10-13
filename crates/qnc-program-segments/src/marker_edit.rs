@@ -41,6 +41,7 @@ impl ProgramSegments {
             return self.refresh_view("Početni i završni M marker su zaključani.".into());
         };
         // The draft starts where the marker is stored; a refused frame keeps it there.
+        self.slot_trim = None;
         self.selected_marker = Some(marker_id.clone());
         self.selected_slot = None;
         self.marker_edit = Some((marker_id, pin.frame));

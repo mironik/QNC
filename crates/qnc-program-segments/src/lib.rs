@@ -15,6 +15,7 @@ mod edit;
 mod lanes;
 mod nav;
 mod slot_move;
+mod slot_trim;
 mod marker_edit;
 mod sync;
 
@@ -155,6 +156,8 @@ pub struct ProgramSegments {
     marker_edit: Option<(String, u64)>,
     /// The slot taken with Ctrl+S and its draft shift (`slot_move.rs`).
     slot_move: Option<slot_move::SlotMove>,
+    /// The slot edge taken with Ctrl+I/O on the segment panel (`slot_trim.rs`).
+    slot_trim: Option<slot_trim::SlotTrim>,
     /// A cover taken with Ctrl+click; Delete removes it.
     cover_taken: Option<String>,
     /// A marker move was confirmed; Enter stays taken until it lands.
@@ -362,12 +365,15 @@ impl ProgramSegments {
     /// Whether a keyboard catalog action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
         self.command_for(action_id).is_some()
-            || (self.slot_move.is_some()
+            || ((self.slot_move.is_some() || self.slot_trim.is_some())
                 && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus" | "close_player"))
     }
 
     /// Applies a keyboard catalog action of the program; false if it is not one.
     pub fn apply_action(&mut self, action_id: &str) -> bool {
+        if let Some(done) = self.trim_key(action_id) {
+            return done; // a taken slot edge (segment panel)
+        }
         if let Some(done) = self.slot_key(action_id) {
             return done; // a taken slot (select_current_marker_slot)
         }
@@ -411,6 +417,7 @@ impl ProgramSegments {
             SegmentCommand::Purge(segment_id) => self.write(Operation::PurgeSegment { segment_id }),
             SegmentCommand::Undo | SegmentCommand::Redo => {
                 self.marker_edit = None;
+                self.slot_trim = None;
                 self.adopt_selection = true;
                 self.write(if matches!(command, SegmentCommand::Undo) {
                     Operation::UndoStory
@@ -976,6 +983,17 @@ impl ProgramSegments {
         if self.slot_move.as_ref().map(|slot| &slot.slot_id) != self.selected_slot.as_ref() {
             self.slot_move = None; // another selection lets the slot go
         }
+        if self.slot_trim.as_ref().map(|trim| &trim.slot_id) != self.selected_slot.as_ref() {
+            self.slot_trim = None; // another selection lets the slot edge go
+        }
+        if let Some(trim) = &self.slot_trim {
+            // The draft: the markers from the slot's end on move with the trim.
+            let total = view.total_frames;
+            view.markers.iter_mut().filter(|pin| !pin.locked).for_each(|pin| pin.frame = trim.moved(pin.frame, total));
+            for drawn in &mut view.slots {
+                (drawn.start_frame, drawn.end_frame) = (trim.moved(drawn.start_frame, total), trim.moved(drawn.end_frame, total));
+            }
+        }
         if let Some(slot) = &self.slot_move {
             // The draft is drawn where the slot and its two markers are going.
             view.markers.iter_mut().for_each(|pin| pin.frame = slot.moved(pin.frame));
@@ -1004,7 +1022,10 @@ impl ProgramSegments {
         view.playhead = self.playhead;
         view.message = message;
         view.editing = self.editing.clone();
-        view.edit_stills = qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves());
+        view.edit_stills = match &self.slot_trim {
+            Some(trim) => qnc_program_view::trim_stills(&view, &slots(&self.stored_slots, None), &trim.slot_id, trim.start, trim.frames),
+            None => qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves()),
+        };
         view.source_edit_stills = self.edge_stills();
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
         self.lane_view(&mut view);

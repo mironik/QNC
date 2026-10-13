@@ -147,6 +147,7 @@ impl Store {
                 program_frame,
             } => self.move_marker(marker_id, *program_frame),
             Operation::MoveSlot { slot_id, start_frame } => self.move_slot(slot_id, *start_frame),
+            Operation::TrimSlot { slot_id, start, frames } => self.trim_slot(slot_id, *start, *frames),
             Operation::DeleteMarker { marker_id } => self.delete_marker(marker_id),
             Operation::ListMarkers => self.list_markers(),
             Operation::ListSlots => self.list_slots(),
@@ -376,6 +377,7 @@ impl Store {
             .map_err(err)?;
         }
         renumber_segments(&tx)?;
+        merge_coincident_markers(&tx)?;
         finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
@@ -850,6 +852,51 @@ impl Store {
             )
             .map_err(err)?;
         }
+        finalize_story(&tx)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// A slot trimmed or extended at one edge (user 2026-10-13, not in v5): the other
+    /// slots keep their lengths, so every marker from the slot's end on moves by
+    /// `frames` and the last slot of the story takes the difference (it keeps at least
+    /// one frame; the locked end stays). At its start the slot keeps its place and its
+    /// cover starts `frames` earlier in its source (as far as the source allows); at its
+    /// end the cover plays on. The last slot ends with the story: its edges move with Ctrl+M.
+    fn trim_slot(&mut self, slot_id: &str, start: bool, frames: i64) -> Result<Data> {
+        let fps = require_story_fps(&self.conn)?;
+        let duration = program_length(&self.conn)?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        let (start_id, slot_start, slot_end): (String, i64, i64) = tx
+            .query_row(
+                "SELECT start_marker_id, start_frame, end_frame FROM story_marker_slots WHERE slot_id = ?1",
+                [slot_id.trim()],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .map_err(err)?
+            .ok_or_else(|| format!("slot not found: {slot_id}"))?;
+        if slot_end >= duration {
+            return Err("Zadnji slot zavrsava s pricom: pomakni njegov pocetni M marker.".into());
+        }
+        if frames == 0 {
+            return Ok(Data::Changed);
+        }
+        if slot_end - slot_start + frames < 1 {
+            return Err("Slot mora imati barem jednu sliku.".into());
+        }
+        let last = user_markers_from(&tx, slot_end)?.into_iter().map(|(_, frame)| frame).max().unwrap_or(slot_end);
+        if last + frames >= duration {
+            return Err("Zadnji slot price mora zadrzati barem jednu sliku.".into());
+        }
+        if start {
+            // The slot keeps its place: its cover starts `frames` earlier in its source.
+            roll_cover(&tx, &start_id, -frames)?;
+        }
+        shift_markers_from(&tx, slot_end, frames, fps)?;
         finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
@@ -1953,6 +2000,60 @@ fn roll_cover(conn: &Connection, start_marker_id: &str, shift: i64) -> Result<()
             ],
         )
         .map_err(err)?;
+    }
+    Ok(())
+}
+
+/// Markers that came onto one program frame (an excluded segment with a marker on its
+/// first and on its last frame, audit 2026-10-13) become one: the locked one, else the
+/// one created first, stays. The covers of the slots of the other one go to the marker
+/// that stays; a cover of the slot between them (the excluded picture) goes.
+fn merge_coincident_markers(conn: &Connection) -> Result<()> {
+    let markers = {
+        let mut statement = conn
+            .prepare(
+                "SELECT marker_id, timeline_frame FROM story_markers
+                 ORDER BY timeline_frame, system_role = '', created_at, marker_id",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        rows
+    };
+    let mut kept: Option<(String, i64)> = None;
+    for (marker_id, frame) in markers {
+        match &kept {
+            Some((keep, at)) if *at == frame => {
+                let covers = {
+                    let mut statement = conn.prepare("SELECT cover_id, slot_id FROM story_covers").map_err(err)?;
+                    let rows = statement
+                        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+                        .map_err(err)?
+                        .collect::<rusqlite::Result<Vec<_>>>()
+                        .map_err(err)?;
+                    rows
+                };
+                for (cover_id, slot) in covers {
+                    let (a, b) = slot.split_once('|').unwrap_or(("", ""));
+                    let swap = |id: &str| if id == marker_id { keep.as_str() } else { id }.to_string();
+                    let (a, b) = (swap(a), swap(b));
+                    if a == b {
+                        conn.execute("DELETE FROM story_covers WHERE cover_id = ?1", [&cover_id]).map_err(err)?;
+                    } else if format!("{a}|{b}") != slot {
+                        conn.execute(
+                            "UPDATE story_covers SET slot_id = ?1 WHERE cover_id = ?2",
+                            params![slot_id(&a, &b), cover_id],
+                        )
+                        .map_err(err)?;
+                    }
+                }
+                conn.execute("DELETE FROM story_markers WHERE marker_id = ?1", [&marker_id]).map_err(err)?;
+            }
+            _ => kept = Some((marker_id, frame)),
+        }
     }
     Ok(())
 }

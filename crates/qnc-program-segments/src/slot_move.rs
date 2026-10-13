@@ -37,10 +37,15 @@ impl ProgramSegments {
     /// moves (a cover starts at its marker), else the one after it. `None` when nothing
     /// is taken or there is no picture (Off).
     pub fn keyframe_reference(&self) -> Option<(String, u64)> {
+        let stills = &self.view.edit_stills;
+        if let Some(trim) = &self.slot_trim {
+            // The picture at the taken edge: the slot's first, or its last.
+            let own = stills.iter().find(|still| still.after == trim.start);
+            return own.and_then(|still| still.picture.as_ref()).map(|picture| (picture.clip_id.clone(), picture.source_frame));
+        }
         if self.slot_move.is_none() && self.marker_edit.is_none() {
             return None;
         }
-        let stills = &self.view.edit_stills;
         let before = stills.iter().filter(|still| !still.after);
         let picture = before.chain(stills.iter().filter(|still| still.after)).find_map(|still| still.picture.as_ref());
         picture.map(|picture| (picture.clip_id.clone(), picture.source_frame))
@@ -49,6 +54,9 @@ impl ProgramSegments {
     /// Moves the taken slot or marker by `frames` (a key picture step); false when
     /// nothing is taken.
     pub fn jump_edit(&mut self, frames: i64) -> bool {
+        if self.slot_trim.is_some() {
+            return self.nudge_trim(frames);
+        }
         if self.slot_move.is_some() {
             return self.nudge_slot(frames);
         }
@@ -65,6 +73,10 @@ impl ProgramSegments {
     }
 
     pub(crate) fn edit_moves(&self) -> Vec<(u64, u64)> {
+        if let Some(trim) = &self.slot_trim {
+            let start = trim.start.then_some((trim.slot_start, trim.slot_start));
+            return start.into_iter().chain([(trim.slot_end, trim.slot_end.saturating_add_signed(trim.frames))]).collect();
+        }
         if let Some(slot) = &self.slot_move {
             return [slot.start, slot.end].iter().map(|frame| (*frame, slot.moved(*frame))).collect();
         }
@@ -77,6 +89,7 @@ impl ProgramSegments {
 
     /// Ctrl+S took this slot: the arrows move it from now on.
     pub(crate) fn take_slot_move(&mut self, slot_id: &str) {
+        self.slot_trim = None;
         self.slot_move = self
             .view
             .slots

@@ -56,6 +56,44 @@ pub fn edit_stills(view: &SegmentsView, slots: &[Slot], moves: &[(u64, u64)]) ->
     stills
 }
 
+/// The pictures of a slot trimmed at one edge by `frames` (user 2026-10-13): the slots
+/// after it move with its end, so at its start the last picture of the slot before and
+/// its new first one (its cover starts `frames` earlier in its source), at its end its
+/// new last picture and the first of the slot after it.
+pub fn trim_stills(view: &SegmentsView, slots: &[Slot], slot_id: &str, start: bool, frames: i64) -> Vec<EditStill> {
+    let Some(slot) = slots.iter().find(|slot| slot.slot_id == slot_id) else {
+        return Vec::new();
+    };
+    let total = view.total_frames;
+    let new_end = slot.end_frame.saturating_add_signed(frames);
+    let moved = |frame: u64| if frame >= slot.end_frame && frame < total { frame.saturating_add_signed(frames) } else { frame };
+    let mut stills = Vec::new();
+    if start {
+        if slot.start_frame > 0 {
+            stills.push(still(view, slots, &|frame| frame, slot.start_frame, false).labelled("Prethodni slot - zadnja"));
+        }
+        let cover = view.covers.iter().find(|cover| cover.slot_id == slot.slot_id);
+        let first = match cover {
+            Some(cover) => {
+                let length = cover.end_frame.saturating_sub(cover.start_frame).max(1) as i64;
+                let source = cover.source_out_frame.saturating_sub(cover.source_in_frame) as i64;
+                let source_in = (cover.source_in_frame as i64 - frames * source / length).max(0);
+                Some(StillPicture { clip_id: cover.clip_id.clone(), source_frame: source_in as u64 })
+            }
+            None => picture_at(view, &[], &|frame| frame, slot.start_frame),
+        };
+        stills.push(EditStill::new(slot.start_frame, true, first).labelled("Slot - nova prva"));
+    } else {
+        if new_end > 0 {
+            stills.push(still(view, slots, &moved, new_end, false).labelled("Slot - nova zadnja"));
+        }
+        if new_end < total {
+            stills.push(still(view, slots, &moved, new_end, true).labelled("Sljedeci slot - prva"));
+        }
+    }
+    stills
+}
+
 impl EditStill {
     /// A picture beside the edit at `marker_frame`; `None` is drawn black.
     pub fn new(marker_frame: u64, after: bool, picture: Option<StillPicture>) -> Self {

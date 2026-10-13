@@ -255,3 +255,39 @@ fn a_cover_is_deleted_only_after_ctrl_click_took_it() {
     settle(&mut segments);
     assert!(segments.view().covers.is_empty(), "{}", segments.view().message);
 }
+
+#[test]
+fn ctrl_o_on_the_segment_panel_lengthens_the_slot_under_the_playhead_and_moves_the_ones_after() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    store_with_story(&file);
+    let mut segments = ProgramSegments::new();
+    configure(&mut segments, &file);
+    for frame in [40, 80] {
+        segments.set_playhead(Some(frame));
+        segments.apply_action("add_marker");
+        settle(&mut segments);
+    }
+    assert_eq!(marker_frames(&segments), vec![0, 40, 80, 150]);
+    // Ctrl+O on the slot 40..80: its end, the slot after moves with it.
+    segments.set_playhead(Some(50));
+    assert!(segments.take_slot_edge_at_playhead(false));
+    for _ in 0..3 {
+        segments.apply_action("step_forward_frame");
+    }
+    assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150], "the draft is drawn");
+    assert_eq!(segments.view().edit_stills.len(), 2, "its new last picture and the next slot's first");
+    segments.apply_action("activate_focused_item");
+    settle(&mut segments);
+    assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150], "stored after Enter");
+    // Ctrl+I on the slot 0..40: a later first picture makes it shorter; Escape drops it.
+    segments.set_playhead(Some(10));
+    assert!(segments.take_slot_edge_at_playhead(true));
+    segments.apply_action("step_forward_frame");
+    assert_eq!(marker_frames(&segments), vec![0, 39, 82, 150]);
+    segments.apply_action("clear_focus");
+    assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150]);
+    // The last slot ends with the story.
+    segments.set_playhead(Some(100));
+    assert!(!segments.take_slot_edge_at_playhead(false));
+}

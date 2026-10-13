@@ -6,7 +6,7 @@
 mod edit_stills;
 mod markers;
 
-pub use edit_stills::{edit_stills, program_picture, EditStill, StillPicture};
+pub use edit_stills::{edit_stills, program_picture, trim_stills, EditStill, StillPicture};
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,

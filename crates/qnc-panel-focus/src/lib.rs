@@ -225,10 +225,15 @@ impl PanelFocus {
             },
             // v5 select_mark_in / select_mark_out: Ctrl+I, Ctrl+O take the source IN, OUT; the
             // arrows move the taken mark, Escape gives the keys back to the playhead.
-            // On the segment panel Ctrl+I, Ctrl+O take the start, the end of the segment
-            // (user 2026-10-10): its clip opens on that edge with the mark taken.
+            // On the segment panel Ctrl+I, Ctrl+O take the start, the end of the slot under
+            // the Wrap playhead (user 2026-10-13: slots are the montage); Ctrl+Shift+I, O
+            // the start, the end of the segment, whose clip opens on that edge with the
+            // mark taken (user 2026-10-10).
             "select_mark_in" | "select_mark_out" if panel == Panel::Segments => {
-                self.mark_taken = segments.take_edge(action_id == "select_mark_in");
+                segments.take_slot_edge_at_playhead(action_id == "select_mark_in")
+            }
+            "select_segment_start" | "select_segment_end" if panel == Panel::Segments => {
+                self.mark_taken = segments.take_edge(action_id == "select_segment_start");
                 self.mark_taken
             }
             // Escape drops a taken segment edge at once and goes back to Wrap.
