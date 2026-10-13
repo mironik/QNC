@@ -64,11 +64,13 @@ fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, visuals: &egui:
     ui.painter().rect_stroke(pane, 0.0, Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color), StrokeKind::Inside);
     if let Some(edge) = still.clip_edge {
         // The clip ends here: a red line on that side (user 2026-10-13).
-        let x = match edge {
-            ClipEdge::Start => pane.left() + 3.0,
-            ClipEdge::End => pane.right() - 3.0,
+        // A band a sixteenth of the picture wide (at least 14 px), well seen at a glance.
+        let width = (pane.width() / 16.0).max(14.0);
+        let band = match edge {
+            ClipEdge::Start => Rect::from_min_max(pane.min, egui::pos2(pane.left() + width, pane.bottom())),
+            ClipEdge::End => Rect::from_min_max(egui::pos2(pane.right() - width, pane.top()), pane.max),
         };
-        ui.painter().line_segment([egui::pos2(x, pane.top()), egui::pos2(x, pane.bottom())], Stroke::new(6.0, Color32::from_rgb(230, 30, 30)));
+        ui.painter().rect_filled(band, 0.0, Color32::from_rgb(230, 30, 30));
     }
     if still.cut {
         // The picture at the cut being moved (user 2026-10-13: a red frame).
