@@ -139,6 +139,13 @@ impl PanelFocus {
             "step_back_frame" | "step_forward_frame" if on_source && segments.lane_is_taken() => {
                 segments.lane_draft(if action_id == "step_back_frame" { -1 } else { 1 })
             }
+            // A Sync (user 2026-10-13): stopped, the arrows move its end; Enter writes the
+            // cover, Delete drops the draft, wherever the keyboard is.
+            "step_back_frame" | "step_forward_frame" if segments.sync_drafting() && !preview.player_view().playing() => {
+                segments.sync_nudge(if action_id == "step_back_frame" { -1 } else { 1 })
+            }
+            "activate_focused_item" if segments.sync_drafting() => segments.confirm_source(),
+            "delete_marker" if segments.sync_drafting() => segments.discard_sync(),
             "step_prev_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(1),
             "step_next_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(-1),
             // Up/Down on a taken edit (user 2026-10-11): to the key picture before or after it,

@@ -3741,3 +3741,12 @@ natrag na sliku koju ima samo pozadinsko dekodiranje unatrag, glavno dekodiranje
 slika iza pozadinskog niza nikad nije napravljena i prica je stala; sada dekodiranje krece odmah iza tog niza. (3)
 `qnc-program-render`: dijelovi s indeksom na pocetku datoteke (`+faststart`; dugi dio s indeksom na kraju otvarao se
 4,6 s), `UNIT_FORMAT` 3 (postojeci dijelovi se jednom renderiraju ponovno, stari se brisu).
+Dopuna 2026-10-13 (korisnik: "kad zaustavim play odmah kreira pokrivalicu, ne dozvoljava skracivanje ili produljivanje
+strelicama ni nastavak playem; jedino Enter formira pokrivalicu, a Delete brise ako Enter nije odraden"): Sync/B-roll
+vise nista ne zapisuje sam. Pauza (player potvrdi sliku-dvije ranije, sto se citalo kao povratak na pocetak prozora)
+ni dolazak do M markera ili kraja izvora ne zatvaraju slot: Sync stane i drzi nacrt kraja. Strelice (dok player stoji,
+na svakom panelu) pomicu kraj za sliku, Space nastavlja od kraja u novom prozoru, Enter zapisuje marker i pokrivalicu,
+Delete odbacuje nacrt bez ikakvog zapisa. `qnc-sync-cover` (`draft_end`, `nudge`, `resume`, `at_end`, `discard`;
+povratak na pocetak prozora tek pri skoku vecem od 3 slike; testovi), `qnc-program-segments` (`sync_nudge`,
+`discard_sync`, `sync_drafting`), `qnc-panel-focus`. Zamjenjuje pravilo od 1. 10. ("Sync zapisuje pokrivalicu kad dode
+do M markera ili OUT-a izvora").

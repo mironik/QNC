@@ -60,6 +60,15 @@ struct Session {
     /// Last window frame seen: the player returns to the window start at its
     /// end, so a frame going back means the end was reached between repaints.
     last: u64,
+    /// The program frame the window being played starts at (the anchor, or the draft
+    /// end when a stopped Sync plays on).
+    play_from: u64,
+    /// The draft end of the slot (exclusive): it follows the play, the arrows move it
+    /// (user 2026-10-13: only Enter writes the cover, Delete drops the draft).
+    end: u64,
+    /// The play stopped (the end reached, or the end moved by an arrow): Space plays
+    /// on from the draft end in a new window.
+    restart: bool,
 }
 
 #[derive(Debug, Default)]
@@ -190,6 +199,9 @@ impl SyncCover {
             },
             per_source,
             last: 0,
+            play_from: anchor,
+            end: anchor + 1,
+            restart: false,
         });
         Ok(preview)
     }
@@ -202,19 +214,78 @@ impl SyncCover {
         let Some(session) = self.active.as_mut() else {
             return window_frame;
         };
-        let frame = window_frame?;
-        let wrapped = frame < session.last;
-        session.last = frame;
-        let program = (session.anchor + frame).min(session.auto_finish);
-        let (num, den) = session.per_source;
-        self.source_frame = Some(session.source.source_in + (program - session.anchor) * den / num);
-        if program + 1 >= session.auto_finish || wrapped {
-            let end = session.auto_finish;
-            // User rule: it stops there; Enter confirms the cover.
-            let _ = self.finish(end);
-            return Some(end);
+        if session.restart {
+            // Stopped: the Wrap playhead shows the last picture of the draft.
+            return Some(session.end.saturating_sub(1).max(session.anchor));
         }
+        let frame = window_frame?;
+        // Back to the window start is the end of the play (the player returns there); a
+        // pause confirming a frame or two before the last is not (live 2026-10-13: that
+        // wrote the cover at every pause).
+        let wrapped = frame + 3 < session.last;
+        session.last = session.last.max(frame);
+        let program = (session.play_from + frame).min(session.auto_finish);
+        let (num, den) = session.per_source;
+        if program + 1 >= session.auto_finish || wrapped {
+            // It stops there and waits: Enter writes the cover, Delete drops it.
+            session.end = session.auto_finish;
+            session.restart = true;
+            self.source_frame = Some(session.source.source_in + ((session.end - session.anchor) * den).div_ceil(num));
+            return Some(session.end.saturating_sub(1));
+        }
+        session.end = program + 1;
+        self.source_frame = Some(session.source.source_in + (program - session.anchor) * den / num);
         Some(program)
+    }
+
+    /// The draft end of a running or stopped Sync (exclusive).
+    pub fn draft_end(&self) -> Option<u64> {
+        self.active.as_ref().map(|session| session.end)
+    }
+
+    /// An arrow on a stopped Sync: its end `frames` later or earlier, within the source
+    /// and up to the marker or source end it may reach; false without a Sync.
+    pub fn nudge(&mut self, frames: i64) -> bool {
+        let Some(session) = self.active.as_mut() else {
+            return false;
+        };
+        let end = session.end.saturating_add_signed(frames).clamp(session.anchor + 1, session.auto_finish);
+        session.end = end;
+        session.restart = true;
+        let (num, den) = session.per_source;
+        self.source_frame = Some(session.source.source_in + ((end - session.anchor) * den).div_ceil(num));
+        true
+    }
+
+    /// Space on a stopped Sync: the window from its draft end on, the source from where
+    /// it got to; `None` when it is not stopped or nothing is left to play.
+    pub fn resume(&mut self) -> Option<SyncPreview> {
+        let session = self.active.as_mut()?;
+        if !session.restart || session.end >= session.auto_finish {
+            return None;
+        }
+        let (num, den) = session.per_source;
+        session.restart = false;
+        session.play_from = session.end;
+        session.last = 0;
+        Some(SyncPreview {
+            window: (session.end, session.auto_finish),
+            clip_id: session.source.clip_id.clone(),
+            source_in: session.source.source_in + (session.end - session.anchor) * den / num,
+            timebase: session.source.timebase,
+        })
+    }
+
+    /// Whether a stopped Sync has reached the end it may reach (Enter keeps it).
+    pub fn at_end(&self) -> bool {
+        self.active.as_ref().is_some_and(|session| session.restart && session.end >= session.auto_finish)
+    }
+
+    /// Delete before Enter: the Sync and its draft go, nothing was written.
+    pub fn discard(&mut self) -> bool {
+        let had = self.active.take().is_some() | self.pending.take().is_some() | self.ready.take().is_some();
+        self.source_frame = None;
+        had
     }
 
     /// O, or the end of the source: the slot from the anchor to `end` (v5
@@ -404,31 +475,45 @@ mod tests {
     fn the_end_of_the_source_stops_and_waits_for_enter() {
         let mut sync = armed();
         sync.start(&[0, 20], 25, 100, (1, 1)).unwrap();
-        assert_eq!(sync.program_frame(Some(29)), Some(50));
-        assert!(!sync.is_active());
+        assert_eq!(sync.program_frame(Some(29)), Some(49), "stopped on its last picture");
+        assert!(sync.is_active(), "it waits: nothing is closed or written");
+        assert!(sync.at_end());
+        sync.finish(sync.draft_end().unwrap()).unwrap(); // Enter
         sync.resolve([("b|c", 20, 50)].into_iter());
-        assert!(
-            sync.take_commit(false).is_none(),
-            "it stops; Enter confirms"
-        );
         assert!(sync.take_commit(true).is_some());
     }
 
     #[test]
-    fn a_window_end_missed_between_repaints_still_closes_the_slot() {
+    fn a_window_end_missed_between_repaints_still_stops_at_the_marker() {
         let mut sync = armed();
         sync.start(&[0, 20, 35], 25, 100, (1, 1)).unwrap();
         assert_eq!(sync.program_frame(Some(5)), Some(25));
         assert_eq!(
             sync.program_frame(Some(0)),
-            Some(35),
+            Some(34),
             "the player went back to the window start: its end was reached"
         );
-        assert!(!sync.is_active());
-        assert!(
-            sync.missing_marker(&[0, 20, 35]).is_none(),
-            "the next marker closes it"
-        );
+        assert_eq!(sync.draft_end(), Some(35));
+        assert!(sync.missing_marker(&[0, 20, 35]).is_none() || sync.is_active(), "the next marker ends it");
+    }
+
+    #[test]
+    fn a_pause_writes_nothing_the_arrows_move_the_end_space_plays_on_delete_drops_it() {
+        let mut sync = armed();
+        sync.start(&[0, 20], 25, 100, (1, 1)).unwrap();
+        assert_eq!(sync.program_frame(Some(8)), Some(28));
+        // A pause confirms a frame or two before the last: no end, no write.
+        assert_eq!(sync.program_frame(Some(7)), Some(27));
+        assert!(sync.is_active() && !sync.at_end());
+        assert_eq!(sync.draft_end(), Some(28));
+        assert!(sync.nudge(3));
+        assert_eq!(sync.draft_end(), Some(31), "the arrows move the end");
+        let window = sync.resume().expect("space plays on from the end");
+        assert_eq!(window.window, (31, 50));
+        assert_eq!(window.source_in, 10 + 11, "the source from where it got to");
+        assert_eq!(sync.program_frame(Some(4)), Some(35));
+        assert!(sync.discard(), "Delete drops the draft");
+        assert!(!sync.is_active() && !sync.holds_enter());
     }
 
     #[test]

@@ -54,6 +54,15 @@ impl ProgramSegments {
 
     /// Space: a Sync play starts in the Source view once IN armed it.
     pub fn sync_space(&mut self, wrap_active: bool) -> SyncSpace {
+        // A stopped Sync plays on from its draft end (user 2026-10-13).
+        if let Some(preview) = self.sync.resume() {
+            self.refresh_view("Sync nastavlja · Enter sprema pokrivalicu, Delete odbacuje".into());
+            return SyncSpace::Start(preview);
+        }
+        if self.sync.at_end() {
+            self.refresh_view("Sync je na kraju · Enter sprema pokrivalicu, Delete odbacuje".into());
+            return SyncSpace::Blocked;
+        }
         if wrap_active || !self.sync.wants_space() {
             return SyncSpace::Play;
         }
@@ -85,14 +94,35 @@ impl ProgramSegments {
     /// A frame the program player confirmed, as a program frame; during a Sync
     /// play the window frame is moved to its anchor and the end of the source
     /// closes the slot.
+    /// Reaching an M marker or the source OUT, or a pause, only stops it (user
+    /// 2026-10-13: only Enter writes the cover, Delete drops the draft).
     pub fn sync_frame(&mut self, confirmed: Option<u64>) -> Option<u64> {
-        let was_active = self.sync.is_active();
-        let frame = self.sync.program_frame(confirmed);
-        if was_active && !self.sync.is_active() {
-            self.sync_commit = true; // reaching an M marker or the source OUT writes it (user rule)
-            self.after_sync_finish("Sync slot zatvoren · spremam pokrivalicu");
+        self.sync.program_frame(confirmed)
+    }
+
+    /// Whether a Sync is running or stopped with a draft that Enter writes, Delete drops.
+    pub fn sync_drafting(&self) -> bool {
+        self.sync.is_active()
+    }
+
+    /// An arrow on a stopped Sync moves its end a frame.
+    pub fn sync_nudge(&mut self, frames: i64) -> bool {
+        if !self.sync.nudge(frames) {
+            return false;
         }
-        frame
+        self.refresh_view("Sync kraj · strelice pomiču, Space nastavlja, Enter sprema, Delete odbacuje".into());
+        true
+    }
+
+    /// Delete before Enter: the Sync draft goes, nothing was written; the player takes
+    /// the whole program again.
+    pub fn discard_sync(&mut self) -> bool {
+        if !self.sync.discard() {
+            return false;
+        }
+        self.program_changed = true;
+        self.refresh_view("Sync odbačen".into());
+        true
     }
 
     /// O during a Sync play closes the slot at the Wrap playhead (v5
@@ -101,7 +131,8 @@ impl ProgramSegments {
         if !self.sync.is_active() {
             return false;
         }
-        match self.sync.finish(self.playhead.unwrap_or(0)) {
+        let end = self.sync.draft_end().unwrap_or(self.playhead.unwrap_or(0));
+        match self.sync.finish(end) {
             Ok(_) => self.after_sync_finish("Sync slot odabran · Enter dodaje pokrivalicu"),
             Err(error) => self.refresh_view(error),
         }
