@@ -3714,3 +3714,9 @@ Dopuna 2026-10-13 (korisnik: "dodaj brisanje starih dijelova prerendera"; mapa `
 nema, pa njihove datoteke i ostatke nedovrsenih rendera u mapi prerendera (samo datoteke imenovane otiskom). Mapa
 projekta zasticena je od brisanja i za datoteke (ACL deny DE/DC), pa se datoteka koja se ne moze obrisati isprazni na
 0 bajtova (prostor je slobodan; isti otisak kasnije se pise preko nje). Nakon Undo stari dijelovi se renderiraju ponovno.
+Ispravak isti dan (korisnik: "ne svida mi se... Undo ne s datotekom nego s XML ili EDL, a naziv treba brisati, ne samo
+vratiti na 0"): datoteka se brise s nazivom ili ostaje netaknuta (nikad se ne prazni), log kaze koliko ih je zastita mape
+zadrzala. Undo vec radi iz opisa price u bazi (`story_undo`), ne iz datoteka. Nalaz: Project postavlja zastitu
+`icacls /deny korisnik:(OI)(CI)(DE,DC)` koja se nasljeduje na sve datoteke projekta (zato se ni stari dijelovi ni WAL ne
+mogu obrisati); predlozeno je da `products/prerender` bude mapa predmemorije (sadrzaj se smije brisati, mapa ne) -
+ceka otkljucavanje Projecta.

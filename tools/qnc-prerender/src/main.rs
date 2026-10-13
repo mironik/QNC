@@ -245,9 +245,9 @@ fn run() -> Result<()> {
 /// The units the story no longer has go (user 2026-10-13: "brisanje starih dijelova"):
 /// their rows first, so no player takes them again, then their files and the leftovers
 /// of unfinished renders in the prerender folder. A project folder is protected against
-/// deleting (its files too), so a file that cannot be deleted is emptied (its space is
-/// free; a unit of the same fingerprint later is written over it). Only files named by a
-/// fingerprint are touched.
+/// deleting; a file it keeps is left as it is (never emptied). Only files named by a
+/// fingerprint are touched. UNDO needs no file: the story's edits are kept in its
+/// database and a unit is rendered again from them.
 fn prune(writer: &PrerenderWriter, reader: &mut PrerenderReader, out_dir: &std::path::Path, keep: &[String]) {
     let keep: std::collections::HashSet<&str> = keep.iter().map(String::as_str).collect();
     let old: Vec<String> = match reader.all() {
@@ -258,7 +258,7 @@ fn prune(writer: &PrerenderWriter, reader: &mut PrerenderReader, out_dir: &std::
         return say(format!("old units not forgotten: {error}"));
     }
     let Ok(entries) = std::fs::read_dir(out_dir) else { return };
-    let (mut files, mut bytes) = (0usize, 0u64);
+    let (mut files, mut bytes, mut kept) = (0usize, 0u64, 0usize);
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
         let fingerprint = name.split('.').next().unwrap_or("");
@@ -267,14 +267,21 @@ fn prune(writer: &PrerenderWriter, reader: &mut PrerenderReader, out_dir: &std::
         if !named || keep.contains(fingerprint) || size == 0 || !entry.path().is_file() {
             continue;
         }
-        let gone = std::fs::remove_file(entry.path()).is_ok()
-            || std::fs::OpenOptions::new().write(true).truncate(true).open(entry.path()).is_ok();
-        if gone {
-            files += 1;
-            bytes += size;
+        // Deleted with its name (user 2026-10-13: never only emptied); a file the folder's
+        // protection keeps stays as it is and is told.
+        match std::fs::remove_file(entry.path()) {
+            Ok(()) => {
+                files += 1;
+                bytes += size;
+            }
+            Err(_) => kept += 1,
         }
     }
-    say(format!("old units: {} forgotten, {files} files freed ({} MB)", old.len(), bytes / 1_048_576));
+    say(format!(
+        "old units: {} forgotten, {files} files deleted ({} MB), {kept} kept by the folder's protection",
+        old.len(),
+        bytes / 1_048_576
+    ));
 }
 
 /// The lease of the one prerender of a project in its database (the waker reads it).
