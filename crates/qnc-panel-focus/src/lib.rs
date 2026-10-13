@@ -125,6 +125,7 @@ impl PanelFocus {
     ) -> Option<bool> {
         let panel = self.panel;
         let on_source = panel == Panel::SourceTimeline;
+        preview.hands_on(); // every key of the montage holds the background work off
         Some(match action_id {
             // Monitor Auto | On under the monitor: whatever the focus.
             qnc_source_preview::MONITOR_AUTO | qnc_source_preview::MONITOR_ON => preview.set_monitor_mode(action_id),

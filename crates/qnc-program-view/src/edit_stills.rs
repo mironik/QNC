@@ -32,6 +32,8 @@ pub struct EditStill {
     pub id: String,
     /// What the picture is, e.g. "Slot - prva" (shown under it).
     pub label: String,
+    /// The picture at the cut being moved (user 2026-10-13: marked red in the zoom).
+    pub cut: bool,
 }
 
 /// The pictures beside markers moved from `old` to `new` (`moves`), with the stored
@@ -45,12 +47,17 @@ pub fn edit_stills(view: &SegmentsView, slots: &[Slot], moves: &[(u64, u64)]) ->
         &[["Prije markera - zadnja", "Poslije markera - prva"]]
     };
     let mut stills = Vec::new();
-    for (&(_, new), [before, after]) in moves.iter().zip(labels.iter().chain(std::iter::repeat(&labels[0]))) {
+    let slot = moves.len() == 2;
+    for (index, (&(_, new), [before, after])) in moves.iter().zip(labels.iter().chain(std::iter::repeat(&labels[0]))).enumerate() {
+        // The cut: the picture after a marker; of a slot its own first and last.
+        let (cut_before, cut_after) = if slot { (index == 1, index == 0) } else { (false, true) };
         if new > 0 {
-            stills.push(still(view, slots, &moved, new, false).labelled(before));
+            let still = still(view, slots, &moved, new, false).labelled(before);
+            stills.push(if cut_before { still.at_cut() } else { still });
         }
         if new < view.total_frames {
-            stills.push(still(view, slots, &moved, new, true).labelled(after));
+            let still = still(view, slots, &moved, new, true).labelled(after);
+            stills.push(if cut_after { still.at_cut() } else { still });
         }
     }
     stills
@@ -82,10 +89,10 @@ pub fn trim_stills(view: &SegmentsView, slots: &[Slot], slot_id: &str, start: bo
             }
             None => picture_at(view, &[], &|frame| frame, slot.start_frame),
         };
-        stills.push(EditStill::new(slot.start_frame, true, first).labelled("Slot - nova prva"));
+        stills.push(EditStill::new(slot.start_frame, true, first).labelled("Slot - nova prva").at_cut());
     } else {
         if new_end > 0 {
-            stills.push(still(view, slots, &moved, new_end, false).labelled("Slot - nova zadnja"));
+            stills.push(still(view, slots, &moved, new_end, false).labelled("Slot - nova zadnja").at_cut());
         }
         if new_end < total {
             stills.push(still(view, slots, &moved, new_end, true).labelled("Sljedeci slot - prva"));
@@ -100,12 +107,18 @@ impl EditStill {
         let id = picture
             .as_ref()
             .map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame));
-        Self { marker_frame, after, picture, image: None, id, label: String::new() }
+        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false }
     }
 
     /// The same picture with what it is.
     pub fn labelled(mut self, label: &str) -> Self {
         self.label = label.to_string();
+        self
+    }
+
+    /// The same picture marked as the one at the cut being moved.
+    pub fn at_cut(mut self) -> Self {
+        self.cut = true;
         self
     }
 }

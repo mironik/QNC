@@ -3664,3 +3664,9 @@ iskljucenje segmenta s markerom na prvoj i zadnjoj slici ostavljalo je dva marke
 pomice markere i pokrivalice (ceka odluku), baza ne provjerava susjede pri pomaku markera (provjerava upravljac),
 pomak markera pomice Wrap playhead, a pomak slota ne. Testovi `qnc-program-db` (30), `qnc-program-segments` (36),
 conformance.
+Dopuna 2026-10-13 (korisnik: "u zoom prikazu da bude oznacena slika koja prikazuje polozaj reza, okvir crveni"):
+`qnc-program-view` `EditStill.cut` (`at_cut`): slika na rezu koji se pomice (rub slota: nova prva ili zadnja; marker:
+prva slika poslije njega; slot: njegova prva i zadnja; rub segmenta: nova prva ili zadnja segmenta), `qnc-trim-overlay`
+je crta s crvenim okvirom. Nalaz iz loga: dok se rub slota pomicao strelicama, prerender je citao karticu (rub slota ne
+mice playera pa se nije brojao kao montaza), slike reza 2,3-3,4 s po prolazu. `qnc-source-preview` `hands_on`, a
+`qnc-panel-focus` ga zove za svaku tipku montaze: prerender ceka jos 3 s nakon svake.

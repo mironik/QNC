@@ -277,6 +277,8 @@ fn ctrl_o_on_the_segment_panel_lengthens_the_slot_under_the_playhead_and_moves_t
     }
     assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150], "the draft is drawn");
     assert_eq!(segments.view().edit_stills.len(), 2, "its new last picture and the next slot's first");
+    let cut: Vec<&str> = segments.view().edit_stills.iter().filter(|still| still.cut).map(|still| still.label.as_str()).collect();
+    assert_eq!(cut, vec!["Slot - nova zadnja"], "the picture at the cut is marked");
     segments.apply_action("activate_focused_item");
     settle(&mut segments);
     assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150], "stored after Enter");

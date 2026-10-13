@@ -62,6 +62,10 @@ fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, visuals: &egui:
         let _ = qnc_ui_kit::paint_rgba_image(ui, pane, &still.id, image.content_key, image.size, &image.pixels);
     }
     ui.painter().rect_stroke(pane, 0.0, Stroke::new(1.0, visuals.widgets.noninteractive.bg_stroke.color), StrokeKind::Inside);
+    if still.cut {
+        // The picture at the cut being moved (user 2026-10-13: a red frame).
+        ui.painter().rect_stroke(pane, 0.0, Stroke::new(4.0, Color32::from_rgb(230, 30, 30)), StrokeKind::Inside);
+    }
     ui.painter().text(
         egui::pos2(pane.center().x, pane.bottom() + LABEL_HEIGHT / 2.0 + 2.0),
         Align2::CENTER_CENTER,

@@ -441,6 +441,13 @@ impl SourcePreview {
         true
     }
 
+    /// A key of the montage (a trim, a marker, a slot) counts as editing for the next
+    /// seconds too, as a step does (2026-10-13: the prerender read the card while a
+    /// slot edge was moved with the arrows).
+    pub fn hands_on(&mut self) {
+        self.touched = Some(std::time::Instant::now());
+    }
+
     pub fn toggle_play(&mut self) -> bool {
         self.touched = Some(std::time::Instant::now());
         self.cue_asked = None; // Play moves the playhead: arrows count from where it stops

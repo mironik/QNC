@@ -95,9 +95,9 @@ impl ProgramSegments {
             if row.start_frame > 0 {
                 stills.push(EditStill::new(in_frame, false, program_picture(&self.view, row.start_frame - 1)).labelled("Prije segmenta - zadnja"));
             }
-            stills.push(EditStill::new(in_frame, true, own(in_frame)).labelled("Segment - nova prva"));
+            stills.push(EditStill::new(in_frame, true, own(in_frame)).labelled("Segment - nova prva").at_cut());
         } else {
-            stills.push(EditStill::new(out_frame, false, own(out_frame.saturating_sub(1))).labelled("Segment - nova zadnja"));
+            stills.push(EditStill::new(out_frame, false, own(out_frame.saturating_sub(1))).labelled("Segment - nova zadnja").at_cut());
             if row.end_frame < self.view.total_frames {
                 stills.push(EditStill::new(out_frame, true, program_picture(&self.view, row.end_frame)).labelled("Poslije segmenta - prva"));
             }
