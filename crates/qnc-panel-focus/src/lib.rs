@@ -215,7 +215,8 @@ impl PanelFocus {
         ),
     ) -> Option<bool> {
         let panel = self.panel;
-        let on_source = panel == Panel::SourceTimeline;
+        // The dock buttons are part of the source timeline panel (user 2026-10-13): its keys work there too.
+        let on_source = matches!(panel, Panel::SourceTimeline | Panel::SourceButtons);
         preview.hands_on(); // every key of the montage holds the background work off
         Some(match action_id {
             // Monitor Auto | On under the monitor: whatever the focus.
@@ -356,7 +357,7 @@ impl PanelFocus {
             // O closes a running Sync slot wherever the keyboard is (v5).
             "mark_out" if on_source && segments.finish_sync() => true,
             // The source timeline takes only I/O; the application marks them.
-            "mark_in" | "mark_out" if panel != Panel::SourceTimeline => false,
+            "mark_in" | "mark_out" if !on_source => false,
             "mark_in" => {
                 self.mark_taken = false;
                 segments.arm_sync(); // v5: every IN arms Sync/B-roll
@@ -367,13 +368,13 @@ impl PanelFocus {
                 return None;
             }
             // v5 navigate_adjacent_source_object: start, IN and OUT in order on the source.
-            "navigate_prev_object" | "navigate_next_object" if panel == Panel::SourceTimeline => {
+            "navigate_prev_object" | "navigate_next_object" if on_source => {
                 let key = qnc_source_mark_focus::adjacent(timeline, action_id == "navigate_prev_object");
                 self.mark_taken = qnc_source_mark_focus::is_taken(timeline);
                 mark_cue(preview, key)
             }
             // v5 mark_in_fit_duration: IN at the playhead, OUT the length of the slot.
-            "mark_in_fit_duration" if panel == Panel::SourceTimeline => match segments.fit_slot() {
+            "mark_in_fit_duration" if on_source => match segments.fit_slot() {
                 Some(frames) => {
                     self.mark_taken = false;
                     mark_cue(preview, qnc_source_mark_focus::fit(timeline, frames))
@@ -398,7 +399,8 @@ impl PanelFocus {
                 segments.apply_action(action_id);
                 self.back_to_wrap(segments, wrap, timeline)
             }
-            "select_mark_in" | "select_mark_out" if panel == Panel::SourceTimeline => {
+            "select_mark_in" | "select_mark_out" if on_source => {
+                self.panel = Panel::SourceTimeline; // the arrows go to the taken mark, not the buttons
                 let key = qnc_source_mark_focus::take(timeline, action_id == "select_mark_in");
                 self.mark_taken = key != MarkKey::Refused;
                 mark_cue(preview, key)
@@ -543,6 +545,7 @@ mod tests {
         focus.set(Panel::SourceTimeline);
         focus.route("activate_focused_item", (&mut preview, &mut wrap, &mut segments, &mut timeline));
         assert_eq!(focus.panel(), Panel::SourceButtons, "nothing to confirm on the source: on to its buttons");
+        assert_eq!(focus.route("mark_in", (&mut preview, &mut wrap, &mut segments, &mut timeline)), None, "I still marks: the buttons are part of the source timeline panel");
         focus.set(Panel::PoolTabs);
         assert_eq!(focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline)), None);
         assert_eq!(focus.take_pick().as_deref(), Some("editorial_tab_virtual"), "the right arrow is the next tab");

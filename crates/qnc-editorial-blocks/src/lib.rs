@@ -56,7 +56,7 @@ pub fn render_desktop(
         }
         "source-dock" => {
             let intent = render_source_dock(ui, contracts, theme, view);
-            paint_focus(ui, rect, view.focus.panel == Panel::SourceTimeline, theme.focus);
+            paint_focus(ui, rect, matches!(view.focus.panel, Panel::SourceTimeline | Panel::SourceButtons), theme.focus);
             intent
         }
         // Right panel of the other groups: empty, reserved for their functions.
