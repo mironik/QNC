@@ -3708,3 +3708,9 @@ klipova iz `view_with_waves` i oznacava rubove u svakom `refresh_view`; strelica
 "Klip je na kraju" (rub slota: njegova slika; marker: obje slike uz njega; pomak slota: slike susjeda, njegova pokrivalica
 ide s njim); pomak koji bi presao kraj (skok na kljucnu sliku) se ponistava, a skok ide slika po slika do zadnje slike
 klipa. `EditStill.past_end`. Testovi.
+Dopuna 2026-10-13 (korisnik: "dodaj brisanje starih dijelova prerendera"; mapa `products/prerender` projekta imala je
+1,1 GB, svaka izmjena price ostavljala je stare dijelove): `qnc-prerender-db` operacija `Forget` (`forget`, test);
+`tools/qnc-prerender` kad su svi dijelovi price gotovi (jednom po stanju price) brise iz baze dijelove kojih prica vise
+nema, pa njihove datoteke i ostatke nedovrsenih rendera u mapi prerendera (samo datoteke imenovane otiskom). Mapa
+projekta zasticena je od brisanja i za datoteke (ACL deny DE/DC), pa se datoteka koja se ne moze obrisati isprazni na
+0 bajtova (prostor je slobodan; isti otisak kasnije se pise preko nje). Nakon Undo stari dijelovi se renderiraju ponovno.

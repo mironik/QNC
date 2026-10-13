@@ -41,11 +41,14 @@ pub enum Operation {
     Read { fingerprints: Vec<String> },
     /// Every rendered unit of the project (the player matches its story against them).
     ReadAll,
+    /// The units among `fingerprints` are no longer rendered (the story no longer has
+    /// them, user 2026-10-13: old units are removed).
+    Forget { fingerprints: Vec<String> },
 }
 
 impl Operation {
     pub fn is_write(&self) -> bool {
-        matches!(self, Self::Publish(_))
+        matches!(self, Self::Publish(_) | Self::Forget { .. })
     }
 }
 
@@ -136,6 +139,17 @@ impl PrerenderWriter {
 
     pub fn publish(&self, unit: RenderedUnit) -> Result<()> {
         match decode(self.0.call(MODULE_ID, encode(&Operation::Publish(unit))?)?)? {
+            Data::Changed => Ok(()),
+            _ => Err(wrong()),
+        }
+    }
+
+    /// The units among `fingerprints` are no longer rendered.
+    pub fn forget(&self, fingerprints: Vec<String>) -> Result<()> {
+        if fingerprints.is_empty() {
+            return Ok(());
+        }
+        match decode(self.0.call(MODULE_ID, encode(&Operation::Forget { fingerprints })?)?)? {
             Data::Changed => Ok(()),
             _ => Err(wrong()),
         }

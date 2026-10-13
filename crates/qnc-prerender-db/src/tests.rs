@@ -41,6 +41,8 @@ fn a_published_unit_is_read_back_and_an_unknown_one_is_not() {
     let found = reader.rendered(vec!["0123456789abcdef".into(), "fedcba9876543210".into()]).unwrap();
     assert_eq!(found, vec![unit("0123456789abcdef", 102)], "the same unit once");
     assert_eq!(reader.all().unwrap(), vec![unit("0123456789abcdef", 102)]);
+    writer.forget(vec!["0123456789abcdef".into()]).unwrap();
+    assert!(PrerenderReader::open(&target).unwrap().all().unwrap().is_empty(), "a forgotten unit is gone");
 }
 
 #[test]

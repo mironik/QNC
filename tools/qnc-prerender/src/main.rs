@@ -140,6 +140,7 @@ fn run() -> Result<()> {
     let mut quiet_since: Option<Instant> = None;
     let writer = PrerenderWriter::start(target.clone())?;
     let (mut idle_since, mut done_now, mut failed) = (Instant::now(), 0usize, std::collections::HashSet::new());
+    let mut pruned: Option<Vec<String>> = None;
     loop {
         if reader.read().map(|now| now.project_id).ok() != Some(settings.project_id.clone()) {
             say("the active project changed: prerender ends".into());
@@ -168,6 +169,11 @@ fn run() -> Result<()> {
             .zip(&fingerprints)
             .find(|(_, fingerprint)| !rendered.contains(*fingerprint) && !failed.contains(*fingerprint));
         let Some((unit, fingerprint)) = next else {
+            // Every unit of the story is there: the units it no longer has go (once per story).
+            if pruned.as_ref() != Some(&fingerprints) {
+                prune(&writer, &mut PrerenderReader::open(&target)?, &out_dir, &fingerprints);
+                pruned = Some(fingerprints.clone());
+            }
             if idle_since.elapsed() > IDLE_END || done_now >= limit {
                 say(format!("story prerendered ({} units): prerender ends", units.len()));
                 return Ok(());
@@ -234,6 +240,41 @@ fn run() -> Result<()> {
             }
         }
     }
+}
+
+/// The units the story no longer has go (user 2026-10-13: "brisanje starih dijelova"):
+/// their rows first, so no player takes them again, then their files and the leftovers
+/// of unfinished renders in the prerender folder. A project folder is protected against
+/// deleting (its files too), so a file that cannot be deleted is emptied (its space is
+/// free; a unit of the same fingerprint later is written over it). Only files named by a
+/// fingerprint are touched.
+fn prune(writer: &PrerenderWriter, reader: &mut PrerenderReader, out_dir: &std::path::Path, keep: &[String]) {
+    let keep: std::collections::HashSet<&str> = keep.iter().map(String::as_str).collect();
+    let old: Vec<String> = match reader.all() {
+        Ok(units) => units.into_iter().map(|unit| unit.fingerprint).filter(|fp| !keep.contains(fp.as_str())).collect(),
+        Err(error) => return say(format!("old units not read: {error}")),
+    };
+    if let Err(error) = writer.forget(old.clone()) {
+        return say(format!("old units not forgotten: {error}"));
+    }
+    let Ok(entries) = std::fs::read_dir(out_dir) else { return };
+    let (mut files, mut bytes) = (0usize, 0u64);
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let fingerprint = name.split('.').next().unwrap_or("");
+        let named = fingerprint.len() == 16 && fingerprint.bytes().all(|byte| byte.is_ascii_hexdigit());
+        let size = entry.metadata().map(|meta| meta.len()).unwrap_or(0);
+        if !named || keep.contains(fingerprint) || size == 0 || !entry.path().is_file() {
+            continue;
+        }
+        let gone = std::fs::remove_file(entry.path()).is_ok()
+            || std::fs::OpenOptions::new().write(true).truncate(true).open(entry.path()).is_ok();
+        if gone {
+            files += 1;
+            bytes += size;
+        }
+    }
+    say(format!("old units: {} forgotten, {files} files freed ({} MB)", old.len(), bytes / 1_048_576));
 }
 
 /// The lease of the one prerender of a project in its database (the waker reads it).

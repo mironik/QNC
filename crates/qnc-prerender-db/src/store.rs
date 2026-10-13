@@ -56,6 +56,7 @@ impl Store {
             Operation::Publish(unit) => self.publish(unit),
             Operation::Read { fingerprints } => self.read(fingerprints),
             Operation::ReadAll => self.read_all(),
+            Operation::Forget { fingerprints } => self.forget(fingerprints),
         }
     }
 
@@ -99,6 +100,21 @@ impl Store {
             }
         }
         Ok(Data::Units(units))
+    }
+
+    fn forget(&mut self, fingerprints: &[String]) -> Result<Data> {
+        if fingerprints.len() > MAX_READ {
+            return Err("Previse jedinica u jednom brisanju.".into());
+        }
+        for fingerprint in fingerprints {
+            valid_fingerprint(fingerprint)?;
+        }
+        let tx = self.conn.transaction().map_err(err)?;
+        for fingerprint in fingerprints {
+            tx.execute("DELETE FROM prerender_units WHERE fingerprint = ?1", params![fingerprint]).map_err(err)?;
+        }
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
     }
 
     fn read_all(&mut self) -> Result<Data> {
