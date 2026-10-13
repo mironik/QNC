@@ -10,6 +10,9 @@
 //! from memory. Where a clip's picture is is found once per clip. One background worker
 //! decodes the pictures still missing in the newest draft, one pass at a time, and each
 //! pass is shown as soon as it is made; a pass that hangs is cancelled after `STUCK`.
+//! A picture not shown yet comes first on its own (user 2026-10-13: "the picture of the
+//! neighbouring clip shows slowly"): every missing picture is made alone, one decoder
+//! per picture at the same time, and only then the passes with neighbours for the arrows.
 //! While a new picture is being made, its place keeps the last picture it showed
 //! (user 2026-10-11: "ima pa nema"), never a black hole. No probe, no database write;
 //! the pictures are a passive aid, not the program.
@@ -43,8 +46,9 @@ const STUCK: Duration = Duration::from_secs(8);
 
 type Decoded = Vec<(StillPicture, Result<Arc<RgbaImage>, String>)>;
 type Located = Arc<Mutex<HashMap<String, LocatedPicture>>>;
-/// A picture to make and the first frame of the pass that makes it.
-type Want = (StillPicture, u64);
+/// A picture to make, the first frame of the pass that makes it and how many pictures
+/// the pass makes (1: the picture alone, made first).
+type Want = (StillPicture, u64, u32);
 
 /// The background worker: it takes the first of `wanted` (the newest draft, kept up to
 /// date by `fill`), sends each pass when made and ends when nothing is wanted.
@@ -116,13 +120,31 @@ impl TrimStills {
                 missing.push(picture.clone());
             }
         }
-        // The missing pictures first, then the ones the arrow reaches next, so stepping
-        // frame by frame finds them made.
-        let mut wants: Vec<Want> =
-            missing.iter().map(|picture| (picture.clone(), picture.source_frame.saturating_sub(RUN_BACK))).collect();
+        // The missing pictures first, each alone; then the neighbours of every shown
+        // picture and the ones the arrow reaches next, so stepping frame by frame finds
+        // them made.
+        let mut wants: Vec<Want> = missing.iter().map(|picture| (picture.clone(), picture.source_frame, 1)).collect();
+        let shown: Vec<StillPicture> = view
+            .edit_stills
+            .iter()
+            .chain(&view.source_edit_stills)
+            .filter_map(|still| still.picture.clone())
+            .collect();
+        for picture in shown {
+            let near = |step: i64| StillPicture {
+                clip_id: picture.clip_id.clone(),
+                source_frame: picture.source_frame.saturating_add_signed(step),
+            };
+            let lacks = |frame: &StillPicture| !self.cache.contains_key(frame) && !self.failed.contains(frame);
+            if (lacks(&near(1)) || (picture.source_frame > 0 && lacks(&near(-1))))
+                && !wants.iter().any(|(want, _, count)| *want == picture && *count == RUN)
+            {
+                wants.push((picture.clone(), picture.source_frame.saturating_sub(RUN_BACK), RUN));
+            }
+        }
         for (picture, first) in self.ahead(view) {
-            if !wants.iter().any(|(want, _)| *want == picture) {
-                wants.push((picture, first));
+            if !wants.iter().any(|(want, _, _)| *want == picture) {
+                wants.push((picture, first, RUN));
             }
         }
         match &self.job {
@@ -139,7 +161,7 @@ impl TrimStills {
 
     /// For each place whose picture moves frame by frame, the first picture not yet made
     /// in that direction within two passes, with a pass that starts there.
-    fn ahead(&mut self, view: &SegmentsView) -> Vec<Want> {
+    fn ahead(&mut self, view: &SegmentsView) -> Vec<(StillPicture, u64)> {
         let mut ahead = Vec::new();
         let mut seen = HashSet::new();
         for still in view.edit_stills.iter().chain(&view.source_edit_stills) {
@@ -250,14 +272,50 @@ fn work(
     cancel: &AtomicBool,
 ) {
     while !cancel.load(Ordering::Acquire) {
-        let Some((picture, first)) = wanted.lock().ok().and_then(|wanted| wanted.first().cloned()) else {
+        // Every picture wanted alone at once, one decoder each, each sent when made.
+        let alone: Vec<Want> = wanted
+            .lock()
+            .map(|wanted| wanted.iter().filter(|(_, _, count)| *count == 1).cloned().collect())
+            .unwrap_or_default();
+        if !alone.is_empty() {
+            if let Ok(mut pass) = pass.lock() {
+                *pass = Some(Instant::now());
+            }
+            std::thread::scope(|scope| {
+                for (picture, first, count) in &alone {
+                    let send = send.clone();
+                    scope.spawn(move || {
+                        let started = Instant::now();
+                        let made: Decoded = match decode_run(picture, *first, *count, locator, located, cancel) {
+                            Ok(run) => {
+                                log(&format!(
+                                    "trim-stills picture {}:{} ms={}",
+                                    picture.clip_id,
+                                    picture.source_frame,
+                                    started.elapsed().as_millis()
+                                ));
+                                run.into_iter().map(|(frame, image)| (frame, Ok(image))).collect()
+                            }
+                            Err(_) if cancel.load(Ordering::Acquire) => return,
+                            Err(error) => vec![(picture.clone(), Err(error))],
+                        };
+                        let _ = send.send(made);
+                    });
+                }
+            });
+            if let Ok(mut wanted) = wanted.lock() {
+                wanted.retain(|want| !alone.contains(want));
+            }
+            continue;
+        }
+        let Some((picture, first, count)) = wanted.lock().ok().and_then(|wanted| wanted.first().cloned()) else {
             return;
         };
         let started = Instant::now();
         if let Ok(mut pass) = pass.lock() {
             *pass = Some(started);
         }
-        let made: Decoded = match decode_run(&picture, first, locator, located, cancel) {
+        let made: Decoded = match decode_run(&picture, first, count, locator, located, cancel) {
             Ok(run) => {
                 log(&format!(
                     "trim-stills run {}:{} pictures={} ms={}",
@@ -274,7 +332,9 @@ fn work(
         };
         // Until `fill` brings the next draft, what this pass made is not wanted again.
         if let Ok(mut wanted) = wanted.lock() {
-            wanted.retain(|(want, _)| !made.iter().any(|(done, _)| done == want));
+            wanted.retain(|(want, want_first, want_count)| {
+                !(made.iter().any(|(done, _)| done == want) || (*want == picture && *want_first == first && *want_count == count))
+            });
         }
         if send.send(made).is_err() {
             return;
@@ -282,10 +342,11 @@ fn work(
     }
 }
 
-/// `RUN` pictures of the clip from `first` (the pass that makes `picture`), as decoded.
+/// `count` pictures of the clip from `first` (the pass that makes `picture`), as decoded.
 fn decode_run(
     picture: &StillPicture,
     first: u64,
+    count: u32,
     locator: &StillLocator,
     located: &Located,
     cancel: &AtomicBool,
@@ -310,9 +371,9 @@ fn decode_run(
     let scratch = scratch_dir();
     std::fs::create_dir_all(&scratch).map_err(|error| error.to_string())?;
     let result = (|| {
-        extractor.extract_run_with_cancel(&place.file, seek, RUN, STILL_SIZE, &scratch, cancel)?;
+        extractor.extract_run_with_cancel(&place.file, seek, count, STILL_SIZE, &scratch, cancel)?;
         let mut run = Vec::new();
-        for index in 0..u64::from(RUN) {
+        for index in 0..u64::from(count) {
             let file = scratch.join(format!("{index:03}.jpg"));
             if !file.is_file() {
                 break; // the end of the media

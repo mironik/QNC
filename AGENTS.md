@@ -3675,3 +3675,8 @@ izabrao "bolju verziju"): Ctrl+I/O uzimaju rub kliknutog (oznacenog) slota, inac
 skace na prvu (Ctrl+I) ili zadnju (Ctrl+O) sliku slota pa monitor odmah pokazuje rez iz playera; strelice i dalje mijenjaju
 nacrt (player svira spremljenu pricu, nacrtne slike pokazuje zoom); nakon Entera playhead stoji na novom rubu.
 `qnc-program-segments` (`slot_trim.rs`, test).
+Popravak 2026-10-13 (korisnik: "slika susjednog klipa se sporo pojavljuje... presporo se prikazuju"): log je pokazao da
+svaka slika zooma ceka cijeli prolaz dekodera od 25 slika (1,4-2,2 s) i da dvije slike idu jedna za drugom (druga
+nakon 3-3,8 s). `qnc-trim-stills`: slika koja nedostaje prvo se dekodira sama, sve takve istodobno (jedan dekoder po
+slici), a tek zatim prolazi sa susjedima za strelice. Izmjereno na kartici (topla): jedna slika 430-690 ms, prolaz od
+25 slika 560-660 ms; vecinu vremena nosi pokretanje ffmpega i dekodiranje od kljucne slike, ne broj slika.
