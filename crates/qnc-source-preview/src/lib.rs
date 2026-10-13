@@ -42,6 +42,17 @@ pub struct MonitorFrame {
     pub frame_map: Option<Arc<std::path::Path>>,
 }
 
+/// A picture of the story program on the monitor.
+#[derive(Debug, Clone)]
+pub struct ShownPicture {
+    /// The program frame it shows.
+    pub frame: u64,
+    /// Which picture of the session it is (output generation, sequence).
+    pub sequence: (u64, u64),
+    pub size: [usize; 2],
+    pub rgba: Arc<[u8]>,
+}
+
 /// Everything a form needs to paint the preview.
 #[derive(Clone)]
 pub struct PreviewView {
@@ -446,6 +457,20 @@ impl SourcePreview {
     /// slot edge was moved with the arrows).
     pub fn hands_on(&mut self) {
         self.touched = Some(std::time::Instant::now());
+    }
+
+    /// The picture the monitor shows from the story program (not a Sync window), with its
+    /// program frame (user 2026-10-13: the trim zoom takes the picture at the cut from
+    /// the monitor instead of decoding it again).
+    pub fn shown_program_picture(&self) -> Option<ShownPicture> {
+        let picture = self.player_view.picture.as_ref()?;
+        let header = &picture.header;
+        (header.source_id.starts_with("program:") && !header.source_id.contains(":window:")).then(|| ShownPicture {
+            frame: header.frame,
+            sequence: (header.output_generation, header.sequence),
+            size: [header.width as usize, header.height as usize],
+            rgba: picture.rgba.clone(),
+        })
     }
 
     pub fn toggle_play(&mut self) -> bool {

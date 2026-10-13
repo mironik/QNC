@@ -37,6 +37,20 @@ impl SlotTrim {
 }
 
 impl ProgramSegments {
+    /// The picture the stored story shows at a program frame (a cover, else the
+    /// segment; `None` on Off): what the player shows there, while the zoom draws drafts.
+    pub fn stored_picture_at(&self, frame: u64) -> Option<qnc_program_view::StillPicture> {
+        let stored = crate::SegmentsView {
+            rows: self.view.rows.clone(),
+            covers: self.view.covers.clone(),
+            slots: crate::slots(&self.stored_slots, None),
+            timebase: self.view.timebase,
+            total_frames: self.view.total_frames,
+            ..crate::SegmentsView::default()
+        };
+        qnc_program_view::program_picture(&stored, frame)
+    }
+
     /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the clicked slot,
     /// else of the slot under the Wrap playhead (the last slot also takes its end).
     /// False when there is none.

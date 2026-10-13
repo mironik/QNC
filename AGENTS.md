@@ -3680,3 +3680,8 @@ svaka slika zooma ceka cijeli prolaz dekodera od 25 slika (1,4-2,2 s) i da dvije
 nakon 3-3,8 s). `qnc-trim-stills`: slika koja nedostaje prvo se dekodira sama, sve takve istodobno (jedan dekoder po
 slici), a tek zatim prolazi sa susjedima za strelice. Izmjereno na kartici (topla): jedna slika 430-690 ms, prolaz od
 25 slika 560-660 ms; vecinu vremena nosi pokretanje ffmpega i dekodiranje od kljucne slike, ne broj slika.
+Dopuna 2026-10-13 (korisnik: "ok, napravi kako si planirao"; korak 1 od 2): slika na rezu u zoomu dolazi s monitora, bez
+dekodiranja. `qnc-source-preview` `shown_program_picture` (slika price na monitoru s brojem slike, ne Sync prozor),
+`qnc-program-segments` `stored_picture_at` (koju sliku klipa spremljena prica pokazuje na tom mjestu), `qnc-trim-stills`
+je uzima samo kad je zoom bas tu sliku trazi (za vrijeme playa nista se ne kopira). Aplikacija predaje to u postojecem
+pozivu (C10 isti). Korak 2: dekoder koji ostaje otvoren (libav u procesu) za ostale slike zooma.

@@ -70,6 +70,8 @@ pub struct TrimStills {
     job: Option<Job>,
     /// The pictures last asked for, as logged (diagnostics only).
     asked: String,
+    /// The monitor picture last taken (output generation, sequence).
+    offered: Option<(u64, u64)>,
     /// The last picture each place of the zoom (by its name) showed.
     shown: HashMap<String, Arc<RgbaImage>>,
     /// Each place's last picture and the way its frame last moved (+1, -1), for making
@@ -82,9 +84,34 @@ impl TrimStills {
         Self::default()
     }
 
+    /// The picture on the monitor as the clip picture the story shows there (user
+    /// 2026-10-13): a picture of the zoom that is it needs no decoding.
+    /// Only a picture the zoom of `view` wants is taken (nothing is copied while playing).
+    fn offer(&mut self, view: &SegmentsView, shown: Option<(StillPicture, qnc_source_preview::ShownPicture)>) {
+        let Some((picture, shown)) = shown else { return };
+        if self.offered == Some(shown.sequence) || self.cache.contains_key(&picture) {
+            return;
+        }
+        let wanted = view.edit_stills.iter().chain(&view.source_edit_stills).any(|still| still.picture.as_ref() == Some(&picture));
+        if !wanted {
+            return;
+        }
+        self.offered = Some(shown.sequence);
+        let content_key = shown.sequence.0.wrapping_mul(1_000_003) ^ shown.sequence.1;
+        let image = RgbaImage { size: shown.size, pixels: shown.rgba.to_vec(), content_key };
+        self.order.push_back(picture.clone());
+        self.cache.insert(picture, Arc::new(image));
+    }
+
     /// Puts the pictures on the edit pictures of `view` (Wrap rows and source timeline),
     /// decoded here. Returns whether a picture arrived.
-    pub fn fill(&mut self, view: &mut SegmentsView, locator: Option<StillLocator>) -> bool {
+    pub fn fill(
+        &mut self,
+        view: &mut SegmentsView,
+        locator: Option<StillLocator>,
+        shown: Option<(StillPicture, qnc_source_preview::ShownPicture)>,
+    ) -> bool {
+        self.offer(view, shown);
         let Some(locator) = locator else {
             return false;
         };
@@ -431,7 +458,7 @@ mod tests {
             edit_stills: vec![qnc_program_view::EditStill::new(10, true, Some(picture))],
             ..Default::default()
         };
-        assert!(!stills.fill(&mut view, None));
+        assert!(!stills.fill(&mut view, None, None));
         assert!(!stills.loading());
         assert!(view.edit_stills[0].image.is_none());
     }
