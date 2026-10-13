@@ -4184,6 +4184,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-keyframe-nav",
+ "qnc-media-card",
  "qnc-program-segments",
  "qnc-source-mark-focus",
  "qnc-source-preview",

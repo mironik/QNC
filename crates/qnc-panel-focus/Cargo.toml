@@ -6,6 +6,7 @@ description = "QNC public component: the keyboard map acts on the editorial pane
 
 [dependencies]
 eframe = { workspace = true }
+qnc-media-card = { workspace = true }
 qnc-program-segments = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-mark-focus = { workspace = true }

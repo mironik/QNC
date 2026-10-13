@@ -485,6 +485,7 @@ pub struct CardRow<'a> {
     pub rgba_thumb: Option<RgbaThumb<'a>>,
 }
 
+#[derive(Clone, Copy)]
 pub struct CardGridInput<'a> {
     pub height: f32,
     pub selected_id: &'a str,
@@ -504,12 +505,71 @@ pub enum CardGridAction {
     ToggleSelection(String),
 }
 
+/// A key on a card grid in keyboard focus: the focused card moves, or Enter opens it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridStep {
+    Left,
+    Right,
+    Up,
+    Down,
+    Open,
+}
+
+/// The card focused after a move by `step` from `from` in a grid of `count` cards in
+/// `cols` columns; it stays inside the grid.
+pub fn step_focus(from: usize, step: GridStep, cols: usize, count: usize) -> usize {
+    let last = count.saturating_sub(1);
+    let cols = cols.max(1);
+    match step {
+        GridStep::Left => from.saturating_sub(1),
+        GridStep::Right => (from + 1).min(last),
+        GridStep::Up => from.checked_sub(cols).unwrap_or(from),
+        GridStep::Down => if from + cols <= last { from + cols } else { from },
+        GridStep::Open => from.min(last),
+    }
+}
+
+/// The card grid in keyboard focus (`input.panel_focused`): it keeps its focused card,
+/// moves it by `step` and scrolls to it; Enter (`GridStep::Open`) opens the focused card
+/// as a click does. Without focus it is `show_card_grid`.
+pub fn show_card_grid_focused(
+    ui: &mut egui::Ui,
+    style: &CardStyle,
+    metrics: &CardMetrics,
+    input: &CardGridInput<'_>,
+    step: Option<GridStep>,
+) -> Option<CardGridAction> {
+    if !input.panel_focused || input.cards.is_empty() {
+        return show_card_grid(ui, style, metrics, input);
+    }
+    let key = egui::Id::new((input.id_salt, "qnc-card-focus"));
+    let selected = input.cards.iter().position(|card| card.id == input.selected_id);
+    let from = ui.data(|data| data.get_temp::<usize>(key)).or(selected).unwrap_or(0).min(input.cards.len() - 1);
+    let cols = grid_metrics(ui.available_width().max(metrics.min_card_width), input.cards.len(), metrics).cols;
+    let focused = step.map_or(from, |step| step_focus(from, step, cols, input.cards.len()));
+    ui.data_mut(|data| data.insert_temp(key, focused));
+    let opened = (step == Some(GridStep::Open)).then(|| CardGridAction::Activate(input.cards[focused].id.to_string()));
+    let focused_input = CardGridInput { focused_id: input.cards[focused].id, ..*input };
+    let clicked = grid(ui, style, metrics, &focused_input, step.map(|_| focused));
+    clicked.or(opened)
+}
+
 /// Virtualized vertical card grid. Returns the last card click, if any.
 pub fn show_card_grid(
     ui: &mut egui::Ui,
     style: &CardStyle,
     metrics: &CardMetrics,
     input: &CardGridInput<'_>,
+) -> Option<CardGridAction> {
+    grid(ui, style, metrics, input, None)
+}
+
+fn grid(
+    ui: &mut egui::Ui,
+    style: &CardStyle,
+    metrics: &CardMetrics,
+    input: &CardGridInput<'_>,
+    scroll_to: Option<usize>,
 ) -> Option<CardGridAction> {
     let mut clicked: Option<CardGridAction> = None;
     let cards = input.cards;
@@ -542,6 +602,11 @@ pub fn show_card_grid(
 
             let total_rows = cards.len().div_ceil(grid.cols);
             let row_stride = grid.card_h + grid.gap;
+            if let Some(index) = scroll_to {
+                // The focused card moved: bring it into view.
+                let top = ui.cursor().min + Vec2::new(0.0, (index / grid.cols) as f32 * row_stride);
+                ui.scroll_to_rect(Rect::from_min_size(top, Vec2::new(grid.card_w, grid.card_h)), None);
+            }
             let first_row = (viewport.top() / row_stride).floor().max(0.0) as usize;
             let last_row = ((viewport.bottom() / row_stride).ceil() as usize + 1).min(total_rows);
             let focus_id = if input.panel_focused && !input.focused_id.trim().is_empty() {
@@ -611,6 +676,18 @@ pub fn show_card_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_focused_card_stays_inside_the_grid() {
+        // 7 cards in 3 columns: 0 1 2 / 3 4 5 / 6
+        assert_eq!(step_focus(0, GridStep::Left, 3, 7), 0);
+        assert_eq!(step_focus(2, GridStep::Right, 3, 7), 3);
+        assert_eq!(step_focus(6, GridStep::Right, 3, 7), 6);
+        assert_eq!(step_focus(4, GridStep::Down, 3, 7), 4, "no card under 4");
+        assert_eq!(step_focus(3, GridStep::Down, 3, 7), 6);
+        assert_eq!(step_focus(1, GridStep::Up, 3, 7), 1);
+        assert_eq!(step_focus(5, GridStep::Up, 3, 7), 2);
+    }
 
     #[test]
     fn the_pipeline_dots_follow_the_catalog_record_only() {

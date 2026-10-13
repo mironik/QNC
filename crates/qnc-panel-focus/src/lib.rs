@@ -70,11 +70,17 @@ impl Default for FocusLayout {
     }
 }
 
-/// What a form draws of the focus: the panel and, on the source dock buttons, which one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// A key on the media pool: the card focus moves, or Enter opens the focused card (the
+/// public card grid applies it).
+pub use qnc_media_card::GridStep as PoolStep;
+
+/// What a form draws of the focus: the panel, on the source dock buttons the action of
+/// the one the arrows are on, and once a key on the media pool for its card grid.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FocusView {
     pub panel: Panel,
-    pub button: Option<usize>,
+    pub button: Option<String>,
+    pub pool_step: Option<PoolStep>,
 }
 
 /// Actions of the segment panel that also run from the other panels: they use
@@ -112,6 +118,8 @@ pub struct PanelFocus {
     /// The catalog action a key on the pool tabs or a dock button stands for; the
     /// caller runs it as its own action (`take_pick`).
     pick: Option<String>,
+    /// A key on the media pool, for the card grid on the next paint.
+    pool_step: Option<PoolStep>,
 }
 
 impl PanelFocus {
@@ -158,7 +166,8 @@ impl PanelFocus {
                 (None, Ok(_)) => {}
             }
         }
-        FocusView { panel: self.panel, button: (self.panel == Panel::SourceButtons).then_some(self.button) }
+        let button = (self.panel == Panel::SourceButtons).then(|| self.layout.buttons.get(self.button).cloned()).flatten();
+        FocusView { panel: self.panel, button, pool_step: self.pool_step.take() }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).
@@ -246,9 +255,24 @@ impl PanelFocus {
                 if routed.is_none() {
                     self.pick = Some(id);
                 }
-                return routed;
+                self.advance(preview, wrap, segments); // Enter goes on round the walk (user 2026-10-13)
+                return routed.map(|_| true);
             }
-            "activate_focused_item" | "step_prev_part" | "step_next_part" if matches!(panel, Panel::PoolTabs | Panel::SourceButtons) => false,
+            // Enter on the pool tabs goes on to the pool.
+            "activate_focused_item" if panel == Panel::PoolTabs => self.advance(preview, wrap, segments),
+            // The media pool: the arrows move the card focus, Enter opens the card (and the
+            // clip chosen puts the keyboard on its source timeline).
+            "step_back_frame" | "step_forward_frame" | "step_prev_part" | "step_next_part" | "activate_focused_item" if panel == Panel::Pool => {
+                self.pool_step = Some(match action_id {
+                    "step_back_frame" => PoolStep::Left,
+                    "step_forward_frame" => PoolStep::Right,
+                    "step_prev_part" => PoolStep::Up,
+                    "step_next_part" => PoolStep::Down,
+                    _ => PoolStep::Open,
+                });
+                true
+            }
+            "step_prev_part" | "step_next_part" if matches!(panel, Panel::PoolTabs | Panel::SourceButtons) => false,
             "step_prev_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(1),
             "step_next_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(-1),
             // Up/Down on a taken edit (user 2026-10-11): to the key picture before or after it,
@@ -273,21 +297,26 @@ impl PanelFocus {
                 if lane {
                     preview.hear_channels(segments.heard_channels());
                 }
-                self.back_to_wrap(segments, wrap, timeline);
-                confirmed
+                // A taken mark is let go; with nothing to confirm Enter goes on round the walk.
+                let released = self.taken(timeline) && mark_cue(preview, qnc_source_mark_focus::release(timeline));
+                self.mark_taken &= !released;
+                let back = self.back_to_wrap(segments, wrap, timeline);
+                confirmed || released || back || self.advance(preview, wrap, segments)
             }
-            "activate_focused_item" if panel == Panel::Segments => segments.confirm_program(),
+            "activate_focused_item" if panel == Panel::Segments => {
+                segments.confirm_program() || self.advance(preview, wrap, segments)
+            }
             "activate_focused_item" => false,
-            // A virtual shot only from the source timeline, and not by an Enter that confirmed.
-            "save_virtual_shot" if !on_source || segments.source_waits_enter() => false,
+            // A virtual shot (Shift+S or Add SubClip), not by an Enter that confirmed.
+            "save_virtual_shot" if segments.source_waits_enter() => false,
             "clear_focus" | "close_player" if on_source && segments.lane_is_taken() => segments.release_lane(),
             // Down closes an open large wave off the segment panel (there down is the next segment).
             "step_next_part" if on_source && segments.view().wave_zoom != [0, 0] => segments.close_wave(),
             // Home on the source timeline: the start of the clip (the V label does the same).
             "playlist_input_start" if on_source => preview.cue(timeline.range_start_frame),
             "focus_next" | "focus_prev" => {
-                let next = cycle(panel, action_id == "focus_next", &self.walk(!segments.view().is_empty()));
-                self.enter(next, preview, wrap)
+                let next = cycle(panel, action_id == "focus_next", &self.walk());
+                self.enter(next, preview, wrap, segments)
             }
             "play_pause" => match segments.sync_space(wrap.is_active()) {
                 SyncSpace::Start(sync) => {
@@ -393,16 +422,21 @@ impl PanelFocus {
         })
     }
 
-    /// The panels Tab reaches now: those of the layout that have something to take.
-    fn walk(&self, has_segments: bool) -> Vec<Panel> {
+    /// The panels Tab and Enter reach: those of the layout that have something to take.
+    fn walk(&self) -> Vec<Panel> {
         let layout = &self.layout;
         let walk = layout.order.iter().copied().filter(|panel| match panel {
             Panel::PoolTabs => !layout.tabs.is_empty(),
             Panel::SourceButtons => !layout.buttons.is_empty(),
-            Panel::Segments => has_segments,
             _ => true,
         });
         walk.collect()
+    }
+
+    /// Enter with nothing to confirm: on to the next panel of the walk.
+    fn advance(&mut self, preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &ProgramSegments) -> bool {
+        let next = cycle(self.panel, true, &self.walk());
+        self.enter(next, preview, wrap, segments)
     }
 
     /// A segment edge written or dropped: the mark is let go and the keyboard and
@@ -421,7 +455,7 @@ impl PanelFocus {
     /// Tab into a panel: the source timeline shows the source clip again (v5
     /// `activate_source_keyboard_panel`), the segment panel opens the program at
     /// the Wrap playhead.
-    fn enter(&mut self, panel: Panel, preview: &mut SourcePreview, wrap: &mut WrapSession) -> bool {
+    fn enter(&mut self, panel: Panel, preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &ProgramSegments) -> bool {
         self.panel = panel;
         match panel {
             Panel::SourceTimeline if wrap.is_active() => {
@@ -429,7 +463,7 @@ impl PanelFocus {
                 let frame = preview.view().timeline.playhead_frame.unwrap_or(0);
                 preview.timeline_intent(&TimelineIntent::CueFrame(frame));
             }
-            Panel::Segments if !wrap.is_active() => wrap.seek(wrap.playhead()),
+            Panel::Segments if !wrap.is_active() && !segments.view().is_empty() => wrap.seek(wrap.playhead()),
             _ => {}
         }
         true
@@ -474,15 +508,24 @@ mod tests {
         let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
         let mut timeline = TimelineProjection::default();
         assert_eq!(focus.panel(), Panel::PoolTabs, "the walk starts on its first panel");
-        for expected in [Panel::Pool, Panel::SourceTimeline, Panel::SourceButtons, Panel::PoolTabs] {
+        for expected in [Panel::Pool, Panel::SourceTimeline, Panel::SourceButtons, Panel::Segments, Panel::PoolTabs] {
             focus.route("focus_next", (&mut preview, &mut wrap, &mut segments, &mut timeline));
-            assert_eq!(focus.panel(), expected, "no segments yet: the segment panel is skipped");
+            assert_eq!(focus.panel(), expected);
         }
+        // Enter goes on round the walk: the pool tabs to the pool, where it opens a card.
+        focus.route("activate_focused_item", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(focus.panel(), Panel::Pool);
+        focus.route("step_next_part", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).pool_step, Some(PoolStep::Down));
+        focus.set(Panel::SourceTimeline);
+        focus.route("activate_focused_item", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(focus.panel(), Panel::SourceButtons, "nothing to confirm on the source: on to its buttons");
+        focus.set(Panel::PoolTabs);
         assert_eq!(focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline)), None);
         assert_eq!(focus.take_pick().as_deref(), Some("editorial_tab_virtual"), "the right arrow is the next tab");
         focus.set(Panel::SourceButtons);
         focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
-        assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).button, Some(1));
+        assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).button.as_deref(), Some("add_ton_segment"));
         assert_eq!(cycle(Panel::SourceTimeline, false, &[Panel::Pool, Panel::SourceTimeline]), Panel::Pool);
     }
 
@@ -524,13 +567,7 @@ mod tests {
         let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
         let mut timeline = TimelineProjection::default();
         focus.set(Panel::Pool);
-        for action in ["activate_focused_item", "step_forward_frame", "save_virtual_shot"] {
-            assert_eq!(
-                focus.route(action, (&mut preview, &mut wrap, &mut segments, &mut timeline)),
-                Some(false),
-                "{action} does nothing on the pool"
-            );
-        }
+        assert_eq!(focus.route("add_marker", (&mut preview, &mut wrap, &mut segments, &mut timeline)), Some(false), "M is the segment panel's");
     }
 
     #[test]
@@ -546,7 +583,7 @@ mod tests {
         assert_eq!(segments.view().a2_choice, Some((0, 2)), "channel 1 kept on A2");
         assert_eq!(segments.view().lane_taken, None, "Enter closed the picker");
         focus.set(Panel::Segments);
-        assert_eq!(focus.route("save_virtual_shot", (&mut preview, &mut wrap, &mut segments, &mut timeline)), Some(false), "no short from the segment panel");
+        assert_eq!(focus.route("save_virtual_shot", (&mut preview, &mut wrap, &mut segments, &mut timeline)), Some(false), "not by the Enter that kept the channel");
         std::thread::sleep(std::time::Duration::from_millis(200));
         focus.set(Panel::SourceTimeline);
         assert_eq!(focus.route("save_virtual_shot", (&mut preview, &mut wrap, &mut segments, &mut timeline)), None, "the source timeline saves a short");

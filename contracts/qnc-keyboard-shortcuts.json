@@ -812,11 +812,6 @@
             "shift": false
           }
         ],
-        "save_virtual_shot": [
-          {
-            "key": "Enter"
-          }
-        ],
         "step_back_frame": [ { "code": "ArrowLeft", "key": "ArrowLeft" } ],
         "step_forward_frame": [ { "code": "ArrowRight", "key": "ArrowRight" } ],
         "record_toggle": [

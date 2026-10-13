@@ -881,6 +881,8 @@ fn require_reference_keyboard_subset(
 const V4_KEY_EXCEPTIONS: &[(&str, &str, &str)] = &[
     ("default", "storyboard", "overwrite_cover"),
     ("default", "storyboard", "focus_empty_slot"),
+    // 2026-10-13 (user: "Enter goes on round the panels"): a SubClip is Shift+S or Add SubClip.
+    ("default", "off", "save_virtual_shot"),
 ];
 
 fn v4_key_exception(preset_id: &str, scope_id: &str, action_id: &str) -> bool {

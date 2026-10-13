@@ -3790,3 +3790,15 @@ njegovu akciju kataloga (`take_pick`). `qnc-editorial-application` (`new(root, F
 `qnc-editorial-blocks` (okvir fokusa na tabovima i dugmetu; stilovi docka, timelinea i gumba premjesteni u
 `qnc-editorial-layout`). C10 spusteno: application 706 -> 703, blocks 379 -> 354, desktop 88 -> 86. Nije izvedeno:
 strelice i Enter po karticama Media poola (fokusirana kartica, gore/dolje za red), Alt+broj za izbor forme u traci desktopa.
+Dopuna 2026-10-13 (korisnik: "Enterom se slijedi krug: tab All -> Enter -> media pool (strelicama odabrati klip) -> Enter
+-> source timeline (odabrati IN/OUT) -> Enter -> grupa dugmica (strelicama odabrati akciju) -> Enter -> segment panel;
+naravno moze se ubrzati direktnim pozivanjem dostupnih akcija"): Enter bez onoga sto bi potvrdio vodi na sljedeci panel
+kruga forme. Tabovi poola -> pool; u poolu strelice pomicu fokusiranu karticu (gore/dolje za red), Enter je otvara kao
+klik (izbor klipa vodi na source timeline); na source timelineu Enter najprije potvrduje uzetu traku, Edit segmenta, Sync
+ili pusta uzeti IN/OUT, inace ide na dugmad; na dugmetu Enter pritisne akciju i ide dalje; na panelu Segmenti Enter
+najprije potvrduje uzeti marker/slot/rub slota, inace ide na tabove poola. Segment panel je u krugu i bez segmenata.
+`qnc-panel-focus` (`advance`, `PoolStep` = `qnc_media_card::GridStep`, `FocusView.pool_step`, `FocusView.button` je
+akcija dugmeta), `qnc-media-card` (`show_card_grid_focused`, `step_focus`, `GridStep`: fokusirana kartica u memoriji
+mreze, pomak, pomicanje pogleda do nje, Enter = klik; `show_card_grid` isti za Ingest), `qnc-editorial-blocks` (mreza
+s fokusom). Katalog: Enter vise ne sprema virtualni kadar (QNC preset, scope `off`; iznimka od qnc_v4 na popisu
+`V4_KEY_EXCEPTIONS`); SubClip je Shift+S ili dugme Add SubClip, s bilo kojeg panela.

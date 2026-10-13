@@ -182,15 +182,13 @@ fn render_source_dock(
         |ui| {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
-                let actions = &contracts.composition().source_dock.actions_rtl;
-                for (index, action) in actions.iter().enumerate() {
+                for action in &contracts.composition().source_dock.actions_rtl {
                     let enabled = action
                         .action_id()
                         .is_some_and(|action_id| view.action_enabled(action_id));
                     let on = action.action_id().is_some_and(|action_id| view.segments.action_selected(action_id));
                     let response = qnc_ui_kit::chrome_button(ui, action.label(), enabled, on, layout::button_style(theme));
-                    // Drawn right to left: the focus counts the buttons left to right.
-                    paint_focus(ui, response.rect.expand(2.0), view.focus.button == Some(actions.len() - 1 - index), theme.focus);
+                    paint_focus(ui, response.rect.expand(2.0), action.action_id().is_some_and(|id| view.focus.button.as_deref() == Some(id)), theme.focus);
                     if response.clicked() {
                         if let Some(action_id) = action.action_id() {
                             header_intent = Some(EditorialIntent::action(action_id));
@@ -344,7 +342,7 @@ fn render_clip_grid(
     let no_textures = std::collections::HashMap::new();
     let mut action = None;
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-        action = qnc_media_card::show_card_grid(
+        action = qnc_media_card::show_card_grid_focused(
             ui,
             &style,
             &metrics,
@@ -356,7 +354,7 @@ fn render_clip_grid(
                     view.chosen_clip_id().unwrap_or("")
                 },
                 focused_id: "",
-                panel_focused: false,
+                panel_focused: view.focus.panel == Panel::Pool,
                 cards: &rows,
                 thumb_textures: &no_textures,
                 tc: &qnc_media_card::minutes_seconds,
@@ -364,6 +362,7 @@ fn render_clip_grid(
                 empty_message,
                 id_salt: "editorial_clip_grid",
             },
+            view.focus.pool_step,
         );
     });
     match action {
