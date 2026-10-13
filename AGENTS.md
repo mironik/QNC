@@ -3753,3 +3753,7 @@ do M markera ili OUT-a izvora").
 Popravak isti dan (korisnik: "nakon Entera sljedeca pokrivalica u Sync/B-roll vraca se na pocetak upravo kreiranog slota";
 log: cetiri Sync prozora zaredom od 0): zaustavljen Sync drzi Wrap playhead na zadnjoj slici slota, a novi Sync krece od
 markera na ili prije playheada, dakle od pocetka tog slota. Nakon Entera Wrap playhead ide na krajnji marker slota.
+Dopuna 2026-10-13 (korisnik: "nepokriveni slot ne bi smio gurati slotove iza njega ako se produljuju slotovi ispred njega"):
+`TrimSlot` pomice markere samo do prvog slota bez pokrivalice iza uzetog slota; taj prazni slot preuzima razliku (zadrzava
+barem jednu sliku), slotovi iza njega ostaju. Bez praznog slota razliku i dalje preuzima zadnji slot price.
+`qnc-program-db` (`shift_markers_between`, testovi), `qnc-program-segments` (nacrt `SlotTrim.empty`), ugovor `slot_trim`.

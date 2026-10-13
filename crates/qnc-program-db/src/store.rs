@@ -889,15 +889,39 @@ impl Store {
         if slot_end - slot_start + frames < 1 {
             return Err("Slot mora imati barem jednu sliku.".into());
         }
-        let last = user_markers_from(&tx, slot_end)?.into_iter().map(|(_, frame)| frame).max().unwrap_or(slot_end);
-        if last + frames >= duration {
-            return Err("Zadnji slot price mora zadrzati barem jednu sliku.".into());
+        // The first slot after it without a cover takes the difference (user 2026-10-13: an
+        // empty slot does not push the slots after it); else the last slot of the story.
+        let empty: Option<(i64, i64)> = tx
+            .query_row(
+                "SELECT start_frame, end_frame FROM story_marker_slots
+                 WHERE start_frame >= ?1 AND slot_id NOT IN (SELECT slot_id FROM story_covers)
+                 ORDER BY start_frame LIMIT 1",
+                [slot_end],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(err)?;
+        match empty {
+            Some((empty_start, empty_end)) => {
+                if empty_end - (empty_start + frames) < 1 {
+                    return Err("Prazni slot iza mora zadrzati barem jednu sliku.".into());
+                }
+            }
+            None => {
+                let last = user_markers_from(&tx, slot_end)?.into_iter().map(|(_, frame)| frame).max().unwrap_or(slot_end);
+                if last + frames >= duration {
+                    return Err("Zadnji slot price mora zadrzati barem jednu sliku.".into());
+                }
+            }
         }
         if start {
             // The slot keeps its place: its cover starts `frames` earlier in its source.
             roll_cover(&tx, &start_id, -frames)?;
         }
-        shift_markers_from(&tx, slot_end, frames, fps)?;
+        match empty {
+            Some((empty_start, _)) => shift_markers_between(&tx, slot_end, empty_start, frames, fps)?,
+            None => shift_markers_from(&tx, slot_end, frames, fps)?,
+        }
         finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
@@ -2316,6 +2340,28 @@ fn set_marker_frame(conn: &Connection, marker_id: &str, frame: i64, fps: f64) ->
         params![frame, timeline_sec(frame, fps), frame_timecode(frame, fps), story_now(), marker_id],
     )
     .map_err(err)?;
+    Ok(())
+}
+
+/// Moves the user markers from `from` up to and including `to` by `delta` frames.
+fn shift_markers_between(conn: &Connection, from: i64, to: i64, delta: i64, fps: f64) -> Result<()> {
+    let rows = {
+        let mut statement = conn
+            .prepare(
+                "SELECT marker_id, timeline_frame FROM story_markers
+                 WHERE timeline_frame >= ?1 AND timeline_frame <= ?2 AND system_role = ''",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map(params![from, to], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        rows
+    };
+    for (marker_id, frame) in rows {
+        set_marker_frame(conn, &marker_id, frame + delta, fps)?;
+    }
     Ok(())
 }
 

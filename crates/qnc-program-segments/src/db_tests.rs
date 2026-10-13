@@ -291,7 +291,7 @@ fn ctrl_o_on_the_segment_panel_lengthens_the_slot_under_the_playhead_and_moves_t
     assert!(segments.take_slot_edge_at_playhead(true));
     assert_eq!(segments.view().playhead, Some(0), "the playhead on the slot's first picture");
     segments.apply_action("step_forward_frame");
-    assert_eq!(marker_frames(&segments), vec![0, 39, 82, 150]);
+    assert_eq!(marker_frames(&segments), vec![0, 39, 83, 150], "the empty slot after it takes the difference");
     segments.apply_action("clear_focus");
     assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150]);
     // The last slot ends with the story.

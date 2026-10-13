@@ -22,13 +22,17 @@ pub(crate) struct SlotTrim {
     pub(crate) slot_end: u64,
     /// Story frames the slot is longer (negative: shorter).
     pub(crate) frames: i64,
+    /// The first slot after it without a cover, (start, end): it takes the difference and
+    /// the slots after it stay (user 2026-10-13); `None`: the last slot takes it.
+    pub(crate) empty: Option<(u64, u64)>,
 }
 
 impl SlotTrim {
     /// Where a marker frame of the program is drawn: from the slot's end on (the locked
     /// end of the story excepted) it moves with the trim.
     pub(crate) fn moved(&self, frame: u64, total: u64) -> u64 {
-        if frame >= self.slot_end && frame < total {
+        let reach = self.empty.map_or(total.saturating_sub(1), |(start, _)| start);
+        if frame >= self.slot_end && frame <= reach && frame < total {
             frame.saturating_add_signed(self.frames)
         } else {
             frame
@@ -77,12 +81,20 @@ impl ProgramSegments {
         self.selected_slot = Some(slot.slot_id.clone());
         self.selected_marker = None;
         self.write(Operation::SelectSlot { slot_id: slot.slot_id.clone() });
+        let empty = self
+            .view
+            .slots
+            .iter()
+            .filter(|later| later.start_frame >= slot.end_frame && !later.has_cover)
+            .min_by_key(|later| later.start_frame)
+            .map(|later| (later.start_frame, later.end_frame));
         self.slot_trim = Some(SlotTrim {
             slot_id: slot.slot_id,
             start,
             slot_start: slot.start_frame,
             slot_end: slot.end_frame,
             frames: 0,
+            empty,
         });
         // The monitor shows the cut at once: the slot's first or last picture.
         self.cue_program(if start { slot.start_frame } else { slot.end_frame.saturating_sub(1) });
@@ -134,9 +146,16 @@ impl ProgramSegments {
             self.refresh_view("Slot mora imati barem jednu sliku.".into());
             return true;
         }
-        if last as i64 + frames >= total as i64 {
-            self.refresh_view("Zadnji slot price mora zadrzati barem jednu sliku.".into());
-            return true;
+        match trim.empty {
+            Some((empty_start, empty_end)) if empty_end as i64 - (empty_start as i64 + frames) < 1 => {
+                self.refresh_view("Prazni slot iza mora zadrzati barem jednu sliku.".into());
+                return true;
+            }
+            None if last as i64 + frames >= total as i64 => {
+                self.refresh_view("Zadnji slot price mora zadrzati barem jednu sliku.".into());
+                return true;
+            }
+            _ => {}
         }
         self.slot_trim = Some(SlotTrim { frames, ..trim.clone() });
         self.refresh_view(Self::trim_message(trim.start));
