@@ -160,7 +160,6 @@ impl WaveSourceBinding {
 pub struct WaveContext {
     pub project_id: String,
     pub wave_root_uri: String,
-    pub project_audio_channels: u16,
     pub content_reader: Arc<dyn WaveContentRead>,
     pub content_writer: Arc<dyn WaveContentWriteFactory>,
     pub source_bindings: Vec<WaveSourceBinding>,
@@ -171,7 +170,6 @@ impl fmt::Debug for WaveContext {
         f.debug_struct("WaveContext")
             .field("project_id", &self.project_id)
             .field("wave_root_uri", &self.wave_root_uri)
-            .field("project_audio_channels", &self.project_audio_channels)
             .field("source_bindings", &self.source_bindings)
             .finish_non_exhaustive()
     }
@@ -653,11 +651,10 @@ fn build_timeline_wave(
         .content_reader
         .read_clip(&request.clip_id)?
         .ok_or_else(|| qnc_ui_text::text("db.clip_project_database").to_string())?;
-    let plan = qnc_wave::plan_from_snapshot_with_project_audio_channels(
+    let plan = qnc_wave::plan_from_snapshot_with_artifact_name(
         &clip.snapshot,
         &context.wave_root_uri,
         Some(&clip.name),
-        context.project_audio_channels,
     )?;
     if cancel.load(Ordering::Acquire) {
         return Err(wave_paused_for_playback().into());

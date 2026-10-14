@@ -29,7 +29,6 @@ pub struct ArtifactsContext {
     /// Where the filmstrip frames of this machine live.
     pub filmstrip_dir: PathBuf,
     pub wave_root_uri: String,
-    pub project_audio_channels: u16,
     pub timeline_reader: Arc<dyn TimelineArtifactRead>,
     pub filmstrip_reader: Arc<dyn FilmstripContentRead>,
     pub filmstrip_writer: Arc<dyn FilmstripContentWriteFactory>,
@@ -85,7 +84,6 @@ impl Artifacts {
         self.wave.configure(WaveContext {
             project_id: context.project_id,
             wave_root_uri: context.wave_root_uri,
-            project_audio_channels: context.project_audio_channels,
             content_reader: context.wave_reader,
             content_writer: context.wave_writer,
             source_bindings: context.wave_sources,

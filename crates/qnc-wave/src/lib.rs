@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 
 pub const MODULE_ID: &str = "qnc.module.wave";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const WAVE_RENDER_VERSION: i64 = 1;
+/// 2: the wave is always made from the original (user 2026-10-14: most camera operators do not
+/// record a proxy, and the original has every channel A1/A2 can pick); waves of version 1 came
+/// from a two channel proxy and are made again.
+pub const WAVE_RENDER_VERSION: i64 = 2;
 pub const WAVE_PEAK_BUCKETS: usize = 1200;
 pub const MAX_WAVE_PEAK_BUCKETS: usize = 9600;
 
@@ -141,27 +144,6 @@ pub fn plan_from_snapshot_with_artifact_name(
         artifact_name,
         WaveSourceKind::Original,
     )
-}
-
-pub fn plan_from_snapshot_with_project_audio_channels(
-    snapshot: &Snapshot,
-    wave_base_uri: &str,
-    artifact_name: Option<&str>,
-    project_audio_channels: u16,
-) -> Result<WavePlan, String> {
-    let proxy_has_audio = snapshot
-        .metadata
-        .proxy
-        .as_ref()
-        .map(|proxy| audio_channel_count(proxy))
-        .transpose()?
-        .is_some_and(|channels| channels > 0);
-    let source_kind = if project_audio_channels == 2 && proxy_has_audio {
-        WaveSourceKind::Proxy
-    } else {
-        WaveSourceKind::Original
-    };
-    plan_from_snapshot_inner(snapshot, wave_base_uri, artifact_name, source_kind)
 }
 
 pub fn media_for_plan<'a>(
@@ -531,20 +513,6 @@ impl ChannelPeakCollector {
     }
 }
 
-fn audio_channel_count(media: &MediaRepresentation) -> Result<u32, String> {
-    let mut count = 0u32;
-    for stream in &media.streams {
-        let StreamDetails::Audio(audio) = &stream.details else {
-            continue;
-        };
-        let (_, source_channels) = audio_format(audio)?;
-        count = count
-            .checked_add(source_channels)
-            .ok_or_else(|| "Wave audio channel count overflow.".to_string())?;
-    }
-    Ok(count)
-}
-
 fn audio_channels(
     media: &MediaRepresentation,
     _source_kind: WaveSourceKind,
@@ -907,39 +875,13 @@ mod tests {
     }
 
     #[test]
-    fn two_channel_project_uses_proxy_wave_when_proxy_exists() {
-        let snapshot = snapshot_with_proxy(4, 1);
-
-        let plan = plan_from_snapshot_with_project_audio_channels(
-            &snapshot,
-            "qnc://local/db/ingest_content/p1/wave",
-            Some("C0001.MXF"),
-            2,
-        )
-        .unwrap();
-
-        assert_eq!(plan.source_kind, WaveSourceKind::Proxy);
-        assert_eq!(
-            plan.source_uri,
-            "qnc://local/source/card/file/PRIVATE/SUB/C0001.MP4"
-        );
-        assert_eq!(plan.channels.len(), 1);
-        assert_eq!(plan.channels[0].lane, WaveLane::A1);
-        assert_eq!(
-            media_for_plan(&snapshot, &plan).unwrap().media_uri,
-            plan.source_uri
-        );
-    }
-
-    #[test]
-    fn more_than_two_channel_project_uses_original_wave_even_when_proxy_exists() {
+    fn the_wave_comes_from_the_original_with_every_channel_even_when_a_proxy_has_sound() {
         let snapshot = snapshot_with_proxy(4, 2);
 
-        let plan = plan_from_snapshot_with_project_audio_channels(
+        let plan = plan_from_snapshot_with_artifact_name(
             &snapshot,
             "qnc://local/db/ingest_content/p1/wave",
             Some("C0001.MXF"),
-            4,
         )
         .unwrap();
 
@@ -948,22 +890,8 @@ mod tests {
             plan.source_uri,
             "qnc://local/source/card/file/PRIVATE/CLIP/C0001.MXF"
         );
-        assert_eq!(plan.channels.len(), 4);
-    }
-
-    #[test]
-    fn two_channel_project_without_proxy_uses_original_wave() {
-        let snapshot = snapshot(vec![video_stream(), audio_stream(1, 2)]);
-
-        let plan = plan_from_snapshot_with_project_audio_channels(
-            &snapshot,
-            "qnc://local/db/ingest_content/p1/wave",
-            Some("C0001.MXF"),
-            2,
-        )
-        .unwrap();
-
-        assert_eq!(plan.source_kind, WaveSourceKind::Original);
+        assert_eq!(plan.channels.len(), 4, "channels 3 and 4 too, which A1/A2 can pick");
+        assert_eq!(media_for_plan(&snapshot, &plan).unwrap().media_uri, plan.source_uri);
     }
 
     #[test]

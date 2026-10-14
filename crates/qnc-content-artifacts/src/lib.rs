@@ -439,7 +439,6 @@ pub fn artifacts_context(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| qnc_ui_text::text("artifact.timeline_artifacts_have_local_binding_project").to_string())?;
     let filmstrip_dir = settings.product_local_dir(&project_dir, ProductArea::Filmstrip);
-    let project_audio_channels = settings.audio_channels().map_err(|e| e.to_string())?;
     let filmstrip_root_uri = settings.product_uri(ProductArea::Filmstrip);
     let project_db = ProjectDbTarget::for_project(reader, settings)?;
     let artifacts = SharedArtifacts::new(project_db.clone());
@@ -452,7 +451,6 @@ pub fn artifacts_context(
         filmstrip_root_uri: filmstrip_root_uri.clone(),
         filmstrip_dir: filmstrip_dir.clone(),
         wave_root_uri: format!("{}/wave", content_target.uri().trim_end_matches('/')),
-        project_audio_channels,
         timeline_reader: Arc::new(ProjectTimelineArtifactReader {
             artifacts: artifacts.clone(),
             filmstrip_root_uri,

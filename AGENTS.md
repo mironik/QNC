@@ -3949,3 +3949,11 @@ stoji otvorena; klik na kanal u stupcu i strelice gore/dolje mijenjaju samo nacr
 kanal, a gore/dolje vise ne otvaraju i ne zatvaraju prosirenje (`zoom`/`lane_zoom` uklonjeni; `qnc-panel-focus`).
 Dugme uzete trake ima crveni rub (`qnc-timeline` `TimelineTheme.lane_taken`). Poruka uzete trake kroz rjecnik
 (`story.msg.lane_taken`). Testovi `qnc-lane-choice`, `qnc-program-segments`, `qnc-panel-focus`, `qnc-timeline`, conformance.
+Promjena pravila 2026-10-14 (korisnik: "treba prebaciti izradu wave iz originala, glavnina snimatelja u kamerama ne
+snima proxy"; nalaz: svih 98 waveova aktivnog projekta bilo je iz proxyja s 2 kanala, pa kanali 3 i 4 koje A1/A2 smiju
+izabrati nisu imali wave iako se cuju iz originala): zamjenjuje pravilo iz §8 da se uz projektni `audio.channels = 2`
+wave gradi iz proxyja. Wave se uvijek gradi iz spremljenog originala, svi stvarni kanali redom u trake A1-A4.
+`qnc-wave` (uklonjen izbor proxyja `plan_from_snapshot_with_project_audio_channels`; `WAVE_RENDER_VERSION` 2, pa se
+waveovi verzije 1 ponovno grade), `qnc-wave-worker`, `qnc-timeline-artifacts`, `qnc-content-artifacts` (uklonjeno polje
+`project_audio_channels`). Wave sada cita original s kartice, pa je prvi prolaz sporiji nego iz proxyja. Testovi,
+conformance.
