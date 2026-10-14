@@ -33,12 +33,11 @@ impl IngestApplication {
             action_ids::INGEST_PREVIEW_FOCUS => self.on_preview_focus(intent.payload),
             action_ids::INGEST_SET_ARCHIVE => self.on_set_archive(intent.payload),
             action_ids::INGEST_SET_AI_MINING => self.on_set_ai_mining(),
-            action_ids::INGEST_APPROVE_PROXY_POSTERS => self.on_approve_proxy_posters(),
             action_ids::INGEST_IMPORT_SELECTED => self.start_import(),
             action_ids::PLAY_PAUSE | action_ids::STEP_BACK_FRAME | action_ids::STEP_FORWARD_FRAME
             | action_ids::MARK_IN | action_ids::MARK_OUT | action_ids::INGEST_CUE_FRAME => self.player_action(intent),
             tab @ (action_ids::INGEST_TAB_ALL | action_ids::INGEST_TAB_VIRTUAL) => { self.view.pool_tab = Some(tab.to_string()); IngestDispatchResult::accepted(None, true) } // v5: only the chosen tab changes
-            _ => IngestDispatchResult::accepted(Some("Akcija je zapisana, komponenta za izvršenje još nije spojena.".to_string()), true),
+            _ => IngestDispatchResult::accepted(Some(qnc_ui_text::text("ingest.msg.action_not_connected").to_string()), true),
         }
     }
 
@@ -65,6 +64,6 @@ impl IngestApplication {
             || self.view.browser_busy
             || (self.pending_source.is_some() && action_id != action_ids::INGEST_DIR_CANCEL);
         (source_action && busy)
-            .then(|| IngestDispatchResult::rejected("Obrada odabranog izvora je u tijeku."))
+            .then(|| IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_busy")))
     }
 }

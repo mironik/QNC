@@ -73,7 +73,7 @@ impl Default for IngestViewModel {
             work_settings_loading: false,
             work_settings_ready: false,
             work_settings_error: None,
-            message: "Odaberi izvor.".to_string(),
+            message: qnc_ui_text::text("ingest.msg.pick_source").to_string(),
         }
     }
 }
@@ -84,7 +84,6 @@ impl IngestViewModel {
             action_ids::INGEST_IMPORT_SELECTED => self.selected_count() > 0 && !self.command_busy,
             action_ids::INGEST_CLEAR_SELECTION => self.visible_clips().any(|clip| clip.selected),
             action_ids::INGEST_SELECT_ALL => self.visible_clips().next().is_some(),
-            action_ids::INGEST_APPROVE_PROXY_POSTERS => self.total_count() > 0,
             _ => !self.command_busy,
         }
     }
@@ -120,35 +119,19 @@ impl IngestViewModel {
                     .find(|clip| clip.clip_id == clip_id)
                     .map(|clip| clip.name.as_str())
             })
-            .unwrap_or("Odaberi klip")
+            .unwrap_or(qnc_ui_text::text("ingest.preview.empty"))
     }
 
     pub fn status_label(&self) -> String {
+        let (clips, warnings) = (self.clips.len().to_string(), self.select_warning_count.to_string());
         if self.select_warning_count > 0 && !self.command_busy {
-            return format!(
-                "{} klipova; {} upozorenja",
-                self.clips.len(),
-                self.select_warning_count
-            );
+            return qnc_ui_text::fill("ingest.status.warnings", &[("clips", &clips), ("warnings", &warnings)]);
         }
         if self.command_busy {
-            return format!("Select: {} klipova", self.clips.len());
+            return qnc_ui_text::fill("ingest.status.select", &[("clips", &clips)]);
         }
-        let imported = self.imported_count();
-        let pending = self.pending_count();
-        let selected = self.selected_count();
-        let total = self.total_count();
-        if pending > 0 {
-            format!("{imported} uvezeno · {pending} nije uvezeno · {selected}/{total}")
-        } else {
-            format!("{imported} uvezeno · {selected}/{total}")
-        }
-    }
-
-    pub fn proxy_poster_approval_count(&self) -> usize {
-        self.clips
-            .iter()
-            .filter(|clip| clip.selected && matches!(clip.thumb_status, ThumbStatus::Missing))
-            .count()
+        let [imported, pending, selected, total] = [self.imported_count(), self.pending_count(), self.selected_count(), self.total_count()].map(|count| count.to_string());
+        let code = if self.pending_count() > 0 { "ingest.status.pending" } else { "ingest.status.idle" };
+        qnc_ui_text::fill(code, &[("imported", &imported), ("pending", &pending), ("selected", &selected), ("total", &total)])
     }
 }

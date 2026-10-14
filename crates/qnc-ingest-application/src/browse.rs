@@ -10,7 +10,7 @@ impl IngestApplication {
             return self.playback_guard_rejected();
         }
         if !self.browse.is_connected() {
-            return IngestDispatchResult::rejected("Izvor nije povezan.");
+            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_not_connected"));
         }
         self.view.source_kind = kind;
         let step = match target {
@@ -74,7 +74,7 @@ impl IngestApplication {
                     .collect();
                 self.view.browser_busy = false;
                 self.view.browser_error = None;
-                self.view.message = "Odaberi lokalni izvor.".to_string();
+                self.view.message = qnc_ui_text::text("ingest.msg.pick_local_source").to_string();
                 IngestDispatchResult::accepted(None, true)
             }
             Err(error) => {

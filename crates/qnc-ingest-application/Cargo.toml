@@ -9,6 +9,7 @@ qnc-contracts = { workspace = true }
 qnc-content-artifacts = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-focus-walk = { workspace = true }
+qnc-ui-text = { workspace = true }
 qnc-ingest-preview-source = { workspace = true }
 qnc-application-sequence = { workspace = true }
 qnc-ingest-selection-write = { workspace = true }

@@ -18,11 +18,54 @@
     "qnc-app/src/editorial/media_pool.rs"
   ],
   "audit_note": "Active qnc_v4 Ingest is editorial_shell (Story ratios) plus bottom source dock. Ingest does not own shell math. Confirm button label is Odaberi; empty grid text still says U redu.",
-  "tab_order": ["browser", "pool_tabs", "pool", "source_timeline", "source_buttons"],
+  "tab_order": [
+    "source_kinds",
+    "browser",
+    "browser_buttons",
+    "pool",
+    "source_timeline",
+    "source_buttons"
+  ],
+  "focus_rows": {
+    "source_kinds": [
+      "ingest_source_kind_local",
+      "ingest_source_kind_lan",
+      "ingest_source_kind_internet"
+    ],
+    "browser_buttons": [
+      "ingest_dir_confirm",
+      "ingest_dir_cancel"
+    ],
+    "pool_tabs": [
+      "ingest_tab_all",
+      "ingest_tab_virtual"
+    ],
+    "source_buttons": [
+      "ingest_clear_selection",
+      "ingest_select_all",
+      "ingest_import_selected"
+    ]
+  },
   "focus_clicks": {
-    "browser": ["ingest_source_kind_local", "ingest_source_kind_lan", "ingest_source_kind_internet", "ingest_dir_roots", "ingest_dir_up", "ingest_dir_open"],
-    "pool": ["ingest_preview_focus", "ingest_clip_toggle"],
-    "source_timeline": ["ingest_cue_frame"]
+    "source_kinds": [
+      "ingest_source_kind_local",
+      "ingest_source_kind_lan",
+      "ingest_source_kind_internet"
+    ],
+    "browser": [
+      "ingest_dir_roots",
+      "ingest_dir_up",
+      "ingest_dir_open",
+      "ingest_dir_cancel"
+    ],
+    "pool": [
+      "ingest_dir_confirm",
+      "ingest_preview_focus",
+      "ingest_clip_toggle"
+    ],
+    "source_timeline": [
+      "ingest_cue_frame"
+    ]
   },
   "board": {
     "shell": "editorial",
@@ -44,7 +87,7 @@
     "min_width": 240.0,
     "aspect": "16:9",
     "fit": "contain_centered",
-    "empty_label": "Odaberi klip",
+    "empty_label": "@ingest.preview.empty",
     "empty_font_size": 14.0,
     "face": "preview_black"
   },
@@ -55,41 +98,66 @@
     "chrome_ctrl_height": 24.0,
     "font_ui": 14.0,
     "tabs_left": [
-      { "label": "All", "action_id": "ingest_tab_all" },
-      { "label": "Virtual", "action_id": "ingest_tab_virtual" }
+      {
+        "label": "@pool.tab.all",
+        "action_id": "ingest_tab_all"
+      },
+      {
+        "label": "@pool.tab.subclip",
+        "action_id": "ingest_tab_virtual"
+      }
     ],
-    "hidden_tabs": ["B-roll", "Segment"],
+    "hidden_tabs": [
+      "@pool.tab.broll",
+      "@pool.tab.segment"
+    ],
     "tab_gap": 10.0,
     "transport_right": [
-      { "label": ">", "action_id": "play_pause" },
-      { "label": "[", "action_id": "mark_in" },
-      { "label": "]", "action_id": "mark_out" }
+      {
+        "label": ">",
+        "action_id": "play_pause"
+      },
+      {
+        "label": "[",
+        "action_id": "mark_in"
+      },
+      {
+        "label": "]",
+        "action_id": "mark_out"
+      }
     ],
     "play_pause_playing": "||",
-    "hidden_transport": ["B", "Export HI-res"]
+    "hidden_transport": [
+      "B",
+      "@story.export_hires"
+    ]
   },
   "dir_browser": {
     "id_salt": "ingest",
-    "sources_label": "Izvori",
-    "kinds": ["Računalo", "LAN", "Internet"],
+    "sources_label": "@source.sources",
+    "kinds": [
+      "@source.computer",
+      "@source.lan",
+      "@source.internet"
+    ],
     "kind_gap": 10.0,
-    "up_label": "Gore",
+    "up_label": "@source.up",
     "up_width": 42.0,
-    "disks_label": "Diskovi",
+    "disks_label": "@source.disks",
     "disks_width": 58.0,
     "nav_gap": 12.0,
     "error_gap": 4.0,
     "tree_footer_gap": 8.0,
     "tree_footer_reserve": 32.0,
     "tree_min_height": 40.0,
-    "confirm_label": "Odaberi",
-    "cancel_label": "Odustani",
+    "confirm_label": "@common.select",
+    "cancel_label": "@common.cancel",
     "footer_item_gap": 8.0,
-    "empty_lan": "Nema konfiguriranih LAN izvora.",
-    "empty_internet": "Nema konfiguriranih Internet izvora.",
-    "empty_local": "Nema diskova.",
-    "empty_folder": "Nema podmapa.",
-    "loading_label": "Učitavam..."
+    "empty_lan": "@source.empty_lan",
+    "empty_internet": "@source.empty_internet",
+    "empty_local": "@source.empty_local",
+    "empty_folder": "@source.empty_folder",
+    "loading_label": "@common.loading"
   },
   "clip_grid": {
     "id_salt": "ingest_media_grid",
@@ -99,12 +167,16 @@
     "selection_check": true,
     "outline": "preview_focus_only",
     "status_dots": "imported_only",
-    "empty_message": "Nema klipova — lijevo odaberi mapu → U redu.",
-    "empty_new_message": "Nema novih klipova.",
-    "loading_settings_message": "Citanje radnih postavki...",
-    "saving_label": "Spremanje...",
-    "save_failed_label": "Upis nije uspio",
-    "imported_marker_rgb": [55, 210, 145]
+    "empty_message": "@ingest.grid.empty",
+    "empty_new_message": "@ingest.grid.empty_new",
+    "loading_settings_message": "@ingest.grid.reading_settings",
+    "saving_label": "@common.saving",
+    "save_failed_label": "@common.write_failed",
+    "imported_marker_rgb": [
+      55,
+      210,
+      145
+    ]
   },
   "source_dock": {
     "show_header": true,
@@ -115,53 +187,77 @@
     "font_ui": 14.0,
     "header_item_gap": 8.0,
     "clip_label_fallback": "—",
-    "header_left": ["clip_label", "ingest_status"],
-    "actions_rtl": [
-      "AI mining",
-      "Kopiraj original",
-      { "label": "Očisti", "action_id": "ingest_clear_selection" },
-      { "label": "Odaberi sve", "action_id": "ingest_select_all" },
-      { "label": "Uvezi", "action_id": "ingest_import_selected" },
-      { "label": "Generiraj postere", "action_id": "ingest_approve_proxy_posters" },
-      "Novi / Sve"
+    "header_left": [
+      "clip_label",
+      "ingest_status"
     ],
-    "clip_filter_labels": ["Novi", "Sve"],
-    "clip_filter_colors": [[16, 185, 129], [37, 99, 235]],
+    "actions_rtl": [
+      "@ingest.ai_mining",
+      "@ingest.copy_original",
+      {
+        "label": "@ingest.clear",
+        "action_id": "ingest_clear_selection"
+      },
+      {
+        "label": "@ingest.select_all",
+        "action_id": "ingest_select_all"
+      },
+      {
+        "label": "@ingest.import",
+        "action_id": "ingest_import_selected"
+      },
+      "@ingest.filter"
+    ],
+    "clip_filter_labels": [
+      "@ingest.filter.new",
+      "@ingest.filter.all"
+    ],
+    "clip_filter_colors": [
+      [
+        16,
+        185,
+        129
+      ],
+      [
+        37,
+        99,
+        235
+      ]
+    ],
     "clip_filter_width": 96.0,
-    "status_idle": "{imported} uvezeno · {selected}/{total}",
-    "status_pending": "{imported} uvezeno · {pending} u tijeku · {selected}/{total}",
-    "no_card_thumb_hint": "Nema postera na kartici",
-    "generate_posters_label": "Generiraj postere ({count})",
-    "archive_original_label": "Kopiraj original",
-    "edit_actions": ["Export", "B"],
-    "ai_mining_label": "AI mining",
+    "status_idle": "@ingest.status.idle",
+    "status_pending": "@ingest.status.pending",
+    "archive_original_label": "@ingest.copy_original",
+    "edit_actions": [
+      "@common.export",
+      "B"
+    ],
+    "ai_mining_label": "@ingest.ai_mining",
     "v4_placeholder_filmstrip_tiles": 12
   },
   "labels": [
-    "Ingest",
-    "Odaberi klip",
-    "All",
-    "Virtual",
-    "Izvori",
-    "Računalo",
-    "LAN",
-    "Internet",
-    "Gore",
-    "Diskovi",
-    "Odaberi",
-    "Odustani",
-    "Nema konfiguriranih LAN izvora.",
-    "Nema konfiguriranih Internet izvora.",
-    "Nema klipova — lijevo odaberi mapu → U redu.",
-    "AI mining",
-    "Kopiraj original",
-    "Očisti",
-    "Odaberi sve",
-    "Uvezi",
-    "Novi",
-    "Sve",
-    "Nema postera na kartici",
-    "Generiraj postere"
+    "@app.ingest",
+    "@ingest.preview.empty",
+    "@pool.tab.all",
+    "@pool.tab.subclip",
+    "@source.sources",
+    "@source.computer",
+    "@source.lan",
+    "@source.internet",
+    "@source.up",
+    "@source.disks",
+    "@common.select",
+    "@common.cancel",
+    "@source.empty_lan",
+    "@source.empty_internet",
+    "@ingest.grid.empty",
+    "@ingest.ai_mining",
+    "@ingest.copy_original",
+    "@ingest.clear",
+    "@ingest.select_all",
+    "@ingest.import",
+    "@ingest.filter.new",
+    "@ingest.filter.all"
   ],
   "forbidden_changes_without_approval": [
     "redesign",

@@ -751,7 +751,7 @@ fn footer_reports_only_the_project_loaded_by_ingest_not_stale_or_guessed_names()
     )
     .unwrap();
     let mut component = IngestApplication::with_store_root(root.path()).unwrap();
-    assert_eq!(component.footer_status(), "Ucitavanje projekta...");
+    assert_eq!(component.footer_status(), qnc_ui_text::text("ingest.msg.project_loading"));
     wait(&mut component);
     assert_eq!(component.footer_status(), "Loaded project");
 
@@ -759,7 +759,7 @@ fn footer_reports_only_the_project_loaded_by_ingest_not_stale_or_guessed_names()
         .unwrap();
     assert_eq!(component.footer_status(), "Loaded project", "not read yet");
     component.dispatch(IngestIntent::empty(action_ids::INGEST_RELOAD));
-    assert_eq!(component.footer_status(), "Ucitavanje projekta...");
+    assert_eq!(component.footer_status(), qnc_ui_text::text("ingest.msg.project_loading"));
     wait(&mut component);
     assert_eq!(component.footer_status(), "p2");
 
@@ -774,6 +774,6 @@ fn footer_reports_only_the_project_loaded_by_ingest_not_stale_or_guessed_names()
     assert_ne!(component.footer_status(), "p2");
     assert_eq!(
         IngestApplication::default().footer_status(),
-        "Projekt nije ucitan."
+        qnc_ui_text::text("ingest.msg.project_not_loaded")
     );
 }

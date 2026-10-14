@@ -1,0 +1,10 @@
+[package]
+name = "qnc-ui-text"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the words of the user interface by code, from the dictionary of the language this computer chose"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }

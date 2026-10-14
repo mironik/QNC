@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC Ingest piece: the model of the Ingest layout contract and its places on the desktop board"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-board = { workspace = true }
 qnc-desktop-theme = { workspace = true }

@@ -22,11 +22,11 @@ impl IngestApplication {
         let reader = self
             .settings_reader
             .as_ref()
-            .ok_or("Nema citaca radnih postavki.")?;
+            .ok_or(qnc_ui_text::text("ingest.msg.no_settings_reader"))?;
         let plan = self
             .work_plan
             .as_ref()
-            .ok_or("Radne postavke nisu dostupne.")?;
+            .ok_or(qnc_ui_text::text("ingest.msg.settings_unavailable"))?;
         qnc_application_sequence::read(reader, &plan.settings)
     }
 }

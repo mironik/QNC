@@ -48,10 +48,13 @@ impl FormActionBarStyle {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct FormActionBarResponse {
     pub confirm_clicked: bool,
     pub cancel_clicked: bool,
+    /// Where the two buttons are drawn (a form may frame the one the keyboard is on).
+    pub confirm_rect: Option<egui::Rect>,
+    pub cancel_rect: Option<egui::Rect>,
 }
 
 pub fn toggle_exclusive_panel(current_open: &mut bool, other_open: &mut bool) -> bool {
@@ -77,12 +80,10 @@ pub fn show_form_action_bar(
         |ui| {
             ui.spacing_mut().item_spacing.x = style.gap;
             ui.add_space(style.right_margin);
-            if primary_button(ui, style, confirm_label, confirm_enabled).clicked() {
-                response.confirm_clicked = true;
-            }
-            if action_button(ui, style, cancel_label).clicked() {
-                response.cancel_clicked = true;
-            }
+            let confirm = primary_button(ui, style, confirm_label, confirm_enabled);
+            (response.confirm_clicked, response.confirm_rect) = (confirm.clicked(), Some(confirm.rect));
+            let cancel = action_button(ui, style, cancel_label);
+            (response.cancel_clicked, response.cancel_rect) = (cancel.clicked(), Some(cancel.rect));
         },
     );
     response

@@ -17,7 +17,6 @@ pub const INGEST_RELOAD: &str = "ingest_reload";
 pub const INGEST_SET_CLIP_FILTER: &str = "ingest_set_clip_filter";
 pub const INGEST_SET_ARCHIVE: &str = "ingest_set_archive";
 pub const INGEST_SET_AI_MINING: &str = "ingest_set_ai_mining";
-pub const INGEST_APPROVE_PROXY_POSTERS: &str = "ingest_approve_proxy_posters";
 pub const INGEST_CUE_FRAME: &str = "ingest_cue_frame";
 pub const INGEST_TOGGLE_AUDIO_LANE: &str = "ingest_toggle_audio_lane";
 pub const PLAY_PAUSE: &str = "play_pause";
@@ -44,7 +43,6 @@ pub const ALL: &[&str] = &[
     INGEST_SET_CLIP_FILTER,
     INGEST_SET_ARCHIVE,
     INGEST_SET_AI_MINING,
-    INGEST_APPROVE_PROXY_POSTERS,
     INGEST_CUE_FRAME,
     INGEST_TOGGLE_AUDIO_LANE,
     PLAY_PAUSE,

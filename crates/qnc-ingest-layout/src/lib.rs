@@ -40,7 +40,8 @@ impl IngestContracts {
 
         let shell: ShellLayoutContract = serde_json::from_str(SHELL_LAYOUT_JSON)
             .map_err(|error| format!("shell layout parse error: {error}"))?;
-        let ingest: IngestLayoutContract = serde_json::from_str(INGEST_LAYOUT_JSON)
+        // The texts of the contract are codes, in the language of this computer (qnc-ui-text).
+        let ingest: IngestLayoutContract = serde_json::from_value(qnc_ui_text::resolve_contract(INGEST_LAYOUT_JSON)?)
             .map_err(|error| format!("ingest layout parse error: {error}"))?;
         let app: ApplicationManifest = serde_json::from_str(INGEST_APP_JSON)
             .map_err(|error| format!("ingest application parse error: {error}"))?;
@@ -76,15 +77,14 @@ impl IngestContracts {
         })
     }
 
-    /// The Tab walk of Ingest: its panels in order, the action ids of its pool tabs and of
-    /// its source dock buttons left to right as they are drawn (the Ingest contract lists
-    /// them left to right).
-    pub fn focus_names(&self) -> (Vec<&str>, Vec<&str>, Vec<&str>, Vec<(&str, &str)>) {
+    /// The Tab walk of Ingest (user 2026-10-14: source, folder, Select or Cancel, pool,
+    /// timeline, its buttons): its panels in order, its row panels and their actions, and
+    /// the click actions of each panel.
+    pub fn focus_names(&self) -> (Vec<&str>, Vec<(&str, Vec<&str>)>, Vec<(&str, &str)>) {
         let order = self.ingest.tab_order.iter().map(String::as_str).collect();
-        let tabs = self.ingest.pool_head.tabs_left.iter().filter_map(TransportCommand::action_id).collect();
-        let buttons = self.ingest.source_dock.actions_rtl.iter().filter_map(TransportCommand::action_id).collect();
+        let rows = self.ingest.focus_rows.iter().map(|(panel, actions)| (panel.as_str(), actions.iter().map(String::as_str).collect())).collect();
         let clicks = self.ingest.focus_clicks.iter().flat_map(|(panel, actions)| actions.iter().map(move |action| (panel.as_str(), action.as_str()))).collect();
-        (order, tabs, buttons, clicks)
+        (order, rows, clicks)
     }
 
     pub fn dock_height(&self) -> f32 {
@@ -150,6 +150,8 @@ pub struct IngestLayoutContract {
     pub application_id: String,
     /// The panels Tab walks, in order (user 2026-10-13: the walk belongs to the form).
     pub tab_order: Vec<String>,
+    /// The row panels and their action ids left to right.
+    pub focus_rows: std::collections::BTreeMap<String, Vec<String>>,
     /// The click actions of each panel: a click there puts the keyboard on that panel.
     pub focus_clicks: std::collections::BTreeMap<String, Vec<String>>,
     pub board: IngestBoard,
@@ -260,8 +262,6 @@ pub struct IngestSourceDock {
     pub header_timeline_gap: f32,
     pub show_edit_actions: bool,
     pub show_import_actions: bool,
-    pub no_card_thumb_hint: String,
-    pub generate_posters_label: String,
     pub archive_original_label: String,
     pub edit_actions: Vec<String>,
     pub ai_mining_label: String,

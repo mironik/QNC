@@ -7,7 +7,7 @@ impl IngestApplication {
             return self.browse_registered(self.view.source_kind, None);
         }
         self.clear_source_browser_state();
-        self.view.message = "Odabir izvora je otkazan.".to_string();
+        self.view.message = qnc_ui_text::text("ingest.msg.source_cancelled").to_string();
         IngestDispatchResult::accepted(None, true)
     }
 }

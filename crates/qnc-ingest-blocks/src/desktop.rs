@@ -23,7 +23,7 @@ pub fn render_desktop(
             None
         }
         "pool-head" => framed(render_pool_head(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::POOL_TABS]),
-        "source-browser" => framed(render_source_browser(ui, rect, contracts, theme, view), ui, rect, &[qnc_focus_walk::BROWSER]),
+        "source-browser" => framed(render_source_browser(ui, rect, contracts, theme, view), ui, rect, &[qnc_focus_walk::SOURCE_KINDS, qnc_focus_walk::BROWSER, qnc_focus_walk::BROWSER_BUTTONS]),
         "clip-cards" => framed(render_clip_grid(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::CARDS]),
         "source-dock" => framed(render_source_dock(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::SOURCE_TIMELINE, qnc_focus_walk::SOURCE_BUTTONS]),
         _ => None,

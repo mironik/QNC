@@ -85,7 +85,7 @@ pub(super) fn render_clip_grid(
                     "ingest_grid_all"
                 },
             },
-            (view.focus.card_step, theme.focus),
+            (view.focus.step_of(qnc_focus_walk::CARDS), theme.focus),
         );
     });
     match action {

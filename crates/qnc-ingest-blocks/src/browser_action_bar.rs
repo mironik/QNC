@@ -27,6 +27,10 @@ pub(super) fn render_location_action_bar(
                 can_confirm,
                 &contracts.ingest.dir_browser.cancel_label,
             );
+            let chosen = |action_id| view.focus.is(qnc_focus_walk::BROWSER_BUTTONS) && view.focus.chosen(action_id);
+            for (rect, action_id) in [(response.confirm_rect, action_ids::INGEST_DIR_CONFIRM), (response.cancel_rect, action_ids::INGEST_DIR_CANCEL)] {
+                qnc_focus_walk::paint_focus(ui, rect.unwrap_or(egui::Rect::NOTHING).expand(2.0), chosen(action_id), theme.focus);
+            }
             if response.confirm_clicked {
                 if let Some(uri) = &view.browser_current_uri {
                     intent = Some(IngestIntent::new(

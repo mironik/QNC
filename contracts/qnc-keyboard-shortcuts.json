@@ -296,9 +296,6 @@
     "ingest_set_ai_mining": {
       "label": "Postavi Ingest AI mining"
     },
-    "ingest_approve_proxy_posters": {
-      "label": "Odobri Ingest postere iz proxya"
-    },
     "ingest_cue_frame": {
       "label": "Postavi Ingest cue frame"
     },
@@ -397,6 +394,39 @@
         ],
         "ingest_tab_virtual": [
           { "code": "KeyS", "alt": true }
+        ],
+        "ingest_source_kind_local": [
+          { "code": "Digit1", "alt": true }
+        ],
+        "ingest_source_kind_lan": [
+          { "code": "Digit2", "alt": true }
+        ],
+        "ingest_source_kind_internet": [
+          { "code": "Digit3", "alt": true }
+        ],
+        "ingest_dir_roots": [
+          { "code": "KeyD", "alt": true }
+        ],
+        "ingest_dir_up": [
+          { "key": "Backspace" }
+        ],
+        "ingest_dir_confirm": [
+          { "key": "Enter", "ctrl": true }
+        ],
+        "ingest_dir_cancel": [
+          { "key": "Escape" }
+        ],
+        "ingest_select_all": [
+          { "code": "KeyA", "ctrl": true, "shift": false }
+        ],
+        "ingest_clear_selection": [
+          { "code": "KeyA", "ctrl": true, "shift": true }
+        ],
+        "ingest_import_selected": [
+          { "code": "KeyI", "shift": true }
+        ],
+        "ingest_set_clip_filter": [
+          { "code": "KeyN", "alt": true }
         ],
         "step_forward_frame": [ { "code": "ArrowRight", "key": "ArrowRight" } ]
       },

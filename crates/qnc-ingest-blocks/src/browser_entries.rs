@@ -50,11 +50,14 @@ pub(super) fn render_browser_body(
                     ui.label(muted(&labels.empty_folder, theme));
                 });
             } else {
+                let focused = keyboard_entry(ui, view, intent);
                 ScrollArea::vertical().show(ui, |ui| {
-                    for entry in &view.browser_entries {
+                    for (index, entry) in view.browser_entries.iter().enumerate() {
                         ui.horizontal(|ui| {
                             ui.add_space(path_tree_offset());
-                            if browser_entry_button(ui, entry, theme).clicked() {
+                            let response = browser_entry_button(ui, entry, theme);
+                            qnc_focus_walk::paint_focus(ui, response.rect.expand(3.0), focused == Some(index), theme.focus);
+                            if response.clicked() {
                                 *intent = Some(IngestIntent::new(
                                     action_ids::INGEST_DIR_OPEN,
                                     IngestPayload::LocationUri(entry.qnc_uri.clone()),
@@ -66,6 +69,15 @@ pub(super) fn render_browser_body(
             }
         }
     }
+}
+
+/// The entry the keyboard is on when the folders have the focus; Enter opens it as a click.
+fn keyboard_entry(ui: &Ui, view: &IngestViewModel, intent: &mut Option<IngestIntent>) -> Option<usize> {
+    let (focused, opened) = qnc_focus_walk::list_keys(ui, "qnc-ingest-browser", view.browser_entries.len(), &view.focus, qnc_focus_walk::BROWSER);
+    if let Some(entry) = opened.and_then(|index| view.browser_entries.get(index)) {
+        *intent = Some(IngestIntent::new(action_ids::INGEST_DIR_OPEN, IngestPayload::LocationUri(entry.qnc_uri.clone())));
+    }
+    focused
 }
 
 pub(super) fn browser_entry_button(
@@ -87,9 +99,12 @@ pub(super) fn render_root_disk_grid(
         .spacing(Vec2::new(14.0, 4.0))
         .striped(false)
         .show(ui, |ui| {
-            for entry in &view.browser_entries {
+            let focused = keyboard_entry(ui, view, intent);
+            for (index, entry) in view.browser_entries.iter().enumerate() {
                 let mut clicked = false;
-                clicked |= root_disk_cell(ui, &entry.name, theme).clicked();
+                let name = root_disk_cell(ui, &entry.name, theme);
+                qnc_focus_walk::paint_focus(ui, name.rect.expand(3.0), focused == Some(index), theme.focus);
+                clicked |= name.clicked();
                 clicked |= root_disk_cell(ui, &entry.serial_number, theme).clicked();
                 clicked |= root_disk_cell(ui, &entry.volume_name, theme).clicked();
                 ui.end_row();

@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.ui-text",
+  "module_name": "User interface texts by code",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.text.resolve"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ui-text",
+  "input": "A text code (`@code` in a layout contract) and the language this computer chose (`ui-language.json` beside the other settings of this computer; without it the base language, English).",
+  "output": "The text of the code from the dictionary of that language (`contracts/text/<language>.json`); a code the dictionary lacks or an unknown language is a controlled error, never a made-up text.",
+  "specification": "User decision 2026-10-14: the user interface is in English and every text has a code, so the language can be chosen; the language is a setting of the computer, not of the project."
+}

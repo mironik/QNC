@@ -8,7 +8,8 @@ impl IngestApplication {
                 self.view.clip_filter = filter;
                 IngestDispatchResult::accepted(None, true)
             }
-            _ => IngestDispatchResult::rejected("Nedostaje filter klipova."),
+            // From a key there is no payload: New and All switch.
+            _ => self.on_set_clip_filter(IngestPayload::ClipFilter(if self.view.clip_filter == ClipFilter::New { ClipFilter::All } else { ClipFilter::New })),
         }
     }
 }

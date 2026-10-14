@@ -50,7 +50,10 @@ pub(super) fn render_location_browser(
                 for kind in [SourceKind::Local, SourceKind::Lan, SourceKind::Internet] {
                     let selected = view.source_kind == kind;
                     let label = source_kind_label(&contracts.ingest.dir_browser, kind);
-                    if qnc_media_pool_head::tab(ui, label, selected, &row_style(theme, 0.0)).clicked() && !selected {
+                    let response = qnc_media_pool_head::tab(ui, label, selected, &row_style(theme, 0.0));
+                    let chosen = view.focus.is(qnc_focus_walk::SOURCE_KINDS) && view.focus.chosen(kind.action_id());
+                    qnc_focus_walk::paint_focus(ui, response.rect.expand(3.0), chosen, theme.focus);
+                    if response.clicked() && !selected {
                         intent = Some(IngestIntent::new(
                             kind.action_id(),
                             IngestPayload::SourceKind(kind),

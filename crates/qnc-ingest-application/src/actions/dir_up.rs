@@ -6,6 +6,6 @@ impl IngestApplication {
         if self.browse.is_connected() {
             return self.browse_registered(self.view.source_kind, Some(None));
         }
-        IngestDispatchResult::rejected("Izvor nije povezan.")
+        IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_not_connected"))
     }
 }

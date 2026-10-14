@@ -67,11 +67,11 @@ impl IngestApplication {
             {
                 return IngestDispatchResult::accepted(None, true);
             }
-            return IngestDispatchResult::rejected("Citanje radnih postavki je u tijeku.");
+            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.settings_reading"));
         }
         let Some(active_project) = self.active_project_reader.clone() else {
-            self.settings_failed("Nema konfiguriranog citaca radnih postavki.".into());
-            return IngestDispatchResult::rejected("Nema konfiguriranog citaca radnih postavki.");
+            self.settings_failed(qnc_ui_text::text("ingest.msg.no_settings_reader_configured").into());
+            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.no_settings_reader_configured"));
         };
         let keep_current_view =
             retain_loaded_workspace && pending_source.is_none() && self.work_plan.is_some();

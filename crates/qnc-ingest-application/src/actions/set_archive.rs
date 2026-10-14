@@ -8,7 +8,7 @@ impl IngestApplication {
                 self.view.archive_original = value;
                 IngestDispatchResult::accepted(None, true)
             }
-            _ => IngestDispatchResult::rejected("Nedostaje bool vrijednost."),
+            _ => IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.missing_bool")),
         }
     }
 }

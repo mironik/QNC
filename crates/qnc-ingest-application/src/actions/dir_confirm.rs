@@ -3,14 +3,19 @@ use crate::*;
 impl IngestApplication {
     /// The user confirmed the source: read the project settings, then Select.
     pub(crate) fn on_dir_confirm(&mut self, payload: IngestPayload) -> IngestDispatchResult {
-        let IngestPayload::LocationUri(uri) = payload else {
-            return IngestDispatchResult::rejected("Nedostaje QNC lokacijski URI.");
+        // From a key there is no payload: the folder the browser shows.
+        let uri = match payload {
+            IngestPayload::LocationUri(uri) => uri,
+            _ => match self.view.browser_current_uri.clone().filter(|_| !self.view.browser_roots) {
+                Some(uri) => uri,
+                None => return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.missing_location_uri")),
+            },
         };
         if self.browse.selected(&uri).is_none() {
             let error = self
                 .selection_config_error
                 .clone()
-                .unwrap_or_else(|| "Odaberi disk ili mapu u browseru.".into());
+                .unwrap_or_else(|| qnc_ui_text::text("ingest.msg.pick_disk_or_folder").into());
             self.view.message = error.clone();
             return IngestDispatchResult::rejected(error);
         }
@@ -22,10 +27,10 @@ impl IngestApplication {
             return self.playback_guard_rejected();
         }
         if self.work_plan.is_none() {
-            return IngestDispatchResult::rejected("Radne postavke nisu dostupne.");
+            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.settings_unavailable"));
         }
         if qnc_contracts::parse_qnc_uri(&uri).is_err() {
-            return IngestDispatchResult::rejected("Odabir izvora nije QNC URI.");
+            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_not_qnc_uri"));
         }
         let display_name = if !self.view.selected_source_name.trim().is_empty() {
             self.view.selected_source_name.clone()
@@ -47,7 +52,7 @@ impl IngestApplication {
             match store.record_source_selection(&record) {
                 Ok(session) => {
                     self.view.selected_source_uri = Some(uri.clone());
-                    self.view.message = format!("Izvor je odabran: {}", session.selected_at_utc);
+                    self.view.message = qnc_ui_text::fill("ingest.msg.source_selected_at", &[("time", &session.selected_at_utc)]);
                     self.start_selection(&uri)
                 }
                 Err(error) => {
@@ -57,7 +62,7 @@ impl IngestApplication {
             }
         } else {
             self.view.selected_source_uri = Some(uri.clone());
-            self.view.message = "Izvor je odabran.".to_string();
+            self.view.message = qnc_ui_text::text("ingest.msg.source_selected").to_string();
             self.start_selection(&uri)
         }
     }
@@ -67,10 +72,10 @@ impl IngestApplication {
             return self.playback_guard_rejected();
         }
         let Some(selected) = self.browse.selected(uri) else {
-            return IngestDispatchResult::rejected("Odabrani izvor vise nije dostupan.");
+            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_gone"));
         };
-        let Some(config) = self.selection_config.clone() else { return IngestDispatchResult::rejected("Nema Select konfiguracije.") };
-        let Some(target) = self.select_target.clone() else { return IngestDispatchResult::rejected("Projektni katalog nije dostupan.") };
+        let Some(config) = self.selection_config.clone() else { return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.no_select_config")) };
+        let Some(target) = self.select_target.clone() else { return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.catalog_unavailable")) };
         match self
             .selection_session
             .start(config, selected, target, self.camera_registry.clone())
@@ -79,7 +84,7 @@ impl IngestApplication {
                 self.selection_events.reset();
                 self.view.select_warning_count = 0;
                 self.view.command_busy = true;
-                self.view.message = "Select je pokrenut.".into();
+                self.view.message = qnc_ui_text::text("ingest.msg.select_started").into();
                 IngestDispatchResult::accepted(None, true)
             }
             Err(error) => {

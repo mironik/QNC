@@ -3840,3 +3840,24 @@ pozivi idu ravno u `qnc-playback-priority`), `qnc-ingest-desktop` (predaje redos
 (okvir fokusa na panelima i dugmetu, mreza kartica s fokusom; tri ista bloka dugmadi u jednoj petlji). C10 spusteno:
 application 1707 -> 1705, blocks 882 -> 863, desktop 79 -> 76. Nije izvedeno: strelice i Enter po mapama u pregledniku
 izvora (u prvom koraku preglednik je samo u krugu).
+Odluka i izvedba 2026-10-14 (korisnik: "idemo sve na engleski, odnosno ENG rjecnik.. bilo bi najbolje da imamo kodove za sve
+kako bi mogli jednostavno birati jezik"; "postavka racunala, otkljucaj Project, kreni s Ingestom"): sucelje je na engleskom,
+svaki natpis ima sifru, jezik je postavka racunala (`ui-language.json` uz ostale postavke racunala u `data`, `{"language":
+"en"}`; bez nje osnovni jezik, engleski), ne projekta. Nova javna kocka `crates/qnc-ui-text` (+ ugovor
+`contracts/modules/ui-text.module.json`): rjecnici `contracts/text/<jezik>.json` (prvi `en.json`), ugovori rasporeda
+pisu tekst kao `@sifra` (`resolve_contract`), kod kao `qnc_ui_text::text("sifra")` / `fill("sifra", ...)`; sifra koje
+nema je greska (testovi: svaka sifra iz ugovora rasporeda i iz koda postoji u svakom rjecniku), nikad izmisljen tekst.
+Ingest: svi natpisi ugovora (`contracts/ui/ingest.layout.json`) i poruke `qnc-ingest-application` (status docka,
+greske, "Select a clip") idu kroz rjecnik; tab Virtual je SubClip. Uklonjeno dugme "Generiraj postere" i akcija
+`ingest_approve_proxy_posters` (posteri dolaze s kartice ili ih pozadinski radnik napravi sam). Novi krug Ingesta
+(korisnik: "najprije se bira gdje je izvor: racunalo, lan, intranet, zatim izbor direktorija, pa odaberi ili odustani,
+pa media pool, select ili deselect, pa timeline, pa dugmad timelinea; All ili Virtual i druga dugmad direktno"):
+`tab_order` = izvori, mape, Select/Cancel, kartice, source timeline, dugmad docka; `focus_rows` i `focus_clicks` u
+ugovoru. `qnc-focus-walk` prepisan na opce redove (strelice biraju, Enter pritisne i ide dalje) i popise (strelice,
+Page Up/Down, Enter otvara, Shift+Enter kvacica; `list_focus`, `list_keys`). Mape: strelice, Enter ulazi u mapu.
+Izravne tipke (QNC preset, scope `ingest`): Alt+1/2/3 izvor, Alt+D diskovi, Backspace gore, Ctrl+Enter Select (bez URI-ja
+uzima mapu koju preglednik pokazuje), Esc Cancel, Ctrl+A Select all, Ctrl+Shift+A Clear, Shift+I Import, Alt+N New/All
+(bez filtra prebacuje), Alt+A/Alt+S tabovi. `qnc-ui-kit` `FormActionBarResponse` daje i polozaje dugmadi (dodatak).
+Tablica tipki zna D, N, 3. C10 spusteno: application 1705 -> 1676, blocks 863 -> 862. Nije izvedeno: poruke zajednickih
+kocki koje Ingest pokazuje (preglednik izvora, Select, player, `qnc-playback-priority`), Story/MA, shell, Project i
+katalog tipki (nazivi akcija, F1).

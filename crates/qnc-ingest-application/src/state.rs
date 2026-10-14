@@ -13,13 +13,13 @@ impl IngestApplication {
 
     pub fn footer_status(&self) -> &str {
         if self.view.work_settings_loading {
-            "Ucitavanje projekta..."
+            qnc_ui_text::text("ingest.msg.project_loading")
         } else if let Some(error) = self.view.work_settings_error.as_deref() {
             error
         } else if let Some(plan) = self.work_plan() {
             &plan.settings.project_name
         } else {
-            "Projekt nije ucitan."
+            qnc_ui_text::text("ingest.msg.project_not_loaded")
         }
     }
 

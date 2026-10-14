@@ -285,29 +285,6 @@ mod tests {
     }
 
     #[test]
-    fn proxy_poster_approval_action_is_explicitly_handled() {
-        let mut component = IngestApplication::default();
-        component.view.clips.push(ClipView {
-            clip_id: "clip-1".into(),
-            selected: true,
-            thumb_status: ThumbStatus::Missing,
-            ..Default::default()
-        });
-
-        let result = component.dispatch(IngestIntent::empty(
-            action_ids::INGEST_APPROVE_PROXY_POSTERS,
-        ));
-
-        assert!(!result.accepted);
-        assert_eq!(
-            result.message.as_deref(),
-            Some(
-                "Samostalno generiranje postera jos nije spojeno; posteri se generiraju tijekom uvoza."
-            )
-        );
-    }
-
-    #[test]
     fn local_browser_exposes_qnc_uri_not_raw_path() {
         let (_dir, mut component) = component_with_registered_source();
         load_local_roots(&mut component);
@@ -380,7 +357,7 @@ mod tests {
         assert!(component.view().selected_source_name.is_empty());
         assert!(component.view().selected_source_serial_number.is_empty());
         assert!(component.view().selected_source_volume_name.is_empty());
-        assert_eq!(component.view().message, "Odaberi lokalni izvor.");
+        assert_eq!(component.view().message, qnc_ui_text::text("ingest.msg.pick_local_source"));
     }
 
     #[test]

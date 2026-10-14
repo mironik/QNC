@@ -21,7 +21,7 @@ impl IngestApplication {
                 Ok(_) => match self.begin_import() {
                     Ok(()) => {
                         self.view.command_busy = false;
-                        self.view.message = "Uvoz je predan pozadinskoj aplikaciji.".into();
+                        self.view.message = qnc_ui_text::text("ingest.msg.import_handed_over").into();
                         self.request_navigation_after_import();
                     }
                     Err(error) => {

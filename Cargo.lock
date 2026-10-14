@@ -3661,6 +3661,7 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-ui-text",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3774,6 +3775,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
+ "qnc-ui-text",
  "serde",
  "serde_json",
 ]
@@ -5019,6 +5021,15 @@ dependencies = [
  "egui-wgpu",
  "qnc-dev-diagnostics",
  "wgpu",
+]
+
+[[package]]
+name = "qnc-ui-text"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

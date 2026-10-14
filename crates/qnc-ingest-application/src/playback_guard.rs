@@ -17,7 +17,6 @@ const PRIORITY: Priority = Priority::new(&[
     action_ids::INGEST_DIR_UP,
     action_ids::INGEST_DIR_OPEN,
     action_ids::INGEST_DIR_CONFIRM,
-    action_ids::INGEST_APPROVE_PROXY_POSTERS,
 ]);
 
 impl IngestApplication {

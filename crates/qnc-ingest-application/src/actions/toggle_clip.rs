@@ -4,14 +4,14 @@ impl IngestApplication {
     /// The checkbox of one clip.
     pub(crate) fn on_toggle_clip(&mut self, payload: IngestPayload) -> IngestDispatchResult {
         let IngestPayload::ClipId(clip_id) = payload else {
-            return IngestDispatchResult::rejected("Nedostaje clip_id.");
+            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.missing_clip_id"));
         };
         match self.view.clips.iter().find(|clip| clip.clip_id == clip_id) {
             Some(clip) => {
                 let selected = !clip.selected;
                 self.select_clips(vec![clip_id], selected)
             }
-            None => IngestDispatchResult::rejected("Clip nije pronađen."),
+            None => IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.clip_not_found")),
         }
     }
 

@@ -27,13 +27,7 @@ pub(super) fn render_source_dock(
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 if contracts.ingest.source_dock.show_import_actions {
-                    let mut style = FormActionBarStyle::new(
-                        theme.text,
-                        theme.accent,
-                        theme.border,
-                        theme.font_ui,
-                        theme.chrome_control_height,
-                    );
+                    let mut style = form_action_bar_style(theme);
                     style.button_width = contracts.ingest.source_dock.clip_filter_width / 2.0;
                     let labels = &contracts.ingest.source_dock.clip_filter_labels;
                     let modes = [ClipFilter::New, ClipFilter::All];
@@ -52,21 +46,6 @@ pub(super) fn render_source_dock(
                             action_ids::INGEST_SET_CLIP_FILTER,
                             IngestPayload::ClipFilter(modes[index]),
                         ));
-                    }
-                    let poster_count = view.proxy_poster_approval_count();
-                    if poster_count > 0 {
-                        let label = dock
-                            .generate_posters_label
-                            .replace("{count}", &poster_count.to_string());
-                        let response = action_button(ui, &label, view.action_enabled(action_ids::INGEST_APPROVE_PROXY_POSTERS), theme);
-                        ring(ui, &response, view, action_ids::INGEST_APPROVE_PROXY_POSTERS, theme);
-                        if response.clicked() {
-                            intent = Some(IngestIntent::empty(
-                                action_ids::INGEST_APPROVE_PROXY_POSTERS,
-                            ));
-                        }
-                    } else {
-                        ui.label(muted(&dock.no_card_thumb_hint, theme));
                     }
                     // Uvezi (the strong one), Odaberi sve, Ocisti, drawn right to left.
                     for action_id in [action_ids::INGEST_IMPORT_SELECTED, action_ids::INGEST_SELECT_ALL, action_ids::INGEST_CLEAR_SELECTION] {

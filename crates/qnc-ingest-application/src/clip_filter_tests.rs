@@ -91,15 +91,14 @@ fn new_filter_accepts_incoming_clips_during_select_without_losing_existing_ones(
 }
 
 #[test]
-fn malformed_filter_intent_does_not_change_view() {
+fn the_filter_action_without_a_filter_switches_new_and_all() {
+    // From a key there is no payload (user 2026-10-14: New / All has its own key).
     let mut component = IngestApplication::default();
-    let before = component.view.clone();
-    assert!(
-        !component
-            .dispatch(IngestIntent::empty(action_ids::INGEST_SET_CLIP_FILTER))
-            .accepted
-    );
-    assert_eq!(component.view, before);
+    let before = component.view.clip_filter;
+    assert!(component.dispatch(IngestIntent::empty(action_ids::INGEST_SET_CLIP_FILTER)).accepted);
+    assert_ne!(component.view.clip_filter, before);
+    component.dispatch(IngestIntent::empty(action_ids::INGEST_SET_CLIP_FILTER));
+    assert_eq!(component.view.clip_filter, before);
 }
 
 #[test]
