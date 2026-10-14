@@ -3980,3 +3980,8 @@ zapisanom formatu prije citanja radi `qnc-wave-worker` (MXF, svaki trazeni strea
 zvucni element k), sve ostalo ide kroz katalog dekodera u jednom prolazu; katalog i player je ne koriste (granica
 playera). Izmjereno (Long GOP original s kartice): 1489 (oko 130 s materijala) 16,6 s, prije 36 s; 60-62 MB/s datoteke.
 Granica je vrijeme jednog citanja na kartici (1,5-2,5 ms po citanju).
+Dopuna 2026-10-15 (korisnik: "generiranje wave je sporo"): wave ima prednost pred filmstripom (oba citaju istu karticu,
+a zvuk montazi treba prvi): `qnc-timeline-artifacts` drzi filmstrip dok wave ima posla. Klip koji preview ima otvoren
+(`qnc-playback-activity` `PLAYBACK_CLIP` u bazi projekta) dobiva wave prvi: `qnc-wave-worker` `prefer`,
+`qnc-content-artifacts` `prefer`, `tools/qnc-ingest-worker` ga cita dvaput u sekundi. Pravilo da wave i filmstrip
+stanu dok player radi ostaje. Granica brzine je citac kartice (USB 2.0, ~28 MB/s; kartica V30 UHS-I cita i do ~90 MB/s).

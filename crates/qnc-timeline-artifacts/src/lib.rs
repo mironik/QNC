@@ -137,9 +137,16 @@ impl Artifacts {
         polled
     }
 
+    /// Both give way to the player. The filmstrip also waits for the waves (user 2026-10-15:
+    /// the sound is what editing needs first, and both read the same card).
     pub fn set_playback_priority(&mut self, active: bool) {
-        self.filmstrip.set_playback_priority(active);
         self.wave.set_playback_priority(active);
+        self.filmstrip.set_playback_priority(active || self.wave.has_pending_work());
+    }
+
+    /// The clip the user has open gets its wave first.
+    pub fn prefer(&mut self, clip_id: &str) {
+        self.wave.prefer(clip_id);
     }
 
     pub fn has_pending_work(&self) -> bool {

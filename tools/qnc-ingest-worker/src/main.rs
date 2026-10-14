@@ -192,11 +192,19 @@ fn run_artifacts(root: &Path, closed: &std::sync::atomic::AtomicBool) -> Result<
     let mut artifacts = qnc_content_artifacts::ProjectArtifacts::new();
     artifacts.set_host_root(root);
     artifacts.set_playback_priority(player_works());
-    artifacts.sync(&reader, &settings, target, false)?;
+    artifacts.sync(&reader, &settings, target.clone(), false)?;
     let deadline = std::time::Instant::now() + Duration::from_secs(60 * 60);
+    let mut shown_checked = std::time::Instant::now() - Duration::from_secs(1);
     while artifacts.has_pending_work() {
         if closed.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(()); // dropping the artifacts cancels their workers
+        }
+        // The clip a preview has open (written to the project database) goes first.
+        if shown_checked.elapsed() >= Duration::from_millis(500) {
+            shown_checked = std::time::Instant::now();
+            if let Some(clip_id) = qnc_playback_activity::read(&target, qnc_playback_activity::PLAYBACK_CLIP) {
+                artifacts.prefer(&clip_id);
+            }
         }
         artifacts.set_playback_priority(player_works());
         let polled = artifacts.poll(None);

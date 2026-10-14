@@ -663,6 +663,11 @@ impl ProjectArtifacts {
         self.artifacts.set_playback_priority(active);
     }
 
+    /// The clip the user has open gets its wave first.
+    pub fn prefer(&mut self, clip_id: &str) {
+        self.artifacts.prefer(clip_id);
+    }
+
     pub fn has_pending_work(&self) -> bool {
         self.artifacts.has_pending_work()
     }

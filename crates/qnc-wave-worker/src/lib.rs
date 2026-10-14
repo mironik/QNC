@@ -487,6 +487,15 @@ impl TimelineWaveService {
         poll
     }
 
+    /// The clip the user has open goes first (user 2026-10-15: editing starts on it while
+    /// the card's other waves are still made). A clip not waiting is left as it is.
+    pub fn prefer(&mut self, clip_id: &str) {
+        if let Some(index) = self.queue.iter().position(|queued| queued.clip_id == clip_id) {
+            let request = self.queue.remove(index).expect("index exists");
+            self.queue.push_front(request);
+        }
+    }
+
     pub fn has_pending_work(&self) -> bool {
         !self.workers.is_empty()
             || !self.queue.is_empty()
