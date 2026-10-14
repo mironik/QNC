@@ -3918,3 +3918,6 @@ Dopuna 2026-10-14 (korisnik: "daj audiju boju kakva je na gornjem dijelu story t
 audio trake imaju boje video segmenta price (izmjereno sa zaslona): podloga tamnozelena traka segmenta (rgb 17,103,88),
 val mint tijela segmenta (rgb 80,190,148). `qnc-timeline` `TimelineTheme.audio_wave` je zasebna boja vala audio traka,
 jer `wave_a1`/`wave_a2` boje i segmente price (te ostaju kakve su bile na zaslonu).
+Dopuna 2026-10-14 (korisnik: "iz source timeline izbaci tamno plave linije"): plave linije bile su obrub raspona klipa
+(`shot_range`, rgb 96,165,250) oko svake trake; na source timelineu raspon je uvijek cijeli klip, pa obrub nista ne
+govori. `qnc-timeline` `TimelineLayerFlags::source()` ga iskljucuje (testovi); IN/OUT, playhead i fokus ostaju.

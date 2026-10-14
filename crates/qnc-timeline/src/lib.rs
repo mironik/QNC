@@ -82,6 +82,9 @@ impl TimelineLayerFlags {
     pub fn source() -> Self {
         let mut layers = Self::a1_v_a2().with_source_marks();
         layers.base_video = false;
+        // The source range is the whole clip: its outline drew blue lines round every lane
+        // and said nothing (user 2026-10-14: no dark blue lines on the source timeline).
+        layers.shot_range = false;
         layers
     }
 
@@ -1790,7 +1793,7 @@ mod tests {
         assert!(layers.audio_a1);
         assert!(layers.audio_a2);
         assert!(!layers.base_video);
-        assert!(layers.shot_range);
+        assert!(!layers.shot_range);
         assert!(layers.in_out);
         assert!(layers.playhead);
         assert!(layers.video_stack_on());
@@ -1839,7 +1842,7 @@ mod tests {
         assert!(!plain.shot_range);
         assert!(!plain.in_out);
         assert!(!source.base_video);
-        assert!(source.shot_range);
+        assert!(!source.shot_range, "the whole clip needs no outline");
         assert!(source.in_out);
     }
 
