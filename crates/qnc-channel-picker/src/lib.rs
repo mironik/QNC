@@ -30,26 +30,28 @@ pub fn cell_width(height: f32) -> f32 {
     (height * 2.0).max(28.0)
 }
 
-/// The rectangle the column takes: from `left`, starting at `lane` and growing down
-/// (`down`) or up within `room` (top, bottom); a cell is as high as the lane, lower when
-/// the channels would not fit in the room.
-pub fn column_rect(lane: Rect, left: f32, room: (f32, f32), down: bool, choice: ChannelChoice) -> Rect {
+/// The rectangle the column takes from `left` within `room` (top, bottom): from its top
+/// down (`down`, under a top lane) or from its bottom up (over a bottom lane); a cell is
+/// `cell` high, lower when the channels would not fit in the room.
+pub fn column_rect(left: f32, room: (f32, f32), cell: f32, down: bool, choice: ChannelChoice) -> Rect {
     let count = f32::from(choice.count.max(1));
-    let span = if down { room.1 - lane.top() } else { lane.bottom() - room.0 };
-    let cell = lane.height().min(span.max(1.0) / count);
+    let cell = cell.min((room.1 - room.0).max(1.0) / count);
     let size = Vec2::new(cell_width(cell), cell * count);
     if down {
-        Rect::from_min_size(egui::pos2(left, lane.top()), size)
+        Rect::from_min_size(egui::pos2(left, room.0), size)
     } else {
-        Rect::from_min_size(egui::pos2(left, lane.bottom() - size.y), size)
+        Rect::from_min_size(egui::pos2(left, room.1 - size.y), size)
     }
 }
 
 /// Draws the row in `rect` and answers with the channel clicked (zero based).
 pub fn show(ui: &mut egui::Ui, id: egui::Id, rect: Rect, style: PickerStyle, choice: ChannelChoice) -> Option<u16> {
+    // A transparent fill and border draw the boxes straight on what is under them.
     let painter = ui.painter();
     painter.rect_filled(rect, 0.0, style.fill);
-    painter.rect_stroke(rect, 0.0, Stroke::new(1.0, style.border), StrokeKind::Inside);
+    if style.border != Color32::TRANSPARENT {
+        painter.rect_stroke(rect, 0.0, Stroke::new(1.0, style.border), StrokeKind::Inside);
+    }
     let cell = rect.height() / f32::from(choice.count.max(1));
     let side = (cell - 4.0).clamp(6.0, 12.0);
     let mut clicked = None;
@@ -88,13 +90,10 @@ mod tests {
     #[test]
     fn the_column_grows_over_the_video_and_never_into_the_other_lane() {
         let choice = ChannelChoice { selected: 1, count: 4, open: true };
-        let a1 = Rect::from_min_size(egui::pos2(10.0, 0.0), Vec2::new(500.0, 18.0));
-        let down = column_rect(a1, 40.0, (0.0, 82.0), true, choice);
-        assert_eq!((down.top(), down.height()), (0.0, 72.0), "four lane-high cells under A1");
-        let a2 = Rect::from_min_size(egui::pos2(10.0, 82.0), Vec2::new(500.0, 18.0));
-        let up = column_rect(a2, 40.0, (18.0, 100.0), false, choice);
-        assert_eq!((up.bottom(), up.height()), (100.0, 72.0), "up from A2, above A1");
-        let tight = column_rect(a1, 40.0, (0.0, 40.0), true, choice);
-        assert_eq!(tight.height(), 40.0, "lower cells when the room is short");
+        // The video row between A1 (0..18) and A2 (82..100).
+        let down = column_rect(40.0, (18.0, 82.0), 18.0, true, choice);
+        assert_eq!((down.top(), down.height()), (18.0, 64.0), "under A1, lower cells to fit");
+        let up = column_rect(40.0, (18.0, 82.0), 14.0, false, choice);
+        assert_eq!((up.bottom(), up.height()), (82.0, 56.0), "above A2");
     }
 }

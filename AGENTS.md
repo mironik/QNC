@@ -3929,3 +3929,7 @@ gore za A2, unutar prostora do druge audio trake; celija je visoka kao traka, ni
 uzeta preko video trake crta veliki val nacrta kanala; audio traka s izborom kanala crta val svog izabranog kanala
 (nacrt dok je uzeta; peakovi timelinea su kanali klipa 1..4 redom). Veliki val koristi `audio_wave`. Strelice gore/dolje
 nisu mijenjane (povecanje ima jednu razinu).
+Ispravak 2026-10-14 (korisnik: "ne ovako, nego iznad A2, odnosno ispod A1; ne na crnoj pozadini nego na trenutnoj"):
+stupac kanala je samo na video traci: ispod trake A1 prema dolje, iznad trake A2 prema gore (sama traka ostaje
+vidljiva), bez vlastite podloge i okvira, izravno preko velikog vala (`column_rect` uzima prostor video trake i visinu
+celije; prozirna podloga i okvir se ne crtaju; test).
