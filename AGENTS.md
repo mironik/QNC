@@ -3914,3 +3914,7 @@ traka je 0, a 6 px nekadasnjih razmaka dobile su audio trake (15 -> 18 px), pa u
 Audio trake su zelene kao u Final Cut Pro (traka rgb 38,98,62, val rgb 132,214,158, sve trake iste). Slike filmstripa i
 vanjski obrub timelinea nisu dirani. Usput: dva testa `qnc-editorial-application` trazila su hrvatski tekst (iz koraka
 zajednickih kocki) i sada uzimaju tekst kroz sifru; svi testovi workspacea prolaze.
+Dopuna 2026-10-14 (korisnik: "daj audiju boju kakva je na gornjem dijelu story timeline video", uz isjecak zaslona):
+audio trake imaju boje video segmenta price (izmjereno sa zaslona): podloga tamnozelena traka segmenta (rgb 17,103,88),
+val mint tijela segmenta (rgb 80,190,148). `qnc-timeline` `TimelineTheme.audio_wave` je zasebna boja vala audio traka,
+jer `wave_a1`/`wave_a2` boje i segmente price (te ostaju kakve su bile na zaslonu).

@@ -198,6 +198,8 @@ pub struct TimelineTheme {
     pub wave_a2: Color32,
     pub wave_a3: Color32,
     pub wave_a4: Color32,
+    /// The wave on an audio lane (the segment colours of a story use `wave_a1`/`wave_a2`).
+    pub audio_wave: Color32,
 }
 
 impl TimelineTheme {
@@ -214,10 +216,10 @@ impl TimelineTheme {
             background,
             label_background: surface_alt,
             video_background: surface,
-            // Audio lanes as Final Cut Pro draws audio: a green lane with a light green wave
-            // (user 2026-10-14).
-            audio_primary_background: Color32::from_rgb(38, 98, 62),
-            audio_secondary_background: Color32::from_rgb(38, 98, 62),
+            // Audio lanes in the colours of a story's video segment: its dark green band with
+            // the mint of its body as the wave (user 2026-10-14).
+            audio_primary_background: Color32::from_rgb(17, 103, 88),
+            audio_secondary_background: Color32::from_rgb(17, 103, 88),
             border,
             text,
             muted,
@@ -229,6 +231,7 @@ impl TimelineTheme {
             wave_a2: Color32::from_rgb(132, 214, 158),
             wave_a3: Color32::from_rgb(132, 214, 158),
             wave_a4: Color32::from_rgb(132, 214, 158),
+            audio_wave: Color32::from_rgb(80, 190, 148),
         }
     }
 }
@@ -745,7 +748,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 AudioLane::A1,
                 input.a1_peaks,
                 input.theme.audio_primary_background,
-                input.theme.wave_a1,
+                input.theme.audio_wave,
                 &input,
             ),
         );
@@ -779,7 +782,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 AudioLane::A2,
                 input.a2_peaks,
                 input.theme.audio_secondary_background,
-                input.theme.wave_a2,
+                input.theme.audio_wave,
                 &input,
             ),
         );
@@ -802,7 +805,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 AudioLane::A3,
                 input.a3_peaks,
                 input.theme.audio_secondary_background,
-                input.theme.wave_a3,
+                input.theme.audio_wave,
                 &input,
             ),
         );
@@ -825,7 +828,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 AudioLane::A4,
                 input.a4_peaks,
                 input.theme.audio_secondary_background,
-                input.theme.wave_a4,
+                input.theme.audio_wave,
                 &input,
             ),
         );
