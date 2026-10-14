@@ -1,7 +1,9 @@
-//! The channel picker (user rule 2026-09-30): a thin row of checkboxes 1..N, one per
-//! audio channel of the source clip, exactly one chosen. It is drawn right of a lane
-//! label at the height of the audio lane. Passive: it draws the choice it is given and
-//! answers with the channel clicked; the caller decides what the choice means.
+//! The channel picker (user rules 2026-09-30, 2026-10-14): a column of checkboxes 1..N,
+//! one under the other, one per audio channel of the source clip, exactly one chosen. It
+//! starts at its lane, right of the lane label, and grows over the video row (down from a
+//! top lane, up from a bottom lane), never into another audio lane. Passive: it draws the
+//! choice it is given and answers with the channel clicked; the caller decides what the
+//! choice means.
 
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
 
@@ -28,10 +30,19 @@ pub fn cell_width(height: f32) -> f32 {
     (height * 2.0).max(28.0)
 }
 
-/// The rectangle the row takes, from `left` at the top of `lane`.
-pub fn row_rect(lane: Rect, left: f32, choice: ChannelChoice) -> Rect {
-    let width = cell_width(lane.height()) * f32::from(choice.count.max(1));
-    Rect::from_min_size(egui::pos2(left, lane.top()), Vec2::new(width, lane.height()))
+/// The rectangle the column takes: from `left`, starting at `lane` and growing down
+/// (`down`) or up within `room` (top, bottom); a cell is as high as the lane, lower when
+/// the channels would not fit in the room.
+pub fn column_rect(lane: Rect, left: f32, room: (f32, f32), down: bool, choice: ChannelChoice) -> Rect {
+    let count = f32::from(choice.count.max(1));
+    let span = if down { room.1 - lane.top() } else { lane.bottom() - room.0 };
+    let cell = lane.height().min(span.max(1.0) / count);
+    let size = Vec2::new(cell_width(cell), cell * count);
+    if down {
+        Rect::from_min_size(egui::pos2(left, lane.top()), size)
+    } else {
+        Rect::from_min_size(egui::pos2(left, lane.bottom() - size.y), size)
+    }
 }
 
 /// Draws the row in `rect` and answers with the channel clicked (zero based).
@@ -39,13 +50,13 @@ pub fn show(ui: &mut egui::Ui, id: egui::Id, rect: Rect, style: PickerStyle, cho
     let painter = ui.painter();
     painter.rect_filled(rect, 0.0, style.fill);
     painter.rect_stroke(rect, 0.0, Stroke::new(1.0, style.border), StrokeKind::Inside);
-    let cell = cell_width(rect.height());
-    let side = (rect.height() - 4.0).clamp(6.0, 12.0);
+    let cell = rect.height() / f32::from(choice.count.max(1));
+    let side = (cell - 4.0).clamp(6.0, 12.0);
     let mut clicked = None;
     for channel in 0..choice.count {
         let cell_rect = Rect::from_min_size(
-            egui::pos2(rect.left() + cell * f32::from(channel), rect.top()),
-            Vec2::new(cell, rect.height()),
+            egui::pos2(rect.left(), rect.top() + cell * f32::from(channel)),
+            Vec2::new(rect.width(), cell),
         );
         let response = ui.interact(cell_rect, id.with(channel), Sense::click());
         let center = cell_rect.left_center() + Vec2::new(side * 0.5 + 3.0, 0.0);
@@ -75,12 +86,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_row_is_as_high_as_the_lane_and_one_cell_per_channel() {
-        let lane = Rect::from_min_size(egui::pos2(10.0, 50.0), Vec2::new(500.0, 15.0));
-        let rect = row_rect(lane, 40.0, ChannelChoice { selected: 1, count: 4, open: false });
-        assert_eq!(rect.height(), 15.0);
-        assert_eq!(rect.top(), 50.0);
-        assert_eq!(rect.left(), 40.0);
-        assert_eq!(rect.width(), 4.0 * cell_width(15.0));
+    fn the_column_grows_over_the_video_and_never_into_the_other_lane() {
+        let choice = ChannelChoice { selected: 1, count: 4, open: true };
+        let a1 = Rect::from_min_size(egui::pos2(10.0, 0.0), Vec2::new(500.0, 18.0));
+        let down = column_rect(a1, 40.0, (0.0, 82.0), true, choice);
+        assert_eq!((down.top(), down.height()), (0.0, 72.0), "four lane-high cells under A1");
+        let a2 = Rect::from_min_size(egui::pos2(10.0, 82.0), Vec2::new(500.0, 18.0));
+        let up = column_rect(a2, 40.0, (18.0, 100.0), false, choice);
+        assert_eq!((up.bottom(), up.height()), (100.0, 72.0), "up from A2, above A1");
+        let tight = column_rect(a1, 40.0, (0.0, 40.0), true, choice);
+        assert_eq!(tight.height(), 40.0, "lower cells when the room is short");
     }
 }

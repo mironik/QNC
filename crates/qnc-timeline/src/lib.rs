@@ -732,6 +732,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     let right = outer.right() - input.metrics.border_width;
     let mut intent = TimelineIntent::None;
     let mut video_row = None;
+    let (mut a1_row, mut a2_row) = (None, None);
 
     if input.layers.audio_a1 {
         let row = next_row(
@@ -743,13 +744,14 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 .lane_height(AudioLane::A1, input.expanded_audio),
             input.metrics.row_gap,
         );
+        a1_row = Some(row);
         keep_first_intent(
             &mut intent,
             paint_audio_row(
                 ui,
                 row,
                 AudioLane::A1,
-                input.a1_peaks,
+                lane_peaks(&input, input.a1_channel, input.a1_peaks),
                 input.theme.audio_primary_background,
                 input.theme.audio_wave,
                 &input,
@@ -777,13 +779,14 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 .lane_height(AudioLane::A2, input.expanded_audio),
             input.metrics.row_gap,
         );
+        a2_row = Some(row);
         keep_first_intent(
             &mut intent,
             paint_audio_row(
                 ui,
                 row,
                 AudioLane::A2,
-                input.a2_peaks,
+                lane_peaks(&input, input.a2_channel, input.a2_peaks),
                 input.theme.audio_secondary_background,
                 input.theme.audio_wave,
                 &input,
@@ -836,8 +839,56 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
             ),
         );
     }
-    if let (Some(row), Some((lane, level))) = (video_row, input.wave_over_video) {
-        paint_wave_over_video(ui, row, lane, level, &input);
+    let taken = [(AudioLane::A1, a1_row, input.a1_channel), (AudioLane::A2, a2_row, input.a2_channel)]
+        .into_iter()
+        .find_map(|(lane, row, choice)| Some((lane, row?, choice.filter(|c| c.open && input.show_lane_labels)?)));
+    match (video_row, taken) {
+        // A taken lane shows the wave of its draft channel over the video row, beside its
+        // channel column (user 2026-10-14: the picker and the large wave together).
+        (Some(row), Some((lane, _, choice))) => {
+            let level = input.wave_over_video.filter(|(over, _)| *over == lane).map_or(1, |(_, level)| level.max(1));
+            paint_wave_over_video(ui, row, channel_peaks(&input, choice.selected), level, &input);
+        }
+        (Some(row), None) => {
+            if let Some((lane, level)) = input.wave_over_video {
+                let peaks = match lane {
+                    AudioLane::A1 => lane_peaks(&input, input.a1_channel, input.a1_peaks),
+                    AudioLane::A2 => lane_peaks(&input, input.a2_channel, input.a2_peaks),
+                    AudioLane::A3 => input.a3_peaks,
+                    AudioLane::A4 => input.a4_peaks,
+                    AudioLane::None => &[],
+                };
+                paint_wave_over_video(ui, row, peaks, level, &input);
+            }
+        }
+        _ => {}
+    }
+    if let Some((lane, row, choice)) = taken {
+        // The column of channels: from the lane over the video row, never into the other
+        // audio lane.
+        let (_, track) = split_label_track(row, input.metrics.label_width);
+        let down = lane == AudioLane::A1;
+        let room = if down {
+            (row.top(), a2_row.map_or(outer.bottom(), |other| other.top()))
+        } else {
+            (a1_row.map_or(outer.top(), |other| other.bottom()), row.bottom())
+        };
+        let rect = qnc_channel_picker::column_rect(row, track.left(), room, down, choice);
+        let style = qnc_channel_picker::PickerStyle {
+            fill: input.theme.background,
+            border: input.theme.border,
+            text: input.theme.text,
+            accent: input.theme.playhead,
+        };
+        let id = ui.make_persistent_id(("qnc_timeline_channel_picker", lane.label()));
+        if let Some(channel) = qnc_channel_picker::show(ui, id, rect, style, choice) {
+            intent = match lane {
+                AudioLane::A2 => TimelineIntent::ChooseA2Channel(channel),
+                _ => TimelineIntent::ChooseA1Channel(channel),
+            };
+        } else if ui.rect_contains_pointer(rect) {
+            intent = TimelineIntent::None; // the click belongs to the column, not the track under it
+        }
     }
     paint_trim_playheads(ui, outer, &input);
 
@@ -913,7 +964,6 @@ fn paint_audio_row(
         _ => None,
     }
     .filter(|_| input.show_lane_labels);
-    let picker_id = label_response.id.with("picker");
     if input.show_lane_labels && label_response.clicked() {
         // A click on A1/A2 takes the lane as Ctrl+1/Ctrl+2 does (user rule 2026-10-01).
         return match picker {
@@ -924,28 +974,6 @@ fn paint_audio_row(
     ui.painter().rect_filled(track_rect, 0.0, fill); // no frame: the lane meets the filmstrip
     qnc_wave_view::paint_wave_peaks(ui.painter(), track_rect, peaks, wave);
     paint_ranges_and_playhead(ui, track_rect, input);
-    if let Some(choice) = picker {
-        if choice.open {
-            // Right of the label, as high as the lane, over the start of the track, while
-            // the lane is taken (its draft is shown); a click on a channel keeps it.
-            let rect = qnc_channel_picker::row_rect(track_rect, track_rect.left(), choice);
-            let style = qnc_channel_picker::PickerStyle {
-                fill: input.theme.background,
-                border: input.theme.border,
-                text: input.theme.text,
-                accent: input.theme.playhead,
-            };
-            if let Some(channel) = qnc_channel_picker::show(ui, picker_id, rect, style, choice) {
-                return match lane {
-                    AudioLane::A2 => TimelineIntent::ChooseA2Channel(channel),
-                    _ => TimelineIntent::ChooseA1Channel(channel),
-                };
-            }
-            if ui.rect_contains_pointer(rect) {
-                return TimelineIntent::None; // the click belongs to the picker
-            }
-        }
-    }
     cue_intent_from_response(&response, track_rect, input)
 }
 
@@ -1951,14 +1979,26 @@ mod tests {
 
 /// The wave of one audio lane over the video row (user rule 2026-10-01): as high as
 /// that row, its peaks at a display gain of 2^(level-1); the sound is not changed.
-fn paint_wave_over_video(ui: &mut egui::Ui, row: Rect, lane: AudioLane, level: u8, input: &TimelineInput<'_>) {
-    let (peaks, wave) = match lane {
-        AudioLane::A1 => (input.a1_peaks, input.theme.wave_a1),
-        AudioLane::A2 => (input.a2_peaks, input.theme.wave_a2),
-        AudioLane::A3 => (input.a3_peaks, input.theme.wave_a3),
-        AudioLane::A4 => (input.a4_peaks, input.theme.wave_a4),
-        AudioLane::None => return,
-    };
+/// The peaks of source channel `channel` (zero based): the timeline gets the clip's
+/// channels 1..4 in order.
+fn channel_peaks<'a>(input: &TimelineInput<'a>, channel: u16) -> &'a [f32] {
+    match channel {
+        0 => input.a1_peaks,
+        1 => input.a2_peaks,
+        2 => input.a3_peaks,
+        3 => input.a4_peaks,
+        _ => &[],
+    }
+}
+
+/// A lane with a channel choice draws the wave of its chosen channel (the draft while
+/// taken); without one, its own peaks.
+fn lane_peaks<'a>(input: &TimelineInput<'a>, choice: Option<ChannelChoice>, own: &'a [f32]) -> &'a [f32] {
+    choice.map_or(own, |choice| channel_peaks(input, choice.selected))
+}
+
+fn paint_wave_over_video(ui: &mut egui::Ui, row: Rect, peaks: &[f32], level: u8, input: &TimelineInput<'_>) {
+    let wave = input.theme.audio_wave;
     if level == 0 {
         return;
     }

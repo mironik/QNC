@@ -3921,3 +3921,11 @@ jer `wave_a1`/`wave_a2` boje i segmente price (te ostaju kakve su bile na zaslon
 Dopuna 2026-10-14 (korisnik: "iz source timeline izbaci tamno plave linije"): plave linije bile su obrub raspona klipa
 (`shot_range`, rgb 96,165,250) oko svake trake; na source timelineu raspon je uvijek cijeli klip, pa obrub nista ne
 govori. `qnc-timeline` `TimelineLayerFlags::source()` ga iskljucuje (testovi); IN/OUT, playhead i fokus ostaju.
+Izmjena izgleda 2026-10-14 (korisnik: "izbor audio kanala prebaciti na vertikalan prikaz, jedan ispod drugoga, ali da ne
+ulazi u podrucje drugog audio traka; ujedno bi prikazivao i zum audio trak odabranog kanala preko polja videa; to smo
+dosad imali odvojeno"): `qnc-channel-picker` je stupac kucica 1..N (`column_rect`: od trake prema dolje za A1, prema
+gore za A2, unutar prostora do druge audio trake; celija je visoka kao traka, niza kad kanali ne stanu; test).
+`qnc-timeline` crta stupac nakon svih traka (klik na kanal je izbor, klik u stupac ne ide traci ispod) i dok je traka
+uzeta preko video trake crta veliki val nacrta kanala; audio traka s izborom kanala crta val svog izabranog kanala
+(nacrt dok je uzeta; peakovi timelinea su kanali klipa 1..4 redom). Veliki val koristi `audio_wave`. Strelice gore/dolje
+nisu mijenjane (povecanje ima jednu razinu).
