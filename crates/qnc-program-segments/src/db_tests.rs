@@ -279,7 +279,7 @@ fn ctrl_o_on_the_segment_panel_lengthens_the_slot_under_the_playhead_and_moves_t
     assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150], "the draft is drawn");
     assert_eq!(segments.view().edit_stills.len(), 2, "its new last picture and the next slot's first");
     let cut: Vec<&str> = segments.view().edit_stills.iter().filter(|still| still.cut).map(|still| still.label.as_str()).collect();
-    assert_eq!(cut, vec!["Slot - nova zadnja"], "the picture at the cut is marked");
+    assert_eq!(cut, vec![qnc_ui_text::text("story.still.slot_new_last")], "the picture at the cut is marked");
     segments.apply_action("activate_focused_item");
     settle(&mut segments);
     assert_eq!(marker_frames(&segments), vec![0, 40, 83, 150], "stored after Enter");
@@ -322,7 +322,7 @@ fn at_the_end_of_its_clip_a_slot_edge_does_not_go_further_that_way() {
     assert_eq!(marker_frames(&segments), vec![0, 40, 81, 150], "to the last picture of the clip");
     segments.apply_action("step_forward_frame");
     assert_eq!(marker_frames(&segments), vec![0, 40, 81, 150], "not past it");
-    assert!(segments.view().message.contains("na kraju"));
+    assert!(segments.view().message == qnc_ui_text::text("story.msg.clip_at_end"));
     segments.apply_action("step_back_frame");
     assert_eq!(marker_frames(&segments), vec![0, 40, 80, 150], "back is allowed");
     // A jump to a key picture past the end of the clip goes to its end.

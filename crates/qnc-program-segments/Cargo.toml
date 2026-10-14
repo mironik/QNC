@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: Ton/Off program segments of an edited story in the project database, their order and program model"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-program-db = { workspace = true }
 qnc-program-commands = { workspace = true }

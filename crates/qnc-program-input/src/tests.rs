@@ -207,7 +207,7 @@ fn missing_or_mixed_facts_are_errors() {
         ],
     );
     let error = resolved_media("a", &original, &original, &layout(&[(1, 0), (2, 0)])).unwrap_err();
-    assert!(error.contains("razlicitim sample rateom"), "{error}");
+    assert!(error.contains("different sample rates"), "{error}");
 
     let mut no_video = layout(&[]);
     no_video.video = None;

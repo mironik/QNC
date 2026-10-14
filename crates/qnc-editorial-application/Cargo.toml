@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC editorial application composition root: clip list of the active project (public views, read-only) and a source preview session; no form, no scan, no probe, no writes"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-clip-posters = { workspace = true }
 qnc-content-store = { workspace = true }

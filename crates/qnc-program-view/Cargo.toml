@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public piece: what a form shows of a story program (segments, markers, slots and covers on one frame axis, duration labels) and the questions asked of it. Pure: it reads nothing and writes nothing."
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-program-commands = { workspace = true }
 qnc-program-db = { workspace = true }
 qnc-program-waveform = { workspace = true }

@@ -1320,7 +1320,7 @@ fn paint_covers(
             ui.painter().text(
                 rect.center(),
                 Align2::CENTER_CENTER,
-                "nije na programu",
+                qnc_ui_text::text("story.ui.not_in_program"),
                 FontId::proportional(10.0),
                 input.theme.text,
             );

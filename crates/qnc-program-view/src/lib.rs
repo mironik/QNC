@@ -195,9 +195,9 @@ impl SegmentsView {
     pub fn quick_cover_slot(&self) -> Result<&Slot, String> {
         let slot = self
             .selected_slot()
-            .ok_or("Odaberi marker slot za pokrivalicu")?;
+            .ok_or(qnc_ui_text::text("story.msg.pick_slot_for_broll"))?;
         if slot.has_cover {
-            return Err("Odabrani marker slot već ima pokrivalicu".into());
+            return Err(qnc_ui_text::text("story.msg.slot_has_broll").into());
         }
         Ok(slot)
     }
@@ -207,7 +207,7 @@ impl SegmentsView {
         self.selected_slot()
             .map(|slot| slot.slot_id.as_str())
             .or_else(|| self.selected_cover().map(|cover| cover.slot_id.as_str()))
-            .ok_or_else(|| "Odaberi marker slot za pokrivalicu".into())
+            .ok_or_else(|| qnc_ui_text::text("story.msg.pick_slot_for_broll").into())
     }
 
     /// The segment that holds a program frame; at or after the end, the last one.

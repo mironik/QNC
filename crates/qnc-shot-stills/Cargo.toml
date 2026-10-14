@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public block: the stills of a saved virtual shot (IN/OUT of a short, the poster of a B-roll shot of a cover) written to the project product folder and published through the virtual shots table module"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-virtual-short-stills = { workspace = true }
 qnc-virtual-shots = { workspace = true }

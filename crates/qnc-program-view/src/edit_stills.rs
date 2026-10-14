@@ -78,9 +78,9 @@ pub fn edit_stills(view: &SegmentsView, slots: &[Slot], moves: &[(u64, u64)]) ->
     let moved = |frame: u64| moves.iter().find(|(old, _)| *old == frame).map_or(frame, |(_, new)| *new);
     // A slot moves two markers: the slot before, the slot itself, the slot after.
     let labels: &[[&str; 2]] = if moves.len() == 2 {
-        &[["Prethodni slot - zadnja", "Slot - prva"], ["Slot - zadnja", "Sljedeci slot - prva"]]
+        &[[qnc_ui_text::text("story.still.previous_slot_last"), "Slot - prva"], ["Slot - zadnja", qnc_ui_text::text("story.still.next_slot_first")]]
     } else {
-        &[["Prije markera - zadnja", "Poslije markera - prva"]]
+        &[[qnc_ui_text::text("story.still.before_marker_last"), qnc_ui_text::text("story.still.after_marker_first")]]
     };
     let mut stills = Vec::new();
     let slot = moves.len() == 2;
@@ -113,7 +113,7 @@ pub fn trim_stills(view: &SegmentsView, slots: &[Slot], slot_id: &str, start: bo
     let mut stills = Vec::new();
     if start {
         if slot.start_frame > 0 {
-            stills.push(still(view, slots, &|frame| frame, slot.start_frame, false).labelled("Prethodni slot - zadnja"));
+            stills.push(still(view, slots, &|frame| frame, slot.start_frame, false).labelled(qnc_ui_text::text("story.still.previous_slot_last")));
         }
         let cover = view.covers.iter().find(|cover| cover.slot_id == slot.slot_id);
         let first = match cover {
@@ -125,13 +125,13 @@ pub fn trim_stills(view: &SegmentsView, slots: &[Slot], slot_id: &str, start: bo
             }
             None => picture_at(view, &[], &|frame| frame, slot.start_frame),
         };
-        stills.push(EditStill::new(slot.start_frame, true, first).labelled("Slot - nova prva").at_cut());
+        stills.push(EditStill::new(slot.start_frame, true, first).labelled(qnc_ui_text::text("story.still.slot_new_first")).at_cut());
     } else {
         if new_end > 0 {
-            stills.push(still(view, slots, &moved, new_end, false).labelled("Slot - nova zadnja").at_cut());
+            stills.push(still(view, slots, &moved, new_end, false).labelled(qnc_ui_text::text("story.still.slot_new_last")).at_cut());
         }
         if new_end < total {
-            stills.push(still(view, slots, &moved, new_end, true).labelled("Sljedeci slot - prva"));
+            stills.push(still(view, slots, &moved, new_end, true).labelled(qnc_ui_text::text("story.still.next_slot_first")));
         }
     }
     stills

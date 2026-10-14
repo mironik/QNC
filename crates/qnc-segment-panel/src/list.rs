@@ -7,7 +7,6 @@ use eframe::egui::{self, Color32, RichText};
 use qnc_program_segments::{SegmentCommand, SegmentsView};
 use qnc_timeline::TimelineTheme;
 
-const EMPTY_LIST_MESSAGE: &str = "Nema segmenata — označi source IN/OUT pa dodaj TON/OFF.";
 
 pub fn show_segment_list(
     ui: &mut egui::Ui,
@@ -21,7 +20,7 @@ pub fn show_segment_list(
         .auto_shrink([false, false])
         .show(ui, |ui| {
             if segments.parts.is_empty() {
-                ui.colored_label(theme.muted, EMPTY_LIST_MESSAGE);
+                ui.colored_label(theme.muted, qnc_ui_text::text("story.ui.no_segments_list"));
                 return;
             }
             for row in &segments.parts {
@@ -53,7 +52,7 @@ pub fn show_segment_list(
                             let duration = RichText::new(&row.duration_label).color(theme.muted);
                             ui.label(duration.small());
                             if !row.active {
-                                ui.label(RichText::new("isključen").color(theme.muted).small());
+                                ui.label(RichText::new(qnc_ui_text::text("story.ui.excluded")).color(theme.muted).small());
                             }
                             if row.selected || !row.active {
                                 let layout = egui::Layout::right_to_left(egui::Align::Center);
@@ -99,38 +98,38 @@ fn row_buttons(
     };
     let id = || row.segment_id.clone();
     if !row.active {
-        if small(ui, "Izbriši", "Trajno obriši isključeni segment") {
+        if small(ui, qnc_ui_text::text("story.ui.delete"), qnc_ui_text::text("story.ui.delete_hint")) {
             *command = Some(SegmentCommand::Purge(id()));
         }
-        if small(ui, "Uključi", "Vrati segment u program gdje je bio") {
+        if small(ui, qnc_ui_text::text("story.ui.include"), qnc_ui_text::text("story.ui.include_hint")) {
             *command = Some(SegmentCommand::Include(id()));
         }
         return area;
     }
     if small(
         ui,
-        "Isključi",
-        "Makni segment iz programa (ostaje na popisu)",
+        qnc_ui_text::text("story.ui.exclude"),
+        qnc_ui_text::text("story.ui.exclude_hint"),
     ) {
         *command = Some(SegmentCommand::Exclude(id()));
     }
-    if small(ui, "Down", "Pomakni segment kasnije") {
+    if small(ui, qnc_ui_text::text("story.ui.down"), qnc_ui_text::text("story.ui.down_hint")) {
         *command = Some(SegmentCommand::Move { up: false });
     }
-    if small(ui, "Up", "Pomakni segment ranije") {
+    if small(ui, qnc_ui_text::text("story.ui.up"), qnc_ui_text::text("story.ui.up_hint")) {
         *command = Some(SegmentCommand::Move { up: true });
     }
     if small(
         ui,
-        "Replace",
-        "Zamijeni bazni sloj označenim izvorom (IN/OUT)",
+        qnc_ui_text::text("story.ui.replace"),
+        qnc_ui_text::text("story.ui.replace_hint"),
     ) {
         *command = Some(SegmentCommand::Replace(id()));
     }
     // Edit (user rule 2026-10-01): IN/OUT of the segment on the source timeline.
-    let edit = ui.add(egui::Button::new(RichText::new("Edit").small()).selected(editing));
+    let edit = ui.add(egui::Button::new(RichText::new(qnc_ui_text::text("story.ui.edit")).small()).selected(editing));
     area = area.union(edit.rect);
-    if edit.on_hover_text("Uredi IN/OUT segmenta na source timelineu (Enter sprema, Esc odustaje)").clicked() {
+    if edit.on_hover_text(qnc_ui_text::text("story.ui.edit_hint")).clicked() {
         *command = Some(SegmentCommand::Edit(id()));
     }
     area

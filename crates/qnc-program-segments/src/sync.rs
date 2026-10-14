@@ -56,11 +56,11 @@ impl ProgramSegments {
     pub fn sync_space(&mut self, wrap_active: bool) -> SyncSpace {
         // A stopped Sync plays on from its draft end (user 2026-10-13).
         if let Some(preview) = self.sync.resume() {
-            self.refresh_view("Sync nastavlja · Enter sprema pokrivalicu, Delete odbacuje".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.sync_resumes").into());
             return SyncSpace::Start(preview);
         }
         if self.sync.at_end() {
-            self.refresh_view("Sync je na kraju · Enter sprema pokrivalicu, Delete odbacuje".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.sync_at_end").into());
             return SyncSpace::Blocked;
         }
         if wrap_active || !self.sync.wants_space() {
@@ -74,14 +74,14 @@ impl ProgramSegments {
         let per_source = match (self.view.timebase, self.sync.armed_timebase()) {
             (Some(story), Some(source)) => qnc_program_db::story_per_source(story, source)
                 .map(|(num, den)| (num as u64, den as u64)),
-            _ => Err("Playlist input je prazan".into()),
+            _ => Err(qnc_ui_text::text("story.msg.program_empty").into()),
         };
         match per_source.and_then(|per_source| self.sync.start(&markers, playhead, total, per_source)) {
             Ok(preview) => {
                 self.selected_marker = None;
                 self.selected_slot = None;
                 self.selected_cover = None;
-                self.refresh_view("Sync play · OUT završava slot".into());
+                self.refresh_view(qnc_ui_text::text("story.msg.sync_play").into());
                 SyncSpace::Start(preview)
             }
             Err(error) => {
@@ -110,7 +110,7 @@ impl ProgramSegments {
         if !self.sync.nudge(frames) {
             return false;
         }
-        self.refresh_view("Sync kraj · strelice pomiču, Space nastavlja, Enter sprema, Delete odbacuje".into());
+        self.refresh_view(qnc_ui_text::text("story.msg.sync_stopped").into());
         true
     }
 
@@ -121,7 +121,7 @@ impl ProgramSegments {
             return false;
         }
         self.program_changed = true;
-        self.refresh_view("Sync odbačen".into());
+        self.refresh_view(qnc_ui_text::text("story.msg.sync_discarded").into());
         true
     }
 
@@ -137,7 +137,7 @@ impl ProgramSegments {
                 // The Wrap playhead on the slot's end marker: the next Sync starts there,
                 // not at the slot just made (live 2026-10-13: four started at 0 in a row).
                 let end = slot.end;
-                self.after_sync_finish("Sync slot odabran · Enter dodaje pokrivalicu");
+                self.after_sync_finish(qnc_ui_text::text("story.msg.sync_slot_chosen"));
                 self.cue_program(end);
             }
             Err(error) => self.refresh_view(error),
@@ -164,14 +164,14 @@ impl ProgramSegments {
 
     pub(crate) fn toggle_sync(&mut self) {
         if self.view.rows.is_empty() && !self.sync.enabled() {
-            return self.refresh_view("Pokrivalice i Sync/B-roll trebaju segmente.".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.broll_needs_segments").into());
         }
         // A running Sync play gives the player back to the whole program.
         self.program_changed |= self.sync.toggle();
         let message = if self.sync.enabled() {
-            "Sync uključen · Source IN armira Sync play"
+            qnc_ui_text::text("story.msg.sync_on")
         } else {
-            "Sync isključen"
+            qnc_ui_text::text("story.msg.sync_off")
         };
         self.refresh_view(message.into());
     }
@@ -189,9 +189,9 @@ impl ProgramSegments {
                         local_frame: frame - segment.start_frame,
                     };
                     self.write(operation);
-                    self.refresh_view("Sync OUT spremljen · čekam novi M-M slot".into());
+                    self.refresh_view(qnc_ui_text::text("story.msg.sync_out_saved").into());
                 }
-                None => self.refresh_view("Nema Wrap segmenta za kraj Sync slota.".into()),
+                None => self.refresh_view(qnc_ui_text::text("story.msg.no_wrap_for_sync_end").into()),
             },
             None => {
                 self.refresh_view(message.into());
@@ -208,14 +208,14 @@ impl ProgramSegments {
         let Some(slot_id) = self.sync.resolve(found) else {
             // v5 `slot_plan`: another M marker inside the Sync range splits it.
             if self.sync.has_pending() {
-                self.refresh_view("Sync slot još nije materijaliziran".into());
+                self.refresh_view(qnc_ui_text::text("story.msg.sync_slot_not_ready").into());
             }
             return;
         };
         self.selected_slot = Some(slot_id.clone());
         self.selected_cover = None;
         self.write(Operation::SelectSlot { slot_id });
-        self.refresh_view("Sync slot odabran · Enter dodaje pokrivalicu".into());
+        self.refresh_view(qnc_ui_text::text("story.msg.sync_slot_chosen").into());
         let commit = std::mem::take(&mut self.sync_commit);
         self.commit_sync(commit);
     }
@@ -232,7 +232,7 @@ impl ProgramSegments {
             .any(|stored| stored.slot_id == slot_id && stored.has_cover)
         {
             self.sync.landed();
-            return self.refresh_view("Sync slot već ima pokrivalicu".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.sync_slot_has_broll").into());
         }
         self.cover(
             NewCover {
@@ -246,7 +246,7 @@ impl ProgramSegments {
             },
             slot.source.clip_name,
         );
-        self.refresh_view("Sync pokrivalica dodana u slot · spremam...".into());
+        self.refresh_view(qnc_ui_text::text("story.msg.sync_broll_added").into());
     }
 }
 

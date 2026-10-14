@@ -200,7 +200,7 @@ fn the_locked_start_marker_is_not_selected() {
     let mut segments = component();
     segments.apply(SegmentCommand::SelectMarker("S".into()));
     assert!(segments.view().selected_marker().is_none());
-    assert!(segments.view().message.contains("zaključan"));
+    assert!(segments.view().message.contains("locked"));
     segments.apply(SegmentCommand::SelectMarker("E".into()));
     assert_eq!(segments.view().selected_marker().unwrap().marker_id, "E");
 }
@@ -281,12 +281,12 @@ fn arrow_steps_select_neighbours_and_stop_at_the_ends() {
 fn move_and_delete_need_a_selection_and_a_database() {
     let mut segments = component();
     segments.apply(SegmentCommand::DeleteSelected);
-    assert_eq!(segments.view().message, "Odaberi segment.");
+    assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.pick_segment"));
     segments.apply(SegmentCommand::Move { up: true });
-    assert_eq!(segments.view().message, "Odaberi segment.");
+    assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.pick_segment"));
     segments.apply(SegmentCommand::Select("a".into()));
     segments.apply(SegmentCommand::DeleteSelected);
-    assert_eq!(segments.view().message, "Projektna baza nije dostupna.");
+    assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.db_unavailable"));
 }
 
 #[test]
@@ -332,7 +332,7 @@ fn a_cover_is_drawn_over_its_slot_and_targets_follow_v5() {
     );
     assert_eq!(
         view.quick_cover_slot().unwrap_err(),
-        "Odabrani marker slot već ima pokrivalicu",
+        qnc_ui_text::text("story.msg.slot_has_broll"),
         "B needs an empty slot"
     );
     assert_eq!(view.overwrite_cover_slot(), Ok("S|m1"));
@@ -356,7 +356,7 @@ fn a_cover_needs_the_marked_source_and_a_segment_click_clears_the_cover() {
     segments.apply(SegmentCommand::Cover { overwrite: false });
     assert_eq!(
         segments.view().message,
-        "Odaberi klip i potvrdi IN i OUT na playeru."
+        qnc_ui_text::text("story.msg.pick_clip_and_marks")
     );
     assert!(SegmentCommand::from_action("quick_overwrite_cover").is_some());
     assert_eq!(
@@ -452,7 +452,7 @@ fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
     segments.resolve_sync();
     assert_eq!(
         segments.view().message,
-        "Sync slot još nije materijaliziran",
+        qnc_ui_text::text("story.msg.sync_slot_not_ready"),
         "v5: no stored slot 15..23 while its end marker is missing"
     );
 }

@@ -107,14 +107,14 @@ pub fn check_move(pins: &[MarkerPin], marker_id: &str, frame: u64) -> Result<(),
     let index = pins
         .iter()
         .position(|pin| pin.marker_id == marker_id)
-        .ok_or("M marker nije pronadjen.")?;
+        .ok_or(qnc_ui_text::text("story.msg.marker_not_found"))?;
     if pins[index].locked {
-        return Err("Početni i završni M marker su zaključani.".into());
+        return Err(qnc_ui_text::text("story.msg.edge_markers_locked").into());
     }
     let low = index.checked_sub(1).map_or(0, |before| pins[before].frame);
     let high = pins.get(index + 1).map_or(u64::MAX, |after| after.frame);
     if frame <= low || frame >= high {
-        return Err("M marker se pomice samo izmedu susjednih markera.".into());
+        return Err(qnc_ui_text::text("story.msg.marker_between_neighbours").into());
     }
     Ok(())
 }

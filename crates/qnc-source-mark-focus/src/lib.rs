@@ -29,7 +29,7 @@ pub fn take(timeline: &mut TimelineProjection, in_mark: bool) -> MarkKey {
         (timeline.source_out_frame, TimelineSourceMarkFocus::Out)
     };
     let Some(frame) = mark else {
-        return MarkKey::Refused; // v5: "Prvo stavi IN"
+        return MarkKey::Refused; // v5: qnc_ui_text::text("story.msg.set_in_first")
     };
     timeline.source_mark_focus = focus;
     MarkKey::Cue(cue_frame(timeline, frame, !in_mark))
@@ -49,7 +49,7 @@ pub fn nudge(timeline: &mut TimelineProjection, frames: i64) -> MarkKey {
                 timeline.source_in_frame = Some(next);
                 MarkKey::Cue(cue_frame(timeline, next, false))
             }
-            None => MarkKey::Refused, // v5: "IN ne smije prijeći OUT"
+            None => MarkKey::Refused, // v5: qnc_ui_text::text("story.msg.in_past_out")
         },
         TimelineSourceMarkFocus::Out => match moved(out_frame).filter(|next| *next > in_frame && *next <= duration) {
             Some(next) => {

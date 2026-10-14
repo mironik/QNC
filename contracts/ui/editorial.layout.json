@@ -35,7 +35,7 @@
     "min_width": 240.0,
     "aspect": "16:9",
     "fit": "contain_centered",
-    "empty_label": "Odaberi klip",
+    "empty_label": "@ingest.preview.empty",
     "empty_font_size": 14.0,
     "face": "preview_black"
   },
@@ -43,38 +43,93 @@
     "min_card_width": 160.0,
     "card_text_height": 34.0,
     "grid_gap": 10.0,
-    "empty_message": "Nema klipova — prvo Ingest import.",
-    "broll_empty_message": "Nema B-roll kadrova — dodaj pokrivalicu.",
-    "virtual_empty_message": "Nema virtualnih — Spremi virtualni kadar.",
-    "loading_message": "Citam projektni katalog..."
+    "empty_message": "@story.pool.empty",
+    "broll_empty_message": "@story.pool.broll_empty",
+    "virtual_empty_message": "@story.pool.subclip_empty",
+    "loading_message": "@story.pool.loading"
   },
   "pool_head": {
     "tabs_left": [
-      { "label": "All", "action_id": "editorial_tab_all" },
-      { "label": "Virtual", "action_id": "editorial_tab_virtual" }
+      {
+        "label": "@pool.tab.all",
+        "action_id": "editorial_tab_all"
+      },
+      {
+        "label": "@pool.tab.subclip",
+        "action_id": "editorial_tab_virtual"
+      }
     ],
     "transport_right": [
-      { "label": ">", "action_id": "play_pause" },
-      { "label": "[", "action_id": "mark_in" },
-      { "label": "]", "action_id": "mark_out" }
+      {
+        "label": ">",
+        "action_id": "play_pause"
+      },
+      {
+        "label": "[",
+        "action_id": "mark_in"
+      },
+      {
+        "label": "]",
+        "action_id": "mark_out"
+      }
     ]
   },
   "cover_lengths": [
-    { "below_seconds": 2.0, "rgb": [255, 140, 0] },
-    { "below_seconds": 3.0, "rgb": [250, 204, 21] },
-    { "below_seconds": 4.0, "rgb": [34, 197, 94] },
-    { "at_most_seconds": 5.0, "rgb": [34, 211, 238] },
-    { "rgb": [59, 130, 246] }
+    {
+      "below_seconds": 2.0,
+      "rgb": [
+        255,
+        140,
+        0
+      ]
+    },
+    {
+      "below_seconds": 3.0,
+      "rgb": [
+        250,
+        204,
+        21
+      ]
+    },
+    {
+      "below_seconds": 4.0,
+      "rgb": [
+        34,
+        197,
+        94
+      ]
+    },
+    {
+      "at_most_seconds": 5.0,
+      "rgb": [
+        34,
+        211,
+        238
+      ]
+    },
+    {
+      "rgb": [
+        59,
+        130,
+        246
+      ]
+    }
   ],
   "source_dock": {
     "inner_margin_x": 8.0,
     "header_timeline_gap": 4.0,
     "header_item_gap": 8.0,
     "clip_label_fallback": "—",
-    "timecode_labels": ["IN", "OUT", "Trajanje"]
+    "timecode_labels": [
+      "@source.in",
+      "@source.out",
+      "@source.duration"
+    ]
   },
   "right_panel": {
-    "empty_kinds": ["none"],
+    "empty_kinds": [
+      "none"
+    ],
     "note": "Reserved space for the functions of each group; stays empty until a group specifies it."
   },
   "groups": {
@@ -87,13 +142,26 @@
         "show_quick_cover": false
       },
       "right_panel": "none",
-      "tab_order": ["pool_tabs", "pool", "source_timeline", "source_buttons"],
+      "tab_order": [
+        "pool_tabs",
+        "pool",
+        "source_timeline",
+        "source_buttons"
+      ],
       "source_dock": {
         "show": true,
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
+        "actions_rtl": [
+          "@story.broll",
+          "@story.voice_over",
+          "@story.talking_head",
+          {
+            "label": "@story.add_subclip",
+            "action_id": "save_virtual_shot"
+          }
+        ]
       },
       "media_card": {
         "selection_check": true,
@@ -109,13 +177,26 @@
         "show_quick_cover": false
       },
       "right_panel": "none",
-      "tab_order": ["pool_tabs", "pool", "source_timeline", "source_buttons"],
+      "tab_order": [
+        "pool_tabs",
+        "pool",
+        "source_timeline",
+        "source_buttons"
+      ],
       "source_dock": {
         "show": true,
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
+        "actions_rtl": [
+          "@story.broll",
+          "@story.voice_over",
+          "@story.talking_head",
+          {
+            "label": "@story.add_subclip",
+            "action_id": "save_virtual_shot"
+          }
+        ]
       },
       "media_card": {
         "selection_check": true,
@@ -131,13 +212,26 @@
         "show_quick_cover": false
       },
       "right_panel": "none",
-      "tab_order": ["pool_tabs", "pool", "source_timeline", "source_buttons"],
+      "tab_order": [
+        "pool_tabs",
+        "pool",
+        "source_timeline",
+        "source_buttons"
+      ],
       "source_dock": {
         "show": true,
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": ["Pokrivalice", "Voice over", "Talking Head", { "label": "Add virtual clip", "action_id": "save_virtual_shot" }]
+        "actions_rtl": [
+          "@story.broll",
+          "@story.voice_over",
+          "@story.talking_head",
+          {
+            "label": "@story.add_subclip",
+            "action_id": "save_virtual_shot"
+          }
+        ]
       },
       "media_card": {
         "selection_check": true,
@@ -152,25 +246,73 @@
         "show_export_hires": true,
         "show_quick_cover": true,
         "tabs_left": [
-          { "label": "All", "action_id": "editorial_tab_all" },
-          { "label": "SubClip", "action_id": "editorial_tab_virtual" },
-          { "label": "B-roll", "action_id": "editorial_tab_broll" },
-          { "label": "Segment", "action_id": "editorial_tab_segment" }
+          {
+            "label": "@pool.tab.all",
+            "action_id": "editorial_tab_all"
+          },
+          {
+            "label": "@pool.tab.subclip",
+            "action_id": "editorial_tab_virtual"
+          },
+          {
+            "label": "@pool.tab.broll",
+            "action_id": "editorial_tab_broll"
+          },
+          {
+            "label": "@pool.tab.segment",
+            "action_id": "editorial_tab_segment"
+          }
         ],
         "transport_right": [
-          { "label": ">", "action_id": "play_pause" },
-          { "label": "Auto", "action_id": "monitor_auto" },
-          { "label": "On", "action_id": "monitor_on" }
+          {
+            "label": ">",
+            "action_id": "play_pause"
+          },
+          {
+            "label": "@story.monitor.auto",
+            "action_id": "monitor_auto"
+          },
+          {
+            "label": "@story.monitor.on",
+            "action_id": "monitor_on"
+          }
         ]
       },
       "right_panel": "segment_panel",
-      "tab_order": ["pool_tabs", "pool", "source_timeline", "source_buttons", "segments"],
+      "tab_order": [
+        "pool_tabs",
+        "pool",
+        "source_timeline",
+        "source_buttons",
+        "segments"
+      ],
       "source_dock": {
         "show": true,
         "show_header": true,
         "show_story_actions": true,
         "show_ingest_actions": false,
-        "actions_rtl": [{ "label": "Sync/B-roll", "action_id": "cover_mode_sync" }, { "label": "B-roll", "action_id": "cover_mode_covers" }, { "label": "Voice over", "action_id": "add_off_segment" }, { "label": "Talking Head", "action_id": "add_ton_segment" }, { "label": "Add SubClip", "action_id": "save_virtual_shot" }]
+        "actions_rtl": [
+          {
+            "label": "@story.sync_broll",
+            "action_id": "cover_mode_sync"
+          },
+          {
+            "label": "@pool.tab.broll",
+            "action_id": "cover_mode_covers"
+          },
+          {
+            "label": "@story.voice_over",
+            "action_id": "add_off_segment"
+          },
+          {
+            "label": "@story.talking_head",
+            "action_id": "add_ton_segment"
+          },
+          {
+            "label": "@story.add_subclip",
+            "action_id": "save_virtual_shot"
+          }
+        ]
       },
       "media_card": {
         "selection_check": false,

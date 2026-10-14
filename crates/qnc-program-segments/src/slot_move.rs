@@ -74,7 +74,7 @@ impl ProgramSegments {
             )
         });
         if blocked {
-            let message = "Klip je na kraju: dalje u tom smjeru ne ide.".to_string();
+            let message = qnc_ui_text::text("story.msg.clip_at_end").to_string();
             self.refresh_view(message);
         }
         blocked
@@ -105,7 +105,7 @@ impl ProgramSegments {
         let moved = self.nudge_edit(frames);
         // A jump past the end of a clip goes to its end (user 2026-10-13): frame by frame
         // as far as the clip allows.
-        if moved && self.view.message.contains("na kraju") {
+        if moved && self.view.message == qnc_ui_text::text("story.msg.clip_at_end") {
             for _ in 0..frames.unsigned_abs() {
                 if self.at_clip_end(frames.signum()) || !self.nudge_edit(frames.signum()) {
                     break;
@@ -126,7 +126,7 @@ impl ProgramSegments {
             self.nudge_marker(frames);
         }
         let after = (self.slot_trim.as_ref().map(|t| t.frames), self.slot_move.as_ref().map(|s| s.shift), self.marker_edit.clone());
-        before != after || self.view.message.contains("na kraju")
+        before != after || self.view.message == qnc_ui_text::text("story.msg.clip_at_end")
     }
 
     /// A message of the program panel (e.g. why a step could not be done).
@@ -158,7 +158,7 @@ impl ProgramSegments {
             .iter()
             .find(|slot| slot.slot_id == slot_id)
             .map(|slot| SlotMove { slot_id: slot_id.to_string(), start: slot.start_frame, end: slot.end_frame, shift: 0 });
-        self.refresh_view("Slot: strelice lijevo/desno pomak, Enter potvrda, Esc odustani".into());
+        self.refresh_view(qnc_ui_text::text("story.msg.slot_taken").into());
     }
 
     /// An arrow, Enter or Escape while a slot is taken; `None` for any other key.
@@ -169,7 +169,7 @@ impl ProgramSegments {
             "step_forward_frame" => Some(self.nudge_slot(1)),
             "clear_focus" | "close_player" => {
                 self.slot_move = None;
-                self.refresh_view("Pomak slota odustan.".into());
+                self.refresh_view(qnc_ui_text::text("story.msg.slot_move_cancelled").into());
                 Some(true)
             }
             _ => None,
@@ -191,7 +191,7 @@ impl ProgramSegments {
             return false;
         };
         if pins[first].locked || pins[last].locked {
-            self.refresh_view("Slot uz pocetni ili zavrsni M marker ne pomice se.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.edge_slot_fixed").into());
             return true;
         }
         let low = first.checked_sub(1).map_or(0, |before| pins[before].frame);
@@ -201,14 +201,14 @@ impl ProgramSegments {
             return true;
         };
         if start <= low || end >= high {
-            self.refresh_view("Slot se pomice samo do susjednog M markera.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.slot_to_neighbour").into());
             return true;
         }
         self.slot_move = Some(SlotMove { shift, ..slot.clone() });
-        self.refresh_view("Slot: strelice lijevo/desno pomak, Enter potvrda, Esc odustani".into());
+        self.refresh_view(qnc_ui_text::text("story.msg.slot_taken").into());
         if self.past_clip_end() {
             self.slot_move = Some(slot);
-            self.refresh_view("Klip je na kraju: dalje u tom smjeru ne ide.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.clip_at_end").into());
         }
         true
     }

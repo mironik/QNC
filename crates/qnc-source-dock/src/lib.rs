@@ -122,7 +122,7 @@ pub fn show_dock(
                                 header.out_label,
                                 header.focus == MarkFocus::Out,
                             );
-                            timecode_label(ui, style, "Trajanje", header.duration_label, false);
+                            timecode_label(ui, style, qnc_ui_text::text("source.duration"), header.duration_label, false);
                         });
                     });
                 });

@@ -462,13 +462,13 @@ impl ProgramSegments {
             SegmentCommand::StepMarker { up } => {
                 match neighbour_marker(&self.view.markers, playhead, up).cloned() {
                     Some(pin) => self.select_marker(&pin.marker_id),
-                    None => self.refresh_view("Nema prethodnog/sljedeceg M markera.".into()),
+                    None => self.refresh_view(qnc_ui_text::text("story.msg.no_adjacent_marker").into()),
                 }
             }
             SegmentCommand::StepSlot { up } => {
                 match neighbour_slot(&self.view.slots, playhead, up).cloned() {
                     Some(slot) => self.select_slot(&slot.slot_id, None),
-                    None => self.refresh_view("Nema prethodnog/sljedeceg M-M slota.".into()),
+                    None => self.refresh_view(qnc_ui_text::text("story.msg.no_adjacent_slot").into()),
                 }
             }
             SegmentCommand::ProgramStart => self.cue_program(0),
@@ -481,7 +481,7 @@ impl ProgramSegments {
                 self.select_cover(cover_id.clone(), frame);
                 if self.selected_cover.as_deref() == Some(cover_id.as_str()) {
                     self.cover_taken = Some(cover_id);
-                    self.refresh_view("Pokrivalica: Delete briše, Esc odustani".into());
+                    self.refresh_view(qnc_ui_text::text("story.msg.cover_taken").into());
                 }
             }
             SegmentCommand::ToggleSync => self.toggle_sync(),
@@ -520,7 +520,7 @@ impl ProgramSegments {
             SegmentCommand::CancelEdit => self.cancel_edit(),
             SegmentCommand::CancelMarkerEdit => {
                 if self.cover_taken.take().is_some() {
-                    self.refresh_view("Brisanje pokrivalice odustano.".into());
+                    self.refresh_view(qnc_ui_text::text("story.msg.cover_delete_cancelled").into());
                 }
                 self.cancel_marker_edit();
             }
@@ -534,7 +534,7 @@ impl ProgramSegments {
                     self.write(Operation::DeleteCover { cover_id });
                 }
                 (None, None) => self.refresh_view(
-                    "Prvo uzmi marker ili pokrivalicu za brisanje.".into(),
+                    qnc_ui_text::text("story.msg.take_before_delete").into(),
                 ),
             },
         }
@@ -606,7 +606,7 @@ impl ProgramSegments {
         // v5 `select_marker`: the start marker is locked and is not selected.
         if frame == 0 {
             self.selected_marker = None;
-            self.refresh_view("Početni M marker je zaključan.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.start_marker_locked").into());
         } else {
             self.selected_marker = Some(marker_id.to_string());
             self.selected_slot = None;
@@ -669,7 +669,7 @@ impl ProgramSegments {
     /// program only shows it. A selected marker moves there (docs/94 7a).
     fn marker_at_playhead(&mut self) {
         let Some(frame) = self.playhead else {
-            return self.refresh_view("M marker se stavlja na Wrap segment (playhead).".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.marker_on_wrap").into());
         };
         // User rule: only a marker taken with Ctrl+M goes to the playhead (a draft,
         // Enter confirms); otherwise M sets a new marker.
@@ -677,7 +677,7 @@ impl ProgramSegments {
             Some((marker_id, _)) => return self.marker_to_playhead(marker_id),
             None => {
                 let Some(segment) = self.view.segment_at(frame) else {
-                    return self.refresh_view("Nema Wrap segmenta pod playheadom.".into());
+                    return self.refresh_view(qnc_ui_text::text("story.msg.no_wrap_segment").into());
                 };
                 Operation::CreateMarker {
                     part_id: segment.segment_id.clone(),
@@ -768,7 +768,7 @@ impl ProgramSegments {
             _ => None,
         };
         if picked.is_none() {
-            self.refresh_view("Odaberi klip i potvrdi IN i OUT na playeru.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.pick_clip_and_marks").into());
         }
         picked
     }
@@ -804,14 +804,14 @@ impl ProgramSegments {
             return self.write(Operation::DeleteCover { cover_id });
         }
         let Some(segment_id) = self.selected.clone() else {
-            return self.refresh_view("Odaberi segment.".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.pick_segment").into());
         };
         self.write(Operation::DeleteSegment { segment_id });
     }
 
     pub fn move_selected(&mut self, up: bool) {
         let Some(segment_id) = self.selected.clone() else {
-            return self.refresh_view("Odaberi segment.".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.pick_segment").into());
         };
         self.write(Operation::MoveSegment { segment_id, up });
     }
@@ -823,7 +823,7 @@ impl ProgramSegments {
     /// Sends a story write without waiting; its key comes back.
     fn write_keyed(&mut self, operation: Operation) -> Option<String> {
         let Some(target) = self.target.clone() else {
-            self.refresh_view("Projektna baza nije dostupna.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.db_unavailable").into());
             return None;
         };
         if self.writer.is_none() {
@@ -853,7 +853,7 @@ impl ProgramSegments {
     /// it is saved.
     pub(crate) fn cover(&mut self, cover: NewCover, clip_name: String) {
         let Some(target) = self.target.clone() else {
-            return self.refresh_view("Projektna baza nije dostupna.".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.db_unavailable").into());
         };
         if self.shots.is_none() {
             match VirtualShotsWriter::spawn(target) { // never waits on the form thread
@@ -894,7 +894,7 @@ impl ProgramSegments {
                     landed = true;
                     match result {
                         Ok(ShotData::Created(shot_id)) => place.push((cover, shot_id)),
-                        Ok(_) => message = "Neispravan odgovor B-roll kadra.".into(),
+                        Ok(_) => message = qnc_ui_text::text("story.msg.bad_broll_reply").into(),
                         Err(error) => message = error,
                     }
                 }
@@ -1041,7 +1041,7 @@ impl ProgramSegments {
             // A Cover slot or Overwrite asked for in the last moments says so (user
             // 2026-10-13: Overwrite gave no sign that it was taken).
             Some((overwrite, at)) if message.is_empty() && at.elapsed() < COVER_NOTICE => {
-                if overwrite { "Overwrite: B-roll zamijenjen u slotu".into() } else { "Cover slot: B-roll spremljen u slot".into() }
+                if overwrite { qnc_ui_text::text("story.msg.overwrite_done").into() } else { qnc_ui_text::text("story.msg.cover_slot_done").into() }
             }
             _ => message,
         };

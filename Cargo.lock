@@ -3453,6 +3453,7 @@ dependencies = [
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-trim-stills",
+ "qnc-ui-text",
  "qnc-virtual-short-cards",
  "qnc-virtual-short-stills",
  "qnc-virtual-shots",
@@ -3509,6 +3510,7 @@ dependencies = [
  "qnc-source-dock",
  "qnc-timeline",
  "qnc-ui-kit",
+ "qnc-ui-text",
  "serde",
  "serde_json",
 ]
@@ -3955,6 +3957,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-media-metadata",
  "qnc-source-preview",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4443,6 +4446,7 @@ dependencies = [
  "qnc-program-db",
  "qnc-program-playlist",
  "qnc-source-timecode",
+ "qnc-ui-text",
  "serde_json",
 ]
 
@@ -4503,6 +4507,7 @@ dependencies = [
  "qnc-source-channels",
  "qnc-source-timecode",
  "qnc-sync-cover",
+ "qnc-ui-text",
  "qnc-virtual-shots",
  "rusqlite",
  "tempfile",
@@ -4517,6 +4522,7 @@ dependencies = [
  "qnc-program-db",
  "qnc-program-waveform",
  "qnc-source-timecode",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4701,6 +4707,7 @@ dependencies = [
  "qnc-program-waveform",
  "qnc-source-dock",
  "qnc-timeline",
+ "qnc-ui-text",
  "serde",
 ]
 
@@ -4751,6 +4758,7 @@ name = "qnc-shot-stills"
 version = "0.1.0"
 dependencies = [
  "qnc-db-broker",
+ "qnc-ui-text",
  "qnc-virtual-short-stills",
  "qnc-virtual-shots",
  "qnc-work-settings",
@@ -4815,6 +4823,7 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4876,6 +4885,7 @@ name = "qnc-source-mark-focus"
 version = "0.1.0"
 dependencies = [
  "qnc-timeline",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4951,6 +4961,9 @@ dependencies = [
 [[package]]
 name = "qnc-sync-cover"
 version = "0.1.0"
+dependencies = [
+ "qnc-ui-text",
+]
 
 [[package]]
 name = "qnc-timeline"
@@ -4960,6 +4973,7 @@ dependencies = [
  "qnc-channel-picker",
  "qnc-filmstrip",
  "qnc-ui-kit",
+ "qnc-ui-text",
  "qnc-wave-view",
 ]
 
@@ -5012,6 +5026,7 @@ dependencies = [
  "qnc-media-stream",
  "qnc-program-view",
  "qnc-source-preview",
+ "qnc-ui-text",
 ]
 
 [[package]]

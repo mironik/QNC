@@ -26,7 +26,7 @@ impl ProgramSegments {
             .filter(|pin| !pin.locked)
             .map(|pin| (pin.marker_id.clone(), pin.frame))
         else {
-            return self.refresh_view("Nema M markera za pomak.".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.no_marker_to_move").into());
         };
         self.start_marker_edit(marker_id, frame);
     }
@@ -38,7 +38,7 @@ impl ProgramSegments {
             .iter()
             .find(|pin| pin.marker_id == marker_id && !pin.locked)
         else {
-            return self.refresh_view("Početni i završni M marker su zaključani.".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.edge_markers_locked").into());
         };
         // The draft starts where the marker is stored; a refused frame keeps it there.
         self.slot_trim = None;
@@ -78,10 +78,10 @@ impl ProgramSegments {
         self.refresh_view(String::new());
         if self.past_clip_end() {
             self.marker_edit = before;
-            return self.refresh_view("Klip je na kraju: dalje u tom smjeru ne ide.".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.clip_at_end").into());
         }
         self.refresh_view(
-            "Marker: strelice lijevo/desno pomak, M na playhead, Enter potvrda, Esc odustani"
+            qnc_ui_text::text("story.msg.marker_taken")
                 .into(),
         );
         self.cue_program(frame);
@@ -103,7 +103,7 @@ impl ProgramSegments {
     /// Escape: the marker stays where it is stored.
     pub(crate) fn cancel_marker_edit(&mut self) {
         if self.marker_edit.take().is_some() {
-            self.refresh_view("Pomak markera odustan.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.marker_move_cancelled").into());
         }
     }
 

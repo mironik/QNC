@@ -185,7 +185,7 @@ pub fn show_timeline_dock(
             };
             mark_label(ui, style, "IN", &start);
             mark_label(ui, style, "OUT", &end);
-            mark_label(ui, style, "Trajanje", &length);
+            mark_label(ui, style, qnc_ui_text::text("source.duration"), &length);
         }
         add_header(ui);
     });

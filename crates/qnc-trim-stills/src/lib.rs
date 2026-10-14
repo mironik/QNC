@@ -412,7 +412,7 @@ fn decode_run(
     }
     let extractor = qnc_decoder_catalog::installed_filmstrip_extractor()
         .map_err(|error| error.to_string())?
-        .ok_or("Ovo racunalo nema izvlakac slika u katalogu dekodera.")?;
+        .ok_or(qnc_ui_text::text("story.msg.no_still_extractor"))?;
     let (num, den) = place.fps;
     // A quarter of a frame early: the first picture at or after it is the frame itself.
     let seek = ((first as f64 - 0.25) * f64::from(den) / f64::from(num.max(1))).max(0.0);
@@ -430,7 +430,7 @@ fn decode_run(
             run.push((frame, read_picture(&file)?));
         }
         if !run.iter().any(|(frame, _)| frame == picture) {
-            return Err("slika nije izvucena".to_string());
+            return Err(qnc_ui_text::text("story.msg.still_failed").to_string());
         }
         Ok(run)
     })();

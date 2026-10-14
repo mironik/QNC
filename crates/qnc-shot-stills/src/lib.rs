@@ -24,7 +24,7 @@ impl Place<'_> {
     fn folder(&self, area: ProductArea) -> Result<(std::path::PathBuf, String), String> {
         let dir = self
             .project_dir
-            .ok_or_else(|| "Lokalni direktorij projekta nije dostupan.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("story.msg.project_folder_unavailable").to_string())?;
         Ok((self.settings.product_local_dir(dir, area), self.settings.product_uri(area)))
     }
 

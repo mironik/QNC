@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: read-only program input of an edited story from the active project database (v5 host program_playlist)"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-program-db = { workspace = true }
 qnc-prerender-db = { workspace = true }

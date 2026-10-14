@@ -69,11 +69,11 @@ impl ProgramSegments {
             })
         });
         let Some(slot) = found.cloned() else {
-            self.refresh_view("Nema M-M slota pod playheadom".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.no_slot_under_playhead").into());
             return false;
         };
         if slot.end_frame >= self.view.total_frames {
-            self.refresh_view("Zadnji slot zavrsava s pricom: pomakni njegov pocetni M marker.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.last_slot_ends_story").into());
             return false;
         }
         self.marker_edit = None;
@@ -103,8 +103,7 @@ impl ProgramSegments {
     }
 
     fn trim_message(start: bool) -> String {
-        let edge = if start { "Pocetak" } else { "Kraj" };
-        format!("{edge} slota: strelice za sliku, gore/dolje kljucna slika, Enter sprema, Esc odustaje")
+        qnc_ui_text::text(if start { "story.msg.slot_start_taken" } else { "story.msg.slot_end_taken" }).to_string()
     }
 
     /// An arrow, Enter or Escape while a slot edge is taken; `None` for any other key.
@@ -116,7 +115,7 @@ impl ProgramSegments {
             "activate_focused_item" => Some(self.commit_slot_trim()),
             "clear_focus" | "close_player" => {
                 self.slot_trim = None;
-                self.refresh_view("Promjena slota odustana.".into());
+                self.refresh_view(qnc_ui_text::text("story.msg.slot_trim_cancelled").into());
                 Some(true)
             }
             _ => None,
@@ -143,16 +142,16 @@ impl ProgramSegments {
             .max()
             .unwrap_or(trim.slot_end);
         if length < 1 {
-            self.refresh_view("Slot mora imati barem jednu sliku.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.slot_one_picture").into());
             return true;
         }
         match trim.empty {
             Some((empty_start, empty_end)) if empty_end as i64 - (empty_start as i64 + frames) < 1 => {
-                self.refresh_view("Prazni slot iza mora zadrzati barem jednu sliku.".into());
+                self.refresh_view(qnc_ui_text::text("story.msg.empty_slot_one_picture").into());
                 return true;
             }
             None if last as i64 + frames >= total as i64 => {
-                self.refresh_view("Zadnji slot price mora zadrzati barem jednu sliku.".into());
+                self.refresh_view(qnc_ui_text::text("story.msg.last_slot_one_picture").into());
                 return true;
             }
             _ => {}
@@ -161,7 +160,7 @@ impl ProgramSegments {
         self.refresh_view(Self::trim_message(trim.start));
         if self.past_clip_end() {
             self.slot_trim = Some(trim);
-            self.refresh_view("Klip je na kraju: dalje u tom smjeru ne ide.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.clip_at_end").into());
         }
         true
     }

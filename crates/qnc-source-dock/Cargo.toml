@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public passive module: bottom source dock (header with clip label, IN/OUT/duration and action buttons, slot for the timeline)"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-timeline = { workspace = true }

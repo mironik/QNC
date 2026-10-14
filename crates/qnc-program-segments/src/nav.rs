@@ -19,7 +19,7 @@ impl ProgramSegments {
                 self.take_slot(&slot_id);
                 self.take_slot_move(&slot_id);
             }
-            None => self.refresh_view("Nema M-M slota pod playheadom".into()),
+            None => self.refresh_view(qnc_ui_text::text("story.msg.no_slot_under_playhead").into()),
         }
     }
 
@@ -29,7 +29,7 @@ impl ProgramSegments {
             Some(slot_id) => {
                 self.apply(SegmentCommand::SelectSlot { frame: self.slot_start(&slot_id), slot_id });
             }
-            None => self.refresh_view("Nema praznog M-M slota".into()),
+            None => self.refresh_view(qnc_ui_text::text("story.msg.no_empty_slot").into()),
         }
     }
 
@@ -50,7 +50,7 @@ impl ProgramSegments {
     pub fn fit_slot(&mut self) -> Option<u64> {
         let slot_id = self.selected_slot.clone().or_else(|| self.first_empty_slot());
         let Some(slot) = slot_id.and_then(|id| self.view.slots.iter().find(|slot| slot.slot_id == id).cloned()) else {
-            self.refresh_view("Nema M-M slota za trajanje".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.no_slot_for_length").into());
             return None;
         };
         self.take_slot(&slot.slot_id);

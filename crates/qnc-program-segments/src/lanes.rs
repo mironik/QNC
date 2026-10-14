@@ -8,7 +8,7 @@ impl ProgramSegments {
     /// Ctrl+1 (lane 0) or Ctrl+2 (lane 1): the lane is taken with its channel as draft.
     pub fn take_lane(&mut self, lane: u8) -> bool {
         if !self.lanes.take(lane) {
-            self.refresh_view("Klip nema poznate audio kanale.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.no_audio_channels").into());
             return false;
         }
         let name = if lane == 0 { "A1" } else { "A2" };

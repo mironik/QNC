@@ -149,20 +149,20 @@ impl SyncCover {
         let source = self
             .armed
             .clone()
-            .ok_or("Source IN nije postavljen za Sync.")?;
+            .ok_or(qnc_ui_text::text("story.msg.sync_no_in"))?;
         if !matches!(per_source, (1, 1) | (2, 1) | (1, 2)) {
-            return Err("Sync: izvor mora imati isti, dvostruki ili upola manji fps od priče.".into());
+            return Err(qnc_ui_text::text("story.msg.sync_rate").into());
         }
         let (num, den) = per_source;
         if total_frames == 0 {
-            return Err("Playlist input je prazan".into());
+            return Err(qnc_ui_text::text("story.msg.program_empty").into());
         }
         let anchor = markers
             .iter()
             .copied()
             .filter(|frame| *frame <= playhead)
             .max()
-            .ok_or("Nema prethodnog M markera za Sync/B-roll")?
+            .ok_or(qnc_ui_text::text("story.msg.sync_no_marker"))?
             .min(total_frames - 1);
         let duration = source.duration_frames.max(1);
         let source_in = source.source_in.min(duration - 1);
@@ -291,14 +291,14 @@ impl SyncCover {
     /// O, or the end of the source: the slot from the anchor to `end` (v5
     /// `pending_slot`). The Sync play stops.
     pub fn finish(&mut self, end: u64) -> Result<&SyncSlot, String> {
-        let session = self.active.take().ok_or("Sync play nije aktivan.")?;
+        let session = self.active.take().ok_or(qnc_ui_text::text("story.msg.sync_not_playing"))?;
         let start = session.anchor;
         let end = end.max(start + 1).min(session.total_frames.max(start + 1));
         let (num, den) = session.per_source;
         let source_out = (session.source.source_in + ((end - start) * den).div_ceil(num))
             .min(session.source.duration_frames);
         if source_out <= session.source.source_in {
-            return Err("Sync OUT mora biti poslije Source IN".into());
+            return Err(qnc_ui_text::text("story.msg.sync_out_after_in").into());
         }
         self.source_frame = Some(source_out);
         Ok(self.pending.insert(SyncSlot {

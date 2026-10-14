@@ -1,4 +1,4 @@
-//! Public "Segmenti" panel of an editorial form (QNC v5 `editorial/segment_panel.rs`,
+//! Public qnc_ui_text::text("story.ui.segments") panel of an editorial form (QNC v5 `editorial/segment_panel.rs`,
 //! `marker_cover_panel.rs` and `qnc_segment_timeline::show_program`).
 //!
 //! Passive paint only: a header with the timing of the program, one row per segment
@@ -33,7 +33,6 @@ const BOTTOM_GAP: f32 = 4.0;
 const PLAYLIST_INPUT_H: f32 = 128.0;
 const HEADER_LABEL_SIZE: f32 = 17.0;
 const HEADER_VALUE_SIZE: f32 = 22.0;
-const EMPTY_MESSAGE: &str = "Nema segmenata — dodaj ton i off segment";
 
 /// Colours of the panel, taken from the timeline theme of the form; the total
 /// colour is the v5 duration red.
@@ -94,7 +93,7 @@ pub fn show(
             if segments.is_empty() {
                 ui.vertical_centered(|ui| {
                     ui.add_space(ui.available_height() * 0.35);
-                    ui.label(RichText::new(EMPTY_MESSAGE).color(style.muted));
+                    ui.label(RichText::new(qnc_ui_text::text("story.ui.no_segments")).color(style.muted));
                 });
                 return;
             }
@@ -140,7 +139,7 @@ pub fn show(
 
 fn header(ui: &mut egui::Ui, segments: &SegmentsView, style: SegmentPanelStyle) {
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Segmenti").color(style.text).strong());
+        ui.label(RichText::new(qnc_ui_text::text("story.ui.segments")).color(style.text).strong());
         if segments.is_empty() {
             return;
         }
@@ -153,15 +152,15 @@ fn header(ui: &mut egui::Ui, segments: &SegmentsView, style: SegmentPanelStyle) 
         ui.add_space(14.0);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             value(ui, &segments.timecode(segments.total_frames), style.total);
-            label(ui, "Trajanje", style.muted);
+            label(ui, qnc_ui_text::text("source.duration"), style.muted);
             ui.add_space(18.0);
             value(ui, &playhead.to_string(), style.playhead);
-            label(ui, "frame", style.muted);
+            label(ui, qnc_ui_text::text("story.ui.frame"), style.muted);
             value(ui, &segments.timecode(playhead), style.playhead);
-            label(ui, "Playhead", style.muted);
+            label(ui, qnc_ui_text::text("story.ui.playhead"), style.muted);
             ui.add_space(18.0);
             value(ui, &segments.timecode(segment_frames), style.segment);
-            label(ui, "Segment", style.muted);
+            label(ui, qnc_ui_text::text("pool.tab.segment"), style.muted);
         });
     });
 }

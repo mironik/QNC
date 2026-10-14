@@ -37,7 +37,8 @@ impl EditorialContracts {
 
         let shell: ShellLayoutContract = serde_json::from_str(SHELL_LAYOUT_JSON)
             .map_err(|error| format!("shell layout parse error: {error}"))?;
-        let editorial: EditorialLayoutContract = serde_json::from_str(EDITORIAL_LAYOUT_JSON)
+        // The texts of the contract are codes, in the language of this computer (qnc-ui-text).
+        let editorial: EditorialLayoutContract = serde_json::from_value(qnc_ui_text::resolve_contract(EDITORIAL_LAYOUT_JSON)?)
             .map_err(|error| format!("editorial layout parse error: {error}"))?;
         let shortcuts = ShortcutCatalog::from_json_str(KEYBOARD_SHORTCUTS_JSON)
             .map_err(|error| format!("keyboard shortcut catalog parse error: {error}"))?;

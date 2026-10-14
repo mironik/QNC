@@ -104,7 +104,7 @@ impl Default for EditorialApplication {
             preview: SourcePreview::new(),
             posters: ClipPosters::new(),
             active_project_reader: None,
-            bindings: Err("Izvori medija nisu ucitani.".into()),
+            bindings: Err(qnc_ui_text::text("story.msg.sources_not_loaded").into()),
             load_result: None,
             shown_project: None,
             shown_signature: None,
@@ -187,7 +187,7 @@ impl EditorialApplication {
             return;
         }
         let Some(reader) = self.active_project_reader.clone() else {
-            self.fail("Nema konfiguriranog citaca radnih postavki.".into());
+            self.fail(qnc_ui_text::text("ingest.msg.no_settings_reader_configured").into());
             return;
         };
         let shown_project = self.shown_project.clone();
@@ -200,7 +200,7 @@ impl EditorialApplication {
                 let _ = send.send(read_catalog(&reader, shown_project, shown_signature));
             }) {
             Ok(_) => self.load_result = Some(receive),
-            Err(_) => self.fail("Nije moguce pokrenuti citanje projektnog kataloga.".into()),
+            Err(_) => self.fail(qnc_ui_text::text("story.msg.catalog_read_failed").into()),
         }
     }
 
@@ -289,7 +289,7 @@ impl EditorialApplication {
             Ok(result) => result,
             Err(TryRecvError::Empty) => return false,
             Err(TryRecvError::Disconnected) => {
-                Err("Citanje projektnog kataloga je prekinuto.".into())
+                Err(qnc_ui_text::text("story.msg.catalog_read_stopped").into())
             }
         };
         self.load_result = None;
@@ -363,8 +363,8 @@ impl EditorialApplication {
         self.current_settings = Some(settings);
         self.reload_shorts();
         self.view.message = match self.view.clips.len() {
-            0 => "Projekt nema uvezenih klipova.".to_string(),
-            count => format!("{count} klipova"),
+            0 => qnc_ui_text::text("story.msg.no_imported_clips").to_string(),
+            count => qnc_ui_text::fill("story.msg.clip_count", &[("count", &count.to_string())]),
         };
     }
 
@@ -393,7 +393,7 @@ impl EditorialApplication {
                     self.posters.prioritize(&clip_id);
                     self.preview.open(&clip_id)
                 } else {
-                    self.view.message = "Klip nije pronadjen.".into();
+                    self.view.message = qnc_ui_text::text("ingest.msg.clip_not_found").into();
                     true
                 }
             }
@@ -457,27 +457,27 @@ impl EditorialApplication {
     /// Writes one short from the IN/OUT the source timeline is showing.
     fn save_virtual_shot(&mut self) -> bool {
         let Some(clip_id) = self.view.chosen_clip_id().map(str::to_string) else {
-            self.view.message = "Odaberi klip.".into();
+            self.view.message = qnc_ui_text::text("story.msg.pick_clip").into();
             return true;
         };
         let Some(clip) = self.view.clips.iter().find(|clip| clip.clip_id == clip_id) else {
-            self.view.message = "Klip nije pronadjen.".into();
+            self.view.message = qnc_ui_text::text("ingest.msg.clip_not_found").into();
             return true;
         };
         if !clip.imported {
-            self.view.message = format!("Klip '{clip_id}' nije uvezen.");
+            self.view.message = qnc_ui_text::fill("story.msg.clip_not_imported", &[("clip", &clip_id)]);
             return true;
         }
         let Some((in_frame, out_frame)) = self.view.preview.timeline.visible_source_marks() else {
-            self.view.message = "IN i OUT nisu potvrdeni na playeru.".into();
+            self.view.message = qnc_ui_text::text("story.msg.marks_not_confirmed").into();
             return true;
         };
         let Some((_, target)) = self.content_target.clone() else {
-            self.view.message = "Projektna baza nije dostupna za upis.".into();
+            self.view.message = qnc_ui_text::text("story.msg.db_not_writable").into();
             return true;
         };
         let Some(project_id) = self.shown_project.clone() else {
-            self.view.message = "Nema aktivnog projekta.".into();
+            self.view.message = qnc_ui_text::text("story.msg.no_active_project").into();
             return true;
         };
         let name = clip.name.clone();
@@ -494,7 +494,7 @@ impl EditorialApplication {
                 self.reload_shorts();
                 self.view.library_tab = LibraryTab::Virtual;
                 self.view.chosen_shot_id = Some(shot.shot_id.clone());
-                self.view.message = format!("Virtualni kadar {} je spremljen.", shot.shot_id);
+                self.view.message = qnc_ui_text::fill("story.msg.subclip_saved", &[("shot", &shot.shot_id)]);
             }
             Err(error) => self.view.message = error,
         }
@@ -524,7 +524,7 @@ impl EditorialApplication {
             .find(|shot| shot.shot_id == shot_id)
             .cloned()
         else {
-            self.view.message = "Virtualni kadar nije pronadjen.".into();
+            self.view.message = qnc_ui_text::text("story.msg.subclip_not_found").into();
             return true;
         };
         if !self
@@ -533,7 +533,7 @@ impl EditorialApplication {
             .iter()
             .any(|clip| clip.clip_id == shot.clip_id)
         {
-            self.view.message = "Klip nije pronadjen.".into();
+            self.view.message = qnc_ui_text::text("ingest.msg.clip_not_found").into();
             return true;
         }
         self.view.chosen_shot_id = Some(shot.shot_id);
@@ -643,7 +643,7 @@ fn read_catalog(
             (snapshot, signature, false)
         }
         ActiveProjectChange::NoActiveProject => {
-            return Err("U bazi nije odabran aktivni projekt.".into());
+            return Err(qnc_ui_text::text("story.msg.no_active_project_in_db").into());
         }
     };
     let content = ContentReader::for_project(reader.settings_reader(), &snapshot.settings)?;
@@ -684,7 +684,7 @@ mod tests {
         app.view.clips = vec![clip("clip-a", "Mironik")];
         app.view.preview.clip_id = Some("clip-a".into());
         app.dispatch(EditorialIntent::action(action_ids::SAVE_VIRTUAL_SHOT));
-        assert!(app.view().message.contains("IN i OUT"));
+        assert!(app.view().message == qnc_ui_text::text("story.msg.marks_not_confirmed"));
     }
 
     #[test]
@@ -737,7 +737,7 @@ mod tests {
         let mut app = EditorialApplication::default();
         app.view.clips = vec![clip("a", "Prvi")];
         assert!(app.dispatch(EditorialIntent::PreviewClip("missing".into())));
-        assert_eq!(app.view().message, "Klip nije pronadjen.");
+        assert_eq!(app.view().message, qnc_ui_text::text("ingest.msg.clip_not_found"));
         assert!(!app.has_player());
         assert!(app.view().chosen_clip_id().is_none());
     }

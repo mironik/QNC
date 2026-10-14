@@ -46,37 +46,37 @@ pub(crate) fn show(
             let icons: [(&str, &str, Option<SegmentCommand>); 7] = [
                 (
                     "⏮",
-                    "Prethodni segment",
+                    qnc_ui_text::text("story.nav.previous_segment"),
                     Some(SegmentCommand::Step { up: true }),
                 ),
                 (
                     "",
-                    "Prethodni slot",
+                    qnc_ui_text::text("story.nav.previous_slot"),
                     Some(SegmentCommand::StepSlot { up: true }),
                 ),
                 (
                     "⚑",
-                    "Prethodni marker",
+                    qnc_ui_text::text("story.nav.previous_marker"),
                     Some(SegmentCommand::StepMarker { up: true }),
                 ),
                 (
                     "🏠",
-                    "Početak Playlist inputa",
+                    qnc_ui_text::text("story.nav.program_start"),
                     Some(SegmentCommand::ProgramStart),
                 ),
                 (
                     "⚑",
-                    "Sljedeći marker",
+                    qnc_ui_text::text("story.nav.next_marker"),
                     Some(SegmentCommand::StepMarker { up: false }),
                 ),
                 (
                     "",
-                    "Sljedeći slot",
+                    qnc_ui_text::text("story.nav.next_slot"),
                     Some(SegmentCommand::StepSlot { up: false }),
                 ),
                 (
                     "⏭",
-                    "Sljedeći segment",
+                    qnc_ui_text::text("story.nav.next_segment"),
                     Some(SegmentCommand::Step { up: false }),
                 ),
             ];
@@ -98,15 +98,15 @@ pub(crate) fn show(
             |ui| {
                 ui.spacing_mut().item_spacing.x = EDIT_ACTION_GAP;
                 ui.spacing_mut().button_padding = Vec2::new(6.0, 1.0);
-                if clicked(action_button(ui, "M marker", true, theme)) {
+                if clicked(action_button(ui, qnc_ui_text::text("story.ui.m_marker"), true, theme)) {
                     command = Some(SegmentCommand::Marker);
                 }
                 let quick = segments.quick_cover_slot().is_ok();
-                if clicked(flash_button(ui, "Cover slot", quick, flashing(ui, segments, false), theme)) {
+                if clicked(flash_button(ui, qnc_ui_text::text("story.ui.cover_slot"), quick, flashing(ui, segments, false), theme)) {
                     command = Some(SegmentCommand::Cover { overwrite: false });
                 }
                 let overwrite = segments.overwrite_cover_slot().is_ok();
-                if clicked(flash_button(ui, "Overwrite", overwrite, flashing(ui, segments, true), theme)) {
+                if clicked(flash_button(ui, qnc_ui_text::text("story.ui.overwrite"), overwrite, flashing(ui, segments, true), theme)) {
                     command = Some(SegmentCommand::Cover { overwrite: true });
                 }
             },
@@ -125,9 +125,9 @@ pub(crate) fn show(
                 // Export of the story (user 2026-10-08: moved here from under the monitor, where
                 // Sync/B-roll was; that went to the source dock as a switch with Pokrivalice).
                 // Not done yet, so offered disabled.
-                let _ = action_button(ui, "Export HI-res", false, theme);
+                let _ = action_button(ui, qnc_ui_text::text("story.export_hires"), false, theme);
                 // Right to left: Redo, then Undo, left of Export HI-res.
-                for (label, target) in [("Redo", SegmentCommand::Redo), ("Undo", SegmentCommand::Undo)] {
+                for (label, target) in [(qnc_ui_text::text("story.ui.redo"), SegmentCommand::Redo), (qnc_ui_text::text("story.ui.undo"), SegmentCommand::Undo)] {
                     let enabled = segments.action_enabled(match target {
                         SegmentCommand::Undo => "undo_object",
                         _ => "redo_object",

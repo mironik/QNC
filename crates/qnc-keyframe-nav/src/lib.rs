@@ -73,9 +73,9 @@ impl KeyframeNav {
             Err(mpsc::TryRecvError::Empty) if search.started.elapsed() < STUCK => return None,
             Err(mpsc::TryRecvError::Empty) => {
                 search.cancel.store(true, Ordering::Release);
-                Err("Trazenje kljucne slike je predugo trajalo.".into())
+                Err(qnc_ui_text::text("story.msg.keyframe_timeout").into())
             }
-            Err(mpsc::TryRecvError::Disconnected) => Err("Trazenje kljucne slike nije uspjelo.".into()),
+            Err(mpsc::TryRecvError::Disconnected) => Err(qnc_ui_text::text("story.msg.keyframe_failed").into()),
         };
         self.search = None;
         Some(answer)
@@ -97,7 +97,7 @@ fn step(
 ) -> Result<i64, String> {
     let extractor = qnc_decoder_catalog::installed_filmstrip_extractor()
         .map_err(|error| error.to_string())?
-        .ok_or("Ovo racunalo nema izvlakac slika u katalogu dekodera.")?;
+        .ok_or(qnc_ui_text::text("story.msg.no_still_extractor"))?;
     let one = 1.0 / per_second(place);
     let keys = |start: u64, seconds: f64| -> Result<Vec<u64>, String> {
         let times = extractor.key_pictures_with_cancel(&place.file, place.seek_of(start), seconds, cancel)?;
@@ -105,7 +105,7 @@ fn step(
     };
     let half = (per_second(place) / 2.0).round().max(1.0) as i64;
     if !forward && frame == 0 {
-        return Err("Pocetak klipa.".into());
+        return Err(qnc_ui_text::text("story.msg.clip_start").into());
     }
     // Whether every picture is a key picture: two pictures next to it, once per clip.
     let known = intra.lock().ok().and_then(|map| map.get(clip).copied());
@@ -127,12 +127,12 @@ fn step(
     if forward {
         let ahead = keys(frame + 1, SEARCH_SECONDS)?;
         let next = ahead.into_iter().filter(|key| *key > frame).min();
-        next.map(|key| (key - frame) as i64).ok_or_else(|| "Nema sljedece kljucne slike u 10 s.".into())
+        next.map(|key| (key - frame) as i64).ok_or_else(|| qnc_ui_text::text("story.msg.no_next_keyframe").into())
     } else {
         let from = frame.saturating_sub((SEARCH_SECONDS * per_second(place)) as u64);
         let behind = keys(from, SEARCH_SECONDS)?;
         let previous = behind.into_iter().filter(|key| *key < frame).max();
-        previous.map(|key| key as i64 - frame as i64).ok_or_else(|| "Nema prethodne kljucne slike u 10 s.".into())
+        previous.map(|key| key as i64 - frame as i64).ok_or_else(|| qnc_ui_text::text("story.msg.no_previous_keyframe").into())
     }
 }
 

@@ -127,7 +127,7 @@ fn load(
     let mut client = StoryReader::open(target)?;
     let segments = client.list_segments()?;
     let mut covers = client.list_covers()?;
-    let story_rate = client.read_story_selection()?.story_fps.ok_or("Program je prazan.")?;
+    let story_rate = client.read_story_selection()?.story_fps.ok_or(qnc_ui_text::text("story.msg.program_is_empty"))?;
     drop(client);
     if let Some((range, cover)) = window {
         covers = with_transient_cover(&covers, range, cover);
@@ -135,7 +135,7 @@ fn load(
     let first = segments
         .iter()
         .find(|segment| segment.active)
-        .ok_or("Program je prazan.")?;
+        .ok_or(qnc_ui_text::text("story.msg.program_is_empty"))?;
     let mut resolver = PreparedResolver {
         clips,
         prepared: BTreeMap::new(),
@@ -253,7 +253,7 @@ pub fn build_input(
         start += frames;
     }
     if inputs.is_empty() {
-        return Err("Program je prazan.".into());
+        return Err(qnc_ui_text::text("story.msg.program_is_empty").into());
     }
     Ok(ProgramPlaylistBuildInput {
         playlist_id: format!("program:{project_id}"),
@@ -331,7 +331,7 @@ pub fn resolved_media(
     let video = layout
         .video
         .as_ref()
-        .ok_or_else(|| format!("Klip '{clip_id}' nema spremljenu sliku za program."))?;
+        .ok_or_else(|| qnc_ui_text::fill("story.msg.clip_no_picture", &[("clip", clip_id)]))?;
     let details = picture
         .streams
         .iter()
@@ -340,8 +340,8 @@ pub fn resolved_media(
             StreamDetails::Video(details) => Some(details),
             _ => None,
         })
-        .ok_or_else(|| format!("Klip '{clip_id}' nema spremljeni video stream."))?;
-    let known = |what: &str| format!("Klip '{clip_id}' nema spremljen podatak: {what}.");
+        .ok_or_else(|| qnc_ui_text::fill("story.msg.clip_no_video_stream", &[("clip", clip_id)]))?;
+    let known = |what: &'static str| qnc_ui_text::fill("story.msg.clip_missing_fact", &[("clip", clip_id), ("what", qnc_ui_text::text(what))]);
     let video_format = ProbedVideoFormat {
         width: details.width.as_ref().ok_or_else(|| known("sirina"))?.value,
         height: details
@@ -365,7 +365,7 @@ pub fn resolved_media(
         },
     };
     let audio_channels =
-        u16::try_from(layout.audio_channels.len()).map_err(|_| known("broj audio kanala"))?;
+        u16::try_from(layout.audio_channels.len()).map_err(|_| known("story.fact.audio_channels"))?;
     let audio_format = if audio_channels == 0 {
         None
     } else {
@@ -379,16 +379,14 @@ pub fn resolved_media(
                     _ => None,
                 })
                 .map(|rate| rate.value)
-                .ok_or_else(|| known("audio sample rate"))
+                .ok_or_else(|| known("story.fact.sample_rate"))
         });
         let rate = rates
             .next()
-            .unwrap_or_else(|| Err(known("audio sample rate")))?;
+            .unwrap_or_else(|| Err(known("story.fact.sample_rate")))?;
         for other in rates {
             if other? != rate {
-                return Err(format!(
-                    "Klip '{clip_id}' ima audio streamove s razlicitim sample rateom."
-                ));
+                return Err(qnc_ui_text::fill("story.msg.clip_mixed_sample_rates", &[("clip", clip_id)]));
             }
         }
         Some(ProbedAudioFormat {
@@ -439,14 +437,12 @@ pub fn timecode_start(clip_id: &str, input: &PreparedInput) -> Result<Option<i64
     if input.representation == qnc_player_input::Representation::Proxy {
         let proxy = tags(input.media().map_err(|error| error.to_string())?);
         if timecode.proxy_matches(proxy.iter().map(|(key, value)| (key.as_str(), value.as_str()))) == Some(false) {
-            return Err(format!(
-                "Klip '{clip_id}': proxy i original nemaju isti pocetni timecode, slika proxyja ne odgovara originalu."
-            ));
+            return Err(qnc_ui_text::fill("story.msg.proxy_timecode_differs", &[("clip", clip_id)]));
         }
     }
     timecode
         .start_frame
-        .map(|frames| i64::try_from(frames).map_err(|_| "Timecode je izvan raspona.".to_string()))
+        .map(|frames| i64::try_from(frames).map_err(|_| qnc_ui_text::text("story.msg.timecode_out_of_range").to_string()))
         .transpose()
 }
 
@@ -464,7 +460,7 @@ impl<C: ClipInputs> PreparedResolver<'_, C> {
         }
         self.prepared
             .get(clip_id)
-            .ok_or_else(|| format!("Klip '{clip_id}' nije pripremljen."))
+            .ok_or_else(|| qnc_ui_text::fill("story.msg.clip_not_prepared", &[("clip", clip_id)]))
     }
 }
 
@@ -485,8 +481,8 @@ impl<C: ClipInputs> ProgramMediaResolver for PreparedResolver<'_, C> {
 /// counted in story frames.
 pub fn at_story_rate(media: &mut ResolvedProgramMedia, story_rate: (u32, u32)) -> Result<(), String> {
     let own = (
-        u32::try_from(media.timebase.fps_num).map_err(|_| "Neispravan timebase klipa.")?,
-        u32::try_from(media.timebase.fps_den).map_err(|_| "Neispravan timebase klipa.")?,
+        u32::try_from(media.timebase.fps_num).map_err(|_| qnc_ui_text::text("story.msg.bad_clip_timebase"))?,
+        u32::try_from(media.timebase.fps_den).map_err(|_| qnc_ui_text::text("story.msg.bad_clip_timebase"))?,
     );
     let (num, den) = qnc_program_db::story_per_source(story_rate, own)?;
     if (num, den) != (1, 1) {
@@ -499,11 +495,11 @@ pub fn at_story_rate(media: &mut ResolvedProgramMedia, story_rate: (u32, u32)) -
 
 fn timebase(num: u32, den: u32, label: &str) -> Result<FrameTimebase, String> {
     FrameTimebase::new(i64::from(num), i64::from(den))
-        .map_err(|_| format!("'{label}' nema valjan originalni timebase iz zapisa."))
+        .map_err(|_| qnc_ui_text::fill("story.msg.no_original_timebase", &[("source", label)]))
 }
 
 fn frame(value: u64) -> Result<i64, String> {
-    i64::try_from(value).map_err(|_| "Frame je izvan raspona.".to_string())
+    i64::try_from(value).map_err(|_| qnc_ui_text::text("story.msg.frame_out_of_range").to_string())
 }
 
 #[cfg(test)]

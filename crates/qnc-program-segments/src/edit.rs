@@ -31,13 +31,13 @@ impl ProgramSegments {
         self.edge = None;
         self.open_for_edit(segment_id, None);
         if self.editing.is_some() {
-            self.refresh_view("Uredivanje segmenta: I/O na source timelineu, Enter sprema, Esc odustaje".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.segment_edit").into());
         }
     }
 
     fn open_for_edit(&mut self, segment_id: String, take: Option<bool>) {
         let Some(segment) = self.stored.iter().find(|row| row.segment_id == segment_id && row.active) else {
-            return self.refresh_view("Ureduje se samo segment u programu.".into());
+            return self.refresh_view(qnc_ui_text::text("story.msg.segment_edit_only_active").into());
         };
         self.source_request = Some((segment.clip_id.clone(), segment.in_frame, segment.out_frame, take));
         self.selected = Some(segment_id.clone());
@@ -54,7 +54,7 @@ impl ProgramSegments {
             .or_else(|| self.view.rows.iter().find(|row| self.selected.as_ref() == Some(&row.segment_id)))
             .cloned();
         let Some(row) = row else {
-            self.refresh_view("Nema segmenta za skracivanje ili produljivanje.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.no_segment_to_trim").into());
             return false;
         };
         self.open_for_edit(row.segment_id.clone(), Some(start));
@@ -68,8 +68,7 @@ impl ProgramSegments {
             program_frames: row.duration_frames(),
             source_frames: row.source_out_frame.saturating_sub(row.source_in_frame).max(1),
         });
-        let edge = if start { "Pocetak" } else { "Kraj" };
-        self.refresh_view(format!("{edge} segmenta: strelice pomicu za sliku, Enter sprema, Esc odustaje"));
+        self.refresh_view(qnc_ui_text::text(if start { "story.msg.segment_start_taken" } else { "story.msg.segment_end_taken" }).to_string());
         true
     }
 
@@ -93,13 +92,13 @@ impl ProgramSegments {
         let mut stills = Vec::new();
         if edge.start {
             if row.start_frame > 0 {
-                stills.push(EditStill::new(in_frame, false, program_picture(&self.view, row.start_frame - 1)).labelled("Prije segmenta - zadnja"));
+                stills.push(EditStill::new(in_frame, false, program_picture(&self.view, row.start_frame - 1)).labelled(qnc_ui_text::text("story.still.before_segment_last")));
             }
-            stills.push(EditStill::new(in_frame, true, own(in_frame)).labelled("Segment - nova prva").at_cut());
+            stills.push(EditStill::new(in_frame, true, own(in_frame)).labelled(qnc_ui_text::text("story.still.segment_new_first")).at_cut());
         } else {
-            stills.push(EditStill::new(out_frame, false, own(out_frame.saturating_sub(1))).labelled("Segment - nova zadnja").at_cut());
+            stills.push(EditStill::new(out_frame, false, own(out_frame.saturating_sub(1))).labelled(qnc_ui_text::text("story.still.segment_new_last")).at_cut());
             if row.end_frame < self.view.total_frames {
-                stills.push(EditStill::new(out_frame, true, program_picture(&self.view, row.end_frame)).labelled("Poslije segmenta - prva"));
+                stills.push(EditStill::new(out_frame, true, program_picture(&self.view, row.end_frame)).labelled(qnc_ui_text::text("story.still.after_segment_first")));
             }
         }
         stills
@@ -126,7 +125,7 @@ impl ProgramSegments {
         if let Some(edge) = self.edge.take() {
             self.wrap_return = Some(edge.wrap_from);
         }
-        self.refresh_view("Uredivanje segmenta odustano.".into());
+        self.refresh_view(qnc_ui_text::text("story.msg.segment_edit_cancelled").into());
     }
 
     /// Enter while a segment is edited: its new IN/OUT from the source marks of the
@@ -140,7 +139,7 @@ impl ProgramSegments {
             return true;
         };
         if clip.as_deref() != Some(clip_id.as_str()) {
-            self.refresh_view("Segment se ureduje na svom klipu; vrati se na njega ili Esc.".into());
+            self.refresh_view(qnc_ui_text::text("story.msg.segment_edit_own_clip").into());
             return true;
         }
         self.editing = None;

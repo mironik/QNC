@@ -3867,3 +3867,14 @@ korak sada vrijedi samo za popis na kojem je nastao (`step_on`, test). Proba kru
 karticu, Enter, Tab i Space idu ispravno (Space ide playeru na svakom panelu). Log probe nije pokazao zasto Space nije
 pustio klip, pa `qnc-ingest-application` uz dijagnostiku playera zapisuje svaku naredbu (`ingest-dispatch`: akcija,
 ishod kruga, panel) i svaku odbijenicu (`ingest-refused`). C10 isti.
+Izvedeno 2026-10-14 (korisnik: "da, kreni sa Storyjem"): Story i Media Assist kroz rjecnik. `contracts/ui/editorial.layout.json`
+(tabovi poola, gumbi docka, prazne poruke, IN/OUT/Duration, Auto/On) pise sifre, `qnc-editorial-layout` ih razrjesava
+pri ucitavanju (`resolve_contract`); MA gumb "Pokrivalice" je "B-roll" (engleski, isti kao Story). Poruke i natpisi koda
+kroz `qnc_ui_text::text`/`fill`: `qnc-editorial-application`, `qnc-program-segments` (statusi Wrapa, markera, slotova,
+Synca), `qnc-program-view` (nazivi slika prozora reza), `qnc-segment-panel` (traka, zaglavlje, popis segmenata,
+savjeti), `qnc-sync-cover`, `qnc-source-mark-focus`, `qnc-keyframe-nav`, `qnc-trim-stills`, `qnc-shot-stills`,
+`qnc-program-input` (greske programa s umetnutim klipom), te zajednicki `qnc-source-dock` ("Duration", vidi se i u
+Ingestu) i `qnc-timeline` ("not in the program"). `qnc-program-segments` je kraj klipa prepoznavao po hrvatskom dijelu
+poruke ("na kraju"); sada usporeduje s tekstom sifre `story.msg.clip_at_end`. Testovi koji su ocekivali hrvatski tekst
+uzimaju isti tekst kroz sifru. Vrijednosti u bazi (`tonovi`/`offovi`) i dijagnostika nisu prevodeni. Nije izvedeno:
+`qnc-source-preview`, `qnc-monitor` i ostale zajednicke kocke, Project, shell, katalog tipki.

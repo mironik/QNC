@@ -88,7 +88,7 @@ pub(crate) fn decode(
     };
     let mut open = match open.lock() {
         Ok(open) => open,
-        Err(_) => return Some(Err("dekoder slike nije dostupan".into())),
+        Err(_) => return Some(Err(qnc_ui_text::text("story.msg.still_decoder_unavailable").into())),
     };
     Some(read(&mut open, picture, first, count, place, cancel))
 }
@@ -138,7 +138,7 @@ fn read(
             None => open.decoder.seek(Rational { numerator: 0, denominator: 1 }).map_err(|error| error.to_string())?,
         };
         if !jumped {
-            return Err("dekoder slike ne skace".into());
+            return Err(qnc_ui_text::text("story.msg.still_decoder_no_seek").into());
         }
         open.next = first.saturating_sub(2);
     }
@@ -156,7 +156,7 @@ fn read(
         }
         if frame <= last {
             let DecodedFormat::Video { width, height, .. } = packet.format else {
-                return Err("dekoder nije dao sliku".into());
+                return Err(qnc_ui_text::text("story.msg.still_decoder_no_picture").into());
             };
             let image = small_rgba(&packet.bytes, width as usize, height as usize)?;
             made.push((StillPicture { clip_id: picture.clip_id.clone(), source_frame: frame }, Arc::new(image)));
@@ -166,7 +166,7 @@ fn read(
         }
     }
     if !made.iter().any(|(made, _)| made == picture) {
-        return Err("slika nije izvucena".into());
+        return Err(qnc_ui_text::text("story.msg.still_failed").into());
     }
     Ok(made)
 }
@@ -176,7 +176,7 @@ fn read(
 fn small_rgba(bytes: &[u8], width: usize, height: usize) -> Result<RgbaImage, String> {
     let (chroma_w, chroma_h) = (width.div_ceil(2), height.div_ceil(2));
     if width == 0 || height == 0 || bytes.len() < width * height + 2 * chroma_w * chroma_h {
-        return Err("neispravna slika dekodera".into());
+        return Err(qnc_ui_text::text("story.msg.still_decoder_bad_picture").into());
     }
     let (luma, chroma) = bytes.split_at(width * height);
     let (u_plane, v_plane) = chroma.split_at(chroma_w * chroma_h);
