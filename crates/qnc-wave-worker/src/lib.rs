@@ -312,6 +312,11 @@ impl TimelineWaveService {
                 .map(|clip| clip.clip_id.clone())
                 .ok_or_else(|| qnc_ui_text::text("wave.wave_content_page_empty").to_string())?;
             for clip in page {
+                // A wave needs the final record; a clip still being completed is taken by
+                // a later sync (user 2026-10-15: each wave as soon as its own record is).
+                if clip.snapshot.phase != qnc_media_records::Phase::Final {
+                    continue;
+                }
                 let request = WaveRequest {
                     project_id: project_id.clone(),
                     clip_id: clip.clip_id,

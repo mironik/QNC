@@ -3985,3 +3985,9 @@ a zvuk montazi treba prvi): `qnc-timeline-artifacts` drzi filmstrip dok wave ima
 (`qnc-playback-activity` `PLAYBACK_CLIP` u bazi projekta) dobiva wave prvi: `qnc-wave-worker` `prefer`,
 `qnc-content-artifacts` `prefer`, `tools/qnc-ingest-worker` ga cita dvaput u sekundi. Pravilo da wave i filmstrip
 stanu dok player radi ostaje. Granica brzine je citac kartice (USB 2.0, ~28 MB/s; kartica V30 UHS-I cita i do ~90 MB/s).
+Dopuna 2026-10-15 (korisnik: "da" na wave cim je zapis klipa gotov): radnik je radio redom filmstrip svih klipova ->
+dovrsetak zapisa svih klipova (dok artefakti rade, dovrsavao je samo klip koji preview trazi) -> waveovi u drugom
+prolazu. Sada `tools/qnc-ingest-worker`: dovrsetak zapisa ne ceka artefakte; dok traje, prolaz artefakata svake 3 s
+ponovno cita bazu i wave klipa krene cim je njegov zapis konacan (`qnc-wave-worker` u red uzima samo klipove s
+konacnim zapisom), otvoreni klip prvi; filmstrip ceka dok traje dovrsetak zapisa i dok waveovi imaju posla
+(`qnc-timeline-artifacts` / `qnc-content-artifacts` `hold_filmstrip`). Waveovi i filmstrip i dalje stanu dok player radi.

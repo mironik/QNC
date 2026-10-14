@@ -109,10 +109,11 @@ fn run_once(root: &Path) -> Result<bool, String> {
         source.backend(media).map_err(|error| error.to_string())
     };
     let cancel = std::sync::atomic::AtomicBool::new(false);
-    // The card sets the pace: while filmstrip and wave read it, the completion takes
-    // only the clip a preview wants, the rest right after them.
-    let artifacts_running = std::sync::atomic::AtomicBool::new(true);
-    let card_busy = || artifacts_running.load(std::sync::atomic::Ordering::Relaxed);
+    // The card sets the pace (user 2026-10-15: waves as soon as possible): first the
+    // records (a wave needs its clip's final record), each clip's wave as soon as its record
+    // is final, the filmstrip after them. The completion never gives way to the filmstrip.
+    let card_busy = || false;
+    let completing = std::sync::atomic::AtomicBool::new(true);
     // The project database is the truth: once its active project is no longer the one
     // this run started for (closed, or another opened), the run stops and lets its
     // database go, so the closed project can be deleted.
@@ -146,9 +147,9 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 }
                 Err(error) => eprintln!("dovrsetak zapisa nije uspio: {error}"),
             }
+            completing.store(false, std::sync::atomic::Ordering::Relaxed);
         });
-        let artifacts = run_artifacts(root, &closed);
-        artifacts_running.store(false, std::sync::atomic::Ordering::Relaxed);
+        let artifacts = run_artifacts(root, &closed, &completing);
         let _ = completion.join();
         if closed.load(std::sync::atomic::Ordering::Relaxed) {
             running.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -165,7 +166,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
         }
         // Wave needs the audio facts the completion has just written; the filmstrips are
         // already made, so this pass only makes the waves the first one had to skip.
-        let artifacts = artifacts.and_then(|()| run_artifacts(root, &closed));
+        let artifacts = artifacts.and_then(|()| run_artifacts(root, &closed, &std::sync::atomic::AtomicBool::new(false)));
         running.store(false, std::sync::atomic::Ordering::Relaxed);
         let import = import.join().map_err(|_| "Uvoz je pao.".to_string())?;
         artifacts.and(import).map(|()| true)
@@ -179,7 +180,13 @@ fn still_active(active_project: &qnc_active_project_read::ActiveProjectReader, s
         .is_ok_and(|snapshot| snapshot.settings.project_id == started)
 }
 
-fn run_artifacts(root: &Path, closed: &std::sync::atomic::AtomicBool) -> Result<(), String> {
+/// Filmstrips and waves of the active project. While `completing`, records still become
+/// final: the waves of newly final clips are taken every few seconds and the filmstrip waits.
+fn run_artifacts(
+    root: &Path,
+    closed: &std::sync::atomic::AtomicBool,
+    completing: &std::sync::atomic::AtomicBool,
+) -> Result<(), String> {
     let active_project = qnc_active_project_read::ActiveProjectReader::from_root(root)
         .map_err(|error| error.to_string())?;
     let snapshot = active_project.read().map_err(|error| error.to_string())?;
@@ -191,13 +198,24 @@ fn run_artifacts(root: &Path, closed: &std::sync::atomic::AtomicBool) -> Result<
     let player_works = qnc_playback_activity::playback_pause(target.clone());
     let mut artifacts = qnc_content_artifacts::ProjectArtifacts::new();
     artifacts.set_host_root(root);
+    artifacts.hold_filmstrip(completing.load(std::sync::atomic::Ordering::Relaxed));
     artifacts.set_playback_priority(player_works());
     artifacts.sync(&reader, &settings, target.clone(), false)?;
     let deadline = std::time::Instant::now() + Duration::from_secs(60 * 60);
     let mut shown_checked = std::time::Instant::now() - Duration::from_secs(1);
-    while artifacts.has_pending_work() {
+    let mut synced = std::time::Instant::now();
+    loop {
+        let still_completing = completing.load(std::sync::atomic::Ordering::Relaxed);
+        if !still_completing && !artifacts.has_pending_work() {
+            break;
+        }
         if closed.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(()); // dropping the artifacts cancels their workers
+        }
+        artifacts.hold_filmstrip(still_completing);
+        if still_completing && synced.elapsed() >= Duration::from_secs(3) {
+            synced = std::time::Instant::now();
+            artifacts.sync(&reader, &settings, target.clone(), false)?;
         }
         // The clip a preview has open (written to the project database) goes first.
         if shown_checked.elapsed() >= Duration::from_millis(500) {

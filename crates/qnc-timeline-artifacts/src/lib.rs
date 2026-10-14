@@ -53,6 +53,8 @@ pub struct Artifacts {
     wave: TimelineWaveService,
     assets: TimelineAssetReader,
     sync_deferred: bool,
+    /// The caller holds the filmstrip (the card serves the records and waves first).
+    filmstrip_held: bool,
 }
 
 impl Artifacts {
@@ -141,7 +143,13 @@ impl Artifacts {
     /// the sound is what editing needs first, and both read the same card).
     pub fn set_playback_priority(&mut self, active: bool) {
         self.wave.set_playback_priority(active);
-        self.filmstrip.set_playback_priority(active || self.wave.has_pending_work());
+        self.filmstrip
+            .set_playback_priority(active || self.filmstrip_held || self.wave.has_pending_work());
+    }
+
+    /// Holds the filmstrip while the caller's other card work goes first.
+    pub fn hold_filmstrip(&mut self, held: bool) {
+        self.filmstrip_held = held;
     }
 
     /// The clip the user has open gets its wave first.

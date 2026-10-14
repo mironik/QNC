@@ -668,6 +668,11 @@ impl ProjectArtifacts {
         self.artifacts.prefer(clip_id);
     }
 
+    /// Holds the filmstrip while the caller's other card work goes first.
+    pub fn hold_filmstrip(&mut self, held: bool) {
+        self.artifacts.hold_filmstrip(held);
+    }
+
     pub fn has_pending_work(&self) -> bool {
         self.artifacts.has_pending_work()
     }
