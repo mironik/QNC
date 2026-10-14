@@ -394,7 +394,12 @@ impl SourcePreview {
             return false;
         }
         let frame = self.player_view.confirmed_source_frame().unwrap_or(0);
-        self.prepare_clip(&clip_id, frame)
+        // A channel picked while playing is heard playing on (user 2026-10-14: the draft
+        // channel is played before Enter keeps it).
+        let playing = self.player_view.playing() || self.play_when_ready;
+        let prepared = self.prepare_clip(&clip_id, frame);
+        self.play_when_ready = playing;
+        prepared
     }
 
     fn prepare_clip(&mut self, clip_id: &str, first_frame: u64) -> bool {

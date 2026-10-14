@@ -63,6 +63,16 @@ impl LaneChoice {
         (self.a1, self.a2)
     }
 
+    /// The source channels the preview plays on A1 and A2 now: the draft of a taken lane
+    /// is heard at once, before Enter keeps it (user 2026-10-14).
+    pub fn audible(&self) -> (u16, u16) {
+        match self.taken {
+            Some((0, draft)) => (draft, self.a2),
+            Some((_, draft)) => (self.a1, draft),
+            None => (self.a1, self.a2),
+        }
+    }
+
     /// The channel of A1 (lane 0) or A2 and the clip's channel count, when known.
     pub fn choice(&self, lane: u8) -> Option<(u16, u16)> {
         let channel = if lane == 0 { self.a1 } else { self.a2 };
@@ -165,6 +175,7 @@ mod tests {
         assert!(!lanes.set_draft(0, 1), "not on the lane that is not taken");
         assert!(!lanes.set_draft(1, 4), "not on a channel the clip does not have");
         assert_eq!(lanes.taken(), Some((1, 2)));
+        assert_eq!((lanes.audible(), lanes.heard()), ((0, 2), (0, 1)), "the draft is heard, not kept");
         lanes.draft(1);
         assert!(lanes.commit());
         assert_eq!(lanes.heard(), (0, 3));

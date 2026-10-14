@@ -1079,9 +1079,15 @@ impl ProgramSegments {
         self.choose_channel(0, channel)
     }
 
-    /// The source channels heard on A1 and A2 now (zero based).
+    /// The source channels kept on A1 and A2 (zero based): what is written to the story.
     pub fn heard_channels(&self) -> (u16, u16) {
         self.lanes.heard()
+    }
+
+    /// The source channels the preview plays now: a taken lane's draft is heard before
+    /// Enter keeps it; Escape goes back to the kept channel.
+    pub fn audible_channels(&self) -> (u16, u16) {
+        self.lanes.audible()
     }
 
     /// The channel picker of the source timeline chose the channel heard on A2.

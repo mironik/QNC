@@ -3965,3 +3965,9 @@ spojeni `amerge` redom u jedan isprepleteni f32 signal, video se samo demuxa), `
 kanali svakog streama idu njegovom sakupljacu; prije citanja ista provjera kataloga za zapisani format svakog streama i
 serijski broj kartice). Izmjereno: klip od 9 s s 4 kanala 2,2 s s kartice. Katalog dekodera nije prebacen na
 ugradeni lib (`selected` ostaje `qnc.ffmpeg`), jer bi to promijenilo i player.
+Dopuna 2026-10-14 (korisnik: "preview play audio treba biti moguc prebacivanjem na neki kanal bez da je spremljen
+enterom; dok je neki kanal oznacen on se pleja, Enter ga samo trajno zapisuje u bazu"): dok je traka uzeta, preview
+odmah pusta oznaceni kanal (strelice gore/dolje ili klik u stupcu); Enter ga zapisuje, Esc vraca spremljeni kanal.
+`qnc-lane-choice` `audible`, `qnc-program-segments` `audible_channels` (zapis u pricu i dalje uzima samo spremljeni
+kanal `heard_channels`), `qnc-panel-focus`, `qnc-editorial-application`. `qnc-source-preview` `hear_channels`: kanal
+promijenjen tijekom playa nastavlja svirati cim je klip ponovno pripremljen (kratki prekid pripreme ostaje).

@@ -293,8 +293,12 @@ impl PanelFocus {
             }
             "step_prev_part" | "step_next_part" if matches!(panel, Panel::PoolTabs | Panel::SourceButtons) => false,
             // A taken lane (user 2026-10-14): its channels stand in a column, up/down pick.
-            "step_prev_part" if on_source && segments.lane_is_taken() => segments.lane_draft(-1),
-            "step_next_part" if on_source && segments.lane_is_taken() => segments.lane_draft(1),
+            // The draft is heard at once (user 2026-10-14); Enter only keeps it.
+            "step_prev_part" | "step_next_part" if on_source && segments.lane_is_taken() => {
+                let moved = segments.lane_draft(if action_id == "step_prev_part" { -1 } else { 1 });
+                preview.hear_channels(segments.audible_channels());
+                moved
+            }
             // Up/Down on a taken edit (user 2026-10-11): to the key picture before or after it,
             // half a second when every picture is one (intra). The answer comes in `poll`.
             "step_prev_part" | "step_next_part"
@@ -315,7 +319,7 @@ impl PanelFocus {
                 let lane = segments.lane_is_taken();
                 let confirmed = segments.confirm_source();
                 if lane {
-                    preview.hear_channels(segments.heard_channels());
+                    preview.hear_channels(segments.audible_channels());
                 }
                 // A taken mark is let go; with nothing to confirm Enter goes on round the walk.
                 let released = self.taken(timeline) && mark_cue(preview, qnc_source_mark_focus::release(timeline));
@@ -329,7 +333,11 @@ impl PanelFocus {
             "activate_focused_item" => false,
             // A virtual shot (Shift+S or Add SubClip), not by an Enter that confirmed.
             "save_virtual_shot" if segments.source_waits_enter() => false,
-            "clear_focus" | "close_player" if on_source && segments.lane_is_taken() => segments.release_lane(),
+            "clear_focus" | "close_player" if on_source && segments.lane_is_taken() => {
+                let released = segments.release_lane();
+                preview.hear_channels(segments.audible_channels()); // back to the kept channel
+                released
+            }
             // Down closes an open large wave off the segment panel (there down is the next segment).
             "step_next_part" if on_source && segments.view().wave_zoom != [0, 0] => segments.close_wave(),
             // Home on the source timeline: the start of the clip (the V label does the same).
