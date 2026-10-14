@@ -9,7 +9,7 @@
 
 use std::{fs, io::BufWriter, path::Path, sync::Arc};
 
-use qnc_source_preview::{MonitorFrame, PreviewView};
+use qnc_source_preview::{MonitorFrame, PreviewView, ShownPicture};
 
 pub const MODULE_ID: &str = "qnc.module.virtual-short-stills";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -33,6 +33,8 @@ pub struct VirtualShortStillCache {
 struct CandidateStill {
     clip_id: String,
     frame: u64,
+    /// Which picture of the player it is, when it came from the monitor's own frame.
+    sequence: Option<(u64, u64)>,
     width: usize,
     height: usize,
     rgba: Arc<[u8]>,
@@ -64,6 +66,38 @@ impl VirtualShortStillCache {
         self.clear_if_clip_changed(Some(&still.clip_id));
         self.out_still = Some(still);
         Ok(())
+    }
+
+    /// Follows the monitor: whenever it shows the picture at the IN or the OUT of the clip,
+    /// that picture is the still of the mark, however the mark got there (a mark key, taking
+    /// and arrows, fit to a slot, a drag). A newer picture of the same frame replaces it.
+    pub fn follow(&mut self, shown: Option<(String, ShownPicture)>, marks: (Option<u64>, Option<u64>)) {
+        let Some((clip_id, picture)) = shown else { return };
+        if picture.rgba.len() != picture.size[0] * picture.size[1] * 4 || picture.size.contains(&0) {
+            return;
+        }
+        let held = |still: &Option<CandidateStill>| {
+            still.as_ref().is_some_and(|s| s.clip_id == clip_id && s.frame == picture.frame && s.sequence == Some(picture.sequence))
+        };
+        let (at_in, at_out) = (marks.0 == Some(picture.frame) && !held(&self.in_still), marks.1 == Some(picture.frame) && !held(&self.out_still));
+        if !at_in && !at_out {
+            return;
+        }
+        self.clear_if_clip_changed(Some(&clip_id));
+        let still = CandidateStill {
+            clip_id,
+            frame: picture.frame,
+            sequence: Some(picture.sequence),
+            width: picture.size[0],
+            height: picture.size[1],
+            rgba: picture.rgba,
+        };
+        if at_in {
+            self.in_still = Some(still.clone());
+        }
+        if at_out {
+            self.out_still = Some(still);
+        }
     }
 
     pub fn has_pair_for(&self, clip_id: &str, in_frame: u64, out_frame: u64) -> bool {
@@ -153,6 +187,7 @@ fn candidate_from_preview(preview: &PreviewView) -> Result<CandidateStill, Strin
     Ok(CandidateStill {
         clip_id,
         frame,
+        sequence: None,
         width: picture.width,
         height: picture.height,
         rgba: picture.rgba.clone(),
@@ -291,4 +326,21 @@ mod tests {
         assert!(stills_dir.join("clip-a_shot_001").join("in.jpg").is_file());
         assert!(stills_dir.join("clip-a_shot_001").join("out.jpg").is_file());
     }
+
+    #[test]
+    fn a_mark_moved_without_i_or_o_takes_the_picture_the_monitor_shows_there() {
+        let shown = |frame, sequence| {
+            let picture = ShownPicture { frame, sequence: (1, sequence), size: [2, 2], rgba: Arc::from(vec![9u8; 16]) };
+            Some(("clip-a".to_string(), picture))
+        };
+        let mut cache = VirtualShortStillCache::default();
+        cache.follow(shown(12, 1), (Some(12), Some(40))); // IN moved to 12 by taking it and stepping
+        cache.follow(shown(20, 2), (Some(12), Some(40))); // a picture away from the marks is not taken
+        assert!(!cache.has_pair_for("clip-a", 12, 40));
+        cache.follow(shown(40, 3), (Some(12), Some(40)));
+        assert!(cache.has_pair_for("clip-a", 12, 40));
+        cache.follow(Some(("clip-b".to_string(), shown(12, 4).unwrap().1)), (Some(12), Some(40)));
+        assert!(!cache.has_pair_for("clip-a", 12, 40), "another clip starts over");
+    }
+
 }

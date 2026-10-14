@@ -242,13 +242,14 @@ impl EditorialApplication {
             let timeline = self.view.preview.timeline.preserving_source_marks_from(&previous_timeline);
             self.view.preview.timeline = timeline;
         } else {
-            self.short_stills
-                .clear_if_clip_changed(self.view.preview.clip_id.as_deref());
+            self.short_stills.clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
         if let Some((clip_id, in_frame, out_frame, edge)) = self.segments.take_source_request() {
             self.open_marked(&clip_id, (in_frame, out_frame), edge); // Edit of a segment, or its edge
         }
         self.pending_marks.apply(self.view.preview.clip_id.as_deref(), &mut self.view.preview.timeline);
+        // The still of IN and OUT is the picture the monitor shows there, however the mark got there.
+        self.short_stills.follow(self.preview.shown_clip_picture(), (self.view.preview.timeline.source_in_frame, self.view.preview.timeline.source_out_frame));
         let timebase = self.preview.player_view().source_timebase();
         let timeline = self.view.preview.timeline;
         // The original source timecode of the chosen clip, from its stored record.

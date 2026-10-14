@@ -473,6 +473,17 @@ impl SourcePreview {
         })
     }
 
+    /// The picture of a clip on the monitor (not of the story), with its clip and frame.
+    pub fn shown_clip_picture(&self) -> Option<(String, ShownPicture)> {
+        let picture = self.player_view.picture.as_ref()?;
+        let header = &picture.header;
+        (!header.source_id.starts_with("program:")).then(|| {
+            let sequence = (header.output_generation, header.sequence);
+            let size = [header.width as usize, header.height as usize];
+            (header.source_id.to_string(), ShownPicture { frame: header.frame, sequence, size, rgba: picture.rgba.clone() })
+        })
+    }
+
     pub fn toggle_play(&mut self) -> bool {
         self.touched = Some(std::time::Instant::now());
         self.cue_asked = None; // Play moves the playhead: arrows count from where it stops

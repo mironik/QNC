@@ -3878,3 +3878,11 @@ Ingestu) i `qnc-timeline` ("not in the program"). `qnc-program-segments` je kraj
 poruke ("na kraju"); sada usporeduje s tekstom sifre `story.msg.clip_at_end`. Testovi koji su ocekivali hrvatski tekst
 uzimaju isti tekst kroz sifru. Vrijednosti u bazi (`tonovi`/`offovi`) i dijagnostika nisu prevodeni. Nije izvedeno:
 `qnc-source-preview`, `qnc-monitor` i ostale zajednicke kocke, Project, shell, katalog tipki.
+Popravak 2026-10-14 (korisnik: "story add subclip ne kreira poster"): baza probne kopije: zadnji SubClip (IN 1, OUT 335)
+ima `still_status = failed`, "IN/OUT slike nisu uhvacene". Slika se hvatala samo u trenutku tipke I/O; IN ili OUT
+pomaknut kasnije (uzet i pomaknut strelicama, prilagoden slotu, povucen) vise nije odgovarao uhvacenoj slici i poster nije
+nastao. `qnc-virtual-short-stills` `follow`: slika IN-a i OUT-a je slika koju monitor pokazuje na tom mjestu, kako god je
+oznaka tamo dosla; novija slika istog mjesta zamjenjuje stariju (test). `qnc-source-preview` `shown_clip_picture` (slika
+klipa na monitoru s klipom i brojem slike, ne slika price). `qnc-editorial-application` jedan poziv (C10 isti).
+Ostaje: oznaka koju monitor nikad ne pokaze (npr. OUT postavljen prilagodbom slotu bez odlaska na njega) i dalje nema
+sliku i SubClip ostaje bez postera.
