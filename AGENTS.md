@@ -3971,3 +3971,12 @@ odmah pusta oznaceni kanal (strelice gore/dolje ili klik u stupcu); Enter ga zap
 `qnc-lane-choice` `audible`, `qnc-program-segments` `audible_channels` (zapis u pricu i dalje uzima samo spremljeni
 kanal `heard_channels`), `qnc-panel-focus`, `qnc-editorial-application`. `qnc-source-preview` `hear_channels`: kanal
 promijenjen tijekom playa nastavlja svirati cim je klip ponovno pripremljen (kratki prekid pripreme ostaje).
+Dopuna 2026-10-15 (korisnik: "to je sporo, 30 minuta materijala za 10 minuta, to za news TV"): mjereno, ffmpeg za zvuk
+originala cita cijelu datoteku brzinom kartice (USB 2.0 citac, ~28 MB/s), a zvuk je oko 4 % datoteke. Nova javna kocka
+`crates/qnc-mxf-sound` (+ `contracts/modules/mxf-sound.module.json`): zvucni elementi frame-wrapped MXF-a bez slike i
+podatkovnih elemenata, jedno citanje od 40 KB po okviru, ostalo se preskace; samo citanje, nista ne dekodira. Na kartici
+bajt za bajt isto kao ffmpeg za sva 4 kanala (test koji se pokrece rucno, `QNC_MXF_SAMPLE`, `QNC_FFMPEG`). Izbor po
+zapisanom formatu prije citanja radi `qnc-wave-worker` (MXF, svaki trazeni stream `pcm_s24le` mono; k-ti audio stream je
+zvucni element k), sve ostalo ide kroz katalog dekodera u jednom prolazu; katalog i player je ne koriste (granica
+playera). Izmjereno (Long GOP original s kartice): 1489 (oko 130 s materijala) 16,6 s, prije 36 s; 60-62 MB/s datoteke.
+Granica je vrijeme jednog citanja na kartici (1,5-2,5 ms po citanju).

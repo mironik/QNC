@@ -4209,6 +4209,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-mxf-sound"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-paint-pace"
 version = "0.1.0"
 dependencies = [
@@ -5164,6 +5171,7 @@ dependencies = [
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-media-stream",
+ "qnc-mxf-sound",
  "qnc-transport-resolver",
  "qnc-ui-text",
  "qnc-wave",

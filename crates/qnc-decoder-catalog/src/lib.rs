@@ -115,24 +115,29 @@ impl LocalFilmstripExtractor {
     pub fn audio_streams_with_cancel(
         &self,
         source: &Path,
-        container: &str,
+        media: &qnc_media_metadata::MediaRepresentation,
         streams: &[u32],
         channels: u32,
         cancel: &AtomicBool,
         on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
     ) -> std::result::Result<(), String> {
-        match &self.deployment.driver {
-            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::audio_streams_with_cancel(
-                &self.deployment.executable,
-                source,
-                container,
-                streams,
-                channels,
-                cancel,
-                on_samples,
-            ),
-            Driver::QncPacketsV1 { .. } => Err("selected decoder does not read local audio".into()),
+        if matches!(self.deployment.driver, Driver::QncPacketsV1 { .. }) {
+            return Err("selected decoder does not read local audio".into());
         }
+        let container = media
+            .container
+            .as_ref()
+            .map(|container| container.value.as_str())
+            .ok_or("audio pass needs the saved container")?;
+        qnc_ffmpeg_decode::audio_streams_with_cancel(
+            &self.deployment.executable,
+            source,
+            container,
+            streams,
+            channels,
+            cancel,
+            on_samples,
+        )
     }
 
     /// The presentation times (seconds of the media's timestamps) of the key pictures

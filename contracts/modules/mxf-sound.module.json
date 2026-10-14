@@ -1,0 +1,44 @@
+{
+  "module_id": "qnc.module.mxf-sound",
+  "module_name": "MXF Sound Reader",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "media.read.mxf_sound"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "module_dependencies": [],
+  "forbidden_calls": [
+    "db.read",
+    "db.write",
+    "media.probe.full",
+    "media.decode",
+    "file.write",
+    "playback.clock"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-player-core"
+  ],
+  "adapter_policy": "The frame-wrapped sound elements of an MXF file without reading its picture or data elements (user 2026-10-14: the wave of a camera original read from the card in a news room; reading the whole file is bound by the card reader). It walks the KLV packets of the essence with one read per content package and seeks over every element that is not sound. The values are given as stored (uncompressed PCM); the caller knows the saved format. The file is opened for reading only; nothing is written, created, renamed or removed (a card is read only). It decodes nothing, runs no probe and reads no database.",
+  "specification": "docs/70-replaceable-decoders.md"
+}

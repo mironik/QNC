@@ -14,7 +14,7 @@ use qnc_wave::{StreamPeakCollector, WaveArtifactRecord, WaveLane, WavePlan};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, SyncSender, TryRecvError},
@@ -711,16 +711,11 @@ fn decode_wave(
     let path = source
         .local_media_path(&media.media_uri)?
         .ok_or("wave decoder requires a seekable QNC decoder endpoint")?;
-    let container = media
-        .container
-        .as_ref()
-        .map(|container| container.value.clone())
-        .ok_or_else(|| qnc_ui_text::text("wave.wave_needs_stored_container").to_string())?;
-    let extractor = qnc_decoder_catalog::installed_filmstrip_extractor()
-        .map_err(|error| error.to_string())?
-        .ok_or("no local decoder for the wave")?;
+    if media.container.is_none() {
+        return Err(qnc_ui_text::text("wave.wave_needs_stored_container").to_string());
+    }
     let mut bytes: Vec<Vec<u8>> = vec![Vec::new(); parts.len()];
-    extractor.audio_streams_with_cancel(&path, &container, &streams, channels as u32, cancel, &mut |samples| {
+    let mut on_samples = |samples: &[f32]| -> Result<(), String> {
         for buffer in &mut bytes {
             buffer.clear();
         }
@@ -737,8 +732,18 @@ fn decode_wave(
             collector.push_f32le_interleaved(buffer)?;
         }
         Ok(())
-    })
-    .map_err(|error| if cancel.load(Ordering::Acquire) { wave_paused_for_playback().into() } else { error })?;
+    };
+    // A camera original stored as uncompressed 24-bit mono sound elements is read without
+    // its pictures (`qnc-mxf-sound`; about twice as fast from a card), decided from the
+    // saved format before any reading; every other source through the selected decoder.
+    let read = match mxf_sound_elements(media, &streams) {
+        Some(elements) => mxf_sound_samples(&path, &elements, cancel, &mut on_samples),
+        None => qnc_decoder_catalog::installed_filmstrip_extractor()
+            .map_err(|error| error.to_string())?
+            .ok_or("no local decoder for the wave")?
+            .audio_streams_with_cancel(&path, media, &streams, channels as u32, cancel, &mut on_samples),
+    };
+    read.map_err(|error| if cancel.load(Ordering::Acquire) { wave_paused_for_playback().into() } else { error })?;
     let by_lane = parts
         .into_iter()
         .flat_map(|(_, collector)| collector.finish())
@@ -751,6 +756,66 @@ fn decode_wave(
 
 /// The selected decoder must declare the saved format of every stream it reads (no silent
 /// fallback): the same check a decode request makes.
+/// The sound element number of each requested stream, when the saved record is an MXF
+/// whose requested streams are all uncompressed 24-bit mono: the k-th audio stream of the
+/// file is sound element k (checked byte for byte against FFmpeg on a camera original).
+fn mxf_sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: &[u32]) -> Option<Vec<u8>> {
+    if media.container.as_ref()?.value != "mxf" {
+        return None;
+    }
+    let mut audio = media
+        .streams
+        .iter()
+        .filter_map(|stream| match &stream.details {
+            qnc_media_metadata::StreamDetails::Audio(details) => Some((stream, details)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    audio.sort_by_key(|(stream, _)| stream.index.as_ref().map(|index| index.value));
+    streams
+        .iter()
+        .map(|wanted| {
+            let position = audio
+                .iter()
+                .position(|(stream, _)| stream.index.as_ref().is_some_and(|index| index.value == *wanted))?;
+            let (stream, details) = audio[position];
+            let codec = stream.codec.as_ref().map(|codec| &codec.value);
+            let pcm = matches!(codec, Some(qnc_media_metadata::Signal::Known(name)) if name == "pcm_s24le");
+            let mono = details.channels.as_ref().is_some_and(|channels| channels.value == 1);
+            (pcm && mono).then(|| u8::try_from(position).ok()).flatten()
+        })
+        .collect()
+}
+
+/// Sound elements to whole interleaved f32 frames of the requested streams, in their order.
+fn mxf_sound_samples(
+    source: &Path,
+    elements: &[u8],
+    cancel: &AtomicBool,
+    on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
+) -> std::result::Result<(), String> {
+    let mut queues = vec![Vec::<f32>::new(); elements.len()];
+    let mut frames = Vec::new();
+    qnc_mxf_sound::read_sound_elements(source, cancel, &mut |number, value| {
+        let Some(slot) = elements.iter().position(|element| *element == number) else {
+            return Ok(());
+        };
+        qnc_mxf_sound::s24le_to_f32(value, &mut queues[slot]);
+        let ready = queues.iter().map(Vec::len).min().unwrap_or(0);
+        if ready == 0 {
+            return Ok(());
+        }
+        frames.clear();
+        for at in 0..ready {
+            frames.extend(queues.iter().map(|queue| queue[at]));
+        }
+        for queue in &mut queues {
+            queue.drain(..ready);
+        }
+        on_samples(&frames)
+    })
+}
+
 fn check_stream_supported(
     media: &MediaRepresentation,
     stream_index: u32,

@@ -16,3 +16,4 @@ qnc-media-records = { workspace = true }
 qnc-media-stream = { workspace = true }
 qnc-transport-resolver = { workspace = true }
 qnc-wave = { workspace = true }
+qnc-mxf-sound = { workspace = true }
