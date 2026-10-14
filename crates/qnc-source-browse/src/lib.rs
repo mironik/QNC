@@ -138,7 +138,7 @@ impl SourceBrowse {
 
     pub fn start(&mut self, step: Step) -> Result<(), String> {
         let Some(mut session) = self.session.clone() else {
-            return Err("Izvor nije povezan.".into());
+            return Err(qnc_ui_text::text("ingest.msg.source_not_connected").into());
         };
         let (send, receive) = mpsc::sync_channel(1);
         std::thread::Builder::new()
@@ -165,7 +165,7 @@ impl SourceBrowse {
             Err(TryRecvError::Empty) => return None,
             Err(TryRecvError::Disconnected) => {
                 self.result = None;
-                return Some(Err("Citanje izvora je prekinuto.".into()));
+                return Some(Err(qnc_ui_text::text("source.reading_source_interrupted").into()));
             }
         };
         self.result = None;
@@ -216,7 +216,7 @@ mod tests {
         assert!(!browse.is_connected());
         assert_eq!(
             browse.start(Step::Parent).unwrap_err(),
-            "Izvor nije povezan."
+            qnc_ui_text::text("ingest.msg.source_not_connected")
         );
         assert!(browse.poll().is_none());
         assert!(!browse.cancel());

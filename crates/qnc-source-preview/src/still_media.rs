@@ -70,16 +70,16 @@ impl StillLocator {
             StreamDetails::Video(video) => Some((stream, video)),
             _ => None,
         });
-        let (stream, video) = video.ok_or("Klip nema spremljeni video tok.")?;
-        let rate = video.frame_rate.as_ref().map(|rate| rate.value).ok_or("Klip nema spremljeni frame rate.")?;
+        let (stream, video) = video.ok_or(qnc_ui_text::text("player.clip_stored_video_stream"))?;
+        let rate = video.frame_rate.as_ref().map(|rate| rate.value).ok_or(qnc_ui_text::text("player.clip_stored_frame_rate"))?;
         let fps = (
             u32::try_from(rate.fps_num).map_err(|_| "Neispravan frame rate.")?,
             u32::try_from(rate.fps_den).map_err(|_| "Neispravan frame rate.")?,
         );
-        let start_pts = stream.start_pts.as_ref().map(|pts| pts.value).ok_or("Klip nema spremljeni pocetni PTS.")?;
-        let base = stream.time_base.as_ref().map(|tb| tb.value).ok_or("Klip nema spremljenu vremensku bazu.")?;
+        let start_pts = stream.start_pts.as_ref().map(|pts| pts.value).ok_or(qnc_ui_text::text("player.clip_stored_start_pts"))?;
+        let base = stream.time_base.as_ref().map(|tb| tb.value).ok_or(qnc_ui_text::text("player.clip_stored_time_base"))?;
         let start = (start_pts, (base.numerator, base.denominator));
-        let stream_index = stream.index.as_ref().map(|index| index.value).ok_or("Klip nema spremljeni indeks video toka.")?;
+        let stream_index = stream.index.as_ref().map(|index| index.value).ok_or(qnc_ui_text::text("player.clip_stored_video_stream_index"))?;
         let (file, stamp) = self.local_file(&media.media_uri)?;
         Ok(LocatedPicture { file, fps, start, media: media.clone(), stream_index, stamp })
     }
@@ -101,11 +101,11 @@ impl StillLocator {
             .filter_map(|binding| Some((binding.uri.clone(), binding.file.clone()?)))
             .chain(project)
             .find(|(uri, _)| uri == reference.source_uri())
-            .ok_or("Medij klipa nije lokalno dostupan za sliku.")?;
+            .ok_or(qnc_ui_text::text("player.clip_media_available_locally_picture"))?;
         let root = root.canonicalize().map_err(|error| error.to_string())?;
         let file = root.join(reference.relative_path()).canonicalize().map_err(|error| error.to_string())?;
         if !file.starts_with(&root) || !file.is_file() {
-            return Err("Medij klipa je izvan svog izvora.".into());
+            return Err(qnc_ui_text::text("player.clip_media_outside_its_source").into());
         }
         let source = qnc_media_stream::LocalSource::new(&source_uri, &root).map_err(|error| error.to_string())?;
         let stamp = qnc_media_stream::MediaStream::local(&source, media_uri)

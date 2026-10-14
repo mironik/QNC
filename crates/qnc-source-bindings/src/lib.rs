@@ -150,16 +150,16 @@ pub fn load(root: &Path) -> Result<TransportBindings, String> {
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("data").join(CONFIG_FILE));
     let file = file.canonicalize().map_err(|_| {
-        "Nedostaje konfiguracija izvora medija (ingest-transport.json).".to_string()
+        qnc_ui_text::text("source.media_source_configuration_ingest_transport_json").to_string()
     })?;
     let metadata = std::fs::metadata(&file).map_err(|error| error.to_string())?;
     if metadata.len() > MAX_CONFIG_BYTES {
-        return Err("Konfiguracija izvora medija je prevelika.".to_string());
+        return Err(qnc_ui_text::text("source.media_source_configuration_too_large").to_string());
     }
     let bytes = std::fs::read(&file).map_err(|error| error.to_string())?;
     let base = file
         .parent()
-        .ok_or("Konfiguracija izvora nema direktorij.")?;
+        .ok_or(qnc_ui_text::text("source.source_configuration_folder"))?;
     parse(&bytes, base)
 }
 
@@ -174,7 +174,7 @@ fn binding(location: ConfigLocation, base: &Path) -> Result<SourceBinding, Strin
     // A binding is either a local path or a network authority, never both.
     match (&file, &location.endpoint) {
         (Some(_), None) | (None, Some(_)) => {}
-        _ => return Err(format!("Veza {} nije jedinstvena.", location.uri)),
+        _ => return Err(qnc_ui_text::fill("source.binding_not_unique", &[("uri", &location.uri)])),
     }
     Ok(SourceBinding {
         uri: location.uri,
@@ -208,16 +208,16 @@ fn probe(probe: ConfigProbe, base: &Path) -> Result<ProbeBinding, String> {
 
 fn parse(bytes: &[u8], base: &Path) -> Result<TransportBindings, String> {
     let config: Config = serde_json::from_slice(bytes)
-        .map_err(|error| format!("Konfiguracija izvora medija nije valjana: {error}"))?;
+        .map_err(|error| qnc_ui_text::fill("source.config_invalid", &[("error", &error.to_string())]))?;
     if config.version != "0.1.0" || config.sources.len() > MAX_SOURCES {
-        return Err("Konfiguracija izvora medija nije podrzana.".to_string());
+        return Err(qnc_ui_text::text("source.media_source_configuration_supported").to_string());
     }
     let mut seen = BTreeSet::new();
     let mut sources = Vec::new();
     let mut registered_sources = Vec::new();
     for source in config.sources {
         if !seen.insert(source.location.uri.clone()) {
-            return Err(format!("Izvor {} je naveden dvaput.", source.location.uri));
+            return Err(qnc_ui_text::fill("source.listed_twice", &[("uri", &source.location.uri)]));
         }
         let location = binding(source.location, base)?;
         sources.push(location.clone());

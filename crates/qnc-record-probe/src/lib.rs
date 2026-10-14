@@ -94,7 +94,7 @@ pub fn complete(
     let mut reports = Vec::new();
     for (i, media_uri) in needed.into_iter().enumerate() {
         if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Interrupted("Dopuna zapisa je prekinuta.".into()));
+            return Err(Error::Interrupted(qnc_ui_text::text("record.completing_record_interrupted").into()));
         }
         let document = probe_once(records, &camera, &media_uri, backend)?;
         // Raw evidence is durable before any semantic interpretation or merge.
@@ -126,7 +126,7 @@ pub fn complete(
     })?;
     records
         .read(&camera.metadata.clip_id, None)?
-        .ok_or_else(|| "Konacni zapis nedostaje.".into())
+        .ok_or_else(|| qnc_ui_text::text("record.final_record_missing").into())
 }
 
 /// Whether a final record still lacks something playback reads.
@@ -143,7 +143,7 @@ fn camera_documents(records: &ProjectMediaRecords, camera: &Snapshot) -> Result<
         .map(|e| &e.document_uri)
         .collect();
     uris.into_iter()
-        .map(|uri| records.document(uri)?.ok_or_else(|| "Dokaz kamere nedostaje.".to_string()))
+        .map(|uri| records.document(uri)?.ok_or_else(|| qnc_ui_text::text("record.camera_evidence_missing").to_string()))
         .collect()
 }
 
@@ -168,12 +168,12 @@ fn probe_once(
         return match claim.acquisition.outcome {
             Some(AcquisitionOutcome::Stored { document_uri }) => records
                 .document(&document_uri)?
-                .ok_or_else(|| "Spremljeni probe dokaz nedostaje.".into()),
+                .ok_or_else(|| qnc_ui_text::text("record.stored_probe_evidence_missing").into()),
             // The medium was probed before and could not be read: the same answer again.
             Some(AcquisitionOutcome::Failed { code }) => {
-                Err(Error::Unreadable(format!("Probe nije uspio: {code}")))
+                Err(Error::Unreadable(qnc_ui_text::fill("record.probe_failed", &[("code", &code.to_string())])))
             }
-            _ => Err("Probe je vec pokusan ili je u tijeku. Nema ponovnog pokretanja.".into()),
+            _ => Err(qnc_ui_text::text("record.probe_already_tried_running_started_again").into()),
         };
     }
     let request = ProbeRequest {
@@ -217,7 +217,7 @@ fn probe_once(
                 outcome,
                 document: None,
             })?;
-            let message = format!("Probe nije uspio: {code}");
+            let message = qnc_ui_text::fill("record.probe_failed", &[("code", &code.to_string())]);
             Err(if interrupted {
                 Error::Interrupted(message)
             } else if matches!(error, qnc_media_probe::Error::TransportUncertain) {

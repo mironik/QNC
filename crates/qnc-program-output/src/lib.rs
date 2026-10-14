@@ -143,7 +143,7 @@ fn start(screen: Screen) -> Result<Host, String> {
         .ok()
         .and_then(|exe| exe.parent().map(|dir| dir.join(format!("{HOST}{}", std::env::consts::EXE_SUFFIX))))
         .filter(|path| path.is_file())
-        .ok_or_else(|| format!("Program izlaz: nema programa {HOST}."))?;
+        .ok_or_else(|| qnc_ui_text::fill("output.host_missing", &[("host", HOST)]))?;
     let mut command = Command::new(executable);
     command
         .args(["--x", &screen.x.to_string(), "--y", &screen.y.to_string()])
@@ -159,6 +159,6 @@ fn start(screen: Screen) -> Result<Host, String> {
         command.creation_flags(0x0800_0000); // no console window
     }
     let mut child = command.spawn().map_err(|error| format!("Program izlaz: {error}"))?;
-    let stdin = child.stdin.take().ok_or("Program izlaz: nema ulaza procesa.")?;
+    let stdin = child.stdin.take().ok_or(qnc_ui_text::text("output.program_output_process_input"))?;
     Ok(Host { child, stdin, screen, sent: None })
 }

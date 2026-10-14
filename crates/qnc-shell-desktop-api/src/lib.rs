@@ -47,7 +47,7 @@ pub trait ShellDesktopApp {
     }
 
     fn navigation_sequence(&self) -> Result<Vec<DesktopApplicationRef>, String> {
-        Err("Aplikacija nema navigacijski DB prikaz.".into())
+        Err(qnc_ui_text::text("shell.application_navigation_view_database").into())
     }
 }
 
@@ -59,22 +59,19 @@ pub fn next_group_tab(
     let current_index = sequence
         .iter()
         .position(|entry| entry.application_id == current)
-        .ok_or("Trenutna aplikacija nije u spremljenom slijedu.")?;
+        .ok_or(qnc_ui_text::text("shell.current_application_stored_sequence"))?;
     let registered = |entry: &DesktopApplicationRef| {
         available
             .iter()
             .find(|app| app.application_id == entry.application_id && app.tab_id == entry.tab_id)
             .ok_or_else(|| {
-                format!(
-                    "Odabrana aplikacija nije dostupna: {}",
-                    entry.application_id
-                )
+                qnc_ui_text::fill("shell.chosen_app_unavailable", &[("app", &entry.application_id)])
             })
     };
     let group = |entry: &DesktopApplicationRef| -> Result<String, String> {
         let value = entry.priority_group.as_str();
         if value.len() != 1 || !value.as_bytes()[0].is_ascii_lowercase() {
-            return Err("Neispravna prioritetna grupa.".into());
+            return Err(qnc_ui_text::text("shell.invalid_priority_group").into());
         }
         Ok(value.to_string())
     };
@@ -84,12 +81,12 @@ pub fn next_group_tab(
     for entry in sequence {
         let entry_group = group(entry)?;
         if previous.as_ref().is_some_and(|value| value >= &entry_group) {
-            return Err("Spremljeni slijed nema jedinstvene rastuce grupe.".into());
+            return Err(qnc_ui_text::text("shell.stored_sequence_does_have_unique_rising").into());
         }
         previous = Some(entry_group);
     }
     if group(source)? != source_group {
-        return Err("Grupa trenutne aplikacije ne odgovara spremljenom slijedu.".into());
+        return Err(qnc_ui_text::text("shell.group_current_application_does_match_stored").into());
     }
     let target = sequence
         .iter()
@@ -100,7 +97,7 @@ pub fn next_group_tab(
     let installed = registered(target)?;
     let target_group = group(installed)?;
     if target_group <= source_group || target.priority_group != target_group {
-        return Err("Ciljna aplikacija nije u sljedecoj odabranoj grupi.".into());
+        return Err(qnc_ui_text::text("shell.target_application_next_chosen_group").into());
     }
     Ok(Some(installed.tab_id.clone()))
 }

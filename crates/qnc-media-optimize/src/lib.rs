@@ -91,7 +91,7 @@ impl Optimizer {
             .iter()
             .copied()
             .find(|encoder| works(&ffmpeg, *encoder))
-            .ok_or("Nijedan H.264 enkoder ne radi na ovom racunalu.")?;
+            .ok_or(qnc_ui_text::text("import.h_264_encoder_works_this_computer"))?;
         Ok(Self { ffmpeg, encoder })
     }
 
@@ -141,7 +141,7 @@ fn wait(mut child: Child, cancel: &AtomicBool) -> Result<(), String> {
         if cancel.load(Ordering::Relaxed) {
             let _ = child.kill();
             let _ = child.wait();
-            return Err("Izrada optimizirane kopije je prekinuta.".into());
+            return Err(qnc_ui_text::text("import.making_optimised_copy_interrupted").into());
         }
         match child.try_wait().map_err(|e| e.to_string())? {
             Some(status) if status.success() => return Ok(()),

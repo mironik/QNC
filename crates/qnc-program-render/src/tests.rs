@@ -33,7 +33,7 @@ fn what_cannot_be_rendered_is_refused_with_a_reason() {
     assert!(Delivery::from_export(&export("prores", "progressive", 50.0)).unwrap_err().contains("prores"));
     assert!(Delivery::from_export(&serde_json::json!({"video_codec": "h264"})).is_err());
     let interlaced = Delivery::from_export(&export("mpeg2_422_50mbit", "upper_first", 25.0)).unwrap();
-    assert!(interlaced.check(&unit()).unwrap_err().contains("isprepletenu"));
+    assert!(interlaced.check(&unit()).unwrap_err().contains("interlaced"));
     let other_rate = Delivery::from_export(&export("h264", "progressive", 25.0)).unwrap();
     assert!(other_rate.check(&unit()).is_err());
 }

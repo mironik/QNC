@@ -104,7 +104,7 @@ impl Writer {
                 }
             }
             if !self.transport.has_pending() {
-                return Err("Content write transport nije vratio rezultat.".into());
+                return Err(qnc_ui_text::text("db.content_writer_returned_result").into());
             }
             std::thread::sleep(Duration::from_millis(2));
         }

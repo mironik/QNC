@@ -294,7 +294,7 @@ fn encode(operation: &Operation) -> Result<Value> {
 }
 
 fn wrong() -> String {
-    "Neispravan odgovor price.".into()
+    qnc_ui_text::text("story.invalid_reply_story").into()
 }
 
 /// Reads of the Story of the active project: a read-only client of its database,

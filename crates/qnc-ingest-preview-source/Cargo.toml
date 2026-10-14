@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public adapter: Ingest content database as a source for the universal source preview (local, LAN or intranet)"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-content-artifacts = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-ingest-select = { workspace = true }

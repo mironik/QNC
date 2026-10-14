@@ -5,5 +5,6 @@ edition = "2021"
 description = "QNC public passive UI block: the keyboard overview (F1) - every key of the active preset for the scopes of a board, with its catalog label"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }

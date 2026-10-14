@@ -95,7 +95,7 @@ impl PlayerClipRecord {
     pub fn validate(&self) -> Result<()> {
         if self.name.trim().is_empty() || self.name.len() > 1024 {
             return Err(InputError::InvalidRecord(
-                "Neispravan naziv klipa u player ulazu.".into(),
+                "Invalid clip name in the player input.".into(),
             ));
         }
         self.snapshot
@@ -243,7 +243,7 @@ impl PreparedInput {
     pub fn with_lead_channels(mut self, lead: &[u16]) -> Result<Self> {
         let count = self.layout.audio_channels.len();
         if let Some(missing) = lead.iter().find(|channel| usize::from(**channel) >= count) {
-            return Err(InputError::UnsupportedMedia(format!("Klip nema audio kanal {}.", missing + 1)));
+            return Err(InputError::UnsupportedMedia(format!("The clip has no audio channel {}.", missing + 1)));
         }
         self.lead_audio_channels = lead.to_vec();
         Ok(self)
@@ -367,7 +367,7 @@ impl ClipSession<'_> {
             .reader
             .content_reader
             .as_ref()
-            .ok_or_else(|| InputError::Database("Nedostaje player content read port.".into()))?
+            .ok_or_else(|| InputError::Database("The player content reader is missing.".into()))?
             .read_clip(clip_id)
             .map_err(InputError::Database)?
             .ok_or(InputError::MissingClip)?;

@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public block: the program picture on an external screen (laptop + HDMI monitor). Runs the program output process full screen on that screen and tells it which shared-memory frame map the preview monitor shows; optional, no clock, no decode, no database"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

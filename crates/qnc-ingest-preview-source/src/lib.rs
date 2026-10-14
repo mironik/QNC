@@ -107,7 +107,7 @@ impl IngestPreviewSource {
     pub fn open_saved_clip(&mut self, clip_id: &str, saved: bool) -> Result<(), String> {
         self.preview.close();
         if !saved {
-            return Err("Klip jos nije spremljen u bazu.".into());
+            return Err(qnc_ui_text::text("ingest.msg.clip_not_saved").into());
         }
         self.preview.open(clip_id);
         let message = self.preview.take_message();
@@ -161,7 +161,7 @@ impl IngestPreviewSource {
         command: PreviewCommand,
     ) -> Result<PreviewCommandOutcome, String> {
         if !self.preview.has_player() {
-            return Err("Broadcast Player nije povezan.".into());
+            return Err(qnc_ui_text::text("player.broadcast_player_connected").into());
         }
         let started_playback = match command {
             PreviewCommand::TogglePlay => {

@@ -194,7 +194,7 @@ impl TimelineAssetReader {
         let context = self
             .context
             .as_ref()
-            .ok_or_else(|| "Timeline asset context nije postavljen.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("player.timeline_asset_context_set").to_string())?;
         let key = cache_key(context.project_id(), clip_id);
         if let Some(assets) = self.cache.get(&key) {
             return Ok(assets.clone());
@@ -208,7 +208,7 @@ impl TimelineAssetReader {
 
     pub fn refresh_clip(&mut self, clip_id: &str) -> Result<SourceTimelineAssets, String> {
         let Some(project_id) = self.context.as_ref().map(TimelineAssetContext::project_id) else {
-            return Err("Timeline asset context nije postavljen.".into());
+            return Err(qnc_ui_text::text("player.timeline_asset_context_set").into());
         };
         self.cache.remove(&cache_key(project_id, clip_id));
         self.load_clip(clip_id)
@@ -282,7 +282,7 @@ fn load_filmstrip_background(
         return Ok(None);
     }
     if record.frame_count != record.frames.len() || record.frames.len() > FILMSTRIP_FRAME_COUNT {
-        return Err("Neispravan filmstrip zapis.".into());
+        return Err(qnc_ui_text::text("player.invalid_filmstrip_record").into());
     }
     let mut frames = Vec::with_capacity(record.frames.len());
     for frame in &record.frames {

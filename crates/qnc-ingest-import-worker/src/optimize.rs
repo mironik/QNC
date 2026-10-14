@@ -25,7 +25,7 @@ pub(crate) fn make(
     let original = &clip.clip.snapshot.metadata.original;
     let source = opener
         .local_path(&original.media_uri)
-        .ok_or("Optimizirana kopija trazi original dostupan na ovom racunalu (kartica ili montirani disk).")?;
+        .ok_or(qnc_ui_text::text("import.optimised_copy_needs_original_this_computer"))?;
     let stem = safe_name(clip.clip.id(), &original.media_uri);
     let name = format!("{}.mov", stem.rsplit_once('.').map_or(stem.as_str(), |(stem, _)| stem));
     let directory = project_dir.join(FOLDER);
@@ -62,12 +62,12 @@ fn optimizer() -> Result<&'static qnc_media_optimize::Optimizer, String> {
 /// Frame N of the copy is frame N of the original: same exact frame count, same frame
 /// rate, same start timecode (when the original has one).
 pub(crate) fn same_frames(original: &MediaRepresentation, copy: &MediaRepresentation) -> Result<(), String> {
-    let (frames, rate) = picture(original).ok_or("Original nema spremljen broj slika i fps.")?;
-    let (copy_frames, copy_rate) = picture(copy).ok_or("Optimizirana kopija nema broj slika i fps.")?;
+    let (frames, rate) = picture(original).ok_or(qnc_ui_text::text("import.original_stored_picture_count_frame_rate"))?;
+    let (copy_frames, copy_rate) = picture(copy).ok_or(qnc_ui_text::text("import.optimised_copy_picture_count_frame_rate"))?;
     if (frames, rate) != (copy_frames, copy_rate) {
-        return Err(format!(
-            "Optimizirana kopija nije slika za sliku original: {copy_frames} slika {}/{} prema {frames} slika {}/{}.",
-            copy_rate.0, copy_rate.1, rate.0, rate.1
+        return Err(qnc_ui_text::fill(
+            "import.optimized_not_frame_exact",
+            &[("copy_frames", &copy_frames.to_string()), ("copy_rate", &format!("{}/{}", copy_rate.0, copy_rate.1)), ("frames", &frames.to_string()), ("rate", &format!("{}/{}", rate.0, rate.1))],
         ));
     }
     let tags = |media: &MediaRepresentation| -> Vec<(String, String)> {
@@ -79,7 +79,7 @@ pub(crate) fn same_frames(original: &MediaRepresentation, copy: &MediaRepresenta
         (rate.0, rate.1),
     );
     if timecode.and_then(|tc| tc.proxy_matches(copy_tags.iter().map(|(k, v)| (k.as_str(), v.as_str())))) == Some(false) {
-        return Err("Optimizirana kopija nema isti pocetni timecode kao original.".into());
+        return Err(qnc_ui_text::text("import.optimised_copy_does_start_at_timecode").into());
     }
     Ok(())
 }

@@ -38,7 +38,7 @@ impl TableModuleFactory for SourceIndexModule {
         access: Access,
     ) -> Result<Box<dyn TableModule>, String> {
         Ok(Box::new(Attached(
-            Store::attach(connection, access).map_err(|e| format!("Izvorni indeks: {e:?}"))?,
+            Store::attach(connection, access).map_err(|e| format!("{}: {e:?}", qnc_ui_text::text("db.source_index")))?,
         )))
     }
 }
@@ -55,7 +55,7 @@ impl TableModule for Attached {
                 db_uri: URI.into(),
                 operation,
             })
-            .map_err(|e| format!("Izvorni indeks: {e:?}"))?;
+            .map_err(|e| format!("{}: {e:?}", qnc_ui_text::text("db.source_index")))?;
         serde_json::to_value(data).map_err(|e| e.to_string())
     }
 }
@@ -72,7 +72,7 @@ impl ProjectSourceIndex {
     pub fn write(&self, batch: Batch) -> Result<Receipt, String> {
         match self.0.request(MODULE_ID, &Operation::Write(batch))? {
             Data::Written(receipt) => Ok(receipt),
-            _ => Err("Neispravan odgovor izvornog indeksa.".into()),
+            _ => Err(qnc_ui_text::text("db.invalid_reply_source_index").into()),
         }
     }
 
@@ -84,7 +84,7 @@ impl ProjectSourceIndex {
             },
         )? {
             Data::Record(record) => Ok(record.map(|r| *r)),
-            _ => Err("Neispravan odgovor izvornog indeksa.".into()),
+            _ => Err(qnc_ui_text::text("db.invalid_reply_source_index").into()),
         }
     }
 }

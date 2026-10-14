@@ -75,7 +75,7 @@ impl ContentTarget {
         match &self.binding {
             TargetBinding::Local(file) => {
                 if !file.is_file() {
-                    return Err("Projektna baza vise ne postoji.".into());
+                    return Err(qnc_ui_text::text("db.project_database_longer_exists").into());
                 }
                 ContentClient::from_owner_binding(file, &self.uri, access)
             }
@@ -187,7 +187,7 @@ impl ContentClient {
                 if let Some(stored) = &clip {
                     stored.clip.validate()?;
                     if stored.clip.id() != clip_id {
-                        return Err("Odgovor ne pripada trazenom klipu.".into());
+                        return Err(qnc_ui_text::text("db.reply_does_belong_requested_clip").into());
                     }
                 }
                 Ok(clip.map(|c| *c))
@@ -262,7 +262,7 @@ impl ContentClient {
     }
     fn execute(&mut self, operation: Operation) -> Result<Data> {
         if operation.is_write() && self.access == Access::ReadOnly {
-            return Err("Pristup je read-only.".into());
+            return Err(qnc_ui_text::text("db.access_read_only").into());
         }
         let request = Request {
             version: VERSION.into(),
@@ -339,7 +339,7 @@ impl ContentWriteTransport {
         };
         self.send
             .as_ref()
-            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .ok_or_else(|| qnc_ui_text::text("db.content_writer_running").to_string())?
             .send(command)
             .map_err(err)?;
         self.pending += 1;
@@ -353,7 +353,7 @@ impl ContentWriteTransport {
         };
         self.send
             .as_ref()
-            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .ok_or_else(|| qnc_ui_text::text("db.content_writer_running").to_string())?
             .send(command)
             .map_err(err)?;
         self.pending += 1;
@@ -367,7 +367,7 @@ impl ContentWriteTransport {
         };
         self.send
             .as_ref()
-            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .ok_or_else(|| qnc_ui_text::text("db.content_writer_running").to_string())?
             .send(command)
             .map_err(err)?;
         self.pending += 1;
@@ -427,7 +427,7 @@ impl ContentWriteTransport {
         let command = ContentWriteCommand { key, operation };
         self.send
             .as_ref()
-            .ok_or_else(|| "Content write transport nije aktivan.".to_string())?
+            .ok_or_else(|| qnc_ui_text::text("db.content_writer_running").to_string())?
             .send(command)
             .map_err(err)?;
         self.pending += 1;
@@ -513,7 +513,7 @@ fn execute_write_command(
         *client = Some(target.open(Access::ReadWrite)?);
     }
     let Some(client) = client.as_mut() else {
-        return Err("Content write transport nije otvorio bazu.".into());
+        return Err(qnc_ui_text::text("db.content_writer_did_open_database").into());
     };
     match operation {
         Operation::PublishBatch(clips) => {
@@ -575,9 +575,9 @@ pub fn respond(
         MAX_BYTES,
         |body: Request, access| {
             let result = if body.db_uri != published_uri {
-                Err("Pogresna projektna baza.".into())
+                Err(qnc_ui_text::text("db.wrong_project_database").into())
             } else if body.operation.is_write() && access == Access::ReadOnly {
-                Err("Pristup je read-only.".into())
+                Err(qnc_ui_text::text("db.access_read_only").into())
             } else {
                 store.execute(&body)
             };

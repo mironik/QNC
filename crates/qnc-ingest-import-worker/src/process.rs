@@ -48,7 +48,7 @@ impl Project {
         let dir = reader
             .local_workspace_dir(&plan.settings)
             .map_err(|e| e.to_string())?
-            .ok_or("Uvoz trazi lokalni pristup direktoriju projekta na ovom stroju.")?;
+            .ok_or(qnc_ui_text::text("import.import_needs_local_access_project_folder"))?;
         // Link needs no source; a copy from an unconfigured source fails per clip.
         let sources = SelectionConfig::load(root)
             .map(|config| config.sources)
@@ -132,9 +132,7 @@ pub fn launch_worker(root: &Path, target: &ContentTarget) -> Result<(), String> 
         .map_err(|e| e.to_string())?
         .with_file_name(&name);
     if !executable.is_file() {
-        return Err(format!(
-            "Nedostaje {name} pored aplikacije. Izgradi -p qnc-ingest-worker istim profilom."
-        ));
+        return Err(qnc_ui_text::fill("app.helper_missing", &[("name", &name.to_string()), ("package", "-p qnc-ingest-worker")]));
     }
     let mut command = Command::new(executable);
     command

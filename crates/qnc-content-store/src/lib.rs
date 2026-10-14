@@ -39,21 +39,21 @@ impl CatalogClip {
         let source = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e.to_string())?;
         if source.resource_kind != "source" || self.name.trim().is_empty() || self.name.len() > 1024
         {
-            return Err("Neispravan zapis klipa.".into());
+            return Err(qnc_ui_text::text("db.invalid_clip_record").into());
         }
         for uri in std::iter::once(&self.snapshot.binding.original_uri)
             .chain(self.snapshot.binding.proxy_uri.iter())
         {
             qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
             if !uri.starts_with(&format!("{}/", self.source_uri.trim_end_matches('/'))) {
-                return Err("Medij ne pripada zapisanom izvoru.".into());
+                return Err(qnc_ui_text::text("db.media_does_belong_recorded_source").into());
             }
         }
         if let Some(uri) = &self.thumbnail_uri {
             qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
             let parsed = qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
             if parsed.resource_kind != "source" && parsed.resource_kind != "project" {
-                return Err("Poster ne pripada izvoru ili projektu.".into());
+                return Err(qnc_ui_text::text("db.poster_belongs_neither_source_nor_project").into());
             }
         }
         Ok(())
@@ -141,7 +141,7 @@ impl StoredClipSummary {
         qnc_media_records::valid_id(&self.clip_id).map_err(|e| e.to_string())?;
         let source = qnc_contracts::parse_qnc_uri(&self.source_uri).map_err(|e| e.to_string())?;
         if source.resource_kind != "source" || self.name.trim().is_empty() {
-            return Err("Neispravan sazetak klipa.".into());
+            return Err(qnc_ui_text::text("db.invalid_clip_summary").into());
         }
         if let Some(uri) = &self.thumbnail_uri {
             qnc_contracts::parse_qnc_uri(uri).map_err(|e| e.to_string())?;
@@ -285,7 +285,7 @@ pub struct Reply {
 pub fn content_uri(workspace_uri: &str) -> Result<String> {
     let uri = qnc_contracts::parse_qnc_uri(workspace_uri).map_err(|e| e.to_string())?;
     if uri.resource_kind != "db" || !uri.resource_id.starts_with("project_workspace/") {
-        return Err("Nedostaje projektna baza iz radnih postavki.".into());
+        return Err(qnc_ui_text::text("db.project_database_work_settings_missing").into());
     }
     Ok(workspace_uri.replacen("/db/project_workspace/", "/db/ingest_content/", 1))
 }
@@ -298,9 +298,9 @@ pub(crate) fn project_id(uri: &str) -> Result<String> {
     let id = parsed
         .resource_id
         .strip_prefix("ingest_content/")
-        .ok_or("Nedostaje projektni identitet.")?;
+        .ok_or(qnc_ui_text::text("db.project_identity_missing"))?;
     if id.is_empty() || id.contains(['/', '\\', ':']) || matches!(id, "." | "..") {
-        return Err("Neispravan projektni identitet.".into());
+        return Err(qnc_ui_text::text("db.invalid_project_identity").into());
     }
     Ok(id.into())
 }

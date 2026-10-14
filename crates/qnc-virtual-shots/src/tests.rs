@@ -63,7 +63,7 @@ fn a_short_is_saved_through_the_intermediary_and_listed_oldest_first() {
 #[test]
 fn only_an_imported_clip_and_a_real_range_make_a_short() {
     let (_dir, target) = project();
-    assert!(save(&target, "clip-b", (0, 10)).unwrap_err().contains("nije uvezen"));
+    assert!(save(&target, "clip-b", (0, 10)).unwrap_err().contains("is not imported"));
     assert!(save(&target, "clip-z", (0, 10)).is_err());
     assert!(save(&target, "clip-a", (10, 10)).is_err());
     assert!(list_shorts(&target).unwrap().is_empty());

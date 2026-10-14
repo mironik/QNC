@@ -5,6 +5,7 @@ edition = "2021"
 description = "Read-only timeline asset loader for QNC"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-work-settings = { workspace = true }

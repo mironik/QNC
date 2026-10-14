@@ -274,7 +274,7 @@ impl Catalog {
         use qnc_media_metadata::{Signal, StreamDetails};
         let container = media.container.as_ref().map(|fact| fact.value.as_str());
         let Some(container) = container else {
-            return Some("spremnik nije poznat".into());
+            return Some("the container is unknown".into());
         };
         let codec = |stream: &qnc_media_metadata::MediaStream| match stream.codec.as_ref().map(|fact| &fact.value) {
             Some(Signal::Known(codec)) => Some(codec.clone()),
@@ -293,7 +293,7 @@ impl Catalog {
             }
         }
         let Some((Some(video_codec), Some(pixel_format))) = picture else {
-            return Some("nema sliku poznatog formata".into());
+            return Some("it has no picture in a known format".into());
         };
         if sounds.iter().any(Option::is_none) {
             return Some("zvuk nepoznatog formata".into());
@@ -308,11 +308,8 @@ impl Catalog {
             return None;
         }
         let sounds: Vec<&str> = sounds.iter().flatten().map(String::as_str).collect();
-        Some(format!(
-            "format nije podrzan ({container}, {video_codec} {pixel_format}{}{})",
-            if sounds.is_empty() { "" } else { ", zvuk " },
-            sounds.join(" ")
-        ))
+        let sound = if sounds.is_empty() { String::new() } else { format!(", sound {}", sounds.join(" ")) };
+        Some(format!("format not supported ({container}, {video_codec} {pixel_format}{sound})"))
     }
 
     pub fn available<'a>(&'a self, directory: &Path) -> Vec<&'a Registration> {

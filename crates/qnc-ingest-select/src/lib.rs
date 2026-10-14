@@ -165,7 +165,7 @@ impl SelectSession {
                 Ok(event) => event,
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
-                    Event::Finished(Err("Select proces je prekinut.".into()))
+                    Event::Finished(Err(qnc_ui_text::text("select.select_process_interrupted").into()))
                 }
             };
             let finished = matches!(event, Event::Finished(_));
@@ -276,10 +276,10 @@ fn run_inner(
     } = target;
     let started = std::time::Instant::now();
     if cancel.load(Ordering::Relaxed) {
-        return Err("Select je prekinut.".into());
+        return Err(qnc_ui_text::text("select.select_interrupted").into());
     }
     if registry.is_empty() {
-        return Err("Nema registriranog adaptera kamere.".into());
+        return Err(qnc_ui_text::text("select.camera_adapter_registered").into());
     }
     selected.validate()?;
     let source_config = config
@@ -343,7 +343,7 @@ fn run_inner(
         )?;
     }
     if cancel.load(Ordering::Relaxed) {
-        return Err("Select je prekinut.".into());
+        return Err(qnc_ui_text::text("select.select_interrupted").into());
     }
     let gone: Vec<_> = scanned.missing.iter().chain(&replaced).cloned().collect();
     let removed = publish::remove_missing(content_target, &project, &gone, send)?;

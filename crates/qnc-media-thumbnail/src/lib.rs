@@ -224,7 +224,7 @@ fn thumbnail(
     let reference = SourceReference::from_uri(uri).map_err(|e| e.to_string())?;
     let source = readers
         .get(reference.source_uri())
-        .ok_or("Izvor postera nije dostupan.")?;
+        .ok_or(qnc_ui_text::text("player.source_poster_available"))?;
     let data = source
         .read_bytes(&reference, qnc_image_assets::MAX_BYTES as u64)
         .map_err(|e| e.to_string())?;

@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: the timeline artifacts of a project database (filmstrip frames, wave peaks) as a table module of the project database intermediary; it knows no worker, form or application"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-content-read = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-filmstrip = { workspace = true }

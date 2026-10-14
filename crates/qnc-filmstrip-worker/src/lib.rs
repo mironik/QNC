@@ -36,7 +36,9 @@ pub const THUMB_HEIGHT: u32 = 64;
 const SEEK_PREROLL_FRAMES: u64 = 25;
 const MAX_ACTIVE_FILMSTRIP_WORKERS: usize = 2;
 const FRAME_PIPELINE_QUEUE: usize = 2;
-const FILMSTRIP_PAUSED_FOR_PLAYBACK: &str = "Filmstrip je pauziran zbog Broadcast Playera.";
+fn filmstrip_paused_for_playback() -> &'static str {
+    qnc_ui_text::text("filmstrip.filmstrip_paused_broadcast_player")
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FilmstripClipRecord {
@@ -344,7 +346,7 @@ impl TimelineFilmstripService {
             let next_after = page
                 .last()
                 .map(|clip| clip.clip_id.clone())
-                .ok_or_else(|| "Filmstrip content page je prazna.".to_string())?;
+                .ok_or_else(|| qnc_ui_text::text("filmstrip.filmstrip_content_page_empty").to_string())?;
             for clip in page {
                 let key = filmstrip_cache_key(&project_id, &clip.clip_id);
                 if self.ready.contains(&key) {
@@ -366,7 +368,7 @@ impl TimelineFilmstripService {
                 );
             }
             if after.as_deref() == Some(next_after.as_str()) {
-                return Err("Filmstrip content paging se nije pomaknuo.".into());
+                return Err(qnc_ui_text::text("filmstrip.filmstrip_content_paging_did_move").into());
             }
             after = Some(next_after);
         }
@@ -435,7 +437,7 @@ impl TimelineFilmstripService {
                 }
                 Err(TryRecvError::Disconnected) => Some(FilmstripOutcome {
                     request: self.workers[index].request.clone(),
-                    result: Err("Filmstrip worker je prekinut.".into()),
+                    result: Err(qnc_ui_text::text("filmstrip.filmstrip_worker_interrupted").into()),
                 }),
             };
             let Some(outcome) = outcome else {
@@ -470,7 +472,7 @@ impl TimelineFilmstripService {
                     });
                 }
                 Ok(_) => {}
-                Err(error) if error == FILMSTRIP_PAUSED_FOR_PLAYBACK => {
+                Err(error) if error == filmstrip_paused_for_playback() => {
                     if current_project == Some(outcome.request.project_id.as_str()) {
                         self.enqueue(outcome.request, true);
                     }
@@ -608,7 +610,7 @@ impl TimelineFilmstripService {
     ) {
         self.ensure_publisher();
         let Some(publisher) = &mut self.publisher else {
-            let error = "Filmstrip content transport nije dostupan.".to_string();
+            let error = qnc_ui_text::text("filmstrip.filmstrip_content_transport_available").to_string();
             eprintln!("{error}");
             if matches_active {
                 poll.active_error = Some(error);
@@ -705,13 +707,13 @@ fn build_timeline_background(
     cancel: &AtomicBool,
 ) -> Result<GeneratedFilmstrip, String> {
     if cancel.load(Ordering::Acquire) {
-        return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+        return Err(filmstrip_paused_for_playback().into());
     }
     let started = Instant::now();
     let clip = context
         .content_reader
         .read_clip(&request.clip_id)?
-        .ok_or_else(|| "Clip nije pronadjen u projektnoj bazi.".to_string())?;
+        .ok_or_else(|| qnc_ui_text::text("db.clip_project_database").to_string())?;
     let plan = qnc_filmstrip::plan_from_snapshot_with_artifact_name(
         &clip.snapshot,
         &context.filmstrip_root_uri,
@@ -719,7 +721,7 @@ fn build_timeline_background(
     )?;
     let media = media_for_plan(&clip.snapshot.metadata, &plan)?;
     if cancel.load(Ordering::Acquire) {
-        return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+        return Err(filmstrip_paused_for_playback().into());
     }
     let artifacts =
         LocalFilmstripArtifacts::new(&context.filmstrip_root_uri, context.filmstrip_dir.clone())?;
@@ -736,7 +738,7 @@ fn build_timeline_background(
     }
     let extract_ms = extract_started.elapsed().as_millis();
     if cancel.load(Ordering::Acquire) {
-        return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+        return Err(filmstrip_paused_for_playback().into());
     }
     let artifact = store_artifact_from_plan(&plan);
     Ok(GeneratedFilmstrip {
@@ -783,7 +785,7 @@ impl DecoderFilmstripGenerator {
         cancel: &AtomicBool,
     ) -> Result<(), String> {
         if cancel.load(Ordering::Acquire) {
-            return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+            return Err(filmstrip_paused_for_playback().into());
         }
         if plan.frames.len() < 2 {
             return Err("filmstrip requires at least two frames".into());
@@ -791,13 +793,13 @@ impl DecoderFilmstripGenerator {
         let source = sources
             .iter()
             .find(|source| source.matches_media_uri(&plan.source_uri))
-            .ok_or_else(|| "Filmstrip source binding nije pronadjen.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("filmstrip.filmstrip_source_binding_found").to_string())?;
         let output_paths = artifacts.output_paths(plan)?;
         if output_paths.iter().all(|path| file_ready(path)) {
             return Ok(());
         }
         if cancel.load(Ordering::Acquire) {
-            return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+            return Err(filmstrip_paused_for_playback().into());
         }
         let started = Instant::now();
         let result = match plan.extraction_mode {
@@ -841,7 +843,7 @@ impl DecoderFilmstripGenerator {
         let temp_dir = filmstrip_scratch_dir(&plan.clip_id);
         let result = (|| {
             if cancel.load(Ordering::Acquire) {
-                return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+                return Err(filmstrip_paused_for_playback().into());
             }
             fs::create_dir_all(&temp_dir)
                 .map_err(|error| format!("filmstrip temp dir: {error}"))?;
@@ -850,12 +852,12 @@ impl DecoderFilmstripGenerator {
             };
             extract?;
             if cancel.load(Ordering::Acquire) {
-                return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+                return Err(filmstrip_paused_for_playback().into());
             }
             prepare_output_dirs(output_paths)?;
             for (index, target) in output_paths.iter().enumerate() {
                 if cancel.load(Ordering::Acquire) {
-                    return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+                    return Err(filmstrip_paused_for_playback().into());
                 }
                 let temp = temp_dir.join(format!("{index:03}.jpg"));
                 if !file_ready(&temp) {
@@ -921,14 +923,14 @@ impl DecoderFilmstripGenerator {
         cancel: &AtomicBool,
     ) -> Result<(), String> {
         if cancel.load(Ordering::Acquire) {
-            return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+            return Err(filmstrip_paused_for_playback().into());
         }
         let (stream_index, video, origin) = video_stream(media)?;
         let mut pipeline = FrameWritePipeline::start(video, output_paths)?;
         for (target_frame, indices) in target_frame_map(plan) {
             if cancel.load(Ordering::Acquire) {
                 let _ = pipeline.finish();
-                return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+                return Err(filmstrip_paused_for_playback().into());
             }
             let start = target_frame.saturating_sub(SEEK_PREROLL_FRAMES);
             let start = (start > 0).then(|| rational_from_frame(start, plan.source_timebase));
@@ -936,7 +938,7 @@ impl DecoderFilmstripGenerator {
             loop {
                 if cancel.load(Ordering::Acquire) {
                     let _ = pipeline.finish();
-                    return Err(FILMSTRIP_PAUSED_FOR_PLAYBACK.into());
+                    return Err(filmstrip_paused_for_playback().into());
                 }
                 let Some(packet) = decoder.next_packet().map_err(|error| error.to_string())? else {
                     return Err("decoder ended before filmstrip frame".into());
@@ -1014,7 +1016,7 @@ fn media_for_plan<'a>(
         .proxy
         .as_ref()
         .filter(|proxy| proxy.media_uri == plan.source_uri)
-        .ok_or_else(|| "Filmstrip media zapis nije pronadjen u spremljenom klipu.".into())
+        .ok_or_else(|| qnc_ui_text::text("filmstrip.filmstrip_media_record_stored_clip").into())
 }
 
 fn video_stream(
@@ -1027,23 +1029,23 @@ fn video_stream(
         let index = stream
             .index
             .as_ref()
-            .ok_or_else(|| "Filmstrip video stream nema index.".to_string())?
+            .ok_or_else(|| qnc_ui_text::text("filmstrip.filmstrip_video_stream_index").to_string())?
             .value;
         let origin = (
             stream
                 .start_pts
                 .as_ref()
-                .ok_or_else(|| "Filmstrip video stream nema start PTS.".to_string())?
+                .ok_or_else(|| qnc_ui_text::text("filmstrip.filmstrip_video_stream_start_pts").to_string())?
                 .value,
             stream
                 .time_base
                 .as_ref()
-                .ok_or_else(|| "Filmstrip video stream nema time base.".to_string())?
+                .ok_or_else(|| qnc_ui_text::text("filmstrip.filmstrip_video_stream_time_base").to_string())?
                 .value,
         );
         return Ok((index, video, origin));
     }
-    Err("Filmstrip video stream nije pronadjen.".into())
+    Err(qnc_ui_text::text("filmstrip.filmstrip_video_stream_found").into())
 }
 
 fn converter_for(video: &VideoMetadata) -> Result<RasterConverter, String> {

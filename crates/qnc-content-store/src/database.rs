@@ -86,7 +86,7 @@ impl ContentStore {
                 ).map_err(err)?;
                 if tables != 0 && !project_settings {
                     return Err(
-                        "Datoteka vec sadrzi drugu shemu; nema migracije ni preuzimanja baze."
+                        qnc_ui_text::text("db.file_already_holds_another_schema_database")
                             .into(),
                     );
                 }
@@ -111,10 +111,10 @@ impl ContentStore {
                 )
                 .map_err(err)?;
             if version != SCHEMA_VERSION {
-                return Err("Nepodrzana Ingest shema; migracije nisu dopustene.".into());
+                return Err(qnc_ui_text::text("db.unsupported_ingest_schema_migrations_allowed").into());
             }
             if stored_project != id {
-                return Err("Ingest baza pripada drugom projektu.".into());
+                return Err(qnc_ui_text::text("db.ingest_database_belongs_another_project").into());
             }
         }
         if access == Access::ReadWrite {
@@ -172,7 +172,7 @@ impl ContentStore {
             return Err("Neispravan DB ugovor.".into());
         }
         if request.operation.is_write() && self.access == Access::ReadOnly {
-            return Err("Pristup je read-only.".into());
+            return Err(qnc_ui_text::text("db.access_read_only").into());
         }
         if !self.schema_ready {
             return match &request.operation {
@@ -183,7 +183,7 @@ impl ContentStore {
                 Operation::Inventory { source_uri, .. } => {
                     let source = qnc_contracts::parse_qnc_uri(source_uri).map_err(err)?;
                     if source.resource_kind != "source" {
-                        return Err("Neispravan izvor.".into());
+                        return Err(qnc_ui_text::text("db.invalid_source").into());
                     }
                     Ok(Data::Inventory(Vec::new()))
                 }
@@ -191,7 +191,7 @@ impl ContentStore {
                     qnc_media_records::valid_id(clip_id).map_err(err)?;
                     Ok(Data::Clip(None))
                 }
-                _ => Err("Ingest shema nije inicijalizirana.".into()),
+                _ => Err(qnc_ui_text::text("db.ingest_schema_initialised").into()),
             };
         }
         self.dispatch(&request.operation)
@@ -202,7 +202,7 @@ impl ContentStore {
             Operation::Publish(clip) => self.publish(clip),
             Operation::PublishBatch(clips) => {
                 if clips.is_empty() || clips.len() > 16 {
-                    return Err("Neispravna velicina upisnog paketa.".into());
+                    return Err(qnc_ui_text::text("db.invalid_write_batch_size").into());
                 }
                 let tx = self
                     .conn
@@ -217,7 +217,7 @@ impl ContentStore {
             Operation::Inventory { source_uri, after } => {
                 let source = qnc_contracts::parse_qnc_uri(source_uri).map_err(err)?;
                 if source.resource_kind != "source" {
-                    return Err("Neispravan izvor.".into());
+                    return Err(qnc_ui_text::text("db.invalid_source").into());
                 }
                 let mut stmt = self.conn.prepare(
                     "SELECT clip_id,source_uri,original_uri,revision,final FROM clips WHERE source_uri=?1 AND clip_id>?2 ORDER BY clip_id LIMIT ?3"
@@ -242,7 +242,7 @@ impl ContentStore {
             }
             Operation::RemoveMissing { clips } => {
                 if clips.len() > 4096 {
-                    return Err("Previse klipova u naredbi.".into());
+                    return Err(qnc_ui_text::text("db.too_many_clips_one_command").into());
                 }
                 let tx = self
                     .conn
@@ -326,7 +326,7 @@ impl ContentStore {
             Operation::Stats => self.catalog_stats().map(Data::CatalogStats),
             Operation::Select { clip_ids, selected } => {
                 if clip_ids.len() > 4096 {
-                    return Err("Previse klipova u naredbi.".into());
+                    return Err(qnc_ui_text::text("db.too_many_clips_one_command").into());
                 }
                 let tx = self
                     .conn
@@ -341,7 +341,7 @@ impl ContentStore {
                         .map_err(err)?
                         != 1
                     {
-                        return Err("Clip nije pronadjen u projektnoj bazi.".into());
+                        return Err(qnc_ui_text::text("db.clip_project_database").into());
                     }
                 }
                 tx.commit().map_err(err)?;
@@ -360,11 +360,11 @@ impl ContentStore {
                     .map_err(err)?;
                 drop(stmt);
                 if clips.is_empty() {
-                    return Err("Nema odabranih klipova.".into());
+                    return Err(qnc_ui_text::text("ingest.msg.no_clips_selected").into());
                 }
                 if clips.iter().any(|c| !ready(c)) {
                     return Err(
-                        "Odabrani klip nema zavrsene metapodatke u bazi. Novi probe nije dopusten."
+                        qnc_ui_text::text("db.chosen_clip_finished_metadata_database_new")
                             .into(),
                     );
                 }
@@ -403,7 +403,7 @@ impl ContentStore {
                     || !key.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
                     || value.len() > 4096
                 {
-                    return Err("Neispravan runtime zapis.".into());
+                    return Err(qnc_ui_text::text("db.invalid_runtime_record").into());
                 }
                 self.conn
                     .execute(
@@ -450,14 +450,14 @@ impl ContentStore {
                     )
                     .map_err(err)?;
                 if n != 1 {
-                    return Err("Import posao nije preuzet ili je vec zavrsen.".into());
+                    return Err(qnc_ui_text::text("db.import_job_taken_already_finished").into());
                 }
                 Ok(Data::Changed)
             }
             Operation::SetPoster { clip_id, thumbnail_uri } => {
                 qnc_contracts::parse_qnc_uri(thumbnail_uri).map_err(err)?;
                 if !self.has_thumbnail_uri {
-                    return Err("Baza nema zapis postera.".into());
+                    return Err(qnc_ui_text::text("db.database_poster_record").into());
                 }
                 self.conn
                     .execute(
@@ -476,23 +476,23 @@ impl ContentStore {
                 error,
             } => {
                 if media_uri.is_some() == error.is_some() {
-                    return Err("Nedostaje ishod importa.".into());
+                    return Err(qnc_ui_text::text("db.import_result_missing").into());
                 }
                 if optimized.is_some() && media_uri.is_none() {
                     return Err("Optimizirana kopija bez uvezenog medija.".into());
                 }
                 if optimized.as_ref().is_some_and(|media| qnc_contracts::parse_qnc_uri(&media.media_uri).is_err()) {
-                    return Err("Neispravna adresa optimizirane kopije.".into());
+                    return Err(qnc_ui_text::text("db.invalid_address_optimised_copy").into());
                 }
                 if (copy_of.is_some() || optimized.is_some()) && !self.has_copy_of {
-                    return Err("Baza nema zapis o kopiji uvezenog medija.".into());
+                    return Err(qnc_ui_text::text("db.database_record_copy_imported_media").into());
                 }
                 let optimized = optimized.as_ref().map(serde_json::to_string).transpose().map_err(err)?;
                 if copy_of.is_some() && media_uri.is_none() {
                     return Err("Kopija bez uvezenog medija.".into());
                 }
                 if copy_of.is_some() && !self.has_copy_of {
-                    return Err("Baza nema zapis o kopiji uvezenog medija.".into());
+                    return Err(qnc_ui_text::text("db.database_record_copy_imported_media").into());
                 }
                 let copy_of = copy_of.map(ImportedCopy::as_str);
                 if let Some(uri) = media_uri {
@@ -517,7 +517,7 @@ impl ContentStore {
                 }
                 .map_err(err)?;
                 if n != 1 {
-                    return Err("Import posao nije preuzet ili je vec zavrsen.".into());
+                    return Err(qnc_ui_text::text("db.import_job_taken_already_finished").into());
                 }
                 Ok(Data::Changed)
             }
@@ -546,7 +546,7 @@ impl ContentStore {
             let clip_id: String = row.get(0).map_err(err)?;
             let revision_raw: i64 = row.get(1).map_err(err)?;
             let revision = u32::try_from(revision_raw)
-                .map_err(|_| "Neispravna revizija klipa u Ingest bazi.")?;
+                .map_err(|_| qnc_ui_text::text("db.invalid_clip_revision_ingest_database"))?;
             let selected: bool = row.get(2).map_err(err)?;
             let import_status: String = row.get(3).map_err(err)?;
             let import_error: Option<String> = row.get(4).map_err(err)?;
@@ -605,7 +605,7 @@ impl ContentStore {
             if old.source_uri != stored.source_uri
                 || old.snapshot.binding != stored.snapshot.binding
             {
-                return Err("Postojeci clip_id ne smije preuzeti drugi izvor ili medij.".into());
+                return Err(qnc_ui_text::text("db.existing_clip_id_must_take_another").into());
             }
             if final_record {
                 if stored.snapshot.phase != Phase::Final {
@@ -615,16 +615,16 @@ impl ContentStore {
                     stored.media_records_uri = old.media_records_uri;
                     stored.snapshot = old.snapshot;
                 } else {
-                    return Err("Zavrseni probe zapis se ne smije zamijeniti.".into());
+                    return Err(qnc_ui_text::text("db.finished_probe_record_must_be_replaced").into());
                 }
             }
             if revision > stored.snapshot.revision as i64 {
-                return Err("Zavrseni probe zapis se ne smije zamijeniti.".into());
+                return Err(qnc_ui_text::text("db.finished_probe_record_must_be_replaced").into());
             }
         }
         let json = serde_json::to_string(&stored).map_err(err)?;
         if json.len() > MAX_BYTES / PAGE_SIZE {
-            return Err("Prevelik zapis klipa.".into());
+            return Err(qnc_ui_text::text("db.clip_record_too_large").into());
         }
         let clip = &stored;
         let original = &clip.snapshot.metadata.original;
@@ -732,7 +732,7 @@ fn validate_container_snapshot(conn: &Connection, id: &str) -> Result<()> {
             )
             .map_err(err)?;
         if !matches {
-            return Err("Projektna baza pripada drugom projektu.".into());
+            return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
     }
     let has_content: bool = conn
@@ -748,7 +748,7 @@ fn validate_container_snapshot(conn: &Connection, id: &str) -> Result<()> {
             params![id, SCHEMA_VERSION], |r| r.get(0),
         ).map_err(err)?;
         if !matches {
-            return Err("Pogresan projekt ili verzija Ingest baze; nema migracije.".into());
+            return Err(qnc_ui_text::text("db.wrong_project_version_ingest_database_migration").into());
         }
     } else if !has_project {
         let count: i64 = conn
@@ -759,7 +759,7 @@ fn validate_container_snapshot(conn: &Connection, id: &str) -> Result<()> {
             )
             .map_err(err)?;
         if count != 0 {
-            return Err("Nepoznata postojeca baza nije Ingest odrediste.".into());
+            return Err(qnc_ui_text::text("db.unknown_existing_database_ingest_destination").into());
         }
     }
     Ok(())

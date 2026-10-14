@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-source-reader = { workspace = true }
 

@@ -714,7 +714,7 @@ fn select_without_any_registered_camera_is_a_controlled_error() {
         &CameraRegistry::new(),
     )
     .unwrap_err();
-    assert!(error.to_string().contains("adaptera kamere"));
+    assert!(error.to_string().contains("camera adapter"));
 }
 
 #[test]

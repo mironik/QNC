@@ -53,7 +53,7 @@ impl Delivery {
     pub fn from_export(export: &Value) -> Result<Self> {
         let text = |key: &str| export.get(key).and_then(Value::as_str).map(str::to_string);
         let number = |key: &str| export.get(key).and_then(Value::as_f64);
-        let missing = |key: &str| format!("Exportne postavke nemaju {key}.");
+        let missing = |key: &str| qnc_ui_text::fill("render.export_setting_missing", &[("key", key)]);
         let field_order = text("field_order").ok_or_else(|| missing("field_order"))?;
         let delivery = Self {
             video_codec: text("video_codec").ok_or_else(|| missing("video_codec"))?,
@@ -67,7 +67,7 @@ impl Delivery {
             encoder: None,
         };
         if delivery.width == 0 || delivery.height == 0 || delivery.fps <= 0.0 || delivery.audio_channels == 0 {
-            return Err("Exportne postavke imaju neispravan format.".into());
+            return Err(qnc_ui_text::text("render.export_settings_have_invalid_format").into());
         }
         delivery.supported()?;
         Ok(delivery)
@@ -112,17 +112,14 @@ impl Delivery {
     /// Whether the unit's frames are the delivery's frames (same rate, progressive).
     fn check(&self, unit: &RenderUnit) -> Result<()> {
         if self.interlaced {
-            return Err("Prerender jos ne radi isprepletenu predaju (field_order); prica je progresivna.".into());
+            return Err(qnc_ui_text::text("render.prerender_does_make_interlaced_delivery_yet").into());
         }
         let program = unit.program_rate.fps_num as f64 / unit.program_rate.fps_den.max(1) as f64;
         if (program - self.fps).abs() > 0.01 {
-            return Err(format!("Stopa price {program:.3} nije stopa predaje {:.3}.", self.fps));
+            return Err(qnc_ui_text::fill("render.rate_not_delivery", &[("story", &format!("{program:.3}")), ("delivery", &format!("{:.3}", self.fps))]));
         }
         if unit.sample_rate != self.audio_sample_rate {
-            return Err(format!(
-                "Frekvencija zvuka price {} nije frekvencija predaje {}.",
-                unit.sample_rate, self.audio_sample_rate
-            ));
+            return Err(qnc_ui_text::fill("render.sample_rate_not_delivery", &[("story", &unit.sample_rate.to_string()), ("delivery", &self.audio_sample_rate.to_string())]));
         }
         if unit.channels > self.audio_channels {
             return Err(format!(
@@ -185,9 +182,9 @@ pub fn render(
     let result = std::thread::scope(|scope| {
         let sound = scope.spawn(|| sound_of(unit, delivery, decoders, access, cancel));
         let picture = encode_picture(unit, delivery, decoders, access, ffmpeg, &video_file, cancel);
-        let sound = sound.join().map_err(|_| "Zvuk prerendera je pao.".to_string())?;
+        let sound = sound.join().map_err(|_| qnc_ui_text::text("render.prerender_sound_failed").to_string())?;
         picture?;
-        std::fs::write(&audio_file, sound?).map_err(|e| format!("Zvuk prerendera se ne moze zapisati: {e}"))?;
+        std::fs::write(&audio_file, sound?).map_err(|e| qnc_ui_text::fill("render.sound_write_failed", &[("error", &e.to_string())]))?;
         mux(unit, delivery, ffmpeg, &video_file, &audio_file, out)
     });
     let _ = std::fs::remove_file(&video_file);
@@ -310,7 +307,7 @@ fn open(
     decoders: &DecoderConfig,
     access: &MediaAccess,
 ) -> Result<Decoder> {
-    let (endpoint, stamp) = access(media).map_err(|e| format!("Medij prerendera nije dostupan: {e}"))?;
+    let (endpoint, stamp) = access(media).map_err(|e| qnc_ui_text::fill("render.media_unavailable", &[("error", &e.to_string())]))?;
     let request = DecodeRequest {
         version: VERSION.into(),
         media: media.clone(),
@@ -338,19 +335,19 @@ fn sound_of(
     for part in &unit.audio {
         let output = usize::from(part.output);
         if output >= channels {
-            return Err(format!("Izlazni kanal {} nije u predaji.", output + 1));
+            return Err(qnc_ui_text::fill("render.channel_not_in_delivery", &[("channel", &(output + 1).to_string())]));
         }
         let mut decoder = open(&part.media, part.stream_index, part.start, None, false, None, decoders, access)?;
         let width = usize::from(part.stream_channels);
         let mut filled = 0usize;
         while filled < samples {
             if cancel.load(Ordering::Relaxed) {
-                return Err("Prerender je prekinut.".into());
+                return Err(qnc_ui_text::text("render.prerender_interrupted").into());
             }
             let packet = decoder
                 .next_packet()
                 .map_err(|e| e.to_string())?
-                .ok_or("Zvuk izvora zavrsava prije kraja jedinice.")?;
+                .ok_or(qnc_ui_text::text("render.source_sound_ends_before_end_unit"))?;
             if packet.format
                 != (DecodedFormat::Audio {
                     sample_rate_hz: unit.sample_rate,
@@ -358,10 +355,10 @@ fn sound_of(
                     sample_format: "f32le".into(),
                 })
             {
-                return Err("Zvuk izvora nije u formatu price.".into());
+                return Err(qnc_ui_text::text("render.source_sound_story_format").into());
             }
             let at = position(packet.pts, packet.time_base, part.origin, i64::from(unit.sample_rate), 1)
-                .ok_or("Vremenska oznaka zvuka nije na mrezi uzoraka.")?;
+                .ok_or(qnc_ui_text::text("render.sound_timestamp_sample_grid"))?;
             for (index, frame) in packet.bytes.chunks_exact(width * 4).enumerate() {
                 let sample = at + index as u64;
                 if sample < part.first_sample {
@@ -372,7 +369,7 @@ fn sound_of(
                     break;
                 }
                 if slot != filled {
-                    return Err("Zvuk izvora preskace uzorke.".into());
+                    return Err(qnc_ui_text::text("render.source_sound_skips_samples").into());
                 }
                 let offset = usize::from(part.channel_index) * 4;
                 pcm[slot * channels + output] = f32::from_le_bytes(frame[offset..offset + 4].try_into().expect("sample"));
@@ -413,7 +410,7 @@ fn encode_picture(
             // The first picture of the unit tells the layout the encoder reads.
             let packet = next_picture(&mut decoder, part, part.first_frame, cancel)?;
             let DecodedFormat::Video { width, height, pixel_format } = &packet.format else {
-                return Err("Slika izvora nije slika.".into());
+                return Err(qnc_ui_text::text("render.source_picture_picture").into());
             };
             command.args(["-f", "rawvideo", "-pix_fmt", pixel_format, "-s", &format!("{width}x{height}"), "-r", &rate, "-i", "pipe:0"]);
             source = Some((part, decoder, packet.bytes));
@@ -457,10 +454,7 @@ fn encode_picture(
     let output = child.wait_with_output().map_err(|e| e.to_string())?;
     fed?;
     if !output.status.success() {
-        return Err(format!(
-            "Koder prerendera je javio gresku: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        return Err(qnc_ui_text::fill("render.encoder_error", &[("error", String::from_utf8_lossy(&output.stderr).trim())]));
     }
     Ok(())
 }
@@ -475,19 +469,19 @@ fn next_picture(
 ) -> Result<qnc_media_decode::DecodedPacket> {
     loop {
         if cancel.load(Ordering::Relaxed) {
-            return Err("Prerender je prekinut.".into());
+            return Err(qnc_ui_text::text("render.prerender_interrupted").into());
         }
         let packet = decoder
             .next_packet()
             .map_err(|e| e.to_string())?
-            .ok_or("Slika izvora zavrsava prije kraja jedinice.")?;
+            .ok_or(qnc_ui_text::text("render.source_picture_ends_before_end_unit"))?;
         let at = position(packet.pts, packet.time_base, part.origin, part.frame_rate.0, part.frame_rate.1)
-            .ok_or("Vremenska oznaka slike nije na mrezi slika.")?;
+            .ok_or(qnc_ui_text::text("render.picture_timestamp_picture_grid"))?;
         if at < frame {
             continue;
         }
         if at != frame {
-            return Err("Dekoder je preskocio sliku izvora.".into());
+            return Err(qnc_ui_text::text("render.decoder_skipped_source_picture").into());
         }
         return Ok(packet);
     }

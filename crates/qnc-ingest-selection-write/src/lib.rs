@@ -46,7 +46,7 @@ impl SelectionWriter {
         unselected: Vec<String>,
     ) -> Result<(), String> {
         if self.is_busy() {
-            return Err("Upis odabira je u tijeku.".into());
+            return Err(qnc_ui_text::text("ingest.selection_being_written").into());
         }
         let (send, receive) = mpsc::sync_channel(1);
         let thread = std::thread::Builder::new()
@@ -65,7 +65,7 @@ impl SelectionWriter {
         let receiver = self.result.as_ref()?;
         let outcome = match receiver.try_recv() {
             Ok(outcome) => outcome,
-            Err(TryRecvError::Disconnected) => Err("Upis odabira je prekinut.".into()),
+            Err(TryRecvError::Disconnected) => Err(qnc_ui_text::text("ingest.writing_selection_interrupted").into()),
             Err(TryRecvError::Empty) => return None,
         };
         self.finish();
@@ -130,7 +130,7 @@ fn run<E: ToString>(
             }
         }
         if !transport.has_pending() {
-            return Err("Content write transport nije vratio rezultat.".into());
+            return Err(qnc_ui_text::text("db.content_writer_returned_result").into());
         }
         std::thread::sleep(Duration::from_millis(2));
     }

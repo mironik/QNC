@@ -85,7 +85,7 @@ pub fn show(ctx: &egui::Context, catalog: &ShortcutCatalog, scopes: &[&str], tog
             .default_height(620.0)
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    ui.heading("Kako čitati tipke");
+                    ui.heading(qnc_ui_text::text("keys.how_read_keys"));
                     let rules = catalog.help.rules.iter().map(|rule| (rule.keys.clone(), rule.meaning.clone()));
                     grid(ui, "qnc_key_cheatsheet_rules", rules);
                     ui.add_space(10.0);

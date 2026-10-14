@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-player-client = { workspace = true }
 qnc-player-input = { workspace = true }

@@ -223,11 +223,11 @@ fn complete_clip(
     let camera = parts
         .records
         .read(clip.id(), None)?
-        .ok_or("Zapis medija klipa nije u bazi projekta.")?;
+        .ok_or(qnc_ui_text::text("record.media_record_clip_project_database"))?;
     let source_record = parts
         .sources
         .read(&camera.binding.source_record_id)?
-        .ok_or("Izvorni zapis klipa nije u bazi projekta.")?;
+        .ok_or(qnc_ui_text::text("record.source_record_clip_project_database"))?;
     let needed =
         qnc_media_metadata_compose::required_probes(&camera).map_err(|e| format!("{e:?}"))?;
     let media = needed

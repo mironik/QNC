@@ -225,7 +225,7 @@ fn process_record(
     // format a decoder of this host can play (user 2026-10-09: filter by format).
     let snapshot = if snapshot.phase == Phase::Final {
         if snapshot.completeness == Completeness::Partial {
-            return Err("Baza sadrzi nepotpune metapodatke. Nema ponovnog probea.".into());
+            return Err(qnc_ui_text::text("select.database_holds_incomplete_metadata_there_second").into());
         }
         snapshot
     } else {
@@ -234,12 +234,12 @@ fn process_record(
             // A file the probe cannot read (a container the probe does not allow, a broken
             // file) is no clip either; an interrupted probe stays an error for a new Select.
             Err(qnc_record_probe::Error::Unreadable(message)) => {
-                return Ok(Some(format!("format nije podrzan ({message})")));
+                return Ok(Some(qnc_ui_text::fill("select.format_not_supported", &[("detail", &message)])));
             }
             Err(error) => return Err(error.to_string().into()),
         };
         if probed.completeness == Completeness::Partial {
-            return Err("Nepotpuni metapodaci spremljeni; ponovni probe nije dopusten.".into());
+            return Err(qnc_ui_text::text("select.incomplete_metadata_saved_second_probe_allowed").into());
         }
         probed
     };

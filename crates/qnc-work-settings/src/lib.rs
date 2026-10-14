@@ -176,7 +176,7 @@ impl SettingsReader {
         {
             return Err(ReadError::new(
                 "transport_config",
-                "Mrezni pristup zahtijeva HTTPS; HTTP je dopusten samo na loopback adresi.",
+                "Network access needs HTTPS; HTTP is allowed only on a loopback address.",
             ));
         }
         let authority = parsed.authority.as_deref().ok_or_else(config_error)?;
@@ -210,7 +210,7 @@ impl SettingsReader {
             .map_err(|_| {
                 ReadError::new(
                     "transport_unavailable",
-                    "Transport baze radnih postavki nije dostupan ili pristup nije odobren.",
+                    "The work settings database transport is not available or access is not granted.",
                 )
             })?;
         let mut bytes = Vec::new();
@@ -231,7 +231,7 @@ impl SettingsReader {
         )) {
             return Err(ReadError::new(
                 "wrong_authority",
-                "Odgovor ne pripada trazenom transport izvoru.",
+                "The reply does not belong to the requested transport source.",
             ));
         }
         Ok(result)
@@ -257,6 +257,6 @@ pub(crate) fn registry_context(uri: &str) -> Result<String, ReadError> {
 fn config_error() -> ReadError {
     ReadError::new(
         "transport_config",
-        "Neispravna transport konfiguracija ili odgovor baze radnih postavki.",
+        "Invalid transport configuration or reply of the work settings database.",
     )
 }

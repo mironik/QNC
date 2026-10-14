@@ -119,7 +119,7 @@ impl WorkSettings {
             Some("optimized_if_available") => Ok(PlaybackInput::OptimizedIfAvailable),
             _ => Err(ReadError::new(
                 "playback_input",
-                "Baza sadrzi nepodrzani playback.input.",
+                "The database holds an unsupported playback.input.",
             )),
         }
     }
@@ -136,7 +136,7 @@ impl WorkSettings {
             Some("off") => Ok(ArtifactMode::Off),
             _ => Err(ReadError::new(
                 "artifacts",
-                "Projektne postavke nemaju valjan artifacts.filmstrip / artifacts.wave.",
+                "The project settings have no valid artifacts.filmstrip / artifacts.wave.",
             )),
         }
     }
@@ -154,7 +154,7 @@ impl WorkSettings {
             .and_then(|value| u16::try_from(value).ok())
             .filter(|value| (1..=64).contains(value))
             .ok_or_else(|| {
-                ReadError::new("audio_channels", "Baza sadrzi nepodrzani audio.channels.")
+                ReadError::new("audio_channels", "The database holds an unsupported audio.channels.")
             })
     }
 
@@ -223,7 +223,7 @@ impl WorkSettings {
         if self.contract_version != VERSION {
             return Err(ReadError::new(
                 "contract_version",
-                "Nepodrzana verzija radnih postavki.",
+                "Unsupported version of the work settings.",
             ));
         }
         if self.project_id.is_empty() || self.project_id.contains(['/', '\\', ':']) {
@@ -307,7 +307,7 @@ impl WorkSettings {
     /// a project made before the prerender has none (a controlled error, no default).
     pub fn prerender_location(&self, project_dir: &Path) -> Result<(PathBuf, String), ReadError> {
         let relative = self.products.prerender.as_deref().ok_or_else(|| {
-            ReadError::new("products_prerender", "Projekt nema mapu za prerender (products.prerender).")
+            ReadError::new("products_prerender", "The project has no prerender folder (products.prerender).")
         })?;
         Ok((
             project_dir.join(relative),
@@ -354,7 +354,7 @@ impl ProductLocations {
 fn incomplete() -> ReadError {
     ReadError::new(
         "incomplete_settings",
-        "Baza nema potpune radne postavke. Nema zamjenskih postavki.",
+        "The database has no complete work settings. There are no substitute settings.",
     )
 }
 

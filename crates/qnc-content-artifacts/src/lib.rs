@@ -69,7 +69,7 @@ impl SharedRead {
         let mut guard = self
             .client
             .lock()
-            .map_err(|_| "Veza prema projektnoj bazi nije dostupna.".to_string())?;
+            .map_err(|_| qnc_ui_text::text("db.connection_project_database_available").to_string())?;
         if guard.open.is_none() {
             guard.open = Some(self.target.open(qnc_content_store::Access::ReadOnly)?);
         }
@@ -118,7 +118,7 @@ impl SharedArtifacts {
         let mut guard = self
             .client
             .lock()
-            .map_err(|_| "Veza prema projektnoj bazi nije dostupna.".to_string())?;
+            .map_err(|_| qnc_ui_text::text("db.connection_project_database_available").to_string())?;
         if guard.open.is_none() {
             guard.open = Some(ArtifactReader::open(&self.target)?);
         }
@@ -420,7 +420,7 @@ pub fn timeline_artifact_reader(
     let project_dir = reader
         .local_workspace_dir(settings)
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Artefakti timelinea nemaju lokalni binding projekta.".to_string())?;
+        .ok_or_else(|| qnc_ui_text::text("artifact.timeline_artifacts_have_local_binding_project").to_string())?;
     Ok(Arc::new(ProjectTimelineArtifactReader {
         artifacts: SharedArtifacts::new(ProjectDbTarget::for_project(reader, settings)?),
         filmstrip_root_uri: settings.product_uri(ProductArea::Filmstrip),
@@ -437,7 +437,7 @@ pub fn artifacts_context(
     let project_dir = reader
         .local_workspace_dir(settings)
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Artefakti timelinea nemaju lokalni binding projekta.".to_string())?;
+        .ok_or_else(|| qnc_ui_text::text("artifact.timeline_artifacts_have_local_binding_project").to_string())?;
     let filmstrip_dir = settings.product_local_dir(&project_dir, ProductArea::Filmstrip);
     let project_audio_channels = settings.audio_channels().map_err(|e| e.to_string())?;
     let filmstrip_root_uri = settings.product_uri(ProductArea::Filmstrip);
@@ -521,7 +521,7 @@ impl ProjectArtifacts {
         let root = self
             .host_root
             .as_deref()
-            .ok_or_else(|| "Nedostaje host konfiguracija izvora medija.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("source.media_source_configuration_this_computer_missing").to_string())?;
         Ok(qnc_source_bindings::load(root)?.sources)
     }
 

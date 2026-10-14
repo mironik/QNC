@@ -27,7 +27,9 @@ use std::{
 pub const MODULE_ID: &str = "qnc.module.wave-worker";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const MAX_ACTIVE_WAVE_WORKERS: usize = 2;
-const WAVE_PAUSED_FOR_PLAYBACK: &str = "Wave worker je pauziran zbog Broadcast Playera.";
+fn wave_paused_for_playback() -> &'static str {
+    qnc_ui_text::text("wave.wave_worker_paused_broadcast_player")
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WaveClipRecord {
@@ -310,7 +312,7 @@ impl TimelineWaveService {
             let next_after = page
                 .last()
                 .map(|clip| clip.clip_id.clone())
-                .ok_or_else(|| "Wave content page je prazna.".to_string())?;
+                .ok_or_else(|| qnc_ui_text::text("wave.wave_content_page_empty").to_string())?;
             for clip in page {
                 let request = WaveRequest {
                     project_id: project_id.clone(),
@@ -329,7 +331,7 @@ impl TimelineWaveService {
                 self.enqueue(request, clip.priority);
             }
             if after.as_deref() == Some(next_after.as_str()) {
-                return Err("Wave content paging se nije pomaknuo.".into());
+                return Err(qnc_ui_text::text("wave.wave_content_paging_did_move").into());
             }
             after = Some(next_after);
         }
@@ -405,7 +407,7 @@ impl TimelineWaveService {
                 }
                 Err(TryRecvError::Disconnected) => Some(WaveOutcome {
                     request: self.workers[index].request.clone(),
-                    result: Err("Wave worker je prekinut.".into()),
+                    result: Err(qnc_ui_text::text("wave.wave_worker_interrupted").into()),
                 }),
             };
             let Some(outcome) = outcome else {
@@ -457,7 +459,7 @@ impl TimelineWaveService {
                     });
                 }
                 Ok(_) => {}
-                Err(error) if error == WAVE_PAUSED_FOR_PLAYBACK => {
+                Err(error) if error == wave_paused_for_playback() => {
                     wave_log(|| {
                         format!(
                             "qnc-wave-worker-paused: clip={} reason=playback_priority",
@@ -593,7 +595,7 @@ impl TimelineWaveService {
     ) {
         self.ensure_publisher();
         let Some(publisher) = &mut self.publisher else {
-            let error = "Wave content transport nije dostupan.".to_string();
+            let error = qnc_ui_text::text("wave.wave_content_transport_available").to_string();
             wave_log(|| format!("qnc-wave-worker-error: stage=publish_queue error={error}"));
             if matches_active {
                 poll.active_error = Some(error);
@@ -635,7 +637,7 @@ fn build_timeline_wave(
     cancel: &AtomicBool,
 ) -> Result<GeneratedWave, String> {
     if cancel.load(Ordering::Acquire) {
-        return Err(WAVE_PAUSED_FOR_PLAYBACK.into());
+        return Err(wave_paused_for_playback().into());
     }
     let started = Instant::now();
     if let Some(record) = context.content_reader.read_wave(&request.clip_id)? {
@@ -650,7 +652,7 @@ fn build_timeline_wave(
     let clip = context
         .content_reader
         .read_clip(&request.clip_id)?
-        .ok_or_else(|| "Clip nije pronadjen u projektnoj bazi.".to_string())?;
+        .ok_or_else(|| qnc_ui_text::text("db.clip_project_database").to_string())?;
     let plan = qnc_wave::plan_from_snapshot_with_project_audio_channels(
         &clip.snapshot,
         &context.wave_root_uri,
@@ -658,16 +660,16 @@ fn build_timeline_wave(
         context.project_audio_channels,
     )?;
     if cancel.load(Ordering::Acquire) {
-        return Err(WAVE_PAUSED_FOR_PLAYBACK.into());
+        return Err(wave_paused_for_playback().into());
     }
     let source = source_for_uri(&context.source_bindings, &plan.source_uri)?;
     let media = qnc_wave::media_for_plan(&clip.snapshot, &plan)?;
     let lane_peaks = decode_wave(&plan, media, source, cancel)?;
     let has_a2 = lane_peaks.iter().any(|(lane, _)| *lane == WaveLane::A2);
-    let warning = (!has_a2).then(|| "Izvor nema A2 audio kanal.".to_string());
+    let warning = (!has_a2).then(|| qnc_ui_text::text("wave.source_a2_audio_channel").to_string());
     let artifact = qnc_wave::artifact_record_from_lane_peaks(&plan, lane_peaks, warning)?;
     if !wave_artifact_ready(&artifact) {
-        return Err("Wave rezultat nije spreman.".to_string());
+        return Err(qnc_ui_text::text("wave.wave_result_ready").to_string());
     }
     Ok(GeneratedWave {
         artifact,
@@ -698,7 +700,7 @@ fn decode_wave(
         qnc_decoder_catalog::installed_config().map_err(|error| error.to_string())?;
     for stream_index in streams {
         if cancel.load(Ordering::Acquire) {
-            return Err(WAVE_PAUSED_FOR_PLAYBACK.into());
+            return Err(wave_paused_for_playback().into());
         }
         let (source_channels, sample_rate_hz, origin) = audio_stream_facts(media, stream_index)?;
         let mut collector = StreamPeakCollector::new(plan, stream_index)?;
@@ -706,7 +708,7 @@ fn decode_wave(
         loop {
             if cancel.load(Ordering::Acquire) {
                 decoder.cancel();
-                return Err(WAVE_PAUSED_FOR_PLAYBACK.into());
+                return Err(wave_paused_for_playback().into());
             }
             let Some(packet) = decoder.next_packet().map_err(|error| error.to_string())? else {
                 break;
@@ -731,7 +733,7 @@ fn decode_wave(
         }
     }
     if !by_lane.contains_key(&WaveLane::A1) {
-        return Err("Wave nije dobio A1 kanal.".to_string());
+        return Err(qnc_ui_text::text("wave.wave_got_a1_channel").to_string());
     }
     Ok(by_lane.into_iter().collect())
 }
@@ -802,30 +804,30 @@ fn audio_stream_facts(
                 .as_ref()
                 .is_some_and(|index| index.value == stream_index)
         })
-        .ok_or_else(|| "Wave audio stream nije pronadjen.".to_string())?;
+        .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_found").to_string())?;
     let StreamDetails::Audio(audio) = &stream.details else {
-        return Err("Wave stream nije audio.".into());
+        return Err(qnc_ui_text::text("wave.wave_stream_audio").into());
     };
     let source_channels = audio
         .channels
         .as_ref()
-        .ok_or_else(|| "Wave audio stream nema broj kanala.".to_string())?
+        .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_channel_count").to_string())?
         .value;
     let sample_rate_hz = audio
         .sample_rate_hz
         .as_ref()
-        .ok_or_else(|| "Wave audio stream nema sample rate.".to_string())?
+        .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_sample_rate").to_string())?
         .value;
     let origin = (
         stream
             .start_pts
             .as_ref()
-            .ok_or_else(|| "Wave audio stream nema start PTS.".to_string())?
+            .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_start_pts").to_string())?
             .value,
         stream
             .time_base
             .as_ref()
-            .ok_or_else(|| "Wave audio stream nema time base.".to_string())?
+            .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_time_base").to_string())?
             .value,
     );
     Ok((source_channels, sample_rate_hz, origin))
@@ -838,7 +840,7 @@ fn source_for_uri<'a>(
     sources
         .iter()
         .find(|source| source.matches_media_uri(media_uri))
-        .ok_or_else(|| "Wave source transport nije registriran.".to_string())
+        .ok_or_else(|| qnc_ui_text::text("wave.wave_source_transport_registered").to_string())
 }
 
 fn open_media_stream(source: &WaveSourceBinding, media_uri: &str) -> Result<MediaStream, String> {

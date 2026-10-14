@@ -5,6 +5,7 @@ edition = "2021"
 description = "Public helper that stores IN/OUT stills for virtual short clips from confirmed preview frames"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
 qnc-source-preview = { workspace = true }
 

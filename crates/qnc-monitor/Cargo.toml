@@ -5,6 +5,7 @@ edition = "2021"
 description = "Passive public player preview surface for any QNC application"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-program-output = { workspace = true }
 qnc-ui-kit = { workspace = true }

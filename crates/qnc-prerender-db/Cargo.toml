@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: the rendered units of the story's prerender as a table module of the project database intermediary; it knows no worker, form or application"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-db-broker = { workspace = true }
 rusqlite = { workspace = true, features = ["hooks"] }
 serde = { workspace = true }

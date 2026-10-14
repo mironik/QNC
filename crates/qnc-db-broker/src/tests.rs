@@ -81,7 +81,7 @@ fn the_intermediary_serves_the_modules_it_is_given_in_order() {
     let n: i64 = writer.request("test.counter", &"count").unwrap();
     assert_eq!(n, 20);
     let error = writer.call("test.unknown", Value::Null).unwrap_err();
-    assert!(error.contains("Nepoznat modul"), "{error}");
+    assert!(error.contains("Unknown project database module"), "{error}");
     let mut reader = target.open(Access::ReadOnly, modules()).unwrap();
     assert_eq!(reader.execute("test.counter", Value::from("count")).unwrap(), 20);
     assert!(reader.execute("test.counter", Value::from("add")).is_err(), "read-only");
@@ -97,7 +97,7 @@ fn only_the_database_of_that_project_is_opened_and_never_created() {
     let file = project(dir.path(), "other");
     let target = ProjectDbTarget::from_owner_binding(&file, URI).unwrap();
     let error = target.open(Access::ReadWrite, modules()).err().unwrap();
-    assert!(error.contains("drugom projektu"), "{error}");
+    assert!(error.contains("another project"), "{error}");
     let plain = dir.path().join("plain.db");
     rusqlite::Connection::open(&plain)
         .unwrap()

@@ -144,7 +144,7 @@ pub fn show(
                             .color(palette.text),
                     )
                     .min_size(Vec2::new(118.0, 24.0));
-                    if ui.add(close_button).on_hover_text("Zatvori aktivni projekt").clicked() {
+                    if ui.add(close_button).on_hover_text(qnc_ui_text::text("shell.close_active_project")).clicked() {
                         intent = Some(FooterIntent::CloseProject);
                     }
                 }

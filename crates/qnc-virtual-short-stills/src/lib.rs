@@ -121,16 +121,16 @@ impl VirtualShortStillCache {
         out_frame: u64,
     ) -> Result<StoredShortStills, String> {
         if !self.has_pair_for(clip_id, in_frame, out_frame) {
-            return Err("IN/OUT slike nisu uhvacene za spremljeni virtualni kadar.".into());
+            return Err(qnc_ui_text::text("stills.out_pictures_were_taken_saved_subclip").into());
         }
         if shot_id.is_empty() || shot_id.contains(['/', '\\']) {
-            return Err("Neispravan identitet virtualnog kadra.".into());
+            return Err(qnc_ui_text::text("stills.invalid_subclip_identity").into());
         }
         let Some(input) = &self.in_still else {
-            return Err("IN slika nije dostupna.".into());
+            return Err(qnc_ui_text::text("stills.picture_available").into());
         };
         let Some(output) = &self.out_still else {
-            return Err("OUT slika nije dostupna.".into());
+            return Err(qnc_ui_text::text("stills.out_picture_available").into());
         };
         let dir = stills_dir.join(shot_id);
         fs::create_dir_all(&dir).map_err(|error| format!("virtual short directory: {error}"))?;
@@ -159,9 +159,9 @@ impl VirtualShortStillCache {
             .in_still
             .as_ref()
             .filter(|still| still.clip_id == clip_id && still.frame == in_frame)
-            .ok_or_else(|| "IN slika pokrivalice nije uhvacena.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("stills.picture_b_roll_taken").to_string())?;
         if shot_id.is_empty() || shot_id.contains(['/', '\\']) {
-            return Err("Neispravan identitet virtualnog kadra.".into());
+            return Err(qnc_ui_text::text("stills.invalid_subclip_identity").into());
         }
         let dir = stills_dir.join(shot_id);
         fs::create_dir_all(&dir).map_err(|error| format!("B-roll poster directory: {error}"))?;
@@ -174,15 +174,15 @@ fn candidate_from_preview(preview: &PreviewView) -> Result<CandidateStill, Strin
     let clip_id = preview
         .clip_id
         .clone()
-        .ok_or_else(|| "Klip nije otvoren u Broadcast Playeru.".to_string())?;
+        .ok_or_else(|| qnc_ui_text::text("stills.clip_open_broadcast_player").to_string())?;
     let frame = preview
         .timeline
         .playhead_frame
-        .ok_or_else(|| "Broadcast Player nije potvrdio poziciju.".to_string())?;
+        .ok_or_else(|| qnc_ui_text::text("stills.broadcast_player_confirmed_position").to_string())?;
     let picture = preview
         .monitor_frame
         .as_ref()
-        .ok_or_else(|| "Broadcast Player nije objavio sliku za marker.".to_string())?;
+        .ok_or_else(|| qnc_ui_text::text("stills.broadcast_player_given_picture_mark").to_string())?;
     validate_picture(picture)?;
     Ok(CandidateStill {
         clip_id,
@@ -196,15 +196,15 @@ fn candidate_from_preview(preview: &PreviewView) -> Result<CandidateStill, Strin
 
 fn validate_picture(picture: &MonitorFrame) -> Result<(), String> {
     if picture.width == 0 || picture.height == 0 {
-        return Err("Neispravna velicina slike.".into());
+        return Err(qnc_ui_text::text("stills.invalid_picture_size").into());
     }
     let expected = picture
         .width
         .checked_mul(picture.height)
         .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(|| "Slika je prevelika.".to_string())?;
+        .ok_or_else(|| qnc_ui_text::text("stills.picture_too_large").to_string())?;
     if picture.rgba.len() != expected {
-        return Err("RGBA slika nema ocekivanu velicinu.".into());
+        return Err(qnc_ui_text::text("stills.rgba_picture_does_have_expected_size").into());
     }
     Ok(())
 }
@@ -212,7 +212,7 @@ fn validate_picture(picture: &MonitorFrame) -> Result<(), String> {
 fn write_still(still: &CandidateStill, path: &Path) -> Result<(), String> {
     let source =
         image::RgbaImage::from_raw(still.width as u32, still.height as u32, still.rgba.to_vec())
-            .ok_or_else(|| "RGBA slika nema ocekivanu velicinu.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("stills.rgba_picture_does_have_expected_size").to_string())?;
     let fitted = fit_to_canvas(&source);
     let file = fs::File::create(path).map_err(|error| format!("virtual short still: {error}"))?;
     let mut writer = BufWriter::new(file);

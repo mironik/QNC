@@ -141,7 +141,7 @@ impl QncShell {
 
     fn activate_tab(&mut self, tab_id: &str) {
         let Some(app) = self.app_registry.find(tab_id).cloned() else {
-            self.status = format!("Aplikacija nije registrirana: {tab_id}");
+            self.status = qnc_ui_text::fill("shell.app_not_registered", &[("tab", tab_id)]);
             return;
         };
 
@@ -210,7 +210,7 @@ impl QncShell {
         self.refresh_tabs(true);
         match result {
             Ok(Some(tab)) => self.activate_tab(&tab),
-            Ok(None) => self.status = "Nema sljedece odabrane grupe.".into(),
+            Ok(None) => self.status = qnc_ui_text::text("shell.there_next_chosen_group").into(),
             Err(error) => self.status = format!("{}: {error}", request.action_id()),
         }
         true
@@ -270,7 +270,7 @@ impl QncShell {
             return;
         }
 
-        qnc_board::show_surface_in_frame(ui, frame, |ui| self.placeholder(ui, "Nema registrirane aplikacije"));
+        qnc_board::show_surface_in_frame(ui, frame, |ui| self.placeholder(ui, qnc_ui_text::text("shell.application_registered")));
     }
 
     fn placeholder(&self, ui: &mut egui::Ui, label: &str) {
@@ -309,9 +309,9 @@ impl QncShell {
                 // 2026-10-01): the bar shows only the first group again.
                 self.refresh_tabs(true);
                 self.status = if outcome.closed {
-                    "Aktivni projekt zatvoren.".into()
+                    qnc_ui_text::text("shell.active_project_closed").into()
                 } else {
-                    "Nema aktivnog projekta.".into()
+                    qnc_ui_text::text("story.msg.no_active_project").into()
                 };
             }
             Err(error) => {
@@ -774,7 +774,7 @@ mod tests {
         assert!(shell.consume_navigation(&source));
         assert_eq!(shell.active_tab, "project");
         let error = shell.status.clone();
-        assert!(error.contains("nije dostupna"));
+        assert!(error.contains("is not available"));
         assert!(shell.ensure_embedded_component(&source));
         assert_eq!(shell.status, error);
         drop(shell.tabs_watch.take()); // its reading thread holds the database
@@ -917,7 +917,7 @@ mod tests {
         assert_eq!(shell.active_tab, "project", "back to the project application");
         assert!(shell.embedded_apps.contains_key("variant"), "no surface is destroyed");
         assert_eq!(shell.tabs.tab_ids, ["project"], "the bar shows only the first group");
-        assert_eq!(shell.status, "Aktivni projekt zatvoren.");
+        assert_eq!(shell.status, qnc_ui_text::text("shell.active_project_closed"));
         drop(conn);
         drop(shell.tabs_watch.take()); // its reading thread holds the database
         fs::remove_dir_all(shell.qnc_root).unwrap();

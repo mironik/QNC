@@ -33,7 +33,7 @@ pub(crate) fn scan_source(
         config.catalog.token()?.as_deref(),
     )?;
     let indexes = registry.indexes();
-    send.send(Event::Status("Prepoznavanje izvora...".into()))?;
+    send.send(Event::Status(qnc_ui_text::text("select.recognising_source").into()))?;
     let scan = qnc_scanner::scan_roles(
         &catalog,
         source,
@@ -43,10 +43,8 @@ pub(crate) fn scan_source(
     )?;
     if !scan.relationships_resolved() {
         send.send(Event::Warning(format!(
-            "Nerazrijeseni zapisi: {}; greske skeniranja: {}; blokirane grupe: {}.",
-            scan.unresolved_files.len(),
-            scan.issues.len(),
-            scan.grouping.blocked.len()
+            "{}",
+            qnc_ui_text::fill("select.scan_warnings", &[("unresolved", &scan.unresolved_files.len().to_string()), ("errors", &scan.issues.len().to_string()), ("blocked", &scan.grouping.blocked.len().to_string())])
         )))?;
     }
     let mut scan_complete = scan.detection.traversal_complete && scan.issues.is_empty();
@@ -141,7 +139,7 @@ fn confirm_missing(
                 Err(qnc_source_reader::ReadError::NotFound) => missing.push(clip.clone()),
                 Err(error) => {
                     send.send(Event::Warning(format!(
-                        "Nije potvrden nedostatak klipa: {error}"
+                        "{}", qnc_ui_text::fill("select.clip_missing_not_confirmed", &[("error", &error.to_string())])
                     )))?;
                 }
                 Ok(_) => {}

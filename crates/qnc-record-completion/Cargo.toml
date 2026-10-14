@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: completes the card records of the active project in the background (v5 media probe scheduler); it knows no form"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-db-broker = { workspace = true }

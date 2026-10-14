@@ -35,7 +35,7 @@ pub fn read(reader: &SettingsReader, settings: &WorkSettings) -> Result<Vec<Sequ
             read_file(&file, &settings.project_id)
         }
         qnc_transport_resolver::ResolvedEndpoint::NetworkEndpoint { .. } => {
-            Err("Slijed aplikacija nema mrežni DB read adapter u ovom rezu.".into())
+            Err(qnc_ui_text::text("app.application_sequence_network_database_reader_yet").into())
         }
     }
 }
@@ -76,7 +76,7 @@ fn validate(steps: &[SequenceStep]) -> Result<(), String> {
             .windows(2)
             .any(|pair| pair[0].priority_group >= pair[1].priority_group);
     if invalid {
-        return Err("Projekt nema valjan slijed prioritetnih grupa.".into());
+        return Err(qnc_ui_text::text("app.project_valid_sequence_priority_groups").into());
     }
     Ok(())
 }

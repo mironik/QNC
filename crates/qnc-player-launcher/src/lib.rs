@@ -77,12 +77,8 @@ pub fn sibling_executable(name: &str) -> Result<PathBuf, String> {
         .map_err(|e| e.to_string())?
         .with_file_name(&executable);
     if !path.is_file() {
-        return Err(format!(
-            "Nedostaje {executable} pored {}. Izgradi -p qnc-player-runner istim profilom.",
-            path.parent()
-                .map(|parent| parent.display().to_string())
-                .unwrap_or_else(|| ".".into())
-        ));
+        let folder = path.parent().map(|parent| parent.display().to_string()).unwrap_or_else(|| ".".into());
+        return Err(qnc_ui_text::fill("player.runner_missing", &[("executable", &executable.to_string()), ("folder", &folder)]));
     }
     Ok(path)
 }

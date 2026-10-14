@@ -322,7 +322,7 @@ fn a_cancelled_import_copies_nothing() {
     )
     .unwrap()
     .unwrap();
-    assert!(outcome.result.unwrap_err().contains("prekinut"));
+    assert!(outcome.result.unwrap_err().contains("interrupted"));
 }
 
 #[test]
@@ -567,7 +567,7 @@ fn launching_while_the_lease_in_the_database_is_alive_starts_nothing() {
 fn without_a_lease_and_without_its_executable_launching_says_so() {
     let f = fixture();
     let error = launch_worker(std::path::Path::new("unused"), &f.target).unwrap_err();
-    assert!(error.contains("Nedostaje"), "{error}");
+    assert!(error.contains("is missing"), "{error}");
 }
 
 #[test]

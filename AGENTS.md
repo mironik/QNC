@@ -3886,3 +3886,14 @@ oznaka tamo dosla; novija slika istog mjesta zamjenjuje stariju (test). `qnc-sou
 klipa na monitoru s klipom i brojem slike, ne slika price). `qnc-editorial-application` jedan poziv (C10 isti).
 Ostaje: oznaka koju monitor nikad ne pokaze (npr. OUT postavljen prilagodbom slotu bez odlaska na njega) i dalje nema
 sliku i SubClip ostaje bez postera.
+Izvedeno 2026-10-14 (korisnik: "nastavi sa zajednickim kockama"): poruke i natpisi 43 zajednicke kocke kroz rjecnik
+(`contracts/text/en.json`, oko 300 sifri): baze i posrednik (`qnc-content-store`, `qnc-db-broker`, `qnc-program-db`,
+`qnc-virtual-shots`, `qnc-artifact-db`, `qnc-prerender-db`, zapisi medija i izvorni indeks), Select, uvoz, dovrsetak
+zapisa, filmstrip i wave radnici, preview i monitor ("The player is getting ready.", "The picture is on the HDMI
+output"), izlaz programa, prerender, izvori, slijed aplikacija i shell kocke. Rjecnik ne smije u granicu playera
+(conformance "public player boundary": `qnc-player-input`, `qnc-player-client`, `qnc-decoder-catalog`,
+`qnc-program-playlist`, `qnc-work-settings` i sve sto player povlaci), pa te kocke pisu engleski tekst izravno;
+`qnc-player-client::PREPARING` je odgovor "player se priprema" koji preview prepoznaje. `qnc-dev-diagnostics` takoder
+pise izravno engleski (rjecnik ovisi o njemu). Signal "radnik pauziran zbog playera" ostaje usporedba s tekstom sifre
+(`filmstrip_paused_for_playback`, `wave_paused_for_playback`). Testovi koji su trazili hrvatski komad poruke traze
+engleski. Nije izvedeno: Project, `qnc-project-close`, `qnc-project-session`, katalog tipki (nazivi akcija, F1).

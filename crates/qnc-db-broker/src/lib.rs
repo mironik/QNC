@@ -67,7 +67,7 @@ pub struct Reply {
 pub fn project_db_uri(workspace_uri: &str) -> Result<String> {
     let uri = qnc_contracts::parse_qnc_uri(workspace_uri).map_err(|e| e.to_string())?;
     if uri.resource_kind != "db" || !uri.resource_id.starts_with("project_workspace/") {
-        return Err("Nedostaje projektna baza iz radnih postavki.".into());
+        return Err(qnc_ui_text::text("db.project_database_work_settings_missing").into());
     }
     Ok(workspace_uri.replacen("/db/project_workspace/", "/db/project_db/", 1))
 }
@@ -79,9 +79,9 @@ pub fn project_id(uri: &str) -> Result<String> {
         .resource_id
         .strip_prefix("project_db/")
         .filter(|_| parsed.resource_kind == "db")
-        .ok_or("Neispravan URI baze projekta.")?;
+        .ok_or(qnc_ui_text::text("db.invalid_uri_project_database"))?;
     if id.is_empty() || id.contains(['/', '\\', ':']) || matches!(id, "." | "..") {
-        return Err("Neispravan projektni identitet.".into());
+        return Err(qnc_ui_text::text("db.invalid_project_identity").into());
     }
     Ok(id.into())
 }

@@ -37,7 +37,7 @@ impl ProjectDb {
     ) -> Result<Self> {
         let id = project_id(uri)?;
         if !file.is_file() {
-            return Err("Projektna baza ne postoji.".into());
+            return Err(qnc_ui_text::text("db.project_database_does_exist").into());
         }
         let check = connect(file, Access::ReadOnly)?;
         let owner: Option<String> = check
@@ -47,9 +47,9 @@ impl ProjectDb {
                 |r| r.get(0),
             )
             .optional()
-            .map_err(|_| "Datoteka nije baza projekta.".to_string())?;
+            .map_err(|_| qnc_ui_text::text("db.file_project_database").to_string())?;
         if owner.as_deref() != Some(id.as_str()) {
-            return Err("Baza pripada drugom projektu.".into());
+            return Err(qnc_ui_text::text("db.database_belongs_another_project").into());
         }
         Ok(Self {
             file: file.to_path_buf(),
@@ -66,16 +66,16 @@ impl ProjectDb {
 
     pub fn execute(&mut self, request: &Request) -> Result<Value> {
         if request.version != VERSION || request.db_uri != self.uri {
-            return Err("Neispravan zahtjev bazi projekta.".into());
+            return Err(qnc_ui_text::text("db.invalid_request_project_database").into());
         }
         let factory = self
             .factories
             .iter()
             .find(|factory| factory.id() == request.module)
             .cloned()
-            .ok_or_else(|| format!("Nepoznat modul baze projekta: {}", request.module))?;
+            .ok_or_else(|| qnc_ui_text::fill("db.unknown_module", &[("module", &request.module)]))?;
         if factory.is_write(&request.payload) && self.access == Access::ReadOnly {
-            return Err("Pristup je read-only.".into());
+            return Err(qnc_ui_text::text("db.access_read_only").into());
         }
         if !self.modules.contains_key(factory.id()) {
             let module = factory.attach(connect(&self.file, self.access)?, self.access)?;
@@ -84,7 +84,7 @@ impl ProjectDb {
         let module = self
             .modules
             .get_mut(factory.id())
-            .ok_or("Modul baze projekta nije otvoren.")?;
+            .ok_or(qnc_ui_text::text("db.project_database_module_open"))?;
         module.execute(request.payload.clone())
     }
 }

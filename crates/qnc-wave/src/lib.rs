@@ -174,10 +174,10 @@ pub fn media_for_plan<'a>(
             .metadata
             .proxy
             .as_ref()
-            .ok_or_else(|| "Wave plan trazi proxy koji nije zapisan.".to_string())?,
+            .ok_or_else(|| qnc_ui_text::text("wave.wave_plan_needs_proxy_that_recorded").to_string())?,
     };
     if media.media_uri != plan.source_uri {
-        return Err("Wave plan source ne odgovara spremljenom media zapisu.".into());
+        return Err(qnc_ui_text::text("wave.wave_plan_source_does_match_stored").into());
     }
     Ok(media)
 }
@@ -190,31 +190,31 @@ fn plan_from_snapshot_inner(
 ) -> Result<WavePlan, String> {
     snapshot.validate().map_err(|error| error.to_string())?;
     if snapshot.phase != Phase::Final {
-        return Err("Wave treba finalni spremljeni media zapis.".into());
+        return Err(qnc_ui_text::text("wave.wave_needs_final_stored_media_record").into());
     }
     let media =
         match source_kind {
             WaveSourceKind::Original => &snapshot.metadata.original,
             WaveSourceKind::Proxy => snapshot.metadata.proxy.as_ref().ok_or_else(|| {
-                "Wave treba spremljeni proxy za projekt sa dva kanala.".to_string()
+                qnc_ui_text::text("wave.wave_needs_stored_proxy_two_channel").to_string()
             })?,
         };
     let duration = media
         .duration_seconds
         .as_ref()
-        .ok_or_else(|| "Wave treba spremljeno trajanje izvornog klipa.".to_string())?
+        .ok_or_else(|| qnc_ui_text::text("wave.wave_needs_stored_length_source_clip").to_string())?
         .value;
     let channels = audio_channels(media, source_kind)?;
     let source_sample_rate_hz = channels
         .first()
-        .ok_or_else(|| "Wave treba najmanje jedan izvorni audio kanal.".to_string())?
+        .ok_or_else(|| qnc_ui_text::text("wave.wave_needs_at_least_one_source").to_string())?
         .sample_rate_hz;
     if channels
         .iter()
         .any(|channel| channel.sample_rate_hz != source_sample_rate_hz)
     {
         return Err(
-            "Wave ne smije miješati izvorne audio kanale razlicitih sample rateova.".into(),
+            qnc_ui_text::text("wave.wave_must_mix_source_audio_channels").into(),
         );
     }
     let duration_seconds = rational_to_f64(duration)?;
@@ -267,7 +267,7 @@ pub fn artifact_record_from_lane_peaks(
             WaveLane::A4 => &mut a4_peaks,
         };
         if !slot.is_empty() {
-            return Err("Wave ima duplicirani lane zapis.".into());
+            return Err(qnc_ui_text::text("wave.wave_duplicated_lane_record").into());
         }
         *slot = peaks;
     }
@@ -323,7 +323,7 @@ pub fn validate_artifact(artifact: &WaveArtifactRecord) -> Result<(), String> {
     }
     if artifact.status == "ready" {
         if artifact.peak_count == 0 || artifact.a1_peaks.len() != artifact.peak_count {
-            return Err("Wave A1 nije spreman.".into());
+            return Err(qnc_ui_text::text("wave.a1_wave_ready").into());
         }
         for (lane, peaks) in [
             ("A2", &artifact.a2_peaks),
@@ -331,7 +331,7 @@ pub fn validate_artifact(artifact: &WaveArtifactRecord) -> Result<(), String> {
             ("A4", &artifact.a4_peaks),
         ] {
             if !peaks.is_empty() && peaks.len() != artifact.peak_count {
-                return Err(format!("Wave {lane} nema isti broj peakova."));
+                return Err(qnc_ui_text::fill("wave.peak_count_differs", &[("lane", &lane.to_string())]));
             }
         }
     }
@@ -343,7 +343,7 @@ pub fn validate_artifact(artifact: &WaveArtifactRecord) -> Result<(), String> {
         .chain(&artifact.a4_peaks)
     {
         if !peak.is_finite() || !(0.0..=1.0).contains(peak) {
-            return Err("Wave peak je izvan valjanog raspona.".into());
+            return Err(qnc_ui_text::text("wave.wave_peak_out_range").into());
         }
     }
     if artifact
@@ -351,7 +351,7 @@ pub fn validate_artifact(artifact: &WaveArtifactRecord) -> Result<(), String> {
         .as_ref()
         .is_some_and(|text| text.len() > 4096)
     {
-        return Err("Wave upozorenje je predugo.".into());
+        return Err(qnc_ui_text::text("wave.wave_warning_too_long").into());
     }
     Ok(())
 }
@@ -371,7 +371,7 @@ impl StreamPeakCollector {
             .filter(|channel| channel.stream_index == stream_index)
             .map(|channel| {
                 if channel.channel_index >= channel.source_channels {
-                    return Err("Wave kanal je izvan izvornog streama.".to_string());
+                    return Err(qnc_ui_text::text("wave.wave_channel_outside_source_stream").to_string());
                 }
                 Ok((
                     channel.lane,
@@ -385,9 +385,9 @@ impl StreamPeakCollector {
             .iter()
             .find(|channel| channel.stream_index == stream_index)
             .map(|channel| channel.source_channels)
-            .ok_or_else(|| "Wave stream nije u planu.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("wave.wave_stream_plan").to_string())?;
         if selected.is_empty() {
-            return Err("Wave stream nema odabrane kanale.".into());
+            return Err(qnc_ui_text::text("wave.wave_stream_chosen_channels").into());
         }
         Ok(Self {
             source_channels,
@@ -412,7 +412,7 @@ impl StreamPeakCollector {
     ) -> Result<(), String> {
         let stride = self.source_channels as usize * 4;
         if stride == 0 || !bytes.len().is_multiple_of(stride) {
-            return Err("Wave PCM paket nije poravnat na izvorne kanale.".into());
+            return Err(qnc_ui_text::text("wave.wave_pcm_packet_aligned_source_channels").into());
         }
         for (offset_frame, frame) in bytes.chunks_exact(stride).enumerate() {
             let sample_frame = first_sample_frame.saturating_add(offset_frame as u64);
@@ -421,7 +421,7 @@ impl StreamPeakCollector {
                 let sample = f32::from_le_bytes(
                     frame[offset..offset + 4]
                         .try_into()
-                        .map_err(|_| "Wave PCM uzorak nije potpun.".to_string())?,
+                        .map_err(|_| qnc_ui_text::text("wave.wave_pcm_sample_incomplete").to_string())?,
                 );
                 collector.push_at(sample_frame, sample)?;
             }
@@ -464,7 +464,7 @@ fn relative_position(
         || num <= 0
         || den <= 0
     {
-        return Err("Wave timestamp scale nije valjan.".into());
+        return Err(qnc_ui_text::text("wave.wave_timestamp_scale_invalid").into());
     }
     let a = mul(
         mul(pts.into(), tb.numerator.into())?,
@@ -484,7 +484,7 @@ fn relative_position(
         den.into(),
     )?;
     if n < 0 || n % d != 0 {
-        return Err("Wave timestamp nije na spremljenoj izvornoj mrezi.".into());
+        return Err(qnc_ui_text::text("wave.wave_timestamp_stored_source_grid").into());
     }
     u64::try_from(n / d).map_err(|error| error.to_string())
 }
@@ -492,7 +492,7 @@ fn relative_position(
 fn sample_frame_count(byte_len: usize, source_channels: u32) -> Result<u64, String> {
     let stride = source_channels as usize * 4;
     if stride == 0 || !byte_len.is_multiple_of(stride) {
-        return Err("Wave PCM paket nije poravnat na izvorne kanale.".into());
+        return Err(qnc_ui_text::text("wave.wave_pcm_packet_aligned_source_channels").into());
     }
     Ok((byte_len / stride) as u64)
 }
@@ -513,7 +513,7 @@ impl ChannelPeakCollector {
 
     fn push_at(&mut self, sample_frame: u64, sample: f32) -> Result<(), String> {
         if !sample.is_finite() || self.peaks.is_empty() {
-            return Err("Wave PCM uzorak nije valjan.".into());
+            return Err(qnc_ui_text::text("wave.invalid_wave_pcm_sample").into());
         }
         let bucket = if self.expected_sample_frames == 0 {
             0
@@ -559,7 +559,7 @@ fn audio_channels(
         let index = stream
             .index
             .as_ref()
-            .ok_or_else(|| "Wave audio stream nema index.".to_string())?
+            .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_index").to_string())?
             .value;
         let (sample_rate_hz, source_channels) = audio_format(audio)?;
         for channel_index in 0..source_channels {
@@ -582,12 +582,12 @@ fn audio_format(audio: &AudioMetadata) -> Result<(u32, u32), String> {
     let sample_rate_hz = audio
         .sample_rate_hz
         .as_ref()
-        .ok_or_else(|| "Wave audio stream nema sample rate.".to_string())?
+        .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_sample_rate").to_string())?
         .value;
     let channels = audio
         .channels
         .as_ref()
-        .ok_or_else(|| "Wave audio stream nema broj kanala.".to_string())?
+        .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_channel_count").to_string())?
         .value;
     if channels == 0 || !(8_000..=768_000).contains(&sample_rate_hz) {
         return Err("Wave audio stream ima nepodrzan format.".into());
@@ -597,7 +597,7 @@ fn audio_format(audio: &AudioMetadata) -> Result<(u32, u32), String> {
 
 fn duration_to_samples(duration: Rational, sample_rate_hz: u32) -> Result<u64, String> {
     if duration.numerator <= 0 || duration.denominator <= 0 {
-        return Err("Wave trajanje nije valjano.".into());
+        return Err(qnc_ui_text::text("wave.invalid_wave_length").into());
     }
     let numerator = i128::from(duration.numerator) * i128::from(sample_rate_hz);
     let denominator = i128::from(duration.denominator);
@@ -607,7 +607,7 @@ fn duration_to_samples(duration: Rational, sample_rate_hz: u32) -> Result<u64, S
 
 fn rational_to_f64(value: Rational) -> Result<f64, String> {
     if value.numerator <= 0 || value.denominator <= 0 {
-        return Err("Wave trajanje nije valjano.".into());
+        return Err(qnc_ui_text::text("wave.invalid_wave_length").into());
     }
     Ok(value.numerator as f64 / value.denominator as f64)
 }

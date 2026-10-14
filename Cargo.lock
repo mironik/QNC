@@ -3070,6 +3070,7 @@ dependencies = [
  "qnc-application-catalog",
  "qnc-contracts",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "serde_json",
 ]
 
@@ -3078,6 +3079,7 @@ name = "qnc-application-sequence"
 version = "0.1.0"
 dependencies = [
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "qnc-work-settings",
  "rusqlite",
  "tempfile",
@@ -3092,6 +3094,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-filmstrip",
  "qnc-media-records",
+ "qnc-ui-text",
  "qnc-wave",
  "rusqlite",
  "serde",
@@ -3274,6 +3277,7 @@ dependencies = [
  "qnc-source-bindings",
  "qnc-timeline-artifacts",
  "qnc-timeline-assets",
+ "qnc-ui-text",
  "qnc-wave",
  "qnc-wave-worker",
  "qnc-work-settings",
@@ -3286,6 +3290,7 @@ dependencies = [
  "qnc-filmstrip",
  "qnc-media-records",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "qnc-wave",
  "qnc-work-settings",
  "rusqlite",
@@ -3302,6 +3307,7 @@ dependencies = [
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3325,6 +3331,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-json-transport",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3371,6 +3378,7 @@ dependencies = [
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
  "qnc-shell-footer",
+ "qnc-ui-text",
  "rusqlite",
  "serde",
  "serde_json",
@@ -3589,6 +3597,7 @@ dependencies = [
  "qnc-media-stream",
  "qnc-pixel-convert",
  "qnc-transport-resolver",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -3707,6 +3716,7 @@ dependencies = [
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
+ "qnc-ui-text",
  "qnc-work-settings",
 ]
 
@@ -3764,6 +3774,7 @@ dependencies = [
  "qnc-poster-create",
  "qnc-source-reader",
  "qnc-source-timecode",
+ "qnc-ui-text",
  "qnc-work-settings",
  "serde_json",
  "tempfile",
@@ -3798,6 +3809,7 @@ dependencies = [
  "qnc-source-preview",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-ui-text",
  "qnc-work-settings",
 ]
 
@@ -3840,6 +3852,7 @@ dependencies = [
  "qnc-source-index-db",
  "qnc-source-reader",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3854,6 +3867,7 @@ name = "qnc-ingest-selection-write"
 version = "0.1.0"
 dependencies = [
  "qnc-ingest-store",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -3876,6 +3890,7 @@ dependencies = [
 name = "qnc-ingest-work-plan"
 version = "0.1.0"
 dependencies = [
+ "qnc-ui-text",
  "qnc-work-settings",
 ]
 
@@ -3913,6 +3928,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-keyboard-shortcut",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4078,6 +4094,7 @@ name = "qnc-media-optimize"
 version = "0.1.0"
 dependencies = [
  "qnc-decoder-catalog",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4132,6 +4149,7 @@ dependencies = [
  "qnc-source-index-db",
  "qnc-source-reader",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "rusqlite",
  "serde_json",
  "tempfile",
@@ -4176,6 +4194,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-image-assets",
  "qnc-source-reader",
+ "qnc-ui-text",
  "tempfile",
 ]
 
@@ -4186,6 +4205,7 @@ dependencies = [
  "eframe",
  "qnc-program-output",
  "qnc-ui-kit",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4242,6 +4262,7 @@ name = "qnc-playback-activity"
 version = "0.1.0"
 dependencies = [
  "qnc-content-store",
+ "qnc-ui-text",
  "rusqlite",
  "tempfile",
 ]
@@ -4326,6 +4347,7 @@ dependencies = [
  "qnc-player-client",
  "qnc-player-input",
  "qnc-source-reader",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4399,6 +4421,7 @@ name = "qnc-prerender-db"
 version = "0.1.0"
 dependencies = [
  "qnc-db-broker",
+ "qnc-ui-text",
  "rusqlite",
  "serde",
  "serde_json",
@@ -4412,6 +4435,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-dev-diagnostics",
  "qnc-playback-activity",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4427,6 +4451,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-media-metadata",
  "qnc-media-records",
+ "qnc-ui-text",
  "qnc-virtual-shots",
  "rusqlite",
  "serde",
@@ -4457,6 +4482,7 @@ dependencies = [
  "eframe",
  "qnc-player-contract",
  "qnc-player-frame-transport",
+ "qnc-ui-text",
  "windows-sys 0.59.0",
 ]
 
@@ -4489,6 +4515,7 @@ dependencies = [
  "qnc-media-metadata",
  "qnc-media-stream",
  "qnc-render-unit",
+ "qnc-ui-text",
  "serde_json",
 ]
 
@@ -4649,6 +4676,7 @@ dependencies = [
  "qnc-record-probe",
  "qnc-source-index-db",
  "qnc-source-reader",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4660,6 +4688,7 @@ dependencies = [
  "qnc-media-probe",
  "qnc-media-record-db",
  "qnc-source-index-db",
+ "qnc-ui-text",
  "uuid",
 ]
 
@@ -4744,6 +4773,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4751,6 +4781,7 @@ name = "qnc-shell-footer"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4784,6 +4815,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-contracts",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "serde",
  "serde_json",
 ]
@@ -4794,6 +4826,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-dir-browser",
  "qnc-source-reader",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4862,6 +4895,7 @@ dependencies = [
  "qnc-source-index-contract",
  "qnc-source-reader",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "rusqlite",
  "serde_json",
  "tempfile",
@@ -4909,6 +4943,7 @@ dependencies = [
  "qnc-source-contract",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-ui-text",
  "qnc-wave",
  "qnc-work-settings",
 ]
@@ -4993,6 +5028,7 @@ dependencies = [
  "qnc-filmstrip",
  "qnc-image-assets",
  "qnc-media-records",
+ "qnc-ui-text",
  "qnc-wave",
  "qnc-work-settings",
 ]
@@ -5073,6 +5109,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "qnc-source-preview",
+ "qnc-ui-text",
  "tempfile",
 ]
 
@@ -5085,6 +5122,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-db-broker",
  "qnc-media-records",
+ "qnc-ui-text",
  "rusqlite",
  "serde",
  "serde_json",
@@ -5097,6 +5135,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-media-metadata",
  "qnc-media-records",
+ "qnc-ui-text",
  "serde",
 ]
 
@@ -5120,6 +5159,7 @@ dependencies = [
  "qnc-media-records",
  "qnc-media-stream",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "qnc-wave",
 ]
 

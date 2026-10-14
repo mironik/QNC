@@ -64,7 +64,7 @@ impl MediaOpener for ConfigMediaOpener {
             .sources
             .iter()
             .find(|s| s.location.uri == reference.source_uri())
-            .ok_or_else(|| "Izvor medija nije vezan u konfiguraciji.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("import.media_source_bound_configuration").to_string())?;
         let stream = if let Some(root) = &source.location.file {
             qnc_dir_browser::verify_local_volume_serial(root, &source.serial_number)
                 .map_err(|e| e.to_string())?;
@@ -76,7 +76,7 @@ impl MediaOpener for ConfigMediaOpener {
                 .location
                 .token()
                 .map_err(|e| e.to_string())?
-                .ok_or_else(|| "Vjerodajnica izvora nedostaje.".to_string())?;
+                .ok_or_else(|| qnc_ui_text::text("import.source_credential_missing").to_string())?;
             MediaStream::remote(&resolver, media_uri, &token).map_err(|e| e.to_string())?
         };
         Ok(Box::new(Stream(stream)))
@@ -100,7 +100,7 @@ impl ConfigMediaOpener {
                 }
                 ProbeConfig::Remote { .. } => None,
             })
-            .ok_or("Na ovom racunalu nije zadan lokalni probe za opis nove datoteke.")?;
+            .ok_or(qnc_ui_text::text("import.this_computer_local_probe_describe_new"))?;
         let executor = Executor::new(OwnerConfig {
             executable,
             bindings: vec![Binding {

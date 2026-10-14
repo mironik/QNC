@@ -130,7 +130,7 @@ pub fn load(
         }
         let next = page.last().unwrap().clip_id.clone();
         if after.as_ref().is_some_and(|last| last >= &next) {
-            return Err("Neispravno stranicenje Ingest baze.".into());
+            return Err(qnc_ui_text::text("ingest.invalid_paging_ingest_database").into());
         }
         after = Some(next);
         for stored in page {
@@ -211,7 +211,7 @@ impl CatalogLoader {
                     retained_stats.as_ref(),
                 ));
             })
-            .map_err(|_| "Nije moguce pokrenuti citanje radnih postavki.".to_string())?;
+            .map_err(|_| qnc_ui_text::text("ingest.could_start_reading_work_settings").to_string())?;
         self.result = Some(receive);
         Ok(())
     }
@@ -222,7 +222,7 @@ impl CatalogLoader {
         let outcome = match self.result.as_ref()?.try_recv() {
             Ok(outcome) => outcome,
             Err(TryRecvError::Empty) => return None,
-            Err(TryRecvError::Disconnected) => Err("Citanje radnih postavki je prekinuto.".into()),
+            Err(TryRecvError::Disconnected) => Err(qnc_ui_text::text("ingest.reading_work_settings_interrupted").into()),
         };
         self.result = None;
         Some(outcome)

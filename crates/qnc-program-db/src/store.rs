@@ -76,7 +76,7 @@ impl Store {
                 Operation::ReadStorySelection => {
                     Ok(Data::StorySelection(StorySelection::default()))
                 }
-                _ => Err("Prica projekta nije inicijalizirana.".into()),
+                _ => Err(qnc_ui_text::text("story.project_story_initialised").into()),
             };
         }
         if operation.edits_story() {
@@ -192,10 +192,10 @@ impl Store {
         let kind = story_kind(kind)?;
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         if out_frame <= in_frame {
-            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+            return Err(qnc_ui_text::text("story.out_after_in").into());
         }
         if fps_num == 0 || fps_den == 0 {
-            return Err("Segment nema valjan source fps.".into());
+            return Err(qnc_ui_text::text("story.segment_valid_source_frame_rate").into());
         }
         let project_matches: bool = self
             .conn
@@ -206,7 +206,7 @@ impl Store {
             )
             .map_err(err)?;
         if !project_matches {
-            return Err("Projektna baza pripada drugom projektu.".into());
+            return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
         let tx = self
@@ -398,7 +398,7 @@ impl Store {
             )
             .map_err(err)?;
         if changed == 0 {
-            return Err(format!("Segment nije iskljucen: {segment_id}"));
+            return Err(qnc_ui_text::fill("story.segment_not_excluded", &[("segment", &segment_id.to_string())]));
         }
         let fps = require_story_fps(&tx)?;
         let (start, end) = segment_window(&tx, segment_id)?
@@ -458,10 +458,10 @@ impl Store {
     ) -> Result<Data> {
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         if out_frame <= in_frame {
-            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+            return Err(qnc_ui_text::text("story.out_after_in").into());
         }
         if fps_num == 0 || fps_den == 0 {
-            return Err("Izvor nema valjan source fps.".into());
+            return Err(qnc_ui_text::text("story.source_valid_frame_rate").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
         let tx = self
@@ -552,7 +552,7 @@ impl Store {
     /// covers; the markers after the segment move by the change of length.
     fn trim_segment(&mut self, segment_id: &str, (in_frame, out_frame): (u64, u64)) -> Result<Data> {
         if out_frame <= in_frame {
-            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+            return Err(qnc_ui_text::text("story.out_after_in").into());
         }
         let tx = self
             .conn
@@ -571,7 +571,7 @@ impl Store {
         let (start, end) = segment_window(&tx, segment_id)?
             .ok_or_else(|| format!("part not found: {segment_id}"))?;
         let (start, end) = (start as i64, end as i64);
-        let rate = story_rate(&tx)?.ok_or("Prica nema segmenata.")?;
+        let rate = story_rate(&tx)?.ok_or(qnc_ui_text::text("story.story_segments"))?;
         let (num, den) = story_per_source(rate, (fps_num, fps_den))?;
         let story_fps = f64::from(rate.0) / f64::from(rate.1);
         let in_frame = in_frame as i64;
@@ -653,7 +653,7 @@ impl Store {
         let index = order
             .iter()
             .position(|(id, active)| id == segment_id && *active)
-            .ok_or("Segment nije pronadjen.")?;
+            .ok_or(qnc_ui_text::text("story.segment_found"))?;
         let other = if up {
             order[..index].iter().rposition(|(_, active)| *active)
         } else {
@@ -758,10 +758,7 @@ impl Store {
         let frame = program_frame as i64;
         let duration = program_length(&self.conn)?;
         if frame > duration {
-            return Err(format!(
-                "M marker mora biti unutar trajanja storyja ({:.3} s).",
-                timeline_sec(duration, fps)
-            ));
+            return Err(qnc_ui_text::fill("story.marker_inside_story", &[("seconds", &format!("{:.3}", timeline_sec(duration, fps)))]));
         }
         let tx = self
             .conn
@@ -887,7 +884,7 @@ impl Store {
             return Ok(Data::Changed);
         }
         if slot_end - slot_start + frames < 1 {
-            return Err("Slot mora imati barem jednu sliku.".into());
+            return Err(qnc_ui_text::text("story.msg.slot_one_picture").into());
         }
         // The first slot after it without a cover takes the difference (user 2026-10-13: an
         // empty slot does not push the slots after it); else the last slot of the story.
@@ -904,13 +901,13 @@ impl Store {
         match empty {
             Some((empty_start, empty_end)) => {
                 if empty_end - (empty_start + frames) < 1 {
-                    return Err("Prazni slot iza mora zadrzati barem jednu sliku.".into());
+                    return Err(qnc_ui_text::text("story.msg.empty_slot_one_picture").into());
                 }
             }
             None => {
                 let last = user_markers_from(&tx, slot_end)?.into_iter().map(|(_, frame)| frame).max().unwrap_or(slot_end);
                 if last + frames >= duration {
-                    return Err("Zadnji slot price mora zadrzati barem jednu sliku.".into());
+                    return Err(qnc_ui_text::text("story.msg.last_slot_one_picture").into());
                 }
             }
         }
@@ -1234,10 +1231,10 @@ impl Store {
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         qnc_media_records::valid_id(shot_id).map_err(err)?;
         if out_frame <= in_frame {
-            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+            return Err(qnc_ui_text::text("story.out_after_in").into());
         }
         if fps_num == 0 || fps_den == 0 {
-            return Err("Pokrivalica nema valjan source fps.".into());
+            return Err(qnc_ui_text::text("story.b_roll_valid_source_frame_rate").into());
         }
         let project_matches: bool = self
             .conn
@@ -1248,14 +1245,14 @@ impl Store {
             )
             .map_err(err)?;
         if !project_matches {
-            return Err("Projektna baza pripada drugom projektu.".into());
+            return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
         let tx = self
             .conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
-        let rate = story_rate(&tx)?.ok_or("Prica nema segmenata.")?;
+        let rate = story_rate(&tx)?.ok_or(qnc_ui_text::text("story.story_segments"))?;
         story_per_source(rate, (fps_num, fps_den))?;
         type SlotRow = (i64, i64, f64, f64, String, i64);
         let slot: Option<SlotRow> = tx
@@ -1534,7 +1531,7 @@ fn story_kind(kind: &str) -> Result<&'static str> {
     match kind.trim() {
         "tonovi" => Ok("tonovi"),
         "offovi" => Ok("offovi"),
-        other => Err(format!("Nepoznata vrsta segmenta: {other}.")),
+        other => Err(qnc_ui_text::fill("story.unknown_segment_kind", &[("kind", other)])),
     }
 }
 
@@ -1551,7 +1548,7 @@ fn new_marker_id() -> String {
 fn require_story_fps(conn: &Connection) -> Result<f64> {
     story_rate(conn)?
         .map(|(num, den)| f64::from(num) / f64::from(den))
-        .ok_or_else(|| "timeline_fps_invalid: story program nema valjan source FPS".into())
+        .ok_or_else(|| qnc_ui_text::text("story.timeline_fps_invalid_story_program_valid").into())
 }
 
 /// The rate of the story: set by its first segment and kept while the story has segments
@@ -1608,9 +1605,9 @@ pub fn story_per_source(story: (u32, u32), source: (u32, u32)) -> Result<(i64, i
     } else if 2 * story_rate == source_rate {
         Ok((1, 2))
     } else {
-        Err(format!(
-            "Klip ima {}/{} fps, a prica {}/{}; dopusten je isti, dvostruki ili upola manji fps.",
-            source.0, source.1, story.0, story.1
+        Err(qnc_ui_text::fill(
+            "story.rate_not_allowed",
+            &[("source", &format!("{}/{}", source.0, source.1)), ("story", &format!("{}/{}", story.0, story.1))],
         ))
     }
 }
@@ -1620,7 +1617,7 @@ pub fn story_per_source(story: (u32, u32), source: (u32, u32)) -> Result<(i64, i
 fn story_length(in_frame: i64, out_frame: i64, (num, den): (i64, i64)) -> Result<(i64, i64)> {
     let out_frame = out_frame - (out_frame - in_frame) % den;
     if out_frame <= in_frame {
-        return Err("Raspon je kraci od jedne slike price.".into());
+        return Err(qnc_ui_text::text("story.range_shorter_than_one_picture_story").into());
     }
     Ok((out_frame, (out_frame - in_frame) * num / den))
 }
@@ -1679,10 +1676,10 @@ fn locked_check(conn: &Connection, marker_id: &str, duration: i64) -> Result<()>
         .map_err(err)?;
     let (frame, role) = marker.ok_or_else(|| format!("marker not found: {marker_id}"))?;
     if frame == 0 || role == "program_start" {
-        return Err("Početni M marker je zaključan.".into());
+        return Err(qnc_ui_text::text("story.msg.start_marker_locked").into());
     }
     if role == "program_end" || frame == duration {
-        return Err("Završni M marker je zaključan.".into());
+        return Err(qnc_ui_text::text("story.end_m_marker_locked").into());
     }
     Ok(())
 }
@@ -2444,8 +2441,8 @@ fn renumber_segments(conn: &Connection) -> Result<()> {
 fn require_imported_clip(conn: &Connection, clip_id: &str) -> Result<()> {
     match qnc_content_read::imported_on(conn, clip_id)? {
         Some(true) => Ok(()),
-        Some(false) => Err(format!("Klip '{clip_id}' nije uvezen.")),
-        None => Err("Klip nije pronadjen.".into()),
+        Some(false) => Err(qnc_ui_text::fill("story.msg.clip_not_imported", &[("clip", &clip_id.to_string())])),
+        None => Err(qnc_ui_text::text("ingest.msg.clip_not_found").into()),
     }
 }
 

@@ -48,7 +48,7 @@ fn open_read_only(path: &Path) -> Result<Connection, ReadError> {
     .map_err(|_| {
         ReadError::new(
             "database_unavailable",
-            "Baza radnih postavki nije dostupna.",
+            "The work settings database is not available.",
         )
     })?;
     conn.busy_timeout(Duration::from_secs(2))
@@ -62,7 +62,7 @@ fn open_read_only(path: &Path) -> Result<Connection, ReadError> {
 fn db_error() -> ReadError {
     ReadError::new(
         "database_contract",
-        "Baza nema trazeni javni DB prikaz ili nije citljiva.",
+        "The database lacks the public view or cannot be read.",
     )
 }
 
@@ -88,7 +88,7 @@ pub(crate) fn read(registry_file: &Path, context_uri: &str) -> Result<WorkSettin
         .optional()
         .map_err(|_| db_error())?;
     let active = active.filter(|id| !id.is_empty()).ok_or_else(|| {
-        ReadError::new("no_active_project", "U bazi nije odabran aktivni projekt.")
+        ReadError::new("no_active_project", "No active project is chosen in the database.")
     })?;
     if active.contains(['/', '\\', ':']) || active == "." || active == ".." {
         return Err(db_error());
@@ -116,14 +116,14 @@ pub(crate) fn read(registry_file: &Path, context_uri: &str) -> Result<WorkSettin
         .map_err(|_| {
             ReadError::new(
                 "missing_binding",
-                "Nedostaje transport lokacija odabrane baze.",
+                "The transport location of the chosen database is missing.",
             )
         })?;
     let directory = PathBuf::from(directory);
     if !directory.is_absolute() {
         return Err(ReadError::new(
             "missing_binding",
-            "Transport lokacija baze nije potpuna.",
+            "The transport location of the database is incomplete.",
         ));
     }
     let local_db_uri = format!("qnc://local/db/project_workspace/{active}");
@@ -138,7 +138,7 @@ pub(crate) fn read(registry_file: &Path, context_uri: &str) -> Result<WorkSettin
         .map_err(|_| {
             ReadError::new(
                 "settings_not_public",
-                "Javni prikaz baze ne sadrzi radne postavke.",
+                "The public view of the database holds no work settings.",
             )
         })?;
     let settings = serde_json::from_str(&settings).map_err(|_| db_error())?;

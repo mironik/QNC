@@ -269,7 +269,7 @@ fn a_segment_needs_a_real_range_a_known_kind_an_imported_clip_and_the_story_rate
     let mut claimed = claimed_store(&path);
     assert!(create_segment(&mut claimed, "tonovi", (0, 10), (50, 1))
         .unwrap_err()
-        .contains("nije uvezen"));
+        .contains("is not imported"));
     drop(claimed);
     let dir = tempfile::tempdir().unwrap();
     let mut store = imported_store(&dir.path().join("db"));
@@ -278,7 +278,7 @@ fn a_segment_needs_a_real_range_a_known_kind_an_imported_clip_and_the_story_rate
     assert!(create_segment(&mut store, "tonovi", (0, 10), (0, 1)).is_err());
     create_segment(&mut store, "tonovi", (0, 10), (50, 1)).unwrap();
     let mixed = create_segment(&mut store, "offovi", (0, 10), (30, 1)).unwrap_err();
-    assert!(mixed.contains("dvostruki ili upola manji"), "{mixed}");
+    assert!(mixed.contains("double or half"), "{mixed}");
     assert_eq!(segments(&mut store).len(), 1);
 }
 
@@ -538,7 +538,7 @@ fn moving_and_deleting_markers_keep_the_start_and_the_end_locked() {
         .contains("already exists"));
     assert!(move_to(&mut store, &id, 31)
         .unwrap_err()
-        .contains("trajanja"));
+        .contains("length of the story"));
     move_to(&mut store, &id, 21).unwrap();
     assert_eq!(markers(&mut store), vec![21, 25]);
     let Data::Created(start) = marker(&mut store, 0).unwrap() else {
@@ -546,7 +546,7 @@ fn moving_and_deleting_markers_keep_the_start_and_the_end_locked() {
     };
     assert!(move_to(&mut store, &start, 5)
         .unwrap_err()
-        .contains("Početni"));
+        .contains("start M marker"));
     let delete = |store: &mut Story, marker_id: &str| {
         run(
             store,
@@ -555,7 +555,7 @@ fn moving_and_deleting_markers_keep_the_start_and_the_end_locked() {
             },
         )
     };
-    assert!(delete(&mut store, &start).unwrap_err().contains("Početni"));
+    assert!(delete(&mut store, &start).unwrap_err().contains("start M marker"));
     delete(&mut store, &id).unwrap();
     assert_eq!(markers(&mut store), vec![25]);
     assert!(delete(&mut store, &id).unwrap_err().contains("not found"));
@@ -1547,8 +1547,8 @@ fn a_slot_trimmed_at_an_edge_moves_the_covered_slots_after_it_up_to_an_empty_one
     let mut ins: Vec<u64> = covers(&mut store).iter().map(|c| c.source_in_frame).collect();
     ins.sort();
     assert_eq!(ins, vec![499, 600]);
-    assert!(trim(&mut store, false, 1).unwrap_err().contains("Prazni slot"), "the empty slot keeps a frame");
-    assert!(trim(&mut store, false, -9).unwrap_err().contains("jednu sliku"), "the slot keeps a frame");
+    assert!(trim(&mut store, false, 1).unwrap_err().contains("empty slot"), "the empty slot keeps a frame");
+    assert!(trim(&mut store, false, -9).unwrap_err().contains("one picture"), "the slot keeps a frame");
     run(&mut store, Operation::UndoStory).unwrap();
     assert_eq!(markers(&mut store), vec![10, 18, 24, 26], "one undo step per trim");
     let last = slot_of(&markers_id(&path, 26));

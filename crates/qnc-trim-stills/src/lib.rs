@@ -439,7 +439,7 @@ fn decode_run(
 }
 
 fn read_picture(file: &Path) -> Result<Arc<RgbaImage>, String> {
-    let bytes = std::fs::read(file).map_err(|error| format!("slika nije izvucena: {error}"))?;
+    let bytes = std::fs::read(file).map_err(|error| qnc_ui_text::fill("story.msg.still_failed_because", &[("error", &error.to_string())]))?;
     qnc_image_assets::decode_thumbnail(&bytes).map(Arc::new)
 }
 

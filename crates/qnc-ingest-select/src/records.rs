@@ -20,7 +20,7 @@ pub(crate) fn register_groups(
     let mut replaced = Vec::new();
     for chunk in groups.chunks(32) {
         if cancel.load(Ordering::Relaxed) {
-            return Err("Select je prekinut.".into());
+            return Err(qnc_ui_text::text("select.select_interrupted").into());
         }
         let references: BTreeSet<_> = chunk
             .iter()

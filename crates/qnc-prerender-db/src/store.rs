@@ -52,7 +52,7 @@ impl Store {
     pub(crate) fn execute(&mut self, operation: &Operation) -> Result<Data> {
         match operation {
             Operation::Read { .. } | Operation::ReadAll if !self.schema_ready => Ok(Data::Units(Vec::new())),
-            _ if !self.schema_ready => Err("Prerender projekta nije inicijaliziran.".into()),
+            _ if !self.schema_ready => Err(qnc_ui_text::text("db.project_prerender_initialised").into()),
             Operation::Publish(unit) => self.publish(unit),
             Operation::Read { fingerprints } => self.read(fingerprints),
             Operation::ReadAll => self.read_all(),
@@ -63,7 +63,7 @@ impl Store {
     fn publish(&mut self, unit: &RenderedUnit) -> Result<Data> {
         valid_fingerprint(&unit.fingerprint)?;
         if unit.frames == 0 || unit.file_uri.trim().is_empty() || unit.encoder.trim().is_empty() {
-            return Err("Neispravna jedinica prerendera.".into());
+            return Err(qnc_ui_text::text("db.invalid_prerender_unit").into());
         }
         self.conn
             .execute(

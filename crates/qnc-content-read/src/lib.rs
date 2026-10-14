@@ -85,7 +85,7 @@ impl ContentReader {
                 project_id: settings.project_id.clone(),
             }),
             ResolvedEndpoint::NetworkEndpoint { .. } => Err(
-                "Citanje projektnog sadrzaja preko LAN/Intranet transporta jos nije podrzano."
+                qnc_ui_text::text("db.reading_project_content_over_lan_intranet")
                     .to_string(),
             ),
         }
@@ -99,7 +99,7 @@ impl ContentReader {
 
     fn open(&self) -> Result<Connection, String> {
         if !self.file.is_file() {
-            return Err("Projektna baza vise ne postoji.".to_string());
+            return Err(qnc_ui_text::text("db.project_database_longer_exists").to_string());
         }
         let conn = Connection::open_with_flags(&self.file, OpenFlags::SQLITE_OPEN_READ_ONLY)
             .map_err(|error| error.to_string())?;
@@ -114,7 +114,7 @@ impl ContentReader {
                 )
                 .map_err(|error| error.to_string())?;
             if !matches {
-                return Err("Projektna baza pripada drugom projektu.".to_string());
+                return Err(qnc_ui_text::text("db.project_database_belongs_another_project").to_string());
             }
         }
         Ok(conn)
@@ -531,7 +531,7 @@ mod tests {
              INSERT INTO project_settings VALUES ('other-project');
              CREATE VIEW public_project_settings AS SELECT project_id FROM project_settings;"
         ));
-        assert!(reader.summaries().unwrap_err().contains("drugom projektu"));
+        assert!(reader.summaries().unwrap_err().contains("another project"));
     }
 
     #[test]

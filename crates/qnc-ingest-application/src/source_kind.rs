@@ -11,7 +11,7 @@ pub enum SourceKind {
 impl SourceKind {
     pub fn label(self) -> &'static str {
         match self {
-            Self::Local => "Računalo",
+            Self::Local => qnc_ui_text::text("source.computer"),
             Self::Lan => "LAN",
             Self::Internet => "Internet",
         }

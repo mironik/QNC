@@ -25,7 +25,7 @@ impl Screen {
         let even = ratio >= 1.0 && (ratio - ratio.round()).abs() < 0.01;
         let kind = if self.interlaced { "i" } else { "p" };
         (!even).then(|| {
-            format!("HDMI {refresh:.0}{kind}, izvor {source_fps:.2}p: slika ce neravnomjerno trzati, postavi ekran na visekratnik izvora")
+            qnc_ui_text::fill("output.uneven", &[("refresh", &format!("{refresh:.0}")), ("kind", &kind.to_string()), ("fps", &format!("{source_fps:.2}"))])
         })
     }
 }
@@ -82,7 +82,7 @@ pub fn screens() -> Result<Vec<Screen>, String> {
         EnumDisplayMonitors(std::ptr::null_mut(), std::ptr::null(), Some(found), &mut list as *mut _ as LPARAM)
     };
     if done == 0 {
-        return Err("Popis ekrana nije dostupan.".into());
+        return Err(qnc_ui_text::text("output.list_screens_available").into());
     }
     Ok(list)
 }
@@ -91,7 +91,7 @@ pub fn screens() -> Result<Vec<Screen>, String> {
 /// guessed screen (the output stays off).
 #[cfg(not(windows))]
 pub fn screens() -> Result<Vec<Screen>, String> {
-    Err("Program izlaz: popis ekrana na ovom OS-u jos nije podrzan.".into())
+    Err(qnc_ui_text::text("output.program_output_list_screens_supported_this").into())
 }
 
 #[cfg(test)]

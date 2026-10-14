@@ -61,7 +61,7 @@ pub trait MediaOpener: Send + Sync {
     /// The description of a file the import made in the project (one probe of the new
     /// file, still the Ingest process), recorded under `media_uri`.
     fn describe(&self, _media_uri: &str, _file: &Path) -> Result<MediaRepresentation, String> {
-        Err("Opis nove datoteke nije dostupan na ovom racunalu.".into())
+        Err(qnc_ui_text::text("import.new_file_cannot_be_described_this").into())
     }
 }
 
@@ -149,7 +149,7 @@ pub fn action_for(clip: &StoredClip, plan: &IngestWorkPlan) -> Result<Action, St
             let media_uri = match plan.playback_input {
                 PlaybackInput::Original => original,
                 PlaybackInput::Proxy => proxy
-                    .ok_or_else(|| "playback.input=proxy, ali kamera nema proxy.".to_string())?,
+                    .ok_or_else(|| qnc_ui_text::text("import.playback_input_proxy_but_camera_proxy").to_string())?,
                 PlaybackInput::ProxyIfAvailable => proxy.unwrap_or(original),
                 // A link makes no optimized copy, so the original plays.
                 PlaybackInput::OptimizedIfAvailable => original,
@@ -161,7 +161,7 @@ pub fn action_for(clip: &StoredClip, plan: &IngestWorkPlan) -> Result<Action, St
                 source_uri,
                 folder: Folder::Proxy,
             }),
-            None => Err("Klip nema proxy, a generiranje proxyja jos nije podrzano.".into()),
+            None => Err(qnc_ui_text::text("import.clip_proxy_making_proxy_supported_yet").into()),
         },
         IngestMedia::Original => Ok(Action::Copy {
             source_uri: original,
@@ -213,7 +213,7 @@ fn copy_into(
     loop {
         while opener.paused() {
             if cancel.load(Ordering::Relaxed) {
-                return Err("Uvoz je prekinut.".into());
+                return Err(qnc_ui_text::text("import.import_interrupted").into());
             }
             if last_beat.elapsed() >= HEARTBEAT_EVERY {
                 beat();
@@ -222,7 +222,7 @@ fn copy_into(
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
         if cancel.load(Ordering::Relaxed) {
-            return Err("Uvoz je prekinut.".into());
+            return Err(qnc_ui_text::text("import.import_interrupted").into());
         }
         let n = source.read(&mut buffer).map_err(|e| e.to_string())?;
         if n == 0 {
@@ -338,7 +338,7 @@ pub(crate) fn inside_project(project_dir: &Path, path: &Path) -> Result<(), Stri
     if plain && path.starts_with(project_dir) {
         Ok(())
     } else {
-        Err("Pisanje je dopusteno samo u direktorij projekta.".into())
+        Err(qnc_ui_text::text("import.writing_allowed_only_into_project_folder").into())
     }
 }
 
@@ -392,10 +392,10 @@ pub(crate) fn create_missing_poster(
     )?;
     let source = opener
         .local_path(&filmstrip.source_uri)
-        .ok_or("Izvor klipa nije dostupan na ovom racunalu.")?;
+        .ok_or(qnc_ui_text::text("import.source_clip_available_this_computer"))?;
     match qnc_poster_create::create_poster(&source, 0.0, filmstrip.source_timebase, output, cancel)? {
         true => Ok(()),
-        false => Err("Ovo racunalo nema lokalni izvlakac slike.".into()),
+        false => Err(qnc_ui_text::text("import.this_computer_local_picture_extractor").into()),
     }
 }
 
@@ -501,7 +501,7 @@ impl TransportQueue {
                 }
             }
             if !self.transport.has_pending() {
-                return Err("Content write transport nije vratio rezultat.".into());
+                return Err(qnc_ui_text::text("db.content_writer_returned_result").into());
             }
             std::thread::sleep(std::time::Duration::from_millis(2));
         }

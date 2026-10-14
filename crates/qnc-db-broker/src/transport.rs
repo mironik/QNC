@@ -134,9 +134,9 @@ impl ProjectDbClient {
             .factories
             .iter()
             .find(|factory| factory.id() == module)
-            .ok_or_else(|| format!("Nepoznat modul baze projekta: {module}"))?;
+            .ok_or_else(|| qnc_ui_text::fill("db.unknown_module", &[("module", module)]))?;
         if factory.is_write(&payload) && self.access == Access::ReadOnly {
-            return Err("Pristup je read-only.".into());
+            return Err(qnc_ui_text::text("db.access_read_only").into());
         }
         let request = Request {
             version: VERSION.into(),
@@ -149,7 +149,7 @@ impl ProjectDbClient {
             Endpoint::Remote(client) => {
                 let reply: Reply = client.post(&request).map_err(|e| e.to_string())?;
                 if reply.version != VERSION || reply.db_uri != request.db_uri {
-                    return Err("Pogresan odgovor baze projekta.".into());
+                    return Err(qnc_ui_text::text("db.wrong_reply_project_database").into());
                 }
                 reply.result
             }
@@ -223,10 +223,10 @@ impl ProjectDbWriter {
         let (reply, answer) = mpsc::channel();
         self.requests
             .send((module.into(), payload, reply))
-            .map_err(|_| "Posrednik baze projekta nije dostupan.".to_string())?;
+            .map_err(|_| qnc_ui_text::text("db.project_database_broker_available").to_string())?;
         answer
             .recv()
-            .map_err(|_| "Posrednik baze projekta nije odgovorio.".to_string())?
+            .map_err(|_| qnc_ui_text::text("db.project_database_broker_did_reply").to_string())?
     }
 
     /// Sends a request without waiting: it runs in order with every other request of
@@ -235,7 +235,7 @@ impl ProjectDbWriter {
         let (reply, answer) = mpsc::channel();
         self.requests
             .send((module.into(), payload, reply))
-            .map_err(|_| "Posrednik baze projekta nije dostupan.".to_string())?;
+            .map_err(|_| qnc_ui_text::text("db.project_database_broker_available").to_string())?;
         Ok(Pending(answer))
     }
 
@@ -257,7 +257,7 @@ impl Pending {
             Ok(result) => Some(result),
             Err(mpsc::TryRecvError::Empty) => None,
             Err(mpsc::TryRecvError::Disconnected) => {
-                Some(Err("Posrednik baze projekta nije odgovorio.".into()))
+                Some(Err(qnc_ui_text::text("db.project_database_broker_did_reply").into()))
             }
         }
     }
@@ -282,9 +282,9 @@ pub fn respond(
                 .find(|factory| factory.id() == body.module)
                 .is_some_and(|factory| factory.is_write(&body.payload));
             let result = if body.db_uri != published_uri {
-                Err("Pogresna projektna baza.".into())
+                Err(qnc_ui_text::text("db.wrong_project_database").into())
             } else if writes && access == Access::ReadOnly {
-                Err("Pristup je read-only.".into())
+                Err(qnc_ui_text::text("db.access_read_only").into())
             } else {
                 db.execute(&body)
             };

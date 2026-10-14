@@ -66,7 +66,7 @@ impl Store {
                         Data::Filmstrip(None)
                     })
                 }
-                _ => Err("Artefakti projekta nisu inicijalizirani.".into()),
+                _ => Err(qnc_ui_text::text("artifact.project_artifacts_initialised").into()),
             };
         }
         match operation {
@@ -82,7 +82,7 @@ impl Store {
     /// imported keeps its artifacts (the catalog never removes it either).
     fn forget_clips(&mut self, clip_ids: &[String]) -> Result<Data> {
         if clip_ids.len() > 4096 {
-            return Err("Previse klipova u naredbi.".into());
+            return Err(qnc_ui_text::text("db.too_many_clips_one_command").into());
         }
         let tx = self
             .conn
@@ -110,11 +110,11 @@ impl Store {
         let clip_exists =
             qnc_content_read::import_status_on(&self.conn, &artifact.clip_id)?.is_some();
         if !clip_exists {
-            return Err("Clip nije pronadjen u projektnoj bazi.".into());
+            return Err(qnc_ui_text::text("db.clip_project_database").into());
         }
         let json = serde_json::to_string(artifact).map_err(err)?;
         if json.len() > MAX_RECORD_BYTES {
-            return Err("Prevelik filmstrip zapis.".into());
+            return Err(qnc_ui_text::text("artifact.filmstrip_record_too_large").into());
         }
         let tx = self
             .conn
@@ -211,16 +211,16 @@ impl Store {
         validate_wave_artifact(artifact)?;
         let stored_source = qnc_content_read::media_uris_on(&self.conn, &artifact.clip_id)?;
         let Some((original_uri, proxy_uri)) = stored_source else {
-            return Err("Clip nije pronadjen u projektnoj bazi.".into());
+            return Err(qnc_ui_text::text("db.clip_project_database").into());
         };
         if artifact.source_uri != original_uri
             && proxy_uri.as_deref() != Some(artifact.source_uri.as_str())
         {
-            return Err("Wave zapis ne pripada spremljenom originalu ili proxyju klipa.".into());
+            return Err(qnc_ui_text::text("artifact.wave_record_does_belong_stored_original").into());
         }
         let json = serde_json::to_string(artifact).map_err(err)?;
         if json.len() > MAX_RECORD_BYTES {
-            return Err("Prevelik wave zapis.".into());
+            return Err(qnc_ui_text::text("artifact.wave_record_too_large").into());
         }
         let now = utc_stamp();
         self.conn
@@ -254,7 +254,7 @@ impl Store {
         };
         let artifact = serde_json::from_str::<WaveArtifactRecord>(&json).map_err(err)?;
         if artifact.clip_id != clip_id || artifact.artifact_uri != artifact_uri {
-            return Err("Wave zapis ne odgovara trazenom klipu.".into());
+            return Err(qnc_ui_text::text("artifact.wave_record_does_match_requested_clip").into());
         }
         validate_wave_artifact(&artifact)?;
         Ok(Data::Wave(Some(artifact)))
@@ -344,7 +344,7 @@ fn validate_filmstrip_artifact(artifact: &FilmstripArtifactRecord) -> Result<()>
     }
     for (expected, frame) in artifact.frames.iter().enumerate() {
         if frame.index != expected {
-            return Err("Filmstrip slicice nisu u pravilnom redoslijedu.".into());
+            return Err(qnc_ui_text::text("artifact.filmstrip_pictures_order").into());
         }
         parse_seconds(&frame.seek_sec)?;
         qnc_media_records::validate_resource_uri(&frame.artifact_uri).map_err(err)?;

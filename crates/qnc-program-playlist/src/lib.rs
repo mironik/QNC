@@ -108,7 +108,7 @@ pub fn build_flat_program_playlist(
         items.extend(flat_items_for_segment(segment, resolver)?);
     }
     if items.is_empty() {
-        return Err("Program input je prazan.".into());
+        return Err("The program is empty.".into());
     }
     let playlist = FlatProgramPlaylist {
         playlist_id: input.playlist_id.clone(),
@@ -139,15 +139,15 @@ pub fn apply_transient_program_overlay(
     .map_err(|error| error.message)?;
     if overlay_range.out_frame > playlist.duration_frames {
         return Err(format!(
-            "Transient overlay završava izvan programa: {} > {}.",
+            "The temporary overlay ends outside the program: {} > {}.",
             overlay_range.out_frame, playlist.duration_frames
         ));
     }
     if overlay.source.video_layer != Some(ProgramVideoLayer::Cover) {
-        return Err("Transient overlay mora biti cover video source.".into());
+        return Err("The temporary overlay must be a B-roll picture source.".into());
     }
     if overlay.source.source_range.frame_len() != overlay_range.frame_len() {
-        return Err("Transient overlay source i program raspon nemaju istu duljinu.".into());
+        return Err("The temporary overlay's source and program ranges differ in length.".into());
     }
     let replaced_audio_outputs = overlay
         .source
@@ -306,7 +306,7 @@ fn trim_flat_source(
     let source_out = source_in.saturating_add(record_out.saturating_sub(record_in));
     if source_out > source.source_range.source_out {
         return Err(format!(
-            "Source '{}' nema dovoljno frameova za program raspon {}..{}.",
+            "Source '{}' does not have enough frames for the program range {}..{}.",
             source.source_id, record_in, record_out
         ));
     }
@@ -322,7 +322,7 @@ fn flat_items_for_segment(
 ) -> Result<Vec<FlatProgramItem>, String> {
     let clip_id = segment.clip_id.trim();
     if clip_id.is_empty() {
-        return Err(format!("Segment '{}' nema clip_id.", segment.segment_id));
+        return Err(format!("Segment '{}' has no clip.", segment.segment_id));
     }
     let base_media = resolver.resolve(clip_id)?;
     let is_off = segment.kind.trim().eq_ignore_ascii_case("offovi");
@@ -427,7 +427,7 @@ impl BaseSegment<'_> {
         );
         if source_range.timebase != media.timebase {
             return Err(format!(
-                "Clip '{}' editorial timebase {}/{} ne odgovara spremljenom probe timebaseu {}/{}.",
+                "Clip '{}': the editorial timebase {}/{} does not match the stored probe timebase {}/{}.",
                 segment.clip_id,
                 source_range.timebase.fps_num,
                 source_range.timebase.fps_den,
@@ -471,7 +471,7 @@ fn cover_sources(
 ) -> Result<Vec<FlatProgramSource>, String> {
     let clip_id = cover.clip_id.trim();
     if clip_id.is_empty() {
-        return Err(format!("Pokrivalica '{}' nema clip_id.", cover.cover_id));
+        return Err(format!("B-roll '{}' has no clip.", cover.cover_id));
     }
     let media = resolver.resolve(clip_id)?;
     let source_range = source_range_for_record_chunk(
@@ -482,7 +482,7 @@ fn cover_sources(
     );
     if source_range.timebase != media.timebase {
         return Err(format!(
-            "Pokrivalica '{}' editorial timebase {}/{} ne odgovara spremljenom probe timebaseu {}/{}.",
+            "B-roll '{}': the editorial timebase {}/{} does not match the stored probe timebase {}/{}.",
             cover.cover_id,
             source_range.timebase.fps_num,
             source_range.timebase.fps_den,

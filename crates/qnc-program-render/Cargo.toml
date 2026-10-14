@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-media-decode.workspace = true
 qnc-media-metadata.workspace = true
 qnc-media-stream.workspace = true

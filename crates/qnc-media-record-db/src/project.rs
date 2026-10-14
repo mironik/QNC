@@ -38,7 +38,7 @@ impl TableModuleFactory for MediaRecordsModule {
         access: Access,
     ) -> Result<Box<dyn TableModule>, String> {
         Ok(Box::new(Attached(
-            Store::attach(connection, access).map_err(|e| format!("Zapisi medija: {e:?}"))?,
+            Store::attach(connection, access).map_err(|e| format!("{}: {e:?}", qnc_ui_text::text("db.media_records")))?,
         )))
     }
 }
@@ -55,7 +55,7 @@ impl TableModule for Attached {
                 db_uri: URI.into(),
                 operation,
             })
-            .map_err(|e| format!("Zapisi medija: {e:?}"))?;
+            .map_err(|e| format!("{}: {e:?}", qnc_ui_text::text("db.media_records")))?;
         serde_json::to_value(data).map_err(|e| e.to_string())
     }
 }
@@ -76,21 +76,21 @@ impl ProjectMediaRecords {
     pub fn write(&self, write: Write) -> Result<Receipt, String> {
         match self.call(Operation::Write(Box::new(write)))? {
             Data::Written(receipt) => Ok(receipt),
-            _ => Err("Neispravan odgovor zapisa medija.".into()),
+            _ => Err(qnc_ui_text::text("db.invalid_reply_media_records").into()),
         }
     }
 
     pub fn begin_acquisition(&self, begin: BeginAcquisition) -> Result<AcquisitionClaim, String> {
         match self.call(Operation::BeginAcquisition(begin))? {
             Data::AcquisitionClaim(claim) => Ok(*claim),
-            _ => Err("Neispravan odgovor zapisa medija.".into()),
+            _ => Err(qnc_ui_text::text("db.invalid_reply_media_records").into()),
         }
     }
 
     pub fn finish_acquisition(&self, finish: FinishAcquisition) -> Result<Acquisition, String> {
         match self.call(Operation::FinishAcquisition(finish))? {
             Data::Acquisition(Some(attempt)) => Ok(*attempt),
-            _ => Err("Neispravan odgovor zapisa medija.".into()),
+            _ => Err(qnc_ui_text::text("db.invalid_reply_media_records").into()),
         }
     }
 
@@ -100,7 +100,7 @@ impl ProjectMediaRecords {
             revision,
         })? {
             Data::Snapshot(snapshot) => Ok(snapshot.map(|s| *s)),
-            _ => Err("Neispravan odgovor zapisa medija.".into()),
+            _ => Err(qnc_ui_text::text("db.invalid_reply_media_records").into()),
         }
     }
 
@@ -109,7 +109,7 @@ impl ProjectMediaRecords {
             document_uri: uri.into(),
         })? {
             Data::Document(document) => Ok(document),
-            _ => Err("Neispravan odgovor zapisa medija.".into()),
+            _ => Err(qnc_ui_text::text("db.invalid_reply_media_records").into()),
         }
     }
 }

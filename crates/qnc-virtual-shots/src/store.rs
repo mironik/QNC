@@ -51,7 +51,7 @@ impl Store {
         if !self.schema_ready {
             return match operation {
                 Operation::ListShorts | Operation::ListBroll => Ok(Data::ShortClips(Vec::new())),
-                _ => Err("Virtualni kadrovi projekta nisu inicijalizirani.".into()),
+                _ => Err(qnc_ui_text::text("stills.project_subclips_initialised").into()),
             };
         }
         match operation {
@@ -96,11 +96,11 @@ impl Store {
         out_frame: u64,
     ) -> Result<Data> {
         if project_id.trim().is_empty() {
-            return Err("Nema aktivnog projekta.".into());
+            return Err(qnc_ui_text::text("story.msg.no_active_project").into());
         }
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         if out_frame <= in_frame {
-            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+            return Err(qnc_ui_text::text("story.out_after_in").into());
         }
         let project_matches: bool = self
             .conn
@@ -111,7 +111,7 @@ impl Store {
             )
             .map_err(err)?;
         if !project_matches {
-            return Err("Projektna baza pripada drugom projektu.".into());
+            return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
         let tx = self
@@ -230,7 +230,7 @@ impl Store {
         error_message: Option<&str>,
     ) -> Result<Data> {
         if shot_id.trim().is_empty() {
-            return Err("Virtualni kadar nije pronadjen.".into());
+            return Err(qnc_ui_text::text("story.msg.subclip_not_found").into());
         }
         if !matches!(status, "ready" | "failed" | "pending") {
             return Err("Neispravan status slicica virtualnog kadra.".into());
@@ -257,7 +257,7 @@ impl Store {
             )
             .map_err(err)?;
         if changed == 0 {
-            Err("Virtualni kadar nije pronadjen.".into())
+            Err(qnc_ui_text::text("story.msg.subclip_not_found").into())
         } else {
             Ok(Data::Changed)
         }
@@ -273,7 +273,7 @@ impl Store {
     ) -> Result<Data> {
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         if out_frame <= in_frame {
-            return Err("OUT mora biti najmanje jedan frame nakon IN.".into());
+            return Err(qnc_ui_text::text("story.out_after_in").into());
         }
         let project_matches: bool = self
             .conn
@@ -284,7 +284,7 @@ impl Store {
             )
             .map_err(err)?;
         if !project_matches {
-            return Err("Projektna baza pripada drugom projektu.".into());
+            return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
         let tx = self
@@ -438,8 +438,8 @@ fn object_exists(conn: &Connection, kind: &str, name: &str) -> Result<bool> {
 fn require_imported_clip(conn: &Connection, clip_id: &str) -> Result<()> {
     match qnc_content_read::imported_on(conn, clip_id)? {
         Some(true) => Ok(()),
-        Some(false) => Err(format!("Klip '{clip_id}' nije uvezen.")),
-        None => Err("Klip nije pronadjen.".into()),
+        Some(false) => Err(qnc_ui_text::fill("story.msg.clip_not_imported", &[("clip", &clip_id.to_string())])),
+        None => Err(qnc_ui_text::text("ingest.msg.clip_not_found").into()),
     }
 }
 

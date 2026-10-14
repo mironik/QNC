@@ -80,7 +80,7 @@ impl ApplicationSelection {
             Ok(result) => result,
             Err(mpsc::TryRecvError::Empty) => return true,
             Err(mpsc::TryRecvError::Disconnected) => {
-                Err("Ucitavanje kataloga je prekinuto.".into())
+                Err(qnc_ui_text::text("app.loading_catalog_interrupted").into())
             }
         };
         self.pending = None;
@@ -125,7 +125,7 @@ impl ApplicationSelection {
                         .map(|app| app.application_id)
                         .collect()
                 }
-                Err(error) => self.error = Some(format!("Neispravan spremljeni izbor: {error}")),
+                Err(error) => self.error = Some(qnc_ui_text::fill("app.saved_choice_invalid", &[("error", &error.to_string())])),
             }
         } else if let Some(tabs) = settings
             .pointer("/workspace/tabs")
@@ -164,9 +164,9 @@ impl ApplicationSelection {
 
     pub fn choose(&mut self, group: &str, id: Option<&str>) -> Result<(), String> {
         if group == "a" && id.is_none() {
-            return Err("Grupa a mora imati odabranu aplikaciju.".into());
+            return Err(qnc_ui_text::text("app.group_a_needs_app").into());
         }
-        let catalog = self.catalog.as_ref().ok_or("Katalog nije ucitan.")?;
+        let catalog = self.catalog.as_ref().ok_or(qnc_ui_text::text("app.catalog_loaded"))?;
         catalog::choose_group(catalog, &mut self.ids, group, id).map_err(|e| e.to_string())
     }
 
@@ -174,12 +174,12 @@ impl ApplicationSelection {
         let catalog = self
             .catalog
             .as_ref()
-            .ok_or("Katalog aplikacija nije ucitan.")?;
+            .ok_or(qnc_ui_text::text("app.application_catalog_loaded"))?;
         if let Some(error) = &self.error {
             return Err(error.clone());
         }
         if self.ids.is_empty() {
-            return Err("Odaberite barem jednu aplikaciju.".into());
+            return Err(qnc_ui_text::text("app.choose_at_least_one_application").into());
         }
         let snapshot =
             SelectionSnapshot::from_catalog(catalog, &self.ids).map_err(|e| e.to_string())?;
@@ -188,7 +188,7 @@ impl ApplicationSelection {
             .iter()
             .any(|app| app.priority_group == "a")
         {
-            return Err("Odaberite aplikaciju iz grupe a.".into());
+            return Err(qnc_ui_text::text("app.choose_application_from_group").into());
         }
         Ok(snapshot)
     }

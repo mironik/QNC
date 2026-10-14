@@ -189,7 +189,7 @@ impl PoolShotsReader {
         let result = match self.reading.as_ref()?.try_recv() {
             Ok(result) => result,
             Err(std::sync::mpsc::TryRecvError::Empty) => return None,
-            Err(std::sync::mpsc::TryRecvError::Disconnected) => Err("Citanje virtualnih kadrova je prekinuto.".into()),
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => Err(qnc_ui_text::text("stills.reading_subclips_interrupted").into()),
         };
         self.reading = None;
         if let Some(target) = self.again.take() {

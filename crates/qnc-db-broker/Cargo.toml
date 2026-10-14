@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: the one serial intermediary of a project database (v5 ProjectDbBroker); it knows no domain: table modules own their tables and requests"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-json-transport = { workspace = true }
 qnc-transport-resolver = { workspace = true }

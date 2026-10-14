@@ -46,7 +46,7 @@ pub(crate) fn publish_batches(
         send.send(Event::Saved { revisions, error })?;
     }
     if failed {
-        Err("Neki klipovi nisu spremljeni u bazu.".into())
+        Err(qnc_ui_text::text("select.some_clips_saved_database").into())
     } else {
         Ok(())
     }
@@ -114,7 +114,7 @@ fn wait_write_completion(
             }
         }
         if !transport.has_pending() {
-            return Err("Content write transport nije vratio rezultat.".into());
+            return Err(qnc_ui_text::text("db.content_writer_returned_result").into());
         }
         std::thread::sleep(std::time::Duration::from_millis(2));
     }

@@ -57,7 +57,7 @@ fn start(target: &ContentTarget) -> Result<(), String> {
     let name = format!("{EXECUTABLE}{}", std::env::consts::EXE_SUFFIX);
     let executable = std::env::current_exe().map_err(|e| e.to_string())?.with_file_name(&name);
     if !executable.is_file() {
-        return Err(format!("Nedostaje {name} pored aplikacije."));
+        return Err(qnc_ui_text::fill("app.helper_missing_short", &[("name", &name.to_string())]));
     }
     let mut command = Command::new(executable);
     command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());

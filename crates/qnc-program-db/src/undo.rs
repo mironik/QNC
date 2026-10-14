@@ -94,9 +94,9 @@ pub(crate) fn step(conn: &Connection, undo: bool) -> Result<()> {
         .map_err(err)?;
     let Some((seq, snapshot)) = kept else {
         return Err(if undo {
-            "Nema izmjene za ponistiti.".into()
+            qnc_ui_text::text("story.nothing_undo").into()
         } else {
-            "Nema izmjene za ponoviti.".into()
+            qnc_ui_text::text("story.nothing_redo").into()
         });
     };
     let current = capture(&tx)?;

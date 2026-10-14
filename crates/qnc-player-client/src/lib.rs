@@ -6,6 +6,10 @@ use qnc_player_contract::{
 };
 use qnc_player_input::{PreparedInput, ProgramInput};
 use serde::Serialize;
+
+/// The reply of a command sent before the player is ready (the player boundary takes no
+/// dictionary).
+pub const PREPARING: &str = "The player is getting ready.";
 use std::{
     path::PathBuf,
     sync::{
@@ -334,10 +338,10 @@ impl Player {
     pub fn send(&self, action: Action) -> Result<()> {
         let view = self.view();
         if view.reply.is_none() {
-            return Err(view.error.unwrap_or_else(|| "Player se priprema.".into()));
+            return Err(view.error.unwrap_or_else(|| PREPARING.into()));
         }
         if !view.has_confirmed_position() {
-            return Err("Player se priprema.".into());
+            return Err(PREPARING.into());
         }
         self.commands
             .try_send((self.shared.generation.load(Ordering::Acquire), action))
@@ -588,7 +592,7 @@ mod tests {
         );
         assert_eq!(
             player.send(Action::TogglePlayPause).unwrap_err(),
-            "Player se priprema."
+            PREPARING
         );
     }
 

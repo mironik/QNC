@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: the virtual shots of a project database (shorts, B-roll shots of covers, stills) as a table module of the project database intermediary"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-content-read = { workspace = true }
 qnc-db-broker = { workspace = true }

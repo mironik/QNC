@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-source-index-contract.workspace = true
 qnc-transport-resolver.workspace = true
 qnc-json-transport.workspace = true

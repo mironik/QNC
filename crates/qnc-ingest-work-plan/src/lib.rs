@@ -38,7 +38,7 @@ impl IngestWorkPlan {
             "original" => IngestMedia::Original,
             "optimized" => IngestMedia::Optimized { with_original: false },
             "optimized_original" => IngestMedia::Optimized { with_original: true },
-            _ => return Err("Baza sadrzi nepodrzani storage.ingest_media.".into()),
+            _ => return Err(qnc_ui_text::text("ingest.database_holds_unsupported_storage_ingest_media").into()),
         };
         let playback_input = settings.playback_input().map_err(|e| e.to_string())?;
         let root = &settings.output_root_uri;

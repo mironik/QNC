@@ -272,7 +272,7 @@ fn builder_rejects_mixed_probe_timebase() {
         &mut resolver(&["base"], timebase),
     )
     .unwrap_err();
-    assert!(error.contains("ne odgovara spremljenom probe timebaseu"));
+    assert!(error.contains("does not match the stored probe timebase"));
 }
 
 #[test]

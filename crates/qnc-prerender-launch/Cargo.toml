@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: wakes the background prerender of the active project (starts its executable when its lease in the project database is not alive), never on the caller's thread"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-playback-activity = { workspace = true }

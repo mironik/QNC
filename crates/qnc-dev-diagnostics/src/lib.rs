@@ -202,43 +202,43 @@ const DIAGNOSTIC_CHECKS: &[DiagnosticCheck] = &[
     DiagnosticCheck {
         id: DiagnosticCheckId::IngestCore,
         title: "Ingest core",
-        description: "Application, Select session i thumbnails.",
+        description: "Application, Select session and thumbnails.",
         args: INGEST_CORE_ARGS,
     },
     DiagnosticCheck {
         id: DiagnosticCheckId::ArtifactTimeline,
         title: "Artifacts + Timeline",
-        description: "Filmstrip, Wave, Timeline i timeline-assets.",
+        description: "Filmstrip, Wave, Timeline and timeline-assets.",
         args: ARTIFACT_TIMELINE_ARGS,
     },
     DiagnosticCheck {
         id: DiagnosticCheckId::PlayerStack,
         title: "Player stack",
-        description: "Player ulaz, klijent, launcher, frame transport i engine.",
+        description: "Player input, client, launcher, frame transport and engine.",
         args: PLAYER_STACK_ARGS,
     },
     DiagnosticCheck {
         id: DiagnosticCheckId::ComponentBoundaries,
         title: "Component boundaries",
-        description: "Javni worker/player-input moduli bez runtime Ingest ovisnosti.",
+        description: "Public worker/player-input modules without a runtime Ingest dependency.",
         args: &[],
     },
     DiagnosticCheck {
         id: DiagnosticCheckId::Conformance,
         title: "Conformance",
-        description: "Projektni zakon i boundary provjere.",
+        description: "Project law and boundary checks.",
         args: CONFORMANCE_ARGS,
     },
     DiagnosticCheck {
         id: DiagnosticCheckId::DiagnosticsTool,
         title: "Diagnostics tool",
-        description: "Diagnostics modul i forma.",
+        description: "Diagnostics module and form.",
         args: DIAGNOSTICS_TOOL_ARGS,
     },
     DiagnosticCheck {
         id: DiagnosticCheckId::AppBuild,
         title: "App build",
-        description: "Glavne QNC aplikacije i pomocni player binary.",
+        description: "Main QNC applications and the helper player binary.",
         args: APP_BUILD_ARGS,
     },
 ];
@@ -285,7 +285,7 @@ pub fn run_diagnostic_checks(root: &Path, ids: &[DiagnosticCheckId]) -> Diagnost
             success: false,
             exit_code: None,
             duration_ms: 0,
-            output: "QNC root nije valjan.".into(),
+            output: "The QNC root is not valid.".into(),
         });
         return DiagnosticTestReport {
             started_unix_ms,
@@ -302,7 +302,7 @@ pub fn run_diagnostic_checks(root: &Path, ids: &[DiagnosticCheckId]) -> Diagnost
                 success: false,
                 exit_code: None,
                 duration_ms: 0,
-                output: "Nepoznata diagnostics provjera.".into(),
+                output: "Unknown diagnostics check.".into(),
             });
             continue;
         };
@@ -349,7 +349,7 @@ fn run_one_check(root: &Path, check: &DiagnosticCheck) -> DiagnosticTestResult {
             success: false,
             exit_code: None,
             duration_ms,
-            output: format!("Pokretanje provjere nije uspjelo: {error}"),
+            output: format!("Starting the check failed: {error}"),
         },
     }
 }
@@ -399,7 +399,7 @@ fn run_component_boundary_check(root: &Path, check: &DiagnosticCheck) -> Diagnos
             Err(error) => {
                 success = false;
                 exit_code = None;
-                output.push_str(&format!("Pokretanje cargo tree nije uspjelo: {error}\n"));
+                output.push_str(&format!("Starting cargo tree failed: {error}\n"));
             }
         }
     }
@@ -447,7 +447,7 @@ fn process_output(stdout: &[u8], stderr: &[u8]) -> String {
         text.push_str(&String::from_utf8_lossy(stderr));
     }
     if text.trim().is_empty() {
-        text.push_str("Nema izlaza.");
+        text.push_str("No output.");
     }
     truncate_test_output(text)
 }
@@ -463,7 +463,7 @@ fn truncate_test_output(text: String) -> String {
         .map(|(index, _)| index)
         .unwrap_or(0);
     format!(
-        "[izlaz skracen; prikazan je zadnji dio]\n{}",
+        "[output shortened; the last part is shown]\n{}",
         &text[start..]
     )
 }
@@ -518,7 +518,7 @@ pub fn diagnostics_state() -> DiagnosticsState {
         },
         None => (
             DiagnosticsSettings::default(),
-            Some("QNC root nije pronadjen.".into()),
+            Some("The QNC root was not found.".into()),
         ),
     };
     let player_env_override = env_flag(PLAYER_ENV);
@@ -730,7 +730,7 @@ mod tests {
 
         assert!(!report.success());
         assert_eq!(report.results.len(), 1);
-        assert_eq!(report.results[0].output, "QNC root nije valjan.");
+        assert_eq!(report.results[0].output, "The QNC root is not valid.");
     }
 
     #[test]

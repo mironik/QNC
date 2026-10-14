@@ -5,6 +5,7 @@ edition = "2021"
 description = "Background waveform peak generator for QNC"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-decoder-catalog = { workspace = true }
 qnc-contracts = { workspace = true }

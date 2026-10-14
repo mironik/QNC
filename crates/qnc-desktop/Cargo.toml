@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC desktop block: the shell layout model, the surfaces of the registered applications, their activation and navigation, one layout with the active surface over the footer"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-app-registry = { workspace = true }
 qnc-board = { workspace = true }

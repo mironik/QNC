@@ -5,4 +5,5 @@ edition = "2021"
 description = "QNC public component: writes the selected flag of clips through the Ingest content write transport, off the caller's thread"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-ingest-store = { workspace = true }

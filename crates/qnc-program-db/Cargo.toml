@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: the Story tables of a project database (segments, markers, slots, covers, selection and undo) as a table module of the project database intermediary; it knows no form and no application"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-content-read = { workspace = true }
 qnc-media-records = { workspace = true }

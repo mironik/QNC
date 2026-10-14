@@ -149,7 +149,7 @@ impl PreviewContext {
             }
             Ok(None) => (
                 None,
-                Some("Timeline artefakti nemaju lokalni filmstrip binding.".to_string()),
+                Some(qnc_ui_text::text("player.timeline_artifacts_have_local_filmstrip_binding").to_string()),
             ),
             Err(error) => (None, Some(error.to_string())),
         };
@@ -407,7 +407,7 @@ impl SourcePreview {
         // Whoever completes records in the background takes this clip first.
         self.activity.clip(self.activity_target.as_ref(), clip_id);
         let Some(context) = self.context.clone() else {
-            self.view.message = "Radne postavke projekta nisu ucitane.".into();
+            self.view.message = qnc_ui_text::text("player.work_settings_project_loaded").into();
             return true;
         };
         // Published artifacts are read again on every choice: they may have
@@ -488,7 +488,7 @@ impl SourcePreview {
         self.touched = Some(std::time::Instant::now());
         self.cue_asked = None; // Play moves the playhead: arrows count from where it stops
         let Some(player) = &self.player else {
-            self.view.message = "Broadcast Player nije povezan.".into();
+            self.view.message = qnc_ui_text::text("player.broadcast_player_connected").into();
             return true;
         };
         let playback = player.view();
@@ -564,7 +564,7 @@ impl SourcePreview {
         build: impl FnOnce(&InputReader, &str) -> Result<ProgramInput, String> + Send + 'static,
     ) -> bool {
         let Some(context) = self.context.clone() else {
-            self.view.message = "Radne postavke projekta nisu ucitane.".into();
+            self.view.message = qnc_ui_text::text("player.work_settings_project_loaded").into();
             return true;
         };
         if self.player.is_none() {
@@ -674,7 +674,7 @@ impl SourcePreview {
         let result = self
             .player
             .as_ref()
-            .ok_or_else(|| "Broadcast Player nije povezan.".to_string())
+            .ok_or_else(|| qnc_ui_text::text("player.broadcast_player_connected").to_string())
             .and_then(|player| player.send(action));
         match result {
             Ok(()) => self.play_when_ready = false,
@@ -750,7 +750,7 @@ impl SourcePreview {
                 if let Some(player) = &self.player {
                     match player.send(Action::TogglePlayPause) {
                         Ok(()) => self.play_when_ready = false,
-                        Err(error) if error == "Player se priprema." => {}
+                        Err(error) if error == qnc_player_client::PREPARING => {}
                         Err(error) => {
                             self.play_when_ready = false;
                             self.view.message = error;
@@ -870,7 +870,7 @@ mod tests {
         assert_eq!(preview.view().clip_id.as_deref(), Some("clip-a"));
         assert_eq!(
             preview.view().message,
-            "Radne postavke projekta nisu ucitane."
+            qnc_ui_text::text("player.work_settings_project_loaded")
         );
         assert!(!preview.has_player());
     }
@@ -879,11 +879,11 @@ mod tests {
     fn transport_without_a_player_says_so() {
         let mut preview = SourcePreview::new();
         assert!(preview.toggle_play());
-        assert_eq!(preview.view().message, "Broadcast Player nije povezan.");
+        assert_eq!(preview.view().message, qnc_ui_text::text("player.broadcast_player_connected"));
         for change in [preview.step(1), preview.step(-1), preview.cue(10)] {
             assert!(change);
         }
-        assert_eq!(preview.view().message, "Broadcast Player nije povezan.");
+        assert_eq!(preview.view().message, qnc_ui_text::text("player.broadcast_player_connected"));
     }
 
     #[test]

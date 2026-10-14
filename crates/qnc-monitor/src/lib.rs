@@ -48,7 +48,6 @@ pub struct MonitorSurface<'a> {
 }
 
 /// What a monitor that leaves its picture to the external screen shows.
-const EXTERNAL_PICTURE: &str = "Slika je na HDMI izlazu";
 
 pub fn paint_monitor(ui: &mut Ui, rect: Rect, surface: MonitorSurface<'_>) -> MonitorPaint {
     ui.allocate_rect(rect, Sense::hover());
@@ -65,7 +64,7 @@ pub fn paint_monitor(ui: &mut Ui, rect: Rect, surface: MonitorSurface<'_>) -> Mo
             if let Some(frame_map) = picture.frame_map {
                 qnc_program_output::offer(ui.ctx(), frame_map);
             }
-            paint_placeholder(ui, rect, surface.chrome, EXTERNAL_PICTURE);
+            paint_placeholder(ui, rect, surface.chrome, qnc_ui_text::text("player.picture_hdmi_output"));
             return MonitorPaint::Message;
         }
         if qnc_ui_kit::paint_stream_frame(

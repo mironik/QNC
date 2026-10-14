@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public module: read-only reader of the project content DB contract, public views only (clip list, clip head, filmstrip and wave artifacts)"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-media-records = { workspace = true }
 qnc-transport-resolver = { workspace = true }
