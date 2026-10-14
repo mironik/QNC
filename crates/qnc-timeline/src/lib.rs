@@ -136,10 +136,11 @@ impl Default for TimelineMetrics {
     fn default() -> Self {
         Self {
             label_width: 28.0,
-            audio_height: 15.0,
+            audio_height: 18.0, // the 3 px gaps went to the lanes: the stack keeps its v4 height
             audio_expanded_height: 52.0,
             video_height: 64.0,
-            row_gap: 3.0,
+            // The lanes sit against each other, without lines between them (user 2026-10-14).
+            row_gap: 0.0,
             border_width: 1.0,
         }
     }
@@ -213,8 +214,10 @@ impl TimelineTheme {
             background,
             label_background: surface_alt,
             video_background: surface,
-            audio_primary_background: surface,
-            audio_secondary_background: background,
+            // Audio lanes as Final Cut Pro draws audio: a green lane with a light green wave
+            // (user 2026-10-14).
+            audio_primary_background: Color32::from_rgb(38, 98, 62),
+            audio_secondary_background: Color32::from_rgb(38, 98, 62),
             border,
             text,
             muted,
@@ -222,10 +225,10 @@ impl TimelineTheme {
             focus: Color32::from_rgb(255, 180, 60),
             shot_range: Color32::from_rgb(96, 165, 250),
             in_out_dim: Color32::from_black_alpha(133),
-            wave_a1: Color32::from_rgb(16, 185, 129),
-            wave_a2: Color32::from_rgb(107, 114, 128),
-            wave_a3: Color32::from_rgb(75, 85, 99),
-            wave_a4: Color32::from_rgb(55, 65, 81),
+            wave_a1: Color32::from_rgb(132, 214, 158),
+            wave_a2: Color32::from_rgb(132, 214, 158),
+            wave_a3: Color32::from_rgb(132, 214, 158),
+            wave_a4: Color32::from_rgb(132, 214, 158),
         }
     }
 }
@@ -912,13 +915,7 @@ fn paint_audio_row(
             None => TimelineIntent::ToggleAudioExpand(lane),
         };
     }
-    ui.painter().rect_filled(track_rect, 0.0, fill);
-    ui.painter().rect_stroke(
-        track_rect,
-        0.0,
-        Stroke::new(1.0, input.theme.border),
-        StrokeKind::Inside,
-    );
+    ui.painter().rect_filled(track_rect, 0.0, fill); // no frame: the lane meets the filmstrip
     qnc_wave_view::paint_wave_peaks(ui.painter(), track_rect, peaks, wave);
     paint_ranges_and_playhead(ui, track_rect, input);
     if let Some(choice) = picker {
@@ -966,12 +963,6 @@ fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> T
     );
     ui.painter()
         .rect_filled(track_rect, 0.0, input.theme.video_background);
-    ui.painter().rect_stroke(
-        track_rect,
-        0.0,
-        Stroke::new(1.0, input.theme.border),
-        StrokeKind::Inside,
-    );
     if let Some(background) = input.filmstrip_background {
         paint_filmstrip_background(ui, track_rect, background);
     }

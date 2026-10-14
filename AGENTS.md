@@ -3906,3 +3906,11 @@ lokacija, brisanja, zastite i seeda), `qnc-project-close`, `apps/qnc-project`, t
 `qnc-shell-footer` (Theme, Close project, nazivi tema). Conformance provjera vrsta lokacije Projecta trazi sifru
 `source.computer` umjesto rijeci "Računalo". Testovi koji su trazili hrvatski tekst traze engleski. Project je ponovno
 zamrznut. Nije izvedeno: katalog tipki (nazivi akcija, pomoc F1), imena sistemskih templatea u seedu (podaci).
+Izmjena izgleda 2026-10-14 (korisnik: "sredio bi source timeline.. previse je upadljiva sa svojim horizontalnim
+linijama; filmstrip ostaje kakav je, ali iznad i ispod filmstripa nemamo linije oko audio trakova; audio trakovi su
+odmah uz filmstrip; boja audio trake moze biti kao u Final Cut Pro"): otkljucan samo `crates/qnc-timeline` (zajednicka
+kocka, vrijedi za source timeline i Wrap redove). Audio trake i video traka (filmstrip) nemaju obrub, razmak izmedu
+traka je 0, a 6 px nekadasnjih razmaka dobile su audio trake (15 -> 18 px), pa ukupna visina ostaje v4 (102 px, test).
+Audio trake su zelene kao u Final Cut Pro (traka rgb 38,98,62, val rgb 132,214,158, sve trake iste). Slike filmstripa i
+vanjski obrub timelinea nisu dirani. Usput: dva testa `qnc-editorial-application` trazila su hrvatski tekst (iz koraka
+zajednickih kocki) i sada uzimaju tekst kroz sifru; svi testovi workspacea prolaze.

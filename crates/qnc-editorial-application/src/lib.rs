@@ -749,7 +749,7 @@ mod tests {
         app.view.clips = vec![clip("a", "Prvi")];
         assert!(app.dispatch(EditorialIntent::PreviewClip("a".into())));
         assert_eq!(app.view().chosen_clip_id(), Some("a"));
-        assert_eq!(app.footer_status(), "Radne postavke projekta nisu ucitane.");
+        assert_eq!(app.footer_status(), qnc_ui_text::text("player.work_settings_project_loaded"));
         assert!(!app.has_player());
     }
 
@@ -762,10 +762,10 @@ mod tests {
             action_ids::STEP_FORWARD_FRAME,
         ] {
             app.dispatch(EditorialIntent::action(action));
-            assert_eq!(app.footer_status(), "Broadcast Player nije povezan.");
+            assert_eq!(app.footer_status(), qnc_ui_text::text("player.broadcast_player_connected"));
         }
         app.dispatch(EditorialIntent::Timeline(TimelineIntent::CueFrame(10)));
-        assert_eq!(app.footer_status(), "Broadcast Player nije povezan.");
+        assert_eq!(app.footer_status(), qnc_ui_text::text("player.broadcast_player_connected"));
     }
 
     #[test]
