@@ -3957,3 +3957,11 @@ wave gradi iz proxyja. Wave se uvijek gradi iz spremljenog originala, svi stvarn
 waveovi verzije 1 ponovno grade), `qnc-wave-worker`, `qnc-timeline-artifacts`, `qnc-content-artifacts` (uklonjeno polje
 `project_audio_channels`). Wave sada cita original s kartice, pa je prvi prolaz sporiji nego iz proxyja. Testovi,
 conformance.
+Dopuna 2026-10-14 (korisnik: "daj ono sto ce najbrze omoguciti pocetak montaze"): wave originala cita se u jednom
+prolazu. Original kamere drzi svaki kanal u zasebnom streamu, a radnik je za svaki stream pokretao dekoder koji cita
+cijeli MXF s kartice (4 citanja po klipu). `qnc-ffmpeg-decode` `audio_streams_with_cancel` (jedan ffmpeg, streamovi
+spojeni `amerge` redom u jedan isprepleteni f32 signal, video se samo demuxa), `qnc-decoder-catalog`
+`LocalFilmstripExtractor::audio_streams_with_cancel` (izabrani dekoder kataloga), `qnc-wave-worker` (`decode_wave`:
+kanali svakog streama idu njegovom sakupljacu; prije citanja ista provjera kataloga za zapisani format svakog streama i
+serijski broj kartice). Izmjereno: klip od 9 s s 4 kanala 2,2 s s kartice. Katalog dekodera nije prebacen na
+ugradeni lib (`selected` ostaje `qnc.ffmpeg`), jer bi to promijenilo i player.

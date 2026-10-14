@@ -110,6 +110,31 @@ impl LocalFilmstripExtractor {
         }
     }
 
+    /// The given audio streams of a local file in one read of the file, merged in order
+    /// into whole interleaved f32 sample frames of `channels` channels (the wave).
+    pub fn audio_streams_with_cancel(
+        &self,
+        source: &Path,
+        container: &str,
+        streams: &[u32],
+        channels: u32,
+        cancel: &AtomicBool,
+        on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
+    ) -> std::result::Result<(), String> {
+        match &self.deployment.driver {
+            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::audio_streams_with_cancel(
+                &self.deployment.executable,
+                source,
+                container,
+                streams,
+                channels,
+                cancel,
+                on_samples,
+            ),
+            Driver::QncPacketsV1 { .. } => Err("selected decoder does not read local audio".into()),
+        }
+    }
+
     /// The presentation times (seconds of the media's timestamps) of the key pictures
     /// from about `start_sec` for `duration_sec`; packets only, nothing decoded.
     pub fn key_pictures_with_cancel(

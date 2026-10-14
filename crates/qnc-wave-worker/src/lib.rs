@@ -5,10 +5,10 @@
 //! content write adapter. It does not scan, probe, own UI, own timeline state
 //! or choose a hardcoded decoder.
 
-use qnc_media_decode::{DecodeRequest, DecodedFormat, Decoder, DecoderConfig};
-use qnc_media_metadata::{MediaRepresentation, Rational, StreamDetails};
+use qnc_media_decode::{DecodeRequest, DecoderConfig};
+use qnc_media_metadata::{MediaRepresentation, StreamDetails};
 use qnc_media_records::Snapshot;
-use qnc_media_stream::{CodecEndpoint, LocalSource, MediaStream, SourceReference};
+use qnc_media_stream::{LocalSource, MediaStream, SourceReference};
 use qnc_transport_resolver::ResolverConfig;
 use qnc_wave::{StreamPeakCollector, WaveArtifactRecord, WaveLane, WavePlan};
 use std::{
@@ -687,61 +687,76 @@ fn decode_wave(
     source: &WaveSourceBinding,
     cancel: &AtomicBool,
 ) -> Result<Vec<(WaveLane, Vec<f32>)>, String> {
-    let mut by_lane = BTreeMap::new();
     let streams = plan
         .channels
         .iter()
         .map(|channel| channel.stream_index)
-        .collect::<BTreeSet<_>>();
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    // An original keeps each channel in a stream of its own; one decoder per stream read
+    // the whole file from the card once per channel. Read in one pass: every stream merged
+    // in order, each one's channels handed to its own collector (user 2026-10-14).
     let decoder_config =
         qnc_decoder_catalog::installed_config().map_err(|error| error.to_string())?;
-    for stream_index in streams {
-        if cancel.load(Ordering::Acquire) {
-            return Err(wave_paused_for_playback().into());
-        }
-        let (source_channels, sample_rate_hz, origin) = audio_stream_facts(media, stream_index)?;
-        let mut collector = StreamPeakCollector::new(plan, stream_index)?;
-        let mut decoder = open_decoder(source, media, stream_index, decoder_config.clone())?;
-        loop {
-            if cancel.load(Ordering::Acquire) {
-                decoder.cancel();
-                return Err(wave_paused_for_playback().into());
-            }
-            let Some(packet) = decoder.next_packet().map_err(|error| error.to_string())? else {
-                break;
-            };
-            validate_audio_packet(
-                &packet,
-                media,
-                stream_index,
-                sample_rate_hz,
-                source_channels,
-            )?;
-            let first_sample = qnc_wave::relative_sample_position(
-                packet.pts,
-                packet.time_base,
-                origin,
-                sample_rate_hz,
-            )?;
-            collector.push_f32le_interleaved_at(first_sample, &packet.bytes)?;
-        }
-        for (lane, peaks) in collector.finish() {
-            by_lane.insert(lane, peaks);
-        }
+    let mut parts = Vec::new();
+    for &stream_index in &streams {
+        check_stream_supported(media, stream_index, &decoder_config)?;
+        let source_channels = audio_stream_channels(media, stream_index)?;
+        parts.push((source_channels, StreamPeakCollector::new(plan, stream_index)?));
     }
+    let channels = parts.iter().map(|(count, _)| *count).sum::<usize>();
+    // The source is the one this machine has bound (the card's volume serial is checked).
+    source.open_media_stream(&media.media_uri)?;
+    let path = source
+        .local_media_path(&media.media_uri)?
+        .ok_or("wave decoder requires a seekable QNC decoder endpoint")?;
+    let container = media
+        .container
+        .as_ref()
+        .map(|container| container.value.clone())
+        .ok_or_else(|| qnc_ui_text::text("wave.wave_needs_stored_container").to_string())?;
+    let extractor = qnc_decoder_catalog::installed_filmstrip_extractor()
+        .map_err(|error| error.to_string())?
+        .ok_or("no local decoder for the wave")?;
+    let mut bytes: Vec<Vec<u8>> = vec![Vec::new(); parts.len()];
+    extractor.audio_streams_with_cancel(&path, &container, &streams, channels as u32, cancel, &mut |samples| {
+        for buffer in &mut bytes {
+            buffer.clear();
+        }
+        for frame in samples.chunks_exact(channels) {
+            let mut at = 0;
+            for (buffer, (count, _)) in bytes.iter_mut().zip(&parts) {
+                for sample in &frame[at..at + count] {
+                    buffer.extend_from_slice(&sample.to_le_bytes());
+                }
+                at += count;
+            }
+        }
+        for (buffer, (_, collector)) in bytes.iter().zip(&mut parts) {
+            collector.push_f32le_interleaved(buffer)?;
+        }
+        Ok(())
+    })
+    .map_err(|error| if cancel.load(Ordering::Acquire) { wave_paused_for_playback().into() } else { error })?;
+    let by_lane = parts
+        .into_iter()
+        .flat_map(|(_, collector)| collector.finish())
+        .collect::<BTreeMap<_, _>>();
     if !by_lane.contains_key(&WaveLane::A1) {
         return Err(qnc_ui_text::text("wave.wave_got_a1_channel").to_string());
     }
     Ok(by_lane.into_iter().collect())
 }
 
-fn open_decoder(
-    source: &WaveSourceBinding,
+/// The selected decoder must declare the saved format of every stream it reads (no silent
+/// fallback): the same check a decode request makes.
+fn check_stream_supported(
     media: &MediaRepresentation,
     stream_index: u32,
-    decoder_config: DecoderConfig,
-) -> Result<Decoder, String> {
-    let request = DecodeRequest {
+    decoder_config: &DecoderConfig,
+) -> Result<(), String> {
+    DecodeRequest {
         version: qnc_media_decode::VERSION.into(),
         media: media.clone(),
         stream_index,
@@ -749,85 +764,27 @@ fn open_decoder(
         output_pixel_format: None,
         progressive: false,
         delivered_rate: None,
-    };
-    request
-        .validate(&decoder_config)
-        .map_err(|error| error.to_string())?;
-    if let Some(path) = source
-        .local_media_path(&media.media_uri)
-        .map_err(|error| error.to_string())?
-    {
-        let stream = open_media_stream(source, &media.media_uri)?;
-        let stamp = stream.info().storage_stamp.clone();
-        let endpoint = CodecEndpoint::for_local_file(path, &media.media_uri)
-            .map_err(|error| error.to_string())?;
-        return Decoder::open_endpoint(request, endpoint, stamp, decoder_config)
-            .map_err(|error| error.to_string());
     }
-    Err("wave decoder requires a seekable QNC decoder endpoint".into())
+    .validate(decoder_config)
+    .map(|_| ())
+    .map_err(|error| error.to_string())
 }
 
-fn validate_audio_packet(
-    packet: &qnc_media_decode::DecodedPacket,
-    media: &MediaRepresentation,
-    stream_index: u32,
-    sample_rate_hz: u32,
-    source_channels: u32,
-) -> Result<(), String> {
-    let expected = DecodedFormat::Audio {
-        sample_rate_hz,
-        channels: source_channels,
-        sample_format: "f32le".into(),
-    };
-    if packet.media_uri != media.media_uri
-        || packet.stream_index != stream_index
-        || packet.format != expected
-    {
-        return Err("Decoded wave audio differs from saved input.".into());
-    }
-    Ok(())
-}
-
-fn audio_stream_facts(
-    media: &MediaRepresentation,
-    stream_index: u32,
-) -> Result<(u32, u32, (i64, Rational)), String> {
+fn audio_stream_channels(media: &MediaRepresentation, stream_index: u32) -> Result<usize, String> {
     let stream = media
         .streams
         .iter()
-        .find(|stream| {
-            stream
-                .index
-                .as_ref()
-                .is_some_and(|index| index.value == stream_index)
-        })
+        .find(|stream| stream.index.as_ref().is_some_and(|index| index.value == stream_index))
         .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_found").to_string())?;
     let StreamDetails::Audio(audio) = &stream.details else {
         return Err(qnc_ui_text::text("wave.wave_stream_audio").into());
     };
-    let source_channels = audio
+    let channels = audio
         .channels
         .as_ref()
         .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_channel_count").to_string())?
         .value;
-    let sample_rate_hz = audio
-        .sample_rate_hz
-        .as_ref()
-        .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_sample_rate").to_string())?
-        .value;
-    let origin = (
-        stream
-            .start_pts
-            .as_ref()
-            .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_start_pts").to_string())?
-            .value,
-        stream
-            .time_base
-            .as_ref()
-            .ok_or_else(|| qnc_ui_text::text("wave.wave_audio_stream_time_base").to_string())?
-            .value,
-    );
-    Ok((source_channels, sample_rate_hz, origin))
+    Ok(channels as usize)
 }
 
 fn source_for_uri<'a>(
@@ -838,10 +795,6 @@ fn source_for_uri<'a>(
         .iter()
         .find(|source| source.matches_media_uri(media_uri))
         .ok_or_else(|| qnc_ui_text::text("wave.wave_source_transport_registered").to_string())
-}
-
-fn open_media_stream(source: &WaveSourceBinding, media_uri: &str) -> Result<MediaStream, String> {
-    source.open_media_stream(media_uri)
 }
 
 fn wave_diagnostics_enabled() -> bool {

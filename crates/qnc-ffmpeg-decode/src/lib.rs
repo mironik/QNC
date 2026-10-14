@@ -305,6 +305,94 @@ pub fn key_pictures_with_cancel(
     }
 }
 
+/// The given audio streams of `source` in one read of the file (user 2026-10-14: a camera
+/// original keeps each channel in a stream of its own, and one decoder per stream read the
+/// whole file once per channel). One ffmpeg merges the streams in the given order into one
+/// interleaved f32 signal (`amerge`); the video is demuxed, never decoded. `on_samples` gets
+/// whole sample frames (every channel of every stream) from the first sample on. Nothing is
+/// probed or written.
+pub fn audio_streams_with_cancel(
+    executable: &Path,
+    source: &Path,
+    container: &str,
+    streams: &[u32],
+    channels: u32,
+    cancel: &AtomicBool,
+    on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
+) -> std::result::Result<(), String> {
+    if !source.is_file() {
+        return Err(format!("media does not exist: {}", source.display()));
+    }
+    if streams.is_empty() || channels == 0 {
+        return Err("audio pass needs at least one stream".into());
+    }
+    let demuxer = container_name(container).map_err(|error| error.to_string())?;
+    let mut command = Command::new(executable);
+    command
+        .args(["-hide_banner", "-nostdin", "-loglevel", "error", "-protocol_whitelist", "file", "-f", demuxer, "-i"])
+        .arg(source);
+    if let [single] = streams {
+        command.args(["-map", &format!("0:{single}")]);
+    } else {
+        let inputs: String = streams.iter().map(|index| format!("[0:{index}]")).collect();
+        command
+            .args(["-filter_complex", &format!("{inputs}amerge=inputs={}[a]", streams.len())])
+            .args(["-map", "[a]"]);
+    }
+    command
+        .args(["-c:a", "pcm_f32le", "-f", "f32le", "-"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    let mut child = command.spawn().map_err(|error| format!("audio ffmpeg start: {error}"))?;
+    let mut stdout = child.stdout.take().ok_or("audio ffmpeg stdout")?;
+    let mut stderr = child.stderr.take().ok_or("audio ffmpeg stderr")?;
+    let err = thread::spawn(move || {
+        let mut text = Vec::new();
+        let _ = stderr.read_to_end(&mut text);
+        text
+    });
+    let frame = channels as usize * 4;
+    let mut buffer = vec![0u8; frame * 4096];
+    let mut filled = 0usize;
+    let mut samples = Vec::new();
+    let outcome = loop {
+        if cancel.load(Ordering::Acquire) {
+            break Err("audio pass cancelled".to_string());
+        }
+        match stdout.read(&mut buffer[filled..]) {
+            Ok(0) => break Ok(()),
+            Ok(read) => {
+                filled += read;
+                let whole = filled - filled % frame;
+                samples.clear();
+                samples.extend(buffer[..whole].chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])));
+                if let Err(error) = on_samples(&samples) {
+                    break Err(error);
+                }
+                buffer.copy_within(whole..filled, 0);
+                filled -= whole;
+            }
+            Err(error) => break Err(format!("audio ffmpeg read: {error}")),
+        }
+    };
+    if outcome.is_err() {
+        let _ = child.kill();
+    }
+    let status = child.wait().map_err(|error| format!("audio ffmpeg wait: {error}"))?;
+    let errors = err.join().unwrap_or_default();
+    outcome?;
+    if !status.success() {
+        return Err(stderr_text_or_default(&errors, "audio ffmpeg failed"));
+    }
+    Ok(())
+}
+
 /// `framecrc` lines: `#tb 0: num/den`, then `stream, dts, pts, duration, size, crc`.
 fn parse_key_packets(text: &str) -> std::result::Result<Vec<f64>, String> {
     let mut time_base = None;
