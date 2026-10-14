@@ -3933,3 +3933,7 @@ Ispravak 2026-10-14 (korisnik: "ne ovako, nego iznad A2, odnosno ispod A1; ne na
 stupac kanala je samo na video traci: ispod trake A1 prema dolje, iznad trake A2 prema gore (sama traka ostaje
 vidljiva), bez vlastite podloge i okvira, izravno preko velikog vala (`column_rect` uzima prostor video trake i visinu
 celije; prozirna podloga i okvir se ne crtaju; test).
+Ispravak 2026-10-14 (korisnik: "tocno ispod A1, preko dijela gdje pise V, jer kad se audio izbor otvori video se ne
+vidi jer ga prekriva zoom audio"): stupac kanala je u stupcu oznaka traka (sirina oznake), tocno ispod A1 odnosno iznad
+A2, s podlogom oznaka (`label_background`, bez okvira), pa ne prekriva video traku ni veliki val
+(`column_rect` dobiva i sirinu; test).

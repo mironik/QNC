@@ -866,17 +866,18 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     if let Some((lane, row, choice)) = taken {
         // The column of channels: from the lane over the video row, never into the other
         // audio lane.
-        // Under A1 or above A2, on the video row: the lane itself stays visible.
-        let (_, track) = split_label_track(row, input.metrics.label_width);
+        // In the label column (over the V label), right under A1 or above A2: the lane and
+        // the video row stay visible (user 2026-10-14).
+        let (label, _) = split_label_track(row, input.metrics.label_width);
         let down = lane == AudioLane::A1;
         let room = if down {
             (row.bottom(), a2_row.map_or(outer.bottom(), |other| other.top()))
         } else {
             (a1_row.map_or(outer.top(), |other| other.bottom()), row.top())
         };
-        let rect = qnc_channel_picker::column_rect(track.left(), room, row.height(), down, choice);
+        let rect = qnc_channel_picker::column_rect(label.left(), label.width(), room, row.height(), down, choice);
         let style = qnc_channel_picker::PickerStyle {
-            fill: Color32::TRANSPARENT, // on what is there, no box of its own
+            fill: input.theme.label_background, // the background of the labels, no box of its own
             border: Color32::TRANSPARENT,
             text: input.theme.text,
             accent: input.theme.playhead,

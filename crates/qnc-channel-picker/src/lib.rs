@@ -30,13 +30,13 @@ pub fn cell_width(height: f32) -> f32 {
     (height * 2.0).max(28.0)
 }
 
-/// The rectangle the column takes from `left` within `room` (top, bottom): from its top
-/// down (`down`, under a top lane) or from its bottom up (over a bottom lane); a cell is
-/// `cell` high, lower when the channels would not fit in the room.
-pub fn column_rect(left: f32, room: (f32, f32), cell: f32, down: bool, choice: ChannelChoice) -> Rect {
+/// The rectangle the column takes from `left`, `width` wide, within `room` (top, bottom):
+/// from its top down (`down`, under a top lane) or from its bottom up (over a bottom lane);
+/// a cell is `cell` high, lower when the channels would not fit in the room.
+pub fn column_rect(left: f32, width: f32, room: (f32, f32), cell: f32, down: bool, choice: ChannelChoice) -> Rect {
     let count = f32::from(choice.count.max(1));
     let cell = cell.min((room.1 - room.0).max(1.0) / count);
-    let size = Vec2::new(cell_width(cell), cell * count);
+    let size = Vec2::new(width, cell * count);
     if down {
         Rect::from_min_size(egui::pos2(left, room.0), size)
     } else {
@@ -91,9 +91,9 @@ mod tests {
     fn the_column_grows_over_the_video_and_never_into_the_other_lane() {
         let choice = ChannelChoice { selected: 1, count: 4, open: true };
         // The video row between A1 (0..18) and A2 (82..100).
-        let down = column_rect(40.0, (18.0, 82.0), 18.0, true, choice);
+        let down = column_rect(40.0, 28.0, (18.0, 82.0), 18.0, true, choice);
         assert_eq!((down.top(), down.height()), (18.0, 64.0), "under A1, lower cells to fit");
-        let up = column_rect(40.0, (18.0, 82.0), 14.0, false, choice);
+        let up = column_rect(40.0, 28.0, (18.0, 82.0), 14.0, false, choice);
         assert_eq!((up.bottom(), up.height()), (82.0, 56.0), "above A2");
     }
 }
