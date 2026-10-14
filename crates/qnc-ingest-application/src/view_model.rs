@@ -2,6 +2,9 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IngestViewModel {
+    /// The panel the keyboard acts on, the dock button and the last card grid step.
+    #[serde(skip)]
+    pub focus: qnc_focus_walk::WalkView,
     /// Original timecode of the previewed clip (camera XML, else the one probe).
     #[serde(skip)]
     pub source_timecode: Option<qnc_source_timecode::SourceTimecode>,
@@ -42,6 +45,7 @@ impl Default for IngestViewModel {
     fn default() -> Self {
         Self {
             source_kind: SourceKind::Local,
+            focus: Default::default(),
             source_timecode: None,
             playback: Default::default(),
             timeline: Default::default(),

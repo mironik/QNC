@@ -3590,6 +3590,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-focus-walk"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-media-card",
+]
+
+[[package]]
 name = "qnc-frame-timebase"
 version = "0.1.0"
 dependencies = [
@@ -3634,6 +3642,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-contracts",
  "qnc-dir-browser",
+ "qnc-focus-walk",
  "qnc-image-assets",
  "qnc-ingest-cameras",
  "qnc-ingest-catalog",
@@ -3666,6 +3675,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
+ "qnc-focus-walk",
  "qnc-ingest-application",
  "qnc-ingest-layout",
  "qnc-media-card",

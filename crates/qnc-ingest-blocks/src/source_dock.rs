@@ -58,14 +58,9 @@ pub(super) fn render_source_dock(
                         let label = dock
                             .generate_posters_label
                             .replace("{count}", &poster_count.to_string());
-                        if action_button(
-                            ui,
-                            &label,
-                            view.action_enabled(action_ids::INGEST_APPROVE_PROXY_POSTERS),
-                            theme,
-                        )
-                        .clicked()
-                        {
+                        let response = action_button(ui, &label, view.action_enabled(action_ids::INGEST_APPROVE_PROXY_POSTERS), theme);
+                        ring(ui, &response, view, action_ids::INGEST_APPROVE_PROXY_POSTERS, theme);
+                        if response.clicked() {
                             intent = Some(IngestIntent::empty(
                                 action_ids::INGEST_APPROVE_PROXY_POSTERS,
                             ));
@@ -73,35 +68,14 @@ pub(super) fn render_source_dock(
                     } else {
                         ui.label(muted(&dock.no_card_thumb_hint, theme));
                     }
-                    if primary_button(
-                        ui,
-                        action_label(contracts, action_ids::INGEST_IMPORT_SELECTED),
-                        view.action_enabled(action_ids::INGEST_IMPORT_SELECTED),
-                        theme,
-                    )
-                    .clicked()
-                    {
-                        intent = Some(IngestIntent::empty(action_ids::INGEST_IMPORT_SELECTED));
-                    }
-                    if action_button(
-                        ui,
-                        action_label(contracts, action_ids::INGEST_SELECT_ALL),
-                        view.action_enabled(action_ids::INGEST_SELECT_ALL),
-                        theme,
-                    )
-                    .clicked()
-                    {
-                        intent = Some(IngestIntent::empty(action_ids::INGEST_SELECT_ALL));
-                    }
-                    if action_button(
-                        ui,
-                        action_label(contracts, action_ids::INGEST_CLEAR_SELECTION),
-                        view.action_enabled(action_ids::INGEST_CLEAR_SELECTION),
-                        theme,
-                    )
-                    .clicked()
-                    {
-                        intent = Some(IngestIntent::empty(action_ids::INGEST_CLEAR_SELECTION));
+                    // Uvezi (the strong one), Odaberi sve, Ocisti, drawn right to left.
+                    for action_id in [action_ids::INGEST_IMPORT_SELECTED, action_ids::INGEST_SELECT_ALL, action_ids::INGEST_CLEAR_SELECTION] {
+                        let (label, enabled) = (action_label(contracts, action_id), view.action_enabled(action_id));
+                        let response = if action_id == action_ids::INGEST_IMPORT_SELECTED { primary_button(ui, label, enabled, theme) } else { action_button(ui, label, enabled, theme) };
+                        ring(ui, &response, view, action_id, theme);
+                        if response.clicked() {
+                            intent = Some(IngestIntent::empty(action_id));
+                        }
                     }
                 }
                 if contracts.ingest.source_dock.show_edit_actions {
@@ -152,6 +126,11 @@ pub(super) fn render_source_dock(
         intent = timeline_intent_to_ingest_intent(timeline_intent);
     }
     intent
+}
+
+/// The frame of the dock button the keyboard is on.
+fn ring(ui: &Ui, response: &egui::Response, view: &IngestViewModel, action_id: &str, theme: &Theme) {
+    qnc_focus_walk::paint_focus(ui, response.rect.expand(2.0), view.focus.button.as_deref() == Some(action_id), theme.focus);
 }
 
 /// The label of a dock action from the layout contract (its action id when missing).

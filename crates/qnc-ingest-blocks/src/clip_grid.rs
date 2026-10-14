@@ -65,15 +65,15 @@ pub(super) fn render_clip_grid(
     let no_textures = std::collections::HashMap::new();
     let mut action = None;
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-        action = qnc_media_card::show_card_grid(
+        action = qnc_media_card::show_card_grid_focused(
             ui,
             &style,
             &metrics,
             &qnc_media_card::CardGridInput {
                 height: rect.height(),
-                selected_id: "",
-                focused_id: view.preview_clip_id.as_deref().unwrap_or(""),
-                panel_focused: true,
+                selected_id: view.preview_clip_id.as_deref().unwrap_or(""),
+                focused_id: "",
+                panel_focused: view.focus.is(qnc_focus_walk::CARDS),
                 cards: &rows,
                 thumb_textures: &no_textures,
                 tc: &qnc_media_card::minutes_seconds,
@@ -85,6 +85,7 @@ pub(super) fn render_clip_grid(
                     "ingest_grid_all"
                 },
             },
+            (view.focus.card_step, theme.focus),
         );
     });
     match action {

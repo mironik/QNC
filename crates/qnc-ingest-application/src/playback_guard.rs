@@ -1,7 +1,7 @@
 //! Ingest only lists which of its actions are heavy; the rule itself is the public
 //! `qnc-playback-priority`.
 
-use super::{action_ids, IngestApplication, IngestDispatchResult, IngestViewModel};
+use super::{action_ids, IngestApplication, IngestDispatchResult};
 use qnc_playback_priority::{PlaybackState, Priority};
 
 /// Heavy source work only. Clip selection (`ingest_clip_toggle`, `ingest_select_all`,
@@ -20,33 +20,11 @@ const PRIORITY: Priority = Priority::new(&[
     action_ids::INGEST_APPROVE_PROXY_POSTERS,
 ]);
 
-pub(super) struct PlaybackGuard;
-
-impl PlaybackGuard {
-    pub(super) fn active(play_when_ready: bool, view: &IngestViewModel) -> bool {
-        Self::state(play_when_ready, view).holds_priority()
-    }
-
-    pub(super) fn blocks_action(action_id: &str) -> bool {
-        PRIORITY.is_heavy(action_id)
-    }
-
-    pub(super) fn message() -> &'static str {
-        qnc_playback_priority::MESSAGE
-    }
-
-    fn state(play_when_ready: bool, view: &IngestViewModel) -> PlaybackState {
-        PlaybackState {
-            play_when_ready,
-            preparing: view.playback.preparing,
-            playing: view.playback.playing(),
-        }
-    }
-}
-
 impl IngestApplication {
     pub(crate) fn playback_guard_active(&self) -> bool {
-        PlaybackGuard::active(self.preview.play_when_ready(), &self.view)
+        let playback = &self.view.playback;
+        let state = PlaybackState { play_when_ready: self.preview.play_when_ready(), preparing: playback.preparing, playing: playback.playing() };
+        state.holds_priority()
     }
 
     pub(crate) fn apply_playback_guard(&mut self) {
@@ -80,10 +58,10 @@ impl IngestApplication {
     }
 
     pub(crate) fn playback_guard_blocks_action(action_id: &str) -> bool {
-        PlaybackGuard::blocks_action(action_id)
+        PRIORITY.is_heavy(action_id)
     }
 }
 
 pub(crate) fn playback_guard_message() -> &'static str {
-    PlaybackGuard::message()
+    qnc_playback_priority::MESSAGE
 }

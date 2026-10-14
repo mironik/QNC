@@ -16,12 +16,9 @@ pub struct IngestApp {
 
 impl IngestApp {
     pub fn new(root: PathBuf) -> Result<Self, String> {
-        let application = IngestApplication::with_store_root(&root)?;
-        Ok(Self {
-            contracts: IngestContracts::load()?,
-            application,
-            pace: qnc_paint_pace::PaintPace::new(),
-        })
+        let contracts = IngestContracts::load()?;
+        let application = IngestApplication::with_store_root(&root)?.with_focus(contracts.focus_names());
+        Ok(Self { contracts, application, pace: qnc_paint_pace::PaintPace::new() })
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {

@@ -3821,3 +3821,22 @@ gore/dolje salje dvije akcije kataloga (`step_prev_part` iz scopea storyboard i 
 svaka akcija ponovno cita stanje fokusa; druga je brisala pomak kartice prije crtanja. Pomak u poolu sada nosi redni
 broj (`FocusView.pool_step`), ne brise se citanjem, a mreza kartica primjenjuje svaki broj jednom
 (`qnc-media-card` `show_card_grid_focused`). Audit svih tipki QNC preseta je u tijeku.
+Popravak 2026-10-13 (korisnik: "selektirani klip ne zadrzava crveni okvir"; "crveni se nije vidio ni prije ni sada"):
+okvir kartice crtao se prvi, a slicica i red s tekstom preko njega cijelom sirinom; `qnc-media-card` sada crta okvir
+zadnji (vrijedi i za Ingest), a okvir tipkovnice ide izvan kartice. Dugmad docka su dio source timeline panela (korisnik:
+"prelaskom enterom na grupu gumba ne bi se smio gubiti fokus source timeline panela"): okvir panela ostaje, I/O, Ctrl+I/O
+i Alt+strelice rade i na dugmadi, Ctrl+I/O vraca strelice timelineu (`qnc-panel-focus`, `qnc-editorial-blocks`).
+Otkljucano i izvedeno 2026-10-14 (korisnik: "tab nam ne radi na ingestu"; "otkljucaj.. predlozi postujuci pravila koja
+smo postavili"): Ingest dobiva isti krug kao Story. Nova javna kocka `crates/qnc-focus-walk` (+ ugovor
+`contracts/modules/focus-walk.module.json`): krug panela po imenima iz ugovora rasporeda, Tab/Shift+Tab, Enter potvrduje i
+bez potvrde vodi dalje, tabovi poola, dugmad docka, koraci po karticama s rednim brojem, klik u panel stavlja fokus na
+taj panel (popis klikova u ugovoru), forma bez kruga propusta sve tipke kao prije; ne zna za aplikaciju.
+`contracts/ui/ingest.layout.json`: `tab_order` (preglednik izvora, tabovi poola, kartice, source timeline, dugmad docka)
+i `focus_clicks`; `qnc-ingest-layout` (`focus_names`; Ingest ugovor nabraja dugmad slijeva nadesno). Katalog (QNC preset,
+scope `ingest`): Tab, Shift+Tab, Enter, Shift+Enter (nova akcija `toggle_focused_item`: kvacica izbora na kartici u
+fokusu, jer Shift+ dodaje), strelice gore/dolje, Page Up/Down, Alt+A / Alt+S tabovi. `qnc-media-card` (`GridStep::Toggle`).
+`qnc-ingest-application` (`with_focus`, kocka u `dispatch`, `IngestViewModel.focus`; posrednik `PlaybackGuard` uklonjen,
+pozivi idu ravno u `qnc-playback-priority`), `qnc-ingest-desktop` (predaje redoslijed iz ugovora), `qnc-ingest-blocks`
+(okvir fokusa na panelima i dugmetu, mreza kartica s fokusom; tri ista bloka dugmadi u jednoj petlji). C10 spusteno:
+application 1707 -> 1705, blocks 882 -> 863, desktop 79 -> 76. Nije izvedeno: strelice i Enter po mapama u pregledniku
+izvora (u prvom koraku preglednik je samo u krugu).

@@ -18,6 +18,12 @@
     "qnc-app/src/editorial/media_pool.rs"
   ],
   "audit_note": "Active qnc_v4 Ingest is editorial_shell (Story ratios) plus bottom source dock. Ingest does not own shell math. Confirm button label is Odaberi; empty grid text still says U redu.",
+  "tab_order": ["browser", "pool_tabs", "pool", "source_timeline", "source_buttons"],
+  "focus_clicks": {
+    "browser": ["ingest_source_kind_local", "ingest_source_kind_lan", "ingest_source_kind_internet", "ingest_dir_roots", "ingest_dir_up", "ingest_dir_open"],
+    "pool": ["ingest_preview_focus", "ingest_clip_toggle"],
+    "source_timeline": ["ingest_cue_frame"]
+  },
   "board": {
     "shell": "editorial",
     "left_ratio": 0.365,

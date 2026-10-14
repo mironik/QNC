@@ -81,11 +81,19 @@ pub struct IngestApplication {
     timecodes: qnc_source_timecode::SourceTimecodes,
     camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
     selection_events: qnc_ingest_clip_list::SelectEventState,
+    /// The keyboard walk over the panels (the form's layout contract gives the order).
+    walk: qnc_focus_walk::FocusWalk,
 }
 
 impl IngestApplication {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The Tab walk of the form: its panels, pool tabs and dock buttons (layout contract).
+    pub fn with_focus(mut self, names: qnc_focus_walk::FocusNames<'_>) -> Self {
+        self.walk = qnc_focus_walk::FocusWalk::new(names);
+        self
     }
 
     /// Replaces the cameras Select can read (composition root only).

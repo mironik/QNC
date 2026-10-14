@@ -518,6 +518,8 @@ pub enum GridStep {
     PageUp,
     PageDown,
     Open,
+    /// The check mark of the focused card (as a click on it).
+    Toggle,
 }
 
 /// The card focused after a move by `step` from `from` in a grid of `count` cards in
@@ -534,7 +536,7 @@ pub fn step_focus(from: usize, step: GridStep, cols: usize, count: usize, page_r
         GridStep::Right => (from + 1).min(last),
         GridStep::Up => from.checked_sub(cols).unwrap_or(from),
         GridStep::Down => if from + cols <= last { from + cols } else { from },
-        GridStep::Open => from.min(last),
+        GridStep::Open | GridStep::Toggle => from.min(last),
     }
 }
 
@@ -567,7 +569,12 @@ pub fn show_card_grid_focused(
     let page_rows = (ui.available_height() / (shape.card_h + shape.gap)).floor() as usize;
     let focused = step.map_or(from, |step| step_focus(from, step, shape.cols, input.cards.len(), page_rows));
     ui.data_mut(|data| data.insert_temp(key, focused));
-    let opened = (step == Some(GridStep::Open)).then(|| CardGridAction::Activate(input.cards[focused].id.to_string()));
+    let id = input.cards[focused].id.to_string();
+    let opened = match step {
+        Some(GridStep::Open) => Some(CardGridAction::Activate(id)),
+        Some(GridStep::Toggle) => Some(CardGridAction::ToggleSelection(id)),
+        _ => None,
+    };
     let unfocused = CardGridInput { panel_focused: false, ..*input }; // the chosen clip keeps its frame
     let clicked = grid(ui, style, metrics, &unfocused, Some(KeyFocus { index: focused, scroll: step.is_some(), color }));
     if let Some(CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id)) = &clicked {

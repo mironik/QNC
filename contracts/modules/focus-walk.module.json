@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.focus-walk",
+  "module_name": "Keyboard walk over the panels of a form",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["keyboard.focus.walk"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-focus-walk",
+  "input": "The panels of the form in the order of its layout contract (tab_order), the action ids of its pool tabs and of its source dock buttons, and every catalog action from a key or a click.",
+  "output": "Per action: left to the caller, taken here (panel changed, dock button chosen, card grid step), or another catalog action it stands for (a pool tab, a dock button); the view of the focus for drawing.",
+  "specification": "User rules 2026-10-13: Tab walks the panels of a form in the order its layout contract gives; Enter confirms in a panel and with nothing to confirm goes on to the next one; the keys act on the panel in focus; the dock buttons are part of the source timeline panel."
+}

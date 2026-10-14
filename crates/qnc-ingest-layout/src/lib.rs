@@ -76,6 +76,17 @@ impl IngestContracts {
         })
     }
 
+    /// The Tab walk of Ingest: its panels in order, the action ids of its pool tabs and of
+    /// its source dock buttons left to right as they are drawn (the Ingest contract lists
+    /// them left to right).
+    pub fn focus_names(&self) -> (Vec<&str>, Vec<&str>, Vec<&str>, Vec<(&str, &str)>) {
+        let order = self.ingest.tab_order.iter().map(String::as_str).collect();
+        let tabs = self.ingest.pool_head.tabs_left.iter().filter_map(TransportCommand::action_id).collect();
+        let buttons = self.ingest.source_dock.actions_rtl.iter().filter_map(TransportCommand::action_id).collect();
+        let clicks = self.ingest.focus_clicks.iter().flat_map(|(panel, actions)| actions.iter().map(move |action| (panel.as_str(), action.as_str()))).collect();
+        (order, tabs, buttons, clicks)
+    }
+
     pub fn dock_height(&self) -> f32 {
         let timeline_height = 15.0 + 3.0 + 64.0 + 3.0 + 15.0 + 2.0;
         self.shell.theme_metrics.chrome_row_height
@@ -137,6 +148,10 @@ fn report_to_result(report: qnc_contracts::ValidationReport) -> Result<(), Strin
 pub struct IngestLayoutContract {
     pub layout_id: String,
     pub application_id: String,
+    /// The panels Tab walks, in order (user 2026-10-13: the walk belongs to the form).
+    pub tab_order: Vec<String>,
+    /// The click actions of each panel: a click there puts the keyboard on that panel.
+    pub focus_clicks: std::collections::BTreeMap<String, Vec<String>>,
     pub board: IngestBoard,
     pub preview: IngestPreviewPane,
     pub pool_head: IngestPoolHead,

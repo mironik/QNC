@@ -4,6 +4,14 @@ use super::*;
 
 impl IngestApplication {
     pub fn dispatch(&mut self, intent: IngestIntent) -> IngestDispatchResult {
+        // The keys act on the panel in focus (user 2026-10-13): taken there, or standing for a tab or a button.
+        let routed = self.walk.route(&intent.action_id);
+        self.view.focus = self.walk.view();
+        let intent = match routed {
+            qnc_focus_walk::Walk::Pass => intent,
+            qnc_focus_walk::Walk::Done(changed) => return IngestDispatchResult::accepted(None, changed),
+            qnc_focus_walk::Walk::Action(action_id) => IngestIntent::empty(action_id),
+        };
         self.dispatch_log.push(intent.action_id.clone());
         if let Some(refused) = self.refuse(&intent.action_id) {
             return refused;
