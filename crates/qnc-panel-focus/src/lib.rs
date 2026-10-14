@@ -222,14 +222,11 @@ impl PanelFocus {
             // Monitor Auto | On under the monitor: whatever the focus.
             qnc_source_preview::MONITOR_AUTO | qnc_source_preview::MONITOR_ON => preview.set_monitor_mode(action_id),
             // A1/A2 by keyboard (user rule 2026-10-01): Ctrl+1, Ctrl+2 take the lane; while it is
-            // taken, left/right pick its channel, up/down show or hide its wave over the
-            // video row, Enter keeps the channel (heard at once), Escape lets go.
+            // taken, its height is expanded over the video row and up/down (or a click) pick its
+            // channel in the column (user 2026-10-14); Enter keeps it (heard at once), Escape lets go.
             "select_audio_a1" | "select_audio_a2" => {
                 self.panel = Panel::SourceTimeline; // the lane is on the source timeline
                 segments.take_lane(u8::from(action_id == "select_audio_a2"))
-            }
-            "step_back_frame" | "step_forward_frame" if on_source && segments.lane_is_taken() => {
-                segments.lane_draft(if action_id == "step_back_frame" { -1 } else { 1 })
             }
             // A Sync (user 2026-10-13): stopped, the arrows move its end; Enter writes the
             // cover, Delete drops the draft, wherever the keyboard is.
@@ -295,8 +292,9 @@ impl PanelFocus {
                 true
             }
             "step_prev_part" | "step_next_part" if matches!(panel, Panel::PoolTabs | Panel::SourceButtons) => false,
-            "step_prev_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(1),
-            "step_next_part" if on_source && segments.lane_is_taken() => segments.lane_zoom(-1),
+            // A taken lane (user 2026-10-14): its channels stand in a column, up/down pick.
+            "step_prev_part" if on_source && segments.lane_is_taken() => segments.lane_draft(-1),
+            "step_next_part" if on_source && segments.lane_is_taken() => segments.lane_draft(1),
             // Up/Down on a taken edit (user 2026-10-11): to the key picture before or after it,
             // half a second when every picture is one (intra). The answer comes in `poll`.
             "step_prev_part" | "step_next_part"
@@ -597,13 +595,13 @@ mod tests {
     }
 
     #[test]
-    fn select_audio_a2_left_and_enter_keep_the_channel_and_close_the_picker() {
+    fn select_audio_a2_up_and_enter_keep_the_channel_and_close_the_picker() {
         let mut focus = PanelFocus::new();
         let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
         segments.set_source(qnc_program_segments::SourcePick::new(Some("c"), Some("C"), None, (None, 100), Some((50, 1))), None);
         segments.set_source_channels(Some(2));
         let mut timeline = TimelineProjection::default();
-        for action in ["select_audio_a2", "step_back_frame", "activate_focused_item"] {
+        for action in ["select_audio_a2", "step_prev_part", "activate_focused_item"] {
             focus.route(action, (&mut preview, &mut wrap, &mut segments, &mut timeline));
         }
         assert_eq!(segments.view().a2_choice, Some((0, 2)), "channel 1 kept on A2");

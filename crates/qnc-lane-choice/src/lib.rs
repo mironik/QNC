@@ -4,15 +4,11 @@
 //! A2 on channel 2 of a new clip, channel 1 when the clip has one).
 //!
 //! By keyboard (user rule 2026-10-01, no mouse needed): Ctrl+1 or Ctrl+2 takes the lane
-//! with its channel as draft; left/right move the draft, Enter keeps it, Escape drops it;
-//! up shows the lane's wave over the whole video row at once and lets the lane go, down
-//! hides it (display only, the sound is not changed).
+//! with its channel as draft. While it is taken the lane's height is expanded over the
+//! video row and the channels stand in a column (user 2026-10-14): up/down or a click on
+//! a channel move the draft, Enter keeps it and closes, Escape drops it and closes.
 
 use std::time::{Duration, Instant};
-
-/// One press opens the wave over the whole video row, one press closes it (user rule
-/// 2026-10-01: not step by step, at once to the maximum).
-const MAX_WAVE_ZOOM: u8 = 1;
 
 #[derive(Debug, Clone, Default)]
 pub struct LaneChoice {
@@ -89,7 +85,7 @@ impl LaneChoice {
         self.taken
     }
 
-    /// Left/right: the draft channel of the taken lane, within the clip's channels.
+    /// Up/down: the draft channel of the taken lane, within the clip's channels.
     pub fn draft(&mut self, delta: i64) -> bool {
         let (Some((lane, draft)), Some(count)) = (self.taken, self.channels) else {
             return false;
@@ -99,15 +95,17 @@ impl LaneChoice {
         true
     }
 
-    /// Up opens the wave of the taken lane over the video row, down closes it; the lane
-    /// is let go with its channel unchanged, so the arrows move the playhead again.
-    pub fn zoom(&mut self, delta: i8) -> bool {
-        let Some((lane, _)) = self.taken.take() else {
-            return false;
-        };
-        let level = &mut self.wave_zoom[usize::from(lane)];
-        *level = level.saturating_add_signed(delta).min(MAX_WAVE_ZOOM);
-        true
+    /// A click on a channel of the taken lane's column: it becomes the draft, the lane
+    /// stays taken and expanded until Enter or Escape (user 2026-10-14). False when that
+    /// lane is not taken or the clip has no such channel.
+    pub fn set_draft(&mut self, lane: u8, channel: u16) -> bool {
+        match (self.taken, self.channels) {
+            (Some((taken, _)), Some(count)) if taken == lane && channel < count => {
+                self.taken = Some((lane, channel));
+                true
+            }
+            _ => false,
+        }
     }
 
     /// Down with no lane taken: the open large wave closes.
@@ -163,6 +161,11 @@ mod tests {
         assert!(lanes.take(1));
         lanes.draft(5);
         assert_eq!(lanes.taken(), Some((1, 3)), "never past the last channel");
+        assert!(lanes.set_draft(1, 2), "a click drafts, the lane stays taken");
+        assert!(!lanes.set_draft(0, 1), "not on the lane that is not taken");
+        assert!(!lanes.set_draft(1, 4), "not on a channel the clip does not have");
+        assert_eq!(lanes.taken(), Some((1, 2)));
+        lanes.draft(1);
         assert!(lanes.commit());
         assert_eq!(lanes.heard(), (0, 3));
         lanes.set_channels(Some(1));

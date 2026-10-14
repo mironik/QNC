@@ -12,7 +12,7 @@ impl ProgramSegments {
             return false;
         }
         let name = if lane == 0 { "A1" } else { "A2" };
-        self.refresh_view(format!("{name}: lijevo/desno kanal, gore/dolje prikaz vala, Enter sprema, Esc odustaje"));
+        self.refresh_view(qnc_ui_text::fill("story.msg.lane_taken", &[("lane", &name.to_string())]));
         true
     }
 
@@ -20,21 +20,12 @@ impl ProgramSegments {
         self.lanes.taken().is_some()
     }
 
-    /// Left/right: the draft channel of the taken lane, within the clip's channels.
+    /// Up/down: the draft channel of the taken lane, within the clip's channels; the
+    /// channels stand in a column (user 2026-10-14).
     pub fn lane_draft(&mut self, delta: i64) -> bool {
         let moved = self.lanes.draft(delta);
         self.view.lane_taken = self.lanes.taken();
         moved
-    }
-
-    /// Up opens the wave of the taken lane over the video row, down closes it; the lane
-    /// is let go with its channel unchanged (user rule 2026-10-01).
-    pub fn lane_zoom(&mut self, delta: i8) -> bool {
-        let zoomed = self.lanes.zoom(delta);
-        if zoomed {
-            self.refresh_view(String::new());
-        }
-        zoomed
     }
 
     /// Down with no lane taken: the open large wave closes.
@@ -70,7 +61,7 @@ mod tests {
     use crate::*;
 
     #[test]
-    fn ctrl_2_takes_a2_arrows_pick_and_zoom_enter_keeps_escape_drops() {
+    fn ctrl_2_takes_a2_arrows_and_clicks_draft_enter_keeps_escape_drops() {
         let mut segments = ProgramSegments::new();
         segments.set_source(SourcePick::new(Some("c"), Some("C"), None, (None, 100), Some((50, 1))), None);
         segments.set_source_channels(Some(4));
@@ -79,13 +70,9 @@ mod tests {
         segments.lane_draft(1);
         segments.lane_draft(5);
         assert_eq!(segments.view().lane_taken, Some((1, 3)), "never past the last channel");
-        segments.lane_zoom(1);
-        assert_eq!(segments.view().wave_zoom, [0, 1], "one press opens it fully");
-        assert_eq!(segments.view().lane_taken, None, "and lets the lane go: the arrows move the playhead");
-        assert!(!segments.lane_zoom(1), "nothing taken any more");
-        assert!(segments.close_wave(), "down closes it without taking the lane");
-        assert_eq!(segments.view().wave_zoom, [0, 0]);
-        segments.take_lane(1);
+        assert!(segments.choose_a2_channel(2), "a click drafts");
+        assert_eq!(segments.view().lane_taken, Some((1, 2)), "the lane stays taken and expanded");
+        assert_eq!(segments.view().a2_choice, Some((1, 4)), "nothing kept before Enter");
         segments.lane_draft(5);
         assert!(segments.sync_holds_enter(), "Enter belongs to the taken lane");
         segments.commit_lane();

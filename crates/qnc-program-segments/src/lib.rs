@@ -1089,8 +1089,14 @@ impl ProgramSegments {
         self.choose_channel(1, channel)
     }
 
-    /// A chosen channel lets the lane go.
+    /// On the taken lane a click only drafts the channel (Enter keeps it, Escape drops it;
+    /// user 2026-10-14); otherwise the chosen channel is kept at once.
     fn choose_channel(&mut self, lane: u8, channel: u16) -> bool {
+        if self.lanes.taken().is_some_and(|(taken, _)| taken == lane) {
+            let drafted = self.lanes.set_draft(lane, channel);
+            self.view.lane_taken = self.lanes.taken();
+            return drafted;
+        }
         if !self.lanes.choose(lane, channel) {
             return false;
         }

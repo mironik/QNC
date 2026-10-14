@@ -203,6 +203,8 @@ pub struct TimelineTheme {
     pub wave_a4: Color32,
     /// The wave on an audio lane (the segment colours of a story use `wave_a1`/`wave_a2`).
     pub audio_wave: Color32,
+    /// The rim of the A1 or A2 button whose channel is being changed (user 2026-10-14).
+    pub lane_taken: Color32,
 }
 
 impl TimelineTheme {
@@ -235,6 +237,7 @@ impl TimelineTheme {
             wave_a3: Color32::from_rgb(132, 214, 158),
             wave_a4: Color32::from_rgb(132, 214, 158),
             audio_wave: Color32::from_rgb(80, 190, 148),
+            lane_taken: Color32::from_rgb(230, 50, 50),
         }
     }
 }
@@ -963,7 +966,18 @@ fn paint_audio_row(
         // A1/A2 are buttons (they take the lane): as bright as the text, in a frame.
         let button = label_rect.shrink2(Vec2::new(3.0, 1.5));
         ui.painter().rect_filled(button, 3.0, input.theme.label_background);
-        ui.painter().rect_stroke(button, 3.0, Stroke::new(1.0, input.theme.text), StrokeKind::Inside);
+        // The lane whose channel is being changed has a red rim (user 2026-10-14).
+        let choice = match lane {
+            AudioLane::A1 => input.a1_channel,
+            AudioLane::A2 => input.a2_channel,
+            _ => None,
+        };
+        let rim = if choice.is_some_and(|choice| choice.open) {
+            Stroke::new(2.0, input.theme.lane_taken)
+        } else {
+            Stroke::new(1.0, input.theme.text)
+        };
+        ui.painter().rect_stroke(button, 3.0, rim, StrokeKind::Inside);
         ui.painter().text(button.center(), Align2::CENTER_CENTER, label, FontId::proportional(12.0), input.theme.text);
     }
     let response = ui.interact(

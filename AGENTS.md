@@ -3941,3 +3941,11 @@ Dopuna 2026-10-14 (korisnik: "A1 i A2 trebaju biti iste svjetline kao tekst i ok
 "kada A1 ili A2 idu u zum oni se prosire, ne dodaje se novi zoom trak"): `qnc-timeline` crta oznake A1/A2 kao dugme
 (okvir i tekst u boji teksta); zoom je sama traka prosirena preko video trake do druge audio trake (A1 prema dolje, A2
 prema gore), u boji trake, s valom nacrta kanala dok je traka uzeta, inace izabranog kanala.
+Dopuna 2026-10-14 (korisnik: "izborom nekog kanala ne zatvara se expandirani audio... tek Enter sprema i zatvara, Esc
+ponistava i zatvara"; "sada su kanali postavljeni vertikalno, tako trebaju i strelice"; "izabrano dugme A1 ili A2 treba
+dobiti crveni rub"): dok je traka uzeta (Ctrl+1/Ctrl+2 ili klik na A1/A2), visina joj je prosirena preko video trake i
+stoji otvorena; klik na kanal u stupcu i strelice gore/dolje mijenjaju samo nacrt kanala (`qnc-lane-choice` `set_draft`,
+`qnc-program-segments` `choose_channel`), Enter sprema i zatvara, Esc odustaje i zatvara. Lijevo/desno vise ne biraju
+kanal, a gore/dolje vise ne otvaraju i ne zatvaraju prosirenje (`zoom`/`lane_zoom` uklonjeni; `qnc-panel-focus`).
+Dugme uzete trake ima crveni rub (`qnc-timeline` `TimelineTheme.lane_taken`). Poruka uzete trake kroz rjecnik
+(`story.msg.lane_taken`). Testovi `qnc-lane-choice`, `qnc-program-segments`, `qnc-panel-focus`, `qnc-timeline`, conformance.

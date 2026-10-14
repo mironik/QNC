@@ -694,6 +694,7 @@
     "shell.theme.dark": "Dark",
     "shell.theme.soft": "Soft",
     "shell.theme.high_contrast": "High contrast",
-    "project.root_not_found": "Cannot find the QNC root with AGENTS.md, seed/system_seed.json and contracts/ui/project.layout.json."
+    "project.root_not_found": "Cannot find the QNC root with AGENTS.md, seed/system_seed.json and contracts/ui/project.layout.json.",
+    "story.msg.lane_taken": "{lane}: up/down or a click picks the channel, Enter keeps it, Esc cancels"
   }
 }
