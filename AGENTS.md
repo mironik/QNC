@@ -3937,3 +3937,7 @@ Ispravak 2026-10-14 (korisnik: "tocno ispod A1, preko dijela gdje pise V, jer ka
 vidi jer ga prekriva zoom audio"): stupac kanala je u stupcu oznaka traka (sirina oznake), tocno ispod A1 odnosno iznad
 A2, s podlogom oznaka (`label_background`, bez okvira), pa ne prekriva video traku ni veliki val
 (`column_rect` dobiva i sirinu; test).
+Dopuna 2026-10-14 (korisnik: "A1 i A2 trebaju biti iste svjetline kao tekst i okviri checkboxova, u obliku dugmeta";
+"kada A1 ili A2 idu u zum oni se prosire, ne dodaje se novi zoom trak"): `qnc-timeline` crta oznake A1/A2 kao dugme
+(okvir i tekst u boji teksta); zoom je sama traka prosirena preko video trake do druge audio trake (A1 prema dolje, A2
+prema gore), u boji trake, s valom nacrta kanala dok je traka uzeta, inace izabranog kanala.

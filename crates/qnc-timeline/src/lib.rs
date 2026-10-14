@@ -842,15 +842,20 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     let taken = [(AudioLane::A1, a1_row, input.a1_channel), (AudioLane::A2, a2_row, input.a2_channel)]
         .into_iter()
         .find_map(|(lane, row, choice)| Some((lane, row?, choice.filter(|c| c.open && input.show_lane_labels)?)));
-    match (video_row, taken) {
-        // A taken lane shows the wave of its draft channel over the video row, beside its
-        // channel column (user 2026-10-14: the picker and the large wave together).
-        (Some(row), Some((lane, _, choice))) => {
-            let level = input.wave_over_video.filter(|(over, _)| *over == lane).map_or(1, |(_, level)| level.max(1));
-            paint_wave_over_video(ui, row, channel_peaks(&input, choice.selected), level, &input);
-        }
-        (Some(row), None) => {
-            if let Some((lane, level)) = input.wave_over_video {
+    // The zoom is the lane itself grown over the video row up to the other audio lane
+    // (user 2026-10-14): a taken lane shows its draft channel, a zoomed one its channel.
+    let grown = |lane: AudioLane, video: Rect| match lane {
+        AudioLane::A1 => a1_row.map(|row| Rect::from_min_max(row.min, video.right_bottom())),
+        AudioLane::A2 => a2_row.map(|row| Rect::from_min_max(video.min, row.right_bottom())),
+        _ => Some(video),
+    };
+    if let Some(video) = video_row {
+        let zoom = match taken {
+            Some((lane, _, choice)) => {
+                let level = input.wave_over_video.filter(|(over, _)| *over == lane).map_or(1, |(_, level)| level.max(1));
+                Some((lane, channel_peaks(&input, choice.selected), level))
+            }
+            None => input.wave_over_video.map(|(lane, level)| {
                 let peaks = match lane {
                     AudioLane::A1 => lane_peaks(&input, input.a1_channel, input.a1_peaks),
                     AudioLane::A2 => lane_peaks(&input, input.a2_channel, input.a2_peaks),
@@ -858,10 +863,14 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                     AudioLane::A4 => input.a4_peaks,
                     AudioLane::None => &[],
                 };
-                paint_wave_over_video(ui, row, peaks, level, &input);
+                (lane, peaks, level)
+            }),
+        };
+        if let Some((lane, peaks, level)) = zoom {
+            if let Some(rect) = grown(lane, video) {
+                paint_wave_over_video(ui, rect, peaks, level, &input);
             }
         }
-        _ => {}
     }
     if let Some((lane, row, choice)) = taken {
         // The column of channels: from the lane over the video row, never into the other
@@ -950,6 +959,13 @@ fn paint_audio_row(
         ""
     };
     paint_lane_label(ui, label_rect, label, input);
+    if !label.is_empty() {
+        // A1/A2 are buttons (they take the lane): as bright as the text, in a frame.
+        let button = label_rect.shrink2(Vec2::new(3.0, 1.5));
+        ui.painter().rect_filled(button, 3.0, input.theme.label_background);
+        ui.painter().rect_stroke(button, 3.0, Stroke::new(1.0, input.theme.text), StrokeKind::Inside);
+        ui.painter().text(button.center(), Align2::CENTER_CENTER, label, FontId::proportional(12.0), input.theme.text);
+    }
     let response = ui.interact(
         track_rect,
         ui.make_persistent_id(("qnc_timeline_audio", lane.label())),
@@ -2008,7 +2024,7 @@ fn paint_wave_over_video(ui: &mut egui::Ui, row: Rect, peaks: &[f32], level: u8,
     let gain = f32::from(1u16 << (level - 1).min(6));
     let scaled: Vec<f32> = peaks.iter().map(|peak| (peak * gain).clamp(-1.0, 1.0)).collect();
     let painter = ui.painter().with_clip_rect(track);
-    painter.rect_filled(track, 0.0, input.theme.audio_primary_background.gamma_multiply(0.92));
+    painter.rect_filled(track, 0.0, input.theme.audio_primary_background); // the same lane, only taller
     qnc_wave_view::paint_wave_peaks(&painter, track, &scaled, wave);
     paint_ranges_and_playhead(ui, track, input);
 }
