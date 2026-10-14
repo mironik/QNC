@@ -7,6 +7,7 @@ impl IngestApplication {
         // The keys act on the panel in focus (user 2026-10-13): taken there, or standing for a tab or a button.
         let routed = self.walk.route(&intent.action_id);
         self.view.focus = self.walk.view();
+        trace(|| format!("ingest-dispatch action={} walk={routed:?} panel={}", intent.action_id, self.view.focus.panel));
         let intent = match routed {
             qnc_focus_walk::Walk::Pass => intent,
             qnc_focus_walk::Walk::Done(changed) => return IngestDispatchResult::accepted(None, changed),
@@ -65,5 +66,12 @@ impl IngestApplication {
             || (self.pending_source.is_some() && action_id != action_ids::INGEST_DIR_CANCEL);
         (source_action && busy)
             .then(|| IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_busy")))
+    }
+}
+
+/// What the user asked for and what became of it, in the player log (dev diagnostics only).
+pub(crate) fn trace(line: impl FnOnce() -> String) {
+    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, line());
     }
 }

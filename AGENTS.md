@@ -3861,3 +3861,9 @@ uzima mapu koju preglednik pokazuje), Esc Cancel, Ctrl+A Select all, Ctrl+Shift+
 Tablica tipki zna D, N, 3. C10 spusteno: application 1705 -> 1676, blocks 863 -> 862. Nije izvedeno: poruke zajednickih
 kocki koje Ingest pokazuje (preglednik izvora, Select, player, `qnc-playback-priority`), Story/MA, shell, Project i
 katalog tipki (nazivi akcija, F1).
+Popravak 2026-10-14 (korisnik: "ne radi play u ingestu i ne ide na timeline"): `qnc-focus-walk` je imao jedan zadnji
+korak za sve popise, pa je Enter iz preglednika mapa, kad tipkovnica dode na kartice, kartici bio "Enter" i otvarao klip;
+korak sada vrijedi samo za popis na kojem je nastao (`step_on`, test). Proba kruga na stvarnom Ingest ugovoru: klik na
+karticu, Enter, Tab i Space idu ispravno (Space ide playeru na svakom panelu). Log probe nije pokazao zasto Space nije
+pustio klip, pa `qnc-ingest-application` uz dijagnostiku playera zapisuje svaku naredbu (`ingest-dispatch`: akcija,
+ishod kruga, panel) i svaku odbijenicu (`ingest-refused`). C10 isti.

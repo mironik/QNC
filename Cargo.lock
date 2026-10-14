@@ -3641,6 +3641,7 @@ dependencies = [
  "qnc-content-artifacts",
  "qnc-content-store",
  "qnc-contracts",
+ "qnc-dev-diagnostics",
  "qnc-dir-browser",
  "qnc-focus-walk",
  "qnc-image-assets",

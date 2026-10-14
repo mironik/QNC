@@ -83,6 +83,9 @@ pub struct FocusWalk {
     panel: usize,
     chosen: BTreeMap<String, usize>,
     step: Option<(GridStep, u64)>,
+    /// The list panel the last step was made on: another list never takes it (the folders'
+    /// Enter must not open a card when the keyboard comes to the cards).
+    step_on: String,
     /// Enter opened the focused card: the clip it chooses puts the keyboard on the source
     /// timeline; a click on a card keeps it on the cards.
     opening: bool,
@@ -102,7 +105,8 @@ impl FocusWalk {
 
     pub fn view(&self) -> WalkView {
         let button = self.row(self.panel()).and_then(|row| row.get(self.chosen_index(self.panel())).cloned());
-        WalkView { panel: self.panel().to_string(), button, step: self.step }
+        let step = self.step.filter(|_| self.step_on == self.panel());
+        WalkView { panel: self.panel().to_string(), button, step }
     }
 
     /// One catalog action from a key or a click.
@@ -146,6 +150,7 @@ impl FocusWalk {
                 let step = list_step(key).unwrap_or(GridStep::Open);
                 let number = self.step.map_or(1, |(_, number)| number + 1);
                 self.step = Some((step, number));
+                self.step_on = list.to_string();
                 self.opening |= list == CARDS && step == GridStep::Open; // the clip it opens takes the keyboard
                 Walk::Done(true)
             }
@@ -291,6 +296,18 @@ mod tests {
         walk.route("focus_next");
         assert_eq!(walk.route("activate_focused_item"), Walk::Action("confirm".into()));
         assert_eq!(walk.panel(), CARDS, "Select, on to the cards");
+    }
+
+    #[test]
+    fn a_step_made_on_one_list_is_not_taken_by_another() {
+        let mut walk = walk();
+        walk.route("focus_next"); // the folders
+        walk.route("activate_focused_item"); // Enter opens a folder
+        walk.route("focus_next");
+        walk.route("focus_next"); // the cards
+        assert_eq!(walk.view().step, None, "the folders' Enter does not open a card");
+        walk.route("step_forward_frame");
+        assert_eq!(walk.view().step, Some((GridStep::Right, 2)));
     }
 
     #[test]
