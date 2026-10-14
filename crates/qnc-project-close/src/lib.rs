@@ -64,23 +64,23 @@ impl CloseProjectComponent {
         let uri = validate_registry_uri(&config.registry_uri)?;
         if uri.environment == "local" {
             if config.endpoint.is_some() || config.token_env.is_some() {
-                return Err("Lokalni Project close ne smije imati mrezni endpoint.".into());
+                return Err(qnc_ui_text::text("project.close.local_no_endpoint").into());
             }
             return Ok(Self::local(config.registry_file.ok_or_else(|| {
-                "Lokalni Project close zahtijeva registry file binding.".to_string()
+                qnc_ui_text::text("project.close.local_needs_binding").to_string()
             })?));
         }
         if config.registry_file.is_some() {
-            return Err("Mrezni Project close ne smije imati lokalni file binding.".into());
+            return Err(qnc_ui_text::text("project.close.network_no_binding").into());
         }
         let endpoint = config
             .endpoint
             .as_deref()
-            .ok_or_else(|| "Mrezni Project close zahtijeva transport endpoint.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("project.close.network_needs_endpoint").to_string())?;
         let authority = uri
             .authority
             .clone()
-            .ok_or_else(|| "Mrezni Project close zahtijeva authority.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("project.close.network_needs_authority").to_string())?;
         let resolver = if uri.environment == "lan" {
             ResolverConfig::new(PathBuf::new()).with_lan_authority(authority, endpoint)
         } else {
@@ -89,11 +89,11 @@ impl CloseProjectComponent {
         let token_env = config
             .token_env
             .as_deref()
-            .ok_or_else(|| "Mrezni Project close zahtijeva write token env.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("project.close.network_needs_token").to_string())?;
         let token = std::env::var(token_env)
             .ok()
             .filter(|token| !token.is_empty())
-            .ok_or_else(|| "Project close write credential nije dostupan.".to_string())?;
+            .ok_or_else(|| qnc_ui_text::text("project.close.no_credential").to_string())?;
         Self::open(&resolver, &config.registry_uri, &token)
     }
 
@@ -105,7 +105,7 @@ impl CloseProjectComponent {
         validate_registry_uri(registry_uri)?;
         let endpoint = match resolver
             .resolve(registry_uri)
-            .map_err(|_| "Project close registry transport nije dostupan.".to_string())?
+            .map_err(|_| qnc_ui_text::text("project.close.registry_unavailable").to_string())?
             .endpoint
         {
             ResolvedEndpoint::LocalPath(path) => CloseEndpoint::Local(path),
@@ -170,13 +170,13 @@ pub fn respond(
         MAX_BYTES,
         |body: CloseProjectRequest, access| {
             let result = if body.version != VERSION {
-                Err("Pogresna Project close verzija.".into())
+                Err(qnc_ui_text::text("project.close.wrong_version").into())
             } else if validate_registry_uri(published_uri).is_err()
                 || body.registry_uri != published_uri
             {
-                Err("Pogresan Project registry.".into())
+                Err(qnc_ui_text::text("project.close.wrong_registry").into())
             } else if access != Access::ReadWrite {
-                Err("Project close zahtijeva write ovlast.".into())
+                Err(qnc_ui_text::text("project.close.needs_write").into())
             } else {
                 match body.operation {
                     CloseProjectOperation::CloseActive => close_local_registry(registry_file),
@@ -196,7 +196,7 @@ fn close_local_registry(path: &Path) -> Result<CloseProjectOutcome, String> {
         path,
         OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
-    .map_err(|_| "Project registry baza nije dostupna.".to_string())?;
+    .map_err(|_| qnc_ui_text::text("project.close.registry_db_unavailable").to_string())?;
     conn.busy_timeout(Duration::from_secs(2))
         .map_err(|error| error.to_string())?;
     let previous_project_id: Option<String> = conn
@@ -206,7 +206,7 @@ fn close_local_registry(path: &Path) -> Result<CloseProjectOutcome, String> {
             |row| row.get(0),
         )
         .optional()
-        .map_err(|_| "Project registry nema javni active_project_id zapis.".to_string())?
+        .map_err(|_| qnc_ui_text::text("project.close.no_active_record").to_string())?
         .filter(|id: &String| !id.trim().is_empty());
     let Some(previous_project_id) = previous_project_id else {
         return Ok(CloseProjectOutcome {
@@ -218,7 +218,7 @@ fn close_local_registry(path: &Path) -> Result<CloseProjectOutcome, String> {
         "UPDATE app_settings SET value = '' WHERE key = ?1",
         params!["active_project_id"],
     )
-    .map_err(|_| "Project registry ne dopusta zatvaranje aktivnog projekta.".to_string())?;
+    .map_err(|_| qnc_ui_text::text("project.close.not_allowed").to_string())?;
     Ok(CloseProjectOutcome {
         closed: true,
         previous_project_id: Some(previous_project_id),
@@ -227,12 +227,12 @@ fn close_local_registry(path: &Path) -> Result<CloseProjectOutcome, String> {
 
 fn validate_registry_uri(uri: &str) -> Result<qnc_contracts::QncUri, String> {
     let parsed = qnc_contracts::parse_qnc_uri(uri)
-        .map_err(|_| "Neispravan registry QNC URI.".to_string())?;
+        .map_err(|_| qnc_ui_text::text("project.close.bad_uri").to_string())?;
     if parsed.resource_kind != "db" || parsed.resource_id != "project_registry" {
-        return Err("Project close zahtijeva project_registry DB URI.".into());
+        return Err(qnc_ui_text::text("project.close.needs_registry_uri").into());
     }
     if !matches!(parsed.environment.as_str(), "local" | "lan" | "intranet") {
-        return Err("Project close zahtijeva local, LAN ili Intranet registry URI.".into());
+        return Err(qnc_ui_text::text("project.close.needs_known_uri").into());
     }
     Ok(parsed)
 }
@@ -242,18 +242,18 @@ fn validate_reply(
     request: &CloseProjectRequest,
 ) -> Result<CloseProjectOutcome, String> {
     if reply.version != VERSION || reply.registry_uri != request.registry_uri {
-        return Err("Pogresan Project close odgovor.".into());
+        return Err(qnc_ui_text::text("project.close.wrong_reply").into());
     }
     reply.result
 }
 
 fn transport_error(error: qnc_json_transport::Error) -> String {
     match error {
-        qnc_json_transport::Error::Configuration => "Project close transport nije konfiguriran.",
-        qnc_json_transport::Error::AccessDenied => "Project close transport nije odobren.",
-        qnc_json_transport::Error::TooLarge => "Project close transport odgovor je prevelik.",
-        qnc_json_transport::Error::Unavailable => "Project close transport nije dostupan.",
-        qnc_json_transport::Error::Protocol => "Project close transport odgovor nije valjan.",
+        qnc_json_transport::Error::Configuration => qnc_ui_text::text("project.close.transport_not_configured"),
+        qnc_json_transport::Error::AccessDenied => qnc_ui_text::text("project.close.transport_denied"),
+        qnc_json_transport::Error::TooLarge => qnc_ui_text::text("project.close.reply_too_large"),
+        qnc_json_transport::Error::Unavailable => qnc_ui_text::text("project.close.transport_unavailable"),
+        qnc_json_transport::Error::Protocol => qnc_ui_text::text("project.close.reply_invalid"),
     }
     .into()
 }
@@ -339,7 +339,7 @@ mod tests {
             .close_active_project()
             .expect_err("missing registry must fail");
 
-        assert!(error.contains("Project registry baza nije dostupna"));
+        assert!(error.contains("project registry database is not available"));
         assert!(!db.exists());
     }
 
@@ -393,7 +393,7 @@ mod tests {
 
         let error = component.close_active_project().unwrap_err();
 
-        assert!(error.contains("write ovlast"));
+        assert!(error.contains("write access"));
         assert_eq!(active_project_id(&db).as_deref(), Some("p1"));
         handle.join().unwrap();
     }

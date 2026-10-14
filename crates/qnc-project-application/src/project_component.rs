@@ -139,7 +139,7 @@ impl ProjectComponent {
         let id = self
             .navigation_project_id
             .as_deref()
-            .ok_or("Nema otvorenog projekta za navigaciju.")?;
+            .ok_or(qnc_ui_text::text("project.msg.no_open_project"))?;
         self.store.navigation_sequence(id)
     }
 

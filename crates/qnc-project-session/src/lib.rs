@@ -25,7 +25,7 @@ pub enum LocationSourceKind {
 impl LocationSourceKind {
     pub fn label(self) -> &'static str {
         match self {
-            Self::Local => "Računalo",
+            Self::Local => qnc_ui_text::text("source.computer"),
             Self::Lan => "LAN",
             Self::Internet => "Internet",
         }
@@ -235,7 +235,7 @@ impl ProjectSession {
     pub fn dispatch(&mut self, action: ProjectIntent) {
         let action_id = action.action_id();
         if !self.known_actions.contains(action_id) {
-            self.status = format!("Nepoznata Project akcija: {action_id}");
+            self.status = qnc_ui_text::fill("project.msg.unknown_action", &[("action", &action_id.to_string())]);
             return;
         }
 
@@ -249,7 +249,7 @@ impl ProjectSession {
                     .applications
                     .choose(&priority_group, application_id.as_deref())
                 {
-                    Ok(()) => "Postavke promijenjene.".into(),
+                    Ok(()) => qnc_ui_text::text("project.settings_changed").into(),
                     Err(error) => error,
                 };
             }
@@ -269,7 +269,7 @@ impl ProjectSession {
             }
             ProjectIntent::CancelDeleteProject => {
                 self.delete_candidate = None;
-                self.status = "Brisanje otkazano.".to_string();
+                self.status = qnc_ui_text::text("project.msg.delete_cancelled").to_string();
             }
             ProjectIntent::ConfirmDeleteProject => {
                 if let Some(project) = self.delete_candidate.clone() {
@@ -300,7 +300,7 @@ impl ProjectSession {
             }
             ProjectIntent::CancelDeleteTemplate => {
                 self.delete_template_candidate = None;
-                self.status = "Brisanje templatea otkazano.".to_string();
+                self.status = qnc_ui_text::text("project.msg.template_delete_cancelled").to_string();
             }
             ProjectIntent::ConfirmDeleteTemplate => {
                 if let Some(template) = self.delete_template_candidate.clone() {
@@ -370,7 +370,7 @@ impl ProjectSession {
         ) {
             Ok(created) => {
                 self.project_name.clear();
-                self.status = format!("Otvoren projekt: {}", created.project.name);
+                self.status = qnc_ui_text::fill("project.msg.opened", &[("name", &created.project.name)]);
                 self.apply_projects_state(created.projects);
             }
             Err(error) => {
@@ -513,7 +513,7 @@ impl ProjectSession {
             .component
             .browser_private_path_for_uri(ProjectBrowserTarget::ProjectsRoot, &uri)
         else {
-            self.status = "Browser URI nema privatni Project path.".to_string();
+            self.status = qnc_ui_text::text("project.msg.browser_no_project_path").to_string();
             return;
         };
         let display_path = qnc_dir_browser::display_private_path(&path);
@@ -531,7 +531,7 @@ impl ProjectSession {
                     "storage.projects_root",
                     self.projects_root.clone(),
                 );
-                self.status = "Lokacija projekata postavljena.".to_string();
+                self.status = qnc_ui_text::text("project.msg.projects_root_set").to_string();
             }
             Err(error) => {
                 self.status = format!("DB: {error}");
@@ -602,7 +602,7 @@ impl ProjectSession {
             .component
             .browser_private_path_for_uri(ProjectBrowserTarget::ExportDir, &uri)
         else {
-            self.status = "Browser URI nema privatni export path.".to_string();
+            self.status = qnc_ui_text::text("project.msg.browser_no_export_path").to_string();
             return;
         };
         let path = qnc_dir_browser::display_private_path(&path);
@@ -617,7 +617,7 @@ impl ProjectSession {
             "export.directory",
             self.export_dir.clone(),
         );
-        self.status = "Export direktorij postavljen.".to_string();
+        self.status = qnc_ui_text::text("project.msg.export_dir_set").to_string();
     }
 
     fn load_projects_root_browser(&mut self, start: Option<PathBuf>) {
@@ -700,14 +700,14 @@ impl ProjectSession {
         };
         self.selected_project = Some(index);
         self.delete_candidate = Some(project);
-        self.status = "Potvrdi uklanjanje projekta.".to_string();
+        self.status = qnc_ui_text::text("project.msg.confirm_remove").to_string();
     }
 
     fn perform_confirm_delete_project(&mut self, project: &ProjectRow) {
         match self.component.delete_project(&project.project_id) {
             Ok(deleted) => {
                 self.delete_candidate = None;
-                self.status = format!("Uklonjen projekt: {}", deleted.project.name);
+                self.status = qnc_ui_text::fill("project.msg.removed", &[("v0", &(deleted.project.name).to_string())]);
                 self.apply_projects_state(deleted.projects);
             }
             Err(error) => {
@@ -732,7 +732,7 @@ impl ProjectSession {
             Ok(templates) => {
                 self.delete_template_candidate = None;
                 self.apply_templates_state(templates);
-                self.status = format!("Template obrisan: {}", template.name);
+                self.status = qnc_ui_text::fill("project.msg.template_deleted", &[("v0", &(template.name).to_string())]);
             }
             Err(error) => {
                 self.delete_template_candidate = None;

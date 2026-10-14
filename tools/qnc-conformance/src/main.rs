@@ -2212,7 +2212,7 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
             has_project_location_browser = true;
         }
         if relative == "crates/qnc-project-session/src/lib.rs"
-            && contents.contains("Računalo")
+            && contents.contains("source.computer")
             && contents.contains("LAN")
             && contents.contains("Internet")
         {

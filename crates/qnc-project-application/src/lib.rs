@@ -30,7 +30,7 @@ pub fn selected_project_label(projects: &[ProjectRow], selected: Option<usize>) 
     selected
         .and_then(|index| projects.get(index))
         .map(|project| project.name.as_str())
-        .unwrap_or("Projekt nije odabran.")
+        .unwrap_or(qnc_ui_text::text("project.msg.no_project_chosen"))
 }
 
 #[cfg(test)]
@@ -57,11 +57,11 @@ mod tests {
         ];
         assert_eq!(selected_project_label(&rows, Some(0)), "First project");
         assert_eq!(selected_project_label(&rows, Some(1)), "Selected project");
-        assert_eq!(selected_project_label(&rows, None), "Projekt nije odabran.");
+        assert_eq!(selected_project_label(&rows, None), qnc_ui_text::text("project.msg.no_project_chosen"));
         rows.clear();
         assert_eq!(
             selected_project_label(&rows, Some(1)),
-            "Projekt nije odabran."
+            qnc_ui_text::text("project.msg.no_project_chosen")
         );
     }
 }

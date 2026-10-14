@@ -3897,3 +3897,12 @@ output"), izlaz programa, prerender, izvori, slijed aplikacija i shell kocke. Rj
 pise izravno engleski (rjecnik ovisi o njemu). Signal "radnik pauziran zbog playera" ostaje usporedba s tekstom sifre
 (`filmstrip_paused_for_playback`, `wave_paused_for_playback`). Testovi koji su trazili hrvatski komad poruke traze
 engleski. Nije izvedeno: Project, `qnc-project-close`, `qnc-project-session`, katalog tipki (nazivi akcija, F1).
+Izvedeno 2026-10-14 (korisnik: "da, nastavi s Projectom"; Project otkljucan samo za zamjenu natpisa siframa): Project i
+shell kroz rjecnik. `contracts/ui/project.layout.json`: 126 natpisa su sifre (naslovi, obrazac Advanced postavki, nazivi
+izbora, tekstovi ploce, pitanja); vrijednosti postavki, kljucevi, redoslijedi i blokovi nisu dirani (rec709/rec2020
+ostaju kako jesu); `qnc-project-blocks` razrjesava sifre pri ucitavanju. Poruke koda kroz `text`/`fill`:
+`qnc-project-application`, `qnc-project-session` (stanja, "Računalo" je `source.computer`), `qnc-project-store` (greske
+lokacija, brisanja, zastite i seeda), `qnc-project-close`, `apps/qnc-project`, te shell `qnc-desktop` i
+`qnc-shell-footer` (Theme, Close project, nazivi tema). Conformance provjera vrsta lokacije Projecta trazi sifru
+`source.computer` umjesto rijeci "Računalo". Testovi koji su trazili hrvatski tekst traze engleski. Project je ponovno
+zamrznut. Nije izvedeno: katalog tipki (nazivi akcija, pomoc F1), imena sistemskih templatea u seedu (podaci).

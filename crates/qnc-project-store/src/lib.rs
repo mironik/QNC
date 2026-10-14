@@ -148,7 +148,7 @@ impl ProjectStore {
     pub fn set_projects_root(&mut self, path: impl AsRef<Path>) -> Result<(), String> {
         let path = path.as_ref();
         if path.as_os_str().is_empty() {
-            return Err("Lokacija projekata je prazna.".to_string());
+            return Err(qnc_ui_text::text("project.store.root_empty").to_string());
         }
         fs::create_dir_all(path).map_err(|error| error.to_string())?;
         let conn = self.open_registry()?;
@@ -258,7 +258,7 @@ impl ProjectStore {
     ) -> Result<ProjectTemplateRow, String> {
         let name = name.trim();
         if name.is_empty() {
-            return Err("Naziv templatea je prazan.".to_string());
+            return Err(qnc_ui_text::text("project.store.template_name_empty").to_string());
         }
         let conn = self.open_registry()?;
         init_registry_schema(&conn)?;
@@ -315,7 +315,7 @@ impl ProjectStore {
         let template = get_template(&conn, template_id)?
             .ok_or_else(|| format!("Template '{template_id}' ne postoji."))?;
         if template.system {
-            return Err("System template se ne može obrisati.".to_string());
+            return Err(qnc_ui_text::text("project.store.system_template_kept").to_string());
         }
 
         let selected_before = selected_template_id(&conn)?;
@@ -337,7 +337,7 @@ impl ProjectStore {
             )
             .map_err(|error| error.to_string())?;
         if deleted == 0 {
-            return Err(format!("Template '{template_id}' nije obrisan."));
+            return Err(qnc_ui_text::fill("project.store.template_not_deleted", &[("template", &template_id.to_string())]));
         }
         if selected_before == template_id {
             tx.execute(
@@ -359,7 +359,7 @@ impl ProjectStore {
     ) -> Result<ProjectRow, String> {
         let name = name.trim();
         if name.is_empty() {
-            return Err("Naziv projekta je prazan.".to_string());
+            return Err(qnc_ui_text::text("project.store.project_name_empty").to_string());
         }
 
         let mut conn = self.open_registry()?;
@@ -404,10 +404,7 @@ impl ProjectStore {
             created_directory = true;
             if let Some(export_path) = &export_path {
                 fs::create_dir_all(export_path).map_err(|error| {
-                    format!(
-                        "Ne mogu kreirati export direktorij '{}': {error}",
-                        export_path.display()
-                    )
+                    qnc_ui_text::fill("project.store.export_dir_create_failed", &[("v0", &(export_path.display()).to_string()), ("error", &(error).to_string())])
                 })?;
             }
             self.ensure_workspace_db(&project_id, &project_dir, Some(&template), &origin)?;
@@ -449,9 +446,7 @@ impl ProjectStore {
                     if let Err(cleanup_error) =
                         remove_unpublished_project(&confirmed_root, &project_dir)
                     {
-                        error.push_str(&format!(
-                            "; uklanjanje nedovrsenog projekta: {cleanup_error}"
-                        ));
+                        error.push_str(&qnc_ui_text::fill("project.store.cleanup_failed", &[("cleanup_error", &(cleanup_error).to_string())]));
                     }
                 }
                 if let Err(lock_error) = lock_projects_root_dir(&projects_root) {
@@ -470,10 +465,10 @@ impl ProjectStore {
                 .unwrap_or_else(|| self.projects_root.clone())
         } else {
             if requested.starts_with("qnc://") {
-                return Err("Lokacija projekta zahtijeva konfiguriran transport binding; nema lokalnog fallbacka.".to_string());
+                return Err(qnc_ui_text::text("project.store.location_needs_binding").to_string());
             }
             if requested.starts_with('$') {
-                return Err(format!("Nepoznata lokacija projekta: {requested}"));
+                return Err(qnc_ui_text::fill("project.store.unknown_location", &[("location", &requested.to_string())]));
             }
             PathBuf::from(requested)
         };
@@ -483,7 +478,7 @@ impl ProjectStore {
             .components()
             .any(|part| !matches!(part, Component::Normal(_) | Component::CurDir))
         {
-            Err("Relativna lokacija projekta ne smije izlaziti iz QNC direktorija.".to_string())
+            Err(qnc_ui_text::text("project.store.relative_outside").to_string())
         } else {
             Ok(self.root.join(location))
         }
@@ -529,7 +524,7 @@ impl ProjectStore {
                 .windows(2)
                 .any(|pair| pair[0].priority_group >= pair[1].priority_group)
         {
-            return Err("Projekt nema valjan novi slijed prioritetnih grupa.".into());
+            return Err(qnc_ui_text::text("project.store.no_valid_sequence").into());
         }
         Ok(steps)
     }
@@ -555,10 +550,7 @@ impl ProjectStore {
         let project_dir = project_dir_from_conn(&conn, &self.projects_root, project_id)?;
         let workspace_db = self.project_workspace_db_path(project_id, &project_dir)?;
         if !workspace_db.is_file() {
-            return Err(format!(
-                "Direktorij projekta '{}' nije ispravan. Nema automatskog popravljanja.",
-                project_dir.display()
-            ));
+            return Err(qnc_ui_text::fill("project.store.folder_invalid", &[("v0", &(project_dir.display()).to_string())]));
         }
         let now = now_str();
         conn.execute(
@@ -605,7 +597,7 @@ impl ProjectStore {
         validate_project_delete_dir(project_id, &project_dir, &workspace_db)?;
         let projects_root = project_dir
             .parent()
-            .ok_or("Projekt nema parent direktorij.")?;
+            .ok_or(qnc_ui_text::text("project.store.no_parent"))?;
 
         let active_project_id = get_setting(&conn, "active_project_id", "")?;
         let next_active_project_id = if active_project_id == project_id {
@@ -667,10 +659,7 @@ impl ProjectStore {
                 return Err(error);
             }
             let remove_result = fs::remove_dir_all(&project_dir).map_err(|error| {
-                format!(
-                    "Ne mogu obrisati direktorij projekta '{}': {error}",
-                    project_dir.display()
-                )
+                qnc_ui_text::fill("project.store.folder_delete_failed", &[("v0", &(project_dir.display()).to_string()), ("error", &(error).to_string())])
             });
             let lock_result = lock_projects_root_dir(projects_root);
             if let Err(error) = remove_result {
@@ -809,7 +798,7 @@ fn remove_unpublished_project(projects_root: &Path, project_dir: &Path) -> Resul
         .map_err(|error| error.to_string())?;
     if metadata.file_type().is_symlink() || resolved.parent() != Some(projects_root) {
         return Err(
-            "Direktorij za uklanjanje nije unutar potvrdene lokacije projekta.".to_string(),
+            qnc_ui_text::text("project.store.remove_outside").to_string(),
         );
     }
     unlock_projects_root_dir(projects_root)?;
@@ -828,9 +817,7 @@ fn export_directory_path(project_dir: &Path, export_directory: &str) -> Result<P
             Component::ParentDir | Component::RootDir | Component::Prefix(_)
         )
     }) {
-        return Err(format!(
-            "Export direktorij mora biti relativan unutar projekta ili apsolutan: {export_directory}"
-        ));
+        return Err(qnc_ui_text::fill("project.store.export_dir_rule", &[("export_directory", &(export_directory).to_string())]));
     }
     Ok(project_dir.join(export_path))
 }
@@ -901,11 +888,7 @@ fn validate_project_delete_dir(
         .and_then(|value| value.to_str())
         .unwrap_or("");
     if actual_leaf != expected_leaf {
-        return Err(format!(
-            "Brisanje zaustavljeno: direktorij projekta '{}' ne odgovara project_id '{}'.",
-            project_dir.display(),
-            project_id
-        ));
+        return Err(qnc_ui_text::fill("project.store.delete_stopped_id", &[("v0", &(project_dir.display()).to_string()), ("v1", &(project_id).to_string())]));
     }
     if !project_dir.exists() {
         return Ok(());
@@ -913,16 +896,10 @@ fn validate_project_delete_dir(
     let metadata = fs::symlink_metadata(project_dir).map_err(|error| error.to_string())?;
     let file_type = metadata.file_type();
     if file_type.is_symlink() {
-        return Err(format!(
-            "Brisanje zaustavljeno: direktorij projekta '{}' je link.",
-            project_dir.display()
-        ));
+        return Err(qnc_ui_text::fill("project.store.delete_stopped_link", &[("v0", &(project_dir.display()).to_string())]));
     }
     if !file_type.is_dir() {
-        return Err(format!(
-            "Brisanje zaustavljeno: '{}' nije direktorij.",
-            project_dir.display()
-        ));
+        return Err(qnc_ui_text::fill("project.store.delete_stopped_not_folder", &[("v0", &(project_dir.display()).to_string())]));
     }
     let _ = workspace_db;
     Ok(())
@@ -963,9 +940,7 @@ fn resolve_local_path(resolver: &ResolverConfig, uri: &str) -> Result<PathBuf, S
         .endpoint
     {
         ResolvedEndpoint::LocalPath(path) => Ok(path),
-        ResolvedEndpoint::NetworkEndpoint { .. } => Err(format!(
-            "Resolver: '{uri}' nije lokalni filesystem endpoint."
-        )),
+        ResolvedEndpoint::NetworkEndpoint { .. } => Err(qnc_ui_text::fill("project.store.not_local_endpoint", &[("uri", &(uri).to_string())])),
     }
 }
 
@@ -1040,10 +1015,7 @@ fn clear_path_read_only_for_delete(path: &Path) -> Result<(), String> {
     }
     permissions.set_readonly(false);
     fs::set_permissions(path, permissions).map_err(|error| {
-        format!(
-            "Ne mogu ukloniti read-only stanje za brisanje '{}': {error}",
-            path.display()
-        )
+        qnc_ui_text::fill("project.store.readonly_clear_failed", &[("v0", &(path.display()).to_string()), ("error", &(error).to_string())])
     })
 }
 
@@ -1054,10 +1026,7 @@ fn delete_project_database_files(workspace_db: &Path) -> Result<(), String> {
         }
         clear_path_read_only_for_delete(&file)?;
         fs::remove_file(&file).map_err(|error| {
-            format!(
-                "Ne mogu obrisati bazu projekta '{}': {error}",
-                file.display()
-            )
+            qnc_ui_text::fill("project.store.db_delete_failed", &[("v0", &(file.display()).to_string()), ("error", &(error).to_string())])
         })?;
     }
     Ok(())
@@ -1095,10 +1064,7 @@ fn set_path_read_only(path: &Path, read_only: bool) -> Result<(), String> {
     }
     permissions.set_mode(next_mode);
     fs::set_permissions(path, permissions).map_err(|error| {
-        format!(
-            "Ne mogu promijeniti read-only stanje za '{}': {error}",
-            path.display()
-        )
+        qnc_ui_text::fill("project.store.readonly_change_failed", &[("v0", &(path.display()).to_string()), ("error", &(error).to_string())])
     })
 }
 
@@ -1140,7 +1106,7 @@ fn icacls_has(path: &Path, entry: &str) -> Result<bool, String> {
         .arg(path)
         .stderr(Stdio::null())
         .output()
-        .map_err(|error| format!("Ne mogu pokrenuti icacls za '{}': {error}", path.display()))?;
+        .map_err(|error| qnc_ui_text::fill("project.store.icacls_failed", &[("v0", &(path.display()).to_string()), ("error", &(error).to_string())]))?;
     let entry = entry.to_lowercase();
     Ok(String::from_utf8_lossy(&output.stdout)
         .lines()
@@ -1155,18 +1121,18 @@ fn run_icacls(path: &Path, args: &[&str]) -> Result<(), String> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map_err(|error| format!("Ne mogu pokrenuti icacls za '{}': {error}", path.display()))?;
+        .map_err(|error| qnc_ui_text::fill("project.store.icacls_failed", &[("v0", &(path.display()).to_string()), ("error", &(error).to_string())]))?;
     if status.success() {
         Ok(())
     } else {
-        Err(format!("Ne mogu promijeniti delete lock za '{}'.", path.display()))
+        Err(qnc_ui_text::fill("project.store.delete_lock_failed", &[("v0", &(path.display()).to_string())]))
     }
 }
 
 #[cfg(windows)]
 fn windows_current_user() -> Result<String, String> {
     let username = env::var("USERNAME")
-        .map_err(|error| format!("Ne mogu procitati USERNAME za Windows ACL: {error}"))?;
+        .map_err(|error| qnc_ui_text::fill("project.store.username_failed", &[("error", &(error).to_string())]))?;
     let domain = env::var("USERDOMAIN").unwrap_or_default();
     if domain.trim().is_empty() {
         Ok(username)
@@ -1187,14 +1153,11 @@ fn set_project_delete_lock(path: &Path, locked: bool) -> Result<(), String> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map_err(|error| format!("Ne mogu pokrenuti chflags za '{}': {error}", path.display()))?;
+        .map_err(|error| qnc_ui_text::fill("project.store.chflags_failed", &[("v0", &(path.display()).to_string()), ("error", &(error).to_string())]))?;
     if status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "Ne mogu promijeniti delete lock za '{}'.",
-            path.display()
-        ))
+        Err(qnc_ui_text::fill("project.store.delete_lock_failed", &[("v0", &(path.display()).to_string())]))
     }
 }
 
@@ -1216,14 +1179,11 @@ fn set_project_hidden(path: &Path, hidden: bool) -> Result<(), String> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map_err(|error| format!("Ne mogu pokrenuti attrib za '{}': {error}", path.display()))?;
+        .map_err(|error| qnc_ui_text::fill("project.store.attrib_failed", &[("v0", &(path.display()).to_string()), ("error", &(error).to_string())]))?;
     if status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "Ne mogu promijeniti hidden stanje za '{}'.",
-            path.display()
-        ))
+        Err(qnc_ui_text::fill("project.store.hidden_failed", &[("v0", &(path.display()).to_string())]))
     }
 }
 
@@ -1239,14 +1199,11 @@ fn set_project_hidden(path: &Path, hidden: bool) -> Result<(), String> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map_err(|error| format!("Ne mogu pokrenuti chflags za '{}': {error}", path.display()))?;
+        .map_err(|error| qnc_ui_text::fill("project.store.chflags_failed", &[("v0", &(path.display()).to_string()), ("error", &(error).to_string())]))?;
     if status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "Ne mogu promijeniti hidden stanje za '{}'.",
-            path.display()
-        ))
+        Err(qnc_ui_text::fill("project.store.hidden_failed", &[("v0", &(path.display()).to_string())]))
     }
 }
 
@@ -1511,7 +1468,7 @@ fn init_workspace_schema(conn: &Connection) -> Result<(), String> {
 
 fn ensure_templates_seeded(conn: &Connection) -> Result<(), String> {
     let seed: SeedFile = serde_json::from_str(SYSTEM_SEED_JSON).map_err(|error| {
-        format!("seed/system_seed.json nije ispravan Project seed JSON: {error}")
+        qnc_ui_text::fill("project.store.seed_invalid", &[("error", &(error).to_string())])
     })?;
     let now = now_str();
 
@@ -1724,18 +1681,18 @@ fn apply_application_selection(
         .iter()
         .any(|app| app.priority_group == "a")
     {
-        return Err("Odaberite aplikaciju iz grupe a.".into());
+        return Err(qnc_ui_text::text("app.choose_application_from_group").into());
     }
     if selection.applications.is_empty() {
-        return Err("Odaberite barem jednu aplikaciju.".into());
+        return Err(qnc_ui_text::text("app.choose_at_least_one_application").into());
     }
     let root = settings
         .as_object_mut()
-        .ok_or("Postavke moraju biti objekt.")?;
+        .ok_or(qnc_ui_text::text("project.store.settings_object"))?;
     let workspace = root.entry("workspace").or_insert_with(|| json!({}));
     let workspace = workspace
         .as_object_mut()
-        .ok_or("Workspace postavke moraju biti objekt.")?;
+        .ok_or(qnc_ui_text::text("project.store.workspace_object"))?;
     workspace.insert(
         "application_selection".into(),
         serde_json::to_value(selection).map_err(|e| e.to_string())?,
@@ -1764,11 +1721,11 @@ fn apply_application_selection(
 fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
     let root = settings
         .as_object_mut()
-        .ok_or("Postavke moraju biti objekt.")?;
+        .ok_or(qnc_ui_text::text("project.store.settings_object"))?;
     let products = root.entry("products").or_insert_with(|| json!({}));
     let products = products
         .as_object_mut()
-        .ok_or("Products postavke moraju biti objekt.")?;
+        .ok_or(qnc_ui_text::text("project.store.products_object"))?;
     for (field, value) in PRODUCT_DIRECTORY_FIELDS {
         products
             .entry((*field).to_string())
@@ -1780,7 +1737,7 @@ fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
         .entry("artifacts")
         .or_insert_with(|| json!({}))
         .as_object_mut()
-        .ok_or("Artifacts postavke moraju biti objekt.")?;
+        .ok_or(qnc_ui_text::text("project.store.artifacts_object"))?;
     for field in ["filmstrip", "wave"] {
         artifacts.entry(field.to_string()).or_insert_with(|| json!("auto"));
     }
@@ -1794,9 +1751,9 @@ fn write_project_workflow(
 ) -> Result<(), String> {
     let selection: SelectionSnapshot = settings
         .pointer("/workspace/application_selection")
-        .ok_or("Nedostaje odabrani slijed aplikacija.")
+        .ok_or(qnc_ui_text::text("project.store.no_sequence"))
         .and_then(|value| {
-            serde_json::from_value(value.clone()).map_err(|_| "Neispravan slijed aplikacija.")
+            serde_json::from_value(value.clone()).map_err(|_| qnc_ui_text::text("project.store.bad_sequence"))
         })
         .map_err(|e| e.to_string())?;
     selection.validate().map_err(|e| e.to_string())?;
@@ -1805,7 +1762,7 @@ fn write_project_workflow(
         .first()
         .is_none_or(|app| app.priority_group != "a")
     {
-        return Err("Slijed mora poceti odabranom grupom a.".into());
+        return Err(qnc_ui_text::text("project.store.sequence_starts_a").into());
     }
     conn.execute(
         "DELETE FROM project_workflow_steps WHERE project_id = ?1",
@@ -2571,7 +2528,7 @@ mod tests {
                 &selection,
             )
             .unwrap_err();
-        assert!(error.contains("Export direktorij"));
+        assert!(error.contains("export folder"));
         assert_eq!(store.list_projects().unwrap(), vec![first]);
         let conn = store.open_registry().unwrap();
         assert_eq!(
@@ -2631,7 +2588,7 @@ mod tests {
             )
             .unwrap_err();
         assert!(error.contains("test publication failure"));
-        assert!(!error.contains("uklanjanje nedovrsenog"), "{error}");
+        assert!(!error.contains("removing the unfinished"), "{error}");
         assert_eq!(store.list_projects().unwrap(), vec![first]);
         assert_eq!(
             conn.query_row("SELECT COUNT(*) FROM project_storage_locations", [], |r| {
@@ -3048,7 +3005,7 @@ mod tests {
         let error = store
             .delete_user_template("tpl_breaking_news")
             .expect_err("system template must be guarded");
-        assert!(error.contains("System template se ne može obrisati"));
+        assert!(error.contains("system template cannot be deleted"));
         let templates = store.list_project_templates().expect("templates");
         assert!(templates
             .iter()
@@ -3297,7 +3254,7 @@ mod tests {
         let error = store
             .delete_project(&project.project_id)
             .expect_err("delete must be guarded");
-        assert!(error.contains("Brisanje zaustavljeno"));
+        assert!(error.contains("Removal stopped"));
         assert!(bad_dir.join("keep.txt").is_file());
         assert!(store
             .list_projects()

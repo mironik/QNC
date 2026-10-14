@@ -174,10 +174,7 @@ impl QncShell {
         }
 
         let Some(factory) = self.embedded_factories.get(&app.desktop_entry).copied() else {
-            self.status = format!(
-                "{} nema registriran embedded adapter ({})",
-                app.label, app.desktop_entry
-            );
+            self.status = qnc_ui_text::fill("shell.no_embedded_adapter", &[("app", &app.label), ("entry", &app.desktop_entry)]);
             return false;
         };
 
@@ -548,7 +545,7 @@ pub fn resolve_qnc_root() -> Result<PathBuf, String> {
         }
     }
 
-    Err("Ne mogu pronaci QNC root s AGENTS.md, seed/system_seed.json i contracts/ui/shell.layout.json.".to_string())
+    Err(qnc_ui_text::text("shell.root_not_found").to_string())
 }
 
 fn is_qnc_root(path: &Path) -> bool {
@@ -651,7 +648,7 @@ mod tests {
         shell.activate_tab("project");
 
         assert!(shell.embedded_apps.contains_key("project"));
-        assert!(!shell.status.contains("nema registriran embedded adapter"));
+        assert!(!shell.status.contains("no registered embedded adapter"));
         let _ = fs::remove_dir_all(root);
     }
 

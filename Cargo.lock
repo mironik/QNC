@@ -4565,6 +4565,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-project-desktop",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4574,6 +4575,7 @@ dependencies = [
  "qnc-application-selection",
  "qnc-dir-browser",
  "qnc-project-store",
+ "qnc-ui-text",
  "serde_json",
 ]
 
@@ -4595,6 +4597,7 @@ dependencies = [
  "qnc-settings-path",
  "qnc-settings-switches",
  "qnc-ui-kit",
+ "qnc-ui-text",
  "serde",
  "serde_json",
 ]
@@ -4606,6 +4609,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-json-transport",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "rusqlite",
  "serde",
  "tempfile",
@@ -4641,6 +4645,7 @@ dependencies = [
  "qnc-project-application",
  "qnc-settings-path",
  "qnc-ui-kit",
+ "qnc-ui-text",
  "serde_json",
 ]
 
@@ -4652,6 +4657,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-db-contract",
  "qnc-transport-resolver",
+ "qnc-ui-text",
  "qnc-workstation-identity",
  "rusqlite",
  "serde",

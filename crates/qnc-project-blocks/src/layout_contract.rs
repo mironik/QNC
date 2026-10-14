@@ -22,7 +22,8 @@ impl AppContracts {
 
         let shell = serde_json::from_str::<ShellLayoutContract>(SHELL_LAYOUT_JSON)
             .map_err(|error| format!("shell layout parse failed: {error}"))?;
-        let project = serde_json::from_str::<ProjectLayoutContract>(PROJECT_LAYOUT_JSON)
+        // The texts of the contract are codes, in the language of this computer (qnc-ui-text).
+        let project = serde_json::from_value::<ProjectLayoutContract>(qnc_ui_text::resolve_contract(PROJECT_LAYOUT_JSON)?)
             .map_err(|error| format!("project layout parse failed: {error}"))?;
         let shortcuts = ShortcutCatalog::from_json_str(KEYBOARD_SHORTCUTS_JSON)?;
         let project_open_hint = shortcuts.chord_hint("project", "project_open_selected");

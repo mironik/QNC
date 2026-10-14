@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC Project application composition root: owns the Project store, no form and no UI"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 qnc-application-selection = { workspace = true }
 qnc-dir-browser = { workspace = true }
 qnc-project-store = { workspace = true }

@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC Project blocks on the desktop board: project list, settings with their sub-blocks and the delete questions; they draw and return intents"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-application-selection = { workspace = true }
 qnc-board = { workspace = true }

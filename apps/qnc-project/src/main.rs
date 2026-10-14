@@ -66,7 +66,7 @@ fn resolve_qnc_root() -> Result<PathBuf, String> {
         }
     }
 
-    Err("Ne mogu pronaći QNC root s AGENTS.md, seed/system_seed.json i contracts/ui/project.layout.json.".to_string())
+    Err(qnc_ui_text::text("project.root_not_found").to_string())
 }
 
 fn is_qnc_root(path: &std::path::Path) -> bool {

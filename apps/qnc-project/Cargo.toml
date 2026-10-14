@@ -9,5 +9,6 @@ name = "qnc-project"
 path = "src/main.rs"
 
 [dependencies]
+qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-project-desktop = { workspace = true }

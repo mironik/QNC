@@ -31,9 +31,9 @@ impl ThemeId {
 
     pub fn label(self) -> &'static str {
         match self {
-            ThemeId::Dark => "Dark",
-            ThemeId::Soft => "Soft",
-            ThemeId::HighContrast => "High contrast",
+            ThemeId::Dark => qnc_ui_text::text("shell.theme.dark"),
+            ThemeId::Soft => qnc_ui_text::text("shell.theme.soft"),
+            ThemeId::HighContrast => qnc_ui_text::text("shell.theme.high_contrast"),
         }
     }
 
@@ -139,7 +139,7 @@ pub fn show(
                 ui.set_min_height(h);
                 if input.project_open {
                     let close_button = egui::Button::new(
-                        RichText::new("Close project")
+                        RichText::new(qnc_ui_text::text("shell.close_project"))
                             .size(style.font_ui)
                             .color(palette.text),
                     )
@@ -167,7 +167,7 @@ fn theme_picker(
     palette: &Palette,
     current: ThemeId,
 ) -> Option<ThemeId> {
-    ui.label(RichText::new("Tema").size(style.font_ui).color(palette.muted));
+    ui.label(RichText::new(qnc_ui_text::text("shell.theme")).size(style.font_ui).color(palette.muted));
     let mut selected = current;
     egui::ComboBox::from_id_salt("qnc_shell_theme")
         .selected_text(selected.label())

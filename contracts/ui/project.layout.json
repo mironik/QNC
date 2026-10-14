@@ -34,7 +34,7 @@
   },
   "left_project_list": {
     "panel_pad": 20.0,
-    "title": "Projekti",
+    "title": "@project.projects",
     "title_row_height": 28.0,
     "below_title_pad": 40.0,
     "row_height": 60.0,
@@ -43,13 +43,13 @@
     "column_gap": 8.0,
     "confirm_button_width": 28.0,
     "confirm_button_height": 22.0,
-    "empty_text": "Nema projekata.",
-    "ready_text": "Spreman."
+    "empty_text": "@project.no_projects",
+    "ready_text": "@project.ready"
   },
   "right_settings_panel": {
     "panel_pad": 20.0,
-    "title": "Postavke",
-    "subtitle": "Odaberi radni tok i pregledaj postavke projekta.",
+    "title": "@project.settings",
+    "subtitle": "@project.choose_workflow_and_review",
     "inner_pad_x": 8.0,
     "inner_pad_y": 8.0,
     "section_gap": 8.0,
@@ -62,13 +62,40 @@
     "row_height": 24.0
   },
   "ai_switches": [
-    {"path": "ai.enabled", "on": true, "off": false, "default_on": false, "label": "AI analiza kadrova i virtualni kadrovi"},
-    {"path": "ai.coverage_suggestions", "on": true, "off": false, "default_on": true, "label": "Coverage suggestions"},
-    {"path": "ai.transcription", "on": true, "off": false, "default_on": false, "label": "Transkripcija u Media tabu"},
-    {"path": "artifacts.filmstrip", "on": "auto", "off": "off", "default_on": true, "label": "Filmstrip automatski nakon Odaberi"}
+    {
+      "path": "ai.enabled",
+      "on": true,
+      "off": false,
+      "default_on": false,
+      "label": "@project.ai_shot_analysis_and_subclips"
+    },
+    {
+      "path": "ai.coverage_suggestions",
+      "on": true,
+      "off": false,
+      "default_on": true,
+      "label": "@project.coverage_suggestions"
+    },
+    {
+      "path": "ai.transcription",
+      "on": true,
+      "off": false,
+      "default_on": false,
+      "label": "@project.transcription_media_tab"
+    },
+    {
+      "path": "artifacts.filmstrip",
+      "on": "auto",
+      "off": "off",
+      "default_on": true,
+      "label": "@project.filmstrip_automatically_after_select"
+    }
   ],
   "pts_slots": {
-    "head": ["Postavke", "subtitle"],
+    "head": [
+      "Postavke",
+      "subtitle"
+    ],
     "fixed_order": [
       "TemplatePicker",
       "ProjectCreate",
@@ -77,10 +104,13 @@
       "ExportDirectory",
       "TemplateActions"
     ],
-    "scroll_order": ["Advanced", "CustomTemplate"]
+    "scroll_order": [
+      "Advanced",
+      "CustomTemplate"
+    ]
   },
   "advanced_settings": {
-    "title": "Advanced postavke",
+    "title": "@project.advanced_settings",
     "grid": {
       "label_size": 12,
       "min_cell_width": 160,
@@ -91,37 +121,37 @@
       "input_modes": [
         [
           "auto",
-          "AUTO"
+          "@project.auto"
         ],
         [
           "manual",
-          "Ručno"
+          "@project.manual"
         ]
       ],
       "formats": [
         [
           "HD 1080p50",
-          "HD 1080p50 (PAL)"
+          "@project.hd_1080p50_pal"
         ],
         [
           "HD 1080i50",
-          "HD 1080i50 (PAL)"
+          "@project.hd_1080i50_pal"
         ],
         [
           "HD 1080p30",
-          "HD 1080p29.97 (NTSC)"
+          "@project.hd_1080p29_97_ntsc"
         ],
         [
           "HD 1080p60",
-          "HD 1080p59.94 (NTSC)"
+          "@project.hd_1080p59_94_ntsc"
         ],
         [
           "HD 1080i60",
-          "HD 1080i59.94 (NTSC)"
+          "@project.hd_1080i59_94_ntsc"
         ],
         [
           "UHD 2160p",
-          "UHD 2160p"
+          "@project.uhd_2160p"
         ]
       ],
       "fps": [
@@ -153,11 +183,11 @@
       "field_order": [
         [
           "progressive",
-          "Progressive"
+          "@project.progressive"
         ],
         [
           "upper_first",
-          "Upper first (i)"
+          "@project.upper_first_i"
         ]
       ],
       "color_space": [
@@ -173,115 +203,115 @@
       "containers": [
         [
           "mxf_op1a",
-          "MXF OP1a"
+          "@project.mxf_op1a"
         ],
         [
           "mp4",
-          "MP4"
+          "@project.mp4"
         ],
         [
           "mov",
-          "MOV"
+          "@project.mov"
         ]
       ],
       "video_codecs": [
         [
           "mpeg2_422_50mbit",
-          "MPEG-2 422 50 Mbit"
+          "@project.mpeg_2_422_50_mbit"
         ],
         [
           "h264",
-          "H.264"
+          "@project.h_264"
         ],
         [
           "prores_422",
-          "ProRes 422"
+          "@project.prores_422"
         ],
         [
           "dnxhd_hq",
-          "DNxHD HQ"
+          "@project.dnxhd_hq"
         ]
       ],
       "ingest_profiles": [
         [
           "field",
-          "Teren"
+          "@project.field"
         ],
         [
           "house",
-          "TV kuca"
+          "@project.tv_house"
         ]
       ],
       "ingest_media": [
         [
           "link",
-          "Samo link"
+          "@project.link_only"
         ],
         [
           "proxy",
-          "Proxy"
+          "@project.proxy"
         ],
         [
           "original",
-          "Original"
+          "@project.original"
         ],
         [
           "optimized",
-          "Optimizirani (H.264 8-bit)"
+          "@project.optimised_h_264_8_bit"
         ],
         [
           "optimized_original",
-          "Optimizirani + original"
+          "@project.optimised_original"
         ]
       ],
       "playback_inputs": [
         [
           "proxy_if_available",
-          "Proxy ako postoji"
+          "@project.proxy_if_available"
         ],
         [
           "original",
-          "Original"
+          "@project.original"
         ],
         [
           "proxy",
-          "Proxy"
+          "@project.proxy"
         ],
         [
           "optimized_if_available",
-          "Optimizirani ako postoji"
+          "@project.optimised_if_available"
         ]
       ],
       "export_modes": [
         [
           "xml_master",
-          "XML master"
+          "@project.xml_master"
         ],
         [
           "xdcam",
-          "XDCAM"
+          "@project.xdcam"
         ],
         [
           "original",
-          "Original"
+          "@project.original"
         ],
         [
           "avid",
-          "Avid"
+          "@project.avid"
         ]
       ],
       "original_policies": [
         [
           "link_when_available",
-          "Link"
+          "@project.link"
         ],
         [
           "copy_background",
-          "Kopiraj u pozadini"
+          "@project.copy_background"
         ],
         [
           "ignore_for_fast_news",
-          "Ignoriraj (brze vijesti)"
+          "@project.ignore_fast_news"
         ]
       ],
       "audio_rates": [
@@ -315,11 +345,11 @@
     },
     "sections": [
       {
-        "title": "Input source",
+        "title": "@project.input_source",
         "fields": [
           {
             "kind": "choice",
-            "label": "Mode",
+            "label": "@project.mode",
             "id": "pts_input_mode",
             "path": "input.mode",
             "options": "input_modes",
@@ -327,7 +357,7 @@
           },
           {
             "kind": "choice",
-            "label": "Ingest profil",
+            "label": "@project.ingest_profile",
             "id": "pts_ingest_profile",
             "path": "storage.ingest_profile",
             "options": "ingest_profiles",
@@ -335,7 +365,7 @@
           },
           {
             "kind": "choice",
-            "label": "Ingest media",
+            "label": "@project.ingest_media",
             "id": "pts_ingest_media",
             "path": "storage.ingest_media",
             "options": "ingest_media",
@@ -343,7 +373,7 @@
           },
           {
             "kind": "choice",
-            "label": "Playback input",
+            "label": "@project.playback_input",
             "id": "pts_playback_input",
             "path": "playback.input",
             "options": "playback_inputs",
@@ -359,7 +389,7 @@
           "fields": [
             {
               "kind": "choice",
-              "label": "Format",
+              "label": "@project.format",
               "id": "pts_input_format",
               "path": "input.format",
               "options": "formats",
@@ -367,26 +397,26 @@
             },
             {
               "kind": "number",
-              "label": "Frame rate",
+              "label": "@project.frame_rate",
               "id": "pts_input_fps",
               "path": "input.fps",
               "options": "fps"
             },
             {
               "kind": "integer",
-              "label": "Width",
+              "label": "@project.width",
               "id": "pts_input_width",
               "path": "input.width"
             },
             {
               "kind": "integer",
-              "label": "Height",
+              "label": "@project.height",
               "id": "pts_input_height",
               "path": "input.height"
             },
             {
               "kind": "choice",
-              "label": "Field order",
+              "label": "@project.field_order",
               "id": "pts_input_field",
               "path": "input.field_order",
               "options": "field_order",
@@ -394,7 +424,7 @@
             },
             {
               "kind": "choice",
-              "label": "Color space",
+              "label": "@project.color_space",
               "id": "pts_input_cs",
               "path": "input.color_space",
               "options": "color_space",
@@ -404,16 +434,16 @@
         }
       },
       {
-        "title": "Tipkovnica",
+        "title": "@project.keyboard",
         "block": "keyboard_preset",
-        "label": "Preset tipki"
+        "label": "@project.key_preset"
       },
       {
-        "title": "Export",
+        "title": "@common.export",
         "fields": [
           {
             "kind": "choice",
-            "label": "Mode",
+            "label": "@project.mode",
             "id": "pts_export_mode",
             "path": "export.default_mode",
             "options": "export_modes",
@@ -421,7 +451,7 @@
           },
           {
             "kind": "choice",
-            "label": "Original policy",
+            "label": "@project.original_policy",
             "id": "pts_orig_policy",
             "path": "storage.original_policy",
             "options": "original_policies",
@@ -430,9 +460,9 @@
         ]
       },
       {
-        "title": "Export format",
+        "title": "@project.export_format",
         "block": "export_preset",
-        "label": "Preset",
+        "label": "@project.preset",
         "then": {
           "when": {
             "path": "export.preset",
@@ -442,7 +472,7 @@
           "fields": [
             {
               "kind": "choice",
-              "label": "Format",
+              "label": "@project.format",
               "id": "pts_export_format",
               "path": "export.format",
               "options": "formats",
@@ -450,26 +480,26 @@
             },
             {
               "kind": "number",
-              "label": "Frame rate",
+              "label": "@project.frame_rate",
               "id": "pts_export_fps",
               "path": "export.fps",
               "options": "fps"
             },
             {
               "kind": "integer",
-              "label": "Width",
+              "label": "@project.width",
               "id": "pts_export_width",
               "path": "export.width"
             },
             {
               "kind": "integer",
-              "label": "Height",
+              "label": "@project.height",
               "id": "pts_export_height",
               "path": "export.height"
             },
             {
               "kind": "choice",
-              "label": "Field order",
+              "label": "@project.field_order",
               "id": "pts_export_field",
               "path": "export.field_order",
               "options": "field_order",
@@ -477,7 +507,7 @@
             },
             {
               "kind": "choice",
-              "label": "Color space",
+              "label": "@project.color_space",
               "id": "pts_export_cs",
               "path": "export.color_space",
               "options": "color_space",
@@ -485,7 +515,7 @@
             },
             {
               "kind": "choice",
-              "label": "Container",
+              "label": "@project.container",
               "id": "pts_export_container",
               "path": "export.container",
               "options": "containers",
@@ -493,7 +523,7 @@
             },
             {
               "kind": "choice",
-              "label": "Video codec",
+              "label": "@project.video_codec",
               "id": "pts_export_codec",
               "path": "export.video_codec",
               "options": "video_codecs",
@@ -501,14 +531,14 @@
             },
             {
               "kind": "integer",
-              "label": "Audio",
+              "label": "@project.audio",
               "id": "pts_export_arate",
               "path": "export.audio_sample_rate",
               "options": "audio_rates"
             },
             {
               "kind": "integer",
-              "label": "Channels",
+              "label": "@project.channels",
               "id": "pts_export_ach",
               "path": "export.audio_channels",
               "options": "audio_channels"
@@ -518,7 +548,7 @@
         }
       },
       {
-        "title": "Plugin tabovi u workflowu",
+        "title": "@project.plugin_tabs_workflow",
         "block": "applications"
       }
     ],
@@ -531,64 +561,64 @@
       "avid"
     ],
     "texts": {
-      "manual_preset": "Ručno",
-      "new_preset_hint": "Naziv novog preseta",
-      "save_preset": "Spremi u template",
-      "no_selection": "Bez odabira",
-      "group": "Grupa {group}",
-      "loading_catalog": "Ucitavanje kataloga..."
+      "manual_preset": "@project.manual",
+      "new_preset_hint": "@project.name_new_preset",
+      "save_preset": "@project.save_template",
+      "no_selection": "@project.none",
+      "group": "@project.group_group",
+      "loading_catalog": "@project.loading_catalog"
     }
   },
   "texts": {
-    "templates_empty": "Nema templatea.",
-    "delete_template_hint": "Obriši template",
-    "project_name_label": "Naziv projekta:",
-    "project_name_hint": "Naziv novog projekta",
-    "new_project": "Novi projekt",
-    "settings_changed": "Postavke promijenjene.",
-    "path_hint": "Putanja",
-    "choose": "Odaberi…",
-    "confirm": "U redu",
-    "cancel": "Odustani",
-    "new_template": "Novi template",
-    "template_base": "Baza: {base}",
-    "template_name_label": "Naziv templatea:",
-    "template_name_hint": "Naziv novog templatea",
-    "save": "Spremi",
-    "short_description_hint": "Kratki opis",
-    "projects_root_label": "Lokacija projekata:",
-    "export_directory_label": "Export direktorij:",
-    "sources": "Izvori",
-    "up": "Gore",
-    "disks": "Diskovi",
-    "internet": "Internet",
-    "empty_lan": "Nema konfiguriranih LAN izvora.",
-    "empty_internet": "Nema konfiguriranih Internet izvora.",
-    "empty_folder": "Nema podmapa.",
-    "empty_disks": "Nema diskova.",
-    "remove_project_hint": "Ukloni projekt",
-    "delete_project_question": "Želite ukloniti projekt?",
-    "delete_template_question": "Želite ukloniti template?"
+    "templates_empty": "@project.no_templates",
+    "delete_template_hint": "@project.delete_template",
+    "project_name_label": "@project.project_name",
+    "project_name_hint": "@project.name_new_project",
+    "new_project": "@project.new_project",
+    "settings_changed": "@project.settings_changed",
+    "path_hint": "@project.path",
+    "choose": "@project.choose",
+    "confirm": "@project.ok",
+    "cancel": "@common.cancel",
+    "new_template": "@project.new_template",
+    "template_base": "@project.base_base",
+    "template_name_label": "@project.template_name",
+    "template_name_hint": "@project.name_new_template",
+    "save": "@project.save",
+    "short_description_hint": "@project.short_description",
+    "projects_root_label": "@project.projects_location",
+    "export_directory_label": "@project.export_folder",
+    "sources": "@source.sources",
+    "up": "@story.ui.up",
+    "disks": "@source.disks",
+    "internet": "@source.internet",
+    "empty_lan": "@project.no_lan_sources_are_configured",
+    "empty_internet": "@project.no_internet_sources_are_configured",
+    "empty_folder": "@source.empty_folder",
+    "empty_disks": "@source.empty_local",
+    "remove_project_hint": "@project.remove_project",
+    "delete_project_question": "@project.remove_project_2",
+    "delete_template_question": "@project.remove_template"
   },
   "labels": [
-    "Project",
-    "Projekti",
-    "Postavke",
-    "RADNI TOK",
-    "Naziv projekta:",
-    "Novi projekt",
-    "AI",
-    "Lokacija projekata:",
-    "Export direktorij:",
-    "Novi template",
-    "Odustani",
-    "Advanced postavke",
-    "Novi template",
-    "Spremi novi template",
+    "@project.project",
+    "@project.projects",
+    "@project.settings",
+    "@project.workflow",
+    "@project.project_name",
+    "@project.new_project",
+    "@project.ai",
+    "@project.projects_location",
+    "@project.export_folder",
+    "@project.new_template",
+    "@common.cancel",
+    "@project.advanced_settings",
+    "@project.new_template",
+    "@project.save_new_template",
     "×",
-    "Želite ukloniti projekt?",
-    "DA",
-    "NE"
+    "@project.remove_project_2",
+    "@project.yes",
+    "@project.no"
   ],
   "forbidden_changes_without_approval": [
     "redesign",
