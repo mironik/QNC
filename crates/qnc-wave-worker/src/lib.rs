@@ -219,6 +219,8 @@ struct GeneratedWave {
     artifact: WaveArtifactRecord,
     ready_before: bool,
     total_ms: u128,
+    /// The key pictures of the filmstrip, read in the same pass over the original.
+    pictures: Option<qnc_filmstrip::EncodedPictures>,
 }
 
 #[derive(Debug)]
@@ -237,8 +239,8 @@ pub struct TimelineWaveService {
     queued: BTreeSet<String>,
     workers: Vec<ActiveWaveWorker>,
     /// Clips whose wave is done (made, already stored, or impossible) since the last
-    /// `take_finished`.
-    finished: Vec<String>,
+    /// `take_finished`, with the key pictures read in the same pass when there are.
+    finished: Vec<(String, Option<Arc<qnc_filmstrip::EncodedPictures>>)>,
     publisher: Option<Box<dyn WaveContentWrite>>,
     playback_priority: bool,
 }
@@ -331,7 +333,7 @@ impl TimelineWaveService {
                 if let Some(record) = context.content_reader.read_wave(&request.clip_id)? {
                     if wave_artifact_ready(&record) {
                         self.ready.insert(key);
-                        self.finished.push(request.clip_id);
+                        self.finished.push((request.clip_id, None));
                         continue;
                     }
                 }
@@ -382,9 +384,6 @@ impl TimelineWaveService {
                                     completion.key
                                 )
                             });
-                            if let Some((_, clip_id)) = completion.key.split_once("::") {
-                                self.finished.push(clip_id.to_string());
-                            }
                             self.ready.insert(completion.key);
                         }
                         Err(error) => {
@@ -447,9 +446,11 @@ impl TimelineWaveService {
                     let a4_count = generated.artifact.a4_peaks.len();
                     let source_uri = generated.artifact.source_uri.clone();
                     let publish_state = if ready_before { "ready" } else { "queued" };
+                    // The wave is made: its clip's filmstrip may come now, from the key pictures
+                    // read with it when there are.
+                    self.finished.push((outcome.request.clip_id.clone(), generated.pictures.map(Arc::new)));
                     if generated.ready_before {
                         self.ready.insert(key);
-                        self.finished.push(outcome.request.clip_id.clone());
                     } else {
                         self.queue_publish(key, generated.artifact, matches_active, &mut poll);
                     }
@@ -488,7 +489,7 @@ impl TimelineWaveService {
                             outcome.request.clip_id, matches_active, error
                         )
                     });
-                    self.finished.push(outcome.request.clip_id.clone()); // no wave to wait for
+                    self.finished.push((outcome.request.clip_id.clone(), None)); // no wave to wait for
                     if matches_active {
                         poll.active_error = Some(error);
                     }
@@ -512,7 +513,7 @@ impl TimelineWaveService {
 
     /// The clips whose wave is done since the last call (made, already stored, or
     /// impossible).
-    pub fn take_finished(&mut self) -> Vec<String> {
+    pub fn take_finished(&mut self) -> Vec<(String, Option<Arc<qnc_filmstrip::EncodedPictures>>)> {
         std::mem::take(&mut self.finished)
     }
 
@@ -673,6 +674,7 @@ fn build_timeline_wave(
                 artifact: record,
                 ready_before: true,
                 total_ms: started.elapsed().as_millis(),
+                pictures: None,
             });
         }
     }
@@ -690,7 +692,13 @@ fn build_timeline_wave(
     }
     let source = source_for_uri(&context.source_bindings, &plan.source_uri)?;
     let media = qnc_wave::media_for_plan(&clip.snapshot, &plan)?;
-    let lane_peaks = decode_wave(&plan, media, source, cancel)?;
+    // An H.264 original gives its filmstrip's key pictures in the same pass (user
+    // 2026-10-15: one reading of the card for the wave and the filmstrip).
+    let targets = h264_picture(&clip.snapshot.metadata.original)
+        .then(|| qnc_filmstrip::original_picture_frames(&clip.snapshot))
+        .flatten()
+        .filter(|_| media.media_uri == clip.snapshot.metadata.original.media_uri);
+    let (lane_peaks, pictures) = decode_wave(&plan, media, source, targets.as_deref(), cancel)?;
     let has_a2 = lane_peaks.iter().any(|(lane, _)| *lane == WaveLane::A2);
     let warning = (!has_a2).then(|| qnc_ui_text::text("wave.source_a2_audio_channel").to_string());
     let artifact = qnc_wave::artifact_record_from_lane_peaks(&plan, lane_peaks, warning)?;
@@ -701,6 +709,16 @@ fn build_timeline_wave(
         artifact,
         ready_before: false,
         total_ms: started.elapsed().as_millis(),
+        pictures,
+    })
+}
+
+/// Whether the stored picture of a representation is H.264 (its key pictures are known by
+/// their first NAL units).
+fn h264_picture(media: &MediaRepresentation) -> bool {
+    media.streams.iter().any(|stream| {
+        matches!(stream.details, StreamDetails::Video(_))
+            && matches!(stream.codec.as_ref().map(|codec| &codec.value), Some(qnc_media_metadata::Signal::Known(name)) if name == "h264")
     })
 }
 
@@ -714,8 +732,9 @@ fn decode_wave(
     plan: &WavePlan,
     media: &MediaRepresentation,
     source: &WaveSourceBinding,
+    picture_targets: Option<&[u64]>,
     cancel: &AtomicBool,
-) -> Result<Vec<(WaveLane, Vec<f32>)>, String> {
+) -> Result<(Vec<(WaveLane, Vec<f32>)>, Option<qnc_filmstrip::EncodedPictures>), String> {
     let streams = plan
         .channels
         .iter()
@@ -765,8 +784,9 @@ fn decode_wave(
     // A camera original stored as uncompressed 24-bit mono sound elements is read without
     // its pictures (`qnc-mxf-sound`; about twice as fast from a card), decided from the
     // saved format before any reading; every other source through the selected decoder.
+    let mut pictures = None;
     let read = match mxf_sound_elements(media, &streams) {
-        Some(elements) => mxf_sound_samples(&path, &elements, cancel, &mut on_samples),
+        Some(elements) => mxf_sound_samples(&path, &elements, picture_targets, &mut pictures, cancel, &mut on_samples),
         None => qnc_decoder_catalog::installed_filmstrip_extractor()
             .map_err(|error| error.to_string())?
             .ok_or("no local decoder for the wave")?
@@ -780,7 +800,7 @@ fn decode_wave(
     if !by_lane.contains_key(&WaveLane::A1) {
         return Err(qnc_ui_text::text("wave.wave_got_a1_channel").to_string());
     }
-    Ok(by_lane.into_iter().collect())
+    Ok((by_lane.into_iter().collect(), pictures))
 }
 
 /// The selected decoder must declare the saved format of every stream it reads (no silent
@@ -820,12 +840,20 @@ fn mxf_sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: 
 fn mxf_sound_samples(
     source: &Path,
     elements: &[u8],
+    picture_targets: Option<&[u64]>,
+    pictures: &mut Option<qnc_filmstrip::EncodedPictures>,
     cancel: &AtomicBool,
     on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
 ) -> std::result::Result<(), String> {
     let mut queues = vec![Vec::<f32>::new(); elements.len()];
     let mut frames = Vec::new();
-    qnc_mxf_sound::read_sound_elements(source, cancel, &mut |number, value| {
+    let targets = picture_targets.unwrap_or(&[]);
+    let mut found: Vec<Option<Vec<u8>>> = vec![None; targets.len()];
+    let mut on_picture = |target: usize, _number: u64, value: &[u8]| -> std::result::Result<(), String> {
+        found[target] = Some(value.to_vec());
+        Ok(())
+    };
+    let read = qnc_mxf_sound::read_sound_and_pictures(source, cancel, targets, &qnc_mxf_sound::h264_gop_start, &mut |number, value| {
         let Some(slot) = elements.iter().position(|element| *element == number) else {
             return Ok(());
         };
@@ -842,7 +870,13 @@ fn mxf_sound_samples(
             queue.drain(..ready);
         }
         on_samples(&frames)
-    })
+    }, &mut on_picture);
+    read?;
+    // Every filmstrip frame needs its picture; otherwise the filmstrip reads the media itself.
+    if !targets.is_empty() && found.iter().all(Option::is_some) {
+        *pictures = Some(qnc_filmstrip::EncodedPictures { codec: "h264".into(), pictures: found.into_iter().flatten().collect() });
+    }
+    Ok(())
 }
 
 fn check_stream_supported(

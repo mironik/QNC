@@ -161,6 +161,34 @@ impl LocalFilmstripExtractor {
         }
     }
 
+    /// Encoded key pictures (`codec` as saved: `h264`; one file each) decoded into
+    /// filmstrip thumbnails `000.jpg`... in `temp_dir` without reading the media (one pass
+    /// over the card gave them with the wave).
+    pub fn decode_pictures_with_cancel(
+        &self,
+        codec: &str,
+        pictures: &[PathBuf],
+        thumb_size: [u32; 2],
+        temp_dir: &Path,
+        cancel: &AtomicBool,
+    ) -> std::result::Result<(), String> {
+        let demuxer = match codec {
+            "h264" => "h264",
+            other => return Err(format!("no picture decoding for codec {other}")),
+        };
+        match &self.deployment.driver {
+            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::decode_pictures_with_cancel(
+                &self.deployment.executable,
+                demuxer,
+                pictures,
+                thumb_size,
+                temp_dir,
+                cancel,
+            ),
+            Driver::QncPacketsV1 { .. } => Err("selected decoder does not decode pictures".into()),
+        }
+    }
+
     pub fn extract_frames_with_cancel(
         &self,
         source: &Path,

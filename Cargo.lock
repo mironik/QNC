@@ -5183,6 +5183,7 @@ dependencies = [
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
  "qnc-dir-browser",
+ "qnc-filmstrip",
  "qnc-media-decode",
  "qnc-media-metadata",
  "qnc-media-records",

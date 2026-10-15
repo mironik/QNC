@@ -163,7 +163,7 @@ impl Artifacts {
         let mode = self.control.filmstrip_mode(self.wave.has_pending_work(), self.filmstrip_held);
         for order in mode.into_iter().chain(self.control.waves_done(finished)) {
             match order {
-                Order::MakeFilmstrip(clip_id) => self.filmstrip.request(&clip_id),
+                Order::MakeFilmstrip(clip_id, pictures) => self.filmstrip.request(&clip_id, pictures),
                 Order::FilmstripOnOrders => self.filmstrip.set_on_orders(true),
                 Order::FilmstripOnItsOwn => self.filmstrip.set_on_orders(false),
             }

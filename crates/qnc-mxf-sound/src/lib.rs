@@ -23,6 +23,10 @@ const ESSENCE_KEY: [u8; 12] = [0x06, 0x0e, 0x2b, 0x34, 0x01, 0x02, 0x01, 0x01, 0
 
 /// The item type of a generic container sound element.
 const SOUND_ITEM: u8 = 0x16;
+/// The item type of a generic container picture element.
+const PICTURE_ITEM: u8 = 0x15;
+/// How much of a picture's start tells whether it is a key picture.
+const PICTURE_HEAD: usize = 256;
 
 struct Packet {
     key: [u8; 16],
@@ -84,11 +88,33 @@ pub fn read_sound_elements(
     cancel: &AtomicBool,
     on_element: &mut dyn FnMut(u8, &[u8]) -> Result<(), String>,
 ) -> Result<(), String> {
+    read_sound_and_pictures(path, cancel, &[], &|_| false, on_element, &mut |_, _, _| Ok(()))
+}
+
+/// The sound elements as `read_sound_elements`, and in the same pass the key pictures a
+/// filmstrip needs (user 2026-10-15: one reading of the card for the wave and the
+/// filmstrip). For each of `targets` (picture numbers counted from 0 in the file, in
+/// order) the first key picture at or after it is read whole and given as (target index,
+/// its picture number, value); a target with no key picture after it gets the last key
+/// picture before it. `is_key` tells a key picture from the start of its value (the
+/// picture's start is already in the read that found its key, so the test costs no read);
+/// only a picture handed over is read whole.
+pub fn read_sound_and_pictures(
+    path: &Path,
+    cancel: &AtomicBool,
+    targets: &[u64],
+    is_key: &dyn Fn(&[u8]) -> bool,
+    on_element: &mut dyn FnMut(u8, &[u8]) -> Result<(), String>,
+    on_picture: &mut dyn FnMut(usize, u64, &[u8]) -> Result<(), String>,
+) -> Result<(), String> {
     let file = File::open(path).map_err(|error| format!("mxf sound open: {error}"))?;
     let size = file.metadata().map_err(|error| format!("mxf sound size: {error}"))?.len();
     let mut chunks = Chunks { file, size, at: 0, data: Vec::new() };
     let mut at = 0u64;
     let mut found = false;
+    let (mut picture, mut want) = (0u64, 0usize);
+    // The last key picture passed: (value place, length, picture number).
+    let mut last_key: Option<(u64, u64, u64)> = None;
     while let Some(packet) = chunks.packet(at)? {
         if cancel.load(Ordering::Acquire) {
             return Err("mxf sound read cancelled".into());
@@ -101,13 +127,52 @@ pub fn read_sound_elements(
             let value = chunks.bytes(packet.value_at, packet.length as usize)?;
             on_element(packet.key[15], value)?;
             found = true;
+        } else if packet.key[..12] == ESSENCE_KEY && packet.key[12] == PICTURE_ITEM && !targets.is_empty() {
+            let head = chunks.bytes(packet.value_at, PICTURE_HEAD.min(packet.length as usize))?;
+            if is_key(head) {
+                last_key = Some((packet.value_at, packet.length, picture));
+                if want < targets.len() && picture >= targets[want] {
+                    let value = chunks.bytes(packet.value_at, packet.length as usize)?;
+                    // Targets closer than a group of pictures share its key picture.
+                    while want < targets.len() && targets[want] <= picture {
+                        on_picture(want, picture, value)?;
+                        want += 1;
+                    }
+                }
+            }
+            picture += 1;
         }
         at = end;
+    }
+    if want < targets.len() {
+        if let Some((value_at, length, number)) = last_key {
+            let value = chunks.bytes(value_at, length as usize)?;
+            for target in want..targets.len() {
+                on_picture(target, number, value)?;
+            }
+        }
     }
     if !found {
         return Err("mxf sound: the file has no frame-wrapped sound elements".into());
     }
     Ok(())
+}
+
+/// Whether an H.264 picture (Annex B, as a camera's MXF stores it) begins a group of
+/// pictures: its first NAL units carry a sequence parameter set or an IDR slice before any
+/// other slice.
+pub fn h264_gop_start(head: &[u8]) -> bool {
+    let mut at = 0;
+    while let Some(found) = head[at..].windows(3).position(|bytes| bytes == [0, 0, 1]) {
+        let nal = at + found + 3;
+        let Some(byte) = head.get(nal) else { return false };
+        match byte & 0x1f {
+            5 | 7 => return true,
+            1 => return false,
+            _ => at = nal,
+        }
+    }
+    false
 }
 
 /// Stored 24-bit little-endian samples as f32, the same value as the FFmpeg decoder gives
@@ -165,6 +230,37 @@ mod tests {
         assert_eq!(got[0], (0, vec![0, 0, 0]));
         assert_eq!(got[1], (1, vec![0, 1, 0]));
         assert_eq!(got[5], (1, vec![2, 1, 0]));
+    }
+
+    #[test]
+    fn the_key_picture_at_or_after_each_target_comes_with_the_sound() {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        for frame in 0..10u8 {
+            // A key picture every 4 pictures: a sequence parameter set first.
+            let nal = if frame % 4 == 0 { 0x67 } else { 0x41 };
+            file.write_all(&klv(essence(PICTURE_ITEM, 0), &[0, 0, 0, 1, nal, frame, 9, 9])).unwrap();
+            file.write_all(&klv(essence(SOUND_ITEM, 0), &[frame, 0, 0])).unwrap();
+        }
+        file.flush().unwrap();
+        let (mut sound, mut pictures) = (0, Vec::new());
+        read_sound_and_pictures(
+            file.path(),
+            &AtomicBool::new(false),
+            &[0, 1, 5, 9],
+            &h264_gop_start,
+            &mut |_, _| {
+                sound += 1;
+                Ok(())
+            },
+            &mut |target, number, value| {
+                pictures.push((target, number, value[5]));
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(sound, 10);
+        // 0 -> 0; 1 -> 4; 5 -> 8; 9 has none after it -> the last one, 8.
+        assert_eq!(pictures, [(0, 0, 0), (1, 4, 4), (2, 8, 8), (3, 8, 8)]);
     }
 
     #[test]

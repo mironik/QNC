@@ -4085,3 +4085,15 @@ waveovi ili dovrsetak zapisa imaju posla, filmstrip sam ne trazi klipove; kad ob
 "filmstrip tek nakon svih waveova". Proba na izoliranoj kopiji projekta (98 klipova, kartica samo citana, waveovi i
 filmstripovi obrisani u kopiji): filmstrip prati waveove (npr. 20 s: 10 waveova i 9 filmstripova), svi waveovi i
 filmstripovi gotovi za 266 s; prije su waveovi trajali oko 150 s, pa filmstrip jos oko 60 s.
+Dopuna 2026-10-16 (korisnik: "ok, napravi jedan prolaz"): MXF original s H.264 slikom cita se s kartice jednom za wave i
+filmstrip. `qnc-mxf-sound` (`read_sound_and_pictures`, `h264_gop_start`): u istom prolazu po zvucnim elementima uzima i
+kljucnu sliku na ili iza svake od 13 pozicija filmstripa (pocetak slike je vec u citanju koje je naslo njezin kljuc, pa
+provjera ne kosta citanje; cijela se cita samo predana slika); `qnc-wave-worker` ih predaje uz gotov wave; `qnc-import-control`
+ih nosi u naredbi filmstripu; `qnc-filmstrip-worker` ih zapise u privremenu mapu sustava i dekodira jednim ffmpeg pozivom
+s po jednim ulazom za svaku sliku (`qnc-decoder-catalog`/`qnc-ffmpeg-decode` `decode_pictures_with_cancel`; u jednom toku
+dekoder je vracao 3 od 13 jer kljucne slike kamere nisu IDR), bez ponovnog citanja medija; ako to ne uspije, filmstrip cita
+medij kao prije (razlog u logu). Promjena pravila iz §8 za ovaj slucaj (odluka korisnika): takav filmstrip je iz originala,
+ne iz proxyja (`qnc-filmstrip` `plan_from_original`). Ostali formati rade kao prije. Proba na izoliranoj kopiji projekta
+(98 klipova, 30 min materijala, kartica samo citana): svih 98 filmstripova iz jednog prolaza, nijedno dodatno citanje
+kartice, dekodiranje medijan 0,8 s po klipu, sve gotovo za oko 250 s (prije 266-276 s); waveovi sami traju gotovo toliko
+jer je granica citac kartice (USB 2.0), a dugi klipovi (2-4 min) i dalje drze wave 20-30 s.

@@ -259,6 +259,8 @@ pub struct TimelineFilmstripService {
     /// It makes only the clips it is told (`request`), it looks for none of its own
     /// (import control: each clip after its wave, user 2026-10-15).
     on_orders: bool,
+    /// Key pictures handed over with a request (read with the wave), by request key.
+    given: std::collections::HashMap<String, Arc<qnc_filmstrip::EncodedPictures>>,
 }
 
 impl Default for TimelineFilmstripService {
@@ -273,6 +275,7 @@ impl Default for TimelineFilmstripService {
             publisher: None,
             playback_priority: false,
             on_orders: false,
+            given: std::collections::HashMap::new(),
         }
     }
 }
@@ -342,12 +345,16 @@ impl TimelineFilmstripService {
         self.on_orders = on_orders;
     }
 
-    /// Make the filmstrip of this clip (an order of the import control).
-    pub fn request(&mut self, clip_id: &str) {
+    /// Make the filmstrip of this clip (an order of the import control); with `pictures`
+    /// it decodes those key pictures of the original instead of reading the media.
+    pub fn request(&mut self, clip_id: &str, pictures: Option<Arc<qnc_filmstrip::EncodedPictures>>) {
         let Some(context) = self.context.as_ref() else {
             return;
         };
         let request = FilmstripRequest { project_id: context.project_id().to_string(), clip_id: clip_id.to_string() };
+        if let Some(pictures) = pictures {
+            self.given.insert(request.key(), pictures);
+        }
         self.enqueue(request, false);
         self.start_next();
     }
@@ -472,6 +479,9 @@ impl TimelineFilmstripService {
             let worker = self.workers.swap_remove(index);
             let _ = worker.thread.join();
             poll.changed = true;
+            if !self.playback_priority {
+                self.given.remove(&worker.request.key());
+            }
             let current_project = self.context.as_ref().map(FilmstripContext::project_id);
             let matches_active = current_project == Some(outcome.request.project_id.as_str())
                 && active_clip_id == Some(outcome.request.clip_id.as_str());
@@ -584,11 +594,12 @@ impl TimelineFilmstripService {
             let worker_request = request.clone();
             let cancel = Arc::new(AtomicBool::new(false));
             let worker_cancel = cancel.clone();
+            let given = self.given.get(&request.key()).cloned();
             match std::thread::Builder::new()
                 .name("qnc-filmstrip-worker".into())
                 .spawn({
                     let context = context.clone();
-                    move || run_filmstrip_worker(worker_request, context, worker_cancel, send)
+                    move || run_filmstrip_worker(worker_request, context, given, worker_cancel, send)
                 }) {
                 Ok(thread) => self.workers.push(ActiveFilmstripWorker {
                     request,
@@ -720,16 +731,18 @@ fn sanitize_scratch_part(value: &str) -> String {
 fn run_filmstrip_worker(
     request: FilmstripRequest,
     context: FilmstripContext,
+    given: Option<Arc<qnc_filmstrip::EncodedPictures>>,
     cancel: Arc<AtomicBool>,
     send: SyncSender<FilmstripOutcome>,
 ) {
-    let result = build_timeline_background(&request, &context, &cancel);
+    let result = build_timeline_background(&request, &context, given.as_deref(), &cancel);
     let _ = send.send(FilmstripOutcome { request, result });
 }
 
 fn build_timeline_background(
     request: &FilmstripRequest,
     context: &FilmstripContext,
+    given: Option<&qnc_filmstrip::EncodedPictures>,
     cancel: &AtomicBool,
 ) -> Result<GeneratedFilmstrip, String> {
     if cancel.load(Ordering::Acquire) {
@@ -753,6 +766,20 @@ fn build_timeline_background(
         LocalFilmstripArtifacts::new(&context.filmstrip_root_uri, context.filmstrip_dir.clone())?;
     let ready_before = artifacts.ready(&plan);
     let extract_started = Instant::now();
+    // The key pictures read with the wave: decoded, the media is not read again. Should
+    // that fail, the filmstrip reads the media as before (the reason goes to the log).
+    let from_pictures = match given.filter(|_| !ready_before) {
+        Some(given) => match filmstrip_from_pictures(&clip, context, given, &artifacts, cancel) {
+            Ok(plan) => Some(plan),
+            Err(error) if error == filmstrip_paused_for_playback() => return Err(error),
+            Err(error) => {
+                filmstrip_log(|| format!("qnc-filmstrip-worker: clip={} pictures_from_wave=failed error={error}", request.clip_id));
+                None
+            }
+        },
+        None => None,
+    };
+    let plan = from_pictures.unwrap_or(plan);
     if !artifacts.ready(&plan) {
         DecoderFilmstripGenerator::from_installed_decoder_catalog()?.generate_from_sources(
             &context.source_bindings,
@@ -775,6 +802,69 @@ fn build_timeline_background(
         extract_ms,
         total_ms: started.elapsed().as_millis(),
     })
+}
+
+/// The filmstrip of the original from its key pictures read with the wave: decoded in one
+/// call into the thumbnails of `plan_from_original`.
+fn filmstrip_from_pictures(
+    clip: &FilmstripClipRecord,
+    context: &FilmstripContext,
+    given: &qnc_filmstrip::EncodedPictures,
+    artifacts: &LocalFilmstripArtifacts,
+    cancel: &AtomicBool,
+) -> Result<FilmstripPlan, String> {
+    let plan = qnc_filmstrip::plan_from_original(&clip.snapshot, &context.filmstrip_root_uri, Some(&clip.name))?;
+    if given.pictures.len() != plan.frames.len() {
+        return Err(format!("{} pictures for {} filmstrip frames", given.pictures.len(), plan.frames.len()));
+    }
+    let extractor = qnc_decoder_catalog::installed_filmstrip_extractor()
+        .map_err(|error| error.to_string())?
+        .ok_or("no local decoder for the filmstrip")?;
+    let output_paths = artifacts.output_paths(&plan)?;
+    let temp_dir = filmstrip_scratch_dir(&plan.clip_id);
+    let started = Instant::now();
+    let result = (|| {
+        fs::create_dir_all(&temp_dir).map_err(|error| format!("filmstrip temp dir: {error}"))?;
+        // Frames closer than a group of pictures share a key picture: each picture is
+        // decoded once (a decoder gives a repeated picture once), its thumbnail shared.
+        let mut unique: Vec<Vec<u8>> = Vec::new();
+        let mut thumbnail_of = Vec::with_capacity(given.pictures.len());
+        for picture in &given.pictures {
+            if unique.last() != Some(picture) {
+                unique.push(picture.clone());
+            }
+            thumbnail_of.push(unique.len() - 1);
+        }
+        let mut inputs = Vec::with_capacity(unique.len());
+        for (index, picture) in unique.iter().enumerate() {
+            let input = temp_dir.join(format!("{index:03}.{}", given.codec));
+            fs::write(&input, picture).map_err(|error| format!("filmstrip picture write: {error}"))?;
+            inputs.push(input);
+        }
+        extractor
+            .decode_pictures_with_cancel(&given.codec, &inputs, [THUMB_WIDTH, THUMB_HEIGHT], &temp_dir, cancel)
+            .map_err(|error| if cancel.load(Ordering::Acquire) { filmstrip_paused_for_playback().to_string() } else { error })?;
+        prepare_output_dirs(&output_paths)?;
+        for (index, target) in output_paths.iter().enumerate() {
+            let temp = temp_dir.join(format!("{:03}.jpg", thumbnail_of[index]));
+            if !file_ready(&temp) {
+                return Err("filmstrip frame missing".to_string());
+            }
+            fs::copy(&temp, target).map_err(|error| format!("filmstrip frame copy: {error}"))?;
+        }
+        Ok(())
+    })();
+    let _ = fs::remove_dir_all(&temp_dir);
+    result?;
+    filmstrip_log(|| {
+        format!(
+            "qnc-filmstrip-worker: clip={} source=Original mode=PicturesFromWave frames={} build_ms={}",
+            plan.clip_id,
+            plan.frames.len(),
+            started.elapsed().as_millis()
+        )
+    });
+    Ok(plan)
 }
 
 #[derive(Clone)]

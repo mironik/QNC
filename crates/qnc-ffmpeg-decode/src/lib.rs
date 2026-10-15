@@ -194,6 +194,49 @@ pub fn extract_filmstrip_frames_with_cancel(
     run_filmstrip_command(executable, args, cancel)
 }
 
+/// Encoded key pictures (each one whole, as the container stores it) decoded into
+/// filmstrip thumbnails `000.jpg`... in `temp_dir`, in their order, so the media is not
+/// read again (user 2026-10-15: one pass over the card for the wave and the filmstrip).
+/// Each picture is an input of its own with its own decoder in one ffmpeg run: a camera's
+/// key pictures are not IDR, and one after another in a single stream the decoder kept
+/// the references of the one before and gave 3 of 13. `demuxer` names the elementary
+/// stream (`h264`); `pictures` are files the caller wrote, one picture each.
+pub fn decode_pictures_with_cancel(
+    executable: &Path,
+    demuxer: &str,
+    pictures: &[PathBuf],
+    thumb_size: [u32; 2],
+    temp_dir: &Path,
+    cancel: &AtomicBool,
+) -> std::result::Result<(), String> {
+    if pictures.is_empty() {
+        return Err("no pictures to decode".into());
+    }
+    let mut args: Vec<OsString> = ["-hide_banner", "-loglevel", "error", "-nostdin", "-y"].map(OsString::from).to_vec();
+    for input in pictures {
+        args.extend([OsString::from("-f"), OsString::from(demuxer), OsString::from("-threads"), OsString::from("1"), OsString::from("-i"), input.clone().into_os_string()]);
+    }
+    let scale = filmstrip_scale_filter(thumb_size);
+    for index in 0..pictures.len() {
+        args.extend([
+            OsString::from("-map"),
+            OsString::from(format!("{index}:v:0")),
+            OsString::from("-frames:v"),
+            OsString::from("1"),
+            OsString::from("-vf"),
+            OsString::from(&scale),
+            OsString::from("-q:v"),
+            OsString::from("2"),
+            OsString::from("-pix_fmt"),
+            OsString::from("yuvj420p"),
+            OsString::from("-strict"),
+            OsString::from("unofficial"),
+            temp_dir.join(format!("{index:03}.jpg")).into_os_string(),
+        ]);
+    }
+    run_filmstrip_command(executable, args, cancel)
+}
+
 /// `count` consecutive pictures from the exact picture at `start_sec` in one decoder
 /// pass (accurate seek), as `000.jpg`... in `temp_dir`; fewer at the end of the media.
 pub fn extract_frame_run_with_cancel(

@@ -105,11 +105,50 @@ pub fn plan_from_snapshot_with_artifact_name(
     filmstrip_root_uri: &str,
     artifact_name: Option<&str>,
 ) -> Result<FilmstripPlan, String> {
+    plan_for(snapshot, filmstrip_root_uri, artifact_name, true)
+}
+
+/// The plan of the original's pictures, proxy or not: the filmstrip of the key pictures
+/// read with the wave in one pass over the original (user 2026-10-15).
+pub fn plan_from_original(
+    snapshot: &Snapshot,
+    filmstrip_root_uri: &str,
+    artifact_name: Option<&str>,
+) -> Result<FilmstripPlan, String> {
+    plan_for(snapshot, filmstrip_root_uri, artifact_name, false)
+}
+
+/// The original's picture numbers a filmstrip shows (`plan_from_original`'s frames).
+pub fn original_picture_frames(snapshot: &Snapshot) -> Option<Vec<u64>> {
+    let timing = representation_timing(&snapshot.metadata.original)?;
+    Some(picture_frames(timing.frames))
+}
+
+fn picture_frames(frames: u64) -> Vec<u64> {
+    (0..FILMSTRIP_FRAME_COUNT)
+        .map(|index| ((index as u128 * frames as u128) / FILMSTRIP_FRAME_COUNT as u128) as u64)
+        .collect()
+}
+
+/// Encoded key pictures of a clip, one per filmstrip frame in order, handed to the
+/// filmstrip so it decodes them instead of reading the media again (`codec` as saved).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EncodedPictures {
+    pub codec: String,
+    pub pictures: Vec<Vec<u8>>,
+}
+
+fn plan_for(
+    snapshot: &Snapshot,
+    filmstrip_root_uri: &str,
+    artifact_name: Option<&str>,
+    proxy_first: bool,
+) -> Result<FilmstripPlan, String> {
     snapshot.validate().map_err(|error| error.to_string())?;
     let metadata = &snapshot.metadata;
     let original_timing = representation_timing(&metadata.original)
         .ok_or_else(|| "filmstrip source frame metadata missing".to_string())?;
-    let (source_kind, source) = if let Some(proxy) = &metadata.proxy {
+    let (source_kind, source) = if let Some(proxy) = metadata.proxy.as_ref().filter(|_| proxy_first) {
         (FilmstripSourceKind::Proxy, proxy)
     } else {
         (FilmstripSourceKind::Original, &metadata.original)
@@ -128,10 +167,10 @@ pub fn plan_from_snapshot_with_artifact_name(
     qnc_media_records::validate_resource_uri(&artifact_root_uri)
         .map_err(|_| "invalid filmstrip artifact uri")?;
 
-    let frames = (0..FILMSTRIP_FRAME_COUNT)
-        .map(|index| {
-            let source_frame =
-                ((index as u128 * timing.frames as u128) / FILMSTRIP_FRAME_COUNT as u128) as u64;
+    let frames = picture_frames(timing.frames)
+        .into_iter()
+        .enumerate()
+        .map(|(index, source_frame)| {
             let seek_sec = duration_from_frames(source_frame, timing.timebase);
             let artifact_uri = format!("{artifact_root_uri}/{}", frame_file_name(index, seek_sec));
             qnc_media_records::validate_resource_uri(&artifact_uri)
