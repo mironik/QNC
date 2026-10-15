@@ -4060,3 +4060,7 @@ samo video dio i uokviruje A2, pa A1 i A2 ostaju iste boje); `qnc-program-view` 
 `picture_placements`); `qnc-program-commands` (`ToggleWrapVideo`, akcija kataloga `toggle_wrap_video` bez tipke);
 `qnc-program-segments`; `qnc-segment-panel`; `qnc-ingest-application` (samo krak namjere, C10 isti). Izbor moda vrijedi dok
 aplikacija radi. Testovi, conformance.
+Popravak 2026-10-15 (korisnik: "ne gradi uopce filmstrip"): filmstripovi su bili spremljeni, ali je svaka slicica crtana
+u svom omjeru u sredini svog dijela reda (`paint_rgba_image` cuva omjer), pa se na sirokom segmentu vidjela jedna mala
+slicica s prazninom oko nje. `qnc-timeline` (`paint_pictures`): slicica se ponavlja u svom omjeru preko svog dijela reda,
+odrezana na njegovim rubovima (kao NLE); odabrani slot preko slicica je samo okvir. Snimljeno u izoliranoj kopiji.

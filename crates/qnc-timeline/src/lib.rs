@@ -1490,15 +1490,25 @@ fn paint_pictures(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u6
     }
     let (top, bottom) = video_middle_insets(input);
     let (top, bottom) = (track.top() + top, track.bottom() - bottom);
+    // Each picture is tiled at its own aspect across its part of the row (as an NLE
+    // draws a clip's thumbnails), cut at the edges of that part.
     for picture in input.pictures {
         let x0 = x_for_frame(track, range_start, duration, picture.start_frame);
         let x1 = x_for_frame(track, range_start, duration, picture.end_frame);
-        if x1 <= x0 {
+        let image = &picture.frame.image;
+        if x1 <= x0 || image.size[1] == 0 {
             continue;
         }
         let rect = Rect::from_min_max(egui::pos2(x0, top), egui::pos2(x1, bottom));
-        let image = &picture.frame.image;
-        let _ = qnc_ui_kit::paint_rgba_image(ui, rect, &picture.frame.uri, image.content_key, image.size, &image.pixels);
+        let tile = (rect.height() * image.size[0] as f32 / image.size[1] as f32).max(4.0);
+        let mut part = ui.new_child(egui::UiBuilder::new().max_rect(rect));
+        part.set_clip_rect(rect.intersect(ui.clip_rect()));
+        let mut left = rect.left();
+        while left < rect.right() {
+            let cell = Rect::from_min_size(egui::pos2(left, top), Vec2::new(tile, rect.height()));
+            let _ = qnc_ui_kit::paint_rgba_image(&mut part, cell, &picture.frame.uri, image.content_key, image.size, &image.pixels);
+            left += tile;
+        }
     }
     for span in input.virtual_spans.iter().filter(|span| span.end_frame > span.start_frame) {
         let x0 = x_for_frame(track, range_start, duration, span.start_frame);
@@ -1590,11 +1600,14 @@ fn paint_marker_slots(
         } else {
             rect
         };
-        ui.painter().rect_filled(
-            fill,
-            1.0,
-            base.linear_multiply(if selected_only { 0.28 } else { 0.18 }),
-        );
+        // Over the filmstrip the selected slot is only framed, its pictures stay clear.
+        if !(selected_only && !input.pictures.is_empty()) {
+            ui.painter().rect_filled(
+                fill,
+                1.0,
+                base.linear_multiply(if selected_only { 0.28 } else { 0.18 }),
+            );
+        }
         ui.painter().rect_stroke(
             rect,
             1.0,
