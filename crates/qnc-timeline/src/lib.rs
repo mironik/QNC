@@ -817,6 +817,13 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 let peaks = lane_peaks(&input, input.a2_channel, input.a2_peaks);
                 keep_first_intent(&mut intent, paint_audio_band(ui, rect, AudioLane::A2, peaks, &input));
             }
+            // The playhead runs through the whole height of the row, over the bands.
+            if input.layers.playhead {
+                if let Some(frame) = input.state.confirmed_frame() {
+                    let (_, track) = split_label_track(row, input.metrics.label_width);
+                    paint_playhead(ui, track, input.state.range_start(), input.state.duration_frames(), frame, &input);
+                }
+            }
         }
     }
     if input.layers.audio_a2 && !input.layers.audio_bands {
@@ -1308,7 +1315,7 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
             input,
         );
     }
-    if input.layers.playhead {
+    if input.layers.playhead && !input.layers.audio_bands {
         if let Some(frame) = input.state.confirmed_frame() {
             paint_playhead(ui, track, range_start, duration, frame, input);
         }
@@ -1444,13 +1451,8 @@ fn paint_covers(
         }
         let x0 = x_for_frame(track, range_start, duration, cover.start_frame);
         let x1 = x_for_frame(track, range_start, duration, cover.end_frame);
-        // With audio bands the covers stay in the light middle, off the A1 band.
-        let (top, bottom) = if input.layers.audio_bands { video_middle_insets(input) } else { (0.0, 0.0) };
-        let middle = track.height() - top - bottom;
-        let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + top + 2.0),
-            egui::pos2(x1.max(x0 + 3.0), track.top() + top + middle * 0.42),
-        );
+        let (top, bottom) = cover_rows(track, input);
+        let rect = Rect::from_min_max(egui::pos2(x0, top), egui::pos2(x1.max(x0 + 3.0), bottom));
         let base = if cover.pending {
             input.theme.focus
         } else {
@@ -1499,7 +1501,7 @@ fn paint_marker_slots(
         let x0 = x_for_frame(track, range_start, duration, slot.start_frame);
         let x1 = x_for_frame(track, range_start, duration, slot.end_frame);
         let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + 2.0),
+            egui::pos2(x0, track.top() + slot_top(input) + 2.0),
             egui::pos2(x1.max(x0 + 3.0), track.bottom() - 2.0),
         );
         let base = if slot.selected {
@@ -1714,6 +1716,7 @@ fn video_intent_from_response(
                 input.state.duration_frames(),
                 pos,
                 input.covers,
+                cover_rows(track, input),
             ) {
                 return TimelineIntent::SelectCover {
                     id: id.to_string(),
@@ -1728,6 +1731,7 @@ fn video_intent_from_response(
                 input.state.duration_frames(),
                 pos,
                 input.marker_slots,
+                slot_top(input),
             ) {
                 return TimelineIntent::SelectMarkerSlot {
                     id: id.to_string(),
@@ -1774,6 +1778,7 @@ fn cover_hit<'a>(
     duration: u64,
     pos: egui::Pos2,
     covers: &'a [TimelineCoverSpan<'a>],
+    rows: (f32, f32),
 ) -> Option<&'a str> {
     covers.iter().rev().find_map(|cover| {
         if cover.end_frame <= cover.start_frame || cover.id.trim().is_empty() {
@@ -1781,13 +1786,27 @@ fn cover_hit<'a>(
         }
         let x0 = x_for_frame(track, range_start, duration, cover.start_frame);
         let x1 = x_for_frame(track, range_start, duration, cover.end_frame);
-        let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + 2.0),
-            egui::pos2(x1.max(x0 + 3.0), track.top() + track.height() * 0.42),
-        )
-        .expand(2.0);
+        let rect = Rect::from_min_max(egui::pos2(x0, rows.0), egui::pos2(x1.max(x0 + 3.0), rows.1)).expand(2.0);
         rect.contains(pos).then_some(cover.id)
     })
+}
+
+/// The top and bottom of a cover in the video row: with audio bands the whole light middle
+/// (user 2026-10-15: a cover paints the video part of the Wrap row), otherwise the upper part.
+fn cover_rows(track: Rect, input: &TimelineInput<'_>) -> (f32, f32) {
+    if input.layers.audio_bands {
+        let (top, bottom) = video_middle_insets(input);
+        (track.top() + top, track.bottom() - bottom)
+    } else {
+        (track.top() + 2.0, track.top() + track.height() * 0.42)
+    }
+}
+
+/// How far below the top of the video row a slot starts: with audio bands under the A1 band,
+/// so a slot marks the light middle and A2; A1 is the base of the slot, not part of it (user
+/// 2026-10-15).
+fn slot_top(input: &TimelineInput<'_>) -> f32 {
+    if input.layers.audio_bands { video_middle_insets(input).0 } else { 0.0 }
 }
 
 fn slot_hit<'a>(
@@ -1796,6 +1815,7 @@ fn slot_hit<'a>(
     duration: u64,
     pos: egui::Pos2,
     slots: &'a [TimelineSlotSpan<'a>],
+    top: f32,
 ) -> Option<&'a str> {
     slots.iter().find_map(|slot| {
         if slot.end_frame <= slot.start_frame || slot.id.trim().is_empty() {
@@ -1804,7 +1824,7 @@ fn slot_hit<'a>(
         let x0 = x_for_frame(track, range_start, duration, slot.start_frame);
         let x1 = x_for_frame(track, range_start, duration, slot.end_frame);
         let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + 2.0),
+            egui::pos2(x0, track.top() + top + 2.0),
             egui::pos2(x1.max(x0 + 3.0), track.bottom() - 2.0),
         )
         .expand(2.0);
@@ -2067,12 +2087,17 @@ mod tests {
             Some("m_mid")
         );
         assert_eq!(
-            cover_hit(track, 50, 100, egui::pos2(140.0, 8.0), &covers),
+            cover_hit(track, 50, 100, egui::pos2(140.0, 8.0), &covers, (2.0, 26.0)),
             Some("cover_mid")
         );
         assert_eq!(
-            slot_hit(track, 50, 100, egui::pos2(135.0, 55.0), &slots),
+            slot_hit(track, 50, 100, egui::pos2(135.0, 55.0), &slots, 0.0),
             Some("slot_mid")
+        );
+        assert_eq!(
+            slot_hit(track, 50, 100, egui::pos2(135.0, 6.0), &slots, 18.0),
+            None,
+            "with audio bands A1 is the base of the slot, not part of it"
         );
         assert_eq!(
             virtual_span_hit(track, 50, 100, egui::pos2(150.0, 34.0), &spans, (VIDEO_BAND, VIDEO_FOOT)),

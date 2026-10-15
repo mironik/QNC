@@ -4036,3 +4036,8 @@ Dopuna 2026-10-15 (korisnik: "svedi wrap timeline na dimenzije source timeline, 
 kao source timeline"): pojasevi A1 i A2 visoki su kao audio traka source timelinea (`TimelineMetrics.audio_height`,
 18 px), a svijetli dio izmedju njih kao njegova video traka (`video_height`, 64 px); obje strane koriste
 `TimelineMetrics::default`. `qnc-timeline` (`video_middle_insets`, pojasevi u `show`, test). Snimljeno u izoliranoj kopiji.
+Dopuna 2026-10-15 (korisnik: "pokrivalice farbaju cijeli dio video traka"; "playhead ide kroz cijelu visinu wrap-segmenta,
+ali u prikazu slota boja se samo video i A2; A1 nije dio slota, on je baza slota"): u Wrap redovima (sloj `audio_bands`)
+pokrivalica boji cijeli svijetli dio (prije gornjih ~40 %), slot (crtanje i klik) pocinje ispod pojasa A1 i boji video i
+A2, a playhead se crta nakon pojaseva preko cijele visine reda. Source timeline nije mijenjan. `qnc-timeline`
+(`cover_rows`, `slot_top`), testovi.
