@@ -453,6 +453,23 @@ pub fn paint_rgba_image(
     size: [usize; 2],
     rgba: &[u8],
 ) -> bool {
+    paint_rgba(ui, rect, uri, content_key, size, rgba, false)
+}
+
+/// The same image filling the whole rect: cut at its sides or top and bottom so it keeps
+/// its aspect (a filmstrip cell).
+pub fn paint_rgba_image_filled(
+    ui: &mut Ui,
+    rect: Rect,
+    uri: &str,
+    content_key: u64,
+    size: [usize; 2],
+    rgba: &[u8],
+) -> bool {
+    paint_rgba(ui, rect, uri, content_key, size, rgba, true)
+}
+
+fn paint_rgba(ui: &mut Ui, rect: Rect, uri: &str, content_key: u64, size: [usize; 2], rgba: &[u8], fill: bool) -> bool {
     if !ui.is_rect_visible(rect) {
         return false;
     }
@@ -504,6 +521,14 @@ pub fn paint_rgba_image(
         handle
     });
     let aspect = size[0] as f32 / size[1] as f32;
+    if fill {
+        // The part of the image with the rect's aspect, from its middle.
+        let wanted = rect.width() / rect.height().max(1.0);
+        let (u, v) = if wanted >= aspect { (1.0, aspect / wanted) } else { (wanted / aspect, 1.0) };
+        let uv = Rect::from_center_size(egui::pos2(0.5, 0.5), Vec2::new(u, v));
+        ui.painter().image(texture.id(), rect, uv, Color32::WHITE);
+        return true;
+    }
     let width = rect.width().min(rect.height() * aspect);
     let fitted = Rect::from_center_size(rect.center(), Vec2::new(width, width / aspect));
     ui.painter().image(

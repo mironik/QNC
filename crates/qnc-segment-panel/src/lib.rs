@@ -305,6 +305,7 @@ fn paint_program(
                 start_frame: picture.program_start,
                 end_frame: picture.program_end,
                 frame: picture.strip.frames.get(picture.frame)?,
+                strip: &picture.strip,
             })
         })
         .collect();

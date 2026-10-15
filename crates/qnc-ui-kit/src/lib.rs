@@ -6,7 +6,7 @@ mod raster;
 mod two_way_switch;
 pub use chrome_button::{chrome_button, fill_block, look_button, strong_button, ButtonLook, ChromeButtonStyle};
 pub use option_columns::*;
-pub use raster::paint_rgba_image;
+pub use raster::{paint_rgba_image, paint_rgba_image_filled};
 pub use raster::paint_stream_frame;
 pub use two_way_switch::show_two_way_switch;
 

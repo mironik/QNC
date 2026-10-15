@@ -213,7 +213,8 @@ impl TimelineMetrics {
     /// The video row with A1 and A2 in its bands: as high as the rows it replaces.
     pub fn banded_video_height(self, layers: TimelineLayerFlags) -> f32 {
         let lanes = [layers.audio_a1, layers.audio_a2].into_iter().filter(|on| *on).count() as f32;
-        let middle = if layers.compact_video { self.audio_height } else { self.video_height };
+        // Narrow: twice an audio band (user 2026-10-15).
+        let middle = if layers.compact_video { 2.0 * self.audio_height } else { self.video_height };
         middle + lanes * self.audio_height
     }
 
@@ -592,6 +593,9 @@ pub struct TimelinePicture<'a> {
     pub start_frame: u64,
     pub end_frame: u64,
     pub frame: &'a qnc_filmstrip::FilmstripFrameAsset,
+    /// The filmstrip the picture is from: touching pictures of one strip are one segment
+    /// or cover, tiled together.
+    pub strip: &'a qnc_filmstrip::FilmstripBackground,
 }
 
 #[derive(Clone, Copy)]
@@ -1482,6 +1486,23 @@ fn paint_virtual_spans(
     }
 }
 
+/// The pictures of one segment or cover: neighbours from the same filmstrip that touch.
+fn picture_runs<'p, 'a>(pictures: &'p [TimelinePicture<'a>]) -> Vec<&'p [TimelinePicture<'a>]> {
+    let mut runs = Vec::new();
+    let mut first = 0;
+    for index in 1..=pictures.len() {
+        let breaks = index == pictures.len() || {
+            let (before, here) = (&pictures[index - 1], &pictures[index]);
+            here.start_frame > before.end_frame || here.start_frame < before.start_frame || !std::ptr::eq(here.strip, before.strip)
+        };
+        if breaks {
+            runs.push(&pictures[first..index]);
+            first = index;
+        }
+    }
+    runs
+}
+
 /// The filmstrip pictures in the light middle of a banded row, with the outline of each
 /// segment over them.
 fn paint_pictures(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u64, input: &TimelineInput<'_>) {
@@ -1490,24 +1511,27 @@ fn paint_pictures(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u6
     }
     let (top, bottom) = video_middle_insets(input);
     let (top, bottom) = (track.top() + top, track.bottom() - bottom);
-    // Each picture is tiled at its own aspect across its part of the row (as an NLE
-    // draws a clip's thumbnails), cut at the edges of that part.
-    for picture in input.pictures {
-        let x0 = x_for_frame(track, range_start, duration, picture.start_frame);
-        let x1 = x_for_frame(track, range_start, duration, picture.end_frame);
-        let image = &picture.frame.image;
+    // A segment or cover shows only as many pictures as fit at their aspect (user
+    // 2026-10-15), each filling its cell: the picture of the clip at the cell's middle.
+    for run in picture_runs(input.pictures) {
+        let (first, last) = (&run[0], &run[run.len() - 1]);
+        let x0 = x_for_frame(track, range_start, duration, first.start_frame);
+        let x1 = x_for_frame(track, range_start, duration, last.end_frame);
+        let image = &first.frame.image;
         if x1 <= x0 || image.size[1] == 0 {
             continue;
         }
         let rect = Rect::from_min_max(egui::pos2(x0, top), egui::pos2(x1, bottom));
-        let tile = (rect.height() * image.size[0] as f32 / image.size[1] as f32).max(4.0);
-        let mut part = ui.new_child(egui::UiBuilder::new().max_rect(rect));
-        part.set_clip_rect(rect.intersect(ui.clip_rect()));
-        let mut left = rect.left();
-        while left < rect.right() {
-            let cell = Rect::from_min_size(egui::pos2(left, top), Vec2::new(tile, rect.height()));
-            let _ = qnc_ui_kit::paint_rgba_image(&mut part, cell, &picture.frame.uri, image.content_key, image.size, &image.pixels);
-            left += tile;
+        let tile = rect.height() * image.size[0] as f32 / image.size[1] as f32;
+        let cells = ((rect.width() / tile.max(1.0)).floor() as usize).max(1);
+        let width = rect.width() / cells as f32;
+        let span = (last.end_frame - first.start_frame) as f32;
+        for cell in 0..cells {
+            let cell_rect = Rect::from_min_size(egui::pos2(rect.left() + cell as f32 * width, top), Vec2::new(width, rect.height()));
+            let middle = first.start_frame + (span * (cell as f32 + 0.5) / cells as f32) as u64;
+            let picture = run.iter().find(|p| middle < p.end_frame).unwrap_or(last);
+            let image = &picture.frame.image;
+            let _ = qnc_ui_kit::paint_rgba_image_filled(ui, cell_rect, &picture.frame.uri, image.content_key, image.size, &image.pixels);
         }
     }
     for span in input.virtual_spans.iter().filter(|span| span.end_frame > span.start_frame) {
@@ -2074,7 +2098,7 @@ mod tests {
         let banded = lanes.with_audio_bands();
         assert_eq!(metrics.outer_height(banded, AudioLane::None), metrics.outer_height(lanes, AudioLane::None));
         assert_eq!(metrics.banded_video_height(banded), metrics.video_height + 2.0 * metrics.audio_height);
-        assert_eq!(metrics.banded_video_height(banded.with_compact_video(true)), 3.0 * metrics.audio_height, "a narrow video row");
+        assert_eq!(metrics.banded_video_height(banded.with_compact_video(true)), 4.0 * metrics.audio_height, "a narrow video row");
         assert_eq!(
             metrics.banded_video_height(banded) - 2.0 * metrics.audio_height,
             metrics.video_height,

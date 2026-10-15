@@ -4068,3 +4068,9 @@ Popravak 2026-10-15 (korisnik: "kad se prikazuje filmstrip u segmentu, u program
 red programa na dnu panela Segmenti imao je stalnih 128 px za traku i red, manje od reda s pojasevima, pa je pojas A2
 ispadao. `qnc-segment-panel`: visina tog dijela je traka plus stvarna visina reda (filmstrip ili uska traka). Snimljeno u
 izoliranoj kopiji.
+Dopuna 2026-10-15 (korisnik: "u pokrivalice na segmentu ne ubacivati vise filmstrip slicica nego sto ih moze stati";
+"suzeni video trak napravio bi duplo siri"): segment ili pokrivalica crta samo onoliko slicica koliko ih stane u njihovom
+omjeru, svaka popunjava svoju celiju (slika njegova klipa na sredini celije; susjedni komadi istog filmstripa su jedan
+segment ili pokrivalica). `qnc-ui-kit` `paint_rgba_image_filled` (ista slika, odrezana da popuni pravokutnik),
+`qnc-timeline` (`picture_runs`, `TimelinePicture.strip`), `qnc-segment-panel`. Uska video traka je dvije visine audio
+pojasa (36 px).
