@@ -9,7 +9,7 @@ use eframe::egui::{self, PointerButton, Pos2, Rect, RichText, Sense, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentsView};
 use qnc_timeline::TimelineTheme;
 
-const COMPACT_CTRL_H: f32 = 22.0;
+pub(crate) const COMPACT_CTRL_H: f32 = 22.0;
 const EDIT_ACTIONS_W: f32 = 250.0;
 const RIGHT_ACTIONS_W: f32 = 210.0;
 const EDIT_ACTION_GAP: f32 = 6.0;

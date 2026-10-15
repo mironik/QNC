@@ -4064,3 +4064,7 @@ Popravak 2026-10-15 (korisnik: "ne gradi uopce filmstrip"): filmstripovi su bili
 u svom omjeru u sredini svog dijela reda (`paint_rgba_image` cuva omjer), pa se na sirokom segmentu vidjela jedna mala
 slicica s prazninom oko nje. `qnc-timeline` (`paint_pictures`): slicica se ponavlja u svom omjeru preko svog dijela reda,
 odrezana na njegovim rubovima (kao NLE); odabrani slot preko slicica je samo okvir. Snimljeno u izoliranoj kopiji.
+Popravak 2026-10-15 (korisnik: "kad se prikazuje filmstrip u segmentu, u program timelineu ne vidi se A2 audio"): pregledni
+red programa na dnu panela Segmenti imao je stalnih 128 px za traku i red, manje od reda s pojasevima, pa je pojas A2
+ispadao. `qnc-segment-panel`: visina tog dijela je traka plus stvarna visina reda (filmstrip ili uska traka). Snimljeno u
+izoliranoj kopiji.

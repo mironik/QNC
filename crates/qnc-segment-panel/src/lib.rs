@@ -30,7 +30,8 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const PANEL_MARGIN: f32 = 10.0;
 const ROW_GAP: f32 = 3.0;
 const BOTTOM_GAP: f32 = 4.0;
-const PLAYLIST_INPUT_H: f32 = 128.0;
+/// Above the program row: the separator, the bar and the gap under it.
+const PLAYLIST_BAR_H: f32 = 18.0 + bar::COMPACT_CTRL_H;
 const HEADER_LABEL_SIZE: f32 = 17.0;
 const HEADER_VALUE_SIZE: f32 = 22.0;
 
@@ -98,7 +99,9 @@ pub fn show(
                 return;
             }
             let body = ui.available_rect_before_wrap();
-            let playlist_top = body.bottom() - PLAYLIST_INPUT_H.min(body.height());
+            // The bar and a whole program row, its A2 band included (user 2026-10-15).
+            let overview = TimelineMetrics::default().outer_height(layers(segments.video_compact), AudioLane::None);
+            let playlist_top = body.bottom() - (PLAYLIST_BAR_H + overview).min(body.height());
             let stack_bottom = (playlist_top - BOTTOM_GAP).max(body.top());
             let stack =
                 egui::Rect::from_min_max(body.left_top(), egui::pos2(body.right(), stack_bottom));
