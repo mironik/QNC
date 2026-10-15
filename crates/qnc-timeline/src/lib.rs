@@ -205,7 +205,8 @@ pub struct TimelineTheme {
     pub audio_wave: Color32,
     /// The rim of the A1 or A2 button whose channel is being changed (user 2026-10-14).
     pub lane_taken: Color32,
-    /// The A1 or A2 button of a lane at level 0, nothing of it heard (user 2026-10-14).
+    /// The A1 or A2 button of a lane that is off (level 0), nothing of it heard (user
+    /// 2026-10-15).
     pub lane_silent: Color32,
 }
 
@@ -973,8 +974,8 @@ fn paint_audio_row(
             AudioLane::A2 => input.a2_channel,
             _ => None,
         };
-        // A lane at level 0 is a red button; the lane whose channel is being changed has a
-        // yellow rim (user 2026-10-14).
+        // A lane that is off is a red button; the lane being changed has a yellow rim
+        // (user 2026-10-15).
         let silent = choice.is_some_and(|choice| choice.silent());
         let fill = if silent { input.theme.lane_silent } else { input.theme.label_background };
         ui.painter().rect_filled(button, 3.0, fill);
@@ -2032,7 +2033,7 @@ fn channel_peaks<'a>(input: &TimelineInput<'a>, channel: u16) -> &'a [f32] {
 /// A lane with a channel choice draws the wave of its chosen channel (the draft while
 /// taken); without one, its own peaks.
 fn lane_peaks<'a>(input: &TimelineInput<'a>, choice: Option<ChannelChoice>, own: &'a [f32]) -> &'a [f32] {
-    // A lane at level 0 is heard as nothing, so its wave is flat.
+    // A lane that is off is heard as nothing, so its wave is flat.
     choice.map_or(own, |choice| if choice.silent() { &[] } else { channel_peaks(input, choice.selected) })
 }
 

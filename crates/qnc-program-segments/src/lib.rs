@@ -1062,6 +1062,8 @@ impl ProgramSegments {
         view.a1_choice = self.lanes.choice(0);
         view.a2_choice = self.lanes.choice(1);
         (view.lane_taken, view.wave_zoom) = (self.lanes.taken(), self.lanes.wave_zoom());
+        let (a1, a2) = (self.lanes.lane(0), self.lanes.lane(1));
+        (view.lane_off, view.lane_level_db) = ([a1.off, a2.off], [a1.level_db, a2.level_db]);
     }
 
     /// How many audio channels the marked clip has (its stored record); a chosen
@@ -1084,9 +1086,9 @@ impl ProgramSegments {
         self.lanes.heard()
     }
 
-    /// The source channels the preview plays on A1 and A2 now and their levels (level 0:
-    /// nothing of the channel is heard): a taken lane's draft is heard before Enter keeps
-    /// it; Escape goes back to the kept channel and level.
+    /// The source channels the preview plays on A1 and A2 now and their gains (0 when a
+    /// lane is off): a taken lane's draft is heard before Enter keeps it; Escape goes back
+    /// to what is kept.
     pub fn audible_channels(&self) -> ((u16, u16), (f32, f32)) {
         self.lanes.audible()
     }

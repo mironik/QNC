@@ -113,6 +113,10 @@ pub struct SegmentsView {
     pub a2_choice: Option<(u16, u16)>,
     /// A1 (0) or A2 (1) taken with the keyboard and its draft channel (zero based).
     pub lane_taken: Option<(u8, u16)>,
+    /// A1 and A2 off (level 0, the channel kept) and their levels in dB, as they play now
+    /// (the taken lane's draft; user 2026-10-15).
+    pub lane_off: [bool; 2],
+    pub lane_level_db: [i8; 2],
     /// Display gain level of the A1 and A2 wave over the video row (0: not shown).
     pub wave_zoom: [u8; 2],
     /// The last Cover slot (`false`) or Overwrite (`true`) and when it was asked for,

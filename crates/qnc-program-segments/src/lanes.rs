@@ -24,8 +24,41 @@ impl ProgramSegments {
     /// channels stand in a column (user 2026-10-14).
     pub fn lane_draft(&mut self, delta: i64) -> bool {
         let moved = self.lanes.draft(delta);
-        self.view.lane_taken = self.lanes.taken();
+        self.refresh_lane();
         moved
+    }
+
+    /// Left (`off`) or right: the taken lane off (level 0, its channel kept) or on (user
+    /// 2026-10-15).
+    pub fn lane_off(&mut self, off: bool) -> bool {
+        let changed = self.lanes.set_off(off);
+        self.refresh_lane();
+        changed
+    }
+
+    /// Ctrl+left/right: the taken lane's level by `delta_db` (user 2026-10-15).
+    pub fn lane_level(&mut self, delta_db: i8) -> bool {
+        let changed = self.lanes.nudge_level(delta_db);
+        self.refresh_lane();
+        changed
+    }
+
+    /// The taken lane in the view and in the status: its channel, on/off and level.
+    fn refresh_lane(&mut self) {
+        let Some((lane, _)) = self.lanes.taken() else {
+            return;
+        };
+        let draft = self.lanes.lane(lane);
+        let name = if lane == 0 { "A1" } else { "A2" };
+        let message = if draft.off {
+            qnc_ui_text::fill("story.msg.lane_off", &[("lane", &name.to_string())])
+        } else {
+            qnc_ui_text::fill(
+                "story.msg.lane_level",
+                &[("lane", &name.to_string()), ("channel", &(draft.channel + 1).to_string()), ("level", &format!("{:+}", draft.level_db))],
+            )
+        };
+        self.refresh_view(message);
     }
 
     /// Down with no lane taken: the open large wave closes.
@@ -69,7 +102,7 @@ mod tests {
         assert_eq!(segments.view().lane_taken, Some((1, 1)), "A2 starts on its channel 2");
         segments.lane_draft(1);
         segments.lane_draft(5);
-        assert_eq!(segments.view().lane_taken, Some((1, 4)), "never past level 0, after the last channel");
+        assert_eq!(segments.view().lane_taken, Some((1, 3)), "never past the last channel");
         assert!(segments.choose_a2_channel(2), "a click drafts");
         assert_eq!(segments.view().lane_taken, Some((1, 2)), "the lane stays taken and expanded");
         assert_eq!(segments.view().a2_choice, Some((1, 4)), "nothing kept before Enter");
@@ -83,5 +116,22 @@ mod tests {
         segments.release_lane();
         assert_eq!(segments.view().a2_choice, Some((3, 4)), "Escape keeps the channel");
         assert_eq!(segments.view().wave_zoom, [0, 0], "Escape does not touch the wave view");
+    }
+
+    #[test]
+    fn left_right_turn_the_taken_lane_off_and_on_and_ctrl_arrows_its_level() {
+        let mut segments = ProgramSegments::new();
+        segments.set_source(SourcePick::new(Some("c"), Some("C"), None, (None, 100), Some((50, 1))), None);
+        segments.set_source_channels(Some(4));
+        segments.take_lane(0);
+        assert!(segments.lane_off(true));
+        assert_eq!((segments.view().lane_off, segments.audible_channels().1), ([true, false], (0.0, 1.0)));
+        segments.lane_off(false);
+        segments.lane_level(-6);
+        assert_eq!(segments.view().lane_level_db, [-6, 0]);
+        segments.commit_lane();
+        assert_eq!(segments.heard_channels(), (0, 1), "the channels kept for the story");
+        assert!((segments.audible_channels().1 .0 - 0.501).abs() < 0.01, "-6 dB is about half");
+        assert!(!segments.lane_off(true), "nothing taken");
     }
 }

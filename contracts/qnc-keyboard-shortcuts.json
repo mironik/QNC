@@ -111,10 +111,16 @@
       "label": "Selektiraj M marker"
     },
     "select_audio_a1": {
-      "label": "Uzmi A1: strelice lijevo/desno kanal, gore/dolje prikaz vala, Enter sprema"
+      "label": "Uzmi A1: gore/dolje kanal, lijevo iskljuci, desno ukljuci, Ctrl+lijevo/desno razina, Enter sprema"
     },
     "select_audio_a2": {
-      "label": "Uzmi A2: strelice lijevo/desno kanal, gore/dolje prikaz vala, Enter sprema"
+      "label": "Uzmi A2: gore/dolje kanal, lijevo iskljuci, desno ukljuci, Ctrl+lijevo/desno razina, Enter sprema"
+    },
+    "lane_level_down": {
+      "label": "Uzeta traka A1/A2: razina 1 dB nize"
+    },
+    "lane_level_up": {
+      "label": "Uzeta traka A1/A2: razina 1 dB vise"
     },
     "select_current_marker_slot": {
       "label": "Selektiraj M–M slot pod playheadom"
@@ -324,7 +330,7 @@
     "groups": [
       { "title": "Reprodukcija i playhead", "actions": ["play_pause", "step_back_frame", "step_forward_frame", "playlist_input_start"] },
       { "title": "IN / OUT", "actions": ["mark_in", "mark_out", "select_mark_in", "select_mark_out", "mark_in_fit_duration", "save_virtual_shot"] },
-      { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2"] },
+      { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2", "lane_level_down", "lane_level_up"] },
       { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "select_segment_start", "select_segment_end", "delete_part"] },
       { "title": "Markeri i slotovi", "actions": ["add_marker", "add_marker_continue", "select_marker", "delete_marker", "select_current_marker_slot", "select_mark_in", "select_mark_out", "navigate_prev_object", "navigate_next_object"] },
       { "title": "Pokrivalice", "actions": ["quick_overwrite_cover", "overwrite_cover", "cover_mode_covers", "cover_mode_sync"] },
@@ -604,6 +610,8 @@
         ],
         "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
         "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }],
         "focus_next": [
           {
             "key": "Tab",
@@ -1070,6 +1078,8 @@
         ],
         "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
         "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }],
         "focus_next": [
           {
             "key": "Tab",
@@ -1502,6 +1512,8 @@
         ],
         "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
         "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }],
         "focus_next": [
           {
             "key": "Tab",
@@ -1924,6 +1936,8 @@
         ],
         "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
         "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }],
         "focus_next": [
           {
             "key": "Tab",
@@ -2353,6 +2367,8 @@
         ],
         "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
         "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }],
         "focus_next": [
           {
             "key": "Tab",
@@ -2789,6 +2805,8 @@
         ],
         "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
         "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }],
         "focus_next": [
           {
             "key": "Tab",

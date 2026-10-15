@@ -4003,3 +4003,14 @@ playera kao postotak (100 kako je snimljeno, 0 tisina, najvise 400): `qnc-player
 nakon preslikavanja kanala (`apply_levels`, test); `qnc-source-preview` `hear_channels` prima kanale i razine.
 Vrijedi za source preview. Nije izvedeno: razina u prici (segment ili pokrivalica s A1/A2 na razini 0 u bazi, Wrap,
 program, prerender) i podesavanje razine osim 0 i 100.
+Izmjena 2026-10-15 (korisnik: "uvodenje novog checkboxa mi se ne svida, ostali checkboxovi postaju mali; radije
+strelice lijevo desno: lijevo iskljucivanje, desno ukljucivanje, a sa Ctrl strelice podesavanje nivoa tona"): kucica
+"0" iz `qnc-channel-picker` je uklonjena (stupac kanala kao prije). Dok je A1 ili A2 uzeta: gore/dolje kanal, lijevo
+iskljucuje traku (razina 0, kanal ostaje), desno ukljucuje, Ctrl+lijevo/desno razina za 1 dB (od -40 do +12 dB);
+sve se odmah cuje, Enter sprema, Esc vraca. Nove akcije kataloga `lane_level_down` (Ctrl+lijevo) i `lane_level_up`
+(Ctrl+desno) u svim presetima (scope `storyboard`, gdje je i `select_audio_a1/a2`) i u grupi pomoci "Audio A1 / A2".
+`qnc-lane-choice` (`Lane`: kanal, `off`, `level_db`; `set_off`, `nudge_level`, `lane`, `audible` daje pojacanje),
+`qnc-program-view` (`lane_off`, `lane_level_db`), `qnc-program-segments` (`lane_off`, `lane_level`, poruka s kanalom i
+razinom), `qnc-panel-focus`, `qnc-channel-picker` (`ChannelChoice.off`), `qnc-segment-panel`, `qnc-timeline` (iskljucena
+traka je crveno dugme, uzeta zuti rub). Razina i dalje ide playeru kao postotak po izlazu (vidi prethodni zapis).
+Vrijedi za source preview; razina u prici nije izvedena.

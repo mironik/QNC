@@ -223,10 +223,21 @@ impl PanelFocus {
             qnc_source_preview::MONITOR_AUTO | qnc_source_preview::MONITOR_ON => preview.set_monitor_mode(action_id),
             // A1/A2 by keyboard (user rule 2026-10-01): Ctrl+1, Ctrl+2 take the lane; while it is
             // taken, its height is expanded over the video row and up/down (or a click) pick its
-            // channel in the column (user 2026-10-14); Enter keeps it (heard at once), Escape lets go.
+            // channel in the column (user 2026-10-14), left turns it off, right on, Ctrl+left/right
+            // set its level (user 2026-10-15); all heard at once, Enter keeps, Escape lets go.
             "select_audio_a1" | "select_audio_a2" => {
                 self.panel = Panel::SourceTimeline; // the lane is on the source timeline
                 segments.take_lane(u8::from(action_id == "select_audio_a2"))
+            }
+            "step_back_frame" | "step_forward_frame" if on_source && segments.lane_is_taken() => {
+                let changed = segments.lane_off(action_id == "step_back_frame");
+                preview.hear_channels(segments.audible_channels());
+                changed
+            }
+            "lane_level_down" | "lane_level_up" if on_source && segments.lane_is_taken() => {
+                let changed = segments.lane_level(if action_id == "lane_level_down" { -1 } else { 1 });
+                preview.hear_channels(segments.audible_channels());
+                changed
             }
             // A Sync (user 2026-10-13): stopped, the arrows move its end; Enter writes the
             // cover, Delete drops the draft, wherever the keyboard is.
