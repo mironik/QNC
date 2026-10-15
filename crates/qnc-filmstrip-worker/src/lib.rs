@@ -256,6 +256,9 @@ pub struct TimelineFilmstripService {
     workers: Vec<ActiveFilmstripWorker>,
     publisher: Option<Box<dyn FilmstripContentWrite>>,
     playback_priority: bool,
+    /// It makes only the clips it is told (`request`), it looks for none of its own
+    /// (import control: each clip after its wave, user 2026-10-15).
+    on_orders: bool,
 }
 
 impl Default for TimelineFilmstripService {
@@ -269,6 +272,7 @@ impl Default for TimelineFilmstripService {
             workers: Vec::new(),
             publisher: None,
             playback_priority: false,
+            on_orders: false,
         }
     }
 }
@@ -330,11 +334,33 @@ impl TimelineFilmstripService {
         }
     }
 
+    /// Only ordered clips (`true`), or every clip without a filmstrip (`false`).
+    pub fn set_on_orders(&mut self, on_orders: bool) {
+        if self.on_orders && !on_orders {
+            self.db_complete = false; // the next poll looks for the rest
+        }
+        self.on_orders = on_orders;
+    }
+
+    /// Make the filmstrip of this clip (an order of the import control).
+    pub fn request(&mut self, clip_id: &str) {
+        let Some(context) = self.context.as_ref() else {
+            return;
+        };
+        let request = FilmstripRequest { project_id: context.project_id().to_string(), clip_id: clip_id.to_string() };
+        self.enqueue(request, false);
+        self.start_next();
+    }
+
     pub fn sync_content_db(&mut self) -> Result<(), String> {
         let Some(context) = self.context.clone() else {
             self.db_complete = true;
             return Ok(());
         };
+        if self.on_orders {
+            self.db_complete = true; // it looks for nothing of its own
+            return Ok(());
+        }
         let project_id = context.project_id().to_string();
         let mut all_ready = true;
         let mut after = None;

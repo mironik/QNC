@@ -236,6 +236,9 @@ pub struct TimelineWaveService {
     queue: VecDeque<WaveRequest>,
     queued: BTreeSet<String>,
     workers: Vec<ActiveWaveWorker>,
+    /// Clips whose wave is done (made, already stored, or impossible) since the last
+    /// `take_finished`.
+    finished: Vec<String>,
     publisher: Option<Box<dyn WaveContentWrite>>,
     playback_priority: bool,
 }
@@ -328,6 +331,7 @@ impl TimelineWaveService {
                 if let Some(record) = context.content_reader.read_wave(&request.clip_id)? {
                     if wave_artifact_ready(&record) {
                         self.ready.insert(key);
+                        self.finished.push(request.clip_id);
                         continue;
                     }
                 }
@@ -378,6 +382,9 @@ impl TimelineWaveService {
                                     completion.key
                                 )
                             });
+                            if let Some((_, clip_id)) = completion.key.split_once("::") {
+                                self.finished.push(clip_id.to_string());
+                            }
                             self.ready.insert(completion.key);
                         }
                         Err(error) => {
@@ -442,6 +449,7 @@ impl TimelineWaveService {
                     let publish_state = if ready_before { "ready" } else { "queued" };
                     if generated.ready_before {
                         self.ready.insert(key);
+                        self.finished.push(outcome.request.clip_id.clone());
                     } else {
                         self.queue_publish(key, generated.artifact, matches_active, &mut poll);
                     }
@@ -480,6 +488,7 @@ impl TimelineWaveService {
                             outcome.request.clip_id, matches_active, error
                         )
                     });
+                    self.finished.push(outcome.request.clip_id.clone()); // no wave to wait for
                     if matches_active {
                         poll.active_error = Some(error);
                     }
@@ -499,6 +508,12 @@ impl TimelineWaveService {
             let request = self.queue.remove(index).expect("index exists");
             self.queue.push_front(request);
         }
+    }
+
+    /// The clips whose wave is done since the last call (made, already stored, or
+    /// impossible).
+    pub fn take_finished(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.finished)
     }
 
     pub fn has_pending_work(&self) -> bool {

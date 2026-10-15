@@ -213,9 +213,9 @@ fn run_artifacts(
             return Ok(()); // dropping the artifacts cancels their workers
         }
         artifacts.hold_filmstrip(still_completing);
-        // The lists are read again every 3 s while there is work: a clip whose record or
-        // wave is new joins the waves or the filmstrip.
-        if synced.elapsed() >= Duration::from_secs(3) {
+        // The lists are read again every 3 s while records are completed: a clip whose
+        // record became final joins the waves.
+        if still_completing && synced.elapsed() >= Duration::from_secs(3) {
             synced = std::time::Instant::now();
             artifacts.sync(&reader, &settings, target.clone(), false)?;
         }

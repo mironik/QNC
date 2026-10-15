@@ -1,0 +1,43 @@
+{
+  "module_id": "qnc.module.import-control",
+  "module_name": "Import control",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "import.order.filmstrip_after_wave"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "ui.paint",
+    "database.read",
+    "database.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.source-preview",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-import-control",
+  "input": "The clips whose wave is done (made, already stored or impossible), whether the wave worker still has work and whether records are still being completed.",
+  "output": "Orders for the filmstrip worker: make this clip's filmstrip now; make only ordered clips; take every clip without a filmstrip. It reads nothing, writes nothing and runs no worker.",
+  "specification": "User 2026-10-15: a wave takes little of the processor, so as soon as a clip has its wave the filmstrip worker is told to make that clip, beside the next waves."
+}

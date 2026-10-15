@@ -205,19 +205,6 @@ struct ProjectFilmstripContentReader {
     artifacts: SharedArtifacts,
     /// `artifacts.filmstrip` of the project: `off` gives the generator no clip.
     enabled: bool,
-    /// While waves are still being made, a clip gets its filmstrip only once its wave is
-    /// stored (user 2026-10-15: the filmstrip runs beside the waves, each clip after its
-    /// wave); a clip that gets no wave is taken when the waves are done.
-    waves_busy: Arc<std::sync::atomic::AtomicBool>,
-}
-
-impl ProjectFilmstripContentReader {
-    fn waits_for_wave(&self, clip_id: &str) -> Result<bool, String> {
-        if !self.waves_busy.load(std::sync::atomic::Ordering::Relaxed) {
-            return Ok(false);
-        }
-        Ok(self.artifacts.read(|reader| reader.read_wave(clip_id))?.is_none())
-    }
 }
 
 impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReader {
@@ -228,31 +215,19 @@ impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReade
         if !self.enabled {
             return Ok(Vec::new());
         }
-        // A page whose clips all wait for their wave is skipped, so an empty page still
-        // means the end of the list.
-        let mut after = after;
-        loop {
-            let page = self.read.open()?.list(after.clone())?;
-            let Some(last) = page.last().map(|stored| stored.clip.id().to_string()) else {
-                return Ok(Vec::new());
-            };
-            let mut clips = Vec::new();
-            for stored in page {
-                if self.waits_for_wave(stored.clip.id())? {
-                    continue;
-                }
-                clips.push(qnc_filmstrip_worker::FilmstripClipRecord {
+        self.read
+            .open()?
+            .list(after)?
+            .into_iter()
+            .map(|stored| {
+                Ok(qnc_filmstrip_worker::FilmstripClipRecord {
                     priority: artifact_priority(&stored),
                     clip_id: stored.clip.id().to_string(),
                     name: stored.clip.name,
                     snapshot: stored.clip.snapshot,
-                });
-            }
-            if !clips.is_empty() {
-                return Ok(clips);
-            }
-            after = Some(last);
-        }
+                })
+            })
+            .collect()
     }
 
     fn read_clip(
@@ -458,7 +433,6 @@ pub fn artifacts_context(
     settings: &WorkSettings,
     content_target: ContentTarget,
     source_bindings: &[SourceBinding],
-    waves_busy: Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<ArtifactsContext, String> {
     let project_dir = reader
         .local_workspace_dir(settings)
@@ -486,7 +460,6 @@ pub fn artifacts_context(
             read: SharedRead::new(content_target.clone()),
             artifacts: artifacts.clone(),
             enabled: filmstrip_enabled,
-            waves_busy,
         }),
         filmstrip_writer: Arc::new(ProjectFilmstripContentWriteFactory {
             target: project_db.clone(),
@@ -509,10 +482,6 @@ pub struct ProjectArtifacts {
     host_root: Option<PathBuf>,
     /// When the clip on screen may be read again while its artifacts are made elsewhere.
     refresh_at: Option<std::time::Instant>,
-    /// The wave worker still has work, or the caller still completes records (read by
-    /// the filmstrip's clip list).
-    waves_busy: Arc<std::sync::atomic::AtomicBool>,
-    records_completing: bool,
 }
 
 /// What `ProjectArtifacts::poll_shown` gave for the clip on screen.
@@ -583,7 +552,6 @@ impl ProjectArtifacts {
             settings,
             content_target,
             &source_bindings,
-            self.waves_busy.clone(),
         )?);
         Ok(())
     }
@@ -693,8 +661,6 @@ impl ProjectArtifacts {
 
     pub fn set_playback_priority(&mut self, active: bool) {
         self.artifacts.set_playback_priority(active);
-        let busy = self.records_completing || self.artifacts.waves_pending();
-        self.waves_busy.store(busy, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// The clip the user has open gets its wave first.
@@ -702,10 +668,9 @@ impl ProjectArtifacts {
         self.artifacts.prefer(clip_id);
     }
 
-    /// While the caller still completes records, the filmstrip takes only clips whose
-    /// wave is stored (it runs beside the waves, user 2026-10-15).
+    /// Holds the filmstrip while the caller's other card work goes first.
     pub fn hold_filmstrip(&mut self, held: bool) {
-        self.records_completing = held;
+        self.artifacts.hold_filmstrip(held);
     }
 
     pub fn has_pending_work(&self) -> bool {

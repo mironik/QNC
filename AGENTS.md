@@ -4074,11 +4074,14 @@ omjeru, svaka popunjava svoju celiju (slika njegova klipa na sredini celije; sus
 segment ili pokrivalica). `qnc-ui-kit` `paint_rgba_image_filled` (ista slika, odrezana da popuni pravokutnik),
 `qnc-timeline` (`picture_runs`, `TimelinePicture.strip`), `qnc-segment-panel`. Uska video traka je dvije visine audio
 pojasa (36 px).
-Promjena 2026-10-15 (korisnik: "ako je tako malo, onda se moze cim neki klip dobije wave, na drugoj jezgri raditi
-filmstrip"; "bitno je da se to sto prije napravi"; izmjereno: citanje zvuka MXF-a s kartice uzima oko 7 % jedne jezgre):
-filmstrip vise ne ceka da svi waveovi zavrse. Dok waveovi imaju posla ili se zapisi jos dovrsavaju, filmstrip uzima samo
-klipove ciji je wave vec spremljen, pa svaki klip dobiva filmstrip odmah nakon svog wavea, usporedno sa sljedecim
-waveovima; klip bez wavea (bez zvuka ili neuspio wave) uzima se kad waveovi zavrse. `qnc-content-artifacts` (popis
-filmstripa preskace klipove bez wavea, `waves_busy`), `qnc-timeline-artifacts` (`waves_pending`, filmstrip ceka samo
-player), `tools/qnc-ingest-worker` (popisi se ponovno citaju svake 3 s dok ima posla). Zamjenjuje redoslijed iz zapisa
-"wave cim je zapis klipa gotov" (filmstrip tek nakon svih waveova).
+Promjena 2026-10-15 (korisnik: "cim neki klip dobije wave, na drugoj jezgri raditi filmstrip"; "nema smisla da trazi koji
+ima wave a koji nema, napravi import control kocku koja ce kad obradi wave nekog klipa dati komandu da drugi worker
+pokrene filmstrip za taj klip"; izmjereno: citanje zvuka MXF-a s kartice uzima oko 7 % jedne jezgre): nova javna kocka
+`crates/qnc-import-control` (+ ugovor `contracts/modules/import-control.module.json`; samo odlucuje, nista ne cita ni
+pise): kad je wave klipa gotov (napravljen, vec spremljen ili nemoguc), daje naredbu filmstrip radniku za taj klip; dok
+waveovi ili dovrsetak zapisa imaju posla, filmstrip sam ne trazi klipove; kad oboje zavrsi, filmstrip uzima ostatak
+(klip bez wavea). `qnc-wave-worker` (`take_finished`), `qnc-filmstrip-worker` (`request`, `set_on_orders`),
+`qnc-timeline-artifacts` (naredbe kocke izmedju dva radnika; filmstrip vise ne ceka sve waveove). Zamjenjuje redoslijed
+"filmstrip tek nakon svih waveova". Proba na izoliranoj kopiji projekta (98 klipova, kartica samo citana, waveovi i
+filmstripovi obrisani u kopiji): filmstrip prati waveove (npr. 20 s: 10 waveova i 9 filmstripova), svi waveovi i
+filmstripovi gotovi za 266 s; prije su waveovi trajali oko 150 s, pa filmstrip jos oko 60 s.
