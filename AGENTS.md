@@ -4032,3 +4032,7 @@ sistemski templatei (4 izvora, 4 projekta) ponovno su upisani iz seeda s vremeno
 greska (nema pada na radni direktorij); kopija je dobila `shell.layout.json`; aplikacija se pokrece s radnim
 direktorijem u kopiji. Samostalne aplikacije (`apps/qnc-project`, `qnc-story`, MA, `qnc-ingest`) imaju svoje
 trazenje korijena bez te provjere.
+Dopuna 2026-10-15 (korisnik: "svedi wrap timeline na dimenzije source timeline, neka visina tonova i videa bude ista
+kao source timeline"): pojasevi A1 i A2 visoki su kao audio traka source timelinea (`TimelineMetrics.audio_height`,
+18 px), a svijetli dio izmedju njih kao njegova video traka (`video_height`, 64 px); obje strane koriste
+`TimelineMetrics::default`. `qnc-timeline` (`video_middle_insets`, pojasevi u `show`, test). Snimljeno u izoliranoj kopiji.

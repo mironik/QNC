@@ -64,8 +64,7 @@ pub struct TimelineLayerFlags {
     pub audio_bands: bool,
 }
 
-/// The height of a dark band of the video row (above the light middle; with audio bands
-/// also below it).
+/// The dark band above the light middle of the video row (without audio bands).
 pub const VIDEO_BAND: f32 = 17.0;
 /// The dark strip under the light middle without audio bands.
 const VIDEO_FOOT: f32 = 10.0;
@@ -802,7 +801,10 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         keep_first_intent(&mut intent, paint_video_row(ui, row, &input));
         if input.layers.audio_bands {
             // A1 in the band above the light middle, A2 in the band below (user 2026-10-15).
-            let band = |top: f32| Rect::from_min_max(egui::pos2(row.left(), top), egui::pos2(row.right(), top + VIDEO_BAND));
+            // Each band is as high as an audio lane of the source timeline, the light middle as
+            // its video row (user 2026-10-15: the Wrap rows in the source timeline's measures).
+            let height = input.metrics.audio_height;
+            let band = |top: f32| Rect::from_min_max(egui::pos2(row.left(), top), egui::pos2(row.right(), top + height));
             if input.layers.audio_a1 {
                 let rect = band(row.top());
                 a1_row = Some(rect);
@@ -810,7 +812,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 keep_first_intent(&mut intent, paint_audio_band(ui, rect, AudioLane::A1, peaks, &input));
             }
             if input.layers.audio_a2 {
-                let rect = band(row.bottom() - VIDEO_BAND);
+                let rect = band(row.bottom() - height);
                 a2_row = Some(rect);
                 let peaks = lane_peaks(&input, input.a2_channel, input.a2_peaks);
                 keep_first_intent(&mut intent, paint_audio_band(ui, rect, AudioLane::A2, peaks, &input));
@@ -1092,7 +1094,12 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
 /// The insets of the light middle of the video row: the dark band above it and the dark
 /// part under it (a band as high with audio bands).
 fn video_middle_insets(input: &TimelineInput<'_>) -> (f32, f32) {
-    if input.layers.audio_bands { (VIDEO_BAND, VIDEO_BAND) } else { (VIDEO_BAND, VIDEO_FOOT) }
+    if input.layers.audio_bands {
+        let band = input.metrics.audio_height;
+        (if input.layers.audio_a1 { band } else { 0.0 }, if input.layers.audio_a2 { band } else { 0.0 })
+    } else {
+        (VIDEO_BAND, VIDEO_FOOT)
+    }
 }
 
 fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> TimelineIntent {
@@ -1945,7 +1952,11 @@ mod tests {
         let banded = lanes.with_audio_bands();
         assert_eq!(metrics.outer_height(banded, AudioLane::None), metrics.outer_height(lanes, AudioLane::None));
         assert_eq!(metrics.banded_video_height(banded), metrics.video_height + 2.0 * metrics.audio_height);
-        assert!(metrics.banded_video_height(banded) - 2.0 * VIDEO_BAND > metrics.video_height - VIDEO_BAND - VIDEO_FOOT, "the light middle grows");
+        assert_eq!(
+            metrics.banded_video_height(banded) - 2.0 * metrics.audio_height,
+            metrics.video_height,
+            "A1, A2 and the light middle as high as the source timeline's lanes and video row"
+        );
     }
 
     #[test]
