@@ -69,11 +69,11 @@ mod tests {
         assert_eq!(segments.view().lane_taken, Some((1, 1)), "A2 starts on its channel 2");
         segments.lane_draft(1);
         segments.lane_draft(5);
-        assert_eq!(segments.view().lane_taken, Some((1, 3)), "never past the last channel");
+        assert_eq!(segments.view().lane_taken, Some((1, 4)), "never past level 0, after the last channel");
         assert!(segments.choose_a2_channel(2), "a click drafts");
         assert_eq!(segments.view().lane_taken, Some((1, 2)), "the lane stays taken and expanded");
         assert_eq!(segments.view().a2_choice, Some((1, 4)), "nothing kept before Enter");
-        segments.lane_draft(5);
+        segments.lane_draft(1);
         assert!(segments.sync_holds_enter(), "Enter belongs to the taken lane");
         segments.commit_lane();
         assert!(segments.sync_holds_enter(), "the same Enter does not also save a short");

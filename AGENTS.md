@@ -3991,3 +3991,15 @@ prolazu. Sada `tools/qnc-ingest-worker`: dovrsetak zapisa ne ceka artefakte; dok
 ponovno cita bazu i wave klipa krene cim je njegov zapis konacan (`qnc-wave-worker` u red uzima samo klipove s
 konacnim zapisom), otvoreni klip prvi; filmstrip ceka dok traje dovrsetak zapisa i dok waveovi imaju posla
 (`qnc-timeline-artifacts` / `qnc-content-artifacts` `hold_filmstrip`). Waveovi i filmstrip i dalje stanu dok player radi.
+Dopuna 2026-10-15 (korisnik: "treba moci iskljuciti bilo koji kanal, da se ne cuje ni jedan na A1 i na A2; dugme A1 ili
+A2 tada crveno"; "mozemo to napraviti kao nivo 0... dobar put da mozemo dodati i podesavanje nivoa"; boja uzete trake
+zuta): A1 i A2 imaju kanal i razinu. U stupcu kanala ispod zadnjeg kanala je "0" (`qnc-channel-picker`: mjesto `count`,
+`ChannelChoice::silent`): traka zadrzava kanal, a cuje se razina 0; izbor kanala vraca razinu. Strelice gore/dolje,
+klik i Enter/Esc rade i za "0" (`qnc-lane-choice`: `silent`, `audible` daje kanale i razine, `choice` daje `count` za
+razinu 0; `heard` za zapis u pricu daje i dalje samo kanal). `qnc-timeline`: dugme trake na razini 0 je crveno
+(`TimelineTheme.lane_silent`), uzeta traka ima zuti rub (`lane_taken`), val trake na razini 0 je ravan. Razina ide do
+playera kao postotak (100 kako je snimljeno, 0 tisina, najvise 400): `qnc-player-input` `lead_audio_levels`,
+`with_lead_levels`, `output_audio_levels`; `qnc-broadcast-engine` `InputPlan.audio_levels`, `DeviceSink` mnozi izlaze
+nakon preslikavanja kanala (`apply_levels`, test); `qnc-source-preview` `hear_channels` prima kanale i razine.
+Vrijedi za source preview. Nije izvedeno: razina u prici (segment ili pokrivalica s A1/A2 na razini 0 u bazi, Wrap,
+program, prerender) i podesavanje razine osim 0 i 100.

@@ -107,6 +107,9 @@ pub struct InputPlan {
     pub(crate) delivered_rate: Option<qnc_media_metadata::FrameTimebase>,
     pub(crate) audio_streams: Vec<AudioStreamPlan>,
     pub(crate) audio_channels: Option<qnc_audio_output::ChannelMap>,
+    /// The level of each device output in percent (user 2026-10-14: level 0 of A1 or A2);
+    /// empty: every output as recorded.
+    pub(crate) audio_levels: Vec<u16>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -249,6 +252,7 @@ impl InputPlan {
             progressive,
             delivered_rate,
             audio_streams,
+            audio_levels: if audio_channels.is_some() { input.output_audio_levels() } else { Vec::new() },
             audio_channels,
         })
     }
@@ -300,6 +304,7 @@ impl InputPlan {
             delivered_rate: None,
             audio_streams: Vec::new(),
             audio_channels: None,
+            audio_levels: Vec::new(),
         })
     }
 

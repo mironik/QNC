@@ -199,8 +199,9 @@ pub struct SourcePreview {
     activity_target: Option<qnc_content_store::ContentTarget>,
     /// The player plays a story program; the view keeps the source clip.
     program: bool,
-    /// The channels of the shown clip heard on output 1 and 2 (A1, A2), when chosen.
-    lead: Option<(String, [u16; 2])>,
+    /// The channels of the shown clip heard on output 1 and 2 (A1, A2), when chosen, and
+    /// their levels in percent (0: level 0, nothing heard).
+    lead: Option<(String, [u16; 2], [u16; 2])>,
 }
 
 impl Default for SourcePreview {
@@ -379,13 +380,15 @@ impl SourcePreview {
     }
 
     /// The channels of the shown clip heard on output 1 (A1) and 2 (A2) (user rule
-    /// 2026-10-01): the clip is prepared again on its confirmed frame. In a story
-    /// program the choice waits for the clip.
-    pub fn hear_channels(&mut self, (a1, a2): (u16, u16)) -> bool {
+    /// 2026-10-01) and their levels (1: as recorded, 0: level 0; user 2026-10-14): the
+    /// clip is prepared again on its confirmed frame. In a story program the choice waits
+    /// for the clip.
+    pub fn hear_channels(&mut self, ((a1, a2), (l1, l2)): ((u16, u16), (f32, f32))) -> bool {
         let Some(clip_id) = self.view.clip_id.clone() else {
             return false;
         };
-        let lead = Some((clip_id.clone(), [a1, a2]));
+        let percent = |level: f32| (level.clamp(0.0, 4.0) * 100.0).round() as u16;
+        let lead = Some((clip_id.clone(), [a1, a2], [percent(l1), percent(l2)]));
         if self.lead == lead {
             return false;
         }
@@ -405,10 +408,10 @@ impl SourcePreview {
     fn prepare_clip(&mut self, clip_id: &str, first_frame: u64) -> bool {
         self.close();
         self.view.clip_id = Some(clip_id.to_string());
-        if self.lead.as_ref().is_some_and(|(id, _)| id != clip_id) {
+        if self.lead.as_ref().is_some_and(|(id, ..)| id != clip_id) {
             self.lead = None; // another clip starts on its own channels
         }
-        let lead = self.lead.as_ref().map(|(_, lead)| *lead);
+        let lead = self.lead.as_ref().map(|(_, lead, levels)| (*lead, *levels));
         // Whoever completes records in the background takes this clip first.
         self.activity.clip(self.activity_target.as_ref(), clip_id);
         let Some(context) = self.context.clone() else {
@@ -448,7 +451,10 @@ impl SourcePreview {
             .load(&context.settings.workspace_db_uri, &clip_id)
             .map_err(|error| error.to_string())?;
             let input = match lead {
-                Some(lead) => input.with_lead_channels(&lead).map_err(|error| error.to_string())?,
+                Some((lead, levels)) => input
+                    .with_lead_channels(&lead)
+                    .and_then(|input| input.with_lead_levels(&levels))
+                    .map_err(|error| error.to_string())?,
                 None => input,
             };
             qnc_player_launcher::prepare_launch(input, &sources, executable)

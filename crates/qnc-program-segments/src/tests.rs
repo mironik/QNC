@@ -475,7 +475,10 @@ fn a1_is_chosen_from_the_real_channels_of_the_marked_clip_and_starts_on_channel_
     assert_eq!(segments.view().a1_choice, Some((0, 4)), "v5: channel 1 first");
     assert!(segments.choose_a1_channel(1));
     assert_eq!(segments.view().a1_choice, Some((1, 4)));
-    assert!(!segments.choose_a1_channel(4), "a channel the clip does not have");
+    assert!(!segments.choose_a1_channel(5), "a channel the clip does not have");
+    assert!(segments.choose_a1_channel(4), "the place after the last channel is level 0");
+    assert_eq!((segments.view().a1_choice, segments.audible_channels()), (Some((4, 4)), ((1, 1), (0.0, 1.0))));
+    assert!(segments.choose_a1_channel(1));
     let mut other = marked(10);
     other.clip_id = Some("clip-y".into());
     segments.set_source(other, None);
@@ -495,7 +498,7 @@ fn a2_has_its_own_choice_from_the_same_real_channels() {
     assert!(segments.choose_a2_channel(2));
     assert_eq!(segments.view().a2_choice, Some((2, 3)));
     assert_eq!(segments.view().a1_choice, Some((0, 3)), "A1 keeps its own choice");
-    assert!(!segments.choose_a2_channel(3), "a channel the clip does not have");
+    assert!(!segments.choose_a2_channel(4), "a channel the clip does not have");
     let mut other = marked(10);
     other.clip_id = Some("clip-y".into());
     segments.set_source(other, None);

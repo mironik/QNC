@@ -205,6 +205,8 @@ pub struct TimelineTheme {
     pub audio_wave: Color32,
     /// The rim of the A1 or A2 button whose channel is being changed (user 2026-10-14).
     pub lane_taken: Color32,
+    /// The A1 or A2 button of a lane at level 0, nothing of it heard (user 2026-10-14).
+    pub lane_silent: Color32,
 }
 
 impl TimelineTheme {
@@ -237,7 +239,8 @@ impl TimelineTheme {
             wave_a3: Color32::from_rgb(132, 214, 158),
             wave_a4: Color32::from_rgb(132, 214, 158),
             audio_wave: Color32::from_rgb(80, 190, 148),
-            lane_taken: Color32::from_rgb(230, 50, 50),
+            lane_taken: Color32::from_rgb(240, 200, 40),
+            lane_silent: Color32::from_rgb(200, 45, 45),
         }
     }
 }
@@ -856,7 +859,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         let zoom = match taken {
             Some((lane, _, choice)) => {
                 let level = input.wave_over_video.filter(|(over, _)| *over == lane).map_or(1, |(_, level)| level.max(1));
-                Some((lane, channel_peaks(&input, choice.selected), level))
+                Some((lane, if choice.silent() { &[] } else { channel_peaks(&input, choice.selected) }, level))
             }
             None => input.wave_over_video.map(|(lane, level)| {
                 let peaks = match lane {
@@ -965,13 +968,16 @@ fn paint_audio_row(
     if !label.is_empty() {
         // A1/A2 are buttons (they take the lane): as bright as the text, in a frame.
         let button = label_rect.shrink2(Vec2::new(3.0, 1.5));
-        ui.painter().rect_filled(button, 3.0, input.theme.label_background);
-        // The lane whose channel is being changed has a red rim (user 2026-10-14).
         let choice = match lane {
             AudioLane::A1 => input.a1_channel,
             AudioLane::A2 => input.a2_channel,
             _ => None,
         };
+        // A lane at level 0 is a red button; the lane whose channel is being changed has a
+        // yellow rim (user 2026-10-14).
+        let silent = choice.is_some_and(|choice| choice.silent());
+        let fill = if silent { input.theme.lane_silent } else { input.theme.label_background };
+        ui.painter().rect_filled(button, 3.0, fill);
         let rim = if choice.is_some_and(|choice| choice.open) {
             Stroke::new(2.0, input.theme.lane_taken)
         } else {
@@ -2026,7 +2032,8 @@ fn channel_peaks<'a>(input: &TimelineInput<'a>, channel: u16) -> &'a [f32] {
 /// A lane with a channel choice draws the wave of its chosen channel (the draft while
 /// taken); without one, its own peaks.
 fn lane_peaks<'a>(input: &TimelineInput<'a>, choice: Option<ChannelChoice>, own: &'a [f32]) -> &'a [f32] {
-    choice.map_or(own, |choice| channel_peaks(input, choice.selected))
+    // A lane at level 0 is heard as nothing, so its wave is flat.
+    choice.map_or(own, |choice| if choice.silent() { &[] } else { channel_peaks(input, choice.selected) })
 }
 
 fn paint_wave_over_video(ui: &mut egui::Ui, row: Rect, peaks: &[f32], level: u8, input: &TimelineInput<'_>) {

@@ -205,6 +205,9 @@ impl ProjectAudio {
     }
 }
 
+/// The highest level of a lead channel, in percent (four times as recorded).
+pub const MAX_LEVEL_PERCENT: u16 = 400;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedInput {
@@ -223,6 +226,11 @@ pub struct PreparedInput {
     /// 2026-10-01). The saved layout itself never changes.
     #[serde(default)]
     pub lead_audio_channels: Vec<u16>,
+    /// The level of each lead channel in percent (100: as recorded, 0: level 0, nothing of
+    /// it is heard; user 2026-10-14). Empty or missing: 100. The inventory after the lead
+    /// channels plays as recorded.
+    #[serde(default)]
+    pub lead_audio_levels: Vec<u16>,
     /// The optimized copy of the clip when the import made one; the picture plays from it
     /// when `representation` is `Optimized`.
     #[serde(default)]
@@ -247,6 +255,22 @@ impl PreparedInput {
         }
         self.lead_audio_channels = lead.to_vec();
         Ok(self)
+    }
+
+    /// The same input with the lead channels at these levels (percent, one per lead
+    /// channel, 0..=400).
+    pub fn with_lead_levels(mut self, levels: &[u16]) -> Result<Self> {
+        if levels.len() != self.lead_audio_channels.len() || levels.iter().any(|level| *level > MAX_LEVEL_PERCENT) {
+            return Err(InputError::InvalidDescriptor);
+        }
+        self.lead_audio_levels = levels.to_vec();
+        Ok(self)
+    }
+
+    /// The level in percent of each output, in the order of `output_audio_channels`.
+    pub fn output_audio_levels(&self) -> Vec<u16> {
+        let lead = (0..self.lead_audio_channels.len()).map(|at| self.lead_audio_levels.get(at).copied().unwrap_or(100));
+        lead.chain(self.layout.audio_channels.iter().map(|_| 100)).collect()
     }
 
     /// The channels the outputs play in order: the lead channels, then the inventory.
@@ -292,6 +316,11 @@ impl PreparedInput {
             return Err(InputError::InvalidDescriptor);
         }
         if self.lead_audio_channels.iter().any(|channel| usize::from(*channel) >= self.layout.audio_channels.len()) {
+            return Err(InputError::InvalidDescriptor);
+        }
+        if self.lead_audio_levels.len() > self.lead_audio_channels.len()
+            || self.lead_audio_levels.iter().any(|level| *level > MAX_LEVEL_PERCENT)
+        {
             return Err(InputError::InvalidDescriptor);
         }
         Ok(())
@@ -407,6 +436,7 @@ fn prepare(settings: &WorkSettings, stored: &impl PlayerClipSource) -> Result<Pr
         layout: layout(snapshot, optimized.as_ref(), representation)?,
         snapshot: snapshot.clone(),
         lead_audio_channels: Vec::new(),
+        lead_audio_levels: Vec::new(),
         optimized,
     })
 }

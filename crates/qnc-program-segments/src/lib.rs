@@ -1084,9 +1084,10 @@ impl ProgramSegments {
         self.lanes.heard()
     }
 
-    /// The source channels the preview plays now: a taken lane's draft is heard before
-    /// Enter keeps it; Escape goes back to the kept channel.
-    pub fn audible_channels(&self) -> (u16, u16) {
+    /// The source channels the preview plays on A1 and A2 now and their levels (level 0:
+    /// nothing of the channel is heard): a taken lane's draft is heard before Enter keeps
+    /// it; Escape goes back to the kept channel and level.
+    pub fn audible_channels(&self) -> ((u16, u16), (f32, f32)) {
         self.lanes.audible()
     }
 
