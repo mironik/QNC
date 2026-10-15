@@ -4014,3 +4014,21 @@ sve se odmah cuje, Enter sprema, Esc vraca. Nove akcije kataloga `lane_level_dow
 razinom), `qnc-panel-focus`, `qnc-channel-picker` (`ChannelChoice.off`), `qnc-segment-panel`, `qnc-timeline` (iskljucena
 traka je crveno dugme, uzeta zuti rub). Razina i dalje ide playeru kao postotak po izlazu (vidi prethodni zapis).
 Vrijedi za source preview; razina u prici nije izvedena.
+Izmjena izgleda 2026-10-15 (korisnik: "timeline treba biti kocka koja ima svoje kocke, tako da timeline uvijek i svugdje
+ima iste mogucnosti; vise mi se svida dizajn timeline iz segmenata"; "video trak ima srednji svjetlo zeleni dio i gore
+tamniji dio; takav tamniji dio iste sirine treba dodati i ispod; A1 se seli u gornji tamniji dio, a A2 u donji; ukupna
+visina se prilagodava trenutnoj visini"): `qnc-timeline` ima sloj `audio_bands` (`TimelineLayerFlags::with_audio_bands`):
+video traka zauzima visinu A1 + video + A2 (`TimelineMetrics::banded_video_height`, ukupna visina ista, test), gore i
+dolje je tamni pojas visine `VIDEO_BAND` (17 px, kao dosadasnji gornji), A1 (dugme i val) je u gornjem, A2 u donjem
+(`paint_audio_band`; dugme `paint_lane_button` dijele trake i pojasevi), svijetli dio i njegov pogodak klikom su izmedju
+pojaseva (`video_middle_insets`), pokrivalice ostaju u svijetlom dijelu. Klik na A1/A2 uzima traku kao i prije; izbornik
+kanala i prosirenje vala koriste pojaseve kao trake. Wrap redovi panela Segmenti (`qnc-segment-panel` `layers`) ga
+koriste. Source timeline jos nije prebacen (pojasevi bi pokrili dio filmstripa; ceka odluku).
+Popravak izolacije 2026-10-15: aplikacija pokrenuta iz izolirane kopije (`QNC_ROOT`) otvorila je stvarnu bazu projekata,
+jer `qnc-desktop::resolve_qnc_root` nije citao `QNC_ROOT`, a kopiji je nedostajao `contracts/ui/shell.layout.json`, pa
+je trazenje palo na radni direktorij (`C:\Users\miron\Projects\QNC`). Posljedica: u stvarnoj `data/qnc-projects.db`
+sistemski templatei (4 izvora, 4 projekta) ponovno su upisani iz seeda s vremenom 20:09:46; projekt "novi test11"
+(`project.db`, `-wal`) nije mijenjan. `resolve_qnc_root` sada prvo uzima `QNC_ROOT`, a korijen koji nije QNC korijen je
+greska (nema pada na radni direktorij); kopija je dobila `shell.layout.json`; aplikacija se pokrece s radnim
+direktorijem u kopiji. Samostalne aplikacije (`apps/qnc-project`, `qnc-story`, MA, `qnc-ingest`) imaju svoje
+trazenje korijena bez te provjere.

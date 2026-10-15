@@ -527,6 +527,16 @@ fn rgb(value: [u8; 3]) -> Color32 {
 }
 
 pub fn resolve_qnc_root() -> Result<PathBuf, String> {
+    // A root named by QNC_ROOT (an isolated copy for tests and measurements) is the one;
+    // one that is not a QNC root is an error, never a quiet fall back to the working
+    // directory, which may be the real projects' root (2026-10-15).
+    if let Some(root) = env::var_os("QNC_ROOT").map(PathBuf::from) {
+        return if is_qnc_root(&root) {
+            Ok(root)
+        } else {
+            Err(qnc_ui_text::text("shell.root_not_found").to_string())
+        };
+    }
     let mut starts = Vec::new();
     if let Ok(path) = env::current_exe() {
         if let Some(parent) = path.parent() {

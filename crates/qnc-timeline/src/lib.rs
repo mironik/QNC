@@ -58,7 +58,17 @@ pub struct TimelineLayerFlags {
     pub shot_range: bool,
     pub in_out: bool,
     pub playhead: bool,
+    /// A1 and A2 in the dark bands of the video row (user 2026-10-15, the segment design):
+    /// the row has a dark band above and one as high below its light middle; A1 sits in
+    /// the band above, A2 in the band below. The stack keeps its height.
+    pub audio_bands: bool,
 }
+
+/// The height of a dark band of the video row (above the light middle; with audio bands
+/// also below it).
+pub const VIDEO_BAND: f32 = 17.0;
+/// The dark strip under the light middle without audio bands.
+const VIDEO_FOOT: f32 = 10.0;
 
 impl TimelineLayerFlags {
     pub fn a1_v_a2() -> Self {
@@ -76,7 +86,14 @@ impl TimelineLayerFlags {
             shot_range: false,
             in_out: false,
             playhead: true,
+            audio_bands: false,
         }
+    }
+
+    /// A1 above and A2 below the light middle of the video row, in its dark bands.
+    pub fn with_audio_bands(mut self) -> Self {
+        self.audio_bands = true;
+        self
     }
 
     pub fn source() -> Self {
@@ -159,6 +176,9 @@ impl TimelineMetrics {
     }
 
     pub fn content_height(self, layers: TimelineLayerFlags, expanded_audio: AudioLane) -> f32 {
+        if layers.audio_bands {
+            return self.banded_video_height(layers);
+        }
         let mut rows = Vec::new();
         if layers.audio_a1 {
             rows.push(self.lane_height(AudioLane::A1, expanded_audio));
@@ -176,6 +196,12 @@ impl TimelineMetrics {
             rows.push(self.lane_height(AudioLane::A4, expanded_audio));
         }
         rows.iter().sum::<f32>() + self.row_gap * rows.len().saturating_sub(1) as f32
+    }
+
+    /// The video row with A1 and A2 in its bands: as high as the rows it replaces.
+    pub fn banded_video_height(self, layers: TimelineLayerFlags) -> f32 {
+        let lanes = [layers.audio_a1, layers.audio_a2].into_iter().filter(|on| *on).count() as f32;
+        self.video_height + lanes * self.audio_height
     }
 
     pub fn outer_height(self, layers: TimelineLayerFlags, expanded_audio: AudioLane) -> f32 {
@@ -741,7 +767,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     let mut video_row = None;
     let (mut a1_row, mut a2_row) = (None, None);
 
-    if input.layers.audio_a1 {
+    if input.layers.audio_a1 && !input.layers.audio_bands {
         let row = next_row(
             &mut next_top,
             left,
@@ -766,17 +792,32 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         );
     }
     if input.layers.video_stack_on() {
-        let row = next_row(
-            &mut next_top,
-            left,
-            right,
-            input.metrics.video_height,
-            input.metrics.row_gap,
-        );
+        let height = if input.layers.audio_bands {
+            input.metrics.banded_video_height(input.layers)
+        } else {
+            input.metrics.video_height
+        };
+        let row = next_row(&mut next_top, left, right, height, input.metrics.row_gap);
         video_row = Some(row);
         keep_first_intent(&mut intent, paint_video_row(ui, row, &input));
+        if input.layers.audio_bands {
+            // A1 in the band above the light middle, A2 in the band below (user 2026-10-15).
+            let band = |top: f32| Rect::from_min_max(egui::pos2(row.left(), top), egui::pos2(row.right(), top + VIDEO_BAND));
+            if input.layers.audio_a1 {
+                let rect = band(row.top());
+                a1_row = Some(rect);
+                let peaks = lane_peaks(&input, input.a1_channel, input.a1_peaks);
+                keep_first_intent(&mut intent, paint_audio_band(ui, rect, AudioLane::A1, peaks, &input));
+            }
+            if input.layers.audio_a2 {
+                let rect = band(row.bottom() - VIDEO_BAND);
+                a2_row = Some(rect);
+                let peaks = lane_peaks(&input, input.a2_channel, input.a2_peaks);
+                keep_first_intent(&mut intent, paint_audio_band(ui, rect, AudioLane::A2, peaks, &input));
+            }
+        }
     }
-    if input.layers.audio_a2 {
+    if input.layers.audio_a2 && !input.layers.audio_bands {
         let row = next_row(
             &mut next_top,
             left,
@@ -966,27 +1007,7 @@ fn paint_audio_row(
         ""
     };
     paint_lane_label(ui, label_rect, label, input);
-    if !label.is_empty() {
-        // A1/A2 are buttons (they take the lane): as bright as the text, in a frame.
-        let button = label_rect.shrink2(Vec2::new(3.0, 1.5));
-        let choice = match lane {
-            AudioLane::A1 => input.a1_channel,
-            AudioLane::A2 => input.a2_channel,
-            _ => None,
-        };
-        // A lane that is off is a red button; the lane being changed has a yellow rim
-        // (user 2026-10-15).
-        let silent = choice.is_some_and(|choice| choice.silent());
-        let fill = if silent { input.theme.lane_silent } else { input.theme.label_background };
-        ui.painter().rect_filled(button, 3.0, fill);
-        let rim = if choice.is_some_and(|choice| choice.open) {
-            Stroke::new(2.0, input.theme.lane_taken)
-        } else {
-            Stroke::new(1.0, input.theme.text)
-        };
-        ui.painter().rect_stroke(button, 3.0, rim, StrokeKind::Inside);
-        ui.painter().text(button.center(), Align2::CENTER_CENTER, label, FontId::proportional(12.0), input.theme.text);
-    }
+    paint_lane_button(ui, label_rect, lane, label, input);
     let response = ui.interact(
         track_rect,
         ui.make_persistent_id(("qnc_timeline_audio", lane.label())),
@@ -1014,6 +1035,64 @@ fn paint_audio_row(
     qnc_wave_view::paint_wave_peaks(ui.painter(), track_rect, peaks, wave);
     paint_ranges_and_playhead(ui, track_rect, input);
     cue_intent_from_response(&response, track_rect, input)
+}
+
+/// A1/A2 are buttons (they take the lane): as bright as the text, in a frame. A lane that
+/// is off is a red button; the lane being changed has a yellow rim (user 2026-10-15).
+fn paint_lane_button(ui: &mut egui::Ui, label_rect: Rect, lane: AudioLane, label: &str, input: &TimelineInput<'_>) {
+    if label.is_empty() {
+        return;
+    }
+    let button = label_rect.shrink2(Vec2::new(3.0, 1.5));
+    let choice = match lane {
+        AudioLane::A1 => input.a1_channel,
+        AudioLane::A2 => input.a2_channel,
+        _ => None,
+    };
+    let silent = choice.is_some_and(|choice| choice.silent());
+    let fill = if silent { input.theme.lane_silent } else { input.theme.label_background };
+    ui.painter().rect_filled(button, 3.0, fill);
+    let rim = if choice.is_some_and(|choice| choice.open) {
+        Stroke::new(2.0, input.theme.lane_taken)
+    } else {
+        Stroke::new(1.0, input.theme.text)
+    };
+    ui.painter().rect_stroke(button, 3.0, rim, StrokeKind::Inside);
+    ui.painter().text(button.center(), Align2::CENTER_CENTER, label, FontId::proportional(12.0), input.theme.text);
+}
+
+/// A1 or A2 in a dark band of the video row: its button in the label column and its wave
+/// over the band (the video row under it keeps the clicks on the track, the markers and the
+/// playhead).
+fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32], input: &TimelineInput<'_>) -> TimelineIntent {
+    let (label_rect, track_rect) = split_label_track(band, input.metrics.label_width);
+    let label = if input.show_lane_labels { lane.label() } else { "" };
+    paint_lane_button(ui, label_rect, lane, label, input);
+    qnc_wave_view::paint_wave_peaks(ui.painter(), track_rect, peaks, input.theme.audio_wave);
+    let label_response = ui.interact(
+        label_rect,
+        ui.make_persistent_id(("qnc_timeline_audio_band_label", lane.label())),
+        Sense::click(),
+    );
+    if input.show_lane_labels && label_response.clicked() {
+        let picker = match lane {
+            AudioLane::A1 => input.a1_channel,
+            AudioLane::A2 => input.a2_channel,
+            _ => None,
+        };
+        // A click on A1/A2 takes the lane as Ctrl+1/Ctrl+2 does (user rule 2026-10-01).
+        return match picker {
+            Some(_) => TimelineIntent::TakeAudioLane(lane),
+            None => TimelineIntent::ToggleAudioExpand(lane),
+        };
+    }
+    TimelineIntent::None
+}
+
+/// The insets of the light middle of the video row: the dark band above it and the dark
+/// part under it (a band as high with audio bands).
+fn video_middle_insets(input: &TimelineInput<'_>) -> (f32, f32) {
+    if input.layers.audio_bands { (VIDEO_BAND, VIDEO_BAND) } else { (VIDEO_BAND, VIDEO_FOOT) }
 }
 
 fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> TimelineIntent {
@@ -1153,8 +1232,9 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
     if input.layers.base_video {
         if input.virtual_spans.is_empty() {
             if !input.base_video_blank {
+                let (top, bottom) = video_middle_insets(input);
                 ui.painter().rect_filled(
-                    track.shrink2(Vec2::new(0.0, 10.0)),
+                    Rect::from_min_max(track.min + Vec2::new(0.0, top), track.max - Vec2::new(0.0, bottom)),
                     1.0,
                     input.theme.wave_a1.linear_multiply(0.20),
                 );
@@ -1164,8 +1244,9 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
         }
     } else if input.layers.virtual_spans {
         if input.virtual_spans.is_empty() && !input.base_video_blank {
+            let (top, bottom) = video_middle_insets(input);
             ui.painter().rect_filled(
-                track.shrink2(Vec2::new(0.0, 10.0)),
+                Rect::from_min_max(track.min + Vec2::new(0.0, top), track.max - Vec2::new(0.0, bottom)),
                 1.0,
                 input.theme.wave_a1.linear_multiply(0.20),
             );
@@ -1307,8 +1388,8 @@ fn paint_virtual_spans(
         let x0 = x_for_frame(track, range_start, duration, span.start_frame);
         let x1 = x_for_frame(track, range_start, duration, span.end_frame);
         let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + 17.0),
-            egui::pos2(x1.max(x0 + 3.0), track.bottom() - 10.0),
+            egui::pos2(x0, track.top() + video_middle_insets(input).0),
+            egui::pos2(x1.max(x0 + 3.0), track.bottom() - video_middle_insets(input).1),
         );
         let base = if span.has_base_video {
             input.theme.wave_a1
@@ -1356,9 +1437,12 @@ fn paint_covers(
         }
         let x0 = x_for_frame(track, range_start, duration, cover.start_frame);
         let x1 = x_for_frame(track, range_start, duration, cover.end_frame);
+        // With audio bands the covers stay in the light middle, off the A1 band.
+        let (top, bottom) = if input.layers.audio_bands { video_middle_insets(input) } else { (0.0, 0.0) };
+        let middle = track.height() - top - bottom;
         let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + 2.0),
-            egui::pos2(x1.max(x0 + 3.0), track.top() + track.height() * 0.42),
+            egui::pos2(x0, track.top() + top + 2.0),
+            egui::pos2(x1.max(x0 + 3.0), track.top() + top + middle * 0.42),
         );
         let base = if cover.pending {
             input.theme.focus
@@ -1651,6 +1735,7 @@ fn video_intent_from_response(
                 input.state.duration_frames(),
                 pos,
                 input.virtual_spans,
+                video_middle_insets(input),
             ) {
                 return TimelineIntent::SelectVirtual {
                     id: id.to_string(),
@@ -1726,6 +1811,7 @@ fn virtual_span_hit<'a>(
     duration: u64,
     pos: egui::Pos2,
     spans: &'a [TimelineVirtualSpan<'a>],
+    (top, bottom): (f32, f32),
 ) -> Option<&'a str> {
     spans.iter().rev().find_map(|span| {
         if span.end_frame <= span.start_frame || span.id.trim().is_empty() {
@@ -1734,8 +1820,8 @@ fn virtual_span_hit<'a>(
         let x0 = x_for_frame(track, range_start, duration, span.start_frame);
         let x1 = x_for_frame(track, range_start, duration, span.end_frame);
         let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + 17.0),
-            egui::pos2(x1.max(x0 + 3.0), track.bottom() - 10.0),
+            egui::pos2(x0, track.top() + top),
+            egui::pos2(x1.max(x0 + 3.0), track.bottom() - bottom),
         )
         .expand(2.0);
         rect.contains(pos).then_some(span.id)
@@ -1850,6 +1936,16 @@ mod tests {
             height_for_layers(TimelineLayerFlags::source(), AudioLane::None),
             102.0
         );
+    }
+
+    #[test]
+    fn audio_bands_keep_the_height_of_the_stack_and_put_a1_a2_in_the_video_row() {
+        let metrics = TimelineMetrics::default();
+        let lanes = TimelineLayerFlags::a1_v_a2().with_overlays();
+        let banded = lanes.with_audio_bands();
+        assert_eq!(metrics.outer_height(banded, AudioLane::None), metrics.outer_height(lanes, AudioLane::None));
+        assert_eq!(metrics.banded_video_height(banded), metrics.video_height + 2.0 * metrics.audio_height);
+        assert!(metrics.banded_video_height(banded) - 2.0 * VIDEO_BAND > metrics.video_height - VIDEO_BAND - VIDEO_FOOT, "the light middle grows");
     }
 
     #[test]
@@ -1968,7 +2064,7 @@ mod tests {
             Some("slot_mid")
         );
         assert_eq!(
-            virtual_span_hit(track, 50, 100, egui::pos2(150.0, 34.0), &spans),
+            virtual_span_hit(track, 50, 100, egui::pos2(150.0, 34.0), &spans, (VIDEO_BAND, VIDEO_FOOT)),
             Some("virtual_b")
         );
         assert_eq!(frame_for_x(track, 50, 100, 150.0), 75);

@@ -175,9 +175,10 @@ fn value(ui: &mut egui::Ui, text: &str, color: Color32) {
     ui.label(text.strong());
 }
 
-/// Carrier, A1, picture, A2, segment spans, markers and slots (v5 `segment_layers`).
+/// Carrier, A1, picture, A2, segment spans, markers and slots (v5 `segment_layers`); A1
+/// and A2 in the dark bands above and below the light middle (user 2026-10-15).
 fn layers() -> TimelineLayerFlags {
-    TimelineLayerFlags::a1_v_a2().with_overlays()
+    TimelineLayerFlags::a1_v_a2().with_overlays().with_audio_bands()
 }
 
 /// One segment row: the program inside its window.
