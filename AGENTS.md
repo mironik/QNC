@@ -4074,3 +4074,11 @@ omjeru, svaka popunjava svoju celiju (slika njegova klipa na sredini celije; sus
 segment ili pokrivalica). `qnc-ui-kit` `paint_rgba_image_filled` (ista slika, odrezana da popuni pravokutnik),
 `qnc-timeline` (`picture_runs`, `TimelinePicture.strip`), `qnc-segment-panel`. Uska video traka je dvije visine audio
 pojasa (36 px).
+Promjena 2026-10-15 (korisnik: "ako je tako malo, onda se moze cim neki klip dobije wave, na drugoj jezgri raditi
+filmstrip"; "bitno je da se to sto prije napravi"; izmjereno: citanje zvuka MXF-a s kartice uzima oko 7 % jedne jezgre):
+filmstrip vise ne ceka da svi waveovi zavrse. Dok waveovi imaju posla ili se zapisi jos dovrsavaju, filmstrip uzima samo
+klipove ciji je wave vec spremljen, pa svaki klip dobiva filmstrip odmah nakon svog wavea, usporedno sa sljedecim
+waveovima; klip bez wavea (bez zvuka ili neuspio wave) uzima se kad waveovi zavrse. `qnc-content-artifacts` (popis
+filmstripa preskace klipove bez wavea, `waves_busy`), `qnc-timeline-artifacts` (`waves_pending`, filmstrip ceka samo
+player), `tools/qnc-ingest-worker` (popisi se ponovno citaju svake 3 s dok ima posla). Zamjenjuje redoslijed iz zapisa
+"wave cim je zapis klipa gotov" (filmstrip tek nakon svih waveova).
