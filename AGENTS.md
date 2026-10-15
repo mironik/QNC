@@ -4036,8 +4036,3 @@ Dopuna 2026-10-15 (korisnik: "svedi wrap timeline na dimenzije source timeline, 
 kao source timeline"): pojasevi A1 i A2 visoki su kao audio traka source timelinea (`TimelineMetrics.audio_height`,
 18 px), a svijetli dio izmedju njih kao njegova video traka (`video_height`, 64 px); obje strane koriste
 `TimelineMetrics::default`. `qnc-timeline` (`video_middle_insets`, pojasevi u `show`, test). Snimljeno u izoliranoj kopiji.
-Dopuna 2026-10-15 (korisnik: "svugdje treba biti isto... u sredini svjetlo zelena ako nema filmstripa... playhead ide po
-cijeloj visini timeline, ali se slot na wrap-segment oznacava samo na srednjem svijetlom dijelu i A2"): source timeline
-(`TimelineLayerFlags::source()`, Ingest, Story, MA) ima iste pojaseve A1/A2 kao Wrap redovi; filmstrip je u svijetlom
-dijelu, a bez filmstripa taj dio je svijetlozelen. Playhead se crta nakon pojaseva preko cijele visine reda. Slot (crtanje
-i klik, `slot_top`) pocinje ispod pojasa A1, pa oznacava svijetli dio i A2. `qnc-timeline`, testovi.

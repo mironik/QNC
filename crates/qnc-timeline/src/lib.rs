@@ -101,9 +101,7 @@ impl TimelineLayerFlags {
         // The source range is the whole clip: its outline drew blue lines round every lane
         // and said nothing (user 2026-10-14: no dark blue lines on the source timeline).
         layers.shot_range = false;
-        // The same timeline everywhere (user 2026-10-15): A1 and A2 in the bands of the video
-        // row, the filmstrip in its light middle.
-        layers.with_audio_bands()
+        layers
     }
 
     pub fn with_source_marks(mut self) -> Self {
@@ -803,7 +801,6 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         keep_first_intent(&mut intent, paint_video_row(ui, row, &input));
         if input.layers.audio_bands {
             // A1 in the band above the light middle, A2 in the band below (user 2026-10-15).
-            // The playhead is drawn after them, over the whole height of the row.
             // Each band is as high as an audio lane of the source timeline, the light middle as
             // its video row (user 2026-10-15: the Wrap rows in the source timeline's measures).
             let height = input.metrics.audio_height;
@@ -819,12 +816,6 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
                 a2_row = Some(rect);
                 let peaks = lane_peaks(&input, input.a2_channel, input.a2_peaks);
                 keep_first_intent(&mut intent, paint_audio_band(ui, rect, AudioLane::A2, peaks, &input));
-            }
-            if input.layers.playhead {
-                if let Some(frame) = input.state.confirmed_frame() {
-                    let (_, track) = split_label_track(row, input.metrics.label_width);
-                    paint_playhead(ui, track, input.state.range_start(), input.state.duration_frames(), frame, &input);
-                }
             }
         }
     }
@@ -1131,23 +1122,11 @@ fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> T
     );
     ui.painter()
         .rect_filled(track_rect, 0.0, input.theme.video_background);
-    // With audio bands the picture is in the light middle: the filmstrip there, light green
-    // while there is none (user 2026-10-15: the same timeline everywhere).
-    let picture = if input.layers.audio_bands {
-        let (top, bottom) = video_middle_insets(input);
-        let middle = Rect::from_min_max(track_rect.min + Vec2::new(0.0, top), track_rect.max - Vec2::new(0.0, bottom));
-        if !input.layers.base_video && !input.layers.virtual_spans {
-            ui.painter().rect_filled(middle, 1.0, input.theme.wave_a1.linear_multiply(0.20));
-        }
-        middle
-    } else {
-        track_rect
-    };
     if let Some(background) = input.filmstrip_background {
-        paint_filmstrip_background(ui, picture, background);
+        paint_filmstrip_background(ui, track_rect, background);
     }
     if let Some(paint_background) = input.video_background {
-        paint_background(ui, picture);
+        paint_background(ui, track_rect);
     }
     paint_video_layers(ui, track_rect, input);
     video_intent_from_response(&response, track_rect, input)
@@ -1329,7 +1308,7 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
             input,
         );
     }
-    if input.layers.playhead && !input.layers.audio_bands {
+    if input.layers.playhead {
         if let Some(frame) = input.state.confirmed_frame() {
             paint_playhead(ui, track, range_start, duration, frame, input);
         }
@@ -1519,9 +1498,8 @@ fn paint_marker_slots(
         }
         let x0 = x_for_frame(track, range_start, duration, slot.start_frame);
         let x1 = x_for_frame(track, range_start, duration, slot.end_frame);
-        let top = slot_top(input);
         let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + top + 2.0),
+            egui::pos2(x0, track.top() + 2.0),
             egui::pos2(x1.max(x0 + 3.0), track.bottom() - 2.0),
         );
         let base = if slot.selected {
@@ -1750,7 +1728,6 @@ fn video_intent_from_response(
                 input.state.duration_frames(),
                 pos,
                 input.marker_slots,
-                slot_top(input),
             ) {
                 return TimelineIntent::SelectMarkerSlot {
                     id: id.to_string(),
@@ -1813,19 +1790,12 @@ fn cover_hit<'a>(
     })
 }
 
-/// How far below the top of the video row a slot starts: with audio bands under the A1 band,
-/// so a slot marks the light middle and A2 (user 2026-10-15).
-fn slot_top(input: &TimelineInput<'_>) -> f32 {
-    if input.layers.audio_bands { video_middle_insets(input).0 } else { 0.0 }
-}
-
 fn slot_hit<'a>(
     track: Rect,
     range_start: u64,
     duration: u64,
     pos: egui::Pos2,
     slots: &'a [TimelineSlotSpan<'a>],
-    top: f32,
 ) -> Option<&'a str> {
     slots.iter().find_map(|slot| {
         if slot.end_frame <= slot.start_frame || slot.id.trim().is_empty() {
@@ -1834,7 +1804,7 @@ fn slot_hit<'a>(
         let x0 = x_for_frame(track, range_start, duration, slot.start_frame);
         let x1 = x_for_frame(track, range_start, duration, slot.end_frame);
         let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + top + 2.0),
+            egui::pos2(x0, track.top() + 2.0),
             egui::pos2(x1.max(x0 + 3.0), track.bottom() - 2.0),
         )
         .expand(2.0);
@@ -2001,7 +1971,6 @@ mod tests {
         assert!(layers.in_out);
         assert!(layers.playhead);
         assert!(layers.video_stack_on());
-        assert!(layers.audio_bands, "the same bands as the Wrap rows");
     }
 
     #[test]
@@ -2102,13 +2071,8 @@ mod tests {
             Some("cover_mid")
         );
         assert_eq!(
-            slot_hit(track, 50, 100, egui::pos2(135.0, 55.0), &slots, 0.0),
+            slot_hit(track, 50, 100, egui::pos2(135.0, 55.0), &slots),
             Some("slot_mid")
-        );
-        assert_eq!(
-            slot_hit(track, 50, 100, egui::pos2(135.0, 6.0), &slots, 18.0),
-            None,
-            "with audio bands a slot is not in the A1 band"
         );
         assert_eq!(
             virtual_span_hit(track, 50, 100, egui::pos2(150.0, 34.0), &spans, (VIDEO_BAND, VIDEO_FOOT)),
