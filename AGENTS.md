@@ -4041,3 +4041,6 @@ ali u prikazu slota boja se samo video i A2; A1 nije dio slota, on je baza slota
 pokrivalica boji cijeli svijetli dio (prije gornjih ~40 %), slot (crtanje i klik) pocinje ispod pojasa A1 i boji video i
 A2, a playhead se crta nakon pojaseva preko cijele visine reda. Source timeline nije mijenjan. `qnc-timeline`
 (`cover_rows`, `slot_top`), testovi.
+Dopuna 2026-10-15 (korisnik: "zasto audio A1 u segmentu gubi boju pozadine, njegova boja treba biti kao i A2"): pojasevi
+A1 i A2 Wrap reda imaju istu pozadinu audio trake (`audio_primary_background`), nacrtanu prije slota i pokrivalica, pa
+slot i dalje boji samo video i A2. `qnc-timeline` (`paint_video_row`).

@@ -1129,6 +1129,18 @@ fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> T
     );
     ui.painter()
         .rect_filled(track_rect, 0.0, input.theme.video_background);
+    if input.layers.audio_bands {
+        // A1 and A2 bands in the colour of an audio lane, both the same (user 2026-10-15);
+        // the slot and the covers are drawn over them afterwards.
+        let (top, bottom) = video_middle_insets(input);
+        let fill = input.theme.audio_primary_background;
+        if top > 0.0 {
+            ui.painter().rect_filled(Rect::from_min_max(track_rect.min, egui::pos2(track_rect.right(), track_rect.top() + top)), 0.0, fill);
+        }
+        if bottom > 0.0 {
+            ui.painter().rect_filled(Rect::from_min_max(egui::pos2(track_rect.left(), track_rect.bottom() - bottom), track_rect.max), 0.0, fill);
+        }
+    }
     if let Some(background) = input.filmstrip_background {
         paint_filmstrip_background(ui, track_rect, background);
     }
