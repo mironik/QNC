@@ -114,6 +114,7 @@ members = [
     "crates/qnc-wrap-session",
     "crates/qnc-sync-cover",
     "crates/qnc-program-waveform",
+    "crates/qnc-program-filmstrip",
     "crates/qnc-board",
     "crates/qnc-channel-picker",
     "crates/qnc-pending-marks",
@@ -287,6 +288,7 @@ qnc-program-segments = { path = "crates/qnc-program-segments" }
 qnc-wrap-session = { path = "crates/qnc-wrap-session" }
 qnc-sync-cover = { path = "crates/qnc-sync-cover" }
 qnc-program-waveform = { path = "crates/qnc-program-waveform" }
+qnc-program-filmstrip = { path = "crates/qnc-program-filmstrip" }
 qnc-board = { path = "crates/qnc-board" }
 qnc-channel-picker = { path = "crates/qnc-channel-picker" }
 qnc-pending-marks = { path = "crates/qnc-pending-marks" }

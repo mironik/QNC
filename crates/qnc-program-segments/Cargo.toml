@@ -14,6 +14,7 @@ qnc-lane-choice = { workspace = true }
 qnc-virtual-shots = { workspace = true }
 qnc-sync-cover = { workspace = true }
 qnc-program-waveform = { workspace = true }
+qnc-program-filmstrip = { workspace = true }
 qnc-source-timecode = { workspace = true }
 qnc-source-channels = { workspace = true }
 qnc-content-store = { workspace = true }

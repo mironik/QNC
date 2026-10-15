@@ -11,7 +11,7 @@ pub fn timeline_intent_to_ingest_intent(intent: TimelineIntent) -> Option<Ingest
         TimelineIntent::SelectVirtual { .. }
         | TimelineIntent::SelectCover { .. }
         | TimelineIntent::SelectMarkerSlot { .. }
-        | TimelineIntent::SelectMarker { .. } => None,
-        TimelineIntent::None => None,
+        | TimelineIntent::SelectMarker { .. }
+        | TimelineIntent::ToggleVideoMode | TimelineIntent::None => None,
     }
 }

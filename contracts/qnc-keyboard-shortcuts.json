@@ -116,6 +116,9 @@
     "select_audio_a2": {
       "label": "Uzmi A2: gore/dolje kanal, lijevo iskljuci, desno ukljuci, Ctrl+lijevo/desno razina, Enter sprema"
     },
+    "toggle_wrap_video": {
+      "label": "Wrap redovi: filmstrip ili uska video traka (Ctrl+klik na V)"
+    },
     "lane_level_down": {
       "label": "Uzeta traka A1/A2: razina 1 dB nize"
     },

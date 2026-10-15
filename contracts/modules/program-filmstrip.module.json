@@ -1,0 +1,43 @@
+{
+  "module_id": "qnc.module.program-filmstrip",
+  "module_name": "Program filmstrip",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "program.filmstrip.compose",
+    "program.filmstrip.row"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "ui.paint",
+    "database.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.source-preview",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-program-filmstrip",
+  "input": "Where each clip shows its picture (segments with a picture and covers: program frames, source IN/OUT), each clip's length in frames and its stored filmstrip read through the public timeline artifact reader.",
+  "output": "The filmstrip pictures over the whole program (covers over segments) and the part of them for one Wrap row. A clip whose filmstrip is not stored yet is asked again after two seconds. It never decodes media, probes, writes or plays.",
+  "specification": "User 2026-10-15: the video part of a Wrap segment row shows the filmstrip of what plays there; laid out like qnc-program-waveform."
+}

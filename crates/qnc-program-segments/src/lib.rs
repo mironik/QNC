@@ -116,6 +116,10 @@ pub struct ProgramSegments {
     waker: qnc_prerender_launch::PrerenderWaker,
     /// The stored waves of the clips the program plays (v5 program waveform).
     waves: qnc_program_waveform::ProgramWaves,
+    /// The stored filmstrips of the clips the program shows (Wrap row pictures).
+    filmstrips: qnc_program_filmstrip::ProgramFilmstrips,
+    /// The Wrap rows show a narrow video row instead of the filmstrip.
+    video_compact: bool,
     project_id: String,
     stored: Vec<ProgramSegment>,
     stored_markers: Vec<ProgramMarker>,
@@ -221,6 +225,7 @@ impl ProgramSegments {
         let same = self.target.as_ref().map(ProjectDbTarget::uri) == Some(story.uri());
         if !same {
             *self = Self::default();
+            self.filmstrips.set_reader(waves.clone());
             self.waves.set_reader(waves);
         }
         self.target = Some(story);
@@ -249,6 +254,10 @@ impl ProgramSegments {
         let (segments, covers) = self.view.wave_placements();
         let mut view = self.view.clone();
         view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());
+        view.video_compact = self.video_compact;
+        if !self.video_compact {
+            view.pictures = self.filmstrips.pictures(&view.picture_placements(), |id| durations.get(id).copied());
+        }
         // A zoom picture at its clip's first or last frame (user 2026-10-13).
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| durations.get(id).copied());
         qnc_program_view::mark_clip_edges(&mut view.source_edit_stills, |id| durations.get(id).copied());
@@ -330,7 +339,7 @@ impl ProgramSegments {
 
     /// Whether a read of the story or of its waves is still running.
     pub fn reading(&self) -> bool {
-        self.reading.is_some() || self.waves.reading()
+        self.reading.is_some() || self.waves.reading() || self.filmstrips.reading()
     }
 
     /// Takes a finished read of the story; true if one was applied.
@@ -430,6 +439,7 @@ impl ProgramSegments {
                 self.write(Operation::IncludeSegment { segment_id });
             }
             SegmentCommand::Purge(segment_id) => self.write(Operation::PurgeSegment { segment_id }),
+            SegmentCommand::ToggleWrapVideo => self.video_compact = !self.video_compact,
             SegmentCommand::Undo | SegmentCommand::Redo => {
                 self.marker_edit = None;
                 self.slot_trim = None;

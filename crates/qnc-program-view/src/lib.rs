@@ -106,6 +106,12 @@ pub struct SegmentsView {
     pub editing: Option<String>,
     /// The program wave (A1 segments, A2 covers) from the stored clip waves.
     pub peaks: qnc_program_waveform::ProgramPeaks,
+    /// The Wrap rows show a narrow video row instead of the filmstrip (Ctrl+click on V,
+    /// user 2026-10-15).
+    pub video_compact: bool,
+    /// The filmstrip pictures of the program (segments with a picture, covers over
+    /// them); empty with a narrow video row.
+    pub pictures: Vec<qnc_program_filmstrip::ProgramPicture>,
     /// The source channel (zero based) heard on A1 in the next Talking Head / Voice
     /// over and how many channels the marked clip has; `None` without a count.
     pub a1_choice: Option<(u16, u16)>,
@@ -148,6 +154,26 @@ impl SegmentsView {
             source_out: cover.source_out_frame,
         });
         (segments.collect(), covers.collect())
+    }
+
+    /// Where each clip's picture is in the program: segments with a picture, then the
+    /// covers over them.
+    pub fn picture_placements(&self) -> Vec<qnc_program_filmstrip::PicturePlacement> {
+        let segments = self.rows.iter().filter(|row| row.kind.has_base_video()).map(|row| qnc_program_filmstrip::PicturePlacement {
+            clip_id: row.clip_id.clone(),
+            program_start: row.start_frame,
+            program_end: row.end_frame,
+            source_in: row.source_in_frame,
+            source_out: row.source_out_frame,
+        });
+        let covers = self.covers.iter().map(|cover| qnc_program_filmstrip::PicturePlacement {
+            clip_id: cover.clip_id.clone(),
+            program_start: cover.start_frame,
+            program_end: cover.end_frame,
+            source_in: cover.source_in_frame,
+            source_out: cover.source_out_frame,
+        });
+        segments.chain(covers).collect()
     }
 
     pub fn selected(&self) -> Option<&SegmentRow> {

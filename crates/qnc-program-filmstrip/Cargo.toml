@@ -1,0 +1,11 @@
+[package]
+name = "qnc-program-filmstrip"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: passive program filmstrip (the stored clip filmstrips laid on the program axis by each segment's and cover's source IN/OUT) and its slice for one Wrap row"
+
+[dependencies]
+qnc-timeline-assets = { workspace = true }
+
+[dev-dependencies]
+qnc-image-assets = { workspace = true }

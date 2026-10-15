@@ -4467,6 +4467,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-program-filmstrip"
+version = "0.1.0"
+dependencies = [
+ "qnc-image-assets",
+ "qnc-timeline-assets",
+]
+
+[[package]]
 name = "qnc-program-input"
 version = "0.1.0"
 dependencies = [
@@ -4536,6 +4544,7 @@ dependencies = [
  "qnc-prerender-launch",
  "qnc-program-commands",
  "qnc-program-db",
+ "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
  "qnc-source-channels",
@@ -4554,6 +4563,7 @@ dependencies = [
  "qnc-image-assets",
  "qnc-program-commands",
  "qnc-program-db",
+ "qnc-program-filmstrip",
  "qnc-program-waveform",
  "qnc-source-timecode",
  "qnc-ui-text",
@@ -4745,6 +4755,7 @@ name = "qnc-segment-panel"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-program-filmstrip",
  "qnc-program-segments",
  "qnc-program-waveform",
  "qnc-source-dock",

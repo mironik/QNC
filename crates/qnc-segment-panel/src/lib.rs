@@ -20,7 +20,7 @@ use eframe::egui::{self, Color32, RichText, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentRow, SegmentsView};
 use qnc_timeline::{
     AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent,
-    TimelineLayerFlags, TimelineMarkerPin, TimelineMetrics, TimelineProjection, TimelineSlotSpan,
+    TimelineLayerFlags, TimelineMarkerPin, TimelineMetrics, TimelinePicture, TimelineProjection, TimelineSlotSpan,
     TimelineTheme, TimelineVirtualSpan,
 };
 
@@ -177,8 +177,9 @@ fn value(ui: &mut egui::Ui, text: &str, color: Color32) {
 
 /// Carrier, A1, picture, A2, segment spans, markers and slots (v5 `segment_layers`); A1
 /// and A2 in the dark bands above and below the light middle (user 2026-10-15).
-fn layers() -> TimelineLayerFlags {
-    TimelineLayerFlags::a1_v_a2().with_overlays().with_audio_bands()
+/// With `compact` the light middle is narrow and shows no filmstrip (Ctrl+click on V).
+fn layers(compact: bool) -> TimelineLayerFlags {
+    TimelineLayerFlags::a1_v_a2().with_overlays().with_audio_bands().with_compact_video(compact)
 }
 
 /// One segment row: the program inside its window.
@@ -292,6 +293,18 @@ fn paint_program(
         .map(|frame| (local(*frame), segments.timecode(*frame)))
         .collect();
     let trim_playheads: Vec<(u64, &str)> = trim_labels.iter().map(|(frame, label)| (*frame, label.as_str())).collect();
+    // This row's part of the program filmstrip (user 2026-10-15).
+    let row_pictures = qnc_program_filmstrip::row_pictures(&segments.pictures, start, end);
+    let pictures: Vec<TimelinePicture<'_>> = row_pictures
+        .iter()
+        .filter_map(|picture| {
+            Some(TimelinePicture {
+                start_frame: picture.program_start,
+                end_frame: picture.program_end,
+                frame: picture.strip.frames.get(picture.frame)?,
+            })
+        })
+        .collect();
     let no_picture = segments
         .segment_at(start)
         .is_some_and(|row| !row.kind.has_base_video() && row.end_frame >= end);
@@ -299,7 +312,7 @@ fn paint_program(
         ui,
         TimelineInput {
             state: &state,
-            layers: layers(),
+            layers: layers(segments.video_compact),
             metrics: TimelineMetrics::default(),
             theme,
             expanded_audio: AudioLane::None,
@@ -326,6 +339,7 @@ fn paint_program(
             a2_channel: None,
             wave_over_video: None,
             trim_playheads: &trim_playheads,
+            pictures: &pictures,
         },
     );
     // Story rows only: a dragged M marker follows the pointer as a draft (Enter confirms).
@@ -356,6 +370,8 @@ fn paint_program(
         TimelineIntent::CueFrame(frame) => Some(SegmentCommand::Cue(start + frame.min(duration))),
         // V on a segment or the program row is Home: the start of the program.
         TimelineIntent::GoHome => Some(SegmentCommand::ProgramStart),
+        // Ctrl+click on V: filmstrip or narrow video row (user 2026-10-15).
+        TimelineIntent::ToggleVideoMode => Some(SegmentCommand::ToggleWrapVideo),
         _ => None,
     }
 }
@@ -366,7 +382,7 @@ mod tests {
 
     #[test]
     fn a_segment_row_shows_picture_audio_spans_markers_and_slots() {
-        let layers = layers();
+        let layers = layers(false);
         assert!(layers.carrier && layers.audio_a1 && layers.base_video && layers.audio_a2);
         assert!(layers.virtual_spans && layers.markers && layers.marker_slots && layers.playhead);
         assert!(!layers.in_out);

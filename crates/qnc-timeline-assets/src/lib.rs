@@ -4,8 +4,8 @@
 //! timeline painting. It does not generate media, probe, scan, own playback, own
 //! application workflow, or write any database.
 
-pub use qnc_filmstrip::FilmstripBackground;
-use qnc_filmstrip::{FilmstripArtifactRecord, FilmstripFrameAsset, FILMSTRIP_FRAME_COUNT};
+pub use qnc_filmstrip::{FilmstripBackground, FilmstripFrameAsset, FILMSTRIP_FRAME_COUNT};
+use qnc_filmstrip::FilmstripArtifactRecord;
 use qnc_wave::{WaveArtifactRecord, WaveformPeaks};
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
@@ -274,8 +274,27 @@ fn read_assets(
     })
 }
 
+/// The stored filmstrip of one clip with its pictures, read through the public reader;
+/// `None` while it is not ready.
+pub fn read_filmstrip_background(
+    reader: &dyn TimelineArtifactRead,
+    clip_id: &str,
+) -> Result<Option<FilmstripBackground>, String> {
+    match reader.read_filmstrip(clip_id)? {
+        Some(record) => filmstrip_pictures(reader, &record),
+        None => Ok(None),
+    }
+}
+
 fn load_filmstrip_background(
     context: &TimelineAssetContext,
+    record: &FilmstripArtifactRecord,
+) -> Result<Option<FilmstripBackground>, String> {
+    filmstrip_pictures(context.reader.as_ref(), record)
+}
+
+fn filmstrip_pictures(
+    reader: &dyn TimelineArtifactRead,
     record: &FilmstripArtifactRecord,
 ) -> Result<Option<FilmstripBackground>, String> {
     if record.status != "ready" || record.frames.is_empty() {
@@ -286,7 +305,7 @@ fn load_filmstrip_background(
     }
     let mut frames = Vec::with_capacity(record.frames.len());
     for frame in &record.frames {
-        let bytes = context.reader.read_image_bytes(&frame.artifact_uri)?;
+        let bytes = reader.read_image_bytes(&frame.artifact_uri)?;
         let image = qnc_image_assets::decode_thumbnail(&bytes)?;
         frames.push(FilmstripFrameAsset {
             index: frame.index,

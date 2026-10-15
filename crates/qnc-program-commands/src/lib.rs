@@ -139,6 +139,8 @@ pub enum SegmentCommand {
     Undo,
     /// REDO: the last undone story edit again.
     Redo,
+    /// Ctrl+click on V of a Wrap row: filmstrip or narrow video row (user 2026-10-15).
+    ToggleWrapVideo,
 }
 
 impl SegmentCommand {
@@ -167,6 +169,7 @@ impl SegmentCommand {
             "navigate_next_object" => Self::NavigateObject { up: false },
             "undo_object" => Self::Undo,
             "redo_object" => Self::Redo,
+            "toggle_wrap_video" => Self::ToggleWrapVideo,
             "cover_mode_covers" => Self::CoverMode { sync: false },
             "cover_mode_sync" => Self::CoverMode { sync: true },
             _ => return None,

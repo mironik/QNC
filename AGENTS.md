@@ -4047,3 +4047,16 @@ slot i dalje boji samo video i A2. `qnc-timeline` (`paint_video_row`).
 Dopuna 2026-10-15 (korisnik: "nije potrebno prikazivati M markere jer smetaju prikazu A1; marker linija ne treba se crtati
 preko A1 audio jer markeri se odnose na pokrivalice"): u Wrap redovima (sloj `audio_bands`) linija markera ide samo preko
 videa i A2, bez oznake "M"; pregledni red programa (bez pojaseva) ostaje kakav je. `qnc-timeline` (`paint_markers`).
+Dopuna 2026-10-15 (korisnik: "ovolika visina video traka u Wrap-segmentu nema smisla ako nema filmstrip... trebamo ili
+filmstrip ili suziti visinu, ili imati obje opcije"; "moze ostati vracanje playheada na pocetak, a uvodimo Ctrl+ za
+prebacivanje modova filmstrip/uska video traka"; "A1 i A2 trake trebaju biti iste boje"): Wrap redovi pokazuju filmstrip
+onoga sto se tamo vidi (Ton segmenti i pokrivalice preko njih), a Ctrl+klik na V prebacuje na usku video traku (visine
+audio pojasa, bez slika) i natrag; obican klik na V ostaje Home. Nova javna kocka `crates/qnc-program-filmstrip` (+ ugovor
+`contracts/modules/program-filmstrip.module.json`): spremljeni filmstripovi klipova procitani u pozadini kroz javni citac
+artefakata, slozeni na os programa po izvornom IN/OUT (kao `qnc-program-waveform`), isjecak za red; ne dekodira, ne pise.
+`qnc-timeline-assets` `read_filmstrip_background`; `qnc-timeline` (`TimelinePicture`, `pictures`, sloj `compact_video`,
+namjera `ToggleVideoMode`; preko slika segment ima samo okvir, a pokrivalica je traka od 13 px na vrhu slike; slot boji
+samo video dio i uokviruje A2, pa A1 i A2 ostaju iste boje); `qnc-program-view` (`video_compact`, `pictures`,
+`picture_placements`); `qnc-program-commands` (`ToggleWrapVideo`, akcija kataloga `toggle_wrap_video` bez tipke);
+`qnc-program-segments`; `qnc-segment-panel`; `qnc-ingest-application` (samo krak namjere, C10 isti). Izbor moda vrijedi dok
+aplikacija radi. Testovi, conformance.

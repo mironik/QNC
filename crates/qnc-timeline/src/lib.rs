@@ -62,12 +62,18 @@ pub struct TimelineLayerFlags {
     /// the row has a dark band above and one as high below its light middle; A1 sits in
     /// the band above, A2 in the band below. The stack keeps its height.
     pub audio_bands: bool,
+    /// With audio bands: the light middle as low as an audio band, without pictures
+    /// (user 2026-10-15: Ctrl+click on V switches a Wrap row between filmstrip and a
+    /// narrow video row).
+    pub compact_video: bool,
 }
 
 /// The dark band above the light middle of the video row (without audio bands).
 pub const VIDEO_BAND: f32 = 17.0;
 /// The dark strip under the light middle without audio bands.
 const VIDEO_FOOT: f32 = 10.0;
+/// A cover over the filmstrip of a Wrap row: a strip as high as its label.
+const COVER_STRIP: f32 = 13.0;
 
 impl TimelineLayerFlags {
     pub fn a1_v_a2() -> Self {
@@ -86,12 +92,19 @@ impl TimelineLayerFlags {
             in_out: false,
             playhead: true,
             audio_bands: false,
+            compact_video: false,
         }
     }
 
     /// A1 above and A2 below the light middle of the video row, in its dark bands.
     pub fn with_audio_bands(mut self) -> Self {
         self.audio_bands = true;
+        self
+    }
+
+    /// With audio bands: a narrow light middle (no pictures).
+    pub fn with_compact_video(mut self, compact: bool) -> Self {
+        self.compact_video = compact;
         self
     }
 
@@ -200,7 +213,8 @@ impl TimelineMetrics {
     /// The video row with A1 and A2 in its bands: as high as the rows it replaces.
     pub fn banded_video_height(self, layers: TimelineLayerFlags) -> f32 {
         let lanes = [layers.audio_a1, layers.audio_a2].into_iter().filter(|on| *on).count() as f32;
-        self.video_height + lanes * self.audio_height
+        let middle = if layers.compact_video { self.audio_height } else { self.video_height };
+        middle + lanes * self.audio_height
     }
 
     pub fn outer_height(self, layers: TimelineLayerFlags, expanded_audio: AudioLane) -> f32 {
@@ -571,6 +585,15 @@ pub enum TimelineFocusPaint {
     Out,
 }
 
+/// A filmstrip picture on the timeline's frames `[start_frame, end_frame)`, drawn in the
+/// light middle of a banded video row (a Wrap row's filmstrip, user 2026-10-15).
+#[derive(Debug, Clone, Copy)]
+pub struct TimelinePicture<'a> {
+    pub start_frame: u64,
+    pub end_frame: u64,
+    pub frame: &'a qnc_filmstrip::FilmstripFrameAsset,
+}
+
 #[derive(Clone, Copy)]
 pub struct TimelineInput<'a> {
     pub state: &'a TimelineProjection,
@@ -608,6 +631,8 @@ pub struct TimelineInput<'a> {
     /// Trim playheads: the local frames of the edits being moved and their labels; the
     /// player's playhead stays where it is.
     pub trim_playheads: &'a [(u64, &'a str)],
+    /// Filmstrip pictures of a banded video row (empty: none).
+    pub pictures: &'a [TimelinePicture<'a>],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -627,6 +652,9 @@ pub enum TimelineIntent {
     TakeAudioLane(AudioLane),
     /// A click on the V label: Home of the panel (start of the clip or of the program).
     GoHome,
+    /// Ctrl+click on the V label of a banded row: filmstrip or narrow video (user
+    /// 2026-10-15).
+    ToggleVideoMode,
 }
 
 impl Default for TimelineIntent {
@@ -738,6 +766,7 @@ pub fn show_source_player_timeline_with_channel(
                 a2_channel,
                 wave_over_video,
                 trim_playheads: &[],
+                pictures: &[],
             },
         );
     });
@@ -1120,6 +1149,9 @@ fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> T
         Sense::click(),
     );
     if input.show_lane_labels && label_response.clicked() {
+        if input.layers.audio_bands && ui.input(|input| input.modifiers.command) {
+            return TimelineIntent::ToggleVideoMode;
+        }
         return TimelineIntent::GoHome;
     }
     let response = ui.interact(
@@ -1280,6 +1312,7 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
             paint_virtual_spans(ui, track, range_start, duration, input.virtual_spans, input);
         }
     }
+    paint_pictures(ui, track, range_start, duration, input);
     if input.layers.shot_range {
         paint_range_outline(
             ui,
@@ -1449,6 +1482,33 @@ fn paint_virtual_spans(
     }
 }
 
+/// The filmstrip pictures in the light middle of a banded row, with the outline of each
+/// segment over them.
+fn paint_pictures(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u64, input: &TimelineInput<'_>) {
+    if input.pictures.is_empty() || !input.layers.audio_bands {
+        return;
+    }
+    let (top, bottom) = video_middle_insets(input);
+    let (top, bottom) = (track.top() + top, track.bottom() - bottom);
+    for picture in input.pictures {
+        let x0 = x_for_frame(track, range_start, duration, picture.start_frame);
+        let x1 = x_for_frame(track, range_start, duration, picture.end_frame);
+        if x1 <= x0 {
+            continue;
+        }
+        let rect = Rect::from_min_max(egui::pos2(x0, top), egui::pos2(x1, bottom));
+        let image = &picture.frame.image;
+        let _ = qnc_ui_kit::paint_rgba_image(ui, rect, &picture.frame.uri, image.content_key, image.size, &image.pixels);
+    }
+    for span in input.virtual_spans.iter().filter(|span| span.end_frame > span.start_frame) {
+        let x0 = x_for_frame(track, range_start, duration, span.start_frame);
+        let x1 = x_for_frame(track, range_start, duration, span.end_frame);
+        let rect = Rect::from_min_max(egui::pos2(x0, top), egui::pos2(x1.max(x0 + 3.0), bottom));
+        let color = if span.selected { input.theme.focus } else { input.theme.border };
+        ui.painter().rect_stroke(rect, 1.0, Stroke::new(if span.selected { 1.8 } else { 1.0 }, color), StrokeKind::Inside);
+    }
+}
+
 fn paint_covers(
     ui: &mut egui::Ui,
     track: Rect,
@@ -1523,8 +1583,15 @@ fn paint_marker_slots(
         } else {
             input.theme.playhead
         };
+        // With audio bands the slot fills only the video part and frames A2, so A1 and
+        // A2 keep the same colour (user 2026-10-15).
+        let fill = if input.layers.audio_bands {
+            Rect::from_min_max(rect.min, egui::pos2(rect.right(), track.bottom() - video_middle_insets(input).1))
+        } else {
+            rect
+        };
         ui.painter().rect_filled(
-            rect,
+            fill,
             1.0,
             base.linear_multiply(if selected_only { 0.28 } else { 0.18 }),
         );
@@ -1811,7 +1878,12 @@ fn cover_hit<'a>(
 /// The top and bottom of a cover in the video row: with audio bands the whole light middle
 /// (user 2026-10-15: a cover paints the video part of the Wrap row), otherwise the upper part.
 fn cover_rows(track: Rect, input: &TimelineInput<'_>) -> (f32, f32) {
-    if input.layers.audio_bands {
+    if input.layers.audio_bands && !input.pictures.is_empty() {
+        // Over the filmstrip a cover is a strip at the top of the picture, so its own
+        // pictures show under it.
+        let top = track.top() + video_middle_insets(input).0;
+        (top, top + COVER_STRIP)
+    } else if input.layers.audio_bands {
         let (top, bottom) = video_middle_insets(input);
         (track.top() + top, track.bottom() - bottom)
     } else {
@@ -1989,6 +2061,7 @@ mod tests {
         let banded = lanes.with_audio_bands();
         assert_eq!(metrics.outer_height(banded, AudioLane::None), metrics.outer_height(lanes, AudioLane::None));
         assert_eq!(metrics.banded_video_height(banded), metrics.video_height + 2.0 * metrics.audio_height);
+        assert_eq!(metrics.banded_video_height(banded.with_compact_video(true)), 3.0 * metrics.audio_height, "a narrow video row");
         assert_eq!(
             metrics.banded_video_height(banded) - 2.0 * metrics.audio_height,
             metrics.video_height,
