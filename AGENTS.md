@@ -4044,3 +4044,6 @@ A2, a playhead se crta nakon pojaseva preko cijele visine reda. Source timeline 
 Dopuna 2026-10-15 (korisnik: "zasto audio A1 u segmentu gubi boju pozadine, njegova boja treba biti kao i A2"): pojasevi
 A1 i A2 Wrap reda imaju istu pozadinu audio trake (`audio_primary_background`), nacrtanu prije slota i pokrivalica, pa
 slot i dalje boji samo video i A2. `qnc-timeline` (`paint_video_row`).
+Dopuna 2026-10-15 (korisnik: "nije potrebno prikazivati M markere jer smetaju prikazu A1; marker linija ne treba se crtati
+preko A1 audio jer markeri se odnose na pokrivalice"): u Wrap redovima (sloj `audio_bands`) linija markera ide samo preko
+videa i A2, bez oznake "M"; pregledni red programa (bez pojaseva) ostaje kakav je. `qnc-timeline` (`paint_markers`).

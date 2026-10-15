@@ -1550,17 +1550,22 @@ fn paint_markers(
             continue;
         }
         let x = x_for_frame(track, range_start, duration, marker.frame);
+        // With audio bands a marker belongs to the covers: its line runs over the video and
+        // A2, never over A1, and it has no "M" over A1's wave (user 2026-10-15).
+        let top = track.top() + slot_top(input);
         ui.painter().line_segment(
-            [egui::pos2(x, track.top()), egui::pos2(x, track.bottom())],
+            [egui::pos2(x, top), egui::pos2(x, track.bottom())],
             Stroke::new(1.0, input.theme.focus),
         );
-        ui.painter().text(
-            egui::pos2(x + 3.0, track.top() + 2.0),
-            Align2::LEFT_TOP,
-            "M",
-            FontId::proportional(9.0),
-            input.theme.focus,
-        );
+        if !input.layers.audio_bands {
+            ui.painter().text(
+                egui::pos2(x + 3.0, track.top() + 2.0),
+                Align2::LEFT_TOP,
+                "M",
+                FontId::proportional(9.0),
+                input.theme.focus,
+            );
+        }
     }
 }
 
