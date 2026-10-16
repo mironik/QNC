@@ -4274,3 +4274,8 @@ kocku umjesto svog koda za I/O i korak (Play ostaje uz cuvar playera), Esc s uze
 `qnc-focus-walk` nove tipke propusta samo na source timelineu i gumbima docka; katalog QNC preseta, Ingest dio:
 `select_mark_in/out`, `navigate_prev/next_object`, `playlist_input_start` kao u Storyju. Kocke nisu spajane: fokus Storyja
 i Ingesta ostaju zasebne kocke. C10 `qnc-ingest-application` 1674 -> 1667. Testovi, conformance.
+Popravak 2026-10-16 (korisnik: "dok skrolam po segment timelineu, source timeline bljeska"): log je pokazao da je svaki
+korak kotacica iznad Wrap redova, dok se program jos pripremao, program otvarao iznova (nova sesija, `command_id 1`), pa
+su se prikaz i playhead izmjenjivali. `qnc-source-preview` `show_program_frame`: dok se program priprema, trazena slika se
+samo pamti (`program_pending`) i program na nju skoci cim je spreman; ponovno otvaranje samo kad se prica promijenila ili
+priprema nije uspjela. Testovi, conformance.

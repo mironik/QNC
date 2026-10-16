@@ -210,6 +210,10 @@ pub struct SourcePreview {
     lead: Option<(String, [u16; 2], [u16; 2])>,
     /// The sound of a segment or cover drafted on the Wrap row, heard in the program.
     program_draft: Option<SoundDraft>,
+    /// The program frame asked for while the program was still being prepared: cued once
+    /// it is ready, never by opening it again (live 2026-10-16: the wheel over the Wrap rows
+    /// opened the program on every step and the source timeline flashed).
+    program_pending: Option<u64>,
     /// The program was opened again with the draft (another channel): Escape opens it
     /// again from the story, a level no longer goes to the output.
     program_draft_reopened: bool,
@@ -235,6 +239,7 @@ impl Default for SourcePreview {
             program: false,
             lead: None,
             program_draft: None,
+            program_pending: None,
             program_draft_reopened: false,
         }
     }
@@ -616,6 +621,7 @@ impl SourcePreview {
             return true;
         };
         self.program = true;
+        self.program_pending = None;
         self.play_when_ready = false;
         (self.cue_in_flight, self.cue_next, self.cue_asked) = (None, None, None);
         player.prepare_at(first_frame, move || {
@@ -639,6 +645,10 @@ impl SourcePreview {
     pub fn show_program_frame(&mut self, frame: u64, reopen: bool) -> bool {
         if !reopen && self.program && self.player_view.has_confirmed_position() {
             return self.cue(frame);
+        }
+        if !reopen && self.program && self.player.is_some() && self.player_view.error.is_none() {
+            self.program_pending = Some(frame); // still being prepared: the latest frame waits
+            return true;
         }
         let Some(context) = &self.context else {
             return true;
@@ -836,6 +846,11 @@ impl SourcePreview {
             self.cue_asked = None;
         }
         self.release_cue();
+        if self.program && self.player_view.has_confirmed_position() {
+            if let Some(frame) = self.program_pending.take() {
+                self.cue(frame);
+            }
+        }
         if self.play_when_ready {
             if self.player_view.error.is_some() {
                 self.play_when_ready = false;
