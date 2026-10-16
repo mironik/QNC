@@ -1,0 +1,10 @@
+[package]
+name = "qnc-source-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the keys of a source timeline, the same in every form that shows one: play, a frame step, IN/OUT, IN or OUT taken and moved, start/IN/OUT in order, Home. It drives the universal source preview; it knows no form, no story and no database."
+
+[dependencies]
+qnc-source-preview = { workspace = true }
+qnc-source-mark-focus = { workspace = true }
+qnc-timeline = { workspace = true }

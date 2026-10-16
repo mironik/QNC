@@ -90,21 +90,14 @@ impl IngestApplication {
             result.request_repaint = true;
             return result;
         }
-        match intent.action_id.as_str() {
-            action_ids::MARK_IN => {
-                self.view.timeline = self.view.timeline.with_source_in_at_confirmed();
-                return IngestDispatchResult::accepted(None, true);
+        // The source timeline's keys are the piece every form takes (Play keeps the guard below).
+        if intent.action_id != action_ids::PLAY_PAUSE {
+            if let Some(changed) = self.source_panel.route(&intent.action_id, self.preview.source_preview_mut(), &mut self.view.timeline) {
+                return IngestDispatchResult::accepted(None, changed);
             }
-            action_ids::MARK_OUT => {
-                self.view.timeline = self.view.timeline.with_source_out_at_confirmed();
-                return IngestDispatchResult::accepted(None, true);
-            }
-            _ => {}
         }
         let command = match intent.action_id.as_str() {
             action_ids::PLAY_PAUSE => qnc_ingest_preview_source::PreviewCommand::TogglePlay,
-            action_ids::STEP_BACK_FRAME => qnc_ingest_preview_source::PreviewCommand::Step(-1),
-            action_ids::STEP_FORWARD_FRAME => qnc_ingest_preview_source::PreviewCommand::Step(1),
             action_ids::INGEST_CUE_FRAME => match intent.payload {
                 IngestPayload::Frame(frame) if frame >= 0 => {
                     qnc_ingest_preview_source::PreviewCommand::Cue(frame as u64)

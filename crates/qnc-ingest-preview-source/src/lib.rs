@@ -148,6 +148,12 @@ impl IngestPreviewSource {
         self.preview.take_message()
     }
 
+    /// The universal source preview itself, for the pieces every form shares (the keys of
+    /// the source timeline, `qnc-source-panel`).
+    pub fn source_preview_mut(&mut self) -> &mut SourcePreview {
+        &mut self.preview
+    }
+
     pub fn has_player(&self) -> bool {
         self.preview.has_player()
     }

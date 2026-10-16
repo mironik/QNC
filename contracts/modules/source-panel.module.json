@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.source-panel",
+  "module_name": "Source timeline panel",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.source_timeline.keys"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-source-panel",
+  "input": "A catalog action of the source timeline (play_pause, step_back_frame, step_forward_frame, mark_in, mark_out, select_mark_in, select_mark_out, navigate_prev_object, navigate_next_object, playlist_input_start, clear_focus), the universal source preview and the shown timeline.",
+  "output": "The preview driven (play, step, cue) and the timeline's IN/OUT and taken mark changed; whether the action was taken here. The form keeps its panels; a form without such a panel never calls it.",
+  "specification": "User 2026-10-16: the source timeline behaves the same and has the same means in every form (Story, Media Assist, Ingest and later ones); pieces are not merged, every form takes this one."
+}

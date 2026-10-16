@@ -108,7 +108,8 @@ pub struct PanelFocus {
     panel: Panel,
     /// Ctrl+I or Ctrl+O took a source mark: the arrows move it, not the playhead
     /// (an I or O press only marks; the playhead keeps the arrows, v5).
-    mark_taken: bool,
+    /// The keys of the source timeline, the same piece every form takes.
+    source: qnc_source_panel::SourcePanel,
     /// Up/Down on a taken edit: the key picture search and what its answer moves.
     keyframes: qnc_keyframe_nav::KeyframeNav,
     jump: Option<Jump>,
@@ -146,8 +147,7 @@ impl PanelFocus {
 
     /// A mark taken with Ctrl+I/O that the source timeline still has in focus.
     fn taken(&mut self, timeline: &TimelineProjection) -> bool {
-        self.mark_taken &= qnc_source_mark_focus::is_taken(timeline);
-        self.mark_taken
+        self.source.mark_taken(timeline)
     }
 
     pub fn panel(&self) -> Panel {
@@ -421,8 +421,7 @@ impl PanelFocus {
                     preview.hear_channels(segments.audible_channels());
                 }
                 // A taken mark is let go; with nothing to confirm Enter goes on round the walk.
-                let released = self.taken(timeline) && mark_cue(preview, qnc_source_mark_focus::release(timeline));
-                self.mark_taken &= !released;
+                let released = self.taken(timeline) && self.source.route("clear_focus", preview, timeline).unwrap_or(false);
                 let back = self.back_to_wrap(segments, wrap, timeline);
                 confirmed || released || back || self.advance(preview, wrap, segments)
             }
@@ -474,24 +473,20 @@ impl PanelFocus {
             // segment panel they do nothing (its edges are Ctrl+I/O).
             "mark_in" | "mark_out" if panel == Panel::Segments => false,
             "mark_in" => {
-                self.mark_taken = false;
+                self.source.set_mark_taken(false);
                 segments.arm_sync(); // v5: every IN arms Sync/B-roll
-                return None;
+                return None; // the application marks IN with its still
             }
             "mark_out" => {
-                self.mark_taken = false;
+                self.source.set_mark_taken(false);
                 return None;
             }
             // v5 navigate_adjacent_source_object: start, IN and OUT in order on the source.
-            "navigate_prev_object" | "navigate_next_object" if on_source => {
-                let key = qnc_source_mark_focus::adjacent(timeline, action_id == "navigate_prev_object");
-                self.mark_taken = qnc_source_mark_focus::is_taken(timeline);
-                mark_cue(preview, key)
-            }
+            "navigate_prev_object" | "navigate_next_object" if on_source => return self.source.route(action_id, preview, timeline),
             // v5 mark_in_fit_duration: IN at the playhead, OUT the length of the slot.
             "mark_in_fit_duration" if on_source => match segments.fit_slot() {
                 Some(frames) => {
-                    self.mark_taken = false;
+                    self.source.set_mark_taken(false);
                     mark_cue(preview, qnc_source_mark_focus::fit(timeline, frames))
                 }
                 None => false,
@@ -506,8 +501,9 @@ impl PanelFocus {
                 segments.take_slot_edge_at_playhead(action_id == "select_mark_in")
             }
             "select_segment_start" | "select_segment_end" if panel == Panel::Segments => {
-                self.mark_taken = segments.take_edge(action_id == "select_segment_start");
-                self.mark_taken
+                let taken = segments.take_edge(action_id == "select_segment_start");
+                self.source.set_mark_taken(taken);
+                taken
             }
             // Escape drops a taken segment edge at once and goes back to Wrap.
             "clear_focus" | "close_player" if on_source && segments.trimming_edge() => {
@@ -516,21 +512,15 @@ impl PanelFocus {
             }
             "select_mark_in" | "select_mark_out" if on_source => {
                 self.panel = Panel::SourceTimeline; // the arrows go to the taken mark, not the buttons
-                let key = qnc_source_mark_focus::take(timeline, action_id == "select_mark_in");
-                self.mark_taken = key != MarkKey::Refused;
-                mark_cue(preview, key)
+                return self.source.route(action_id, preview, timeline);
             }
             "step_back_frame" | "step_forward_frame"
-                if panel == Panel::SourceTimeline
-                    && (self.taken(timeline) || (segments.trimming_edge() && qnc_source_mark_focus::is_taken(timeline))) =>
+                if panel == Panel::SourceTimeline && segments.trimming_edge() && qnc_source_mark_focus::is_taken(timeline) =>
             {
-                let frames = if action_id == "step_back_frame" { -1 } else { 1 };
-                mark_cue(preview, qnc_source_mark_focus::nudge(timeline, frames))
+                self.source.set_mark_taken(true); // a segment edge opened with its mark taken
+                return self.source.route(action_id, preview, timeline);
             }
-            "clear_focus" | "close_player" if self.taken(timeline) => {
-                self.mark_taken = false;
-                mark_cue(preview, qnc_source_mark_focus::release(timeline))
-            }
+            "clear_focus" | "close_player" if self.taken(timeline) => return self.source.route(action_id, preview, timeline),
             // Escape drops the edit of a segment wherever the keyboard is.
             "clear_focus" | "close_player" if on_source && segments.view().editing.is_some() => {
                 segments.apply_action(action_id)
@@ -548,7 +538,7 @@ impl PanelFocus {
                     Panel::Segments => wrap.step(frames),
                     // The pool has no arrow keys: they step the source playhead (user rule
                     // 2026-10-01: the arrows move the playhead one frame, no other key needed).
-                    Panel::SourceTimeline => preview.step(frames),
+                    Panel::SourceTimeline => return self.source.route(action_id, preview, timeline),
                     Panel::Pool | Panel::PoolTabs | Panel::SourceButtons => false, // the keys act on the panel in focus only
                 }
             }
@@ -583,7 +573,7 @@ impl PanelFocus {
         let Some(frame) = segments.take_wrap_return() else {
             return false;
         };
-        self.mark_taken = false;
+        self.source.set_mark_taken(false);
         qnc_source_mark_focus::release(timeline);
         self.panel = Panel::Segments;
         wrap.seek(frame);

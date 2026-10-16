@@ -3674,6 +3674,7 @@ dependencies = [
  "qnc-playback-priority",
  "qnc-player-client",
  "qnc-source-browse",
+ "qnc-source-panel",
  "qnc-source-reader",
  "qnc-source-timecode",
  "qnc-timeline",
@@ -4250,6 +4251,7 @@ dependencies = [
  "qnc-media-card",
  "qnc-program-segments",
  "qnc-source-mark-focus",
+ "qnc-source-panel",
  "qnc-source-preview",
  "qnc-timeline",
  "qnc-wheel-jog",
@@ -4974,6 +4976,15 @@ version = "0.1.0"
 dependencies = [
  "qnc-timeline",
  "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-source-panel"
+version = "0.1.0"
+dependencies = [
+ "qnc-source-mark-focus",
+ "qnc-source-preview",
+ "qnc-timeline",
 ]
 
 [[package]]

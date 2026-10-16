@@ -27,6 +27,8 @@ impl IngestApplication {
             action_ids::INGEST_DIR_UP => self.on_dir_up(),
             action_ids::INGEST_DIR_OPEN => self.on_dir_open(intent.payload),
             action_ids::INGEST_DIR_CONFIRM => self.on_dir_confirm(intent.payload),
+            // Escape with IN or OUT taken lets it go (the source timeline's own Escape).
+            action_ids::INGEST_DIR_CANCEL if self.source_panel.mark_taken(&self.view.timeline) => self.player_action(IngestIntent::empty("clear_focus")),
             action_ids::INGEST_DIR_CANCEL => self.on_dir_cancel(),
             action_ids::INGEST_SELECT_ALL => self.on_select_all(),
             action_ids::INGEST_CLEAR_SELECTION => self.on_clear_selection(),
@@ -35,8 +37,7 @@ impl IngestApplication {
             action_ids::INGEST_SET_ARCHIVE => self.on_set_archive(intent.payload),
             action_ids::INGEST_SET_AI_MINING => self.on_set_ai_mining(),
             action_ids::INGEST_IMPORT_SELECTED => self.start_import(),
-            action_ids::PLAY_PAUSE | action_ids::STEP_BACK_FRAME | action_ids::STEP_FORWARD_FRAME
-            | action_ids::MARK_IN | action_ids::MARK_OUT | action_ids::INGEST_CUE_FRAME => self.player_action(intent),
+            action if action == action_ids::INGEST_CUE_FRAME || qnc_source_panel::ACTIONS.contains(&action) => self.player_action(intent),
             tab @ (action_ids::INGEST_TAB_ALL | action_ids::INGEST_TAB_VIRTUAL) => { self.view.pool_tab = Some(tab.to_string()); IngestDispatchResult::accepted(None, true) } // v5: only the chosen tab changes
             _ => IngestDispatchResult::accepted(Some(qnc_ui_text::text("ingest.msg.action_not_connected").to_string()), true),
         }

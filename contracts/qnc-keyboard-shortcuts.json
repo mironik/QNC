@@ -398,6 +398,11 @@
           }
         ],
         "step_back_frame": [ { "code": "ArrowLeft", "key": "ArrowLeft" } ],
+        "select_mark_in": [ { "code": "KeyI", "ctrl": true, "shift": false } ],
+        "select_mark_out": [ { "code": "KeyO", "ctrl": true, "shift": false } ],
+        "navigate_prev_object": [ { "code": "ArrowLeft", "alt": true } ],
+        "navigate_next_object": [ { "code": "ArrowRight", "alt": true } ],
+        "playlist_input_start": [ { "key": "Home", "code": "Home" } ],
         "focus_next": [
           { "key": "Tab", "shift": false }
         ],

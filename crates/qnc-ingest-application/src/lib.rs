@@ -83,6 +83,8 @@ pub struct IngestApplication {
     selection_events: qnc_ingest_clip_list::SelectEventState,
     /// The keyboard walk over the panels (the form's layout contract gives the order).
     walk: qnc_focus_walk::FocusWalk,
+    /// The keys of the source timeline, the same piece every form takes.
+    source_panel: qnc_source_panel::SourcePanel,
 }
 
 impl IngestApplication {

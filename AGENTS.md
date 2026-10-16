@@ -4264,3 +4264,13 @@ Ingest `timeline_projection`), Wrap redovi `SegmentCommand::Wheel` (`qnc-segment
 `wheel_action` pretvara u akciju panela Segmenti. Kotacic iznad monitora je uklonjen (nije bio trazen). C10
 `qnc-ingest-application` 1676 -> 1674. Ostaje (sljedeci korak, korisnik ga ceka): dva puta fokusa (`qnc-panel-focus`
 Story, `qnc-focus-walk` Ingest) spojiti u jednu kocku za sve forme, pa i tipke Media poola. Testovi, conformance.
+Izvedeno 2026-10-16 (korisnik: "Ingest u kocke, pa nece biti prevelik"; "racunaj da ce se dodavati jos formi, pa bi i one
+trebale moci koristiti postojece kocke, zato ne spajaj kocke ako nije neophodno"): korak 1. Nova javna kocka
+`crates/qnc-source-panel` (+ ugovor): tipke source timelinea, iste u svakoj formi (Play, korak, I/O, Ctrl+I/O uzimanje i
+pomak strelicama/kotacicem, Esc pusta, Alt+strelice start/IN/OUT, Home); vozi univerzalni `qnc-source-preview` i
+prikazani timeline, ne zna za formu ni bazu. Story (`qnc-panel-focus`) za te tipke zove kocku, svoje (Sync, A1/A2, rubovi
+segmenata, I/O sa slicicama) zadrzava. Ingest: `qnc-ingest-preview-source` `source_preview_mut`, aplikacijski sloj zove
+kocku umjesto svog koda za I/O i korak (Play ostaje uz cuvar playera), Esc s uzetom oznakom pusta oznaku;
+`qnc-focus-walk` nove tipke propusta samo na source timelineu i gumbima docka; katalog QNC preseta, Ingest dio:
+`select_mark_in/out`, `navigate_prev/next_object`, `playlist_input_start` kao u Storyju. Kocke nisu spajane: fokus Storyja
+i Ingesta ostaju zasebne kocke. C10 `qnc-ingest-application` 1674 -> 1667. Testovi, conformance.
