@@ -227,20 +227,29 @@ impl PanelFocus {
             // set its level (user 2026-10-15); all heard at once, Enter keeps, Escape lets go.
             // On the segment panel the same keys take the sound of the stored segment (A1) or
             // cover (A2) under the Wrap playhead (user 2026-10-16); Enter writes it.
+            // The draft is heard in the program at once (user 2026-10-16), before Enter.
             "select_audio_a1" | "select_audio_a2" if panel == Panel::Segments => {
                 segments.take_part_sound(u8::from(action_id == "select_audio_a2"), wrap.playhead())
             }
             "step_prev_part" | "step_next_part" if panel == Panel::Segments && segments.part_sound_taken() => {
-                segments.part_sound_draft(if action_id == "step_prev_part" { -1 } else { 1 })
+                let changed = segments.part_sound_draft(if action_id == "step_prev_part" { -1 } else { 1 });
+                preview.hear_program_draft(sound_draft(segments), wrap.playhead());
+                changed
             }
             "step_back_frame" | "step_forward_frame" if panel == Panel::Segments && segments.part_sound_taken() => {
-                segments.part_sound_off(action_id == "step_back_frame")
+                let changed = segments.part_sound_off(action_id == "step_back_frame");
+                preview.hear_program_draft(sound_draft(segments), wrap.playhead());
+                changed
             }
             "lane_level_down" | "lane_level_up" if panel == Panel::Segments && segments.part_sound_taken() => {
-                segments.part_sound_level(if action_id == "lane_level_down" { -1 } else { 1 })
+                let changed = segments.part_sound_level(if action_id == "lane_level_down" { -1 } else { 1 });
+                preview.hear_program_draft(sound_draft(segments), wrap.playhead());
+                changed
             }
             "clear_focus" | "close_player" if panel == Panel::Segments && segments.part_sound_taken() => {
-                segments.release_part_sound()
+                let released = segments.release_part_sound();
+                preview.hear_program_draft(None, wrap.playhead()); // the stored sound again
+                released
             }
             "select_audio_a1" | "select_audio_a2" => {
                 self.panel = Panel::SourceTimeline; // the lane is on the source timeline
@@ -361,7 +370,12 @@ impl PanelFocus {
                 confirmed || released || back || self.advance(preview, wrap, segments)
             }
             "activate_focused_item" if panel == Panel::Segments => {
-                segments.confirm_program() || self.advance(preview, wrap, segments)
+                let sound = segments.part_sound_taken();
+                let confirmed = segments.confirm_program();
+                if sound && confirmed {
+                    preview.forget_program_draft(); // written: the program opens from the story
+                }
+                confirmed || self.advance(preview, wrap, segments)
             }
             "activate_focused_item" => false,
             // A virtual shot (Shift+S or Add SubClip), not by an Enter that confirmed.
@@ -556,6 +570,12 @@ pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {
         (index + order.len() - 1) % order.len()
     };
     order[next]
+}
+
+/// The sound drafted on the Wrap row, as the program plays it before Enter.
+fn sound_draft(segments: &ProgramSegments) -> Option<qnc_source_preview::SoundDraft> {
+    let (lane, id, draft) = segments.part_sound_draft_now()?;
+    Some(qnc_source_preview::SoundDraft { lane, id, channel: draft.channel, level_db: draft.level_db, off: draft.off })
 }
 
 #[cfg(test)]

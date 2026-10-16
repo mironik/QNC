@@ -17,7 +17,7 @@ use qnc_content_read::ContentReader;
 use qnc_player_client::{Action, Player, View as PlayerView};
 use qnc_player_input::{InputReader, PlayerContentRead, ProgramInput};
 use qnc_player_launcher::SourceTransportBinding;
-pub use qnc_program_input::TransientCover;
+pub use qnc_program_input::{SoundDraft, TransientCover};
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_timeline_assets::{
@@ -208,6 +208,8 @@ pub struct SourcePreview {
     /// The channels of the shown clip heard on output 1 and 2 (A1, A2), when chosen, and
     /// their levels in percent (0: level 0, nothing heard).
     lead: Option<(String, [u16; 2], [u16; 2])>,
+    /// The sound of a segment or cover drafted on the Wrap row, heard in the program.
+    program_draft: Option<SoundDraft>,
 }
 
 impl Default for SourcePreview {
@@ -229,6 +231,7 @@ impl Default for SourcePreview {
             activity_target: None,
             program: false,
             lead: None,
+            program_draft: None,
         }
     }
 }
@@ -633,6 +636,39 @@ impl SourcePreview {
         let project_id = context.settings.project_id.clone();
         self.open_story(frame, move |target| qnc_program_input::loader(target, project_id))
     }
+    /// The sound of a segment or cover drafted on the Wrap row is heard at once (user
+    /// 2026-10-16): the program opens again with it at the frame it shows (`frame` when
+    /// it shows none), playing on when it played. `None` hears the stored sound again.
+    /// Nothing is written. False when nothing changed or no program plays.
+    pub fn hear_program_draft(&mut self, draft: Option<SoundDraft>, frame: u64) -> bool {
+        if self.program_draft == draft {
+            return false;
+        }
+        self.program_draft = draft.clone();
+        if !self.program {
+            return false;
+        }
+        let Some(context) = &self.context else {
+            return false;
+        };
+        let project_id = context.settings.project_id.clone();
+        let pending = self.cue_next.or(self.cue_in_flight.map(|(frame, _)| frame)).or(self.cue_asked);
+        let frame = pending.or_else(|| self.program_frame()).unwrap_or(frame);
+        let playing = self.player_view.playing() || self.play_when_ready;
+        match draft {
+            Some(draft) => self.open_story(frame, move |target| qnc_program_input::draft_loader(target, project_id, draft)),
+            None => self.open_story(frame, move |target| qnc_program_input::loader(target, project_id)),
+        };
+        self.play_when_ready = playing;
+        true
+    }
+
+    /// The draft was written (Enter): the stored story now holds it, the program opens
+    /// again from it as after every write.
+    pub fn forget_program_draft(&mut self) {
+        self.program_draft = None;
+    }
+
     /// Sync/B-roll (v5 `PlayProgram` of the Sync preview): the program window
     /// `[in, out)` with the source from its IN over it, opened at its first frame
     /// and played as soon as it is ready. Its frames start at 0.

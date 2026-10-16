@@ -53,6 +53,13 @@ impl ProgramSegments {
         self.part_sound.taken().is_some()
     }
 
+    /// The taken part (lane, id) and its draft, which the program hears before Enter
+    /// (user 2026-10-16).
+    pub fn part_sound_draft_now(&self) -> Option<(u8, String, Lane)> {
+        let (part, draft) = self.part_sound.taken()?;
+        Some((part.lane, part.id.clone(), draft))
+    }
+
     /// Up/down on the taken part: its draft channel.
     pub fn part_sound_draft(&mut self, delta: i64) -> bool {
         let moved = self.part_sound.draft(delta);

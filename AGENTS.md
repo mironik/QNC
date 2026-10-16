@@ -4196,3 +4196,11 @@ zvuk segmenta/pokrivalice, gore/dolje kanal, lijevo/desno off/on, Ctrl+lijevo/de
 ponovno otvara nakon upisa). Ugovor `story.database.json` (`lane_sound`). Testovi (`qnc-program-db`, `qnc-render-unit`,
 `qnc-program-waveform`, `qnc-part-sound`), conformance. Uzivo nije provjereno. Usput: `cargo clean --profile dev`
 (49,3 GiB; disk je imao 223 MB slobodno), uz dozvolu korisnika.
+Dopuna 2026-10-16 (korisnik: "neka se nacrt na Wrap retku cuje odmah prije Entera"): `qnc-program-input` `SoundDraft`
+(zvuk jednog spremljenog segmenta ili pokrivalice kako je nacrtan) i `draft_loader` (prica iz baze s tim nacrtom; nista se
+ne pise; dio prerendera koji nacrt mijenja ima drugi otisak pa svira iz izvora). `qnc-source-preview`
+`hear_program_draft`: dok svira program (Wrap), program se ponovno otvara s nacrtom na slici koju pokazuje i nastavlja
+svirati ako je svirao; `None` vraca spremljeni zvuk (Esc), `forget_program_draft` nakon Entera (upis ponovno otvara
+program iz baze). `qnc-panel-focus` slaze nacrt iz `qnc-program-segments` (`part_sound_draft_now`) i predaje ga
+previewu pri svakoj promjeni kanala, razine i ukljucenosti. Svaka promjena ponovno slaze program (oko 0,5 s), kao
+promjena kanala na source timelineu. Test `a_sound_draft_changes_only_its_own_segment_or_cover`, conformance.

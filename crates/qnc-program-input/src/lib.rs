@@ -73,13 +73,38 @@ pub struct TransientCover {
 
 const TRANSIENT_COVER_ID: &str = "sync-cover-preview";
 
+/// The sound of one stored segment (lane 0, A1) or cover (lane 1, A2) as drafted on the
+/// Wrap row, heard before Enter writes it (user 2026-10-16). It is never written here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SoundDraft {
+    pub lane: u8,
+    pub id: String,
+    pub channel: u16,
+    pub level_db: i8,
+    pub off: bool,
+}
+
+impl SoundDraft {
+    fn apply(&self, segments: &mut [ProgramSegment], covers: &mut [ProgramCover]) {
+        if self.lane == 0 {
+            for segment in segments.iter_mut().filter(|segment| segment.segment_id == self.id) {
+                (segment.a1_source_channel, segment.a1_level_db, segment.a1_off) = (self.channel, self.level_db, self.off);
+            }
+        } else {
+            for cover in covers.iter_mut().filter(|cover| cover.cover_id == self.id) {
+                (cover.a2_source_channel, cover.a2_level_db, cover.a2_off) = (self.channel, self.level_db, self.off);
+            }
+        }
+    }
+}
+
 /// Reads the story of the active project and builds its program.
 pub fn load_program(
     target: &ProjectDbTarget,
     project_id: &str,
     clips: &impl ClipInputs,
 ) -> Result<ProgramInput, String> {
-    load(target, project_id, clips, None)
+    load(target, project_id, clips, None, None)
 }
 
 /// The program window `[in, out)` of the active project with a transient cover
@@ -92,7 +117,7 @@ pub fn load_program_window(
     window: (u64, u64),
     cover: &TransientCover,
 ) -> Result<ProgramInput, String> {
-    load(target, project_id, clips, Some((window, cover)))
+    load(target, project_id, clips, Some((window, cover)), None)
 }
 
 /// The stored covers outside the window and the transient cover over all of it.
@@ -128,10 +153,14 @@ fn load(
     project_id: &str,
     clips: &impl ClipInputs,
     window: Option<((u64, u64), &TransientCover)>,
+    draft: Option<&SoundDraft>,
 ) -> Result<ProgramInput, String> {
     let mut client = StoryReader::open(target)?;
-    let segments = client.list_segments()?;
+    let mut segments = client.list_segments()?;
     let mut covers = client.list_covers()?;
+    if let Some(draft) = draft {
+        draft.apply(&mut segments, &mut covers);
+    }
     let story_rate = client.read_story_selection()?.story_fps.ok_or(qnc_ui_text::text("story.msg.program_is_empty"))?;
     drop(client);
     if let Some((range, cover)) = window {
@@ -196,6 +225,20 @@ pub fn loader(
         with_session(reader, workspace_db_uri, |clips| load_program(&target, &project_id, clips))
     }
 }
+/// The program with the drafted sound of one segment or cover, built where the player
+/// is prepared. Its rendered units still play where the draft does not change them (a
+/// changed unit has another fingerprint and plays from its sources).
+pub fn draft_loader(
+    target: ProjectDbTarget,
+    project_id: String,
+    draft: SoundDraft,
+) -> impl FnOnce(&qnc_player_input::InputReader, &str) -> Result<ProgramInput, String> + Send + 'static
+{
+    move |reader, workspace_db_uri| {
+        with_session(reader, workspace_db_uri, |clips| load(&target, &project_id, clips, None, Some(&draft)))
+    }
+}
+
 /// The program window with a transient cover, built where the player is prepared.
 pub fn window_loader(
     target: ProjectDbTarget,
