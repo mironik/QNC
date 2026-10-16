@@ -32,10 +32,7 @@ pub fn render_desktop(
     let (sizes, faces, names) = (contracts.board_sizes(), theme.board_faces(), contracts.board_names());
     let board = sizes.standard_layout(&names);
     qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| qnc_dev_diagnostics::timed_block(block, || match block {
-        "preview" => {
-            render_preview(ui, rect, contracts, theme, view);
-            None
-        }
+        "preview" => render_preview(ui, rect, contracts, theme, view),
         "pool-head" => {
             let intent = render_pool_head(ui, contracts, theme, view);
             paint_focus(ui, rect, view.focus.panel == Panel::PoolTabs, theme.focus);
@@ -49,13 +46,15 @@ pub fn render_desktop(
             intent
         }
         "right-panel" if contracts.composition().right_panel == "segment_panel" => {
-            let intent = qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths, view.preview.output_levels)
-                .map(EditorialIntent::Segment);
+            // The wheel moves what is taken there, else the rows scroll (taken before them).
+            let jog = qnc_wheel_jog::action(ui, rect, view.segments.holds_edit(), "segments", qnc_panel_focus::WHEEL_SEGMENTS).map(EditorialIntent::Action);
+            let intent = jog.or(qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths, view.preview.output_levels)
+                .map(EditorialIntent::Segment));
             paint_focus(ui, rect, view.focus.panel == Panel::Segments, theme.focus);
             intent
         }
         "source-dock" => {
-            let intent = render_source_dock(ui, contracts, theme, view);
+            let intent = render_source_dock(ui, contracts, theme, view).or(qnc_wheel_jog::action(ui, rect, true, "source-dock", qnc_panel_focus::WHEEL_SOURCE).map(EditorialIntent::Action));
             paint_focus(ui, rect, matches!(view.focus.panel, Panel::SourceTimeline | Panel::SourceButtons), theme.focus);
             intent
         }
@@ -70,7 +69,7 @@ fn render_preview(
     contracts: &EditorialContracts,
     theme: &Theme,
     view: &EditorialView,
-) {
+) -> Option<EditorialIntent> {
     let chrome = MonitorChrome {
         fill: theme.black,
         border: theme.border,
@@ -117,6 +116,8 @@ fn render_preview(
         poster,
         label,
     );
+    // The wheel over the monitor steps the source like the arrows (user 2026-10-16).
+    qnc_wheel_jog::action(ui, rect, true, "monitor", qnc_panel_focus::WHEEL_SOURCE).map(EditorialIntent::Action)
 }
 
 fn render_pool_head(

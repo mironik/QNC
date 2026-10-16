@@ -1,0 +1,8 @@
+[package]
+name = "qnc-wheel-jog"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the mouse wheel over a panel as catalog actions, one step per notch (a touchpad's fine scrolling added up); it takes the scroll so a list under it does not move. No state of a form, no database, no player."
+
+[dependencies]
+eframe = { workspace = true }

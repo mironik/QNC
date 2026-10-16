@@ -258,6 +258,13 @@ impl PanelFocus {
             // taken, its height is expanded over the video row and up/down (or a click) pick its
             // channel in the column (user 2026-10-14), left turns it off, right on, Ctrl+left/right
             // set its level (user 2026-10-15); all heard at once, Enter keeps, Escape lets go.
+            // The wheel over a panel (user 2026-10-16, piece `qnc-wheel-jog`): that panel takes
+            // the keyboard and the wheel is its left/right arrow.
+            "wheel_source_back" | "wheel_source_forward" | "wheel_segments_back" | "wheel_segments_forward" => {
+                self.panel = if action_id.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
+                let arrow = if action_id.ends_with("back") { "step_back_frame" } else { "step_forward_frame" };
+                return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
+            }
             // On the segment panel the same keys take the sound of the stored segment (A1) or
             // cover (A2) under the Wrap playhead (user 2026-10-16); Enter writes it.
             // The draft is heard in the program at once (user 2026-10-16), before Enter.
@@ -606,6 +613,11 @@ pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {
     };
     order[next]
 }
+
+/// The catalog actions of the wheel over the source timeline or monitor (back, forward).
+pub const WHEEL_SOURCE: (&str, &str) = ("wheel_source_back", "wheel_source_forward");
+/// The same over the segment panel, while something there is taken.
+pub const WHEEL_SEGMENTS: (&str, &str) = ("wheel_segments_back", "wheel_segments_forward");
 
 /// The sound drafted on the Wrap row, as the program plays it before Enter.
 fn sound_draft(segments: &ProgramSegments) -> Option<qnc_source_preview::SoundDraft> {

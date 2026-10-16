@@ -116,6 +116,18 @@
     "select_audio_a2": {
       "label": "Uzmi A2: gore/dolje kanal, lijevo iskljuci, desno ukljuci, Ctrl+lijevo/desno razina, Enter sprema"
     },
+    "wheel_source_back": {
+      "label": "Kotacic iznad source timelinea ili monitora: kao strelica lijevo"
+    },
+    "wheel_source_forward": {
+      "label": "Kotacic iznad source timelinea ili monitora: kao strelica desno"
+    },
+    "wheel_segments_back": {
+      "label": "Kotacic iznad panela Segmenti dok je nesto uzeto (Ctrl+): kao strelica lijevo"
+    },
+    "wheel_segments_forward": {
+      "label": "Kotacic iznad panela Segmenti dok je nesto uzeto (Ctrl+): kao strelica desno"
+    },
     "toggle_wrap_video": {
       "label": "Wrap redovi: filmstrip ili uska video traka (Ctrl+klik na V)"
     },

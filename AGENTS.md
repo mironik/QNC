@@ -4220,3 +4220,12 @@ s nacrtom. `qnc-part-sound` `kept`, `qnc-program-segments` `part_sound_stored`. 
 Popravak 2026-10-16 (korisnik: "izaberem kadar u media poolu, pokrenem play, moram prebaciti na source timeline da bi
 mogao odrediti IN ili OUT"): I i O oznacavaju izabrani klip i kad je tipkovnica u poolu ili na tabovima poola
 (`qnc-panel-focus`); na panelu Segmenti i dalje ne rade nista (rub slota je Ctrl+I/O). Test, conformance.
+Izvedeno 2026-10-16 (korisnik: "kotacic radi isto sto i strelice lijevo desno, ovisno iznad kojeg je panela"; "ok,
+kreni s kotacicem"): nova javna kocka `crates/qnc-wheel-jog` (+ ugovor): kotacic iznad panela daje akciju kataloga, jedan
+zarez jedan korak (touchpad zbraja svoje male pomake, 40 tocaka korak), brzo vrtenje daje jednu akciju po slici, ostatak
+u sljedecim slikama; iznad panela uzima pomak pa se popis ispod ne mice. Katalog: akcije bez tipke `wheel_source_back` /
+`wheel_source_forward` (source timeline i monitor, uvijek) i `wheel_segments_back` / `wheel_segments_forward` (panel
+Segmenti, samo dok je nesto uzeto: marker, slot, rub slota, zvuk segmenta ili pokrivalice; inace kotacic pomice redove).
+`qnc-panel-focus`: te akcije stavljaju fokus na taj panel i rade isto sto strelica lijevo/desno. `qnc-program-view`
+`holds_edit`. Kotacic prema korisniku je naprijed. Ploca Storyja/MA: tri poziva kocke, C10 354 -> 353. Testovi
+(`qnc-wheel-jog`), conformance. Uzivo nije provjereno.

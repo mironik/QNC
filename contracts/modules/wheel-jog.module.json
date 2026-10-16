@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.wheel-jog",
+  "module_name": "Mouse wheel jog",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.input.wheel_jog"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-wheel-jog",
+  "input": "The pointer and the mouse wheel or touchpad scroll of a frame, the panel's rectangle, whether the wheel steps there now and the catalog actions of a step back and forward.",
+  "output": "At most one catalog action a frame (a step back or forward; the rest of a fast spin follows in the next frames); the scroll over the panel is taken so a list under it does not move.",
+  "specification": "User 2026-10-16: the wheel does what the left/right arrows do, by the panel under the pointer; a notch is one step, a touchpad adds up its fine scrolling."
+}

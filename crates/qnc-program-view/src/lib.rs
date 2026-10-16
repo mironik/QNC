@@ -154,6 +154,12 @@ impl SegmentsView {
         self.rows.is_empty()
     }
 
+    /// Something on the segment panel is taken and moves with the arrows: a marker, a
+    /// slot or its edge (their pictures are shown), or a segment's or cover's sound.
+    pub fn holds_edit(&self) -> bool {
+        !self.trim_frames.is_empty() || !self.edit_stills.is_empty() || self.part_sound.is_some()
+    }
+
     /// Where each clip sounds in the program: segments on A1, covers on A2.
     pub fn wave_placements(&self) -> (Vec<qnc_program_waveform::Placement>, Vec<qnc_program_waveform::Placement>) {
         let segments = self.rows.iter().map(|row| qnc_program_waveform::Placement {
