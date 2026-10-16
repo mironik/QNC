@@ -262,7 +262,14 @@ impl PanelFocus {
             // the keyboard and the wheel is its left/right arrow.
             "wheel_source_back" | "wheel_source_forward" | "wheel_segments_back" | "wheel_segments_forward" => {
                 self.panel = if action_id.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
-                let arrow = if action_id.ends_with("back") { "step_back_frame" } else { "step_forward_frame" };
+                let (back, sound) = (action_id.ends_with("back"), if self.panel == Panel::Segments { segments.part_sound_taken() } else { segments.lane_is_taken() });
+                // A taken A1/A2 sound: the wheel is its level, up louder (Ctrl+left/right).
+                let arrow = match (sound, back) {
+                    (true, true) => "lane_level_down",
+                    (true, false) => "lane_level_up",
+                    (false, true) => "step_back_frame",
+                    (false, false) => "step_forward_frame",
+                };
                 return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
             }
             // On the segment panel the same keys take the sound of the stored segment (A1) or

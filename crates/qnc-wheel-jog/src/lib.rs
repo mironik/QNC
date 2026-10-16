@@ -21,12 +21,13 @@ struct Pending {
 }
 
 /// The wheel steps of one frame from its scroll events: notches (`Line`, `Page`) count
-/// one each, points add up. Down (toward the user) and right are forward.
+/// one each, points add up. Up (away from the user) and right are forward (user
+/// 2026-10-16: up moves the playhead on, raises a level).
 fn steps_of(events: &[egui::Event], points: &mut f32) -> i32 {
     let mut steps = 0;
     for event in events {
         let egui::Event::MouseWheel { unit, delta, .. } = event else { continue };
-        let amount = -delta.y + delta.x;
+        let amount = delta.y + delta.x;
         match unit {
             egui::MouseWheelUnit::Point => *points += amount,
             _ => steps += amount.signum() as i32 * amount.abs().round().max(1.0) as i32,
@@ -77,17 +78,17 @@ mod tests {
     }
 
     #[test]
-    fn a_notch_is_one_step_down_is_forward() {
+    fn a_notch_is_one_step_up_is_forward() {
         let mut points = 0.0;
-        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, -1.0)], &mut points), 1);
-        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, 1.0), wheel(egui::MouseWheelUnit::Line, 1.0)], &mut points), -2);
+        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, 1.0)], &mut points), 1);
+        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, -1.0), wheel(egui::MouseWheelUnit::Line, -1.0)], &mut points), -2);
     }
 
     #[test]
     fn a_touchpad_adds_up_its_points() {
         let mut points = 0.0;
-        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Point, -15.0)], &mut points), 0);
-        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Point, -30.0)], &mut points), 1);
+        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Point, 15.0)], &mut points), 0);
+        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Point, 30.0)], &mut points), 1);
         assert!((points - 5.0).abs() < 0.01, "the rest is kept");
     }
 }

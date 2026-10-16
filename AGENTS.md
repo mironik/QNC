@@ -4229,3 +4229,7 @@ Segmenti, samo dok je nesto uzeto: marker, slot, rub slota, zvuk segmenta ili po
 `qnc-panel-focus`: te akcije stavljaju fokus na taj panel i rade isto sto strelica lijevo/desno. `qnc-program-view`
 `holds_edit`. Kotacic prema korisniku je naprijed. Ploca Storyja/MA: tri poziva kocke, C10 354 -> 353. Testovi
 (`qnc-wheel-jog`), conformance. Uzivo nije provjereno.
+Ispravak 2026-10-16 (korisnik: "kad kotac guram gore playhead ide na pocetak... nivo tona isto ide naopako"): kotacic
+od sebe (gore) je naprijed i glasnije, prema sebi natrag (`qnc-wheel-jog`). Dok je A1/A2 uzet (source timeline) ili
+zvuk segmenta/pokrivalice (Wrap redak), kotacic je razina kao Ctrl+lijevo/desno, a ne ukljuci/iskljuci
+(`qnc-panel-focus`). Testovi, conformance.
