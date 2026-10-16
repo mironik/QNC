@@ -308,3 +308,37 @@ fn mxf_edit_units_at_a_constant_rate_are_an_exact_frame_count() {
     f["streams"][0]["duration_ts"] = 10194.into();
     assert!(matches!(frames(&f), FrameCount::Estimated(_)));
 }
+#[test]
+fn colour_unknown_in_the_summary_comes_from_the_first_picture_of_the_same_stream() {
+    // XDCAM MXF (Sony PMW-300): the MPEG-2 sequence display extension says BT.709, the
+    // container does not repeat it, so only the decoded picture knows it.
+    let mut f = fixture();
+    f["streams"][0]["color_primaries"] = "unknown".into();
+    f["streams"][0]["color_space"] = "unknown".into();
+    let index = f["streams"][0]["index"].clone();
+    f["frames"] = serde_json::json!([
+        {"stream_index": 99, "media_type": "audio"},
+        {"stream_index": index, "media_type": "video", "color_primaries": "bt470bg", "color_space": "unknown"},
+        {"stream_index": index, "media_type": "video", "color_primaries": "bt709", "color_space": "bt709"}
+    ]);
+    let p = parse(&f);
+    let StreamDetails::Video(v) = &p.media.streams[0].details else {
+        panic!()
+    };
+    let primaries = v.color.primaries.as_ref().unwrap();
+    assert_eq!(primaries.value, Signal::Known("bt470bg".into()), "the first picture that knows it");
+    assert_eq!(primaries.locator, "/frames/1/color_primaries");
+    assert_eq!(v.color.matrix.as_ref().unwrap().value, Signal::Known("bt709".into()));
+    assert_eq!(v.color.transfer.as_ref().unwrap().locator, "/streams/0/color_transfer", "a known summary stays");
+}
+#[test]
+fn colour_unknown_everywhere_stays_unspecified() {
+    let mut f = fixture();
+    f["streams"][0]["color_primaries"] = "unknown".into();
+    f["frames"] = serde_json::json!([{"stream_index": 7, "color_primaries": "bt709"}]);
+    let p = parse(&f);
+    let StreamDetails::Video(v) = &p.media.streams[0].details else {
+        panic!()
+    };
+    assert_eq!(v.color.primaries.as_ref().unwrap().value, Signal::Unspecified, "another stream's picture is not this one's");
+}

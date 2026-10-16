@@ -170,6 +170,10 @@ pub(crate) fn run_command(command: &mut Command, timeout: Duration) -> Result<Ve
     bytes
 }
 
+/// The packets read from the start of the file for the colour of the first pictures: the
+/// sound of a frame of eight channels and its picture fit with room to spare.
+pub(crate) const FIRST_PACKETS: &str = "%+#32";
+
 pub(crate) fn arguments(config: &OwnerConfig) -> Vec<String> {
     [
         "-v",
@@ -194,6 +198,15 @@ pub(crate) fn arguments(config: &OwnerConfig) -> Vec<String> {
         "-show_error",
         "-show_optional_fields",
         "always",
+        // The colour a picture stream carries in its own headers (MPEG-2 sequence display
+        // extension, H.264 VUI) reaches only decoded pictures; some containers (XDCAM MXF)
+        // do not repeat it, so the stream summary says "unknown" (user 2026-10-16). The same
+        // single call decodes the first packets of the file, bounded, never a frame scan.
+        "-show_frames",
+        "-read_intervals",
+        FIRST_PACKETS,
+        "-show_entries",
+        "frame=stream_index,media_type,color_primaries,color_transfer,color_space,color_range",
         "-of",
         "json",
     ]

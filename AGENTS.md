@@ -4159,3 +4159,14 @@ preskocen), radnik je napravio konacne zapise, valove, filmstripove i postere. J
 (`qnc-mxf-sound` `s16le_to_f32`; `qnc-wave-worker` `mxf_sound_elements` daje i velicinu uzorka, svi trazeni streamovi
 iste velicine): valovi jednaki onima iz ffmpega (7 od 7), filmstripovi iz istog prolaza (7 od 7, dekodiranje ~0,3 s po
 klipu), slicica ispravna.
+Popravak 2026-10-16 (korisnik: XDCAM klip ne svira, `pixel conversion: Missing("color.primaries")`; "je li to nagadanje
+ili cinjenica"; "sto je kamera zapisala"; "da"): kamera (Sony PMW-300, MPEG HD 35 1080i50 4:2:0) u zaglavlju video toka
+(MPEG-2 sequence display extension) izricito pise primarne boje, prijenos i matricu = 1 (BT.709), u svih 7 klipova diska;
+MXF omot to ne ponavlja, pa sazetak streama koji ffprobe daje bez dekodiranja kaze `unknown` za primarne boje i matricu,
+a to je zapisano u bazu. Izvedeno: isti jedini probe (`qnc-media-probe`) cita i prve pakete datoteke (`-show_frames
+-read_intervals %+#32`, samo polja boje slike; nije prolaz kroz slike), a `qnc-ffprobe-metadata` boju koju sazetak ne zna
+uzima iz prve dekodirane slike istog streama koja je zna (lokator `/frames/<i>/...`); ako je ne zna ni slika, ostaje
+nenavedena i player daje jasnu gresku kao prije. Nema pravila "HD znaci BT.709". Test argumenata probea vise ne zabranjuje
+`-show_frames`/`-read_intervals`, nego trazi ograniceni broj paketa (`FIRST_PACKETS`); `-count_frames` i `-show_packets`
+ostaju zabranjeni. Izmjereno: poziv 0,12 s. Klipovi koji vec imaju konacni zapis zadrzavaju ga (jedan probe po mediju);
+novi zapis nastaje u novom projektu. Testovi `qnc-ffprobe-metadata` (17), `qnc-media-probe` (8), conformance.

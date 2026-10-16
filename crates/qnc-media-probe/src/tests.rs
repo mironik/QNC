@@ -31,14 +31,13 @@ fn single_full_call_not_per_field_or_frame_scan() {
     ] {
         assert!(args.iter().any(|a| a == required));
     }
-    for forbidden in [
-        "-count_frames",
-        "-show_frames",
-        "-show_packets",
-        "-read_intervals",
-    ] {
+    for forbidden in ["-count_frames", "-show_packets"] {
         assert!(!args.iter().any(|a| a == forbidden));
     }
+    // Pictures are read only from the first packets of the file (their colour), never scanned.
+    let interval = args.iter().position(|a| a == "-read_intervals").unwrap();
+    assert_eq!(args[interval + 1], process::FIRST_PACKETS);
+    assert!(process::FIRST_PACKETS.starts_with("%+#"));
     assert_eq!(
         args.iter()
             .filter(|a| a.as_str() == "-show_streams")

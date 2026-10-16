@@ -52,6 +52,13 @@ pub fn read(text: &str, media_uri: &str, document_uri: &str, evidence_id: &str) 
     if streams.is_empty() || streams.len() > 128 {
         return Err(Error::InvalidDocument);
     }
+    // The first decoded pictures of the same call (`-show_frames` bounded to the first
+    // packets): only their colour is read, when the stream summary does not know it.
+    let frames = match root.get("frames") {
+        None | Some(Value::Null) => &[][..],
+        Some(Value::Array(frames)) if frames.len() <= 256 => frames.as_slice(),
+        _ => return Err(Error::InvalidDocument),
+    };
     let reader = Reader { id: evidence_id };
     let mut media = MediaRepresentation {
         media_uri: media_uri.into(),
@@ -75,7 +82,7 @@ pub fn read(text: &str, media_uri: &str, document_uri: &str, evidence_id: &str) 
             .string(stream, "codec_type", &path)?
             .ok_or_else(|| Error::InvalidField(path.clone()))?;
         let details = match kind.value.as_str() {
-            "video" => StreamDetails::Video(Box::new(reader.video(stream, &path)?)),
+            "video" => StreamDetails::Video(Box::new(reader.video(stream, &path, index.value, frames)?)),
             "audio" => StreamDetails::Audio(Box::new(AudioMetadata {
                 sample_rate_hz: reader.integer(stream, "sample_rate", &path)?,
                 channels: reader.integer(stream, "channels", &path)?,
@@ -204,7 +211,25 @@ impl Reader<'_> {
             .transpose()
             .map(|r| r.filter(|f| f.value.numerator > 0 && f.value.denominator > 0))
     }
-    fn video(&self, stream: &Value, path: &str) -> Result<VideoMetadata> {
+    /// A colour of a picture stream: the stream summary's, and when it does not know it
+    /// (missing or "unknown"), the first decoded picture of that stream that does.
+    fn color(&self, stream: &Value, key: &str, path: &str, index: u32, frames: &[Value]) -> Result<Option<Fact<Signal<String>>>> {
+        let summary = self.signal(stream, key, path)?;
+        if matches!(summary, Some(Fact { value: Signal::Known(_), .. })) {
+            return Ok(summary);
+        }
+        for (i, frame) in frames.iter().enumerate() {
+            if frame.get("stream_index").and_then(Value::as_u64) != Some(u64::from(index)) {
+                continue;
+            }
+            let known = self.signal(frame, key, &format!("/frames/{i}"))?;
+            if matches!(known, Some(Fact { value: Signal::Known(_), .. })) {
+                return Ok(known);
+            }
+        }
+        Ok(summary)
+    }
+    fn video(&self, stream: &Value, path: &str, index: u32, frames: &[Value]) -> Result<VideoMetadata> {
         let rate = self.ratio(stream, "avg_frame_rate", path)?.or(self.ratio(
             stream,
             "r_frame_rate",
@@ -313,10 +338,10 @@ impl Reader<'_> {
             sample_aspect_ratio: self.ratio(stream, "sample_aspect_ratio", path)?,
             rotation_degrees: rotation,
             color: ColorMetadata {
-                primaries: self.signal(stream, "color_primaries", path)?,
-                transfer: self.signal(stream, "color_transfer", path)?,
-                matrix: self.signal(stream, "color_space", path)?,
-                range: self.signal(stream, "color_range", path)?,
+                primaries: self.color(stream, "color_primaries", path, index, frames)?,
+                transfer: self.color(stream, "color_transfer", path, index, frames)?,
+                matrix: self.color(stream, "color_space", path, index, frames)?,
+                range: self.color(stream, "color_range", path, index, frames)?,
             },
         })
     }
