@@ -112,6 +112,28 @@ impl LocalFilmstripExtractor {
 
     /// The given audio streams of a local file in one read of the file, merged in order
     /// into whole interleaved f32 sample frames of `channels` channels (the wave).
+    /// Stored sound already read (`codec` as saved: `aac`, given as ADTS frames) decoded to
+    /// interleaved f32 of `channels`, without reading the media.
+    pub fn audio_bytes_with_cancel(
+        &self,
+        codec: &str,
+        bytes: Vec<u8>,
+        channels: u32,
+        cancel: &AtomicBool,
+        on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
+    ) -> std::result::Result<(), String> {
+        let demuxer = match codec {
+            "aac" => "aac",
+            other => return Err(format!("no sound decoding for codec {other}")),
+        };
+        match &self.deployment.driver {
+            Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => {
+                qnc_ffmpeg_decode::audio_bytes_with_cancel(&self.deployment.executable, demuxer, bytes, channels, cancel, on_samples)
+            }
+            Driver::QncPacketsV1 { .. } => Err("selected decoder does not decode sound".into()),
+        }
+    }
+
     pub fn audio_streams_with_cancel(
         &self,
         source: &Path,

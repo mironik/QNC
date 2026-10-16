@@ -1,0 +1,7 @@
+[package]
+name = "qnc-mp4-sound"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the sound samples and key pictures of an MP4/QuickTime file read through its index, read only"
+
+[dependencies]

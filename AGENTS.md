@@ -4103,3 +4103,14 @@ Dopuna 2026-10-16 (korisnik: "zasto XDCAM i MP4 ne mogu raditi na isti nacin"; "
 (MPEG-2 slike kroz ffmpeg demuxer `mpegvideo`). Primjer `qnc-mxf-sound/examples/time_read.rs` uzima i 13 slika i pise ih
 samo u zadanu mapu. Provjereno na korisnikovom XDCAM exportu `Mironik 2002.MXF` (samo citano): 13 od 13 kljucnih slika
 (GOP 12) u istom prolazu sa zvukom, dekodirane jednim ffmpeg pozivom za 0,25 s, slicica ispravna.
+Dopuna 2026-10-16 (isto: "idemo ovo ispeglati"): MP4 i QuickTime original s jednom AAC zvucnom trakom ide jednim prolazom
+kroz indeks datoteke. Nova javna kocka `crates/qnc-mp4-sound` (+ ugovor `contracts/modules/mp4-sound.module.json`; samo
+citanje): cita indeks (`moov`: trake, mjesta uzoraka, kljucni uzorci, AAC konfiguracija, H.264 parametri), pa s kartice
+samo uzorke zvuka (uzastopni uzorci jednim citanjem) i kljucnu sliku na ili iza svake od 13 pozicija filmstripa
+(`adts_frame`, `avc_annexb`). `qnc-ffmpeg-decode`/`qnc-decoder-catalog` `audio_bytes_with_cancel` (AAC iz procitanih
+okvira kroz izabrani dekoder), `qnc-wave-worker` (`mp4_sound`, `mp4_sound_samples`; slike H.264 idu filmstripu kao kod
+MXF-a). Ostali MP4 (vise zvucnih traka, PCM zvuk, HEVC slika) rade kao prije. Provjereno na MP4 datotekama s kartice (samo
+citano, test koji se pokrece rucno `QNC_MP4_SAMPLE`): zvuk kroz indeks jednak je uzorak po uzorak zvuku koji daje ffmpeg
+iz cijele datoteke, 13 od 13 kljucnih slika; 336 MB datoteka 1,2 s kroz indeks prema 4,8 s cijela (moguce djelomicno iz
+memorije sustava), prototip mimo memorije sustava 1,13 s za 3:43 (369 MB). Nije provjereno kroz cijeli radni tijek: projekt
+s MP4 originalima nije bio dostupan.

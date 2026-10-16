@@ -392,7 +392,53 @@ pub fn audio_streams_with_cancel(
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000);
     }
+    let child = command.spawn().map_err(|error| format!("audio ffmpeg start: {error}"))?;
+    read_f32_output(child, channels, cancel, on_samples)
+}
+
+/// Stored sound already read (an elementary stream such as AAC with ADTS headers, named by
+/// `demuxer`) decoded to interleaved f32 of `channels`: the media is not read again (user
+/// 2026-10-16: the wave of an MP4 from its sound chunks only).
+pub fn audio_bytes_with_cancel(
+    executable: &Path,
+    demuxer: &str,
+    bytes: Vec<u8>,
+    channels: u32,
+    cancel: &AtomicBool,
+    on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
+) -> std::result::Result<(), String> {
+    if bytes.is_empty() || channels == 0 {
+        return Err("audio pass needs sound".into());
+    }
+    let mut command = Command::new(executable);
+    command
+        .args(["-hide_banner", "-nostdin", "-loglevel", "error", "-f", demuxer, "-i", "pipe:0", "-map", "0:a:0", "-c:a", "pcm_f32le", "-f", "f32le", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
     let mut child = command.spawn().map_err(|error| format!("audio ffmpeg start: {error}"))?;
+    let mut stdin = child.stdin.take().ok_or("audio ffmpeg stdin")?;
+    let writer = thread::spawn(move || {
+        let _ = std::io::Write::write_all(&mut stdin, &bytes);
+    });
+    let result = read_f32_output(child, channels, cancel, on_samples);
+    let _ = writer.join();
+    result
+}
+
+/// The f32 samples a started ffmpeg writes to its standard output, handed over in whole
+/// frames of `channels`.
+fn read_f32_output(
+    mut child: std::process::Child,
+    channels: u32,
+    cancel: &AtomicBool,
+    on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
+) -> std::result::Result<(), String> {
     let mut stdout = child.stdout.take().ok_or("audio ffmpeg stdout")?;
     let mut stderr = child.stderr.take().ok_or("audio ffmpeg stderr")?;
     let err = thread::spawn(move || {

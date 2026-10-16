@@ -1,0 +1,47 @@
+{
+  "module_id": "qnc.module.mp4-sound",
+  "module_name": "MP4 sound",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "media.read.mp4_sound"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "module_dependencies": [],
+  "forbidden_calls": [
+    "db.read",
+    "db.write",
+    "media.probe.full",
+    "media.decode",
+    "file.write",
+    "playback.clock"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-player-core"
+  ],
+  "adapter_policy": "The frame-wrapped sound elements of an MP4 file without reading its picture or data elements (user 2026-10-14: the wave of a camera original read from the card in a news room; reading the whole file is bound by the card reader). It walks the KLV packets of the essence with one read per content package and seeks over every element that is not sound. The values are given as stored (uncompressed PCM); the caller knows the saved format. The file is opened for reading only; nothing is written, created, renamed or removed (a card is read only). It decodes nothing, runs no probe and reads no database.",
+  "specification": "User 2026-10-16: one reading of the card for the wave and the filmstrip, also for MP4: only the sound chunks and 13 key pictures through the file's index (measured: 3:43 of MP4 in 1.13 s instead of reading 369 MB).",
+  "runtime_crate": "qnc-mp4-sound",
+  "input": "A local MP4 or QuickTime file (a camera original), the sound track to read and optionally the picture track and the picture numbers of a filmstrip.",
+  "output": "The file's tracks from its index, the stored sound samples of one track in order (AAC frames, PCM) and the key picture at or after each asked number. Read only; nothing is decoded or written."
+}

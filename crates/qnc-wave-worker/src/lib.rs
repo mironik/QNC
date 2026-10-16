@@ -793,9 +793,12 @@ fn decode_wave(
     // its pictures (`qnc-mxf-sound`; about twice as fast from a card), decided from the
     // saved format before any reading; every other source through the selected decoder.
     let mut pictures = None;
-    let read = match mxf_sound_elements(media, &streams) {
-        Some(elements) => mxf_sound_samples(&path, &elements, picture_targets, &mut pictures, cancel, &mut on_samples),
-        None => qnc_decoder_catalog::installed_filmstrip_extractor()
+    let read = match (mxf_sound_elements(media, &streams), mp4_sound(media, &streams)) {
+        (Some(elements), _) => mxf_sound_samples(&path, &elements, picture_targets, &mut pictures, cancel, &mut on_samples),
+        // An MP4 with one AAC sound track: its sound chunks and key pictures through its
+        // index (user 2026-10-16), decoded from what was read.
+        (None, Some(stream)) => mp4_sound_samples(&path, stream, channels as u32, picture_targets, &mut pictures, cancel, &mut on_samples),
+        (None, None) => qnc_decoder_catalog::installed_filmstrip_extractor()
             .map_err(|error| error.to_string())?
             .ok_or("no local decoder for the wave")?
             .audio_streams_with_cancel(&path, media, &streams, channels as u32, cancel, &mut on_samples),
@@ -842,6 +845,73 @@ fn mxf_sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: 
             (pcm && mono).then(|| u8::try_from(position).ok()).flatten()
         })
         .collect()
+}
+
+/// The track of the one requested sound stream when the saved record is an MP4 or
+/// QuickTime file and that stream is AAC (the k-th stream is the file's k-th track).
+fn mp4_sound(media: &qnc_media_metadata::MediaRepresentation, streams: &[u32]) -> Option<u32> {
+    let container = media.container.as_ref()?.value.as_str();
+    if !(container == "mp4" || container == "mov" || container.split(',').any(|name| name == "mp4" || name == "mov")) {
+        return None;
+    }
+    let [stream] = streams else { return None };
+    let found = media.streams.iter().find(|candidate| candidate.index.as_ref().is_some_and(|index| index.value == *stream))?;
+    let aac = matches!(found.codec.as_ref().map(|codec| &codec.value), Some(qnc_media_metadata::Signal::Known(name)) if name == "aac");
+    aac.then_some(*stream)
+}
+
+/// The sound of an MP4 through its index: AAC frames read from the card in a few hundred
+/// reads, decoded by the selected decoder; with `picture_targets` the key pictures too.
+fn mp4_sound_samples(
+    source: &Path,
+    stream: u32,
+    channels: u32,
+    picture_targets: Option<(&[u64], &'static str)>,
+    pictures: &mut Option<qnc_filmstrip::EncodedPictures>,
+    cancel: &AtomicBool,
+    on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
+) -> std::result::Result<(), String> {
+    let tracks = qnc_mp4_sound::read_index(source)?;
+    let sound = stream as usize;
+    let config = tracks
+        .get(sound)
+        .filter(|track| track.is_sound() && &track.codec == b"mp4a")
+        .and_then(|track| track.aac_config.clone())
+        .ok_or("mp4: the stream is not an AAC track of the file")?;
+    // H.264 pictures only: an MP4 sample becomes a picture that decodes on its own.
+    let picture = picture_targets.filter(|(_, codec)| *codec == "h264").and_then(|(targets, _)| {
+        let index = tracks.iter().position(|track| track.is_picture() && track.avc.is_some())?;
+        Some((index, targets))
+    });
+    let avc = picture.and_then(|(index, _)| tracks[index].avc.clone());
+    let mut adts = Vec::new();
+    let mut found: Vec<Option<Vec<u8>>> = vec![None; picture.map_or(0, |(_, targets)| targets.len())];
+    let mut error = None;
+    qnc_mp4_sound::read_sound_and_pictures(
+        source,
+        cancel,
+        &tracks,
+        sound,
+        picture,
+        &mut |frame| qnc_mp4_sound::adts_frame(&config, frame, &mut adts),
+        &mut |target, _, sample| {
+            if let Some((nal_length, sets)) = &avc {
+                match qnc_mp4_sound::avc_annexb(sample, *nal_length, sets) {
+                    Ok(picture) => found[target] = Some(picture),
+                    Err(problem) => error = Some(problem),
+                }
+            }
+            Ok(())
+        },
+    )?;
+    let decoder = qnc_decoder_catalog::installed_filmstrip_extractor()
+        .map_err(|error| error.to_string())?
+        .ok_or("no local decoder for the wave")?;
+    decoder.audio_bytes_with_cancel("aac", adts, channels, cancel, on_samples)?;
+    if error.is_none() && !found.is_empty() && found.iter().all(Option::is_some) {
+        *pictures = Some(qnc_filmstrip::EncodedPictures { codec: "h264".into(), pictures: found.into_iter().flatten().collect() });
+    }
+    Ok(())
 }
 
 /// Sound elements to whole interleaved f32 frames of the requested streams, in their order.
@@ -947,6 +1017,38 @@ fn wave_log(message: impl FnOnce() -> String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A camera MP4 (QNC_MP4_SAMPLE, read only): the sound read through its index gives the
+    /// same samples as the decoder reading the whole file, and its 13 key pictures come.
+    #[test]
+    #[ignore]
+    fn mp4_sound_through_the_index_is_the_same_as_the_whole_file() {
+        let Ok(path) = std::env::var("QNC_MP4_SAMPLE") else { return };
+        let path = Path::new(&path);
+        let cancel = AtomicBool::new(false);
+        let mut through_index = Vec::new();
+        let mut pictures = None;
+        let targets: Vec<u64> = (0..13).map(|index| index * 1000).collect();
+        let started = Instant::now();
+        mp4_sound_samples(path, 1, 2, Some((&targets, "h264")), &mut pictures, &cancel, &mut |samples| {
+            through_index.extend_from_slice(samples);
+            Ok(())
+        })
+        .unwrap();
+        let index_ms = started.elapsed().as_millis();
+        let mut whole = Vec::new();
+        let started = Instant::now();
+        qnc_ffmpeg_decode::audio_streams_with_cancel(Path::new("ffmpeg"), path, "mp4", &[1], 2, &cancel, &mut |samples| {
+            whole.extend_from_slice(samples);
+            Ok(())
+        })
+        .unwrap();
+        let whole_ms = started.elapsed().as_millis();
+        eprintln!("through the index {index_ms} ms, whole file {whole_ms} ms, {} samples", whole.len());
+        assert_eq!(through_index.len(), whole.len());
+        assert!(through_index == whole, "the same samples");
+        assert_eq!(pictures.map(|pictures| pictures.pictures.len()), Some(13));
+    }
 
     #[test]
     fn cache_key_is_project_and_clip_scoped() {

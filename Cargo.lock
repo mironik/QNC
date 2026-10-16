@@ -4213,6 +4213,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-mp4-sound"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-mxf-sound"
 version = "0.1.0"
 dependencies = [
@@ -5183,11 +5187,13 @@ dependencies = [
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
  "qnc-dir-browser",
+ "qnc-ffmpeg-decode",
  "qnc-filmstrip",
  "qnc-media-decode",
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-media-stream",
+ "qnc-mp4-sound",
  "qnc-mxf-sound",
  "qnc-transport-resolver",
  "qnc-ui-text",
