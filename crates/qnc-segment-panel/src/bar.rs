@@ -19,10 +19,15 @@ const TRANSPORT_GAP: f32 = 5.0;
 const TRANSPORT_CONTROLS_W: f32 = TRANSPORT_BTN_W * 7.0 + TRANSPORT_GAP * 6.0;
 const FONT_UI: f32 = 14.0;
 
+/// The middle buttons (previous/next segment, slot, marker, program start) are hidden: a
+/// level meter is in their place (user 2026-10-16: hidden, not deleted).
+const SHOW_NAVIGATION: bool = false;
+
 pub(crate) fn show(
     ui: &mut egui::Ui,
     segments: &SegmentsView,
     theme: TimelineTheme,
+    levels: [Option<f32>; 2],
 ) -> Option<SegmentCommand> {
     let mut command = None;
     let (row, _) = ui.allocate_exact_size(
@@ -37,11 +42,19 @@ pub(crate) fn show(
         Pos2::new(x, row.min.y),
         Vec2::new(TRANSPORT_CONTROLS_W, COMPACT_CTRL_H),
     );
+    if !SHOW_NAVIGATION {
+        let style = qnc_level_meter::MeterStyle { background: theme.background, border: theme.border, text: theme.muted };
+        let lanes = [("A1", levels[0]), ("A2", levels[1])];
+        qnc_level_meter::show(ui, ui.make_persistent_id("qnc_segment_level_meter"), transport.shrink2(Vec2::new(0.0, 1.0)), &lanes, style);
+    }
     in_rect(
         ui,
         transport,
         egui::Layout::left_to_right(egui::Align::Center),
         |ui| {
+            if !SHOW_NAVIGATION {
+                return;
+            }
             ui.spacing_mut().item_spacing.x = TRANSPORT_GAP;
             let icons: [(&str, &str, Option<SegmentCommand>); 7] = [
                 (

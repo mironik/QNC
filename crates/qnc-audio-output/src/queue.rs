@@ -2,7 +2,7 @@ use crate::*;
 use rtrb::{Consumer, Producer, RingBuffer};
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
 };
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -26,7 +26,12 @@ pub(crate) struct Shared {
     timing_playback_ns: AtomicU64,
     timing_frames: AtomicU64,
     last_playback_position_ns: AtomicU64,
+    /// The loudest sample of each output channel handed to the device since the last
+    /// `take_peaks` (f32 bits of the absolute value; a level meter, user 2026-10-16).
+    peaks: [AtomicU32; METER_CHANNELS],
 }
+/// How many output channels the level meter follows.
+pub const METER_CHANNELS: usize = 8;
 impl Shared {
     fn new() -> Self {
         Self {
@@ -51,7 +56,12 @@ impl Shared {
             timing_playback_ns: AtomicU64::new(NONE),
             timing_frames: AtomicU64::new(0),
             last_playback_position_ns: AtomicU64::new(0),
+            peaks: Default::default(),
         }
+    }
+    /// The loudest sample of each output channel since the last call, then zero again.
+    pub fn take_peaks(&self, channels: usize) -> Vec<f32> {
+        self.peaks.iter().take(channels).map(|peak| f32::from_bits(peak.swap(0, Ordering::AcqRel))).collect()
     }
     pub fn elapsed_ns(&self) -> u64 {
         self.origin.elapsed().as_nanos().min((NONE - 1) as u128) as u64
@@ -358,6 +368,21 @@ fn samples_to_ns(samples: u64, rate: u32) -> u64 {
 }
 
 impl Callback {
+    /// The loudest sample of each channel of what goes to the device (no allocation).
+    fn note_peaks(&self, output: &[f32]) {
+        let channels = self.channels.clamp(1, METER_CHANNELS);
+        let mut loudest = [0f32; METER_CHANNELS];
+        for frame in output.chunks_exact(self.channels.max(1)) {
+            for (channel, sample) in frame.iter().take(channels).enumerate() {
+                loudest[channel] = loudest[channel].max(sample.abs());
+            }
+        }
+        for (peak, value) in self.shared.peaks.iter().zip(loudest).take(channels) {
+            // Positive floats order as their bits do.
+            peak.fetch_max(value.to_bits(), Ordering::AcqRel);
+        }
+    }
+
     /// Real-time path: no allocation, blocking synchronization, decode, or logging.
     pub fn render(&mut self, output: &mut [f32], now_ns: u64, driver_delay_ns: Option<u64>) {
         output.fill(0.0);
@@ -398,6 +423,7 @@ impl Callback {
                 output[a.len()..a.len() + b.len()].copy_from_slice(b);
                 chunk.commit_all();
             }
+            self.note_peaks(output);
             return;
         }
         // Playing: a step heard before Play is not heard over it.
@@ -439,6 +465,7 @@ impl Callback {
             output.fill(0.0);
             return;
         }
+        self.note_peaks(output);
         if needed > 0 {
             self.shared.timing_revision.fetch_add(1, Ordering::SeqCst);
             self.shared

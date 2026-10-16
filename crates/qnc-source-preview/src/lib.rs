@@ -68,6 +68,8 @@ pub struct PreviewView {
     /// Monitor Auto (user 2026-10-08, the default): while the program is on an external
     /// screen the monitor leaves the picture to it; Monitor On keeps showing it.
     pub monitor_auto: bool,
+    /// The level (dBFS) of A1 and A2 at the player's output, for a meter (user 2026-10-16).
+    pub output_levels: [Option<f32>; 2],
 }
 
 impl PreviewView {
@@ -96,6 +98,7 @@ impl Default for PreviewView {
             playing: false,
             message: String::new(),
             monitor_auto: true,
+            output_levels: [None, None],
         }
     }
 }
@@ -797,6 +800,7 @@ impl SourcePreview {
                 qnc_player_timeline::projection_from_player_reply(playback.reply.as_ref());
         }
         self.view.playing = playback.playing();
+        self.view.output_levels = [playback.output_level_dbfs(1), playback.output_level_dbfs(2)];
         self.player_view = playback;
     }
 }

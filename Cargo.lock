@@ -3985,6 +3985,13 @@ name = "qnc-lane-choice"
 version = "0.1.0"
 
 [[package]]
+name = "qnc-level-meter"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
 name = "qnc-libav-decode"
 version = "0.1.0"
 dependencies = [
@@ -4763,6 +4770,7 @@ name = "qnc-segment-panel"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-level-meter",
  "qnc-program-filmstrip",
  "qnc-program-segments",
  "qnc-program-waveform",

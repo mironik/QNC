@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.level-meter",
+  "module_name": "Level meter",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.paint.level_meter"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-level-meter",
+  "input": "The peak (dBFS) the player measured at each output since its last state, with the lane labels (A1, A2), a rectangle and theme colours.",
+  "output": "Bars on a dBFS scale (-48 to 0; green, yellow from -12, red from -3) with a short peak hold. It measures, plays and reads nothing; only the fall of a bar between two states is its own.",
+  "specification": "User 2026-10-16: a level meter on the Segments panel in place of the middle buttons, from the player's real output, two horizontal bars A1/A2."
+}

@@ -109,6 +109,11 @@ impl AudioOutput {
     pub fn telemetry(&self) -> Telemetry {
         self.queue.telemetry()
     }
+    /// The loudest sample (0..1) of each output channel handed to the device since the last
+    /// call: what is heard now, not what waits in the queue (a level meter).
+    pub fn take_peaks(&self) -> Vec<f32> {
+        self.queue.shared.take_peaks(self.queue.config.format.channels as usize)
+    }
     pub fn driver_timing(&self) -> Option<DriverTiming> {
         self.queue.driver_timing()
     }

@@ -49,7 +49,7 @@ pub fn render_desktop(
             intent
         }
         "right-panel" if contracts.composition().right_panel == "segment_panel" => {
-            let intent = qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths)
+            let intent = qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths, view.preview.output_levels)
                 .map(EditorialIntent::Segment);
             paint_focus(ui, rect, view.focus.panel == Panel::Segments, theme.focus);
             intent

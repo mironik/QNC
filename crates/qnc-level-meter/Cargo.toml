@@ -1,0 +1,8 @@
+[package]
+name = "qnc-level-meter"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive UI piece: a sound level meter (one bar per lane, dBFS) of the peaks the player measured at its output"
+
+[dependencies]
+eframe = { workspace = true }

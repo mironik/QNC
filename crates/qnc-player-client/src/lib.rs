@@ -95,6 +95,16 @@ impl View {
                 .any(|e| matches!(e, Event::PlaybackReadinessChanged { ready: true, .. }))
         })
     }
+    /// The peak (dBFS) of output `output` (1 is A1, 2 is A2) the player measured at its
+    /// device since its previous state; `None` without one.
+    pub fn output_level_dbfs(&self, output: usize) -> Option<f32> {
+        let name = format!("output_{output}");
+        self.reply.as_ref()?.events.iter().find_map(|event| match event {
+            Event::AudioLevelChanged { track_id, peak_dbfs_x100 } if *track_id == name => Some(*peak_dbfs_x100 as f32 / 100.0),
+            _ => None,
+        })
+    }
+
     pub fn has_confirmed_position(&self) -> bool {
         self.confirmed_source_frame().is_some()
     }

@@ -189,6 +189,13 @@ impl Session {
         if let Some(frame) = state.submitted_frame {
             events.push(Event::VideoFrameSubmitted { frame });
         }
+        // The level of each output heard since the last reply (output 1 is A1, output 2 A2).
+        for (output, peak) in self.player.take_output_peaks().into_iter().enumerate() {
+            events.push(Event::AudioLevelChanged {
+                track_id: format!("output_{}", output + 1),
+                peak_dbfs_x100: peak_dbfs_x100(peak),
+            });
+        }
         if let Some(frame) = state.presented_frame {
             events.push(Event::FramePresented { frame });
         }
@@ -216,4 +223,12 @@ impl Session {
             events,
         })
     }
+}
+
+/// A sample peak (0..1) in hundredths of dBFS; silence is -100 dBFS.
+fn peak_dbfs_x100(peak: f32) -> i32 {
+    if peak <= 0.00001 {
+        return -10_000;
+    }
+    (20.0 * peak.log10() * 100.0).round().max(-10_000.0) as i32
 }

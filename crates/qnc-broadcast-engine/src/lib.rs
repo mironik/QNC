@@ -447,6 +447,11 @@ impl Runtime {
     pub fn state(&self) -> &TransportEngineState {
         self.engine.state()
     }
+    /// The loudest sample of each output channel the device played since the last call
+    /// (a level meter of what is heard).
+    pub fn take_output_peaks(&self) -> Vec<f32> {
+        self.audio.as_ref().map(|device| device.borrow().take_peaks()).unwrap_or_default()
+    }
     pub fn audio_telemetry(&self) -> Option<qnc_audio_output::Telemetry> {
         self.audio.as_ref().map(|d| d.borrow().telemetry())
     }

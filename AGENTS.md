@@ -4120,3 +4120,14 @@ timeline uz playhead pokazuje IN i OUT pokrivalice: OUT je kraj nacrta i prati p
 `source_view`); (2) strelica na zaustavljenom Syncu pomakne kraj i player prozora Synca pokaze zadnju sliku pokrivalice na
 novom kraju (`stopped_window_frame`, `qnc-program-segments` `sync_window_frame`, `qnc-panel-focus`). Kraj pomaknut ispred
 pocetka prozora (nakon nastavka Spaceom) nema sliku u tom prozoru. Testovi.
+Izmjena izgleda 2026-10-16 (korisnik: "na segment panelu gdje su dugmad sakrij centralnu grupu dugmadi i umjesto nje
+postavi pokazivac jacine tona; dugmad trenutno samo sakrij, nemoj brisati"; izbor: stvarni izlaz playera, dvije vodoravne
+trake A1/A2): u traci panela Segmenti srednja grupa (prethodni/sljedeci segment, slot, marker, pocetak programa) je
+skrivena (`qnc-segment-panel` `bar.rs` `SHOW_NAVIGATION = false`, kod ostaje), na njezinom mjestu je pokazivac razine.
+Razina se mjeri tamo gdje uzorci idu na zvucni uredaj, ne u redu (`qnc-audio-output`: vrh svakog izlaznog kanala u
+povratnom pozivu uredaja, bez alokacije, `take_peaks`), engine ga daje (`take_output_peaks`), player ga uz svako stanje
+salje kao postojeci dogadaj ugovora `AudioLevelChanged` (`output_1` = A1, `output_2` = A2, stotinke dBFS;
+`tools/qnc-player-runner`), klijent ga cita (`qnc-player-client` `output_level_dbfs`), preview ga nosi
+(`qnc-source-preview` `PreviewView.output_levels`). Nova pasivna kocka `crates/qnc-level-meter` (+ ugovor): trake
+-48..0 dBFS, zelena, zuta od -12, crvena od -3, pad 24 dB/s, vrh se drzi 1,2 s. Story ploca predaje razine jednim
+argumentom postojeceg poziva. Testovi, conformance. Uzivo nije provjereno.

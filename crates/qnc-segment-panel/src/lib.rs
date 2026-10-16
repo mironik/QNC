@@ -68,6 +68,7 @@ pub fn show(
     segments: &SegmentsView,
     timeline_theme: TimelineTheme,
     lengths: &[CoverLengthBand],
+    levels: [Option<f32>; 2],
 ) -> Option<SegmentCommand> {
     let style = SegmentPanelStyle::from_timeline(timeline_theme);
     let panel_rect = ui.available_rect_before_wrap();
@@ -123,7 +124,7 @@ pub fn show(
             ui.scope_builder(egui::UiBuilder::new().max_rect(playlist), |ui| {
                 ui.set_clip_rect(playlist);
                 ui.separator();
-                command = command.take().or(bar::show(ui, segments, timeline_theme));
+                command = command.take().or(bar::show(ui, segments, timeline_theme, levels));
                 ui.add_space(2.0);
                 let total = segments.total_frames;
                 // Every timeline row needs its own id space: `qnc-timeline` names its

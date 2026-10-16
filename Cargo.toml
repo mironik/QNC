@@ -117,6 +117,7 @@ members = [
     "crates/qnc-program-filmstrip",
     "crates/qnc-import-control",
     "crates/qnc-mp4-sound",
+    "crates/qnc-level-meter",
     "crates/qnc-board",
     "crates/qnc-channel-picker",
     "crates/qnc-pending-marks",
@@ -293,6 +294,7 @@ qnc-program-waveform = { path = "crates/qnc-program-waveform" }
 qnc-program-filmstrip = { path = "crates/qnc-program-filmstrip" }
 qnc-import-control = { path = "crates/qnc-import-control" }
 qnc-mp4-sound = { path = "crates/qnc-mp4-sound" }
+qnc-level-meter = { path = "crates/qnc-level-meter" }
 qnc-board = { path = "crates/qnc-board" }
 qnc-channel-picker = { path = "crates/qnc-channel-picker" }
 qnc-pending-marks = { path = "crates/qnc-pending-marks" }
