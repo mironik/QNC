@@ -445,8 +445,10 @@ impl PanelFocus {
             },
             // O closes a running Sync slot wherever the keyboard is (v5).
             "mark_out" if on_source && segments.finish_sync() => true,
-            // The source timeline takes only I/O; the application marks them.
-            "mark_in" | "mark_out" if !on_source => false,
+            // The application marks IN/OUT. I/O mark the chosen clip from the pool too (user 2026-10-16: a clip chosen in
+            // the pool and played is marked without going to the source timeline); on the
+            // segment panel they do nothing (its edges are Ctrl+I/O).
+            "mark_in" | "mark_out" if panel == Panel::Segments => false,
             "mark_in" => {
                 self.mark_taken = false;
                 segments.arm_sync(); // v5: every IN arms Sync/B-roll
@@ -673,6 +675,12 @@ mod tests {
             focus.route("mark_in", (&mut preview, &mut wrap, &mut segments, &mut TimelineProjection::default())),
             None,
             "the application marks IN"
+        );
+        focus.set(Panel::Pool);
+        assert_eq!(
+            focus.route("mark_out", (&mut preview, &mut wrap, &mut segments, &mut TimelineProjection::default())),
+            None,
+            "a clip chosen in the pool is marked from the pool"
         );
         assert_eq!(
             focus.route("add_marker", (&mut preview, &mut wrap, &mut segments, &mut TimelineProjection::default())),

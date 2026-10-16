@@ -4217,3 +4217,6 @@ izlaz A1 ili A2 (do Entera vrijedi za cijeli A1/A2), promjena kanala ili dio spr
 s nacrtom. `qnc-part-sound` `kept`, `qnc-program-segments` `part_sound_stored`. Uz to zapis tipki Storyja u player log
 (`story-key`, commit e4e42cf) za nalaz IN/OUT. Testovi (`a_gain_set_while_playing_is_heard_in_the_next_callback`,
 `levels_become_device_gains...`), conformance. Uzivo nije provjereno.
+Popravak 2026-10-16 (korisnik: "izaberem kadar u media poolu, pokrenem play, moram prebaciti na source timeline da bi
+mogao odrediti IN ili OUT"): I i O oznacavaju izabrani klip i kad je tipkovnica u poolu ili na tabovima poola
+(`qnc-panel-focus`); na panelu Segmenti i dalje ne rade nista (rub slota je Ctrl+I/O). Test, conformance.
