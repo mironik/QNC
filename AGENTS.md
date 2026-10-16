@@ -4285,3 +4285,10 @@ greska, izabrani izvor: naziv, serijski broj, volumen) drzi kocka `qnc-source-br
 sloj vise ne puni ni ne brise ta polja; `LocationEntry` je stavka kocke. Project (`qnc-project-session`) ima isti
 obrazac i moze ga preuzeti uz otkljucavanje. C10 `qnc-ingest-application` 1667 -> 1584. Testovi, conformance. Nije
 prenesen u kopiju dok se trazi uzrok zastoja zvuka (vidi sljedeci zapis).
+Popravak 2026-10-16 (korisnik: "program je blokirao kad sam u segmentima isao raditi korekciju slota in/out... tocak
+nije radio"): log je pokazao da sucelje nije stalo nego da je rub slota uzet s Ctrl+O (strelice i kotacic su ga
+pomicali) ostao uzet kad je korisnik misem otvorio klip u poolu; Esc na source timelineu ga vise nije mogao pustiti.
+Sada sve sto je panel Segmenti uzeo (slot, rub slota, marker, pokrivalica, A1/A2 segmenta) odbacuje se kao Esc cim
+tipkovnica ode s panela (klik, Tab, Enter); nista se ne zapisuje. Uredivanje segmenta (Ctrl+Shift+I/O, Edit) zivi na
+source timelineu i ostaje. `qnc-program-segments` (`leave_panel`, test), `qnc-panel-focus` (`poll`). Kotacic i strelice
+na prvom slotu (uz zakljucani pocetni marker) ne pomicu ga, po pravilu od 10. 10. (poruka u statusu).
