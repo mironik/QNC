@@ -5,7 +5,8 @@
 //! source transport, so a slow LAN or intranet source never freezes the form. Nothing
 //! here knows a form or an application.
 
-use qnc_dir_browser::{BrowserState, TransportBrowserSession};
+use qnc_dir_browser::BrowserState;
+pub use qnc_dir_browser::TransportBrowserSession;
 use qnc_source_reader::SourceReference;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 

@@ -102,7 +102,10 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
     assert!(component.selection_config_error.is_none());
     assert!(component.selection_config.is_some());
     assert!(component.view.work_settings_ready);
-    assert_eq!(component.view.browser_entries.len(), 2);
+    // The two registered local sources are listed; the disks attached to this computer are
+    // listed with them (user 2026-10-16).
+    let listed = |uri: &str| component.view.browser_entries.iter().any(|entry| entry.qnc_uri == uri);
+    assert!(listed("qnc://local/source/offline") && listed("qnc://local/source/online"));
     component.dispatch(IngestIntent::new(
         action_ids::INGEST_DIR_OPEN,
         IngestPayload::LocationUri("qnc://local/source/offline".into()),

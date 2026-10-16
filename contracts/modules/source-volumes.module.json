@@ -1,0 +1,40 @@
+{
+  "module_id": "qnc.module.source-volumes",
+  "module_name": "Source volumes",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "source.volumes.list"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "workflow.run",
+    "media.process",
+    "media.scan",
+    "media.probe",
+    "filesystem.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-source-volumes",
+  "input": "Nothing: the operating system's attached disks.",
+  "output": "Each attached disk: its root, its volume serial number and its label, and the QNC source URI of that serial (qnc://local/source/volume-<serial>). Read only; it never mounts, writes or scans. Windows now; other systems give an empty list until they have their adapter.",
+  "specification": "User 2026-10-16: a disk the system sees is a source without being added by hand."
+}

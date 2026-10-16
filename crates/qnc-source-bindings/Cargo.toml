@@ -8,5 +8,6 @@ description = "QNC public module: read-only source bindings (QNC source URI to a
 qnc-ui-text = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-transport-resolver = { workspace = true }
+qnc-source-volumes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

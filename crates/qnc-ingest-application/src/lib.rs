@@ -107,17 +107,10 @@ impl IngestApplication {
         component.root = Some(root.as_ref().to_path_buf());
         component.artifacts.set_host_root(root.as_ref());
         component.store = Some(IngestStore::open(root.as_ref())?);
-        match selection_config::SelectionConfig::load(root.as_ref()).and_then(|config| {
-            let browser = config.browser()?;
-            Ok((config, browser))
-        }) {
-            Ok((config, mut browser)) => {
-                let state = browser.roots("local").map(Into::into);
-                component.selection_config = Some(config);
-                component.browse.connect(browser);
-                component.apply_source_browser_result(state);
-            }
-            Err(error) => component.selection_config_error = Some(error.to_string()),
+        if let Some(mut browser) = component.refresh_sources() {
+            let state = browser.roots("local").map(Into::into);
+            component.browse.connect(browser);
+            component.apply_source_browser_result(state);
         }
         match ActiveProjectReader::from_root(root.as_ref()) {
             Ok(active_project) => {

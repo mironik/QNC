@@ -160,7 +160,57 @@ pub fn load(root: &Path) -> Result<TransportBindings, String> {
     let base = file
         .parent()
         .ok_or(qnc_ui_text::text("source.source_configuration_folder"))?;
-    parse(&bytes, base)
+    let mut bindings = parse(&bytes, base)?;
+    with_attached(&mut bindings, &qnc_source_volumes::mounted());
+    Ok(bindings)
+}
+
+/// The disks attached now are sources without being added by hand (user 2026-10-16): a
+/// registered disk is served from the letter it has now, an unregistered one becomes
+/// `volume-<serial>` with the probe of the local sources. Nothing is removed and the
+/// configuration file is not written.
+pub fn with_attached(bindings: &mut TransportBindings, volumes: &[qnc_source_volumes::Volume]) {
+    let probe = bindings
+        .registered_sources
+        .iter()
+        .find(|source| source.location.uri.starts_with("qnc://local/") && source.probe.is_some())
+        .and_then(|source| source.probe.clone());
+    for volume in volumes {
+        let serial = volume.serial_number.to_ascii_lowercase();
+        let known = bindings.registered_sources.iter().position(|source| {
+            source.serial_number.as_deref().is_some_and(|known| known.eq_ignore_ascii_case(&serial)) || source.location.uri == volume.source_uri()
+        });
+        match known {
+            Some(index) => {
+                let source = &mut bindings.registered_sources[index];
+                if source.location.file.as_ref().is_some_and(|file| file != &volume.root) && source.location.endpoint.is_none() {
+                    let uri = source.location.uri.clone();
+                    source.location.file = Some(volume.root.clone());
+                    source.name = Some(volume_label(volume));
+                    for binding in bindings.sources.iter_mut().filter(|binding| binding.uri == uri) {
+                        binding.file = Some(volume.root.clone());
+                    }
+                }
+            }
+            None => {
+                let location = SourceBinding { uri: volume.source_uri(), file: Some(volume.root.clone()), endpoint: None, token_env: None };
+                bindings.sources.push(location.clone());
+                bindings.registered_sources.push(RegisteredSource {
+                    location,
+                    name: Some(volume_label(volume)),
+                    serial_number: Some(serial),
+                    volume_name: volume.volume_name.clone(),
+                    scope: Some("card_relative".into()),
+                    probe: probe.clone(),
+                });
+            }
+        }
+    }
+}
+
+/// `E:` as the source's name.
+fn volume_label(volume: &qnc_source_volumes::Volume) -> String {
+    volume.root.to_string_lossy().trim_end_matches(['\\', '/']).to_string()
 }
 
 fn binding(location: ConfigLocation, base: &Path) -> Result<SourceBinding, String> {
@@ -256,6 +306,22 @@ fn parse(bytes: &[u8], base: &Path) -> Result<TransportBindings, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_attached_disk_is_a_source_and_a_known_one_follows_its_letter() {
+        let config = br#"{"version":"0.1.0","sources":[
+            {"location":{"uri":"qnc://local/source/volume-de666c9f","file":"G:/"},"name":"G:","serial_number":"de666c9f",
+             "probe":{"kind":"local","executable":"C:/ffprobe.exe","probe_size_bytes":8,"analyze_duration_us":1}}]}"#;
+        let mut bindings = parse(config, Path::new(BASE)).unwrap();
+        let volume = |root: &str, serial: &str| qnc_source_volumes::Volume { root: PathBuf::from(root), serial_number: serial.into(), volume_name: None };
+        with_attached(&mut bindings, &[volume("F:\\", "DE666C9F"), volume("E:\\", "7e80f1fb")]);
+        assert_eq!(bindings.sources.len(), 2, "nothing removed, the new disk added");
+        assert_eq!(bindings.sources[0].file.as_deref(), Some(Path::new("F:\\")), "the card moved to F:");
+        let new = &bindings.registered_sources[1];
+        assert_eq!(new.location.uri, "qnc://local/source/volume-7e80f1fb");
+        assert_eq!((new.name.as_deref(), new.serial_number.as_deref()), (Some("E:"), Some("7e80f1fb")));
+        assert!(new.probe.is_some(), "the probe of the local sources");
+    }
 
     const BASE: &str = "C:/qnc/data";
 

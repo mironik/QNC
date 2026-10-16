@@ -4854,6 +4854,7 @@ name = "qnc-source-bindings"
 version = "0.1.0"
 dependencies = [
  "qnc-contracts",
+ "qnc-source-volumes",
  "qnc-transport-resolver",
  "qnc-ui-text",
  "serde",
@@ -5012,6 +5013,13 @@ version = "0.1.0"
 dependencies = [
  "qnc-content-store",
  "qnc-media-metadata",
+]
+
+[[package]]
+name = "qnc-source-volumes"
+version = "0.1.0"
+dependencies = [
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

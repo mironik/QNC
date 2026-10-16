@@ -1,0 +1,10 @@
+[package]
+name = "qnc-source-volumes"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the disks attached to this computer with their volume serial number; read only"
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Storage_FileSystem"] }

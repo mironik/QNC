@@ -4139,3 +4139,12 @@ Wrap reda, uvecani val) ima tanke linije iznad i ispod sredine na -18 dBFS (refe
 (Ctrl+lijevo/desno, iskljucena traka) mnozi prikazani val (`qnc-channel-picker` `ChannelChoice.level_db`, `gain`;
 `qnc-wave-view` `paint_wave_peaks_gain`; `qnc-timeline` `lane_gain`); glasnije od pune skale udara u rub trake. Valovi
 price u Wrap redovima ostaju kako su snimljeni (razina segmenta jos se ne sprema u pricu). Testovi, conformance.
+Popravak 2026-10-16 (korisnik: "dodao sam jos jedan USB ali ga ne prepoznaje iako ga sistem vidi"; "ne dodaji ni oduzimaj,
+to treba biti automatsko"): izvori Ingesta bili su samo diskovi rucno upisani u konfiguraciju racunala
+(`data/ingest-transport.json`). Sada je svaki disk koji sustav vidi izvor bez rucnog upisa. Nova javna kocka
+`crates/qnc-source-volumes` (+ ugovor; samo citanje: priklјuceni diskovi sa serijskim brojem volumena; Windows, ostali
+sustavi zasad prazan popis). `qnc-source-bindings::load` (`with_attached`): priklјuceni disk koji nije upisan postaje izvor
+`qnc://local/source/volume-<serijski>` s probeom lokalnih izvora; upisani disk pod drugim slovom dobiva trenutno slovo;
+nista se ne brise i datoteka se ne pise. Vrijedi za sve koji citaju izvore (Ingest, preview/player, radnici). Ingest popis
+izvora cita ponovno kad se otvori popis diskova (`qnc-ingest-application` `refresh_sources`; C10 isti), pa disk
+prikljucen dok aplikacija radi se pojavi bez ponovnog pokretanja. Rucni upis E: u kopiju je vracen.

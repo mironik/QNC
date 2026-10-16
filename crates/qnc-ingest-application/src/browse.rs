@@ -15,6 +15,8 @@ impl IngestApplication {
         self.view.source_kind = kind;
         let step = match target {
             None => {
+                // The disks attached now are listed (user 2026-10-16), not those at the start.
+                if let Some(browser) = self.refresh_sources() { self.browse.connect(browser) }
                 self.clear_source_browser_state();
                 qnc_source_browse::Step::Roots(
                     match kind {
@@ -35,6 +37,15 @@ impl IngestApplication {
                 IngestDispatchResult::rejected(error)
             }
         }
+    }
+
+    /// The sources of this computer read again (a disk attached since is one) and their
+    /// browser; the reason when they cannot be read.
+    pub(crate) fn refresh_sources(&mut self) -> Option<qnc_source_browse::TransportBrowserSession> {
+        let loaded = selection_config::SelectionConfig::load(self.root.as_ref()?).and_then(|config| Ok((config.browser()?, config)));
+        let (browser, config) = loaded.map_err(|error| self.selection_config_error = Some(error.to_string())).ok()?;
+        (self.selection_config, self.selection_config_error) = (Some(config), None);
+        Some(browser)
     }
 
     pub(crate) fn clear_source_browser_state(&mut self) {
