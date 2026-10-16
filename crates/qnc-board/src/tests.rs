@@ -131,3 +131,20 @@ fn a_bare_frame_leaves_the_board_as_it_is() {
     let frame = Frame::bare();
     assert_eq!(frame.layout.nest(&frame.slot, &board), board);
 }
+
+#[test]
+fn every_block_is_drawn_even_after_an_earlier_one_answered() {
+    let ctx = egui::Context::default();
+    let mut drawn = Vec::new();
+    let mut answer = None;
+    let _ = ctx.run(egui::RawInput::default(), |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            answer = show_layout(ui, &sizes().standard_layout(&NAMES), |_| None, |_, name, _| {
+                drawn.push(name.to_string());
+                (name == "right" || name == "dock").then(|| name.to_string())
+            });
+        });
+    });
+    assert!(drawn.iter().any(|name| name == "dock"), "the dock is drawn after the right panel answered: {drawn:?}");
+    assert_eq!(answer.as_deref(), Some("right"), "the first answer is the board's");
+}

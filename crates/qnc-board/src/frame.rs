@@ -112,7 +112,7 @@ fn collect_names(node: &Node, names: &mut Vec<String>) {
 }
 
 /// Draws a board layout in its frame as one tree: the board's blocks through `block`
-/// (the first answer stops the rest of the board), the frame's own places through the
+/// (every block is drawn, the first answer is the board's), the frame's own places through the
 /// frame owner (always drawn).
 pub fn show_in_frame<R>(
     ui: &mut egui::Ui,
@@ -144,7 +144,6 @@ pub fn show_in_frame<R>(
                 block(ui, name, rect)
             }
         },
-        |name| own.iter().any(|own| own == name),
     )
 }
 

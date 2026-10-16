@@ -310,8 +310,8 @@ fn part_lengths(parts: &[Part], total: f32, cross: f32) -> Vec<f32> {
 }
 
 /// Paints the standard layout with `faces` and calls `block` for every named place in
-/// the order monitor, head, body, right, dock; the first answer stops the rest (one
-/// intent per frame, as the forms do).
+/// the order monitor, head, body, right, dock; every place is drawn, the first answer
+/// is the board's (one intent per frame).
 pub fn show<R>(
     ui: &mut egui::Ui,
     sizes: &BoardSizes,
@@ -334,17 +334,18 @@ pub fn show_layout<R>(
         return None;
     }
     ui.allocate_rect(rect, Sense::hover());
-    draw(ui, &solve(layout, rect), face, block, |_| false)
+    draw(ui, &solve(layout, rect), face, block)
 }
 
-/// Faces first, then blocks in tree order. After the first answer only the blocks
-/// `always` names are still drawn (the frame's own places are never skipped).
+/// Faces first, then every block in tree order; the first answer is the board's. A block
+/// is never left undrawn because an earlier one answered (live 2026-10-16: the wheel over
+/// the segment panel answers every frame and the source dock under it was not drawn, so
+/// it flashed).
 fn draw<R>(
     ui: &mut egui::Ui,
     solved: &Solved,
     face: impl Fn(&str) -> Option<Color32>,
     mut block: impl FnMut(&mut egui::Ui, &str, Rect) -> Option<R>,
-    always: impl Fn(&str) -> bool,
 ) -> Option<R> {
     for (name, area) in &solved.faces {
         if let Some(color) = face(name) {
@@ -353,7 +354,7 @@ fn draw<R>(
     }
     let mut answer = None;
     for (name, area) in &solved.blocks {
-        if area.width() < 1.0 || area.height() < 1.0 || (answer.is_some() && !always(name)) {
+        if area.width() < 1.0 || area.height() < 1.0 {
             continue;
         }
         let this = ui

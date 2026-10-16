@@ -4292,3 +4292,9 @@ Sada sve sto je panel Segmenti uzeo (slot, rub slota, marker, pokrivalica, A1/A2
 tipkovnica ode s panela (klik, Tab, Enter); nista se ne zapisuje. Uredivanje segmenta (Ctrl+Shift+I/O, Edit) zivi na
 source timelineu i ostaje. `qnc-program-segments` (`leave_panel`, test), `qnc-panel-focus` (`poll`). Kotacic i strelice
 na prvom slotu (uz zakljucani pocetni marker) ne pomicu ga, po pravilu od 10. 10. (poruka u statusu).
+Popravak 2026-10-16 (korisnik: "i dalje bljeska source timeline kad u segmentu tockom pokrecem playhead"; "odvoji
+kocke"): snimke ekrana tijekom kotacica pokazale su da u nekim slikama cijeli source dock nije nacrtan. Ploca
+(`qnc-board` `draw`) je nakon prve kocke koja vrati namjeru preskakala crtanje svih kocki iza nje; kotacic iznad panela
+Segmenti daje namjeru svaki frame, pa dock (iza njega) nije crtan. Sada se svaka kocka crta neovisno o drugima, a prva
+namjera je namjera ploce (jedna po frameu). Test `every_block_is_drawn_even_after_an_earlier_one_answered`,
+conformance. Provjereno u izoliranoj kopiji: 20 snimaka tijekom kotacica, dock nacrtan u svakoj.
