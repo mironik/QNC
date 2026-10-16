@@ -4785,6 +4785,7 @@ name = "qnc-segment-panel"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-dev-diagnostics",
  "qnc-level-meter",
  "qnc-program-filmstrip",
  "qnc-program-segments",
@@ -5079,6 +5080,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-channel-picker",
+ "qnc-dev-diagnostics",
  "qnc-filmstrip",
  "qnc-ui-kit",
  "qnc-ui-text",

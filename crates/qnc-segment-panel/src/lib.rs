@@ -117,6 +117,9 @@ pub fn show(
                         ui.spacing_mut().item_spacing = Vec2::new(0.0, ROW_GAP);
                         for row in &segments.rows {
                             let row_command = paint_row(ui, segments, row, timeline_theme, lengths);
+                            if command.is_some() && row_command.is_some() && qnc_dev_diagnostics::player_diagnostics_enabled() {
+                                qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("segment-row command lost {row_command:?} to {command:?}"));
+                            }
                             command = command.take().or(row_command);
                         }
                     });
@@ -314,16 +317,26 @@ fn paint_program(
         .segment_at(start)
         .is_some_and(|row| !row.kind.has_base_video() && row.end_frame >= end);
     // The sound of the segment or cover taken on this row (user 2026-10-16): the channel
-    // column and the lane button show its draft; the wave stays as stored until Enter.
+    // column and the lane button show its draft, and its wave follows the drafted level at
+    // once (live 2026-10-16: the level was not seen until Enter). The row's wave is drawn
+    // at the stored level, so the draft gives the difference.
     let part_choice = |lane: u8| {
-        segments.part_sound.as_ref().filter(|part| part.lane == lane).filter(|part| {
-            if lane == 0 {
-                segments.rows.iter().any(|row| row.segment_id == part.id && row.start_frame == start)
-            } else {
-                segments.covers.iter().any(|cover| cover.cover_id == part.id && (start..end).contains(&cover.start_frame))
-            }
+        let stored = if lane == 0 {
+            segments.part_sound.as_ref().and_then(|part| {
+                segments.rows.iter().find(|row| row.segment_id == part.id && row.start_frame == start).map(|row| row.a1_level_db)
+            })
+        } else {
+            segments.part_sound.as_ref().and_then(|part| {
+                segments.covers.iter().find(|cover| cover.cover_id == part.id && (start..end).contains(&cover.start_frame)).map(|cover| cover.a2_level_db)
+            })
+        };
+        segments.part_sound.as_ref().filter(|part| part.lane == lane).zip(stored).map(|(part, stored)| qnc_timeline::ChannelChoice {
+            selected: part.channel,
+            count: part.channels,
+            open: true,
+            off: part.off,
+            level_db: part.level_db.saturating_sub(stored),
         })
-        .map(|part| qnc_timeline::ChannelChoice { selected: part.channel, count: part.channels, open: true, off: part.off, level_db: 0 })
     };
     let intent = qnc_timeline::show(
         ui,

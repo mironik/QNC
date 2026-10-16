@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public passive UI component: the Segmenti panel (program timing header and one qnc-timeline row per segment)"
 
 [dependencies]
+qnc-dev-diagnostics = { workspace = true }
 qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-level-meter = { workspace = true }

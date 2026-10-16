@@ -1023,7 +1023,12 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
 
     match (intent, wheel) {
         (TimelineIntent::None, Some(wheel)) => TimelineIntent::Wheel(wheel),
-        (intent, _) => intent,
+        (intent, wheel) => {
+            if wheel.is_some() && qnc_dev_diagnostics::player_diagnostics_enabled() {
+                qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("timeline-wheel lost to {intent:?}"));
+            }
+            intent
+        }
     }
 }
 
