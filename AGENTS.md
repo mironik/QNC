@@ -4247,3 +4247,11 @@ Dopuna 2026-10-16 (korisnik: "prikaz duljine u source timelineu u realnoj pozici
 daleko"; "ok, to je ok"): polje Duration source docka dok OUT nije postavljen pokazuje udaljenost od IN-a do playheada i
 prati ga; s postavljenim OUT-om IN-OUT kao prije (`qnc-timeline` `shown_source_length`, `qnc-source-dock`). Vrijedi i za
 Ingest. Test, conformance.
+Dopuna 2026-10-16 (korisnik: "kad je mis iznad segmenata trebao bi raditi kao i u source timelineu, isto i source
+timeline u Ingestu; source timeline mora se svugdje ponasati na isti nacin"): kotacic iznad panela Segmenti uvijek radi
+kao na source timelineu (Wrap redovi se listaju trakom). Ingest: isti kotacic iznad monitora i source timelinea
+(`qnc-focus-walk` prebacuje fokus i daje strelicu, ista postavka smjera; Ctrl+kotacic tamo nema sto uzeti).
+`qnc-wheel-jog` `SOURCE_ACTIONS` i `source_step_forward` (jedan skup akcija za sve forme); `qnc-program-view`
+`holds_edit` uklonjen. C10 `qnc-ingest-blocks` 862 -> 860. Napomena korisnika (isti dan): sve sto pripada source
+timelineu i media poolu mora biti neovisno o formi; ovaj rez jos poziva kotacic iz ploca i ima dva puta fokusa
+(`qnc-panel-focus` za Story, `qnc-focus-walk` za Ingest) - predlozeno je premjestanje u kocke.

@@ -18,14 +18,11 @@ pub fn render_desktop(
         intent
     };
     qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| match block {
-        "preview" => {
-            render_preview(ui, rect, contracts, theme, view);
-            None
-        }
+        "preview" => render_preview(ui, rect, contracts, theme, view),
         "pool-head" => framed(render_pool_head(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::POOL_TABS]),
         "source-browser" => framed(render_source_browser(ui, rect, contracts, theme, view), ui, rect, &[qnc_focus_walk::SOURCE_KINDS, qnc_focus_walk::BROWSER, qnc_focus_walk::BROWSER_BUTTONS]),
         "clip-cards" => framed(render_clip_grid(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::CARDS]),
-        "source-dock" => framed(render_source_dock(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::SOURCE_TIMELINE, qnc_focus_walk::SOURCE_BUTTONS]),
+        "source-dock" => framed(render_source_dock(ui, contracts, theme, view).or(qnc_wheel_jog::action(ui, rect, true, "source-dock", qnc_wheel_jog::SOURCE_ACTIONS).map(IngestIntent::empty)), ui, rect, &[qnc_focus_walk::SOURCE_TIMELINE, qnc_focus_walk::SOURCE_BUTTONS]),
         _ => None,
     })
 }

@@ -118,6 +118,17 @@ impl FocusWalk {
         let back = action_id == "step_back_frame";
         match (panel.as_str(), action_id) {
             (_, "focus_next" | "focus_prev") => Walk::Done(self.step_panel(action_id == "focus_next")),
+            // The wheel over the source timeline or monitor (user 2026-10-16, the same in every
+            // form): the keyboard goes there and the wheel is its left/right arrow; Ctrl+wheel
+            // (the level of a taken sound) has nothing to take here.
+            (_, wheel) if wheel.starts_with("wheel_source") => {
+                self.go(SOURCE_TIMELINE);
+                match qnc_wheel_jog::source_step_forward(wheel) {
+                    Some(true) => Walk::Action("step_forward_frame".into()),
+                    Some(false) => Walk::Action("step_back_frame".into()),
+                    None => Walk::Done(false),
+                }
+            }
             // A click on a panel puts the keyboard there; the card Enter opened goes on to the
             // source timeline.
             (_, click) if self.clicks.iter().any(|(_, action)| action == click) => {

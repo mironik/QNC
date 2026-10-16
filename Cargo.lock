@@ -3607,6 +3607,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-media-card",
+ "qnc-wheel-jog",
 ]
 
 [[package]]
@@ -3702,6 +3703,7 @@ dependencies = [
  "qnc-source-dock",
  "qnc-timeline",
  "qnc-ui-kit",
+ "qnc-wheel-jog",
 ]
 
 [[package]]

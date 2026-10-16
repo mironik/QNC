@@ -5,5 +5,6 @@ edition = "2021"
 description = "QNC public block: the keyboard walk over the panels of a form in the order of its layout contract (Tab, Enter, keys of the panel in focus)"
 
 [dependencies]
+qnc-wheel-jog = { workspace = true }
 qnc-media-card = { workspace = true }
 eframe = { workspace = true }

@@ -87,6 +87,22 @@ fn with_ctrl(events: &[egui::Event]) -> Option<bool> {
 /// The catalog actions of a panel's wheel: back and forward, then with Ctrl held.
 pub type WheelActions<'a> = ((&'a str, &'a str), (&'a str, &'a str));
 
+/// The wheel over a source timeline or its monitor, in every form (user 2026-10-16: the
+/// source timeline behaves the same everywhere).
+pub const SOURCE_ACTIONS: WheelActions<'static> =
+    (("wheel_source_back", "wheel_source_forward"), ("wheel_source_ctrl_back", "wheel_source_ctrl_forward"));
+
+/// Whether a wheel action of `SOURCE_ACTIONS` moves the playhead forward, after this
+/// computer's choice of direction; `None` for the Ctrl pair or another action.
+pub fn source_step_forward(action_id: &str) -> Option<bool> {
+    let ((back, forward), _) = SOURCE_ACTIONS;
+    match action_id {
+        id if id == back => Some(!playhead_up_forward()),
+        id if id == forward => Some(playhead_up_forward()),
+        _ => None,
+    }
+}
+
 /// The catalog action of this frame's wheel over `rect` (back or forward, the Ctrl pair
 /// when Ctrl is held), when the wheel steps there now (`enabled`); `None` otherwise.
 /// Over the panel the scroll is taken. `id` names the panel's pending steps.

@@ -633,9 +633,8 @@ pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {
 
 /// The catalog actions of the wheel over the source timeline or monitor (back, forward).
 /// Then with Ctrl held (the level of a taken sound).
-pub const WHEEL_SOURCE: qnc_wheel_jog::WheelActions<'static> =
-    (("wheel_source_back", "wheel_source_forward"), ("wheel_source_ctrl_back", "wheel_source_ctrl_forward"));
-/// The same over the segment panel, while something there is taken.
+pub const WHEEL_SOURCE: qnc_wheel_jog::WheelActions<'static> = qnc_wheel_jog::SOURCE_ACTIONS;
+/// The same over the segment panel (its Wrap rows), as over the source timeline.
 pub const WHEEL_SEGMENTS: qnc_wheel_jog::WheelActions<'static> =
     (("wheel_segments_back", "wheel_segments_forward"), ("wheel_segments_ctrl_back", "wheel_segments_ctrl_forward"));
 

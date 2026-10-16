@@ -46,8 +46,8 @@ pub fn render_desktop(
             intent
         }
         "right-panel" if contracts.composition().right_panel == "segment_panel" => {
-            // The wheel moves what is taken there, else the rows scroll (taken before them).
-            let jog = qnc_wheel_jog::action(ui, rect, view.segments.holds_edit(), "segments", qnc_panel_focus::WHEEL_SEGMENTS).map(EditorialIntent::Action);
+            // The wheel works as on the source timeline (user 2026-10-16); the rows scroll by their bar.
+            let jog = qnc_wheel_jog::action(ui, rect, true, "segments", qnc_panel_focus::WHEEL_SEGMENTS).map(EditorialIntent::Action);
             let intent = jog.or(qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths, view.preview.output_levels)
                 .map(EditorialIntent::Segment));
             paint_focus(ui, rect, view.focus.panel == Panel::Segments, theme.focus);

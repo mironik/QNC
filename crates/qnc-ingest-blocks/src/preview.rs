@@ -6,7 +6,7 @@ pub(super) fn render_preview(
     contracts: &IngestContracts,
     theme: &Theme,
     view: &IngestViewModel,
-) {
+) -> Option<IngestIntent> {
     let chrome = MonitorChrome {
         fill: theme.black,
         border: theme.border,
@@ -60,4 +60,5 @@ pub(super) fn render_preview(
         poster,
         label,
     );
+    qnc_wheel_jog::action(ui, rect, true, "monitor", qnc_wheel_jog::SOURCE_ACTIONS).map(IngestIntent::empty) // steps the source like the arrows
 }
