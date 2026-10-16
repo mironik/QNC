@@ -168,7 +168,9 @@ impl PanelFocus {
                 segments.release_part_sound();
                 preview.hear_program_draft(None, None, wrap.playhead()); // the stored sound again
             }
-            segments.leave_panel();
+            if segments.leave_panel() && qnc_dev_diagnostics::player_diagnostics_enabled() {
+                qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("story-leave panel={:?} dropped the segment panel's taken edit", self.panel));
+            }
         }
         if let Some(answer) = self.keyframes.take() {
             match (self.jump.take(), answer) {
@@ -234,13 +236,16 @@ impl PanelFocus {
             qnc_dev_diagnostics::log_line(
                 qnc_dev_diagnostics::DiagnosticsStream::Player,
                 format!(
-                    "story-key action={action_id} panel={panel:?}->{:?} routed={routed:?} in={:?} out={:?} playhead={:?} program={} part_sound={}",
+                    "story-key action={action_id} panel={panel:?}->{:?} routed={routed:?} in={:?} out={:?} playhead={:?} program={} part_sound={} marker={} edge={} message={:?}",
                     self.panel,
                     timeline.source_in_frame,
                     timeline.source_out_frame,
                     timeline.playhead_frame,
                     preview.in_program(),
                     pieces.2.part_sound_taken(),
+                    pieces.2.editing_marker(),
+                    pieces.2.trimming_edge(),
+                    pieces.2.view().message,
                 ),
             );
         }
@@ -280,7 +285,10 @@ impl PanelFocus {
             // where those arrows turn a taken sound off/on, the wheel moves the playhead
             // (user 2026-10-16: the level never goes straight to the wheel, the playhead does).
             wheel if wheel.starts_with("wheel_") => {
-                self.panel = if wheel.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
+                // A segment edge (Ctrl+Shift+I/O) is taken on the source timeline: the wheel
+                // moves it wherever the pointer is (live 2026-10-16: over the segment panel the
+                // wheel did nothing).
+                self.panel = if wheel.starts_with("wheel_source") || segments.trimming_edge() { Panel::SourceTimeline } else { Panel::Segments };
                 let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();
                 let frames = if forward { 1 } else { -1 };
                 if self.panel == Panel::Segments && segments.part_sound_taken() {
@@ -516,7 +524,7 @@ impl PanelFocus {
                 taken
             }
             // Escape drops a taken segment edge at once and goes back to Wrap.
-            "clear_focus" | "close_player" if on_source && segments.trimming_edge() => {
+            "clear_focus" | "close_player" if segments.trimming_edge() => {
                 segments.apply_action(action_id);
                 self.back_to_wrap(segments, wrap, timeline)
             }
@@ -524,9 +532,8 @@ impl PanelFocus {
                 self.panel = Panel::SourceTimeline; // the arrows go to the taken mark, not the buttons
                 return self.source.route(action_id, preview, timeline);
             }
-            "step_back_frame" | "step_forward_frame"
-                if panel == Panel::SourceTimeline && segments.trimming_edge() && qnc_source_mark_focus::is_taken(timeline) =>
-            {
+            "step_back_frame" | "step_forward_frame" if segments.trimming_edge() && qnc_source_mark_focus::is_taken(timeline) => {
+                self.panel = Panel::SourceTimeline; // the edge is on the source timeline
                 self.source.set_mark_taken(true); // a segment edge opened with its mark taken
                 return self.source.route(action_id, preview, timeline);
             }

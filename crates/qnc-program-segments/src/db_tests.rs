@@ -356,3 +356,25 @@ fn leaving_the_segment_panel_drops_a_taken_slot_edge_without_writing() {
     assert!(!segments.handles("step_forward_frame"), "the arrows are free again");
     assert!(!segments.leave_panel(), "nothing more to drop");
 }
+
+#[test]
+fn ctrl_m_takes_a_marker_after_a_segment_edge_was_dropped_with_escape() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    store_with_story(&file);
+    let mut segments = ProgramSegments::new();
+    configure(&mut segments, &file);
+    segments.set_playhead(Some(60));
+    segments.apply_action("add_marker");
+    settle(&mut segments);
+    segments.set_playhead(Some(70));
+    assert!(segments.take_edge(true), "{}", segments.view().message);
+    assert!(segments.apply_action("clear_focus"));
+    assert!(!segments.trimming_edge());
+    settle(&mut segments);
+    segments.set_playhead(Some(60));
+    segments.apply_action("select_marker");
+    assert!(segments.editing_marker(), "{}", segments.view().message);
+    segments.apply_action("step_forward_frame");
+    assert_eq!(marker_frames(&segments), vec![0, 61, 150]);
+}
