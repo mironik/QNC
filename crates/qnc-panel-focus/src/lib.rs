@@ -242,7 +242,12 @@ impl PanelFocus {
             // A Sync (user 2026-10-13): stopped, the arrows move its end; Enter writes the
             // cover, Delete drops the draft, wherever the keyboard is.
             "step_back_frame" | "step_forward_frame" if segments.sync_drafting() && !preview.player_view().playing() => {
-                segments.sync_nudge(if action_id == "step_back_frame" { -1 } else { 1 })
+                let moved = segments.sync_nudge(if action_id == "step_back_frame" { -1 } else { 1 });
+                // The monitor shows the cover's last picture at the new end (user 2026-10-16).
+                if let Some(frame) = segments.sync_window_frame().filter(|_| moved) {
+                    preview.show_program_frame(frame, false);
+                }
+                moved
             }
             "activate_focused_item" if segments.sync_drafting() => segments.confirm_source(),
             "delete_marker" if segments.sync_drafting() => segments.discard_sync(),

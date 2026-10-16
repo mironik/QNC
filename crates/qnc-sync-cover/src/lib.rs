@@ -257,6 +257,16 @@ impl SyncCover {
         true
     }
 
+    /// The frame of the playing window that shows the last picture of a stopped Sync's
+    /// draft (the window's frames start at 0): the monitor shows the new end when an arrow
+    /// moves it (user 2026-10-16). `None` while it plays, or when the end moved before the
+    /// window.
+    pub fn stopped_window_frame(&self) -> Option<u64> {
+        let session = self.active.as_ref().filter(|session| session.restart)?;
+        let last = session.end.checked_sub(1)?;
+        last.checked_sub(session.play_from)
+    }
+
     /// Space on a stopped Sync: the window from its draft end on, the source from where
     /// it got to; `None` when it is not stopped or nothing is left to play.
     pub fn resume(&mut self) -> Option<SyncPreview> {
@@ -356,8 +366,11 @@ impl SyncCover {
     /// and once the slot is closed its source OUT with the IN/OUT of the slot.
     pub fn source_view(&self) -> Option<(u64, Option<(u64, u64)>)> {
         if let Some(session) = &self.active {
+            // The source IN to the draft end are the cover's IN and OUT: the OUT follows the
+            // play and the arrows (user 2026-10-16).
             let frame = self.source_frame.unwrap_or(session.source.source_in);
-            return Some((frame, None));
+            let source_in = session.source.source_in;
+            return Some((frame, Some((source_in, frame.max(source_in + 1)))));
         }
         let slot = self
             .pending
@@ -444,7 +457,7 @@ mod tests {
         assert_eq!(sync.program_frame(Some(12)), Some(32));
         assert_eq!(
             sync.source_view(),
-            Some((22, None)),
+            Some((22, Some((10, 22)))),
             "the source plays in parallel"
         );
         let slot = sync.finish(32).unwrap().clone();
@@ -508,6 +521,10 @@ mod tests {
         assert_eq!(sync.draft_end(), Some(28));
         assert!(sync.nudge(3));
         assert_eq!(sync.draft_end(), Some(31), "the arrows move the end");
+        // The window started at 20 (the marker): its frame 10 is program frame 30, the last
+        // picture of the new end; the OUT follows it on the source.
+        assert_eq!(sync.stopped_window_frame(), Some(10), "the monitor shows the new end");
+        assert_eq!(sync.source_view(), Some((21, Some((10, 21)))));
         let window = sync.resume().expect("space plays on from the end");
         assert_eq!(window.window, (31, 50));
         assert_eq!(window.source_in, 10 + 11, "the source from where it got to");
@@ -523,7 +540,8 @@ mod tests {
         let preview = sync.start(&[0, 20], 25, 200, (2, 1)).unwrap();
         assert_eq!(preview.window, (20, 80), "30 source frames are 60 story frames");
         assert_eq!(sync.program_frame(Some(11)), Some(31));
-        assert_eq!(sync.source_view(), Some((15, None)));
+        assert_eq!(sync.source_view(), Some((15, Some((10, 15)))));
+        assert_eq!(sync.stopped_window_frame(), None, "it plays");
         let slot = sync.finish(31).unwrap().clone();
         assert_eq!(slot.source_out, 16, "11 story frames need 6 source pictures");
         // 50p in a 25 story: every other picture.

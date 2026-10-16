@@ -4114,3 +4114,9 @@ citano, test koji se pokrece rucno `QNC_MP4_SAMPLE`): zvuk kroz indeks jednak je
 iz cijele datoteke, 13 od 13 kljucnih slika; 336 MB datoteka 1,2 s kroz indeks prema 4,8 s cijela (moguce djelomicno iz
 memorije sustava), prototip mimo memorije sustava 1,13 s za 3:43 (369 MB). Nije provjereno kroz cijeli radni tijek: projekt
 s MP4 originalima nije bio dostupan.
+Popravak 2026-10-16 (korisnik: "kada se pleya klip u source timeline u Sync/B-roll, playhead ne putuje s playem, pa ako
+strelicama produljim ili skratim selektirani dio, ne prikazuju se slicice u monitoru"): (1) za vrijeme Synca source
+timeline uz playhead pokazuje IN i OUT pokrivalice: OUT je kraj nacrta i prati play i strelice (`qnc-sync-cover`
+`source_view`); (2) strelica na zaustavljenom Syncu pomakne kraj i player prozora Synca pokaze zadnju sliku pokrivalice na
+novom kraju (`stopped_window_frame`, `qnc-program-segments` `sync_window_frame`, `qnc-panel-focus`). Kraj pomaknut ispred
+pocetka prozora (nakon nastavka Spaceom) nema sliku u tom prozoru. Testovi.

@@ -114,6 +114,11 @@ impl ProgramSegments {
         true
     }
 
+    /// The frame of the Sync window that shows the stopped draft's last picture.
+    pub fn sync_window_frame(&self) -> Option<u64> {
+        self.sync.stopped_window_frame()
+    }
+
     /// Delete before Enter: the Sync draft goes, nothing was written; the player takes
     /// the whole program again.
     pub fn discard_sync(&mut self) -> bool {
