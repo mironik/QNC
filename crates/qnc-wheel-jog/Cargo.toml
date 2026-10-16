@@ -6,3 +6,5 @@ description = "QNC public piece: the mouse wheel over a panel as catalog actions
 
 [dependencies]
 eframe = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+serde_json = { workspace = true }

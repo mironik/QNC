@@ -10,6 +10,42 @@ use eframe::egui::{self, Rect, Ui};
 pub const MODULE_ID: &str = "qnc.module.wheel-jog";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// The setting of this computer beside its others (`data/mouse-wheel.json`).
+pub const SETTING_FILE: &str = "mouse-wheel.json";
+
+/// Whether the wheel away from the user moves the playhead forward: the choice of this
+/// computer (`{"playhead_up": "forward"}` or `"back"` in `SETTING_FILE`, user 2026-10-16:
+/// editors come with either habit), forward without it. A level is not turned by it: up
+/// is louder everywhere. Read once a run.
+pub fn playhead_up_forward() -> bool {
+    static CHOSEN: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CHOSEN.get_or_init(|| {
+        let Some(path) = qnc_dev_diagnostics::locate_qnc_root().map(|root| qnc_dev_diagnostics::config_path(&root).with_file_name(SETTING_FILE)) else {
+            return true;
+        };
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            return true; // not chosen: forward
+        };
+        match parse_setting(&text) {
+            Ok(forward) => forward,
+            Err(error) => {
+                qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("wheel-setting {}: {error}; forward", path.display()));
+                true
+            }
+        }
+    })
+}
+
+/// `{"playhead_up": "forward" | "back"}`.
+fn parse_setting(text: &str) -> Result<bool, String> {
+    let value: serde_json::Value = serde_json::from_str(text).map_err(|error| error.to_string())?;
+    match value.get("playhead_up").and_then(serde_json::Value::as_str) {
+        Some("forward") => Ok(true),
+        Some("back") => Ok(false),
+        other => Err(format!("playhead_up must be \"forward\" or \"back\", not {other:?}")),
+    }
+}
+
 /// Touchpad points of one step.
 pub const POINTS_PER_STEP: f32 = 40.0;
 
@@ -82,6 +118,13 @@ mod tests {
         let mut points = 0.0;
         assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, 1.0)], &mut points), 1);
         assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, -1.0), wheel(egui::MouseWheelUnit::Line, -1.0)], &mut points), -2);
+    }
+
+    #[test]
+    fn the_computer_chooses_the_playhead_direction() {
+        assert_eq!(parse_setting(r#"{"playhead_up": "forward"}"#), Ok(true));
+        assert_eq!(parse_setting(r#"{"playhead_up": "back"}"#), Ok(false));
+        assert!(parse_setting(r#"{"playhead_up": "up"}"#).is_err(), "no guess");
     }
 
     #[test]

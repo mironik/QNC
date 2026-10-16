@@ -4251,6 +4251,7 @@ dependencies = [
  "qnc-source-mark-focus",
  "qnc-source-preview",
  "qnc-timeline",
+ "qnc-wheel-jog",
  "qnc-wrap-session",
 ]
 
@@ -5232,6 +5233,8 @@ name = "qnc-wheel-jog"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-dev-diagnostics",
+ "serde_json",
 ]
 
 [[package]]

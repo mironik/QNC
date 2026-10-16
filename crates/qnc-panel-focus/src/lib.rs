@@ -264,11 +264,12 @@ impl PanelFocus {
                 self.panel = if action_id.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
                 let (back, sound) = (action_id.ends_with("back"), if self.panel == Panel::Segments { segments.part_sound_taken() } else { segments.lane_is_taken() });
                 // A taken A1/A2 sound: the wheel is its level, up louder (Ctrl+left/right).
-                let arrow = match (sound, back) {
-                    (true, true) => "lane_level_down",
-                    (true, false) => "lane_level_up",
-                    (false, true) => "step_back_frame",
-                    (false, false) => "step_forward_frame",
+                // The playhead direction is this computer's choice (`qnc-wheel-jog`).
+                let arrow = match (sound, back != qnc_wheel_jog::playhead_up_forward()) {
+                    (true, _) if back => "lane_level_down",
+                    (true, _) => "lane_level_up",
+                    (false, false) => "step_back_frame",
+                    (false, true) => "step_forward_frame",
                 };
                 return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
             }

@@ -4233,3 +4233,8 @@ Ispravak 2026-10-16 (korisnik: "kad kotac guram gore playhead ide na pocetak... 
 od sebe (gore) je naprijed i glasnije, prema sebi natrag (`qnc-wheel-jog`). Dok je A1/A2 uzet (source timeline) ili
 zvuk segmenta/pokrivalice (Wrap redak), kotacic je razina kao Ctrl+lijevo/desno, a ne ukljuci/iskljuci
 (`qnc-panel-focus`). Testovi, conformance.
+Dopuna 2026-10-16 (korisnik: "dodaj postavku... zadrzi kako je, ali ton gore = +, dolje = -"): smjer playheada na
+kotacicu je postavka racunala, kao jezik sucelja: `data/mouse-wheel.json` `{"playhead_up": "forward" | "back"}`, bez nje
+`forward` (od sebe naprijed); neispravan zapis se zapisuje u player log i vrijedi `forward` (`qnc-wheel-jog`
+`playhead_up_forward`, cita se jednom po pokretanju). Razina A1/A2 se ne okrece: gore glasnije uvijek (`qnc-panel-focus`).
+Testovi, conformance.
