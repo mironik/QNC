@@ -4152,3 +4152,10 @@ Popravak 2026-10-16 (korisnik: "to je krivo... G nije prikljucen"): popis izvora
 prikljuceni; upisani lokalni disk sa serijskim brojem koji nije prikljucen se ne prikazuje (iz konfiguracije se ne brise i
 vraca se cim se prikljuci). Bez popisa diskova (sustav bez tog adaptera) nude se svi izvori. `qnc-ingest-select`
 `SelectionConfig::browser`. Veze izvora za player i radnike nisu mijenjane.
+Dopuna 2026-10-16 (korisnik prikljucio XDCAM disk, Sony PMW-300: MPEG-2 HD 35 Mbit/s 1920x1080 50i, 4 kanala LPCM 16-bit,
+`XDROOT/MEDIAPRO.XML`; djelomicno kopiran, za 1910 samo XML): proba na izoliranoj kopiji (disk samo citan) - disk je
+prepoznat automatski (`volume-7e80f1fb`), Select je primio 7 klipova s tocnim trajanjem iz XML-a (1910 bez MXF-a
+preskocen), radnik je napravio konacne zapise, valove, filmstripove i postere. Jedan prolaz sada prima i 16-bitni zvuk
+(`qnc-mxf-sound` `s16le_to_f32`; `qnc-wave-worker` `mxf_sound_elements` daje i velicinu uzorka, svi trazeni streamovi
+iste velicine): valovi jednaki onima iz ffmpega (7 od 7), filmstripovi iz istog prolaza (7 od 7, dekodiranje ~0,3 s po
+klipu), slicica ispravna.

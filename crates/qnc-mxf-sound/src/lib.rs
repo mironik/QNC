@@ -193,6 +193,12 @@ pub fn key_picture_test(codec: &str) -> Option<fn(&[u8]) -> bool> {
     }
 }
 
+/// Stored 16-bit little-endian samples as f32, the same value as the FFmpeg decoder gives
+/// (`pcm_s16le` to `pcm_f32le`; XDCAM HD's LPCM16).
+pub fn s16le_to_f32(bytes: &[u8], out: &mut Vec<f32>) {
+    out.extend(bytes.chunks_exact(2).map(|sample| f32::from(i16::from_le_bytes([sample[0], sample[1]])) / 32_768.0));
+}
+
 /// Stored 24-bit little-endian samples as f32, the same value as the FFmpeg decoder gives
 /// (`pcm_s24le` to `pcm_f32le`).
 pub fn s24le_to_f32(bytes: &[u8], out: &mut Vec<f32>) {

@@ -794,7 +794,7 @@ fn decode_wave(
     // saved format before any reading; every other source through the selected decoder.
     let mut pictures = None;
     let read = match (mxf_sound_elements(media, &streams), mp4_sound(media, &streams)) {
-        (Some(elements), _) => mxf_sound_samples(&path, &elements, picture_targets, &mut pictures, cancel, &mut on_samples),
+        (Some((elements, bytes)), _) => mxf_sound_samples(&path, &elements, bytes, picture_targets, &mut pictures, cancel, &mut on_samples),
         // An MP4 with one AAC sound track: its sound chunks and key pictures through its
         // index (user 2026-10-16), decoded from what was read.
         (None, Some(stream)) => mp4_sound_samples(&path, stream, channels as u32, picture_targets, &mut pictures, cancel, &mut on_samples),
@@ -817,9 +817,10 @@ fn decode_wave(
 /// The selected decoder must declare the saved format of every stream it reads (no silent
 /// fallback): the same check a decode request makes.
 /// The sound element number of each requested stream, when the saved record is an MXF
-/// whose requested streams are all uncompressed 24-bit mono: the k-th audio stream of the
-/// file is sound element k (checked byte for byte against FFmpeg on a camera original).
-fn mxf_sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: &[u32]) -> Option<Vec<u8>> {
+/// whose requested streams are all uncompressed mono of one sample size (24-bit, or 16-bit
+/// as XDCAM HD's LPCM16): the k-th audio stream of the file is sound element k (checked
+/// byte for byte against FFmpeg on a camera original), with the sample size in bytes.
+fn mxf_sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: &[u32]) -> Option<(Vec<u8>, usize)> {
     if media.container.as_ref()?.value != "mxf" {
         return None;
     }
@@ -832,7 +833,8 @@ fn mxf_sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: 
         })
         .collect::<Vec<_>>();
     audio.sort_by_key(|(stream, _)| stream.index.as_ref().map(|index| index.value));
-    streams
+    let mut size = None;
+    let elements = streams
         .iter()
         .map(|wanted| {
             let position = audio
@@ -840,11 +842,17 @@ fn mxf_sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: 
                 .position(|(stream, _)| stream.index.as_ref().is_some_and(|index| index.value == *wanted))?;
             let (stream, details) = audio[position];
             let codec = stream.codec.as_ref().map(|codec| &codec.value);
-            let pcm = matches!(codec, Some(qnc_media_metadata::Signal::Known(name)) if name == "pcm_s24le");
+            let bytes = match codec {
+                Some(qnc_media_metadata::Signal::Known(name)) if name == "pcm_s24le" => 3,
+                Some(qnc_media_metadata::Signal::Known(name)) if name == "pcm_s16le" => 2,
+                _ => return None,
+            };
             let mono = details.channels.as_ref().is_some_and(|channels| channels.value == 1);
-            (pcm && mono).then(|| u8::try_from(position).ok()).flatten()
+            let same = *size.get_or_insert(bytes) == bytes;
+            (mono && same).then(|| u8::try_from(position).ok()).flatten()
         })
-        .collect()
+        .collect::<Option<Vec<u8>>>()?;
+    Some((elements, size?))
 }
 
 /// The track of the one requested sound stream when the saved record is an MP4 or
@@ -918,6 +926,7 @@ fn mp4_sound_samples(
 fn mxf_sound_samples(
     source: &Path,
     elements: &[u8],
+    sample_bytes: usize,
     picture_targets: Option<(&[u64], &'static str)>,
     pictures: &mut Option<qnc_filmstrip::EncodedPictures>,
     cancel: &AtomicBool,
@@ -936,7 +945,11 @@ fn mxf_sound_samples(
         let Some(slot) = elements.iter().position(|element| *element == number) else {
             return Ok(());
         };
-        qnc_mxf_sound::s24le_to_f32(value, &mut queues[slot]);
+        if sample_bytes == 2 {
+            qnc_mxf_sound::s16le_to_f32(value, &mut queues[slot]);
+        } else {
+            qnc_mxf_sound::s24le_to_f32(value, &mut queues[slot]);
+        }
         let ready = queues.iter().map(Vec::len).min().unwrap_or(0);
         if ready == 0 {
             return Ok(());
