@@ -22,6 +22,9 @@ struct Args {
     jumps: Vec<String>,
     back: Vec<String>,
     program_back: Vec<u64>,
+    /// Clips scrubbed as by the mouse wheel, then played (live 2026-10-16: the sound
+    /// stopped every second after a scrub).
+    scrub: Vec<String>,
     seconds: u64,
     /// Also run the program output on the external screen and measure what it showed.
     hdmi: bool,
@@ -30,7 +33,7 @@ struct Args {
 }
 
 fn args() -> Result<Args, String> {
-    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), jumps: Vec::new(), back: Vec::new(), program_back: Vec::new(), seconds: 10, hdmi: false, start: 0 };
+    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), jumps: Vec::new(), back: Vec::new(), program_back: Vec::new(), scrub: Vec::new(), seconds: 10, hdmi: false, start: 0 };
     let mut list = std::env::args().skip(1);
     while let Some(arg) = list.next() {
         if arg == "--hdmi" {
@@ -45,6 +48,7 @@ fn args() -> Result<Args, String> {
             "--steps" => parsed.steps.push(value),
             "--jumps" => parsed.jumps.push(value),
             "--back" => parsed.back.push(value),
+            "--scrub" => parsed.scrub.push(value),
             "--program-back" => parsed.program_back.push(value.parse().map_err(|_| "--program-back FRAME")?),
             "--start" => parsed.start = value.parse().map_err(|_| "--start FRAME")?,
             "--seconds" => parsed.seconds = value.parse().map_err(|_| "--seconds N")?,
@@ -463,6 +467,39 @@ fn back(preview: &mut SourcePreview, run: &mut Steps, start: u64) {
     run.burst_ms = Some(0);
 }
 
+/// The wheel over the source timeline (user 2026-10-16): bursts of single steps 20-50 ms
+/// apart, back and forth, with the pauses in which the player's background decoding
+/// starts, then Play, measured as any play.
+fn scrub(preview: &mut SourcePreview, run: &mut Run, seconds: u64, hdmi: Option<&mut Hdmi>) {
+    run.started = unix_ms();
+    if let Err(error) = wait_ready(preview, Duration::from_secs(20)) {
+        run.error = Some(error);
+        return;
+    }
+    for (count, delta) in [(5, -1i64), (5, 1), (5, -1), (5, 1), (8, -1), (6, 1)] {
+        for _ in 0..count {
+            preview.step(delta);
+            for _ in 0..3 {
+                preview.poll();
+                std::thread::sleep(Duration::from_millis(12));
+            }
+        }
+        let pause = Instant::now();
+        while pause.elapsed() < Duration::from_millis(900) {
+            preview.poll();
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    match wait_ready(preview, Duration::from_secs(20)) {
+        Ok(ms) => {
+            run.prepare_ms = Some(ms);
+            play(preview, run, seconds, hdmi);
+        }
+        Err(error) => run.error = Some(error),
+    }
+    run.ended = unix_ms();
+}
+
 /// The same steps back on the story program, as Wrap makes them (a cue per step on the
 /// program's own frames).
 fn program_back(preview: &mut SourcePreview, run: &mut Steps, start: u64) {
@@ -573,6 +610,17 @@ fn main() -> Result<(), String> {
             None => run.error = Some("no such clip".into()),
         }
         step_runs.push(run);
+    }
+    for wanted in &args.scrub {
+        let mut run = Run { name: format!("scrub {wanted}"), ..Run::default() };
+        match clips.iter().find(|clip| clip.name.contains(wanted.as_str())) {
+            Some(clip) => {
+                preview.open_at(&clip.clip_id, args.start);
+                scrub(&mut preview, &mut run, args.seconds, hdmi.as_mut());
+            }
+            None => run.error = Some("no such clip".into()),
+        }
+        runs.push(run);
     }
     for wanted in &args.jumps {
         let mut run = Steps { name: format!("jumps {wanted}"), ..Steps::default() };
