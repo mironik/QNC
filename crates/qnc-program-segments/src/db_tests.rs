@@ -334,3 +334,25 @@ fn at_the_end_of_its_clip_a_slot_edge_does_not_go_further_that_way() {
     assert!(segments.jump_edit(12));
     assert_eq!(marker_frames(&segments), vec![0, 40, 81, 150], "the jump stops at the clip's last picture");
 }
+
+#[test]
+fn leaving_the_segment_panel_drops_a_taken_slot_edge_without_writing() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    store_with_story(&file);
+    let mut segments = ProgramSegments::new();
+    configure(&mut segments, &file);
+    for frame in [40, 80] {
+        segments.set_playhead(Some(frame));
+        segments.apply_action("add_marker");
+        settle(&mut segments);
+    }
+    segments.set_playhead(Some(50));
+    assert!(segments.take_slot_edge_at_playhead(false));
+    segments.apply_action("step_forward_frame");
+    assert_eq!(marker_frames(&segments), vec![0, 40, 81, 150], "the draft");
+    assert!(segments.leave_panel(), "a clip chosen in the pool: the edge is let go");
+    assert_eq!(marker_frames(&segments), vec![0, 40, 80, 150], "nothing written");
+    assert!(!segments.handles("step_forward_frame"), "the arrows are free again");
+    assert!(!segments.leave_panel(), "nothing more to drop");
+}

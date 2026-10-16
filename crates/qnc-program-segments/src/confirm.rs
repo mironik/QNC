@@ -52,3 +52,19 @@ impl ProgramSegments {
             || self.lanes.committed_within(SAME_ENTER)
     }
 }
+
+impl ProgramSegments {
+    /// The keyboard left the segment panel (live 2026-10-16: a slot edge left taken while a
+    /// clip was opened in the pool; Escape on the source timeline could no longer drop it and
+    /// the story seemed blocked). What the segment panel took (a slot, a slot edge, a marker,
+    /// a cover) belongs to it and is dropped as by Escape; nothing is written. The edit of a
+    /// segment (Ctrl+Shift+I/O, Edit) lives on the source timeline and stays.
+    pub fn leave_panel(&mut self) -> bool {
+        let taken = self.slot_trim.take().is_some() | self.slot_move.take().is_some();
+        let taken = taken | self.marker_edit.take().is_some() | self.cover_taken.take().is_some();
+        if taken {
+            self.refresh_view(qnc_ui_text::text("story.msg.panel_left_edit_dropped").into());
+        }
+        taken
+    }
+}

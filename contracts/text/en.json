@@ -134,6 +134,7 @@
     "story.msg.slot_to_neighbour": "A slot moves only up to the next M marker.",
     "story.msg.last_slot_ends_story": "The last slot ends with the story: move its start M marker.",
     "story.msg.slot_trim_cancelled": "Slot change cancelled.",
+    "story.msg.panel_left_edit_dropped": "Left the segment panel: the taken edit is cancelled.",
     "story.msg.slot_one_picture": "A slot must keep at least one picture.",
     "story.msg.empty_slot_one_picture": "The empty slot after it must keep at least one picture.",
     "story.msg.last_slot_one_picture": "The last slot of the story must keep at least one picture.",

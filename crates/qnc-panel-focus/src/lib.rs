@@ -106,6 +106,8 @@ enum Jump {
 #[derive(Debug, Default)]
 pub struct PanelFocus {
     panel: Panel,
+    /// The panel of the last poll: leaving the segment panel drops what it took.
+    last_panel: Panel,
     /// Ctrl+I or Ctrl+O took a source mark: the arrows move it, not the playhead
     /// (an I or O press only marks; the playhead keeps the arrows, v5).
     /// The keys of the source timeline, the same piece every form takes.
@@ -158,8 +160,16 @@ impl PanelFocus {
     /// for (the taken source mark, or the taken slot or marker); returns the panel.
     pub fn poll(
         &mut self,
-        (preview, _wrap, segments, timeline): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection),
+        (preview, wrap, segments, timeline): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection),
     ) -> FocusView {
+        // What the segment panel took is its own: left by a click, Tab or Enter, it is dropped.
+        if std::mem::replace(&mut self.last_panel, self.panel) == Panel::Segments && self.panel != Panel::Segments {
+            if segments.part_sound_taken() {
+                segments.release_part_sound();
+                preview.hear_program_draft(None, None, wrap.playhead()); // the stored sound again
+            }
+            segments.leave_panel();
+        }
         if let Some(answer) = self.keyframes.take() {
             match (self.jump.take(), answer) {
                 (Some(Jump::SourceMark), Ok(frames)) => {
