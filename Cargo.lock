@@ -3855,6 +3855,7 @@ dependencies = [
  "qnc-source-groups",
  "qnc-source-index-db",
  "qnc-source-reader",
+ "qnc-source-volumes",
  "qnc-transport-resolver",
  "qnc-ui-text",
  "qnc-work-settings",

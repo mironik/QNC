@@ -4148,3 +4148,7 @@ sustavi zasad prazan popis). `qnc-source-bindings::load` (`with_attached`): prik
 nista se ne brise i datoteka se ne pise. Vrijedi za sve koji citaju izvore (Ingest, preview/player, radnici). Ingest popis
 izvora cita ponovno kad se otvori popis diskova (`qnc-ingest-application` `refresh_sources`; C10 isti), pa disk
 prikljucen dok aplikacija radi se pojavi bez ponovnog pokretanja. Rucni upis E: u kopiju je vracen.
+Popravak 2026-10-16 (korisnik: "to je krivo... G nije prikljucen"): popis izvora u Ingestu nudi samo diskove koji su sada
+prikljuceni; upisani lokalni disk sa serijskim brojem koji nije prikljucen se ne prikazuje (iz konfiguracije se ne brise i
+vraca se cim se prikljuci). Bez popisa diskova (sustav bez tog adaptera) nude se svi izvori. `qnc-ingest-select`
+`SelectionConfig::browser`. Veze izvora za player i radnike nisu mijenjane.

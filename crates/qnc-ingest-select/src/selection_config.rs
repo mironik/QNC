@@ -232,9 +232,20 @@ impl SelectionConfig {
         Ok(config)
     }
     pub fn browser(&self) -> Result<TransportBrowserSession> {
+        // Only the disks attached now are offered: a registered disk that is not attached is
+        // not listed (user 2026-10-16), and comes back when it is. Without a list of the
+        // attached disks (a system without that adapter) every source is offered.
+        let attached = qnc_source_volumes::mounted();
+        let offered = |s: &&SourceConfig| {
+            attached.is_empty()
+                || s.serial_number.trim().is_empty()
+                || !s.location.uri.starts_with("qnc://local/")
+                || attached.iter().any(|volume| volume.serial_number.eq_ignore_ascii_case(s.serial_number.trim()))
+        };
         let sources = self
             .sources
             .iter()
+            .filter(offered)
             .map(|s| {
                 let source = s.clone();
                 let mut browser_source = BrowserSource::new(
