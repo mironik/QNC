@@ -435,6 +435,7 @@ impl ProgramSegments {
     pub fn apply(&mut self, command: SegmentCommand) -> bool {
         let playhead = self.playhead.unwrap_or(0);
         match command {
+            SegmentCommand::Wheel { .. } => return false, // the form turns it into the panel's arrow
             SegmentCommand::Select(segment_id) => self.select(&segment_id),
             SegmentCommand::Step { up } => self.step(up),
             SegmentCommand::Move { up } => self.move_selected(up),

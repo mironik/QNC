@@ -3488,7 +3488,6 @@ dependencies = [
  "qnc-timeline",
  "qnc-trim-overlay",
  "qnc-ui-kit",
- "qnc-wheel-jog",
 ]
 
 [[package]]
@@ -3680,6 +3679,7 @@ dependencies = [
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-ui-text",
+ "qnc-wheel-jog",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3703,7 +3703,6 @@ dependencies = [
  "qnc-source-dock",
  "qnc-timeline",
  "qnc-ui-kit",
- "qnc-wheel-jog",
 ]
 
 [[package]]
@@ -5072,6 +5071,7 @@ dependencies = [
  "qnc-ui-kit",
  "qnc-ui-text",
  "qnc-wave-view",
+ "qnc-wheel-jog",
 ]
 
 [[package]]

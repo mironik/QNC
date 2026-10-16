@@ -4255,3 +4255,12 @@ kao na source timelineu (Wrap redovi se listaju trakom). Ingest: isti kotacic iz
 `holds_edit` uklonjen. C10 `qnc-ingest-blocks` 862 -> 860. Napomena korisnika (isti dan): sve sto pripada source
 timelineu i media poolu mora biti neovisno o formi; ovaj rez jos poziva kotacic iz ploca i ima dva puta fokusa
 (`qnc-panel-focus` za Story, `qnc-focus-walk` za Ingest) - predlozeno je premjestanje u kocke.
+Izmjena 2026-10-16 (korisnik: "sve sto se odnosi na source timeline mora biti nevezano s formom koja ga koristi, isto i
+media pool; kocke i moduli, paneli, forme"; "da, kreni s kotacicem u qnc-timeline"): kotacic je dio kocke `qnc-timeline`.
+Svaki timeline (source timeline u Storyju, MA-u i Ingestu, Wrap redovi) sam prepoznaje kotacic iznad sebe i javlja ga
+kao svoju namjeru `TimelineIntent::Wheel` (`qnc-wheel-jog` `take`, `Wheel { up, ctrl }`, `Wheel::action`); ploce formi ga
+vise ne pozivaju. Source timeline daje skup akcija `SOURCE_ACTIONS` (Story ploca kao i dosad pretvara namjere docka,
+Ingest `timeline_projection`), Wrap redovi `SegmentCommand::Wheel` (`qnc-segment-panel`), koji `qnc-panel-focus`
+`wheel_action` pretvara u akciju panela Segmenti. Kotacic iznad monitora je uklonjen (nije bio trazen). C10
+`qnc-ingest-application` 1676 -> 1674. Ostaje (sljedeci korak, korisnik ga ceka): dva puta fokusa (`qnc-panel-focus`
+Story, `qnc-focus-walk` Ingest) spojiti u jednu kocku za sve forme, pa i tipke Media poola. Testovi, conformance.

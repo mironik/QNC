@@ -103,14 +103,31 @@ pub fn source_step_forward(action_id: &str) -> Option<bool> {
     }
 }
 
-/// The catalog action of this frame's wheel over `rect` (back or forward, the Ctrl pair
-/// when Ctrl is held), when the wheel steps there now (`enabled`); `None` otherwise.
-/// Over the panel the scroll is taken. `id` names the panel's pending steps.
-pub fn action(ui: &Ui, rect: Rect, enabled: bool, id: &str, ((back, forward), (ctrl_back, ctrl_forward)): WheelActions<'_>) -> Option<String> {
-    let key = egui::Id::new(("qnc-wheel-jog", id));
+/// One wheel step: away from the user (`up`) or toward, with Ctrl (Cmd) held or not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Wheel {
+    pub up: bool,
+    pub ctrl: bool,
+}
+
+impl Wheel {
+    /// Its catalog action: forward for up, the Ctrl pair with Ctrl.
+    pub fn action<'a>(self, ((back, forward), (ctrl_back, ctrl_forward)): WheelActions<'a>) -> &'a str {
+        match (self.ctrl, self.up) {
+            (false, false) => back,
+            (false, true) => forward,
+            (true, false) => ctrl_back,
+            (true, true) => ctrl_forward,
+        }
+    }
+}
+
+/// This frame's wheel step over `rect` (one a frame; the rest of a fast spin follows in
+/// the next frames); the scroll over it is taken. `key` names its pending steps.
+pub fn take(ui: &Ui, rect: Rect, key: egui::Id) -> Option<Wheel> {
     let ctx = ui.ctx();
     let mut pending: Pending = ctx.data(|data| data.get_temp(key)).unwrap_or_default();
-    let over = enabled && ctx.pointer_hover_pos().is_some_and(|at| rect.contains(at));
+    let over = ctx.pointer_hover_pos().is_some_and(|at| rect.contains(at));
     if over {
         let events = ctx.input(|input| input.events.clone());
         if let Some(ctrl) = with_ctrl(&events).filter(|ctrl| *ctrl != pending.ctrl) {
@@ -130,13 +147,7 @@ pub fn action(ui: &Ui, rect: Rect, enabled: bool, id: &str, ((back, forward), (c
     if pending.steps != 0 {
         ctx.request_repaint(); // the rest of a fast spin, one a frame
     }
-    match (step, pending.ctrl) {
-        (-1, false) => Some(back.to_string()),
-        (1, false) => Some(forward.to_string()),
-        (-1, true) => Some(ctrl_back.to_string()),
-        (1, true) => Some(ctrl_forward.to_string()),
-        _ => None,
-    }
+    (step != 0).then_some(Wheel { up: step > 0, ctrl: pending.ctrl })
 }
 
 #[cfg(test)]

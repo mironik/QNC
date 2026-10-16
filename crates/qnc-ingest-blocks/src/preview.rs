@@ -60,5 +60,5 @@ pub(super) fn render_preview(
         poster,
         label,
     );
-    qnc_wheel_jog::action(ui, rect, true, "monitor", qnc_wheel_jog::SOURCE_ACTIONS).map(IngestIntent::empty) // steps the source like the arrows
+    None // the monitor gives no intent
 }

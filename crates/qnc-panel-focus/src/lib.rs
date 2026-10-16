@@ -638,6 +638,14 @@ pub const WHEEL_SOURCE: qnc_wheel_jog::WheelActions<'static> = qnc_wheel_jog::SO
 pub const WHEEL_SEGMENTS: qnc_wheel_jog::WheelActions<'static> =
     (("wheel_segments_back", "wheel_segments_forward"), ("wheel_segments_ctrl_back", "wheel_segments_ctrl_forward"));
 
+/// The catalog action of a Wrap row's wheel; `None` for every other command.
+pub fn wheel_action(command: &qnc_program_segments::SegmentCommand) -> Option<&'static str> {
+    match command {
+        qnc_program_segments::SegmentCommand::Wheel { up, ctrl } => Some(qnc_wheel_jog::Wheel { up: *up, ctrl: *ctrl }.action(WHEEL_SEGMENTS)),
+        _ => None,
+    }
+}
+
 /// The sound drafted on the Wrap row, as the program plays it before Enter.
 fn sound_draft(segments: &ProgramSegments) -> Option<qnc_source_preview::SoundDraft> {
     let (lane, id, draft) = segments.part_sound_draft_now()?;

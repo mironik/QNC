@@ -683,6 +683,9 @@ pub enum TimelineIntent {
     /// Ctrl+click on the V label of a banded row: filmstrip or narrow video (user
     /// 2026-10-15).
     ToggleVideoMode,
+    /// The mouse wheel over the timeline (user 2026-10-16: the timeline behaves the same
+    /// in every form): one step a frame, Ctrl held or not.
+    Wheel(qnc_wheel_jog::Wheel),
 }
 
 impl Default for TimelineIntent {
@@ -808,6 +811,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         .outer_height(input.layers, input.expanded_audio)
         .max(1.0);
     let (outer, _) = ui.allocate_exact_size(Vec2::new(width, height), Sense::hover());
+    let wheel = qnc_wheel_jog::take(ui, outer, ui.id().with("qnc-timeline-wheel"));
     ui.painter().rect_filled(outer, 0.0, input.theme.background);
     ui.painter().rect_stroke(
         outer,
@@ -1017,7 +1021,10 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     }
     paint_trim_playheads(ui, outer, &input);
 
-    intent
+    match (intent, wheel) {
+        (TimelineIntent::None, Some(wheel)) => TimelineIntent::Wheel(wheel),
+        (intent, _) => intent,
+    }
 }
 
 /// The trim playheads (user 2026-10-10: a second playhead on the edit being moved, the

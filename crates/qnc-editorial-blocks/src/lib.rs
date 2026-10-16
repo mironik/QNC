@@ -46,15 +46,13 @@ pub fn render_desktop(
             intent
         }
         "right-panel" if contracts.composition().right_panel == "segment_panel" => {
-            // The wheel works as on the source timeline (user 2026-10-16); the rows scroll by their bar.
-            let jog = qnc_wheel_jog::action(ui, rect, true, "segments", qnc_panel_focus::WHEEL_SEGMENTS).map(EditorialIntent::Action);
-            let intent = jog.or(qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths, view.preview.output_levels)
-                .map(EditorialIntent::Segment));
+            let intent = qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths, view.preview.output_levels)
+                .map(|command| qnc_panel_focus::wheel_action(&command).map_or(EditorialIntent::Segment(command), EditorialIntent::action));
             paint_focus(ui, rect, view.focus.panel == Panel::Segments, theme.focus);
             intent
         }
         "source-dock" => {
-            let intent = render_source_dock(ui, contracts, theme, view).or(qnc_wheel_jog::action(ui, rect, true, "source-dock", qnc_panel_focus::WHEEL_SOURCE).map(EditorialIntent::Action));
+            let intent = render_source_dock(ui, contracts, theme, view);
             paint_focus(ui, rect, matches!(view.focus.panel, Panel::SourceTimeline | Panel::SourceButtons), theme.focus);
             intent
         }
@@ -116,8 +114,7 @@ fn render_preview(
         poster,
         label,
     );
-    // The wheel over the monitor steps the source like the arrows (user 2026-10-16).
-    qnc_wheel_jog::action(ui, rect, true, "monitor", qnc_panel_focus::WHEEL_SOURCE).map(EditorialIntent::Action)
+    None // the monitor gives no intent
 }
 
 fn render_pool_head(
@@ -206,6 +203,7 @@ fn render_source_dock(
         TimelineIntent::None => header_intent,
         // A click on A1/A2 is the same catalog action as Ctrl+1/Ctrl+2.
         TimelineIntent::TakeAudioLane(qnc_timeline::AudioLane::A2) => Some(EditorialIntent::action("select_audio_a2")),
+        TimelineIntent::Wheel(wheel) => Some(EditorialIntent::action(wheel.action(qnc_panel_focus::WHEEL_SOURCE))),
         TimelineIntent::TakeAudioLane(_) => Some(EditorialIntent::action("select_audio_a1")),
         other => Some(EditorialIntent::Timeline(other)),
     }

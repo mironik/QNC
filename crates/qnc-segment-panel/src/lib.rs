@@ -389,6 +389,7 @@ fn paint_program(
         TimelineIntent::GoHome => Some(SegmentCommand::ProgramStart),
         // Ctrl+click on V: filmstrip or narrow video row (user 2026-10-15).
         TimelineIntent::ToggleVideoMode => Some(SegmentCommand::ToggleWrapVideo),
+        TimelineIntent::Wheel(wheel) => Some(SegmentCommand::Wheel { up: wheel.up, ctrl: wheel.ctrl }),
         _ => None,
     }
 }

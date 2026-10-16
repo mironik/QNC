@@ -42,6 +42,9 @@ impl SegmentKind {
 /// What a form, the navigation bar or the keyboard asks of the program.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SegmentCommand {
+    /// The mouse wheel over a Wrap row: away from the user (`up`) or toward, Ctrl held or
+    /// not; the panel's arrow or Ctrl+arrow (user 2026-10-16).
+    Wheel { up: bool, ctrl: bool },
     Select(String),
     /// Previous (`up`) or next segment: select it and cue its start (arrows, ⏮ ⏭).
     Step {
