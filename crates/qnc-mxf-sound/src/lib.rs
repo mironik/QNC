@@ -175,6 +175,24 @@ pub fn h264_gop_start(head: &[u8]) -> bool {
     false
 }
 
+/// Whether an MPEG-2 picture (as XDCAM's MXF stores it) begins a group of pictures: its
+/// first start code is a sequence header or a group of pictures header, not a picture.
+pub fn mpeg2_gop_start(head: &[u8]) -> bool {
+    head.windows(4)
+        .find(|bytes| bytes[..3] == [0, 0, 1])
+        .is_some_and(|bytes| matches!(bytes[3], 0xb3 | 0xb8))
+}
+
+/// The key picture test of a stored picture codec (`h264`, `mpeg2video`); `None` for a
+/// codec whose key pictures this reader does not know.
+pub fn key_picture_test(codec: &str) -> Option<fn(&[u8]) -> bool> {
+    match codec {
+        "h264" => Some(h264_gop_start),
+        "mpeg2video" => Some(mpeg2_gop_start),
+        _ => None,
+    }
+}
+
 /// Stored 24-bit little-endian samples as f32, the same value as the FFmpeg decoder gives
 /// (`pcm_s24le` to `pcm_f32le`).
 pub fn s24le_to_f32(bytes: &[u8], out: &mut Vec<f32>) {
@@ -261,6 +279,14 @@ mod tests {
         assert_eq!(sound, 10);
         // 0 -> 0; 1 -> 4; 5 -> 8; 9 has none after it -> the last one, 8.
         assert_eq!(pictures, [(0, 0, 0), (1, 4, 4), (2, 8, 8), (3, 8, 8)]);
+    }
+
+    #[test]
+    fn an_mpeg2_key_picture_begins_with_a_sequence_or_gop_header() {
+        assert!(mpeg2_gop_start(&[0, 0, 1, 0xb3, 0x78, 4]));
+        assert!(mpeg2_gop_start(&[0, 0, 1, 0xb8, 0, 8]));
+        assert!(!mpeg2_gop_start(&[0, 0, 1, 0x00, 0, 0x1a]));
+        assert!(key_picture_test("mpeg2video").is_some() && key_picture_test("prores").is_none());
     }
 
     #[test]

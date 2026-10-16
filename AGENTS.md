@@ -4097,3 +4097,9 @@ ne iz proxyja (`qnc-filmstrip` `plan_from_original`). Ostali formati rade kao pr
 (98 klipova, 30 min materijala, kartica samo citana): svih 98 filmstripova iz jednog prolaza, nijedno dodatno citanje
 kartice, dekodiranje medijan 0,8 s po klipu, sve gotovo za oko 250 s (prije 266-276 s); waveovi sami traju gotovo toliko
 jer je granica citac kartice (USB 2.0), a dugi klipovi (2-4 min) i dalje drze wave 20-30 s.
+Dopuna 2026-10-16 (korisnik: "zasto XDCAM i MP4 ne mogu raditi na isti nacin"; "idemo ovo ispeglati"): i XDCAM (MPEG-2
+4:2:2 u MXF-u) ide jednim prolazom. `qnc-mxf-sound` (`mpeg2_gop_start`: kljucna slika pocinje oznakom sekvence ili GOP-a;
+`key_picture_test` po spremljenom kodeku), `qnc-wave-worker` (`picture_codec`: h264 ili mpeg2video), `qnc-decoder-catalog`
+(MPEG-2 slike kroz ffmpeg demuxer `mpegvideo`). Primjer `qnc-mxf-sound/examples/time_read.rs` uzima i 13 slika i pise ih
+samo u zadanu mapu. Provjereno na korisnikovom XDCAM exportu `Mironik 2002.MXF` (samo citano): 13 od 13 kljucnih slika
+(GOP 12) u istom prolazu sa zvukom, dekodirane jednim ffmpeg pozivom za 0,25 s, slicica ispravna.

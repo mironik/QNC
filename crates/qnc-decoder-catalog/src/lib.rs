@@ -161,7 +161,7 @@ impl LocalFilmstripExtractor {
         }
     }
 
-    /// Encoded key pictures (`codec` as saved: `h264`; one file each) decoded into
+    /// Encoded key pictures (`codec` as saved: `h264`, `mpeg2video`; one file each) decoded into
     /// filmstrip thumbnails `000.jpg`... in `temp_dir` without reading the media (one pass
     /// over the card gave them with the wave).
     pub fn decode_pictures_with_cancel(
@@ -174,6 +174,7 @@ impl LocalFilmstripExtractor {
     ) -> std::result::Result<(), String> {
         let demuxer = match codec {
             "h264" => "h264",
+            "mpeg2video" => "mpegvideo",
             other => return Err(format!("no picture decoding for codec {other}")),
         };
         match &self.deployment.driver {

@@ -692,13 +692,16 @@ fn build_timeline_wave(
     }
     let source = source_for_uri(&context.source_bindings, &plan.source_uri)?;
     let media = qnc_wave::media_for_plan(&clip.snapshot, &plan)?;
-    // An H.264 original gives its filmstrip's key pictures in the same pass (user
-    // 2026-10-15: one reading of the card for the wave and the filmstrip).
-    let targets = h264_picture(&clip.snapshot.metadata.original)
-        .then(|| qnc_filmstrip::original_picture_frames(&clip.snapshot))
-        .flatten()
-        .filter(|_| media.media_uri == clip.snapshot.metadata.original.media_uri);
-    let (lane_peaks, pictures) = decode_wave(&plan, media, source, targets.as_deref(), cancel)?;
+    // An original whose key pictures the reader knows (H.264, MPEG-2) gives its
+    // filmstrip's key pictures in the same pass (user 2026-10-15: one reading of the card
+    // for the wave and the filmstrip).
+    let codec = picture_codec(&clip.snapshot.metadata.original);
+    let targets = codec
+        .and_then(|_| qnc_filmstrip::original_picture_frames(&clip.snapshot))
+        .filter(|_| media.media_uri == clip.snapshot.metadata.original.media_uri)
+        .zip(codec);
+    let targets = targets.as_ref().map(|(frames, codec)| (frames.as_slice(), *codec));
+    let (lane_peaks, pictures) = decode_wave(&plan, media, source, targets, cancel)?;
     let has_a2 = lane_peaks.iter().any(|(lane, _)| *lane == WaveLane::A2);
     let warning = (!has_a2).then(|| qnc_ui_text::text("wave.source_a2_audio_channel").to_string());
     let artifact = qnc_wave::artifact_record_from_lane_peaks(&plan, lane_peaks, warning)?;
@@ -713,12 +716,17 @@ fn build_timeline_wave(
     })
 }
 
-/// Whether the stored picture of a representation is H.264 (its key pictures are known by
-/// their first NAL units).
-fn h264_picture(media: &MediaRepresentation) -> bool {
-    media.streams.iter().any(|stream| {
-        matches!(stream.details, StreamDetails::Video(_))
-            && matches!(stream.codec.as_ref().map(|codec| &codec.value), Some(qnc_media_metadata::Signal::Known(name)) if name == "h264")
+/// The stored picture codec of a representation when the MXF reader knows its key
+/// pictures (`h264`, `mpeg2video`).
+fn picture_codec(media: &MediaRepresentation) -> Option<&'static str> {
+    media.streams.iter().find_map(|stream| {
+        if !matches!(stream.details, StreamDetails::Video(_)) {
+            return None;
+        }
+        match stream.codec.as_ref().map(|codec| &codec.value) {
+            Some(qnc_media_metadata::Signal::Known(name)) => ["h264", "mpeg2video"].into_iter().find(|known| known == name),
+            _ => None,
+        }
     })
 }
 
@@ -732,7 +740,7 @@ fn decode_wave(
     plan: &WavePlan,
     media: &MediaRepresentation,
     source: &WaveSourceBinding,
-    picture_targets: Option<&[u64]>,
+    picture_targets: Option<(&[u64], &'static str)>,
     cancel: &AtomicBool,
 ) -> Result<(Vec<(WaveLane, Vec<f32>)>, Option<qnc_filmstrip::EncodedPictures>), String> {
     let streams = plan
@@ -840,20 +848,21 @@ fn mxf_sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: 
 fn mxf_sound_samples(
     source: &Path,
     elements: &[u8],
-    picture_targets: Option<&[u64]>,
+    picture_targets: Option<(&[u64], &'static str)>,
     pictures: &mut Option<qnc_filmstrip::EncodedPictures>,
     cancel: &AtomicBool,
     on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
 ) -> std::result::Result<(), String> {
     let mut queues = vec![Vec::<f32>::new(); elements.len()];
     let mut frames = Vec::new();
-    let targets = picture_targets.unwrap_or(&[]);
+    let (targets, codec) = picture_targets.unwrap_or((&[], ""));
+    let is_key = qnc_mxf_sound::key_picture_test(codec).unwrap_or(|_| false);
     let mut found: Vec<Option<Vec<u8>>> = vec![None; targets.len()];
     let mut on_picture = |target: usize, _number: u64, value: &[u8]| -> std::result::Result<(), String> {
         found[target] = Some(value.to_vec());
         Ok(())
     };
-    let read = qnc_mxf_sound::read_sound_and_pictures(source, cancel, targets, &qnc_mxf_sound::h264_gop_start, &mut |number, value| {
+    let read = qnc_mxf_sound::read_sound_and_pictures(source, cancel, targets, &is_key, &mut |number, value| {
         let Some(slot) = elements.iter().position(|element| *element == number) else {
             return Ok(());
         };
@@ -874,7 +883,7 @@ fn mxf_sound_samples(
     read?;
     // Every filmstrip frame needs its picture; otherwise the filmstrip reads the media itself.
     if !targets.is_empty() && found.iter().all(Option::is_some) {
-        *pictures = Some(qnc_filmstrip::EncodedPictures { codec: "h264".into(), pictures: found.into_iter().flatten().collect() });
+        *pictures = Some(qnc_filmstrip::EncodedPictures { codec: codec.into(), pictures: found.into_iter().flatten().collect() });
     }
     Ok(())
 }
