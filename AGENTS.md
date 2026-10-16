@@ -4170,3 +4170,9 @@ nenavedena i player daje jasnu gresku kao prije. Nema pravila "HD znaci BT.709".
 `-show_frames`/`-read_intervals`, nego trazi ograniceni broj paketa (`FIRST_PACKETS`); `-count_frames` i `-show_packets`
 ostaju zabranjeni. Izmjereno: poziv 0,12 s. Klipovi koji vec imaju konacni zapis zadrzavaju ga (jedan probe po mediju);
 novi zapis nastaje u novom projektu. Testovi `qnc-ffprobe-metadata` (17), `qnc-media-probe` (8), conformance.
+Popravak 2026-10-16 (korisnik: "kad u source timelineu vise puta ukljucim/iskljucim audio, IN i OUT se postave na
+pocetak klipa"): promjena kanala ili razine A1/A2 ponovno priprema isti klip u playeru; dok player ne potvrdi poziciju,
+prikaz timelinea je prazan (trajanje 1, bez playheada), a prijenos IN/OUT-a na novi prikaz (`preserving_source_marks_from`)
+stisnuo ih je na tu duljinu, dakle na pocetak. `qnc-timeline`: dok novi prikaz nema potvrdjenu poziciju, IN/OUT ostaju
+kakvi jesu (test). `qnc-source-preview` `hear_channels`: klip se ponovno otvara na trazenoj ili potvrdjenoj slici, a dok
+ni jedne nema, na slici na kojoj je zadnji put otvaran (`opening_at`), ne na pocetku. Testovi, conformance.

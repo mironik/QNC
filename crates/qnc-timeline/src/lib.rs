@@ -380,6 +380,12 @@ impl TimelineProjection {
         self.source_in_frame = previous.source_in_frame;
         self.source_out_frame = previous.source_out_frame;
         self.source_mark_focus = previous.source_mark_focus;
+        // While the player prepares the clip again (another A1/A2 channel, live 2026-10-16)
+        // it has confirmed no position and its length is not known yet: the marks stay as
+        // they were, not clamped to that unknown length.
+        if self.playhead_frame.is_none() {
+            return self;
+        }
         self.normalize_source_marks()
     }
 
@@ -2082,6 +2088,19 @@ mod tests {
 
         assert_eq!(refreshed.confirmed_frame(), Some(40));
         assert_eq!(refreshed.source_in_frame, Some(20));
+    }
+
+    #[test]
+    fn source_marks_survive_a_refresh_that_does_not_know_the_length_yet() {
+        let previous = TimelineProjection::new(0, 300)
+            .with_playhead(120)
+            .with_source_in_at_confirmed()
+            .with_playhead(200)
+            .with_source_out_at_confirmed();
+        let preparing = TimelineProjection::default().preserving_source_marks_from(&previous);
+        assert_eq!((preparing.source_in_frame, preparing.source_out_frame), (Some(120), Some(200)));
+        let ready = TimelineProjection::new(0, 300).preserving_source_marks_from(&preparing);
+        assert_eq!((ready.source_in_frame, ready.source_out_frame), (Some(120), Some(200)));
     }
 
     #[test]

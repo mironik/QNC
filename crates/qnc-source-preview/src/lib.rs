@@ -196,6 +196,9 @@ pub struct SourcePreview {
     /// The frame last asked for, until the player confirms it: the next arrow press
     /// counts from it even when the cue in flight was released on its timeout.
     cue_asked: Option<u64>,
+    /// The clip and frame the player was last asked to prepare: where a clip opened
+    /// again before the player confirmed a position stays (live 2026-10-16).
+    opening_at: Option<(String, u64)>,
     /// Every preview tells the project database while its player prepares or plays,
     /// so background generators of any process give way.
     activity: qnc_playback_activity::PlaybackReporter,
@@ -221,6 +224,7 @@ impl Default for SourcePreview {
             cue_in_flight: None,
             cue_next: None,
             cue_asked: None,
+            opening_at: None,
             activity: qnc_playback_activity::PlaybackReporter::new(),
             activity_target: None,
             program: false,
@@ -399,7 +403,11 @@ impl SourcePreview {
         if self.program {
             return false;
         }
-        let frame = self.player_view.confirmed_source_frame().unwrap_or(0);
+        // The frame shown or asked for, not the start: a channel changed again before the
+        // player confirmed a position reopens where it was (live 2026-10-16).
+        let pending = self.cue_next.or(self.cue_in_flight.map(|(frame, _)| frame)).or(self.cue_asked);
+        let opening = self.opening_at.as_ref().filter(|(id, _)| *id == clip_id).map(|(_, frame)| *frame);
+        let frame = pending.or_else(|| self.player_view.confirmed_source_frame()).or(opening).unwrap_or(0);
         // A channel picked while playing is heard playing on (user 2026-10-14: the draft
         // channel is played before Enter keeps it).
         let playing = self.player_view.playing() || self.play_when_ready;
@@ -410,6 +418,7 @@ impl SourcePreview {
 
     fn prepare_clip(&mut self, clip_id: &str, first_frame: u64) -> bool {
         self.close();
+        self.opening_at = Some((clip_id.to_string(), first_frame));
         self.view.clip_id = Some(clip_id.to_string());
         if self.lead.as_ref().is_some_and(|(id, ..)| id != clip_id) {
             self.lead = None; // another clip starts on its own channels
