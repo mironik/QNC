@@ -122,9 +122,7 @@ impl IngestApplication {
                     self.reset_timeline_artifacts();
                     self.stop_player();
                     self.view.selected_source_uri = None;
-                    self.view.selected_source_name.clear();
-                    self.view.selected_source_serial_number.clear();
-                    self.view.selected_source_volume_name.clear();
+                    self.view.browser.chosen = Default::default();
                     self.catalog_stats = None;
                 }
                 self.view.ai_mining = plan.settings.ai_enabled();
@@ -162,14 +160,10 @@ impl IngestApplication {
                 if self.pending_source.is_none() && catalog_was_loaded {
                     if let Some(source) = loaded.source {
                         self.view.selected_source_uri = Some(source.uri);
-                        self.view.selected_source_name = source.name;
-                        self.view.selected_source_serial_number = source.serial_number;
-                        self.view.selected_source_volume_name = source.volume_name;
+                        self.view.browser.chosen = qnc_source_browse::SourceMetadata { name: source.name, serial_number: source.serial_number, volume_name: source.volume_name };
                     } else {
                         self.view.selected_source_uri = None;
-                        self.view.selected_source_name.clear();
-                        self.view.selected_source_serial_number.clear();
-                        self.view.selected_source_volume_name.clear();
+                        self.view.browser.chosen = Default::default();
                     }
                 }
                 self.wake_artifact_worker();

@@ -4883,6 +4883,7 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-source-reader",
  "qnc-ui-text",
+ "serde",
 ]
 
 [[package]]

@@ -42,8 +42,8 @@ impl IngestApplication {
             self.view.message = playback_guard_message().to_string();
         }
         if self.browse.cancel() {
-            self.view.browser_busy = false;
-            self.view.browser_error = Some(playback_guard_message().to_string());
+            self.view.browser.busy = false;
+            self.view.browser.error = Some(playback_guard_message().to_string());
         }
         self.pending_source = None;
     }

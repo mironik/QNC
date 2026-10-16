@@ -104,7 +104,7 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
     assert!(component.view.work_settings_ready);
     // The two registered local sources are listed; the disks attached to this computer are
     // listed with them (user 2026-10-16).
-    let listed = |uri: &str| component.view.browser_entries.iter().any(|entry| entry.qnc_uri == uri);
+    let listed = |uri: &str| component.view.browser.entries.iter().any(|entry| entry.qnc_uri == uri);
     assert!(listed("qnc://local/source/offline") && listed("qnc://local/source/online"));
     component.dispatch(IngestIntent::new(
         action_ids::INGEST_DIR_OPEN,
@@ -113,7 +113,7 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
     wait(&mut component);
     assert!(component
         .view
-        .browser_error
+        .browser.error
         .as_ref()
         .unwrap()
         .contains("qnc://local/source/offline"));
@@ -122,16 +122,16 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
         IngestPayload::LocationUri("qnc://local/source/online".into()),
     ));
     wait(&mut component);
-    assert!(component.view.browser_error.is_none());
+    assert!(component.view.browser.error.is_none());
     assert_eq!(
-        component.view.browser_current_uri.as_deref(),
+        component.view.browser.current_uri.as_deref(),
         Some("qnc://local/source/online")
     );
     component.dispatch(IngestIntent::empty(action_ids::INGEST_SOURCE_KIND_INTERNET));
     wait(&mut component);
-    assert!(component.view.browser_error.is_none());
+    assert!(component.view.browser.error.is_none());
     assert_eq!(
-        component.view.browser_entries[0].qnc_uri,
+        component.view.browser.entries[0].qnc_uri,
         "qnc://intranet/test/source/remote"
     );
     assert!(!component.preview.has_player());
@@ -404,8 +404,8 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
     let mut component = IngestApplication::with_store_root(root.path()).unwrap();
     wait(&mut component);
     assert_eq!(component.view.clips.len(), 2);
-    assert_eq!(component.view.selected_source_serial_number, "card-serial");
-    assert_eq!(component.view.selected_source_volume_name, "camera-volume");
+    assert_eq!(component.view.browser.chosen.serial_number, "card-serial");
+    assert_eq!(component.view.browser.chosen.volume_name, "camera-volume");
     let preview_id = component
         .view
         .clips
@@ -546,7 +546,7 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
     wait(&mut restarted);
     assert!(restarted.view.clips.is_empty());
     assert_eq!(restarted.view.clip_filter, ClipFilter::All);
-    assert!(restarted.view.selected_source_serial_number.is_empty());
+    assert!(restarted.view.browser.chosen.serial_number.is_empty());
     assert_eq!(
         calls.load(Ordering::SeqCst),
         4,
@@ -660,7 +660,7 @@ fn source_selection_records_private_local_path_for_local_owner_binding() {
     wait(&mut component);
     component.dispatch(IngestIntent::empty(action_ids::INGEST_DIR_ROOTS));
     wait(&mut component);
-    let uri = component.view.browser_entries[0].qnc_uri.clone();
+    let uri = component.view.browser.entries[0].qnc_uri.clone();
 
     assert!(
         component

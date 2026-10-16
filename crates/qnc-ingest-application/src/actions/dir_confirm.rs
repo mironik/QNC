@@ -6,7 +6,7 @@ impl IngestApplication {
         // From a key there is no payload: the folder the browser shows.
         let uri = match payload {
             IngestPayload::LocationUri(uri) => uri,
-            _ => match self.view.browser_current_uri.clone().filter(|_| !self.view.browser_roots) {
+            _ => match self.view.browser.current_uri.clone().filter(|_| !self.view.browser.roots) {
                 Some(uri) => uri,
                 None => return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.missing_location_uri")),
             },
@@ -32,10 +32,10 @@ impl IngestApplication {
         if qnc_contracts::parse_qnc_uri(&uri).is_err() {
             return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_not_qnc_uri"));
         }
-        let display_name = if !self.view.selected_source_name.trim().is_empty() {
-            self.view.selected_source_name.clone()
-        } else if !self.view.browser_path_label.trim().is_empty() {
-            self.view.browser_path_label.clone()
+        let display_name = if !self.view.browser.chosen.name.trim().is_empty() {
+            self.view.browser.chosen.name.clone()
+        } else if !self.view.browser.path_label.trim().is_empty() {
+            self.view.browser.path_label.clone()
         } else {
             uri.clone()
         };
@@ -43,8 +43,8 @@ impl IngestApplication {
             source_uri: uri.clone(),
             source_kind: source_kind_id(self.view.source_kind).to_string(),
             display_name,
-            serial_number: self.view.selected_source_serial_number.clone(),
-            volume_name: self.view.selected_source_volume_name.clone(),
+            serial_number: self.view.browser.chosen.serial_number.clone(),
+            volume_name: self.view.browser.chosen.volume_name.clone(),
             private_local_path: self.browse.selected_private_local_path(&uri),
         };
 

@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: browses the registered sources (local, LAN, intranet) off the caller's thread, one step at a time; no form, no application"
 
 [dependencies]
+serde = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-dir-browser = { workspace = true }
 qnc-source-reader = { workspace = true }

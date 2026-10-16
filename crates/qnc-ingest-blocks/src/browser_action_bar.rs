@@ -15,10 +15,10 @@ pub(super) fn render_location_action_bar(
             .max_rect(rect)
             .layout(Layout::right_to_left(Align::Center)),
         |ui| {
-            let can_confirm = !view.browser_roots
-                && !view.browser_path_label.is_empty()
+            let can_confirm = !view.browser.roots
+                && !view.browser.path_label.is_empty()
                 && !view.work_settings_loading
-                && !view.browser_busy
+                && !view.browser.busy
                 && !view.command_busy;
             let response = qnc_ui_kit::show_form_action_bar(
                 ui,
@@ -32,7 +32,7 @@ pub(super) fn render_location_action_bar(
                 qnc_focus_walk::paint_focus(ui, rect.unwrap_or(egui::Rect::NOTHING).expand(2.0), chosen(action_id), theme.focus);
             }
             if response.confirm_clicked {
-                if let Some(uri) = &view.browser_current_uri {
+                if let Some(uri) = &view.browser.current_uri {
                     intent = Some(IngestIntent::new(
                         action_ids::INGEST_DIR_CONFIRM,
                         IngestPayload::LocationUri(uri.clone()),

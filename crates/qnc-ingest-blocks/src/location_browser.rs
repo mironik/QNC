@@ -19,7 +19,7 @@ pub(super) fn render_location_browser(
         egui::pos2(rect.left(), source_row_rect.bottom() + 8.0),
         Vec2::new(rect.width(), browser_nav_height(view, theme)),
     );
-    let error_height = if view.browser_error.is_some() {
+    let error_height = if view.browser.error.is_some() {
         theme.chrome_control_height + 4.0
     } else {
         0.0
@@ -28,7 +28,7 @@ pub(super) fn render_location_browser(
         egui::pos2(rect.left(), nav_rect.bottom() + 4.0),
         Vec2::new(rect.width(), error_height),
     );
-    let body_top = if view.browser_error.is_some() {
+    let body_top = if view.browser.error.is_some() {
         error_rect.bottom() + 6.0
     } else {
         nav_rect.bottom() + 6.0
@@ -72,7 +72,7 @@ pub(super) fn render_location_browser(
         |ui| {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 0.0;
-                let up_enabled = view.browser_parent_available;
+                let up_enabled = view.browser.parent_available;
                 if fixed_text_link(
                     ui,
                     &contracts.ingest.dir_browser.up_label,
@@ -88,7 +88,7 @@ pub(super) fn render_location_browser(
                 if fixed_text_link(
                     ui,
                     &contracts.ingest.dir_browser.disks_label,
-                    !view.browser_busy && !view.command_busy,
+                    !view.browser.busy && !view.command_busy,
                     58.0,
                     theme,
                 )
@@ -108,7 +108,7 @@ pub(super) fn render_location_browser(
         },
     );
 
-    if let Some(error) = &view.browser_error {
+    if let Some(error) = &view.browser.error {
         ui.scope_builder(
             egui::UiBuilder::new()
                 .max_rect(error_rect)
@@ -132,8 +132,8 @@ pub(super) fn render_location_browser(
 }
 
 pub(super) fn browser_nav_height(view: &IngestViewModel, theme: &Theme) -> f32 {
-    if view.browser_roots {
-        let rows = view.browser_entries.len().max(1) as f32;
+    if view.browser.roots {
+        let rows = view.browser.entries.len().max(1) as f32;
         (theme.chrome_control_height * rows) + (4.0 * (rows - 1.0))
     } else {
         theme.chrome_control_height

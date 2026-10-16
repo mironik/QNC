@@ -22,7 +22,7 @@ pub enum Step {
     Open(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct BrowseLocationEntry {
     pub name: String,
     pub qnc_uri: String,
@@ -60,11 +60,86 @@ impl From<BrowserState> for BrowseState {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct SourceMetadata {
     pub name: String,
     pub serial_number: String,
     pub volume_name: String,
+}
+
+impl BrowseEntry for BrowseLocationEntry {
+    fn browse_uri(&self) -> &str {
+        &self.qnc_uri
+    }
+    fn browse_name(&self) -> &str {
+        &self.name
+    }
+    fn browse_serial_number(&self) -> &str {
+        &self.serial_number
+    }
+    fn browse_volume_name(&self) -> &str {
+        &self.volume_name
+    }
+}
+
+/// What a form shows of the browser (user 2026-10-16: kept by this piece, not by every
+/// form that browses): the roots or a folder, its entries, a step running, the last
+/// error and the source chosen in it (name, serial, volume).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BrowserView {
+    pub roots: bool,
+    pub path_label: String,
+    pub current_uri: Option<String>,
+    pub parent_available: bool,
+    pub entries: Vec<BrowseLocationEntry>,
+    pub busy: bool,
+    pub error: Option<String>,
+    pub chosen: SourceMetadata,
+}
+
+impl Default for BrowserView {
+    fn default() -> Self {
+        Self {
+            roots: true,
+            path_label: String::new(),
+            current_uri: None,
+            parent_available: false,
+            entries: Vec::new(),
+            busy: false,
+            error: None,
+            chosen: SourceMetadata::default(),
+        }
+    }
+}
+
+impl BrowserView {
+    /// Back to the empty roots, nothing chosen.
+    pub fn clear(&mut self) {
+        *self = Self::default();
+    }
+
+    /// A finished step shown; the error of a failed one kept, the shown entries stay.
+    pub fn apply(&mut self, result: Result<BrowseState, String>) -> Result<(), String> {
+        self.busy = false;
+        match result {
+            Ok(state) => {
+                (self.roots, self.path_label, self.current_uri) = (state.roots, state.path_label, state.current_uri);
+                (self.parent_available, self.entries, self.error) = (state.parent_available, state.entries, None);
+                Ok(())
+            }
+            Err(error) => {
+                self.error = Some(error.clone());
+                Err(error)
+            }
+        }
+    }
+
+    /// The entry `uri` opened is the chosen source (its name, serial and volume).
+    pub fn choose(&mut self, uri: &str) {
+        if let Some(metadata) = selected_metadata(&self.entries, uri, self.chosen.name.trim().is_empty()) {
+            self.chosen = metadata;
+        }
+    }
 }
 
 pub trait BrowseEntry {

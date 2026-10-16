@@ -29,11 +29,11 @@ impl IngestApplication {
             Some(None) => qnc_source_browse::Step::Parent,
             Some(Some(uri)) => qnc_source_browse::Step::Open(uri),
         };
-        self.view.browser_busy = true;
+        self.view.browser.busy = true;
         match self.browse.start(step) {
             Ok(()) => IngestDispatchResult::accepted(None, true),
             Err(error) => {
-                self.view.browser_busy = false;
+                self.view.browser.busy = false;
                 IngestDispatchResult::rejected(error)
             }
         }
@@ -49,48 +49,20 @@ impl IngestApplication {
     }
 
     pub(crate) fn clear_source_browser_state(&mut self) {
-        self.pending_source = None;
-        self.view.browser_roots = true;
-        self.view.browser_path_label.clear();
-        self.view.browser_current_uri = None;
-        self.view.browser_parent_available = false;
-        self.view.browser_entries.clear();
-        self.view.browser_busy = false;
-        self.view.browser_error = None;
-        self.view.selected_source_uri = None;
-        self.view.selected_source_name.clear();
-        self.view.selected_source_serial_number.clear();
-        self.view.selected_source_volume_name.clear();
+        (self.pending_source, self.view.selected_source_uri) = (None, None);
+        self.view.browser.clear();
     }
 
     pub(crate) fn apply_source_browser_result(
         &mut self,
         result: Result<qnc_source_browse::BrowseState, String>,
     ) -> IngestDispatchResult {
-        match result {
-            Ok(state) => {
-                self.view.browser_roots = state.roots;
-                self.view.browser_path_label = state.path_label;
-                self.view.browser_current_uri = state.current_uri;
-                self.view.browser_parent_available = state.parent_available;
-                self.view.browser_entries = state
-                    .entries
-                    .into_iter()
-                    .map(|entry| LocationEntry {
-                        name: entry.name,
-                        qnc_uri: entry.qnc_uri,
-                        serial_number: entry.serial_number,
-                        volume_name: entry.volume_name,
-                    })
-                    .collect();
-                self.view.browser_busy = false;
-                self.view.browser_error = None;
+        match self.view.browser.apply(result) {
+            Ok(()) => {
                 self.view.message = qnc_ui_text::text("ingest.msg.pick_local_source").to_string();
                 IngestDispatchResult::accepted(None, true)
             }
             Err(error) => {
-                self.view.browser_busy = false;
-                self.view.browser_error = Some(error.clone());
                 self.view.message = error.clone();
                 IngestDispatchResult::rejected(error)
             }
@@ -98,14 +70,6 @@ impl IngestApplication {
     }
 
     pub(crate) fn capture_selected_source_metadata(&mut self, uri: &str) {
-        if let Some(metadata) = qnc_source_browse::selected_metadata(
-            &self.view.browser_entries,
-            uri,
-            self.view.selected_source_name.trim().is_empty(),
-        ) {
-            self.view.selected_source_name = metadata.name;
-            self.view.selected_source_serial_number = metadata.serial_number;
-            self.view.selected_source_volume_name = metadata.volume_name;
-        }
+        self.view.browser.choose(uri);
     }
 }

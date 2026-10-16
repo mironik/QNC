@@ -26,7 +26,7 @@ impl IngestApplication {
     pub fn has_pending_work(&self) -> bool {
         self.view.work_settings_loading
             || self.view.command_busy
-            || self.view.browser_busy
+            || self.view.browser.busy
             || self.catalog_loader.is_busy()
             || self.selection_writer.is_busy()
             || self.posters.has_pending_work()

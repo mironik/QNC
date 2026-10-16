@@ -23,7 +23,6 @@ mod clip_view;
 mod dispatch;
 mod dispatch_result;
 mod intent;
-mod location_entry;
 mod navigation;
 mod playback;
 mod playback_guard;
@@ -44,7 +43,7 @@ pub use clip_state::{ClipFilter, SaveState, ThumbStatus};
 pub use clip_view::ClipView;
 pub use dispatch_result::IngestDispatchResult;
 pub use intent::{IngestIntent, IngestPayload};
-pub use location_entry::LocationEntry;
+pub use qnc_source_browse::BrowseLocationEntry as LocationEntry;
 pub use navigation::SequenceStep;
 pub use source_kind::SourceKind;
 pub use timeline_projection::timeline_intent_to_ingest_intent;
@@ -151,8 +150,8 @@ mod tests {
     fn component_starts_with_passive_empty_view() {
         let component = IngestApplication::new();
         assert_eq!(component.view().source_kind, SourceKind::Local);
-        assert!(component.view().browser_roots);
-        assert!(component.view().browser_entries.is_empty());
+        assert!(component.view().browser.roots);
+        assert!(component.view().browser.entries.is_empty());
         assert!(component.view().clips.is_empty());
         assert_eq!(component.dispatch_log().len(), 0);
     }
@@ -284,7 +283,7 @@ mod tests {
         let (_dir, mut component) = component_with_registered_source();
         load_local_roots(&mut component);
         wait_for_component(&mut component);
-        for entry in &component.view().browser_entries {
+        for entry in &component.view().browser.entries {
             assert!(entry.qnc_uri.starts_with("qnc://local/source/"));
             assert!(!qnc_contracts::looks_like_raw_os_path(&entry.qnc_uri));
         }
@@ -297,7 +296,7 @@ mod tests {
         wait_for_component(&mut component);
         let first_uri = component
             .view()
-            .browser_entries
+            .browser.entries
             .first()
             .map(|entry| entry.qnc_uri.clone())
             .expect("local root");
@@ -307,18 +306,18 @@ mod tests {
             IngestPayload::LocationUri(first_uri),
         ));
         wait_for_component(&mut component);
-        assert!(!component.view().browser_path_label.is_empty());
+        assert!(!component.view().browser.path_label.is_empty());
 
         component.dispatch(IngestIntent::empty(action_ids::INGEST_SOURCE_KIND_LAN));
         wait_for_component(&mut component);
 
         assert_eq!(component.view().source_kind, SourceKind::Lan);
-        assert!(component.view().browser_path_label.is_empty());
-        assert!(component.view().browser_current_uri.is_none());
-        assert!(component.view().browser_entries.is_empty());
-        assert!(component.view().selected_source_name.is_empty());
-        assert!(component.view().selected_source_serial_number.is_empty());
-        assert!(component.view().selected_source_volume_name.is_empty());
+        assert!(component.view().browser.path_label.is_empty());
+        assert!(component.view().browser.current_uri.is_none());
+        assert!(component.view().browser.entries.is_empty());
+        assert!(component.view().browser.chosen.name.is_empty());
+        assert!(component.view().browser.chosen.serial_number.is_empty());
+        assert!(component.view().browser.chosen.volume_name.is_empty());
     }
 
     #[test]
@@ -328,7 +327,7 @@ mod tests {
         wait_for_component(&mut component);
         let first_uri = component
             .view()
-            .browser_entries
+            .browser.entries
             .first()
             .map(|entry| entry.qnc_uri.clone())
             .expect("local root");
@@ -338,20 +337,20 @@ mod tests {
             IngestPayload::LocationUri(first_uri),
         ));
         wait_for_component(&mut component);
-        component.view.selected_source_name = "stale".to_string();
-        component.view.selected_source_serial_number = "serial".to_string();
-        component.view.selected_source_volume_name = "volume".to_string();
+        component.view.browser.chosen.name = "stale".to_string();
+        component.view.browser.chosen.serial_number = "serial".to_string();
+        component.view.browser.chosen.volume_name = "volume".to_string();
 
         component.dispatch(IngestIntent::empty(action_ids::INGEST_DIR_CANCEL));
         wait_for_component(&mut component);
 
         assert_eq!(component.view().source_kind, SourceKind::Local);
-        assert!(component.view().browser_roots);
-        assert!(component.view().browser_current_uri.is_none());
-        assert!(!component.view().browser_entries.is_empty());
-        assert!(component.view().selected_source_name.is_empty());
-        assert!(component.view().selected_source_serial_number.is_empty());
-        assert!(component.view().selected_source_volume_name.is_empty());
+        assert!(component.view().browser.roots);
+        assert!(component.view().browser.current_uri.is_none());
+        assert!(!component.view().browser.entries.is_empty());
+        assert!(component.view().browser.chosen.name.is_empty());
+        assert!(component.view().browser.chosen.serial_number.is_empty());
+        assert!(component.view().browser.chosen.volume_name.is_empty());
         assert_eq!(component.view().message, qnc_ui_text::text("ingest.msg.pick_local_source"));
     }
 

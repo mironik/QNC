@@ -63,7 +63,7 @@ impl IngestApplication {
         );
         let busy = self.selection_writer.is_busy()
             || self.view.command_busy
-            || self.view.browser_busy
+            || self.view.browser.busy
             || (self.pending_source.is_some() && action_id != action_ids::INGEST_DIR_CANCEL);
         (source_action && busy)
             .then(|| IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_busy")))

@@ -4279,3 +4279,9 @@ korak kotacica iznad Wrap redova, dok se program jos pripremao, program otvarao 
 su se prikaz i playhead izmjenjivali. `qnc-source-preview` `show_program_frame`: dok se program priprema, trazena slika se
 samo pamti (`program_pending`) i program na nju skoci cim je spreman; ponovno otvaranje samo kad se prica promijenila ili
 priprema nije uspjela. Testovi, conformance.
+Izvedeno 2026-10-16 (Ingest u kocke, korak 2): prikaz preglednika izvora (korijeni ili mapa, stavke, posao u tijeku,
+greska, izabrani izvor: naziv, serijski broj, volumen) drzi kocka `qnc-source-browse` (`BrowserView`: `clear`, `apply`,
+`choose`; `BrowseLocationEntry` je stavka za sve forme). Ingest prikaz ima jedno polje `browser` umjesto 11, aplikacijski
+sloj vise ne puni ni ne brise ta polja; `LocationEntry` je stavka kocke. Project (`qnc-project-session`) ima isti
+obrazac i moze ga preuzeti uz otkljucavanje. C10 `qnc-ingest-application` 1667 -> 1584. Testovi, conformance. Nije
+prenesen u kopiju dok se trazi uzrok zastoja zvuka (vidi sljedeci zapis).
