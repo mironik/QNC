@@ -54,6 +54,8 @@ pub const POINTS_PER_STEP: f32 = 40.0;
 struct Pending {
     steps: i32,
     points: f32,
+    /// The steps came with Ctrl held (Ctrl+wheel, like Ctrl+arrows).
+    ctrl: bool,
 }
 
 /// The wheel steps of one frame from its scroll events: notches (`Line`, `Page`) count
@@ -74,16 +76,30 @@ fn steps_of(events: &[egui::Event], points: &mut f32) -> i32 {
     steps + whole as i32
 }
 
-/// The catalog action of this frame's wheel over `rect` (`back` or `forward`), when the
-/// wheel steps there now (`enabled`); `None` otherwise. Over the panel the scroll is
-/// taken. `id` names the panel's pending steps.
-pub fn action(ui: &Ui, rect: Rect, enabled: bool, id: &str, (back, forward): (&str, &str)) -> Option<String> {
+/// Whether this frame's wheel events came with Ctrl (Cmd on macOS) held.
+fn with_ctrl(events: &[egui::Event]) -> Option<bool> {
+    events.iter().rev().find_map(|event| match event {
+        egui::Event::MouseWheel { modifiers, .. } => Some(modifiers.command || modifiers.ctrl),
+        _ => None,
+    })
+}
+
+/// The catalog actions of a panel's wheel: back and forward, then with Ctrl held.
+pub type WheelActions<'a> = ((&'a str, &'a str), (&'a str, &'a str));
+
+/// The catalog action of this frame's wheel over `rect` (back or forward, the Ctrl pair
+/// when Ctrl is held), when the wheel steps there now (`enabled`); `None` otherwise.
+/// Over the panel the scroll is taken. `id` names the panel's pending steps.
+pub fn action(ui: &Ui, rect: Rect, enabled: bool, id: &str, ((back, forward), (ctrl_back, ctrl_forward)): WheelActions<'_>) -> Option<String> {
     let key = egui::Id::new(("qnc-wheel-jog", id));
     let ctx = ui.ctx();
     let mut pending: Pending = ctx.data(|data| data.get_temp(key)).unwrap_or_default();
     let over = enabled && ctx.pointer_hover_pos().is_some_and(|at| rect.contains(at));
     if over {
         let events = ctx.input(|input| input.events.clone());
+        if let Some(ctrl) = with_ctrl(&events).filter(|ctrl| *ctrl != pending.ctrl) {
+            pending = Pending { ctrl, ..Pending::default() }; // Ctrl pressed or let go: start again
+        }
         pending.steps += steps_of(&events, &mut pending.points);
         ctx.input_mut(|input| {
             input.smooth_scroll_delta = egui::Vec2::ZERO;
@@ -98,9 +114,11 @@ pub fn action(ui: &Ui, rect: Rect, enabled: bool, id: &str, (back, forward): (&s
     if pending.steps != 0 {
         ctx.request_repaint(); // the rest of a fast spin, one a frame
     }
-    match step {
-        -1 => Some(back.to_string()),
-        1 => Some(forward.to_string()),
+    match (step, pending.ctrl) {
+        (-1, false) => Some(back.to_string()),
+        (1, false) => Some(forward.to_string()),
+        (-1, true) => Some(ctrl_back.to_string()),
+        (1, true) => Some(ctrl_forward.to_string()),
         _ => None,
     }
 }

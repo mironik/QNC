@@ -128,6 +128,18 @@
     "wheel_segments_forward": {
       "label": "Kotacic iznad panela Segmenti dok je nesto uzeto (Ctrl+): kao strelica desno"
     },
+    "wheel_source_ctrl_back": {
+      "label": "Ctrl+kotacic iznad source timelinea: razina uzete trake A1/A2 nize"
+    },
+    "wheel_source_ctrl_forward": {
+      "label": "Ctrl+kotacic iznad source timelinea: razina uzete trake A1/A2 vise"
+    },
+    "wheel_segments_ctrl_back": {
+      "label": "Ctrl+kotacic iznad panela Segmenti: razina uzetog zvuka segmenta ili pokrivalice nize"
+    },
+    "wheel_segments_ctrl_forward": {
+      "label": "Ctrl+kotacic iznad panela Segmenti: razina uzetog zvuka segmenta ili pokrivalice vise"
+    },
     "toggle_wrap_video": {
       "label": "Wrap redovi: filmstrip ili uska video traka (Ctrl+klik na V)"
     },

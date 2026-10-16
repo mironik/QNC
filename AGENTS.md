@@ -4238,3 +4238,8 @@ kotacicu je postavka racunala, kao jezik sucelja: `data/mouse-wheel.json` `{"pla
 `forward` (od sebe naprijed); neispravan zapis se zapisuje u player log i vrijedi `forward` (`qnc-wheel-jog`
 `playhead_up_forward`, cita se jednom po pokretanju). Razina A1/A2 se ne okrece: gore glasnije uvijek (`qnc-panel-focus`).
 Testovi, conformance.
+Ispravak 2026-10-16 (korisnik: "nivo tona ne smije ici direktno na timeline, direktno je playhead; nivo tona ide isto kao
+tipkovnicom Ctrl+strelice ili kotac"): kotacic sam uvijek pomice playhead (kao strelice); gdje strelice uzetom zvuku
+ukljucuju/iskljucuju zvuk (uzeta traka A1/A2, zvuk segmenta ili pokrivalice) kotacic pomice playhead. Razinu mijenja samo
+Ctrl+kotacic, kao Ctrl+lijevo/desno, gore glasnije. `qnc-wheel-jog` daje par akcija s Ctrl-om (`WheelActions`), katalog
+`wheel_source_ctrl_back/forward`, `wheel_segments_ctrl_back/forward` (bez tipke), `qnc-panel-focus`. Testovi, conformance.

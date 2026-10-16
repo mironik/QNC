@@ -260,17 +260,26 @@ impl PanelFocus {
             // set its level (user 2026-10-15); all heard at once, Enter keeps, Escape lets go.
             // The wheel over a panel (user 2026-10-16, piece `qnc-wheel-jog`): that panel takes
             // the keyboard and the wheel is its left/right arrow.
-            "wheel_source_back" | "wheel_source_forward" | "wheel_segments_back" | "wheel_segments_forward" => {
-                self.panel = if action_id.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
-                let (back, sound) = (action_id.ends_with("back"), if self.panel == Panel::Segments { segments.part_sound_taken() } else { segments.lane_is_taken() });
-                // A taken A1/A2 sound: the wheel is its level, up louder (Ctrl+left/right).
-                // The playhead direction is this computer's choice (`qnc-wheel-jog`).
-                let arrow = match (sound, back != qnc_wheel_jog::playhead_up_forward()) {
-                    (true, _) if back => "lane_level_down",
-                    (true, _) => "lane_level_up",
-                    (false, false) => "step_back_frame",
-                    (false, true) => "step_forward_frame",
-                };
+            // Ctrl+wheel is Ctrl+left/right: the level of a taken A1/A2 sound, up louder.
+            wheel if wheel.starts_with("wheel_") && wheel.contains("_ctrl_") => {
+                self.panel = if wheel.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
+                let level = if wheel.ends_with("back") { "lane_level_down" } else { "lane_level_up" };
+                return self.route_on_panel(level, (preview, wrap, segments, timeline));
+            }
+            // The wheel alone is the left/right arrow, its direction this computer's choice;
+            // where those arrows turn a taken sound off/on, the wheel moves the playhead
+            // (user 2026-10-16: the level never goes straight to the wheel, the playhead does).
+            wheel if wheel.starts_with("wheel_") => {
+                self.panel = if wheel.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
+                let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();
+                let frames = if forward { 1 } else { -1 };
+                if self.panel == Panel::Segments && segments.part_sound_taken() {
+                    return Some(wrap.step(frames));
+                }
+                if self.panel == Panel::SourceTimeline && segments.lane_is_taken() {
+                    return Some(preview.step(frames));
+                }
+                let arrow = if forward { "step_forward_frame" } else { "step_back_frame" };
                 return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
             }
             // On the segment panel the same keys take the sound of the stored segment (A1) or
@@ -623,9 +632,12 @@ pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {
 }
 
 /// The catalog actions of the wheel over the source timeline or monitor (back, forward).
-pub const WHEEL_SOURCE: (&str, &str) = ("wheel_source_back", "wheel_source_forward");
+/// Then with Ctrl held (the level of a taken sound).
+pub const WHEEL_SOURCE: qnc_wheel_jog::WheelActions<'static> =
+    (("wheel_source_back", "wheel_source_forward"), ("wheel_source_ctrl_back", "wheel_source_ctrl_forward"));
 /// The same over the segment panel, while something there is taken.
-pub const WHEEL_SEGMENTS: (&str, &str) = ("wheel_segments_back", "wheel_segments_forward");
+pub const WHEEL_SEGMENTS: qnc_wheel_jog::WheelActions<'static> =
+    (("wheel_segments_back", "wheel_segments_forward"), ("wheel_segments_ctrl_back", "wheel_segments_ctrl_forward"));
 
 /// The sound drafted on the Wrap row, as the program plays it before Enter.
 fn sound_draft(segments: &ProgramSegments) -> Option<qnc_source_preview::SoundDraft> {
