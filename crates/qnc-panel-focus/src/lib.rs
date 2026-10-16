@@ -207,6 +207,39 @@ impl PanelFocus {
     pub fn route(
         &mut self,
         action_id: &str,
+        pieces: (
+            &mut SourcePreview,
+            &mut WrapSession,
+            &mut ProgramSegments,
+            &mut TimelineProjection,
+        ),
+    ) -> Option<bool> {
+        let panel = self.panel;
+        let routed = self.route_on_panel(action_id, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3));
+        // Every key of the story in the player log (live 2026-10-16: IN/OUT not taken
+        // after some action): the action, the panel it met, what came of it and the source
+        // marks and playhead as the key found them.
+        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+            let (preview, timeline) = (&*pieces.0, &*pieces.3);
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!(
+                    "story-key action={action_id} panel={panel:?}->{:?} routed={routed:?} in={:?} out={:?} playhead={:?} program={} part_sound={}",
+                    self.panel,
+                    timeline.source_in_frame,
+                    timeline.source_out_frame,
+                    timeline.playhead_frame,
+                    preview.in_program(),
+                    pieces.2.part_sound_taken(),
+                ),
+            );
+        }
+        routed
+    }
+
+    fn route_on_panel(
+        &mut self,
+        action_id: &str,
         (preview, wrap, segments, timeline): (
             &mut SourcePreview,
             &mut WrapSession,
