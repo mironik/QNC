@@ -29,6 +29,9 @@ pub(crate) struct Shared {
     /// The loudest sample of each output channel handed to the device since the last
     /// `take_peaks` (f32 bits of the absolute value; a level meter, user 2026-10-16).
     peaks: [AtomicU32; METER_CHANNELS],
+    /// The gain of each output channel (f32 bits, 1.0 as recorded), applied where the
+    /// samples go to the device, so a change is heard at once (user 2026-10-16).
+    gains: [AtomicU32; METER_CHANNELS],
 }
 /// How many output channels the level meter follows.
 pub const METER_CHANNELS: usize = 8;
@@ -57,6 +60,13 @@ impl Shared {
             timing_frames: AtomicU64::new(0),
             last_playback_position_ns: AtomicU64::new(0),
             peaks: Default::default(),
+            gains: std::array::from_fn(|_| AtomicU32::new(1f32.to_bits())),
+        }
+    }
+    /// The gain of the first `gains.len()` output channels; the others keep theirs.
+    pub fn set_gains(&self, gains: &[f32]) {
+        for (slot, gain) in self.gains.iter().zip(gains) {
+            slot.store(gain.max(0.0).to_bits(), Ordering::Release);
         }
     }
     /// The loudest sample of each output channel since the last call, then zero again.
@@ -368,6 +378,23 @@ fn samples_to_ns(samples: u64, rate: u32) -> u64 {
 }
 
 impl Callback {
+    /// Each output channel times its gain (no allocation; nothing when all are 1.0).
+    fn apply_gains(&self, output: &mut [f32]) {
+        let channels = self.channels.clamp(1, METER_CHANNELS);
+        let mut gains = [1f32; METER_CHANNELS];
+        for (gain, slot) in gains.iter_mut().zip(&self.shared.gains).take(channels) {
+            *gain = f32::from_bits(slot.load(Ordering::Acquire));
+        }
+        if gains.iter().take(channels).all(|gain| *gain == 1.0) {
+            return;
+        }
+        for frame in output.chunks_exact_mut(self.channels.max(1)) {
+            for (sample, gain) in frame.iter_mut().zip(gains).take(channels) {
+                *sample *= gain;
+            }
+        }
+    }
+
     /// The loudest sample of each channel of what goes to the device (no allocation).
     fn note_peaks(&self, output: &[f32]) {
         let channels = self.channels.clamp(1, METER_CHANNELS);
@@ -423,6 +450,7 @@ impl Callback {
                 output[a.len()..a.len() + b.len()].copy_from_slice(b);
                 chunk.commit_all();
             }
+            self.apply_gains(output);
             self.note_peaks(output);
             return;
         }
@@ -465,6 +493,7 @@ impl Callback {
             output.fill(0.0);
             return;
         }
+        self.apply_gains(output);
         self.note_peaks(output);
         if needed > 0 {
             self.shared.timing_revision.fetch_add(1, Ordering::SeqCst);

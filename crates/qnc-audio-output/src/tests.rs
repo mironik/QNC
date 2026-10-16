@@ -354,3 +354,17 @@ fn a_frame_step_is_heard_once_while_paused_and_play_drops_what_is_left() {
     c.render(&mut out, 300, None);
     assert_eq!(out, [0.1; 4], "Play plays the playout queue, not the step");
 }
+
+#[test]
+fn a_gain_set_while_playing_is_heard_in_the_next_callback() {
+    let (mut q, mut c, g) = prepared(2);
+    q.push(g, 10, &[0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]).unwrap();
+    q.commit(g).unwrap();
+    q.start(g).unwrap();
+    let mut out = [0.0; 4];
+    c.render(&mut out, 100, Some(5));
+    assert_eq!(out, [0.5, 0.5, 0.5, 0.5], "as recorded");
+    q.shared.set_gains(&[0.0, 2.0]);
+    c.render(&mut out, 200, Some(5));
+    assert_eq!(out, [0.0, 1.0, 0.0, 1.0], "A1 off, A2 twice, at once");
+}

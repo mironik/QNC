@@ -107,6 +107,10 @@ impl Session {
                         frame,
                         present_frame,
                     } => self.player.cue_frame(frame, present_frame),
+                    Command::SetOutputLevels { levels_percent } => {
+                        self.player.set_output_levels(&levels_percent);
+                        Ok(Vec::new())
+                    }
                     _ => {
                         return self.rejected(
                             sequence,

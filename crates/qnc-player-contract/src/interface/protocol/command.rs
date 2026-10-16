@@ -23,6 +23,11 @@ pub enum BroadcastPlayerProtocolCommand {
         frame: FrameNumber,
         present_frame: bool,
     },
+    /// The level of the first output channels in percent (100 as recorded, at most
+    /// 400), heard at once; nothing is prepared again (user 2026-10-16).
+    SetOutputLevels {
+        levels_percent: Vec<u16>,
+    },
 
     Play,
     Pause,
@@ -39,6 +44,7 @@ impl BroadcastPlayerProtocolCommand {
             BroadcastPlayerProtocolCommand::UnloadSource => "UnloadSource",
             BroadcastPlayerProtocolCommand::SetPlaybackRequest { .. } => "SetPlaybackRequest",
             BroadcastPlayerProtocolCommand::CueFrame { .. } => "CueFrame",
+            BroadcastPlayerProtocolCommand::SetOutputLevels { .. } => "SetOutputLevels",
             BroadcastPlayerProtocolCommand::Play => "Play",
             BroadcastPlayerProtocolCommand::Pause => "Pause",
             BroadcastPlayerProtocolCommand::Stop => "Stop",
@@ -57,6 +63,13 @@ impl BroadcastPlayerProtocolCommand {
             }
             BroadcastPlayerProtocolCommand::SetPlaybackRequest { request } => request.validate(),
             BroadcastPlayerProtocolCommand::CueFrame { .. } => Ok(()),
+            BroadcastPlayerProtocolCommand::SetOutputLevels { levels_percent } => {
+                if levels_percent.is_empty() || levels_percent.len() > 8 || levels_percent.iter().any(|level| *level > 400) {
+                    Err("output levels: 1 to 8 channels of 0..400 percent".into())
+                } else {
+                    Ok(())
+                }
+            }
             BroadcastPlayerProtocolCommand::UnloadSource
             | BroadcastPlayerProtocolCommand::Play
             | BroadcastPlayerProtocolCommand::Pause

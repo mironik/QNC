@@ -449,6 +449,14 @@ impl Runtime {
     }
     /// The loudest sample of each output channel the device played since the last call
     /// (a level meter of what is heard).
+    /// The level of the first output channels in percent (100 as recorded), heard at
+    /// once: the device applies it where the samples leave (user 2026-10-16: a level
+    /// change does not prepare the clip again).
+    pub fn set_output_levels(&self, levels_percent: &[u16]) {
+        if let Some(device) = &self.audio {
+            device.borrow().set_gains(&output::gains_of(levels_percent));
+        }
+    }
     pub fn take_output_peaks(&self) -> Vec<f32> {
         self.audio.as_ref().map(|device| device.borrow().take_peaks()).unwrap_or_default()
     }

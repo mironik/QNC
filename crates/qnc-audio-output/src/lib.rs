@@ -111,6 +111,11 @@ impl AudioOutput {
     }
     /// The loudest sample (0..1) of each output channel handed to the device since the last
     /// call: what is heard now, not what waits in the queue (a level meter).
+    /// The gain of the first `gains.len()` output channels, heard at once (the next
+    /// device callback); the others keep theirs.
+    pub fn set_gains(&self, gains: &[f32]) {
+        self.queue.shared.set_gains(gains);
+    }
     pub fn take_peaks(&self) -> Vec<f32> {
         self.queue.shared.take_peaks(self.queue.config.format.channels as usize)
     }

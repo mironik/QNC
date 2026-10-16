@@ -53,6 +53,12 @@ impl ProgramSegments {
         self.part_sound.taken().is_some()
     }
 
+    /// The taken part (lane, id) and its stored sound (as it was taken).
+    pub fn part_sound_stored(&self) -> Option<(u8, String, Lane)> {
+        let (part, _) = self.part_sound.taken()?;
+        Some((part.lane, part.id.clone(), self.part_sound.kept()?))
+    }
+
     /// The taken part (lane, id) and its draft, which the program hears before Enter
     /// (user 2026-10-16).
     pub fn part_sound_draft_now(&self) -> Option<(u8, String, Lane)> {

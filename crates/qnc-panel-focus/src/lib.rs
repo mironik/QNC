@@ -266,22 +266,22 @@ impl PanelFocus {
             }
             "step_prev_part" | "step_next_part" if panel == Panel::Segments && segments.part_sound_taken() => {
                 let changed = segments.part_sound_draft(if action_id == "step_prev_part" { -1 } else { 1 });
-                preview.hear_program_draft(sound_draft(segments), wrap.playhead());
+                preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
                 changed
             }
             "step_back_frame" | "step_forward_frame" if panel == Panel::Segments && segments.part_sound_taken() => {
                 let changed = segments.part_sound_off(action_id == "step_back_frame");
-                preview.hear_program_draft(sound_draft(segments), wrap.playhead());
+                preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
                 changed
             }
             "lane_level_down" | "lane_level_up" if panel == Panel::Segments && segments.part_sound_taken() => {
                 let changed = segments.part_sound_level(if action_id == "lane_level_down" { -1 } else { 1 });
-                preview.hear_program_draft(sound_draft(segments), wrap.playhead());
+                preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
                 changed
             }
             "clear_focus" | "close_player" if panel == Panel::Segments && segments.part_sound_taken() => {
                 let released = segments.release_part_sound();
-                preview.hear_program_draft(None, wrap.playhead()); // the stored sound again
+                preview.hear_program_draft(None, None, wrap.playhead()); // the stored sound again
                 released
             }
             "select_audio_a1" | "select_audio_a2" => {
@@ -609,6 +609,12 @@ pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {
 fn sound_draft(segments: &ProgramSegments) -> Option<qnc_source_preview::SoundDraft> {
     let (lane, id, draft) = segments.part_sound_draft_now()?;
     Some(qnc_source_preview::SoundDraft { lane, id, channel: draft.channel, level_db: draft.level_db, off: draft.off })
+}
+
+/// The stored sound of the part taken on the Wrap row.
+fn stored_sound(segments: &ProgramSegments) -> Option<qnc_source_preview::SoundDraft> {
+    let (lane, id, stored) = segments.part_sound_stored()?;
+    Some(qnc_source_preview::SoundDraft { lane, id, channel: stored.channel, level_db: stored.level_db, off: stored.off })
 }
 
 #[cfg(test)]

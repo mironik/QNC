@@ -167,6 +167,8 @@ pub enum Action {
     TogglePlayPause,
     Step(i64),
     Cue(u64),
+    /// The level of output channels 1 and 2 (A1, A2) in percent, heard at once.
+    SetOutputLevels([u16; 2]),
 }
 type Loader = Box<dyn FnOnce() -> Result<Launch> + Send>;
 /// Generation, first cued frame and loader of the latest selection.

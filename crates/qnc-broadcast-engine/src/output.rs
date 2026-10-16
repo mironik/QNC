@@ -116,8 +116,6 @@ pub(crate) struct DeviceSink {
     source: SourceRuntime,
     generation: Option<u64>,
     channel_map: Option<ChannelMap>,
-    /// The level of each device output in percent; empty: as recorded.
-    levels: Vec<u16>,
     routed: Vec<f32>,
     /// The frame a cue went to: its sound is heard once, frame by frame (user rule
     /// 2026-10-01: stepping by frames is cut by ear).
@@ -163,15 +161,17 @@ impl DeviceSink {
             source: source.clone(),
             generation: None,
             channel_map,
-            levels: Vec::new(),
             routed: Vec::new(),
             audition_frame: None,
         })
     }
 
-    /// The device outputs at these levels (percent; user 2026-10-14: level 0 of A1/A2).
-    pub(crate) fn with_levels(mut self, levels: Vec<u16>) -> Self {
-        self.levels = levels;
+    /// The device outputs at these levels (percent; user 2026-10-14: level 0 of A1/A2),
+    /// applied by the device where the samples leave, so a later change is heard at once.
+    pub(crate) fn with_levels(self, levels: Vec<u16>) -> Self {
+        if let Some(device) = &self.device {
+            device.borrow().set_gains(&gains_of(&levels));
+        }
         self
     }
 
@@ -212,8 +212,6 @@ impl DeviceSink {
             .ok_or_else(|| error("missing device channel map"))?
             .route(&packet.payload, &mut self.routed)
             .map_err(error)?;
-        let width = self.channel_map.as_ref().map_or(1, |map| map.output_channels().len());
-        apply_levels(&self.levels, width, &mut self.routed);
         device
             .queue(generation, start, &self.routed)
             .map_err(error)?;
@@ -518,16 +516,9 @@ impl PcmTrack {
     }
 }
 
-/// Each output sample times its output's level (percent); outputs as recorded are left.
-fn apply_levels(levels: &[u16], width: usize, samples: &mut [f32]) {
-    if width == 0 || levels.iter().take(width).all(|level| *level == 100) {
-        return;
-    }
-    for frame in samples.chunks_exact_mut(width) {
-        for (sample, level) in frame.iter_mut().zip(levels) {
-            *sample *= f32::from(*level) / 100.0;
-        }
-    }
+/// Output levels in percent as device gains (100 as recorded).
+pub(crate) fn gains_of(levels: &[u16]) -> Vec<f32> {
+    levels.iter().map(|level| f32::from(*level) / 100.0).collect()
 }
 
 fn interleave_tracks(tracks: &mut [PcmTrack], frames: usize) -> Result<Vec<f32>> {
@@ -618,13 +609,9 @@ mod tests {
     }
 
     #[test]
-    fn a_level_0_output_is_silent_and_the_others_play_as_recorded() {
-        let mut samples = vec![0.5, -0.25, 0.5, -0.25];
-        apply_levels(&[0, 100], 2, &mut samples);
-        assert_eq!(samples, [0.0, -0.25, 0.0, -0.25]);
-        let mut kept = vec![0.5, -0.25];
-        apply_levels(&[], 2, &mut kept);
-        assert_eq!(kept, [0.5, -0.25], "no levels: as recorded");
+    fn levels_become_device_gains_level_0_silent_100_as_recorded() {
+        assert_eq!(gains_of(&[0, 100, 200]), [0.0, 1.0, 2.0]);
+        assert!(gains_of(&[]).is_empty(), "no levels: the device keeps its gains");
     }
 
     #[test]

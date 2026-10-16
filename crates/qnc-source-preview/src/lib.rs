@@ -210,6 +210,9 @@ pub struct SourcePreview {
     lead: Option<(String, [u16; 2], [u16; 2])>,
     /// The sound of a segment or cover drafted on the Wrap row, heard in the program.
     program_draft: Option<SoundDraft>,
+    /// The program was opened again with the draft (another channel): Escape opens it
+    /// again from the story, a level no longer goes to the output.
+    program_draft_reopened: bool,
 }
 
 impl Default for SourcePreview {
@@ -232,6 +235,7 @@ impl Default for SourcePreview {
             program: false,
             lead: None,
             program_draft: None,
+            program_draft_reopened: false,
         }
     }
 }
@@ -402,9 +406,15 @@ impl SourcePreview {
         if self.lead == lead {
             return false;
         }
+        let same_channels = self.lead.as_ref().is_some_and(|(id, channels, _)| *id == clip_id && *channels == [a1, a2]);
         self.lead = lead;
         if self.program {
             return false;
+        }
+        // Only the level changed: the player takes it at once, nothing is prepared again
+        // (live 2026-10-16: every level step stopped the sound).
+        if same_channels && self.set_output_levels([percent(l1), percent(l2)]) {
+            return true;
         }
         // The frame shown or asked for, not the start: a channel changed again before the
         // player confirmed a position reopens where it was (live 2026-10-16).
@@ -637,10 +647,12 @@ impl SourcePreview {
         self.open_story(frame, move |target| qnc_program_input::loader(target, project_id))
     }
     /// The sound of a segment or cover drafted on the Wrap row is heard at once (user
-    /// 2026-10-16): the program opens again with it at the frame it shows (`frame` when
-    /// it shows none), playing on when it played. `None` hears the stored sound again.
-    /// Nothing is written. False when nothing changed or no program plays.
-    pub fn hear_program_draft(&mut self, draft: Option<SoundDraft>, frame: u64) -> bool {
+    /// 2026-10-16). Its level or off against the stored sound (`stored`, the same part)
+    /// is the level of its output A1 or A2, taken by the player at once; another channel,
+    /// or a part stored off, opens the program again with the draft at the frame it shows
+    /// (`frame` when it shows none), playing on when it played. `None` hears the stored
+    /// sound again. Nothing is written. False when nothing changed or no program plays.
+    pub fn hear_program_draft(&mut self, draft: Option<SoundDraft>, stored: Option<SoundDraft>, frame: u64) -> bool {
         if self.program_draft == draft {
             return false;
         }
@@ -648,6 +660,21 @@ impl SourcePreview {
         if !self.program {
             return false;
         }
+        if !self.program_draft_reopened {
+            let level = match (&draft, &stored) {
+                (None, _) => Some([100, 100]),
+                (Some(draft), Some(stored)) if draft.channel == stored.channel && !stored.off => {
+                    let gain = if draft.off { 0.0 } else { 10f32.powf(f32::from(draft.level_db - stored.level_db) / 20.0) };
+                    let percent = (gain * 100.0).round().clamp(0.0, 400.0) as u16;
+                    Some(if draft.lane == 0 { [percent, 100] } else { [100, percent] })
+                }
+                _ => None,
+            };
+            if level.is_some_and(|level| self.set_output_levels(level)) {
+                return true;
+            }
+        }
+        self.program_draft_reopened = draft.is_some();
         let Some(context) = &self.context else {
             return false;
         };
@@ -667,6 +694,7 @@ impl SourcePreview {
     /// again from it as after every write.
     pub fn forget_program_draft(&mut self) {
         self.program_draft = None;
+        self.program_draft_reopened = false;
     }
 
     /// Sync/B-roll (v5 `PlayProgram` of the Sync preview): the program window
@@ -727,6 +755,12 @@ impl SourcePreview {
         self.program
             .then(|| self.player_view.confirmed_source_frame())
             .flatten()
+    }
+
+    /// The level of outputs 1 and 2 in percent, heard at once; false when the player
+    /// cannot take it now (not prepared yet).
+    fn set_output_levels(&mut self, levels: [u16; 2]) -> bool {
+        self.player.as_ref().is_some_and(|player| player.send(Action::SetOutputLevels(levels)).is_ok())
     }
 
     fn send(&mut self, action: Action) -> bool {

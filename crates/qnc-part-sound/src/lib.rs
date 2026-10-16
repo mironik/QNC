@@ -50,6 +50,12 @@ impl PartSound {
         self.taken.as_ref().map(|part| (part, self.lanes.lane(part.lane)))
     }
 
+    /// The taken part's sound as it was stored when taken (before its draft).
+    pub fn kept(&self) -> Option<Lane> {
+        let lane = self.taken.as_ref()?.lane;
+        Some(self.lanes.kept(lane))
+    }
+
     /// The channel count of the taken part's clip.
     pub fn channels(&self) -> Option<u16> {
         let lane = self.taken.as_ref()?.lane;

@@ -4204,3 +4204,16 @@ svirati ako je svirao; `None` vraca spremljeni zvuk (Esc), `forget_program_draft
 program iz baze). `qnc-panel-focus` slaze nacrt iz `qnc-program-segments` (`part_sound_draft_now`) i predaje ga
 previewu pri svakoj promjeni kanala, razine i ukljucenosti. Svaka promjena ponovno slaze program (oko 0,5 s), kao
 promjena kanala na source timelineu. Test `a_sound_draft_changes_only_its_own_segment_or_cover`, conformance.
+Otkljucano i izvedeno 2026-10-16 (korisnik: "prekida dok mijenjam razinu"; "da, otkljucaj i napravi"): log je pokazao da
+svaki korak razine (Ctrl+lijevo/desno, ukljuci/iskljuci) zatvara i ponovno priprema klip (`player-open`), a engine je
+razinu primjenjivao kad zvuk ulazi u red (do 4 s unaprijed). Sada razinu primjenjuje uredaj: `qnc-audio-output` drzi
+pojacanje po izlaznom kanalu (`set_gains`) i mnozi uzorke u povratnom pozivu uredaja (gdje se mjeri i pokazivac razine),
+pa se promjena cuje u sljedecem pozivu. `qnc-broadcast-engine`: `DeviceSink::with_levels` postavlja pojacanja uredaja
+(vise ne mnozi red), `Runtime::set_output_levels`. `qnc-player-contract`: naredba `SetOutputLevels { levels_percent }`
+(1-8 kanala, 0..400 %), `tools/qnc-player-runner` je izvrsava, `qnc-player-client` `Action::SetOutputLevels([u16; 2])`
+(bez cekanja pozicije). `qnc-source-preview`: na source timelineu promjena samo razine ili ukljucenosti salje tu
+naredbu (promjena kanala i dalje ponovno priprema klip); na Wrap retku nacrt razine prema spremljenoj (`stored`) ide na
+izlaz A1 ili A2 (do Entera vrijedi za cijeli A1/A2), promjena kanala ili dio spremljen iskljucen ponovno otvara program
+s nacrtom. `qnc-part-sound` `kept`, `qnc-program-segments` `part_sound_stored`. Uz to zapis tipki Storyja u player log
+(`story-key`, commit e4e42cf) za nalaz IN/OUT. Testovi (`a_gain_set_while_playing_is_heard_in_the_next_callback`,
+`levels_become_device_gains...`), conformance. Uzivo nije provjereno.
