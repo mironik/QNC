@@ -178,7 +178,7 @@ pub fn show_timeline_dock(
         );
         ui.add_space(10.0);
         if let Some((start, end)) = timeline.projection.visible_source_marks() {
-            let length = end.saturating_sub(start);
+            let length = timeline.projection.shown_source_length((start, end));
             let [start, end, length] = match timeline.timecode {
                 Some(tc) => [tc.label(start), tc.label(end), tc.duration_label(length)],
                 None => [start, end, length].map(|frame| frame.to_string()),

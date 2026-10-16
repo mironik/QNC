@@ -451,6 +451,16 @@ impl TimelineProjection {
         }
     }
 
+    /// The length the header shows for the marks `(start, end)`: while OUT is not set, from
+    /// IN to the playhead, following it (user 2026-10-16: how far the playhead is from IN);
+    /// with OUT set, IN to OUT.
+    pub fn shown_source_length(&self, (start, end): (u64, u64)) -> u64 {
+        match (self.source_out_frame, self.playhead_frame) {
+            (None, Some(playhead)) => self.local_frame(playhead).saturating_sub(start),
+            _ => end.saturating_sub(start),
+        }
+    }
+
     fn normalize_source_marks(mut self) -> Self {
         let duration = self.duration_frames();
         self.source_in_frame = self.source_in_frame.map(|frame| frame.min(duration));
@@ -2088,6 +2098,15 @@ mod tests {
 
         assert_eq!(refreshed.confirmed_frame(), Some(40));
         assert_eq!(refreshed.source_in_frame, Some(20));
+    }
+
+    #[test]
+    fn the_length_follows_the_playhead_from_in_until_out_is_set() {
+        let marked_in = TimelineProjection::new(0, 300).with_playhead(40).with_source_in_at_confirmed();
+        let moved = marked_in.with_playhead(115);
+        assert_eq!(moved.shown_source_length(moved.visible_source_marks().unwrap()), 75, "IN 40 to the playhead");
+        let out = moved.with_source_out_at_confirmed().with_playhead(200);
+        assert_eq!(out.shown_source_length(out.visible_source_marks().unwrap()), 75, "OUT set: IN to OUT");
     }
 
     #[test]

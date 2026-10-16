@@ -4243,3 +4243,7 @@ tipkovnicom Ctrl+strelice ili kotac"): kotacic sam uvijek pomice playhead (kao s
 ukljucuju/iskljucuju zvuk (uzeta traka A1/A2, zvuk segmenta ili pokrivalice) kotacic pomice playhead. Razinu mijenja samo
 Ctrl+kotacic, kao Ctrl+lijevo/desno, gore glasnije. `qnc-wheel-jog` daje par akcija s Ctrl-om (`WheelActions`), katalog
 `wheel_source_ctrl_back/forward`, `wheel_segments_ctrl_back/forward` (bez tipke), `qnc-panel-focus`. Testovi, conformance.
+Dopuna 2026-10-16 (korisnik: "prikaz duljine u source timelineu u realnoj poziciji playheada, od IN koliko je playhead
+daleko"; "ok, to je ok"): polje Duration source docka dok OUT nije postavljen pokazuje udaljenost od IN-a do playheada i
+prati ga; s postavljenim OUT-om IN-OUT kao prije (`qnc-timeline` `shown_source_length`, `qnc-source-dock`). Vrijedi i za
+Ingest. Test, conformance.
