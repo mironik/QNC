@@ -698,6 +698,8 @@
     "story.msg.lane_taken": "{lane}: up/down channel, left off, right on, Ctrl+left/right level, Enter keeps, Esc cancels",
     "wave.wave_needs_stored_container": "The wave needs the stored container of the source clip.",
     "story.msg.lane_off": "{lane}: off (level 0), right turns it on",
-    "story.msg.lane_level": "{lane}: channel {channel}, level {level} dB"
+    "story.msg.lane_level": "{lane}: channel {channel}, level {level} dB",
+    "story.msg.no_segment_at_playhead": "No segment under the Wrap playhead.",
+    "story.msg.no_cover_at_playhead": "No B-roll under the Wrap playhead."
   }
 }

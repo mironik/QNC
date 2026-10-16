@@ -313,6 +313,18 @@ fn paint_program(
     let no_picture = segments
         .segment_at(start)
         .is_some_and(|row| !row.kind.has_base_video() && row.end_frame >= end);
+    // The sound of the segment or cover taken on this row (user 2026-10-16): the channel
+    // column and the lane button show its draft; the wave stays as stored until Enter.
+    let part_choice = |lane: u8| {
+        segments.part_sound.as_ref().filter(|part| part.lane == lane).filter(|part| {
+            if lane == 0 {
+                segments.rows.iter().any(|row| row.segment_id == part.id && row.start_frame == start)
+            } else {
+                segments.covers.iter().any(|cover| cover.cover_id == part.id && (start..end).contains(&cover.start_frame))
+            }
+        })
+        .map(|part| qnc_timeline::ChannelChoice { selected: part.channel, count: part.channels, open: true, off: part.off, level_db: 0 })
+    };
     let intent = qnc_timeline::show(
         ui,
         TimelineInput {
@@ -340,8 +352,8 @@ fn paint_program(
             base_video_blank: no_picture,
             filmstrip_background: None,
             video_background: None,
-            a1_channel: None,
-            a2_channel: None,
+            a1_channel: part_choice(0),
+            a2_channel: part_choice(1),
             wave_over_video: None,
             trim_playheads: &trim_playheads,
             pictures: &pictures,

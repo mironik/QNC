@@ -1,0 +1,8 @@
+[package]
+name = "qnc-part-sound"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the sound of one stored segment (A1) or cover (A2) taken with the keyboard on the Wrap row, its draft channel, level and on/off, and the change to write. Its own state only: no database, no player, no form."
+
+[dependencies]
+qnc-lane-choice = { workspace = true }

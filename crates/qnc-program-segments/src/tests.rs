@@ -12,6 +12,8 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         fps_den: 1,
         active: true,
         a1_source_channel: 0,
+        a1_level_db: 0,
+        a1_off: false,
         duration_frames: range.1 - range.0,
     }
 }
@@ -316,6 +318,8 @@ fn cover(id: &str, slot_id: &str, frames: (u64, u64)) -> ProgramCover {
         fps_num: 50,
         fps_den: 1,
         a2_source_channel: 0,
+        a2_level_db: 0,
+        a2_off: false,
     }
 }
 
@@ -649,6 +653,8 @@ fn a_moved_slot_takes_its_cover_with_it_in_the_edit_pictures() {
         fps_num: 50,
         fps_den: 1,
         a2_source_channel: 1,
+        a2_level_db: 0,
+        a2_off: false,
     };
     segments.stored_covers = vec![
         cover("c0", "S|m1", (0, 15), "prev"),

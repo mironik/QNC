@@ -37,6 +37,7 @@ fn source(
             .map(|(source_channel, output_channel)| p::ProgramAudioRoute {
                 source_channel,
                 output_channel,
+                level_db: 0,
             })
             .into_iter()
             .collect(),
@@ -160,6 +161,7 @@ fn buses_take_the_chosen_saved_channel_to_a1_and_a2() {
         stream_index: 2,
         channel_index: 0,
         stream_channels: 1,
+        level_db: 0,
     };
     assert_eq!(
         audio[0].buses,
@@ -180,6 +182,7 @@ fn buses_take_the_chosen_saved_channel_to_a1_and_a2() {
                 stream_index: 1,
                 channel_index: 0,
                 stream_channels: 2,
+                level_db: 0,
             },
         ],
         "the segment keeps A1 under the cover; the cover is heard on A2"
@@ -212,6 +215,7 @@ fn a_cover_has_its_own_lane_so_its_sound_opens_before_the_cut() {
         stream_index: 1,
         channel_index: 0,
         stream_channels: 4,
+        level_db: 0,
     };
     let span = |record_in, bus| AudioSpan {
         record_in,
@@ -248,7 +252,7 @@ fn the_picture_decoder_of_the_next_cover_opens_two_seconds_ahead() {
 
 #[test]
 fn a_cover_cut_in_two_opens_its_sound_once_at_its_first_part() {
-    let bus = |clip, source_in| Bus { output: 1, clip, source_in, stream_index: 2, channel_index: 0, stream_channels: 1 };
+    let bus = |clip, source_in| Bus { output: 1, clip, source_in, stream_index: 2, channel_index: 0, stream_channels: 1, level_db: 0 };
     let span = |record_in, record_out, buses| AudioSpan { record_in, record_out, buses };
     // The cover 2878..3088 over the end of a segment (2961): two items, the same lane.
     let spans = vec![

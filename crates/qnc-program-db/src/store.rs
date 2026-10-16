@@ -107,13 +107,15 @@ impl Store {
                 fps_num,
                 fps_den,
                 a1_source_channel,
+                a1_level_db,
+                a1_off,
             } => self.create_segment(
                 project_id,
                 kind,
                 clip_id,
                 (*in_frame, *out_frame),
                 (*fps_num, *fps_den),
-                *a1_source_channel,
+                (*a1_source_channel, lane_level(*a1_level_db)?, *a1_off),
             ),
             Operation::DeleteSegment { segment_id } => self.delete_segment(segment_id),
             Operation::IncludeSegment { segment_id } => self.include_segment(segment_id),
@@ -165,14 +167,22 @@ impl Store {
                 fps_num,
                 fps_den,
                 a2_source_channel,
+                a2_level_db,
+                a2_off,
             } => self.create_cover(
                 project_id,
                 slot_id,
                 (clip_id, virtual_shot_id),
                 (*in_frame, *out_frame),
                 (*fps_num, *fps_den),
-                *a2_source_channel,
+                (*a2_source_channel, lane_level(*a2_level_db)?, *a2_off),
             ),
+            Operation::SetSegmentSound { segment_id, channel, level_db, off } => {
+                self.set_sound("story_parts", "part_id", "a1", segment_id, (*channel, lane_level(*level_db)?, *off))
+            }
+            Operation::SetCoverSound { cover_id, channel, level_db, off } => {
+                self.set_sound("story_covers", "cover_id", "a2", cover_id, (*channel, lane_level(*level_db)?, *off))
+            }
             Operation::DeleteCover { cover_id } => self.delete_cover(cover_id),
             Operation::SelectCover { cover_id } => self.select_cover(cover_id),
         }
@@ -187,7 +197,7 @@ impl Store {
         clip_id: &str,
         (in_frame, out_frame): (u64, u64),
         (fps_num, fps_den): (u32, u32),
-        a1_source_channel: u16,
+        (a1_source_channel, a1_level_db, a1_off): (u16, i8, bool),
     ) -> Result<Data> {
         let kind = story_kind(kind)?;
         qnc_media_records::valid_id(clip_id).map_err(err)?;
@@ -245,9 +255,9 @@ impl Store {
                 part_id, kind, sort_index, title, text, clip_id, virtual_shot_id,
                 in_tc, out_tc, in_seconds, out_seconds, fps, source_fps_num, source_fps_den,
                 in_frame, out_frame, duration_frames, duration_label, duration_color_key,
-                active, created_at, updated_at, a1_source_channel
+                active, created_at, updated_at, a1_source_channel, a1_level_db, a1_off
              ) VALUES (?1, ?2, ?3, '', '', ?4, '', ?5, ?6, ?7, ?8, ?9, ?10, ?11,
-                       ?12, ?13, ?14, ?15, ?16, 1, ?17, ?17, ?18)",
+                       ?12, ?13, ?14, ?15, ?16, 1, ?17, ?17, ?18, ?19, ?20)",
             params![
                 segment_id,
                 kind,
@@ -266,7 +276,9 @@ impl Store {
                 frames_label(duration, story_fps),
                 duration_color_key(duration, story_fps),
                 now,
-                a1_source_channel
+                a1_source_channel,
+                a1_level_db,
+                a1_off
             ],
         )
         .map_err(err)?;
@@ -519,7 +531,7 @@ impl Store {
             "UPDATE story_parts SET clip_id = ?2, virtual_shot_id = '', in_tc = ?3, out_tc = ?4,
                 in_seconds = ?5, out_seconds = ?6, fps = ?7, source_fps_num = ?8,
                 source_fps_den = ?9, in_frame = ?10, out_frame = ?11, duration_frames = ?12,
-                duration_label = ?13, duration_color_key = ?14, a1_source_channel = 0,
+                duration_label = ?13, duration_color_key = ?14, a1_source_channel = 0, a1_level_db = 0, a1_off = 0,
                 updated_at = ?15
              WHERE part_id = ?1 AND active = 1",
             params![
@@ -981,7 +993,7 @@ impl Store {
             .conn
             .prepare(
                 "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num,
-                        fps_den, active, a1_source_channel, duration_frames
+                        fps_den, active, a1_source_channel, duration_frames, a1_level_db, a1_off
                  FROM public_story_parts ORDER BY sort_index, segment_id",
             )
             .map_err(err)?;
@@ -1000,6 +1012,8 @@ impl Store {
                     fps_den: row.get(7)?,
                     active: row.get::<_, i64>(8)? != 0,
                     a1_source_channel: channel(row.get(9)?),
+                    a1_level_db: level(row.get(11)?),
+                    a1_off: row.get::<_, i64>(12)? != 0,
                     // A story written before the length was kept in story frames: its range.
                     duration_frames: if duration > 0 { duration } else { out_frame.saturating_sub(in_frame) },
                 })
@@ -1049,7 +1063,7 @@ impl Store {
             .prepare(
                 "SELECT cover_id, slot_id, clip_id, virtual_shot_id, timeline_start_frame,
                         timeline_end_frame, source_in_frame, source_out_frame, fps_num, fps_den,
-                        a2_source_channel
+                        a2_source_channel, a2_level_db, a2_off
                  FROM public_story_covers ORDER BY timeline_start_frame, cover_id",
             )
             .map_err(err)?;
@@ -1068,6 +1082,8 @@ impl Store {
                     fps_num: row.get(8)?,
                     fps_den: row.get(9)?,
                     a2_source_channel: channel(row.get(10)?),
+                    a2_level_db: level(row.get(11)?),
+                    a2_off: row.get::<_, i64>(12)? != 0,
                 })
             })
             .map_err(err)?
@@ -1163,6 +1179,25 @@ impl Store {
         Ok(Data::Changed)
     }
     /// v5 `delete_cover`: the selection is cleared when it was this cover.
+    /// The source channel, level and on/off of A1 of a segment or A2 of a cover.
+    fn set_sound(&mut self, table: &str, key: &str, lane: &str, id: &str, (channel, level_db, off): (u16, i8, bool)) -> Result<Data> {
+        let now = story_now();
+        let changed = self
+            .conn
+            .execute(
+                &format!(
+                    "UPDATE {table} SET {lane}_source_channel = ?1, {lane}_level_db = ?2, {lane}_off = ?3,
+                        updated_at = ?4 WHERE {key} = ?5"
+                ),
+                params![channel, level_db, off, now, id.trim()],
+            )
+            .map_err(err)?;
+        if changed == 0 {
+            return Err(format!("{key} not found: {}", id.trim()));
+        }
+        Ok(Data::Changed)
+    }
+
     fn delete_cover(&mut self, cover_id: &str) -> Result<Data> {
         let cover_id = cover_id.trim();
         let now = story_now();
@@ -1226,7 +1261,7 @@ impl Store {
         (clip_id, shot_id): (&str, &str),
         (in_frame, out_frame): (u64, u64),
         (fps_num, fps_den): (u32, u32),
-        a2_source_channel: u16,
+        (a2_source_channel, a2_level_db, a2_off): (u16, i8, bool),
     ) -> Result<Data> {
         qnc_media_records::valid_id(clip_id).map_err(err)?;
         qnc_media_records::valid_id(shot_id).map_err(err)?;
@@ -1292,9 +1327,9 @@ impl Store {
                 timeline_start_sec, timeline_end_sec, slot_signature, slot_index,
                 clip_id, virtual_shot_id, title, note, in_tc, out_tc, in_seconds, out_seconds,
                 source_in_frame, source_out_frame, source_fps, source_fps_num, source_fps_den,
-                sort_index, a2_source_channel, created_at, updated_at
+                sort_index, a2_source_channel, created_at, updated_at, a2_level_db, a2_off
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, '', '', ?11, ?12, ?13, ?14,
-                       ?15, ?16, ?17, ?18, ?19, 0, ?21, ?20, ?20)",
+                       ?15, ?16, ?17, ?18, ?19, 0, ?21, ?20, ?20, ?22, ?23)",
             params![
                 cover_id,
                 slot_id,
@@ -1316,7 +1351,9 @@ impl Store {
                 fps_num,
                 fps_den,
                 now,
-                a2_source_channel
+                a2_source_channel,
+                a2_level_db,
+                a2_off
             ],
         )
         .map_err(err)?;
@@ -1360,6 +1397,17 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
              ALTER TABLE story_state ADD COLUMN story_fps_den INTEGER NOT NULL DEFAULT 1;",
         )
         .map_err(err)?;
+    }
+    // The level of A1/A2 (2026-10-16) is added to existing stories: as recorded, on.
+    for (table, lane) in [("story_parts", "a1"), ("story_covers", "a2")] {
+        let columns = table_columns(conn, table)?;
+        if !columns.is_empty() && !columns.iter().any(|column| *column == format!("{lane}_level_db")) {
+            conn.execute_batch(&format!(
+                "ALTER TABLE {table} ADD COLUMN {lane}_level_db INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE {table} ADD COLUMN {lane}_off INTEGER NOT NULL DEFAULT 0;"
+            ))
+            .map_err(err)?;
+        }
     }
     let cover_columns = table_columns(conn, "story_covers")?;
     if !cover_columns.is_empty()
@@ -1409,6 +1457,8 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
             duration_color_key TEXT NOT NULL DEFAULT '',
             active INTEGER NOT NULL DEFAULT 1,
             a1_source_channel INTEGER NOT NULL DEFAULT 0 CHECK (a1_source_channel >= 0),
+            a1_level_db INTEGER NOT NULL DEFAULT 0,
+            a1_off INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -1466,6 +1516,8 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
             source_fps_den INTEGER NOT NULL DEFAULT 1,
             sort_index INTEGER NOT NULL DEFAULT 0,
             a2_source_channel INTEGER NOT NULL DEFAULT 0 CHECK (a2_source_channel >= 0),
+            a2_level_db INTEGER NOT NULL DEFAULT 0,
+            a2_off INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -1481,7 +1533,8 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
          CREATE VIEW public_story_parts AS
          SELECT part_id AS segment_id, kind, sort_index, clip_id, in_frame, out_frame,
                 source_fps_num AS fps_num, source_fps_den AS fps_den, active,
-                duration_frames, duration_label, duration_color_key, a1_source_channel
+                duration_frames, duration_label, duration_color_key, a1_source_channel,
+                a1_level_db, a1_off
          FROM story_parts;
          DROP VIEW IF EXISTS public_story_markers;
          CREATE VIEW public_story_markers AS
@@ -1502,7 +1555,8 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
          CREATE VIEW public_story_covers AS
          SELECT cover_id, slot_id, slot_signature, slot_index, timeline_start_frame,
                 timeline_end_frame, clip_id, virtual_shot_id, source_in_frame, source_out_frame,
-                source_fps_num AS fps_num, source_fps_den AS fps_den, a2_source_channel
+                source_fps_num AS fps_num, source_fps_den AS fps_den, a2_source_channel,
+                a2_level_db, a2_off
          FROM story_covers;",
     )
     .map_err(err)?;
@@ -2122,10 +2176,12 @@ fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> Result<()> 
             cover_id, slot_id, timeline_start_frame, timeline_end_frame, timeline_start_sec,
             timeline_end_sec, slot_signature, slot_index, clip_id, virtual_shot_id, title, note,
             in_tc, out_tc, in_seconds, out_seconds, source_in_frame, source_out_frame, source_fps,
-            source_fps_num, source_fps_den, sort_index, a2_source_channel, created_at, updated_at)
+            source_fps_num, source_fps_den, sort_index, a2_source_channel, a2_level_db, a2_off,
+            created_at, updated_at)
          SELECT ?1, ?2, ?3, timeline_end_frame, ?4, timeline_end_sec, slot_signature, slot_index,
             clip_id, virtual_shot_id, title, note, ?5, out_tc, ?6, out_seconds, ?7, source_out_frame,
-            source_fps, source_fps_num, source_fps_den, sort_index, a2_source_channel, ?8, ?8
+            source_fps, source_fps_num, source_fps_den, sort_index, a2_source_channel, a2_level_db,
+            a2_off, ?8, ?8
          FROM story_covers WHERE cover_id = ?9",
         params![
             format!("cover_{created:x}"),
@@ -2457,6 +2513,21 @@ fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>> {
 }
 
 /// A stored source channel index; the column never holds a negative one.
+/// The lowest and highest level of A1/A2 in dB (the source timeline's range).
+pub(crate) const LANE_LEVEL_DB: (i8, i8) = (-40, 12);
+
+fn lane_level(level_db: i8) -> Result<i8> {
+    if (LANE_LEVEL_DB.0..=LANE_LEVEL_DB.1).contains(&level_db) {
+        Ok(level_db)
+    } else {
+        Err(format!("lane level {level_db} dB outside {}..{} dB", LANE_LEVEL_DB.0, LANE_LEVEL_DB.1))
+    }
+}
+
+fn level(value: i64) -> i8 {
+    value.clamp(i64::from(LANE_LEVEL_DB.0), i64::from(LANE_LEVEL_DB.1)) as i8
+}
+
 fn channel(value: i64) -> u16 {
     u16::try_from(value.max(0)).unwrap_or(u16::MAX)
 }

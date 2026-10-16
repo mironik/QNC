@@ -53,6 +53,21 @@ pub struct AudioPart {
     pub start: Option<Rational>,
     pub first_sample: u64,
     pub origin: (i64, Rational),
+    /// The level of the channel in dB, 0 as recorded (user 2026-10-16). Left out of the
+    /// description at 0, so a unit as recorded keeps the fingerprint it had.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub level_db: i8,
+}
+
+fn is_zero(level_db: &i8) -> bool {
+    *level_db == 0
+}
+
+impl AudioPart {
+    /// The factor the decoded samples are multiplied by.
+    pub fn gain(&self) -> f32 {
+        10f32.powf(f32::from(self.level_db) / 20.0)
+    }
 }
 
 impl RenderUnit {
@@ -129,6 +144,37 @@ mod tests {
         let mut longer = unit(0);
         longer.record_out += 1;
         assert_ne!(unit(0).fingerprint(&delivery), longer.fingerprint(&delivery));
+    }
+
+    #[test]
+    fn a_unit_as_recorded_keeps_its_fingerprint_and_a_level_makes_another() {
+        let delivery = serde_json::json!({"video_codec": "h264"});
+        let sound = |level_db| {
+            let mut unit = unit(0);
+            unit.audio.push(AudioPart {
+                output: 0,
+                media: MediaRepresentation {
+                    media_uri: "qnc://local/source/a/file/a.MXF".into(),
+                    container: None,
+                    duration_seconds: None,
+                    streams_complete: None,
+                    streams: Vec::new(),
+                    tags: Default::default(),
+                },
+                stream_index: 1,
+                channel_index: 0,
+                stream_channels: 1,
+                start: None,
+                first_sample: 0,
+                origin: (0, Rational { numerator: 1, denominator: 48000 }),
+                level_db,
+            });
+            unit
+        };
+        let described = serde_json::to_value(&sound(0).audio[0]).unwrap();
+        assert!(described.get("level_db").is_none(), "as recorded, described as before");
+        assert_ne!(sound(0).fingerprint(&delivery), sound(3).fingerprint(&delivery));
+        assert!((sound(-6).audio[0].gain() - 0.501).abs() < 0.001);
     }
 
     #[test]

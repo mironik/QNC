@@ -8,7 +8,19 @@ fn at(clip_id: &str, channel: u16, program: (u64, u64), source: (u64, u64)) -> P
         program_end: program.1,
         source_in: source.0,
         source_out: source.1,
+        level_db: 0,
+        off: false,
     }
+}
+
+#[test]
+fn a_lane_is_drawn_at_its_level_and_flat_when_off() {
+    let waves = HashMap::from([("c".to_string(), wave(vec![vec![0.5; 100]], 100))]);
+    let loud = Placement { level_db: 6, ..at("c", 0, (0, 100), (0, 100)) };
+    let peaks = compose(100, &[loud.clone()], &[], &waves);
+    assert!((peaks.a1[0] - 0.5 * 10f32.powf(0.3)).abs() < 1e-4, "{}", peaks.a1[0]);
+    let off = Placement { off: true, ..loud };
+    assert_eq!(compose(100, &[off], &[], &waves).a1[0], 0.0);
 }
 
 fn wave(lanes: Vec<Vec<f32>>, duration_frames: u64) -> ClipWave {

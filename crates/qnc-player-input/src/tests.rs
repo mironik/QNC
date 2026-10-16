@@ -938,6 +938,7 @@ fn program_of(
                     vec![p::ProgramAudioRoute {
                         source_channel: 1,
                         output_channel: 0,
+                        level_db: 0,
                     }],
                 ),
             ],

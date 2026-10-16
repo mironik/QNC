@@ -51,6 +51,8 @@ fn store_with_story(file: &std::path::Path) -> Vec<String> {
                 fps_num: 50,
                 fps_den: 1,
                 a1_source_channel: 0,
+                a1_level_db: 0,
+                a1_off: false,
             })
             .unwrap()
         else {
@@ -222,6 +224,8 @@ fn a_cover_is_deleted_only_after_ctrl_click_took_it() {
             fps_num: 50,
             fps_den: 1,
             a2_source_channel: 0,
+            a2_level_db: 0,
+            a2_off: false,
         },
         "C1".into(),
     );

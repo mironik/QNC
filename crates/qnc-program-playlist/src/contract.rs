@@ -170,6 +170,17 @@ impl ProgramAudioLayout {
 pub struct ProgramAudioRoute {
     pub source_channel: u16,
     pub output_channel: u16,
+    /// The level of the lane in dB, 0 as recorded (user 2026-10-16). A lane that is off
+    /// has no route: its output is silent.
+    #[serde(default)]
+    pub level_db: i8,
+}
+
+impl ProgramAudioRoute {
+    /// The factor the source samples are multiplied by.
+    pub fn gain(&self) -> f32 {
+        10f32.powf(f32::from(self.level_db) / 20.0)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

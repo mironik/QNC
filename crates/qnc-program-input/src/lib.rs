@@ -66,6 +66,9 @@ pub struct TransientCover {
     pub timebase: (u32, u32),
     /// Source channel (zero based) heard on A2, the one chosen for covers.
     pub a2_source_channel: u16,
+    /// Level of A2 in dB and A2 off, as set on the source timeline (user 2026-10-16).
+    pub a2_level_db: i8,
+    pub a2_off: bool,
 }
 
 const TRANSIENT_COVER_ID: &str = "sync-cover-preview";
@@ -114,6 +117,8 @@ pub fn with_transient_cover(
             fps_num: cover.timebase.0,
             fps_den: cover.timebase.1,
             a2_source_channel: cover.a2_source_channel,
+            a2_level_db: cover.a2_level_db,
+            a2_off: cover.a2_off,
         }))
         .collect()
 }
@@ -248,6 +253,8 @@ pub fn build_input(
                 timebase: program_timebase,
             },
             a1_source_channel: segment.a1_source_channel,
+            a1_level_db: segment.a1_level_db,
+            a1_off: segment.a1_off,
             covers,
         });
         start += frames;
@@ -315,6 +322,8 @@ fn cover_input(cover: &ProgramCover, story_rate: (u32, u32)) -> Result<ProgramCo
         },
         record_range,
         a2_source_channel: cover.a2_source_channel,
+        a2_level_db: cover.a2_level_db,
+        a2_off: cover.a2_off,
         active: true,
     })
 }

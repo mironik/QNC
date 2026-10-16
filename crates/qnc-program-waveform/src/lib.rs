@@ -39,6 +39,16 @@ pub struct Placement {
     pub program_end: u64,
     pub source_in: u64,
     pub source_out: u64,
+    /// The level the lane is heard at in dB (0 as recorded) and whether it is off: the
+    /// wave is drawn as it sounds (user 2026-10-16).
+    pub level_db: i8,
+    pub off: bool,
+}
+
+impl Placement {
+    fn gain(&self) -> f32 {
+        if self.off { 0.0 } else { 10f32.powf(f32::from(self.level_db) / 20.0) }
+    }
 }
 
 /// The stored wave of one clip: one peak lane per source channel, over `duration_frames`.
@@ -110,7 +120,8 @@ fn fill(out: &mut [f32], program_duration: u64, at: &Placement, peaks: &[f32], s
             let t = ((frame - program_start) / (program_end - program_start).max(1.0)).clamp(0.0, 1.0);
             source_in as f64 + t * (source_out - source_in).max(1) as f64
         };
-        out[bucket] = out[bucket].max(max_peak(peaks, source_duration, map(from), map(to)));
+        let peak = (max_peak(peaks, source_duration, map(from), map(to)) * at.gain()).min(1.0);
+        out[bucket] = out[bucket].max(peak);
     }
 }
 
@@ -212,6 +223,12 @@ impl ProgramWaves {
         let peaks = compose(total_frames, segments, covers, &self.waves);
         self.composed = Some((total_frames, segments.to_vec(), covers.to_vec(), loaded, peaks.clone()));
         peaks
+    }
+
+    /// How many channels the stored wave of a clip has (one lane per channel of its
+    /// original); `None` before it is read.
+    pub fn channels(&self, clip_id: &str) -> Option<u16> {
+        self.waves.get(clip_id).and_then(|wave| u16::try_from(wave.lanes.len()).ok()).filter(|count| *count > 0)
     }
 
     /// Whether waves are still being read.

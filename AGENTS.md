@@ -4176,3 +4176,23 @@ prikaz timelinea je prazan (trajanje 1, bez playheada), a prijenos IN/OUT-a na n
 stisnuo ih je na tu duljinu, dakle na pocetak. `qnc-timeline`: dok novi prikaz nema potvrdjenu poziciju, IN/OUT ostaju
 kakvi jesu (test). `qnc-source-preview` `hear_channels`: klip se ponovno otvara na trazenoj ili potvrdjenoj slici, a dok
 ni jedne nema, na slici na kojoj je zadnji put otvaran (`opening_at`), ne na pocetku. Testovi, conformance.
+Otkljucano i izvedeno 2026-10-16 (korisnik: "ne snima pojacani ton... dodati polje koje bi pamtilo pojacanje, kako bi se i
+u konacnom exportu zadrzali parametri tona"; "odkljucaj, ali pazi da sve rjesavas preko kocki"): razina A1/A2 vise nije samo
+za slusalice. `qnc-program-db`: segment ima `a1_level_db` (dB, 0 kako je snimljeno, -40..+12) i `a1_off`, pokrivalica
+`a2_level_db` i `a2_off`; postojece price dobivaju stupce s 0/ukljuceno pri otvaranju (bez brisanja); `CreateSegment` i
+`CreateCover` ih primaju, nove operacije `SetSegmentSound` / `SetCoverSound` (kanal, razina, off) mijenjaju ih kasnije
+(jedan Undo korak); podjela pokrivalice markerom ih prenosi. Talking Head / Voice over, Cover slot / Overwrite i Sync
+upisuju zvuk spremljen na source timelineu (Enter; `qnc-lane-choice` `kept`). `qnc-program-playlist`: zvucna ruta nosi
+`level_db`, iskljucena traka nema rutu (tisina). `qnc-program-input` (i privremena pokrivalica Synca) ih prenosi.
+`qnc-broadcast-engine`: traka programa mnozi uzorke razinom; gotov dio prerendera svira na 0 dB jer je razina vec u njemu.
+`qnc-render-unit`: `AudioPart.level_db` ulazi u opis i otisak samo kad nije 0 (dijelovi kako je snimljeno zadrzavaju
+otisak), `qnc-program-render` je primjenjuje pri renderu (pa i u exportu iz prerendera). `qnc-program-waveform`: val Wrap
+reda crta se s razinom (iskljucen ravno). Nova javna kocka `crates/qnc-part-sound` (+ ugovor): zvuk spremljenog segmenta
+(A1) ili pokrivalice (A2) uzet na Wrap retku, nad `qnc-lane-choice` (`keep`); `qnc-program-segments` (`part_sound.rs`)
+nade segment ili pokrivalicu pod Wrap playheadom (inace izabranu), broj kanala iz procitanog vala klipa
+(`qnc-program-waveform` `channels`), Enter pise operaciju. `qnc-panel-focus`: na panelu Segmenti Ctrl+1/Ctrl+2 uzimaju
+zvuk segmenta/pokrivalice, gore/dolje kanal, lijevo/desno off/on, Ctrl+lijevo/desno razina, Enter sprema, Esc odustaje;
+`qnc-segment-panel` na tom Wrap retku pokazuje stupac kanala. Nacrt na Wrap retku se ne cuje prije Entera (program se
+ponovno otvara nakon upisa). Ugovor `story.database.json` (`lane_sound`). Testovi (`qnc-program-db`, `qnc-render-unit`,
+`qnc-program-waveform`, `qnc-part-sound`), conformance. Uzivo nije provjereno. Usput: `cargo clean --profile dev`
+(49,3 GiB; disk je imao 223 MB slobodno), uz dozvolu korisnika.

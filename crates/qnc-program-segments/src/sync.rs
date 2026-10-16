@@ -247,7 +247,9 @@ impl ProgramSegments {
                 out_frame: slot.source_out,
                 fps_num: slot.source.timebase.0,
                 fps_den: slot.source.timebase.1,
-                a2_source_channel: self.lanes.heard().1,
+                a2_source_channel: self.lanes.kept(1).channel,
+                a2_level_db: self.lanes.kept(1).level_db,
+                a2_off: self.lanes.kept(1).off,
             },
             slot.source.clip_name,
         );

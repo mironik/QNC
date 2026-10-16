@@ -34,6 +34,15 @@ struct Bus {
     stream_index: u32,
     channel_index: u16,
     stream_channels: u16,
+    /// The level of the lane in dB, 0 as recorded (user 2026-10-16); the lane's samples
+    /// are taken as decoded, the level is applied where they go to the output.
+    level_db: i8,
+}
+
+impl Bus {
+    fn gain(&self) -> f32 {
+        10f32.powf(f32::from(self.level_db) / 20.0)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -191,7 +200,7 @@ fn with_prerendered(
                 record_in: from,
                 record_out: to,
                 buses: (0..channels)
-                    .map(|output| Bus { output, clip: index, source_in: 0, stream_index, channel_index: output, stream_channels })
+                    .map(|output| Bus { output, clip: index, source_in: 0, stream_index, channel_index: output, stream_channels, level_db: 0 }) // the level is in the rendered unit
                     .collect(),
             });
             continue;
@@ -309,6 +318,7 @@ impl ProgramPlan {
                             start: seek_start(&plan.source, first)?,
                             first_sample: sample_boundary(first, plan.source.timebase, rate)?,
                             origin: plan.audio_origin,
+                            level_db: bus.level_db,
                         })
                     })
                     .collect::<Result<Vec<_>>>()?,
@@ -1097,8 +1107,9 @@ impl AudioOutputAdapter for ProgramAudio {
                 lane.consumed_through = Some(lane_end);
             }
             let source = &taken[&key];
+            let gain = bus.gain();
             for (index, value) in source.iter().take(frames).enumerate() {
-                samples[index * channels + usize::from(bus.output)] = *value;
+                samples[index * channels + usize::from(bus.output)] = *value * gain;
             }
         }
         Ok(AudioFramePacket {
@@ -1184,6 +1195,7 @@ fn program_spans(
                     stream_index: channel.stream_index,
                     channel_index: u16::try_from(channel.channel_index).map_err(error)?,
                     stream_channels,
+                    level_db: route.level_db,
                 });
             }
         }

@@ -33,7 +33,7 @@ impl ProgramSegments {
     /// Enter on the segment panel: the marker taken with Ctrl+M, the slot taken with
     /// Ctrl+S or the slot edge taken with Ctrl+I/O.
     pub fn confirm_program(&mut self) -> bool {
-        self.commit_marker_edit() || self.commit_slot_move() || self.commit_slot_trim()
+        self.commit_part_sound() || self.commit_marker_edit() || self.commit_slot_move() || self.commit_slot_trim()
     }
 
     /// Ctrl+I (`start`) or Ctrl+O on the segment panel: that edge of the slot under the

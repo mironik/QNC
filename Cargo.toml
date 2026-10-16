@@ -170,6 +170,7 @@ members = [
     "crates/qnc-program-commands",
     "crates/qnc-program-view",
     "crates/qnc-lane-choice",
+    "crates/qnc-part-sound",
     "crates/qnc-settings-form",
     "crates/qnc-virtual-short-cards",
     "crates/qnc-virtual-short-stills",
@@ -348,6 +349,7 @@ qnc-paint-pace = { path = "crates/qnc-paint-pace" }
 qnc-program-commands = { path = "crates/qnc-program-commands" }
 qnc-program-view = { path = "crates/qnc-program-view" }
 qnc-lane-choice = { path = "crates/qnc-lane-choice" }
+qnc-part-sound = { path = "crates/qnc-part-sound" }
 qnc-settings-form = { path = "crates/qnc-settings-form" }
 qnc-virtual-short-cards = { path = "crates/qnc-virtual-short-cards" }
 qnc-virtual-short-stills = { path = "crates/qnc-virtual-short-stills" }

@@ -17,6 +17,7 @@ mod nav;
 mod slot_move;
 mod slot_trim;
 mod marker_edit;
+mod part_sound;
 mod sync;
 
 // The view and the commands are their own pieces (audit 2026-10-10); this model keeps
@@ -50,8 +51,10 @@ struct NewCover {
     out_frame: u64,
     fps_num: u32,
     fps_den: u32,
-    /// Source channel (zero based) heard on A2.
+    /// Source channel (zero based) heard on A2, its level in dB and whether it is off.
     a2_source_channel: u16,
+    a2_level_db: i8,
+    a2_off: bool,
 }
 
 pub const MODULE_ID: &str = "qnc.module.program-segments";
@@ -100,8 +103,10 @@ pub struct NewSegment {
     pub out_frame: u64,
     pub fps_num: u32,
     pub fps_den: u32,
-    /// Source channel (zero based) heard on A1.
+    /// Source channel (zero based) heard on A1, its level in dB and whether it is off.
     pub a1_source_channel: u16,
+    pub a1_level_db: i8,
+    pub a1_off: bool,
 }
 
 /// The program of the active project: read, written and turned into a view.
@@ -143,6 +148,8 @@ pub struct ProgramSegments {
     /// The channels heard on A1 and A2, a lane taken with the keyboard and the large
     /// wave (piece `qnc-lane-choice`).
     lanes: qnc_lane_choice::LaneChoice,
+    /// The sound of a stored segment or cover taken on the Wrap row (`part_sound.rs`).
+    part_sound: qnc_part_sound::PartSound,
     /// Clip lengths in their own frames, as the form last gave them (`view_with_waves`):
     /// the edit pictures know where their clip ends.
     clip_frames: std::collections::HashMap<String, u64>,
@@ -709,6 +716,8 @@ impl ProgramSegments {
             fps_num: segment.fps_num,
             fps_den: segment.fps_den,
             a1_source_channel: segment.a1_source_channel,
+            a1_level_db: segment.a1_level_db,
+            a1_off: segment.a1_off,
         });
         if key.is_some() {
             self.pending_create = key;
@@ -730,7 +739,9 @@ impl ProgramSegments {
             out_frame,
             fps_num,
             fps_den,
-            a1_source_channel: self.lanes.heard().0,
+            a1_source_channel: self.lanes.kept(0).channel,
+            a1_level_db: self.lanes.kept(0).level_db,
+            a1_off: self.lanes.kept(0).off,
         });
     }
 
@@ -762,7 +773,9 @@ impl ProgramSegments {
                 out_frame,
                 fps_num,
                 fps_den,
-                a2_source_channel: self.lanes.heard().1,
+                a2_source_channel: self.lanes.kept(1).channel,
+                a2_level_db: self.lanes.kept(1).level_db,
+                a2_off: self.lanes.kept(1).off,
             },
             clip_name,
         );
@@ -922,6 +935,8 @@ impl ProgramSegments {
                 fps_num: cover.fps_num,
                 fps_den: cover.fps_den,
                 a2_source_channel: cover.a2_source_channel,
+                a2_level_db: cover.a2_level_db,
+                a2_off: cover.a2_off,
             });
         }
         let mut created = None;
@@ -1074,6 +1089,7 @@ impl ProgramSegments {
         (view.lane_taken, view.wave_zoom) = (self.lanes.taken(), self.lanes.wave_zoom());
         let (a1, a2) = (self.lanes.lane(0), self.lanes.lane(1));
         (view.lane_off, view.lane_level_db) = ([a1.off, a2.off], [a1.level_db, a2.level_db]);
+        view.part_sound = self.part_sound_view();
     }
 
     /// How many audio channels the marked clip has (its stored record); a chosen
@@ -1094,6 +1110,12 @@ impl ProgramSegments {
     /// The source channels kept on A1 and A2 (zero based): what is written to the story.
     pub fn heard_channels(&self) -> (u16, u16) {
         self.lanes.heard()
+    }
+
+    /// A1 (lane 0) or A2 as kept on the source timeline: channel, level and off, what a
+    /// new segment, cover or Sync cover takes (user 2026-10-16).
+    pub fn kept_lane(&self, lane: u8) -> qnc_lane_choice::Lane {
+        self.lanes.kept(lane)
     }
 
     /// The source channels the preview plays on A1 and A2 now and their gains (0 when a

@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.part-sound",
+  "module_name": "Segment and cover sound",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["story.program.part_sound"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-part-sound",
+  "input": "A stored segment (A1) or cover (A2): its id, its kept channel, level and on/off and the channel count of its clip; the keyboard taking it, its arrows, Enter and Escape.",
+  "output": "The taken part and its draft; on Enter the change (part, lane, channel, level in dB, off) for the story database's writer.",
+  "specification": "User 2026-10-16: the level of A1/A2 is kept in the story for the program, the prerender and the export, and changed later on the Wrap row with the same keys as on the source timeline. The lane rules are qnc-lane-choice."
+}

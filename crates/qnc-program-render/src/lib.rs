@@ -334,6 +334,7 @@ fn sound_of(
     let mut pcm = vec![0f32; samples * channels];
     for part in &unit.audio {
         let output = usize::from(part.output);
+        let gain = part.gain();
         if output >= channels {
             return Err(qnc_ui_text::fill("render.channel_not_in_delivery", &[("channel", &(output + 1).to_string())]));
         }
@@ -372,7 +373,7 @@ fn sound_of(
                     return Err(qnc_ui_text::text("render.source_sound_skips_samples").into());
                 }
                 let offset = usize::from(part.channel_index) * 4;
-                pcm[slot * channels + output] = f32::from_le_bytes(frame[offset..offset + 4].try_into().expect("sample"));
+                pcm[slot * channels + output] = f32::from_le_bytes(frame[offset..offset + 4].try_into().expect("sample")) * gain;
                 filled += 1;
             }
         }

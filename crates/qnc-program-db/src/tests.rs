@@ -210,6 +210,8 @@ fn create_cover(store: &mut Story, slot_id: &str, range: (u64, u64)) -> Result<D
             fps_num: 50,
             fps_den: 1,
             a2_source_channel: 0,
+            a2_level_db: 0,
+            a2_off: false,
         },
     )
 }
@@ -231,6 +233,8 @@ fn create_segment(
             fps_num: fps.0,
             fps_den: fps.1,
             a1_source_channel: 0,
+            a1_level_db: 0,
+            a1_off: false,
         },
     )
 }
@@ -1111,6 +1115,8 @@ fn a_cover_needs_a_slot_the_story_rate_and_one_frame() {
             fps_num: 30,
             fps_den: 1,
             a2_source_channel: 0,
+            a2_level_db: 0,
+            a2_off: false,
         },
     );
     assert!(mixed.is_err(), "a rate not 2:1 is refused");
@@ -1311,10 +1317,22 @@ fn a_new_segment_keeps_the_source_channel_chosen_for_a1() {
             fps_num: 50,
             fps_den: 1,
             a1_source_channel: 1,
+            a1_level_db: -6,
+            a1_off: false,
         },
     )
     .unwrap();
-    assert_eq!(segments(&mut store)[0].a1_source_channel, 1, "channel 2 of the source on A1");
+    let segment = segments(&mut store)[0].clone();
+    assert_eq!(segment.a1_source_channel, 1, "channel 2 of the source on A1");
+    assert_eq!((segment.a1_level_db, segment.a1_off), (-6, false), "its level as set on the source timeline");
+    // Changed later on the Wrap row: one UNDO step.
+    run(&mut store, Operation::SetSegmentSound { segment_id: segment.segment_id.clone(), channel: 0, level_db: 3, off: true }).unwrap();
+    let changed = segments(&mut store)[0].clone();
+    assert_eq!((changed.a1_source_channel, changed.a1_level_db, changed.a1_off), (0, 3, true));
+    run(&mut store, Operation::UndoStory).unwrap();
+    let undone = segments(&mut store)[0].clone();
+    assert_eq!((undone.a1_source_channel, undone.a1_level_db, undone.a1_off), (1, -6, false));
+    assert!(run(&mut store, Operation::SetSegmentSound { segment_id: segment.segment_id, channel: 0, level_db: 40, off: false }).is_err(), "above +12 dB");
 }
 
 #[test]
@@ -1351,10 +1369,17 @@ fn a_new_cover_keeps_the_source_channel_chosen_for_a2() {
             fps_num: 50,
             fps_den: 1,
             a2_source_channel: 2,
+            a2_level_db: 4,
+            a2_off: true,
         },
     )
     .unwrap();
-    assert_eq!(covers(&mut store)[0].a2_source_channel, 2, "channel 3 of the source on A2");
+    let cover = covers(&mut store)[0].clone();
+    assert_eq!(cover.a2_source_channel, 2, "channel 3 of the source on A2");
+    assert_eq!((cover.a2_level_db, cover.a2_off), (4, true));
+    run(&mut store, Operation::SetCoverSound { cover_id: cover.cover_id, channel: 1, level_db: -2, off: false }).unwrap();
+    let changed = covers(&mut store)[0].clone();
+    assert_eq!((changed.a2_source_channel, changed.a2_level_db, changed.a2_off), (1, -2, false));
 }
 
 #[test]

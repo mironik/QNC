@@ -14,6 +14,8 @@ fn part(id: &str, kind: &str, clip: &str, range: (u64, u64), active: bool) -> Pr
         fps_den: 1,
         active,
         a1_source_channel: 0,
+        a1_level_db: 0,
+        a1_off: false,
         duration_frames: range.1 - range.0,
     }
 }
@@ -31,6 +33,8 @@ fn cover(id: &str, program: (u64, u64), shot: &str) -> ProgramCover {
         fps_num: 50,
         fps_den: 1,
         a2_source_channel: 1,
+        a2_level_db: 0,
+        a2_off: false,
     }
 }
 
@@ -228,6 +232,8 @@ fn a_transient_cover_takes_the_window_and_the_stored_covers_there_give_way() {
         source_in: 40,
         timebase: (50, 1),
         a2_source_channel: 1,
+        a2_level_db: 0,
+        a2_off: false,
     };
     let covers = with_transient_cover(&covers, (12, 30), &transient);
     let ids: Vec<&str> = covers.iter().map(|c| c.cover_id.as_str()).collect();

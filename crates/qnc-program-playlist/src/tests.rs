@@ -75,6 +75,8 @@ fn segment(
         record_range: ProgramFrameRange::new(record.0, record.1).unwrap(),
         source_range: frames(source.0, source.1, timebase),
         a1_source_channel: DEFAULT_SOURCE_CHANNEL,
+        a1_level_db: 0,
+        a1_off: false,
         covers: Vec::new(),
     }
 }
@@ -93,6 +95,8 @@ fn cover(
         record_range: ProgramFrameRange::new(record.0, record.1).unwrap(),
         source_range: frames(source.0, source.1, timebase),
         a2_source_channel: DEFAULT_SOURCE_CHANNEL,
+        a2_level_db: 0,
+        a2_off: false,
         active: true,
     }
 }
@@ -197,7 +201,8 @@ fn the_segment_chooses_which_source_channel_is_heard_on_a1() {
         a1.audio_routes,
         vec![ProgramAudioRoute {
             source_channel: 1,
-            output_channel: PROGRAM_AUDIO_OUTPUT_A1
+            output_channel: PROGRAM_AUDIO_OUTPUT_A1,
+            level_db: 0,
         }]
     );
 
@@ -306,6 +311,7 @@ fn transient_overlay_replaces_video_and_a2_but_keeps_a1() {
             audio_routes: vec![ProgramAudioRoute {
                 source_channel: 0,
                 output_channel: PROGRAM_AUDIO_OUTPUT_A2,
+                level_db: 0,
             }],
             source_audio_channels: 2,
             source_audio_format: new_cover.audio_format,

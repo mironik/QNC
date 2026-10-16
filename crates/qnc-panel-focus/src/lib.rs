@@ -225,6 +225,23 @@ impl PanelFocus {
             // taken, its height is expanded over the video row and up/down (or a click) pick its
             // channel in the column (user 2026-10-14), left turns it off, right on, Ctrl+left/right
             // set its level (user 2026-10-15); all heard at once, Enter keeps, Escape lets go.
+            // On the segment panel the same keys take the sound of the stored segment (A1) or
+            // cover (A2) under the Wrap playhead (user 2026-10-16); Enter writes it.
+            "select_audio_a1" | "select_audio_a2" if panel == Panel::Segments => {
+                segments.take_part_sound(u8::from(action_id == "select_audio_a2"), wrap.playhead())
+            }
+            "step_prev_part" | "step_next_part" if panel == Panel::Segments && segments.part_sound_taken() => {
+                segments.part_sound_draft(if action_id == "step_prev_part" { -1 } else { 1 })
+            }
+            "step_back_frame" | "step_forward_frame" if panel == Panel::Segments && segments.part_sound_taken() => {
+                segments.part_sound_off(action_id == "step_back_frame")
+            }
+            "lane_level_down" | "lane_level_up" if panel == Panel::Segments && segments.part_sound_taken() => {
+                segments.part_sound_level(if action_id == "lane_level_down" { -1 } else { 1 })
+            }
+            "clear_focus" | "close_player" if panel == Panel::Segments && segments.part_sound_taken() => {
+                segments.release_part_sound()
+            }
             "select_audio_a1" | "select_audio_a2" => {
                 self.panel = Panel::SourceTimeline; // the lane is on the source timeline
                 segments.take_lane(u8::from(action_id == "select_audio_a2"))
@@ -365,11 +382,14 @@ impl PanelFocus {
             "play_pause" => match segments.sync_space(wrap.is_active()) {
                 SyncSpace::Start(sync) => {
                     wrap.hold(sync.window.0);
+                    let a2 = segments.kept_lane(1);
                     let cover = TransientCover {
                         clip_id: sync.clip_id,
                         source_in: sync.source_in,
                         timebase: sync.timebase,
-                        a2_source_channel: segments.heard_channels().1,
+                        a2_source_channel: a2.channel,
+                        a2_level_db: a2.level_db,
+                        a2_off: a2.off,
                     };
                     preview.open_program_window(sync.window, cover)
                 }

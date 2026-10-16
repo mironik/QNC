@@ -98,6 +98,19 @@ impl LaneChoice {
         (self.lanes[0].channel, self.lanes[1].channel)
     }
 
+    /// A1 (lane 0) or A2 is kept as `kept` (a stored segment or cover taken again,
+    /// user 2026-10-16); a taken lane is let go.
+    pub fn keep(&mut self, lane: u8, kept: Lane) {
+        self.lanes[slot(lane)] = kept;
+        self.taken = None;
+    }
+
+    /// A1 (lane 0) or A2 as kept (Enter), without a draft: what a new segment or cover
+    /// takes with it (user 2026-10-16).
+    pub fn kept(&self, lane: u8) -> Lane {
+        self.lanes[slot(lane)]
+    }
+
     /// A1 (lane 0) or A2 as it plays now: the taken lane's draft, else what is kept.
     pub fn lane(&self, lane: u8) -> Lane {
         match self.taken {

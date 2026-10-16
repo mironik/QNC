@@ -42,6 +42,12 @@ pub struct ProgramSegment {
     /// channel 1 (0) unless the user picks another one.
     #[serde(default)]
     pub a1_source_channel: u16,
+    /// Level of A1 in dB (0 as recorded) and whether A1 is off, set on the source
+    /// timeline and kept for the program, the prerender and the export (user 2026-10-16).
+    #[serde(default)]
+    pub a1_level_db: i8,
+    #[serde(default)]
+    pub a1_off: bool,
     /// Length in story frames: the source range times story frames per source frame
     /// (2 for a source of half the story rate, 1/2 for twice; user 2026-10-09).
     #[serde(default)]
@@ -86,6 +92,11 @@ pub struct ProgramCover {
     pub fps_num: u32,
     pub fps_den: u32,
     pub a2_source_channel: u16,
+    /// Level of A2 in dB (0 as recorded) and whether A2 is off (user 2026-10-16).
+    #[serde(default)]
+    pub a2_level_db: i8,
+    #[serde(default)]
+    pub a2_off: bool,
 }
 
 /// The stored Story selection (v5 `story_state`).
@@ -122,6 +133,11 @@ pub enum Operation {
         /// channel 1 when not given (v5).
         #[serde(default)]
         a1_source_channel: u16,
+        /// Level of A1 in dB and A1 off, as set on the source timeline.
+        #[serde(default)]
+        a1_level_db: i8,
+        #[serde(default)]
+        a1_off: bool,
     },
     /// Takes a segment out of the program (v5 `delete_part`: `active = 0`); it stays
     /// listed where it was.
@@ -197,7 +213,17 @@ pub enum Operation {
         /// channel 1 when not given (v5).
         #[serde(default)]
         a2_source_channel: u16,
+        /// Level of A2 in dB and A2 off, as set on the source timeline.
+        #[serde(default)]
+        a2_level_db: i8,
+        #[serde(default)]
+        a2_off: bool,
     },
+    /// The sound of a segment on A1 changed later (user 2026-10-16): its source
+    /// channel, level in dB and whether it is off. An UNDO step.
+    SetSegmentSound { segment_id: String, channel: u16, level_db: i8, off: bool },
+    /// The sound of a cover on A2 changed later. An UNDO step.
+    SetCoverSound { cover_id: String, channel: u16, level_db: i8, off: bool },
     /// v5 `delete_cover`; its B-roll virtual shot stays.
     DeleteCover { cover_id: String },
     /// v5 `select_cover`.
@@ -223,6 +249,8 @@ impl Operation {
                 | Self::DeleteMarker { .. }
                 | Self::CreateCover { .. }
                 | Self::DeleteCover { .. }
+                | Self::SetSegmentSound { .. }
+                | Self::SetCoverSound { .. }
         )
     }
 

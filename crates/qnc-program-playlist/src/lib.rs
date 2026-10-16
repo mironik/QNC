@@ -78,6 +78,9 @@ pub struct ProgramSegmentInput {
     pub source_range: FrameRange,
     /// Source channel heard on A1 (zero based), chosen on the Wrap segment.
     pub a1_source_channel: u16,
+    /// Level of A1 in dB (0 as recorded) and A1 off (silent), user 2026-10-16.
+    pub a1_level_db: i8,
+    pub a1_off: bool,
     pub covers: Vec<ProgramCoverInput>,
 }
 
@@ -90,6 +93,9 @@ pub struct ProgramCoverInput {
     pub source_range: FrameRange,
     /// Source channel heard on A2 (zero based).
     pub a2_source_channel: u16,
+    /// Level of A2 in dB (0 as recorded) and A2 off (silent).
+    pub a2_level_db: i8,
+    pub a2_off: bool,
     pub active: bool,
 }
 
@@ -449,9 +455,10 @@ impl BaseSegment<'_> {
             video_layer: has_video.then_some(ProgramVideoLayer::Base),
             source_video_format: has_video.then_some(media.video_format).flatten(),
             audio_routes: audio_routes(
-                has_audio,
+                has_audio && !segment.a1_off,
                 segment.a1_source_channel,
                 PROGRAM_AUDIO_OUTPUT_A1,
+                segment.a1_level_db,
             ),
             source_audio_channels: if has_audio { media.audio_channels } else { 0 },
             source_audio_format: has_audio.then_some(media.audio_format).flatten(),
@@ -504,10 +511,10 @@ fn cover_sources(
         source_audio_format: None,
         source_timecode_start: media.timecode_start,
     };
-    if !media.has_audio {
-        return Ok(vec![picture]);
+    if !media.has_audio || cover.a2_off {
+        return Ok(vec![picture]); // A2 silent: no sound source (user 2026-10-16)
     }
-    let routes = audio_routes(true, cover.a2_source_channel, PROGRAM_AUDIO_OUTPUT_A2);
+    let routes = audio_routes(!cover.a2_off, cover.a2_source_channel, PROGRAM_AUDIO_OUTPUT_A2, cover.a2_level_db);
     if media.audio_media == media.media {
         return Ok(vec![FlatProgramSource {
             audio_routes: routes,
@@ -529,17 +536,20 @@ fn cover_sources(
     Ok(vec![picture, sound])
 }
 
+/// The route of a lane that is heard (it has sound and is not off); none otherwise.
 fn audio_routes(
-    has_audio: bool,
+    heard: bool,
     source_channel: u16,
     output_channel: u16,
+    level_db: i8,
 ) -> Vec<ProgramAudioRoute> {
-    if !has_audio {
+    if !heard {
         return Vec::new();
     }
     vec![ProgramAudioRoute {
         source_channel,
         output_channel,
+        level_db,
     }]
 }
 

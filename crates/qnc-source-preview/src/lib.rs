@@ -844,6 +844,8 @@ mod tests {
             source_in: var("QNC_DIAG_IN").parse().unwrap(),
             timebase: (50, 1),
             a2_source_channel: 1,
+            a2_level_db: 0,
+            a2_off: false,
         };
         let end: u64 = var("QNC_DIAG_END").parse().unwrap();
         let load = qnc_program_input::window_loader(target, settings.project_id.clone(), (0, end), cover);

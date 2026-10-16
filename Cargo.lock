@@ -4253,6 +4253,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-part-sound"
+version = "0.1.0"
+dependencies = [
+ "qnc-lane-choice",
+]
+
+[[package]]
 name = "qnc-pending-marks"
 version = "0.1.0"
 dependencies = [
@@ -4557,6 +4564,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-lane-choice",
+ "qnc-part-sound",
  "qnc-prerender-launch",
  "qnc-program-commands",
  "qnc-program-db",

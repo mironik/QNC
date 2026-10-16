@@ -24,8 +24,10 @@ pub struct SegmentRow {
     pub clip_id: String,
     pub source_in_frame: u64,
     pub source_out_frame: u64,
-    /// Source channel heard on A1 (zero based).
+    /// Source channel heard on A1 (zero based), its level in dB and whether it is off.
     pub a1_source_channel: u16,
+    pub a1_level_db: i8,
+    pub a1_off: bool,
     /// Program frames `[start, end)`: segments follow each other without gaps.
     pub start_frame: u64,
     pub end_frame: u64,
@@ -66,6 +68,20 @@ pub struct CoverSpan {
     pub source_in_frame: u64,
     pub source_out_frame: u64,
     pub a2_source_channel: u16,
+    pub a2_level_db: i8,
+    pub a2_off: bool,
+}
+
+/// A segment's A1 or a cover's A2 taken on the Wrap row: its id, the draft channel, the
+/// clip's channel count, off and level in dB.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PartSoundView {
+    pub lane: u8,
+    pub id: String,
+    pub channel: u16,
+    pub channels: u16,
+    pub off: bool,
+    pub level_db: i8,
 }
 
 /// What a form shows: the program in order, its markers and slots, timebase,
@@ -123,6 +139,9 @@ pub struct SegmentsView {
     /// (the taken lane's draft; user 2026-10-15).
     pub lane_off: [bool; 2],
     pub lane_level_db: [i8; 2],
+    /// The sound of a stored segment (A1) or cover (A2) taken on the Wrap row and its
+    /// draft (user 2026-10-16).
+    pub part_sound: Option<PartSoundView>,
     /// Display gain level of the A1 and A2 wave over the video row (0: not shown).
     pub wave_zoom: [u8; 2],
     /// The last Cover slot (`false`) or Overwrite (`true`) and when it was asked for,
@@ -144,6 +163,8 @@ impl SegmentsView {
             program_end: row.end_frame,
             source_in: row.source_in_frame,
             source_out: row.source_out_frame,
+            level_db: row.a1_level_db,
+            off: row.a1_off,
         });
         let covers = self.covers.iter().map(|cover| qnc_program_waveform::Placement {
             clip_id: cover.clip_id.clone(),
@@ -152,6 +173,8 @@ impl SegmentsView {
             program_end: cover.end_frame,
             source_in: cover.source_in_frame,
             source_out: cover.source_out_frame,
+            level_db: cover.a2_level_db,
+            off: cover.a2_off,
         });
         (segments.collect(), covers.collect())
     }
@@ -309,6 +332,8 @@ pub fn program(
             source_in_frame: segment.in_frame,
             source_out_frame: segment.out_frame,
             a1_source_channel: segment.a1_source_channel,
+            a1_level_db: segment.a1_level_db,
+            a1_off: segment.a1_off,
             start_frame: start,
             end_frame: start + frames,
             duration_label: duration_label(frames, rate_num, rate_den),
@@ -384,6 +409,8 @@ pub fn cover_spans(covers: &[ProgramCover], selected: Option<&str>, story_rate: 
             source_in_frame: cover.source_in_frame,
             source_out_frame: played_source_out(cover, story_rate),
             a2_source_channel: cover.a2_source_channel,
+            a2_level_db: cover.a2_level_db,
+            a2_off: cover.a2_off,
         })
         .collect()
 }
