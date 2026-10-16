@@ -4131,3 +4131,11 @@ salje kao postojeci dogadaj ugovora `AudioLevelChanged` (`output_1` = A1, `outpu
 (`qnc-source-preview` `PreviewView.output_levels`). Nova pasivna kocka `crates/qnc-level-meter` (+ ugovor): trake
 -48..0 dBFS, zelena, zuta od -12, crvena od -3, pad 24 dB/s, vrh se drzi 1,2 s. Story ploca predaje razine jednim
 argumentom postojeceg poziva. Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-16 (korisnik: "u audio traku oznake (tanke linije) da korisnik vidi je li mu ton u granicama"; "pojacanje
+ili smanjivanje nivoa tona u source timeline treba djelovati na prikaz wavea"): svaka audio traka (source timeline, pojasevi
+Wrap reda, uvecani val) ima tanke linije iznad i ispod sredine na -18 dBFS (referenca EBU R 68, prigusena), -9 dBFS
+(najvisa dopustena razina, zuta) i -1 dBFS (granica, crvena) na istoj linearnoj ljestvici kao val (`qnc-wave-view`
+`LEVEL_MARKS_DBFS`, `paint_level_marks`; boje u `TimelineTheme.level_marks`). Razina A1/A2 iz source timelinea
+(Ctrl+lijevo/desno, iskljucena traka) mnozi prikazani val (`qnc-channel-picker` `ChannelChoice.level_db`, `gain`;
+`qnc-wave-view` `paint_wave_peaks_gain`; `qnc-timeline` `lane_gain`); glasnije od pune skale udara u rub trake. Valovi
+price u Wrap redovima ostaju kako su snimljeni (razina segmenta jos se ne sprema u pricu). Testovi, conformance.

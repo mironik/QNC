@@ -17,12 +17,19 @@ pub struct ChannelChoice {
     /// The lane is off (level 0): its channel is kept, nothing of it is heard (user
     /// 2026-10-15). Its button is drawn red; the column itself is unchanged.
     pub off: bool,
+    /// The lane's level in dB (0 as recorded): its wave is drawn at it (user 2026-10-16).
+    pub level_db: i8,
 }
 
 impl ChannelChoice {
     /// The lane is off: nothing of its channel is heard.
     pub fn silent(&self) -> bool {
         self.off
+    }
+
+    /// The lane's level as a factor of the recorded sound (0 when it is off).
+    pub fn gain(&self) -> f32 {
+        if self.off { 0.0 } else { 10f32.powf(f32::from(self.level_db) / 20.0) }
     }
 }
 
@@ -95,11 +102,20 @@ pub fn show(ui: &mut egui::Ui, id: egui::Id, rect: Rect, style: PickerStyle, cho
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_lane_is_drawn_at_its_level() {
+        let choice = |off, level_db| ChannelChoice { selected: 0, count: 2, open: false, off, level_db };
+        assert_eq!(choice(false, 0).gain(), 1.0);
+        assert!((choice(false, -6).gain() - 0.501).abs() < 0.001, "-6 dB is about half");
+        assert_eq!(choice(true, 6).gain(), 0.0, "off is flat");
+    }
+
     use super::*;
 
     #[test]
     fn the_column_grows_over_the_video_and_never_into_the_other_lane() {
-        let choice = ChannelChoice { selected: 1, count: 4, open: true, off: false };
+        let choice = ChannelChoice { selected: 1, count: 4, open: true, off: false, level_db: 0 };
         // The video row between A1 (0..18) and A2 (82..100).
         let down = column_rect(40.0, 28.0, (18.0, 82.0), 18.0, true, choice);
         assert_eq!((down.top(), down.height()), (18.0, 64.0), "under A1, lower cells to fit");

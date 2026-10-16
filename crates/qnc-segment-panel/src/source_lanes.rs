@@ -10,8 +10,8 @@ use qnc_timeline::{AudioLane, ChannelChoice};
 pub fn source_lane_choice(segments: &SegmentsView, lane: u8) -> Option<ChannelChoice> {
     let (selected, count) = if lane == 0 { segments.a1_choice } else { segments.a2_choice }?;
     let draft = segments.lane_taken.filter(|(taken, _)| *taken == lane).map(|(_, draft)| draft);
-    let off = segments.lane_off[usize::from(lane.min(1))];
-    Some(ChannelChoice { selected: draft.unwrap_or(selected), count, open: draft.is_some(), off })
+    let (off, level_db) = (segments.lane_off[usize::from(lane.min(1))], segments.lane_level_db[usize::from(lane.min(1))]);
+    Some(ChannelChoice { selected: draft.unwrap_or(selected), count, open: draft.is_some(), off, level_db })
 }
 
 /// The wave shown over the video row: the taken lane's, else A1's, else A2's.
