@@ -349,29 +349,35 @@ fn wrong() -> String {
 /// The owner brings the Story tables of a project to the current schema (one short write
 /// connection, one transaction).
 pub fn prepare_schema(target: &ProjectDbTarget) -> Result<()> {
-    drop(target.open(Access::ReadWrite, vec![StoryModule::factory()])?);
-    Ok(())
+    // The module joins the base on its first request: one read makes it bring the schema up.
+    let mut owner = target.open(Access::ReadWrite, vec![StoryModule::factory()])?;
+    decode(owner.execute(MODULE_ID, encode(&Operation::ReadStorySelection)?)?).map(|_| ())
 }
 
 /// Reads of the Story of the active project: a read-only client of its database,
 /// so a form reading never waits for a writer.
-pub struct StoryReader(ProjectDbClient);
+pub struct StoryReader {
+    client: ProjectDbClient,
+    target: ProjectDbTarget,
+}
 
 impl StoryReader {
-    /// A story of an older schema is first brought up by the owner (a short write
-    /// connection of this module), then read; the reader itself never changes the base.
     pub fn open(target: &ProjectDbTarget) -> Result<Self> {
-        match target.open(Access::ReadOnly, vec![StoryModule::factory()]) {
-            Err(error) if error.to_string() == qnc_ui_text::text("story.schema_outdated") => {
-                prepare_schema(target)?;
-                Ok(Self(target.open(Access::ReadOnly, vec![StoryModule::factory()])?))
-            }
-            opened => Ok(Self(opened?)),
-        }
+        Ok(Self { client: target.open(Access::ReadOnly, vec![StoryModule::factory()])?, target: target.clone() })
     }
 
+    /// A story of an older schema is first brought up by the owner (a short write
+    /// connection of this module), then read once more; the reader itself never changes
+    /// the base. The module joins the base on the first read, so this is where the older
+    /// schema shows (live 2026-10-17: the segment panel stayed empty until a write).
     fn call(&mut self, operation: &Operation) -> Result<Data> {
-        decode(self.0.execute(MODULE_ID, encode(operation)?)?)
+        match self.client.execute(MODULE_ID, encode(operation)?) {
+            Err(error) if error.to_string().contains(qnc_ui_text::text("story.schema_outdated")) => {
+                prepare_schema(&self.target)?;
+                decode(self.client.execute(MODULE_ID, encode(operation)?)?)
+            }
+            answer => decode(answer?),
+        }
     }
 
     pub fn list_segments(&mut self) -> Result<Vec<ProgramSegment>> {

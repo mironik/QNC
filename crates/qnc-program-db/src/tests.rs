@@ -1775,3 +1775,17 @@ fn the_program_snapshot_has_a_revision_that_grows_with_every_change_and_never_go
     run(&mut store, Operation::SelectSlot { slot_id: String::new() }).ok();
     assert_eq!(snapshot(&mut store).revision, undone.revision, "a selection is not a change of the program");
 }
+
+#[test]
+fn the_story_reader_brings_an_older_story_up_through_its_owner_and_reads_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    drop(store);
+    // A story from before its revision (2026-10-17): the reader saw nothing until a write.
+    Connection::open(&path).unwrap().execute_batch("DROP TABLE story_revision;").unwrap();
+    let target = qnc_db_broker::ProjectDbTarget::from_owner_binding(&path, "qnc://local/db/project_db/p1").unwrap();
+    let snapshot = crate::StoryReader::open(&target).unwrap().program_snapshot().expect("read after the owner brought it up");
+    assert_eq!(snapshot.segments.len(), 3);
+}

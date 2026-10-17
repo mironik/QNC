@@ -4466,3 +4466,10 @@ svake sekunde, `held()` postaje false kad ga drugi preuzme) zamjenjuje `Beat`. K
 `is_fresh` cita i `on:<vlasnik>`. `qnc-ingest-select` novi odgovor pisaca tretira kao neispravan u svom toku. Test
 `a_lease_is_one_holders_and_its_end_lets_go_only_of_its_own`, testovi `qnc-content-store`, `qnc-ingest-import-worker`,
 `qnc-ingest-worker`, `qnc-ingest-select`, `qnc-prerender-launch`, `qnc-ingest-application`, conformance.
+Popravak 2026-10-17 (korisnik: "na Story stranici nije se vidio sadrzaj panela Segmenti, tek kad sam dodao novi segment
+pojavili su se i stari"; log: "The story of this project was written by an older version..."): posrednik baze priklјucuje
+modul tablica tek pri prvom zahtjevu, ne pri otvaranju, pa se starija shema (bez `story_revision` iz koraka 3) javila
+pri citanju, gdje je ponovni pokusaj nije hvatao, a ni nadogradnja vlasnika nista nije radila (samo je otvarala vezu).
+Sada `StoryReader` na tu gresku pri citanju pusta vlasnika da shemu dovede na tekucu i cita jos jednom, a
+`prepare_schema` jednim citanjem kroz vezu za pisanje priklјuci modul (koji tada nadogradi shemu). Test kroz pravi put
+posrednika `the_story_reader_brings_an_older_story_up_through_its_owner_and_reads_it` (pada na prethodnoj verziji).
