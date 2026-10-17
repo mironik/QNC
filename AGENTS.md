@@ -4533,3 +4533,9 @@ tek pri upisu, pa greska moze doci i tijekom rada; prije su se greske upisa tiho
 i zadnji klip zadrzi dok ih ne upise (`tell`); greska ide u player log. Ako nit ipak stane, `PlaybackReporter` je za isti
 projekt pokrece ponovno nakon 2 s i ponovno salje stanje i klip (`reporting`, `retry_at`). Test
 `a_reporter_whose_writes_failed_tells_its_state_once_the_database_is_back`, conformance.
+Popravak 2026-10-17 (korisnik: "lijevi klik na source timeline ne postavlja marker, nego i dalje zadrzava Ctrl skrol
+kotaca"; log Ingesta: dok je IN uzet, klikovi su postali `ingest_cue_frame`): `qnc-timeline` je oznaku spremao samo na
+cisti klik; pritisak drzan trenutak ili s pomakom od piksel-dva egui racuna kao povlacenje, pa je klik pomicao playhead,
+a IN je ostajao uzet. Sada dok je IN/OUT ili A1/A2 uzet svaki pritisak lijeve tipke (brz ili spor) sprema i pusta oznaku
+(`KeepMark`), a do pustanja tipke ne pomice nista (`qnc_timeline_kept_press`); desna tipka to ne radi. Vrijedi za sve
+forme.

@@ -1278,7 +1278,25 @@ fn lane_taken(input: &TimelineInput<'_>) -> bool {
 /// marker or a slot on a row with them. `None`: neither.
 fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
     let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
-    if response.clicked() && (input.focus != TimelineFocusPaint::Playhead || lane_taken(input)) && !input.layers.markers {
+    // While IN/OUT or A1/A2 is taken, a press of the left button keeps it, a quick click or a
+    // slow one alike (live 2026-10-17: a press held a moment was a drag and moved the playhead,
+    // the mark stayed taken); until that button is let go the press moves nothing more.
+    let kept_key = response.id.with("qnc_timeline_kept_press");
+    let kept_press = response.ctx.data(|data| data.get_temp::<bool>(kept_key)).unwrap_or(false);
+    if kept_press {
+        if response.is_pointer_button_down_on() || response.dragged() {
+            return Some(TimelineIntent::None);
+        }
+        response.ctx.data_mut(|data| data.remove::<bool>(kept_key));
+        if response.clicked() || response.drag_stopped() {
+            return Some(TimelineIntent::None); // the release of the press that kept
+        }
+    }
+    let taken = (input.focus != TimelineFocusPaint::Playhead || lane_taken(input)) && !input.layers.markers;
+    if taken && (response.clicked() || response.drag_started_by(egui::PointerButton::Primary)) {
+        if !response.clicked() {
+            response.ctx.data_mut(|data| data.insert_temp(kept_key, true));
+        }
         return Some(TimelineIntent::KeepMark);
     }
     if !right_click(response) {
