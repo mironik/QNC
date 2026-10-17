@@ -4479,3 +4479,10 @@ pozadinskoj niti (`read_catalog`, polja `Loaded`), a `apply_loaded` na niti suce
 `PlaybackReporter` pri promjeni projekta ne ceka svoju nit (`stop` bez `join`; nit pise sto je primila i zavrsi sama),
 a pisac reportera otvara se u njegovoj niti, ne na niti sucelja. C10 Story aplikacija 699 -> 689 (baseline spusten).
 Testovi, conformance.
+Izvedeno 2026-10-17 (vanjski audit, P1-6): pisac price provjerava ono sto klijent salje prema spremljenom zapisu klipa.
+`qnc-program-db` `require_source_range` (novi segment, zamjena segmenta, pokrivalica, skracivanje segmenta): stopa koju
+klijent salje mora biti spremljena stopa klipa, a OUT unutar klipa; klip bez spremljene duljine ili stope se odbija, nikad
+se ne pogada. Citanje kroz jedini citac kataloga `qnc-content-read::clip_timing_on` (`public_clips`). Testni klipovi
+dobili su spremljenu duljinu i stopu kao stvarni (`set_clip_timing`; `qnc-program-segments` db testovi); testovi stope
+price uskladuju zapis klipa prije upisa. Provjereno citanjem kopije projekta: svih 105 klipova ima duljinu i stopu.
+Testovi, conformance.

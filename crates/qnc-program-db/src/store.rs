@@ -288,6 +288,7 @@ impl Store {
             return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
+        require_source_range(&self.conn, clip_id, (in_frame, out_frame), (fps_num, fps_den))?;
         let tx = self.conn.savepoint().map_err(err)?;
         // The first segment sets the rate of the story; later ones keep it.
         let rate = match story_rate(&tx)? {
@@ -536,6 +537,7 @@ impl Store {
             return Err(qnc_ui_text::text("story.source_valid_frame_rate").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
+        require_source_range(&self.conn, clip_id, (in_frame, out_frame), (fps_num, fps_den))?;
         let tx = self.conn.savepoint().map_err(err)?;
         // The story keeps its rate while other segments have it; the only segment of a
         // story gives it the rate of its new source.
@@ -624,16 +626,17 @@ impl Store {
             return Err(qnc_ui_text::text("story.out_after_in").into());
         }
         let tx = self.conn.savepoint().map_err(err)?;
-        let (old_in, fps_num, fps_den): (i64, u32, u32) = tx
+        let (old_in, fps_num, fps_den, clip_id): (i64, u32, u32, String) = tx
             .query_row(
-                "SELECT in_frame, source_fps_num, source_fps_den FROM story_parts
+                "SELECT in_frame, source_fps_num, source_fps_den, clip_id FROM story_parts
                  WHERE part_id = ?1 AND active = 1",
                 [segment_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .optional()
             .map_err(err)?
             .ok_or_else(|| format!("part not found: {segment_id}"))?;
+        require_source_range(&tx, &clip_id, (in_frame, out_frame), (fps_num, fps_den))?;
         let (start, end) = segment_window(&tx, segment_id)?
             .ok_or_else(|| format!("part not found: {segment_id}"))?;
         let (start, end) = (start as i64, end as i64);
@@ -1313,6 +1316,7 @@ impl Store {
             return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
+        require_source_range(&self.conn, clip_id, (in_frame, out_frame), (fps_num, fps_den))?;
         let tx = self.conn.savepoint().map_err(err)?;
         let rate = story_rate(&tx)?.ok_or(qnc_ui_text::text("story.story_segments"))?;
         story_per_source(rate, (fps_num, fps_den))?;
@@ -2619,6 +2623,24 @@ fn renumber_segments(conn: &Connection) -> Result<()> {
 }
 /// Only an imported clip goes into the story (docs/93 R10), read through the one
 /// public reader of the clip catalog.
+/// The source a client sends against the clip's stored record (external audit
+/// 2026-10-17: the writer trusted the client): its rate is the stored one and its OUT
+/// lies inside the clip. A clip without a stored length or rate is refused, never guessed.
+fn require_source_range(conn: &Connection, clip_id: &str, (_, out_frame): (u64, u64), (fps_num, fps_den): (u32, u32)) -> Result<()> {
+    let Some((frames, (num, den))) = qnc_content_read::clip_timing_on(conn, clip_id)? else {
+        return Err(qnc_ui_text::text("story.clip_timing_unknown").into());
+    };
+    if u64::from(fps_num) * u64::from(den) != u64::from(num) * u64::from(fps_den) {
+        let (sent, stored) = (format!("{fps_num}/{fps_den}"), format!("{num}/{den}"));
+        return Err(qnc_ui_text::fill("story.source_rate_not_stored", &[("sent", &sent), ("stored", &stored)]));
+    }
+    if out_frame > frames {
+        let (out, frames) = (out_frame.to_string(), frames.to_string());
+        return Err(qnc_ui_text::fill("story.out_past_clip", &[("out", &out), ("frames", &frames)]));
+    }
+    Ok(())
+}
+
 fn require_imported_clip(conn: &Connection, clip_id: &str) -> Result<()> {
     match qnc_content_read::imported_on(conn, clip_id)? {
         Some(true) => Ok(()),

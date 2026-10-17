@@ -340,6 +340,24 @@ pub fn duration_frames_on(conn: &Connection, clip_id: &str) -> Result<Option<u64
     Ok(frames.flatten().filter(|frames| *frames > 0).map(|frames| frames as u64))
 }
 
+/// The stored length in frames and frame rate of clip `clip_id` of the catalog, on a
+/// connection another public module holds. `None`: not in it, or either is not stored.
+pub fn clip_timing_on(conn: &Connection, clip_id: &str) -> Result<Option<(u64, (u32, u32))>, String> {
+    if !has_view(conn, "public_clips")? {
+        return Ok(None);
+    }
+    let row: Option<(Option<i64>, Option<i64>, Option<i64>)> = conn
+        .query_row("SELECT duration_frames, fps_num, fps_den FROM public_clips WHERE clip_id = ?1", [clip_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })
+        .optional()
+        .map_err(|error| error.to_string())?;
+    Ok(row.and_then(|(frames, num, den)| {
+        let (frames, num, den) = (frames.filter(|v| *v > 0)?, num.filter(|v| *v > 0)?, den.filter(|v| *v > 0)?);
+        Some((frames as u64, (u32::try_from(num).ok()?, u32::try_from(den).ok()?)))
+    }))
+}
+
 /// The stored media of clip `clip_id`: its original and, when it has one, its proxy
 /// (QNC URIs), on a connection another public module holds. `None`: not in it.
 pub fn media_uris_on(

@@ -32,9 +32,9 @@ fn store_with_story(file: &std::path::Path) -> Vec<String> {
         .unwrap()
         .execute(
             "INSERT INTO clips (clip_id, source_uri, original_uri, name, catalog_json,
-                revision, final, selected, import_status)
+                revision, final, selected, import_status, duration_frames, fps_num, fps_den)
              VALUES ('c1', 'qnc://local/source/card-a', 'qnc://local/source/card-a/c1.mxf',
-                'C1', '{}', 1, 1, 0, 'imported')",
+                'C1', '{}', 1, 1, 0, 'imported', 10000, 50, 1)",
             [],
         )
         .unwrap();

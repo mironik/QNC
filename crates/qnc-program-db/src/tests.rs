@@ -173,7 +173,23 @@ fn imported_store(path: &Path) -> Story {
         },
     )
     .unwrap();
+    // The clip's stored record: a long 50p clip (the writer checks the rate and the range
+    // a client sends against it).
+    set_clip_timing(path, 100_000, (50, 1));
     story
+}
+
+/// What the catalog stores for clip c1: its length in frames and its rate.
+fn set_clip_timing(path: &Path, frames: u64, (num, den): (u32, u32)) {
+    let conn = Connection::open(path).unwrap();
+    // The same journal as the story's open connection.
+    conn.pragma_update(None, "journal_mode", "PERSIST").unwrap();
+    conn
+        .execute(
+            "UPDATE clips SET duration_frames = ?1, fps_num = ?2, fps_den = ?3 WHERE clip_id = 'c1'",
+            rusqlite::params![frames as i64, num, den],
+        )
+        .unwrap();
 }
 
 /// The virtual shots of the same project database, through their own module.
@@ -276,11 +292,18 @@ fn a_segment_needs_a_real_range_a_known_kind_an_imported_clip_and_the_story_rate
         .contains("is not imported"));
     drop(claimed);
     let dir = tempfile::tempdir().unwrap();
-    let mut store = imported_store(&dir.path().join("db"));
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
     assert!(create_segment(&mut store, "tonovi", (10, 10), (50, 1)).is_err());
     assert!(create_segment(&mut store, "voice", (0, 10), (50, 1)).is_err());
     assert!(create_segment(&mut store, "tonovi", (0, 10), (0, 1)).is_err());
+    // The writer checks what the client sends against the clip's stored record.
+    let sent = create_segment(&mut store, "tonovi", (0, 10), (25, 1)).unwrap_err();
+    assert!(sent.contains("not the clip's stored rate"), "{sent}");
+    let past = create_segment(&mut store, "tonovi", (0, 100_001), (50, 1)).unwrap_err();
+    assert!(past.contains("past the end of the clip"), "{past}");
     create_segment(&mut store, "tonovi", (0, 10), (50, 1)).unwrap();
+    set_clip_timing(&path, 100_000, (30, 1));
     let mixed = create_segment(&mut store, "offovi", (0, 10), (30, 1)).unwrap_err();
     assert!(mixed.contains("double or half"), "{mixed}");
     assert_eq!(segments(&mut store).len(), 1);
@@ -1425,8 +1448,10 @@ fn program_length(store: &mut Story) -> u64 {
 fn a_source_of_half_or_twice_the_story_rate_joins_with_its_length_in_story_frames() {
     // A 50p story: a 1080i50 source (25 frames) is two story frames per frame.
     let dir = tempfile::tempdir().unwrap();
-    let mut store = imported_store(&dir.path().join("db"));
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
     create_segment(&mut store, "tonovi", (0, 10), (50, 1)).unwrap();
+    set_clip_timing(&path, 100_000, (25, 1));
     create_segment(&mut store, "offovi", (5, 15), (25, 1)).unwrap();
     let rows = segments(&mut store);
     assert_eq!((rows[1].in_frame, rows[1].out_frame, rows[1].duration_frames), (5, 15, 20));
@@ -1441,12 +1466,16 @@ fn a_source_of_half_or_twice_the_story_rate_joins_with_its_length_in_story_frame
     // The rate stays the story's when its first segment goes.
     let first = rows[0].segment_id.clone();
     run(&mut store, Operation::DeleteSegment { segment_id: first }).unwrap();
+    set_clip_timing(&path, 100_000, (50, 1));
     create_segment(&mut store, "tonovi", (0, 4), (50, 1)).unwrap();
     assert_eq!(program_length(&mut store), 24);
     // A 25 story: a 50p source is one story frame per two, its range ends on a pair.
     let dir = tempfile::tempdir().unwrap();
-    let mut store = imported_store(&dir.path().join("db"));
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    set_clip_timing(&path, 100_000, (25, 1));
     create_segment(&mut store, "tonovi", (0, 10), (25, 1)).unwrap();
+    set_clip_timing(&path, 100_000, (50, 1));
     create_segment(&mut store, "offovi", (0, 11), (50, 1)).unwrap();
     let rows = segments(&mut store);
     assert_eq!((rows[1].out_frame, rows[1].duration_frames), (10, 5), "11 ends on the pair at 10");
