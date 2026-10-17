@@ -1219,7 +1219,15 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
         };
     }
     let band_response = ui.interact(track_rect, ui.make_persistent_id(("qnc_timeline_audio_band", lane.label())), Sense::click());
-    take_lane_intent(&[&label_response, &band_response], track_rect, lane, input).unwrap_or(TimelineIntent::None)
+    if let Some(take) = take_lane_intent(&[&label_response, &band_response], track_rect, lane, input) {
+        return take;
+    }
+    // A left click on the band is a click on the row: the playhead goes there, or a taken edit
+    // is kept (audit 2026-10-17: the band took the click and nothing happened).
+    match band_response.interact_pointer_pos().filter(|_| band_response.clicked() && input.state.can_cue()) {
+        Some(pos) => TimelineIntent::CueFrame(frame_for_x(track_rect, input.state.range_start(), input.state.duration_frames(), pos.x)),
+        None => TimelineIntent::None,
+    }
 }
 
 /// A right click on A1/A2 (its label or its track) takes the lane, as Ctrl+1/Ctrl+2: on a
@@ -1710,7 +1718,7 @@ fn paint_covers(
         let rect = Rect::from_min_max(egui::pos2(x0, top), egui::pos2(x1.max(x0 + 3.0), bottom));
         // Over the filmstrip the strip shows only under the mouse or when the cover is chosen
         // (user 2026-10-17); the narrow video row keeps it, it has no picture of its own.
-        let strip = input.layers.audio_bands && !input.pictures.is_empty();
+        let strip = cover_strip(input);
         if strip && !cover.selected && !cover.pending && !ui.rect_contains_pointer(rect) {
             continue;
         }
@@ -2059,7 +2067,7 @@ fn cover_hit<'a>(
 /// The top and bottom of a cover in the video row: with audio bands the whole light middle
 /// (user 2026-10-15: a cover paints the video part of the Wrap row), otherwise the upper part.
 fn cover_rows(track: Rect, input: &TimelineInput<'_>) -> (f32, f32) {
-    if input.layers.audio_bands && !input.pictures.is_empty() {
+    if cover_strip(input) {
         // Over the filmstrip a cover is a strip at the bottom of the picture, so its own
         // pictures show above it (user 2026-10-17).
         let bottom = track.bottom() - video_middle_insets(input).1;
@@ -2070,6 +2078,14 @@ fn cover_rows(track: Rect, input: &TimelineInput<'_>) -> (f32, f32) {
     } else {
         (track.top() + 2.0, track.top() + track.height() * 0.42)
     }
+}
+
+/// A Wrap row in its filmstrip mode (not the narrow video row): a cover is a strip at the
+/// bottom of the picture, shown under the mouse or when chosen. It is the row's mode, not
+/// whether its filmstrip pictures are read yet (audit 2026-10-17: a row whose pictures were
+/// not there drew the cover over the whole video part, always, and every click hit it).
+fn cover_strip(input: &TimelineInput<'_>) -> bool {
+    input.layers.audio_bands && !input.layers.compact_video
 }
 
 /// How far below the top of the video row a slot starts: with audio bands under the A1 band,

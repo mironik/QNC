@@ -190,6 +190,9 @@ impl PanelFocus {
                 qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("story-leave panel={:?} dropped the segment panel's taken edit", self.panel));
             }
         }
+        if segments.take_dropped_sound() {
+            preview.hear_program_draft(None, None, wrap.playhead()); // another edit took over
+        }
         if let Some(answer) = self.keyframes.take() {
             match (self.jump.take(), answer) {
                 (Some(Jump::SourceMark), Ok(frames)) => {

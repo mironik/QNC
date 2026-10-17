@@ -4570,6 +4570,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
+ "qnc-dev-diagnostics",
  "qnc-lane-choice",
  "qnc-part-sound",
  "qnc-prerender-launch",

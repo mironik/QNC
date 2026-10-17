@@ -41,7 +41,7 @@ impl ProgramSegments {
             return self.refresh_view(qnc_ui_text::text("story.msg.edge_markers_locked").into());
         };
         // The draft starts where the marker is stored; a refused frame keeps it there.
-        self.slot_trim = None;
+        self.let_go_edits(false);
         self.selected_marker = Some(marker_id.clone());
         self.selected_slot = None;
         self.marker_edit = Some((marker_id, pin.frame));
@@ -74,9 +74,10 @@ impl ProgramSegments {
             return self.refresh_view(error);
         }
         let before = self.marker_edit.clone();
+        let direction = before.as_ref().map_or(0, |(_, draft)| frame as i64 - *draft as i64);
         self.marker_edit = Some((marker_id, frame));
         self.refresh_view(String::new());
-        if self.past_clip_end() {
+        if self.past_clip_end(direction) {
             self.marker_edit = before;
             return self.refresh_view(qnc_ui_text::text("story.msg.clip_at_end").into());
         }

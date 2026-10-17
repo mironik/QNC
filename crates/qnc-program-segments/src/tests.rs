@@ -653,3 +653,25 @@ fn a_taken_slot_has_trim_playheads_on_its_moved_markers_and_the_playhead_stays()
     segments.apply_action("clear_focus");
     assert!(segments.view().trim_frames.is_empty());
 }
+
+#[test]
+fn taking_a_marker_lets_go_of_a_taken_slot_one_edit_at_a_time() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::SelectSlotAtPlayhead);
+    assert!(segments.slot_move.is_some());
+    let marker = segments.view().markers.iter().find(|pin| pin.frame == 33).expect("marker at 33").marker_id.clone();
+    segments.apply(SegmentCommand::TakeMarker(marker));
+    assert!(segments.slot_move.is_none(), "the slot is let go");
+    assert!(segments.marker_edit.is_some(), "the marker is taken");
+    segments.apply_action("step_forward_frame");
+    assert_eq!(segments.view().trim_frames, vec![34], "the arrows move the marker, not the slot");
+}
+
+#[test]
+fn a_click_that_only_places_the_playhead_lets_go_of_a_chosen_cover() {
+    let mut segments = component();
+    segments.selected_cover = Some("k".into());
+    segments.apply(SegmentCommand::Cue(3));
+    assert!(segments.selected_cover.is_none());
+}

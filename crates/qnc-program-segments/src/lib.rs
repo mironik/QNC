@@ -155,6 +155,8 @@ pub struct ProgramSegments {
     selected_marker: Option<String>,
     selected_slot: Option<String>,
     selected_cover: Option<String>,
+    /// A taken sound let go by another take (`let_go_edits`), until the panel asks.
+    sound_dropped: bool,
     /// What Talking Head, Voice over and covers take from the source view.
     source: SourcePick,
     /// The sound of a stored segment or cover taken on the Wrap row (`part_sound.rs`).
@@ -431,7 +433,30 @@ impl ProgramSegments {
     }
 
     /// Applies a command; returns true so the caller repaints.
+    /// A command of the segment panel (a click, a right click, a key). Every one but the wheel
+    /// goes to the player log with what came of it (audit 2026-10-17: the clicks on Wrap rows
+    /// left no trace, only the keys did).
     pub fn apply(&mut self, command: SegmentCommand) -> bool {
+        let shown = (!matches!(command, SegmentCommand::Wheel { .. }) && qnc_dev_diagnostics::player_diagnostics_enabled())
+            .then(|| format!("{command:?}"));
+        let done = self.apply_command(command);
+        if let Some(command) = shown {
+            let taken = format!(
+                "trim={} move={} marker={} sound={}",
+                self.slot_trim.is_some(),
+                self.slot_move.is_some(),
+                self.marker_edit.is_some(),
+                self.part_sound_taken()
+            );
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!("story-click {command} done={done} {taken} slot={:?} message={:?}", self.selected_slot, self.view.message),
+            );
+        }
+        done
+    }
+
+    fn apply_command(&mut self, command: SegmentCommand) -> bool {
         let playhead = self.playhead.unwrap_or(0);
         match command {
             SegmentCommand::Wheel { .. } => return false, // the form turns it into the panel's arrow
@@ -492,6 +517,7 @@ impl ProgramSegments {
                 self.take_part_sound(lane, frame);
             }
             SegmentCommand::SelectSlot { slot_id, frame } => {
+                self.drop_selected_cover();
                 self.select_slot(&slot_id, Some(frame))
             }
             SegmentCommand::StepMarker { up } => {
@@ -516,6 +542,7 @@ impl ProgramSegments {
                 if !inside {
                     self.selected_slot = None;
                 }
+                self.drop_selected_cover();
                 self.cue_at(frame)
             }
             SegmentCommand::Marker => self.marker_at_playhead(),
@@ -841,6 +868,15 @@ impl ProgramSegments {
         self.write(Operation::SelectCover { cover_id });
         self.refresh_view(String::new());
         self.cue_at(frame);
+    }
+
+    /// A click that chooses something else (the playhead, a slot) lets go of the chosen cover
+    /// (audit 2026-10-17: a cover chosen earlier stayed chosen in the base for good, its strip
+    /// stayed drawn on its row and Delete would have taken it).
+    fn drop_selected_cover(&mut self) {
+        if self.selected_cover.take().is_some() {
+            self.write(Operation::SelectCover { cover_id: String::new() });
+        }
     }
 
     pub fn delete_selected(&mut self) {

@@ -41,6 +41,7 @@ impl ProgramSegments {
         };
         // The channel count of the clip from its stored wave (one lane per channel).
         let channels = self.waves.channels(&clip_id);
+        self.let_go_edits(true);
         if !self.part_sound.take(Part { lane, id }, kept, channels) {
             self.refresh_view(qnc_ui_text::text("story.msg.no_audio_channels").into());
             return false;

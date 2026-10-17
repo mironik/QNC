@@ -76,8 +76,7 @@ impl ProgramSegments {
             self.refresh_view(qnc_ui_text::text("story.msg.last_slot_ends_story").into());
             return false;
         }
-        self.marker_edit = None;
-        self.slot_move = None;
+        self.let_go_edits(false);
         self.selected_slot = Some(slot.slot_id.clone());
         self.selected_marker = None;
         self.write(Operation::SelectSlot { slot_id: slot.slot_id.clone() });
@@ -158,7 +157,7 @@ impl ProgramSegments {
         }
         self.slot_trim = Some(SlotTrim { frames, ..trim.clone() });
         self.refresh_view(Self::trim_message(trim.start));
-        if self.past_clip_end() {
+        if self.past_clip_end(picture) {
             self.slot_trim = Some(trim);
             self.refresh_view(qnc_ui_text::text("story.msg.clip_at_end").into());
         }

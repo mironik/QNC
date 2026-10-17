@@ -51,6 +51,25 @@ impl ProgramSegments {
     /// the story seemed blocked). What the segment panel took (a slot, a slot edge, a marker,
     /// a cover) belongs to it and is dropped as by Escape; nothing is written. The edit of a
     /// segment (Ctrl+Shift+I/O, Edit) lives on the source timeline and stays.
+    /// One edit is taken at a time (audit 2026-10-17: a right click on a marker while a slot
+    /// was taken left both taken, and the arrows went on moving the slot). Taking a slot, a
+    /// slot edge, a marker or a sound lets go of what was taken before, unsaved, as Escape.
+    pub(crate) fn let_go_edits(&mut self, keep_sound: bool) {
+        self.slot_trim = None;
+        self.slot_move = None;
+        self.marker_edit = None;
+        self.cover_taken = None;
+        if !keep_sound && self.part_sound.release() {
+            self.sound_dropped = true;
+        }
+    }
+
+    /// The sound draft of a segment or cover was let go by another take: the program hears its
+    /// stored sound again (the caller tells the preview). Asked once.
+    pub fn take_dropped_sound(&mut self) -> bool {
+        std::mem::take(&mut self.sound_dropped)
+    }
+
     pub fn leave_panel(&mut self) -> bool {
         let taken = self.slot_trim.take().is_some() | self.slot_move.take().is_some();
         let taken = taken | self.marker_edit.take().is_some() | self.cover_taken.take().is_some();

@@ -80,9 +80,14 @@ impl ProgramSegments {
         blocked
     }
 
-    /// After a move: a picture that moves with the edit went past the end of its clip
-    /// (a jump to a key picture can pass it in one step); the caller takes the move back.
-    pub(crate) fn past_clip_end(&self) -> bool {
+    /// After a move later in the source (`direction` > 0): a picture that moves with the edit
+    /// went past the end of its clip (a jump to a key picture can pass it in one step); the
+    /// caller takes the move back. A move back toward the clip is always let through (audit
+    /// 2026-10-17: a cover already past its clip's end could not be shortened either way).
+    pub(crate) fn past_clip_end(&self, direction: i64) -> bool {
+        if direction <= 0 {
+            return false;
+        }
         let moving = |still: &&qnc_program_view::EditStill| {
             if self.slot_trim.is_some() {
                 still.cut
@@ -151,7 +156,7 @@ impl ProgramSegments {
 
     /// Ctrl+S took this slot: the arrows move it from now on.
     pub(crate) fn take_slot_move(&mut self, slot_id: &str) {
-        self.slot_trim = None;
+        self.let_go_edits(false);
         self.slot_move = self
             .view
             .slots
@@ -206,7 +211,7 @@ impl ProgramSegments {
         }
         self.slot_move = Some(SlotMove { shift, ..slot.clone() });
         self.refresh_view(qnc_ui_text::text("story.msg.slot_taken").into());
-        if self.past_clip_end() {
+        if self.past_clip_end(frames) {
             self.slot_move = Some(slot);
             self.refresh_view(qnc_ui_text::text("story.msg.clip_at_end").into());
         }

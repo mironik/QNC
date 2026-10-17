@@ -270,7 +270,8 @@ fn paint_program(
             id: &cover.cover_id,
             start_frame: local(cover.start_frame),
             end_frame: local(cover.end_frame),
-            selected: cover.selected,
+            // The strip of a cover shows while it or its slot is chosen (drawing only).
+            selected: cover.selected || segments.selected_slot().is_some_and(|slot| slot.slot_id == cover.slot_id),
             pending: false,
             fill: cover_fill(cover.end_frame - cover.start_frame, segments.timebase, lengths),
             label: Some(label.as_str()),

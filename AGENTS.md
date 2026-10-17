@@ -4379,3 +4379,21 @@ uzima bliži rub slota kao Ctrl+I/O: playhead ide na taj rub, kotacic i strelice
 Esc odustaje. `qnc-timeline` (lijevi klik u slot vise ne daje `SelectMarkerSlot`; desni klik bez granice od 8 px),
 `qnc-segment-panel` (klik na traku -> `SelectSlot`), `qnc-program-segments` (`Cue` pusta napusteni slot). Testovi,
 conformance.
+Audit 2026-10-17 (korisnik: "napravi audit Wrap-segmenta sa svim dodanim opcijama... na prvom klipu ne prihvaca Ctrl
+misem editiranje OUT ni IN; na drugom cijelo vrijeme stoji prikazana traka s vremenom trajanja"): nalazi iz loga i koda,
+popravljeno: (1) traka pokrivalice ovisila je o tome jesu li slike filmstripa reda vec procitane, ne o nacinu prikaza;
+red bez slika crtao je pokrivalicu preko cijelog video dijela, stalno, i svaki klik ju je pogadao (desni klik uzimao je
+slot umjesto ruba, a prvi slot uz pocetni marker se ne mice: "A slot at the start or end M marker does not move"). Sada
+je to nacin reda (`qnc-timeline` `cover_strip`: filmstrip nacin, ne uska traka). (2) Pokrivalica odabrana nekad prije
+ostajala je odabrana u bazi zauvijek (traka stalno vidljiva, Delete bi je obrisao); klik koji samo postavlja playhead
+ili bira slot je pusta (`drop_selected_cover`); traka se vidi i kad je odabran njezin slot (samo crtanje,
+`qnc-segment-panel`). (3) Pokrivalica vec dulja od svog klipa nije se dala ni skratiti (strelice i kotacic u oba smjera:
+"The clip is at its end"); provjera kraja klipa vraca samo pomak dalje u izvor (`past_clip_end(direction)`).
+(4) Lijevi klik na pojasu A1/A2 Wrap reda nije radio nista (pojas je uzimao klik); sada postavlja playhead ili sprema
+uzeto kao klik na redu. (5) Jedno uzeto u isto vrijeme: desni klik na marker dok je slot uzet ostavljao je oba, strelice
+su micale slot; svako uzimanje (slot, rub slota, marker, zvuk) pusta prethodno bez zapisa (`let_go_edits`; nacrt zvuka
+koji se tako pusti vraca spremljeni zvuk, `take_dropped_sound`). (6) Mišje naredbe panela Segmenti pisu se u player log
+(`story-click`). Testovi (`qnc-program-segments` 38), conformance. Otvoreno (nije mijenjano, po pravilima): zadnji slot
+price nema rubove (iza njega nema slota koji bi preuzeo razliku), slot uz pocetni ili zavrsni marker se ne mice, u uskoj
+video traci pokrivalica pokriva cijeli video dio pa desni klik tamo uzima slot (rubovi samo tipkama), A2 desni klik bez
+pokrivalice na kliknutom mjestu uzima odabranu pokrivalicu.
