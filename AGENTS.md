@@ -4555,3 +4555,7 @@ Dopuna 2026-10-17 (korisnik: "napravi vidljiviji vertikalni skrol sirine cijele 
 redova ispunjava desnu marginu panela Segmenti (10 px, `PANEL_MARGIN`), pa redovi zadrzavaju svoju sirinu; boje su
 kontrastne (podloga boja ruba panela, rucka prigusena boja teksta, pod misem boja teksta, dok se vuce boja playheada).
 `qnc-segment-panel`. Kotacic iznad Wrap reda i dalje pomice playhead.
+Dopuna 2026-10-17 (korisnik: "i strelice gore-dolje bi mogle skrolati"): strelice gore/dolje na panelu Segmenti (kad
+nista nije uzeto) i dalje biraju prethodni ili sljedeci segment i stavljaju Wrap playhead na njegov pocetak, a panel se
+sada sam lista do novo odabranog reda (`qnc-segment-panel`, `scroll_to_rect`). Dok je nesto uzeto, gore/dolje ostaju
+skok na kljucnu sliku ili izbor kanala.

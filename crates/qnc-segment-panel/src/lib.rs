@@ -126,8 +126,17 @@ pub fn show(
                     .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
                     .show(ui, |ui| {
                         ui.spacing_mut().item_spacing = Vec2::new(0.0, ROW_GAP);
+                        // A newly chosen segment (Up/Down, user 2026-10-17) is scrolled into view.
+                        let shown_key = egui::Id::new("qnc_segment_panel_scrolled_to");
+                        let shown: Option<String> = ui.ctx().data(|data| data.get_temp(shown_key));
                         for row in &segments.rows {
+                            let top = ui.cursor().top();
                             let row_command = paint_row(ui, segments, row, timeline_theme, lengths);
+                            if row.selected && shown.as_deref() != Some(row.segment_id.as_str()) {
+                                let rect = egui::Rect::from_min_max(egui::pos2(stack.left(), top), egui::pos2(stack.right(), ui.cursor().top()));
+                                ui.scroll_to_rect(rect, None);
+                                ui.ctx().data_mut(|data| data.insert_temp(shown_key, row.segment_id.clone()));
+                            }
                             if command.is_some() && row_command.is_some() && qnc_dev_diagnostics::player_diagnostics_enabled() {
                                 qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("segment-row command lost {row_command:?} to {command:?}"));
                             }
