@@ -4408,3 +4408,8 @@ koliko slika svakoj pokrivalici nedostaje do kraja slota (`cover_shortfalls`, du
 koraka Undo) i odbija porukom `story.cover_hole`. Postojece rupe se ne popravljaju. Test
 `no_edit_leaves_a_cover_shorter_than_its_slot`, conformance. Otvoreno: odbijeni CreateCover ostavlja B-roll kadar koji je
 pokrivalica vec stvorila (dva upisa, kao i prije kod greske).
+Popravak 2026-10-17 (korisnik: "ne radi Ctrl+Delete za selektirani slot"; log: klik na kolor traku izabere slot, Delete i
+Ctrl+Delete daju "First take a marker or a B-roll to remove"): Delete/Ctrl+Delete (`delete_marker`, `DeleteFocused`)
+nakon uzetog markera i uzete pokrivalice uzima i slot: uzet (Ctrl+S, desni klik na traku) ili izabran (klik na traku);
+brise se njegova B-roll pokrivalica, slot i M markeri ostaju; slot bez pokrivalice javlja `story.msg.slot_has_no_broll`.
+`qnc-program-segments`, rjecnik, test. Katalog daje istu akciju za Delete i Ctrl+Delete, pa radi i obicni Delete.

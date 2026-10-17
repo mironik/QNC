@@ -605,9 +605,24 @@ impl ProgramSegments {
                     self.selected_cover = None;
                     self.write(Operation::DeleteCover { cover_id });
                 }
-                (None, None) => self.refresh_view(
-                    qnc_ui_text::text("story.msg.take_before_delete").into(),
-                ),
+                // A chosen or taken slot (click on its colour strip, Ctrl+S, right click on the
+                // strip): Ctrl+Delete removes its B-roll; the slot and its M markers stay (user
+                // 2026-10-17: Ctrl+Delete did nothing on a selected slot).
+                (None, None) => {
+                    let slot = self.slot_move.take().map(|taken| taken.slot_id).or_else(|| self.selected_slot.clone());
+                    let cover = slot
+                        .as_deref()
+                        .and_then(|slot_id| self.stored_covers.iter().find(|cover| cover.slot_id == slot_id))
+                        .map(|cover| cover.cover_id.clone());
+                    match (slot, cover) {
+                        (_, Some(cover_id)) => {
+                            self.selected_cover = None;
+                            self.write(Operation::DeleteCover { cover_id });
+                        }
+                        (Some(_), None) => self.refresh_view(qnc_ui_text::text("story.msg.slot_has_no_broll").into()),
+                        (None, None) => self.refresh_view(qnc_ui_text::text("story.msg.take_before_delete").into()),
+                    }
+                }
             },
         }
         true
