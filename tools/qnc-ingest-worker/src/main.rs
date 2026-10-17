@@ -59,6 +59,7 @@ fn import_while(
     root: &Path,
     running: &std::sync::atomic::AtomicBool,
     closed: &std::sync::atomic::AtomicBool,
+    run: &qnc_ingest_import_worker::ImportRun<'_>,
 ) -> Result<(), String> {
     loop {
         if closed.load(std::sync::atomic::Ordering::Relaxed) {
@@ -66,7 +67,7 @@ fn import_while(
         }
         let last = !running.load(std::sync::atomic::Ordering::Relaxed);
         if import_waiting(root)? {
-            qnc_ingest_import_worker::run_import(root)?;
+            qnc_ingest_import_worker::run_import(root, run)?;
         }
         if last {
             return Ok(());
@@ -117,6 +118,8 @@ fn run_once(root: &Path) -> Result<bool, String> {
     // this run started for (closed, or another opened), the run stops and lets its
     // database go, so the closed project can be deleted.
     let closed = std::sync::atomic::AtomicBool::new(false);
+    // The import belongs to this run: its project, its lease, its cancel.
+    let run = qnc_ingest_import_worker::ImportRun { project_id: &started, lease: &lease, cancel: &cancel };
     std::thread::scope(|scope| {
         scope.spawn(|| {
             while running.load(std::sync::atomic::Ordering::Relaxed) {
@@ -128,7 +131,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 std::thread::sleep(Duration::from_secs(1));
             }
         });
-        let import = scope.spawn(|| import_while(root, &running, &closed));
+        let import = scope.spawn(|| import_while(root, &running, &closed, &run));
         let completion = scope.spawn(|| {
             let done = qnc_record_completion::complete_active_project(
                 root,

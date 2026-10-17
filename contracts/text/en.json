@@ -365,6 +365,7 @@
     "story.range_shorter_than_one_picture_story": "The range is shorter than one picture of the story.",
     "story.end_m_marker_locked": "The end M marker is locked.",
     "story.nothing_undo": "Nothing to undo.",
+    "import.lease_lost": "The import stopped: this process no longer holds the project's worker lease.",
     "story.clip_timing_unknown": "The clip's stored record has no length or frame rate: it cannot go into the story.",
     "story.source_rate_not_stored": "The frame rate sent ({sent}) is not the clip's stored rate ({stored}).",
     "story.out_past_clip": "OUT {out} lies past the end of the clip ({frames} pictures).",

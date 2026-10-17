@@ -174,7 +174,9 @@ fn run() -> Result<()> {
         let Some((unit, fingerprint)) = next else {
             // Every unit of the story is there: the units it no longer has go (once per story).
             if pruned.as_ref() != Some(&fingerprints) {
-                prune(&writer, &mut PrerenderReader::open(&target)?, &out_dir, &fingerprints);
+                if lease.confirm() {
+                    prune(&writer, &mut PrerenderReader::open(&target)?, &out_dir, &fingerprints);
+                }
                 pruned = Some(fingerprints.clone());
             }
             if idle_since.elapsed() > IDLE_END || done_now >= limit {
@@ -214,6 +216,12 @@ fn run() -> Result<()> {
                     .map_err(|e| e.to_string())?
                     .uri();
                 let media = qnc_program_render::unit_media(unit, &delivery, &file_uri)?;
+                // Published only while this process still holds the lease (external audit
+                // 2026-10-17): another prerender may have taken it meanwhile.
+                if !lease.confirm() {
+                    say("the lease is another's: the unit is not published".into());
+                    return Ok(());
+                }
                 writer.publish(RenderedUnit {
                     fingerprint: fingerprint.clone(),
                     file_uri,

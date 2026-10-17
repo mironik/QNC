@@ -21,7 +21,7 @@ mod optimize;
 pub use config::ConfigMediaOpener;
 mod process;
 
-pub use process::{
+pub use process::{ImportRun, 
     launch_worker, make_missing_posters, run_import, run_service, ImportSummary, WORKER_EXECUTABLE,
 };
 

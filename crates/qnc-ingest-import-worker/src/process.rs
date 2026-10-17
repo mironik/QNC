@@ -9,7 +9,9 @@
 //! the worker lease (only one runs), whether a player works (the copy waits) and what
 //! the worker did last. The form never waits for the worker.
 
-use crate::{run_next, ConfigMediaOpener, TransportQueue};
+use crate::{run_next, ConfigMediaOpener, ImportQueue, TransportQueue};
+use qnc_ingest_store::content::{ImportedCopy, StoredClip};
+use qnc_media_metadata::MediaRepresentation;
 use qnc_active_project_read::ActiveProjectReader;
 use qnc_ingest_runtime::{Lease, Writer, WORKER, WORKER_FRESH_SECONDS, WORKER_RESULT};
 use qnc_ingest_select::selection_config::SelectionConfig;
@@ -72,20 +74,73 @@ pub fn run_service(root: &Path) -> Result<ImportSummary, String> {
     let snapshot = active_project.read().map_err(|e| e.to_string())?;
     let reader = active_project.settings_reader().clone();
     let target = ContentTarget::for_project(&reader, &snapshot.settings)?;
-    let Some(_lease) = Lease::claim(target, WORKER, WORKER_FRESH_SECONDS)? else {
+    let Some(lease) = Lease::claim(target, WORKER, WORKER_FRESH_SECONDS)? else {
         return Ok(ImportSummary {
             imported: 0,
             failed: 0,
         });
     };
-    run_import(root)
+    run_import(root, &ImportRun { project_id: &snapshot.settings.project_id, lease: &lease, cancel: lease.lost() })
 }
 
-/// The import of one Uvezi without taking the worker lease: for a caller that already
-/// holds it for its whole run (the background application also builds the artifacts).
-pub fn run_import(root: &Path) -> Result<ImportSummary, String> {
+/// The run an import belongs to (external audit 2026-10-17): the project its lease was
+/// taken for, the lease, and the cancel of the whole run.
+pub struct ImportRun<'a> {
+    pub project_id: &'a str,
+    pub lease: &'a Lease,
+    pub cancel: &'a AtomicBool,
+}
+
+impl ImportRun<'_> {
+    /// The run may still work and publish: not cancelled and the lease still its own.
+    fn allowed(&self) -> bool {
+        !self.cancel.load(std::sync::atomic::Ordering::Relaxed) && self.lease.confirm()
+    }
+}
+
+/// The queue of a run: it takes no clip and publishes no result once the run may no
+/// longer (cancelled, or its lease is another's).
+struct RunQueue<'q, 'r> {
+    queue: &'q mut dyn ImportQueue,
+    run: &'q ImportRun<'r>,
+}
+
+impl ImportQueue for RunQueue<'_, '_> {
+    fn claim_next(&mut self) -> Result<Option<StoredClip>, String> {
+        if !self.run.allowed() {
+            return Ok(None);
+        }
+        self.queue.claim_next()
+    }
+
+    fn heartbeat(&mut self, clip_id: &str) -> Result<(), String> {
+        self.queue.heartbeat(clip_id)
+    }
+
+    fn finish_import(
+        &mut self,
+        clip_id: String,
+        media_uri: Option<String>,
+        thumbnail_uri: Option<String>,
+        copy_of: Option<ImportedCopy>,
+        optimized: Option<MediaRepresentation>,
+        error: Option<String>,
+    ) -> Result<(), String> {
+        if !self.run.allowed() {
+            return Err(qnc_ui_text::text("import.lease_lost").into());
+        }
+        self.queue.finish_import(clip_id, media_uri, thumbnail_uri, copy_of, optimized, error)
+    }
+}
+
+/// The import of one Uvezi under the lease the caller holds (the background application
+/// also builds the artifacts under it), for the project the lease was taken for only.
+pub fn run_import(root: &Path, run: &ImportRun<'_>) -> Result<ImportSummary, String> {
     let active_project = ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
     let snapshot = active_project.read().map_err(|e| e.to_string())?;
+    if snapshot.settings.project_id != run.project_id {
+        return Ok(ImportSummary { imported: 0, failed: 0 }); // another project is active now
+    }
     let reader = active_project.settings_reader().clone();
     let plan = IngestWorkPlan::from_settings(snapshot.settings)?;
     let target = ContentTarget::for_project(&reader, &plan.settings)?;
@@ -94,15 +149,9 @@ pub fn run_import(root: &Path) -> Result<ImportSummary, String> {
         failed: 0,
     };
     let mut project = Project::open(root, &reader, &plan, &target)?;
-    let cancel = AtomicBool::new(false);
     let outcome = loop {
-        match run_next(
-            &mut project.queue,
-            &plan,
-            &project.dir,
-            &project.opener,
-            &cancel,
-        ) {
+        let mut queue = RunQueue { queue: &mut project.queue, run };
+        match run_next(&mut queue, &plan, &project.dir, &project.opener, run.cancel) {
             Ok(Some(outcome)) if outcome.result.is_ok() => summary.imported += 1,
             Ok(Some(_)) => summary.failed += 1,
             Ok(None) => break Ok(()),
@@ -113,8 +162,10 @@ pub fn run_import(root: &Path) -> Result<ImportSummary, String> {
         Ok(()) => format!("uvezeno {}, neuspjelo {}", summary.imported, summary.failed),
         Err(error) => format!("greska: {error}"),
     };
-    if let Ok(mut writer) = Writer::start(target) {
-        let _ = writer.set(WORKER_RESULT, &result);
+    if run.lease.confirm() {
+        if let Ok(mut writer) = Writer::start(target) {
+            let _ = writer.set(WORKER_RESULT, &result);
+        }
     }
     outcome.map(|()| summary)
 }

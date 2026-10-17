@@ -4515,3 +4515,10 @@ kadra (i shorta) vise ne broji retke. Brojanje je s brisanjem kadra odbijene pok
 davalo vec iskoristen ID, pa je upis padao. `qnc-virtual-shots`: tablica `virtual_shot_numbers` (brojac po klipu i vrsti,
 samo raste, nikad ispod najveceg broja koji ID te vrste vec ima), `next_index`; ugovor baze dopunjen tablicom. Test
 `a_b_roll_shot_never_takes_the_id_of_one_that_was_or_is_still_there`.
+Izvedeno 2026-10-17 (drugi vanjski audit, P1-1): rad pod najmom staje kad najam vise nije njegov. `qnc-playback-activity`
+`Lease`: obnova koja ne uspijeva dulje od isteka najma (greska baze) znaci gubitak najma; zastavica `lost()` je prekid
+posla pod njim; `confirm()` u bazi potvrduje da je najam jos tog vlasnika. `qnc-ingest-import-worker`: uvoz je vezan uz
+svoj posao (`ImportRun`: projekt za koji je najam uzet, najam, prekid); kad je aktivan drugi projekt, ne radi nista;
+ne preuzima klip i ne objavljuje ishod uvoza ni rezultat workera dok `confirm()` ne potvrdi najam (`RunQueue`).
+`tools/qnc-ingest-worker` predaje uvozu svoj projekt, najam i prekid; `tools/qnc-prerender` ne objavljuje dio ni ne brise
+stare bez potvrdenog najma. Test `a_lease_another_owner_took_is_not_confirmed_and_its_work_is_cancelled`.

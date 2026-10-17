@@ -139,7 +139,13 @@ impl Writer {
 pub struct Lease {
     stop: Arc<AtomicBool>,
     held: Arc<AtomicBool>,
+    /// Set once the lease is lost: the cancel of the work done under it.
+    lost: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
+    target: ContentTarget,
+    name: &'static str,
+    owner: String,
+    fresh_seconds: i64,
 }
 
 impl Lease {
@@ -147,30 +153,61 @@ impl Lease {
     /// `fresh_seconds`; `None` when another holds it. It is renewed once a second.
     pub fn claim(target: ContentTarget, name: &'static str, fresh_seconds: i64) -> Result<Option<Self>, String> {
         let owner = owner_id();
-        let mut writer = Writer::start(target)?;
+        let mut writer = Writer::start(target.clone())?;
         if !writer.lease(name, &owner, LeaseAct::Claim, fresh_seconds)? {
             return Ok(None);
         }
         let stop = Arc::new(AtomicBool::new(false));
         let held = Arc::new(AtomicBool::new(true));
-        let (flag, holding) = (stop.clone(), held.clone());
+        let lost = Arc::new(AtomicBool::new(false));
+        let (flag, holding, losing, renewer) = (stop.clone(), held.clone(), lost.clone(), owner.clone());
         let thread = std::thread::Builder::new()
             .name("playback-activity-lease".into())
             .spawn(move || {
+                let mut renewed = Instant::now();
+                let lose = || {
+                    holding.store(false, Ordering::Relaxed);
+                    losing.store(true, Ordering::Relaxed);
+                };
                 while !flag.load(Ordering::Relaxed) {
                     std::thread::sleep(RENEW_EVERY);
                     if flag.load(Ordering::Relaxed) {
                         break;
                     }
-                    if let Ok(false) = writer.lease(name, &owner, LeaseAct::Renew, fresh_seconds) {
-                        holding.store(false, Ordering::Relaxed); // another owner took it
-                        return;
+                    match writer.lease(name, &renewer, LeaseAct::Renew, fresh_seconds) {
+                        Ok(true) => renewed = Instant::now(),
+                        // Another owner took it.
+                        Ok(false) => return lose(),
+                        // Not renewed for as long as it is fresh (external audit 2026-10-17: a
+                        // failing renewal was ignored and the work went on): another may take it.
+                        Err(_) if renewed.elapsed() >= Duration::from_secs(fresh_seconds.max(1) as u64) => return lose(),
+                        Err(_) => {}
                     }
                 }
-                let _ = writer.lease(name, &owner, LeaseAct::Release, fresh_seconds);
+                let _ = writer.lease(name, &renewer, LeaseAct::Release, fresh_seconds);
             })
             .map_err(|e| e.to_string())?;
-        Ok(Some(Self { stop, held, thread: Some(thread) }))
+        Ok(Some(Self { stop, held, lost, thread: Some(thread), target, name, owner, fresh_seconds }))
+    }
+
+    /// The cancel of the work done under this lease: set once it is lost.
+    pub fn lost(&self) -> &AtomicBool {
+        &self.lost
+    }
+
+    /// Still this owner's in the database, now: asked before work is published (external
+    /// audit 2026-10-17), so a process whose lease another took writes nothing more.
+    pub fn confirm(&self) -> bool {
+        self.held()
+            && self
+                .target
+                .open(Access::ReadOnly)
+                .and_then(|mut client| client.get_runtime(self.name))
+                .ok()
+                .flatten()
+                .is_some_and(|entry| {
+                    entry.value == qnc_content_store::lease_value(&self.owner) && entry.age_seconds <= self.fresh_seconds
+                })
     }
 
     /// Still this owner's: false once another owner took it (it was not renewed in time).
@@ -354,6 +391,22 @@ mod tests {
             read(&target, WORKER_RESULT).as_deref(),
             Some("uvezeno 2, neuspjelo 0")
         );
+    }
+
+    #[test]
+    fn a_lease_another_owner_took_is_not_confirmed_and_its_work_is_cancelled() {
+        let (_dir, target) = target();
+        let lease = Lease::claim(target.clone(), WORKER, WORKER_FRESH_SECONDS).unwrap().expect("taken");
+        assert!(lease.confirm(), "its own in the database");
+        // Another owner holds it now (as after this one was not renewed in time).
+        Writer::start(target.clone()).unwrap().set(WORKER, &qnc_content_store::lease_value("other-owner")).unwrap();
+        assert!(!lease.confirm(), "nothing may be published under it any more");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !lease.lost().load(Ordering::Relaxed) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(lease.lost().load(Ordering::Relaxed), "the renewal saw it and cancelled the work");
+        assert!(!lease.held());
     }
 
     #[test]
