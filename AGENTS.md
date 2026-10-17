@@ -4492,3 +4492,7 @@ promjene posrednika), pa se odbijeni drugi korak ponistava prvim: `qnc-virtual-s
 B-roll kadar samo dok ga nijedna pokrivalica price ne koristi; `qnc-program-segments` je salje kad je upis pokrivalice
 odbijen (`cover_writes`) i za taj kadar ne pravi poster. Otvoreno: pad programa izmedu dva koraka i dalje moze ostaviti
 kadar. Test `a_refused_cover_leaves_no_b_roll_shot_behind`.
+Izvedeno 2026-10-17 (vanjski audit, P2-8): broj kanala za A1/A2 segmenta ili pokrivalice na Wrap retku cita se iz
+spremljenog zapisa medija klipa (`qnc-source-channels::read_clip`, u istoj pozadinskoj niti kao snimka price, samo za
+klipove koji jos nisu procitani; `qnc-program-segments` `clip_channels`), ne iz vala; val ostaje prikaz. Test
+`a1_of_a_segment_takes_its_channel_count_from_the_media_record_not_the_wave`.

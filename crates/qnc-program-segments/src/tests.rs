@@ -687,3 +687,16 @@ fn ctrl_delete_on_a_chosen_slot_without_b_roll_says_so() {
     segments.apply(SegmentCommand::DeleteFocused);
     assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.slot_has_no_broll"));
 }
+
+#[test]
+fn a1_of_a_segment_takes_its_channel_count_from_the_media_record_not_the_wave() {
+    let mut segments = component();
+    let row = segments.view().rows[0].clone();
+    // No stored record counted: the sound is not taken (there is no wave either).
+    assert!(!segments.take_part_sound(0, row.start_frame));
+    assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.no_audio_channels"));
+    // The media record has four channels: taken, without any wave read.
+    segments.clip_channels.insert(row.clip_id.clone(), Some(4));
+    assert!(segments.take_part_sound(0, row.start_frame));
+    assert!(segments.part_sound_taken());
+}

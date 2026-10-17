@@ -19,6 +19,7 @@ qnc-program-waveform = { workspace = true }
 qnc-program-filmstrip = { workspace = true }
 qnc-source-timecode = { workspace = true }
 qnc-content-store = { workspace = true }
+qnc-source-channels = { workspace = true }
 qnc-prerender-launch = { workspace = true }
 
 [dev-dependencies]

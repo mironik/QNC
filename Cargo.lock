@@ -4579,6 +4579,7 @@ dependencies = [
  "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
+ "qnc-source-channels",
  "qnc-source-timecode",
  "qnc-sync-cover",
  "qnc-ui-text",

@@ -215,6 +215,9 @@ pub struct ProgramSegments {
     /// meanwhile: the form's thread never waits on the database (a reader waits while a
     /// background job writes the project database).
     reading: Option<std::sync::mpsc::Receiver<qnc_program_db::Result<StoryRead>>>,
+    /// The audio channels of each clip of the story, from its stored media record (external
+    /// audit 2026-10-17: A1/A2 of a segment hang on the wave no more; the wave only draws).
+    clip_channels: ClipChannels,
     read_again: bool,
 }
 
@@ -225,7 +228,11 @@ type StoryRead = (
     Vec<ProgramSlot>,
     Vec<ProgramCover>,
     qnc_program_db::StorySelection,
+    ClipChannels,
 );
+
+/// The audio channel count of clips of the story, from their stored media records.
+type ClipChannels = std::collections::HashMap<String, Option<u16>>;
 
 impl ProgramSegments {
     pub fn new() -> Self {
@@ -330,12 +337,21 @@ impl ProgramSegments {
             return;
         }
         let (send, receive) = std::sync::mpsc::channel();
+        // The clips counted before are not read again; the read gives the new ones.
+        let (content, known) = (self.prerender.clone(), self.clip_channels.keys().cloned().collect::<std::collections::HashSet<_>>());
         let started = std::thread::Builder::new().name("qnc-story-read".into()).spawn(move || {
             // One consistent read of the story (external audit 2026-10-17), the same the
             // player builds its program from.
             let read = StoryReader::open(&target).and_then(|mut client| {
                 let story = client.program_snapshot()?;
-                Ok((story.segments, story.markers, story.slots, story.covers, story.selection))
+                let clips = story.segments.iter().map(|segment| &segment.clip_id).chain(story.covers.iter().map(|cover| &cover.clip_id));
+                let channels = clips
+                    .filter(|clip| !known.contains(*clip))
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .into_iter()
+                    .filter_map(|clip| Some((clip.clone(), qnc_source_channels::read_clip(content.as_ref()?, clip).ok().flatten())))
+                    .collect();
+                Ok((story.segments, story.markers, story.slots, story.covers, story.selection, channels))
             });
             let _ = send.send(read);
         });
@@ -370,7 +386,8 @@ impl ProgramSegments {
 
     fn apply_read(&mut self, read: qnc_program_db::Result<StoryRead>) {
         match read {
-            Ok((stored, markers, slots, covers, selection)) => {
+            Ok((stored, markers, slots, covers, selection, channels)) => {
+                self.clip_channels.extend(channels);
                 if stored != self.stored || covers != self.stored_covers {
                     self.program_changed = true;
                     self.waker.wake(self.prerender.as_ref());
