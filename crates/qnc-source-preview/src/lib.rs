@@ -176,6 +176,27 @@ impl PreviewContext {
 
 /// How long after a frame step, cue or Play the user still counts as working.
 const HANDS_ON: std::time::Duration = std::time::Duration::from_secs(3);
+/// The most an output level may be raised by the player's `SetOutputLevels` (its contract).
+const OUTPUT_LEVEL_MAX_PERCENT: u16 = 400;
+
+/// The output levels (A1, A2) that make a drafted sound heard as the written edit will be:
+/// `None` when the output's level cannot do it (another channel, a part stored off, or more
+/// than the player's 400 %: stored -20 dB, draft 0 dB is 1000 %), so the program opens
+/// with the draft itself (external audit 2026-10-17).
+fn draft_output_level(draft: Option<&SoundDraft>, stored: Option<&SoundDraft>) -> Option<[u16; 2]> {
+    match (draft, stored) {
+        (None, _) => Some([100, 100]),
+        (Some(draft), Some(stored)) if draft.channel == stored.channel && !stored.off => {
+            let gain = if draft.off { 0.0 } else { 10f32.powf(f32::from(draft.level_db - stored.level_db) / 20.0) };
+            let percent = (gain * 100.0).round();
+            (percent <= f32::from(OUTPUT_LEVEL_MAX_PERCENT)).then(|| {
+                let percent = percent as u16;
+                if draft.lane == 0 { [percent, 100] } else { [100, percent] }
+            })
+        }
+        _ => None,
+    }
+}
 
 pub struct SourcePreview {
     view: PreviewView,
@@ -696,15 +717,7 @@ impl SourcePreview {
             return false;
         }
         if !self.program_draft_reopened {
-            let level = match (&draft, &stored) {
-                (None, _) => Some([100, 100]),
-                (Some(draft), Some(stored)) if draft.channel == stored.channel && !stored.off => {
-                    let gain = if draft.off { 0.0 } else { 10f32.powf(f32::from(draft.level_db - stored.level_db) / 20.0) };
-                    let percent = (gain * 100.0).round().clamp(0.0, 400.0) as u16;
-                    Some(if draft.lane == 0 { [percent, 100] } else { [100, percent] })
-                }
-                _ => None,
-            };
+            let level = draft_output_level(draft.as_ref(), stored.as_ref());
             if level.is_some_and(|level| self.set_output_levels(level)) {
                 return true;
             }
@@ -934,6 +947,14 @@ impl Drop for SourcePreview {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_draft_level_beyond_what_the_output_holds_opens_the_program_with_the_draft() {
+        let sound = |level_db: i8| SoundDraft { lane: 0, id: "s".into(), channel: 0, level_db, off: false };
+        assert_eq!(draft_output_level(Some(&sound(-6)), Some(&sound(-12))), Some([200, 100]), "+6 dB is the output's level");
+        assert_eq!(draft_output_level(Some(&sound(0)), Some(&sound(-20))), None, "1000 % is not: the draft itself is heard");
+        assert_eq!(draft_output_level(None, Some(&sound(-20))), Some([100, 100]), "the stored sound again");
+    }
+
     use super::*;
 
     /// Diagnostics on an isolated copy only (never the project itself): prints the

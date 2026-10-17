@@ -4496,3 +4496,9 @@ Izvedeno 2026-10-17 (vanjski audit, P2-8): broj kanala za A1/A2 segmenta ili pok
 spremljenog zapisa medija klipa (`qnc-source-channels::read_clip`, u istoj pozadinskoj niti kao snimka price, samo za
 klipove koji jos nisu procitani; `qnc-program-segments` `clip_channels`), ne iz vala; val ostaje prikaz. Test
 `a1_of_a_segment_takes_its_channel_count_from_the_media_record_not_the_wave`.
+Izvedeno 2026-10-17 (vanjski audit, P2-9): pregled razine nacrta na Wrap retku zvuci kao zapisana izmjena. Izlazna razina
+playera drzi najvise 400 % (`SetOutputLevels`), pa je npr. spremljeno -20 dB s nacrtom 0 dB (1000 %) zvucalo tise nego
+nakon Entera. Sada nacrt koji izlaz ne moze tocno dati otvara program s nacrtom (kao promjena kanala), bez ogranicenja
+(`qnc-source-preview` `draft_output_level`, `OUTPUT_LEVEL_MAX_PERCENT`). Test
+`a_draft_level_beyond_what_the_output_holds_opens_the_program_with_the_draft`, conformance. Svi koraci vanjskog audita
+(1-9) su izvedeni.
