@@ -69,6 +69,7 @@ impl Store {
                 in_frame,
                 out_frame,
             } => self.create_cover_shot(project_id, clip_id, clip_name, (*in_frame, *out_frame)),
+            Operation::ForgetCoverShot { shot_id } => self.forget_cover_shot(shot_id),
             Operation::ListShorts => self.list_shorts(),
             Operation::ListBroll => self.list_b_roll(),
             Operation::MarkShortStills {
@@ -262,6 +263,21 @@ impl Store {
             Ok(Data::Changed)
         }
     }
+    /// A B-roll shot no cover uses goes (its cover was refused); one in use stays.
+    fn forget_cover_shot(&mut self, shot_id: &str) -> Result<Data> {
+        let used = object_exists(&self.conn, "table", "story_covers")?
+            && self
+                .conn
+                .query_row("SELECT EXISTS(SELECT 1 FROM story_covers WHERE virtual_shot_id = ?1)", [shot_id], |row| row.get(0))
+                .map_err(err)?;
+        if !used {
+            self.conn
+                .execute("DELETE FROM virtual_shots WHERE shot_id = ?1 AND class = 'b_roll'", [shot_id])
+                .map_err(err)?;
+        }
+        Ok(Data::Changed)
+    }
+
     /// v5 `add_virtual_shot_from_frames` for a cover (category `cover`): the source
     /// IN/OUT becomes a B-roll virtual shot; the Story module then puts it in a slot.
     fn create_cover_shot(

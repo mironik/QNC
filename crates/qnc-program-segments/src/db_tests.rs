@@ -378,3 +378,35 @@ fn ctrl_m_takes_a_marker_after_a_segment_edge_was_dropped_with_escape() {
     segments.apply_action("step_forward_frame");
     assert_eq!(marker_frames(&segments), vec![0, 61, 150]);
 }
+
+#[test]
+fn a_refused_cover_leaves_no_b_roll_shot_behind() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    store_with_story(&file);
+    // A clip of 100 pictures: from IN 10 it cannot fill the one slot of the story (150).
+    rusqlite::Connection::open(&file).unwrap().execute("UPDATE clips SET duration_frames = 100 WHERE clip_id = 'c1'", []).unwrap();
+    let mut segments = ProgramSegments::new();
+    configure(&mut segments, &file);
+    let slot_id = segments.view().slots[0].slot_id.clone();
+    segments.cover(
+        NewCover { slot_id, clip_id: "c1".into(), in_frame: 10, out_frame: 30, fps_num: 50, fps_den: 1, a2_source_channel: 0, a2_level_db: 0, a2_off: false },
+        "C1".into(),
+    );
+    settle(&mut segments);
+    assert!(segments.view().covers.is_empty(), "the cover is refused");
+    assert!(segments.take_created_cover_shots().is_empty(), "no poster for it");
+    let shots = || -> i64 {
+        rusqlite::Connection::open(&file)
+            .unwrap()
+            .query_row("SELECT COUNT(*) FROM virtual_shots WHERE class = 'b_roll'", [], |row| row.get(0))
+            .unwrap()
+    };
+    for _ in 0..400 {
+        if shots() == 0 {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    panic!("the B-roll shot of the refused cover stayed");
+}

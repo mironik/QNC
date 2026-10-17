@@ -202,6 +202,9 @@ pub struct ProgramSegments {
     covers_waiting: Vec<(VirtualShotsPending, NewCover)>,
     /// B-roll shots saved for covers: (shot, clip, IN frame), for their posters.
     created_cover_shots: Vec<(String, String, u64)>,
+    /// The cover writes waiting for the store, with the B-roll shot made for each: a
+    /// refused cover takes its shot away again.
+    cover_writes: Vec<(String, String)>,
     /// The source IN (clip, frame) a cover was made from: used, it makes no short.
     cover_marks: Option<(String, u64)>,
     /// Write whose completion selects the new segment.
@@ -1007,7 +1010,8 @@ impl ProgramSegments {
         }
         for (cover, virtual_shot_id) in place {
             self.created_cover_shots.push((virtual_shot_id.clone(), cover.clip_id.clone(), cover.in_frame));
-            self.write(Operation::CreateCover {
+            let shot = virtual_shot_id.clone();
+            let key = self.write_keyed(Operation::CreateCover {
                 project_id: self.project_id.clone(),
                 slot_id: cover.slot_id,
                 clip_id: cover.clip_id,
@@ -1020,6 +1024,10 @@ impl ProgramSegments {
                 a2_level_db: cover.a2_level_db,
                 a2_off: cover.a2_off,
             });
+            match key {
+                Some(key) => self.cover_writes.push((key, shot)),
+                None => self.forget_cover_shot(shot),
+            }
         }
         let mut created = None;
         let mut waiting = Vec::new();
@@ -1035,8 +1043,16 @@ impl ProgramSegments {
                             created = Some(segment_id);
                         }
                         Ok(_) => {}
-                        Err(error) => message = error,
+                        Err(error) => {
+                            message = error;
+                            // A refused cover leaves no B-roll shot behind.
+                            if let Some(index) = self.cover_writes.iter().position(|(written, _)| *written == key) {
+                                let (_, shot) = self.cover_writes.remove(index);
+                                self.forget_cover_shot(shot);
+                            }
+                        }
                     }
+                    self.cover_writes.retain(|(written, _)| *written != key);
                 }
             }
         }
@@ -1063,6 +1079,14 @@ impl ProgramSegments {
             self.refresh_view(message);
         }
         true
+    }
+
+    /// The B-roll shot made for a refused cover goes again (its poster is not made).
+    fn forget_cover_shot(&mut self, shot_id: String) {
+        self.created_cover_shots.retain(|(shot, _, _)| *shot != shot_id);
+        if let Some(shots) = &self.shots {
+            let _ = shots.submit(&ShotOperation::ForgetCoverShot { shot_id });
+        }
     }
 
     fn next_key(&mut self, what: &str) -> String {

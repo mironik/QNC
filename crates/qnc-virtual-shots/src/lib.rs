@@ -66,6 +66,12 @@ pub enum Operation {
         in_frame: u64,
         out_frame: u64,
     },
+    /// The B-roll shot made for a cover whose write was refused (external audit 2026-10-17:
+    /// a refused cover left its new B-roll shot behind, and every retry one more). Removed
+    /// only while no cover of the story uses it.
+    ForgetCoverShot {
+        shot_id: String,
+    },
     ListShorts,
     /// The B-roll virtual shots (covers), oldest first.
     ListBroll,

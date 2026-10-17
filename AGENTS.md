@@ -4486,3 +4486,9 @@ se ne pogada. Citanje kroz jedini citac kataloga `qnc-content-read::clip_timing_
 dobili su spremljenu duljinu i stopu kao stvarni (`set_clip_timing`; `qnc-program-segments` db testovi); testovi stope
 price uskladuju zapis klipa prije upisa. Provjereno citanjem kopije projekta: svih 105 klipova ima duljinu i stopu.
 Testovi, conformance.
+Izvedeno 2026-10-17 (vanjski audit, P2-7; korisnik: "da, otkljucaj i kreni s 7, 8 i 9"): odbijena pokrivalica ne ostavlja
+B-roll kadar. B-roll kadar i pokrivalica pisu dva modula tablica sa zasebnim vezama (jedna SQL transakcija nije moguca bez
+promjene posrednika), pa se odbijeni drugi korak ponistava prvim: `qnc-virtual-shots` operacija `ForgetCoverShot` brise
+B-roll kadar samo dok ga nijedna pokrivalica price ne koristi; `qnc-program-segments` je salje kad je upis pokrivalice
+odbijen (`cover_writes`) i za taj kadar ne pravi poster. Otvoreno: pad programa izmedu dva koraka i dalje moze ostaviti
+kadar. Test `a_refused_cover_leaves_no_b_roll_shot_behind`.
