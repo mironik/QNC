@@ -4551,3 +4551,7 @@ Izmjena izgleda 2026-10-17 (korisnik: "trebas dodati skrol u segment panel"): ko
 playhead (pravilo od 16. 10.), pa se redovi nisu imali cime listati (plutajuca traka gotovo se ne vidi). Wrap redovi
 panela Segmenti imaju punu traku za listanje uz desni rub, uvijek vidljivu (`qnc-segment-panel`); lista se kotacicem iznad
 nje ili povlacenjem. Redovi su zato uzi za sirinu trake.
+Dopuna 2026-10-17 (korisnik: "napravi vidljiviji vertikalni skrol sirine cijele desne margine"): traka za listanje Wrap
+redova ispunjava desnu marginu panela Segmenti (10 px, `PANEL_MARGIN`), pa redovi zadrzavaju svoju sirinu; boje su
+kontrastne (podloga boja ruba panela, rucka prigusena boja teksta, pod misem boja teksta, dok se vuce boja playheada).
+`qnc-segment-panel`. Kotacic iznad Wrap reda i dalje pomice playhead.

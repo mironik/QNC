@@ -102,16 +102,24 @@ pub fn show(
             let overview = TimelineMetrics::default().outer_height(layers(segments.video_compact), AudioLane::None);
             let playlist_top = body.bottom() - (PLAYLIST_BAR_H + overview).min(body.height());
             let stack_bottom = (playlist_top - BOTTOM_GAP).max(body.top());
-            let stack =
-                egui::Rect::from_min_max(body.left_top(), egui::pos2(body.right(), stack_bottom));
+            // The rows' scroll bar fills the panel's right margin (user 2026-10-17): the rows
+            // keep their width.
+            let stack = egui::Rect::from_min_max(body.left_top(), egui::pos2(body.right() + PANEL_MARGIN, stack_bottom));
             let playlist =
                 egui::Rect::from_min_max(egui::pos2(body.left(), playlist_top), body.max);
             ui.scope_builder(egui::UiBuilder::new().max_rect(stack), |ui| {
                 ui.set_clip_rect(stack);
                 // The wheel over a Wrap row moves its playhead (user 2026-10-16), so the rows
-                // scroll by a solid bar at their right, always shown (user 2026-10-17): the
-                // wheel over it or a drag of it.
-                ui.style_mut().spacing.scroll = egui::style::ScrollStyle::solid();
+                // scroll by a solid bar as wide as the panel's right margin, always shown and
+                // easy to see (user 2026-10-17): the wheel over it or a drag of it.
+                let mut scroll = egui::style::ScrollStyle::solid();
+                (scroll.bar_width, scroll.bar_inner_margin, scroll.bar_outer_margin) = (PANEL_MARGIN, 0.0, 0.0);
+                ui.style_mut().spacing.scroll = scroll;
+                let visuals = ui.visuals_mut();
+                visuals.extreme_bg_color = style.border;
+                visuals.widgets.inactive.bg_fill = style.muted;
+                visuals.widgets.hovered.bg_fill = style.text;
+                visuals.widgets.active.bg_fill = style.playhead;
                 egui::ScrollArea::vertical()
                     .id_salt("qnc_segment_panel_stack")
                     .auto_shrink([false, false])
