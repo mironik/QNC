@@ -32,6 +32,18 @@ pub struct PartSound {
 }
 
 impl PartSound {
+    /// The lanes of the taken part, for the keys every timeline gives its lanes
+    /// (`qnc_timeline::lane_key`); `None` when no part is taken.
+    pub fn lanes_mut(&mut self) -> Option<&mut LaneChoice> {
+        self.taken.as_ref()?;
+        Some(&mut self.lanes)
+    }
+
+    /// The lanes of the taken part (its draft, for the status line).
+    pub fn lanes(&self) -> &LaneChoice {
+        &self.lanes
+    }
+
     /// The part is taken with its kept sound as draft; `channels` is how many its clip
     /// has. False without channels (its sound is not known).
     pub fn take(&mut self, part: Part, kept: Lane, channels: Option<u16>) -> bool {

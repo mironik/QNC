@@ -5097,6 +5097,7 @@ dependencies = [
  "qnc-channel-picker",
  "qnc-dev-diagnostics",
  "qnc-filmstrip",
+ "qnc-lane-choice",
  "qnc-ui-kit",
  "qnc-ui-text",
  "qnc-wave-view",

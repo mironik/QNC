@@ -11,7 +11,8 @@
     "timeline.filmstrip_background.paint",
     "timeline.wave_peaks.paint",
     "timeline.hit_test",
-    "timeline.intent.emit"
+    "timeline.intent.emit",
+    "timeline.audio_lanes.keys"
   ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
@@ -50,6 +51,7 @@
   "intent_policy": "emit_only",
   "database_write_policy": "no_db_writes",
   "state_owner": "qnc.module.broadcast-player",
+  "audio_lanes_policy": "User 2026-10-17: the universal timeline is the basis. The A1/A2 lane keys (take, channel, off/on, level by 1 dB, keep, drop), the status words and the channel column with the level beside A1/A2 are this module's and the same on every timeline (source timeline, Wrap rows, program row). The lane state is owned by the caller (qnc-lane-choice), who also says what a lane belongs to and writes what Enter kept.",
   "ui_layers": [
     "carrier",
     "audio_a1",

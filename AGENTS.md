@@ -4317,3 +4317,14 @@ Razina se vidi na traci: uz dugme A1/A2 pise "+N dB" ili "OFF" kad nije kako je 
 (`qnc-timeline` `paint_lane_level`, `ChannelChoice.heard_db`); poruka statusa Storyja se nigdje nije crtala.
 C10: Story application 700 -> 699, Story ploca 353 -> 349, Ingest application 1584 (isto). Testovi, conformance.
 Uzivo nije provjereno.
+Promjena pravila i izvedba 2026-10-17 (korisnik: "i dalje ne koristis univerzalnu timeline kocku.. to je osnova";
+potvrdio: upravljanje trakama A1/A2 prelazi u samu kocku `qnc-timeline` i jednako je na source timelineu, Wrap redovima
+i redu programa; Ctrl+kotacic mijenja razinu tek nakon Ctrl+1/Ctrl+2): dopuna pravila 8.1 - timeline i dalje nema
+playback sat, playhead, IN/OUT ni bazu, ali pravila A1/A2 traka su njegova: koja tipka sto radi traci (`LaneKey`:
+Ctrl+1/Ctrl+2 uzima, gore/dolje kanal, lijevo/desno off/on, Ctrl+lijevo/desno i Ctrl+kotacic razina, Enter zadrzi,
+Esc odbaci), rijeci statusa (`lane_message`) i stupac kanala s razinom uz A1/A2 (`lane_choice`, `drafted_choice`).
+Stanje traka drzi vlasnik (`qnc-lane-choice`), on kaze cemu traka pripada i zapisuje sto je Enter zadrzao.
+`qnc-timeline` (`lanes.rs`, ugovor `timeline.module.json` `audio_lanes_policy`), `qnc-source-timeline` (tipke traka
+idu kroz `LaneKey`), `qnc-part-sound` (`lanes_mut`), `qnc-program-segments` (bez vlastitih koraka kanala/off/razine,
+`part_sound_lanes`), `qnc-panel-focus` (Wrap redak: jedna grana za tipke traka kroz `qnc_timeline::lane_key`),
+`qnc-segment-panel` (`drafted_choice`). Testovi, conformance. Uzivo nije provjereno.

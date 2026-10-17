@@ -10,6 +10,7 @@ qnc-wheel-jog = { workspace = true }
 qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-channel-picker = { workspace = true }
+qnc-lane-choice = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-wave-view = { workspace = true }

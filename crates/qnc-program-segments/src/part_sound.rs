@@ -66,25 +66,10 @@ impl ProgramSegments {
         Some((part.lane, part.id.clone(), draft))
     }
 
-    /// Up/down on the taken part: its draft channel.
-    pub fn part_sound_draft(&mut self, delta: i64) -> bool {
-        let moved = self.part_sound.draft(delta);
-        self.refresh_part_sound();
-        moved
-    }
-
-    /// Left (`off`) or right on the taken part.
-    pub fn part_sound_off(&mut self, off: bool) -> bool {
-        let changed = self.part_sound.set_off(off);
-        self.refresh_part_sound();
-        changed
-    }
-
-    /// Ctrl+left/right on the taken part: its level.
-    pub fn part_sound_level(&mut self, delta_db: i8) -> bool {
-        let changed = self.part_sound.nudge_level(delta_db);
-        self.refresh_part_sound();
-        changed
+    /// The lanes of the taken part, for the keys every timeline gives its lanes
+    /// (`qnc_timeline::lane_key`); the caller says what it did with [`Self::say`].
+    pub fn part_sound_lanes(&mut self) -> Option<&mut qnc_lane_choice::LaneChoice> {
+        self.part_sound.lanes_mut()
     }
 
     /// Enter: the change is written (one UNDO step); the program plays it once stored.
@@ -112,21 +97,11 @@ impl ProgramSegments {
         released
     }
 
-    /// The taken part and its draft in the view and the status, in the words of a lane.
+    /// The taken part and its draft in the view.
     fn refresh_part_sound(&mut self) {
-        let Some((part, draft)) = self.part_sound.taken() else {
-            return;
-        };
-        let name = if part.lane == 0 { "A1" } else { "A2" };
-        let message = if draft.off {
-            qnc_ui_text::fill("story.msg.lane_off", &[("lane", &name.to_string())])
-        } else {
-            qnc_ui_text::fill(
-                "story.msg.lane_level",
-                &[("lane", &name.to_string()), ("channel", &(draft.channel + 1).to_string()), ("level", &format!("{:+}", draft.level_db))],
-            )
-        };
-        self.refresh_view(message);
+        if self.part_sound.taken().is_some() {
+            self.refresh_view(self.view.message.clone());
+        }
     }
 
     /// What the view shows of the taken part.

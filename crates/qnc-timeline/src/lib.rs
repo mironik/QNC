@@ -8,6 +8,9 @@ use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKin
 use qnc_filmstrip::{FILMSTRIP_FRAME_COUNT, FilmstripBackground};
 pub use qnc_channel_picker::ChannelChoice;
 
+mod lanes;
+pub use lanes::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
+
 pub const MODULE_ID: &str = "qnc.module.timeline";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 

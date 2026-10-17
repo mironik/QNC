@@ -328,13 +328,9 @@ fn paint_program(
                 segments.covers.iter().find(|cover| cover.cover_id == part.id && (start..end).contains(&cover.start_frame)).map(|cover| cover.a2_level_db)
             })
         };
-        segments.part_sound.as_ref().filter(|part| part.lane == lane).zip(stored).map(|(part, stored)| qnc_timeline::ChannelChoice {
-            selected: part.channel,
-            count: part.channels,
-            open: true,
-            off: part.off,
-            level_db: part.level_db.saturating_sub(stored),
-            heard_db: part.level_db,
+        segments.part_sound.as_ref().filter(|part| part.lane == lane).zip(stored).map(|(part, stored)| {
+            let now = qnc_timeline::Lane { channel: part.channel, off: part.off, level_db: part.level_db };
+            qnc_timeline::drafted_choice(now, part.channels, true, stored)
         })
     };
     let intent = qnc_timeline::show(

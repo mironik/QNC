@@ -19,7 +19,7 @@ use qnc_lane_choice::{Lane, LaneChoice};
 use qnc_source_dock::{show_timeline_dock, SourceTimeline as DockTimeline, TimelineDockStyle};
 use qnc_source_panel::SourcePanel;
 use qnc_source_preview::SourcePreview;
-use qnc_timeline::{AudioLane, ChannelChoice, TimelineIntent, TimelineProjection, TimelineTheme};
+use qnc_timeline::{lane_choice, lane_key, lane_message, AudioLane, TimelineIntent, TimelineProjection, TimelineTheme, LaneKey};
 use qnc_timeline_assets::SourceTimelineAssets;
 
 pub use qnc_source_channels::ContentTarget;
@@ -40,8 +40,8 @@ const SAME_ENTER: Duration = Duration::from_millis(150);
 /// artifacts: the lane pickers, the large wave and the clip's timecode.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SourceTimelineView {
-    pub a1: Option<ChannelChoice>,
-    pub a2: Option<ChannelChoice>,
+    pub a1: Option<qnc_timeline::ChannelChoice>,
+    pub a2: Option<qnc_timeline::ChannelChoice>,
     pub wave_over_video: Option<(AudioLane, u8)>,
     pub timecode: Option<SourceTimecode>,
     /// What a taken lane does, for the form's status line (empty: nothing to say).
@@ -190,39 +190,19 @@ impl SourceTimeline {
         }
     }
 
-    /// The keys of A1/A2 (user rules 2026-10-01, 2026-10-14, 2026-10-15): Ctrl+1/Ctrl+2
-    /// take the lane, up/down its channel, left off, right on, Ctrl+left/right its level,
-    /// Enter keeps, Escape drops; all heard at once.
+    /// The keys of A1/A2, the same on every timeline (`qnc_timeline::LaneKey`): Ctrl+1/Ctrl+2
+    /// take a lane of the shown clip; while it is taken the timeline's lane keys drive it;
+    /// all heard at once.
     pub fn route_lane(&mut self, action_id: &str, preview: &mut SourcePreview) -> Option<bool> {
-        let changed = match action_id {
-            "select_audio_a1" | "select_audio_a2" => {
-                let lane = u8::from(action_id == "select_audio_a2");
-                if !self.lanes.take(lane) {
-                    self.message = qnc_ui_text::text("story.msg.no_audio_channels").into();
-                    return Some(self.after_lane(false, preview));
-                }
-                self.message = qnc_ui_text::fill("story.msg.lane_taken", &[("lane", &lane_name(lane).to_string())]);
-                true
-            }
-            _ if !self.lane_taken() => return None,
-            "step_prev_part" | "step_next_part" => self.lanes.draft(if action_id == "step_prev_part" { -1 } else { 1 }),
-            "step_back_frame" | "step_forward_frame" => self.lanes.set_off(action_id == "step_back_frame"),
-            "lane_level_down" | "lane_level_up" => self.lanes.nudge_level(if action_id == "lane_level_down" { -1 } else { 1 }),
-            "activate_focused_item" => {
-                let kept = self.lanes.commit();
-                self.lanes.mark_committed();
-                self.message.clear();
-                kept
-            }
-            "clear_focus" | "close_player" => {
-                self.message.clear();
-                self.lanes.release()
-            }
-            _ => return None,
-        };
-        if self.lane_taken() {
-            self.message = lane_message(&self.lanes);
+        let key = LaneKey::of(action_id)?;
+        if !matches!(key, LaneKey::Take(_)) && !self.lane_taken() {
+            return None;
         }
+        let changed = lane_key(&mut self.lanes, key);
+        self.message = match (key, changed) {
+            (LaneKey::Take(_), false) => qnc_ui_text::text("story.msg.no_audio_channels").into(),
+            _ => lane_message(&self.lanes),
+        };
         Some(self.after_lane(changed, preview))
     }
 
@@ -236,41 +216,13 @@ impl SourceTimeline {
 
     fn refresh(&mut self, timecode: Option<SourceTimecode>) {
         self.view = SourceTimelineView {
-            a1: lane_choice(&self.lanes, 0),
-            a2: lane_choice(&self.lanes, 1),
+            a1: lane_choice(&self.lanes, 0, 0),
+            a2: lane_choice(&self.lanes, 1, 0),
             wave_over_video: wave_over_video(&self.lanes),
             timecode,
             message: self.message.clone(),
         };
     }
-}
-
-fn lane_name(lane: u8) -> &'static str {
-    if lane == 0 { "A1" } else { "A2" }
-}
-
-/// The taken lane in the words of the status line: its channel, on/off and level.
-fn lane_message(lanes: &LaneChoice) -> String {
-    let Some((lane, _)) = lanes.taken() else {
-        return String::new();
-    };
-    let (draft, name) = (lanes.lane(lane), lane_name(lane).to_string());
-    if draft.off {
-        return qnc_ui_text::fill("story.msg.lane_off", &[("lane", &name)]);
-    }
-    qnc_ui_text::fill(
-        "story.msg.lane_level",
-        &[("lane", &name), ("channel", &(draft.channel + 1).to_string()), ("level", &format!("{:+}", draft.level_db))],
-    )
-}
-
-/// The channel picker of A1 (lane 0) or A2: a taken lane shows its draft with the picker
-/// open; the wave is drawn at the level the lane plays now.
-fn lane_choice(lanes: &LaneChoice, lane: u8) -> Option<ChannelChoice> {
-    let (_, count) = lanes.choice(lane)?;
-    let now = lanes.lane(lane);
-    let open = lanes.taken().is_some_and(|(taken, _)| taken == lane);
-    Some(ChannelChoice { selected: now.channel, count, open, off: now.off, level_db: now.level_db, heard_db: now.level_db })
 }
 
 /// The wave over the video row: the taken lane's, else A1's, else A2's.

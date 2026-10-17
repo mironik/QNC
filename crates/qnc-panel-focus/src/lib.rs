@@ -12,7 +12,7 @@ use eframe::egui;
 use qnc_program_segments::{ProgramSegments, SyncSpace};
 use qnc_source_preview::{SourcePreview, TransientCover};
 use qnc_source_mark_focus::MarkKey;
-use qnc_timeline::{TimelineIntent, TimelineProjection};
+use qnc_timeline::{LaneKey, TimelineIntent, TimelineProjection};
 use qnc_wrap_session::WrapSession;
 
 pub const MODULE_ID: &str = "qnc.module.panel-focus";
@@ -313,21 +313,20 @@ impl PanelFocus {
             // On the segment panel the same keys take the sound of the stored segment (A1) or
             // cover (A2) under the Wrap playhead (user 2026-10-16); Enter writes it.
             // The draft is heard in the program at once (user 2026-10-16), before Enter.
+            // The lane keys are those of every timeline (`qnc_timeline::LaneKey`): the Wrap row's
+            // lanes are driven the same way as the source timeline's.
             "select_audio_a1" | "select_audio_a2" if panel == Panel::Segments => {
-                segments.take_part_sound(u8::from(action_id == "select_audio_a2"), wrap.playhead())
+                let taken = segments.take_part_sound(u8::from(action_id == "select_audio_a2"), wrap.playhead());
+                say_part_lane(segments);
+                taken
             }
-            "step_prev_part" | "step_next_part" if panel == Panel::Segments && segments.part_sound_taken() => {
-                let changed = segments.part_sound_draft(if action_id == "step_prev_part" { -1 } else { 1 });
-                preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
-                changed
-            }
-            "step_back_frame" | "step_forward_frame" if panel == Panel::Segments && segments.part_sound_taken() => {
-                let changed = segments.part_sound_off(action_id == "step_back_frame");
-                preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
-                changed
-            }
-            "lane_level_down" | "lane_level_up" if panel == Panel::Segments && segments.part_sound_taken() => {
-                let changed = segments.part_sound_level(if action_id == "lane_level_down" { -1 } else { 1 });
+            lane if panel == Panel::Segments
+                && segments.part_sound_taken()
+                && matches!(LaneKey::of(lane), Some(LaneKey::Channel(_) | LaneKey::Off(_) | LaneKey::Level(_))) =>
+            {
+                let key = LaneKey::of(lane).unwrap_or(LaneKey::Drop);
+                let changed = segments.part_sound_lanes().is_some_and(|lanes| qnc_timeline::lane_key(lanes, key));
+                say_part_lane(segments);
                 preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
                 changed
             }
@@ -654,6 +653,13 @@ pub fn wheel_action(command: &qnc_program_segments::SegmentCommand) -> Option<&'
     match command {
         qnc_program_segments::SegmentCommand::Wheel { up, ctrl } => Some(qnc_wheel_jog::Wheel { up: *up, ctrl: *ctrl }.action(WHEEL_SEGMENTS)),
         _ => None,
+    }
+}
+
+/// The taken lane of the Wrap row in the status line, in the timeline's words.
+fn say_part_lane(segments: &mut ProgramSegments) {
+    if let Some(message) = segments.part_sound_lanes().map(|lanes| qnc_timeline::lane_message(lanes)) {
+        segments.say(message);
     }
 }
 
