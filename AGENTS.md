@@ -4298,3 +4298,22 @@ kocke"): snimke ekrana tijekom kotacica pokazale su da u nekim slikama cijeli so
 Segmenti daje namjeru svaki frame, pa dock (iza njega) nije crtan. Sada se svaka kocka crta neovisno o drugima, a prva
 namjera je namjera ploce (jedna po frameu). Test `every_block_is_drawn_even_after_an_earlier_one_answered`,
 conformance. Provjereno u izoliranoj kopiji: 20 snimaka tijekom kotacica, dock nacrtan u svakoj.
+Otkljucano i izvedeno 2026-10-17 (korisnik: "opet radis posebne verzije source timeline... sve moraju biti iste, znaci
+samo jedan source timeline, forme ga samo ugraduju"; "odkljucaj i napravi"; "source timeline panel je modul, source
+timeline je kocka, samo source timeline dugmad moze imati drugacije funkcije"; "korisnik mora moci uredivati ton i u
+Wrap-segment timelineu"): nova javna kocka `crates/qnc-source-timeline` (+ ugovor
+`contracts/modules/source-timeline.module.json`) je jedini source timeline: A1/A2 trake (kanal, off/on, razina, veliki
+val; `qnc-lane-choice`), broj kanala i izvorni timecode prikazanog klipa (`qnc-source-channels`,
+`qnc-source-timecode`), tipke i kotacic (`qnc-source-panel`, Ctrl+kotacic razina), klik na A1/A2 i na kanal
+(`action_of`, `choose_action`), crtanje kroz `qnc-source-dock` (`show`). Kocke se ne spajaju, kocka ih sastavlja.
+Forme (Story/MA ploca, Ingest ploca) samo ugraduju `qnc_source_timeline::show` s vlastitim dugmadima zaglavlja.
+Uklonjeno: trake iz `qnc-program-segments` (`lanes.rs`, izbor kanala, `audible/heard_channels`; prica dobiva zadrzane
+trake i "Enter je zauzet" kroz `SourcePick::with_lanes`), polja traka iz `qnc-program-view`, Story dodatak source
+timelineu `qnc-segment-panel::source_lanes` (`.story(..)`), Story i Ingest vlastiti prijevodi radnji timelinea, mrtvi
+Ingest `ingest_toggle_audio_lane`. Ingest sada ima iste A1/A2 mogucnosti kao Story (katalog: Ctrl+1/Ctrl+2,
+Ctrl+lijevo/desno u Ingest scopeu; akcije klika na kanal `source_choose_a1_channel` / `_a2_`). Uredivanje tona
+spremljenog segmenta ili pokrivalice na Wrap retku ostaje (`qnc-part-sound`), a val Wrap reda prati nacrt razine.
+Razina se vidi na traci: uz dugme A1/A2 pise "+N dB" ili "OFF" kad nije kako je snimljeno ili dok je traka uzeta
+(`qnc-timeline` `paint_lane_level`, `ChannelChoice.heard_db`); poruka statusa Storyja se nigdje nije crtala.
+C10: Story application 700 -> 699, Story ploca 353 -> 349, Ingest application 1584 (isto). Testovi, conformance.
+Uzivo nije provjereno.

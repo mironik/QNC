@@ -6,11 +6,8 @@ pub fn timeline_intent_to_ingest_intent(intent: TimelineIntent) -> Option<Ingest
             action_ids::INGEST_CUE_FRAME, // V is Home: frame 0
             IngestPayload::Frame(if let TimelineIntent::CueFrame(frame) = cue { frame.min(i64::MAX as u64) as i64 } else { 0 }),
         )),
-        // The wheel is the same in every form (user 2026-10-16).
-        TimelineIntent::Wheel(wheel) => Some(IngestIntent::empty(wheel.action(qnc_wheel_jog::SOURCE_ACTIONS))),
-        // Ingest gives no A1/A2 channel choice, so its timeline never asks for one.
-        TimelineIntent::ToggleAudioExpand(_) | TimelineIntent::ChooseA1Channel(_) | TimelineIntent::ChooseA2Channel(_) | TimelineIntent::TakeAudioLane(_) => None,
-        TimelineIntent::SelectVirtual { .. } | TimelineIntent::SelectCover { .. } | TimelineIntent::SelectMarkerSlot { .. }
-        | TimelineIntent::SelectMarker { .. } | TimelineIntent::ToggleVideoMode | TimelineIntent::None => None,
+        // The wheel and a click on A1/A2 or a channel are the source timeline's own actions.
+        other => qnc_source_timeline::SourceTimeline::action_of(&other)
+            .map(|(action, channel)| IngestIntent::new(action, channel.map_or(IngestPayload::None, |channel| IngestPayload::Frame(i64::from(channel))))),
     }
 }

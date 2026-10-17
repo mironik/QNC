@@ -19,6 +19,10 @@ pub struct ChannelChoice {
     pub off: bool,
     /// The lane's level in dB (0 as recorded): its wave is drawn at it (user 2026-10-16).
     pub level_db: i8,
+    /// The level the lane is heard at, written beside its button when it is not 0 or the
+    /// lane is taken (live 2026-10-16: the user did not see the level). It differs from
+    /// `level_db` where the wave is already drawn at a stored level (a Wrap row).
+    pub heard_db: i8,
 }
 
 impl ChannelChoice {
@@ -105,7 +109,7 @@ mod tests {
 
     #[test]
     fn a_lane_is_drawn_at_its_level() {
-        let choice = |off, level_db| ChannelChoice { selected: 0, count: 2, open: false, off, level_db };
+        let choice = |off, level_db| ChannelChoice { selected: 0, count: 2, open: false, off, level_db, heard_db: level_db };
         assert_eq!(choice(false, 0).gain(), 1.0);
         assert!((choice(false, -6).gain() - 0.501).abs() < 0.001, "-6 dB is about half");
         assert_eq!(choice(true, 6).gain(), 0.0, "off is flat");
@@ -115,7 +119,7 @@ mod tests {
 
     #[test]
     fn the_column_grows_over_the_video_and_never_into_the_other_lane() {
-        let choice = ChannelChoice { selected: 1, count: 4, open: true, off: false, level_db: 0 };
+        let choice = ChannelChoice { selected: 1, count: 4, open: true, off: false, level_db: 0, heard_db: 0 };
         // The video row between A1 (0..18) and A2 (82..100).
         let down = column_rect(40.0, 28.0, (18.0, 82.0), 18.0, true, choice);
         assert_eq!((down.top(), down.height()), (18.0, 64.0), "under A1, lower cells to fit");

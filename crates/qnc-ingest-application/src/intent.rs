@@ -9,7 +9,6 @@ pub enum IngestPayload {
     ClipId(String),
     Bool(bool),
     Frame(i64),
-    AudioLane(String),
     ClipFilter(ClipFilter),
 }
 

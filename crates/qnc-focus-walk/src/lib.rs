@@ -118,16 +118,12 @@ impl FocusWalk {
         let back = action_id == "step_back_frame";
         match (panel.as_str(), action_id) {
             (_, "focus_next" | "focus_prev") => Walk::Done(self.step_panel(action_id == "focus_next")),
-            // The wheel over the source timeline or monitor (user 2026-10-16, the same in every
-            // form): the keyboard goes there and the wheel is its left/right arrow; Ctrl+wheel
-            // (the level of a taken sound) has nothing to take here.
+            // The wheel over the source timeline (user 2026-10-16, the same in every form): the
+            // keyboard goes there and the source timeline takes the wheel itself (piece
+            // `qnc-source-timeline`: the arrows, Ctrl+wheel the level of a taken lane).
             (_, wheel) if wheel.starts_with("wheel_source") => {
                 self.go(SOURCE_TIMELINE);
-                match qnc_wheel_jog::source_step_forward(wheel) {
-                    Some(true) => Walk::Action("step_forward_frame".into()),
-                    Some(false) => Walk::Action("step_back_frame".into()),
-                    None => Walk::Done(false),
-                }
+                Walk::Pass
             }
             // A click on a panel puts the keyboard there; the card Enter opened goes on to the
             // source timeline.
@@ -190,6 +186,13 @@ impl FocusWalk {
         let index = if back { from.saturating_sub(1) } else { (from + 1).min(count.saturating_sub(1)) };
         self.chosen.insert(panel.to_string(), index);
         self.row(panel).and_then(|row| row.get(index).cloned())
+    }
+
+    /// The keyboard goes to the panel `name` (a key of another panel took it there); the
+    /// view after it.
+    pub fn focus(&mut self, name: &str) -> WalkView {
+        self.go(name);
+        self.view()
     }
 
     fn go(&mut self, name: &str) {

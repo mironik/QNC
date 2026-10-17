@@ -77,13 +77,13 @@ pub struct IngestApplication {
     selection_session: selection::SelectSession,
     root: Option<std::path::PathBuf>,
     worker: worker_launch::WorkerLauncher,
-    timecodes: qnc_source_timecode::SourceTimecodes,
     camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
     selection_events: qnc_ingest_clip_list::SelectEventState,
     /// The keyboard walk over the panels (the form's layout contract gives the order).
     walk: qnc_focus_walk::FocusWalk,
-    /// The keys of the source timeline, the same piece every form takes.
-    source_panel: qnc_source_panel::SourcePanel,
+    /// The one source timeline every form embeds (piece `qnc-source-timeline`): its keys,
+    /// wheel, A1/A2 lanes and the clip's timecode.
+    source_timeline: qnc_source_timeline::SourceTimeline,
 }
 
 impl IngestApplication {

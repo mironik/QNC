@@ -7,7 +7,8 @@ pub struct IngestViewModel {
     pub focus: qnc_focus_walk::WalkView,
     /// Original timecode of the previewed clip (camera XML, else the one probe).
     #[serde(skip)]
-    pub source_timecode: Option<qnc_source_timecode::SourceTimecode>,
+    /// What the one source timeline shows besides the clip (lanes, large wave, timecode).
+    pub source_timeline: qnc_source_timeline::SourceTimelineView,
     #[serde(skip)]
     pub playback: qnc_player_client::View,
     #[serde(skip)]
@@ -38,7 +39,7 @@ impl Default for IngestViewModel {
         Self {
             source_kind: SourceKind::Local,
             focus: Default::default(),
-            source_timecode: None,
+            source_timeline: Default::default(),
             playback: Default::default(),
             timeline: Default::default(),
             timeline_assets: SourceTimelineAssets::empty(),

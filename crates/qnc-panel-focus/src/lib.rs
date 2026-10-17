@@ -110,8 +110,9 @@ pub struct PanelFocus {
     last_panel: Panel,
     /// Ctrl+I or Ctrl+O took a source mark: the arrows move it, not the playhead
     /// (an I or O press only marks; the playhead keeps the arrows, v5).
-    /// The keys of the source timeline, the same piece every form takes.
-    source: qnc_source_panel::SourcePanel,
+    /// The one source timeline (piece `qnc-source-timeline`): its keys, the wheel and the
+    /// A1/A2 lanes, the same in every form.
+    source: qnc_source_timeline::SourceTimeline,
     /// Up/Down on a taken edit: the key picture search and what its answer moves.
     keyframes: qnc_keyframe_nav::KeyframeNav,
     jump: Option<Jump>,
@@ -150,6 +151,15 @@ impl PanelFocus {
     /// A mark taken with Ctrl+I/O that the source timeline still has in focus.
     fn taken(&mut self, timeline: &TimelineProjection) -> bool {
         self.source.mark_taken(timeline)
+    }
+
+    /// The source timeline this form embeds.
+    pub fn source_timeline(&self) -> &qnc_source_timeline::SourceTimeline {
+        &self.source
+    }
+
+    pub fn source_timeline_mut(&mut self) -> &mut qnc_source_timeline::SourceTimeline {
+        &mut self.source
     }
 
     pub fn panel(&self) -> Panel {
@@ -294,8 +304,8 @@ impl PanelFocus {
                 if self.panel == Panel::Segments && segments.part_sound_taken() {
                     return Some(wrap.step(frames));
                 }
-                if self.panel == Panel::SourceTimeline && segments.lane_is_taken() {
-                    return Some(preview.step(frames));
+                if self.panel == Panel::SourceTimeline && self.source.lane_taken() {
+                    return self.source.route(wheel, preview, timeline); // the playhead moves
                 }
                 let arrow = if forward { "step_forward_frame" } else { "step_back_frame" };
                 return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
@@ -326,19 +336,14 @@ impl PanelFocus {
                 preview.hear_program_draft(None, None, wrap.playhead()); // the stored sound again
                 released
             }
+            // A1/A2 of the source timeline are its own (piece `qnc-source-timeline`): Ctrl+1,
+            // Ctrl+2 take a lane there; while it is taken its keys belong to it.
             "select_audio_a1" | "select_audio_a2" => {
                 self.panel = Panel::SourceTimeline; // the lane is on the source timeline
-                segments.take_lane(u8::from(action_id == "select_audio_a2"))
+                return self.source.route(action_id, preview, timeline);
             }
-            "step_back_frame" | "step_forward_frame" if on_source && segments.lane_is_taken() => {
-                let changed = segments.lane_off(action_id == "step_back_frame");
-                preview.hear_channels(segments.audible_channels());
-                changed
-            }
-            "lane_level_down" | "lane_level_up" if on_source && segments.lane_is_taken() => {
-                let changed = segments.lane_level(if action_id == "lane_level_down" { -1 } else { 1 });
-                preview.hear_channels(segments.audible_channels());
-                changed
+            lane if on_source && self.source.lane_taken() && LANE_KEYS.contains(&lane) => {
+                return self.source.route(lane, preview, timeline);
             }
             // A Sync (user 2026-10-13): stopped, the arrows move its end; Enter writes the
             // cover, Delete drops the draft, wherever the keyboard is.
@@ -409,13 +414,6 @@ impl PanelFocus {
                 true
             }
             "step_prev_part" | "step_next_part" if matches!(panel, Panel::PoolTabs | Panel::SourceButtons) => false,
-            // A taken lane (user 2026-10-14): its channels stand in a column, up/down pick.
-            // The draft is heard at once (user 2026-10-14); Enter only keeps it.
-            "step_prev_part" | "step_next_part" if on_source && segments.lane_is_taken() => {
-                let moved = segments.lane_draft(if action_id == "step_prev_part" { -1 } else { 1 });
-                preview.hear_channels(segments.audible_channels());
-                moved
-            }
             // Up/Down on a taken edit (user 2026-10-11): to the key picture before or after it,
             // half a second when every picture is one (intra). The answer comes in `poll`.
             "step_prev_part" | "step_next_part"
@@ -433,11 +431,7 @@ impl PanelFocus {
             }
             // Enter is the confirmation of the panel in focus only.
             "activate_focused_item" if on_source => {
-                let lane = segments.lane_is_taken();
                 let confirmed = segments.confirm_source();
-                if lane {
-                    preview.hear_channels(segments.audible_channels());
-                }
                 // A taken mark is let go; with nothing to confirm Enter goes on round the walk.
                 let released = self.taken(timeline) && self.source.route("clear_focus", preview, timeline).unwrap_or(false);
                 let back = self.back_to_wrap(segments, wrap, timeline);
@@ -453,14 +447,11 @@ impl PanelFocus {
             }
             "activate_focused_item" => false,
             // A virtual shot (Shift+S or Add SubClip), not by an Enter that confirmed.
-            "save_virtual_shot" if segments.source_waits_enter() => false,
-            "clear_focus" | "close_player" if on_source && segments.lane_is_taken() => {
-                let released = segments.release_lane();
-                preview.hear_channels(segments.audible_channels()); // back to the kept channel
-                released
-            }
+            "save_virtual_shot" if segments.source_waits_enter() || self.source.holds_enter() => false,
             // Down closes an open large wave off the segment panel (there down is the next segment).
-            "step_next_part" if on_source && segments.view().wave_zoom != [0, 0] => segments.close_wave(),
+            "step_next_part" if on_source && self.source.view().wave_over_video.is_some() => {
+                return self.source.route(action_id, preview, timeline);
+            }
             // Home on the source timeline: the start of the clip (the V label does the same).
             "playlist_input_start" if on_source => preview.cue(timeline.range_start_frame),
             "focus_next" | "focus_prev" => {
@@ -617,6 +608,19 @@ impl PanelFocus {
 
 /// The passive mark of the focused panel: a thin frame on top of it (user
 /// decision 2026-09-25). It paints only; it takes no input.
+/// The keys a taken A1/A2 lane of the source timeline takes.
+const LANE_KEYS: &[&str] = &[
+    "step_back_frame",
+    "step_forward_frame",
+    "step_prev_part",
+    "step_next_part",
+    "lane_level_down",
+    "lane_level_up",
+    "activate_focused_item",
+    "clear_focus",
+    "close_player",
+];
+
 pub fn paint_focus(ui: &egui::Ui, rect: egui::Rect, focused: bool, color: egui::Color32) {
     if focused {
         let stroke = egui::Stroke::new(1.5, color);
@@ -752,22 +756,16 @@ mod tests {
     }
 
     #[test]
-    fn select_audio_a2_up_and_enter_keep_the_channel_and_close_the_picker() {
+    fn ctrl_2_takes_a2_on_the_source_timeline_from_any_panel() {
         let mut focus = PanelFocus::new();
         let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
-        segments.set_source(qnc_program_segments::SourcePick::new(Some("c"), Some("C"), None, (None, 100), Some((50, 1))), None);
-        segments.set_source_channels(Some(2));
         let mut timeline = TimelineProjection::default();
-        for action in ["select_audio_a2", "step_prev_part", "activate_focused_item"] {
-            focus.route(action, (&mut preview, &mut wrap, &mut segments, &mut timeline));
-        }
-        assert_eq!(segments.view().a2_choice, Some((0, 2)), "channel 1 kept on A2");
-        assert_eq!(segments.view().lane_taken, None, "Enter closed the picker");
-        focus.set(Panel::Segments);
-        assert_eq!(focus.route("save_virtual_shot", (&mut preview, &mut wrap, &mut segments, &mut timeline)), Some(false), "not by the Enter that kept the channel");
-        std::thread::sleep(std::time::Duration::from_millis(200));
-        focus.set(Panel::SourceTimeline);
-        assert_eq!(focus.route("save_virtual_shot", (&mut preview, &mut wrap, &mut segments, &mut timeline)), None, "the source timeline saves a short");
+        focus.set(Panel::Pool);
+        // A clip without a known channel count: the lane is not taken, the keyboard is on the source timeline.
+        assert_eq!(focus.route("select_audio_a2", (&mut preview, &mut wrap, &mut segments, &mut timeline)), Some(false));
+        assert_eq!(focus.panel(), Panel::SourceTimeline);
+        assert!(!focus.source_timeline().lane_taken());
+        assert!(!focus.source_timeline().view().message.is_empty(), "it says why");
     }
 
     #[test]

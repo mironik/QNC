@@ -11,8 +11,6 @@ mod bar;
 mod list;
 
 pub use list::show_segment_list;
-mod source_lanes;
-pub use source_lanes::{source_lane_choice, source_wave_over_video, StorySourceTimeline};
 mod cover_length;
 pub use cover_length::{cover_fill, CoverLengthBand};
 
@@ -336,6 +334,7 @@ fn paint_program(
             open: true,
             off: part.off,
             level_db: part.level_db.saturating_sub(stored),
+            heard_db: part.level_db,
         })
     };
     let intent = qnc_timeline::show(

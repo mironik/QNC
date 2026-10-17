@@ -18,5 +18,6 @@ qnc-program-segments = { workspace = true }
 qnc-segment-panel = { workspace = true }
 qnc-trim-overlay = { workspace = true }
 qnc-source-dock = { workspace = true }
+qnc-source-timeline = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-ui-kit = { workspace = true }

@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.source-timeline",
+  "module_name": "Source timeline",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.source_timeline", "ui.source_timeline.lanes", "ui.source_timeline.keys"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.write", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-source-timeline",
+  "input": "The shown clip and the project content its stored record is read from (once a frame), the catalog actions of the source timeline panel (play, steps, IN/OUT, taken marks, Ctrl+1/Ctrl+2 and the keys of a taken A1/A2 lane, the wheel), a click on a lane channel, the universal source preview and the shown timeline.",
+  "output": "The preview driven (play, step, cue, the channels and levels heard), the timeline's IN/OUT and taken mark, the A1/A2 lanes kept (what a form writes with a segment or cover), and the drawn source dock with the clip's timecode, lane pickers and large wave.",
+  "specification": "User 2026-10-16/17: only one source timeline; every form (Ingest, Story, Media Assist and later ones) embeds this one with the same means and gives only its header widgets. It composes qnc-source-panel, qnc-lane-choice, qnc-source-channels, qnc-source-timecode and qnc-source-dock without merging them."
+}

@@ -1,0 +1,18 @@
+[package]
+name = "qnc-source-timeline"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the one source timeline every form embeds. It keeps what the source timeline knows (the shown clip's A1/A2 lanes, its channel count and timecode, the keys, the wheel and the timeline's intents) on top of the existing pieces, and draws the source dock. Forms only place it and give their header widgets."
+
+[dependencies]
+eframe = { workspace = true }
+qnc-lane-choice = { workspace = true }
+qnc-source-channels = { workspace = true }
+qnc-source-dock = { workspace = true }
+qnc-source-panel = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-source-timecode = { workspace = true, features = ["read"] }
+qnc-timeline = { workspace = true }
+qnc-timeline-assets = { workspace = true }
+qnc-ui-text = { workspace = true }
+qnc-wheel-jog = { workspace = true }

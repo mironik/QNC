@@ -1,0 +1,365 @@
+//! The one source timeline (user 2026-10-16/17: "only one source timeline, forms only
+//! embed it"). Story, Media Assist, Ingest and every later form take this piece as it is:
+//! the same A1/A2 lanes (channel, off/on, level, the large wave), the same keys, the same
+//! wheel and the same answer to a click. It composes the existing pieces without merging
+//! them: `qnc-source-panel` (play, steps, IN/OUT and the taken mark), `qnc-lane-choice`
+//! (the lanes), `qnc-source-channels` and `qnc-source-timecode` (what the stored record of
+//! the shown clip says) and `qnc-source-dock` (the drawing). It drives the universal source
+//! preview; it knows no form, no story and writes no database.
+//!
+//! A form keeps one [`SourceTimeline`] beside its preview, calls [`SourceTimeline::sync`]
+//! once a frame, routes the catalog actions of its source timeline panel through
+//! [`SourceTimeline::route`] and draws [`show`] with the [`SourceTimelineView`] in its view.
+//! What a form writes (a segment, a cover) takes the kept lanes from [`SourceTimeline::kept`].
+
+use std::time::Duration;
+
+use eframe::egui::{Rect, Ui};
+use qnc_lane_choice::{Lane, LaneChoice};
+use qnc_source_dock::{show_timeline_dock, SourceTimeline as DockTimeline, TimelineDockStyle};
+use qnc_source_panel::SourcePanel;
+use qnc_source_preview::SourcePreview;
+use qnc_timeline::{AudioLane, ChannelChoice, TimelineIntent, TimelineProjection, TimelineTheme};
+use qnc_timeline_assets::SourceTimelineAssets;
+
+pub use qnc_source_channels::ContentTarget;
+pub use qnc_source_timecode::SourceTimecode;
+
+pub const MODULE_ID: &str = "qnc.module.source-timeline";
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The catalog actions of a click on a channel in the A1 or A2 column.
+pub const CHOOSE_A1_CHANNEL: &str = "source_choose_a1_channel";
+pub const CHOOSE_A2_CHANNEL: &str = "source_choose_a2_channel";
+
+/// One Enter does one thing: the other catalog actions of the Enter that kept a lane
+/// arrive at once and are its.
+const SAME_ENTER: Duration = Duration::from_millis(150);
+
+/// What the board draws of the source timeline besides the clip's projection and
+/// artifacts: the lane pickers, the large wave and the clip's timecode.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SourceTimelineView {
+    pub a1: Option<ChannelChoice>,
+    pub a2: Option<ChannelChoice>,
+    pub wave_over_video: Option<(AudioLane, u8)>,
+    pub timecode: Option<SourceTimecode>,
+    /// What a taken lane does, for the form's status line (empty: nothing to say).
+    pub message: String,
+}
+
+/// The state of the source timeline of one form.
+#[derive(Debug, Default)]
+pub struct SourceTimeline {
+    keys: SourcePanel,
+    lanes: LaneChoice,
+    channels: qnc_source_channels::SourceChannels,
+    timecodes: qnc_source_timecode::SourceTimecodes,
+    clip: Option<String>,
+    message: String,
+    view: SourceTimelineView,
+}
+
+impl SourceTimeline {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Once a frame: the shown clip and the project content its stored record is read
+    /// from. Another clip starts on A1 channel 1 and A2 channel 2 (user rule 2026-10-01).
+    pub fn sync(&mut self, clip_id: Option<&str>, content: Option<&ContentTarget>) -> &SourceTimelineView {
+        if self.clip.as_deref() != clip_id {
+            self.clip = clip_id.map(str::to_string);
+            self.lanes.new_clip();
+            self.message.clear();
+        }
+        let count = self.channels.for_clip(content, clip_id);
+        self.lanes.set_channels(count);
+        let timecode = self.timecodes.for_clip(content, clip_id);
+        self.refresh(timecode);
+        &self.view
+    }
+
+    pub fn view(&self) -> &SourceTimelineView {
+        &self.view
+    }
+
+    /// A1 (lane 0) or A2 as kept (Enter): what a new segment, cover or Sync cover takes.
+    pub fn kept(&self, lane: u8) -> Lane {
+        self.lanes.kept(lane)
+    }
+
+    /// A1 and A2 as kept.
+    pub fn kept_lanes(&self) -> [Lane; 2] {
+        [self.kept(0), self.kept(1)]
+    }
+
+    /// A lane is taken (its keys belong to it).
+    pub fn lane_taken(&self) -> bool {
+        self.lanes.taken().is_some()
+    }
+
+    /// A lane waits for Enter, or this Enter kept it: the same Enter does nothing else.
+    pub fn holds_enter(&self) -> bool {
+        self.lane_taken() || self.lanes.committed_within(SAME_ENTER)
+    }
+
+    /// IN or OUT is taken: the arrows move it.
+    pub fn mark_taken(&mut self, timeline: &TimelineProjection) -> bool {
+        self.keys.mark_taken(timeline)
+    }
+
+    /// A mark was taken or let go by someone else (a segment edge opened with its mark).
+    pub fn set_mark_taken(&mut self, taken: bool) {
+        self.keys.set_mark_taken(taken);
+    }
+
+    /// The catalog action a timeline intent stands for, when it is one: a click on A1/A2
+    /// is Ctrl+1/Ctrl+2, the wheel is the arrows (Ctrl+wheel the level), a click on a
+    /// channel of the column is [`CHOOSE_A1_CHANNEL`]/[`CHOOSE_A2_CHANNEL`] with the channel.
+    pub fn action_of(intent: &TimelineIntent) -> Option<(&'static str, Option<u16>)> {
+        match intent {
+            TimelineIntent::TakeAudioLane(AudioLane::A2) => Some(("select_audio_a2", None)),
+            TimelineIntent::TakeAudioLane(_) => Some(("select_audio_a1", None)),
+            TimelineIntent::Wheel(wheel) => Some((wheel.action(qnc_wheel_jog::SOURCE_ACTIONS), None)),
+            TimelineIntent::ChooseA1Channel(channel) => Some((CHOOSE_A1_CHANNEL, Some(*channel))),
+            TimelineIntent::ChooseA2Channel(channel) => Some((CHOOSE_A2_CHANNEL, Some(*channel))),
+            _ => None,
+        }
+    }
+
+    /// A click on a channel of the column (`action_id` from [`Self::action_of`]), else the
+    /// keys of a lane (Ctrl+1/Ctrl+2, and those of a taken lane); `None` for any other.
+    pub fn route_input(&mut self, action_id: &str, channel: Option<u16>, preview: &mut SourcePreview) -> Option<bool> {
+        channel
+            .and_then(|channel| self.choose_action(action_id, channel, preview))
+            .or_else(|| self.route_lane(action_id, preview))
+    }
+
+    /// A click on a channel of the column (`action_id` from [`Self::action_of`]); `None`
+    /// for any other action.
+    pub fn choose_action(&mut self, action_id: &str, channel: u16, preview: &mut SourcePreview) -> Option<bool> {
+        let lane = match action_id {
+            CHOOSE_A1_CHANNEL => 0,
+            CHOOSE_A2_CHANNEL => 1,
+            _ => return None,
+        };
+        Some(self.choose(lane, channel, preview))
+    }
+
+    /// A click on a channel in the column of A1 (lane 0) or A2: on the taken lane it only
+    /// drafts (Enter keeps it), otherwise it is kept at once. Heard at once.
+    pub fn choose(&mut self, lane: u8, channel: u16, preview: &mut SourcePreview) -> bool {
+        let changed = if self.lanes.taken().is_some_and(|(taken, _)| taken == lane) {
+            self.lanes.set_draft(lane, channel)
+        } else {
+            self.lanes.choose(lane, channel)
+        };
+        self.after_lane(changed, preview)
+    }
+
+    /// One catalog action of the source timeline. `None`: not one of its actions, the
+    /// form handles it; `Some(changed)`: taken here.
+    pub fn route(&mut self, action_id: &str, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
+        if let Some(changed) = self.route_lane(action_id, preview) {
+            return Some(changed);
+        }
+        match action_id {
+            // The wheel is the left/right arrow; while a lane is taken (where the arrows
+            // turn it off/on) it moves the playhead (user 2026-10-16). Ctrl+wheel is
+            // Ctrl+left/right: the level of a taken lane, up louder.
+            wheel if wheel.starts_with("wheel_") && wheel.contains("_ctrl_") => {
+                let level = if wheel.ends_with("back") { "lane_level_down" } else { "lane_level_up" };
+                Some(self.route_lane(level, preview).unwrap_or(false))
+            }
+            wheel if wheel.starts_with("wheel_") => {
+                let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();
+                let frames = if forward { 1 } else { -1 };
+                if self.lane_taken() {
+                    return Some(preview.step(frames));
+                }
+                let arrow = if forward { "step_forward_frame" } else { "step_back_frame" };
+                self.keys.route(arrow, preview, timeline)
+            }
+            // Down with no lane taken closes an open large wave.
+            "step_next_part" if self.lanes.wave_zoom() != [0, 0] => {
+                let closed = self.lanes.close_wave();
+                Some(self.after_lane(closed, preview))
+            }
+            _ => self.keys.route(action_id, preview, timeline),
+        }
+    }
+
+    /// The keys of A1/A2 (user rules 2026-10-01, 2026-10-14, 2026-10-15): Ctrl+1/Ctrl+2
+    /// take the lane, up/down its channel, left off, right on, Ctrl+left/right its level,
+    /// Enter keeps, Escape drops; all heard at once.
+    pub fn route_lane(&mut self, action_id: &str, preview: &mut SourcePreview) -> Option<bool> {
+        let changed = match action_id {
+            "select_audio_a1" | "select_audio_a2" => {
+                let lane = u8::from(action_id == "select_audio_a2");
+                if !self.lanes.take(lane) {
+                    self.message = qnc_ui_text::text("story.msg.no_audio_channels").into();
+                    return Some(self.after_lane(false, preview));
+                }
+                self.message = qnc_ui_text::fill("story.msg.lane_taken", &[("lane", &lane_name(lane).to_string())]);
+                true
+            }
+            _ if !self.lane_taken() => return None,
+            "step_prev_part" | "step_next_part" => self.lanes.draft(if action_id == "step_prev_part" { -1 } else { 1 }),
+            "step_back_frame" | "step_forward_frame" => self.lanes.set_off(action_id == "step_back_frame"),
+            "lane_level_down" | "lane_level_up" => self.lanes.nudge_level(if action_id == "lane_level_down" { -1 } else { 1 }),
+            "activate_focused_item" => {
+                let kept = self.lanes.commit();
+                self.lanes.mark_committed();
+                self.message.clear();
+                kept
+            }
+            "clear_focus" | "close_player" => {
+                self.message.clear();
+                self.lanes.release()
+            }
+            _ => return None,
+        };
+        if self.lane_taken() {
+            self.message = lane_message(&self.lanes);
+        }
+        Some(self.after_lane(changed, preview))
+    }
+
+    /// The preview hears what the lanes play now; the view follows.
+    fn after_lane(&mut self, changed: bool, preview: &mut SourcePreview) -> bool {
+        let heard = preview.hear_channels(self.lanes.audible());
+        let timecode = self.view.timecode;
+        self.refresh(timecode);
+        changed | heard
+    }
+
+    fn refresh(&mut self, timecode: Option<SourceTimecode>) {
+        self.view = SourceTimelineView {
+            a1: lane_choice(&self.lanes, 0),
+            a2: lane_choice(&self.lanes, 1),
+            wave_over_video: wave_over_video(&self.lanes),
+            timecode,
+            message: self.message.clone(),
+        };
+    }
+}
+
+fn lane_name(lane: u8) -> &'static str {
+    if lane == 0 { "A1" } else { "A2" }
+}
+
+/// The taken lane in the words of the status line: its channel, on/off and level.
+fn lane_message(lanes: &LaneChoice) -> String {
+    let Some((lane, _)) = lanes.taken() else {
+        return String::new();
+    };
+    let (draft, name) = (lanes.lane(lane), lane_name(lane).to_string());
+    if draft.off {
+        return qnc_ui_text::fill("story.msg.lane_off", &[("lane", &name)]);
+    }
+    qnc_ui_text::fill(
+        "story.msg.lane_level",
+        &[("lane", &name), ("channel", &(draft.channel + 1).to_string()), ("level", &format!("{:+}", draft.level_db))],
+    )
+}
+
+/// The channel picker of A1 (lane 0) or A2: a taken lane shows its draft with the picker
+/// open; the wave is drawn at the level the lane plays now.
+fn lane_choice(lanes: &LaneChoice, lane: u8) -> Option<ChannelChoice> {
+    let (_, count) = lanes.choice(lane)?;
+    let now = lanes.lane(lane);
+    let open = lanes.taken().is_some_and(|(taken, _)| taken == lane);
+    Some(ChannelChoice { selected: now.channel, count, open, off: now.off, level_db: now.level_db, heard_db: now.level_db })
+}
+
+/// The wave over the video row: the taken lane's, else A1's, else A2's.
+fn wave_over_video(lanes: &LaneChoice) -> Option<(AudioLane, u8)> {
+    let (zoom, names) = (lanes.wave_zoom(), [AudioLane::A1, AudioLane::A2]);
+    let taken = lanes.taken().map(|(lane, _)| usize::from(lane.min(1)));
+    taken.into_iter().chain([0, 1]).find(|lane| zoom[*lane] > 0).map(|lane| (names[lane], zoom[lane]))
+}
+
+/// Draws the source dock of any form: its frame, the header row (the clip's `title` and
+/// whatever `header` adds) and the one source timeline under it.
+pub fn show(
+    ui: &mut Ui,
+    rect: Rect,
+    style: &TimelineDockStyle,
+    title: &str,
+    header: impl FnOnce(&mut Ui),
+    (projection, theme, assets): (&TimelineProjection, TimelineTheme, &SourceTimelineAssets),
+    view: &SourceTimelineView,
+) -> TimelineIntent {
+    let timeline = DockTimeline::from_assets(projection, theme, assets)
+        .with_timecode(view.timecode)
+        .with_a1_channel(view.a1)
+        .with_a2_channel(view.a2)
+        .with_wave_over_video(view.wave_over_video);
+    show_timeline_dock(ui, rect, style, title, header, timeline)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn with_channels(count: u16) -> SourceTimeline {
+        let mut source = SourceTimeline::new();
+        source.lanes.new_clip();
+        source.lanes.set_channels(Some(count));
+        source
+    }
+
+    #[test]
+    fn ctrl_2_takes_a2_arrows_draft_enter_keeps_escape_drops() {
+        let (mut source, mut preview, mut timeline) = (with_channels(4), SourcePreview::default(), TimelineProjection::new(0, 100));
+        assert_eq!(source.route("select_audio_a2", &mut preview, &mut timeline), Some(true));
+        assert_eq!(source.view().a2.map(|a2| (a2.selected, a2.open)), Some((1, true)), "A2 starts on channel 2");
+        source.route("step_next_part", &mut preview, &mut timeline);
+        source.route("step_next_part", &mut preview, &mut timeline);
+        source.route("step_next_part", &mut preview, &mut timeline);
+        assert_eq!(source.view().a2.map(|a2| a2.selected), Some(3), "never past the last channel");
+        assert_eq!(source.kept(1).channel, 1, "nothing kept before Enter");
+        source.route("activate_focused_item", &mut preview, &mut timeline);
+        assert!(source.holds_enter(), "the same Enter does nothing else");
+        assert_eq!((source.kept(1).channel, source.lane_taken()), (3, false));
+        source.route("select_audio_a2", &mut preview, &mut timeline);
+        source.route("step_prev_part", &mut preview, &mut timeline);
+        source.route("clear_focus", &mut preview, &mut timeline);
+        assert_eq!(source.kept(1).channel, 3, "Escape keeps the channel");
+    }
+
+    #[test]
+    fn left_right_turn_a_lane_off_and_on_and_ctrl_wheel_sets_its_level() {
+        let (mut source, mut preview, mut timeline) = (with_channels(2), SourcePreview::default(), TimelineProjection::new(0, 100));
+        source.route("select_audio_a1", &mut preview, &mut timeline);
+        source.route("step_back_frame", &mut preview, &mut timeline);
+        assert!(source.view().a1.is_some_and(|a1| a1.off), "left: off");
+        source.route("step_forward_frame", &mut preview, &mut timeline);
+        source.route("wheel_source_ctrl_forward", &mut preview, &mut timeline);
+        source.route("wheel_source_ctrl_forward", &mut preview, &mut timeline);
+        assert_eq!(source.view().a1.map(|a1| (a1.off, a1.level_db)), Some((false, 2)), "the wave is drawn at the draft level");
+        assert!(source.view().message.contains("+2"), "{}", source.view().message);
+        source.route("activate_focused_item", &mut preview, &mut timeline);
+        assert_eq!(source.kept(0).level_db, 2);
+    }
+
+    #[test]
+    fn a_click_on_a_lane_is_its_key_and_the_wheel_its_arrows() {
+        assert_eq!(SourceTimeline::action_of(&TimelineIntent::TakeAudioLane(AudioLane::A2)), Some(("select_audio_a2", None)));
+        assert_eq!(SourceTimeline::action_of(&TimelineIntent::ChooseA2Channel(3)), Some((CHOOSE_A2_CHANNEL, Some(3))));
+        assert_eq!(SourceTimeline::action_of(&TimelineIntent::CueFrame(3)), None, "a cue is the form's");
+    }
+
+    #[test]
+    fn another_clip_starts_on_its_own_channels() {
+        let (mut source, mut preview, mut timeline) = (with_channels(4), SourcePreview::default(), TimelineProjection::new(0, 100));
+        source.clip = Some("a".into());
+        source.route("select_audio_a1", &mut preview, &mut timeline);
+        source.route("step_next_part", &mut preview, &mut timeline);
+        source.route("activate_focused_item", &mut preview, &mut timeline);
+        assert_eq!(source.kept(0).channel, 1);
+        source.sync(Some("b"), None);
+        assert_eq!((source.kept(0).channel, source.kept(1).channel), (0, 1), "A1 on channel 1, A2 on channel 2");
+    }
+}

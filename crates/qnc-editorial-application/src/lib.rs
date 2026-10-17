@@ -94,7 +94,6 @@ pub struct EditorialApplication {
     segments: qnc_program_segments::ProgramSegments,
     wrap: qnc_wrap_session::WrapSession,
     focus: PanelFocus,
-    timecodes: qnc_source_timecode::SourceTimecodes,
 }
 
 impl Default for EditorialApplication {
@@ -118,7 +117,6 @@ impl Default for EditorialApplication {
             segments: qnc_program_segments::ProgramSegments::new(),
             wrap: qnc_wrap_session::WrapSession::new(),
             focus: PanelFocus::new(),
-            timecodes: qnc_source_timecode::SourceTimecodes::new(),
         }
     }
 }
@@ -252,15 +250,15 @@ impl EditorialApplication {
         self.short_stills.follow(self.preview.shown_clip_picture(), (self.view.preview.timeline.source_in_frame, self.view.preview.timeline.source_out_frame));
         let timebase = self.preview.player_view().source_timebase();
         let timeline = self.view.preview.timeline;
-        // The original source timecode of the chosen clip, from its stored record.
-        self.view.source_timecode = self.timecodes.for_clip(self.content_target.as_ref().map(|targets| &targets.0), self.view.preview.clip_id.as_deref());
+        let source = self.focus.source_timeline_mut(); // the one source timeline: lanes, channels, timecode
+        self.view.source_timeline = source.sync(self.view.preview.clip_id.as_deref(), self.content_target.as_ref().map(|targets| &targets.0)).clone();
         self.segments.set_source(SourcePick::new(
             self.view.chosen_clip_id(),
             self.view.current_clip_label(),
             self.view.preview.timeline.visible_source_marks(),
             (timeline.source_in_frame, timeline.duration_frames),
             timebase.map(|timebase| (timebase.fps_num, timebase.fps_den)),
-        ), self.content_target.as_ref().map(|targets| &targets.0)); // and its audio channels
+        ).with_lanes(source.kept_lanes(), source.holds_enter()));
         // Source and Wrap stay apart (v5): the Wrap timeline plays the program in the same player.
         let seek = self.segments.take_seek();
         let total = self.segments.view().total_frames;
@@ -415,8 +413,8 @@ impl EditorialApplication {
                 self.focus.to_source(&mut self.wrap); // the Source view
                 self.preview.timeline_intent(&intent)
             }
-            EditorialIntent::Timeline(TimelineIntent::ChooseA1Channel(channel)) => self.segments.choose_a1_channel(channel) | self.preview.hear_channels(self.segments.audible_channels()),
-            EditorialIntent::Timeline(TimelineIntent::ChooseA2Channel(channel)) => self.segments.choose_a2_channel(channel) | self.preview.hear_channels(self.segments.audible_channels()),
+            EditorialIntent::Timeline(TimelineIntent::ChooseA1Channel(channel)) => self.focus.source_timeline_mut().choose(0, channel, &mut self.preview),
+            EditorialIntent::Timeline(TimelineIntent::ChooseA2Channel(channel)) => self.focus.source_timeline_mut().choose(1, channel, &mut self.preview),
             EditorialIntent::Timeline(_) => false,
         };
         self.sync_preview_view();

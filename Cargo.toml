@@ -173,6 +173,7 @@ members = [
     "crates/qnc-part-sound",
     "crates/qnc-wheel-jog",
     "crates/qnc-source-panel",
+    "crates/qnc-source-timeline",
     "crates/qnc-settings-form",
     "crates/qnc-virtual-short-cards",
     "crates/qnc-virtual-short-stills",
@@ -354,6 +355,7 @@ qnc-lane-choice = { path = "crates/qnc-lane-choice" }
 qnc-part-sound = { path = "crates/qnc-part-sound" }
 qnc-wheel-jog = { path = "crates/qnc-wheel-jog" }
 qnc-source-panel = { path = "crates/qnc-source-panel" }
+qnc-source-timeline = { path = "crates/qnc-source-timeline" }
 qnc-settings-form = { path = "crates/qnc-settings-form" }
 qnc-virtual-short-cards = { path = "crates/qnc-virtual-short-cards" }
 qnc-virtual-short-stills = { path = "crates/qnc-virtual-short-stills" }

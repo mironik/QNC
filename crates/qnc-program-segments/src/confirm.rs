@@ -6,15 +6,12 @@
 
 use crate::ProgramSegments;
 
-/// The other actions of one Enter arrive at once; within this time they are its.
-const SAME_ENTER: std::time::Duration = std::time::Duration::from_millis(150);
 
 impl ProgramSegments {
-    /// Enter on the source timeline: the lane, the segment edit or Sync, in that order.
+    /// Enter on the source timeline: the segment edit or Sync (a taken lane is the source
+    /// timeline's own, piece `qnc-source-timeline`).
     pub fn confirm_source(&mut self) -> bool {
-        let confirmed = if self.lanes.taken().is_some() {
-            self.commit_lane()
-        } else if self.editing.is_some() {
+        if self.editing.is_some() {
             self.commit_edit()
         } else if self.sync.is_active() || self.sync.holds_enter() {
             if !self.finish_sync_with_cover() {
@@ -23,11 +20,7 @@ impl ProgramSegments {
             true
         } else {
             false
-        };
-        if confirmed {
-            self.lanes.mark_committed();
         }
-        confirmed
     }
 
     /// Enter on the segment panel: the marker taken with Ctrl+M, the slot taken with
@@ -45,11 +38,10 @@ impl ProgramSegments {
     /// Something on the source timeline waits for Enter, or this Enter confirmed it:
     /// the same Enter saves no virtual shot.
     pub fn source_waits_enter(&self) -> bool {
-        self.lanes.taken().is_some()
+        self.source.holds_enter
             || self.editing.is_some()
             || self.sync.is_active()
             || self.sync.holds_enter()
-            || self.lanes.committed_within(SAME_ENTER)
     }
 }
 

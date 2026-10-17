@@ -1113,8 +1113,29 @@ fn paint_audio_row(
     let gain = lane_gain(input, lane);
     qnc_wave_view::paint_wave_peaks_gain(ui.painter(), track_rect, peaks, gain, wave);
     qnc_wave_view::paint_level_marks(ui.painter(), track_rect, 1.0, input.theme.level_marks);
+    paint_lane_level(ui, track_rect, lane, input);
     paint_ranges_and_playhead(ui, track_rect, input);
     cue_intent_from_response(&response, track_rect, input)
+}
+
+/// The level a lane is heard at, at the start of its track, when it is not as recorded or
+/// the lane is taken (live 2026-10-16: the user could not see the level); "OFF" when off.
+fn paint_lane_level(ui: &mut egui::Ui, track: Rect, lane: AudioLane, input: &TimelineInput<'_>) {
+    let choice = match lane {
+        AudioLane::A1 => input.a1_channel,
+        AudioLane::A2 => input.a2_channel,
+        _ => None,
+    };
+    let Some(choice) = choice.filter(|choice| choice.open || choice.off || choice.heard_db != 0) else {
+        return;
+    };
+    let text = if choice.off { "OFF".to_string() } else { format!("{:+} dB", choice.heard_db) };
+    let font = FontId::proportional((track.height() - 4.0).clamp(9.0, 12.0));
+    let galley = ui.painter().layout_no_wrap(text, font, input.theme.text);
+    let at = egui::pos2(track.left() + 4.0, track.center().y - galley.size().y / 2.0);
+    let back = Rect::from_min_size(at, galley.size()).expand2(Vec2::new(3.0, 1.0));
+    ui.painter().rect_filled(back, 2.0, input.theme.label_background);
+    ui.painter().galley(at, galley, input.theme.text);
 }
 
 /// A1/A2 are buttons (they take the lane): as bright as the text, in a frame. A lane that
@@ -1151,6 +1172,7 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
     let gain = lane_gain(input, lane);
     qnc_wave_view::paint_wave_peaks_gain(ui.painter(), track_rect, peaks, gain, input.theme.audio_wave);
     qnc_wave_view::paint_level_marks(ui.painter(), track_rect, 1.0, input.theme.level_marks);
+    paint_lane_level(ui, track_rect, lane, input);
     let label_response = ui.interact(
         label_rect,
         ui.make_persistent_id(("qnc_timeline_audio_band_label", lane.label())),

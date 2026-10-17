@@ -407,7 +407,7 @@ fn marked(in_mark: u64) -> SourcePick {
 fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
     let mut segments = component();
     segments.set_playhead(Some(20));
-    segments.set_source(marked(10), None);
+    segments.set_source(marked(10));
     assert_eq!(segments.sync_space(false), SyncSpace::Play, "Sync is off");
     segments.apply(SegmentCommand::ToggleSync);
     assert!(segments.view().sync_enabled);
@@ -416,20 +416,20 @@ fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
         SyncSpace::Play,
         "IN before Sync does not arm"
     );
-    segments.set_source(marked(12), None);
+    segments.set_source(marked(12));
     assert_eq!(
         segments.sync_space(true),
         SyncSpace::Play,
         "Space in Wrap plays"
     );
     segments.arm_sync();
-    segments.set_source(marked(12), None);
+    segments.set_source(marked(12));
     assert!(
         matches!(segments.sync_space(false), SyncSpace::Start(_)),
         "IN again on the same frame arms it again (v5)"
     );
     segments.finish_sync();
-    segments.set_source(marked(13), None);
+    segments.set_source(marked(13));
     let SyncSpace::Start(preview) = segments.sync_space(false) else {
         panic!("Sync starts in the Source view")
     };
@@ -468,45 +468,6 @@ fn the_panel_header_shows_program_time_as_timecode() {
     view.timebase = Some((50, 1));
     assert_eq!(view.timecode(0), "00:00:00:00");
     assert_eq!(view.timecode(1837), "00:00:36:37");
-}
-
-#[test]
-fn a1_is_chosen_from_the_real_channels_of_the_marked_clip_and_starts_on_channel_one() {
-    let mut segments = component();
-    segments.set_source(marked(10), None);
-    assert_eq!(segments.view().a1_choice, None, "no count, no choice");
-    segments.set_source_channels(Some(4));
-    assert_eq!(segments.view().a1_choice, Some((0, 4)), "v5: channel 1 first");
-    assert!(segments.choose_a1_channel(1));
-    assert_eq!(segments.view().a1_choice, Some((1, 4)));
-    assert!(!segments.choose_a1_channel(4), "a channel the clip does not have");
-    let mut other = marked(10);
-    other.clip_id = Some("clip-y".into());
-    segments.set_source(other, None);
-    segments.set_source_channels(Some(4));
-    assert_eq!(segments.view().a1_choice, Some((0, 4)), "another clip starts on channel 1");
-    assert!(segments.choose_a1_channel(3));
-    segments.set_source_channels(Some(2));
-    assert_eq!(segments.view().a1_choice, Some((0, 2)), "back to 1 when the clip has fewer");
-}
-
-#[test]
-fn a2_has_its_own_choice_from_the_same_real_channels() {
-    let mut segments = component();
-    segments.set_source(marked(10), None);
-    segments.set_source_channels(Some(3));
-    assert_eq!(segments.view().a2_choice, Some((1, 3)), "A2 starts on channel 2 (user rule)");
-    assert!(segments.choose_a2_channel(2));
-    assert_eq!(segments.view().a2_choice, Some((2, 3)));
-    assert_eq!(segments.view().a1_choice, Some((0, 3)), "A1 keeps its own choice");
-    assert!(!segments.choose_a2_channel(3), "a channel the clip does not have");
-    let mut other = marked(10);
-    other.clip_id = Some("clip-y".into());
-    segments.set_source(other, None);
-    segments.set_source_channels(Some(3));
-    assert_eq!(segments.view().a2_choice, Some((1, 3)), "another clip starts on channel 2");
-    segments.set_source_channels(Some(1));
-    assert_eq!(segments.view().a2_choice, Some((0, 1)), "one channel: A2 on channel 1");
 }
 
 #[test]
@@ -621,7 +582,7 @@ fn a_taken_segment_edge_shows_its_pictures_on_the_source_timeline() {
     segments.set_playhead(Some(32));
     assert!(segments.take_edge(true), "the start of segment c (program 30..40, source 500..510)");
     let pick = |marks| SourcePick::new(Some("clip-c"), Some("C"), Some(marks), (Some(marks.0), 600), Some((50, 1)));
-    segments.set_source(pick((498, 510)), None);
+    segments.set_source(pick((498, 510)));
     let stills: Vec<_> = segments
         .view()
         .source_edit_stills
@@ -634,7 +595,7 @@ fn a_taken_segment_edge_shows_its_pictures_on_the_source_timeline() {
         "the Off segment before is black, the new first picture is source frame 498"
     );
     segments.apply_action("clear_focus");
-    segments.set_source(pick((498, 510)), None);
+    segments.set_source(pick((498, 510)));
     assert!(segments.view().source_edit_stills.is_empty(), "Escape drops the edge");
 }
 

@@ -14,5 +14,6 @@ qnc-focus-walk = { workspace = true }
 qnc-media-pool-head = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-source-dock = { workspace = true }
+qnc-source-timeline = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-ui-kit = { workspace = true }

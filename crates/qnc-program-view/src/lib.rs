@@ -128,22 +128,9 @@ pub struct SegmentsView {
     /// The filmstrip pictures of the program (segments with a picture, covers over
     /// them); empty with a narrow video row.
     pub pictures: Vec<qnc_program_filmstrip::ProgramPicture>,
-    /// The source channel (zero based) heard on A1 in the next Talking Head / Voice
-    /// over and how many channels the marked clip has; `None` without a count.
-    pub a1_choice: Option<(u16, u16)>,
-    /// The same for A2 in the next cover, its own choice.
-    pub a2_choice: Option<(u16, u16)>,
-    /// A1 (0) or A2 (1) taken with the keyboard and its draft channel (zero based).
-    pub lane_taken: Option<(u8, u16)>,
-    /// A1 and A2 off (level 0, the channel kept) and their levels in dB, as they play now
-    /// (the taken lane's draft; user 2026-10-15).
-    pub lane_off: [bool; 2],
-    pub lane_level_db: [i8; 2],
     /// The sound of a stored segment (A1) or cover (A2) taken on the Wrap row and its
     /// draft (user 2026-10-16).
     pub part_sound: Option<PartSoundView>,
-    /// Display gain level of the A1 and A2 wave over the video row (0: not shown).
-    pub wave_zoom: [u8; 2],
     /// The last Cover slot (`false`) or Overwrite (`true`) and when it was asked for,
     /// by click or key: its button flashes for a moment (user 2026-10-13).
     pub cover_pressed: Option<(bool, std::time::Instant)>,

@@ -3457,7 +3457,7 @@ dependencies = [
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-source-reader",
- "qnc-source-timecode",
+ "qnc-source-timeline",
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-trim-stills",
@@ -3485,6 +3485,7 @@ dependencies = [
  "qnc-program-segments",
  "qnc-segment-panel",
  "qnc-source-dock",
+ "qnc-source-timeline",
  "qnc-timeline",
  "qnc-trim-overlay",
  "qnc-ui-kit",
@@ -3606,7 +3607,6 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-media-card",
- "qnc-wheel-jog",
 ]
 
 [[package]]
@@ -3676,11 +3676,10 @@ dependencies = [
  "qnc-source-browse",
  "qnc-source-panel",
  "qnc-source-reader",
- "qnc-source-timecode",
+ "qnc-source-timeline",
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-ui-text",
- "qnc-wheel-jog",
  "qnc-work-settings",
  "rusqlite",
  "serde",
@@ -3702,6 +3701,7 @@ dependencies = [
  "qnc-media-pool-head",
  "qnc-monitor",
  "qnc-source-dock",
+ "qnc-source-timeline",
  "qnc-timeline",
  "qnc-ui-kit",
 ]
@@ -4251,8 +4251,8 @@ dependencies = [
  "qnc-media-card",
  "qnc-program-segments",
  "qnc-source-mark-focus",
- "qnc-source-panel",
  "qnc-source-preview",
+ "qnc-source-timeline",
  "qnc-timeline",
  "qnc-wheel-jog",
  "qnc-wrap-session",
@@ -4577,7 +4577,6 @@ dependencies = [
  "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
- "qnc-source-channels",
  "qnc-source-timecode",
  "qnc-sync-cover",
  "qnc-ui-text",
@@ -4790,7 +4789,6 @@ dependencies = [
  "qnc-program-filmstrip",
  "qnc-program-segments",
  "qnc-program-waveform",
- "qnc-source-dock",
  "qnc-timeline",
  "qnc-ui-text",
  "serde",
@@ -5039,6 +5037,23 @@ version = "0.1.0"
 dependencies = [
  "qnc-content-store",
  "qnc-media-metadata",
+]
+
+[[package]]
+name = "qnc-source-timeline"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-lane-choice",
+ "qnc-source-channels",
+ "qnc-source-dock",
+ "qnc-source-panel",
+ "qnc-source-preview",
+ "qnc-source-timecode",
+ "qnc-timeline",
+ "qnc-timeline-assets",
+ "qnc-ui-text",
+ "qnc-wheel-jog",
 ]
 
 [[package]]

@@ -163,8 +163,7 @@ impl ProgramSegments {
             || self.marker_edit.is_some()
             || self.marker_committing
             || self.editing.is_some()
-            || self.lanes.taken().is_some()
-            || self.lanes.committed_within(std::time::Duration::from_millis(150))
+            || self.source.holds_enter
     }
 
     pub(crate) fn toggle_sync(&mut self) {
@@ -247,9 +246,9 @@ impl ProgramSegments {
                 out_frame: slot.source_out,
                 fps_num: slot.source.timebase.0,
                 fps_den: slot.source.timebase.1,
-                a2_source_channel: self.lanes.kept(1).channel,
-                a2_level_db: self.lanes.kept(1).level_db,
-                a2_off: self.lanes.kept(1).off,
+                a2_source_channel: self.source.lanes[1].channel,
+                a2_level_db: self.source.lanes[1].level_db,
+                a2_off: self.source.lanes[1].off,
             },
             slot.source.clip_name,
         );

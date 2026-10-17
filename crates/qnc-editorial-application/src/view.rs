@@ -63,8 +63,9 @@ pub struct EditorialView {
     pub segments: qnc_program_segments::SegmentsView,
     /// The panel the keyboard acts on (and the dock button it is on).
     pub focus: qnc_panel_focus::FocusView,
-    /// Original timecode of the chosen source clip (camera XML, else the one probe).
-    pub source_timecode: Option<qnc_source_timecode::SourceTimecode>,
+    /// What the one source timeline shows besides the clip: its A1/A2 lanes, large wave
+    /// and the clip's original timecode (piece `qnc-source-timeline`).
+    pub source_timeline: qnc_source_timeline::SourceTimelineView,
 }
 
 impl EditorialView {

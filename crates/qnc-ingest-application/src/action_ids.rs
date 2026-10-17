@@ -18,7 +18,7 @@ pub const INGEST_SET_CLIP_FILTER: &str = "ingest_set_clip_filter";
 pub const INGEST_SET_ARCHIVE: &str = "ingest_set_archive";
 pub const INGEST_SET_AI_MINING: &str = "ingest_set_ai_mining";
 pub const INGEST_CUE_FRAME: &str = "ingest_cue_frame";
-pub const INGEST_TOGGLE_AUDIO_LANE: &str = "ingest_toggle_audio_lane";
+pub use qnc_source_timeline::{CHOOSE_A1_CHANNEL as SOURCE_CHOOSE_A1_CHANNEL, CHOOSE_A2_CHANNEL as SOURCE_CHOOSE_A2_CHANNEL};
 pub const PLAY_PAUSE: &str = "play_pause";
 pub const STEP_BACK_FRAME: &str = "step_back_frame";
 pub const STEP_FORWARD_FRAME: &str = "step_forward_frame";
@@ -44,7 +44,8 @@ pub const ALL: &[&str] = &[
     INGEST_SET_ARCHIVE,
     INGEST_SET_AI_MINING,
     INGEST_CUE_FRAME,
-    INGEST_TOGGLE_AUDIO_LANE,
+    SOURCE_CHOOSE_A1_CHANNEL,
+    SOURCE_CHOOSE_A2_CHANNEL,
     PLAY_PAUSE,
     STEP_BACK_FRAME,
     STEP_FORWARD_FRAME,

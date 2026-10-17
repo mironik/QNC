@@ -4,6 +4,13 @@ use super::*;
 
 impl IngestApplication {
     pub fn dispatch(&mut self, intent: IngestIntent) -> IngestDispatchResult {
+        // The A1/A2 lanes of the one source timeline (piece `qnc-source-timeline`): Ctrl+1/2, the
+        // keys of a taken lane and a click on a channel; the keyboard goes to the source timeline.
+        let channel = if let IngestPayload::Frame(channel) = intent.payload { u16::try_from(channel).ok() } else { None };
+        if let Some(changed) = self.source_timeline.route_input(&intent.action_id, channel, self.preview.source_preview_mut()) {
+            (self.view.focus, self.view.message) = (self.walk.focus(qnc_focus_walk::SOURCE_TIMELINE), self.source_timeline.view().message.clone());
+            return IngestDispatchResult::accepted(None, changed);
+        }
         // The keys act on the panel in focus (user 2026-10-13): taken there, or standing for a tab or a button.
         let routed = self.walk.route(&intent.action_id);
         self.view.focus = self.walk.view();
@@ -28,7 +35,7 @@ impl IngestApplication {
             action_ids::INGEST_DIR_OPEN => self.on_dir_open(intent.payload),
             action_ids::INGEST_DIR_CONFIRM => self.on_dir_confirm(intent.payload),
             // Escape with IN or OUT taken lets it go (the source timeline's own Escape).
-            action_ids::INGEST_DIR_CANCEL if self.source_panel.mark_taken(&self.view.timeline) => self.player_action(IngestIntent::empty("clear_focus")),
+            action_ids::INGEST_DIR_CANCEL if self.source_timeline.mark_taken(&self.view.timeline) => self.player_action(IngestIntent::empty("clear_focus")),
             action_ids::INGEST_DIR_CANCEL => self.on_dir_cancel(),
             action_ids::INGEST_SELECT_ALL => self.on_select_all(),
             action_ids::INGEST_CLEAR_SELECTION => self.on_clear_selection(),
@@ -37,7 +44,7 @@ impl IngestApplication {
             action_ids::INGEST_SET_ARCHIVE => self.on_set_archive(intent.payload),
             action_ids::INGEST_SET_AI_MINING => self.on_set_ai_mining(),
             action_ids::INGEST_IMPORT_SELECTED => self.start_import(),
-            action if action == action_ids::INGEST_CUE_FRAME || qnc_source_panel::ACTIONS.contains(&action) => self.player_action(intent),
+            action if action == action_ids::INGEST_CUE_FRAME || qnc_source_panel::ACTIONS.contains(&action) || action.starts_with("wheel_source") => self.player_action(intent),
             tab @ (action_ids::INGEST_TAB_ALL | action_ids::INGEST_TAB_VIRTUAL) => { self.view.pool_tab = Some(tab.to_string()); IngestDispatchResult::accepted(None, true) } // v5: only the chosen tab changes
             _ => IngestDispatchResult::accepted(Some(qnc_ui_text::text("ingest.msg.action_not_connected").to_string()), true),
         }

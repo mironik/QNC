@@ -1,7 +1,7 @@
 use super::*;
-use qnc_source_dock::{show_timeline_dock, SourceTimeline};
 
-/// The source dock is the public one; this form adds its own import actions to the header.
+/// The source dock is the one source timeline (piece `qnc-source-timeline`); this form
+/// adds only its own import actions to the header.
 pub(super) fn render_source_dock(
     ui: &mut Ui,
     contracts: &IngestContracts,
@@ -11,7 +11,7 @@ pub(super) fn render_source_dock(
     let rect = ui.available_rect_before_wrap();
     let mut intent = None;
     let dock = &contracts.ingest.source_dock;
-    let timeline_intent = show_timeline_dock(
+    let timeline_intent = qnc_source_timeline::show(
         ui,
         rect,
         &dock_style(contracts, theme),
@@ -99,7 +99,8 @@ pub(super) fn render_source_dock(
                 }
             });
         },
-        SourceTimeline::from_assets(&view.timeline, timeline_theme(theme), &view.timeline_assets).with_timecode(view.source_timecode),
+        (&view.timeline, timeline_theme(theme), &view.timeline_assets),
+        &view.source_timeline,
     );
     if intent.is_none() {
         intent = timeline_intent_to_ingest_intent(timeline_intent);

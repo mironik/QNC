@@ -13,12 +13,10 @@ impl IngestApplication {
 
     /// Copies what the preview reports into the view the form reads.
     pub(super) fn sync_playback_view(&mut self) {
-        let previous_timeline = self.view.timeline;
         let preview = self.preview.view();
         self.view.playback = preview.playback;
-        self.view.timeline = preview.timeline.preserving_source_marks_from(&previous_timeline);
-        let (target, clip) = (self.catalog_target.as_ref(), self.view.preview_clip_id.as_deref());
-        self.view.source_timecode = self.timecodes.for_clip(target, clip);
+        self.view.timeline = preview.timeline.preserving_source_marks_from(&self.view.timeline);
+        self.view.source_timeline = self.source_timeline.sync(self.view.preview_clip_id.as_deref(), self.catalog_target.as_ref()).clone();
     }
 
     pub(super) fn prepare_preview(&mut self, clip_id: String) -> IngestDispatchResult {
@@ -92,7 +90,7 @@ impl IngestApplication {
         }
         // The source timeline's keys are the piece every form takes (Play keeps the guard below).
         if intent.action_id != action_ids::PLAY_PAUSE {
-            if let Some(changed) = self.source_panel.route(&intent.action_id, self.preview.source_preview_mut(), &mut self.view.timeline) {
+            if let Some(changed) = self.source_timeline.route(&intent.action_id, self.preview.source_preview_mut(), &mut self.view.timeline) {
                 return IngestDispatchResult::accepted(None, changed);
             }
         }

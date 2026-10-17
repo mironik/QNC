@@ -12,7 +12,6 @@
 
 mod confirm;
 mod edit;
-mod lanes;
 mod nav;
 mod slot_move;
 mod slot_trim;
@@ -73,6 +72,11 @@ pub struct SourcePick {
     pub in_mark: Option<u64>,
     pub duration_frames: u64,
     pub timebase: Option<(i64, i64)>,
+    /// A1 and A2 as the source timeline keeps them (piece `qnc-source-timeline`): what a
+    /// segment, cover or Sync cover takes with it.
+    pub lanes: [qnc_lane_choice::Lane; 2],
+    /// The source timeline holds the current Enter (a lane taken or just kept).
+    pub holds_enter: bool,
 }
 
 impl SourcePick {
@@ -90,7 +94,15 @@ impl SourcePick {
             in_mark,
             duration_frames,
             timebase,
+            lanes: [qnc_lane_choice::Lane::default(), qnc_lane_choice::Lane { channel: 1, ..Default::default() }],
+            holds_enter: false,
         }
+    }
+
+    /// The lanes the source timeline keeps and whether it holds the Enter.
+    pub fn with_lanes(mut self, lanes: [qnc_lane_choice::Lane; 2], holds_enter: bool) -> Self {
+        (self.lanes, self.holds_enter) = (lanes, holds_enter);
+        self
     }
 }
 
@@ -145,15 +157,11 @@ pub struct ProgramSegments {
     selected_cover: Option<String>,
     /// What Talking Head, Voice over and covers take from the source view.
     source: SourcePick,
-    /// The channels heard on A1 and A2, a lane taken with the keyboard and the large
-    /// wave (piece `qnc-lane-choice`).
-    lanes: qnc_lane_choice::LaneChoice,
     /// The sound of a stored segment or cover taken on the Wrap row (`part_sound.rs`).
     part_sound: qnc_part_sound::PartSound,
     /// Clip lengths in their own frames, as the form last gave them (`view_with_waves`):
     /// the edit pictures know where their clip ends.
     clip_frames: std::collections::HashMap<String, u64>,
-    channels: qnc_source_channels::SourceChannels,
     sync: qnc_sync_cover::SyncCover,
     /// IN was pressed since the last source (arms Sync).
     sync_in_pressed: bool,
@@ -289,24 +297,15 @@ impl ProgramSegments {
         }
     }
 
-    /// The source the user marked, given by the caller each repaint.
-    /// `content` is the project content of the clip: its stored record gives the audio
-    /// channels A1 is chosen from.
-    pub fn set_source(&mut self, source: SourcePick, content: Option<&qnc_source_channels::ContentTarget>) {
-        let count = self.channels.for_clip(content, source.clip_id.as_deref());
+    /// The source the user marked, given by the caller each repaint, with the A1/A2
+    /// lanes its source timeline keeps.
+    pub fn set_source(&mut self, source: SourcePick) {
         let previous_in = (self.source.clip_id == source.clip_id)
             .then_some(self.source.in_mark)
             .flatten();
-        if self.source.clip_id != source.clip_id {
-            self.lanes.new_clip(); // another clip: A1 on channel 1, A2 on channel 2 (user rule)
-            self.view.lane_taken = None;
-            self.view.a1_choice = self.lanes.choice(0);
-            self.view.a2_choice = self.lanes.choice(1);
-        }
         self.source = source;
         self.view.source_edit_stills = self.edge_stills();
         self.arm_sync_on_new_in(previous_in);
-        self.set_source_channels(count);
     }
 
     /// Whether the playable program (segments or covers) changed since the last
@@ -740,9 +739,9 @@ impl ProgramSegments {
             out_frame,
             fps_num,
             fps_den,
-            a1_source_channel: self.lanes.kept(0).channel,
-            a1_level_db: self.lanes.kept(0).level_db,
-            a1_off: self.lanes.kept(0).off,
+            a1_source_channel: self.source.lanes[0].channel,
+            a1_level_db: self.source.lanes[0].level_db,
+            a1_off: self.source.lanes[0].off,
         });
     }
 
@@ -774,9 +773,9 @@ impl ProgramSegments {
                 out_frame,
                 fps_num,
                 fps_den,
-                a2_source_channel: self.lanes.kept(1).channel,
-                a2_level_db: self.lanes.kept(1).level_db,
-                a2_off: self.lanes.kept(1).off,
+                a2_source_channel: self.source.lanes[1].channel,
+                a2_level_db: self.source.lanes[1].level_db,
+                a2_off: self.source.lanes[1].off,
             },
             clip_name,
         );
@@ -1083,69 +1082,15 @@ impl ProgramSegments {
         self.view = view;
     }
 
-    /// What the view shows of the A1/A2 lanes.
+    /// What the view shows of a segment's or cover's sound taken on the Wrap row.
     fn lane_view(&self, view: &mut SegmentsView) {
-        view.a1_choice = self.lanes.choice(0);
-        view.a2_choice = self.lanes.choice(1);
-        (view.lane_taken, view.wave_zoom) = (self.lanes.taken(), self.lanes.wave_zoom());
-        let (a1, a2) = (self.lanes.lane(0), self.lanes.lane(1));
-        (view.lane_off, view.lane_level_db) = ([a1.off, a2.off], [a1.level_db, a2.level_db]);
         view.part_sound = self.part_sound_view();
     }
 
-    /// How many audio channels the marked clip has (its stored record); a chosen
-    /// channel the clip does not have goes back to channel 1.
-    pub fn set_source_channels(&mut self, count: Option<u16>) {
-        if self.lanes.set_channels(count) {
-            let mut view = std::mem::take(&mut self.view);
-            self.lane_view(&mut view);
-            self.view = view;
-        }
-    }
-
-    /// The channel picker of the source timeline chose the channel heard on A1.
-    pub fn choose_a1_channel(&mut self, channel: u16) -> bool {
-        self.choose_channel(0, channel)
-    }
-
-    /// The source channels kept on A1 and A2 (zero based): what is written to the story.
-    pub fn heard_channels(&self) -> (u16, u16) {
-        self.lanes.heard()
-    }
-
-    /// A1 (lane 0) or A2 as kept on the source timeline: channel, level and off, what a
-    /// new segment, cover or Sync cover takes (user 2026-10-16).
+    /// A1 (lane 0) or A2 as the source timeline keeps it: what a new segment, cover or
+    /// Sync cover takes (user 2026-10-16).
     pub fn kept_lane(&self, lane: u8) -> qnc_lane_choice::Lane {
-        self.lanes.kept(lane)
-    }
-
-    /// The source channels the preview plays on A1 and A2 now and their gains (0 when a
-    /// lane is off): a taken lane's draft is heard before Enter keeps it; Escape goes back
-    /// to what is kept.
-    pub fn audible_channels(&self) -> ((u16, u16), (f32, f32)) {
-        self.lanes.audible()
-    }
-
-    /// The channel picker of the source timeline chose the channel heard on A2.
-    pub fn choose_a2_channel(&mut self, channel: u16) -> bool {
-        self.choose_channel(1, channel)
-    }
-
-    /// On the taken lane a click only drafts the channel (Enter keeps it, Escape drops it;
-    /// user 2026-10-14); otherwise the chosen channel is kept at once.
-    fn choose_channel(&mut self, lane: u8, channel: u16) -> bool {
-        if self.lanes.taken().is_some_and(|(taken, _)| taken == lane) {
-            let drafted = self.lanes.set_draft(lane, channel);
-            self.view.lane_taken = self.lanes.taken();
-            return drafted;
-        }
-        if !self.lanes.choose(lane, channel) {
-            return false;
-        }
-        let mut view = std::mem::take(&mut self.view);
-        self.lane_view(&mut view);
-        self.view = view;
-        true
+        self.source.lanes[usize::from(lane.min(1))]
     }
 }
 

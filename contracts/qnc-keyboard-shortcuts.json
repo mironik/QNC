@@ -329,6 +329,12 @@
     "ingest_set_ai_mining": {
       "label": "Postavi Ingest AI mining"
     },
+    "source_choose_a1_channel": {
+      "label": "Kanal na A1 (klik u stupcu kanala source timelinea)"
+    },
+    "source_choose_a2_channel": {
+      "label": "Kanal na A2 (klik u stupcu kanala source timelinea)"
+    },
     "ingest_cue_frame": {
       "label": "Postavi Ingest cue frame"
     },
@@ -377,6 +383,10 @@
         ]
       },
       "ingest": {
+        "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
+        "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }],
         "play_pause": [
           {
             "code": "Space"

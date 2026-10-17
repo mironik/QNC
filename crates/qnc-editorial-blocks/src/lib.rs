@@ -9,8 +9,7 @@ use eframe::egui::{
 };
 
 use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
-use qnc_segment_panel::StorySourceTimeline as _;
-use qnc_source_dock::{show_chrome_row, show_timeline_dock, SourceTimeline};
+use qnc_source_dock::show_chrome_row;
 use qnc_timeline::TimelineIntent;
 
 use qnc_editorial_application::{EditorialIntent, EditorialView, LibraryTab};
@@ -172,7 +171,7 @@ fn render_source_dock(
 ) -> Option<EditorialIntent> {
     let rect = ui.available_rect_before_wrap();
     let mut header_intent = None;
-    let intent = show_timeline_dock(
+    let intent = qnc_source_timeline::show(
         ui,
         rect,
         &contracts.dock_style(theme),
@@ -195,17 +194,14 @@ fn render_source_dock(
                 }
             });
         },
-        SourceTimeline::from_assets(&view.preview.timeline, layout::timeline_theme(theme), &view.preview.assets)
-            .with_timecode(view.source_timecode)
-            .story(&view.segments),
+        (&view.preview.timeline, layout::timeline_theme(theme), &view.preview.assets),
+        &view.source_timeline,
     );
-    match intent {
-        TimelineIntent::None => header_intent,
-        // A click on A1/A2 is the same catalog action as Ctrl+1/Ctrl+2.
-        TimelineIntent::TakeAudioLane(qnc_timeline::AudioLane::A2) => Some(EditorialIntent::action("select_audio_a2")),
-        TimelineIntent::Wheel(wheel) => Some(EditorialIntent::action(wheel.action(qnc_panel_focus::WHEEL_SOURCE))),
-        TimelineIntent::TakeAudioLane(_) => Some(EditorialIntent::action("select_audio_a1")),
-        other => Some(EditorialIntent::Timeline(other)),
+    // A click on A1/A2 and the wheel are the source timeline's own catalog actions.
+    match (intent, header_intent) {
+        (TimelineIntent::None, header) => header,
+        (choose @ (TimelineIntent::ChooseA1Channel(_) | TimelineIntent::ChooseA2Channel(_)), _) => Some(EditorialIntent::Timeline(choose)),
+        (intent, _) => Some(qnc_source_timeline::SourceTimeline::action_of(&intent).map_or(EditorialIntent::Timeline(intent), |(action, _)| EditorialIntent::action(action))),
     }
 }
 
