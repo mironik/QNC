@@ -76,7 +76,9 @@ pub const VIDEO_BAND: f32 = 17.0;
 /// The dark strip under the light middle without audio bands.
 const VIDEO_FOOT: f32 = 10.0;
 /// A cover over the filmstrip of a Wrap row: a strip as high as its label.
-const COVER_STRIP: f32 = 13.0;
+/// The cover strip over the filmstrip of a Wrap row: at the bottom of the picture, half as
+/// high again as the first one (user 2026-10-17: it was 13 px at the top).
+const COVER_STRIP: f32 = 19.5;
 
 impl TimelineLayerFlags {
     pub fn a1_v_a2() -> Self {
@@ -1705,6 +1707,12 @@ fn paint_covers(
         let x1 = x_for_frame(track, range_start, duration, cover.end_frame);
         let (top, bottom) = cover_rows(track, input);
         let rect = Rect::from_min_max(egui::pos2(x0, top), egui::pos2(x1.max(x0 + 3.0), bottom));
+        // Over the filmstrip the strip shows only under the mouse or when the cover is chosen
+        // (user 2026-10-17); the narrow video row keeps it, it has no picture of its own.
+        let strip = input.layers.audio_bands && !input.pictures.is_empty();
+        if strip && !cover.selected && !cover.pending && !ui.rect_contains_pointer(rect) {
+            continue;
+        }
         let base = if cover.pending {
             input.theme.focus
         } else {
@@ -2065,10 +2073,10 @@ fn cover_hit<'a>(
 /// (user 2026-10-15: a cover paints the video part of the Wrap row), otherwise the upper part.
 fn cover_rows(track: Rect, input: &TimelineInput<'_>) -> (f32, f32) {
     if input.layers.audio_bands && !input.pictures.is_empty() {
-        // Over the filmstrip a cover is a strip at the top of the picture, so its own
-        // pictures show under it.
-        let top = track.top() + video_middle_insets(input).0;
-        (top, top + COVER_STRIP)
+        // Over the filmstrip a cover is a strip at the bottom of the picture, so its own
+        // pictures show above it (user 2026-10-17).
+        let bottom = track.bottom() - video_middle_insets(input).1;
+        (bottom - COVER_STRIP, bottom)
     } else if input.layers.audio_bands {
         let (top, bottom) = video_middle_insets(input);
         (track.top() + top, track.bottom() - bottom)

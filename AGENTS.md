@@ -4365,3 +4365,8 @@ sto Ctrl radi na retku (`qnc-timeline`): M marker (Ctrl+M), blizu ruba slota taj
 slotu slot (Ctrl+S), pokrivalica izvan slota (Ctrl+klik, `TakeCover`), A1/A2 zvuk na kliknutom mjestu (Ctrl+1/2),
 oznaka V filmstrip/uska traka (Ctrl+klik). `qnc-program-commands` (`Keep`, `TakeSlotEdge`), `qnc-program-segments`.
 Testovi, conformance. Uzivo nije provjereno.
+Izmjena izgleda 2026-10-17 (korisnik: traka pokrivalice na Wrap retku "s gornjeg polozaja prebacio na donji, visinu
+povecao za 50%, ne bi trajno bila vidljiva, vec samo kad je mis iznad nje ili je selektirana"): `qnc-timeline`
+(`COVER_STRIP` 13 -> 19,5 px, `cover_rows`: dno slike, `paint_covers`: preko filmstripa samo pod misem ili kad je
+pokrivalica odabrana). Uska video traka (bez filmstripa) i dalje uvijek pokazuje pokrivalicu, jer nema svoje slike.
+Klik i desni klik na mjestu trake rade kao prije.
