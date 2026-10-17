@@ -1752,3 +1752,26 @@ fn a_refused_edit_writes_nothing_not_even_an_undo_step() {
     let open: bool = Connection::open(&path).unwrap().is_autocommit();
     assert!(open, "no transaction is left open");
 }
+
+#[test]
+fn the_program_snapshot_has_a_revision_that_grows_with_every_change_and_never_goes_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    let snapshot = |store: &mut Story| match run(store, Operation::ReadProgramSnapshot).unwrap() {
+        Data::Program(snapshot) => snapshot,
+        _ => panic!(),
+    };
+    assert_eq!(snapshot(&mut store).revision, 0);
+    three_segments(&mut store);
+    let after_edits = snapshot(&mut store);
+    assert_eq!(after_edits.segments.len(), 3);
+    assert!(after_edits.revision >= 3);
+    assert!(after_edits.story_fps.is_some());
+    run(&mut store, Operation::UndoStory).unwrap();
+    let undone = snapshot(&mut store);
+    assert_eq!(undone.segments.iter().filter(|segment| segment.active).count(), 2);
+    assert!(undone.revision > after_edits.revision, "Undo is a new revision, never an old one");
+    run(&mut store, Operation::SelectSlot { slot_id: String::new() }).ok();
+    assert_eq!(snapshot(&mut store).revision, undone.revision, "a selection is not a change of the program");
+}

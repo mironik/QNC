@@ -328,14 +328,11 @@ impl ProgramSegments {
         }
         let (send, receive) = std::sync::mpsc::channel();
         let started = std::thread::Builder::new().name("qnc-story-read".into()).spawn(move || {
+            // One consistent read of the story (external audit 2026-10-17), the same the
+            // player builds its program from.
             let read = StoryReader::open(&target).and_then(|mut client| {
-                Ok((
-                    client.list_segments()?,
-                    client.list_markers()?,
-                    client.list_slots()?,
-                    client.list_covers()?,
-                    client.read_story_selection()?,
-                ))
+                let story = client.program_snapshot()?;
+                Ok((story.segments, story.markers, story.slots, story.covers, story.selection))
             });
             let _ = send.send(read);
         });

@@ -4448,3 +4448,10 @@ procesu moglo pokazati nevaljano stanje ili pregaziti njegovu izmjenu. Testovi
 `a_story_of_an_older_schema_is_not_read_until_the_owner_brings_it_up`, `a_refused_edit_writes_nothing_not_even_an_undo_step`,
 svi testovi `qnc-program-db` (35), `qnc-program-segments`, `qnc-program-input`, `qnc-db-broker`, `qnc-virtual-shots`,
 `qnc-editorial-application`, conformance. Sljedeci koraci audita (3-9) cekaju odobrenje.
+Izvedeno 2026-10-17 (vanjski audit, P1-3; korisnik: "da, otkljucaj i kreni s 3 i 4"): jedna snimka price. Novo citanje
+`qnc-program-db` `ReadProgramSnapshot` (`StoryReader::program_snapshot`) cita segmente, pokrivalice, markere, slotove,
+odabir i stopu price u jednoj transakciji citanja, uz reviziju price (`story_revision`, zasebna tablica izvan snimke za
+Undo: raste sa svakom izmjenom, Undo i Redo, nikad ne ide unatrag; odabir je ne mijenja). Istu snimku koriste player
+i prerender (`qnc-program-input`, revizija ide u playlistu umjesto 0) i prikaz price (`qnc-program-segments`). Priča
+bez tablice revizije je starija shema (citac je odbija, vlasnik je dovodi na tekucu). Test
+`the_program_snapshot_has_a_revision_that_grows_with_every_change_and_never_goes_back`, conformance.

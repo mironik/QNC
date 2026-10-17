@@ -155,14 +155,14 @@ fn load(
     window: Option<((u64, u64), &TransientCover)>,
     draft: Option<&SoundDraft>,
 ) -> Result<ProgramInput, String> {
-    let mut client = StoryReader::open(target)?;
-    let mut segments = client.list_segments()?;
-    let mut covers = client.list_covers()?;
+    // One consistent read of the story (external audit 2026-10-17): segments, covers and
+    // rate of the same revision, never an old segment with a new cover.
+    let snapshot = StoryReader::open(target)?.program_snapshot()?;
+    let (mut segments, mut covers, revision) = (snapshot.segments, snapshot.covers, snapshot.revision);
     if let Some(draft) = draft {
         draft.apply(&mut segments, &mut covers);
     }
-    let story_rate = client.read_story_selection()?.story_fps.ok_or(qnc_ui_text::text("story.msg.program_is_empty"))?;
-    drop(client);
+    let story_rate = snapshot.story_fps.ok_or(qnc_ui_text::text("story.msg.program_is_empty"))?;
     if let Some((range, cover)) = window {
         covers = with_transient_cover(&covers, range, cover);
     }
@@ -177,7 +177,8 @@ fn load(
     };
     let channels = resolver.prepared(&first.clip_id)?.project_audio.channels;
     let covers = fit_covers(covers, &mut resolver, story_rate)?;
-    let input = build_input(project_id, story_rate, &segments, &covers, channels)?;
+    let mut input = build_input(project_id, story_rate, &segments, &covers, channels)?;
+    input.revision = revision;
     let mut playlist = build_flat_program_playlist(&input, &mut resolver)?;
     if let Some(((start, end), _)) = window {
         let range =

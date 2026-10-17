@@ -102,6 +102,21 @@ pub struct ProgramCover {
 /// The stored Story selection (v5 `story_state`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct ProgramSnapshot {
+    /// Grows with every change of the story (an edit, Undo, Redo); 0 for a story that has
+    /// not changed since it got its revision.
+    pub revision: u64,
+    pub segments: Vec<ProgramSegment>,
+    pub covers: Vec<ProgramCover>,
+    /// The rate of the story; `None` without segments.
+    pub story_fps: Option<(u32, u32)>,
+    pub markers: Vec<ProgramMarker>,
+    pub slots: Vec<ProgramSlot>,
+    pub selection: StorySelection,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StorySelection {
     pub selected_part_id: String,
     pub selected_slot_id: String,
@@ -192,6 +207,10 @@ pub enum Operation {
     ListSlots,
     ListCovers,
     ReadStorySelection,
+    /// The program as one consistent read: its segments, covers and rate, read in one
+    /// read transaction, with the story's revision (external audit 2026-10-17: the player
+    /// read them apart and could mix an old segment with a new cover).
+    ReadProgramSnapshot,
     /// v5 `select_part`.
     SelectPart { part_id: String },
     /// v5 `select_marker_slot`.
@@ -258,6 +277,7 @@ impl Operation {
         !matches!(
             self,
             Self::ListSegments
+                | Self::ReadProgramSnapshot
                 | Self::ListMarkers
                 | Self::ListSlots
                 | Self::ListCovers
@@ -275,6 +295,7 @@ pub enum Data {
     Slots(Vec<ProgramSlot>),
     Covers(Vec<ProgramCover>),
     StorySelection(StorySelection),
+    Program(ProgramSnapshot),
     Changed,
 }
 
@@ -384,6 +405,14 @@ impl StoryReader {
     pub fn read_story_selection(&mut self) -> Result<StorySelection> {
         match self.call(&Operation::ReadStorySelection)? {
             Data::StorySelection(selection) => Ok(selection),
+            _ => Err(wrong()),
+        }
+    }
+
+    /// The program in one read (segments, covers, rate) with its revision.
+    pub fn program_snapshot(&mut self) -> Result<ProgramSnapshot> {
+        match self.call(&Operation::ReadProgramSnapshot)? {
+            Data::Program(snapshot) => Ok(snapshot),
             _ => Err(wrong()),
         }
     }

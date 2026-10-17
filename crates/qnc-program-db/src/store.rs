@@ -6,7 +6,8 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The tables this module owns; it writes no other.
-const OWNED: [&str; 7] = [
+const OWNED: [&str; 8] = [
+    "story_revision",
     "story_parts",
     "story_markers",
     "story_marker_slots",
@@ -78,6 +79,7 @@ impl Store {
                 Operation::ListMarkers => Ok(Data::Markers(Vec::new())),
                 Operation::ListSlots => Ok(Data::Slots(Vec::new())),
                 Operation::ListCovers => Ok(Data::Covers(Vec::new())),
+                Operation::ReadProgramSnapshot => Ok(Data::Program(ProgramSnapshot::default())),
                 Operation::ReadStorySelection => {
                     Ok(Data::StorySelection(StorySelection::default()))
                 }
@@ -108,7 +110,11 @@ impl Store {
 
     fn write_in_transaction(&mut self, operation: &Operation) -> Result<Data> {
         if !operation.edits_story() {
-            return self.dispatch(operation);
+            let data = self.dispatch(operation)?;
+            if matches!(operation, Operation::UndoStory | Operation::RedoStory) {
+                bump_revision(&self.conn)?;
+            }
+            return Ok(data);
         }
         let before = crate::undo::capture(&self.conn)?;
         let short = cover_shortfalls(&self.conn)?;
@@ -120,7 +126,34 @@ impl Store {
             return Err(refusal);
         }
         crate::undo::record(&self.conn, &before)?;
+        bump_revision(&self.conn)?;
         Ok(data)
+    }
+
+    /// Segments, covers and rate in one read transaction, with the revision.
+    fn read_program_snapshot(&mut self) -> Result<Data> {
+        self.conn.execute_batch("BEGIN").map_err(err)?;
+        let read = (|| -> Result<ProgramSnapshot> {
+            let Data::Segments(segments) = self.list_segments()? else {
+                return Err(qnc_ui_text::text("story.invalid_reply_story").into());
+            };
+            let Data::Covers(covers) = self.list_covers()? else {
+                return Err(qnc_ui_text::text("story.invalid_reply_story").into());
+            };
+            let Data::Markers(markers) = self.list_markers()? else {
+                return Err(qnc_ui_text::text("story.invalid_reply_story").into());
+            };
+            let Data::Slots(slots) = self.list_slots()? else {
+                return Err(qnc_ui_text::text("story.invalid_reply_story").into());
+            };
+            let Data::StorySelection(selection) = self.read_story_selection()? else {
+                return Err(qnc_ui_text::text("story.invalid_reply_story").into());
+            };
+            let story_fps = selection.story_fps;
+            Ok(ProgramSnapshot { revision: read_revision(&self.conn)?, segments, covers, story_fps, markers, slots, selection })
+        })();
+        let _ = self.conn.execute_batch(if read.is_ok() { "COMMIT" } else { "ROLLBACK" });
+        read.map(Data::Program)
     }
 
     fn dispatch(&mut self, operation: &Operation) -> Result<Data> {
@@ -190,6 +223,7 @@ impl Store {
             Operation::ListSlots => self.list_slots(),
             Operation::ListCovers => self.list_covers(),
             Operation::ReadStorySelection => self.read_story_selection(),
+            Operation::ReadProgramSnapshot => self.read_program_snapshot(),
             Operation::SelectPart { part_id } => self.select_part(part_id),
             Operation::SelectSlot { slot_id } => self.select_slot(slot_id),
             Operation::CreateCover {
@@ -1370,8 +1404,11 @@ const SCHEMA_COLUMNS: &[(&str, &[&str])] = &[
     ("story_covers", &["slot_id", "a2_source_channel", "a2_level_db", "a2_off"]),
 ];
 
-/// A story table lacks a column of the current schema.
+/// A story table lacks a column of the current schema, or the story has no revision yet.
 fn schema_outdated(conn: &Connection) -> Result<bool> {
+    if !table_columns(conn, "story_state")?.is_empty() && table_columns(conn, "story_revision")?.is_empty() {
+        return Ok(true);
+    }
     for (table, needed) in SCHEMA_COLUMNS {
         let columns = table_columns(conn, table)?;
         if !columns.is_empty() && needed.iter().any(|column| !columns.iter().any(|have| have == column)) {
@@ -1381,7 +1418,34 @@ fn schema_outdated(conn: &Connection) -> Result<bool> {
     Ok(false)
 }
 
+/// The revision of the story: kept apart from the story tables, so Undo never takes it
+/// back (a revision is never given to two different stories).
+fn bump_revision(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "INSERT INTO story_revision (id, revision) VALUES (1, 1)
+         ON CONFLICT(id) DO UPDATE SET revision = revision + 1",
+        [],
+    )
+    .map_err(err)?;
+    Ok(())
+}
+
+fn read_revision(conn: &Connection) -> Result<u64> {
+    let revision: Option<i64> = conn
+        .query_row("SELECT revision FROM story_revision WHERE id = 1", [], |row| row.get(0))
+        .optional()
+        .map_err(err)?;
+    Ok(revision.unwrap_or(0).max(0) as u64)
+}
+
 fn ensure_story_schema(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS story_revision (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            revision INTEGER NOT NULL
+         );",
+    )
+    .map_err(err)?;
     // Development records are removed, not converted (AGENTS section 3):
     // program_segments / program_markers, story_covers from before the
     // marker-pair slot binding or the A2 channel, and a story from before the
