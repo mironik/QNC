@@ -407,10 +407,12 @@ fn paint_program(
         TimelineIntent::SelectCover { id, frame } => {
             let cover_id = id;
             let frame = start + frame.min(duration);
-            Some(if ui.input(|input| input.modifiers.command) {
-                SegmentCommand::TakeCover { cover_id, frame }
-            } else {
-                SegmentCommand::SelectCover { cover_id, frame }
+            // A plain click on the colour strip selects the slot it covers (user 2026-10-17).
+            let slot = segments.covers.iter().find(|cover| cover.cover_id == cover_id).map(|cover| cover.slot_id.clone());
+            Some(match (ui.input(|input| input.modifiers.command), slot) {
+                (true, _) => SegmentCommand::TakeCover { cover_id, frame },
+                (false, Some(slot_id)) => SegmentCommand::SelectSlot { slot_id, frame },
+                (false, None) => SegmentCommand::SelectCover { cover_id, frame },
             })
         }
         TimelineIntent::SelectVirtual { frame, .. } => {

@@ -1260,13 +1260,14 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
             let cover = input.layers.covers.then(|| cover_hit(track, range_start, duration, pos, input.covers, cover_rows(track, input))).flatten();
             return cover.map(|id| TimelineIntent::TakeCover { id: id.to_string(), frame });
         };
-        // Near an edge of the slot: that edge (as Ctrl+I/O); inside it: the slot (as Ctrl+S).
-        const EDGE: f32 = 8.0;
-        let (x0, x1) = (x_for_frame(track, range_start, duration, span.start_frame), x_for_frame(track, range_start, duration, span.end_frame));
-        if (pos.x - x0).abs() <= EDGE || (pos.x - x1).abs() <= EDGE {
-            return Some(TimelineIntent::TakeSlotEdge { id: span.id.to_string(), start: (pos.x - x0).abs() <= (pos.x - x1).abs() });
+        // On the colour strip a right click takes the slot (as Ctrl+S); elsewhere it is
+        // Ctrl+I/O: the nearer edge of the slot, the playhead goes there (user 2026-10-17).
+        let on_strip = input.layers.covers && cover_hit(track, range_start, duration, pos, input.covers, cover_rows(track, input)).is_some();
+        if on_strip {
+            return Some(TimelineIntent::TakeSlot { id: span.id.to_string(), frame });
         }
-        return Some(TimelineIntent::TakeSlot { id: span.id.to_string(), frame });
+        let (x0, x1) = (x_for_frame(track, range_start, duration, span.start_frame), x_for_frame(track, range_start, duration, span.end_frame));
+        return Some(TimelineIntent::TakeSlotEdge { id: span.id.to_string(), start: (pos.x - x0).abs() <= (pos.x - x1).abs() });
     }
     if !(input.draft_in_active || input.draft_out_active) {
         return None;
@@ -2002,21 +2003,7 @@ fn video_intent_from_response(
                 };
             }
         }
-        if input.layers.covers && input.layers.marker_slots {
-            if let Some(id) = slot_hit(
-                track,
-                input.state.range_start(),
-                input.state.duration_frames(),
-                pos,
-                input.marker_slots,
-                slot_top(input),
-            ) {
-                return TimelineIntent::SelectMarkerSlot {
-                    id: id.to_string(),
-                    frame,
-                };
-            }
-        }
+        // Outside the colour strip a left click only places the playhead (user 2026-10-17).
         if input.layers.virtual_spans {
             if let Some(id) = virtual_span_hit(
                 track,

@@ -507,7 +507,17 @@ impl ProgramSegments {
                 }
             }
             SegmentCommand::ProgramStart => self.cue_program(0),
-            SegmentCommand::Cue(frame) => self.cue_at(frame),
+            SegmentCommand::Cue(frame) => {
+                // A click that only places the playhead lets go of a slot it leaves, so
+                // Ctrl+I/O take the slot under the playhead.
+                let inside = self.view.slots.iter().any(|slot| {
+                    self.selected_slot.as_deref() == Some(slot.slot_id.as_str()) && (slot.start_frame..slot.end_frame).contains(&frame)
+                });
+                if !inside {
+                    self.selected_slot = None;
+                }
+                self.cue_at(frame)
+            }
             SegmentCommand::Marker => self.marker_at_playhead(),
             SegmentCommand::AddSegment(kind) => self.create_from_source(kind),
             SegmentCommand::Cover { overwrite } => self.cover_from_source(overwrite),

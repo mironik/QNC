@@ -4370,3 +4370,12 @@ povecao za 50%, ne bi trajno bila vidljiva, vec samo kad je mis iznad nje ili je
 (`COVER_STRIP` 13 -> 19,5 px, `cover_rows`: dno slike, `paint_covers`: preko filmstripa samo pod misem ili kad je
 pokrivalica odabrana). Uska video traka (bez filmstripa) i dalje uvijek pokazuje pokrivalicu, jer nema svoje slike.
 Klik i desni klik na mjestu trake rade kao prije.
+Izmjena 2026-10-17 (korisnik: "klik na color oznaku selektira slot, a klik izvan kolor oznake ... to je samo
+postavljanje playholdera.. ctrl+ prebacuje playholder na in ili out i nakon toga tockom ili strelicama moze se raditi
+isto sto i na source timelineu"): na Wrap retku lijevi klik na kolor traku pokrivalice bira slot koji pokriva (Ctrl+klik
+na nju i dalje uzima pokrivalicu), lijevi klik drugdje samo postavlja playhead i pusta izabrani slot koji playhead
+napusti (pa Ctrl+I/O uzimaju slot pod playheadom). Desni klik (Ctrl+) na kolor traku uzima slot (Ctrl+S), drugdje u slotu
+uzima bliži rub slota kao Ctrl+I/O: playhead ide na taj rub, kotacic i strelice ga pomicu, Enter ili lijevi klik sprema,
+Esc odustaje. `qnc-timeline` (lijevi klik u slot vise ne daje `SelectMarkerSlot`; desni klik bez granice od 8 px),
+`qnc-segment-panel` (klik na traku -> `SelectSlot`), `qnc-program-segments` (`Cue` pusta napusteni slot). Testovi,
+conformance.
