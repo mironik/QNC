@@ -4510,3 +4510,8 @@ timeline pokazuje (korisnikov, inace pocetak ili kraj klipa); zadana oznaka post
 kad nista nije uzeto uzima IN ili OUT blizi misu; `qnc-source-timeline`: Ctrl+kotacic pomice uzetu oznaku kad A1/A2
 nije uzet (uz uzet A1/A2 i dalje mijenja razinu). Vrijedi za sve forme (Story, MA, Ingest). Test
 `without_marks_ctrl_i_and_ctrl_o_take_the_clips_start_and_end_and_moving_one_sets_it`, conformance.
+Izvedeno 2026-10-17 (drugi vanjski audit, ocjena 7/10, nalaz P1-2; korisnik: "da, otkljucaj i kreni s 1 i 2"): ID B-roll
+kadra (i shorta) vise ne broji retke. Brojanje je s brisanjem kadra odbijene pokrivalice (moj korak 7) sljedecem kadru
+davalo vec iskoristen ID, pa je upis padao. `qnc-virtual-shots`: tablica `virtual_shot_numbers` (brojac po klipu i vrsti,
+samo raste, nikad ispod najveceg broja koji ID te vrste vec ima), `next_index`; ugovor baze dopunjen tablicom. Test
+`a_b_roll_shot_never_takes_the_id_of_one_that_was_or_is_still_there`.

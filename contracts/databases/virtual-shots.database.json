@@ -6,7 +6,8 @@
   "schema_version": "0.2.0",
   "qnc_uri": "qnc://local/db/virtual_shots/{project_id}",
   "tables": [
-    "virtual_shots"
+    "virtual_shots",
+    "virtual_shot_numbers"
   ],
   "public_read_views": [
     "public_short_clips",

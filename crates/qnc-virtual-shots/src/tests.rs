@@ -125,3 +125,33 @@ fn attaching_again_to_a_project_keeps_its_shots() {
     };
     assert_eq!(shorts.len(), 1);
 }
+
+#[test]
+fn a_b_roll_shot_never_takes_the_id_of_one_that_was_or_is_still_there() {
+    let (_dir, target) = project();
+    let writer = VirtualShotsWriter::start(target.clone()).unwrap();
+    let call = |operation: Operation| {
+        let pending = writer.submit(&operation).unwrap();
+        loop {
+            if let Some(reply) = pending.try_take() {
+                break reply;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    };
+    let cover = || Operation::CreateCoverShot {
+        project_id: "p1".into(),
+        clip_id: "clip-a".into(),
+        clip_name: "Mironik".into(),
+        in_frame: 5,
+        out_frame: 25,
+    };
+    assert_eq!(call(cover()).unwrap(), Data::Created("clip-a_broll_001".into()));
+    assert_eq!(call(cover()).unwrap(), Data::Created("clip-a_broll_002".into()));
+    // The shot of a refused cover goes (external audit 2026-10-17: a count of the rows gave
+    // the next shot the id 002 again, and it failed on the unique id).
+    call(Operation::ForgetCoverShot { shot_id: "clip-a_broll_001".into() }).unwrap();
+    assert_eq!(call(cover()).unwrap(), Data::Created("clip-a_broll_003".into()));
+    call(Operation::ForgetCoverShot { shot_id: "clip-a_broll_003".into() }).unwrap();
+    assert_eq!(call(cover()).unwrap(), Data::Created("clip-a_broll_004".into()), "never back, not even to the last");
+}

@@ -31,7 +31,7 @@ impl Store {
                 A::Insert { table_name }
                 | A::Delete { table_name }
                 | A::Update { table_name, .. }
-                    if access == Access::ReadWrite && table_name == "virtual_shots" =>
+                    if access == Access::ReadWrite && (table_name == "virtual_shots" || table_name == "virtual_shot_numbers") =>
                 {
                     R::Allow
                 }
@@ -120,7 +120,7 @@ impl Store {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
         let source_shot_id = source_row(&tx, clip_id)?;
-        let index = next_short_index(&tx, clip_id)?;
+        let index = next_index(&tx, clip_id, "short", "_shot_")?;
         let shot_id = format!("{clip_id}_shot_{index:03}");
         let name = format!("{} {index:03}", clip_name.trim());
         let created = SystemTime::now()
@@ -308,14 +308,7 @@ impl Store {
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(err)?;
         let source_shot_id = source_row(&tx, clip_id)?;
-        let count: i64 = tx
-            .query_row(
-                "SELECT COUNT(*) FROM virtual_shots WHERE clip_id = ?1 AND class = 'b_roll'",
-                [clip_id],
-                |row| row.get(0),
-            )
-            .map_err(err)?;
-        let index = count + 1;
+        let index = next_index(&tx, clip_id, "b_roll", "_broll_")?;
         let shot_id = format!("{clip_id}_broll_{index:03}");
         let name = format!("{} B{index:03}", clip_name.trim());
         let created = SystemTime::now()
@@ -345,7 +338,13 @@ impl Store {
 
 fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS virtual_shots (
+        "CREATE TABLE IF NOT EXISTS virtual_shot_numbers (
+            clip_id TEXT NOT NULL,
+            class TEXT NOT NULL,
+            last INTEGER NOT NULL,
+            PRIMARY KEY (clip_id, class)
+        );
+        CREATE TABLE IF NOT EXISTS virtual_shots (
             shot_id TEXT PRIMARY KEY,
             clip_id TEXT NOT NULL,
             class TEXT NOT NULL CHECK (class IN ('source', 'short', 'b_roll')),
@@ -415,15 +414,42 @@ fn source_row(conn: &Connection, clip_id: &str) -> Result<Option<String>> {
     .map_err(err)
 }
 
-fn next_short_index(conn: &Connection, clip_id: &str) -> Result<u32> {
-    let count: i64 = conn
+/// The next number of a shot of `class` of a clip (external audit 2026-10-17: a number
+/// counted from the rows came back after a B-roll shot of a refused cover went, and the
+/// next shot took an id already used). It only grows: a kept counter per clip and class,
+/// never below the highest number an id of that class already has.
+fn next_index(conn: &Connection, clip_id: &str, class: &str, marker: &str) -> Result<u32> {
+    let kept: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM virtual_shots WHERE clip_id = ?1 AND class = 'short'",
-            [clip_id],
+            "SELECT last FROM virtual_shot_numbers WHERE clip_id = ?1 AND class = ?2",
+            [clip_id, class],
             |row| row.get(0),
         )
-        .map_err(err)?;
-    Ok(u32::try_from(count).unwrap_or(0).saturating_add(1))
+        .optional()
+        .map_err(err)?
+        .unwrap_or(0);
+    let used = {
+        let mut statement = conn
+            .prepare("SELECT shot_id FROM virtual_shots WHERE clip_id = ?1 AND class = ?2")
+            .map_err(err)?;
+        let ids = statement
+            .query_map([clip_id, class], |row| row.get::<_, String>(0))
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        ids.iter()
+            .filter_map(|id| id.rsplit_once(marker).and_then(|(_, number)| number.parse::<i64>().ok()))
+            .max()
+            .unwrap_or(0)
+    };
+    let next = kept.max(used) + 1;
+    conn.execute(
+        "INSERT INTO virtual_shot_numbers (clip_id, class, last) VALUES (?1, ?2, ?3)
+         ON CONFLICT(clip_id, class) DO UPDATE SET last = excluded.last",
+        params![clip_id, class, next],
+    )
+    .map_err(err)?;
+    u32::try_from(next).map_err(err)
 }
 
 fn short_clip_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ShortClip> {
