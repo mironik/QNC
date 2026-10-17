@@ -66,7 +66,6 @@ pub fn locate_qnc_root() -> Option<std::path::PathBuf> {
 
 struct Loaded {
     settings: WorkSettings,
-    content: ContentReader,
     signature: CatalogSignature,
     /// `None` when the signature matched what is already shown.
     clips: Option<Vec<ClipSummary>>,
@@ -75,6 +74,8 @@ struct Loaded {
     project_dir: Option<std::path::PathBuf>,
     targets: Result<(qnc_content_store::ContentTarget, qnc_db_broker::ProjectDbTarget), String>,
     artifacts: Option<std::sync::Arc<dyn qnc_timeline_assets::TimelineArtifactRead>>,
+    /// The preview's context, built here too: taking it reads no database.
+    preview: Option<PreviewContext>,
 }
 
 type LoadResult = Result<Loaded, String>;
@@ -195,12 +196,13 @@ impl EditorialApplication {
         };
         let shown_project = self.shown_project.clone();
         let shown_signature = self.shown_signature.clone();
+        let bindings = self.bindings.clone().ok();
         self.view.loading = shown_project.is_none();
         let (send, receive) = mpsc::sync_channel(1);
         match std::thread::Builder::new()
             .name("editorial-catalog".into())
             .spawn(move || {
-                let _ = send.send(read_catalog(&reader, shown_project, shown_signature));
+                let _ = send.send(read_catalog(&reader, shown_project, shown_signature, bindings));
             }) {
             Ok(_) => self.load_result = Some(receive),
             Err(_) => self.fail(qnc_ui_text::text("story.msg.catalog_read_failed").into()),
@@ -332,7 +334,7 @@ impl EditorialApplication {
             self.request_posters();
         }
         match (&self.active_project_reader, &self.bindings) {
-            (Some(reader), Ok(bindings)) => {
+            (Some(_), Ok(_)) => {
                 self.content_target = match loaded.targets {
                     Ok(targets) => {
                         self.segments.configure(targets.1.clone(), &project_id, loaded.artifacts, Some(targets.0.clone()));
@@ -343,12 +345,9 @@ impl EditorialApplication {
                         None
                     }
                 };
-                self.preview.configure(PreviewContext::new(
-                    reader.settings_reader().clone(),
-                    loaded.settings,
-                    loaded.content,
-                    bindings.clone(),
-                ));
+                if let Some(context) = loaded.preview {
+                    self.preview.configure(context);
+                }
             }
             (_, Err(error)) => self.view.preview.message = error.clone(),
             _ => {}
@@ -621,6 +620,7 @@ fn read_catalog(
     reader: &ActiveProjectReader,
     shown_project: Option<String>,
     shown_signature: Option<CatalogSignature>,
+    bindings: Option<TransportBindings>,
 ) -> LoadResult {
     let shown = shown_project
         .zip(shown_signature)
@@ -648,7 +648,8 @@ fn read_catalog(
     let story = qnc_db_broker::ProjectDbTarget::for_project(settings, work);
     let targets = qnc_content_store::ContentTarget::for_project(settings, work).and_then(|target| Ok((target, story?)));
     let artifacts = qnc_content_artifacts::timeline_artifact_reader(settings, work).ok();
-    Ok(Loaded { settings: snapshot.settings, content, signature, clips, project_dir, targets, artifacts })
+    let preview = bindings.map(|bindings| PreviewContext::new(settings.clone(), work.clone(), content, bindings));
+    Ok(Loaded { settings: snapshot.settings, signature, clips, project_dir, targets, artifacts, preview })
 }
 
 #[cfg(test)]

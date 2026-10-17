@@ -4522,3 +4522,8 @@ svoj posao (`ImportRun`: projekt za koji je najam uzet, najam, prekid); kad je a
 ne preuzima klip i ne objavljuje ishod uvoza ni rezultat workera dok `confirm()` ne potvrdi najam (`RunQueue`).
 `tools/qnc-ingest-worker` predaje uvozu svoj projekt, najam i prekid; `tools/qnc-prerender` ne objavljuje dio ni ne brise
 stare bez potvrdenog najma. Test `a_lease_another_owner_took_is_not_confirmed_and_its_work_is_cancelled`.
+Izvedeno 2026-10-17 (drugi vanjski audit, P2-3; korisnik: "da, otkljucaj i kreni s 3 i 4"): kontekst previewa gradi se
+izvan niti sucelja. `qnc-editorial-application` `read_catalog` gradi `PreviewContext::new` (lokacija projekta, citaci,
+cilj baze sadrzaja) u pozadinskoj niti kataloga, a `apply_loaded` ga samo preda previewu; `qnc-source-preview`
+`PreviewContext` nosi i razrijesen cilj za javljanje rada playera, pa `configure` na niti sucelja ne cita bazu.
+Testovi, conformance.

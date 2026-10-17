@@ -113,6 +113,9 @@ pub struct PreviewContext {
     player_content: Arc<dyn PlayerContentRead>,
     artifacts: Option<Arc<dyn TimelineArtifactRead>>,
     notice: Option<String>,
+    /// Where this preview says a player works: resolved with the context, so taking the
+    /// context on the form thread reads no database (external audit 2026-10-17).
+    activity_target: Option<qnc_content_store::ContentTarget>,
 }
 
 impl PreviewContext {
@@ -124,6 +127,7 @@ impl PreviewContext {
         player_content: Arc<dyn PlayerContentRead>,
         artifacts: Option<Arc<dyn TimelineArtifactRead>>,
     ) -> Self {
+        let activity_target = qnc_content_store::ContentTarget::for_project(&reader, &settings).ok();
         Self {
             reader,
             settings,
@@ -131,6 +135,7 @@ impl PreviewContext {
             player_content,
             artifacts,
             notice: None,
+            activity_target,
         }
     }
 
@@ -156,9 +161,9 @@ impl PreviewContext {
             ),
             Err(error) => (None, Some(error.to_string())),
         };
-        let player_content = Arc::new(content::PlayerContent {
-            target: qnc_content_store::ContentTarget::for_project(&reader, &settings),
-        });
+        let target = qnc_content_store::ContentTarget::for_project(&reader, &settings);
+        let activity_target = target.clone().ok();
+        let player_content = Arc::new(content::PlayerContent { target });
         Self {
             reader,
             settings,
@@ -166,6 +171,7 @@ impl PreviewContext {
             player_content,
             artifacts,
             notice,
+            activity_target,
         }
     }
 
@@ -348,8 +354,7 @@ impl SourcePreview {
         if let Some(notice) = &context.notice {
             self.view.message = notice.clone();
         }
-        self.activity_target =
-            qnc_content_store::ContentTarget::for_project(&context.reader, &context.settings).ok();
+        self.activity_target = context.activity_target.clone();
         self.context = Some(context);
     }
 
