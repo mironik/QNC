@@ -79,10 +79,10 @@ pub(crate) fn record(conn: &Connection, before: &str) -> Result<()> {
 }
 
 /// Undo (or redo): the last kept story comes back, the current one goes to the
-/// other stack. Nothing kept is a controlled error.
+/// other stack. Nothing kept is a controlled error. It runs in the write's transaction.
 pub(crate) fn step(conn: &Connection, undo: bool) -> Result<()> {
     let (from, to) = if undo { ("undo", "redo") } else { ("redo", "undo") };
-    let tx = conn.unchecked_transaction().map_err(err)?;
+    let tx = conn;
     let kept: Option<(i64, String)> = tx
         .query_row(
             "SELECT seq, snapshot_json FROM story_undo WHERE stack = ?1
@@ -104,7 +104,7 @@ pub(crate) fn step(conn: &Connection, undo: bool) -> Result<()> {
     tx.execute("DELETE FROM story_undo WHERE seq = ?1", [seq])
         .map_err(err)?;
     push(&tx, to, &current)?;
-    tx.commit().map_err(err)
+    Ok(())
 }
 
 /// How many undo and redo steps are kept.
@@ -128,14 +128,6 @@ fn push(conn: &Connection, stack: &str, snapshot: &str) -> Result<()> {
     )
     .map_err(err)?;
     Ok(())
-}
-
-/// An edit refused after it ran: the story as it was before it, in one transaction; no
-/// undo step is kept.
-pub(crate) fn put_back(conn: &Connection, before: &str) -> Result<()> {
-    let tx = conn.unchecked_transaction().map_err(err)?;
-    restore(&tx, before)?;
-    tx.commit().map_err(err)
 }
 
 fn restore(conn: &Connection, snapshot: &str) -> Result<()> {

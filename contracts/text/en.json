@@ -365,6 +365,7 @@
     "story.range_shorter_than_one_picture_story": "The range is shorter than one picture of the story.",
     "story.end_m_marker_locked": "The end M marker is locked.",
     "story.nothing_undo": "Nothing to undo.",
+    "story.schema_outdated": "The story of this project was written by an older version; it is brought up to date before it is read.",
     "story.cover_hole": "A cover would end before its M marker (it needs picture {need}, its clip has {frames}): the change is not made.",
     "story.nothing_redo": "Nothing to redo.",
     "output.program_output_process_input": "Program output: the process has no input.",

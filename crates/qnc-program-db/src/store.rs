@@ -41,6 +41,11 @@ impl Store {
                 |r| r.get(0),
             )
             .map_err(err)?;
+        // A story written by an older schema is not read (external audit 2026-10-17: the
+        // reader failed on columns the writer adds); the owner brings it up first.
+        if schema_ready && schema_outdated(&conn)? {
+            return Err(qnc_ui_text::text("story.schema_outdated").into());
+        }
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
@@ -79,21 +84,43 @@ impl Store {
                 _ => Err(qnc_ui_text::text("story.project_story_initialised").into()),
             };
         }
-        if operation.edits_story() {
-            let before = crate::undo::capture(&self.conn)?;
-            let short = cover_shortfalls(&self.conn)?;
-            let data = self.dispatch(operation)?;
-            // An M marker is the OUT of one cover and the IN of the next (user 2026-10-17):
-            // no edit may leave a cover shorter than its slot, so no hole shows the segment
-            // under it. Such an edit is taken back whole and refused.
-            if let Some(refusal) = cover_hole(&short, &cover_shortfalls(&self.conn)?) {
-                crate::undo::put_back(&self.conn, &before)?;
-                return Err(refusal);
-            }
-            crate::undo::record(&self.conn, &before)?;
-            return Ok(data);
+        if !operation.is_write() {
+            return self.dispatch(operation);
         }
-        self.dispatch(operation)
+        // Every write is one transaction (external audit 2026-10-17): an edit, its check and
+        // its undo step are written together or not at all, so no other process ever reads
+        // a half done or refused edit, and a crash between them leaves nothing behind.
+        self.conn.execute_batch("BEGIN IMMEDIATE").map_err(err)?;
+        match self.write_in_transaction(operation) {
+            Ok(data) => match self.conn.execute_batch("COMMIT") {
+                Ok(()) => Ok(data),
+                Err(error) => {
+                    let _ = self.conn.execute_batch("ROLLBACK");
+                    Err(err(error))
+                }
+            },
+            Err(error) => {
+                let _ = self.conn.execute_batch("ROLLBACK");
+                Err(error)
+            }
+        }
+    }
+
+    fn write_in_transaction(&mut self, operation: &Operation) -> Result<Data> {
+        if !operation.edits_story() {
+            return self.dispatch(operation);
+        }
+        let before = crate::undo::capture(&self.conn)?;
+        let short = cover_shortfalls(&self.conn)?;
+        let data = self.dispatch(operation)?;
+        // An M marker is the OUT of one cover and the IN of the next (user 2026-10-17): no
+        // edit may leave a cover shorter than its slot, so no hole shows the segment under
+        // it. Such an edit is refused; the transaction takes it back whole.
+        if let Some(refusal) = cover_hole(&short, &cover_shortfalls(&self.conn)?) {
+            return Err(refusal);
+        }
+        crate::undo::record(&self.conn, &before)?;
+        Ok(data)
     }
 
     fn dispatch(&mut self, operation: &Operation) -> Result<Data> {
@@ -227,10 +254,7 @@ impl Store {
             return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         // The first segment sets the rate of the story; later ones keep it.
         let rate = match story_rate(&tx)? {
             Some(rate) => rate,
@@ -304,10 +328,7 @@ impl Store {
         if segment_id.is_empty() {
             return Err("part_id required".into());
         }
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let deleted_sort: i64 = tx
             .query_row(
                 "SELECT sort_index FROM story_parts WHERE part_id = ?1 AND active = 1",
@@ -407,10 +428,7 @@ impl Store {
     /// its length there and the markers after it move right by as much (the inverse
     /// of `delete_part`; markers that were inside it are gone). It becomes selected.
     fn include_segment(&mut self, segment_id: &str) -> Result<Data> {
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let changed = tx
             .execute(
                 "UPDATE story_parts SET active = 1, updated_at = ?2 WHERE part_id = ?1 AND active = 0",
@@ -484,10 +502,7 @@ impl Store {
             return Err(qnc_ui_text::text("story.source_valid_frame_rate").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         // The story keeps its rate while other segments have it; the only segment of a
         // story gives it the rate of its new source.
         let others: bool = tx
@@ -574,10 +589,7 @@ impl Store {
         if out_frame <= in_frame {
             return Err(qnc_ui_text::text("story.out_after_in").into());
         }
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let (old_in, fps_num, fps_den): (i64, u32, u32) = tx
             .query_row(
                 "SELECT in_frame, source_fps_num, source_fps_den FROM story_parts
@@ -644,10 +656,7 @@ impl Store {
 
     /// Removes an excluded segment for good (it is no longer in the program).
     fn purge_segment(&mut self, segment_id: &str) -> Result<Data> {
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let removed = tx
             .execute(
                 "DELETE FROM story_parts WHERE part_id = ?1 AND active = 0",
@@ -665,10 +674,7 @@ impl Store {
     /// Swaps with the neighbouring active segment; at the edge nothing changes
     /// (docs/93 R13). Excluded segments keep their place in the order.
     fn move_segment(&mut self, segment_id: &str, up: bool) -> Result<Data> {
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let mut order = all_segment_order(&tx)?;
         let index = order
             .iter()
@@ -701,10 +707,7 @@ impl Store {
         if part_id.is_empty() {
             return Err("part_id required".into());
         }
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let (start, end) =
             segment_window(&tx, part_id)?.ok_or_else(|| format!("part not found: {part_id}"))?;
         let local = (local_frame as i64).min((end - start) as i64).max(0);
@@ -780,10 +783,7 @@ impl Store {
         if frame > duration {
             return Err(qnc_ui_text::fill("story.marker_inside_story", &[("seconds", &format!("{:.3}", timeline_sec(duration, fps)))]));
         }
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         locked_check(&tx, marker_id, duration)?;
         let taken: bool = tx
             .query_row(
@@ -825,10 +825,7 @@ impl Store {
     fn move_slot(&mut self, slot_id: &str, start_frame: u64) -> Result<Data> {
         let fps = require_story_fps(&self.conn)?;
         let duration = program_length(&self.conn)?;
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let (start_id, end_id): (String, String) = tx
             .query_row(
                 "SELECT start_marker_id, end_marker_id FROM story_marker_slots WHERE slot_id = ?1",
@@ -884,10 +881,7 @@ impl Store {
     fn trim_slot(&mut self, slot_id: &str, start: bool, frames: i64) -> Result<Data> {
         let fps = require_story_fps(&self.conn)?;
         let duration = program_length(&self.conn)?;
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let (start_id, slot_start, slot_end): (String, i64, i64) = tx
             .query_row(
                 "SELECT start_marker_id, start_frame, end_frame FROM story_marker_slots WHERE slot_id = ?1",
@@ -952,10 +946,7 @@ impl Store {
             return Err("marker_id required".into());
         }
         let duration = program_length(&self.conn)?;
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         locked_check(&tx, marker_id, duration)?;
         delete_markers_with_slots(&tx, &[marker_id.to_string()])?;
         finalize_story(&tx)?;
@@ -1209,10 +1200,7 @@ impl Store {
     fn delete_cover(&mut self, cover_id: &str) -> Result<Data> {
         let cover_id = cover_id.trim();
         let now = story_now();
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let deleted = tx
             .execute("DELETE FROM story_covers WHERE cover_id = ?1", [cover_id])
             .map_err(err)?;
@@ -1291,10 +1279,7 @@ impl Store {
             return Err(qnc_ui_text::text("db.project_database_belongs_another_project").into());
         }
         require_imported_clip(&self.conn, clip_id)?;
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-            .map_err(err)?;
+        let tx = self.conn.savepoint().map_err(err)?;
         let rate = story_rate(&tx)?.ok_or(qnc_ui_text::text("story.story_segments"))?;
         story_per_source(rate, (fps_num, fps_den))?;
         type SlotRow = (i64, i64, f64, f64, String, i64);
@@ -1375,6 +1360,25 @@ impl Store {
         Ok(Data::Created(cover_id))
     }
 
+}
+
+/// The columns a story of the current schema has; `ensure_story_schema` adds the ones
+/// an older story lacks.
+const SCHEMA_COLUMNS: &[(&str, &[&str])] = &[
+    ("story_state", &["story_fps_num", "story_fps_den"]),
+    ("story_parts", &["a1_source_channel", "a1_level_db", "a1_off"]),
+    ("story_covers", &["slot_id", "a2_source_channel", "a2_level_db", "a2_off"]),
+];
+
+/// A story table lacks a column of the current schema.
+fn schema_outdated(conn: &Connection) -> Result<bool> {
+    for (table, needed) in SCHEMA_COLUMNS {
+        let columns = table_columns(conn, table)?;
+        if !columns.is_empty() && needed.iter().any(|column| !columns.iter().any(|have| have == column)) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn ensure_story_schema(conn: &Connection) -> Result<()> {

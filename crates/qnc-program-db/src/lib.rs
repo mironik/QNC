@@ -325,13 +325,28 @@ fn wrong() -> String {
     qnc_ui_text::text("story.invalid_reply_story").into()
 }
 
+/// The owner brings the Story tables of a project to the current schema (one short write
+/// connection, one transaction).
+pub fn prepare_schema(target: &ProjectDbTarget) -> Result<()> {
+    drop(target.open(Access::ReadWrite, vec![StoryModule::factory()])?);
+    Ok(())
+}
+
 /// Reads of the Story of the active project: a read-only client of its database,
 /// so a form reading never waits for a writer.
 pub struct StoryReader(ProjectDbClient);
 
 impl StoryReader {
+    /// A story of an older schema is first brought up by the owner (a short write
+    /// connection of this module), then read; the reader itself never changes the base.
     pub fn open(target: &ProjectDbTarget) -> Result<Self> {
-        Ok(Self(target.open(Access::ReadOnly, vec![StoryModule::factory()])?))
+        match target.open(Access::ReadOnly, vec![StoryModule::factory()]) {
+            Err(error) if error.to_string() == qnc_ui_text::text("story.schema_outdated") => {
+                prepare_schema(target)?;
+                Ok(Self(target.open(Access::ReadOnly, vec![StoryModule::factory()])?))
+            }
+            opened => Ok(Self(opened?)),
+        }
     }
 
     fn call(&mut self, operation: &Operation) -> Result<Data> {

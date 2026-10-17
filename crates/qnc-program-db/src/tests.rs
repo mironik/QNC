@@ -1697,3 +1697,58 @@ fn no_edit_leaves_a_cover_shorter_than_its_slot() {
     assert_eq!(markers(&mut store), vec![16, 27], "nothing was written: the M marker stays the cover's OUT");
     let _ = m16;
 }
+
+#[test]
+fn a_story_of_an_older_schema_is_not_read_until_the_owner_brings_it_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    drop(store);
+    // A story from before the A1 level (2026-10-16).
+    Connection::open(&path)
+        .unwrap()
+        .execute_batch("DROP VIEW public_story_parts; ALTER TABLE story_parts DROP COLUMN a1_level_db; ALTER TABLE story_parts DROP COLUMN a1_off;")
+        .unwrap();
+    let read_only = |path: &Path| store::Store::attach(Connection::open(path).unwrap(), Access::ReadOnly);
+    let refused = read_only(&path).err().expect("an older story is not read");
+    assert_eq!(refused, qnc_ui_text::text("story.schema_outdated"));
+    drop(reopen(&path)); // the owner's write connection brings it up
+    let mut reader = Story { store: read_only(&path).expect("read after the owner"), path: path.clone() };
+    let Data::Segments(rows) = run(&mut reader, Operation::ListSegments).unwrap() else {
+        panic!()
+    };
+    assert_eq!(rows.len(), 3);
+    assert!(rows.iter().all(|row| row.a1_level_db == 0), "as recorded");
+}
+
+#[test]
+fn a_refused_edit_writes_nothing_not_even_an_undo_step() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m16) = marker(&mut store, 16).unwrap() else {
+        panic!()
+    };
+    let Data::Created(m25) = marker(&mut store, 25).unwrap() else {
+        panic!()
+    };
+    let slot: String = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [&m16], |row| row.get(0))
+        .unwrap();
+    create_cover(&mut store, &slot, (500, 509)).unwrap();
+    drop(store);
+    Connection::open(&path).unwrap().execute("UPDATE clips SET duration_frames = 512 WHERE clip_id = 'c1'", []).unwrap();
+    let mut store = reopen(&path);
+    let undo_steps = |path: &Path| -> i64 {
+        Connection::open(path).unwrap().query_row("SELECT COUNT(*) FROM story_undo", [], |row| row.get(0)).unwrap()
+    };
+    let steps = undo_steps(&path);
+    run(&mut store, Operation::MoveMarker { marker_id: m25, program_frame: 29 }).unwrap_err();
+    assert_eq!(undo_steps(&path), steps, "no undo step for a refused edit");
+    assert_eq!(markers(&mut store), vec![16, 25]);
+    let open: bool = Connection::open(&path).unwrap().is_autocommit();
+    assert!(open, "no transaction is left open");
+}

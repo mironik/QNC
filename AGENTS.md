@@ -4436,3 +4436,15 @@ A1/A2 Wrap retka uzima zvuk onoga sto je pod Wrap playheadom u retku (inace na p
 je zvuk uzet, sprema ga (`qnc-segment-panel`). Jednako: desni klik na traku uzima, strelice gore/dolje kanal, lijevo/desno
 off/on, Ctrl+strelice i Ctrl+kotacic razina, Enter ili lijevi klik sprema, Esc odustaje. Test
 `a_left_click_keeps_a_taken_lane_as_enter_does`, conformance.
+Otkljucano i izvedeno 2026-10-17 (vanjski audit, ocjena 6,5/10, nalazi P1-1 i P1-2; korisnik: "da, otkljucaj i kreni s 1
+i 2"): otkljucan `qnc-program-db` s ugovorom, testovima i rjecnikom. (1) Starija shema price: citac je provjeravao samo
+postoje li tablice, pa je pucao na stupcima koje dodaje pisac (`no such column: a1_level_db`). Sada citac price starije
+sheme odbija (`SCHEMA_COLUMNS`, `schema_outdated`, poruka `story.schema_outdated`), a `StoryReader::open` tada najprije
+pusta vlasnika da shemu dovede na tekucu (`prepare_schema`: kratka veza za pisanje istog modula, jedna transakcija), pa
+cita; citac sam nikad ne mijenja bazu. (2) Atomski upis: svaki upis price je jedna transakcija (`BEGIN IMMEDIATE` u
+`execute`, transakcije operacija su savepointi u njoj, Undo/Redo bez vlastite transakcije): izmjena, provjera "bez rupe"
+i korak Undo upisuju se zajedno ili nikako. Ukinuto vracanje snimke nakon upisa (`undo::put_back`), koje je drugom
+procesu moglo pokazati nevaljano stanje ili pregaziti njegovu izmjenu. Testovi
+`a_story_of_an_older_schema_is_not_read_until_the_owner_brings_it_up`, `a_refused_edit_writes_nothing_not_even_an_undo_step`,
+svi testovi `qnc-program-db` (35), `qnc-program-segments`, `qnc-program-input`, `qnc-db-broker`, `qnc-virtual-shots`,
+`qnc-editorial-application`, conformance. Sljedeci koraci audita (3-9) cekaju odobrenje.
