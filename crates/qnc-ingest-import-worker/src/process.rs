@@ -11,7 +11,7 @@
 
 use crate::{run_next, ConfigMediaOpener, TransportQueue};
 use qnc_active_project_read::ActiveProjectReader;
-use qnc_ingest_runtime::{Beat, Writer, WORKER, WORKER_FRESH_SECONDS, WORKER_RESULT};
+use qnc_ingest_runtime::{Lease, Writer, WORKER, WORKER_FRESH_SECONDS, WORKER_RESULT};
 use qnc_ingest_select::selection_config::SelectionConfig;
 use qnc_ingest_store::content::ContentTarget;
 use qnc_ingest_work_plan::IngestWorkPlan;
@@ -72,13 +72,12 @@ pub fn run_service(root: &Path) -> Result<ImportSummary, String> {
     let snapshot = active_project.read().map_err(|e| e.to_string())?;
     let reader = active_project.settings_reader().clone();
     let target = ContentTarget::for_project(&reader, &snapshot.settings)?;
-    if qnc_ingest_runtime::is_fresh(&target, WORKER, WORKER_FRESH_SECONDS) {
+    let Some(_lease) = Lease::claim(target, WORKER, WORKER_FRESH_SECONDS)? else {
         return Ok(ImportSummary {
             imported: 0,
             failed: 0,
         });
-    }
-    let _lease = Beat::start(target, WORKER)?;
+    };
     run_import(root)
 }
 

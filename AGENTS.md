@@ -4455,3 +4455,14 @@ Undo: raste sa svakom izmjenom, Undo i Redo, nikad ne ide unatrag; odabir je ne 
 i prerender (`qnc-program-input`, revizija ide u playlistu umjesto 0) i prikaz price (`qnc-program-segments`). Priča
 bez tablice revizije je starija shema (citac je odbija, vlasnik je dovodi na tekucu). Test
 `the_program_snapshot_has_a_revision_that_grows_with_every_change_and_never_goes_back`, conformance.
+Izvedeno 2026-10-17 (vanjski audit, P1-4): atomski najam "jedan po projektu". Prije: proces je procitao je li najam ziv,
+pa ga zasebno upisao "on", bez vlasnika; dva procesa mogla su oba proci, a kraj jednoga upisivao je "off" dok drugi radi.
+Sada `qnc-content-store` (vlasnik tablice `ingest_runtime`; otkljucan uz ovaj korak jer je bez njega korak nemoguc) ima
+operaciju `Lease` (`LeaseAct::Claim`/`Renew`/`Release`): svaka je jedan uvjetni SQL upis, vrijednost je `on:<vlasnik>`,
+preuzima se samo kad nitko ne drzi, drzac ga je pustio, nije obnovljen dulje od isteka ili je vec tog vlasnika; obnova i
+otpustanje samo dok je jos tog vlasnika. `qnc-playback-activity` `Lease::claim` (vlasnik = proces i trenutak, obnova
+svake sekunde, `held()` postaje false kad ga drugi preuzme) zamjenjuje `Beat`. Koriste ga `tools/qnc-ingest-worker`
+(staje i kad izgubi najam), `qnc-ingest-import-worker` (`run_service`) i `tools/qnc-prerender` (isti pogresan obrazac);
+`is_fresh` cita i `on:<vlasnik>`. `qnc-ingest-select` novi odgovor pisaca tretira kao neispravan u svom toku. Test
+`a_lease_is_one_holders_and_its_end_lets_go_only_of_its_own`, testovi `qnc-content-store`, `qnc-ingest-import-worker`,
+`qnc-ingest-worker`, `qnc-ingest-select`, `qnc-prerender-launch`, `qnc-ingest-application`, conformance.

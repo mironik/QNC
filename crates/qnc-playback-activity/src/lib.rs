@@ -6,7 +6,7 @@
 //! Ages are counted by the clock of the database, so machines that disagree about the
 //! time still agree here. Local, LAN or intranet: only the content target differs.
 
-use qnc_content_store::{Access, ContentTarget, ContentWriteTransport};
+use qnc_content_store::{Access, ContentTarget, ContentWriteTransport, LeaseAct};
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -47,7 +47,12 @@ pub fn is_fresh(target: &ContentTarget, name: &str, max_age_seconds: i64) -> boo
         .and_then(|mut client| client.get_runtime(name))
         .ok()
         .flatten()
-        .is_some_and(|entry| entry.value == ON && entry.age_seconds <= max_age_seconds)
+        .is_some_and(|entry| held(&entry.value) && entry.age_seconds <= max_age_seconds)
+}
+
+/// "on", or a lease held by an owner ("on:<owner>").
+fn held(value: &str) -> bool {
+    value == ON || value.starts_with("on:")
 }
 
 /// The last value written under `name`, whatever its age.
@@ -97,10 +102,27 @@ impl Writer {
         self.transport
             .set_runtime(key.clone(), name.into(), value.into())
             .map_err(|e| e.to_string())?;
+        self.wait(&key).map(|_| ())
+    }
+
+    /// One lease act of `owner` on `name`; true when it succeeded for this owner.
+    pub fn lease(&mut self, name: &str, owner: &str, act: LeaseAct, max_age_seconds: i64) -> Result<bool, String> {
+        self.sequence += 1;
+        let key = format!("lease-{}", self.sequence);
+        self.transport
+            .lease(key.clone(), name.into(), owner.into(), act, max_age_seconds)
+            .map_err(|e| e.to_string())?;
+        match self.wait(&key)? {
+            qnc_content_store::ContentWriteData::Leased(held) => Ok(held),
+            _ => Err(qnc_ui_text::text("db.content_writer_returned_result").into()),
+        }
+    }
+
+    fn wait(&mut self, key: &str) -> Result<qnc_content_store::ContentWriteData, String> {
         loop {
             for completion in self.transport.poll() {
                 if completion.key == key {
-                    return completion.result.map(|_| ()).map_err(|e| e.to_string());
+                    return completion.result.map(|result| result.data).map_err(|e| e.to_string());
                 }
             }
             if !self.transport.has_pending() {
@@ -111,45 +133,67 @@ impl Writer {
     }
 }
 
-/// Keeps `name` on in the database while it lives and turns it off when it ends.
-pub struct Beat {
+/// The one holder of `name` in a project (external audit 2026-10-17): taken in one
+/// conditional statement with its owner, renewed and let go only while it is still this
+/// owner's. Two processes never both take it; one ending never lets go of another's.
+pub struct Lease {
     stop: Arc<AtomicBool>,
+    held: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
 
-impl Beat {
-    pub fn start(target: ContentTarget, name: &'static str) -> Result<Self, String> {
+impl Lease {
+    /// Takes `name` when nobody holds it, its holder let it go, or it was not renewed for
+    /// `fresh_seconds`; `None` when another holds it. It is renewed once a second.
+    pub fn claim(target: ContentTarget, name: &'static str, fresh_seconds: i64) -> Result<Option<Self>, String> {
+        let owner = owner_id();
         let mut writer = Writer::start(target)?;
-        writer.set(name, ON)?;
+        if !writer.lease(name, &owner, LeaseAct::Claim, fresh_seconds)? {
+            return Ok(None);
+        }
         let stop = Arc::new(AtomicBool::new(false));
-        let flag = stop.clone();
+        let held = Arc::new(AtomicBool::new(true));
+        let (flag, holding) = (stop.clone(), held.clone());
         let thread = std::thread::Builder::new()
-            .name("playback-activity-beat".into())
+            .name("playback-activity-lease".into())
             .spawn(move || {
                 while !flag.load(Ordering::Relaxed) {
                     std::thread::sleep(RENEW_EVERY);
                     if flag.load(Ordering::Relaxed) {
                         break;
                     }
-                    let _ = writer.set(name, ON);
+                    if let Ok(false) = writer.lease(name, &owner, LeaseAct::Renew, fresh_seconds) {
+                        holding.store(false, Ordering::Relaxed); // another owner took it
+                        return;
+                    }
                 }
-                let _ = writer.set(name, OFF);
+                let _ = writer.lease(name, &owner, LeaseAct::Release, fresh_seconds);
             })
             .map_err(|e| e.to_string())?;
-        Ok(Self {
-            stop,
-            thread: Some(thread),
-        })
+        Ok(Some(Self { stop, held, thread: Some(thread) }))
+    }
+
+    /// Still this owner's: false once another owner took it (it was not renewed in time).
+    pub fn held(&self) -> bool {
+        self.held.load(Ordering::Relaxed)
     }
 }
 
-impl Drop for Beat {
+impl Drop for Lease {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
     }
+}
+
+/// This process and the moment it asked: unique among the holders of a project.
+fn owner_id() -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos());
+    format!("{}-{nanos}", std::process::id())
 }
 
 /// For a form: says whether a player works, without ever blocking the form.
@@ -309,12 +353,20 @@ mod tests {
     }
 
     #[test]
-    fn a_beat_keeps_the_lease_on_while_it_lives_and_off_when_it_ends() {
+    fn a_lease_is_one_holders_and_its_end_lets_go_only_of_its_own() {
         let (_dir, target) = target();
-        let beat = Beat::start(target.clone(), WORKER).unwrap();
+        let first = Lease::claim(target.clone(), WORKER, WORKER_FRESH_SECONDS).unwrap().expect("the first takes it");
         assert!(is_fresh(&target, WORKER, WORKER_FRESH_SECONDS));
-        drop(beat);
+        assert!(Lease::claim(target.clone(), WORKER, WORKER_FRESH_SECONDS).unwrap().is_none(), "a second does not");
+        assert!(first.held());
+        drop(first);
         assert!(!is_fresh(&target, WORKER, WORKER_FRESH_SECONDS));
+        let second = Lease::claim(target.clone(), WORKER, WORKER_FRESH_SECONDS).unwrap().expect("free again");
+        // An owner that lost it (here: a stale one) cannot let go of the new holder's.
+        let mut writer = Writer::start(target.clone()).unwrap();
+        assert!(!writer.lease(WORKER, "someone-else", LeaseAct::Release, WORKER_FRESH_SECONDS).unwrap());
+        assert!(is_fresh(&target, WORKER, WORKER_FRESH_SECONDS));
+        drop(second);
     }
 
     #[test]

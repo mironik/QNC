@@ -209,6 +209,16 @@ pub enum Operation {
     GetRuntime {
         key: String,
     },
+    /// A lease one process holds (external audit 2026-10-17): taken, renewed and let go
+    /// by its owner only, each in one conditional statement, so two processes never both
+    /// hold it and the end of one never lets go of the other's.
+    Lease {
+        key: String,
+        owner: String,
+        act: LeaseAct,
+        /// A lease not renewed for longer than this may be taken by another owner.
+        max_age_seconds: i64,
+    },
     /// The poster made in the project folder for a clip whose source has none; kept
     /// only when the clip has no poster yet.
     SetPoster {
@@ -264,7 +274,27 @@ pub enum Data {
     Inventory(Vec<InventoryClip>),
     Removed(Vec<String>),
     Runtime(Option<RuntimeEntry>),
+    /// The lease act succeeded for its owner.
+    Leased(bool),
     Changed,
+}
+
+/// What a lease owner does with it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LeaseAct {
+    /// Takes it when nobody holds it, its holder let it go, it is too old, or it is
+    /// already this owner's.
+    Claim,
+    /// Renews it while it is still this owner's.
+    Renew,
+    /// Lets it go while it is still this owner's.
+    Release,
+}
+
+/// The value a held lease has: `on:` and its owner (read as "on" by everyone).
+pub fn lease_value(owner: &str) -> String {
+    format!("on:{owner}")
 }
 
 /// A runtime entry and how old it is by the clock of the database.

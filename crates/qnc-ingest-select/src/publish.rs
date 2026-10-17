@@ -73,7 +73,7 @@ pub(crate) fn remove_missing(
         writer.remove_missing(key.clone(), chunk.to_vec())?;
         let removed = match wait_write_completion(&mut writer, &key)?.data {
             ContentWriteData::Removed(ids) => ids,
-            ContentWriteData::Changed | ContentWriteData::Claimed(_) => {
+            ContentWriteData::Changed | ContentWriteData::Claimed(_) | ContentWriteData::Leased(_) => {
                 return Err("Neispravan remove-missing odgovor.".into())
             }
         };
@@ -123,7 +123,7 @@ fn wait_write_completion(
 fn expect_changed(result: ContentWriteResult) -> Result<()> {
     match result.data {
         ContentWriteData::Changed => Ok(()),
-        ContentWriteData::Removed(_) | ContentWriteData::Claimed(_) => {
+        ContentWriteData::Removed(_) | ContentWriteData::Claimed(_) | ContentWriteData::Leased(_) => {
             Err("Neispravan content write odgovor.".into())
         }
     }

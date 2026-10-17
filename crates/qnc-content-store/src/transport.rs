@@ -165,6 +165,13 @@ impl ContentClient {
         })
         .map(|_| ())
     }
+    /// A lease act of `owner` on `key`; true when it succeeded for this owner.
+    pub fn lease(&mut self, key: &str, owner: &str, act: crate::LeaseAct, max_age_seconds: i64) -> Result<bool> {
+        match self.execute(Operation::Lease { key: key.into(), owner: owner.into(), act, max_age_seconds })? {
+            Data::Leased(held) => Ok(held),
+            _ => Err("Neispravan odgovor baze.".into()),
+        }
+    }
     /// What was told under `key`, and how old it is by the clock of the database.
     pub fn get_runtime(&mut self, key: &str) -> Result<Option<RuntimeEntry>> {
         match self.execute(Operation::GetRuntime { key: key.into() })? {
@@ -294,6 +301,8 @@ pub enum ContentWriteData {
     Removed(Vec<String>),
     /// The clip taken from the import queue, if any.
     Claimed(Option<Box<StoredClip>>),
+    /// A lease act succeeded for its owner.
+    Leased(bool),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -387,6 +396,11 @@ impl ContentWriteTransport {
     /// Tells the other processes and forms something through the serialized transport.
     pub fn set_runtime(&mut self, key: String, name: String, value: String) -> Result<()> {
         self.send_operation(key, Operation::SetRuntime { key: name, value })
+    }
+
+    /// A lease act through the serialized transport (`Leased`).
+    pub fn lease(&mut self, key: String, name: String, owner: String, act: crate::LeaseAct, max_age_seconds: i64) -> Result<()> {
+        self.send_operation(key, Operation::Lease { key: name, owner, act, max_age_seconds })
     }
 
     /// The poster made in the project for a clip that has none.
@@ -542,6 +556,9 @@ fn execute_write_command(
         Operation::SetRuntime { key, value } => {
             client.set_runtime(&key, &value)?;
             Ok(ContentWriteData::Changed)
+        }
+        Operation::Lease { key, owner, act, max_age_seconds } => {
+            Ok(ContentWriteData::Leased(client.lease(&key, &owner, act, max_age_seconds)?))
         }
         Operation::FinishImport {
             clip_id,

@@ -558,8 +558,9 @@ fn launching_while_the_lease_in_the_database_is_alive_starts_nothing() {
     let f = fixture();
     let root = std::path::Path::new("unused");
     // No worker executable beside the test binary: this fails if it tries to start one.
-    let _lease =
-        qnc_ingest_runtime::Beat::start(f.target.clone(), qnc_ingest_runtime::WORKER).unwrap();
+    let _lease = qnc_ingest_runtime::Lease::claim(f.target.clone(), qnc_ingest_runtime::WORKER, qnc_ingest_runtime::WORKER_FRESH_SECONDS)
+        .unwrap()
+        .expect("the lease");
     assert!(launch_worker(root, &f.target).is_ok());
 }
 

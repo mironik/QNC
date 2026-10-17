@@ -128,11 +128,10 @@ fn run() -> Result<()> {
 
     // The one prerender of the project: its lease in the project database; the player first.
     let content = ContentTarget::for_project(&reader, &settings)?;
-    if qnc_playback_activity::is_fresh(&content, LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS) {
+    let Some(lease) = qnc_playback_activity::Lease::claim(content.clone(), LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS)? else {
         say("another prerender of this project runs".into());
         return Ok(());
-    }
-    let _lease = qnc_playback_activity::Beat::start(content.clone(), LEASE)?;
+    };
     // Asked of the database each time (no cache): a player that starts is seen within
     // 100 ms (with a cached answer the prerender read the card 2.7 s into a Play and the
     // sound ran dry, 2026-10-12).
@@ -142,6 +141,10 @@ fn run() -> Result<()> {
     let (mut idle_since, mut done_now, mut failed) = (Instant::now(), 0usize, std::collections::HashSet::new());
     let mut pruned: Option<Vec<String>> = None;
     loop {
+        if !lease.held() {
+            say("another prerender took the lease: prerender ends".into());
+            return Ok(());
+        }
         if reader.read().map(|now| now.project_id).ok() != Some(settings.project_id.clone()) {
             say("the active project changed: prerender ends".into());
             return Ok(());

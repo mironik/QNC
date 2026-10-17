@@ -85,15 +85,14 @@ fn run_once(root: &Path) -> Result<bool, String> {
     let target = qnc_content_store::ContentTarget::for_project(&reader, &snapshot.settings)?;
     // One worker per project: the lease covers the import and the artifacts, so a
     // second start while the artifacts are still built finds it and ends at once.
-    if qnc_playback_activity::is_fresh(
-        &target,
-        qnc_playback_activity::WORKER,
-        qnc_playback_activity::WORKER_FRESH_SECONDS,
-    ) {
-        return Ok(false);
-    }
     let player_works = qnc_playback_activity::playback_pause(target.clone());
-    let _lease = qnc_playback_activity::Beat::start(target, qnc_playback_activity::WORKER)?;
+    // Taken in one statement with its owner (external audit 2026-10-17): two starts never
+    // both run; a run whose lease another took stops.
+    let Some(lease) =
+        qnc_playback_activity::Lease::claim(target, qnc_playback_activity::WORKER, qnc_playback_activity::WORKER_FRESH_SECONDS)?
+    else {
+        return Ok(false);
+    };
     let running = std::sync::atomic::AtomicBool::new(true);
     // v5 media probe job: a card record gets what playback lacks, once, in the
     // background, so a preview of a clip not yet imported plays. Beside the artifacts
@@ -121,7 +120,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
     std::thread::scope(|scope| {
         scope.spawn(|| {
             while running.load(std::sync::atomic::Ordering::Relaxed) {
-                if !still_active(&active_project, &started) {
+                if !still_active(&active_project, &started) || !lease.held() {
                     closed.store(true, std::sync::atomic::Ordering::Relaxed);
                     cancel.store(true, std::sync::atomic::Ordering::Relaxed);
                     return;

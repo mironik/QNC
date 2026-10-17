@@ -413,6 +413,41 @@ impl ContentStore {
                     .map_err(err)?;
                 Ok(Data::Changed)
             }
+            Operation::Lease { key, owner, act, max_age_seconds } => {
+                if key.is_empty()
+                    || key.len() > 64
+                    || !key.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
+                    || owner.is_empty()
+                    || owner.len() > 128
+                    || !owner.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+                {
+                    return Err(qnc_ui_text::text("db.invalid_runtime_record").into());
+                }
+                let value = crate::lease_value(owner);
+                let now = "CAST(strftime('%s','now') AS INTEGER)";
+                let changed = match act {
+                    crate::LeaseAct::Claim => self.conn.execute(
+                        &format!(
+                            "INSERT INTO ingest_runtime(key,value,updated_at) VALUES(?1,?2,{now})
+                             ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
+                             WHERE ingest_runtime.value NOT LIKE 'on%'
+                                OR ingest_runtime.value = excluded.value
+                                OR {now} - ingest_runtime.updated_at > ?3"
+                        ),
+                        params![key, value, max_age_seconds],
+                    ),
+                    crate::LeaseAct::Renew => self.conn.execute(
+                        &format!("UPDATE ingest_runtime SET updated_at={now} WHERE key=?1 AND value=?2"),
+                        params![key, value],
+                    ),
+                    crate::LeaseAct::Release => self.conn.execute(
+                        &format!("UPDATE ingest_runtime SET value='off', updated_at={now} WHERE key=?1 AND value=?2"),
+                        params![key, value],
+                    ),
+                }
+                .map_err(err)?;
+                Ok(Data::Leased(changed == 1))
+            }
             Operation::GetRuntime { key } => {
                 let has_table: bool = self
                     .conn
