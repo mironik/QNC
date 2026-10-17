@@ -374,6 +374,13 @@ fn paint_program(
     }
     match intent {
         TimelineIntent::SelectMarker { id, .. } => Some(SegmentCommand::SelectMarker(id)),
+        // A right click takes what it points at, as Ctrl+M, Ctrl+S, Ctrl+1/Ctrl+2 (user 2026-10-17).
+        TimelineIntent::TakeMarker { id, .. } => Some(SegmentCommand::TakeMarker(id)),
+        TimelineIntent::TakeSlot { id, .. } => Some(SegmentCommand::TakeSlot(id)),
+        TimelineIntent::TakeSound { lane, frame } => Some(SegmentCommand::TakeSound {
+            lane: u8::from(lane == qnc_timeline::AudioLane::A2),
+            frame: start + frame.min(duration),
+        }),
         // v5 `program_intent_from_timeline_interact`: a click keeps its frame.
         TimelineIntent::SelectMarkerSlot { id, frame } => Some(SegmentCommand::SelectSlot {
             slot_id: id,

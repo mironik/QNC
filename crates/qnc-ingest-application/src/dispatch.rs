@@ -7,7 +7,7 @@ impl IngestApplication {
         // The A1/A2 lanes of the one source timeline (piece `qnc-source-timeline`): Ctrl+1/2, the
         // keys of a taken lane and a click on a channel; the keyboard goes to the source timeline.
         let channel = if let IngestPayload::Frame(channel) = intent.payload { u16::try_from(channel).ok() } else { None };
-        if let Some(changed) = self.source_timeline.route_input(&intent.action_id, channel, self.preview.source_preview_mut()) {
+        if let Some(changed) = self.source_timeline.route_input(&intent.action_id, channel, self.preview.source_preview_mut(), &mut self.view.timeline) {
             (self.view.focus, self.view.message) = (self.walk.focus(qnc_focus_walk::SOURCE_TIMELINE), self.source_timeline.view().message.clone());
             return IngestDispatchResult::accepted(None, changed);
         }

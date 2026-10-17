@@ -352,6 +352,7 @@
     "rules": [
       { "keys": "Tipka", "meaning": "Radi odmah: postavlja ili pokreće (IN, OUT, marker, pokrivalica, Play)." },
       { "keys": "Ctrl + tipka", "meaning": "Uzima kontrolu nad nečim što već postoji (IN, OUT, marker, slot, A1/A2). Uzeto mijenjaš strelicama, Enter potvrđuje, Esc odustaje." },
+      { "keys": "Desni klik mišem", "meaning": "Isto kao Ctrl + tipka: uzima ono na što pokazuješ (bliži IN ili OUT, A1/A2, M marker, slot). Kotačić ili strelice mijenjaju uzeto, Enter ili lijevi klik sprema, Esc odustaje." },
       { "keys": "Shift + tipka", "meaning": "Dodaje nešto novo (segment, marker u nastavku, pokrivalica, IN i OUT po trajanju slota)." },
       { "keys": "Alt + strelice", "meaning": "Skače po objektima: marker, slot, segment; na source timelineu početak, IN, OUT." },
       { "keys": "Strelice", "meaning": "Lijevo/desno za jedan frame, a kad je nešto uzeto mijenjaju to; gore/dolje prethodni ili sljedeći blok." },

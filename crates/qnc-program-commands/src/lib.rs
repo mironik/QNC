@@ -66,6 +66,13 @@ pub enum SegmentCommand {
     /// The selected marker first, otherwise the selected segment (docs/94 section 2).
     DeleteSelected,
     SelectMarker(String),
+    /// A right click on an M marker: it is taken as with Ctrl+M (user 2026-10-17).
+    TakeMarker(String),
+    /// A right click in a slot: it is taken as with Ctrl+S.
+    TakeSlot(String),
+    /// A right click on A1 (0) or A2 of a Wrap row: the sound of what lies at the program
+    /// frame is taken as with Ctrl+1/Ctrl+2 there.
+    TakeSound { lane: u8, frame: u64 },
     /// A click on a slot: select it, playhead at the clicked program frame (v5
     /// `SelectMarkerSlot { frame }`).
     SelectSlot {

@@ -58,7 +58,7 @@ impl ProgramSegments {
     }
 
     /// Selects a slot without moving the Wrap playhead (v5 `select_marker_slot`).
-    fn take_slot(&mut self, slot_id: &str) {
+    pub(crate) fn take_slot(&mut self, slot_id: &str) {
         self.selected_slot = Some(slot_id.to_string());
         self.selected_marker = None;
         self.write(Operation::SelectSlot { slot_id: slot_id.to_string() });

@@ -4349,3 +4349,11 @@ vise ne cita artefakte sam (`timeline_artifacts.rs` samo budi radnika); klik na 
 (`qnc-source-timeline` `cue`) u obje forme; kocka zapisuje svaku tipku source timelinea u log (`source-key`), isto
 za sve forme. Ocisceno: `cargo clean --profile dev` (disk 3 GB -> 46 GB). C10 Ingest application 1583 -> 1567.
 Ostaje u aplikacijama: cuvanje IN/OUT pri osvjezavanju prikaza (jedan redak, Story uz to otvara kadar s IN/OUT).
+Dopuna 2026-10-17 (korisnik: "Enter ili lijevo dugme misa sprema promjenu edita Ctrl+I/O"; "vec neko vrijeme odgadamo
+dodavanje funkcije Ctrl desnom dugmetu misa"): u univerzalnom `qnc-timeline` lijevi klik dok je IN ili OUT uzet je
+`KeepMark` (kao Enter: promjena ostaje, oznaka se pusta), a desni klik je Ctrl+ (uzima ono na sto pokazuje): na source
+timelineu blizi IN ili OUT (`TakeMark`), na A1/A2 traku (`TakeAudioLane`), na Wrap retku M marker (`TakeMarker`, kao
+Ctrl+M), slot (`TakeSlot`, kao Ctrl+S) ili zvuk segmenta/pokrivalice na kliknutom mjestu (`TakeSound`, kao Ctrl+1/2).
+`qnc-source-timeline` (`action_of`; `route_input` s Enterom pusta uzetu oznaku, pa Enter sprema i u Ingestu, gdje ga je
+prije uzimao krug panela), `qnc-program-commands` (`TakeMarker`, `TakeSlot`, `TakeSound`), `qnc-program-segments`,
+`qnc-segment-panel`; pomoc F1 (katalog, pravilo "Desni klik misem"). Testovi, conformance. Uzivo nije provjereno.

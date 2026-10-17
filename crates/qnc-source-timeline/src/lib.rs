@@ -124,6 +124,9 @@ impl SourceTimeline {
             TimelineIntent::TakeAudioLane(AudioLane::A2) => Some(("select_audio_a2", None)),
             TimelineIntent::TakeAudioLane(_) => Some(("select_audio_a1", None)),
             TimelineIntent::Wheel(wheel) => Some((wheel.action(qnc_wheel_jog::SOURCE_ACTIONS), None)),
+            // A left click keeps a taken IN/OUT (Enter); a right click takes the nearer (Ctrl+I/O).
+            TimelineIntent::KeepMark => Some(("activate_focused_item", None)),
+            TimelineIntent::TakeMark(in_mark) => Some((if *in_mark { "select_mark_in" } else { "select_mark_out" }, None)),
             TimelineIntent::ChooseA1Channel(channel) => Some((CHOOSE_A1_CHANNEL, Some(*channel))),
             TimelineIntent::ChooseA2Channel(channel) => Some((CHOOSE_A2_CHANNEL, Some(*channel))),
             _ => None,
@@ -132,7 +135,11 @@ impl SourceTimeline {
 
     /// A click on a channel of the column (`action_id` from [`Self::action_of`]), else the
     /// keys of a lane (Ctrl+1/Ctrl+2, and those of a taken lane); `None` for any other.
-    pub fn route_input(&mut self, action_id: &str, channel: Option<u16>, preview: &mut SourcePreview) -> Option<bool> {
+    /// Enter (or a left click) while IN or OUT is taken keeps the edit and lets the mark go.
+    pub fn route_input(&mut self, action_id: &str, channel: Option<u16>, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
+        if action_id == "activate_focused_item" && !self.lane_taken() && self.keys.mark_taken(timeline) {
+            return self.keys.route("clear_focus", preview, timeline);
+        }
         channel
             .and_then(|channel| self.choose_action(action_id, channel, preview))
             .or_else(|| self.route_lane(action_id, preview))
@@ -324,6 +331,21 @@ mod tests {
         assert_eq!(SourceTimeline::action_of(&TimelineIntent::TakeAudioLane(AudioLane::A2)), Some(("select_audio_a2", None)));
         assert_eq!(SourceTimeline::action_of(&TimelineIntent::ChooseA2Channel(3)), Some((CHOOSE_A2_CHANNEL, Some(3))));
         assert_eq!(SourceTimeline::action_of(&TimelineIntent::CueFrame(3)), None, "a cue is the form's");
+    }
+
+    #[test]
+    fn enter_or_a_left_click_keeps_a_taken_mark_and_a_right_click_takes_one() {
+        assert_eq!(SourceTimeline::action_of(&TimelineIntent::KeepMark), Some(("activate_focused_item", None)));
+        assert_eq!(SourceTimeline::action_of(&TimelineIntent::TakeMark(false)), Some(("select_mark_out", None)));
+        let (mut source, mut preview) = (SourceTimeline::new(), SourcePreview::default());
+        let mut timeline = TimelineProjection::new(0, 100).with_playhead(10).with_source_in_at_confirmed().with_playhead(40).with_source_out_at_confirmed();
+        source.route("select_mark_in", &mut preview, &mut timeline);
+        source.route("step_forward_frame", &mut preview, &mut timeline);
+        assert!(source.mark_taken(&timeline));
+        assert_eq!(source.route_input("activate_focused_item", None, &mut preview, &mut timeline), Some(true), "Enter keeps the edit");
+        assert!(!source.mark_taken(&timeline));
+        assert_eq!(timeline.source_in_frame, Some(11), "the moved IN stays");
+        assert_eq!(source.route_input("activate_focused_item", None, &mut preview, &mut timeline), None, "nothing taken: the form's Enter");
     }
 
     #[test]

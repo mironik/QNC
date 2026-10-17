@@ -689,6 +689,19 @@ pub enum TimelineIntent {
     /// The mouse wheel over the timeline (user 2026-10-16: the timeline behaves the same
     /// in every form): one step a frame, Ctrl held or not.
     Wheel(qnc_wheel_jog::Wheel),
+    /// A left click while IN or OUT is taken (Ctrl+I/O): the edit is kept, as Enter (user
+    /// 2026-10-17).
+    KeepMark,
+    /// A right click is Ctrl+ (user 2026-10-17: the right mouse button takes what it points
+    /// at): IN (`true`) or OUT, whichever is nearer.
+    TakeMark(bool),
+    /// A right click on an M marker of a row (as Ctrl+M).
+    TakeMarker { id: String, frame: u64 },
+    /// A right click in a slot of a row (as Ctrl+S).
+    TakeSlot { id: String, frame: u64 },
+    /// A right click on A1 or A2 of a row with markers (a Wrap row): the sound of what lies
+    /// there, at that frame (as Ctrl+1/Ctrl+2 there).
+    TakeSound { lane: AudioLane, frame: u64 },
 }
 
 impl Default for TimelineIntent {
@@ -1112,12 +1125,18 @@ fn paint_audio_row(
             None => TimelineIntent::ToggleAudioExpand(lane),
         };
     }
+    if let Some(take) = take_lane_intent(&[&label_response, &response], track_rect, lane, input) {
+        return take;
+    }
     ui.painter().rect_filled(track_rect, 0.0, fill); // no frame: the lane meets the filmstrip
     let gain = lane_gain(input, lane);
     qnc_wave_view::paint_wave_peaks_gain(ui.painter(), track_rect, peaks, gain, wave);
     qnc_wave_view::paint_level_marks(ui.painter(), track_rect, 1.0, input.theme.level_marks);
     paint_lane_level(ui, track_rect, lane, input);
     paint_ranges_and_playhead(ui, track_rect, input);
+    if let Some(take) = take_or_keep_intent(&response, track_rect, input) {
+        return take;
+    }
     cue_intent_from_response(&response, track_rect, input)
 }
 
@@ -1193,7 +1212,50 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
             None => TimelineIntent::ToggleAudioExpand(lane),
         };
     }
-    TimelineIntent::None
+    let band_response = ui.interact(track_rect, ui.make_persistent_id(("qnc_timeline_audio_band", lane.label())), Sense::click());
+    take_lane_intent(&[&label_response, &band_response], track_rect, lane, input).unwrap_or(TimelineIntent::None)
+}
+
+/// A right click on A1/A2 (its label or its track) takes the lane, as Ctrl+1/Ctrl+2: on a
+/// Wrap row (markers) the sound of what lies at the clicked frame.
+fn take_lane_intent(responses: &[&egui::Response], track: Rect, lane: AudioLane, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
+    let clicked = responses.iter().find(|response| response.secondary_clicked())?;
+    if !matches!(lane, AudioLane::A1 | AudioLane::A2) {
+        return None;
+    }
+    if input.layers.markers {
+        let x = clicked.interact_pointer_pos()?.x;
+        let frame = frame_for_x(track, input.state.range_start(), input.state.duration_frames(), x);
+        return Some(TimelineIntent::TakeSound { lane, frame });
+    }
+    Some(TimelineIntent::TakeAudioLane(lane))
+}
+
+/// A click on the track: a left click while IN or OUT is taken keeps the edit (as Enter);
+/// a right click takes what it points at (as Ctrl+): IN or OUT on the source timeline, an M
+/// marker or a slot on a row with them. `None`: neither.
+fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
+    let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
+    if response.clicked() && input.focus != TimelineFocusPaint::Playhead && !input.layers.markers {
+        return Some(TimelineIntent::KeepMark);
+    }
+    if !response.secondary_clicked() {
+        return None;
+    }
+    let pos = response.interact_pointer_pos()?;
+    let frame = frame_for_x(track, range_start, duration, pos.x);
+    if input.layers.markers {
+        if let Some(id) = marker_hit(track, range_start, duration, pos, input.markers) {
+            return Some(TimelineIntent::TakeMarker { id: id.to_string(), frame });
+        }
+        let slot = input.layers.marker_slots.then(|| slot_hit(track, range_start, duration, pos, input.marker_slots, slot_top(input))).flatten();
+        return slot.map(|id| TimelineIntent::TakeSlot { id: id.to_string(), frame });
+    }
+    if !(input.draft_in_active || input.draft_out_active) {
+        return None;
+    }
+    let local = frame.saturating_sub(range_start);
+    Some(TimelineIntent::TakeMark(local.abs_diff(input.draft_in_frame) <= local.abs_diff(input.draft_out_frame)))
 }
 
 /// The insets of the light middle of the video row: the dark band above it and the dark
@@ -1864,6 +1926,9 @@ fn video_intent_from_response(
 ) -> TimelineIntent {
     if track_marker_drag(response, track, input) {
         return TimelineIntent::None;
+    }
+    if let Some(take) = take_or_keep_intent(response, track, input) {
+        return take;
     }
     if !(response.clicked() || response.dragged()) || !input.state.can_cue() {
         return TimelineIntent::None;
