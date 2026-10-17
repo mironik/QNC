@@ -4473,3 +4473,9 @@ pri citanju, gdje je ponovni pokusaj nije hvatao, a ni nadogradnja vlasnika nist
 Sada `StoryReader` na tu gresku pri citanju pusta vlasnika da shemu dovede na tekucu i cita jos jednom, a
 `prepare_schema` jednim citanjem kroz vezu za pisanje priklјuci modul (koji tada nadogradi shemu). Test kroz pravi put
 posrednika `the_story_reader_brings_an_older_story_up_through_its_owner_and_reads_it` (pada na prethodnoj verziji).
+Izvedeno 2026-10-17 (vanjski audit, P1-5; korisnik: "da, otkljucaj i kreni s 5 i 6"): sucelje ne ceka bazu ni nit.
+`qnc-editorial-application`: mapa projekta, ciljevi baze sadrzaja i price i citac artefakata citaju se uz katalog u
+pozadinskoj niti (`read_catalog`, polja `Loaded`), a `apply_loaded` na niti sucelja samo ih preuzme. `qnc-playback-activity`:
+`PlaybackReporter` pri promjeni projekta ne ceka svoju nit (`stop` bez `join`; nit pise sto je primila i zavrsi sama),
+a pisac reportera otvara se u njegovoj niti, ne na niti sucelja. C10 Story aplikacija 699 -> 689 (baseline spusten).
+Testovi, conformance.

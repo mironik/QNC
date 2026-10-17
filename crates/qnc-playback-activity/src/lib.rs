@@ -247,11 +247,12 @@ impl PlaybackReporter {
         }
     }
 
+    /// Lets the reporter go without waiting for it (external audit 2026-10-17: the form
+    /// waited for its database work): its channel closes, it writes what it was told and
+    /// ends on its own.
     fn stop(&mut self) {
         self.sender = None;
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
+        self.thread = None;
     }
 }
 
@@ -277,11 +278,14 @@ fn start_reporter(
     thread: &mut Option<JoinHandle<()>>,
 ) -> Result<Sender<Report>, String> {
     let (send, receive) = mpsc::channel::<Report>();
-    let mut writer = Writer::start(target)?;
     *thread = Some(
         std::thread::Builder::new()
             .name("playback-activity-report".into())
             .spawn(move || {
+                // The writer opens on its own thread, never on the form's.
+                let Ok(mut writer) = Writer::start(target) else {
+                    return;
+                };
                 let mut active = false;
                 loop {
                     match receive.recv_timeout(RENEW_EVERY) {

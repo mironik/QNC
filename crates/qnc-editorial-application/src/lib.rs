@@ -70,6 +70,11 @@ struct Loaded {
     signature: CatalogSignature,
     /// `None` when the signature matched what is already shown.
     clips: Option<Vec<ClipSummary>>,
+    /// Read with the catalog, off the form thread (external audit 2026-10-17): the project
+    /// folder, the content and story bases and the artifact reader of the project.
+    project_dir: Option<std::path::PathBuf>,
+    targets: Result<(qnc_content_store::ContentTarget, qnc_db_broker::ProjectDbTarget), String>,
+    artifacts: Option<std::sync::Arc<dyn qnc_timeline_assets::TimelineArtifactRead>>,
 }
 
 type LoadResult = Result<Loaded, String>;
@@ -310,13 +315,7 @@ impl EditorialApplication {
             self.posters.reset();
             self.short_stills.clear();
         }
-        self.project_dir = self.active_project_reader.as_ref().and_then(|reader| {
-            reader
-                .settings_reader()
-                .local_workspace_dir(&loaded.settings)
-                .ok()
-                .flatten()
-        });
+        self.project_dir = loaded.project_dir.clone();
         let project_folder =
             self.project_dir
                 .clone()
@@ -334,12 +333,9 @@ impl EditorialApplication {
         }
         match (&self.active_project_reader, &self.bindings) {
             (Some(reader), Ok(bindings)) => {
-                let (settings, work) = (reader.settings_reader(), &loaded.settings);
-                let story = qnc_db_broker::ProjectDbTarget::for_project(settings, work);
-                let content = qnc_content_store::ContentTarget::for_project(settings, work);
-                self.content_target = match content.and_then(|target| Ok((target, story?))) {
+                self.content_target = match loaded.targets {
                     Ok(targets) => {
-                        self.segments.configure(targets.1.clone(), &project_id, qnc_content_artifacts::timeline_artifact_reader(settings, work).ok(), Some(targets.0.clone()));
+                        self.segments.configure(targets.1.clone(), &project_id, loaded.artifacts, Some(targets.0.clone()));
                         Some(targets)
                     }
                     Err(error) => {
@@ -645,18 +641,14 @@ fn read_catalog(
             return Err(qnc_ui_text::text("story.msg.no_active_project_in_db").into());
         }
     };
-    let content = ContentReader::for_project(reader.settings_reader(), &snapshot.settings)?;
-    let clips = if unchanged {
-        None
-    } else {
-        Some(content.summaries()?)
-    };
-    Ok(Loaded {
-        settings: snapshot.settings,
-        content,
-        signature,
-        clips,
-    })
+    let (settings, work) = (reader.settings_reader(), &snapshot.settings);
+    let content = ContentReader::for_project(settings, work)?;
+    let clips = if unchanged { None } else { Some(content.summaries()?) };
+    let project_dir = settings.local_workspace_dir(work).ok().flatten();
+    let story = qnc_db_broker::ProjectDbTarget::for_project(settings, work);
+    let targets = qnc_content_store::ContentTarget::for_project(settings, work).and_then(|target| Ok((target, story?)));
+    let artifacts = qnc_content_artifacts::timeline_artifact_reader(settings, work).ok();
+    Ok(Loaded { settings: snapshot.settings, content, signature, clips, project_dir, targets, artifacts })
 }
 
 #[cfg(test)]
