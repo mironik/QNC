@@ -329,6 +329,9 @@
     "ingest_set_ai_mining": {
       "label": "Postavi Ingest AI mining"
     },
+    "source_keep_mark": {
+      "label": "Lijevi klik na source timeline: uzeti IN/OUT ostaje gdje je i pusta se"
+    },
     "source_choose_a1_channel": {
       "label": "Kanal na A1 (klik u stupcu kanala source timelinea)"
     },
@@ -545,6 +548,11 @@
           {
             "code": "KeyB",
             "shift": false,
+            "ctrl": false
+          },
+          {
+            "code": "KeyB",
+            "shift": true,
             "ctrl": false
           }
         ],

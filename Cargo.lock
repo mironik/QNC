@@ -5050,6 +5050,7 @@ dependencies = [
  "qnc-lane-choice",
  "qnc-source-channels",
  "qnc-source-dock",
+ "qnc-source-mark-focus",
  "qnc-source-panel",
  "qnc-source-preview",
  "qnc-source-timecode",

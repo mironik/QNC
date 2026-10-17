@@ -236,6 +236,7 @@ impl SegmentsView {
     pub fn quick_cover_slot(&self) -> Result<&Slot, String> {
         let slot = self
             .selected_slot()
+            .or_else(|| self.slot_at_playhead())
             .ok_or(qnc_ui_text::text("story.msg.pick_slot_for_broll"))?;
         if slot.has_cover {
             return Err(qnc_ui_text::text("story.msg.slot_has_broll").into());
@@ -243,11 +244,20 @@ impl SegmentsView {
         Ok(slot)
     }
 
+    /// The slot under the Wrap playhead (user 2026-10-13: the playhead says which slot is
+    /// meant). An empty slot has no colour strip to click (user 2026-10-17), so B and
+    /// Overwrite take the slot under the playhead when none is chosen.
+    pub fn slot_at_playhead(&self) -> Option<&Slot> {
+        let frame = self.playhead?;
+        self.slots.iter().find(|slot| (slot.start_frame..slot.end_frame).contains(&frame))
+    }
+
     /// v5 `overwrite_cover_target`: the selected slot, else the selected cover's slot.
     pub fn overwrite_cover_slot(&self) -> Result<&str, String> {
         self.selected_slot()
             .map(|slot| slot.slot_id.as_str())
             .or_else(|| self.selected_cover().map(|cover| cover.slot_id.as_str()))
+            .or_else(|| self.slot_at_playhead().map(|slot| slot.slot_id.as_str()))
             .ok_or_else(|| qnc_ui_text::text("story.msg.pick_slot_for_broll").into())
     }
 

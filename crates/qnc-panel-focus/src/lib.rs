@@ -290,6 +290,12 @@ impl PanelFocus {
         Some(match action_id {
             // Monitor Auto | On under the monitor: whatever the focus.
             qnc_source_preview::MONITOR_AUTO | qnc_source_preview::MONITOR_ON => preview.set_monitor_mode(action_id),
+            // A left click on the source timeline while IN/OUT is drawn taken keeps it (piece
+            // `qnc-source-timeline`): never Enter, which walks the panels.
+            qnc_source_timeline::KEEP_MARK => {
+                self.panel = Panel::SourceTimeline;
+                return self.source.route_input(action_id, None, preview, timeline);
+            }
             // A1/A2 by keyboard (user rule 2026-10-01): Ctrl+1, Ctrl+2 take the lane; while it is
             // taken, its height is expanded over the video row and up/down (or a click) pick its
             // channel in the column (user 2026-10-14), left turns it off, right on, Ctrl+left/right
@@ -493,11 +499,13 @@ impl PanelFocus {
             "mark_in" | "mark_out" if panel == Panel::Segments => false,
             "mark_in" => {
                 self.source.set_mark_taken(false);
+                qnc_source_mark_focus::release(timeline); // a new IN lets go of a taken mark
                 segments.arm_sync(); // v5: every IN arms Sync/B-roll
                 return None; // the application marks IN with its still
             }
             "mark_out" => {
                 self.source.set_mark_taken(false);
+                qnc_source_mark_focus::release(timeline);
                 return None;
             }
             // v5 navigate_adjacent_source_object: start, IN and OUT in order on the source.

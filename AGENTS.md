@@ -4413,3 +4413,13 @@ Ctrl+Delete daju "First take a marker or a B-roll to remove"): Delete/Ctrl+Delet
 nakon uzetog markera i uzete pokrivalice uzima i slot: uzet (Ctrl+S, desni klik na traku) ili izabran (klik na traku);
 brise se njegova B-roll pokrivalica, slot i M markeri ostaju; slot bez pokrivalice javlja `story.msg.slot_has_no_broll`.
 `qnc-program-segments`, rjecnik, test. Katalog daje istu akciju za Delete i Ctrl+Delete, pa radi i obicni Delete.
+Popravak 2026-10-17 (korisnik: "ne mogu dodati B-roll na postojeci prazni slot sa Shift+B ni dugmetom B-roll"; "ako ima
+IN-OUT na source timelineu svaki drugi klik misem stvara SubClip"): (1) Log: lijevi klik na source timeline, dok je
+timeline crtao IN/OUT uzetim (a tipke ga vise nisu drzale: I/O su ga ostavljali uzetim), bio je Enter; Enter vodi krug
+panela na dugmad docka, pa je sljedeci klik pritisnuo prvo dugme, Add SubClip. Sada taj klik ima svoju akciju kataloga
+`source_keep_mark` (bez tipke): oznaka ostaje gdje je i pusta se, nikad Enter (`qnc-source-timeline` `KEEP_MARK`,
+`qnc-panel-focus`, Ingest isti put kroz `route_input`); I i O pustaju uzetu oznaku i na timelineu. (2) Prazni slot nema
+kolor traku pa ga lijevi klik ne bira (pravilo od 17. 10.), a B/Cover slot i Overwrite trazili su izabrani slot: sada
+uzimaju izabrani, inace slot pod Wrap playheadom (`qnc-program-view` `slot_at_playhead`). Shift+B (Shift+ dodaje) u QNC
+presetu radi isto sto B (katalog, iznimka od qnc_v4 u `tools/qnc-conformance`). Dugme "B-roll" u docku ostaje prekidac
+nacina (B-roll | Sync/B-roll), ne dodaje pokrivalicu. Testovi, conformance.

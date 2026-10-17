@@ -11,6 +11,7 @@ qnc-lane-choice = { workspace = true }
 qnc-source-channels = { workspace = true }
 qnc-source-dock = { workspace = true }
 qnc-source-panel = { workspace = true }
+qnc-source-mark-focus = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true, features = ["read"] }
 qnc-timeline = { workspace = true }

@@ -883,6 +883,8 @@ const V4_KEY_EXCEPTIONS: &[(&str, &str, &str)] = &[
     ("default", "storyboard", "focus_empty_slot"),
     // 2026-10-13 (user: "Enter goes on round the panels"): a SubClip is Shift+S or Add SubClip.
     ("default", "off", "save_virtual_shot"),
+    // 2026-10-17 (user: Shift+ adds): Shift+B adds a B-roll to the slot, as B does.
+    ("default", "storyboard", "quick_overwrite_cover"),
 ];
 
 fn v4_key_exception(preset_id: &str, scope_id: &str, action_id: &str) -> bool {
