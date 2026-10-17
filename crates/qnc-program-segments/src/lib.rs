@@ -564,6 +564,12 @@ impl ProgramSegments {
                 } else {
                     self.refresh_view(String::new());
                 }
+                // The B-roll button (and P) also puts the marked source into the empty slot,
+                // the chosen one or the one under the Wrap playhead, as B does (user 2026-10-17:
+                // "the B-roll button does not work").
+                if !sync && self.source.marks.is_some() && self.view.quick_cover_slot().is_ok() {
+                    self.cover_from_source(false);
+                }
             }
             SegmentCommand::CommitSync => {
                 if !self.commit_marker_edit() && !self.commit_edit() {

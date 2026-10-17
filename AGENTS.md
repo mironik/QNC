@@ -4423,3 +4423,6 @@ kolor traku pa ga lijevi klik ne bira (pravilo od 17. 10.), a B/Cover slot i Ove
 uzimaju izabrani, inace slot pod Wrap playheadom (`qnc-program-view` `slot_at_playhead`). Shift+B (Shift+ dodaje) u QNC
 presetu radi isto sto B (katalog, iznimka od qnc_v4 u `tools/qnc-conformance`). Dugme "B-roll" u docku ostaje prekidac
 nacina (B-roll | Sync/B-roll), ne dodaje pokrivalicu. Testovi, conformance.
+Dopuna 2026-10-17 (korisnik: "Shift+B radi, dugme B-roll ne radi"; log: tri klika na dugme daju samo izbor nacina):
+dugme B-roll u docku (i P) uz izbor nacina B-roll stavlja oznaceni izvor (IN/OUT) u prazni slot, izabrani ili pod Wrap
+playheadom, kao B; bez IN/OUT-a ili bez praznog slota samo bira nacin. `qnc-program-segments` (`CoverMode`).
