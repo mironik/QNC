@@ -81,7 +81,15 @@ impl Store {
         }
         if operation.edits_story() {
             let before = crate::undo::capture(&self.conn)?;
+            let short = cover_shortfalls(&self.conn)?;
             let data = self.dispatch(operation)?;
+            // An M marker is the OUT of one cover and the IN of the next (user 2026-10-17):
+            // no edit may leave a cover shorter than its slot, so no hole shows the segment
+            // under it. Such an edit is taken back whole and refused.
+            if let Some(refusal) = cover_hole(&short, &cover_shortfalls(&self.conn)?) {
+                crate::undo::put_back(&self.conn, &before)?;
+                return Err(refusal);
+            }
             crate::undo::record(&self.conn, &before)?;
             return Ok(data);
         }
@@ -2203,6 +2211,55 @@ fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> Result<()> 
     )
     .map_err(err)?;
     Ok(())
+}
+
+/// Every cover whose clip ends before its slot does: cover id -> (pictures missing, the
+/// picture its slot would need, the clip's length). A cover plays its clip from IN for its
+/// slot's length, at the story's ratio to its source.
+fn cover_shortfalls(conn: &Connection) -> Result<std::collections::HashMap<String, (i64, i64, u64)>> {
+    let mut short = std::collections::HashMap::new();
+    let Some(rate) = story_rate(conn)? else {
+        return Ok(short);
+    };
+    type Row = (String, String, i64, i64, u32, u32);
+    let rows = {
+        let mut statement = conn
+            .prepare(
+                "SELECT c.cover_id, c.clip_id, c.source_in_frame, s.end_frame - s.start_frame,
+                        c.source_fps_num, c.source_fps_den
+                 FROM story_covers c JOIN story_marker_slots s ON s.slot_id = c.slot_id",
+            )
+            .map_err(err)?;
+        let rows = statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)))
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<Row>>>()
+            .map_err(err)?;
+        rows
+    };
+    for (cover_id, clip_id, source_in, slot_frames, fps_num, fps_den) in rows {
+        // A cover without its source rate (not made by CreateCover) cannot be measured.
+        if fps_num == 0 || fps_den == 0 {
+            continue;
+        }
+        let (num, den) = story_per_source(rate, (fps_num, fps_den))?;
+        let source_end = source_in + (slot_frames * den + num - 1) / num;
+        if let Some(frames) = qnc_content_read::duration_frames_on(conn, &clip_id)? {
+            if source_end > frames as i64 {
+                short.insert(cover_id, (source_end - frames as i64, source_end, frames));
+            }
+        }
+    }
+    Ok(short)
+}
+
+/// A cover the edit left shorter than its slot (or shorter than it was): the refusal.
+fn cover_hole(before: &std::collections::HashMap<String, (i64, i64, u64)>, after: &std::collections::HashMap<String, (i64, i64, u64)>) -> Option<String> {
+    after.iter().find(|(cover_id, (missing, _, _))| before.get(*cover_id).is_none_or(|(was, _, _)| missing > was)).map(
+        |(_, (_, need, frames))| {
+            qnc_ui_text::fill("story.cover_hole", &[("need", &need.to_string()), ("frames", &frames.to_string())])
+        },
+    )
 }
 
 /// Slot identity: the ids of its start and end marker.

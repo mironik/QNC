@@ -1669,3 +1669,31 @@ fn a_marker_inside_a_cover_splits_it_and_the_picture_plays_on() {
     run(&mut store, Operation::UndoStory).unwrap();
     assert_eq!(covers(&mut store).len(), 1, "undo brings the one cover back");
 }
+
+#[test]
+fn no_edit_leaves_a_cover_shorter_than_its_slot() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m16) = marker(&mut store, 16).unwrap() else {
+        panic!()
+    };
+    let Data::Created(m25) = marker(&mut store, 25).unwrap() else {
+        panic!()
+    };
+    let slot: String = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [&m16], |row| row.get(0))
+        .unwrap();
+    create_cover(&mut store, &slot, (500, 509)).unwrap();
+    drop(store);
+    // The clip has 512 frames: the cover 500.. can fill a slot of 12 at most.
+    Connection::open(&path).unwrap().execute("UPDATE clips SET duration_frames = 512 WHERE clip_id = 'c1'", []).unwrap();
+    let mut store = reopen(&path);
+    run(&mut store, Operation::MoveMarker { marker_id: m25.clone(), program_frame: 27 }).unwrap();
+    let error = run(&mut store, Operation::MoveMarker { marker_id: m25, program_frame: 29 }).unwrap_err();
+    assert!(error.contains("its clip has 512"), "{error}");
+    assert_eq!(markers(&mut store), vec![16, 27], "nothing was written: the M marker stays the cover's OUT");
+    let _ = m16;
+}

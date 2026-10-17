@@ -130,6 +130,14 @@ fn push(conn: &Connection, stack: &str, snapshot: &str) -> Result<()> {
     Ok(())
 }
 
+/// An edit refused after it ran: the story as it was before it, in one transaction; no
+/// undo step is kept.
+pub(crate) fn put_back(conn: &Connection, before: &str) -> Result<()> {
+    let tx = conn.unchecked_transaction().map_err(err)?;
+    restore(&tx, before)?;
+    tx.commit().map_err(err)
+}
+
 fn restore(conn: &Connection, snapshot: &str) -> Result<()> {
     let tables: Map<String, Json> = serde_json::from_str(snapshot).map_err(err)?;
     for table in STORY_TABLES {

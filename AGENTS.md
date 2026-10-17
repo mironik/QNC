@@ -4397,3 +4397,14 @@ koji se tako pusti vraca spremljeni zvuk, `take_dropped_sound`). (6) Mišje nare
 price nema rubove (iza njega nema slota koji bi preuzeo razliku), slot uz pocetni ili zavrsni marker se ne mice, u uskoj
 video traci pokrivalica pokriva cijeli video dio pa desni klik tamo uzima slot (rubovi samo tipkama), A2 desni klik bez
 pokrivalice na kliknutom mjestu uzima odabranu pokrivalicu.
+Promjena pravila 2026-10-17 (korisnik: "izmedu prvog i drugog klipa postoji rupa kroz koju se vidi klip iz pozadine ili
+filmstrip; to se ne bi smjelo dogoditi, jer M marker je zamisljen kao OUT/IN granica"; izbor "odbij promjenu"; "nije
+bitan trenutni projekt, bitno je da se to ne moze dogoditi u novom"): zamjenjuje pravilo od 11. 10. ("pokrivalica koja
+prelazi kraj klipa pusta se do kraja, ostatak slota pokazuje segment ispod"). Log probe: prvi slot 0-347, pokrivalica od
+slike 20 klipa od 314 slika (rupa 53 slike, nastala ranije), skracen na 300 (rupa 6 slika). Sada nijedna izmjena price ne
+smije ostaviti pokrivalicu kracom od njezina slota: `qnc-program-db` `execute` prije i poslije svake izmjene price mjeri
+koliko slika svakoj pokrivalici nedostaje do kraja slota (`cover_shortfalls`, duljina klipa iz jedinog citaca kataloga
+`qnc-content-read::duration_frames_on`); ako je izmjena napravila ili povecala rupu, cijela se vraca (`undo::put_back`, bez
+koraka Undo) i odbija porukom `story.cover_hole`. Postojece rupe se ne popravljaju. Test
+`no_edit_leaves_a_cover_shorter_than_its_slot`, conformance. Otvoreno: odbijeni CreateCover ostavlja B-roll kadar koji je
+pokrivalica vec stvorila (dva upisa, kao i prije kod greske).
