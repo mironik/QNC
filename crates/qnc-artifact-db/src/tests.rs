@@ -184,6 +184,7 @@ fn a_missing_clip_loses_its_artifacts_first_and_an_imported_one_keeps_them() {
         store.execute(&qnc_content_store::Request {
             version: qnc_content_store::VERSION.into(),
             db_uri: CONTENT.into(),
+            lease: None,
             operation: qnc_content_store::Operation::RemoveMissing {
                 clips: ids
                     .iter()

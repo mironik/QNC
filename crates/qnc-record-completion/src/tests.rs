@@ -43,6 +43,7 @@ fn card_records_are_completed_once_in_the_background_and_published() {
         player_works: &|| false,
         card_busy: &|| false,
         cancel: &cancel,
+        lease: None,
     };
     let done = complete_clips(&parts, waiting, &target.content, &run);
     assert_eq!(done.completed.len(), 2, "{:?}", done.failed);
@@ -89,6 +90,7 @@ fn a_working_player_is_waited_for_and_cancel_ends_the_wait() {
         player_works: &player,
         card_busy: &|| false,
         cancel: &cancel,
+        lease: None,
     };
     let done = complete_clips(&parts, waiting, &target.content, &run);
     assert_eq!(done, Completion::default());
@@ -127,6 +129,7 @@ fn the_wanted_clip_is_completed_first() {
         player_works: &|| false,
         card_busy: &|| false,
         cancel: &cancel,
+        lease: None,
     };
     let done = complete_clips(&parts, waiting, &target.content, &run);
     assert_eq!(done.completed.first(), Some(&last), "the clip a preview wants goes first");
@@ -166,6 +169,7 @@ fn run_with_first_failure(first: qnc_media_probe::Error) -> (Completion, usize) 
         player_works: &|| false,
         card_busy: &|| false,
         cancel: &cancel,
+        lease: None,
     };
     let waiting = camera_clips(&target.content).unwrap();
     let done = complete_clips(&parts, waiting, &target.content, &run);
@@ -258,6 +262,7 @@ fn while_the_card_is_busy_only_the_wanted_clip_is_completed() {
         player_works: &|| false,
         card_busy: &busy,
         cancel: &cancel,
+        lease: None,
     };
     let done = complete_clips(&parts, waiting, &target.content, &run);
     assert_eq!(done.completed.first(), Some(&wanted_id));

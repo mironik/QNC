@@ -109,7 +109,7 @@ impl Store {
         for fingerprint in fingerprints {
             valid_fingerprint(fingerprint)?;
         }
-        let tx = self.conn.transaction().map_err(err)?;
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
         for fingerprint in fingerprints {
             tx.execute("DELETE FROM prerender_units WHERE fingerprint = ?1", params![fingerprint]).map_err(err)?;
         }
@@ -203,4 +203,11 @@ fn object_exists(conn: &Connection, kind: &str, name: &str) -> Result<bool> {
 
 pub(crate) fn err(error: impl std::fmt::Display) -> String {
     error.to_string()
+}
+
+impl Store {
+    /// The connection the intermediary opens a leased write's transaction on.
+    pub(crate) fn connection(&self) -> &Connection {
+        &self.conn
+    }
 }

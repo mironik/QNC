@@ -46,6 +46,7 @@ impl Project {
         reader: &SettingsReader,
         plan: &IngestWorkPlan,
         target: &ContentTarget,
+        lease: Option<qnc_ingest_store::content::WriteLease>,
     ) -> Result<Self, String> {
         let dir = reader
             .local_workspace_dir(&plan.settings)
@@ -57,7 +58,7 @@ impl Project {
             .unwrap_or_default();
         Ok(Self {
             dir,
-            queue: TransportQueue::start(target.clone())?,
+            queue: TransportQueue::start_leased(target.clone(), lease)?,
             opener: ConfigMediaOpener::new(
                 sources,
                 qnc_ingest_runtime::playback_pause(target.clone()),
@@ -148,7 +149,7 @@ pub fn run_import(root: &Path, run: &ImportRun<'_>) -> Result<ImportSummary, Str
         imported: 0,
         failed: 0,
     };
-    let mut project = Project::open(root, &reader, &plan, &target)?;
+    let mut project = Project::open(root, &reader, &plan, &target, Some(run.lease.write_lease()))?;
     let outcome = loop {
         let mut queue = RunQueue { queue: &mut project.queue, run };
         match run_next(&mut queue, &plan, &project.dir, &project.opener, run.cancel) {
@@ -209,7 +210,7 @@ pub fn launch_worker(root: &Path, target: &ContentTarget) -> Result<(), String> 
 /// v5 shows a coloured card instead). The poster is the start of the clip, written in the
 /// project thumbnails folder (never into the source) and recorded through the write
 /// transport only for a clip that has no poster yet. Returns how many were made.
-pub fn make_missing_posters(root: &Path) -> Result<usize, String> {
+pub fn make_missing_posters(root: &Path, lease: Option<qnc_ingest_store::content::WriteLease>) -> Result<usize, String> {
     use qnc_ingest_store::content::Access;
     let active_project = ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
     let snapshot = active_project.read().map_err(|e| e.to_string())?;
@@ -223,7 +224,7 @@ pub fn make_missing_posters(root: &Path) -> Result<usize, String> {
     if wanted.is_empty() {
         return Ok(0);
     }
-    let mut project = Project::open(root, &reader, &plan, &target)?;
+    let mut project = Project::open(root, &reader, &plan, &target, lease)?;
     let cancel = AtomicBool::new(false);
     let mut made = 0;
     for clip_id in wanted {

@@ -194,7 +194,25 @@ impl ContentStore {
                 _ => Err(qnc_ui_text::text("db.ingest_schema_initialised").into()),
             };
         }
-        self.dispatch(&request.operation)
+        match &request.lease {
+            Some(lease) if request.operation.is_write() => self.leased(lease, &request.operation),
+            _ => self.dispatch(&request.operation),
+        }
+    }
+
+    /// A write made under a lease (external audit 2026-10-17): the lease is checked and the
+    /// write made in one transaction, so a worker that lost its lease writes nothing.
+    fn leased(&mut self, lease: &qnc_write_lease::WriteLease, operation: &Operation) -> Result<Data> {
+        self.conn.execute_batch("BEGIN IMMEDIATE").map_err(err)?;
+        let result = lease.check(&self.conn).and_then(|()| self.dispatch(operation));
+        let end = if result.is_ok() { "COMMIT" } else { "ROLLBACK" };
+        match self.conn.execute_batch(end) {
+            Ok(()) => result,
+            Err(error) => {
+                let _ = self.conn.execute_batch("ROLLBACK");
+                result.and(Err(error.to_string()))
+            }
+        }
     }
 
     fn dispatch(&mut self, operation: &Operation) -> Result<Data> {
@@ -204,9 +222,7 @@ impl ContentStore {
                 if clips.is_empty() || clips.len() > 16 {
                     return Err(qnc_ui_text::text("db.invalid_write_batch_size").into());
                 }
-                let tx = self
-                    .conn
-                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                let tx = qnc_write_lease::begin_write(&mut self.conn)
                     .map_err(err)?;
                 for clip in clips {
                     Self::write_clip(&tx, clip)?;
@@ -244,9 +260,7 @@ impl ContentStore {
                 if clips.len() > 4096 {
                     return Err(qnc_ui_text::text("db.too_many_clips_one_command").into());
                 }
-                let tx = self
-                    .conn
-                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                let tx = qnc_write_lease::begin_write(&mut self.conn)
                     .map_err(err)?;
                 let mut removed = Vec::new();
                 for clip in clips {
@@ -328,9 +342,7 @@ impl ContentStore {
                 if clip_ids.len() > 4096 {
                     return Err(qnc_ui_text::text("db.too_many_clips_one_command").into());
                 }
-                let tx = self
-                    .conn
-                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                let tx = qnc_write_lease::begin_write(&mut self.conn)
                     .map_err(err)?;
                 for id in clip_ids {
                     if tx
@@ -348,9 +360,7 @@ impl ContentStore {
                 Ok(Data::Changed)
             }
             Operation::QueueSelected => {
-                let tx = self
-                    .conn
-                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                let tx = qnc_write_lease::begin_write(&mut self.conn)
                     .map_err(err)?;
                 let mut stmt = tx.prepare(&format!("SELECT {} FROM clips WHERE selected != 0", stored_columns(self.has_copy_of))).map_err(err)?;
                 let clips = stmt
@@ -373,9 +383,7 @@ impl ContentStore {
                 Ok(Data::Changed)
             }
             Operation::ClaimNext => {
-                let tx = self
-                    .conn
-                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                let tx = qnc_write_lease::begin_write(&mut self.conn)
                     .map_err(err)?;
                 // A clip whose importer stopped reporting is offered again.
                 tx.execute(
@@ -610,9 +618,7 @@ impl ContentStore {
     }
 
     fn publish(&mut self, clip: &CatalogClip) -> Result<Data> {
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        let tx = qnc_write_lease::begin_write(&mut self.conn)
             .map_err(err)?;
         Self::write_clip(&tx, clip)?;
         let saved = tx.query_row(&format!("SELECT {} FROM clips WHERE clip_id=?1", stored_columns(self.has_copy_of)),[clip.id()],row).map_err(err)?;
@@ -620,7 +626,7 @@ impl ContentStore {
         Ok(Data::Saved(Box::new(saved)))
     }
 
-    fn write_clip(tx: &rusqlite::Transaction<'_>, clip: &CatalogClip) -> Result<()> {
+    fn write_clip(tx: &Connection, clip: &CatalogClip) -> Result<()> {
         clip.validate()?;
         let mut stored = clip.clone();
         let old: Option<(i64, bool, String)> = tx

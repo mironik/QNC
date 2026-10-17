@@ -2691,3 +2691,10 @@ fn object_exists(conn: &Connection, kind: &str, name: &str) -> Result<bool> {
     )
     .map_err(err)
 }
+
+impl Store {
+    /// The connection the intermediary opens a leased write's transaction on.
+    pub(crate) fn connection(&self) -> &Connection {
+        &self.conn
+    }
+}

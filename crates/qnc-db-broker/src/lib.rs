@@ -13,7 +13,10 @@ mod transport;
 
 pub use database::ProjectDb;
 pub use qnc_json_transport::{Access, Credentials};
-pub use transport::{respond, Pending, ProjectDbClient, ProjectDbTarget, ProjectDbWriter, ENDPOINT};
+pub use qnc_write_lease::{begin_write, WriteLease, WriteTx};
+pub use transport::{
+    respond, Pending, ProjectDbClient, ProjectDbTarget, ProjectDbWriter, ENDPOINT,
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -28,6 +31,10 @@ pub type Result<T> = std::result::Result<T, String>;
 /// on the connection the intermediary gives it.
 pub trait TableModule: Send {
     fn execute(&mut self, payload: Value) -> Result<Value>;
+    /// The module's connection: a write made under a lease runs in a transaction the
+    /// intermediary opens on it, the lease checked first (the module's own writes are
+    /// then savepoints, see [`qnc_write_lease::begin_write`]).
+    fn connection(&self) -> &rusqlite::Connection;
 }
 
 /// How a table module joins a project database. The process composing the
@@ -52,6 +59,9 @@ pub struct Request {
     pub db_uri: String,
     pub module: String,
     pub payload: Value,
+    /// The lease a write is made under: checked in the same transaction as the write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lease: Option<WriteLease>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

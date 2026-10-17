@@ -210,6 +210,16 @@ impl Lease {
                 })
     }
 
+    /// What a write made under this lease carries: the database owner checks it in the
+    /// same transaction as the write (external audit 2026-10-17).
+    pub fn write_lease(&self) -> qnc_content_store::WriteLease {
+        qnc_content_store::WriteLease {
+            key: self.name.into(),
+            owner: self.owner.clone(),
+            max_age_seconds: self.fresh_seconds,
+        }
+    }
+
     /// Still this owner's: false once another owner took it (it was not renewed in time).
     pub fn held(&self) -> bool {
         self.held.load(Ordering::Relaxed)

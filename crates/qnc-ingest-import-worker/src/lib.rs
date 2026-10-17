@@ -481,8 +481,17 @@ pub struct TransportQueue {
 
 impl TransportQueue {
     pub fn start(target: qnc_ingest_store::content::ContentTarget) -> Result<Self, String> {
+        Self::start_leased(target, None)
+    }
+
+    /// A queue whose writes are made under `lease` (external audit 2026-10-17): once the
+    /// worker lost it, the database owner refuses its claims and results.
+    pub fn start_leased(
+        target: qnc_ingest_store::content::ContentTarget,
+        lease: Option<qnc_ingest_store::content::WriteLease>,
+    ) -> Result<Self, String> {
         Ok(Self {
-            transport: qnc_ingest_store::content::ContentWriteTransport::start(target)
+            transport: qnc_ingest_store::content::ContentWriteTransport::start_leased(target, lease)
                 .map_err(|e| e.to_string())?,
             sequence: 0,
         })

@@ -146,9 +146,7 @@ impl Store {
                 .as_millis(),
         )
         .map_err(|_| Error::Unavailable)?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
+        let tx = qnc_db_broker::begin_write(&mut self.connection)
             .map_err(db_error)?;
         let previous: Option<(Vec<u8>, String)> = tx
             .query_row(
@@ -383,4 +381,11 @@ fn db_error(error: rusqlite::Error) -> Error {
         }
     }
     Error::Unavailable
+}
+
+impl Store {
+    /// The connection the intermediary opens a leased write's transaction on.
+    pub fn connection(&self) -> &Connection {
+        &self.connection
+    }
 }

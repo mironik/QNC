@@ -3309,6 +3309,7 @@ dependencies = [
  "qnc-transport-resolver",
  "qnc-ui-text",
  "qnc-work-settings",
+ "qnc-write-lease",
  "rusqlite",
  "serde",
  "serde_json",
@@ -3333,6 +3334,7 @@ dependencies = [
  "qnc-transport-resolver",
  "qnc-ui-text",
  "qnc-work-settings",
+ "qnc-write-lease",
  "rusqlite",
  "serde",
  "serde_json",
@@ -5307,6 +5309,15 @@ dependencies = [
 [[package]]
 name = "qnc-wrap-session"
 version = "0.1.0"
+
+[[package]]
+name = "qnc-write-lease"
+version = "0.1.0"
+dependencies = [
+ "qnc-ui-text",
+ "rusqlite",
+ "serde",
+]
 
 [[package]]
 name = "quick-error"

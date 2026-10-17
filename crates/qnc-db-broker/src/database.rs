@@ -22,7 +22,9 @@ pub struct ProjectDb {
 
 impl std::fmt::Debug for ProjectDb {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ProjectDb").field("uri", &self.uri).finish_non_exhaustive()
+        f.debug_struct("ProjectDb")
+            .field("uri", &self.uri)
+            .finish_non_exhaustive()
     }
 }
 
@@ -73,7 +75,9 @@ impl ProjectDb {
             .iter()
             .find(|factory| factory.id() == request.module)
             .cloned()
-            .ok_or_else(|| qnc_ui_text::fill("db.unknown_module", &[("module", &request.module)]))?;
+            .ok_or_else(|| {
+                qnc_ui_text::fill("db.unknown_module", &[("module", &request.module)])
+            })?;
         if factory.is_write(&request.payload) && self.access == Access::ReadOnly {
             return Err(qnc_ui_text::text("db.access_read_only").into());
         }
@@ -85,7 +89,36 @@ impl ProjectDb {
             .modules
             .get_mut(factory.id())
             .ok_or(qnc_ui_text::text("db.project_database_module_open"))?;
-        module.execute(request.payload.clone())
+        match &request.lease {
+            Some(lease) if factory.is_write(&request.payload) => {
+                leased(module.as_mut(), lease, request.payload.clone())
+            }
+            _ => module.execute(request.payload.clone()),
+        }
+    }
+}
+
+/// A write made under a lease (external audit 2026-10-17): the lease is checked and the
+/// write made in one transaction, so a worker that lost its lease writes nothing.
+fn leased(
+    module: &mut dyn TableModule,
+    lease: &crate::WriteLease,
+    payload: Value,
+) -> Result<Value> {
+    module
+        .connection()
+        .execute_batch("BEGIN IMMEDIATE")
+        .map_err(|e| e.to_string())?;
+    let result = lease
+        .check(module.connection())
+        .and_then(|()| module.execute(payload));
+    let end = if result.is_ok() { "COMMIT" } else { "ROLLBACK" };
+    match module.connection().execute_batch(end) {
+        Ok(()) => result,
+        Err(error) => {
+            let _ = module.connection().execute_batch("ROLLBACK");
+            result.and(Err(error.to_string()))
+        }
     }
 }
 

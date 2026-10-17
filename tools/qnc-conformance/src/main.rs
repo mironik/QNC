@@ -1907,6 +1907,10 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-camera-patterns/",
         "crates/qnc-work-settings/",
         "crates/qnc-virtual-shots/",
+        // The serial writer of the project database: it opens the transaction of a write
+        // made under a lease and checks the lease in it (external audit 2026-10-17).
+        "crates/qnc-db-broker/",
+        "crates/qnc-write-lease/",
     ]
     .iter()
     .any(|prefix| relative.starts_with(prefix))

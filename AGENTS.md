@@ -4559,3 +4559,21 @@ Dopuna 2026-10-17 (korisnik: "i strelice gore-dolje bi mogle skrolati"): strelic
 nista nije uzeto) i dalje biraju prethodni ili sljedeci segment i stavljaju Wrap playhead na njegov pocetak, a panel se
 sada sam lista do novo odabranog reda (`qnc-segment-panel`, `scroll_to_rect`). Dok je nesto uzeto, gore/dolje ostaju
 skok na kljucnu sliku ili izbor kanala.
+Otkljucano i izvedeno 2026-10-18 (treci vanjski audit, koraci 1 i 2; korisnik: "da, obrisi i kreni s 1 i 2"):
+(1) Upis pod najmom provjerava vlasnik baze u istoj transakciji kao upis. Nova javna kocka `crates/qnc-write-lease`
+(+ ugovor `contracts/modules/write-lease.module.json`): najam (kljuc, vlasnik, svjezina) i provjera u bazi (samo
+citanje `ingest_runtime`, sat baze), te `begin_write` (vlastita immediate transakcija ili savepoint unutar transakcije
+koju je otvorio posrednik). `qnc-db-broker`: zahtjev nosi `lease`; upis pod najmom posrednik izvodi kao BEGIN IMMEDIATE,
+provjera najma, upis modula, COMMIT (inace ROLLBACK, nista se ne upise); `ProjectDbWriter::leased`,
+`ProjectDbClient::execute_leased`; `TableModule::connection`. Isto u `qnc-content-store` (`Request.lease`,
+`ContentClient::leased`, `ContentWriteTransport::start_leased`). Moduli `qnc-artifact-db`, `qnc-prerender-db`,
+`qnc-media-record-db`, `qnc-source-index-db` pisu kroz `begin_write`. `qnc-playback-activity` `Lease::write_lease`.
+Pod najmom radnika (`tools/qnc-ingest-worker`) pisu: uvoz (`qnc-ingest-import-worker`: red, rezultat, posteri),
+filmstrip i wave (`qnc-content-artifacts` `set_write_lease`, `ArtifactWriter::leased`), dovrsetak zapisa
+(`qnc-record-completion`: zapisi medija, izvorni indeks, objava kataloga; `Run.lease`) i prerender
+(`PrerenderWriter::leased`). (2) Prerender: posao se prekida i kad najam preuzme drugi (`lease.lost()`), jedinica se
+renderira u vlastitu datoteku posla (`<otisak>.partial-<proces>-<trenutak>.mov`) i tek cijela premjesta pod svoje
+ime, pa objavljuje pod najmom; ostaci nedovrsenih poslova brisu se s ciscenjem starih jedinica. Conformance: posrednik i
+`qnc-write-lease` dodani na popis javnih DB pisaca (nova granica: posrednik otvara transakciju upisa pod najmom).
+Testovi: `qnc-write-lease`, posrednik i spremiste sadrzaja (upis pod tudim najmom odbijen, nista upisano, citanje
+radi), svi testovi dotaknutih kocki, conformance.

@@ -135,9 +135,9 @@ struct ArtifactPublisher {
 }
 
 impl ArtifactPublisher {
-    fn start(target: &ProjectDbTarget) -> Result<Self, String> {
+    fn start(target: &ProjectDbTarget, lease: Option<qnc_db_broker::WriteLease>) -> Result<Self, String> {
         Ok(Self {
-            writer: ArtifactWriter::start(target.clone())?,
+            writer: ArtifactWriter::start(target.clone())?.leased(lease),
             pending: Vec::new(),
         })
     }
@@ -258,11 +258,12 @@ impl qnc_filmstrip_worker::FilmstripContentRead for ProjectFilmstripContentReade
 #[derive(Clone)]
 struct ProjectFilmstripContentWriteFactory {
     target: ProjectDbTarget,
+    lease: Option<qnc_db_broker::WriteLease>,
 }
 
 impl qnc_filmstrip_worker::FilmstripContentWriteFactory for ProjectFilmstripContentWriteFactory {
     fn start(&self) -> Result<Box<dyn qnc_filmstrip_worker::FilmstripContentWrite>, String> {
-        Ok(Box::new(ProjectFilmstripContentWriter(ArtifactPublisher::start(&self.target)?)))
+        Ok(Box::new(ProjectFilmstripContentWriter(ArtifactPublisher::start(&self.target, self.lease.clone())?)))
     }
 }
 
@@ -346,11 +347,12 @@ impl qnc_wave_worker::WaveContentRead for ProjectWaveContentReader {
 #[derive(Clone)]
 struct ProjectWaveContentWriteFactory {
     target: ProjectDbTarget,
+    lease: Option<qnc_db_broker::WriteLease>,
 }
 
 impl qnc_wave_worker::WaveContentWriteFactory for ProjectWaveContentWriteFactory {
     fn start(&self) -> Result<Box<dyn qnc_wave_worker::WaveContentWrite>, String> {
-        Ok(Box::new(ProjectWaveContentWriter(ArtifactPublisher::start(&self.target)?)))
+        Ok(Box::new(ProjectWaveContentWriter(ArtifactPublisher::start(&self.target, self.lease.clone())?)))
     }
 }
 
@@ -433,6 +435,7 @@ pub fn artifacts_context(
     settings: &WorkSettings,
     content_target: ContentTarget,
     source_bindings: &[SourceBinding],
+    lease: Option<qnc_db_broker::WriteLease>,
 ) -> Result<ArtifactsContext, String> {
     let project_dir = reader
         .local_workspace_dir(settings)
@@ -463,6 +466,7 @@ pub fn artifacts_context(
         }),
         filmstrip_writer: Arc::new(ProjectFilmstripContentWriteFactory {
             target: project_db.clone(),
+            lease: lease.clone(),
         }),
         filmstrip_sources: filmstrip_source_bindings(source_bindings)?,
         wave_reader: Arc::new(ProjectWaveContentReader {
@@ -470,7 +474,7 @@ pub fn artifacts_context(
             artifacts,
             enabled: wave_enabled,
         }),
-        wave_writer: Arc::new(ProjectWaveContentWriteFactory { target: project_db }),
+        wave_writer: Arc::new(ProjectWaveContentWriteFactory { target: project_db, lease }),
         wave_sources: wave_source_bindings(source_bindings)?,
     })
 }
@@ -482,6 +486,8 @@ pub struct ProjectArtifacts {
     host_root: Option<PathBuf>,
     /// When the clip on screen may be read again while its artifacts are made elsewhere.
     refresh_at: Option<std::time::Instant>,
+    /// The lease the artifacts are published under (the background worker's).
+    write_lease: Option<qnc_db_broker::WriteLease>,
 }
 
 /// What `ProjectArtifacts::poll_shown` gave for the clip on screen.
@@ -513,6 +519,12 @@ impl ProjectArtifacts {
 
     pub fn set_host_root(&mut self, root: impl Into<PathBuf>) {
         self.host_root = Some(root.into());
+    }
+
+    /// Every artifact is published under `lease` (external audit 2026-10-17): once the
+    /// worker lost it, the database owner refuses its publications.
+    pub fn set_write_lease(&mut self, lease: qnc_db_broker::WriteLease) {
+        self.write_lease = Some(lease);
     }
 
     fn source_bindings(&self) -> Result<Vec<SourceBinding>, String> {
@@ -552,6 +564,7 @@ impl ProjectArtifacts {
             settings,
             content_target,
             &source_bindings,
+            self.write_lease.clone(),
         )?);
         Ok(())
     }

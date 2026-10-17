@@ -88,6 +88,9 @@ impl TableModule for Attached {
         let data = self.0.execute(&operation)?;
         serde_json::to_value(data).map_err(|e| e.to_string())
     }
+    fn connection(&self) -> &rusqlite::Connection {
+        self.0.connection()
+    }
 }
 
 fn decode(value: Value) -> Result<Data> {
@@ -135,6 +138,12 @@ pub struct PrerenderWriter(ProjectDbWriter);
 impl PrerenderWriter {
     pub fn start(target: ProjectDbTarget) -> Result<Self> {
         Ok(Self(ProjectDbWriter::start(target, vec![PrerenderModule::factory()])?))
+    }
+
+    /// The same writer whose writes are made under `lease` (external audit 2026-10-17):
+    /// a prerender that lost its lease publishes and forgets nothing.
+    pub fn leased(self, lease: qnc_db_broker::WriteLease) -> Self {
+        Self(self.0.leased(lease))
     }
 
     pub fn publish(&self, unit: RenderedUnit) -> Result<()> {

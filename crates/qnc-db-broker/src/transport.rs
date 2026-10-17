@@ -16,7 +16,7 @@ use serde_json::Value;
 
 use crate::{
     project_db_uri, project_id, Access, Credentials, ProjectDb, Reply, Request, Result,
-    TableModuleFactory, MAX_BYTES, VERSION,
+    TableModuleFactory, WriteLease, MAX_BYTES, VERSION,
 };
 
 pub const ENDPOINT: &str = "/v1/project-db";
@@ -37,12 +37,17 @@ pub struct ProjectDbTarget {
 #[derive(Clone)]
 enum Binding {
     Local(PathBuf),
-    Remote { resolver: ResolverConfig, token: String },
+    Remote {
+        resolver: ResolverConfig,
+        token: String,
+    },
 }
 
 impl std::fmt::Debug for ProjectDbTarget {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ProjectDbTarget").field("uri", &self.uri).finish_non_exhaustive()
+        f.debug_struct("ProjectDbTarget")
+            .field("uri", &self.uri)
+            .finish_non_exhaustive()
     }
 }
 
@@ -52,7 +57,9 @@ impl ProjectDbTarget {
         reader: &qnc_work_settings::SettingsReader,
         settings: &qnc_work_settings::WorkSettings,
     ) -> Result<Self> {
-        let owner = reader.workspace_binding(settings).map_err(|e| e.to_string())?;
+        let owner = reader
+            .workspace_binding(settings)
+            .map_err(|e| e.to_string())?;
         let uri = project_db_uri(&settings.workspace_db_uri)?;
         let binding = match owner
             .resolver
@@ -130,6 +137,16 @@ pub struct ProjectDbClient {
 
 impl ProjectDbClient {
     pub fn execute(&mut self, module: &str, payload: Value) -> Result<Value> {
+        self.execute_leased(module, payload, None)
+    }
+
+    /// A request made under `lease`: a write of it is refused once the lease is lost.
+    pub fn execute_leased(
+        &mut self,
+        module: &str,
+        payload: Value,
+        lease: Option<WriteLease>,
+    ) -> Result<Value> {
         let factory = self
             .factories
             .iter()
@@ -143,6 +160,7 @@ impl ProjectDbClient {
             db_uri: self.uri.clone(),
             module: module.into(),
             payload,
+            lease,
         };
         match &mut self.endpoint {
             Endpoint::Local(db) => db.execute(&request),
@@ -160,9 +178,13 @@ impl ProjectDbClient {
 /// The one serial writer of a project database in this process (v5
 /// `serialize_project_write`): any number of workers send requests; they run in
 /// order and each waits for its own reply.
+type Job = (String, Value, Option<WriteLease>, Sender<Result<Value>>);
+
 #[derive(Debug, Clone)]
 pub struct ProjectDbWriter {
-    requests: Sender<(String, Value, Sender<Result<Value>>)>,
+    requests: Sender<Job>,
+    /// The lease every write of this writer is made under, if any.
+    lease: Option<WriteLease>,
 }
 
 impl ProjectDbWriter {
@@ -191,12 +213,12 @@ impl ProjectDbWriter {
         factories: Vec<Arc<dyn TableModuleFactory>>,
         mut client: Option<ProjectDbClient>,
     ) -> Result<Self> {
-        let (requests, receive) = mpsc::channel::<(String, Value, Sender<Result<Value>>)>();
+        let (requests, receive) = mpsc::channel::<Job>();
         std::thread::Builder::new()
             .name("qnc-db-broker-writer".into())
             .spawn(move || loop {
                 match receive.recv_timeout(IDLE_RELEASE) {
-                    Ok((module, payload, reply)) => {
+                    Ok((module, payload, lease, reply)) => {
                         if client.is_none() {
                             match target.open(Access::ReadWrite, factories.clone()) {
                                 Ok(opened) => client = Some(opened),
@@ -207,7 +229,7 @@ impl ProjectDbWriter {
                             }
                         }
                         let open = client.as_mut().expect("opened above");
-                        let _ = reply.send(open.execute(&module, payload));
+                        let _ = reply.send(open.execute_leased(&module, payload, lease));
                     }
                     // Idle: the database is let go (a closed project can be deleted, user
                     // 2026-10-09); the next request opens it again.
@@ -216,13 +238,25 @@ impl ProjectDbWriter {
                 }
             })
             .map_err(|e| e.to_string())?;
-        Ok(Self { requests })
+        Ok(Self {
+            requests,
+            lease: None,
+        })
+    }
+
+    /// The same writer whose writes are made under `lease` (external audit 2026-10-17):
+    /// once the lease is lost, every write of it is refused by the database owner.
+    pub fn leased(&self, lease: WriteLease) -> Self {
+        Self {
+            requests: self.requests.clone(),
+            lease: Some(lease),
+        }
     }
 
     pub fn call(&self, module: &str, payload: Value) -> Result<Value> {
         let (reply, answer) = mpsc::channel();
         self.requests
-            .send((module.into(), payload, reply))
+            .send((module.into(), payload, self.lease.clone(), reply))
             .map_err(|_| qnc_ui_text::text("db.project_database_broker_available").to_string())?;
         answer
             .recv()
@@ -234,13 +268,17 @@ impl ProjectDbWriter {
     pub fn submit(&self, module: &str, payload: Value) -> Result<Pending> {
         let (reply, answer) = mpsc::channel();
         self.requests
-            .send((module.into(), payload, reply))
+            .send((module.into(), payload, self.lease.clone(), reply))
             .map_err(|_| qnc_ui_text::text("db.project_database_broker_available").to_string())?;
         Ok(Pending(answer))
     }
 
     /// A typed request of a table module and its typed reply.
-    pub fn request<Q: Serialize, R: DeserializeOwned>(&self, module: &str, request: &Q) -> Result<R> {
+    pub fn request<Q: Serialize, R: DeserializeOwned>(
+        &self,
+        module: &str,
+        request: &Q,
+    ) -> Result<R> {
         let payload = serde_json::to_value(request).map_err(|e| e.to_string())?;
         serde_json::from_value(self.call(module, payload)?).map_err(|e| e.to_string())
     }
@@ -256,9 +294,10 @@ impl Pending {
         match self.0.try_recv() {
             Ok(result) => Some(result),
             Err(mpsc::TryRecvError::Empty) => None,
-            Err(mpsc::TryRecvError::Disconnected) => {
-                Some(Err(qnc_ui_text::text("db.project_database_broker_did_reply").into()))
-            }
+            Err(mpsc::TryRecvError::Disconnected) => Some(Err(qnc_ui_text::text(
+                "db.project_database_broker_did_reply",
+            )
+            .into())),
         }
     }
 }

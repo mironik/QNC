@@ -83,6 +83,9 @@ impl TableModule for Attached {
         let data = self.0.execute(&operation)?;
         serde_json::to_value(data).map_err(|e| e.to_string())
     }
+    fn connection(&self) -> &rusqlite::Connection {
+        self.0.connection()
+    }
 }
 
 fn decode(value: Value) -> Result<Data> {
@@ -139,6 +142,15 @@ impl ArtifactWriter {
             target,
             vec![ArtifactsModule::factory()],
         )?))
+    }
+
+    /// The same writer whose writes are made under `lease`, if any (external audit
+    /// 2026-10-17): a worker that lost its lease publishes nothing.
+    pub fn leased(self, lease: Option<qnc_db_broker::WriteLease>) -> Self {
+        match lease {
+            Some(lease) => Self(self.0.leased(lease)),
+            None => self,
+        }
     }
 
     /// Runs a request and waits for its reply.

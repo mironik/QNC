@@ -1,0 +1,10 @@
+[package]
+name = "qnc-write-lease"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the lease a write is made under, checked by the database owner in the same transaction as the write"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }

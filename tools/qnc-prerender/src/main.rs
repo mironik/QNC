@@ -137,7 +137,9 @@ fn run() -> Result<()> {
     // sound ran dry, 2026-10-12).
     let playing = || qnc_playback_activity::is_fresh(&content, qnc_playback_activity::PLAYBACK, qnc_playback_activity::PLAYBACK_FRESH_SECONDS);
     let mut quiet_since: Option<Instant> = None;
-    let writer = PrerenderWriter::start(target.clone())?;
+    // Every write is made under the lease, checked by the database owner in the same
+    // transaction (external audit 2026-10-17).
+    let writer = PrerenderWriter::start(target.clone())?.leased(lease.write_lease());
     let (mut idle_since, mut done_now, mut failed) = (Instant::now(), 0usize, std::collections::HashSet::new());
     let mut pruned: Option<Vec<String>> = None;
     loop {
@@ -192,25 +194,47 @@ fn run() -> Result<()> {
         idle_since = Instant::now();
         let name = delivery.file_name(unit);
         let out = out_dir.join(&name);
+        // Rendered into a file of this job only and moved to its name when it is whole
+        // (external audit 2026-10-17: two prerenders wrote the same file).
+        let partial = out_dir.join(partial_name(fingerprint));
         let started = Instant::now();
         let cancel = AtomicBool::new(false);
         let rendered = std::thread::scope(|scope| {
-            // A player that starts takes the machine back: the unit is left unfinished.
+            // A player that starts takes the machine back, and a lease another took ends
+            // the job: the unit is left unfinished.
             let watch = scope.spawn(|| {
                 while !cancel.load(Ordering::Relaxed) {
                     if playing() {
                         cancel.store(true, Ordering::Relaxed);
-                        return true;
+                        return Stopped::Player;
+                    }
+                    if lease.lost().load(Ordering::Relaxed) {
+                        cancel.store(true, Ordering::Relaxed);
+                        return Stopped::LeaseLost;
                     }
                     std::thread::sleep(Duration::from_millis(100));
                 }
-                false
+                Stopped::No
             });
-            let result = qnc_program_render::render(unit, &delivery, &decoders, &access, &ffmpeg, &out, &cancel);
+            let result = qnc_program_render::render(unit, &delivery, &decoders, &access, &ffmpeg, &partial, &cancel)
+                .and_then(|()| {
+                    if lease.held() {
+                        std::fs::rename(&partial, &out).map_err(|e| e.to_string())
+                    } else {
+                        Err("the lease is another's".into())
+                    }
+                });
             cancel.store(true, Ordering::Relaxed);
-            (result, watch.join().unwrap_or(false))
+            (result, watch.join().unwrap_or(Stopped::No))
         });
+        if rendered.0.is_err() {
+            let _ = std::fs::remove_file(&partial);
+        }
         match rendered {
+            (_, Stopped::LeaseLost) => {
+                say("another prerender took the lease: the unit is left, prerender ends".into());
+                return Ok(());
+            }
             (Ok(()), _) => {
                 let file_uri = SourceReference::new(&project_source, &format!("{}/{name}", relative.trim_matches('/')))
                     .map_err(|e| e.to_string())?
@@ -222,6 +246,7 @@ fn run() -> Result<()> {
                     say("the lease is another's: the unit is not published".into());
                     return Ok(());
                 }
+                // The database owner checks the lease again in the transaction of the row.
                 writer.publish(RenderedUnit {
                     fingerprint: fingerprint.clone(),
                     file_uri,
@@ -241,11 +266,11 @@ fn run() -> Result<()> {
                     unit.frames() as f64 * 1000.0 / ms as f64 / rate
                 ));
             }
-            (Err(_), true) => {
+            (Err(_), Stopped::Player) => {
                 quiet_since = None;
                 say(format!("unit {}..{} left for the player", unit.record_in, unit.record_out));
             }
-            (Err(error), false) => {
+            (Err(error), Stopped::No) => {
                 say(format!("unit {}..{} failed: {error}", unit.record_in, unit.record_out));
                 failed.insert(fingerprint.clone());
             }
@@ -275,7 +300,8 @@ fn prune(writer: &PrerenderWriter, reader: &mut PrerenderReader, out_dir: &std::
         let fingerprint = name.split('.').next().unwrap_or("");
         let named = fingerprint.len() == 16 && fingerprint.bytes().all(|byte| byte.is_ascii_hexdigit());
         let size = entry.metadata().map(|meta| meta.len()).unwrap_or(0);
-        if !named || keep.contains(fingerprint) || size == 0 || !entry.path().is_file() {
+        let unfinished = name.contains(".partial-");
+        if !named || (keep.contains(fingerprint) && !unfinished) || (size == 0 && !unfinished) || !entry.path().is_file() {
             continue;
         }
         // Deleted with its name (user 2026-10-13: never only emptied); a file the folder's
@@ -293,6 +319,25 @@ fn prune(writer: &PrerenderWriter, reader: &mut PrerenderReader, out_dir: &std::
         old.len(),
         bytes / 1_048_576
     ));
+}
+
+/// Why a render job stopped before its end.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Stopped {
+    No,
+    /// A player started: the machine is the player's.
+    Player,
+    /// Another prerender took the lease: this one writes nothing more.
+    LeaseLost,
+}
+
+/// The file one job renders a unit into: the fingerprint first (the prune knows it), this
+/// process and moment after, so two jobs never write the same file.
+fn partial_name(fingerprint: &str) -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos());
+    format!("{fingerprint}.partial-{}-{nanos}.mov", std::process::id())
 }
 
 /// The lease of the one prerender of a project in its database (the waker reads it).

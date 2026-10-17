@@ -260,6 +260,9 @@ pub struct Request {
     pub version: String,
     pub db_uri: String,
     pub operation: Operation,
+    /// The lease a write is made under: checked in the same transaction as the write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lease: Option<qnc_write_lease::WriteLease>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -293,8 +296,10 @@ pub enum LeaseAct {
 }
 
 /// The value a held lease has: `on:` and its owner (read as "on" by everyone).
+pub use qnc_write_lease::WriteLease;
+
 pub fn lease_value(owner: &str) -> String {
-    format!("on:{owner}")
+    qnc_write_lease::held_by(owner)
 }
 
 /// A runtime entry and how old it is by the clock of the database.

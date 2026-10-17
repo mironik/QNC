@@ -110,6 +110,7 @@ fn content(path: &Path, operation: ContentOperation) -> Result<ContentData> {
     store.execute(&Request {
         version: qnc_content_store::VERSION.into(),
         db_uri: URI.into(),
+        lease: None,
         operation,
     })
 }

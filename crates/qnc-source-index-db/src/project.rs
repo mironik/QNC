@@ -58,6 +58,9 @@ impl TableModule for Attached {
             .map_err(|e| format!("{}: {e:?}", qnc_ui_text::text("db.source_index")))?;
         serde_json::to_value(data).map_err(|e| e.to_string())
     }
+    fn connection(&self) -> &rusqlite::Connection {
+        self.0.connection()
+    }
 }
 
 /// The source index of the active project, through its one intermediary.

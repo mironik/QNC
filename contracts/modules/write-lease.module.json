@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.write-lease",
+  "module_name": "Write lease",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["database.write.lease_guard"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-write-lease",
+  "input": "The lease a worker holds (key, owner, freshness) and the connection of the database owner inside the transaction of a write.",
+  "output": "Whether the lease is still that owner's and renewed in time, by the clock of the database; a write of a lost lease is refused.",
+  "specification": "External audit 2026-10-17 and user 2026-10-18: a worker writes only while it holds its lease; the owner of the database checks the lease in the same transaction as the write."
+}

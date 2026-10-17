@@ -84,9 +84,7 @@ impl Store {
         if clip_ids.len() > 4096 {
             return Err(qnc_ui_text::text("db.too_many_clips_one_command").into());
         }
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        let tx = qnc_db_broker::begin_write(&mut self.conn)
             .map_err(err)?;
         let mut forgotten = Vec::new();
         for clip_id in clip_ids {
@@ -116,9 +114,7 @@ impl Store {
         if json.len() > MAX_RECORD_BYTES {
             return Err(qnc_ui_text::text("artifact.filmstrip_record_too_large").into());
         }
-        let tx = self
-            .conn
-            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        let tx = qnc_db_broker::begin_write(&mut self.conn)
             .map_err(err)?;
         let now = utc_stamp();
         tx.execute(
@@ -392,4 +388,11 @@ fn object_exists(conn: &Connection, kind: &str, name: &str) -> Result<bool> {
 
 pub(crate) fn err(error: impl std::fmt::Display) -> String {
     error.to_string()
+}
+
+impl Store {
+    /// The connection the intermediary opens a leased write's transaction on.
+    pub(crate) fn connection(&self) -> &Connection {
+        &self.conn
+    }
 }

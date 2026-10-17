@@ -102,15 +102,25 @@ pub struct ContentClient {
     uri: String,
     access: Access,
     endpoint: Endpoint,
+    /// The lease every write of this client is made under, if any.
+    lease: Option<qnc_write_lease::WriteLease>,
 }
 
 impl ContentClient {
+    /// The same client whose writes are made under `lease` (external audit 2026-10-17):
+    /// once the lease is lost, every write of it is refused by the database owner.
+    pub fn leased(mut self, lease: Option<qnc_write_lease::WriteLease>) -> Self {
+        self.lease = lease;
+        self
+    }
+
     /// The storage owner supplies the exact file binding; this module chooses no directory.
     pub fn from_owner_binding(file: &Path, uri: &str, access: Access) -> Result<Self> {
         Ok(Self {
             uri: uri.into(),
             access,
             endpoint: Endpoint::Local(ContentStore::open_owner_binding(file, uri, access)?),
+            lease: None,
         })
     }
 
@@ -127,6 +137,7 @@ impl ContentClient {
             endpoint: Endpoint::Remote(
                 JsonClient::connect(resolver, uri, ENDPOINT, token, MAX_BYTES).map_err(err)?,
             ),
+            lease: None,
         })
     }
     pub fn publish(&mut self, clip: CatalogClip) -> Result<StoredClip> {
@@ -275,6 +286,7 @@ impl ContentClient {
             version: VERSION.into(),
             db_uri: self.uri.clone(),
             operation,
+            lease: self.lease.clone(),
         };
         match &mut self.endpoint {
             Endpoint::Local(store) => store.execute(&request),
@@ -327,11 +339,16 @@ pub struct ContentWriteTransport {
 
 impl ContentWriteTransport {
     pub fn start(target: ContentTarget) -> Result<Self> {
+        Self::start_leased(target, None)
+    }
+
+    /// A transport whose writes are made under `lease` (external audit 2026-10-17).
+    pub fn start_leased(target: ContentTarget, lease: Option<qnc_write_lease::WriteLease>) -> Result<Self> {
         let (send, receive_commands) = mpsc::channel();
         let (send_results, receive) = mpsc::channel();
         let thread = std::thread::Builder::new()
             .name("qnc-content-write-transport".into())
-            .spawn(move || run_content_write_transport(target, receive_commands, send_results))
+            .spawn(move || run_content_write_transport(target, lease, receive_commands, send_results))
             .map_err(err)?;
         Ok(Self {
             pending: 0,
@@ -486,6 +503,7 @@ impl Drop for ContentWriteTransport {
 
 fn run_content_write_transport(
     target: ContentTarget,
+    lease: Option<qnc_write_lease::WriteLease>,
     receive: Receiver<ContentWriteCommand>,
     send: Sender<ContentWriteCompletion>,
 ) {
@@ -502,7 +520,7 @@ fn run_content_write_transport(
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
         };
         let started = Instant::now();
-        let result = execute_write_command(&target, &mut client, command.operation).map(|data| {
+        let result = execute_write_command(&target, lease.as_ref(), &mut client, command.operation).map(|data| {
             ContentWriteResult {
                 elapsed_ms: started.elapsed().as_millis(),
                 data,
@@ -520,11 +538,12 @@ fn run_content_write_transport(
 
 fn execute_write_command(
     target: &ContentTarget,
+    lease: Option<&qnc_write_lease::WriteLease>,
     client: &mut Option<ContentClient>,
     operation: Operation,
 ) -> Result<ContentWriteData> {
     if client.is_none() {
-        *client = Some(target.open(Access::ReadWrite)?);
+        *client = Some(target.open(Access::ReadWrite)?.leased(lease.cloned()));
     }
     let Some(client) = client.as_mut() else {
         return Err(qnc_ui_text::text("db.content_writer_did_open_database").into());

@@ -488,3 +488,10 @@ fn require_imported_clip(conn: &Connection, clip_id: &str) -> Result<()> {
 pub(crate) fn err(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
+
+impl Store {
+    /// The connection the intermediary opens a leased write's transaction on.
+    pub(crate) fn connection(&self) -> &Connection {
+        &self.conn
+    }
+}

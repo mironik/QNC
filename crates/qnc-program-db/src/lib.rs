@@ -332,6 +332,9 @@ impl TableModule for Attached {
         let data = self.0.execute(&operation)?;
         serde_json::to_value(data).map_err(|e| e.to_string())
     }
+    fn connection(&self) -> &rusqlite::Connection {
+        self.0.connection()
+    }
 }
 
 fn decode(value: Value) -> Result<Data> {

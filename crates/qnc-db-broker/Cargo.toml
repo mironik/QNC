@@ -6,6 +6,7 @@ description = "QNC public module: the one serial intermediary of a project datab
 
 [dependencies]
 qnc-ui-text = { workspace = true }
+qnc-write-lease = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-json-transport = { workspace = true }
 qnc-transport-resolver = { workspace = true }

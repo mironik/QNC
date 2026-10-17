@@ -140,6 +140,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 &*player_works,
                 &card_busy,
                 &cancel,
+                Some(lease.write_lease()),
             );
             match done {
                 Ok(done) => {
@@ -151,7 +152,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
             }
             completing.store(false, std::sync::atomic::Ordering::Relaxed);
         });
-        let artifacts = run_artifacts(root, &closed, &completing);
+        let artifacts = run_artifacts(root, &lease, &closed, &completing);
         let _ = completion.join();
         if closed.load(std::sync::atomic::Ordering::Relaxed) {
             running.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -161,14 +162,15 @@ fn run_once(root: &Path) -> Result<bool, String> {
         }
         // Posters for clips whose source has none (a single file): their records are
         // final now, so the start of the clip is known.
-        match qnc_ingest_import_worker::make_missing_posters(root) {
+        match qnc_ingest_import_worker::make_missing_posters(root, Some(lease.write_lease())) {
             Ok(0) => {}
             Ok(made) => eprintln!("posteri napravljeni: {made}"),
             Err(error) => eprintln!("posteri nisu napravljeni: {error}"),
         }
         // Wave needs the audio facts the completion has just written; the filmstrips are
         // already made, so this pass only makes the waves the first one had to skip.
-        let artifacts = artifacts.and_then(|()| run_artifacts(root, &closed, &std::sync::atomic::AtomicBool::new(false)));
+        let artifacts =
+            artifacts.and_then(|()| run_artifacts(root, &lease, &closed, &std::sync::atomic::AtomicBool::new(false)));
         running.store(false, std::sync::atomic::Ordering::Relaxed);
         let import = import.join().map_err(|_| "Uvoz je pao.".to_string())?;
         artifacts.and(import).map(|()| true)
@@ -186,6 +188,7 @@ fn still_active(active_project: &qnc_active_project_read::ActiveProjectReader, s
 /// final: the waves of newly final clips are taken every few seconds and the filmstrip waits.
 fn run_artifacts(
     root: &Path,
+    lease: &qnc_playback_activity::Lease,
     closed: &std::sync::atomic::AtomicBool,
     completing: &std::sync::atomic::AtomicBool,
 ) -> Result<(), String> {
@@ -200,6 +203,8 @@ fn run_artifacts(
     let player_works = qnc_playback_activity::playback_pause(target.clone());
     let mut artifacts = qnc_content_artifacts::ProjectArtifacts::new();
     artifacts.set_host_root(root);
+    // Published under the lease, checked by the database owner in the same transaction.
+    artifacts.set_write_lease(lease.write_lease());
     artifacts.hold_filmstrip(completing.load(std::sync::atomic::Ordering::Relaxed));
     artifacts.set_playback_priority(player_works());
     artifacts.sync(&reader, &settings, target.clone(), false)?;

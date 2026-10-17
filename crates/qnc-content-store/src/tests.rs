@@ -358,6 +358,7 @@ fn run(store: &mut ContentStore, op: Operation) -> Result<Data> {
         version: VERSION.into(),
         db_uri: URI.into(),
         operation: op,
+        lease: None,
     })
 }
 #[test]
@@ -1052,4 +1053,35 @@ fn an_idle_write_transport_releases_the_project_database_and_reopens_it() {
     std::fs::rename(&path, &moved).expect("an idle transport holds no handle");
     std::fs::rename(&moved, &path).unwrap();
     write(&mut transport, "b").unwrap();
+}
+
+/// A worker's writes carry its lease; the store checks it in the transaction of the write
+/// (external audit 2026-10-17): once another worker took the lease, a claim of the first
+/// is refused and the queued clip stays for the new holder.
+#[test]
+fn a_write_under_a_lease_another_took_is_refused_and_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
+    run(&mut store, Operation::Publish(Box::new(clip("c1")))).unwrap();
+    run(&mut store, Operation::Select { clip_ids: vec!["c1".into()], selected: true }).unwrap();
+    run(&mut store, Operation::QueueSelected).unwrap();
+    let claim = |store: &mut ContentStore, owner: &str| {
+        run(store, Operation::Lease { key: "worker".into(), owner: owner.into(), act: LeaseAct::Claim, max_age_seconds: 60 })
+            .unwrap()
+    };
+    let leased = |store: &mut ContentStore, owner: &str, operation: Operation| {
+        store.execute(&Request {
+            version: VERSION.into(),
+            db_uri: URI.into(),
+            operation,
+            lease: Some(WriteLease { key: "worker".into(), owner: owner.into(), max_age_seconds: 60 }),
+        })
+    };
+    claim(&mut store, "a");
+    run(&mut store, Operation::SetRuntime { key: "worker".into(), value: lease_value("b") }).unwrap();
+    let error = leased(&mut store, "a", Operation::ClaimNext).unwrap_err();
+    assert!(error.contains("lost its lease"), "{error}");
+    let claimed = leased(&mut store, "b", Operation::ClaimNext).unwrap();
+    assert!(matches!(claimed, Data::Claimed(Some(_))), "the clip stayed queued for the holder");
 }

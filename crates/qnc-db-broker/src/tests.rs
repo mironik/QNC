@@ -26,10 +26,7 @@ impl TableModuleFactory for Counter {
 impl TableModule for CounterModule {
     fn execute(&mut self, payload: Value) -> Result<Value> {
         if payload == "add" {
-            let tx = self
-                .0
-                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-                .map_err(|e| e.to_string())?;
+            let tx = begin_write(&mut self.0).map_err(|e| e.to_string())?;
             tx.execute("INSERT INTO counter VALUES (1)", [])
                 .map_err(|e| e.to_string())?;
             tx.commit().map_err(|e| e.to_string())?;
@@ -40,6 +37,9 @@ impl TableModule for CounterModule {
             .map_err(|e| e.to_string())?;
         Ok(Value::from(n))
     }
+    fn connection(&self) -> &rusqlite::Connection {
+        &self.0
+    }
 }
 
 fn project(dir: &std::path::Path, id: &str) -> std::path::PathBuf {
@@ -49,7 +49,8 @@ fn project(dir: &std::path::Path, id: &str) -> std::path::PathBuf {
         .execute_batch(&format!(
             "CREATE TABLE project_settings (project_id TEXT);
              INSERT INTO project_settings VALUES ('{id}');
-             CREATE VIEW public_project_settings AS SELECT project_id FROM project_settings;"
+             CREATE VIEW public_project_settings AS SELECT project_id FROM project_settings;
+             CREATE TABLE ingest_runtime (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);"
         ))
         .unwrap();
     file
@@ -83,8 +84,16 @@ fn the_intermediary_serves_the_modules_it_is_given_in_order() {
     let error = writer.call("test.unknown", Value::Null).unwrap_err();
     assert!(error.contains("Unknown project database module"), "{error}");
     let mut reader = target.open(Access::ReadOnly, modules()).unwrap();
-    assert_eq!(reader.execute("test.counter", Value::from("count")).unwrap(), 20);
-    assert!(reader.execute("test.counter", Value::from("add")).is_err(), "read-only");
+    assert_eq!(
+        reader
+            .execute("test.counter", Value::from("count"))
+            .unwrap(),
+        20
+    );
+    assert!(
+        reader.execute("test.counter", Value::from("add")).is_err(),
+        "read-only"
+    );
 }
 
 #[test]
@@ -131,5 +140,50 @@ fn an_idle_writer_releases_the_project_database_and_reopens_it() {
     let moved = dir.path().join("moved.db");
     std::fs::rename(&file, &moved).expect("an idle writer holds no handle");
     std::fs::rename(&moved, &file).unwrap();
-    assert_eq!(writer.call("test.counter", Value::from("add")).unwrap(), Value::from(2));
+    assert_eq!(
+        writer.call("test.counter", Value::from("add")).unwrap(),
+        Value::from(2)
+    );
+}
+
+/// A write made under a lease is made only while that lease is its owner's: once another
+/// worker took it, the write is refused in the same transaction and nothing is written.
+#[test]
+fn a_write_under_a_lease_another_took_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = project(dir.path(), "p1");
+    let hold = |owner: &str| {
+        let conn = rusqlite::Connection::open(&file).unwrap();
+        conn.pragma_update(None, "journal_mode", "PERSIST").unwrap(); // as the broker keeps it
+        conn.execute(
+                "INSERT OR REPLACE INTO ingest_runtime VALUES('worker', ?1, CAST(strftime('%s','now') AS INTEGER))",
+                [qnc_write_lease::held_by(owner)],
+            )
+            .unwrap();
+    };
+    hold("a");
+    let target = ProjectDbTarget::from_owner_binding(&file, URI).unwrap();
+    let writer = ProjectDbWriter::start(target, modules()).unwrap();
+    let leased = writer.leased(WriteLease {
+        key: "worker".into(),
+        owner: "a".into(),
+        max_age_seconds: 5,
+    });
+    assert_eq!(
+        leased.call("test.counter", Value::from("add")).unwrap(),
+        Value::from(1)
+    );
+    hold("b");
+    let error = leased.call("test.counter", Value::from("add")).unwrap_err();
+    assert!(error.contains("lost its lease"), "{error}");
+    assert_eq!(
+        leased.call("test.counter", Value::from("count")).unwrap(),
+        Value::from(1),
+        "a read is not refused"
+    );
+    assert_eq!(
+        writer.call("test.counter", Value::from("add")).unwrap(),
+        Value::from(2),
+        "a write without a lease still goes"
+    );
 }

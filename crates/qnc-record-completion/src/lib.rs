@@ -64,6 +64,9 @@ pub struct Run<'a> {
     /// the pace; two jobs on it at once make both slower).
     pub card_busy: &'a (dyn Fn() -> bool + Sync),
     pub cancel: &'a AtomicBool,
+    /// The lease the records are published under (the background worker's): once it is
+    /// lost, the database owner refuses them (external audit 2026-10-17).
+    pub lease: Option<qnc_content_store::WriteLease>,
 }
 
 /// What completing a clip reads and writes.
@@ -82,6 +85,7 @@ pub fn complete_active_project(
     player_works: &(dyn Fn() -> bool + Sync),
     card_busy: &(dyn Fn() -> bool + Sync),
     cancel: &AtomicBool,
+    lease: Option<qnc_content_store::WriteLease>,
 ) -> Result<Completion, String> {
     let active = qnc_active_project_read::ActiveProjectReader::from_root(root)
         .map_err(|e| e.to_string())?;
@@ -96,6 +100,10 @@ pub fn complete_active_project(
         ProjectDbTarget::for_project(reader, &snapshot.settings)?,
         vec![MediaRecordsModule::factory(), SourceIndexModule::factory()],
     )?;
+    let writer = match &lease {
+        Some(lease) => writer.leased(lease.clone()),
+        None => writer,
+    };
     let records = ProjectMediaRecords::new(writer.clone());
     let sources = ProjectSourceIndex::new(writer);
     let parts = Parts {
@@ -110,6 +118,7 @@ pub fn complete_active_project(
         player_works,
         card_busy,
         cancel,
+        lease,
     };
     Ok(complete_clips(&parts, waiting, &content, &run))
 }
@@ -153,7 +162,7 @@ pub fn complete_clips(
     std::thread::scope(|scope| {
         for _ in 0..run.workers.max(1) {
             scope.spawn(|| {
-                let mut publisher = match ContentWriteTransport::start(content.clone()) {
+                let mut publisher = match ContentWriteTransport::start_leased(content.clone(), run.lease.clone()) {
                     Ok(publisher) => publisher,
                     Err(error) => {
                         done.lock().expect("completion").failed.push((String::new(), error));

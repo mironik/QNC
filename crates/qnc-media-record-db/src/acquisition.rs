@@ -3,7 +3,7 @@ use crate::{
     database::{check_document, db_error},
     Store,
 };
-use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 impl Store {
@@ -11,9 +11,7 @@ impl Store {
         &mut self,
         begin: &BeginAcquisition,
     ) -> Result<AcquisitionClaim> {
-        let tx = self
-            .conn
-            .transaction_with_behavior(TransactionBehavior::Immediate)
+        let tx = qnc_db_broker::begin_write(&mut self.conn)
             .map_err(db_error)?;
         if let Some(existing) = read(&tx, &begin.media_uri)? {
             // An interrupted attempt learned nothing about the medium: it gives way to a
@@ -86,9 +84,7 @@ impl Store {
     }
 
     pub(crate) fn finish_acquisition(&mut self, finish: &FinishAcquisition) -> Result<Acquisition> {
-        let tx = self
-            .conn
-            .transaction_with_behavior(TransactionBehavior::Immediate)
+        let tx = qnc_db_broker::begin_write(&mut self.conn)
             .map_err(db_error)?;
         let uri: String = tx
             .query_row(
