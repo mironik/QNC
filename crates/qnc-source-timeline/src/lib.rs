@@ -144,6 +144,9 @@ impl SourceTimeline {
         if action_id == "activate_focused_item" && !self.lane_taken() && self.keys.mark_taken(timeline) {
             return self.keys.route("clear_focus", preview, timeline);
         }
+        if action_id == KEEP_MARK && self.lane_taken() {
+            return self.route_lane("activate_focused_item", preview); // a left click keeps the lane
+        }
         if action_id == KEEP_MARK {
             // The timeline draws the mark taken: let it go whoever took it.
             self.keys.set_mark_taken(false);
@@ -356,6 +359,20 @@ mod tests {
         assert!(!source.mark_taken(&timeline));
         assert_eq!(timeline.source_in_frame, Some(11), "the moved IN stays");
         assert_eq!(source.route_input("activate_focused_item", None, &mut preview, &mut timeline), None, "nothing taken: the form's Enter");
+    }
+
+    #[test]
+    fn a_left_click_keeps_a_taken_lane_as_enter_does() {
+        let (mut source, mut preview) = (SourceTimeline::new(), SourcePreview::default());
+        let mut timeline = TimelineProjection::new(0, 100);
+        source.lanes.new_clip();
+        source.lanes.set_channels(Some(4));
+        assert_eq!(source.route_lane("select_audio_a2", &mut preview), Some(true));
+        source.route_lane("lane_level_up", &mut preview);
+        assert!(source.lane_taken());
+        assert_eq!(source.route_input(KEEP_MARK, None, &mut preview, &mut timeline), Some(true));
+        assert!(!source.lane_taken(), "the click kept the lane and closed it");
+        assert_eq!(source.kept(1).level_db, 1, "its level is kept");
     }
 
     #[test]

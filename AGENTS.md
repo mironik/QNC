@@ -4426,3 +4426,13 @@ nacina (B-roll | Sync/B-roll), ne dodaje pokrivalicu. Testovi, conformance.
 Dopuna 2026-10-17 (korisnik: "Shift+B radi, dugme B-roll ne radi"; log: tri klika na dugme daju samo izbor nacina):
 dugme B-roll u docku (i P) uz izbor nacina B-roll stavlja oznaceni izvor (IN/OUT) u prazni slot, izabrani ili pod Wrap
 playheadom, kao B; bez IN/OUT-a ili bez praznog slota samo bira nacin. `qnc-program-segments` (`CoverMode`).
+Audit 2026-10-17 (korisnik: "opet nije jedinstveni timeline: na Wrap retku desni klik na ton otvara zoom, lijevi vraca
+filmstrip, u source to ne radi; izgubilo se pojacavanje tona desnom tipkom misa i kotacicem"): usporedba A1/A2 na source
+timelineu i Wrap retku, popravljeno u zajednickim kockama: (1) lijevi klik dok je A1/A2 uzet sprema traku i zatvara
+povecanje i na source timelineu (`qnc-timeline` `lane_taken` -> `KeepMark`, `qnc-source-timeline` `KEEP_MARK` zadrzava
+traku); (2) kotacic dok je desna tipka drzana je Ctrl+kotacic (razina uzetog zvuka) svugdje, a pustanje te tipke nakon
+kotacica nije desni klik (`qnc-wheel-jog` `wheeled_with_right`, `qnc-timeline` `right_click`); (3) lijevi klik na dugme
+A1/A2 Wrap retka uzima zvuk onoga sto je pod Wrap playheadom u retku (inace na pocetku retka), kao Ctrl+1/Ctrl+2, a dok
+je zvuk uzet, sprema ga (`qnc-segment-panel`). Jednako: desni klik na traku uzima, strelice gore/dolje kanal, lijevo/desno
+off/on, Ctrl+strelice i Ctrl+kotacic razina, Enter ili lijevi klik sprema, Esc odustaje. Test
+`a_left_click_keeps_a_taken_lane_as_enter_does`, conformance.

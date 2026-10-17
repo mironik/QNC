@@ -1233,7 +1233,7 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
 /// A right click on A1/A2 (its label or its track) takes the lane, as Ctrl+1/Ctrl+2: on a
 /// Wrap row (markers) the sound of what lies at the clicked frame.
 fn take_lane_intent(responses: &[&egui::Response], track: Rect, lane: AudioLane, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
-    let clicked = responses.iter().find(|response| response.secondary_clicked())?;
+    let clicked = responses.iter().find(|response| right_click(response))?;
     if !matches!(lane, AudioLane::A1 | AudioLane::A2) {
         return None;
     }
@@ -1245,15 +1245,27 @@ fn take_lane_intent(responses: &[&egui::Response], track: Rect, lane: AudioLane,
     Some(TimelineIntent::TakeAudioLane(lane))
 }
 
+/// A right click (Ctrl+), unless the right button was held for the wheel (then it was Ctrl
+/// for the wheel, not a click).
+fn right_click(response: &egui::Response) -> bool {
+    response.secondary_clicked() && !qnc_wheel_jog::wheeled_with_right(&response.ctx)
+}
+
+/// A1 or A2 is taken (its column is open): a left click on the timeline keeps it, as on a
+/// Wrap row (user 2026-10-17: the source timeline did not).
+fn lane_taken(input: &TimelineInput<'_>) -> bool {
+    input.a1_channel.is_some_and(|choice| choice.open) || input.a2_channel.is_some_and(|choice| choice.open)
+}
+
 /// A click on the track: a left click while IN or OUT is taken keeps the edit (as Enter);
 /// a right click takes what it points at (as Ctrl+): IN or OUT on the source timeline, an M
 /// marker or a slot on a row with them. `None`: neither.
 fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
     let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
-    if response.clicked() && input.focus != TimelineFocusPaint::Playhead && !input.layers.markers {
+    if response.clicked() && (input.focus != TimelineFocusPaint::Playhead || lane_taken(input)) && !input.layers.markers {
         return Some(TimelineIntent::KeepMark);
     }
-    if !response.secondary_clicked() {
+    if !right_click(response) {
         return None;
     }
     let pos = response.interact_pointer_pos()?;
@@ -1312,7 +1324,7 @@ fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> T
         return TimelineIntent::GoHome;
     }
     // A right click is Ctrl+ (user 2026-10-17): on V it is Ctrl+click.
-    if input.show_lane_labels && input.layers.audio_bands && label_response.secondary_clicked() {
+    if input.show_lane_labels && input.layers.audio_bands && right_click(&label_response) {
         return TimelineIntent::ToggleVideoMode;
     }
     let response = ui.interact(

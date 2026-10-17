@@ -84,6 +84,17 @@ fn with_ctrl(events: &[egui::Event]) -> Option<bool> {
     })
 }
 
+fn right_wheel_key() -> egui::Id {
+    egui::Id::new("qnc_wheel_jog_right_wheel")
+}
+
+/// The wheel was turned while the right mouse button was held: letting that button go is
+/// not a right click (it was Ctrl for the wheel). Asked when a right click comes; the next
+/// press of the right button starts over.
+pub fn wheeled_with_right(ctx: &egui::Context) -> bool {
+    ctx.data(|data| data.get_temp::<bool>(right_wheel_key())).unwrap_or(false)
+}
+
 /// The catalog actions of a panel's wheel: back and forward, then with Ctrl held.
 pub type WheelActions<'a> = ((&'a str, &'a str), (&'a str, &'a str));
 
@@ -126,11 +137,21 @@ impl Wheel {
 /// the next frames); the scroll over it is taken. `key` names its pending steps.
 pub fn take(ui: &Ui, rect: Rect, key: egui::Id) -> Option<Wheel> {
     let ctx = ui.ctx();
+    if ctx.input(|input| input.pointer.secondary_pressed()) {
+        ctx.data_mut(|data| data.remove::<bool>(right_wheel_key()));
+    }
     let mut pending: Pending = ctx.data(|data| data.get_temp(key)).unwrap_or_default();
     let over = ctx.pointer_hover_pos().is_some_and(|at| rect.contains(at));
     if over {
         let events = ctx.input(|input| input.events.clone());
-        if let Some(ctrl) = with_ctrl(&events).filter(|ctrl| *ctrl != pending.ctrl) {
+        // The right mouse button is Ctrl (user 2026-10-17): the wheel turned with it held is
+        // Ctrl+wheel, the level of a taken sound.
+        let right = ctx.input(|input| input.pointer.secondary_down());
+        let ctrl = with_ctrl(&events).map(|ctrl| ctrl || right);
+        if right && ctrl.is_some() {
+            ctx.data_mut(|data| data.insert_temp(right_wheel_key(), true));
+        }
+        if let Some(ctrl) = ctrl.filter(|ctrl| *ctrl != pending.ctrl) {
             pending = Pending { ctrl, ..Pending::default() }; // Ctrl pressed or let go: start again
         }
         pending.steps += steps_of(&events, &mut pending.points);

@@ -425,6 +425,18 @@ fn paint_program(
         // Ctrl+click on V: filmstrip or narrow video row (user 2026-10-15).
         TimelineIntent::ToggleVideoMode => Some(SegmentCommand::ToggleWrapVideo),
         TimelineIntent::Wheel(wheel) => Some(SegmentCommand::Wheel { up: wheel.up, ctrl: wheel.ctrl }),
+        // A left click on the A1/A2 button of a Wrap row, as on the source timeline (user
+        // 2026-10-17): it takes the sound of what lies under the Wrap playhead in this row
+        // (else at its start), as Ctrl+1/Ctrl+2; while a sound is taken it keeps it (Enter).
+        TimelineIntent::TakeAudioLane(lane) | TimelineIntent::ToggleAudioExpand(lane)
+            if matches!(lane, qnc_timeline::AudioLane::A1 | qnc_timeline::AudioLane::A2) =>
+        {
+            if segments.part_sound.is_some() {
+                return Some(SegmentCommand::Keep);
+            }
+            let frame = segments.playhead.filter(|frame| (start..end).contains(frame)).unwrap_or(start);
+            Some(SegmentCommand::TakeSound { lane: u8::from(lane == qnc_timeline::AudioLane::A2), frame })
+        }
         _ => None,
     }
 }
