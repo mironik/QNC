@@ -1044,6 +1044,22 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     paint_trim_playheads(ui, outer, &input);
 
     match (intent, wheel) {
+        // Ctrl+wheel (or the wheel with the right button held) on a source timeline with
+        // nothing taken takes IN or OUT, whichever is nearer the mouse, the clip's start or
+        // end when the user set none (user 2026-10-17); the next steps move it.
+        (TimelineIntent::None, Some(wheel))
+            if wheel.ctrl
+                && !input.layers.markers
+                && input.focus == TimelineFocusPaint::Playhead
+                && !lane_taken(&input)
+                && (input.draft_in_active || input.draft_out_active) =>
+        {
+            let track = split_label_track(outer, input.metrics.label_width).1;
+            let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
+            let at = ui.ctx().pointer_hover_pos().map_or(track.center().x, |pos| pos.x);
+            let local = frame_for_x(track, range_start, duration, at).saturating_sub(range_start);
+            TimelineIntent::TakeMark(local.abs_diff(input.draft_in_frame) <= local.abs_diff(input.draft_out_frame))
+        }
         (TimelineIntent::None, Some(wheel)) => TimelineIntent::Wheel(wheel),
         (intent, wheel) => {
             if wheel.is_some() && qnc_dev_diagnostics::player_diagnostics_enabled() {

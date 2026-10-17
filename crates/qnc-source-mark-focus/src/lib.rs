@@ -21,15 +21,17 @@ pub fn is_taken(timeline: &TimelineProjection) -> bool {
     timeline.source_mark_focus != TimelineSourceMarkFocus::Playhead
 }
 
-/// Ctrl+I (`in_mark`) or Ctrl+O: takes a set mark and cues the playhead to it.
+/// Ctrl+I (`in_mark`) or Ctrl+O: takes the mark and cues the playhead to it. Every clip
+/// is a virtual clip (user 2026-10-17): without a mark the user set, IN is its start and
+/// OUT its end, and those are taken; a mark the user sets wins over them.
 pub fn take(timeline: &mut TimelineProjection, in_mark: bool) -> MarkKey {
-    let (mark, focus) = if in_mark {
-        (timeline.source_in_frame, TimelineSourceMarkFocus::In)
-    } else {
-        (timeline.source_out_frame, TimelineSourceMarkFocus::Out)
+    let Some((in_frame, out_frame)) = timeline.visible_source_marks() else {
+        return MarkKey::Refused; // no clip shown yet
     };
-    let Some(frame) = mark else {
-        return MarkKey::Refused; // v5: qnc_ui_text::text("story.msg.set_in_first")
+    let (frame, focus) = if in_mark {
+        (in_frame, TimelineSourceMarkFocus::In)
+    } else {
+        (out_frame, TimelineSourceMarkFocus::Out)
     };
     timeline.source_mark_focus = focus;
     MarkKey::Cue(cue_frame(timeline, frame, !in_mark))
@@ -66,9 +68,10 @@ pub fn nudge(timeline: &mut TimelineProjection, frames: i64) -> MarkKey {
 /// OUT (OUT is exclusive); `None` when no mark is taken.
 pub fn taken_picture(timeline: &TimelineProjection) -> Option<u64> {
     let start = timeline.range_start_frame;
+    let (in_frame, out_frame) = timeline.visible_source_marks()?;
     match timeline.source_mark_focus {
-        TimelineSourceMarkFocus::In => timeline.source_in_frame.map(|frame| start + frame),
-        TimelineSourceMarkFocus::Out => timeline.source_out_frame.map(|frame| start + frame.saturating_sub(1)),
+        TimelineSourceMarkFocus::In => Some(start + in_frame),
+        TimelineSourceMarkFocus::Out => Some(start + out_frame.saturating_sub(1)),
         TimelineSourceMarkFocus::Playhead => None,
     }
 }
@@ -181,5 +184,23 @@ mod tests {
         t.playhead_frame = Some(90);
         assert_eq!(fit(&mut t, 25), MarkKey::Changed);
         assert_eq!((t.source_in_frame, t.source_out_frame), (Some(90), Some(100)), "inside the clip");
+    }
+}
+
+#[cfg(test)]
+mod default_marks {
+    use super::*;
+
+    #[test]
+    fn without_marks_ctrl_i_and_ctrl_o_take_the_clips_start_and_end_and_moving_one_sets_it() {
+        // Every clip is a virtual clip (user 2026-10-17): IN is its start, OUT its end.
+        let mut timeline = TimelineProjection::new(0, 100).with_playhead(40);
+        assert_eq!(take(&mut timeline, false), MarkKey::Cue(99), "OUT: the last picture of the clip");
+        assert_eq!(timeline.source_out_frame, None, "taken, not yet set");
+        assert_eq!(nudge(&mut timeline, -10), MarkKey::Cue(89));
+        assert_eq!(timeline.source_out_frame, Some(90), "moved, it is the user's mark now");
+        assert_eq!(take(&mut timeline, true), MarkKey::Cue(0), "IN: the clip's start");
+        assert_eq!(nudge(&mut timeline, 5), MarkKey::Cue(5));
+        assert_eq!((timeline.source_in_frame, timeline.source_out_frame), (Some(5), Some(90)));
     }
 }

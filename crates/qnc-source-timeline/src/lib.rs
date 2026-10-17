@@ -213,7 +213,16 @@ impl SourceTimeline {
             // Ctrl+left/right: the level of a taken lane, up louder.
             wheel if wheel.starts_with("wheel_") && wheel.contains("_ctrl_") => {
                 let level = if wheel.ends_with("back") { "lane_level_down" } else { "lane_level_up" };
-                Some(self.route_lane(level, preview).unwrap_or(false))
+                if let Some(changed) = self.route_lane(level, preview) {
+                    return Some(changed);
+                }
+                // No lane taken: Ctrl+wheel moves the taken IN or OUT, as the wheel does
+                // (user 2026-10-17: right button and wheel cut the clip).
+                if !self.keys.mark_taken(timeline) {
+                    return Some(false);
+                }
+                let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();
+                self.keys.route(if forward { "step_forward_frame" } else { "step_back_frame" }, preview, timeline)
             }
             wheel if wheel.starts_with("wheel_") => {
                 let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();

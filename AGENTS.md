@@ -4502,3 +4502,11 @@ nakon Entera. Sada nacrt koji izlaz ne moze tocno dati otvara program s nacrtom 
 (`qnc-source-preview` `draft_output_level`, `OUTPUT_LEVEL_MAX_PERCENT`). Test
 `a_draft_level_beyond_what_the_output_holds_opens_the_program_with_the_draft`, conformance. Svi koraci vanjskog audita
 (1-9) su izvedeni.
+Dopuna 2026-10-17 (korisnik: "svi klipovi bez naknadne oznake po defaultu imaju IN (pocetak) i OUT (kraj); kako sve
+klipove tretiramo kao virtualne klipove, trebalo bi ih tako i tretirati; naknadni IN ili OUT koji postavi korisnik ima
+prednost; Ctrl+kotacic treba moci voziti defaultni IN ili OUT"): `qnc-source-mark-focus` `take` uzima IN ili OUT koji
+timeline pokazuje (korisnikov, inace pocetak ili kraj klipa); zadana oznaka postaje korisnikova kad se pomakne
+(`nudge`); `taken_picture` isto. `qnc-timeline`: Ctrl+kotacic (i kotacic s drzanom desnom tipkom) na source timelineu
+kad nista nije uzeto uzima IN ili OUT blizi misu; `qnc-source-timeline`: Ctrl+kotacic pomice uzetu oznaku kad A1/A2
+nije uzet (uz uzet A1/A2 i dalje mijenja razinu). Vrijedi za sve forme (Story, MA, Ingest). Test
+`without_marks_ctrl_i_and_ctrl_o_take_the_clips_start_and_end_and_moving_one_sets_it`, conformance.
