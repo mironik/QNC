@@ -108,9 +108,14 @@ pub fn show(
                 egui::Rect::from_min_max(egui::pos2(body.left(), playlist_top), body.max);
             ui.scope_builder(egui::UiBuilder::new().max_rect(stack), |ui| {
                 ui.set_clip_rect(stack);
+                // The wheel over a Wrap row moves its playhead (user 2026-10-16), so the rows
+                // scroll by a solid bar at their right, always shown (user 2026-10-17): the
+                // wheel over it or a drag of it.
+                ui.style_mut().spacing.scroll = egui::style::ScrollStyle::solid();
                 egui::ScrollArea::vertical()
                     .id_salt("qnc_segment_panel_stack")
                     .auto_shrink([false, false])
+                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
                     .show(ui, |ui| {
                         ui.spacing_mut().item_spacing = Vec2::new(0.0, ROW_GAP);
                         for row in &segments.rows {

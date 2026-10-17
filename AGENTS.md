@@ -4547,3 +4547,7 @@ pokazuje sliku na rezu, pustanje tipke je sprema. `qnc-timeline` (`DragMark`, `m
 `source_drag_in` / `source_drag_out`; `action_of` i `route_input` nose vrijednost i64 za kanal ili sliku). Story i
 Ingest samo predaju namjeru kocki (C10 Story aplikacija 689 -> 687). Test
 `a_dragged_mark_follows_the_mouse_but_never_crosses_the_other_or_leaves_the_clip`, conformance.
+Izmjena izgleda 2026-10-17 (korisnik: "trebas dodati skrol u segment panel"): kotacic iznad Wrap reda pomice njegov
+playhead (pravilo od 16. 10.), pa se redovi nisu imali cime listati (plutajuca traka gotovo se ne vidi). Wrap redovi
+panela Segmenti imaju punu traku za listanje uz desni rub, uvijek vidljivu (`qnc-segment-panel`); lista se kotacicem iznad
+nje ili povlacenjem. Redovi su zato uzi za sirinu trake.
