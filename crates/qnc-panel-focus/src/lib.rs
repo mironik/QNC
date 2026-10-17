@@ -659,9 +659,12 @@ pub const WHEEL_SOURCE: qnc_wheel_jog::WheelActions<'static> = qnc_wheel_jog::SO
 pub const WHEEL_SEGMENTS: qnc_wheel_jog::WheelActions<'static> =
     (("wheel_segments_back", "wheel_segments_forward"), ("wheel_segments_ctrl_back", "wheel_segments_ctrl_forward"));
 
-/// The catalog action of a Wrap row's wheel; `None` for every other command.
+/// The catalog action of a Wrap row's wheel or of a left click that keeps a taken edit
+/// (Enter); `None` for every other command.
 pub fn wheel_action(command: &qnc_program_segments::SegmentCommand) -> Option<&'static str> {
     match command {
+        // A left click that keeps a taken edit is Enter on the segment panel.
+        qnc_program_segments::SegmentCommand::Keep => Some("activate_focused_item"),
         qnc_program_segments::SegmentCommand::Wheel { up, ctrl } => Some(qnc_wheel_jog::Wheel { up: *up, ctrl: *ctrl }.action(WHEEL_SEGMENTS)),
         _ => None,
     }

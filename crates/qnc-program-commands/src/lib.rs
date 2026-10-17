@@ -66,10 +66,17 @@ pub enum SegmentCommand {
     /// The selected marker first, otherwise the selected segment (docs/94 section 2).
     DeleteSelected,
     SelectMarker(String),
+    /// A left click on a Wrap row while something there is taken (a slot, a slot edge, a
+    /// marker, the sound of a segment or cover): the change is kept, as Enter (user
+    /// 2026-10-17: the same as on the source timeline).
+    Keep,
     /// A right click on an M marker: it is taken as with Ctrl+M (user 2026-10-17).
     TakeMarker(String),
     /// A right click in a slot: it is taken as with Ctrl+S.
     TakeSlot(String),
+    /// A right click near an edge of a slot: that edge is taken as with Ctrl+I (`start`) or
+    /// Ctrl+O on that slot.
+    TakeSlotEdge { slot_id: String, start: bool },
     /// A right click on A1 (0) or A2 of a Wrap row: the sound of what lies at the program
     /// frame is taken as with Ctrl+1/Ctrl+2 there.
     TakeSound { lane: u8, frame: u64 },

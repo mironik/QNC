@@ -699,6 +699,10 @@ pub enum TimelineIntent {
     TakeMarker { id: String, frame: u64 },
     /// A right click in a slot of a row (as Ctrl+S).
     TakeSlot { id: String, frame: u64 },
+    /// A right click near the start (`true`) or end of a slot (as Ctrl+I/Ctrl+O there).
+    TakeSlotEdge { id: String, start: bool },
+    /// A right click on a cover (as Ctrl+click on it).
+    TakeCover { id: String, frame: u64 },
     /// A right click on A1 or A2 of a row with markers (a Wrap row): the sound of what lies
     /// there, at that frame (as Ctrl+1/Ctrl+2 there).
     TakeSound { lane: AudioLane, frame: u64 },
@@ -1249,7 +1253,18 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
             return Some(TimelineIntent::TakeMarker { id: id.to_string(), frame });
         }
         let slot = input.layers.marker_slots.then(|| slot_hit(track, range_start, duration, pos, input.marker_slots, slot_top(input))).flatten();
-        return slot.map(|id| TimelineIntent::TakeSlot { id: id.to_string(), frame });
+        let Some(span) = slot.and_then(|id| input.marker_slots.iter().find(|span| span.id == id)) else {
+            // Outside a slot: a cover (as Ctrl+click on it).
+            let cover = input.layers.covers.then(|| cover_hit(track, range_start, duration, pos, input.covers, cover_rows(track, input))).flatten();
+            return cover.map(|id| TimelineIntent::TakeCover { id: id.to_string(), frame });
+        };
+        // Near an edge of the slot: that edge (as Ctrl+I/O); inside it: the slot (as Ctrl+S).
+        const EDGE: f32 = 8.0;
+        let (x0, x1) = (x_for_frame(track, range_start, duration, span.start_frame), x_for_frame(track, range_start, duration, span.end_frame));
+        if (pos.x - x0).abs() <= EDGE || (pos.x - x1).abs() <= EDGE {
+            return Some(TimelineIntent::TakeSlotEdge { id: span.id.to_string(), start: (pos.x - x0).abs() <= (pos.x - x1).abs() });
+        }
+        return Some(TimelineIntent::TakeSlot { id: span.id.to_string(), frame });
     }
     if !(input.draft_in_active || input.draft_out_active) {
         return None;
@@ -1284,6 +1299,10 @@ fn paint_video_row(ui: &mut egui::Ui, row: Rect, input: &TimelineInput<'_>) -> T
             return TimelineIntent::ToggleVideoMode;
         }
         return TimelineIntent::GoHome;
+    }
+    // A right click is Ctrl+ (user 2026-10-17): on V it is Ctrl+click.
+    if input.show_lane_labels && input.layers.audio_bands && label_response.secondary_clicked() {
+        return TimelineIntent::ToggleVideoMode;
     }
     let response = ui.interact(
         track_rect,

@@ -372,11 +372,28 @@ fn paint_program(
         let frame = start + frame.min(duration);
         return Some(SegmentCommand::DragMarker { marker_id, frame });
     }
+    // A left click while something on the row is taken keeps it, as Enter (user 2026-10-17:
+    // the Wrap rows work as the source timeline: right click takes, wheel moves, left click keeps).
+    let taken = !segments.trim_frames.is_empty() || segments.part_sound.is_some();
+    if taken
+        && matches!(
+            intent,
+            TimelineIntent::CueFrame(_)
+                | TimelineIntent::SelectMarker { .. }
+                | TimelineIntent::SelectCover { .. }
+                | TimelineIntent::SelectMarkerSlot { .. }
+                | TimelineIntent::SelectVirtual { .. }
+        )
+    {
+        return Some(SegmentCommand::Keep);
+    }
     match intent {
         TimelineIntent::SelectMarker { id, .. } => Some(SegmentCommand::SelectMarker(id)),
         // A right click takes what it points at, as Ctrl+M, Ctrl+S, Ctrl+1/Ctrl+2 (user 2026-10-17).
         TimelineIntent::TakeMarker { id, .. } => Some(SegmentCommand::TakeMarker(id)),
         TimelineIntent::TakeSlot { id, .. } => Some(SegmentCommand::TakeSlot(id)),
+        TimelineIntent::TakeSlotEdge { id, start } => Some(SegmentCommand::TakeSlotEdge { slot_id: id, start }),
+        TimelineIntent::TakeCover { id, frame } => Some(SegmentCommand::TakeCover { cover_id: id, frame: start + frame.min(duration) }),
         TimelineIntent::TakeSound { lane, frame } => Some(SegmentCommand::TakeSound {
             lane: u8::from(lane == qnc_timeline::AudioLane::A2),
             frame: start + frame.min(duration),

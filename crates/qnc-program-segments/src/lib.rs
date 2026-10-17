@@ -473,6 +473,9 @@ impl ProgramSegments {
             }
             SegmentCommand::DeleteSelected => self.delete_selected(),
             SegmentCommand::SelectMarker(marker_id) => self.select_marker(&marker_id),
+            SegmentCommand::Keep => {
+                self.confirm_program();
+            }
             SegmentCommand::TakeMarker(marker_id) => {
                 self.select_marker(&marker_id);
                 self.edit_marker();
@@ -480,6 +483,10 @@ impl ProgramSegments {
             SegmentCommand::TakeSlot(slot_id) => {
                 self.take_slot(&slot_id);
                 self.take_slot_move(&slot_id);
+            }
+            SegmentCommand::TakeSlotEdge { slot_id, start } => {
+                self.take_slot(&slot_id);
+                self.take_slot_edge_at_playhead(start);
             }
             SegmentCommand::TakeSound { lane, frame } => {
                 self.take_part_sound(lane, frame);

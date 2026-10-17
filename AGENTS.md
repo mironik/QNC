@@ -4357,3 +4357,11 @@ Ctrl+M), slot (`TakeSlot`, kao Ctrl+S) ili zvuk segmenta/pokrivalice na kliknuto
 `qnc-source-timeline` (`action_of`; `route_input` s Enterom pusta uzetu oznaku, pa Enter sprema i u Ingestu, gdje ga je
 prije uzimao krug panela), `qnc-program-commands` (`TakeMarker`, `TakeSlot`, `TakeSound`), `qnc-program-segments`,
 `qnc-segment-panel`; pomoc F1 (katalog, pravilo "Desni klik misem"). Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-17 (korisnik: "isti sistem trebali primijeniti i na rad na Wrap-segment timelineu"; "desni klik treba
+biti opcija Ctrl, isto kao i na timelineu"): Wrap redovi rade kao source timeline. Lijevi klik dok je na retku nesto
+uzeto (slot, rub slota, marker, zvuk segmenta ili pokrivalice) sprema kao Enter (`SegmentCommand::Keep`,
+`qnc-segment-panel`, `qnc-panel-focus::wheel_action` ga daje kao `activate_focused_item`). Desni klik je Ctrl+ za sve
+sto Ctrl radi na retku (`qnc-timeline`): M marker (Ctrl+M), blizu ruba slota taj rub (Ctrl+I/O, `TakeSlotEdge`), u
+slotu slot (Ctrl+S), pokrivalica izvan slota (Ctrl+klik, `TakeCover`), A1/A2 zvuk na kliknutom mjestu (Ctrl+1/2),
+oznaka V filmstrip/uska traka (Ctrl+klik). `qnc-program-commands` (`Keep`, `TakeSlotEdge`), `qnc-program-segments`.
+Testovi, conformance. Uzivo nije provjereno.
