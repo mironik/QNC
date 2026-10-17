@@ -4527,3 +4527,9 @@ izvan niti sucelja. `qnc-editorial-application` `read_catalog` gradi `PreviewCon
 cilj baze sadrzaja) u pozadinskoj niti kataloga, a `apply_loaded` ga samo preda previewu; `qnc-source-preview`
 `PreviewContext` nosi i razrijesen cilj za javljanje rada playera, pa `configure` na niti sucelja ne cita bazu.
 Testovi, conformance.
+Izvedeno 2026-10-17 (drugi vanjski audit, P2-5): reporter playera ne utihne nakon greske. Pisac baze sadrzaja otvara vezu
+tek pri upisu, pa greska moze doci i tijekom rada; prije su se greske upisa tiho preskakale s istim pokvarenim piscem.
+`qnc-playback-activity`: nit reportera na neuspio upis odbaci pisac i otvori novi pri sljedecem upisu, a stanje playera
+i zadnji klip zadrzi dok ih ne upise (`tell`); greska ide u player log. Ako nit ipak stane, `PlaybackReporter` je za isti
+projekt pokrece ponovno nakon 2 s i ponovno salje stanje i klip (`reporting`, `retry_at`). Test
+`a_reporter_whose_writes_failed_tells_its_state_once_the_database_is_back`, conformance.

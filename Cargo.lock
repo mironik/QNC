@@ -4299,6 +4299,7 @@ name = "qnc-playback-activity"
 version = "0.1.0"
 dependencies = [
  "qnc-content-store",
+ "qnc-dev-diagnostics",
  "qnc-ui-text",
  "rusqlite",
  "tempfile",

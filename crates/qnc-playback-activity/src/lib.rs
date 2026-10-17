@@ -240,7 +240,14 @@ pub struct PlaybackReporter {
     sender: Option<Sender<Report>>,
     thread: Option<JoinHandle<()>>,
     last: bool,
+    /// The last clip told, told again by a reporter started anew.
+    clip: Option<String>,
+    /// When a reporter that stopped (its writer did not open) is started again.
+    retry_at: Option<Instant>,
 }
+
+/// How long a reporter that stopped waits before it is started again for the same project.
+const REPORTER_RETRY: Duration = Duration::from_secs(2);
 
 impl PlaybackReporter {
     pub fn new() -> Self {
@@ -268,20 +275,53 @@ impl PlaybackReporter {
             return;
         };
         self.bind(target);
+        self.clip = Some(clip_id.to_string());
         if let Some(sender) = &self.sender {
             let _ = sender.send(Report::Clip(clip_id.into()));
         }
+    }
+
+    /// The reporter runs (its writer opened and it has not stopped): false while one that
+    /// stopped waits to be started again (external audit 2026-10-17).
+    pub fn reporting(&self) -> bool {
+        self.thread.as_ref().is_some_and(|thread| !thread.is_finished())
     }
 
     fn bind(&mut self, target: &ContentTarget) {
         if self.target_uri.as_deref() != Some(target.uri()) {
             self.stop();
             self.target_uri = Some(target.uri().to_string());
-            if let Ok(sender) = start_reporter(target.clone(), &mut self.thread) {
-                self.sender = Some(sender);
-                self.last = false;
-            }
+            (self.last, self.clip, self.retry_at) = (false, None, None);
+            self.start(target);
+            return;
         }
+        // The reporter of the same project stopped (external audit 2026-10-17: its writer
+        // did not open and nothing more was ever told): started again after a pause, with
+        // what it was last told.
+        if self.reporting() {
+            return;
+        }
+        let now = Instant::now();
+        match self.retry_at {
+            None => self.retry_at = Some(now + REPORTER_RETRY),
+            Some(at) if now >= at => {
+                self.retry_at = None;
+                self.start(target);
+                if let Some(sender) = &self.sender {
+                    if self.last {
+                        let _ = sender.send(Report::Active(true));
+                    }
+                    if let Some(clip) = &self.clip {
+                        let _ = sender.send(Report::Clip(clip.clone()));
+                    }
+                }
+            }
+            Some(_) => {}
+        }
+    }
+
+    fn start(&mut self, target: &ContentTarget) {
+        self.sender = start_reporter(target.clone(), &mut self.thread).ok();
     }
 
     /// Lets the reporter go without waiting for it (external audit 2026-10-17: the form
@@ -319,32 +359,66 @@ fn start_reporter(
         std::thread::Builder::new()
             .name("playback-activity-report".into())
             .spawn(move || {
-                // The writer opens on its own thread, never on the form's.
-                let Ok(mut writer) = Writer::start(target) else {
-                    return;
-                };
-                let mut active = false;
+                // The writer opens on its own thread, never on the form's. A write that fails
+                // (the database was away) drops the writer: the next one opens it again and
+                // what is still to be told is told then (external audit 2026-10-17: a writer
+                // that failed once left the reporter silent for good).
+                let mut writer: Option<Writer> = None;
+                let (mut active, mut clip_to_tell): (Option<bool>, Option<String>) = (None, None);
                 loop {
                     match receive.recv_timeout(RENEW_EVERY) {
-                        Ok(Report::Active(state)) => {
-                            active = state;
-                            let _ = writer.set(PLAYBACK, if active { ON } else { OFF });
-                        }
-                        Ok(Report::Clip(clip_id)) => {
-                            let _ = writer.set(PLAYBACK_CLIP, &clip_id);
-                        }
-                        Err(RecvTimeoutError::Timeout) => {
-                            if active {
-                                let _ = writer.set(PLAYBACK, ON);
+                        Ok(Report::Active(state)) => active = Some(state),
+                        Ok(Report::Clip(clip_id)) => clip_to_tell = Some(clip_id),
+                        Err(RecvTimeoutError::Timeout) => {}
+                        Err(RecvTimeoutError::Disconnected) => {
+                            // What it was told last is still written before it ends.
+                            if active.is_some() || clip_to_tell.is_some() {
+                                tell(&target, &mut writer, &mut active, &mut clip_to_tell);
                             }
+                            break;
                         }
-                        Err(RecvTimeoutError::Disconnected) => break,
                     }
+                    tell(&target, &mut writer, &mut active, &mut clip_to_tell);
                 }
             })
             .map_err(|e| e.to_string())?,
     );
     Ok(send)
+}
+
+/// Writes what the reporter is to tell: the playback state (renewed while on, written
+/// once when off) and the last clip. Kept to tell again when the write fails.
+fn tell(target: &ContentTarget, writer: &mut Option<Writer>, active: &mut Option<bool>, clip: &mut Option<String>) {
+    if writer.is_none() {
+        *writer = Writer::start(target.clone()).ok();
+    }
+    let Some(open) = writer.as_mut() else {
+        return;
+    };
+    let mut failed = None;
+    if let Some(state) = *active {
+        match open.set(PLAYBACK, if state { ON } else { OFF }) {
+            // On is renewed every second; off is written once.
+            Ok(()) if !state => *active = None,
+            Ok(()) => {}
+            Err(error) => failed = Some(error),
+        }
+    }
+    if let Some(clip_id) = clip.clone().filter(|_| failed.is_none()) {
+        match open.set(PLAYBACK_CLIP, &clip_id) {
+            Ok(()) => *clip = None,
+            Err(error) => failed = Some(error),
+        }
+    }
+    if let Some(error) = failed {
+        *writer = None;
+        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!("playback reporter write failed, it opens its writer again: {error}"),
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -369,6 +443,25 @@ mod tests {
             .unwrap();
         let target = ContentTarget::from_owner_binding(&path, URI).unwrap();
         (dir, target)
+    }
+
+    #[test]
+    fn a_reporter_whose_writes_failed_tells_its_state_once_the_database_is_back() {
+        let (dir, target) = target();
+        let (path, away) = (dir.path().join("db"), dir.path().join("db.away"));
+        std::fs::rename(&path, &away).unwrap();
+        let mut reporter = PlaybackReporter::new();
+        reporter.update(Some(&target), true);
+        std::thread::sleep(Duration::from_millis(1500)); // its writes fail meanwhile
+        assert!(reporter.reporting(), "it keeps running");
+        let _ = std::fs::remove_file(&path); // what a failed open left
+        std::fs::rename(&away, &path).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !is_fresh(&target, PLAYBACK, PLAYBACK_FRESH_SECONDS) && Instant::now() < deadline {
+            reporter.update(Some(&target), true);
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(is_fresh(&target, PLAYBACK, PLAYBACK_FRESH_SECONDS), "the database back, it told that a player works");
     }
 
     #[test]
