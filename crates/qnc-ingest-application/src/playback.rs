@@ -81,18 +81,18 @@ impl IngestApplication {
     }
 
     pub(super) fn player_action(&mut self, intent: IngestIntent) -> IngestDispatchResult {
+        // The source timeline's keys are the piece every form takes (Play keeps the guard below).
+        if intent.action_id != action_ids::PLAY_PAUSE {
+            if let Some(changed) = self.source_timeline.route(&intent.action_id, self.preview.source_preview_mut(), &mut self.view.timeline) {
+                return IngestDispatchResult::accepted(None, changed);
+            }
+        }
         if !self.preview.has_player() {
             let message = "Broadcast Player nije povezan.";
             self.view.message = message.into();
             let mut result = IngestDispatchResult::rejected(message);
             result.request_repaint = true;
             return result;
-        }
-        // The source timeline's keys are the piece every form takes (Play keeps the guard below).
-        if intent.action_id != action_ids::PLAY_PAUSE {
-            if let Some(changed) = self.source_timeline.route(&intent.action_id, self.preview.source_preview_mut(), &mut self.view.timeline) {
-                return IngestDispatchResult::accepted(None, changed);
-            }
         }
         let command = match intent.action_id.as_str() {
             action_ids::PLAY_PAUSE => qnc_ingest_preview_source::PreviewCommand::TogglePlay,
@@ -102,7 +102,7 @@ impl IngestApplication {
                 }
                 _ => return IngestDispatchResult::rejected("Neispravan frame."),
             },
-            _ => return IngestDispatchResult::rejected("Nepoznata player akcija."),
+            _ => return IngestDispatchResult::accepted(None, false), // a source timeline key with nothing to do (Escape)
         };
         let outcome = match self.preview.send_command(command) {
             Ok(outcome) => outcome,

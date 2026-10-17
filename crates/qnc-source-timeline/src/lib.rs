@@ -26,6 +26,8 @@ pub use qnc_source_channels::ContentTarget;
 pub use qnc_source_timecode::SourceTimecode;
 
 pub const MODULE_ID: &str = "qnc.module.source-timeline";
+/// The catalog scope of the source timeline's keys, the same in every form.
+pub const KEY_SCOPE: &str = "source_timeline";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The catalog actions of a click on a channel in the A1 or A2 column.

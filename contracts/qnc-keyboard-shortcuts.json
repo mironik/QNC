@@ -478,6 +478,27 @@
         ],
         "step_forward_frame": [ { "code": "ArrowRight", "key": "ArrowRight" } ]
       },
+      "source_timeline": {
+        "play_pause": [{ "code": "Space" }, { "key": " " }],
+        "step_back_frame": [{ "code": "ArrowLeft", "key": "ArrowLeft" }],
+        "step_forward_frame": [{ "code": "ArrowRight", "key": "ArrowRight" }],
+        "mark_in": [{ "code": "KeyI", "shift": false }],
+        "mark_out": [{ "code": "KeyO", "shift": false }],
+        "select_mark_in": [{ "code": "KeyI", "ctrl": true, "shift": false }],
+        "select_mark_out": [{ "code": "KeyO", "ctrl": true, "shift": false }],
+        "navigate_prev_object": [{ "code": "ArrowLeft", "alt": true }],
+        "navigate_next_object": [{ "code": "ArrowRight", "alt": true }],
+        "playlist_input_start": [{ "key": "Home", "code": "Home" }],
+        "clear_focus": [{ "key": "Escape" }],
+        "close_player": [{ "key": "Escape" }],
+        "activate_focused_item": [{ "key": "Enter" }],
+        "step_prev_part": [{ "key": "ArrowUp" }],
+        "step_next_part": [{ "key": "ArrowDown" }],
+        "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
+        "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }]
+      },
       "storyboard": {
         "play_pause": [
           {
@@ -994,6 +1015,23 @@
     "edius": {
       "name": "Grass Valley EDIUS",
       "description": "EDIUS raspored: V marker, ] overwrite, Space play",
+      "source_timeline": {
+        "play_pause": [{ "code": "Space" }, { "key": " " }],
+        "step_back_frame": [{ "code": "ArrowLeft", "key": "ArrowLeft" }],
+        "step_forward_frame": [{ "code": "ArrowRight", "key": "ArrowRight" }],
+        "mark_in": [{ "code": "KeyI", "shift": false }],
+        "mark_out": [{ "code": "KeyO", "shift": false }],
+        "select_mark_in": [{ "code": "KeyI", "ctrl": true, "shift": false }],
+        "select_mark_out": [{ "code": "KeyO", "ctrl": true, "shift": false }],
+        "clear_focus": [{ "key": "Escape" }],
+        "close_player": [{ "key": "Escape" }],
+        "step_prev_part": [{ "key": "ArrowUp" }],
+        "step_next_part": [{ "key": "ArrowDown" }],
+        "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
+        "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }]
+      },
       "storyboard": {
         "play_pause": [
           {
@@ -1435,6 +1473,23 @@
     "resolve": {
       "name": "DaVinci Resolve",
       "description": "M marker, I/O in-out, F10 overwrite, Space play",
+      "source_timeline": {
+        "play_pause": [{ "code": "Space" }, { "key": " " }],
+        "step_back_frame": [{ "code": "ArrowLeft", "key": "ArrowLeft" }],
+        "step_forward_frame": [{ "code": "ArrowRight", "key": "ArrowRight" }],
+        "mark_in": [{ "code": "KeyI", "shift": false }],
+        "mark_out": [{ "code": "KeyO", "shift": false }],
+        "select_mark_in": [{ "code": "KeyI", "ctrl": true, "shift": false }],
+        "select_mark_out": [{ "code": "KeyO", "ctrl": true, "shift": false }],
+        "clear_focus": [{ "key": "Escape" }],
+        "close_player": [{ "key": "Escape" }],
+        "step_prev_part": [{ "key": "ArrowUp" }],
+        "step_next_part": [{ "key": "ArrowDown" }],
+        "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
+        "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }]
+      },
       "storyboard": {
         "play_pause": [
           {
@@ -1859,6 +1914,23 @@
     "premiere": {
       "name": "Adobe Premiere Pro",
       "description": "Premiere raspored: M marker, . overwrite, Space play",
+      "source_timeline": {
+        "play_pause": [{ "code": "Space" }, { "key": " " }],
+        "step_back_frame": [{ "code": "ArrowLeft", "key": "ArrowLeft" }],
+        "step_forward_frame": [{ "code": "ArrowRight", "key": "ArrowRight" }],
+        "mark_in": [{ "code": "KeyI", "shift": false }],
+        "mark_out": [{ "code": "KeyO", "shift": false }],
+        "select_mark_in": [{ "code": "KeyI", "ctrl": true, "shift": false }],
+        "select_mark_out": [{ "code": "KeyO", "ctrl": true, "shift": false }],
+        "clear_focus": [{ "key": "Escape" }],
+        "close_player": [{ "key": "Escape" }],
+        "step_prev_part": [{ "key": "ArrowUp" }],
+        "step_next_part": [{ "key": "ArrowDown" }],
+        "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
+        "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }]
+      },
       "storyboard": {
         "play_pause": [
           {
@@ -2283,6 +2355,23 @@
     "finalcut": {
       "name": "Final Cut Pro 11",
       "description": "Final Cut raspored: M marker, D overwrite, Space play",
+      "source_timeline": {
+        "play_pause": [{ "code": "Space" }, { "key": " " }],
+        "step_back_frame": [{ "code": "ArrowLeft", "key": "ArrowLeft" }],
+        "step_forward_frame": [{ "code": "ArrowRight", "key": "ArrowRight" }],
+        "mark_in": [{ "code": "KeyI", "shift": false }],
+        "mark_out": [{ "code": "KeyO", "shift": false }],
+        "select_mark_in": [{ "code": "KeyI", "ctrl": true, "shift": false }],
+        "select_mark_out": [{ "code": "KeyO", "ctrl": true, "shift": false }],
+        "clear_focus": [{ "key": "Escape" }],
+        "close_player": [{ "key": "Escape" }],
+        "step_prev_part": [{ "key": "ArrowUp" }],
+        "step_next_part": [{ "key": "ArrowDown" }],
+        "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
+        "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }]
+      },
       "storyboard": {
         "play_pause": [
           {
@@ -2724,6 +2813,23 @@
     "avid": {
       "name": "Avid Media Composer",
       "description": "Avid raspored: ' marker, B overwrite, Space play",
+      "source_timeline": {
+        "play_pause": [{ "code": "Space" }, { "key": " " }],
+        "step_back_frame": [{ "code": "ArrowLeft", "key": "ArrowLeft" }],
+        "step_forward_frame": [{ "code": "ArrowRight", "key": "ArrowRight" }],
+        "mark_in": [{ "code": "KeyI", "shift": false }],
+        "mark_out": [{ "code": "KeyO", "shift": false }],
+        "select_mark_in": [{ "code": "KeyI", "ctrl": true, "shift": false }],
+        "select_mark_out": [{ "code": "KeyO", "ctrl": true, "shift": false }],
+        "clear_focus": [{ "key": "Escape" }],
+        "close_player": [{ "key": "Escape" }],
+        "step_prev_part": [{ "key": "ArrowUp" }],
+        "step_next_part": [{ "key": "ArrowDown" }],
+        "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
+        "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
+        "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
+        "lane_level_up": [{ "code": "ArrowRight", "key": "ArrowRight", "ctrl": true, "shift": false }]
+      },
       "storyboard": {
         "play_pause": [
           {

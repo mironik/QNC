@@ -43,6 +43,20 @@ pub fn action_ids(
     scopes: &[&str],
     play_action: &str,
 ) -> Vec<String> {
+    action_ids_in(ctx, catalog, None, scopes, play_action)
+}
+
+/// Like [`action_ids`], with the scope of the panel that has the keyboard first: a key it
+/// knows is that panel's only (user 2026-10-17: the source timeline has its own keys, the
+/// same in every form; Escape there drops its taken lane or mark, not the form's browser).
+/// A key the panel's scope does not know goes to `scopes` as before.
+pub fn action_ids_in(
+    ctx: &egui::Context,
+    catalog: &ShortcutCatalog,
+    focused: Option<&str>,
+    scopes: &[&str],
+    play_action: &str,
+) -> Vec<String> {
     qnc_key_focus::keep_keys(ctx); // a focused button would take every key (Tab, Space, I/O)
     let preset = project_preset();
     let chosen = in_preset(ctx, catalog, preset.as_deref());
@@ -54,6 +68,8 @@ pub fn action_ids(
     }
     for event in qnc_keyboard_shortcut::egui_shortcut_events(ctx) {
         let mut this_key: Vec<String> = Vec::new();
+        let own = focused.map(|scope| catalog.action_ids_for_event(scope, &event)).unwrap_or_default();
+        let scopes: &[&str] = if own.is_empty() { scopes } else { focused.as_slice() };
         for scope in scopes {
             for action_id in catalog.action_ids_for_event(scope, &event) {
                 if !this_key.iter().any(|seen| seen == action_id) {

@@ -57,6 +57,12 @@ pub struct WalkView {
 }
 
 impl WalkView {
+    /// The catalog scope that reads the keys first: the source timeline's own while it (or
+    /// its buttons) has the keyboard (piece `qnc-source-timeline`).
+    pub fn key_scope(&self) -> Option<&'static str> {
+        matches!(self.panel.as_str(), SOURCE_TIMELINE | SOURCE_BUTTONS).then_some(qnc_source_timeline::KEY_SCOPE)
+    }
+
     pub fn is(&self, panel: &str) -> bool {
         self.panel == panel
     }
@@ -164,6 +170,7 @@ impl FocusWalk {
             (_, "activate_focused_item") => Walk::Done(self.step_panel(true)),
             // The arrows and I/O belong to the source timeline (and its buttons).
             (SOURCE_TIMELINE, _) => Walk::Pass,
+            (CARDS, "mark_in" | "mark_out") => Walk::Pass,
             (SOURCE_BUTTONS, "mark_in" | "mark_out" | "select_mark_in" | "select_mark_out" | "navigate_prev_object" | "navigate_next_object" | "playlist_input_start") => Walk::Pass,
             (_, "step_back_frame" | "step_forward_frame" | "step_prev_part" | "step_next_part" | "mark_in" | "mark_out" | "page_prev" | "page_next" | "toggle_focused_item"
                 | "select_mark_in" | "select_mark_out" | "navigate_prev_object" | "navigate_next_object" | "playlist_input_start") => Walk::Done(false),
@@ -331,7 +338,7 @@ mod tests {
         walk.route("focus_next");
         walk.route("focus_next");
         walk.route("focus_next");
-        assert_eq!(walk.route("mark_in"), Walk::Done(false), "I does not reach the player from the cards");
+        assert_eq!(walk.route("mark_in"), Walk::Pass, "I marks the chosen clip from the cards too, as in every form");
         walk.route("toggle_focused_item");
         assert_eq!(walk.view().step.map(|(step, _)| step), Some(GridStep::Toggle), "the tick key ticks the card");
         walk.route("activate_focused_item");

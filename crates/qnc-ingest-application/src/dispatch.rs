@@ -34,8 +34,6 @@ impl IngestApplication {
             action_ids::INGEST_DIR_UP => self.on_dir_up(),
             action_ids::INGEST_DIR_OPEN => self.on_dir_open(intent.payload),
             action_ids::INGEST_DIR_CONFIRM => self.on_dir_confirm(intent.payload),
-            // Escape with IN or OUT taken lets it go (the source timeline's own Escape).
-            action_ids::INGEST_DIR_CANCEL if self.source_timeline.mark_taken(&self.view.timeline) => self.player_action(IngestIntent::empty("clear_focus")),
             action_ids::INGEST_DIR_CANCEL => self.on_dir_cancel(),
             action_ids::INGEST_SELECT_ALL => self.on_select_all(),
             action_ids::INGEST_CLEAR_SELECTION => self.on_clear_selection(),

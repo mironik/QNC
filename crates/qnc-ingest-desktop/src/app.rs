@@ -65,7 +65,7 @@ impl IngestApp {
 
     fn dispatch_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
         let catalog = &self.contracts.shortcuts;
-        for action_id in qnc_key_intents::action_ids(ctx, catalog, &["ingest"], action_ids::PLAY_PAUSE) {
+        for action_id in qnc_key_intents::action_ids_in(ctx, catalog, self.application.view().focus.key_scope(), &["ingest"], action_ids::PLAY_PAUSE) {
             self.dispatch(ctx, IngestIntent::empty(action_id));
         }
     }

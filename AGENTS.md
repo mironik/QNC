@@ -4328,3 +4328,14 @@ Stanje traka drzi vlasnik (`qnc-lane-choice`), on kaze cemu traka pripada i zapi
 idu kroz `LaneKey`), `qnc-part-sound` (`lanes_mut`), `qnc-program-segments` (bez vlastitih koraka kanala/off/razine,
 `part_sound_lanes`), `qnc-panel-focus` (Wrap redak: jedna grana za tipke traka kroz `qnc_timeline::lane_key`),
 `qnc-segment-panel` (`drafted_choice`). Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-17 (korisnik: "i dalje nije zajednicka univerzalna... u Storyju ESC zatvara otvoreni audio zoom, u
+Ingestu ne... napravi audit source timeline i koristi jedan kod"): audit je nasao da su tipke source timelinea dolazile
+iz kataloga po formi: u Ingestu je Esc bio `ingest_dir_cancel` (Odustani preglednika), u Storyju `clear_focus`; I/O iz
+poola radio je u Storyju, u Ingestu ne. Sada katalog ima opseg `source_timeline` (svih sest preseta, kljucevi preuzeti
+iz istog preseta), `qnc-key-intents::action_ids_in` cita tipku najprije u opsegu panela u fokusu (tipka koju taj opseg
+zna samo je njegova), `qnc-focus-walk` / `qnc-panel-focus` `key_scope()` kazu kad source timeline ima tipkovnicu
+(`qnc_source_timeline::KEY_SCOPE`). Ingest: Esc na source timelineu je `clear_focus` (odbacuje uzetu traku ili
+oznaku), I/O iz kartica oznacava izabrani klip kao u Storyju; uklonjen Ingest prijevod Esc -> `clear_focus`.
+Ostalo iz audita (nije izvedeno): Ingest sam cita filmstrip/wave source timelinea (`timeline_artifacts.rs`), Story
+kroz `qnc-source-preview`; obje aplikacije same cuvaju IN/OUT pri osvjezavanju prikaza; cue s timelinea ide u Ingestu
+kroz `ingest_cue_frame` s cuvarom playera, u Storyju izravno. C10 Ingest application 1584 -> 1583.

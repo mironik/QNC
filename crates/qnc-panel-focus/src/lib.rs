@@ -84,6 +84,14 @@ pub struct FocusView {
     pub pool_step: Option<(PoolStep, u64)>,
 }
 
+impl FocusView {
+    /// The catalog scope that reads the keys first: the source timeline's own while it (or
+    /// its buttons) has the keyboard (piece `qnc-source-timeline`).
+    pub fn key_scope(&self) -> Option<&'static str> {
+        matches!(self.panel, Panel::SourceTimeline | Panel::SourceButtons).then_some(qnc_source_timeline::KEY_SCOPE)
+    }
+}
+
 /// Actions of the segment panel that also run from the other panels: they use
 /// the source the user marked (v5 dispatches them whatever the focus).
 const SOURCE_TO_PROGRAM: [&str; 6] = [

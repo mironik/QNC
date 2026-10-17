@@ -53,7 +53,7 @@ impl EditorialApp {
     }
 
     fn dispatch_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
-        let ids = qnc_key_intents::action_ids(ctx, self.form.shortcuts(), &EDITORIAL_SHORTCUT_SCOPES, action_ids::PLAY_PAUSE);
+        let ids = qnc_key_intents::action_ids_in(ctx, self.form.shortcuts(), self.application.view().focus.key_scope(), &EDITORIAL_SHORTCUT_SCOPES, action_ids::PLAY_PAUSE);
         for action_id in ids {
             self.dispatch(ctx, EditorialIntent::action(action_id));
         }
