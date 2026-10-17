@@ -697,6 +697,9 @@ pub enum TimelineIntent {
     /// A right click is Ctrl+ (user 2026-10-17: the right mouse button takes what it points
     /// at): IN (`true`) or OUT, whichever is nearer.
     TakeMark(bool),
+    /// IN (`in_mark`) or OUT dragged with the left button to `frame` of the clip (user
+    /// 2026-10-17: as in editing programs); letting the button go keeps it (`KeepMark`).
+    DragMark { in_mark: bool, frame: u64 },
     /// A right click on an M marker of a row (as Ctrl+M).
     TakeMarker { id: String, frame: u64 },
     /// A right click in a slot of a row (as Ctrl+S).
@@ -1150,6 +1153,9 @@ fn paint_audio_row(
     if let Some(take) = take_lane_intent(&[&label_response, &response], track_rect, lane, input) {
         return take;
     }
+    if let Some(drag) = mark_drag_intent(&response, track_rect, input) {
+        return drag;
+    }
     ui.painter().rect_filled(track_rect, 0.0, fill); // no frame: the lane meets the filmstrip
     let gain = lane_gain(input, lane);
     qnc_wave_view::paint_wave_peaks_gain(ui.painter(), track_rect, peaks, gain, wave);
@@ -1259,6 +1265,35 @@ fn take_lane_intent(responses: &[&egui::Response], track: Rect, lane: AudioLane,
         return Some(TimelineIntent::TakeSound { lane, frame });
     }
     Some(TimelineIntent::TakeAudioLane(lane))
+}
+
+/// A left press on IN or OUT of a source timeline (within a few pixels; the clip's start
+/// and end when the user set none) drags that mark: the timeline reports where the pointer
+/// is (`DragMark`) and, when the button is let go, keeps it (`KeepMark`). It moves nothing
+/// itself. `None`: no mark drag.
+fn mark_drag_intent(response: &egui::Response, track: Rect, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
+    if input.layers.markers || !(input.draft_in_active || input.draft_out_active) {
+        return None;
+    }
+    let key = response.id.with("qnc_timeline_mark_drag");
+    let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
+    if response.drag_started_by(egui::PointerButton::Primary) {
+        let at = response.ctx.input(|i| i.pointer.press_origin()).or(response.interact_pointer_pos())?;
+        let x = |frame: u64| x_for_frame(track, range_start, duration, range_start + frame);
+        let (to_in, to_out) = ((at.x - x(input.draft_in_frame)).abs(), (at.x - x(input.draft_out_frame)).abs());
+        const GRAB: f32 = 6.0;
+        if to_in.min(to_out) <= GRAB {
+            response.ctx.data_mut(|data| data.insert_temp(key, to_in <= to_out));
+        }
+    }
+    let in_mark = response.ctx.data(|data| data.get_temp::<bool>(key))?;
+    if response.dragged() || response.is_pointer_button_down_on() {
+        let x = response.interact_pointer_pos()?.x;
+        let frame = frame_for_x(track, range_start, duration, x).saturating_sub(range_start);
+        return Some(TimelineIntent::DragMark { in_mark, frame });
+    }
+    response.ctx.data_mut(|data| data.remove::<bool>(key));
+    Some(TimelineIntent::KeepMark)
 }
 
 /// A right click (Ctrl+), unless the right button was held for the wheel (then it was Ctrl
@@ -2008,6 +2043,9 @@ fn video_intent_from_response(
 ) -> TimelineIntent {
     if track_marker_drag(response, track, input) {
         return TimelineIntent::None;
+    }
+    if let Some(drag) = mark_drag_intent(response, track, input) {
+        return drag;
     }
     if let Some(take) = take_or_keep_intent(response, track, input) {
         return take;

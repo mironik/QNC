@@ -36,6 +36,9 @@ pub const CHOOSE_A1_CHANNEL: &str = "source_choose_a1_channel";
 /// and is let go (its own action, never Enter: audit 2026-10-17, the click as Enter walked
 /// the panels and the next click pressed Add SubClip).
 pub const KEEP_MARK: &str = "source_keep_mark";
+/// IN or OUT dragged with the mouse (user 2026-10-17); its value is the frame of the clip.
+pub const DRAG_IN: &str = "source_drag_in";
+pub const DRAG_OUT: &str = "source_drag_out";
 pub const CHOOSE_A2_CHANNEL: &str = "source_choose_a2_channel";
 
 /// One Enter does one thing: the other catalog actions of the Enter that kept a lane
@@ -123,7 +126,7 @@ impl SourceTimeline {
     /// The catalog action a timeline intent stands for, when it is one: a click on A1/A2
     /// is Ctrl+1/Ctrl+2, the wheel is the arrows (Ctrl+wheel the level), a click on a
     /// channel of the column is [`CHOOSE_A1_CHANNEL`]/[`CHOOSE_A2_CHANNEL`] with the channel.
-    pub fn action_of(intent: &TimelineIntent) -> Option<(&'static str, Option<u16>)> {
+    pub fn action_of(intent: &TimelineIntent) -> Option<(&'static str, Option<i64>)> {
         match intent {
             TimelineIntent::TakeAudioLane(AudioLane::A2) => Some(("select_audio_a2", None)),
             TimelineIntent::TakeAudioLane(_) => Some(("select_audio_a1", None)),
@@ -131,8 +134,9 @@ impl SourceTimeline {
             // A left click keeps a taken IN/OUT (Enter); a right click takes the nearer (Ctrl+I/O).
             TimelineIntent::KeepMark => Some((KEEP_MARK, None)),
             TimelineIntent::TakeMark(in_mark) => Some((if *in_mark { "select_mark_in" } else { "select_mark_out" }, None)),
-            TimelineIntent::ChooseA1Channel(channel) => Some((CHOOSE_A1_CHANNEL, Some(*channel))),
-            TimelineIntent::ChooseA2Channel(channel) => Some((CHOOSE_A2_CHANNEL, Some(*channel))),
+            TimelineIntent::ChooseA1Channel(channel) => Some((CHOOSE_A1_CHANNEL, Some(i64::from(*channel)))),
+            TimelineIntent::ChooseA2Channel(channel) => Some((CHOOSE_A2_CHANNEL, Some(i64::from(*channel)))),
+            TimelineIntent::DragMark { in_mark, frame } => Some((if *in_mark { DRAG_IN } else { DRAG_OUT }, i64::try_from(*frame).ok())),
             _ => None,
         }
     }
@@ -140,7 +144,11 @@ impl SourceTimeline {
     /// A click on a channel of the column (`action_id` from [`Self::action_of`]), else the
     /// keys of a lane (Ctrl+1/Ctrl+2, and those of a taken lane); `None` for any other.
     /// Enter (or a left click) while IN or OUT is taken keeps the edit and lets the mark go.
-    pub fn route_input(&mut self, action_id: &str, channel: Option<u16>, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
+    pub fn route_input(&mut self, action_id: &str, value: Option<i64>, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
+        if let (DRAG_IN | DRAG_OUT, Some(frame)) = (action_id, value.and_then(|frame| u64::try_from(frame).ok())) {
+            return Some(self.drag(action_id == DRAG_IN, frame, preview, timeline));
+        }
+        let channel = value.and_then(|channel| u16::try_from(channel).ok());
         if action_id == "activate_focused_item" && !self.lane_taken() && self.keys.mark_taken(timeline) {
             return self.keys.route("clear_focus", preview, timeline);
         }
@@ -173,6 +181,25 @@ impl SourceTimeline {
     /// in every form the same; while the player plays a story program, the clip comes back.
     pub fn cue(&mut self, intent: &TimelineIntent, preview: &mut SourcePreview) -> bool {
         preview.timeline_intent(intent)
+    }
+
+    /// An intent of the timeline that is the source timeline's own and carries a value: a
+    /// channel clicked in the column of A1/A2, IN or OUT dragged. False for any other.
+    pub fn timeline_input(&mut self, intent: &TimelineIntent, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> bool {
+        match intent {
+            TimelineIntent::ChooseA1Channel(channel) => self.choose(0, *channel, preview),
+            TimelineIntent::ChooseA2Channel(channel) => self.choose(1, *channel, preview),
+            TimelineIntent::DragMark { in_mark, frame } => self.drag(*in_mark, *frame, preview, timeline),
+            _ => false,
+        }
+    }
+
+    /// IN or OUT dragged to `frame` of the clip: taken while it is dragged, the playhead
+    /// on the cut; letting the button go keeps it (`KEEP_MARK`).
+    pub fn drag(&mut self, in_mark: bool, frame: u64, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> bool {
+        let key = qnc_source_mark_focus::drag(timeline, in_mark, frame);
+        self.keys.set_mark_taken(key != qnc_source_mark_focus::MarkKey::Refused);
+        qnc_source_panel::mark_cue(preview, key)
     }
 
     /// A click on a channel in the column of A1 (lane 0) or A2: on the taken lane it only

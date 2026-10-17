@@ -4539,3 +4539,11 @@ cisti klik; pritisak drzan trenutak ili s pomakom od piksel-dva egui racuna kao 
 a IN je ostajao uzet. Sada dok je IN/OUT ili A1/A2 uzet svaki pritisak lijeve tipke (brz ili spor) sprema i pusta oznaku
 (`KeepMark`), a do pustanja tipke ne pomice nista (`qnc_timeline_kept_press`); desna tipka to ne radi. Vrijedi za sve
 forme.
+Dopuna 2026-10-17 (korisnik: "programi za montazu imaju i povlacenje IN/OUT oznake misem; mi imamo skrolom kotaca; mozemo
+li dodati i povlacenje"): na source timelineu (sve forme) pritisak lijeve tipke do 6 piksela od IN ili OUT oznake (bez
+korisnikove oznake: pocetak ili kraj klipa) i povlacenje vuce tu oznaku; nikad preko druge ni izvan klipa, playhead
+pokazuje sliku na rezu, pustanje tipke je sprema. `qnc-timeline` (`DragMark`, `mark_drag_intent`; sam nista ne mice),
+`qnc-source-mark-focus` (`drag`), `qnc-source-timeline` (`drag`, `timeline_input`, akcije kataloga bez tipke
+`source_drag_in` / `source_drag_out`; `action_of` i `route_input` nose vrijednost i64 za kanal ili sliku). Story i
+Ingest samo predaju namjeru kocki (C10 Story aplikacija 689 -> 687). Test
+`a_dragged_mark_follows_the_mouse_but_never_crosses_the_other_or_leaves_the_clip`, conformance.

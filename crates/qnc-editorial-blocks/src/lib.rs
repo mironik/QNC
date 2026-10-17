@@ -201,7 +201,7 @@ fn render_source_dock(
     match (intent, header_intent) {
         (TimelineIntent::None, header) => header,
         (choose @ (TimelineIntent::ChooseA1Channel(_) | TimelineIntent::ChooseA2Channel(_)), _) => Some(EditorialIntent::Timeline(choose)),
-        (intent, _) => Some(qnc_source_timeline::SourceTimeline::action_of(&intent).map_or(EditorialIntent::Timeline(intent), |(action, _)| EditorialIntent::action(action))),
+        (intent, _) => Some(match qnc_source_timeline::SourceTimeline::action_of(&intent) { Some((action, None)) => EditorialIntent::action(action), _ => EditorialIntent::Timeline(intent) }), // with a value: the intent
     }
 }
 

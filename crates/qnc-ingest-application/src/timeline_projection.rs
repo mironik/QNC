@@ -8,6 +8,6 @@ pub fn timeline_intent_to_ingest_intent(intent: TimelineIntent) -> Option<Ingest
         )),
         // The wheel and a click on A1/A2 or a channel are the source timeline's own actions.
         other => qnc_source_timeline::SourceTimeline::action_of(&other)
-            .map(|(action, channel)| IngestIntent::new(action, channel.map_or(IngestPayload::None, |channel| IngestPayload::Frame(i64::from(channel))))),
+            .map(|(action, value)| IngestIntent::new(action, value.map_or(IngestPayload::None, IngestPayload::Frame))),
     }
 }

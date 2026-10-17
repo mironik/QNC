@@ -37,6 +37,26 @@ pub fn take(timeline: &mut TimelineProjection, in_mark: bool) -> MarkKey {
     MarkKey::Cue(cue_frame(timeline, frame, !in_mark))
 }
 
+/// IN or OUT dragged with the mouse to `frame` of the clip (user 2026-10-17): the mark goes
+/// there, never across the other one or out of the clip, it is taken while it is dragged
+/// and the playhead shows the picture at the cut.
+pub fn drag(timeline: &mut TimelineProjection, in_mark: bool, frame: u64) -> MarkKey {
+    let Some((in_frame, out_frame)) = timeline.visible_source_marks() else {
+        return MarkKey::Refused;
+    };
+    if in_mark {
+        let frame = frame.min(out_frame.saturating_sub(1));
+        timeline.source_in_frame = Some(frame);
+        timeline.source_mark_focus = TimelineSourceMarkFocus::In;
+        MarkKey::Cue(cue_frame(timeline, frame, false))
+    } else {
+        let frame = frame.clamp(in_frame + 1, timeline.duration_frames.max(in_frame + 1));
+        timeline.source_out_frame = Some(frame);
+        timeline.source_mark_focus = TimelineSourceMarkFocus::Out;
+        MarkKey::Cue(cue_frame(timeline, frame, true))
+    }
+}
+
 /// An arrow while a mark is taken: the mark moves by `frames`, never across the
 /// other one or out of the clip, and the playhead follows it.
 pub fn nudge(timeline: &mut TimelineProjection, frames: i64) -> MarkKey {
@@ -190,6 +210,17 @@ mod tests {
 #[cfg(test)]
 mod default_marks {
     use super::*;
+
+    #[test]
+    fn a_dragged_mark_follows_the_mouse_but_never_crosses_the_other_or_leaves_the_clip() {
+        let mut timeline = TimelineProjection::new(0, 100).with_playhead(40);
+        assert_eq!(drag(&mut timeline, true, 30), MarkKey::Cue(30), "IN from the clip's start to 30");
+        assert_eq!(drag(&mut timeline, false, 60), MarkKey::Cue(59), "OUT from the clip's end to 60");
+        assert_eq!(drag(&mut timeline, true, 80), MarkKey::Cue(59), "IN stops a picture before OUT");
+        assert_eq!(drag(&mut timeline, false, 500), MarkKey::Cue(99), "OUT stops at the clip's end");
+        assert_eq!((timeline.source_in_frame, timeline.source_out_frame), (Some(59), Some(100)));
+        assert!(is_taken(&timeline), "taken while it is dragged");
+    }
 
     #[test]
     fn without_marks_ctrl_i_and_ctrl_o_take_the_clips_start_and_end_and_moving_one_sets_it() {

@@ -329,6 +329,12 @@
     "ingest_set_ai_mining": {
       "label": "Postavi Ingest AI mining"
     },
+    "source_drag_in": {
+      "label": "Povlacenje IN oznake misem na source timelineu"
+    },
+    "source_drag_out": {
+      "label": "Povlacenje OUT oznake misem na source timelineu"
+    },
     "source_keep_mark": {
       "label": "Lijevi klik na source timeline: uzeti IN/OUT ostaje gdje je i pusta se"
     },
