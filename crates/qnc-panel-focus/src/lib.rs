@@ -526,8 +526,11 @@ impl PanelFocus {
                 segments.apply_action(action_id);
                 self.back_to_wrap(segments, wrap, timeline)
             }
-            "select_mark_in" | "select_mark_out" if on_source => {
-                self.panel = Panel::SourceTimeline; // the arrows go to the taken mark, not the buttons
+            // Ctrl+I/O take IN/OUT of the chosen clip from the pool too (as I/O mark it there,
+            // user 2026-10-17); the keyboard goes to the source timeline, where the arrows and
+            // the wheel move the taken mark.
+            "select_mark_in" | "select_mark_out" => {
+                self.panel = Panel::SourceTimeline;
                 return self.source.route(action_id, preview, timeline);
             }
             "step_back_frame" | "step_forward_frame" if segments.trimming_edge() && qnc_source_mark_focus::is_taken(timeline) => {

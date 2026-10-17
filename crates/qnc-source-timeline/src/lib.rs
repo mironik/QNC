@@ -149,6 +149,12 @@ impl SourceTimeline {
         Some(self.choose(lane, channel, preview))
     }
 
+    /// A click on the source timeline (a frame, or V: its start): the playhead goes there,
+    /// in every form the same; while the player plays a story program, the clip comes back.
+    pub fn cue(&mut self, intent: &TimelineIntent, preview: &mut SourcePreview) -> bool {
+        preview.timeline_intent(intent)
+    }
+
     /// A click on a channel in the column of A1 (lane 0) or A2: on the taken lane it only
     /// drafts (Enter keeps it), otherwise it is kept at once. Heard at once.
     pub fn choose(&mut self, lane: u8, channel: u16, preview: &mut SourcePreview) -> bool {
@@ -163,6 +169,21 @@ impl SourceTimeline {
     /// One catalog action of the source timeline. `None`: not one of its actions, the
     /// form handles it; `Some(changed)`: taken here.
     pub fn route(&mut self, action_id: &str, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
+        let routed = self.route_keys(action_id, preview, timeline);
+        // Every key of the source timeline in the player log, the same for every form.
+        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!(
+                    "source-key action={action_id} routed={routed:?} in={:?} out={:?} playhead={:?} mark_taken={} lane={:?}",
+                    timeline.source_in_frame, timeline.source_out_frame, timeline.playhead_frame, self.keys.mark_taken(timeline), self.lanes.taken(),
+                ),
+            );
+        }
+        routed
+    }
+
+    fn route_keys(&mut self, action_id: &str, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
         if let Some(changed) = self.route_lane(action_id, preview) {
             return Some(changed);
         }

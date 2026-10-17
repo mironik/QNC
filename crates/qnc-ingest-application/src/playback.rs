@@ -16,6 +16,11 @@ impl IngestApplication {
         let preview = self.preview.view();
         self.view.playback = preview.playback;
         self.view.timeline = preview.timeline.preserving_source_marks_from(&self.view.timeline);
+        // Filmstrip and wave come from the universal preview, read again while the worker makes them.
+        let clip = self.view.preview_clip_id.clone().unwrap_or_default();
+        let assets = if preview.assets.clip_id == clip { preview.assets } else { SourceTimelineAssets::empty_for(&clip) };
+        let posters = self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.thumb_image.as_deref()));
+        self.view.timeline_assets = qnc_timeline_assets::with_clip_poster(assets, self.work_plan().map(|plan| &plan.settings), posters);
         self.view.source_timeline = self.source_timeline.sync(self.view.preview_clip_id.as_deref(), self.catalog_target.as_ref()).clone();
     }
 
@@ -26,7 +31,8 @@ impl IngestApplication {
         {
             // The player session is already right, but the artifacts of the clip may
             // have changed (filmstrip or wave finished): never keep a stale timeline.
-            self.focus_timeline_assets(&clip_id);
+            self.preview.refresh_assets();
+            self.sync_playback_view();
             return IngestDispatchResult::accepted(None, true);
         }
         let Some(save_state) = self
@@ -42,7 +48,7 @@ impl IngestApplication {
         self.stop_player();
         self.set_timeline_artifact_playback_priority(true);
         self.view.preview_clip_id = Some(clip_id.clone());
-        self.focus_timeline_assets(&clip_id);
+        self.view.timeline_assets = SourceTimelineAssets::empty_for(&clip_id); // the preview reads them
         if save_state != SaveState::Saved {
             self.set_timeline_artifact_playback_priority(false);
             self.view.message = "Klip jos nije spremljen u bazu.".into();
@@ -81,24 +87,27 @@ impl IngestApplication {
     }
 
     pub(super) fn player_action(&mut self, intent: IngestIntent) -> IngestDispatchResult {
-        // The source timeline's keys are the piece every form takes (Play keeps the guard below).
-        if intent.action_id != action_ids::PLAY_PAUSE {
-            if let Some(changed) = self.source_timeline.route(&intent.action_id, self.preview.source_preview_mut(), &mut self.view.timeline) {
-                return IngestDispatchResult::accepted(None, changed);
-            }
-        }
-        if !self.preview.has_player() {
+        // Without a player only Escape still lets go of what the source timeline took.
+        let escape = matches!(intent.action_id.as_str(), "clear_focus" | "close_player");
+        if !self.preview.has_player() && !escape {
             let message = "Broadcast Player nije povezan.";
             self.view.message = message.into();
             let mut result = IngestDispatchResult::rejected(message);
             result.request_repaint = true;
             return result;
         }
+        // The source timeline's keys are the piece every form takes (Play keeps the guard below).
+        if intent.action_id != action_ids::PLAY_PAUSE {
+            if let Some(changed) = self.source_timeline.route(&intent.action_id, self.preview.source_preview_mut(), &mut self.view.timeline) {
+                return IngestDispatchResult::accepted(None, changed);
+            }
+        }
         let command = match intent.action_id.as_str() {
             action_ids::PLAY_PAUSE => qnc_ingest_preview_source::PreviewCommand::TogglePlay,
             action_ids::INGEST_CUE_FRAME => match intent.payload {
                 IngestPayload::Frame(frame) if frame >= 0 => {
-                    qnc_ingest_preview_source::PreviewCommand::Cue(frame as u64)
+                    let cue = TimelineIntent::CueFrame(frame as u64); // the same in every form
+                    return IngestDispatchResult::accepted(None, self.source_timeline.cue(&cue, self.preview.source_preview_mut()));
                 }
                 _ => return IngestDispatchResult::rejected("Neispravan frame."),
             },

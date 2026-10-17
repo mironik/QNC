@@ -171,9 +171,15 @@ impl FocusWalk {
             // The arrows and I/O belong to the source timeline (and its buttons).
             (SOURCE_TIMELINE, _) => Walk::Pass,
             (CARDS, "mark_in" | "mark_out") => Walk::Pass,
-            (SOURCE_BUTTONS, "mark_in" | "mark_out" | "select_mark_in" | "select_mark_out" | "navigate_prev_object" | "navigate_next_object" | "playlist_input_start") => Walk::Pass,
+            // Ctrl+I/O take IN/OUT of the chosen clip from any panel; the keyboard goes to the
+            // source timeline, where the arrows and the wheel move the taken mark.
+            (_, "select_mark_in" | "select_mark_out") => {
+                self.go(SOURCE_TIMELINE);
+                Walk::Pass
+            }
+            (SOURCE_BUTTONS, "mark_in" | "mark_out" | "navigate_prev_object" | "navigate_next_object" | "playlist_input_start") => Walk::Pass,
             (_, "step_back_frame" | "step_forward_frame" | "step_prev_part" | "step_next_part" | "mark_in" | "mark_out" | "page_prev" | "page_next" | "toggle_focused_item"
-                | "select_mark_in" | "select_mark_out" | "navigate_prev_object" | "navigate_next_object" | "playlist_input_start") => Walk::Done(false),
+                | "navigate_prev_object" | "navigate_next_object" | "playlist_input_start") => Walk::Done(false),
             _ => Walk::Pass,
         }
     }

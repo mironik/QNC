@@ -4339,3 +4339,13 @@ oznaku), I/O iz kartica oznacava izabrani klip kao u Storyju; uklonjen Ingest pr
 Ostalo iz audita (nije izvedeno): Ingest sam cita filmstrip/wave source timelinea (`timeline_artifacts.rs`), Story
 kroz `qnc-source-preview`; obje aplikacije same cuvaju IN/OUT pri osvjezavanju prikaza; cue s timelinea ide u Ingestu
 kroz `ingest_cue_frame` s cuvarom playera, u Storyju izravno. C10 Ingest application 1584 -> 1583.
+Nastavak 2026-10-17 (korisnik: "ocisti i premjesti ostatak u kocku.. nedostaje opcija Ctrl+I/O za kontrolu IN i OUT
+strelicama ili tockom"): log je pokazao da je Ctrl+I iz poola bio odbijen u Storyju (kotacic je pomicao playhead) i
+Ingestu. Sada Ctrl+I/O iz svakog panela (osim panela Segmenti, gdje su rubovi slota) uzima IN/OUT izabranog klipa i
+prebacuje tipkovnicu na source timeline, gdje ga strelice i kotacic pomicu (`qnc-panel-focus`, `qnc-focus-walk`).
+Ostatak iz audita premjesten: filmstrip i val source timelinea cita samo zajednicki preview (`qnc-source-preview`
+`read_missing_assets`: ponovno citanje jednom u sekundi dok ih radnik radi, za sve forme; `forget_assets`), Ingest
+vise ne cita artefakte sam (`timeline_artifacts.rs` samo budi radnika); klik na source timeline ide kroz kocku
+(`qnc-source-timeline` `cue`) u obje forme; kocka zapisuje svaku tipku source timelinea u log (`source-key`), isto
+za sve forme. Ocisceno: `cargo clean --profile dev` (disk 3 GB -> 46 GB). C10 Ingest application 1583 -> 1567.
+Ostaje u aplikacijama: cuvanje IN/OUT pri osvjezavanju prikaza (jedan redak, Story uz to otvara kadar s IN/OUT).

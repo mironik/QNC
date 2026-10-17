@@ -411,7 +411,7 @@ impl EditorialApplication {
             }
             EditorialIntent::Timeline(intent @ (TimelineIntent::CueFrame(_) | TimelineIntent::GoHome)) => {
                 self.focus.to_source(&mut self.wrap); // the Source view
-                self.preview.timeline_intent(&intent)
+                self.focus.source_timeline_mut().cue(&intent, &mut self.preview)
             }
             EditorialIntent::Timeline(TimelineIntent::ChooseA1Channel(channel)) => self.focus.source_timeline_mut().choose(0, channel, &mut self.preview),
             EditorialIntent::Timeline(TimelineIntent::ChooseA2Channel(channel)) => self.focus.source_timeline_mut().choose(1, channel, &mut self.preview),

@@ -15,7 +15,6 @@ impl IngestApplication {
         if !self.playback_guard_active() {
             changed |= self.poll_thumbnails();
         }
-        changed |= self.poll_timeline_artifacts();
         if let Some(result) = self.selection_writer.poll() {
             match result {
                 Ok(_) => match self.begin_import() {

@@ -11,7 +11,7 @@ mod content;
 mod still_media;
 pub use still_media::{LocatedPicture, StillLocator};
 
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, time::{Duration, Instant}};
 
 use qnc_content_read::ContentReader;
 use qnc_player_client::{Action, Player, View as PlayerView};
@@ -183,6 +183,9 @@ pub struct SourcePreview {
     player: Option<Player>,
     player_view: PlayerView,
     timeline_assets: TimelineAssetReader,
+    /// When the artifacts of the shown clip are read again while the background worker
+    /// still makes them (one read a second; every form the same, user 2026-10-17).
+    assets_again_at: Option<Instant>,
     play_when_ready: bool,
     /// The last frame step, cue or Play of the user: the machine is theirs a while after.
     touched: Option<std::time::Instant>,
@@ -227,6 +230,7 @@ impl Default for SourcePreview {
             player: None,
             player_view: PlayerView::default(),
             timeline_assets: TimelineAssetReader::default(),
+            assets_again_at: None,
             play_when_ready: false,
             touched: None,
             record_wait: None,
@@ -364,6 +368,27 @@ impl SourcePreview {
             self.timeline_assets.request(&clip_id, true);
         }
         false
+    }
+
+    /// The filmstrip or wave of the shown clip is still missing (the background worker
+    /// makes it): it is read again, once a second, on a thread of its own.
+    fn read_missing_assets(&mut self) {
+        let Some(clip_id) = self.view.clip_id.clone() else {
+            return;
+        };
+        let assets = &self.view.assets;
+        let complete = assets.clip_id == clip_id && assets.filmstrip_background.is_some() && assets.wave.is_some();
+        let now = Instant::now();
+        if complete || self.timeline_assets.loading() || self.assets_again_at.is_some_and(|at| now < at) {
+            return;
+        }
+        self.assets_again_at = Some(now + Duration::from_secs(1));
+        self.timeline_assets.request(&clip_id, true);
+    }
+
+    /// Clips gone from the project: their artifacts are not shown again.
+    pub fn forget_assets(&mut self, clip_ids: &[String]) {
+        self.timeline_assets.remove_clips(clip_ids);
     }
 
     /// Shows the artifacts read for the clip on screen.
@@ -828,6 +853,7 @@ impl SourcePreview {
     pub fn poll(&mut self) -> bool {
         let mut changed = self.retry_incomplete_record();
         changed |= self.take_assets();
+        self.read_missing_assets();
         if let Some(player) = &self.player {
             let playback = player.view();
             if playback != self.player_view {
