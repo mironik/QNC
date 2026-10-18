@@ -86,6 +86,9 @@ pub struct WaveformPeaks {
     pub a2_peaks: Vec<f32>,
     pub a3_peaks: Vec<f32>,
     pub a4_peaks: Vec<f32>,
+    /// The coarse wave of the intra frames: shown until the wave of every frame comes.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub coarse: bool,
 }
 
 impl WaveformPeaks {
@@ -115,6 +118,10 @@ pub struct WaveArtifactRecord {
     pub a4_peaks: Vec<f32>,
     pub warning: Option<String>,
     pub render_version: i64,
+    /// A first, coarse wave from the sound of the intra frames only (user 2026-10-18); the
+    /// wave of every frame replaces it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub coarse: bool,
 }
 
 impl WaveArtifactRecord {
@@ -125,6 +132,7 @@ impl WaveArtifactRecord {
             a2_peaks: self.a2_peaks.clone(),
             a3_peaks: self.a3_peaks.clone(),
             a4_peaks: self.a4_peaks.clone(),
+            coarse: self.coarse,
         })
     }
 }
@@ -277,6 +285,7 @@ pub fn artifact_record_from_peaks4(
         a4_peaks,
         warning,
         render_version: WAVE_RENDER_VERSION,
+        coarse: false,
     };
     validate_artifact(&record)?;
     Ok(record)

@@ -166,9 +166,13 @@ pub struct ProgramWaves {
     waves: HashMap<String, ClipWave>,
     retry_after: HashMap<String, Instant>,
     /// Waves read on the reading thread, by clip (None: not there yet), until taken.
-    read: Arc<std::sync::Mutex<Vec<(String, Option<Vec<Vec<f32>>>)>>>,
+    read: Arc<std::sync::Mutex<Vec<(String, Option<(Vec<Vec<f32>>, bool)>)>>>,
+    /// Clips whose wave is still the coarse one: read again until every frame's comes.
+    coarse: std::collections::HashSet<String>,
+    /// Grows with every wave taken in: the composed program is made again.
+    revision: u64,
     asked: std::collections::HashSet<String>,
-    composed: Option<(u64, Vec<Placement>, Vec<Placement>, usize, ProgramPeaks)>,
+    composed: Option<(u64, Vec<Placement>, Vec<Placement>, u64, ProgramPeaks)>,
 }
 
 impl ProgramWaves {
@@ -195,7 +199,16 @@ impl ProgramWaves {
         for (clip_id, lanes) in read {
             self.asked.remove(&clip_id);
             match (lanes, duration_frames(&clip_id)) {
-                (Some(lanes), Some(duration_frames)) if duration_frames > 0 => {
+                (Some((lanes, coarse)), Some(duration_frames)) if duration_frames > 0 => {
+                    if coarse {
+                        self.coarse.insert(clip_id.clone());
+                        self.retry_after.insert(clip_id.clone(), now + WAVE_RETRY_DELAY);
+                    } else {
+                        self.coarse.remove(&clip_id);
+                    }
+                    if self.waves.get(&clip_id).is_none_or(|wave| wave.lanes != lanes) {
+                        self.revision += 1;
+                    }
                     self.waves.insert(clip_id, ClipWave { lanes, duration_frames });
                 }
                 _ => _ = self.retry_after.insert(clip_id, now + WAVE_RETRY_DELAY),
@@ -204,7 +217,7 @@ impl ProgramWaves {
         let mut wanted = Vec::new();
         for placement in segments.iter().chain(covers) {
             let clip_id = placement.clip_id.as_str();
-            if self.waves.contains_key(clip_id)
+            if (self.waves.contains_key(clip_id) && !self.coarse.contains(clip_id))
                 || self.asked.contains(clip_id)
                 || self.retry_after.get(clip_id).is_some_and(|at| *at > now)
             {
@@ -214,7 +227,7 @@ impl ProgramWaves {
             wanted.push(clip_id.to_string());
         }
         self.ask(wanted);
-        let loaded = self.waves.len();
+        let loaded = self.revision;
         if let Some((total, a1, a2, count, peaks)) = &self.composed {
             if *total == total_frames && a1 == segments && a2 == covers && *count == loaded {
                 return peaks.clone();
@@ -260,12 +273,13 @@ impl ProgramWaves {
     }
 }
 
-fn read_wave(reader: &dyn TimelineArtifactRead, clip_id: &str) -> Option<Vec<Vec<f32>>> {
+fn read_wave(reader: &dyn TimelineArtifactRead, clip_id: &str) -> Option<(Vec<Vec<f32>>, bool)> {
     let record = reader.read_wave(clip_id).ok()??;
     let peaks = record.peaks()?;
+    let coarse = peaks.coarse;
     let lanes = [peaks.a1_peaks, peaks.a2_peaks, peaks.a3_peaks, peaks.a4_peaks];
     let lanes: Vec<Vec<f32>> = lanes.into_iter().collect();
-    lanes.iter().any(|lane| !lane.is_empty()).then_some(lanes)
+    lanes.iter().any(|lane| !lane.is_empty()).then_some((lanes, coarse))
 }
 
 #[cfg(test)]

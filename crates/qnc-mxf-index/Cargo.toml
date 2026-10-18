@@ -1,0 +1,7 @@
+[package]
+name = "qnc-mxf-index"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the index of a frame-wrapped MXF original (where each frame is, which are intra) and the elements of one frame; read only"
+
+[dependencies]

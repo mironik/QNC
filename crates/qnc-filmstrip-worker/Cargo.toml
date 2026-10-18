@@ -10,6 +10,7 @@ qnc-dev-diagnostics = { workspace = true }
 qnc-decoder-catalog = { workspace = true }
 qnc-dir-browser = { workspace = true }
 qnc-filmstrip = { workspace = true }
+qnc-mxf-index = { workspace = true }
 qnc-frame-timebase = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-contracts = { workspace = true }

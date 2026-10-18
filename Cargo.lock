@@ -3604,6 +3604,7 @@ dependencies = [
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-media-stream",
+ "qnc-mxf-index",
  "qnc-pixel-convert",
  "qnc-transport-resolver",
  "qnc-ui-text",
@@ -4272,6 +4273,10 @@ dependencies = [
 
 [[package]]
 name = "qnc-mp4-sound"
+version = "0.1.0"
+
+[[package]]
+name = "qnc-mxf-index"
 version = "0.1.0"
 
 [[package]]
@@ -5364,6 +5369,7 @@ dependencies = [
  "qnc-media-records",
  "qnc-media-stream",
  "qnc-mp4-sound",
+ "qnc-mxf-index",
  "qnc-mxf-sound",
  "qnc-read-pace",
  "qnc-transport-resolver",

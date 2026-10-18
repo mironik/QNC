@@ -429,7 +429,10 @@ impl SourcePreview {
             return;
         };
         let assets = &self.view.assets;
-        let complete = assets.clip_id == clip_id && assets.filmstrip_background.is_some() && assets.wave.is_some();
+        // A coarse wave is read again until the wave of every frame replaces it.
+        let complete = assets.clip_id == clip_id
+            && assets.filmstrip_background.is_some()
+            && assets.wave.as_ref().is_some_and(|wave| !wave.coarse);
         let now = Instant::now();
         if complete || self.timeline_assets.loading() || self.assets_again_at.is_some_and(|at| now < at) {
             return;

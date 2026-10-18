@@ -78,6 +78,7 @@ fn wave(id: &str) -> WaveArtifactRecord {
         a4_peaks: Vec::new(),
         warning: None,
         render_version: qnc_wave::WAVE_RENDER_VERSION,
+        coarse: false,
     }
 }
 

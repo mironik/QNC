@@ -4844,3 +4844,17 @@ pa valovi; val otvorenog klipa ne ceka. `qnc-import-control` (`Order::FilmstripR
 `qnc-timeline-artifacts`. Probe u izoliranoj kopiji: `probe_size_bytes` 2 MB umjesto 8 MB (postavka racunala;
 izlaz ffprobea isti za XAVC, MP4 proxy i XDCAM, s 512 KB nije); stvarni `data` nije diran. Testovi, conformance.
 Uzivo nije izmjereno.
+Izvedeno 2026-10-18/19 (korisnik "da": MXF indeks za filmstrip i val u dva prolaza; "valove mozes citati u vise prolaza:
+prvo grubo citanje samo intra slike za sve klipove, nakon toga sve slike"): mjereno, filmstrip kroz ffmpeg trajao je
+2,3-2,9 s po klipu i kad su datoteke u memoriji (13 ulaza, svaki otvara MXF), 93 s za 98 klipova. Nova javna kocka
+`crates/qnc-mxf-index` (+ ugovor `contracts/modules/mxf-index.module.json`; samo citanje): indeks koji original nosi
+(XAVC kamere: puni indeks iza zaglavlja, jedna particija s esencijom), polozaj paketa svake slike, koje su intra
+(SMPTE 377 zastavice), elementi slike i zvuka jednog paketa; bez upotrebljivog indeksa `None` i sve ide kao prije.
+Provjereno na stiku: 13 intra slika klipa od 11178 slika za 23 ms, sve se dekodiraju. `qnc-filmstrip-worker`: klip
+dulji od 10 s uzima intra sliku najblizu svakoj od 13 pozicija kroz indeks i dekodira ih jednim pozivom (do 10 s ostaje
+ubrzano citanje); `qnc-filmstrip` `original_picture_codec`. Val u dva prolaza: klip bez vala najprije dobiva grubi val
+(zvuk samo intra slika kroz indeks, svaki zadrzan do sljedece; oko jedno citanje na 24 slike), zatim val svake slike
+tiho ga zamjenjuje; otvoreni klip dobiva puni val prvi. Zapis vala `qnc-wave` `WaveArtifactRecord.coarse` (u istom
+JSON-u, bez promjene sheme; puni zapis bez polja), `WaveformPeaks.coarse`; `qnc-wave-worker` (grubi zapis nije
+"ready", klip se vraca u red), `qnc-source-preview` i `qnc-program-waveform` citaju grubi val ponovno dok ga puni ne
+zamijeni. Testovi, conformance. Uzivo nije izmjereno.

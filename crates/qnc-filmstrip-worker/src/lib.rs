@@ -771,9 +771,21 @@ fn build_timeline_background(
         LocalFilmstripArtifacts::new(&context.filmstrip_root_uri, context.filmstrip_dir.clone())?;
     let ready_before = artifacts.ready(&plan);
     let extract_started = Instant::now();
-    // The key pictures read with the wave: decoded, the media is not read again. Should
-    // that fail, the filmstrip reads the media as before (the reason goes to the log).
-    let from_pictures = match given.filter(|_| !ready_before) {
+    // A clip longer than 10 s takes the intra picture nearest each of its 13 places straight
+    // from the original's own index (user 2026-10-18), a few reads instead of opening the
+    // file thirteen times; a clip up to 10 s is read through by the decoder below.
+    let from_index = (given.is_none() && !ready_before && plan.extraction_mode == FilmstripExtractionMode::KeyframeSeek)
+        .then(|| intra_pictures(&clip, context, cancel))
+        .and_then(|found| match found {
+            Ok(found) => found,
+            Err(error) => {
+                filmstrip_log(|| format!("qnc-filmstrip-worker: clip={} index=failed error={error}", request.clip_id));
+                None
+            }
+        });
+    // Pictures handed over or read by the index: decoded, the media is not read again.
+    // Should that fail, the filmstrip reads the media as before (the reason goes to the log).
+    let from_pictures = match given.or(from_index.as_ref()).filter(|_| !ready_before) {
         Some(given) => match filmstrip_from_pictures(&clip, context, given, &artifacts, cancel) {
             Ok(plan) => Some(plan),
             Err(error) if error == filmstrip_paused_for_playback() => return Err(error),
@@ -809,8 +821,48 @@ fn build_timeline_background(
     })
 }
 
-/// The filmstrip of the original from its key pictures read with the wave: decoded in one
-/// call into the thumbnails of `plan_from_original`.
+/// The intra picture of the original nearest each of the 13 places, read through the file's
+/// own index; `None` when the original is not an MXF whose index and pictures can be used.
+fn intra_pictures(
+    clip: &FilmstripClipRecord,
+    context: &FilmstripContext,
+    cancel: &AtomicBool,
+) -> Result<Option<qnc_filmstrip::EncodedPictures>, String> {
+    let Some(codec) = qnc_filmstrip::original_picture_codec(&clip.snapshot) else {
+        return Ok(None);
+    };
+    let Some(targets) = qnc_filmstrip::original_picture_frames(&clip.snapshot) else {
+        return Ok(None);
+    };
+    let original = &clip.snapshot.metadata.original.media_uri;
+    let Some(source) = context.source_bindings.iter().find(|source| source.matches_media_uri(original)) else {
+        return Ok(None);
+    };
+    let Some(path) = source.local_media_path(original)? else {
+        return Ok(None);
+    };
+    let Some(index) = qnc_mxf_index::MxfIndex::read(&path)? else {
+        return Ok(None);
+    };
+    let mut file = fs::File::open(&path).map_err(|error| format!("filmstrip original open: {error}"))?;
+    let mut pictures = Vec::with_capacity(targets.len());
+    for target in targets {
+        if cancel.load(Ordering::Acquire) {
+            return Err(filmstrip_paused_for_playback().into());
+        }
+        let Some(entry) = index.intra_nearest(target) else {
+            return Ok(None);
+        };
+        let Some(picture) = qnc_mxf_index::read_package(&mut file, &index, entry, true, false)?.picture else {
+            return Ok(None);
+        };
+        pictures.push(picture);
+    }
+    Ok(Some(qnc_filmstrip::EncodedPictures { codec: codec.to_string(), pictures }))
+}
+
+/// The filmstrip of the original from its key pictures (handed over or read by the
+/// index): decoded in one call into the thumbnails of `plan_from_original`.
 fn filmstrip_from_pictures(
     clip: &FilmstripClipRecord,
     context: &FilmstripContext,
@@ -863,7 +915,7 @@ fn filmstrip_from_pictures(
     result?;
     filmstrip_log(|| {
         format!(
-            "qnc-filmstrip-worker: clip={} source=Original mode=PicturesFromWave frames={} build_ms={}",
+            "qnc-filmstrip-worker: clip={} source=Original mode=IntraPictures frames={} build_ms={}",
             plan.clip_id,
             plan.frames.len(),
             started.elapsed().as_millis()

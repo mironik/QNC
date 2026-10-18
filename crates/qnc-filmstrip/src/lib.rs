@@ -127,6 +127,20 @@ pub fn original_picture_frames(snapshot: &Snapshot) -> Option<Vec<u64>> {
     Some(picture_frames(timing.frames))
 }
 
+/// The saved picture codec of the original when its intra pictures decode on their own
+/// from the stored bytes (`h264`, `mpeg2video`).
+pub fn original_picture_codec(snapshot: &Snapshot) -> Option<&'static str> {
+    snapshot.metadata.original.streams.iter().find_map(|stream| {
+        if !matches!(stream.details, StreamDetails::Video(_)) {
+            return None;
+        }
+        match stream.codec.as_ref().map(|codec| &codec.value) {
+            Some(qnc_media_metadata::Signal::Known(name)) => ["h264", "mpeg2video"].into_iter().find(|known| known == name),
+            _ => None,
+        }
+    })
+}
+
 fn picture_frames(frames: u64) -> Vec<u64> {
     (0..FILMSTRIP_FRAME_COUNT)
         .map(|index| ((index as u128 * frames as u128) / FILMSTRIP_FRAME_COUNT as u128) as u64)

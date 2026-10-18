@@ -229,6 +229,8 @@ struct GeneratedWave {
     artifact: WaveArtifactRecord,
     ready_before: bool,
     total_ms: u128,
+    /// The coarse wave of the intra frames: the clip comes again for every frame.
+    coarse: bool,
 }
 
 #[derive(Debug)]
@@ -248,6 +250,8 @@ pub struct TimelineWaveService {
     workers: Vec<ActiveWaveWorker>,
     /// Held: only the clip open in a preview gets its wave (the filmstrips go first).
     held: bool,
+    /// Coarse waves on their way to the database: their clips are not ready.
+    coarse: BTreeSet<String>,
     publisher: Option<Box<dyn WaveContentWrite>>,
     playback_priority: bool,
     /// The clip open in a preview: its pass reads the card alone (user 2026-10-18: two long
@@ -396,7 +400,10 @@ impl TimelineWaveService {
                                     completion.key
                                 )
                             });
-                            self.ready.insert(completion.key);
+                            // A coarse wave stored: its clip waits for the wave of every frame.
+                            if !self.coarse.remove(&completion.key) {
+                                self.ready.insert(completion.key);
+                            }
                         }
                         Err(error) => {
                             let matches_active = current_project.is_some_and(|project| {
@@ -458,14 +465,24 @@ impl TimelineWaveService {
                     let a4_count = generated.artifact.a4_peaks.len();
                     let source_uri = generated.artifact.source_uri.clone();
                     let publish_state = if ready_before { "ready" } else { "queued" };
+                    let coarse = generated.coarse;
                     if generated.ready_before {
                         self.ready.insert(key);
                     } else {
+                        if coarse {
+                            self.coarse.insert(key.clone());
+                        }
                         self.queue_publish(key, generated.artifact, matches_active, &mut poll);
+                    }
+                    if coarse {
+                        // The wave of every frame comes after every clip's coarse one; the
+                        // open clip's comes first.
+                        let first = self.preferred.as_deref() == Some(outcome.request.clip_id.as_str());
+                        self.enqueue(outcome.request.clone(), first);
                     }
                     wave_log(|| {
                         format!(
-                            "qnc-wave-worker: clip={} source={} ready_before={} peaks={} a1={} a2={} a3={} a4={} total_ms={} publish={}",
+                            "qnc-wave-worker: clip={} source={} coarse={coarse} ready_before={} peaks={} a1={} a2={} a3={} a4={} total_ms={} publish={}",
                             outcome.request.clip_id,
                             source_uri,
                             ready_before,
@@ -722,15 +739,18 @@ fn build_timeline_wave(
         return Err(wave_paused_for_playback().into());
     }
     let started = Instant::now();
-    if let Some(record) = context.content_reader.read_wave(&request.clip_id)? {
-        if wave_artifact_ready(&record) {
-            return Ok(GeneratedWave {
-                artifact: record,
-                ready_before: true,
-                total_ms: started.elapsed().as_millis(),
-            });
-        }
+    let stored = context.content_reader.read_wave(&request.clip_id)?;
+    if let Some(record) = stored.as_ref().filter(|record| wave_artifact_ready(record)) {
+        return Ok(GeneratedWave {
+            artifact: record.clone(),
+            ready_before: true,
+            total_ms: started.elapsed().as_millis(),
+            coarse: false,
+        });
     }
+    // A clip without any wave gets the coarse one first (user 2026-10-18: every clip's
+    // approximate sound quickly, the complete one later).
+    let coarse_first = stored.is_none();
     let clip = context
         .content_reader
         .read_clip(&request.clip_id)?
@@ -749,10 +769,14 @@ fn build_timeline_wave(
     // The filmstrip reads its own pictures before the waves (user 2026-10-18: up to 10 s a
     // clip is read through, a longer one gives the intra picture nearest each of 13 places),
     // so the pass reads only the sound.
-    let (lane_peaks, _) = decode_wave(&plan, media, source, None, cancel)?;
+    let (lane_peaks, coarse) = match coarse_first.then(|| decode_wave(&plan, media, source, true, cancel)).transpose()?.flatten() {
+        Some(lanes) => (lanes, true),
+        None => (decode_wave(&plan, media, source, false, cancel)?.ok_or("wave: no full wave")?, false),
+    };
     let has_a2 = lane_peaks.iter().any(|(lane, _)| *lane == WaveLane::A2);
     let warning = (!has_a2).then(|| qnc_ui_text::text("wave.source_a2_audio_channel").to_string());
-    let artifact = qnc_wave::artifact_record_from_lane_peaks(&plan, lane_peaks, warning)?;
+    let mut artifact = qnc_wave::artifact_record_from_lane_peaks(&plan, lane_peaks, warning)?;
+    artifact.coarse = coarse;
     if !wave_artifact_ready(&artifact) {
         return Err(qnc_ui_text::text("wave.wave_result_ready").to_string());
     }
@@ -760,6 +784,7 @@ fn build_timeline_wave(
         artifact,
         ready_before: false,
         total_ms: started.elapsed().as_millis(),
+        coarse,
     })
 }
 
@@ -793,7 +818,8 @@ fn test_medium(readers: &Readers, source: &WaveSourceBinding, media: &MediaRepre
 }
 
 fn wave_artifact_ready(record: &WaveArtifactRecord) -> bool {
-    qnc_wave::validate_artifact(record).is_ok()
+    !record.coarse
+        && qnc_wave::validate_artifact(record).is_ok()
         && record.render_version == qnc_wave::WAVE_RENDER_VERSION
         && record.peaks().is_some()
 }
@@ -802,9 +828,9 @@ fn decode_wave(
     plan: &WavePlan,
     media: &MediaRepresentation,
     source: &WaveSourceBinding,
-    picture_targets: Option<(&[u64], &'static str)>,
+    coarse: bool,
     cancel: &AtomicBool,
-) -> Result<(Vec<(WaveLane, Vec<f32>)>, Option<qnc_filmstrip::EncodedPictures>), String> {
+) -> Result<Option<Vec<(WaveLane, Vec<f32>)>>, String> {
     let streams = plan
         .channels
         .iter()
@@ -856,10 +882,18 @@ fn decode_wave(
     // saved format before any reading; every other source through the selected decoder.
     let mut pictures = None;
     let read = match (mxf_sound_elements(media, &streams), mp4_sound(media, &streams)) {
-        (Some((elements, bytes)), _) => mxf_sound_samples(&path, &elements, bytes, picture_targets, &mut pictures, cancel, &mut on_samples),
+        // The coarse wave: the sound of the intra frames through the original's own index,
+        // each held over its group of pictures; without an index there is none.
+        (Some((elements, bytes)), _) if coarse => match mxf_intra_sound_samples(&path, &elements, bytes, cancel, &mut on_samples) {
+            Ok(true) => Ok(()),
+            Ok(false) => return Ok(None),
+            Err(error) => Err(error),
+        },
+        _ if coarse => return Ok(None),
+        (Some((elements, bytes)), _) => mxf_sound_samples(&path, &elements, bytes, None, &mut pictures, cancel, &mut on_samples),
         // An MP4 with one AAC sound track: its sound chunks and key pictures through its
         // index (user 2026-10-16), decoded from what was read.
-        (None, Some(stream)) => mp4_sound_samples(&path, stream, channels as u32, picture_targets, &mut pictures, cancel, &mut on_samples),
+        (None, Some(stream)) => mp4_sound_samples(&path, stream, channels as u32, None, &mut pictures, cancel, &mut on_samples),
         (None, None) => qnc_decoder_catalog::installed_filmstrip_extractor()
             .map_err(|error| error.to_string())?
             .ok_or("no local decoder for the wave")?
@@ -873,7 +907,7 @@ fn decode_wave(
     if !by_lane.contains_key(&WaveLane::A1) {
         return Err(qnc_ui_text::text("wave.wave_got_a1_channel").to_string());
     }
-    Ok((by_lane.into_iter().collect(), pictures))
+    Ok(Some(by_lane.into_iter().collect()))
 }
 
 /// The selected decoder must declare the saved format of every stream it reads (no silent
@@ -985,6 +1019,61 @@ fn mp4_sound_samples(
 }
 
 /// Sound elements to whole interleaved f32 frames of the requested streams, in their order.
+/// The coarse sound of an MXF original: the sound elements of its intra frames only,
+/// read through its own index, each intra frame's sound held over the frames up to the next
+/// one, so the wave has every frame's place (a GOP of 24 reads one frame in 24). `false`
+/// when the file has no usable index.
+fn mxf_intra_sound_samples(
+    source: &Path,
+    elements: &[u8],
+    sample_bytes: usize,
+    cancel: &AtomicBool,
+    on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
+) -> std::result::Result<bool, String> {
+    let Some(index) = qnc_mxf_index::MxfIndex::read(source)? else {
+        return Ok(false);
+    };
+    let intra = index.intra_frames();
+    if intra.is_empty() {
+        return Ok(false);
+    }
+    let mut file = std::fs::File::open(source).map_err(|error| format!("wave original open: {error}"))?;
+    let mut held: Vec<f32> = Vec::new();
+    let mut next = 0usize;
+    for frame in 0..index.entries.len() {
+        if cancel.load(Ordering::Acquire) {
+            return Err(wave_paused_for_playback().into());
+        }
+        if next < intra.len() && intra[next] == frame || held.is_empty() {
+            let at = intra[next.min(intra.len() - 1)];
+            let package = qnc_mxf_index::read_package(&mut file, &index, at, false, true)?;
+            let mut channels = vec![Vec::<f32>::new(); elements.len()];
+            for (number, value) in &package.sound {
+                if let Some(slot) = elements.iter().position(|element| element == number) {
+                    if sample_bytes == 2 {
+                        qnc_mxf_sound::s16le_to_f32(value, &mut channels[slot]);
+                    } else {
+                        qnc_mxf_sound::s24le_to_f32(value, &mut channels[slot]);
+                    }
+                }
+            }
+            let samples = channels.iter().map(Vec::len).min().unwrap_or(0);
+            if samples == 0 {
+                return Ok(false);
+            }
+            held.clear();
+            for sample in 0..samples {
+                held.extend(channels.iter().map(|channel| channel[sample]));
+            }
+            if next < intra.len() && intra[next] <= frame {
+                next += 1;
+            }
+        }
+        on_samples(&held)?;
+    }
+    Ok(true)
+}
+
 fn mxf_sound_samples(
     source: &Path,
     elements: &[u8],

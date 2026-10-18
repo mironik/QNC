@@ -383,6 +383,7 @@ mod tests {
             a4_peaks: Vec::new(),
             warning: None,
             render_version: qnc_wave::WAVE_RENDER_VERSION,
+            coarse: false,
         };
 
         let peaks = ready_wave(&record).expect("ready wave");
