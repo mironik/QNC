@@ -4577,3 +4577,16 @@ ime, pa objavljuje pod najmom; ostaci nedovrsenih poslova brisu se s ciscenjem s
 `qnc-write-lease` dodani na popis javnih DB pisaca (nova granica: posrednik otvara transakciju upisa pod najmom).
 Testovi: `qnc-write-lease`, posrednik i spremiste sadrzaja (upis pod tudim najmom odbijen, nista upisano, citanje
 radi), svi testovi dotaknutih kocki, conformance.
+Otkljucano i izvedeno 2026-10-18 (treci vanjski audit, ostali koraci; korisnik: "da, otkljucaj i kreni s ostalim
+koracima"): (1) Broj audio kanala klipa za A1/A2 na Wrap retku: procitan broj se pamti, a klip ciji broj nije procitan
+(zapis jos nije konacan ili citanje nije uspjelo) cita se ponovno pri sljedecem citanju price i odmah kad se uzme
+njegov zvuk (`qnc-program-segments` `counted`, `part_sound`; test). (2) Test reportera playera vise ne mice datoteku
+baze (preimenovanje otvorene datoteke na Windowsima je padalo): baza privremeno pripada drugom projektu pa svako
+otvaranje pisaca odbija, zatim se vraca (`qnc-playback-activity`; 3 od 3 prolaza). (3) B-roll kadar pokrivalice
+(odluka: zapis u bazi, jer jedna transakcija kroz posrednika trazi da moduli dijele vezu i ruse svoju zastitu tablica):
+`qnc-virtual-shots` stupac `cover_pending` (stari kadrovi 0); `CreateCoverShot` pise kadar s 1, `ConfirmCoverShot`
+ga potvrduje kad je pokrivalica upisana (`qnc-program-segments` nakon upisa pokrivalice), `ForgetCoverShot` kao prije za
+odbijenu; `ForgetUnconfirmedCoverShots` pri otvaranju price potvrduje nepotvrdjene kadrove stare preko minute koje
+pokrivalica koristi, a ostale brise (pad programa izmedu dva upisa vise ne ostavlja kadar). Nepotvrdjen kadar nije u
+tabu B-roll (`public_b_roll_clips`). Ugovor `virtual-shots.database.json`. Testovi `qnc-virtual-shots`,
+`qnc-program-db`, `qnc-program-segments` (`a_written_cover_confirms_its_b_roll_shot`), conformance.

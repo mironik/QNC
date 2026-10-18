@@ -72,6 +72,16 @@ pub enum Operation {
     ForgetCoverShot {
         shot_id: String,
     },
+    /// The cover of a B-roll shot is written: the shot is kept (third audit 2026-10-17: a
+    /// B-roll shot is made unconfirmed and stays only once its cover is in the story).
+    ConfirmCoverShot {
+        shot_id: String,
+    },
+    /// Unconfirmed B-roll shots older than `older_than_seconds` (their writer stopped
+    /// between the shot and its cover): one a cover uses is confirmed, any other goes.
+    ForgetUnconfirmedCoverShots {
+        older_than_seconds: u64,
+    },
     ListShorts,
     /// The B-roll virtual shots (covers), oldest first.
     ListBroll,

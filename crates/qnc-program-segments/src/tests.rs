@@ -700,3 +700,13 @@ fn a1_of_a_segment_takes_its_channel_count_from_the_media_record_not_the_wave() 
     assert!(segments.take_part_sound(0, row.start_frame));
     assert!(segments.part_sound_taken());
 }
+
+#[test]
+fn a_clip_whose_channel_count_was_not_read_is_read_again() {
+    let mut channels = ClipChannels::new();
+    channels.insert("read".into(), Some(4));
+    channels.insert("missing".into(), None);
+    let known = counted(&channels);
+    assert!(known.contains("read"));
+    assert!(!known.contains("missing"), "a count not read is asked again");
+}

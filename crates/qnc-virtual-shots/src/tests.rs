@@ -107,6 +107,8 @@ fn a_cover_shot_is_a_b_roll_shot_listed_after_the_shorts() {
         std::thread::sleep(std::time::Duration::from_millis(2));
     };
     assert_eq!(reply.unwrap(), Data::Created("clip-a_broll_001".into()));
+    // Its cover is written: the shot is kept.
+    writer.call(&Operation::ConfirmCoverShot { shot_id: "clip-a_broll_001".into() }).unwrap();
     let pool = list_pool_shots(&target).unwrap();
     assert_eq!(pool.len(), 2);
     assert!(!pool[0].b_roll && pool[1].b_roll);
@@ -154,4 +156,38 @@ fn a_b_roll_shot_never_takes_the_id_of_one_that_was_or_is_still_there() {
     assert_eq!(call(cover()).unwrap(), Data::Created("clip-a_broll_003".into()));
     call(Operation::ForgetCoverShot { shot_id: "clip-a_broll_003".into() }).unwrap();
     assert_eq!(call(cover()).unwrap(), Data::Created("clip-a_broll_004".into()), "never back, not even to the last");
+}
+
+/// A B-roll shot is kept only once its cover is written (third audit 2026-10-17): until
+/// then it is not in the B-roll tab, and one whose cover never came goes later.
+#[test]
+fn an_unconfirmed_b_roll_shot_is_not_listed_and_goes_when_its_cover_never_came() {
+    let (dir, target) = project();
+    let writer = VirtualShotsWriter::start(target.clone()).unwrap();
+    let cover = || Operation::CreateCoverShot {
+        project_id: "p1".into(),
+        clip_id: "clip-a".into(),
+        clip_name: "Mironik".into(),
+        in_frame: 5,
+        out_frame: 25,
+    };
+    let b_roll = |target: &ProjectDbTarget| list_pool_shots(target).unwrap().into_iter().filter(|shot| shot.b_roll).count();
+    writer.call(&cover()).unwrap();
+    writer.call(&cover()).unwrap();
+    assert_eq!(b_roll(&target), 0, "not confirmed: not in the B-roll tab");
+    writer.call(&Operation::ConfirmCoverShot { shot_id: "clip-a_broll_001".into() }).unwrap();
+    assert_eq!(b_roll(&target), 1);
+    // A shot younger than the limit stays (another process may be writing its cover).
+    writer.call(&Operation::ForgetUnconfirmedCoverShots { older_than_seconds: 60 }).unwrap();
+    let rows = |file: &std::path::Path| -> i64 {
+        rusqlite::Connection::open(file)
+            .unwrap()
+            .query_row("SELECT COUNT(*) FROM virtual_shots WHERE class = 'b_roll'", [], |row| row.get(0))
+            .unwrap()
+    };
+    assert_eq!(rows(&dir.path().join("project.db")), 2);
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    writer.call(&Operation::ForgetUnconfirmedCoverShots { older_than_seconds: 0 }).unwrap();
+    assert_eq!(rows(&dir.path().join("project.db")), 1, "the unconfirmed one went, the confirmed one stays");
+    assert_eq!(b_roll(&target), 1);
 }

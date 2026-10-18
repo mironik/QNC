@@ -70,6 +70,10 @@ impl Store {
                 out_frame,
             } => self.create_cover_shot(project_id, clip_id, clip_name, (*in_frame, *out_frame)),
             Operation::ForgetCoverShot { shot_id } => self.forget_cover_shot(shot_id),
+            Operation::ConfirmCoverShot { shot_id } => self.confirm_cover_shot(shot_id),
+            Operation::ForgetUnconfirmedCoverShots { older_than_seconds } => {
+                self.forget_unconfirmed_cover_shots(*older_than_seconds)
+            }
             Operation::ListShorts => self.list_shorts(),
             Operation::ListBroll => self.list_b_roll(),
             Operation::MarkShortStills {
@@ -263,6 +267,44 @@ impl Store {
             Ok(Data::Changed)
         }
     }
+    fn confirm_cover_shot(&mut self, shot_id: &str) -> Result<Data> {
+        self.conn
+            .execute("UPDATE virtual_shots SET cover_pending = 0 WHERE shot_id = ?1 AND class = 'b_roll'", [shot_id])
+            .map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// The unconfirmed B-roll shots older than `older_than` seconds: confirmed when a
+    /// cover of the story uses them, otherwise removed. One transaction.
+    fn forget_unconfirmed_cover_shots(&mut self, older_than: u64) -> Result<Data> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_secs())
+            .unwrap_or(0);
+        let before = now.saturating_sub(older_than) as i64;
+        let covers = object_exists(&self.conn, "table", "story_covers")?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(err)?;
+        if covers {
+            tx.execute(
+                "UPDATE virtual_shots SET cover_pending = 0
+                 WHERE class = 'b_roll' AND cover_pending = 1 AND created_at_utc < ?1
+                   AND shot_id IN (SELECT virtual_shot_id FROM story_covers)",
+                [before],
+            )
+            .map_err(err)?;
+        }
+        tx.execute(
+            "DELETE FROM virtual_shots WHERE class = 'b_roll' AND cover_pending = 1 AND created_at_utc < ?1",
+            [before],
+        )
+        .map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
     /// A B-roll shot no cover uses goes (its cover was refused); one in use stays.
     fn forget_cover_shot(&mut self, shot_id: &str) -> Result<Data> {
         let used = object_exists(&self.conn, "table", "story_covers")?
@@ -318,8 +360,8 @@ impl Store {
         tx.execute(
             "INSERT INTO virtual_shots (
                 shot_id, clip_id, class, in_frame, out_frame, source_shot_id, name,
-                created_at_utc, still_status
-             ) VALUES (?1, ?2, 'b_roll', ?3, ?4, ?5, ?6, ?7, 'pending')",
+                created_at_utc, still_status, cover_pending
+             ) VALUES (?1, ?2, 'b_roll', ?3, ?4, ?5, ?6, ?7, 'pending', 1)",
             params![
                 shot_id,
                 clip_id,
@@ -369,6 +411,8 @@ fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
         "TEXT NOT NULL DEFAULT 'pending' CHECK (still_status IN ('pending', 'ready', 'failed'))",
     )?;
     add_virtual_column_if_missing(conn, "still_error", "TEXT")?;
+    // A B-roll shot is kept once its cover is written (third audit 2026-10-17).
+    add_virtual_column_if_missing(conn, "cover_pending", "INTEGER NOT NULL DEFAULT 0")?;
     conn.execute_batch(
         "DROP VIEW IF EXISTS public_short_clips;
         CREATE VIEW public_short_clips AS
@@ -381,7 +425,7 @@ fn ensure_virtual_shots_schema(conn: &Connection) -> Result<()> {
         SELECT shot_id, clip_id, in_frame, out_frame, source_shot_id, name, created_at_utc,
                in_still_uri, out_still_uri, still_status, still_error
         FROM virtual_shots
-        WHERE class = 'b_roll';",
+        WHERE class = 'b_roll' AND cover_pending = 0;",
     )
     .map_err(err)
 }

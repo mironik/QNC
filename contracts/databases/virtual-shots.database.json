@@ -23,6 +23,7 @@
     "virtual_shots.out_still_uri": "TEXT, optional URI of the virtual short OUT still",
     "virtual_shots.still_status": "TEXT: pending | ready | failed",
     "virtual_shots.still_error": "TEXT, optional controlled error from still artifact creation",
+    "virtual_shots.cover_pending": "INTEGER 0/1: a B-roll shot made for a cover is 1 until its cover is written (third audit 2026-10-17); an unconfirmed shot is not in public_b_roll_clips, and one older than a minute that no cover uses is removed when the story opens",
     "virtual_shots.class": "TEXT: source | short (Virtual tab) | b_roll (the shot of a Story cover, B-roll tab; written with the cover, v5 category cover)"
   }
 }

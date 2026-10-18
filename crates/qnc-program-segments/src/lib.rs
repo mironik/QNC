@@ -234,6 +234,11 @@ type StoryRead = (
 /// The audio channel count of clips of the story, from their stored media records.
 type ClipChannels = std::collections::HashMap<String, Option<u16>>;
 
+/// The clips whose channel count was read; any other is read again.
+fn counted(channels: &ClipChannels) -> std::collections::HashSet<String> {
+    channels.iter().filter(|(_, count)| count.is_some()).map(|(clip, _)| clip.clone()).collect()
+}
+
 impl ProgramSegments {
     pub fn new() -> Self {
         Self::default()
@@ -254,6 +259,14 @@ impl ProgramSegments {
             *self = Self::default();
             self.filmstrips.set_reader(waves.clone());
             self.waves.set_reader(waves);
+        }
+        if !same {
+            // B-roll shots whose cover never came (the program stopped between the two
+            // writes) go; a minute old, so a cover another process is writing stays.
+            if let Ok(shots) = VirtualShotsWriter::spawn(story.clone()) {
+                let _ = shots.submit(&ShotOperation::ForgetUnconfirmedCoverShots { older_than_seconds: 60 });
+                self.shots = Some(shots);
+            }
         }
         self.target = Some(story);
         self.project_id = project_id.to_string();
@@ -338,7 +351,7 @@ impl ProgramSegments {
         }
         let (send, receive) = std::sync::mpsc::channel();
         // The clips counted before are not read again; the read gives the new ones.
-        let (content, known) = (self.prerender.clone(), self.clip_channels.keys().cloned().collect::<std::collections::HashSet<_>>());
+        let (content, known) = (self.prerender.clone(), counted(&self.clip_channels));
         let started = std::thread::Builder::new().name("qnc-story-read".into()).spawn(move || {
             // One consistent read of the story (external audit 2026-10-17), the same the
             // player builds its program from.
@@ -349,7 +362,13 @@ impl ProgramSegments {
                     .filter(|clip| !known.contains(*clip))
                     .collect::<std::collections::BTreeSet<_>>()
                     .into_iter()
-                    .filter_map(|clip| Some((clip.clone(), qnc_source_channels::read_clip(content.as_ref()?, clip).ok().flatten())))
+                    // Only a count read is kept: a clip whose record is not final yet, or a read
+                    // that failed, is read again with the next read of the story (third audit
+                    // 2026-10-17: a missed count stayed missing for good).
+                    .filter_map(|clip| {
+                        let count = qnc_source_channels::read_clip(content.as_ref()?, clip).ok()??;
+                        Some((clip.clone(), Some(count)))
+                    })
                     .collect();
                 Ok((story.segments, story.markers, story.slots, story.covers, story.selection, channels))
             });
@@ -1053,6 +1072,14 @@ impl ProgramSegments {
                 None => waiting.push((key, pending)),
                 Some(result) => {
                     landed = true;
+                    // The cover is in the story: its B-roll shot is kept.
+                    if result.is_ok() {
+                        if let Some((_, shot)) = self.cover_writes.iter().find(|(written, _)| *written == key) {
+                            if let Some(shots) = &self.shots {
+                                let _ = shots.submit(&ShotOperation::ConfirmCoverShot { shot_id: shot.clone() });
+                            }
+                        }
+                    }
                     match result {
                         Ok(StoryData::Created(segment_id))
                             if self.pending_create.as_deref() == Some(key.as_str()) =>

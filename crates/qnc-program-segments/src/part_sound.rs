@@ -39,8 +39,12 @@ impl ProgramSegments {
             self.refresh_view(qnc_ui_text::text(key).into());
             return false;
         };
-        // The channel count of the clip from its stored wave (one lane per channel).
+        // The channel count of the clip from its stored media record (one lane per channel);
+        // not read yet (the record was not final), it is asked again now.
         let channels = self.clip_channels.get(&clip_id).copied().flatten();
+        if channels.is_none() {
+            self.reload();
+        }
         self.let_go_edits(true);
         if !self.part_sound.take(Part { lane, id }, kept, channels) {
             self.refresh_view(qnc_ui_text::text("story.msg.no_audio_channels").into());

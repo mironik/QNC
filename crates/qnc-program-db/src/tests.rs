@@ -215,13 +215,13 @@ fn create_cover(store: &mut Story, slot_id: &str, range: (u64, u64)) -> Result<D
     else {
         panic!()
     };
-    run(
+    let written = run(
         store,
         Operation::CreateCover {
             project_id: "p1".into(),
             slot_id: slot_id.into(),
             clip_id: "c1".into(),
-            virtual_shot_id: shot_id,
+            virtual_shot_id: shot_id.clone(),
             in_frame: range.0,
             out_frame: range.1,
             fps_num: 50,
@@ -230,7 +230,10 @@ fn create_cover(store: &mut Story, slot_id: &str, range: (u64, u64)) -> Result<D
             a2_level_db: 0,
             a2_off: false,
         },
-    )
+    )?;
+    // As the story's writer does: the cover is in, its B-roll shot is kept.
+    shots(&store.path.clone(), qnc_virtual_shots::Operation::ConfirmCoverShot { shot_id })?;
+    Ok(written)
 }
 
 fn create_segment(

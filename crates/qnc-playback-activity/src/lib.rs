@@ -458,14 +458,21 @@ mod tests {
     #[test]
     fn a_reporter_whose_writes_failed_tells_its_state_once_the_database_is_back() {
         let (dir, target) = target();
-        let (path, away) = (dir.path().join("db"), dir.path().join("db.away"));
-        std::fs::rename(&path, &away).unwrap();
+        // The database says it is another project's: every open of the writer is refused.
+        // No file is moved (third audit 2026-10-17: a rename of an open file failed on
+        // Windows), so the test does not depend on who holds the file when.
+        let belong = |project: &str| {
+            let conn = rusqlite::Connection::open(dir.path().join("db")).unwrap();
+            conn.busy_timeout(Duration::from_secs(5)).unwrap();
+            conn.execute("UPDATE project_settings SET project_id=?1", [project]).unwrap();
+        };
+        belong("another");
         let mut reporter = PlaybackReporter::new();
         reporter.update(Some(&target), true);
         std::thread::sleep(Duration::from_millis(1500)); // its writes fail meanwhile
         assert!(reporter.reporting(), "it keeps running");
-        let _ = std::fs::remove_file(&path); // what a failed open left
-        std::fs::rename(&away, &path).unwrap();
+        assert!(!is_fresh(&target, PLAYBACK, PLAYBACK_FRESH_SECONDS), "nothing was written meanwhile");
+        belong("p1");
         let deadline = Instant::now() + Duration::from_secs(10);
         while !is_fresh(&target, PLAYBACK, PLAYBACK_FRESH_SECONDS) && Instant::now() < deadline {
             reporter.update(Some(&target), true);
