@@ -238,6 +238,12 @@ impl SyncCover {
         Some(program)
     }
 
+    /// The program span of a running or stopped Sync's draft, `[anchor, end)` (user
+    /// 2026-10-18: the cover being written is drawn as it grows).
+    pub fn draft_span(&self) -> Option<(u64, u64)> {
+        self.active.as_ref().map(|session| (session.anchor, session.end.max(session.anchor + 1)))
+    }
+
     /// The draft end of a running or stopped Sync (exclusive).
     pub fn draft_end(&self) -> Option<u64> {
         self.active.as_ref().map(|session| session.end)

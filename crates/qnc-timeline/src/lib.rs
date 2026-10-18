@@ -1857,10 +1857,10 @@ fn paint_covers(
         if strip && !cover.selected && !cover.pending && !ui.rect_contains_pointer(rect) {
             continue;
         }
-        let base = if cover.pending {
-            input.theme.focus
-        } else {
-            cover.fill.unwrap_or(input.theme.shot_range)
+        let base = match (cover.pending, cover.fill) {
+            (_, Some(fill)) => fill,
+            (true, None) => input.theme.focus,
+            (false, None) => input.theme.shot_range,
         };
         let fill = if cover.selected {
             base.linear_multiply(0.85)
@@ -1868,7 +1868,11 @@ fn paint_covers(
             base.linear_multiply(0.55)
         };
         ui.painter().rect_filled(rect, 1.0, fill);
-        if let Some(label) = cover.label.filter(|_| !cover.pending && rect.width() >= 34.0) {
+        if cover.pending {
+            // Not saved yet: a frame in the focus colour round it.
+            ui.painter().rect_stroke(rect, 1.0, Stroke::new(2.0, input.theme.focus), StrokeKind::Inside);
+        }
+        if let Some(label) = cover.label.filter(|_| rect.width() >= 34.0) {
             ui.painter().text(
                 rect.center(),
                 Align2::CENTER_CENTER,
@@ -1877,7 +1881,7 @@ fn paint_covers(
                 Color32::BLACK,
             );
         }
-        if cover.pending && rect.width() >= 56.0 {
+        if cover.pending && cover.label.is_none() && rect.width() >= 56.0 {
             ui.painter().text(
                 rect.center(),
                 Align2::CENTER_CENTER,

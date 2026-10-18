@@ -290,6 +290,18 @@ fn paint_program(
         .iter()
         .map(|cover| qnc_program_segments::duration_label(cover.end_frame - cover.start_frame, rate.0, rate.1))
         .collect::<Vec<_>>();
+    // The cover a Sync is writing, as it grows (user 2026-10-18).
+    let draft = segments.sync_draft.filter(|(from, to)| *to > start && *from < end);
+    let draft_label = draft.map(|(from, to)| qnc_program_segments::duration_label(to - from, rate.0, rate.1));
+    let draft_span = draft.zip(draft_label.as_deref()).map(|((from, to), label)| TimelineCoverSpan {
+        id: "sync-draft",
+        start_frame: local(from),
+        end_frame: local(to),
+        selected: true,
+        pending: true,
+        fill: cover_fill(to - from, segments.timebase, lengths),
+        label: Some(label),
+    });
     let covers = shown
         .iter()
         .zip(&labels)
@@ -303,6 +315,7 @@ fn paint_program(
             fill: cover_fill(cover.end_frame - cover.start_frame, segments.timebase, lengths),
             label: Some(label.as_str()),
         })
+        .chain(draft_span)
         .collect::<Vec<_>>();
     let markers = segments
         .markers

@@ -106,6 +106,9 @@ pub struct SegmentsView {
     pub trim_frames: Vec<u64>,
     /// Sync/B-roll is on.
     pub sync_enabled: bool,
+    /// The cover a Sync is writing, `[start, end)` on the program, until Enter or Delete
+    /// (user 2026-10-18: the user sees it grow, coloured by its length).
+    pub sync_draft: Option<(u64, u64)>,
     /// Pokrivalice was chosen (user 2026-10-10: at first neither way is chosen).
     pub covers_chosen: bool,
     /// Story timebase (`num`, `den`); `None` while the program is empty.

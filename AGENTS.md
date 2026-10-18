@@ -4787,3 +4787,10 @@ oznaka promijeni boju u crvenu"; "sve to u kockama"): u kocki `qnc-timeline` zas
 pravilo za klik, povlacenje i crtanje): marker se uzima 8 piksela od crte, uzeti ili izabrani marker
 (`TimelineMarkerPin.taken`) povlacenjem i do 40 piksela; marker u dosegu misa crta se crveno i deblje
 (`TimelineTheme.marker_hover`). `qnc-segment-panel` predaje `taken` (izabrani marker). Uzivo nije provjereno.
+Dopuna 2026-10-18 (korisnik: "kada radim Sync/B-roll ne vidi se da se pokrivalica pise... linija koja mijenja boju
+ovisno koliko traje pokrivalica"): pokrivalica koju Sync pise crta se na Wrap retku dok raste (od markera do trenutne
+slike, i kad je zaustavljena i strelice joj pomicu kraj): boja po trajanju (iste granice kao spremljene pokrivalice,
+`cover_lengths`), trajanje u brojkama, okvir boje fokusa dok nije spremljena (Enter) ili odbacena (Delete).
+`qnc-sync-cover` `draft_span`, `qnc-program-view` `SegmentsView.sync_draft`, `qnc-program-segments` (`sync_frame`),
+`qnc-segment-panel` (nepotvrdjena pokrivalica), `qnc-timeline` (nepotvrdjena pokrivalica u svojoj boji, s oznakom i
+okvirom). Test u `qnc-program-segments`. Uzivo nije provjereno.

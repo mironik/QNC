@@ -97,7 +97,9 @@ impl ProgramSegments {
     /// Reaching an M marker or the source OUT, or a pause, only stops it (user
     /// 2026-10-13: only Enter writes the cover, Delete drops the draft).
     pub fn sync_frame(&mut self, confirmed: Option<u64>) -> Option<u64> {
-        self.sync.program_frame(confirmed)
+        let frame = self.sync.program_frame(confirmed);
+        self.view.sync_draft = self.sync.draft_span();
+        frame
     }
 
     /// Whether a Sync is running or stopped with a draft that Enter writes, Delete drops.
