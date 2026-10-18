@@ -424,6 +424,28 @@ impl TimelineProjection {
         self.normalize_source_marks()
     }
 
+    /// The first cut of a pair at the playhead: IN there, no OUT yet (user 2026-10-18).
+    pub fn with_first_cut_at_confirmed(mut self) -> Self {
+        if let Some(frame) = self.confirmed_frame() {
+            self.source_in_frame = Some(self.local_frame(frame));
+            self.source_out_frame = None;
+            self.source_mark_focus = TimelineSourceMarkFocus::In;
+        }
+        self.normalize_source_marks()
+    }
+
+    /// The second cut at the playhead, the first at `first` (an absolute frame): the distance
+    /// between them is marked, the earlier is IN, the later OUT, whatever their order.
+    pub fn with_second_cut_at_confirmed(mut self, first: u64) -> Self {
+        if let Some(frame) = self.confirmed_frame() {
+            let (earlier, later) = (self.local_frame(first.min(frame)), self.local_frame(first.max(frame)));
+            self.source_in_frame = Some(earlier);
+            self.source_out_frame = Some(later.max(earlier.saturating_add(1)).min(self.duration_frames()));
+            self.source_mark_focus = TimelineSourceMarkFocus::Out;
+        }
+        self.normalize_source_marks()
+    }
+
     pub fn focus_source_in(mut self) -> Self {
         self.source_mark_focus = TimelineSourceMarkFocus::In;
         self
@@ -713,6 +735,10 @@ pub enum TimelineIntent {
     /// A right click on A1 or A2 of a row with markers (a Wrap row): the sound of what lies
     /// there, at that frame (as Ctrl+1/Ctrl+2 there).
     TakeSound { lane: AudioLane, frame: u64 },
+    /// A cut (scissors) at the playhead of a source timeline: the middle mouse button, a
+    /// touchpad's three-finger tap set to it, a two-finger tap on a touch screen (user
+    /// 2026-10-18: two cuts mark IN and OUT, the earlier IN, the later OUT).
+    Cut,
 }
 
 impl Default for TimelineIntent {
@@ -843,6 +869,10 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     let swipe = qnc_touchpad::take(ui, outer, ui.id().with("qnc-timeline-touchpad"));
     let touch = qnc_touch_gestures::take(ui, outer, ui.id().with("qnc-timeline-touch"));
     let wheel = notch.or(swipe).or(touch);
+    let over = ui.ctx().pointer_hover_pos().is_some_and(|at| outer.contains(at));
+    let cut = !input.layers.markers
+        && ((over && ui.input(|input| input.pointer.button_clicked(egui::PointerButton::Middle)))
+            || qnc_touch_gestures::tapped(ui, outer, ui.id().with("qnc-timeline-touch-tap")));
     ui.painter().rect_filled(outer, 0.0, input.theme.background);
     ui.painter().rect_stroke(
         outer,
@@ -1070,6 +1100,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
             TimelineIntent::TakeMark(local.abs_diff(input.draft_in_frame) <= local.abs_diff(input.draft_out_frame))
         }
         (TimelineIntent::None, Some(wheel)) => TimelineIntent::Wheel(wheel),
+        (TimelineIntent::None, None) if cut => TimelineIntent::Cut,
         (intent, wheel) => {
             if wheel.is_some() && qnc_dev_diagnostics::player_diagnostics_enabled() {
                 qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("timeline-wheel lost to {intent:?}"));

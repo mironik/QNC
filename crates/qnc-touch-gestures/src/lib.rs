@@ -21,6 +21,9 @@ pub struct TouchMap {
     pub drag_horizontal: Role,
     pub drag_vertical: Role,
     pub pinch: Role,
+    /// Whether a quick tap of two fingers in place is a cut (scissors) at the playhead
+    /// (`"cut"`) or nothing (`"none"`).
+    pub two_finger_tap_cuts: bool,
     /// Points of a drag of one step.
     pub points_per_step: f32,
     /// The zoom factor of one pinch step.
@@ -34,6 +37,11 @@ impl TouchMap {
             drag_horizontal: qnc_gesture_steps::role(&map, "drag_horizontal")?,
             drag_vertical: qnc_gesture_steps::role(&map, "drag_vertical")?,
             pinch: qnc_gesture_steps::role(&map, "pinch")?,
+            two_finger_tap_cuts: match map.get("two_finger_tap").and_then(serde_json::Value::as_str) {
+                Some("cut") => true,
+                Some("none") => false,
+                other => return Err(format!("two_finger_tap must be \"cut\" or \"none\", not {other:?}")),
+            },
             points_per_step: qnc_gesture_steps::amount(&map, "points_per_step", 0.0)?,
             zoom_per_step: qnc_gesture_steps::amount(&map, "zoom_per_step", 1.0)?,
         })
@@ -77,6 +85,49 @@ pub fn take(ui: &Ui, rect: Rect, key: egui::Id) -> Option<Wheel> {
     next
 }
 
+/// How long and how far two fingers may stay for a tap.
+const TAP_SECONDS: f64 = 0.35;
+const TAP_POINTS: f32 = 10.0;
+
+/// The two fingers of a possible tap: when they came and how far they moved.
+#[derive(Debug, Clone, Copy, Default)]
+struct Tap {
+    start: f64,
+    moved: f32,
+    zoom: f32,
+    on: bool,
+}
+
+/// Whether two fingers were lifted this frame after a quick tap in place over `rect`, when
+/// the map makes that a cut (user 2026-10-18: scissors by gesture).
+pub fn tapped(ui: &Ui, rect: Rect, key: egui::Id) -> bool {
+    if !TouchMap::of_this_qnc().is_some_and(|map| map.two_finger_tap_cuts) {
+        return false;
+    }
+    let ctx = ui.ctx();
+    let now = ctx.input(|input| input.time);
+    let mut tap: Tap = ctx.data(|data| data.get_temp(key)).unwrap_or_default();
+    let ended = match ctx.multi_touch().filter(|touch| touch.num_touches == 2 && rect.contains(touch.center_pos)) {
+        Some(touch) => {
+            if !tap.on {
+                tap = Tap { start: now, on: true, zoom: 1.0, ..Tap::default() };
+            }
+            tap.moved += touch.translation_delta.length();
+            tap.zoom *= touch.zoom_delta;
+            false
+        }
+        None => std::mem::take(&mut tap.on),
+    };
+    let cut = ended && is_tap(now - tap.start, tap.moved, tap.zoom);
+    ctx.data_mut(|data| data.insert_temp(key, tap));
+    cut
+}
+
+/// A tap: quick, in place, no pinch.
+fn is_tap(seconds: f64, moved: f32, zoom: f32) -> bool {
+    seconds <= TAP_SECONDS && moved <= TAP_POINTS && (zoom - 1.0).abs() < 0.05
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,5 +145,9 @@ mod tests {
         assert_eq!(steps.next(), None, "along does nothing in this map");
         add(&map, egui::Vec2::ZERO, 1.1 * 1.001, &mut steps);
         assert_eq!(steps.next(), Some(Wheel { up: true, ctrl: true }));
+        assert!(map.two_finger_tap_cuts);
+        assert!(is_tap(0.2, 3.0, 1.0), "quick and in place: a cut");
+        assert!(!is_tap(0.8, 3.0, 1.0), "held: no cut");
+        assert!(!is_tap(0.2, 40.0, 1.0), "a drag: no cut");
     }
 }

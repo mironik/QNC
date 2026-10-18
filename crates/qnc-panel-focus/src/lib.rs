@@ -313,6 +313,13 @@ impl PanelFocus {
                 self.panel = Panel::SourceTimeline;
                 Some(self.source.route_input(id, event.value, preview, timeline))
             }
+            // Scissors (user 2026-10-18): the source timeline keeps the pair of cuts; a cut
+            // marks IN, so it arms Sync/B-roll as I does.
+            qnc_source_timeline::CUT => {
+                self.panel = Panel::SourceTimeline;
+                qnc_sync_session::armed_by_in(segments);
+                Some(self.source.route_input(id, None, preview, timeline))
+            }
             _ => {
                 self.panel = Panel::SourceTimeline;
                 None

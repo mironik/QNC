@@ -20,6 +20,8 @@ pub fn event(intent: &TimelineIntent, wheel: qnc_wheel_jog::WheelActions<'_>, fr
     let lane = |lane: &AudioLane| if *lane == AudioLane::A2 { "select_audio_a2" } else { "select_audio_a1" };
     Some(match intent {
         TimelineIntent::None | TimelineIntent::ToggleAudioExpand(_) => return None,
+        // The cut is at the playhead; the source timeline keeps the pair.
+        TimelineIntent::Cut => key("source_cut"),
         TimelineIntent::CueFrame(at) | TimelineIntent::SelectVirtual { frame: at, .. } => key("timeline_cue_frame").with_value(frame(*at)),
         // V on a timeline is Home: the start.
         TimelineIntent::GoHome => key("playlist_input_start"),

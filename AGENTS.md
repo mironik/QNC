@@ -4742,3 +4742,14 @@ pokazivac). `qnc-wheel-jog` broji samo cijele zareze misa (`is_notch`). Svaki ti
 daju iste sistemske radnje kao kotacic. Promjena ponasanja: pomak touchpadom na Windowsima je sporiji (korak po cijelom
 zarezu umjesto po svakom djelicu). Pocetne vrijednosti mapa (uloge, koraci) su prijedlog, mijenjaju se u ugovoru. Testovi,
 conformance. Uzivo nije provjereno (touchpad i zaslon na dodir).
+Izvedeno 2026-10-18 (korisnik: "za geste i misa trebam cut (skare) za odredivanje reza"; "na mjestu playheada napravim
+cut rez, a razmak izmedu dva cut reza odreduju IN i OUT na source timelineu"; "nije bitno koji je prvi a koji drugi,
+razmak je bitan"; "tipkovnicom postoji I ili O, trazim rjesenje za mis i pad"): skare na source timelineu (sve forme).
+Rez je uvijek na mjestu playheada (i dok svira): prvi rez je IN bez OUT-a, drugi oznacava razmak (raniji IN, kasniji
+OUT, bez obzira na redoslijed), treci pocinje novi par; par pripada klipu. Mis: srednja tipka (kotacic) iznad source
+timelinea; touchpad: dodir s tri prsta kad je u Windows postavkama srednji klik; zaslon na dodir: kratki dodir s dva
+prsta na mjestu (`contracts/input/touch.json` `two_finger_tap`: `cut` ili `none`). Radnja kataloga `source_cut` (bez
+tipke; tipke ostaju I i O). `qnc-timeline` (`TimelineIntent::Cut`, mapa misa `source_cut`,
+`with_first_cut_at_confirmed`, `with_second_cut_at_confirmed`), `qnc-source-timeline` (`cut`, pamti prvi rez,
+`route_input`, pa isto u Storyju i Ingestu), `qnc-touch-gestures` (`tapped`), `qnc-panel-focus` (rez naoruzava
+Sync/B-roll kao I). Testovi, conformance. Uzivo nije provjereno.

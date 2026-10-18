@@ -40,6 +40,8 @@ pub const CHOOSE_A1_CHANNEL: &str = "source_choose_a1_channel";
 pub const KEEP_MARK: &str = "source_keep_mark";
 /// IN or OUT dragged with the mouse (user 2026-10-17); its value is the frame of the clip.
 pub const DRAG_IN: &str = "source_drag_in";
+/// The cut (scissors) at the playhead (user 2026-10-18).
+pub const CUT: &str = "source_cut";
 pub const DRAG_OUT: &str = "source_drag_out";
 pub const CHOOSE_A2_CHANNEL: &str = "source_choose_a2_channel";
 
@@ -69,6 +71,8 @@ pub struct SourceTimeline {
     clip: Option<String>,
     message: String,
     view: SourceTimelineView,
+    /// The first cut of a pair (its frame), until the second.
+    first_cut: Option<u64>,
 }
 
 impl SourceTimeline {
@@ -81,6 +85,7 @@ impl SourceTimeline {
     pub fn sync(&mut self, clip_id: Option<&str>, content: Option<&ContentTarget>) -> &SourceTimelineView {
         if self.clip.as_deref() != clip_id {
             self.clip = clip_id.map(str::to_string);
+            self.first_cut = None; // a pair of cuts belongs to its clip
             self.lanes.new_clip();
             self.message.clear();
         }
@@ -138,6 +143,9 @@ impl SourceTimeline {
     /// keys of a lane (Ctrl+1/Ctrl+2, and those of a taken lane); `None` for any other.
     /// Enter (or a left click) while IN or OUT is taken keeps the edit and lets the mark go.
     pub fn route_input(&mut self, action_id: &str, value: Option<i64>, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
+        if action_id == CUT {
+            return Some(self.cut(timeline));
+        }
         if let (DRAG_IN | DRAG_OUT, Some(frame)) = (action_id, value.and_then(|frame| u64::try_from(frame).ok())) {
             return Some(self.drag(action_id == DRAG_IN, frame, preview, timeline));
         }
@@ -157,6 +165,25 @@ impl SourceTimeline {
         channel
             .and_then(|channel| self.choose_action(action_id, channel, preview))
             .or_else(|| self.route_lane(action_id, preview))
+    }
+
+    /// A cut (scissors) at the playhead (user 2026-10-18: the distance between two cuts is
+    /// what is marked, not their order): the first is IN with no OUT, the second marks the
+    /// earlier IN and the later OUT, the next starts a new pair. A taken mark is let go.
+    pub fn cut(&mut self, timeline: &mut TimelineProjection) -> bool {
+        let Some(at) = timeline.playhead_frame else {
+            return false;
+        };
+        self.keys.set_mark_taken(false);
+        qnc_source_mark_focus::release(timeline);
+        *timeline = match self.first_cut.take() {
+            Some(first) if first != at => timeline.clone().with_second_cut_at_confirmed(first),
+            _ => {
+                self.first_cut = Some(at);
+                timeline.clone().with_first_cut_at_confirmed()
+            }
+        };
+        true
     }
 
     /// A click on a channel of the column (`action_id` from [`Self::action_of`]); `None`
@@ -382,6 +409,17 @@ mod tests {
     fn enter_or_a_left_click_keeps_a_taken_mark_and_a_right_click_takes_one() {
         assert_eq!(SourceTimeline::event_of(&TimelineIntent::KeepMark).map(|event| event.action_id), Some(KEEP_MARK.into()), "a click is never Enter");
         assert_eq!(SourceTimeline::event_of(&TimelineIntent::TakeMark(false)).map(|event| event.action_id), Some("select_mark_out".into()));
+        // Scissors: two cuts mark the distance, whatever their order; the third starts again.
+        let mut source = SourceTimeline::new();
+        let mut marks = TimelineProjection::new(0, 100).with_playhead(50);
+        assert!(source.cut(&mut marks));
+        assert_eq!((marks.source_in_frame, marks.source_out_frame), (Some(50), None));
+        marks = marks.with_playhead(20);
+        source.cut(&mut marks);
+        assert_eq!((marks.source_in_frame, marks.source_out_frame), (Some(20), Some(50)), "the earlier is IN");
+        marks = marks.with_playhead(70);
+        source.cut(&mut marks);
+        assert_eq!((marks.source_in_frame, marks.source_out_frame), (Some(70), None), "a new pair");
         let (mut source, mut preview) = (SourceTimeline::new(), SourcePreview::default());
         let mut timeline = TimelineProjection::new(0, 100).with_playhead(10).with_source_in_at_confirmed().with_playhead(40).with_source_out_at_confirmed();
         source.route("select_mark_in", &mut preview, &mut timeline);

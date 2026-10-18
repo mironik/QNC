@@ -362,6 +362,9 @@
     "timeline_drag_marker": {
       "label": "Povlacenje M markera misem"
     },
+    "source_cut": {
+      "label": "Rez (skare) na mjestu playheada na source timelineu: dva reza su IN i OUT, raniji IN, kasniji OUT"
+    },
     "segment_select": {
       "label": "Panel Segmenti: klik na segment u popisu (odabir)"
     },
