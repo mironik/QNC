@@ -34,13 +34,26 @@ pub(crate) fn scan_source(
     )?;
     let indexes = registry.indexes();
     send.send(Event::Status(qnc_ui_text::text("select.recognising_source").into()))?;
-    let scan = qnc_scanner::scan_roles(
-        &catalog,
-        source,
-        source_config.scope,
-        &indexes,
-        Default::default(),
-    )?;
+    // The card is looked for from the chosen folder up to the source root: a card copied
+    // into a folder (`SDXC/PRIVATE/XDROOT` on a stick) is the card, chosen at its copy's
+    // folder or inside it (user 2026-10-18).
+    let mut bases = vec![selected.relative_path().to_string()];
+    while let Some((parent, _)) = bases.last().and_then(|base| base.rsplit_once('/')) {
+        bases.push(parent.to_string());
+    }
+    if bases.last().map(String::as_str) != Some(".") {
+        bases.push(".".into());
+    }
+    let mut scan = None;
+    for base in &bases {
+        let found = qnc_scanner::scan_roles_at(&catalog, source, source_config.scope, base, &indexes, Default::default())?;
+        let card = found.detection.roots.iter().any(|root| root.has_original_candidates());
+        scan = Some(found);
+        if card {
+            break;
+        }
+    }
+    let scan = scan.ok_or("no card base")?;
     if !scan.relationships_resolved() {
         send.send(Event::Warning(format!(
             "{}",

@@ -119,6 +119,20 @@ pub fn detect(
     scope: SourceScope,
     limits: Limits,
 ) -> Result<DetectionReport, String> {
+    detect_at(catalog, source, scope, ".", limits)
+}
+
+/// `detect` with the card's roots looked for from the folder `base` of the source (its
+/// relative path; "." the source root): a card copied into a folder of a disk or stick
+/// is the card (user 2026-10-18: a card copied to `SDXC/` on a stick was taken as single
+/// files, its proxies as clips).
+pub fn detect_at(
+    catalog: &Catalog,
+    source: &SourceReader,
+    scope: SourceScope,
+    base: &str,
+    limits: Limits,
+) -> Result<DetectionReport, String> {
     catalog.validate()?;
     if limits.max_depth == 0
         || limits.max_depth > 64
@@ -172,7 +186,7 @@ pub fn detect(
         }
         let mut roots = BTreeSet::new();
         for expression in &pattern.roots {
-            match walk.expand(".", expression, EntryKind::Directory) {
+            match walk.expand(base, expression, EntryKind::Directory) {
                 Ok(found) => roots.extend(found),
                 Err(message) => report.issues.push(Issue {
                     pattern_id: pattern.id.clone(),

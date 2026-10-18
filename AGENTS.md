@@ -4661,3 +4661,11 @@ filmstrip; kartica nakon Selecta cita samo za dovrsetak zapisa (svi klipovi se m
 `qnc-source-preview`: klip koji ceka zapis otvara se ponovno svakih 250 ms (prije 1 s), poruka je obicna priprema playera
 (`player.player_getting_ready`, prije hrvatski tekst u kodu), Space se pamti i klip krene cim je spreman. Jezgra playera
 i pravilo jednog probea nisu mijenjani. Testovi, conformance. Uzivo nije izmjereno.
+Popravak 2026-10-18 (korisnik: SD kartica kopirana na USB stik; "uvozi i proxy i original", "iako u projektnim
+postavkama pise link original", Select "10 puta sporije"): katalog kamera trazi Sonyjevu karticu kao `PRIVATE/XDROOT` u
+korijenu nositelja (`card_relative`), a kopija na stiku je u `E:\SDXC\PRIVATE\XDROOT`. Kartica nije prepoznata, Select je
+svaku video datoteku uzeo kao pojedinacnu datoteku: 98 proxyja postalo je zasebnih klipova (pa su i uvezeni), a svaka
+datoteka dobila je probe u samom Selectu (19 s za 173 datoteke). `qnc-camera-detector` `detect_at` i `qnc-scanner`
+`scan_roles_at` traze korijene kartice od zadane mape; Select (`scan.rs`) trazi od izabrane mape prema korijenu
+nositelja i uzima prvu na kojoj je kartica. Provjereno na stiku (samo citanje): `E:\SDXC` daje 98 klipova s 98 proxyja,
+bez ijednog problema, 169 ms. Test `a_card_copied_into_a_folder_is_found_from_that_folder`, conformance.

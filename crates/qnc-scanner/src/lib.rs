@@ -1,5 +1,5 @@
 //! Read-only role scanning with caller-supplied public recording readers.
-use qnc_camera_detector::{detect, DetectionReport, Limits, SourceScope};
+use qnc_camera_detector::{DetectionReport, Limits, SourceScope};
 use qnc_camera_patterns::Catalog;
 use qnc_source_groups::{
     assemble, single_file, FileFact, FileStamp, FileReader, FileState, GroupProposal, GroupReport,
@@ -82,6 +82,19 @@ pub fn scan_roles(
     readers: &[&dyn IndexReader],
     limits: ScanLimits,
 ) -> Result<ScanReport, String> {
+    scan_roles_at(catalog, source, scope, ".", readers, limits)
+}
+
+/// `scan_roles` with the card's roots looked for from the folder `base` of the source
+/// (`qnc_camera_detector::detect_at`).
+pub fn scan_roles_at(
+    catalog: &Catalog,
+    source: &SourceReader,
+    scope: SourceScope,
+    base: &str,
+    readers: &[&dyn IndexReader],
+    limits: ScanLimits,
+) -> Result<ScanReport, String> {
     if limits.max_indexes == 0
         || limits.max_indexes > 256
         || limits.max_groups == 0
@@ -100,7 +113,7 @@ pub fn scan_roles(
             return Err("invalid or duplicate index reader identity".into());
         }
     }
-    let detection = detect(catalog, source, scope, limits.detection)?;
+    let detection = qnc_camera_detector::detect_at(catalog, source, scope, base, limits.detection)?;
     let mut issues = vec![];
     let mut proposals = vec![];
     let mut facts = BTreeMap::<String, FileFact>::new();

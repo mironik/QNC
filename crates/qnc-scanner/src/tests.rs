@@ -464,3 +464,20 @@ fn single_files_under_the_selected_folder_are_one_clip_each_and_nothing_else_is_
     let day = scan.grouping.groups.iter().find(|g| g.proposal.original.relative_path().ends_with("B.mxf")).unwrap();
     assert_eq!(day.proposal.root, source.reference("incoming/ftp/day").unwrap());
 }
+
+/// A card copied into a folder of a disk or stick is the card when the search starts at
+/// that folder (user 2026-10-18: its proxies were taken as clips of their own).
+#[test]
+fn a_card_copied_into_a_folder_is_found_from_that_folder() {
+    let dir = fixture(&[]);
+    fs::create_dir_all(dir.path().join("SDXC")).unwrap();
+    fs::rename(dir.path().join("PRIVATE"), dir.path().join("SDXC").join("PRIVATE")).unwrap();
+    let source = SourceReader::local(SOURCE, dir.path()).unwrap();
+    let at = |base: &str| {
+        scan_roles_at(&catalog(), &source, SourceScope::CardRelative, base, &[&SonyIndexReader], ScanLimits::default()).unwrap()
+    };
+    assert!(at(".").grouping.groups.is_empty(), "not at the source root");
+    let report = at("SDXC");
+    assert_eq!(report.grouping.groups.len(), 2, "{:?}", report.issues);
+    assert!(report.grouping.groups.iter().all(|g| g.proposal.proxies.len() == 1), "the proxies belong to their originals");
+}
