@@ -549,6 +549,7 @@ fn select_uses_same_source_and_database_contracts_over_lan_and_intranet() {
                                 "fixture-write".to_string(),
                             )
                             .unwrap(),
+                            posters: None,
                         }
                     },
                     &crate::test_support::registry(MetadataSufficiency::NeedsProbe),

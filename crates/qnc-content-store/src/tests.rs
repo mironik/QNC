@@ -1010,11 +1010,22 @@ fn a_poster_made_for_a_clip_without_one_is_kept_and_survives_a_new_select() {
     let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
     let mut no_poster = clip("c1");
     no_poster.thumbnail_uri = None;
+    // The card's poster is replaced by the project's copy (user 2026-10-18).
+    let mut card_poster = clip("c2");
+    card_poster.thumbnail_uri = Some("qnc://local/source/card/file/Thmbnl/c2.JPG".into());
+    run(&mut store, Operation::Publish(Box::new(card_poster.clone()))).unwrap();
+    run(&mut store, Operation::SetPoster { clip_id: "c2".into(), thumbnail_uri: "qnc://local/project/p1/products/thumbnails/c2/poster.jpg".into() }).unwrap();
+    run(&mut store, Operation::Publish(Box::new(card_poster))).unwrap();
+    let c2: Option<String> = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT thumbnail_uri FROM clips WHERE clip_id='c2'", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(c2.as_deref(), Some("qnc://local/project/p1/products/thumbnails/c2/poster.jpg"), "the copy stays after a new Select");
     run(&mut store, Operation::Publish(Box::new(no_poster.clone()))).unwrap();
     let poster = |path: &std::path::Path| {
         Connection::open(path)
             .unwrap()
-            .query_row::<Option<String>, _, _>("SELECT thumbnail_uri FROM public_clips", [], |r| r.get(0))
+            .query_row::<Option<String>, _, _>("SELECT thumbnail_uri FROM public_clips WHERE clip_id='c1'", [], |r| r.get(0))
             .unwrap()
     };
     assert_eq!(poster(&path), None);

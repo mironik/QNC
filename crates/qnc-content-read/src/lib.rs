@@ -120,24 +120,21 @@ impl ContentReader {
         Ok(conn)
     }
 
-    /// Clips of the catalog that have no poster (a single file or a disc without a card
-    /// picture), imported or not: what a background process makes posters for. An imported
-    /// one is included (user 2026-10-18: a clip imported before its record was final got no
-    /// poster at Uvezi and was never asked again). Empty when the catalog keeps no posters.
-    pub fn clips_without_poster(&self) -> Result<Vec<String>, String> {
+    /// The poster each clip of the catalog has now (the card's, the project's or none),
+    /// imported or not: what the poster block brings into the project right after Select
+    /// (user 2026-10-18). Empty when the catalog keeps no posters.
+    pub fn clip_posters(&self) -> Result<Vec<(String, Option<String>)>, String> {
         let conn = self.open()?;
         if !has_view(&conn, "public_clips")? || !has_column(&conn, "public_clips", "thumbnail_uri")? {
             return Ok(Vec::new());
         }
         let mut statement = conn
-            .prepare(
-                "SELECT clip_id FROM public_clips WHERE thumbnail_uri IS NULL ORDER BY clip_id LIMIT ?1",
-            )
+            .prepare("SELECT clip_id, thumbnail_uri FROM public_clips ORDER BY clip_id LIMIT ?1")
             .map_err(|error| error.to_string())?;
         let rows = statement
-            .query_map([MAX_CLIPS as i64], |row| row.get(0))
+            .query_map([MAX_CLIPS as i64], |row| Ok((row.get(0)?, row.get(1)?)))
             .map_err(|error| error.to_string())?;
-        rows.collect::<rusqlite::Result<Vec<String>>>()
+        rows.collect::<rusqlite::Result<Vec<(String, Option<String>)>>>()
             .map_err(|error| error.to_string())
     }
 
@@ -473,18 +470,10 @@ mod tests {
             clips[0].thumbnail_uri.as_deref(),
             Some("qnc://local/source/card/file/Thmbnl/b.JPG")
         );
-        // Every clip without a poster that is not imported, also one only detected.
-        let without = reader.clips_without_poster().unwrap();
-        assert!(!without.contains(&"clip-b".to_string()));
-        let imported: Vec<String> = conn
-            .prepare("SELECT clip_id FROM clips WHERE import_status IN ('imported','done')")
-            .unwrap()
-            .query_map([], |r| r.get(0))
-            .unwrap()
-            .map(Result::unwrap)
-            .collect();
-        assert!(without.iter().all(|id| !imported.contains(id)));
-        assert!(!without.is_empty());
+        // Every clip with the poster it has now: the card's or none.
+        let posters = reader.clip_posters().unwrap();
+        assert!(posters.contains(&("clip-b".into(), Some("qnc://local/source/card/file/Thmbnl/b.JPG".into()))));
+        assert!(posters.iter().any(|(_, poster)| poster.is_none()));
     }
 
     #[test]

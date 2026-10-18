@@ -4617,3 +4617,13 @@ pozadinski radnik je postere radio samo za neuvezene klipove, pa takav klip nika
 `qnc-content-read` `clips_without_poster` daje svaki klip bez postera, uvezen ili ne; `tools/qnc-ingest-worker`
 (`make_posters`) pokrece kocku `qnc-missing-posters` nakon dovrsetka zapisa i jos jednom nakon uvoza. Testovi,
 conformance. Uzivo nije provjereno (treba Select XDCAM diska).
+Izmjena 2026-10-18 (korisnik: "cim se odabere kartica (select) provjerava se imaju li postere, ako nema odmah ih
+kreira i kopira"; "sve to treba biti u kockama, select pokrece kocke"): kocka `qnc-missing-posters` je jedino mjesto
+koje unosi poster u projekt: poster koji kartica ima kopira se u `products/thumbnails/<klip>/poster.jpg` projekta
+(kartica se samo cita, `copy_card_poster`), klip bez postera dobiva poster s pocetka klipa (`poster_from_start`), a
+zapis pokazuje na kopiju u projektu. `PosterProject` (projekt na kojem radi), `start` (vlastita nit). Select
+(`qnc-ingest-select`, `SelectTarget.posters`) je pokrece cim objavi klipove i ne ceka je; pozadinski radnik je pokrece
+jos nakon dovrsetka zapisa i nakon uvoza (klip ciji zapis pri Selectu nije imao brzinu i broj slika).
+`qnc-content-store` `SetPoster`: poster iz projekta zamjenjuje prazno mjesto ili poster s kartice, poster koji je vec u
+projektu se ne zamjenjuje; ponovni Select zadrzava poster koji klip vec ima. `qnc-content-read` `clip_posters` umjesto
+`clips_without_poster`. Testovi `qnc-content-store`, `qnc-missing-posters`, `qnc-ingest-select`, conformance.

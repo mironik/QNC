@@ -238,6 +238,7 @@ pub fn select_target_at(file: &Path) -> crate::SelectTarget {
         content: ContentTarget::from_owner_binding(file, "qnc://local/db/ingest_content/p1").unwrap(),
         records: qnc_db_broker::ProjectDbTarget::from_owner_binding(file, "qnc://local/db/project_db/p1")
             .unwrap(),
+        posters: None,
     }
 }
 

@@ -91,6 +91,9 @@ const CANCEL_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
 pub struct SelectTarget {
     pub content: ContentTarget,
     pub records: qnc_db_broker::ProjectDbTarget,
+    /// The project whose posters Select brings in when it has published (user 2026-10-18:
+    /// Select runs the blocks; the posters are copied or made at once).
+    pub posters: Option<qnc_missing_posters::PosterProject>,
 }
 
 impl SelectTarget {
@@ -102,6 +105,7 @@ impl SelectTarget {
         Ok(Self {
             content: ContentTarget::for_project(reader, settings)?,
             records: qnc_db_broker::ProjectDbTarget::for_project(reader, settings)?,
+            posters: Some(qnc_missing_posters::PosterProject::new(reader.clone(), settings.clone())),
         })
     }
 }
@@ -273,6 +277,7 @@ fn run_inner(
     let SelectTarget {
         content: content_target,
         records: records_target,
+        posters,
     } = target;
     let started = std::time::Instant::now();
     if cancel.load(Ordering::Relaxed) {
@@ -349,6 +354,19 @@ fn run_inner(
     let removed = publish::remove_missing(content_target, &project, &gone, send)?;
     publish::warn_kept_replaced(&replaced, &removed, send)?;
     let removed = removed.len();
+    // Select runs the poster block (user 2026-10-18): the card's posters are copied into the
+    // project and the missing ones made at once, on the block's own thread.
+    if let Some(project) = posters {
+        let sources = config.sources.clone();
+        qnc_missing_posters::start(
+            project,
+            Box::new(move |uri: &str| {
+                let reference = SourceReference::from_uri(uri).ok()?;
+                let source = sources.iter().find(|source| source.location.uri == reference.source_uri())?;
+                source.local_media_path(uri).ok().flatten()
+            }),
+        );
+    }
     Ok(Summary {
         unchanged: scanned.groups.len() - records.len(),
         processed: records.len(),

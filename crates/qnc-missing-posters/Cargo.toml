@@ -12,3 +12,6 @@ qnc-content-store = { workspace = true }
 qnc-work-settings = { workspace = true }
 qnc-filmstrip = { workspace = true }
 qnc-poster-create = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

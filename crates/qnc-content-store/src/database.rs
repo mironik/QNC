@@ -502,12 +502,22 @@ impl ContentStore {
                 if !self.has_thumbnail_uri {
                     return Err(qnc_ui_text::text("db.database_poster_record").into());
                 }
-                self.conn
-                    .execute(
-                        "UPDATE clips SET thumbnail_uri=?2 WHERE clip_id=?1 AND thumbnail_uri IS NULL",
-                        params![clip_id, thumbnail_uri],
-                    )
+                // The project's poster replaces none or the card's (user 2026-10-18: posters
+                // come into the project at Select); a poster already in the project is kept.
+                let current: Option<Option<String>> = self
+                    .conn
+                    .query_row("SELECT thumbnail_uri FROM clips WHERE clip_id=?1", [clip_id], |r| r.get(0))
+                    .optional()
                     .map_err(err)?;
+                let in_project = current
+                    .flatten()
+                    .and_then(|uri| qnc_contracts::parse_qnc_uri(&uri).ok())
+                    .is_some_and(|uri| uri.resource_kind == "project");
+                if !in_project {
+                    self.conn
+                        .execute("UPDATE clips SET thumbnail_uri=?2 WHERE clip_id=?1", params![clip_id, thumbnail_uri])
+                        .map_err(err)?;
+                }
                 Ok(Data::Changed)
             }
             Operation::FinishImport {
@@ -683,7 +693,7 @@ impl ContentStore {
             ON CONFLICT(clip_id) DO UPDATE SET name=excluded.name,catalog_json=excluded.catalog_json,revision=excluded.revision,final=excluded.final,
             duration_seconds=excluded.duration_seconds,duration_frames=excluded.duration_frames,fps_num=excluded.fps_num,fps_den=excluded.fps_den,
             created_at_utc=excluded.created_at_utc,
-            thumbnail_uri=CASE WHEN clips.import_status='imported' THEN clips.thumbnail_uri ELSE COALESCE(excluded.thumbnail_uri,clips.thumbnail_uri) END",
+            thumbnail_uri=COALESCE(clips.thumbnail_uri,excluded.thumbnail_uri)",
             params![clip.id(),clip.source_uri,original.media_uri,clip.name,original.tags.get("creation_time").map(|f| &f.value),duration,
                 video.and_then(|v|v.exact_frame_count()),fps.map(|f|f.fps_num),fps.map(|f|f.fps_den),clip.thumbnail_uri.as_deref(),json,
                 clip.snapshot.revision,clip.snapshot.phase == Phase::Final]).map_err(err)?;

@@ -150,10 +150,8 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 }
                 Err(error) => eprintln!("dovrsetak zapisa nije uspio: {error}"),
             }
-            // Posters for clips whose source has none (a single file, an XDCAM disc): their
-            // records are final now, so the start of the clip is known. Made right away, not
-            // after every wave and filmstrip (user 2026-10-18: since 2026-10-15 they came only
-            // when all artifacts were done, minutes later, and Ingest had stopped looking).
+            // Once more now the records are final: a clip whose record had no timing at
+            // Select gets its poster from the start of the clip.
             if !closed.load(std::sync::atomic::Ordering::Relaxed) {
                 make_posters(root, &config, &lease, &cancel);
             }
@@ -195,7 +193,11 @@ fn make_posters(
         let source = config.sources.iter().find(|source| source.location.uri == reference.source_uri())?;
         source.local_media_path(uri).ok().flatten()
     };
-    match qnc_missing_posters::make_missing_posters(root, &local_media, Some(lease.write_lease()), cancel) {
+    let project = match qnc_missing_posters::PosterProject::active(root) {
+        Ok(project) => project,
+        Err(error) => return eprintln!("posteri nisu napravljeni: {error}"),
+    };
+    match qnc_missing_posters::make_missing_posters(&project, &local_media, Some(lease.write_lease()), cancel) {
         Ok(0) => {}
         Ok(made) => eprintln!("posteri napravljeni: {made}"),
         Err(error) => eprintln!("posteri nisu napravljeni: {error}"),

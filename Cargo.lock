@@ -3854,6 +3854,7 @@ dependencies = [
  "qnc-media-metadata-compose",
  "qnc-media-probe",
  "qnc-media-record-db",
+ "qnc-missing-posters",
  "qnc-record-probe",
  "qnc-scanner",
  "qnc-sony-metadata",
@@ -4228,6 +4229,7 @@ dependencies = [
  "qnc-poster-create",
  "qnc-ui-text",
  "qnc-work-settings",
+ "tempfile",
 ]
 
 [[package]]
