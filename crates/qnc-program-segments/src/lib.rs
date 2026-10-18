@@ -207,6 +207,10 @@ pub struct ProgramSegments {
     cover_writes: Vec<(String, String)>,
     /// The source IN (clip, frame) a cover was made from: used, it makes no short.
     cover_marks: Option<(String, u64)>,
+    /// Where the cover being written ends on the program: once it is in, the Wrap playhead
+    /// goes there, so the next B fills the next empty part (user 2026-10-18: subclips laid
+    /// one after another over the offs).
+    cover_end: Option<u64>,
     /// Write whose completion selects the new segment.
     pending_create: Option<String>,
     sequence: u64,
@@ -879,6 +883,7 @@ impl ProgramSegments {
         else {
             return;
         };
+        self.cover_end = self.cover_end_of(&slot_id, (in_frame, out_frame), (fps_num, fps_den));
         let clip_name = self.source.clip_name.clone();
         self.cover(
             NewCover {
@@ -894,6 +899,16 @@ impl ProgramSegments {
             },
             clip_name,
         );
+    }
+
+    /// The program frame a cover of the source range ends at in slot `slot_id`: its start
+    /// and the source's length in story frames, at most the slot's end (a longer B-roll fills
+    /// the slot, a shorter one splits it there, `qnc-program-db`).
+    fn cover_end_of(&self, slot_id: &str, (in_frame, out_frame): (u64, u64), source_rate: (u32, u32)) -> Option<u64> {
+        let slot = self.view.slots.iter().find(|slot| slot.slot_id == slot_id)?;
+        let (num, den) = qnc_program_db::story_per_source(self.view.timebase?, source_rate).ok()?;
+        let frames = out_frame.saturating_sub(in_frame) * num as u64 / den as u64;
+        Some((slot.start_frame + frames).min(slot.end_frame))
     }
 
     fn marked_source(&mut self) -> Option<(String, (u64, u64), (u32, u32))> {
@@ -1075,13 +1090,20 @@ impl ProgramSegments {
                 None => waiting.push((key, pending)),
                 Some(result) => {
                     landed = true;
-                    // The cover is in the story: its B-roll shot is kept.
+                    // The cover is in the story: its B-roll shot is kept, and the Wrap playhead
+                    // goes to its end for the next B.
+                    let cover = self.cover_writes.iter().any(|(written, _)| *written == key);
                     if result.is_ok() {
                         if let Some((_, shot)) = self.cover_writes.iter().find(|(written, _)| *written == key) {
                             if let Some(shots) = &self.shots {
                                 let _ = shots.submit(&ShotOperation::ConfirmCoverShot { shot_id: shot.clone() });
                             }
                         }
+                        if let Some(end) = self.cover_end.take().filter(|_| cover) {
+                            self.cue_program(end);
+                        }
+                    } else if cover {
+                        self.cover_end = None;
                     }
                     match result {
                         Ok(StoryData::Created(segment_id))

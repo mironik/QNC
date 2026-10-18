@@ -412,6 +412,28 @@ fn a_refused_cover_leaves_no_b_roll_shot_behind() {
     panic!("the B-roll shot of the refused cover stayed");
 }
 
+/// B laid over the offs one after another (user 2026-10-18): once a B-roll is in, the Wrap
+/// playhead is at its end, so the next B fills the next empty part of the slot.
+#[test]
+fn after_a_b_roll_the_wrap_playhead_is_at_its_end() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    store_with_story(&file);
+    let mut segments = ProgramSegments::new();
+    configure(&mut segments, &file);
+    segments.set_playhead(Some(0));
+    segments.set_source(SourcePick::new(Some("c1"), Some("C1"), Some((10, 30)), (Some(10), 1000), Some((50, 1))));
+    segments.cover_from_source(false);
+    settle(&mut segments);
+    assert_eq!(segments.view().covers.len(), 1, "the cover is written");
+    assert_eq!(segments.view().playhead, Some(20), "at the end of the 20 frames of B-roll");
+    segments.set_source(SourcePick::new(Some("c1"), Some("C1"), Some((40, 55)), (Some(40), 1000), Some((50, 1))));
+    segments.cover_from_source(false);
+    settle(&mut segments);
+    assert_eq!(segments.view().covers.len(), 2, "the next B fills the next part");
+    assert_eq!(segments.view().playhead, Some(35));
+}
+
 /// A cover written through the story's writer confirms its B-roll shot (third audit
 /// 2026-10-17): it is kept and the B-roll tab lists it.
 #[test]

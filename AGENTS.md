@@ -4776,3 +4776,8 @@ bilo, iako je status rekao "saved"). `qnc-program-db` `create_cover` (`split_slo
 u istoj transakciji M marker na svom kraju (kao Sync), pokrivalica pokriva prvi dio, ostatak je prazan slot; jedan Undo
 korak. Testovi `a_b_roll_shorter_than_its_slot_splits_it_with_an_m_marker`; dva starija testa koja su kratkom
 pokrivalicom izazivala odbijanje sada pokrivalicom pune duljine, odnosno OUT-om iza kraja klipa.
+Dopuna 2026-10-18 (korisnik: "B-roll treba staviti playhead na svoj kraj, kako bi se sljedeci B-roll mogao nastaviti...
+bitno je maksimalno brzo pokriti offove, a prethodno imamo napravljene SubClipove"): kad baza potvrdi pokrivalicu
+(Cover slot/B, dugme B-roll, Overwrite), Wrap playhead ide na njezin kraj (pocetak slota + duljina izvora u slikama
+price, najvise kraj slota), pa sljedeci B puni sljedeci prazni dio. Odbijena pokrivalica ne mice playhead.
+`qnc-program-segments` (`cover_end`, `cover_end_of`). Test `after_a_b_roll_the_wrap_playhead_is_at_its_end`.
