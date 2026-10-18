@@ -339,10 +339,28 @@
       "label": "Lijevi klik na source timeline: uzeti IN/OUT ostaje gdje je i pusta se"
     },
     "source_choose_a1_channel": {
-      "label": "Kanal na A1 (klik u stupcu kanala source timelinea)"
+      "label": "Kanal na A1 (klik u stupcu kanala uzete trake, na svakom timelineu)"
     },
     "source_choose_a2_channel": {
-      "label": "Kanal na A2 (klik u stupcu kanala source timelinea)"
+      "label": "Kanal na A2 (klik u stupcu kanala uzete trake, na svakom timelineu)"
+    },
+    "timeline_cue_frame": {
+      "label": "Klik na timeline: playhead na kliknutu sliku"
+    },
+    "timeline_select_marker": {
+      "label": "Klik na M marker: odabir markera"
+    },
+    "timeline_select_slot": {
+      "label": "Klik na traku pokrivalice: odabir slota, playhead na kliknutu sliku"
+    },
+    "timeline_select_cover": {
+      "label": "Klik na pokrivalicu bez slota: odabir pokrivalice"
+    },
+    "timeline_take_cover": {
+      "label": "Ctrl+klik na pokrivalicu: pokrivalica uzeta za Delete"
+    },
+    "timeline_drag_marker": {
+      "label": "Povlacenje M markera misem"
     },
     "ingest_cue_frame": {
       "label": "Postavi Ingest cue frame"

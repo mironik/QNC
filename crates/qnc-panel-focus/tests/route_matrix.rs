@@ -37,7 +37,7 @@ fn row(panel: Panel, name: &str, timeline: &TimelineProjection, actions: &[&str]
     let mut timeline = timeline.clone();
     let mut answers = Vec::new();
     for action in actions {
-        let routed = focus.route(action, (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        let routed = focus.route(*action, (&mut preview, &mut wrap, &mut segments, &mut timeline));
         let pick = focus.take_pick();
         answers.push(format!("{routed:?}/{:?}/{pick:?}", focus.panel()));
     }

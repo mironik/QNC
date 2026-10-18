@@ -103,6 +103,10 @@ pub type WheelActions<'a> = ((&'a str, &'a str), (&'a str, &'a str));
 pub const SOURCE_ACTIONS: WheelActions<'static> =
     (("wheel_source_back", "wheel_source_forward"), ("wheel_source_ctrl_back", "wheel_source_ctrl_forward"));
 
+/// The wheel over the segment panel's Wrap rows, as over the source timeline.
+pub const SEGMENTS_ACTIONS: WheelActions<'static> =
+    (("wheel_segments_back", "wheel_segments_forward"), ("wheel_segments_ctrl_back", "wheel_segments_ctrl_forward"));
+
 /// Whether a wheel action of `SOURCE_ACTIONS` moves the playhead forward, after this
 /// computer's choice of direction; `None` for the Ctrl pair or another action.
 pub fn source_step_forward(action_id: &str) -> Option<bool> {

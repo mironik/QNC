@@ -14,6 +14,7 @@ pub use list::show_segment_list;
 mod cover_length;
 pub use cover_length::{cover_fill, CoverLengthBand};
 
+use qnc_action_event::ActionEvent;
 use eframe::egui::{self, Color32, RichText, Vec2};
 use qnc_program_segments::{SegmentCommand, SegmentRow, SegmentsView};
 use qnc_timeline::{
@@ -60,6 +61,27 @@ impl SegmentPanelStyle {
     }
 }
 
+/// The panel name of the segment panel in the layout contracts (where a click happened).
+pub const PANEL: &str = "segments";
+
+/// What the panel gives: a pointer on a Wrap row as a system action (any input device can
+/// give the same, user 2026-10-18), a button of its bar as a program command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SegmentInput {
+    Event(ActionEvent),
+    Command(SegmentCommand),
+}
+
+impl SegmentInput {
+    /// The event or the command, each to its own.
+    pub fn either<T>(self, event: impl FnOnce(ActionEvent) -> T, command: impl FnOnce(SegmentCommand) -> T) -> T {
+        match self {
+            Self::Event(action) => event(action),
+            Self::Command(order) => command(order),
+        }
+    }
+}
+
 /// Paints the panel into the whole available rectangle.
 pub fn show(
     ui: &mut egui::Ui,
@@ -67,7 +89,7 @@ pub fn show(
     timeline_theme: TimelineTheme,
     lengths: &[CoverLengthBand],
     levels: [Option<f32>; 2],
-) -> Option<SegmentCommand> {
+) -> Option<SegmentInput> {
     let style = SegmentPanelStyle::from_timeline(timeline_theme);
     let panel_rect = ui.available_rect_before_wrap();
     ui.painter().rect_filled(panel_rect, 0.0, style.surface);
@@ -147,7 +169,7 @@ pub fn show(
             ui.scope_builder(egui::UiBuilder::new().max_rect(playlist), |ui| {
                 ui.set_clip_rect(playlist);
                 ui.separator();
-                command = command.take().or(bar::show(ui, segments, timeline_theme, levels));
+                command = command.take().or(bar::show(ui, segments, timeline_theme, levels).map(SegmentInput::Command));
                 ui.add_space(2.0);
                 let total = segments.total_frames;
                 // Every timeline row needs its own id space: `qnc-timeline` names its
@@ -216,7 +238,7 @@ fn paint_row(
     row: &SegmentRow,
     theme: TimelineTheme,
     lengths: &[CoverLengthBand],
-) -> Option<SegmentCommand> {
+) -> Option<SegmentInput> {
     let window = (row.start_frame, row.end_frame);
     ui.push_id(("qnc_segment_row", &row.segment_id), |ui| {
         paint_program(ui, segments, window, theme, row.start_frame == 0, lengths)
@@ -232,7 +254,7 @@ fn paint_program(
     theme: TimelineTheme,
     lane_labels: bool,
     lengths: &[CoverLengthBand],
-) -> Option<SegmentCommand> {
+) -> Option<SegmentInput> {
     let duration = end.saturating_sub(start).max(1);
     let local = |frame: u64| frame.clamp(start, end) - start;
     let mut state = TimelineProjection::new(0, duration).with_cue_enabled(true);
@@ -390,10 +412,13 @@ fn paint_program(
             pictures: &pictures,
         },
     );
+    // A pointer on the row is a system action on this panel (the mouse map of every
+    // timeline, `qnc_timeline::event`; user 2026-10-18); the rules below are the panel's own.
+    let row_frame = |frame: u64| start + frame.min(duration);
+    let on_panel = |event: ActionEvent| Some(SegmentInput::Event(event.at(PANEL)));
     // Story rows only: a dragged M marker follows the pointer as a draft (Enter confirms).
     if let Some((marker_id, frame)) = qnc_timeline::take_marker_drag(ui.ctx()) {
-        let frame = start + frame.min(duration);
-        return Some(SegmentCommand::DragMarker { marker_id, frame });
+        return on_panel(ActionEvent::key("timeline_drag_marker").with_target(marker_id).with_value(row_frame(frame)));
     }
     // A left click while something on the row is taken keeps it, as Enter (user 2026-10-17:
     // the Wrap rows work as the source timeline: right click takes, wheel moves, left click keeps).
@@ -408,48 +433,20 @@ fn paint_program(
                 | TimelineIntent::SelectVirtual { .. }
         )
     {
-        return Some(SegmentCommand::Keep);
+        return on_panel(ActionEvent::key("activate_focused_item"));
     }
     match intent {
-        TimelineIntent::SelectMarker { id, .. } => Some(SegmentCommand::SelectMarker(id)),
-        // A right click takes what it points at, as Ctrl+M, Ctrl+S, Ctrl+1/Ctrl+2 (user 2026-10-17).
-        TimelineIntent::TakeMarker { id, .. } => Some(SegmentCommand::TakeMarker(id)),
-        TimelineIntent::TakeSlot { id, .. } => Some(SegmentCommand::TakeSlot(id)),
-        TimelineIntent::TakeSlotEdge { id, start } => Some(SegmentCommand::TakeSlotEdge { slot_id: id, start }),
-        TimelineIntent::TakeCover { id, frame } => Some(SegmentCommand::TakeCover { cover_id: id, frame: start + frame.min(duration) }),
-        TimelineIntent::TakeSound { lane, frame } => Some(SegmentCommand::TakeSound {
-            lane: u8::from(lane == qnc_timeline::AudioLane::A2),
-            frame: start + frame.min(duration),
-        }),
-        // v5 `program_intent_from_timeline_interact`: a click keeps its frame.
-        TimelineIntent::SelectMarkerSlot { id, frame } => Some(SegmentCommand::SelectSlot {
-            slot_id: id,
-            frame: start + frame.min(duration),
-        }),
-        // Ctrl+click takes the cover for Delete (Ctrl+ selects); a plain click selects it.
+        // Ctrl+click takes the cover for Delete (Ctrl+ selects); a plain click on the colour
+        // strip selects the slot it covers (user 2026-10-17), else the cover.
         TimelineIntent::SelectCover { id, frame } => {
-            let cover_id = id;
-            let frame = start + frame.min(duration);
-            // A plain click on the colour strip selects the slot it covers (user 2026-10-17).
-            let slot = segments.covers.iter().find(|cover| cover.cover_id == cover_id).map(|cover| cover.slot_id.clone());
-            Some(match (ui.input(|input| input.modifiers.command), slot) {
-                (true, _) => SegmentCommand::TakeCover { cover_id, frame },
-                (false, Some(slot_id)) => SegmentCommand::SelectSlot { slot_id, frame },
-                (false, None) => SegmentCommand::SelectCover { cover_id, frame },
-            })
+            let slot = segments.covers.iter().find(|cover| cover.cover_id == id).map(|cover| cover.slot_id.clone());
+            let event = match (ui.input(|input| input.modifiers.command), slot) {
+                (true, _) => ActionEvent::key("timeline_take_cover").with_target(id),
+                (false, Some(slot_id)) => ActionEvent::key("timeline_select_slot").with_target(slot_id),
+                (false, None) => ActionEvent::key("timeline_select_cover").with_target(id),
+            };
+            on_panel(event.with_value(row_frame(frame)))
         }
-        TimelineIntent::SelectVirtual { frame, .. } => {
-            Some(SegmentCommand::Cue(start + frame.min(duration)))
-        }
-        TimelineIntent::CueFrame(frame) => Some(SegmentCommand::Cue(start + frame.min(duration))),
-        // V on a segment or the program row is Home: the start of the program.
-        TimelineIntent::GoHome => Some(SegmentCommand::ProgramStart),
-        // Ctrl+click on V: filmstrip or narrow video row (user 2026-10-15).
-        TimelineIntent::ToggleVideoMode => Some(SegmentCommand::ToggleWrapVideo),
-        TimelineIntent::Wheel(wheel) => Some(SegmentCommand::Wheel { up: wheel.up, ctrl: wheel.ctrl }),
-        // A click on a channel in the column of the taken sound (user 2026-10-18: by mouse too).
-        TimelineIntent::ChooseA1Channel(channel) => Some(SegmentCommand::PickChannel { lane: 0, channel }),
-        TimelineIntent::ChooseA2Channel(channel) => Some(SegmentCommand::PickChannel { lane: 1, channel }),
         // A left click on the A1/A2 button of a Wrap row, as on the source timeline (user
         // 2026-10-17): it takes the sound of what lies under the Wrap playhead in this row
         // (else at its start), as Ctrl+1/Ctrl+2; while a sound is taken it keeps it (Enter).
@@ -457,12 +454,13 @@ fn paint_program(
             if matches!(lane, qnc_timeline::AudioLane::A1 | qnc_timeline::AudioLane::A2) =>
         {
             if segments.part_sound.is_some() {
-                return Some(SegmentCommand::Keep);
+                return on_panel(ActionEvent::key("activate_focused_item"));
             }
             let frame = segments.playhead.filter(|frame| (start..end).contains(frame)).unwrap_or(start);
-            Some(SegmentCommand::TakeSound { lane: u8::from(lane == qnc_timeline::AudioLane::A2), frame })
+            let id = if lane == qnc_timeline::AudioLane::A2 { "select_audio_a2" } else { "select_audio_a1" };
+            on_panel(ActionEvent::key(id).with_value(frame))
         }
-        _ => None,
+        other => qnc_timeline::event(&other, qnc_wheel_jog::SEGMENTS_ACTIONS, &row_frame).map(|event| SegmentInput::Event(event.at(PANEL))),
     }
 }
 

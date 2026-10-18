@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.action-event",
+  "module_name": "Action event",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "input.action_event"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-action-event",
+  "input": "A catalog action id from any input device, with an optional value (frame, channel), target (marker, slot, cover) and the panel the pointer was on.",
+  "output": "One system action the panel router takes, the same for the keyboard, the mouse and future devices (touchpad, gestures, programmable keyboard, edit console).",
+  "specification": "User 2026-10-18: every action under a system code so that many input devices can drive QNC through their own maps; each device is a block."
+}

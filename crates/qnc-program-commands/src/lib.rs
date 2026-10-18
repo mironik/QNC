@@ -164,6 +164,30 @@ pub enum SegmentCommand {
 }
 
 impl SegmentCommand {
+    /// The command behind a system action that names what it acts on (a pointer on a Wrap
+    /// row: the marker, slot or cover, the frame, the channel); `None` for a key, which acts
+    /// on what the playhead or the selection gives (`from_action`). The same action ids as
+    /// the keys where one exists: a right click is Ctrl+ (user 2026-10-18).
+    pub fn from_event(event: &qnc_action_event::ActionEvent) -> Option<Self> {
+        let (target, value) = (event.target.clone(), event.unsigned());
+        Some(match (event.action_id.as_str(), target, value) {
+            ("timeline_cue_frame", _, Some(frame)) => Self::Cue(frame),
+            ("timeline_select_marker", Some(id), _) => Self::SelectMarker(id),
+            ("select_marker", Some(id), _) => Self::TakeMarker(id),
+            ("select_current_marker_slot", Some(id), _) => Self::TakeSlot(id),
+            (edge @ ("select_mark_in" | "select_mark_out"), Some(slot_id), _) => Self::TakeSlotEdge { slot_id, start: edge == "select_mark_in" },
+            ("timeline_take_cover", Some(cover_id), Some(frame)) => Self::TakeCover { cover_id, frame },
+            ("timeline_select_cover", Some(cover_id), Some(frame)) => Self::SelectCover { cover_id, frame },
+            ("timeline_select_slot", Some(slot_id), Some(frame)) => Self::SelectSlot { slot_id, frame },
+            ("timeline_drag_marker", Some(marker_id), Some(frame)) => Self::DragMarker { marker_id, frame },
+            (lane @ ("select_audio_a1" | "select_audio_a2"), None, Some(frame)) => Self::TakeSound { lane: u8::from(lane == "select_audio_a2"), frame },
+            (lane @ ("source_choose_a1_channel" | "source_choose_a2_channel"), _, Some(channel)) => {
+                Self::PickChannel { lane: u8::from(lane == "source_choose_a2_channel"), channel: u16::try_from(channel).ok()? }
+            }
+            _ => return None,
+        })
+    }
+
     /// The command behind a keyboard catalog `action_id`.
     pub fn from_action(action_id: &str) -> Option<Self> {
         Some(match action_id {
@@ -194,5 +218,23 @@ impl SegmentCommand {
             "cover_mode_sync" => Self::CoverMode { sync: true },
             _ => return None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use qnc_action_event::ActionEvent;
+
+    #[test]
+    fn a_pointer_names_what_its_key_takes_from_the_playhead() {
+        let at = |id: &str| ActionEvent::key(id).at("segments");
+        assert_eq!(SegmentCommand::from_event(&at("select_marker").with_target("m")), Some(SegmentCommand::TakeMarker("m".into())), "a right click on a marker takes that marker");
+        assert_eq!(SegmentCommand::from_event(&at("select_marker")), None, "the key itself acts on the selection");
+        assert_eq!(SegmentCommand::from_event(&at("select_mark_out").with_target("s")), Some(SegmentCommand::TakeSlotEdge { slot_id: "s".into(), start: false }));
+        assert_eq!(SegmentCommand::from_event(&at("timeline_cue_frame").with_value(40u64)), Some(SegmentCommand::Cue(40)));
+        assert_eq!(SegmentCommand::from_event(&at("select_audio_a2").with_value(7u64)), Some(SegmentCommand::TakeSound { lane: 1, frame: 7 }));
+        assert_eq!(SegmentCommand::from_event(&at("source_choose_a1_channel").with_value(3u64)), Some(SegmentCommand::PickChannel { lane: 0, channel: 3 }));
+        assert_eq!(SegmentCommand::from_event(&at("play_pause")), None);
     }
 }

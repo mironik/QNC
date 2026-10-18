@@ -22,7 +22,6 @@ use qnc_program_segments::SourcePick;
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_source_preview::{PreviewContext, SourcePreview};
 use qnc_source_reader::SourceReader;
-use qnc_timeline::TimelineIntent;
 use qnc_virtual_short_cards::ParentClip;
 use qnc_virtual_short_stills::VirtualShortStillCache;
 use qnc_work_settings::WorkSettings;
@@ -365,22 +364,18 @@ impl EditorialApplication {
             }
             // The short opens with its IN/OUT, then the keyboard is where the choice left it.
             EditorialIntent::PreviewShort(shot_id) => self.open_short(&shot_id) && self.focus.chose_clip(&mut self.wrap),
-            EditorialIntent::Action(action_id) => {
+            EditorialIntent::Action(event) => {
                 let pieces = (&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline);
-                match self.focus.route(&action_id, pieces) {
-                    Some(changed) => changed, // the keyboard acts on the panel in focus
+                let action_id = event.action_id.clone();
+                match self.focus.route(event, pieces) {
+                    Some(changed) => changed, // the action acts on its panel
                     None => self.application_action(&action_id),
                 }
             }
-            EditorialIntent::Segment(command) => match self.focus.segment_command(&command, (&mut self.preview, &mut self.wrap, &mut self.segments)) {
-                Some(changed) => changed,
-                None => self.segments.apply(command),
-            },
-            EditorialIntent::Timeline(intent @ (TimelineIntent::CueFrame(_) | TimelineIntent::GoHome)) => {
-                self.focus.to_source(&mut self.wrap); // the Source view
-                self.focus.source_timeline_mut().cue(&intent, &mut self.preview)
+            EditorialIntent::Segment(command) => {
+                self.focus.set(Panel::Segments);
+                self.segments.apply(command)
             }
-            EditorialIntent::Timeline(intent) => self.focus.source_timeline_mut().timeline_input(&intent, &mut self.preview, &mut self.view.preview.timeline),
         };
         self.sync_preview_view();
         changed
@@ -725,7 +720,7 @@ mod tests {
             app.dispatch(EditorialIntent::action(action));
             assert_eq!(app.footer_status(), qnc_ui_text::text("player.broadcast_player_connected"));
         }
-        app.dispatch(EditorialIntent::Timeline(TimelineIntent::CueFrame(10)));
+        app.dispatch(EditorialIntent::action(qnc_action_event::ActionEvent::key("timeline_cue_frame").with_value(10u64).at("source_timeline")));
         assert_eq!(app.footer_status(), qnc_ui_text::text("player.broadcast_player_connected"));
     }
 

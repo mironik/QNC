@@ -114,14 +114,15 @@ pub enum EditorialIntent {
     PreviewClip(String),
     /// Open the parent clip and show this short's IN/OUT.
     PreviewShort(String),
-    Action(String),
-    Timeline(qnc_timeline::TimelineIntent),
+    /// One system action from any input device: a key, a click, the wheel (user 2026-10-18).
+    Action(qnc_action_event::ActionEvent),
+    /// A button of the segment panel's bar or list.
     Segment(qnc_program_segments::SegmentCommand),
 }
 
 impl EditorialIntent {
-    pub fn action(action_id: impl Into<String>) -> Self {
-        Self::Action(action_id.into())
+    pub fn action(action: impl Into<qnc_action_event::ActionEvent>) -> Self {
+        Self::Action(action.into())
     }
 }
 

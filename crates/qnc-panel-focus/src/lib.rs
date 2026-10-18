@@ -11,6 +11,7 @@
 use std::ops::ControlFlow;
 
 use eframe::egui;
+use qnc_action_event::ActionEvent;
 use qnc_program_segments::ProgramSegments;
 use qnc_source_preview::SourcePreview;
 use qnc_source_mark_focus::MarkKey;
@@ -230,28 +231,12 @@ impl PanelFocus {
         self.panel = panel;
     }
 
-    /// A command of a Wrap row (a click, the wheel): the segment panel takes the keyboard; the
-    /// ones its key block answers are answered here (a channel picked by mouse is heard at
-    /// once, user 2026-10-18), `None` for the program model.
-    pub fn segment_command(
-        &mut self,
-        command: &qnc_program_segments::SegmentCommand,
-        (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments),
-    ) -> Option<bool> {
-        self.panel = Panel::Segments;
-        match command {
-            qnc_program_segments::SegmentCommand::PickChannel { lane, channel } => {
-                Some(qnc_segments_keys::pick(*lane, *channel, (preview, wrap, segments)))
-            }
-            _ => None,
-        }
-    }
-
-    /// Routes one catalog action to the focused panel. `None`: not a panel action
-    /// (the application handles it); `Some(changed)`: taken here, done or ignored.
+    /// Routes one system action, from any input device (user 2026-10-18), to the panel it
+    /// belongs to: a key to the panel in focus, a pointer to the panel it was on. `None`: not
+    /// a panel action (the application handles it); `Some(changed)`: taken here, done or ignored.
     pub fn route(
         &mut self,
-        action_id: &str,
+        event: impl Into<ActionEvent>,
         pieces: (
             &mut SourcePreview,
             &mut WrapSession,
@@ -259,8 +244,13 @@ impl PanelFocus {
             &mut TimelineProjection,
         ),
     ) -> Option<bool> {
+        let event = event.into();
+        let action_id = event.action_id.as_str();
         let panel = self.panel;
-        let routed = self.route_on_panel(action_id, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3));
+        let routed = match self.pointer(&event, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3)) {
+            Some(answer) => answer,
+            None => self.route_on_panel(action_id, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3)),
+        };
         // Every key of the story in the player log (live 2026-10-16: IN/OUT not taken
         // after some action): the action, the panel it met, what came of it and the source
         // marks and playhead as the key found them.
@@ -269,7 +259,10 @@ impl PanelFocus {
             qnc_dev_diagnostics::log_line(
                 qnc_dev_diagnostics::DiagnosticsStream::Player,
                 format!(
-                    "story-key action={action_id} panel={panel:?}->{:?} routed={routed:?} in={:?} out={:?} playhead={:?} program={} part_sound={} marker={} edge={} message={:?}",
+                    "story-key action={action_id} value={:?} target={:?} at={:?} panel={panel:?}->{:?} routed={routed:?} in={:?} out={:?} playhead={:?} program={} part_sound={} marker={} edge={} message={:?}",
+                    event.value,
+                    event.target,
+                    event.at,
                     self.panel,
                     timeline.source_in_frame,
                     timeline.source_out_frame,
@@ -283,6 +276,48 @@ impl PanelFocus {
             );
         }
         routed
+    }
+
+    /// An event of a pointer (a click, a drag, the wheel) on a panel: the panel takes the
+    /// keyboard (a click in a panel focuses it); what names its object or frame is answered
+    /// here, the rest goes on as the same key on that panel. `None`: go on as a key.
+    fn pointer(
+        &mut self,
+        event: &ActionEvent,
+        (preview, wrap, segments, timeline): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection),
+    ) -> Option<Option<bool>> {
+        if event.is_at(qnc_segment_panel_name()) {
+            self.panel = Panel::Segments;
+            // The marker, slot, cover, frame or channel the pointer named (piece
+            // `qnc-program-commands`: one map for keys and pointers).
+            return match qnc_program_segments::SegmentCommand::from_event(event)? {
+                qnc_program_segments::SegmentCommand::PickChannel { lane, channel } => {
+                    Some(Some(qnc_segments_keys::pick(lane, channel, (preview, wrap, segments))))
+                }
+                command => Some(Some(segments.apply(command))),
+            };
+        }
+        if !event.is_at(qnc_source_timeline::PANEL) {
+            return None;
+        }
+        // A click on the source timeline: the Source view, the playhead where it points (in
+        // every form the same); a dragged IN/OUT or a channel picked with its value.
+        let id = event.action_id.as_str();
+        match id {
+            "timeline_cue_frame" | "playlist_input_start" => {
+                self.to_source(wrap);
+                let intent = event.unsigned().filter(|_| id == "timeline_cue_frame").map_or(TimelineIntent::GoHome, TimelineIntent::CueFrame);
+                Some(Some(self.source.cue(&intent, preview)))
+            }
+            qnc_source_timeline::DRAG_IN | qnc_source_timeline::DRAG_OUT | qnc_source_timeline::CHOOSE_A1_CHANNEL | qnc_source_timeline::CHOOSE_A2_CHANNEL => {
+                self.panel = Panel::SourceTimeline;
+                Some(self.source.route_input(id, event.value, preview, timeline))
+            }
+            _ => {
+                self.panel = Panel::SourceTimeline;
+                None
+            }
+        }
     }
 
     fn route_on_panel(
@@ -617,27 +652,29 @@ pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {
     order[next]
 }
 
-/// The catalog actions of the wheel over the source timeline or monitor (back, forward).
-/// Then with Ctrl held (the level of a taken sound).
-pub const WHEEL_SOURCE: qnc_wheel_jog::WheelActions<'static> = qnc_wheel_jog::SOURCE_ACTIONS;
-/// The same over the segment panel (its Wrap rows), as over the source timeline.
-pub const WHEEL_SEGMENTS: qnc_wheel_jog::WheelActions<'static> =
-    (("wheel_segments_back", "wheel_segments_forward"), ("wheel_segments_ctrl_back", "wheel_segments_ctrl_forward"));
-
-/// The catalog action of a Wrap row's wheel or of a left click that keeps a taken edit
-/// (Enter); `None` for every other command.
-pub fn wheel_action(command: &qnc_program_segments::SegmentCommand) -> Option<&'static str> {
-    match command {
-        // A left click that keeps a taken edit is Enter on the segment panel.
-        qnc_program_segments::SegmentCommand::Keep => Some("activate_focused_item"),
-        qnc_program_segments::SegmentCommand::Wheel { up, ctrl } => Some(qnc_wheel_jog::Wheel { up: *up, ctrl: *ctrl }.action(WHEEL_SEGMENTS)),
-        _ => None,
-    }
+/// The panel name of the segment panel, as its block gives it with a pointer event.
+fn qnc_segment_panel_name() -> &'static str {
+    "segments"
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pointer_event_belongs_to_the_panel_it_was_on() {
+        let mut focus = PanelFocus::new();
+        let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
+        let mut timeline = TimelineProjection { duration_frames: 100, playhead_frame: Some(0), ..Default::default() };
+        focus.set(Panel::Segments);
+        // A right click on the source timeline is Ctrl+I there, not the slot edge of the segment panel in focus.
+        focus.route(ActionEvent::key("select_mark_in").at(qnc_source_timeline::PANEL), (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(focus.panel(), Panel::SourceTimeline);
+        focus.route(ActionEvent::key("timeline_cue_frame").with_value(5u64).at("segments"), (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(focus.panel(), Panel::Segments, "a click on a Wrap row focuses the segment panel");
+        focus.route(ActionEvent::key("timeline_cue_frame").with_value(9u64).at(qnc_source_timeline::PANEL), (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_eq!(focus.panel(), Panel::SourceTimeline, "and one on the source timeline the source timeline");
+    }
 
     #[test]
     fn tab_walks_the_panels_of_the_form_and_keys_on_tabs_and_buttons_become_their_actions() {

@@ -1,0 +1,7 @@
+[package]
+name = "qnc-action-event"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: one system action from any input device (catalog action id, value, target, panel)"
+
+[dependencies]

@@ -25,11 +25,9 @@ impl eframe::App for Host {
                     eprintln!("intent: {intent:?}");
                     match intent {
                         EditorialIntent::PreviewClip(id) => self.view.preview.clip_id = Some(id),
-                        EditorialIntent::Timeline(qnc_timeline::TimelineIntent::CueFrame(
-                            frame,
-                        )) => {
+                        EditorialIntent::Action(event) if event.action_id == "timeline_cue_frame" => {
                             self.view.preview.timeline =
-                                self.view.preview.timeline.with_playhead(frame);
+                                self.view.preview.timeline.with_playhead(event.unsigned().unwrap_or(0));
                         }
                         _ => {}
                     }

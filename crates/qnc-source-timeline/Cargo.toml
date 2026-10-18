@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public piece: the one source timeline every form embeds. It keeps what the source timeline knows (the shown clip's A1/A2 lanes, its channel count and timecode, the keys, the wheel and the timeline's intents) on top of the existing pieces, and draws the source dock. Forms only place it and give their header widgets."
 
 [dependencies]
+qnc-action-event = { workspace = true }
 eframe = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-lane-choice = { workspace = true }

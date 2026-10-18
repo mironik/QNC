@@ -5,6 +5,7 @@ edition = "2024"
 description = "Shared passive QNC timeline UI component"
 
 [dependencies]
+qnc-action-event = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-wheel-jog = { workspace = true }
 qnc-ui-text = { workspace = true }

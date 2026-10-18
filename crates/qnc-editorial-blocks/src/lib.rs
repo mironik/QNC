@@ -46,7 +46,7 @@ pub fn render_desktop(
         }
         "right-panel" if contracts.composition().right_panel == "segment_panel" => {
             let intent = qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths, view.preview.output_levels)
-                .map(|command| qnc_panel_focus::wheel_action(&command).map_or(EditorialIntent::Segment(command), EditorialIntent::action));
+                .map(|input| input.either(EditorialIntent::Action, EditorialIntent::Segment));
             paint_focus(ui, rect, view.focus.panel == Panel::Segments, theme.focus);
             intent
         }
@@ -200,8 +200,7 @@ fn render_source_dock(
     // A click on A1/A2 and the wheel are the source timeline's own catalog actions.
     match (intent, header_intent) {
         (TimelineIntent::None, header) => header,
-        (choose @ (TimelineIntent::ChooseA1Channel(_) | TimelineIntent::ChooseA2Channel(_)), _) => Some(EditorialIntent::Timeline(choose)),
-        (intent, _) => Some(match qnc_source_timeline::SourceTimeline::action_of(&intent) { Some((action, None)) => EditorialIntent::action(action), _ => EditorialIntent::Timeline(intent) }), // with a value: the intent
+        (intent, header) => qnc_source_timeline::SourceTimeline::event_of(&intent).map(EditorialIntent::Action).or(header),
     }
 }
 

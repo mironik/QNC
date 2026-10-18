@@ -3005,6 +3005,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
+name = "qnc-action-event"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-active-project-read"
 version = "0.1.0"
 dependencies = [
@@ -3442,6 +3446,7 @@ dependencies = [
 name = "qnc-editorial-application"
 version = "0.1.0"
 dependencies = [
+ "qnc-action-event",
  "qnc-active-project-read",
  "qnc-clip-posters",
  "qnc-content-artifacts",
@@ -4279,6 +4284,7 @@ name = "qnc-panel-focus"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-action-event",
  "qnc-dev-diagnostics",
  "qnc-key-list",
  "qnc-key-row",
@@ -4514,6 +4520,9 @@ dependencies = [
 [[package]]
 name = "qnc-program-commands"
 version = "0.1.0"
+dependencies = [
+ "qnc-action-event",
+]
 
 [[package]]
 name = "qnc-program-db"
@@ -4823,6 +4832,7 @@ name = "qnc-segment-panel"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-action-event",
  "qnc-dev-diagnostics",
  "qnc-level-meter",
  "qnc-program-filmstrip",
@@ -4830,6 +4840,7 @@ dependencies = [
  "qnc-program-waveform",
  "qnc-timeline",
  "qnc-ui-text",
+ "qnc-wheel-jog",
  "serde",
 ]
 
@@ -5095,6 +5106,7 @@ name = "qnc-source-timeline"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-action-event",
  "qnc-dev-diagnostics",
  "qnc-lane-choice",
  "qnc-source-channels",
@@ -5156,6 +5168,7 @@ name = "qnc-timeline"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-action-event",
  "qnc-channel-picker",
  "qnc-dev-diagnostics",
  "qnc-filmstrip",

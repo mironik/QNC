@@ -4703,3 +4703,20 @@ klikom jedan kljuc traka svih timelinea: `qnc-timeline` `LaneKey::Pick(kanal)` (
 redovi; source timeline vise nema svoj `set_draft`), `qnc-program-commands` `SegmentCommand::PickChannel`,
 `qnc-segment-panel` ga daje, `qnc-panel-focus` `segment_command` ga predaje kocki `qnc-segments-keys` (`pick`: nacrt se
 odmah cuje, kao strelice). Testovi, conformance, zlatni testovi. Uzivo nije provjereno.
+Izvedeno 2026-10-18 (korisnik: "sve radnje pod sistemskom sifrom, kako bi se mogle koristiti razne shortcut mape i vise
+ulaznih uredaja: tipkovnica, mis, touchpad, programabilna tipkovnica, edit konzola, geste... to trebaju biti kocke"; "da,
+kreni s a i b"): (a) nova javna kocka `qnc-action-event` (+ ugovor): jedna sistemska radnja s bilo kojeg uredaja
+(`action_id` iz kataloga, neobavezna vrijednost: slika, kanal; neobavezan cilj: marker, slot, pokrivalica; panel na kojem
+je bio pokazivac, tipka ga nema). Mapa misa svih timelinea je jedna funkcija u `qnc-timeline` (`event`): klik je ista
+radnja kao njegova tipka gdje postoji (desni klik je Ctrl+: na markeru `select_marker`, u slotu
+`select_current_marker_slot`, uz rub slota `select_mark_in/out`, na A1/A2 `select_audio_a1/a2`; kotacic su strelice),
+pokazivac dodaje cilj i sliku. Nove radnje kataloga bez tipke: `timeline_cue_frame`, `timeline_select_marker`,
+`timeline_select_slot`, `timeline_select_cover`, `timeline_take_cover`, `timeline_drag_marker`. Source timeline
+(`event_of`, umjesto `action_of`), panel Segmenti (Wrap reci daju `SegmentInput::Event`, gumbi trake i popisa ostaju
+naredbe) i Ingest koriste istu mapu. (b) `qnc-panel-focus::route` prima sistemsku radnju: tipka ide panelu u fokusu,
+pokazivac panelu na kojem je bio (klik u panel stavlja fokus na njega; desni klik na source timeline dok je fokus na
+Segmentima vise ne uzima rub slota); radnja koja imenuje objekt ili sliku na Wrap retku ide kroz jedno preslikavanje
+`qnc-program-commands::SegmentCommand::from_event`; `EditorialIntent::Timeline` i `segment_command`/`wheel_action`
+uklonjeni. Zlatni testovi tipki nepromijenjeni; novi testovi za mapu misa i za panel pokazivaca. C10 Editorial
+application 660 -> 654, ploca 349 -> 348. Nije izvedeno (c): kocke za touchpad/geste i vanjske konzole; gumbi trake i
+popisa panela Segmenti jos su naredbe, ne sistemske radnje. Uzivo nije provjereno.

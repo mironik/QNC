@@ -28,6 +28,8 @@ pub use qnc_source_timecode::SourceTimecode;
 pub const MODULE_ID: &str = "qnc.module.source-timeline";
 /// The catalog scope of the source timeline's keys, the same in every form.
 pub const KEY_SCOPE: &str = "source_timeline";
+/// The panel name of the source timeline in the layout contracts (where a click happened).
+pub const PANEL: &str = "source_timeline";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The catalog actions of a click on a channel in the A1 or A2 column.
@@ -123,22 +125,13 @@ impl SourceTimeline {
         self.keys.set_mark_taken(taken);
     }
 
-    /// The catalog action a timeline intent stands for, when it is one: a click on A1/A2
-    /// is Ctrl+1/Ctrl+2, the wheel is the arrows (Ctrl+wheel the level), a click on a
-    /// channel of the column is [`CHOOSE_A1_CHANNEL`]/[`CHOOSE_A2_CHANNEL`] with the channel.
-    pub fn action_of(intent: &TimelineIntent) -> Option<(&'static str, Option<i64>)> {
-        match intent {
-            TimelineIntent::TakeAudioLane(AudioLane::A2) => Some(("select_audio_a2", None)),
-            TimelineIntent::TakeAudioLane(_) => Some(("select_audio_a1", None)),
-            TimelineIntent::Wheel(wheel) => Some((wheel.action(qnc_wheel_jog::SOURCE_ACTIONS), None)),
-            // A left click keeps a taken IN/OUT (Enter); a right click takes the nearer (Ctrl+I/O).
-            TimelineIntent::KeepMark => Some((KEEP_MARK, None)),
-            TimelineIntent::TakeMark(in_mark) => Some((if *in_mark { "select_mark_in" } else { "select_mark_out" }, None)),
-            TimelineIntent::ChooseA1Channel(channel) => Some((CHOOSE_A1_CHANNEL, Some(i64::from(*channel)))),
-            TimelineIntent::ChooseA2Channel(channel) => Some((CHOOSE_A2_CHANNEL, Some(i64::from(*channel)))),
-            TimelineIntent::DragMark { in_mark, frame } => Some((if *in_mark { DRAG_IN } else { DRAG_OUT }, i64::try_from(*frame).ok())),
-            _ => None,
-        }
+    /// The system action a pointer intent on the source timeline stands for, on this panel
+    /// (the mouse map of every timeline, `qnc_timeline::event`): a click on A1/A2 is
+    /// Ctrl+1/Ctrl+2, the wheel the arrows (Ctrl+wheel the level), a click on a channel of
+    /// the column [`CHOOSE_A1_CHANNEL`]/[`CHOOSE_A2_CHANNEL`] with the channel, a click on the
+    /// track `timeline_cue_frame` with the frame.
+    pub fn event_of(intent: &TimelineIntent) -> Option<qnc_action_event::ActionEvent> {
+        qnc_timeline::event(intent, qnc_wheel_jog::SOURCE_ACTIONS, &|frame| frame).map(|event| event.at(PANEL))
     }
 
     /// A click on a channel of the column (`action_id` from [`Self::action_of`]), else the
@@ -379,15 +372,16 @@ mod tests {
 
     #[test]
     fn a_click_on_a_lane_is_its_key_and_the_wheel_its_arrows() {
-        assert_eq!(SourceTimeline::action_of(&TimelineIntent::TakeAudioLane(AudioLane::A2)), Some(("select_audio_a2", None)));
-        assert_eq!(SourceTimeline::action_of(&TimelineIntent::ChooseA2Channel(3)), Some((CHOOSE_A2_CHANNEL, Some(3))));
-        assert_eq!(SourceTimeline::action_of(&TimelineIntent::CueFrame(3)), None, "a cue is the form's");
+        let of = |intent| SourceTimeline::event_of(&intent).map(|event| (event.action_id, event.value, event.at));
+        assert_eq!(of(TimelineIntent::TakeAudioLane(AudioLane::A2)), Some(("select_audio_a2".into(), None, Some(PANEL.into()))));
+        assert_eq!(of(TimelineIntent::ChooseA2Channel(3)), Some((CHOOSE_A2_CHANNEL.into(), Some(3), Some(PANEL.into()))));
+        assert_eq!(of(TimelineIntent::CueFrame(3)), Some(("timeline_cue_frame".into(), Some(3), Some(PANEL.into()))), "a cue is a system action too");
     }
 
     #[test]
     fn enter_or_a_left_click_keeps_a_taken_mark_and_a_right_click_takes_one() {
-        assert_eq!(SourceTimeline::action_of(&TimelineIntent::KeepMark), Some((KEEP_MARK, None)), "a click is never Enter");
-        assert_eq!(SourceTimeline::action_of(&TimelineIntent::TakeMark(false)), Some(("select_mark_out", None)));
+        assert_eq!(SourceTimeline::event_of(&TimelineIntent::KeepMark).map(|event| event.action_id), Some(KEEP_MARK.into()), "a click is never Enter");
+        assert_eq!(SourceTimeline::event_of(&TimelineIntent::TakeMark(false)).map(|event| event.action_id), Some("select_mark_out".into()));
         let (mut source, mut preview) = (SourceTimeline::new(), SourcePreview::default());
         let mut timeline = TimelineProjection::new(0, 100).with_playhead(10).with_source_in_at_confirmed().with_playhead(40).with_source_out_at_confirmed();
         source.route("select_mark_in", &mut preview, &mut timeline);
