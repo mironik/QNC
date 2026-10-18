@@ -243,6 +243,9 @@ pub struct TimelineWaveService {
     finished: Vec<(String, Option<Arc<qnc_filmstrip::EncodedPictures>>)>,
     publisher: Option<Box<dyn WaveContentWrite>>,
     playback_priority: bool,
+    /// The clip open in a preview: its pass reads the card alone (user 2026-10-18: two long
+    /// passes side by side on one card took 45-55 s each, its filmstrip waited for it).
+    preferred: Option<String>,
 }
 
 impl fmt::Debug for TimelineWaveService {
@@ -504,11 +507,29 @@ impl TimelineWaveService {
 
     /// The clip the user has open goes first (user 2026-10-15: editing starts on it while
     /// the card's other waves are still made). A clip not waiting is left as it is.
+    /// Its pass reads the card alone: the other passes give way (they are cancelled and
+    /// queued again, as for a player) and wait until it is done.
     pub fn prefer(&mut self, clip_id: &str) {
+        self.preferred = Some(clip_id.to_string());
         if let Some(index) = self.queue.iter().position(|queued| queued.clip_id == clip_id) {
             let request = self.queue.remove(index).expect("index exists");
             self.queue.push_front(request);
+            for worker in self.workers.iter().filter(|worker| worker.request.clip_id != clip_id) {
+                worker.cancel.store(true, Ordering::Release);
+            }
         }
+    }
+
+    /// Whether the preferred clip waits in the queue or runs: then nothing else starts.
+    fn preferred_alone(&mut self) -> Option<bool> {
+        let preferred = self.preferred.as_deref()?;
+        if self.workers.iter().any(|worker| worker.request.clip_id == preferred) {
+            return Some(true); // it runs: the card is its own
+        }
+        let index = self.queue.iter().position(|queued| queued.clip_id == preferred)?;
+        let request = self.queue.remove(index).expect("index exists");
+        self.queue.push_front(request);
+        Some(!self.workers.is_empty()) // the others still stop: it starts once they have
     }
 
     /// The clips whose wave is done since the last call (made, already stored, or
@@ -555,9 +576,27 @@ impl TimelineWaveService {
         let Some(context) = self.context.clone() else {
             return;
         };
-        while self.workers.len() < MAX_ACTIVE_WAVE_WORKERS {
-            let Some(request) = self.queue.pop_front() else {
+        match self.preferred_alone() {
+            Some(true) => return,
+            // The preferred clip is first in the queue and starts alone.
+            Some(false) => {
+                self.start_one(&context);
                 return;
+            }
+            None => {}
+        }
+        while self.workers.len() < MAX_ACTIVE_WAVE_WORKERS {
+            if !self.start_one(&context) {
+                return;
+            }
+        }
+    }
+
+    /// Starts the first request of the queue that still needs a wave; false when none.
+    fn start_one(&mut self, context: &WaveContext) -> bool {
+        loop {
+            let Some(request) = self.queue.pop_front() else {
+                return false;
             };
             self.queued.remove(&request.key());
             if request.project_id != context.project_id() || self.ready.contains(&request.key()) {
@@ -583,6 +622,7 @@ impl TimelineWaveService {
                     wave_log(|| format!("qnc-wave-worker-error: stage=start error={error}"))
                 }
             }
+            return true;
         }
     }
 
@@ -1093,6 +1133,30 @@ mod tests {
 
         assert_eq!(service.queue.len(), 1);
         assert!(service.workers.is_empty());
+    }
+
+    #[test]
+    fn the_preferred_clip_reads_the_card_alone() {
+        let request = |clip: &str| WaveRequest { project_id: "project-a".into(), clip_id: clip.into() };
+        let mut service = TimelineWaveService::default();
+        let (_send, receive) = mpsc::sync_channel(1);
+        let cancel = Arc::new(AtomicBool::new(false));
+        service.workers.push(ActiveWaveWorker {
+            request: request("long"),
+            result: receive,
+            cancel: cancel.clone(),
+            thread: std::thread::spawn(|| {}),
+        });
+        service.enqueue(request("other"), false);
+        service.enqueue(request("open"), false);
+        service.prefer("open");
+        assert!(cancel.load(Ordering::Acquire), "the other pass gives way");
+        assert_eq!(service.queue.front().map(|queued| queued.clip_id.as_str()), Some("open"));
+        assert_eq!(service.preferred_alone(), Some(true), "nothing starts while the other one stops");
+        // Once it has stopped, the preferred clip starts first and alone.
+        service.workers.clear();
+        assert_eq!(service.preferred_alone(), Some(false));
+        assert_eq!(service.queue.front().map(|queued| queued.clip_id.as_str()), Some("open"));
     }
 
     #[test]

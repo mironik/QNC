@@ -4590,3 +4590,10 @@ odbijenu; `ForgetUnconfirmedCoverShots` pri otvaranju price potvrduje nepotvrdje
 pokrivalica koristi, a ostale brise (pad programa izmedu dva upisa vise ne ostavlja kadar). Nepotvrdjen kadar nije u
 tabu B-roll (`public_b_roll_clips`). Ugovor `virtual-shots.database.json`. Testovi `qnc-virtual-shots`,
 `qnc-program-db`, `qnc-program-segments` (`a_written_cover_confirms_its_b_roll_shot`), conformance.
+Popravak 2026-10-18 (korisnik: "filmstrip se kreira sporo"; "jedan prolaz radi i jedno i drugo, moze i s dvije
+jezgre"): provjera nije nasla promjenu jednog prolaza (u logu su val i filmstrip svakog klipa nastajali zajedno, 98
+klipova za oko 5 min, kao 16. 10.). Filmstrip otvorenog klipa kasnio je jer je njegov prolaz (2002, 3,4 min) citao karticu
+uz drugi dugi prolaz (2676), pa su trajali 55 s i 45 s. `qnc-wave-worker` (`preferred`, `preferred_alone`, `start_one`):
+prolaz klipa otvorenog u previewu cita karticu sam; ostali prolazi se prekidaju i vracaju u red (kao za player) i
+cekaju da on zavrsi. Dekodiranje slika filmstripa i dalje ide na drugoj jezgri. Test
+`the_preferred_clip_reads_the_card_alone`, conformance. Uzivo nije izmjereno.
