@@ -4835,3 +4835,12 @@ testiran radi jedan prolaz, koji ga prvi testira (datoteka manja od 64 MB ostavl
 kraja rada (najvise 8, nikad vise od niti procesora), zapis `qnc-wave-worker-pace: readers=.. test=..`. Izmjereno na
 USB 3 stiku mimo cachea: 1 citac 34-56 MB/s, 2 citaca 53-59, 4 i 8 isto ili manje: stik je zasicen s 2 citaca (oko 850
 citanja u sekundi), pa su ~90 s za 98 klipova granica stika, ne jezgri. Testovi, conformance. Uzivo nije provjereno.
+Izmjena 2026-10-18 (korisnik: "do 10 sekundi ubrzano citanje je bolje, nakon toga duljina fajla se dijeli na 13 dijelova i
+gadaju se najblize intra slicice"; "taj kod smo imali... u QNC"): vracen prag iz QNC-a uklonjen 30. 9. (`afc4607`):
+`qnc-filmstrip` klip do 10 s `RandomSeek`, dulji `KeyframeSeek` (13 jednakih dijelova, najbliza intra slika).
+Redoslijed (zamjenjuje 15. i 16. 10.: filmstrip iz prolaza vala): zapisi, pa filmstrip koji sam cita svojih 13 slika,
+pa valovi; val otvorenog klipa ne ceka. `qnc-import-control` (`Order::FilmstripRuns`, `Order::WavesRun`),
+`qnc-wave-worker` (`set_held`; prolaz cita samo zvuk, slike filmstripa i `take_finished` uklonjeni),
+`qnc-timeline-artifacts`. Probe u izoliranoj kopiji: `probe_size_bytes` 2 MB umjesto 8 MB (postavka racunala;
+izlaz ffprobea isti za XAVC, MP4 proxy i XDCAM, s 512 KB nije); stvarni `data` nije diran. Testovi, conformance.
+Uzivo nije izmjereno.

@@ -4,7 +4,7 @@
   "module_version": "0.1.0",
   "module_kind": "library",
   "capabilities": [
-    "import.order.filmstrip_after_wave"
+    "import.order.records_filmstrips_waves"
   ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
@@ -37,7 +37,7 @@
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-import-control",
-  "input": "The clips whose wave is done (made, already stored or impossible), whether the wave worker still has work and whether records are still being completed.",
-  "output": "Orders for the filmstrip worker: make this clip's filmstrip now; make only ordered clips; take every clip without a filmstrip. It reads nothing, writes nothing and runs no worker.",
-  "specification": "User 2026-10-15: a wave takes little of the processor, so as soon as a clip has its wave the filmstrip worker is told to make that clip, beside the next waves."
+  "input": "Whether records are still being completed and whether the filmstrip worker still has work.",
+  "output": "Orders: the filmstrip worker takes clips of its own or waits; the wave worker takes clips of its own or makes only the open clip's wave. It reads nothing, writes nothing and runs no worker.",
+  "specification": "User 2026-10-18: records first, then filmstrips (a clip up to 10 s read through, a longer one the intra picture nearest each of 13 places), then waves (a wave reads the sound of every frame). The open clip's wave never waits. Replaces 2026-10-15 (filmstrip after each wave)."
 }

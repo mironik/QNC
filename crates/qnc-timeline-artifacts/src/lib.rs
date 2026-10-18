@@ -103,10 +103,11 @@ impl Artifacts {
             return Ok(());
         }
         self.sync_deferred = false;
-        // The waves first: the import control then tells the filmstrip what it may take.
-        let wave = self.wave.sync_content_db();
-        self.control_filmstrip();
+        // The import control first tells each worker whether it may take clips.
+        self.control();
         let filmstrip = self.filmstrip.sync_content_db();
+        let wave = self.wave.sync_content_db();
+        self.control();
         filmstrip.and(wave)
     }
 
@@ -128,9 +129,9 @@ impl Artifacts {
     }
 
     pub fn poll(&mut self, active_clip_id: Option<&str>) -> Polled {
-        let wave = self.wave.poll(active_clip_id);
-        self.control_filmstrip();
         let filmstrip = self.filmstrip.poll(active_clip_id);
+        self.control();
+        let wave = self.wave.poll(active_clip_id);
         let mut polled = Polled {
             changed: filmstrip.changed || wave.changed,
             error: filmstrip.active_error.or(wave.active_error),
@@ -150,22 +151,18 @@ impl Artifacts {
         self.filmstrip.set_playback_priority(active);
     }
 
-    /// The caller still completes records: the filmstrip makes only the clips the import
-    /// control orders (each after its wave).
+    /// The caller still completes records: the filmstrip and the waves wait (the open
+    /// clip's wave does not).
     pub fn hold_filmstrip(&mut self, held: bool) {
         self.filmstrip_held = held;
     }
 
-    /// The import control's orders: the filmstrip of each clip whose wave is done, and
-    /// whether the filmstrip may look for clips of its own.
-    fn control_filmstrip(&mut self) {
-        let finished = self.wave.take_finished();
-        let mode = self.control.filmstrip_mode(self.wave.has_pending_work(), self.filmstrip_held);
-        for order in mode.into_iter().chain(self.control.waves_done(finished)) {
+    /// The import control's orders: records, then filmstrips, then waves.
+    fn control(&mut self) {
+        for order in self.control.orders(self.filmstrip_held, self.filmstrip.has_pending_work()) {
             match order {
-                Order::MakeFilmstrip(clip_id, pictures) => self.filmstrip.request(&clip_id, pictures),
-                Order::FilmstripOnOrders => self.filmstrip.set_on_orders(true),
-                Order::FilmstripOnItsOwn => self.filmstrip.set_on_orders(false),
+                Order::FilmstripRuns(runs) => self.filmstrip.set_on_orders(!runs),
+                Order::WavesRun(runs) => self.wave.set_held(!runs),
             }
         }
     }

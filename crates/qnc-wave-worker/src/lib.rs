@@ -229,9 +229,6 @@ struct GeneratedWave {
     artifact: WaveArtifactRecord,
     ready_before: bool,
     total_ms: u128,
-    /// Seconds of media this pass read (0 for a wave already stored).
-    /// The key pictures of the filmstrip, read in the same pass over the original.
-    pictures: Option<qnc_filmstrip::EncodedPictures>,
 }
 
 #[derive(Debug)]
@@ -249,9 +246,8 @@ pub struct TimelineWaveService {
     queue: VecDeque<WaveRequest>,
     queued: BTreeSet<String>,
     workers: Vec<ActiveWaveWorker>,
-    /// Clips whose wave is done (made, already stored, or impossible) since the last
-    /// `take_finished`, with the key pictures read in the same pass when there are.
-    finished: Vec<(String, Option<Arc<qnc_filmstrip::EncodedPictures>>)>,
+    /// Held: only the clip open in a preview gets its wave (the filmstrips go first).
+    held: bool,
     publisher: Option<Box<dyn WaveContentWrite>>,
     playback_priority: bool,
     /// The clip open in a preview: its pass reads the card alone (user 2026-10-18: two long
@@ -350,7 +346,6 @@ impl TimelineWaveService {
                 if let Some(record) = context.content_reader.read_wave(&request.clip_id)? {
                     if wave_artifact_ready(&record) {
                         self.ready.insert(key);
-                        self.finished.push((request.clip_id, None));
                         continue;
                     }
                 }
@@ -463,9 +458,6 @@ impl TimelineWaveService {
                     let a4_count = generated.artifact.a4_peaks.len();
                     let source_uri = generated.artifact.source_uri.clone();
                     let publish_state = if ready_before { "ready" } else { "queued" };
-                    // The wave is made: its clip's filmstrip may come now, from the key pictures
-                    // read with it when there are.
-                    self.finished.push((outcome.request.clip_id.clone(), generated.pictures.map(Arc::new)));
                     if generated.ready_before {
                         self.ready.insert(key);
                     } else {
@@ -506,7 +498,6 @@ impl TimelineWaveService {
                             outcome.request.clip_id, matches_active, error
                         )
                     });
-                    self.finished.push((outcome.request.clip_id.clone(), None)); // no wave to wait for
                     if matches_active {
                         poll.active_error = Some(error);
                     }
@@ -546,10 +537,13 @@ impl TimelineWaveService {
         Some(!self.workers.is_empty()) // the others still stop: it starts once they have
     }
 
-    /// The clips whose wave is done since the last call (made, already stored, or
-    /// impossible).
-    pub fn take_finished(&mut self) -> Vec<(String, Option<Arc<qnc_filmstrip::EncodedPictures>>)> {
-        std::mem::take(&mut self.finished)
+    /// While held only the clip open in a preview gets its wave; the others wait
+    /// (user 2026-10-18: records, then filmstrips, then waves).
+    pub fn set_held(&mut self, held: bool) {
+        self.held = held;
+        if !held {
+            self.start_next();
+        }
     }
 
     pub fn has_pending_work(&self) -> bool {
@@ -597,6 +591,7 @@ impl TimelineWaveService {
                 self.start_one(&context);
                 return;
             }
+            None if self.held => return,
             None => {}
         }
         // Until the medium is tested one pass runs (it tests first).
@@ -733,7 +728,6 @@ fn build_timeline_wave(
                 artifact: record,
                 ready_before: true,
                 total_ms: started.elapsed().as_millis(),
-                pictures: None,
             });
         }
     }
@@ -752,16 +746,10 @@ fn build_timeline_wave(
     let source = source_for_uri(&context.source_bindings, &plan.source_uri)?;
     let media = qnc_wave::media_for_plan(&clip.snapshot, &plan)?;
     test_medium(readers, source, media, cancel);
-    // An original whose key pictures the reader knows (H.264, MPEG-2) gives its
-    // filmstrip's key pictures in the same pass (user 2026-10-15: one reading of the card
-    // for the wave and the filmstrip).
-    let codec = picture_codec(&clip.snapshot.metadata.original);
-    let targets = codec
-        .and_then(|_| qnc_filmstrip::original_picture_frames(&clip.snapshot))
-        .filter(|_| media.media_uri == clip.snapshot.metadata.original.media_uri)
-        .zip(codec);
-    let targets = targets.as_ref().map(|(frames, codec)| (frames.as_slice(), *codec));
-    let (lane_peaks, pictures) = decode_wave(&plan, media, source, targets, cancel)?;
+    // The filmstrip reads its own pictures before the waves (user 2026-10-18: up to 10 s a
+    // clip is read through, a longer one gives the intra picture nearest each of 13 places),
+    // so the pass reads only the sound.
+    let (lane_peaks, _) = decode_wave(&plan, media, source, None, cancel)?;
     let has_a2 = lane_peaks.iter().any(|(lane, _)| *lane == WaveLane::A2);
     let warning = (!has_a2).then(|| qnc_ui_text::text("wave.source_a2_audio_channel").to_string());
     let artifact = qnc_wave::artifact_record_from_lane_peaks(&plan, lane_peaks, warning)?;
@@ -772,7 +760,6 @@ fn build_timeline_wave(
         artifact,
         ready_before: false,
         total_ms: started.elapsed().as_millis(),
-        pictures,
     })
 }
 
@@ -803,20 +790,6 @@ fn test_medium(readers: &Readers, source: &WaveSourceBinding, media: &MediaRepre
             *found = Some(1);
         }
     }
-}
-
-/// The stored picture codec of a representation when the MXF reader knows its key
-/// pictures (`h264`, `mpeg2video`).
-fn picture_codec(media: &MediaRepresentation) -> Option<&'static str> {
-    media.streams.iter().find_map(|stream| {
-        if !matches!(stream.details, StreamDetails::Video(_)) {
-            return None;
-        }
-        match stream.codec.as_ref().map(|codec| &codec.value) {
-            Some(qnc_media_metadata::Signal::Known(name)) => ["h264", "mpeg2video"].into_iter().find(|known| known == name),
-            _ => None,
-        }
-    })
 }
 
 fn wave_artifact_ready(record: &WaveArtifactRecord) -> bool {
