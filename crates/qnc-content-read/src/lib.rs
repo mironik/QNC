@@ -120,6 +120,22 @@ impl ContentReader {
         Ok(conn)
     }
 
+    /// The clips whose record still waits for its completion (`final` of the catalog);
+    /// none when the catalog does not tell it. Light: no record is read.
+    pub fn records_waiting(&self) -> Result<Vec<String>, String> {
+        let conn = self.open()?;
+        if !has_view(&conn, "public_clips")? || !has_column(&conn, "public_clips", "final")? {
+            return Ok(Vec::new());
+        }
+        let mut statement = conn
+            .prepare("SELECT clip_id FROM public_clips WHERE final = 0 ORDER BY clip_id LIMIT ?1")
+            .map_err(|error| error.to_string())?;
+        let rows = statement
+            .query_map([MAX_CLIPS as i64], |row| row.get(0))
+            .map_err(|error| error.to_string())?;
+        rows.collect::<rusqlite::Result<Vec<String>>>().map_err(|error| error.to_string())
+    }
+
     /// The poster each clip of the catalog has now (the card's, the project's or none),
     /// imported or not: what the poster block brings into the project right after Select
     /// (user 2026-10-18). Empty when the catalog keeps no posters.
@@ -423,6 +439,18 @@ mod tests {
                 project_id: "project-1".into(),
             },
         )
+    }
+
+    #[test]
+    fn the_clips_whose_record_waits_are_read_from_the_catalog_view() {
+        let (_dir, reader) = reader_for(SCHEMA);
+        assert!(reader.records_waiting().unwrap().is_empty(), "a view without final tells nothing");
+        let (_dir, reader) = reader_for(
+            "CREATE TABLE clips (clip_id TEXT PRIMARY KEY, final INTEGER);
+             CREATE VIEW public_clips AS SELECT clip_id, final FROM clips;
+             INSERT INTO clips VALUES ('clip-a', 1), ('clip-b', 0);",
+        );
+        assert_eq!(reader.records_waiting().unwrap(), vec!["clip-b".to_string()]);
     }
 
     #[test]

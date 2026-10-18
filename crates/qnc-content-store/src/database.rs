@@ -914,12 +914,14 @@ fn ensure_summary_columns(conn: &Connection) -> Result<()> {
     } else {
         false
     };
-    if added_thumbnail || !has_column(conn, "public_clips", "thumbnail_uri")? {
+    // `final`: whether the clip's record is complete (user 2026-10-18: a worker asks once a
+    // second which records wait, without reading the records).
+    if added_thumbnail || !has_column(conn, "public_clips", "thumbnail_uri")? || !has_column(conn, "public_clips", "final")? {
         conn.execute_batch(
             "DROP VIEW IF EXISTS public_clips;
             CREATE VIEW public_clips AS SELECT clip_id,source_uri,original_uri,name,created_at_utc,
                 duration_seconds,duration_frames,fps_num,fps_den,selected,import_status,
-                imported_media_uri,import_error,thumbnail_uri FROM clips;",
+                imported_media_uri,import_error,thumbnail_uri,final FROM clips;",
         )
         .map_err(err)?;
     }

@@ -34,10 +34,20 @@ fn single_full_call_not_per_field_or_frame_scan() {
     for forbidden in ["-count_frames", "-show_packets"] {
         assert!(!args.iter().any(|a| a == forbidden));
     }
-    // Pictures are read only from the first packets of the file (their colour), never scanned.
-    let interval = args.iter().position(|a| a == "-read_intervals").unwrap();
-    assert_eq!(args[interval + 1], process::FIRST_PACKETS);
+    // The summary decodes no picture; pictures are read only from the first packets of the
+    // file (their colour) and only when the summary does not state it, never scanned.
+    assert!(!args.iter().any(|a| a == "-show_frames"));
+    let frames = process::frame_arguments(&config());
+    let interval = frames.iter().position(|a| a == "-read_intervals").unwrap();
+    assert_eq!(frames[interval + 1], process::FIRST_PACKETS);
     assert!(process::FIRST_PACKETS.starts_with("%+#"));
+    for forbidden in ["-count_frames", "-show_packets", "-show_streams"] {
+        assert!(!frames.iter().any(|a| a == forbidden));
+    }
+    let stated = serde_json::json!({"streams": [{"codec_type": "video", "color_primaries": "bt709", "color_space": "bt709"}]});
+    let unknown = serde_json::json!({"streams": [{"codec_type": "video", "color_primaries": "unknown", "color_space": "bt709"}]});
+    assert!(!process::summary_lacks_colour(&stated), "FX6: the summary states the colour");
+    assert!(process::summary_lacks_colour(&unknown), "XDCAM: the colour is read from the first pictures");
     assert_eq!(
         args.iter()
             .filter(|a| a.as_str() == "-show_streams")

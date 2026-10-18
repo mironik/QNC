@@ -89,24 +89,17 @@ impl Executor {
         else {
             return Err(Error::Configuration);
         };
-        let mut command = Command::new(&self.config.executable);
-        command
-            .args(arguments(&self.config))
-            .arg("-i")
-            .arg(file)
-            .env_remove("FFREPORT")
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
         let started = Instant::now();
-        let bytes = run_command(&mut command, Duration::from_millis(self.config.timeout_ms))?;
-        let mut json: serde_json::Value =
-            serde_json::from_slice(&bytes).map_err(|_| Error::InvalidOutput)?;
+        let mut json = self.read_json(arguments(&self.config), &file)?;
+        // The first pictures are decoded only when the stream summary does not state the
+        // colour (XDCAM MXF keeps it in the MPEG-2 headers only); a summary that states it
+        // needs nothing more (user 2026-10-18: the decode doubled every FX6 probe).
+        if summary_lacks_colour(&json) {
+            let frames = self.read_json(frame_arguments(&self.config), &file)?;
+            if let (Some(object), Some(frames)) = (json.as_object_mut(), frames.get("frames")) {
+                object.insert("frames".into(), frames.clone());
+            }
+        }
         let format = json
             .get_mut("format")
             .and_then(|v| v.as_object_mut())
@@ -122,6 +115,40 @@ impl Executor {
         report.validate(request)?;
         Ok(report)
     }
+}
+
+impl Executor {
+    fn read_json(&self, args: Vec<String>, file: &std::path::Path) -> Result<serde_json::Value> {
+        let mut command = Command::new(&self.config.executable);
+        command
+            .args(args)
+            .arg("-i")
+            .arg(file)
+            .env_remove("FFREPORT")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000);
+        }
+        let bytes = run_command(&mut command, Duration::from_millis(self.config.timeout_ms))?;
+        serde_json::from_slice(&bytes).map_err(|_| Error::InvalidOutput)
+    }
+}
+
+/// Whether a picture stream of the summary leaves its colour (primaries or matrix) unknown.
+pub(crate) fn summary_lacks_colour(json: &serde_json::Value) -> bool {
+    let known = |stream: &serde_json::Value, field: &str| {
+        stream.get(field).and_then(|v| v.as_str()).is_some_and(|v| !v.is_empty() && v != "unknown")
+    };
+    json.get("streams").and_then(|v| v.as_array()).is_some_and(|streams| {
+        streams
+            .iter()
+            .filter(|stream| stream.get("codec_type").and_then(|v| v.as_str()) == Some("video"))
+            .any(|stream| !known(stream, "color_primaries") || !known(stream, "color_space"))
+    })
 }
 
 pub(crate) fn run_command(command: &mut Command, timeout: Duration) -> Result<Vec<u8>> {
@@ -198,10 +225,32 @@ pub(crate) fn arguments(config: &OwnerConfig) -> Vec<String> {
         "-show_error",
         "-show_optional_fields",
         "always",
-        // The colour a picture stream carries in its own headers (MPEG-2 sequence display
-        // extension, H.264 VUI) reaches only decoded pictures; some containers (XDCAM MXF)
-        // do not repeat it, so the stream summary says "unknown" (user 2026-10-16). The same
-        // single call decodes the first packets of the file, bounded, never a frame scan.
+        "-of",
+        "json",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
+}
+
+/// The colour a picture stream carries in its own headers (MPEG-2 sequence display
+/// extension, H.264 VUI) reaches only decoded pictures; some containers (XDCAM MXF) do not
+/// repeat it, so the stream summary says "unknown" (user 2026-10-16). Then the first
+/// packets of the file are decoded, bounded, never a frame scan; the same probe of the medium.
+pub(crate) fn frame_arguments(config: &OwnerConfig) -> Vec<String> {
+    [
+        "-v",
+        "error",
+        "-probesize",
+        &config.probe_size_bytes.to_string(),
+        "-analyzeduration",
+        &config.analyze_duration_us.to_string(),
+        "-threads",
+        "1",
+        "-protocol_whitelist",
+        "file",
+        "-format_whitelist",
+        &config.demuxers.join(","),
         "-show_frames",
         "-read_intervals",
         FIRST_PACKETS,

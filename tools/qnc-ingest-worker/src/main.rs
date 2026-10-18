@@ -50,8 +50,7 @@ fn records_waiting(root: &Path) -> Result<Vec<String>, String> {
     let active_project = qnc_active_project_read::ActiveProjectReader::from_root(root)
         .map_err(|error| error.to_string())?;
     let snapshot = active_project.read().map_err(|error| error.to_string())?;
-    let content = qnc_content_store::ContentTarget::for_project(active_project.settings_reader(), &snapshot.settings)?;
-    Ok(qnc_record_completion::camera_clips(&content)?.iter().map(|clip| clip.id().to_string()).collect())
+    qnc_content_read::ContentReader::for_project(active_project.settings_reader(), &snapshot.settings)?.records_waiting()
 }
 
 /// Whether clips wait in the import queue of the active project.
@@ -314,9 +313,11 @@ fn run_artifacts(
     Ok(())
 }
 
-/// Probes read the card; the card, not the processor, sets the pace (about 0.5 s per
-/// MXF). Two at once keep it busy without crowding the filmstrip reads into timeouts.
-const PROBE_WORKERS: usize = 2;
+/// Probes at once. The working media is USB 3 or faster (user 2026-10-18; USB 2.0 is no
+/// working medium): there a probe is bound by the processor, and measured on a stick 8 at
+/// once took 0.22 s a clip, 2 at once 0.37 s. The records are done before the artifacts
+/// read the card, so the probes have it to themselves.
+const PROBE_WORKERS: usize = 6;
 
 fn root_argument() -> Option<PathBuf> {
     let mut args = std::env::args_os().skip(1);

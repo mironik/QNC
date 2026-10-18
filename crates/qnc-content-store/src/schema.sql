@@ -22,7 +22,7 @@ CREATE TABLE probe_records (
 );
 CREATE VIEW public_clips AS SELECT clip_id,source_uri,original_uri,name,created_at_utc,
     duration_seconds,duration_frames,fps_num,fps_den,selected,import_status,
-    imported_media_uri,import_error,thumbnail_uri FROM clips;
+    imported_media_uri,import_error,thumbnail_uri,final FROM clips;
 CREATE VIEW public_clip_sources AS SELECT * FROM clip_sources;
 CREATE VIEW public_clip_proxy AS SELECT * FROM clip_proxy;
 CREATE VIEW public_probe_records AS SELECT * FROM probe_records;

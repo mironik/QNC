@@ -4674,3 +4674,11 @@ otvaranju projekta (prije Selecta), dovrsetak zapisa nije nasao klipove i zavrsi
 filmstrip (citanjem kartice), a zapisi su krenuli tek ~52 s nakon Selecta, kad se radnik pokrenuo ponovno.
 `tools/qnc-ingest-worker`: dok radnik radi, dovrsetak zapisa svake sekunde gleda ceka li koji zapis i odmah ga radi;
 filmstrip za to vrijeme stoji (`completing`). Conformance. Uzivo nije provjereno.
+Ubrzanje 2026-10-18 (korisnik: "provjeri je li taj nacin adekvatan ili postoji bolje i brze rjesenje"; "necemo
+racunati USB 2.0 kao radni medij, racunajmo na USB 3 i noviji"): okidanje kroz bazu (radnik svake sekunde pita ceka li
+koji zapis) ostaje, jer je baza jedina veza procesa; provjera je sada lagani upit: `qnc-content-store` javni prikaz
+`public_clips` dobio je stupac `final`, `qnc-content-read` `records_waiting` (bez citanja zapisa). Probe
+(`qnc-media-probe`): sazetak streamova uvijek, prvi paketi (boja slike) samo kad sazetak ne zna boju (XDCAM MXF); izmjereno
+na stiku za FX6 MXF 0,53-0,70 s -> 0,26-0,28 s; i dalje jedan probe po mediju. `tools/qnc-ingest-worker` 6 istodobnih
+probeova (uz nit klipa koji preview trazi); izmjereno na stiku 8 istodobno 0,22 s po klipu, 2 istodobno 0,37 s. Test
+`the_wanted_clip_is_completed_first` prilagoden (vlastita nit, ne nuzno prvi zavrseni). Testovi, conformance.
