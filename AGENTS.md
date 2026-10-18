@@ -4770,3 +4770,9 @@ Popravak 2026-10-18 (korisnik: "desna tipka misa (Ctrl+) trebala bi mi omoguciti
 Wrap reda (kraj treceg segmenta, 777) misem se nije dao uzeti: pogodak markera bio je 5 piksela od crte, a klik jednu
 sliku lijevo (oko 9 piksela) bio je samo pomak playheada. `qnc-timeline` `marker_hit`: 8 piksela, uzima se najblizi
 marker. Desni klik na marker uzima ga (kao Ctrl+M), kotacic i strelice ga pomicu, lijevi klik ili Enter spremaju.
+Popravak 2026-10-18 (korisnik: "ne radi dugme B-roll, ni Shift+B"): novi projekt ima jedan slot preko cijele price
+(0-3695), a B-roll od 222 slike pokrio bi samo njegov pocetak; pravilo "bez rupe" odbijalo je pokrivalicu (u bazi je nije
+bilo, iako je status rekao "saved"). `qnc-program-db` `create_cover` (`split_slot_for`): B-roll kraci od slota postavlja
+u istoj transakciji M marker na svom kraju (kao Sync), pokrivalica pokriva prvi dio, ostatak je prazan slot; jedan Undo
+korak. Testovi `a_b_roll_shorter_than_its_slot_splits_it_with_an_m_marker`; dva starija testa koja su kratkom
+pokrivalicom izazivala odbijanje sada pokrivalicom pune duljine, odnosno OUT-om iza kraja klipa.

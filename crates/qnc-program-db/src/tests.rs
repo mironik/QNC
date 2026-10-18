@@ -1732,6 +1732,30 @@ fn no_edit_leaves_a_cover_shorter_than_its_slot() {
 }
 
 #[test]
+fn a_b_roll_shorter_than_its_slot_splits_it_with_an_m_marker() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store); // 30 frames, one slot 0..30
+    let slot: String = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT slot_id FROM story_marker_slots", [], |row| row.get(0))
+        .unwrap();
+    // Live 2026-10-18: a B-roll of a few frames in the one slot of a new story was refused.
+    create_cover(&mut store, &slot, (500, 512)).expect("the cover is made");
+    assert_eq!(markers(&mut store), vec![12], "an M marker where the B-roll ends");
+    let covers: Vec<(i64, i64)> = Connection::open(&path)
+        .unwrap()
+        .prepare("SELECT timeline_start_frame, timeline_end_frame FROM story_covers")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    assert_eq!(covers, vec![(0, 12)], "the cover fills the first part, the rest is an empty slot");
+}
+
+#[test]
 fn a_new_segment_keeps_the_last_slot_of_a_cover_and_gets_an_empty_slot() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
@@ -1744,7 +1768,7 @@ fn a_new_segment_keeps_the_last_slot_of_a_cover_and_gets_an_empty_slot() {
         .unwrap()
         .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [&m25], |row| row.get(0))
         .unwrap();
-    create_cover(&mut store, &slot, (500, 504)).unwrap();
+    create_cover(&mut store, &slot, (500, 505)).unwrap(); // fills the last slot (25..30)
     drop(store);
     // The cover's clip ends soon after it: a longer last slot would leave a hole.
     Connection::open(&path).unwrap().execute("UPDATE clips SET duration_frames = 506 WHERE clip_id = 'c1'", []).unwrap();

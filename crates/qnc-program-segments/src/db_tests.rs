@@ -384,13 +384,14 @@ fn a_refused_cover_leaves_no_b_roll_shot_behind() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("project.db");
     store_with_story(&file);
-    // A clip of 100 pictures: from IN 10 it cannot fill the one slot of the story (150).
+    // A clip of 100 pictures: an OUT past its end is refused by the story's writer (a short
+    // B-roll is no longer refused: it splits its slot, user 2026-10-18).
     rusqlite::Connection::open(&file).unwrap().execute("UPDATE clips SET duration_frames = 100 WHERE clip_id = 'c1'", []).unwrap();
     let mut segments = ProgramSegments::new();
     configure(&mut segments, &file);
     let slot_id = segments.view().slots[0].slot_id.clone();
     segments.cover(
-        NewCover { slot_id, clip_id: "c1".into(), in_frame: 10, out_frame: 30, fps_num: 50, fps_den: 1, a2_source_channel: 0, a2_level_db: 0, a2_off: false },
+        NewCover { slot_id, clip_id: "c1".into(), in_frame: 10, out_frame: 120, fps_num: 50, fps_den: 1, a2_source_channel: 0, a2_level_db: 0, a2_off: false },
         "C1".into(),
     );
     settle(&mut segments);
