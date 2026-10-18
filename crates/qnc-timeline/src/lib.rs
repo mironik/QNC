@@ -9,6 +9,10 @@ use qnc_filmstrip::{FILMSTRIP_FRAME_COUNT, FilmstripBackground};
 pub use qnc_channel_picker::ChannelChoice;
 
 mod events;
+mod marker_reach;
+use marker_reach::{marker_hit, marker_in_reach};
+#[cfg(test)]
+use marker_reach::taken_marker_near;
 mod lanes;
 pub use events::event;
 pub use lanes::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
@@ -255,6 +259,9 @@ pub struct TimelineTheme {
     /// The A1 or A2 button of a lane that is off (level 0), nothing of it heard (user
     /// 2026-10-15).
     pub lane_silent: Color32,
+    /// An M marker the mouse is close enough to take or drag (user 2026-10-18: red in its
+    /// reach, so the user sees it is caught).
+    pub marker_hover: Color32,
     /// The thin level lines of an audio lane: alignment (-18 dBFS), permitted maximum
     /// (-9 dBFS), limit (-1 dBFS).
     pub level_marks: [Color32; 3],
@@ -292,6 +299,7 @@ impl TimelineTheme {
             audio_wave: Color32::from_rgb(80, 190, 148),
             lane_taken: Color32::from_rgb(240, 200, 40),
             lane_silent: Color32::from_rgb(200, 45, 45),
+            marker_hover: Color32::from_rgb(230, 40, 40),
             level_marks: [
                 Color32::from_rgba_unmultiplied(220, 230, 225, 70),
                 Color32::from_rgba_unmultiplied(240, 200, 40, 150),
@@ -540,6 +548,10 @@ pub struct TimelineSlotSpan<'a> {
 pub struct TimelineMarkerPin<'a> {
     pub id: &'a str,
     pub frame: u64,
+    /// Taken (a right click, Ctrl+M) or chosen: a mouse drag takes it from much further
+    /// away (user 2026-10-18: a marker taken by the right button should not need a precise
+    /// pointer to be dragged).
+    pub taken: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1935,17 +1947,24 @@ fn paint_markers(
     markers: &[TimelineMarkerPin<'_>],
     input: &TimelineInput<'_>,
 ) {
+    // The marker in the mouse's reach (the same reach a click or drag takes it from) is red.
+    let hovered = ui
+        .ctx()
+        .pointer_hover_pos()
+        .filter(|pos| track.y_range().contains(pos.y))
+        .and_then(|pos| marker_in_reach(track, range_start, duration, pos, markers));
     for marker in markers {
         if marker.id.trim().is_empty() {
             continue;
         }
         let x = x_for_frame(track, range_start, duration, marker.frame);
+        let (width, color) = if hovered == Some(marker.id) { (2.0, input.theme.marker_hover) } else { (1.0, input.theme.focus) };
         // With audio bands a marker belongs to the covers: its line runs over the video and
         // A2, never over A1, and it has no "M" over A1's wave (user 2026-10-15).
         let top = track.top() + slot_top(input);
         ui.painter().line_segment(
             [egui::pos2(x, top), egui::pos2(x, track.bottom())],
-            Stroke::new(1.0, input.theme.focus),
+            Stroke::new(width, color),
         );
         if !input.layers.audio_bands {
             ui.painter().text(
@@ -1953,7 +1972,7 @@ fn paint_markers(
                 Align2::LEFT_TOP,
                 "M",
                 FontId::proportional(9.0),
-                input.theme.focus,
+                color,
             );
         }
     }
@@ -2049,7 +2068,7 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
     if response.drag_started() {
         let hit = ctx
             .input(|i| i.pointer.press_origin())
-            .and_then(|pos| marker_hit(track, start, duration, pos, input.markers))
+            .and_then(|pos| marker_in_reach(track, start, duration, pos, input.markers))
             .map(str::to_string);
         ctx.data_mut(|d| match hit {
             Some(id) => d.insert_temp(active, id),
@@ -2155,25 +2174,6 @@ fn video_intent_from_response(
         }
     }
     TimelineIntent::CueFrame(frame)
-}
-
-fn marker_hit<'a>(
-    track: Rect,
-    range_start: u64,
-    duration: u64,
-    pos: egui::Pos2,
-    markers: &'a [TimelineMarkerPin<'a>],
-) -> Option<&'a str> {
-    // Wide enough to take a marker by mouse (live 2026-10-18: a marker on the edge of a Wrap
-    // row, one frame away, was a cue); on the row's edge the whole strip beside it counts.
-    let tolerance = 8.0;
-    markers
-        .iter()
-        .filter(|marker| !marker.id.trim().is_empty())
-        .map(|marker| (marker.id, (pos.x - x_for_frame(track, range_start, duration, marker.frame)).abs()))
-        .filter(|(_, distance)| *distance <= tolerance)
-        .min_by(|a, b| a.1.total_cmp(&b.1))
-        .map(|(id, _)| id)
 }
 
 fn cover_hit<'a>(
@@ -2520,12 +2520,17 @@ mod tests {
         let markers = [TimelineMarkerPin {
             id: "m_mid",
             frame: 75,
+            taken: false,
         }];
 
         assert_eq!(
             marker_hit(track, 50, 100, egui::pos2(150.0, 20.0), &markers),
             Some("m_mid")
         );
+        // A taken marker is dragged from much further away (user 2026-10-18).
+        assert_eq!(taken_marker_near(track, 50, 100, egui::pos2(180.0, 20.0), &markers), None, "not taken");
+        let taken = [TimelineMarkerPin { id: "m_mid", frame: 75, taken: true }];
+        assert_eq!(taken_marker_near(track, 50, 100, egui::pos2(180.0, 20.0), &taken), Some("m_mid"));
         assert_eq!(
             cover_hit(track, 50, 100, egui::pos2(140.0, 8.0), &covers, (2.0, 26.0)),
             Some("cover_mid")

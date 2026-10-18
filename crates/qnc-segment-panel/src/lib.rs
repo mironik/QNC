@@ -313,6 +313,7 @@ fn paint_program(
         .map(|pin| TimelineMarkerPin {
             id: &pin.marker_id,
             frame: local(pin.frame),
+            taken: pin.selected,
         })
         .collect::<Vec<_>>();
     // v5 `local_peaks_for_row`: this row's part of the program wave.

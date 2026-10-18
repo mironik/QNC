@@ -4781,3 +4781,9 @@ bitno je maksimalno brzo pokriti offove, a prethodno imamo napravljene SubClipov
 (Cover slot/B, dugme B-roll, Overwrite), Wrap playhead ide na njezin kraj (pocetak slota + duljina izvora u slikama
 price, najvise kraj slota), pa sljedeci B puni sljedeci prazni dio. Odbijena pokrivalica ne mice playhead.
 `qnc-program-segments` (`cover_end`, `cover_end_of`). Test `after_a_b_roll_the_wrap_playhead_is_at_its_end`.
+Dopuna 2026-10-18 (korisnik: "markeri za povlacenje trebali bi biti virtualno siri kako korisnik ne bi morao precizno
+dolaziti misem, ako je prethodno postavljen desnom tipkom (Ctrl+)"; "kad korisnik dode misem u tu zonu osjetljivosti da
+oznaka promijeni boju u crvenu"; "sve to u kockama"): u kocki `qnc-timeline` zasebna podkocka `marker_reach.rs` (jedno
+pravilo za klik, povlacenje i crtanje): marker se uzima 8 piksela od crte, uzeti ili izabrani marker
+(`TimelineMarkerPin.taken`) povlacenjem i do 40 piksela; marker u dosegu misa crta se crveno i deblje
+(`TimelineTheme.marker_hover`). `qnc-segment-panel` predaje `taken` (izabrani marker). Uzivo nije provjereno.
