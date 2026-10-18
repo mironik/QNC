@@ -10,9 +10,7 @@ pub use qnc_channel_picker::ChannelChoice;
 
 mod events;
 mod marker_reach;
-use marker_reach::{marker_hit, marker_in_reach};
-#[cfg(test)]
-use marker_reach::taken_marker_near;
+use marker_reach::marker_in_reach;
 mod lanes;
 pub use events::event;
 pub use lanes::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
@@ -548,10 +546,6 @@ pub struct TimelineSlotSpan<'a> {
 pub struct TimelineMarkerPin<'a> {
     pub id: &'a str,
     pub frame: u64,
-    /// Taken (a right click, Ctrl+M) or chosen: a mouse drag takes it from much further
-    /// away (user 2026-10-18: a marker taken by the right button should not need a precise
-    /// pointer to be dragged).
-    pub taken: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1394,7 +1388,7 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
     let pos = response.interact_pointer_pos()?;
     let frame = frame_for_x(track, range_start, duration, pos.x);
     if input.layers.markers {
-        if let Some(id) = marker_hit(track, range_start, duration, pos, input.markers) {
+        if let Some(id) = marker_in_reach(track, range_start, duration, pos, input.markers) {
             return Some(TimelineIntent::TakeMarker { id: id.to_string(), frame });
         }
         let slot = input.layers.marker_slots.then(|| slot_hit(track, range_start, duration, pos, input.marker_slots, slot_top(input))).flatten();
@@ -2136,7 +2130,7 @@ fn video_intent_from_response(
     );
     if response.clicked() {
         if input.layers.covers && input.layers.markers {
-            if let Some(id) = marker_hit(
+            if let Some(id) = marker_in_reach(
                 track,
                 input.state.range_start(),
                 input.state.duration_frames(),
@@ -2528,17 +2522,15 @@ mod tests {
         let markers = [TimelineMarkerPin {
             id: "m_mid",
             frame: 75,
-            taken: false,
         }];
 
         assert_eq!(
-            marker_hit(track, 50, 100, egui::pos2(150.0, 20.0), &markers),
+            marker_in_reach(track, 50, 100, egui::pos2(150.0, 20.0), &markers),
             Some("m_mid")
         );
-        // A taken marker is dragged from much further away (user 2026-10-18).
-        assert_eq!(taken_marker_near(track, 50, 100, egui::pos2(180.0, 20.0), &markers), None, "not taken");
-        let taken = [TimelineMarkerPin { id: "m_mid", frame: 75, taken: true }];
-        assert_eq!(taken_marker_near(track, 50, 100, egui::pos2(180.0, 20.0), &taken), Some("m_mid"));
+        // One wide zone (user 2026-10-18): 30 pixels off still reaches it, 50 does not.
+        assert_eq!(marker_in_reach(track, 50, 100, egui::pos2(180.0, 20.0), &markers), Some("m_mid"));
+        assert_eq!(marker_in_reach(track, 50, 100, egui::pos2(200.0, 20.0), &markers), None);
         assert_eq!(
             cover_hit(track, 50, 100, egui::pos2(140.0, 8.0), &covers, (2.0, 26.0)),
             Some("cover_mid")

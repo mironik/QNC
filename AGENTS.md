@@ -4801,3 +4801,8 @@ pokazao da je povlacenje IN-a na source timelineu radilo, a na Wrap retku pritis
 zapisuje u player log pogodak i najblizi marker s udaljenoscu u pikselima (`timeline-drag start`). Uzivo nije provjereno.
 Dopuna 2026-10-18 (korisnik: "zona prihvata je preuska"; log: povlacenje radi, marker uhvacen 1-12 piksela od crte):
 doseg markera 24 piksela, uzetog 60 (`qnc-timeline` `marker_reach.rs`).
+Izmjena 2026-10-18 (korisnik: "hvatanje markera i zona osjetljivosti mogu biti isti... korisnik ne mora traziti marker,
+cim korisnik ude u tu zonu marker postaje crven i korisnik ga moze povlaciti"): jedna zona za sve markere i sve radnje:
+40 piksela od crte, najblizi marker; ista zona crveni marker pod misem, uzima ga klikom, desnim klikom i povlacenjem
+(nema posebne zone za uzeti marker). `qnc-timeline` `marker_reach.rs` (`MARKER_REACH`, `marker_in_reach`),
+`TimelineMarkerPin.taken` uklonjen.
