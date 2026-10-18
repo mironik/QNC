@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "description": "The touch screen map of QNC (user 2026-10-18: gestures are a block with their own map). A role is what a gesture of two or more fingers does over a panel: jog = the panel's wheel (the left/right arrow), level = Ctrl+wheel (the level of a taken A1/A2 sound), none = nothing. One finger is the pointer (a tap is a click, as the mouse).",
+  "drag_horizontal": "jog",
+  "drag_vertical": "none",
+  "pinch": "level",
+  "points_per_step": 12.0,
+  "zoom_per_step": 1.1
+}

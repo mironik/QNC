@@ -1,0 +1,11 @@
+[package]
+name = "qnc-touchpad"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the laptop touchpad (two-finger swipes, pinch) as panel actions through its own map"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-gesture-steps = { workspace = true }
+qnc-wheel-jog = { workspace = true }
+serde_json = { workspace = true }

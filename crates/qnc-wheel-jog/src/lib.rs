@@ -1,6 +1,7 @@
 //! The mouse wheel over a panel as catalog actions (user 2026-10-16: the wheel does what
 //! the left/right arrows do, by the panel under the pointer). A mouse notch is one step;
-//! a touchpad's fine scrolling is added up, a step every `POINTS_PER_STEP`. A fast spin
+//! a touchpad's fine scrolling is the touchpad block's (`qnc-touchpad`, user 2026-10-18:
+//! every device its own block). A fast spin
 //! gives one action a frame and the rest in the next frames, so the player gets its steps
 //! in order. Over the panel the scroll is taken, so a list under it does not move.
 //! No form state, no database, no player.
@@ -46,40 +47,43 @@ fn parse_setting(text: &str) -> Result<bool, String> {
     }
 }
 
-/// Touchpad points of one step.
-pub const POINTS_PER_STEP: f32 = 40.0;
+/// Whether a scroll is a mouse wheel's whole notch (or page); a fine one (points, or a
+/// fraction of a notch as Windows gives a touchpad) is the touchpad's.
+pub fn is_notch(unit: egui::MouseWheelUnit, delta: egui::Vec2) -> bool {
+    match unit {
+        egui::MouseWheelUnit::Point => false,
+        egui::MouseWheelUnit::Page => true,
+        egui::MouseWheelUnit::Line => delta.x.fract() == 0.0 && delta.y.fract() == 0.0 && delta != egui::Vec2::ZERO,
+    }
+}
 
-/// Steps not yet given and the touchpad points not yet a step, kept by the panel's id.
+/// Steps not yet given, kept by the panel's id.
 #[derive(Clone, Copy, Default)]
 struct Pending {
     steps: i32,
-    points: f32,
     /// The steps came with Ctrl held (Ctrl+wheel, like Ctrl+arrows).
     ctrl: bool,
 }
 
-/// The wheel steps of one frame from its scroll events: notches (`Line`, `Page`) count
-/// one each, points add up. Up (away from the user) and right are forward (user
-/// 2026-10-16: up moves the playhead on, raises a level).
-fn steps_of(events: &[egui::Event], points: &mut f32) -> i32 {
+/// The wheel steps of one frame from its scroll events: a notch counts one step. Up (away
+/// from the user) and right are forward (user 2026-10-16: up moves the playhead on, raises a
+/// level). Fine scrolling is the touchpad block's.
+fn steps_of(events: &[egui::Event]) -> i32 {
     let mut steps = 0;
     for event in events {
         let egui::Event::MouseWheel { unit, delta, .. } = event else { continue };
-        let amount = delta.y + delta.x;
-        match unit {
-            egui::MouseWheelUnit::Point => *points += amount,
-            _ => steps += amount.signum() as i32 * amount.abs().round().max(1.0) as i32,
+        if is_notch(*unit, *delta) {
+            let amount = delta.y + delta.x;
+            steps += amount.signum() as i32 * amount.abs().round().max(1.0) as i32;
         }
     }
-    let whole = (*points / POINTS_PER_STEP).trunc();
-    *points -= whole * POINTS_PER_STEP;
-    steps + whole as i32
+    steps
 }
 
-/// Whether this frame's wheel events came with Ctrl (Cmd on macOS) held.
+/// Whether this frame's wheel notches came with Ctrl (Cmd on macOS) held.
 fn with_ctrl(events: &[egui::Event]) -> Option<bool> {
     events.iter().rev().find_map(|event| match event {
-        egui::Event::MouseWheel { modifiers, .. } => Some(modifiers.command || modifiers.ctrl),
+        egui::Event::MouseWheel { unit, delta, modifiers } if is_notch(*unit, *delta) => Some(modifiers.command || modifiers.ctrl),
         _ => None,
     })
 }
@@ -158,11 +162,13 @@ pub fn take(ui: &Ui, rect: Rect, key: egui::Id) -> Option<Wheel> {
         if let Some(ctrl) = ctrl.filter(|ctrl| *ctrl != pending.ctrl) {
             pending = Pending { ctrl, ..Pending::default() }; // Ctrl pressed or let go: start again
         }
-        pending.steps += steps_of(&events, &mut pending.points);
-        ctx.input_mut(|input| {
-            input.smooth_scroll_delta = egui::Vec2::ZERO;
-            input.raw_scroll_delta = egui::Vec2::ZERO;
-        });
+        pending.steps += steps_of(&events);
+        if ctrl.is_some() {
+            ctx.input_mut(|input| {
+                input.smooth_scroll_delta = egui::Vec2::ZERO;
+                input.raw_scroll_delta = egui::Vec2::ZERO;
+            });
+        }
     } else {
         pending = Pending::default(); // the pointer left: nothing carries over
     }
@@ -185,9 +191,8 @@ mod tests {
 
     #[test]
     fn a_notch_is_one_step_up_is_forward() {
-        let mut points = 0.0;
-        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, 1.0)], &mut points), 1);
-        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, -1.0), wheel(egui::MouseWheelUnit::Line, -1.0)], &mut points), -2);
+        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, 1.0)]), 1);
+        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, -1.0), wheel(egui::MouseWheelUnit::Line, -1.0)]), -2);
     }
 
     #[test]
@@ -198,10 +203,9 @@ mod tests {
     }
 
     #[test]
-    fn a_touchpad_adds_up_its_points() {
-        let mut points = 0.0;
-        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Point, 15.0)], &mut points), 0);
-        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Point, 30.0)], &mut points), 1);
-        assert!((points - 5.0).abs() < 0.01, "the rest is kept");
+    fn fine_scrolling_is_the_touchpads_not_the_wheels() {
+        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Point, 45.0)]), 0, "points: a touchpad");
+        assert_eq!(steps_of(&[wheel(egui::MouseWheelUnit::Line, 0.4)]), 0, "a fraction of a notch: a Windows touchpad");
+        assert!(is_notch(egui::MouseWheelUnit::Line, egui::vec2(0.0, -2.0)));
     }
 }

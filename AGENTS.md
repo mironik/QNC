@@ -4730,3 +4730,15 @@ Cover slot `quick_overwrite_cover`, Overwrite `overwrite_cover`, Undo/Redo `undo
 postojece `step_prev/next_segment` i `step_prev/next_marker_slot`; preslikavanje u naredbu je ono isto
 `SegmentCommand::from_event`. Razlika: gumbi M, Cover slot i Overwrite rade tocno kao njihove tipke (npr. dok je slot uzet).
 Zlatni testovi nepromijenjeni, novi test za gumbe. C10 Editorial application 654 -> 649. Uzivo nije provjereno.
+Izvedeno 2026-10-18 (korisnik: "kreni s c, touchpad i geste kao kocke"): svaki ulazni uredaj je kocka sa svojom mapom u
+ugovoru. Nalaz: na Windowsima touchpad ne salje vlastite geste: pomak s dva prsta stize kao kotacic u djelicima zareza,
+pinch kao Ctrl uz njih (winit samo na macOS-u daje pinch kao zasebnu gestu); `qnc-wheel-jog` je svaki djelic brojao kao
+cijeli korak. Nove javne kocke (s ugovorima): `qnc-gesture-steps` (uloge geste `jog` = kotacic panela, `level` =
+Ctrl+kotacic, `none`; fini pomak zbrojen u cijele korake, korak po slici; citanje mape uredaja, nevaljana mapa = uredaj ne
+radi nista, zapis u logu), `qnc-touchpad` (mapa `contracts/input/touchpad.json`: vodoravno i okomito s dva prsta `jog`,
+pinch `level`; Windows djelici zareza i Ctrl, macOS tocke i zoom) i `qnc-touch-gestures` (zaslon na dodir, mapa
+`contracts/input/touch.json`: povlacenje dva prsta vodoravno `jog`, okomito `none`, pinch `level`; jedan prst ostaje
+pokazivac). `qnc-wheel-jog` broji samo cijele zareze misa (`is_notch`). Svaki timeline poziva sve tri kocke, pa sve
+daju iste sistemske radnje kao kotacic. Promjena ponasanja: pomak touchpadom na Windowsima je sporiji (korak po cijelom
+zarezu umjesto po svakom djelicu). Pocetne vrijednosti mapa (uloge, koraci) su prijedlog, mijenjaju se u ugovoru. Testovi,
+conformance. Uzivo nije provjereno (touchpad i zaslon na dodir).

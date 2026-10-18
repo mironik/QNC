@@ -5,6 +5,8 @@ edition = "2024"
 description = "Shared passive QNC timeline UI component"
 
 [dependencies]
+qnc-touch-gestures = { workspace = true }
+qnc-touchpad = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-wheel-jog = { workspace = true }

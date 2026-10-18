@@ -1,0 +1,10 @@
+[package]
+name = "qnc-gesture-steps"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the roles of a gesture (jog, level, none) and its fine movement added up to steps, for every gesture device"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-wheel-jog = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.gesture-steps",
+  "module_name": "Gesture steps",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "input.gesture.steps"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-gesture-steps",
+  "input": "A gesture device map (roles jog, level, none and amounts) and its fine movement by role.",
+  "output": "Whole steps of the panel wheel (jog) or Ctrl+wheel (level), one a frame in order; the map read once from the QNC root, a missing or invalid one said in the player log (no invented map).",
+  "specification": "User 2026-10-18: every input device is a block with its own map (keyboard, mouse, touchpad, later consoles and gestures)."
+}

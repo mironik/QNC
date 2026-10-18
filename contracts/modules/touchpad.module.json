@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.touchpad",
+  "module_name": "Touchpad",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "input.touchpad"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-touchpad",
+  "input": "The touchpad events over a panel (fine wheel steps and Ctrl pinch on Windows, points and zoom on macOS) and the touchpad map contracts/input/touchpad.json.",
+  "output": "One step of the panel wheel (jog) or Ctrl+wheel (level) per the role the map gives a horizontal swipe, a vertical swipe and a pinch; the fine movement is added up. A mouse notch is the wheel block's.",
+  "specification": "User 2026-10-18: every input device is a block with its own map (keyboard, mouse, touchpad, later consoles and gestures)."
+}

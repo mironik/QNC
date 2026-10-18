@@ -154,6 +154,9 @@ members = [
     "crates/qnc-artifact-db",
     "crates/qnc-settings-switches",
     "crates/qnc-panel-focus",
+    "crates/qnc-touch-gestures",
+    "crates/qnc-gesture-steps",
+    "crates/qnc-touchpad",
     "crates/qnc-action-event",
     "crates/qnc-segments-keys",
     "crates/qnc-sync-session",
@@ -344,6 +347,9 @@ qnc-program-db = { path = "crates/qnc-program-db" }
 qnc-artifact-db = { path = "crates/qnc-artifact-db" }
 qnc-settings-switches = { path = "crates/qnc-settings-switches" }
 qnc-panel-focus = { path = "crates/qnc-panel-focus" }
+qnc-touch-gestures = { path = "crates/qnc-touch-gestures" }
+qnc-gesture-steps = { path = "crates/qnc-gesture-steps" }
+qnc-touchpad = { path = "crates/qnc-touchpad" }
 qnc-action-event = { path = "crates/qnc-action-event" }
 qnc-segments-keys = { path = "crates/qnc-segments-keys" }
 qnc-sync-session = { path = "crates/qnc-sync-session" }

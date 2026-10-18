@@ -838,7 +838,11 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         .outer_height(input.layers, input.expanded_audio)
         .max(1.0);
     let (outer, _) = ui.allocate_exact_size(Vec2::new(width, height), Sense::hover());
-    let wheel = qnc_wheel_jog::take(ui, outer, ui.id().with("qnc-timeline-wheel"));
+    // The mouse wheel and the touchpad, each its own block with its own map (user 2026-10-18).
+    let notch = qnc_wheel_jog::take(ui, outer, ui.id().with("qnc-timeline-wheel"));
+    let swipe = qnc_touchpad::take(ui, outer, ui.id().with("qnc-timeline-touchpad"));
+    let touch = qnc_touch_gestures::take(ui, outer, ui.id().with("qnc-timeline-touch"));
+    let wheel = notch.or(swipe).or(touch);
     ui.painter().rect_filled(outer, 0.0, input.theme.background);
     ui.painter().rect_stroke(
         outer,

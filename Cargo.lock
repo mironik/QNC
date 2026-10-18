@@ -3628,6 +3628,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-gesture-steps"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+ "qnc-wheel-jog",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-gpu-raster"
 version = "0.1.0"
 dependencies = [
@@ -5173,6 +5182,8 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-filmstrip",
  "qnc-lane-choice",
+ "qnc-touch-gestures",
+ "qnc-touchpad",
  "qnc-ui-kit",
  "qnc-ui-text",
  "qnc-wave-view",
@@ -5199,6 +5210,26 @@ dependencies = [
  "qnc-ui-text",
  "qnc-wave",
  "qnc-work-settings",
+]
+
+[[package]]
+name = "qnc-touch-gestures"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-gesture-steps",
+ "qnc-wheel-jog",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-touchpad"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-gesture-steps",
+ "qnc-wheel-jog",
+ "serde_json",
 ]
 
 [[package]]
