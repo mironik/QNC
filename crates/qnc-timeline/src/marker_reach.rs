@@ -7,8 +7,9 @@ use eframe::egui::{self, Rect};
 
 use crate::{x_for_frame, TimelineMarkerPin};
 
-/// How far from its line a marker is taken by a click.
-pub(crate) const MARKER_REACH: f32 = 8.0;
+/// How far from its line a marker is taken by a click or a drag (live 2026-10-18: 8 pixels
+/// were too precise, a drag a few pixels off scrubbed the playhead instead).
+pub(crate) const MARKER_REACH: f32 = 16.0;
 /// How far from a taken marker a drag still takes it.
 pub(crate) const TAKEN_MARKER_REACH: f32 = 40.0;
 
@@ -45,3 +46,12 @@ pub(crate) fn marker_hit<'a>(
         .map(|(id, _)| id)
 }
 
+
+/// The marker nearest the pointer and its distance in pixels (for the player log).
+pub(crate) fn nearest<'a>(track: Rect, range_start: u64, duration: u64, pos: egui::Pos2, markers: &'a [TimelineMarkerPin<'a>]) -> Option<(&'a str, f32)> {
+    markers
+        .iter()
+        .filter(|marker| !marker.id.trim().is_empty())
+        .map(|marker| (marker.id, (pos.x - x_for_frame(track, range_start, duration, marker.frame)).abs()))
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+}

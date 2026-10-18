@@ -4794,3 +4794,8 @@ slike, i kad je zaustavljena i strelice joj pomicu kraj): boja po trajanju (iste
 `qnc-sync-cover` `draft_span`, `qnc-program-view` `SegmentsView.sync_draft`, `qnc-program-segments` (`sync_frame`),
 `qnc-segment-panel` (nepotvrdjena pokrivalica), `qnc-timeline` (nepotvrdjena pokrivalica u svojoj boji, s oznakom i
 okvirom). Test u `qnc-program-segments`. Uzivo nije provjereno.
+Popravak 2026-10-18 (korisnik: "povlacenje markera i dalje ne radi... povlacenje mora raditi u svim timeline"): log je
+pokazao da je povlacenje IN-a na source timelineu radilo, a na Wrap retku pritisak oko 66 slika od markera (1061 prema
+1127, marker nije bio uzet) bio je scrub playheada: doseg neuzetog markera bio je 8 piksela. `qnc-timeline`
+`marker_reach.rs`: svaki marker 16 piksela (klik i povlacenje), uzeti 40; svaki pocetak povlacenja na redu s markerima
+zapisuje u player log pogodak i najblizi marker s udaljenoscu u pikselima (`timeline-drag start`). Uzivo nije provjereno.

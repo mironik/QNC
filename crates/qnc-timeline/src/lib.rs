@@ -2070,10 +2070,14 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
     );
     let active = egui::Id::new(MARKER_DRAG).with(response.id);
     if response.drag_started() {
-        let hit = ctx
-            .input(|i| i.pointer.press_origin())
-            .and_then(|pos| marker_in_reach(track, start, duration, pos, input.markers))
-            .map(str::to_string);
+        let press = ctx.input(|i| i.pointer.press_origin());
+        let hit = press.and_then(|pos| marker_in_reach(track, start, duration, pos, input.markers)).map(str::to_string);
+        // Every drag on a row with markers in the player log: which marker was nearest and
+        // how far (live 2026-10-18: a marker drag that scrubbed instead could not be told).
+        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+            let nearest = press.and_then(|pos| marker_reach::nearest(track, start, duration, pos, input.markers));
+            qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("timeline-drag start hit={hit:?} nearest={nearest:?}"));
+        }
         ctx.data_mut(|d| match hit {
             Some(id) => d.insert_temp(active, id),
             None => d.remove::<String>(active),
