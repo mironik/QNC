@@ -4806,3 +4806,6 @@ cim korisnik ude u tu zonu marker postaje crven i korisnik ga moze povlaciti"): 
 40 piksela od crte, najblizi marker; ista zona crveni marker pod misem, uzima ga klikom, desnim klikom i povlacenjem
 (nema posebne zone za uzeti marker). `qnc-timeline` `marker_reach.rs` (`MARKER_REACH`, `marker_in_reach`),
 `TimelineMarkerPin.taken` uklonjen.
+Dopuna 2026-10-18 (korisnik: "to treba biti i na source timeline"): IN i OUT na source timelineu (sve forme) imaju istu
+zonu kao M markeri: 40 piksela, bliza oznaka, crvena cim je mis u zoni, povlacenje iz cijele zone (prije 6 piksela).
+`qnc-timeline` `marker_reach.rs` `source_mark_in_reach`, test.

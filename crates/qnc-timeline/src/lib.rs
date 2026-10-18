@@ -10,7 +10,7 @@ pub use qnc_channel_picker::ChannelChoice;
 
 mod events;
 mod marker_reach;
-use marker_reach::marker_in_reach;
+use marker_reach::{marker_in_reach, source_mark_in_reach};
 mod lanes;
 pub use events::event;
 pub use lanes::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
@@ -1327,11 +1327,10 @@ fn mark_drag_intent(response: &egui::Response, track: Rect, input: &TimelineInpu
     let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
     if response.drag_started_by(egui::PointerButton::Primary) {
         let at = response.ctx.input(|i| i.pointer.press_origin()).or(response.interact_pointer_pos())?;
-        let x = |frame: u64| x_for_frame(track, range_start, duration, range_start + frame);
-        let (to_in, to_out) = ((at.x - x(input.draft_in_frame)).abs(), (at.x - x(input.draft_out_frame)).abs());
-        const GRAB: f32 = 6.0;
-        if to_in.min(to_out) <= GRAB {
-            response.ctx.data_mut(|data| data.insert_temp(key, to_in <= to_out));
+        // The zone of the M markers (user 2026-10-18: the same on the source timeline).
+        let marks = ((input.draft_in_frame, input.draft_in_active), (input.draft_out_frame, input.draft_out_active));
+        if let Some(in_mark) = source_mark_in_reach(track, range_start, duration, at, marks.0, marks.1) {
+            response.ctx.data_mut(|data| data.insert_temp(key, in_mark));
         }
     }
     let in_mark = response.ctx.data(|data| data.get_temp::<bool>(key))?;
@@ -1692,16 +1691,23 @@ fn paint_in_out_handles(
 ) {
     let in_x = x_for_local_frame(track, duration, in_frame);
     let out_x = x_for_local_frame(track, duration, out_frame);
-    let in_stroke = if input.focus == TimelineFocusPaint::In {
-        Stroke::new(3.0, input.theme.focus)
-    } else {
-        Stroke::new(2.0, input.theme.text)
+    // IN or OUT in the mouse's reach is red, as an M marker (user 2026-10-18).
+    let range_start = input.state.range_start();
+    let hovered = ui
+        .ctx()
+        .pointer_hover_pos()
+        .filter(|pos| track.y_range().contains(pos.y))
+        .and_then(|pos| source_mark_in_reach(track, range_start, duration, pos, (in_frame, input.draft_in_active), (out_frame, input.draft_out_active)));
+    let stroke = |is_in: bool, focus: TimelineFocusPaint| {
+        if hovered == Some(is_in) {
+            Stroke::new(3.0, input.theme.marker_hover)
+        } else if input.focus == focus {
+            Stroke::new(3.0, input.theme.focus)
+        } else {
+            Stroke::new(2.0, input.theme.text)
+        }
     };
-    let out_stroke = if input.focus == TimelineFocusPaint::Out {
-        Stroke::new(3.0, input.theme.focus)
-    } else {
-        Stroke::new(2.0, input.theme.text)
-    };
+    let (in_stroke, out_stroke) = (stroke(true, TimelineFocusPaint::In), stroke(false, TimelineFocusPaint::Out));
     if input.draft_in_active {
         ui.painter().line_segment(
             [
