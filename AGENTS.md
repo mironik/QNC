@@ -4611,3 +4611,9 @@ mjesto koje radi poster s pocetka klipa: `make_missing_posters` (klipovi aktivno
 pa kocka ne ovisi o Ingestu. Iz `qnc-ingest-import-worker` uklonjeni su `make_missing_posters`, `create_missing_poster`
 i vlastiti `inside_project`; poster pri Uvezi radi ista kocka. `tools/qnc-ingest-worker` (procedura) je pokrece odmah
 nakon dovrsetka zapisa. Testovi `qnc-missing-posters`, `qnc-ingest-import-worker` (22), conformance.
+Popravak 2026-10-18 (korisnik: "posteri se kreiraju kad ne postoje na kartici"; to i dalje ne radi): klip uvezen prije
+nego mu je zapis dovrsen (XDCAM disk: zapis s kartice jos bez broja slika i brzine) pri Uvezi nije dobio poster, a
+pozadinski radnik je postere radio samo za neuvezene klipove, pa takav klip nikad nije dobio poster.
+`qnc-content-read` `clips_without_poster` daje svaki klip bez postera, uvezen ili ne; `tools/qnc-ingest-worker`
+(`make_posters`) pokrece kocku `qnc-missing-posters` nakon dovrsetka zapisa i jos jednom nakon uvoza. Testovi,
+conformance. Uzivo nije provjereno (treba Select XDCAM diska).

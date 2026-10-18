@@ -120,9 +120,10 @@ impl ContentReader {
         Ok(conn)
     }
 
-    /// Clips of the catalog that have no poster and are not imported yet (a single file
-    /// without a card picture): what a background process makes posters for. Empty when
-    /// the catalog keeps no posters at all.
+    /// Clips of the catalog that have no poster (a single file or a disc without a card
+    /// picture), imported or not: what a background process makes posters for. An imported
+    /// one is included (user 2026-10-18: a clip imported before its record was final got no
+    /// poster at Uvezi and was never asked again). Empty when the catalog keeps no posters.
     pub fn clips_without_poster(&self) -> Result<Vec<String>, String> {
         let conn = self.open()?;
         if !has_view(&conn, "public_clips")? || !has_column(&conn, "public_clips", "thumbnail_uri")? {
@@ -130,8 +131,7 @@ impl ContentReader {
         }
         let mut statement = conn
             .prepare(
-                "SELECT clip_id FROM public_clips WHERE thumbnail_uri IS NULL
-                 AND import_status NOT IN ('imported', 'done') ORDER BY clip_id LIMIT ?1",
+                "SELECT clip_id FROM public_clips WHERE thumbnail_uri IS NULL ORDER BY clip_id LIMIT ?1",
             )
             .map_err(|error| error.to_string())?;
         let rows = statement

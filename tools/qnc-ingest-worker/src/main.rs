@@ -155,17 +155,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
             // after every wave and filmstrip (user 2026-10-18: since 2026-10-15 they came only
             // when all artifacts were done, minutes later, and Ingest had stopped looking).
             if !closed.load(std::sync::atomic::Ordering::Relaxed) {
-                // Where each medium is on this computer: the source bindings Select uses.
-                let local_media = |uri: &str| {
-                    let reference = qnc_source_reader::SourceReference::from_uri(uri).ok()?;
-                    let source = config.sources.iter().find(|source| source.location.uri == reference.source_uri())?;
-                    source.local_media_path(uri).ok().flatten()
-                };
-                match qnc_missing_posters::make_missing_posters(root, &local_media, Some(lease.write_lease()), &cancel) {
-                    Ok(0) => {}
-                    Ok(made) => eprintln!("posteri napravljeni: {made}"),
-                    Err(error) => eprintln!("posteri nisu napravljeni: {error}"),
-                }
+                make_posters(root, &config, &lease, &cancel);
             }
             completing.store(false, std::sync::atomic::Ordering::Relaxed);
         });
@@ -183,8 +173,33 @@ fn run_once(root: &Path) -> Result<bool, String> {
             artifacts.and_then(|()| run_artifacts(root, &lease, &closed, &std::sync::atomic::AtomicBool::new(false)));
         running.store(false, std::sync::atomic::Ordering::Relaxed);
         let import = import.join().map_err(|_| "Uvoz je pao.".to_string())?;
+        // Once more after the import: a clip imported before its record was final could not
+        // get its poster at Uvezi (user 2026-10-18).
+        if !closed.load(std::sync::atomic::Ordering::Relaxed) {
+            make_posters(root, &config, &lease, &cancel);
+        }
         artifacts.and(import).map(|()| true)
     })
+}
+
+/// Posters of the clips without one, by their block (`qnc-missing-posters`); where each
+/// medium is on this computer comes from the source bindings Select uses.
+fn make_posters(
+    root: &Path,
+    config: &qnc_ingest_select::selection_config::SelectionConfig,
+    lease: &qnc_playback_activity::Lease,
+    cancel: &std::sync::atomic::AtomicBool,
+) {
+    let local_media = |uri: &str| {
+        let reference = qnc_source_reader::SourceReference::from_uri(uri).ok()?;
+        let source = config.sources.iter().find(|source| source.location.uri == reference.source_uri())?;
+        source.local_media_path(uri).ok().flatten()
+    };
+    match qnc_missing_posters::make_missing_posters(root, &local_media, Some(lease.write_lease()), cancel) {
+        Ok(0) => {}
+        Ok(made) => eprintln!("posteri napravljeni: {made}"),
+        Err(error) => eprintln!("posteri nisu napravljeni: {error}"),
+    }
 }
 
 /// Whether the active project in the database is still the one a run started for.
