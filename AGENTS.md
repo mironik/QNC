@@ -4669,3 +4669,8 @@ datoteka dobila je probe u samom Selectu (19 s za 173 datoteke). `qnc-camera-det
 `scan_roles_at` traze korijene kartice od zadane mape; Select (`scan.rs`) trazi od izabrane mape prema korijenu
 nositelja i uzima prvu na kojoj je kartica. Provjereno na stiku (samo citanje): `E:\SDXC` daje 98 klipova s 98 proxyja,
 bez ijednog problema, 169 ms. Test `a_card_copied_into_a_folder_is_found_from_that_folder`, conformance.
+Popravak 2026-10-18 (korisnik: "i dalje poruka player input NotFinal"): log novog projekta: radnik se pokrenuo vec pri
+otvaranju projekta (prije Selecta), dovrsetak zapisa nije nasao klipove i zavrsio je; klipove Selecta zatim je uzeo
+filmstrip (citanjem kartice), a zapisi su krenuli tek ~52 s nakon Selecta, kad se radnik pokrenuo ponovno.
+`tools/qnc-ingest-worker`: dok radnik radi, dovrsetak zapisa svake sekunde gleda ceka li koji zapis i odmah ga radi;
+filmstrip za to vrijeme stoji (`completing`). Conformance. Uzivo nije provjereno.

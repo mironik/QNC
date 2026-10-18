@@ -137,6 +137,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
     let closed = std::sync::atomic::AtomicBool::new(false);
     // The import belongs to this run: its project, its lease, its cancel.
     let run = qnc_ingest_import_worker::ImportRun { project_id: &started, lease: &lease, cancel: &cancel };
+    let artifacts_done = std::sync::atomic::AtomicBool::new(false);
     std::thread::scope(|scope| {
         scope.spawn(|| {
             while running.load(std::sync::atomic::Ordering::Relaxed) {
@@ -149,7 +150,11 @@ fn run_once(root: &Path) -> Result<bool, String> {
             }
         });
         let import = scope.spawn(|| import_while(root, &running, &closed, &run));
-        let completion = scope.spawn(|| {
+        // The records are completed for as long as this run works: a Select made while it
+        // runs (or right after the worker was started for an opened project) adds clips
+        // whose records are completed at once (user 2026-10-18: they waited until the
+        // filmstrips were done, Play said NotFinal).
+        let completion = scope.spawn(|| loop {
             let done = qnc_record_completion::complete_active_project(
                 root,
                 &make_backend,
@@ -173,6 +178,19 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 make_posters(root, &config, &lease, &cancel);
             }
             completing.store(false, std::sync::atomic::Ordering::Relaxed);
+            // Until the artifacts are done, new records are looked for once a second.
+            loop {
+                let stop = closed.load(std::sync::atomic::Ordering::Relaxed)
+                    || artifacts_done.load(std::sync::atomic::Ordering::Relaxed);
+                if stop {
+                    return;
+                }
+                std::thread::sleep(Duration::from_secs(1));
+                if records_waiting(root).is_ok_and(|waiting| !waiting.is_empty()) {
+                    completing.store(true, std::sync::atomic::Ordering::Relaxed);
+                    break;
+                }
+            }
         });
         // The records first: every clip can play (and editing start) before the card is read
         // for waves and filmstrips (user 2026-10-18: speed for editing comes first).
@@ -180,6 +198,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
             std::thread::sleep(Duration::from_millis(100));
         }
         let artifacts = run_artifacts(root, &lease, &closed, &completing);
+        artifacts_done.store(true, std::sync::atomic::Ordering::Relaxed);
         let _ = completion.join();
         if closed.load(std::sync::atomic::Ordering::Relaxed) {
             running.store(false, std::sync::atomic::Ordering::Relaxed);
