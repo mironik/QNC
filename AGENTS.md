@@ -4825,3 +4825,13 @@ prolaz daje svoju brzinu (sekunde medija kroz svoje trajanje), razina je medijan
 broj citaca, sudi se nakon najmanje 6 takvih prolaza (2 po citacu); prolaz zapocet prije prekida ili promjene razine ne
 broji se (`Round`). `qnc-wave-worker` pamti krug svakog prolaza. Testovi (dugi spori prolaz ne odlucuje razinu),
 conformance. Uzivo nije izmjereno.
+Izmjena 2026-10-18 (korisnik: "ne djeluje mi brze... moras imati svoj kratki test brzine citanja medija i na osnovu
+njega odrediti broj jezgri i niti; nakon toga ne testiras vise"; log: novi projekt opet na 2 citaca, 89,7 s): mjerenje iz
+prolaza je zamijenjeno jednim kratkim testom medija. `qnc-read-pace` `measure`: blokovi od 64 KB svakih 1 MB kroz jednu
+datoteku (kao sto prolaz cita zvuk i preskace sliku) s 1, 2, 4 i 8 citaca po 0,3 s, svaka razina u svom dijelu
+datoteke; bira najmanje citaca unutar 5 % najboljeg; samo citanje, na Windowsima mimo cachea sustava
+(`FILE_FLAG_NO_BUFFERING`; bez toga je stik procitan ranije davao brzinu memorije). `qnc-wave-worker`: dok medij nije
+testiran radi jedan prolaz, koji ga prvi testira (datoteka manja od 64 MB ostavlja test sljedecem), rezultat vrijedi do
+kraja rada (najvise 8, nikad vise od niti procesora), zapis `qnc-wave-worker-pace: readers=.. test=..`. Izmjereno na
+USB 3 stiku mimo cachea: 1 citac 34-56 MB/s, 2 citaca 53-59, 4 i 8 isto ili manje: stik je zasicen s 2 citaca (oko 850
+citanja u sekundi), pa su ~90 s za 98 klipova granica stika, ne jezgri. Testovi, conformance. Uzivo nije provjereno.

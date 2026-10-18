@@ -26,10 +26,17 @@ use std::{
 
 pub const MODULE_ID: &str = "qnc.module.wave-worker";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-/// One-pass readers at the start of a run; `qnc-read-pace` adds more while they read faster
-/// (measured 2026-10-18 on a USB 3 stick: 1 at a time 62 MB/s of file, 2: 94, 4: 158).
-const FIRST_WAVE_READERS: usize = 2;
+/// The most one-pass readers at once; how many really run, one short test of the medium
+/// decides (`qnc-read-pace`; user 2026-10-18). Never more than the processor's threads.
 const MOST_WAVE_READERS: usize = 8;
+
+/// The readers the medium's test found: `None` until the first pass has tested it; then one
+/// pass runs at a time. Shared with the passes, kept for the run (no more testing).
+type Readers = Arc<std::sync::Mutex<Option<usize>>>;
+
+fn most_readers() -> usize {
+    std::thread::available_parallelism().map_or(1, |threads| threads.get()).min(MOST_WAVE_READERS)
+}
 fn wave_paused_for_playback() -> &'static str {
     qnc_ui_text::text("wave.wave_worker_paused_broadcast_player")
 }
@@ -223,7 +230,6 @@ struct GeneratedWave {
     ready_before: bool,
     total_ms: u128,
     /// Seconds of media this pass read (0 for a wave already stored).
-    work_seconds: f64,
     /// The key pictures of the filmstrip, read in the same pass over the original.
     pictures: Option<qnc_filmstrip::EncodedPictures>,
 }
@@ -234,8 +240,6 @@ struct ActiveWaveWorker {
     result: Receiver<WaveOutcome>,
     cancel: Arc<AtomicBool>,
     thread: JoinHandle<()>,
-    /// The pace round the pass started in: it counts only for that round.
-    round: qnc_read_pace::Round,
 }
 
 #[derive(Default)]
@@ -253,8 +257,8 @@ pub struct TimelineWaveService {
     /// The clip open in a preview: its pass reads the card alone (user 2026-10-18: two long
     /// passes side by side on one card took 45-55 s each, its filmstrip waited for it).
     preferred: Option<String>,
-    /// How many passes read at once, found by the passes of this run (user 2026-10-18).
-    pace: Option<qnc_read_pace::ReadPace>,
+    /// How many passes read at once, found by one short test of the medium (user 2026-10-18).
+    readers: Readers,
 }
 
 impl fmt::Debug for TimelineWaveService {
@@ -286,7 +290,7 @@ impl TimelineWaveService {
             self.queue.clear();
             self.queued.clear();
             self.publisher = None;
-            self.pace = None;
+            self.readers = Readers::default();
         }
         self.context = Some(context);
         self.ensure_publisher();
@@ -308,7 +312,6 @@ impl TimelineWaveService {
         }
         self.playback_priority = active;
         if active {
-            self.pace_mut().interrupted();
             self.cancel_active_workers();
         } else {
             self.start_next();
@@ -437,7 +440,6 @@ impl TimelineWaveService {
                 continue;
             };
             let worker = self.workers.swap_remove(index);
-            let round = worker.round;
             let _ = worker.thread.join();
             poll.changed = true;
             let current_project = self.context.as_ref().map(WaveContext::project_id);
@@ -454,12 +456,6 @@ impl TimelineWaveService {
                     let key = outcome.request.key();
                     let ready_before = generated.ready_before;
                     let total_ms = generated.total_ms;
-                    if !ready_before {
-                        let seconds = total_ms as f64 / 1000.0;
-                        if let Some(step) = self.pace_mut().finished(round, generated.work_seconds, seconds) {
-                            wave_log(|| format!("qnc-wave-worker-pace: {step:?}"));
-                        }
-                    }
                     let peak_count = generated.artifact.peak_count;
                     let a1_count = generated.artifact.a1_peaks.len();
                     let a2_count = generated.artifact.a2_peaks.len();
@@ -595,29 +591,21 @@ impl TimelineWaveService {
             return;
         };
         match self.preferred_alone() {
-            Some(true) => {
-                self.pace_mut().interrupted();
-                return;
-            }
+            Some(true) => return,
             // The preferred clip is first in the queue and starts alone.
             Some(false) => {
-                self.pace_mut().interrupted();
                 self.start_one(&context);
                 return;
             }
             None => {}
         }
-        while self.workers.len() < self.pace_mut().readers() {
+        // Until the medium is tested one pass runs (it tests first).
+        let readers = self.readers.try_lock().ok().and_then(|readers| *readers).unwrap_or(1);
+        while self.workers.len() < readers {
             if !self.start_one(&context) {
-                // Fewer passes than readers: this is not the pace of the medium.
-                self.pace_mut().interrupted();
                 return;
             }
         }
-    }
-
-    fn pace_mut(&mut self) -> &mut qnc_read_pace::ReadPace {
-        self.pace.get_or_insert_with(|| qnc_read_pace::ReadPace::new(FIRST_WAVE_READERS, MOST_WAVE_READERS))
     }
 
     /// Starts the first request of the queue that still needs a wave; false when none.
@@ -634,19 +622,18 @@ impl TimelineWaveService {
             let worker_request = request.clone();
             let cancel = Arc::new(AtomicBool::new(false));
             let worker_cancel = cancel.clone();
-            let round = self.pace_mut().round();
+            let readers = self.readers.clone();
             match std::thread::Builder::new()
                 .name("qnc-wave-worker".into())
                 .spawn({
                     let context = context.clone();
-                    move || run_wave_worker(worker_request, context, worker_cancel, send)
+                    move || run_wave_worker(worker_request, context, readers, worker_cancel, send)
                 }) {
                 Ok(thread) => self.workers.push(ActiveWaveWorker {
                     request,
                     result: receive,
                     cancel,
                     thread,
-                    round,
                 }),
                 Err(error) => {
                     wave_log(|| format!("qnc-wave-worker-error: stage=start error={error}"))
@@ -722,16 +709,18 @@ pub fn wave_cache_key(project_id: &str, clip_id: &str) -> String {
 fn run_wave_worker(
     request: WaveRequest,
     context: WaveContext,
+    readers: Readers,
     cancel: Arc<AtomicBool>,
     send: SyncSender<WaveOutcome>,
 ) {
-    let result = build_timeline_wave(&request, &context, &cancel);
+    let result = build_timeline_wave(&request, &context, &readers, &cancel);
     let _ = send.send(WaveOutcome { request, result });
 }
 
 fn build_timeline_wave(
     request: &WaveRequest,
     context: &WaveContext,
+    readers: &Readers,
     cancel: &AtomicBool,
 ) -> Result<GeneratedWave, String> {
     if cancel.load(Ordering::Acquire) {
@@ -744,7 +733,6 @@ fn build_timeline_wave(
                 artifact: record,
                 ready_before: true,
                 total_ms: started.elapsed().as_millis(),
-                work_seconds: 0.0,
                 pictures: None,
             });
         }
@@ -763,6 +751,7 @@ fn build_timeline_wave(
     }
     let source = source_for_uri(&context.source_bindings, &plan.source_uri)?;
     let media = qnc_wave::media_for_plan(&clip.snapshot, &plan)?;
+    test_medium(readers, source, media, cancel);
     // An original whose key pictures the reader knows (H.264, MPEG-2) gives its
     // filmstrip's key pictures in the same pass (user 2026-10-15: one reading of the card
     // for the wave and the filmstrip).
@@ -783,9 +772,37 @@ fn build_timeline_wave(
         artifact,
         ready_before: false,
         total_ms: started.elapsed().as_millis(),
-        work_seconds: plan.duration_seconds,
         pictures,
     })
+}
+
+/// The first pass of a run tests the medium it reads, once (user 2026-10-18); a file too
+/// small for the test leaves it to the next pass. A failed test keeps one reader.
+fn test_medium(readers: &Readers, source: &WaveSourceBinding, media: &MediaRepresentation, cancel: &AtomicBool) {
+    let Ok(mut found) = readers.lock() else {
+        return;
+    };
+    if found.is_some() {
+        return;
+    }
+    let Ok(Some(path)) = source.local_media_path(&media.media_uri) else {
+        return;
+    };
+    match qnc_read_pace::measure(&path, most_readers(), cancel) {
+        Ok(Some(measured)) => {
+            wave_log(|| {
+                let rates: Vec<String> =
+                    measured.rates.iter().map(|(level, rate)| format!("{level}:{:.0}MB/s", rate / 1e6)).collect();
+                format!("qnc-wave-worker-pace: readers={} test={}", measured.readers, rates.join(" "))
+            });
+            *found = Some(measured.readers);
+        }
+        Ok(None) => {}
+        Err(error) => {
+            wave_log(|| format!("qnc-wave-worker-pace: test failed, one reader: {error}"));
+            *found = Some(1);
+        }
+    }
 }
 
 /// The stored picture codec of a representation when the MXF reader knows its key
@@ -1178,7 +1195,6 @@ mod tests {
             result: receive,
             cancel: cancel.clone(),
             thread: std::thread::spawn(|| {}),
-            round: qnc_read_pace::ReadPace::new(1, 1).round(),
         });
         service.enqueue(request("other"), false);
         service.enqueue(request("open"), false);
@@ -1205,7 +1221,6 @@ mod tests {
             result: receive,
             cancel: cancel.clone(),
             thread: std::thread::spawn(|| {}),
-            round: qnc_read_pace::ReadPace::new(1, 1).round(),
         });
 
         service.set_playback_priority(true);

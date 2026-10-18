@@ -4,7 +4,7 @@
   "module_version": "0.1.0",
   "module_kind": "library",
   "capabilities": [
-    "media.read.readers_by_measure"
+    "media.read.readers_by_test"
   ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
@@ -21,7 +21,6 @@
   "forbidden_calls": [
     "ffprobe",
     "media.decode",
-    "media.read",
     "source.scan.roles",
     "business.workflow",
     "player.command",
@@ -38,7 +37,7 @@
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-read-pace",
-  "input": "The work each finished pass did (seconds of media read) while every reader was busy, and when the readers gave way or had nothing to read.",
-  "output": "How many readers may run now, and each decision (one more is tried, or the run settles). It reads nothing, writes nothing and runs no worker.",
-  "specification": "User 2026-10-18: the number of readers is found by a short test so it adapts to the speed of the reader. The first passes are the test (no extra reading): a level is judged by the work finished per second; one more reader stays while it brings at least a tenth more, then the best level stays for the run."
+  "input": "One media file of the medium to test and the most readers allowed. It only reads (on Windows past the system file cache).",
+  "output": "How many readers to run and the rate read at each level tried. It writes nothing and runs no worker.",
+  "specification": "User 2026-10-18: one short test of the reading speed of the medium decides the number of readers; after that no more testing. Small blocks spread through the file, as a pass reads, with 1, 2, 4 and 8 readers for 0.3 s each; the fewest readers within 5 % of the best."
 }
