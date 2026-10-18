@@ -4766,3 +4766,7 @@ zavrsni ide iza novog segmenta, koji dobiva prazan slot; bez pokrivalice kraj se
 se vidjela jer je statusna traka prvo pokazivala poruku playera; sada poruka price ima prednost
 (`qnc-editorial-application` `footer_status`). Proba na kopiji baze projekta: segment upisan, pokrivalica u svom slotu
 (671-777), novi prazan slot (777-1227). Test `a_new_segment_keeps_the_last_slot_of_a_cover_and_gets_an_empty_slot`.
+Popravak 2026-10-18 (korisnik: "desna tipka misa (Ctrl+) trebala bi mi omoguciti pomicanje tog markera"): marker na rubu
+Wrap reda (kraj treceg segmenta, 777) misem se nije dao uzeti: pogodak markera bio je 5 piksela od crte, a klik jednu
+sliku lijevo (oko 9 piksela) bio je samo pomak playheada. `qnc-timeline` `marker_hit`: 8 piksela, uzima se najblizi
+marker. Desni klik na marker uzima ga (kao Ctrl+M), kotacic i strelice ga pomicu, lijevi klik ili Enter spremaju.

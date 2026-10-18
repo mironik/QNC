@@ -2164,11 +2164,16 @@ fn marker_hit<'a>(
     pos: egui::Pos2,
     markers: &'a [TimelineMarkerPin<'a>],
 ) -> Option<&'a str> {
-    let tolerance = 5.0;
-    markers.iter().find_map(|marker| {
-        let x = x_for_frame(track, range_start, duration, marker.frame);
-        (!marker.id.trim().is_empty() && (pos.x - x).abs() <= tolerance).then_some(marker.id)
-    })
+    // Wide enough to take a marker by mouse (live 2026-10-18: a marker on the edge of a Wrap
+    // row, one frame away, was a cue); on the row's edge the whole strip beside it counts.
+    let tolerance = 8.0;
+    markers
+        .iter()
+        .filter(|marker| !marker.id.trim().is_empty())
+        .map(|marker| (marker.id, (pos.x - x_for_frame(track, range_start, duration, marker.frame)).abs()))
+        .filter(|(_, distance)| *distance <= tolerance)
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(id, _)| id)
 }
 
 fn cover_hit<'a>(
