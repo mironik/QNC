@@ -4758,3 +4758,11 @@ nije imao nijedan `source_cut`: srednja tipka je ujedno pritisak na traku, a nam
 prednost pred rezom. Sada je rez (srednja tipka ili dodir s dva prsta) uvijek ono sto znaci, na svakom timelineu
 (`qnc-timeline`). Na Wrap retku (pokrivalice) rez je M marker na Wrap playheadu, kao tipka M (`add_marker`): dva reza
 omeduju slot za pokrivalicu (`qnc-segment-panel`). Uzivo nije provjereno.
+Popravak 2026-10-18 (korisnik: "sad ne rade shortcut ni gumbi za kreiranje segmenta"): tipka i gumb su stizali do price,
+ali je baza odbijala novi segment ("pokrivalica bi zavrsila prije svog M markera"): novi segment pomice zavrsni marker,
+pa je zadnji slot s kratkom pokrivalicom rastao i pravilo "bez rupe" (17. 10.) odbijalo je izmjenu. `qnc-program-db`
+`create_segment`: kad zadnji slot ima pokrivalicu, njegov zavrsni marker ostaje na mjestu kao obican M marker, a novi
+zavrsni ide iza novog segmenta, koji dobiva prazan slot; bez pokrivalice kraj se pomice kao u v5. Poruka odbijanja nije
+se vidjela jer je statusna traka prvo pokazivala poruku playera; sada poruka price ima prednost
+(`qnc-editorial-application` `footer_status`). Proba na kopiji baze projekta: segment upisan, pokrivalica u svom slotu
+(671-777), novi prazan slot (777-1227). Test `a_new_segment_keeps_the_last_slot_of_a_cover_and_gets_an_empty_slot`.

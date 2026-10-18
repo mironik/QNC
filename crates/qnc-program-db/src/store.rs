@@ -313,6 +313,18 @@ impl Store {
             .unwrap_or(0);
         let segment_id = format!("part_{created:x}");
         let now = story_now();
+        // A last slot with a cover keeps its length (user 2026-10-18: a new segment was
+        // refused because it made the last cover's slot longer than its clip): its end
+        // marker stays where it is as a plain M marker, the new end comes after the new
+        // segment, which gets an empty slot. Without a cover the end moves, as in v5.
+        tx.execute(
+            "UPDATE story_markers SET system_role = ''
+             WHERE system_role = 'program_end'
+               AND EXISTS (SELECT 1 FROM story_covers
+                           WHERE slot_id LIKE '%|' || story_markers.marker_id)",
+            [],
+        )
+        .map_err(err)?;
         // v5 `segment_source_from_clip_frames`; the length is in story frames.
         let in_frame = in_frame as i64;
         let (out_frame, duration) = story_length(in_frame, out_frame as i64, per_source)?;

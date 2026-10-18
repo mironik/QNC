@@ -120,7 +120,9 @@ impl EditorialApplication {
 
     /// Text for the shell footer: the last preview error, else the catalog state.
     pub fn footer_status(&self) -> &str {
-        [&self.view.preview.message, &self.view.segments.message]
+        // The story's answer first (live 2026-10-18: a refused segment said why only under
+        // the player's message, so nothing seemed to happen).
+        [&self.view.segments.message, &self.view.preview.message]
             .into_iter()
             .find(|message| !message.is_empty())
             .unwrap_or(&self.view.message)

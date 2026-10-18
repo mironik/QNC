@@ -1732,6 +1732,34 @@ fn no_edit_leaves_a_cover_shorter_than_its_slot() {
 }
 
 #[test]
+fn a_new_segment_keeps_the_last_slot_of_a_cover_and_gets_an_empty_slot() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store); // 30 frames
+    let Data::Created(m25) = marker(&mut store, 25).unwrap() else {
+        panic!()
+    };
+    let slot: String = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT slot_id FROM story_marker_slots WHERE start_marker_id = ?1", [&m25], |row| row.get(0))
+        .unwrap();
+    create_cover(&mut store, &slot, (500, 504)).unwrap();
+    drop(store);
+    // The cover's clip ends soon after it: a longer last slot would leave a hole.
+    Connection::open(&path).unwrap().execute("UPDATE clips SET duration_frames = 506 WHERE clip_id = 'c1'", []).unwrap();
+    let mut store = reopen(&path);
+    // Live 2026-10-18: a new segment was refused because the end marker moved.
+    create_segment(&mut store, "tonovi", (300, 310), (50, 1)).expect("a new segment is made");
+    assert_eq!(markers(&mut store), vec![25, 30], "the old end stays as an M marker");
+    let cover_slot: (i64, i64) = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT timeline_start_frame, timeline_end_frame FROM story_covers", [], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap();
+    assert_eq!(cover_slot, (25, 30), "the cover keeps its slot");
+}
+
+#[test]
 fn a_story_of_an_older_schema_is_not_read_until_the_owner_brings_it_up() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
