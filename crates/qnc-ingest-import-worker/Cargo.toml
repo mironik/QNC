@@ -16,7 +16,7 @@ qnc-ingest-select = { workspace = true }
 qnc-ingest-store = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-media-stream = { workspace = true }
-qnc-poster-create = { workspace = true }
+qnc-missing-posters = { workspace = true }
 qnc-source-reader = { workspace = true }
 qnc-work-settings = { workspace = true }
 qnc-media-metadata = { workspace = true }

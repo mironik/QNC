@@ -3781,7 +3781,7 @@ dependencies = [
  "qnc-media-optimize",
  "qnc-media-probe",
  "qnc-media-stream",
- "qnc-poster-create",
+ "qnc-missing-posters",
  "qnc-source-reader",
  "qnc-source-timecode",
  "qnc-ui-text",
@@ -3915,6 +3915,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-ingest-import-worker",
  "qnc-ingest-select",
+ "qnc-missing-posters",
  "qnc-playback-activity",
  "qnc-record-completion",
  "qnc-source-reader",
@@ -4214,6 +4215,19 @@ dependencies = [
  "qnc-source-reader",
  "qnc-ui-text",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-missing-posters"
+version = "0.1.0"
+dependencies = [
+ "qnc-active-project-read",
+ "qnc-content-read",
+ "qnc-content-store",
+ "qnc-filmstrip",
+ "qnc-poster-create",
+ "qnc-ui-text",
+ "qnc-work-settings",
 ]
 
 [[package]]

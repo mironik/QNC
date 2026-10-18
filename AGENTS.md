@@ -4597,3 +4597,17 @@ uz drugi dugi prolaz (2676), pa su trajali 55 s i 45 s. `qnc-wave-worker` (`pref
 prolaz klipa otvorenog u previewu cita karticu sam; ostali prolazi se prekidaju i vracaju u red (kao za player) i
 cekaju da on zavrsi. Dekodiranje slika filmstripa i dalje ide na drugoj jezgri. Test
 `the_preferred_clip_reads_the_card_alone`, conformance. Uzivo nije izmjereno.
+Popravak 2026-10-18 (korisnik: "pokvario si kocku kreiranja postera ako ne postoje posteri kreirani na kartici"): od
+15. 10. (`2eeadaa`: artefakti idu uz dovrsetak zapisa) `tools/qnc-ingest-worker` je postere klipova bez postera s
+kartice radio tek nakon svih valova i filmstripova (u izoliranoj kopiji 7 XDCAM klipova nakon 79 s, na vecoj kartici
+minute), a Ingest prati postere najvise 3 min. Sada se rade odmah nakon dovrsetka zapisa, u istoj niti, prije valova i
+filmstripova preostalih klipova; pod najmom radnika kao i prije. Testovi `qnc-ingest-worker`, conformance.
+Dopuna 2026-10-18 (korisnik: "kreiranje postera u svoju kocku"; "sve u kockama, kojima upravlja modul, a module koriste
+forme; nema prepisivanja ni dupliranja koda; podjela rada i hijerarhija"; "ingest worker (procedura) pokrece kocke"):
+nova javna kocka `crates/qnc-missing-posters` (+ ugovor `contracts/modules/missing-posters.module.json`) je jedino
+mjesto koje radi poster s pocetka klipa: `make_missing_posters` (klipovi aktivnog projekta bez postera, poster u
+`products/thumbnails` projekta, upis kroz pisca baze pod najmom pozivatelja), `poster_from_start`, `poster_file`,
+`inside_project` (jedina provjera da se pise samo u mapu projekta). Gdje je medij na ovom racunalu daje pozivatelj,
+pa kocka ne ovisi o Ingestu. Iz `qnc-ingest-import-worker` uklonjeni su `make_missing_posters`, `create_missing_poster`
+i vlastiti `inside_project`; poster pri Uvezi radi ista kocka. `tools/qnc-ingest-worker` (procedura) je pokrece odmah
+nakon dovrsetka zapisa. Testovi `qnc-missing-posters`, `qnc-ingest-import-worker` (22), conformance.

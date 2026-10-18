@@ -22,13 +22,12 @@ pub use config::ConfigMediaOpener;
 mod process;
 
 pub use process::{ImportRun, 
-    launch_worker, make_missing_posters, run_import, run_service, ImportSummary, WORKER_EXECUTABLE,
+    launch_worker, run_import, run_service, ImportSummary, WORKER_EXECUTABLE,
 };
 
 use qnc_ingest_store::content::{ContentClient, ImportedCopy, StoredClip};
 use qnc_media_metadata::MediaRepresentation;
 use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
-use qnc_work_settings::ProductArea;
 use std::{
     fs,
     io::{Read, Write},
@@ -331,16 +330,8 @@ fn copy_media(
 
 /// Writes go only where the project says: below the project folder. A source (a card) is read
 /// only, so nothing is ever written, created or changed there.
-pub(crate) fn inside_project(project_dir: &Path, path: &Path) -> Result<(), String> {
-    let plain = path
-        .components()
-        .all(|part| !matches!(part, std::path::Component::ParentDir));
-    if plain && path.starts_with(project_dir) {
-        Ok(())
-    } else {
-        Err(qnc_ui_text::text("import.writing_allowed_only_into_project_folder").into())
-    }
-}
+/// The one guard of where the project may be written (the poster block's).
+pub(crate) use qnc_missing_posters::inside_project;
 
 /// The poster of a clip in the project. The card is read only and is never touched.
 /// - The card has a poster: the poster is copied into the project thumbnail location, so the
@@ -356,12 +347,8 @@ pub fn import_poster(
     cancel: &AtomicBool,
 ) -> Option<String> {
     let clip_id = clip.clip.id();
-    let directory = plan
-        .settings
-        .product_local_dir(project_dir, ProductArea::Thumbnails)
-        .join(clip_id);
-    let output = directory.join("poster.jpg");
-    inside_project(project_dir, &output).ok()?;
+    let output = qnc_missing_posters::poster_file(&plan.settings, project_dir, clip_id).ok()?;
+    let directory = output.parent()?.to_path_buf();
     let made = format!("{}/{clip_id}/poster.jpg", plan.thumbnails_uri.trim_end_matches('/'));
     match clip.clip.thumbnail_uri.as_deref() {
         // Already made in the project (a single file without a card poster): kept.
@@ -370,33 +357,10 @@ pub fn import_poster(
             fs::create_dir_all(&directory).ok()?;
             copy_into(opener, source_uri, &output, cancel, &mut || {}).ok()?;
         }
-        None => create_missing_poster(clip, plan, &output, opener, cancel).ok()?,
+        // The start of the clip, by the one block that makes missing posters.
+        None => qnc_missing_posters::poster_from_start(clip, &plan.settings, &|uri: &str| opener.local_path(uri), &output, cancel).ok()?,
     }
     Some(made)
-}
-
-/// The frame is the start of the clip (user 2026-10-09: not the middle), the first key
-/// frame; the source (proxy when there is one) and its timing come from what the project
-/// database already holds, the media is never probed.
-pub(crate) fn create_missing_poster(
-    clip: &StoredClip,
-    plan: &IngestWorkPlan,
-    output: &Path,
-    opener: &dyn MediaOpener,
-    cancel: &AtomicBool,
-) -> Result<(), String> {
-    let filmstrip = qnc_filmstrip::plan_from_snapshot_with_artifact_name(
-        &clip.clip.snapshot,
-        &plan.filmstrip_uri,
-        Some(&clip.clip.name),
-    )?;
-    let source = opener
-        .local_path(&filmstrip.source_uri)
-        .ok_or(qnc_ui_text::text("import.source_clip_available_this_computer"))?;
-    match qnc_poster_create::create_poster(&source, 0.0, filmstrip.source_timebase, output, cancel)? {
-        true => Ok(()),
-        false => Err(qnc_ui_text::text("import.this_computer_local_picture_extractor").into()),
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

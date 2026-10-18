@@ -150,6 +150,23 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 }
                 Err(error) => eprintln!("dovrsetak zapisa nije uspio: {error}"),
             }
+            // Posters for clips whose source has none (a single file, an XDCAM disc): their
+            // records are final now, so the start of the clip is known. Made right away, not
+            // after every wave and filmstrip (user 2026-10-18: since 2026-10-15 they came only
+            // when all artifacts were done, minutes later, and Ingest had stopped looking).
+            if !closed.load(std::sync::atomic::Ordering::Relaxed) {
+                // Where each medium is on this computer: the source bindings Select uses.
+                let local_media = |uri: &str| {
+                    let reference = qnc_source_reader::SourceReference::from_uri(uri).ok()?;
+                    let source = config.sources.iter().find(|source| source.location.uri == reference.source_uri())?;
+                    source.local_media_path(uri).ok().flatten()
+                };
+                match qnc_missing_posters::make_missing_posters(root, &local_media, Some(lease.write_lease()), &cancel) {
+                    Ok(0) => {}
+                    Ok(made) => eprintln!("posteri napravljeni: {made}"),
+                    Err(error) => eprintln!("posteri nisu napravljeni: {error}"),
+                }
+            }
             completing.store(false, std::sync::atomic::Ordering::Relaxed);
         });
         let artifacts = run_artifacts(root, &lease, &closed, &completing);
@@ -159,13 +176,6 @@ fn run_once(root: &Path) -> Result<bool, String> {
             let _ = import.join();
             eprintln!("projekt je zatvoren: pozadinski proces staje");
             return Ok(false);
-        }
-        // Posters for clips whose source has none (a single file): their records are
-        // final now, so the start of the clip is known.
-        match qnc_ingest_import_worker::make_missing_posters(root, Some(lease.write_lease())) {
-            Ok(0) => {}
-            Ok(made) => eprintln!("posteri napravljeni: {made}"),
-            Err(error) => eprintln!("posteri nisu napravljeni: {error}"),
         }
         // Wave needs the audio facts the completion has just written; the filmstrips are
         // already made, so this pass only makes the waves the first one had to skip.

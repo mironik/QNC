@@ -1,0 +1,14 @@
+[package]
+name = "qnc-missing-posters"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the poster of a clip whose source has none, made from the start of the clip into the project thumbnails and recorded through the content write transport"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+qnc-active-project-read = { workspace = true }
+qnc-content-read = { workspace = true }
+qnc-content-store = { workspace = true }
+qnc-work-settings = { workspace = true }
+qnc-filmstrip = { workspace = true }
+qnc-poster-create = { workspace = true }
