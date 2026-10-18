@@ -4627,3 +4627,11 @@ jos nakon dovrsetka zapisa i nakon uvoza (klip ciji zapis pri Selectu nije imao 
 `qnc-content-store` `SetPoster`: poster iz projekta zamjenjuje prazno mjesto ili poster s kartice, poster koji je vec u
 projektu se ne zamjenjuje; ponovni Select zadrzava poster koji klip vec ima. `qnc-content-read` `clip_posters` umjesto
 `clips_without_poster`. Testovi `qnc-content-store`, `qnc-missing-posters`, `qnc-ingest-select`, conformance.
+Popravak 2026-10-18 (korisnik: "najprije XDCAM klipovi, njih Space pokrece; nakon njih XAVC, njih Space ne pokrece";
+"stvari rjesavati na nivou kocki"): log "player input: NotFinal". Drugi Select (XAVC) dosao je dok je pozadinski proces
+prvog (XDCAM) jos radio; drugi proces se nije pokrenuo (najam), a kocka `qnc-record-completion` je popis klipova za
+dovrsetak procitala samo jednom, pa 98 uvezenih klipova nikad nije dobilo konacni zapis. Kocka sada nakon svakog kruga
+ponovno cita bazu i radi dok ima klipova koji cekaju (klip ciji dovrsetak nije uspio ne uzima ponovno u istom radu);
+`tools/qnc-ingest-worker` nakon rada ponovno pogleda bazu i radi jos jednom kad zapisi cekaju, ali ne kad cekaju isti
+zapisi kao prije (dovrsetak im nije uspio). Testovi `qnc-record-completion`, conformance. U izoliranoj kopiji radnik je
+pokrenut za projekt `kjhfdtz`: dovrsava zapise koji su cekali.

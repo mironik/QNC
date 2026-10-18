@@ -92,8 +92,7 @@ pub fn complete_active_project(
     let snapshot = active.read().map_err(|e| e.to_string())?;
     let reader = active.settings_reader();
     let content = ContentTarget::for_project(reader, &snapshot.settings)?;
-    let waiting = camera_clips(&content)?;
-    if waiting.is_empty() {
+    if camera_clips(&content)?.is_empty() {
         return Ok(Completion::default());
     }
     let writer = ProjectDbWriter::start(
@@ -120,7 +119,32 @@ pub fn complete_active_project(
         cancel,
         lease,
     };
-    Ok(complete_clips(&parts, waiting, &content, &run))
+    // The project database is read again after every round: clips a later Select added while
+    // this one ran are completed too (user 2026-10-18: a second card selected during the first
+    // card's completion was imported, but its records were never completed). A clip that
+    // failed is not taken again in this run.
+    let mut done = Completion::default();
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return Ok(done);
+        }
+        let tried: std::collections::HashSet<&str> = done
+            .completed
+            .iter()
+            .map(String::as_str)
+            .chain(done.failed.iter().map(|(clip, _)| clip.as_str()))
+            .collect();
+        let waiting: Vec<CatalogClip> = camera_clips(&content)?
+            .into_iter()
+            .filter(|clip| !tried.contains(clip.id()))
+            .collect();
+        if waiting.is_empty() {
+            return Ok(done);
+        }
+        let round = complete_clips(&parts, waiting, &content, &run);
+        done.completed.extend(round.completed);
+        done.failed.extend(round.failed);
+    }
 }
 
 /// The clip a preview wants next, from the project database.

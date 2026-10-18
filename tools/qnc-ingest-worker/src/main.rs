@@ -25,16 +25,33 @@ fn main() -> ExitCode {
     }
 }
 
-/// Runs while it holds the lease; then, with the lease released, looks at the import
-/// queue once more: an Uvezi whose start found the lease held (and ended at once) is
-/// never lost, it is taken here.
+/// Runs while it holds the lease; then, with the lease released, looks at the project
+/// database once more: an Uvezi or a Select whose start found the lease held (and ended at
+/// once) is never lost, its clips are taken here (user 2026-10-18: a second card's records
+/// were never completed). Records that wait again unchanged after a run (their completion
+/// failed) do not start another one.
 fn run_background(root: &Path) -> Result<(), String> {
+    let mut last_records: Vec<String> = Vec::new();
     while run_once(root)? {
-        if !import_waiting(root)? {
+        if import_waiting(root)? {
+            continue;
+        }
+        let records = records_waiting(root)?;
+        if records.is_empty() || records == last_records {
             break;
         }
+        last_records = records;
     }
     Ok(())
+}
+
+/// The clips of the active project whose record still waits for its completion.
+fn records_waiting(root: &Path) -> Result<Vec<String>, String> {
+    let active_project = qnc_active_project_read::ActiveProjectReader::from_root(root)
+        .map_err(|error| error.to_string())?;
+    let snapshot = active_project.read().map_err(|error| error.to_string())?;
+    let content = qnc_content_store::ContentTarget::for_project(active_project.settings_reader(), &snapshot.settings)?;
+    Ok(qnc_record_completion::camera_clips(&content)?.iter().map(|clip| clip.id().to_string()).collect())
 }
 
 /// Whether clips wait in the import queue of the active project.
