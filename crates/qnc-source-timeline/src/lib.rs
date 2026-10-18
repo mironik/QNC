@@ -205,8 +205,10 @@ impl SourceTimeline {
     /// A click on a channel in the column of A1 (lane 0) or A2: on the taken lane it only
     /// drafts (Enter keeps it), otherwise it is kept at once. Heard at once.
     pub fn choose(&mut self, lane: u8, channel: u16, preview: &mut SourcePreview) -> bool {
+        // The click on a channel of a taken lane is the timeline's own lane key, the same on
+        // every timeline (Wrap rows too; user 2026-10-18: written once, used everywhere).
         let changed = if self.lanes.taken().is_some_and(|(taken, _)| taken == lane) {
-            self.lanes.set_draft(lane, channel)
+            qnc_timeline::lane_key(&mut self.lanes, qnc_timeline::LaneKey::Pick(channel))
         } else {
             self.lanes.choose(lane, channel)
         };

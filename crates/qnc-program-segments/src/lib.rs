@@ -552,6 +552,9 @@ impl ProgramSegments {
             SegmentCommand::TakeSound { lane, frame } => {
                 self.take_part_sound(lane, frame);
             }
+            // The channel picked by mouse is the segment panel keys' (piece `qnc-segments-keys`:
+            // the draft is heard at once); nothing to do here.
+            SegmentCommand::PickChannel { .. } => return false,
             SegmentCommand::SelectSlot { slot_id, frame } => {
                 self.drop_selected_cover();
                 self.select_slot(&slot_id, Some(frame))

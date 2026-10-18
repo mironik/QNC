@@ -372,10 +372,10 @@ impl EditorialApplication {
                     None => self.application_action(&action_id),
                 }
             }
-            EditorialIntent::Segment(command) => {
-                self.focus.set(Panel::Segments);
-                self.segments.apply(command)
-            }
+            EditorialIntent::Segment(command) => match self.focus.segment_command(&command, (&mut self.preview, &mut self.wrap, &mut self.segments)) {
+                Some(changed) => changed,
+                None => self.segments.apply(command),
+            },
             EditorialIntent::Timeline(intent @ (TimelineIntent::CueFrame(_) | TimelineIntent::GoHome)) => {
                 self.focus.to_source(&mut self.wrap); // the Source view
                 self.focus.source_timeline_mut().cue(&intent, &mut self.preview)

@@ -4695,3 +4695,11 @@ zaustavljenog Synca, Enter, Delete, O, I naoruzava); stanje i upisi Synca ostaju
 `qnc-panel-focus` je modul koji drzi samo redoslijed kocki (prva koja uzme tipku odgovara) i krug panela; 827 -> 745
 redaka (prava funkcija preusmjeravanja i dalje oko 240 redaka: tipke source timelinea vezane uz rub segmenta).
 Ponasanje se ne mijenja. Testovi, conformance, release gradnja. Uzivo nije provjereno.
+Popravak 2026-10-18 (korisnik: "promjena audio kanala nije moguca misem, samo strelicama gore-dolje"; "timeline mora biti
+zajednicki za sve, jednom pisi koristi svugdje"; "wrap-segment je isti timeline samo ima dodan jos jedan lajer,
+pokrivalica... tako je zamisljen jos od verzije 5"): na Wrap retku klik na kanal u stupcu uzetog A1/A2 kocka
+`qnc-timeline` je javljala (`ChooseA1Channel`/`ChooseA2Channel`), ali ga panel Segmenti nije primao. Sada je izbor kanala
+klikom jedan kljuc traka svih timelinea: `qnc-timeline` `LaneKey::Pick(kanal)` (isti put koriste source timeline i Wrap
+redovi; source timeline vise nema svoj `set_draft`), `qnc-program-commands` `SegmentCommand::PickChannel`,
+`qnc-segment-panel` ga daje, `qnc-panel-focus` `segment_command` ga predaje kocki `qnc-segments-keys` (`pick`: nacrt se
+odmah cuje, kao strelice). Testovi, conformance, zlatni testovi. Uzivo nije provjereno.

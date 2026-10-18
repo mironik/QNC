@@ -80,6 +80,9 @@ pub enum SegmentCommand {
     /// A right click on A1 (0) or A2 of a Wrap row: the sound of what lies at the program
     /// frame is taken as with Ctrl+1/Ctrl+2 there.
     TakeSound { lane: u8, frame: u64 },
+    /// A click on a channel in the column of the taken A1 (0) or A2 of a Wrap row: that
+    /// channel, as up/down picks it (user 2026-10-18: by mouse too).
+    PickChannel { lane: u8, channel: u16 },
     /// A click on a slot: select it, playhead at the clicked program frame (v5
     /// `SelectMarkerSlot { frame }`).
     SelectSlot {

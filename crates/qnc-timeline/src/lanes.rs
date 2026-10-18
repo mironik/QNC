@@ -18,6 +18,9 @@ pub enum LaneKey {
     Take(u8),
     /// Up (-1) or down: the channel of the taken lane.
     Channel(i64),
+    /// A click on a channel of the column (0-based): that channel of the taken lane, by
+    /// mouse, pad or any other device, as up/down by keys (user 2026-10-18).
+    Pick(u16),
     /// Left (off) or right (on).
     Off(bool),
     /// Ctrl+left/right, Ctrl+wheel: the level in dB.
@@ -53,6 +56,7 @@ pub fn lane_key(lanes: &mut LaneChoice, key: LaneKey) -> bool {
     match key {
         LaneKey::Take(lane) => lanes.take(lane),
         LaneKey::Channel(delta) => lanes.draft(delta),
+        LaneKey::Pick(channel) => lanes.taken().is_some_and(|(lane, _)| lanes.set_draft(lane, channel)),
         LaneKey::Off(off) => lanes.set_off(off),
         LaneKey::Level(delta_db) => lanes.nudge_level(delta_db),
         LaneKey::Keep => {

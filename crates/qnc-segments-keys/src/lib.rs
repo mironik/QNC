@@ -33,11 +33,7 @@ pub fn sound(
         lane if segments.part_sound_taken()
             && matches!(LaneKey::of(lane), Some(LaneKey::Channel(_) | LaneKey::Off(_) | LaneKey::Level(_))) =>
         {
-            let key = LaneKey::of(lane).unwrap_or(LaneKey::Drop);
-            let changed = segments.part_sound_lanes().is_some_and(|lanes| qnc_timeline::lane_key(lanes, key));
-            say_part_lane(segments);
-            preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
-            changed
+            draft(LaneKey::of(lane).unwrap_or(LaneKey::Drop), (preview, wrap, segments))
         }
         "clear_focus" | "close_player" if segments.part_sound_taken() => {
             let released = segments.release_part_sound();
@@ -46,6 +42,26 @@ pub fn sound(
         }
         _ => return ControlFlow::Continue(()),
     }))
+}
+
+/// A channel picked in the column of the taken sound (a click, or any device that names
+/// the channel): drafted and heard at once, as up/down. False when lane `lane` is not the
+/// taken one.
+pub fn pick(
+    lane: u8,
+    channel: u16,
+    (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments),
+) -> bool {
+    let taken = segments.part_sound_lanes().and_then(|lanes| lanes.taken()).map(|(taken, _)| taken);
+    taken == Some(lane) && draft(LaneKey::Pick(channel), (preview, wrap, segments))
+}
+
+/// A lane key on the taken sound: drafted, said in the status line and heard in the program.
+fn draft(key: LaneKey, (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments)) -> bool {
+    let changed = segments.part_sound_lanes().is_some_and(|lanes| qnc_timeline::lane_key(lanes, key));
+    say_part_lane(segments);
+    preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
+    changed
 }
 
 /// The keyboard left the segment panel (a click, Tab or Enter): what it took is dropped and

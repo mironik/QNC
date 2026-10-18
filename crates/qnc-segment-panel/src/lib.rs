@@ -447,6 +447,9 @@ fn paint_program(
         // Ctrl+click on V: filmstrip or narrow video row (user 2026-10-15).
         TimelineIntent::ToggleVideoMode => Some(SegmentCommand::ToggleWrapVideo),
         TimelineIntent::Wheel(wheel) => Some(SegmentCommand::Wheel { up: wheel.up, ctrl: wheel.ctrl }),
+        // A click on a channel in the column of the taken sound (user 2026-10-18: by mouse too).
+        TimelineIntent::ChooseA1Channel(channel) => Some(SegmentCommand::PickChannel { lane: 0, channel }),
+        TimelineIntent::ChooseA2Channel(channel) => Some(SegmentCommand::PickChannel { lane: 1, channel }),
         // A left click on the A1/A2 button of a Wrap row, as on the source timeline (user
         // 2026-10-17): it takes the sound of what lies under the Wrap playhead in this row
         // (else at its start), as Ctrl+1/Ctrl+2; while a sound is taken it keeps it (Enter).

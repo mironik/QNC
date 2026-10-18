@@ -230,6 +230,23 @@ impl PanelFocus {
         self.panel = panel;
     }
 
+    /// A command of a Wrap row (a click, the wheel): the segment panel takes the keyboard; the
+    /// ones its key block answers are answered here (a channel picked by mouse is heard at
+    /// once, user 2026-10-18), `None` for the program model.
+    pub fn segment_command(
+        &mut self,
+        command: &qnc_program_segments::SegmentCommand,
+        (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments),
+    ) -> Option<bool> {
+        self.panel = Panel::Segments;
+        match command {
+            qnc_program_segments::SegmentCommand::PickChannel { lane, channel } => {
+                Some(qnc_segments_keys::pick(*lane, *channel, (preview, wrap, segments)))
+            }
+            _ => None,
+        }
+    }
+
     /// Routes one catalog action to the focused panel. `None`: not a panel action
     /// (the application handles it); `Some(changed)`: taken here, done or ignored.
     pub fn route(
