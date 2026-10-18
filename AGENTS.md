@@ -4753,3 +4753,8 @@ tipke; tipke ostaju I i O). `qnc-timeline` (`TimelineIntent::Cut`, mapa misa `so
 `with_first_cut_at_confirmed`, `with_second_cut_at_confirmed`), `qnc-source-timeline` (`cut`, pamti prvi rez,
 `route_input`, pa isto u Storyju i Ingestu), `qnc-touch-gestures` (`tapped`), `qnc-panel-focus` (rez naoruzava
 Sync/B-roll kao I). Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-18 (korisnik: "srednji klik ne radi"; "ta srednja tipka misa treba raditi i na pokrivalicama"): log
+nije imao nijedan `source_cut`: srednja tipka je ujedno pritisak na traku, a namjera tog pritiska (cue) imala je
+prednost pred rezom. Sada je rez (srednja tipka ili dodir s dva prsta) uvijek ono sto znaci, na svakom timelineu
+(`qnc-timeline`). Na Wrap retku (pokrivalice) rez je M marker na Wrap playheadu, kao tipka M (`add_marker`): dva reza
+omeduju slot za pokrivalicu (`qnc-segment-panel`). Uzivo nije provjereno.

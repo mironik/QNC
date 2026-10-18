@@ -870,9 +870,10 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     let touch = qnc_touch_gestures::take(ui, outer, ui.id().with("qnc-timeline-touch"));
     let wheel = notch.or(swipe).or(touch);
     let over = ui.ctx().pointer_hover_pos().is_some_and(|at| outer.contains(at));
-    let cut = !input.layers.markers
-        && ((over && ui.input(|input| input.pointer.button_clicked(egui::PointerButton::Middle)))
-            || qnc_touch_gestures::tapped(ui, outer, ui.id().with("qnc-timeline-touch-tap")));
+    // A cut (scissors) on every timeline: the middle button over it or a two-finger tap
+    // (user 2026-10-18: on the source timeline and on the Wrap rows with the covers).
+    let cut = (over && ui.input(|input| input.pointer.button_clicked(egui::PointerButton::Middle)))
+        || qnc_touch_gestures::tapped(ui, outer, ui.id().with("qnc-timeline-touch-tap"));
     ui.painter().rect_filled(outer, 0.0, input.theme.background);
     ui.painter().rect_stroke(
         outer,
@@ -1082,6 +1083,11 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     }
     paint_trim_playheads(ui, outer, &input);
 
+    // The middle button also presses on the track; the cut is what it means (live
+    // 2026-10-18: the cue of that press won and no cut came).
+    if cut {
+        return TimelineIntent::Cut;
+    }
     match (intent, wheel) {
         // Ctrl+wheel (or the wheel with the right button held) on a source timeline with
         // nothing taken takes IN or OUT, whichever is nearer the mouse, the clip's start or
@@ -1100,7 +1106,6 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
             TimelineIntent::TakeMark(local.abs_diff(input.draft_in_frame) <= local.abs_diff(input.draft_out_frame))
         }
         (TimelineIntent::None, Some(wheel)) => TimelineIntent::Wheel(wheel),
-        (TimelineIntent::None, None) if cut => TimelineIntent::Cut,
         (intent, wheel) => {
             if wheel.is_some() && qnc_dev_diagnostics::player_diagnostics_enabled() {
                 qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("timeline-wheel lost to {intent:?}"));

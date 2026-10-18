@@ -443,6 +443,9 @@ fn paint_program(
             let id = if lane == qnc_timeline::AudioLane::A2 { "select_audio_a2" } else { "select_audio_a1" };
             on_panel(ActionEvent::key(id).with_value(frame))
         }
+        // A cut (scissors) on a Wrap row is an M marker at the Wrap playhead, as the M key: two
+        // cuts bound a slot for a cover (user 2026-10-18).
+        TimelineIntent::Cut => on_panel(ActionEvent::key("add_marker")),
         other => qnc_timeline::event(&other, qnc_wheel_jog::SEGMENTS_ACTIONS, &row_frame).map(|event| event.at(PANEL)),
     }
 }
