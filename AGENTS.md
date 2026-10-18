@@ -4645,3 +4645,11 @@ Space dok klip ceka zapis pamti Play i pusta klip cim je zapis gotov. Ingest i S
 Smanjeno: iz `qnc-ingest-application` uklonjen nekoristen objekt artefakata (filmstrip i val radi radnik, prikaz cita
 preview), C10 1567 -> 1552; iz `qnc-editorial-application` uklonjena kopija trazenja korijena QNC-a (koristi kocku
 `qnc-dev-diagnostics::locate_qnc_root`), C10 687 -> 660. Testovi, conformance.
+Audit i popravak 2026-10-18 (korisnik: "kreiranje filmstripa i wavea je presporo, napravi audit"): projekt `jjf653257`
+(105 klipova, 9,9 GB s kartice u USB 2.0 citacu): prolaz za val citao je karticu oko 30 MB/s po datoteci (medijan
+31,7), kao da cita cijelu datoteku; 1489 (1 GB) 34 s, a 14. 10. 16,6 s. Uzrok u kocki `qnc-mxf-sound` od jednog prolaza
+(16. 10.): za filmstrip je provjeravao je li slika kljucna na pocetku svake slike, dakle dva citanja po kadru umjesto
+jednog, a kartica je ogranicena trajanjem citanja. Sada se pocetak slike cita samo od cilja filmstripa do prve kljucne
+slike iza njega (i do 60 slika prije zadnjeg cilja, za klip koji zavrsava prije sljedece kljucne slike). Izmjereno na
+kartici: 1489 sa svih 13 slika 15,0 s (67 MB/s). Filmstrip ide uz val (isti prolaz), pa se ubrzava jednako. Testovi
+`qnc-mxf-sound`, `qnc-wave-worker`, conformance.

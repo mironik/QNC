@@ -27,6 +27,9 @@ const SOUND_ITEM: u8 = 0x16;
 const PICTURE_ITEM: u8 = 0x15;
 /// How much of a picture's start tells whether it is a key picture.
 const PICTURE_HEAD: usize = 256;
+/// Before the last target, how many pictures are looked at for a key picture (a group of
+/// pictures of a camera), so a clip that ends before the next one still has it.
+const KEY_LOOK_BACK: u64 = 60;
 
 struct Packet {
     key: [u8; 16],
@@ -128,8 +131,14 @@ pub fn read_sound_and_pictures(
             on_element(packet.key[15], value)?;
             found = true;
         } else if packet.key[..12] == ESSENCE_KEY && packet.key[12] == PICTURE_ITEM && !targets.is_empty() {
-            let head = chunks.bytes(packet.value_at, PICTURE_HEAD.min(packet.length as usize))?;
-            if is_key(head) {
+            // Only from a target on is a picture's start read, until its key picture is found
+            // (user 2026-10-18: the start of every picture was read, two reads a frame instead
+            // of one, and the wave of a card took twice as long). The last target's key picture
+            // may be before it: the picture just before the last target is looked at too.
+            let wanted = want < targets.len()
+                && (picture >= targets[want] || (want + 1 == targets.len() && picture + KEY_LOOK_BACK >= targets[want]));
+            let head = if wanted { chunks.bytes(packet.value_at, PICTURE_HEAD.min(packet.length as usize))? } else { &[][..] };
+            if wanted && is_key(head) {
                 last_key = Some((packet.value_at, packet.length, picture));
                 if want < targets.len() && picture >= targets[want] {
                     let value = chunks.bytes(packet.value_at, packet.length as usize)?;
