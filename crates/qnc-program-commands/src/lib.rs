@@ -180,6 +180,17 @@ impl SegmentCommand {
             ("timeline_select_cover", Some(cover_id), Some(frame)) => Self::SelectCover { cover_id, frame },
             ("timeline_select_slot", Some(slot_id), Some(frame)) => Self::SelectSlot { slot_id, frame },
             ("timeline_drag_marker", Some(marker_id), Some(frame)) => Self::DragMarker { marker_id, frame },
+            // The buttons of the segment panel (user 2026-10-18: buttons are system actions too).
+            ("segment_select", Some(id), _) => Self::Select(id),
+            ("segment_exclude", Some(id), _) => Self::Exclude(id),
+            ("segment_include", Some(id), _) => Self::Include(id),
+            ("segment_purge", Some(id), _) => Self::Purge(id),
+            ("segment_replace", Some(id), _) => Self::Replace(id),
+            ("segment_edit", Some(id), _) => Self::Edit(id),
+            (side @ ("segment_move_up" | "segment_move_down"), _, _) => Self::Move { up: side == "segment_move_up" },
+            (side @ ("step_prev_segment" | "step_next_segment"), _, _) => Self::Step { up: side == "step_prev_segment" },
+            (side @ ("step_prev_marker_slot" | "step_next_marker_slot"), _, _) => Self::StepSlot { up: side == "step_prev_marker_slot" },
+            (side @ ("program_prev_marker" | "program_next_marker"), _, _) => Self::StepMarker { up: side == "program_prev_marker" },
             (lane @ ("select_audio_a1" | "select_audio_a2"), None, Some(frame)) => Self::TakeSound { lane: u8::from(lane == "select_audio_a2"), frame },
             (lane @ ("source_choose_a1_channel" | "source_choose_a2_channel"), _, Some(channel)) => {
                 Self::PickChannel { lane: u8::from(lane == "source_choose_a2_channel"), channel: u16::try_from(channel).ok()? }
@@ -236,5 +247,10 @@ mod tests {
         assert_eq!(SegmentCommand::from_event(&at("select_audio_a2").with_value(7u64)), Some(SegmentCommand::TakeSound { lane: 1, frame: 7 }));
         assert_eq!(SegmentCommand::from_event(&at("source_choose_a1_channel").with_value(3u64)), Some(SegmentCommand::PickChannel { lane: 0, channel: 3 }));
         assert_eq!(SegmentCommand::from_event(&at("play_pause")), None);
+        // A button of the segment panel is a system action on its segment (user 2026-10-18).
+        assert_eq!(SegmentCommand::from_event(&at("segment_exclude").with_target("p1")), Some(SegmentCommand::Exclude("p1".into())));
+        assert_eq!(SegmentCommand::from_event(&at("segment_move_up").with_target("p1")), Some(SegmentCommand::Move { up: true }));
+        assert_eq!(SegmentCommand::from_event(&at("program_next_marker")), Some(SegmentCommand::StepMarker { up: false }));
+        assert_eq!(SegmentCommand::from_event(&at("add_marker")), None, "a button with a key goes as that key");
     }
 }

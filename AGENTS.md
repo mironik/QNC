@@ -4720,3 +4720,13 @@ Segmentima vise ne uzima rub slota); radnja koja imenuje objekt ili sliku na Wra
 uklonjeni. Zlatni testovi tipki nepromijenjeni; novi testovi za mapu misa i za panel pokazivaca. C10 Editorial
 application 660 -> 654, ploca 349 -> 348. Nije izvedeno (c): kocke za touchpad/geste i vanjske konzole; gumbi trake i
 popisa panela Segmenti jos su naredbe, ne sistemske radnje. Uzivo nije provjereno.
+Izvedeno 2026-10-18 (korisnik: "prebaci i gumbe panela Segmenti na sistemske radnje"): svi gumbi trake i popisa panela
+Segmenti salju sistemsku radnju na tom panelu (`qnc-action-event`), panel daje samo sistemske radnje
+(`EditorialIntent::Segment` i `SegmentInput` uklonjeni). Gumb koji ima tipku salje istu sifru kao tipka (M `add_marker`,
+Cover slot `quick_overwrite_cover`, Overwrite `overwrite_cover`, Undo/Redo `undo_object`/`redo_object`, pocetak programa
+`playlist_input_start`) i ide istim putem kao tipka. Gumbi bez tipke dobili su sifre u katalogu s ciljem (segment):
+`segment_select`, `segment_exclude`, `segment_include`, `segment_purge`, `segment_replace`, `segment_edit`,
+`segment_move_up`, `segment_move_down`, te `program_prev_marker`/`program_next_marker`, a skrivena navigacija koristi
+postojece `step_prev/next_segment` i `step_prev/next_marker_slot`; preslikavanje u naredbu je ono isto
+`SegmentCommand::from_event`. Razlika: gumbi M, Cover slot i Overwrite rade tocno kao njihove tipke (npr. dok je slot uzet).
+Zlatni testovi nepromijenjeni, novi test za gumbe. C10 Editorial application 654 -> 649. Uzivo nije provjereno.

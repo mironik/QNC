@@ -4,7 +4,8 @@
 //! (user rule 2026-09-25) and cannot be picked.
 
 use eframe::egui::{self, Color32, RichText};
-use qnc_program_segments::{SegmentCommand, SegmentsView};
+use qnc_action_event::ActionEvent;
+use qnc_program_segments::SegmentsView;
 use qnc_timeline::TimelineTheme;
 
 
@@ -13,8 +14,8 @@ pub fn show_segment_list(
     segments: &SegmentsView,
     theme: TimelineTheme,
     select: Color32,
-) -> Option<SegmentCommand> {
-    let mut command = None;
+) -> Option<ActionEvent> {
+    let mut command: Option<(&'static str, String)> = None;
     egui::ScrollArea::vertical()
         .id_salt("qnc_segment_list")
         .auto_shrink([false, false])
@@ -74,12 +75,13 @@ pub fn show_segment_list(
                     && command.is_none()
                     && ui.input(|i| i.pointer.primary_clicked())
                 {
-                    command = Some(SegmentCommand::Select(row.segment_id.clone()));
+                    command = Some(("segment_select", row.segment_id.clone()));
                 }
                 ui.add_space(6.0);
             }
         });
-    command
+    // The row's segment is the target; the panel is the segment panel's (user 2026-10-18).
+    command.map(|(action_id, id)| ActionEvent::key(action_id).with_target(id).at(crate::PANEL))
 }
 
 /// The buttons of a row: Isključi, Down, Up on the selected active one; Izbriši,
@@ -88,7 +90,7 @@ fn row_buttons(
     ui: &mut egui::Ui,
     row: &qnc_program_segments::SegmentPart,
     editing: bool,
-    command: &mut Option<SegmentCommand>,
+    command: &mut Option<(&'static str, String)>,
 ) -> egui::Rect {
     let mut area = egui::Rect::NOTHING;
     let mut small = |ui: &mut egui::Ui, text: &str, hint: &str| {
@@ -99,10 +101,10 @@ fn row_buttons(
     let id = || row.segment_id.clone();
     if !row.active {
         if small(ui, qnc_ui_text::text("story.ui.delete"), qnc_ui_text::text("story.ui.delete_hint")) {
-            *command = Some(SegmentCommand::Purge(id()));
+            *command = Some(("segment_purge", id()));
         }
         if small(ui, qnc_ui_text::text("story.ui.include"), qnc_ui_text::text("story.ui.include_hint")) {
-            *command = Some(SegmentCommand::Include(id()));
+            *command = Some(("segment_include", id()));
         }
         return area;
     }
@@ -111,26 +113,26 @@ fn row_buttons(
         qnc_ui_text::text("story.ui.exclude"),
         qnc_ui_text::text("story.ui.exclude_hint"),
     ) {
-        *command = Some(SegmentCommand::Exclude(id()));
+        *command = Some(("segment_exclude", id()));
     }
     if small(ui, qnc_ui_text::text("story.ui.down"), qnc_ui_text::text("story.ui.down_hint")) {
-        *command = Some(SegmentCommand::Move { up: false });
+        *command = Some(("segment_move_down", id()));
     }
     if small(ui, qnc_ui_text::text("story.ui.up"), qnc_ui_text::text("story.ui.up_hint")) {
-        *command = Some(SegmentCommand::Move { up: true });
+        *command = Some(("segment_move_up", id()));
     }
     if small(
         ui,
         qnc_ui_text::text("story.ui.replace"),
         qnc_ui_text::text("story.ui.replace_hint"),
     ) {
-        *command = Some(SegmentCommand::Replace(id()));
+        *command = Some(("segment_replace", id()));
     }
     // Edit (user rule 2026-10-01): IN/OUT of the segment on the source timeline.
     let edit = ui.add(egui::Button::new(RichText::new(qnc_ui_text::text("story.ui.edit")).small()).selected(editing));
     area = area.union(edit.rect);
     if edit.on_hover_text(qnc_ui_text::text("story.ui.edit_hint")).clicked() {
-        *command = Some(SegmentCommand::Edit(id()));
+        *command = Some(("segment_edit", id()));
     }
     area
 }

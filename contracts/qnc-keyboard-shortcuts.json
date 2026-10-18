@@ -362,6 +362,36 @@
     "timeline_drag_marker": {
       "label": "Povlacenje M markera misem"
     },
+    "segment_select": {
+      "label": "Panel Segmenti: klik na segment u popisu (odabir)"
+    },
+    "segment_exclude": {
+      "label": "Panel Segmenti: iskljuci segment"
+    },
+    "segment_include": {
+      "label": "Panel Segmenti: ukljuci iskljuceni segment"
+    },
+    "segment_purge": {
+      "label": "Panel Segmenti: izbrisi iskljuceni segment"
+    },
+    "segment_replace": {
+      "label": "Panel Segmenti: zamijeni segment oznacenim izvorom"
+    },
+    "segment_edit": {
+      "label": "Panel Segmenti: uredi IN/OUT segmenta na source timelineu"
+    },
+    "segment_move_up": {
+      "label": "Panel Segmenti: segment gore"
+    },
+    "segment_move_down": {
+      "label": "Panel Segmenti: segment dolje"
+    },
+    "program_prev_marker": {
+      "label": "Panel Segmenti: prethodni M marker"
+    },
+    "program_next_marker": {
+      "label": "Panel Segmenti: sljedeci M marker"
+    },
     "ingest_cue_frame": {
       "label": "Postavi Ingest cue frame"
     },

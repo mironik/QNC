@@ -16,7 +16,7 @@ pub use cover_length::{cover_fill, CoverLengthBand};
 
 use qnc_action_event::ActionEvent;
 use eframe::egui::{self, Color32, RichText, Vec2};
-use qnc_program_segments::{SegmentCommand, SegmentRow, SegmentsView};
+use qnc_program_segments::{SegmentRow, SegmentsView};
 use qnc_timeline::{
     AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent,
     TimelineLayerFlags, TimelineMarkerPin, TimelineMetrics, TimelinePicture, TimelineProjection, TimelineSlotSpan,
@@ -64,32 +64,15 @@ impl SegmentPanelStyle {
 /// The panel name of the segment panel in the layout contracts (where a click happened).
 pub const PANEL: &str = "segments";
 
-/// What the panel gives: a pointer on a Wrap row as a system action (any input device can
-/// give the same, user 2026-10-18), a button of its bar as a program command.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SegmentInput {
-    Event(ActionEvent),
-    Command(SegmentCommand),
-}
-
-impl SegmentInput {
-    /// The event or the command, each to its own.
-    pub fn either<T>(self, event: impl FnOnce(ActionEvent) -> T, command: impl FnOnce(SegmentCommand) -> T) -> T {
-        match self {
-            Self::Event(action) => event(action),
-            Self::Command(order) => command(order),
-        }
-    }
-}
-
-/// Paints the panel into the whole available rectangle.
+/// Paints the panel into the whole available rectangle. What it gives is a system action
+/// on this panel (user 2026-10-18): a pointer on a Wrap row, a button of its bar.
 pub fn show(
     ui: &mut egui::Ui,
     segments: &SegmentsView,
     timeline_theme: TimelineTheme,
     lengths: &[CoverLengthBand],
     levels: [Option<f32>; 2],
-) -> Option<SegmentInput> {
+) -> Option<ActionEvent> {
     let style = SegmentPanelStyle::from_timeline(timeline_theme);
     let panel_rect = ui.available_rect_before_wrap();
     ui.painter().rect_filled(panel_rect, 0.0, style.surface);
@@ -169,7 +152,7 @@ pub fn show(
             ui.scope_builder(egui::UiBuilder::new().max_rect(playlist), |ui| {
                 ui.set_clip_rect(playlist);
                 ui.separator();
-                command = command.take().or(bar::show(ui, segments, timeline_theme, levels).map(SegmentInput::Command));
+                command = command.take().or(bar::show(ui, segments, timeline_theme, levels));
                 ui.add_space(2.0);
                 let total = segments.total_frames;
                 // Every timeline row needs its own id space: `qnc-timeline` names its
@@ -238,7 +221,7 @@ fn paint_row(
     row: &SegmentRow,
     theme: TimelineTheme,
     lengths: &[CoverLengthBand],
-) -> Option<SegmentInput> {
+) -> Option<ActionEvent> {
     let window = (row.start_frame, row.end_frame);
     ui.push_id(("qnc_segment_row", &row.segment_id), |ui| {
         paint_program(ui, segments, window, theme, row.start_frame == 0, lengths)
@@ -254,7 +237,7 @@ fn paint_program(
     theme: TimelineTheme,
     lane_labels: bool,
     lengths: &[CoverLengthBand],
-) -> Option<SegmentInput> {
+) -> Option<ActionEvent> {
     let duration = end.saturating_sub(start).max(1);
     let local = |frame: u64| frame.clamp(start, end) - start;
     let mut state = TimelineProjection::new(0, duration).with_cue_enabled(true);
@@ -415,7 +398,7 @@ fn paint_program(
     // A pointer on the row is a system action on this panel (the mouse map of every
     // timeline, `qnc_timeline::event`; user 2026-10-18); the rules below are the panel's own.
     let row_frame = |frame: u64| start + frame.min(duration);
-    let on_panel = |event: ActionEvent| Some(SegmentInput::Event(event.at(PANEL)));
+    let on_panel = |event: ActionEvent| Some(event.at(PANEL));
     // Story rows only: a dragged M marker follows the pointer as a draft (Enter confirms).
     if let Some((marker_id, frame)) = qnc_timeline::take_marker_drag(ui.ctx()) {
         return on_panel(ActionEvent::key("timeline_drag_marker").with_target(marker_id).with_value(row_frame(frame)));
@@ -460,7 +443,7 @@ fn paint_program(
             let id = if lane == qnc_timeline::AudioLane::A2 { "select_audio_a2" } else { "select_audio_a1" };
             on_panel(ActionEvent::key(id).with_value(frame))
         }
-        other => qnc_timeline::event(&other, qnc_wheel_jog::SEGMENTS_ACTIONS, &row_frame).map(|event| SegmentInput::Event(event.at(PANEL))),
+        other => qnc_timeline::event(&other, qnc_wheel_jog::SEGMENTS_ACTIONS, &row_frame).map(|event| event.at(PANEL)),
     }
 }
 

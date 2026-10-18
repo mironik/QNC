@@ -372,10 +372,6 @@ impl EditorialApplication {
                     None => self.application_action(&action_id),
                 }
             }
-            EditorialIntent::Segment(command) => {
-                self.focus.set(Panel::Segments);
-                self.segments.apply(command)
-            }
         };
         self.sync_preview_view();
         changed

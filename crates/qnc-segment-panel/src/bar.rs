@@ -6,7 +6,8 @@
 //! Pokrivalice on the source dock.
 
 use eframe::egui::{self, PointerButton, Pos2, Rect, RichText, Sense, Vec2};
-use qnc_program_segments::{SegmentCommand, SegmentsView};
+use qnc_action_event::ActionEvent;
+use qnc_program_segments::SegmentsView;
 use qnc_timeline::TimelineTheme;
 
 pub(crate) const COMPACT_CTRL_H: f32 = 22.0;
@@ -28,8 +29,8 @@ pub(crate) fn show(
     segments: &SegmentsView,
     theme: TimelineTheme,
     levels: [Option<f32>; 2],
-) -> Option<SegmentCommand> {
-    let mut command = None;
+) -> Option<ActionEvent> {
+    let mut command: Option<&'static str> = None;
     let (row, _) = ui.allocate_exact_size(
         Vec2::new(ui.available_width(), COMPACT_CTRL_H),
         Sense::hover(),
@@ -56,41 +57,41 @@ pub(crate) fn show(
                 return;
             }
             ui.spacing_mut().item_spacing.x = TRANSPORT_GAP;
-            let icons: [(&str, &str, Option<SegmentCommand>); 7] = [
+            let icons: [(&str, &str, Option<&'static str>); 7] = [
                 (
                     "⏮",
                     qnc_ui_text::text("story.nav.previous_segment"),
-                    Some(SegmentCommand::Step { up: true }),
+                    Some("step_prev_segment"),
                 ),
                 (
                     "",
                     qnc_ui_text::text("story.nav.previous_slot"),
-                    Some(SegmentCommand::StepSlot { up: true }),
+                    Some("step_prev_marker_slot"),
                 ),
                 (
                     "⚑",
                     qnc_ui_text::text("story.nav.previous_marker"),
-                    Some(SegmentCommand::StepMarker { up: true }),
+                    Some("program_prev_marker"),
                 ),
                 (
                     "🏠",
                     qnc_ui_text::text("story.nav.program_start"),
-                    Some(SegmentCommand::ProgramStart),
+                    Some("playlist_input_start"),
                 ),
                 (
                     "⚑",
                     qnc_ui_text::text("story.nav.next_marker"),
-                    Some(SegmentCommand::StepMarker { up: false }),
+                    Some("program_next_marker"),
                 ),
                 (
                     "",
                     qnc_ui_text::text("story.nav.next_slot"),
-                    Some(SegmentCommand::StepSlot { up: false }),
+                    Some("step_next_marker_slot"),
                 ),
                 (
                     "⏭",
                     qnc_ui_text::text("story.nav.next_segment"),
-                    Some(SegmentCommand::Step { up: false }),
+                    Some("step_next_segment"),
                 ),
             ];
             for (icon, hint, target) in icons {
@@ -112,15 +113,15 @@ pub(crate) fn show(
                 ui.spacing_mut().item_spacing.x = EDIT_ACTION_GAP;
                 ui.spacing_mut().button_padding = Vec2::new(6.0, 1.0);
                 if clicked(action_button(ui, qnc_ui_text::text("story.ui.m_marker"), true, theme)) {
-                    command = Some(SegmentCommand::Marker);
+                    command = Some("add_marker"); // the M key
                 }
                 let quick = segments.quick_cover_slot().is_ok();
                 if clicked(flash_button(ui, qnc_ui_text::text("story.ui.cover_slot"), quick, flashing(ui, segments, false), theme)) {
-                    command = Some(SegmentCommand::Cover { overwrite: false });
+                    command = Some("quick_overwrite_cover"); // the B key
                 }
                 let overwrite = segments.overwrite_cover_slot().is_ok();
                 if clicked(flash_button(ui, qnc_ui_text::text("story.ui.overwrite"), overwrite, flashing(ui, segments, true), theme)) {
-                    command = Some(SegmentCommand::Cover { overwrite: true });
+                    command = Some("overwrite_cover"); // the Overwrite key
                 }
             },
         );
@@ -140,11 +141,8 @@ pub(crate) fn show(
                 // Not done yet, so offered disabled.
                 let _ = action_button(ui, qnc_ui_text::text("story.export_hires"), false, theme);
                 // Right to left: Redo, then Undo, left of Export HI-res.
-                for (label, target) in [(qnc_ui_text::text("story.ui.redo"), SegmentCommand::Redo), (qnc_ui_text::text("story.ui.undo"), SegmentCommand::Undo)] {
-                    let enabled = segments.action_enabled(match target {
-                        SegmentCommand::Undo => "undo_object",
-                        _ => "redo_object",
-                    });
+                for (label, target) in [(qnc_ui_text::text("story.ui.redo"), "redo_object"), (qnc_ui_text::text("story.ui.undo"), "undo_object")] {
+                    let enabled = segments.action_enabled(target);
                     if clicked(action_button(ui, label, enabled, theme)) {
                         command = Some(target);
                     }
@@ -152,7 +150,7 @@ pub(crate) fn show(
             },
         );
     }
-    command
+    command.map(|action_id| ActionEvent::key(action_id).at(crate::PANEL))
 }
 
 fn in_rect(ui: &mut egui::Ui, rect: Rect, layout: egui::Layout, add: impl FnOnce(&mut egui::Ui)) {

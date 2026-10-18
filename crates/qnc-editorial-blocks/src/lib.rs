@@ -46,7 +46,7 @@ pub fn render_desktop(
         }
         "right-panel" if contracts.composition().right_panel == "segment_panel" => {
             let intent = qnc_segment_panel::show(ui, &view.segments, layout::timeline_theme(theme), &contracts.editorial.cover_lengths, view.preview.output_levels)
-                .map(|input| input.either(EditorialIntent::Action, EditorialIntent::Segment));
+                .map(EditorialIntent::Action);
             paint_focus(ui, rect, view.focus.panel == Panel::Segments, theme.focus);
             intent
         }
@@ -223,7 +223,7 @@ fn render_clip_grid(
                 theme.danger,
             );
         });
-        return command.map(EditorialIntent::Segment);
+        return command.map(EditorialIntent::Action);
     }
     let empty_message = if view.loading {
         contracts.editorial.media_card.loading_message.as_str()

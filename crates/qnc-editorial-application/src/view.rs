@@ -116,8 +116,6 @@ pub enum EditorialIntent {
     PreviewShort(String),
     /// One system action from any input device: a key, a click, the wheel (user 2026-10-18).
     Action(qnc_action_event::ActionEvent),
-    /// A button of the segment panel's bar or list.
-    Segment(qnc_program_segments::SegmentCommand),
 }
 
 impl EditorialIntent {
