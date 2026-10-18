@@ -4682,3 +4682,16 @@ koji zapis) ostaje, jer je baza jedina veza procesa; provjera je sada lagani upi
 na stiku za FX6 MXF 0,53-0,70 s -> 0,26-0,28 s; i dalje jedan probe po mediju. `tools/qnc-ingest-worker` 6 istodobnih
 probeova (uz nit klipa koji preview trazi); izmjereno na stiku 8 istodobno 0,22 s po klipu, 2 istodobno 0,37 s. Test
 `the_wanted_clip_is_completed_first` prilagoden (vlastita nit, ne nuzno prvi zavrseni). Testovi, conformance.
+Izvedeno 2026-10-18 (korisnik: "svakim korakom kvaris jedno dok popravljas drugo"; "da, kreni s 1 i 2" na prijedlog
+rastavljanja na kocke): (1) tipke po panelu. Prije rastavljanja zlatni testovi zakljucavaju odgovor svake tipke kataloga
+na svakom panelu: `crates/qnc-panel-focus/tests/route_matrix.*` (Story/MA, 830 slucajeva) i
+`crates/qnc-focus-walk/tests/walk_matrix.*` (Ingest, 588), zapisani iz koda prije izmjene i nepromijenjeni poslije. Nove
+javne kocke (s ugovorima modula): `qnc-key-row` (red dugmadi/tabova: strelice biraju, krajevi drze, klik bira) i
+`qnc-key-list` (tipke popisa kao numerirani koraci, Enter koji otvara karticu) koje sada koriste i Story
+(`qnc-panel-focus`) i Ingest (`qnc-focus-walk`) umjesto dviju kopija; `qnc-segments-keys` (tipke panela Segmenti: zvuk
+segmenta/pokrivalice na Wrap retku, Enter, strelice, Ctrl+I/O rub slota, Ctrl+Shift+I/O rub segmenta, I/O bez ucinka).
+(2) `qnc-sync-session`: sve tipke Sync/B-roll na jednom mjestu (Space start/nastavak ili play/pauza, strelice
+zaustavljenog Synca, Enter, Delete, O, I naoruzava); stanje i upisi Synca ostaju u `qnc-program-segments`.
+`qnc-panel-focus` je modul koji drzi samo redoslijed kocki (prva koja uzme tipku odgovara) i krug panela; 827 -> 745
+redaka (prava funkcija preusmjeravanja i dalje oko 240 redaka: tipke source timelinea vezane uz rub segmenta).
+Ponasanje se ne mijenja. Testovi, conformance, release gradnja. Uzivo nije provjereno.

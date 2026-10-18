@@ -1,0 +1,8 @@
+[package]
+name = "qnc-key-list"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the keys of a list panel (cards, folders) as numbered steps, the same in every form"
+
+[dependencies]
+qnc-media-card = { workspace = true }

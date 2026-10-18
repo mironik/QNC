@@ -84,23 +84,22 @@ pub type FocusNames<'a> = (Vec<&'a str>, Vec<(&'a str, Vec<&'a str>)>, Vec<(&'a 
 #[derive(Debug, Clone, Default)]
 pub struct FocusWalk {
     order: Vec<String>,
-    rows: BTreeMap<String, Vec<String>>,
+    /// The row panels and the button each has chosen (piece `qnc-key-row`).
+    rows: BTreeMap<String, qnc_key_row::KeyRow>,
     clicks: Vec<(String, String)>,
     panel: usize,
-    chosen: BTreeMap<String, usize>,
-    step: Option<(GridStep, u64)>,
+    /// The keys on the list panels as numbered steps; Enter that opened a card puts the
+    /// keyboard on the source timeline (piece `qnc-key-list`).
+    list: qnc_key_list::KeyList,
     /// The list panel the last step was made on: another list never takes it (the folders'
     /// Enter must not open a card when the keyboard comes to the cards).
     step_on: String,
-    /// Enter opened the focused card: the clip it chooses puts the keyboard on the source
-    /// timeline; a click on a card keeps it on the cards.
-    opening: bool,
 }
 
 impl FocusWalk {
     /// The walk of a form; it starts on the first panel.
     pub fn new((order, rows, clicks): FocusNames<'_>) -> Self {
-        let rows = rows.into_iter().map(|(panel, actions)| (panel.to_string(), actions.into_iter().map(str::to_string).collect())).collect();
+        let rows = rows.into_iter().map(|(panel, actions)| (panel.to_string(), qnc_key_row::KeyRow::new(actions))).collect();
         let clicks = clicks.into_iter().map(|(panel, action)| (panel.to_string(), action.to_string())).collect();
         Self { order: order.into_iter().map(str::to_string).collect(), rows, clicks, ..Self::default() }
     }
@@ -110,8 +109,8 @@ impl FocusWalk {
     }
 
     pub fn view(&self) -> WalkView {
-        let button = self.row(self.panel()).and_then(|row| row.get(self.chosen_index(self.panel())).cloned());
-        let step = self.step.filter(|_| self.step_on == self.panel());
+        let button = self.row(self.panel()).and_then(|row| row.chosen().map(str::to_string));
+        let step = self.list.last().filter(|_| self.step_on == self.panel());
         WalkView { panel: self.panel().to_string(), button, step }
     }
 
@@ -135,14 +134,15 @@ impl FocusWalk {
             // source timeline.
             (_, click) if self.clicks.iter().any(|(_, action)| action == click) => {
                 let target = self.clicks.iter().find(|(_, action)| action == click).map(|(panel, _)| panel.clone()).unwrap_or_default();
-                let opened = std::mem::take(&mut self.opening) && target == CARDS;
+                let opened = self.list.take_opening() && target == CARDS;
                 self.go(if opened { SOURCE_TIMELINE } else { &target });
                 Walk::Pass
             }
             // A pool tab, by click or its own key, puts the keyboard on the pool tabs.
-            (_, tab) if self.row(POOL_TABS).is_some_and(|row| row.iter().any(|id| id == tab)) => {
-                let index = self.row(POOL_TABS).and_then(|row| row.iter().position(|id| id == tab)).unwrap_or(0);
-                self.chosen.insert(POOL_TABS.to_string(), index);
+            (_, tab) if self.row(POOL_TABS).is_some_and(|row| row.contains(tab)) => {
+                if let Some(row) = self.rows.get_mut(POOL_TABS) {
+                    row.select(tab);
+                }
                 self.go(POOL_TABS);
                 Walk::Pass
             }
@@ -155,16 +155,14 @@ impl FocusWalk {
                 Walk::Done(true)
             }
             (row, "activate_focused_item") if row != POOL_TABS && self.row(row).is_some() => {
-                let pressed = self.row(row).and_then(|actions| actions.get(self.chosen_index(row)).cloned());
+                let pressed = self.row(row).and_then(|actions| actions.chosen().map(str::to_string));
                 self.step_panel(true);
                 pressed.map_or(Walk::Done(false), Walk::Action)
             }
-            (list, key) if LISTS.contains(&list) && list_step(key).is_some() => {
-                let step = list_step(key).unwrap_or(GridStep::Open);
-                let number = self.step.map_or(1, |(_, number)| number + 1);
-                self.step = Some((step, number));
+            (list, key) if LISTS.contains(&list) && qnc_key_list::step_of(key).is_some() => {
+                let step = qnc_key_list::step_of(key).unwrap_or(GridStep::Open);
+                self.list.press(step, list == CARDS); // the clip a card opens takes the keyboard
                 self.step_on = list.to_string();
-                self.opening |= list == CARDS && step == GridStep::Open; // the clip it opens takes the keyboard
                 Walk::Done(true)
             }
             (_, "activate_focused_item") => Walk::Done(self.step_panel(true)),
@@ -184,21 +182,13 @@ impl FocusWalk {
         }
     }
 
-    fn row(&self, panel: &str) -> Option<&Vec<String>> {
+    fn row(&self, panel: &str) -> Option<&qnc_key_row::KeyRow> {
         self.rows.get(panel).filter(|row| !row.is_empty())
-    }
-
-    fn chosen_index(&self, panel: &str) -> usize {
-        self.chosen.get(panel).copied().unwrap_or(0)
     }
 
     /// The button to the left or right in a row, and its action.
     fn choose(&mut self, panel: &str, back: bool) -> Option<String> {
-        let count = self.row(panel).map_or(0, Vec::len);
-        let from = self.chosen_index(panel);
-        let index = if back { from.saturating_sub(1) } else { (from + 1).min(count.saturating_sub(1)) };
-        self.chosen.insert(panel.to_string(), index);
-        self.row(panel).and_then(|row| row.get(index).cloned())
+        self.rows.get_mut(panel).filter(|row| !row.is_empty()).and_then(|row| row.choose(back).map(str::to_string))
     }
 
     /// The keyboard goes to the panel `name` (a key of another panel took it there); the
@@ -228,21 +218,6 @@ impl FocusWalk {
         }
         false
     }
-}
-
-/// A key on a list panel: the arrows, a page up or down, Enter opens, the tick key ticks.
-fn list_step(action_id: &str) -> Option<GridStep> {
-    Some(match action_id {
-        "step_back_frame" => GridStep::Left,
-        "step_forward_frame" => GridStep::Right,
-        "step_prev_part" => GridStep::Up,
-        "step_next_part" => GridStep::Down,
-        "page_prev" => GridStep::PageUp,
-        "page_next" => GridStep::PageDown,
-        "activate_focused_item" => GridStep::Open,
-        "toggle_focused_item" => GridStep::Toggle,
-        _ => return None,
-    })
 }
 
 /// The focused item of a drawn list in focus (`step` from the walk view; each number is

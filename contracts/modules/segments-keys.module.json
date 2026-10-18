@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.segments-keys",
+  "module_name": "Segments keys",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "editorial.segments.keys"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-segments-keys",
+  "input": "A catalog key on the segment panel, the source preview, the Wrap session, the program model and the source timeline.",
+  "output": "The sound of a stored segment/cover under the Wrap playhead (Ctrl+1/2, lane keys, heard at once, Escape), Enter that confirms what the panel took, the arrows, Ctrl+I/O slot edges, Ctrl+Shift+I/O segment edges; I/O do nothing there.",
+  "specification": "User 2026-10-18: the segment panel keys out of the panel router into their own block; user rules 2026-10-13 and 2026-10-16."
+}

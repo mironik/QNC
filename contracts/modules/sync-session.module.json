@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.sync-session",
+  "module_name": "Sync session",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "editorial.sync.keys"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-sync-session",
+  "input": "A catalog key, the source preview, the Wrap session and the program model, whether the source timeline has the keyboard.",
+  "output": "What the key does while Sync/B-roll is on: Space starts or resumes a Sync play (else play/pause), a stopped Sync takes the arrows (its end), Enter writes the cover, Delete drops the draft, O closes the slot, I arms it. The Sync state and writes stay in qnc-program-segments.",
+  "specification": "User 2026-10-18: the Sync keys were spread over four places that did not know each other; QNC_v5 story.rs sync_cover_capture, user rules 2026-10-13."
+}

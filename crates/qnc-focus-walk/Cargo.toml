@@ -7,4 +7,6 @@ description = "QNC public block: the keyboard walk over the panels of a form in 
 [dependencies]
 qnc-source-timeline = { workspace = true }
 qnc-media-card = { workspace = true }
+qnc-key-list = { workspace = true }
+qnc-key-row = { workspace = true }
 eframe = { workspace = true }

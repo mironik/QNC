@@ -1,0 +1,12 @@
+[package]
+name = "qnc-segments-keys"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the keys of the segment panel (Wrap rows of the story)"
+
+[dependencies]
+qnc-program-segments = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-source-timeline = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-wrap-session = { workspace = true }

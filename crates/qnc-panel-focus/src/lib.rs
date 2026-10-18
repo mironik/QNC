@@ -8,11 +8,13 @@
 //! panel drives: the source preview (Broadcast Player), the Wrap view and the
 //! program model. It owns no player, database or form, and knows no application.
 
+use std::ops::ControlFlow;
+
 use eframe::egui;
-use qnc_program_segments::{ProgramSegments, SyncSpace};
-use qnc_source_preview::{SourcePreview, TransientCover};
+use qnc_program_segments::ProgramSegments;
+use qnc_source_preview::SourcePreview;
 use qnc_source_mark_focus::MarkKey;
-use qnc_timeline::{LaneKey, TimelineIntent, TimelineProjection};
+use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_wrap_session::WrapSession;
 
 pub const MODULE_ID: &str = "qnc.module.panel-focus";
@@ -72,7 +74,7 @@ impl Default for FocusLayout {
 
 /// A key on the media pool: the card focus moves, or Enter opens the focused card (the
 /// public card grid applies it).
-pub use qnc_media_card::GridStep as PoolStep;
+pub use qnc_key_list::GridStep as PoolStep;
 
 /// What a form draws of the focus: the panel, on the source dock buttons the action of
 /// the one the arrows are on, and the last key on the media pool with its number (the
@@ -125,19 +127,17 @@ pub struct PanelFocus {
     keyframes: qnc_keyframe_nav::KeyframeNav,
     jump: Option<Jump>,
     layout: FocusLayout,
-    /// The pool tab and the source dock button the arrows are on.
-    tab: usize,
-    button: usize,
+    /// The pool tabs and the source dock buttons the arrows walk (piece `qnc-key-row`).
+    tabs: qnc_key_row::KeyRow,
+    buttons: qnc_key_row::KeyRow,
     /// The catalog action a key on the pool tabs or a dock button stands for; the
     /// caller runs it as its own action (`take_pick`).
     pick: Option<String>,
-    /// The last key on the media pool and its number, for the card grid. It is not taken
-    /// on read: one arrow fires two catalog actions (storyboard and off scope) and every
-    /// action reads the view again (live 2026-10-13: Up/Down were lost).
-    pool_step: Option<(PoolStep, u64)>,
-    /// Enter opened the focused card: the clip it chooses puts the keyboard on its
-    /// source timeline; a click on a card keeps it on the pool.
-    opening: bool,
+    /// The keys on the media pool as numbered steps for the card grid (piece
+    /// `qnc-key-list`). A step is not taken on read: one arrow fires two catalog actions
+    /// (storyboard and off scope) and every action reads the view again (live 2026-10-13).
+    /// Enter that opened a card puts the keyboard on its source timeline.
+    pool: qnc_key_list::KeyList,
 }
 
 impl PanelFocus {
@@ -148,7 +148,8 @@ impl PanelFocus {
     /// The focus of a form with its Tab walk; it starts on the first panel of the walk.
     pub fn with_layout(layout: FocusLayout) -> Self {
         let panel = layout.order.first().copied().unwrap_or_default();
-        Self { panel, layout, ..Self::default() }
+        let (tabs, buttons) = (qnc_key_row::KeyRow::new(layout.tabs.clone()), qnc_key_row::KeyRow::new(layout.buttons.clone()));
+        Self { panel, layout, tabs, buttons, ..Self::default() }
     }
 
     /// The action a key on the pool tabs or a dock button stood for, once.
@@ -182,17 +183,11 @@ impl PanelFocus {
     ) -> FocusView {
         // What the segment panel took is its own: left by a click, Tab or Enter, it is dropped.
         if std::mem::replace(&mut self.last_panel, self.panel) == Panel::Segments && self.panel != Panel::Segments {
-            if segments.part_sound_taken() {
-                segments.release_part_sound();
-                preview.hear_program_draft(None, None, wrap.playhead()); // the stored sound again
-            }
-            if segments.leave_panel() && qnc_dev_diagnostics::player_diagnostics_enabled() {
+            if qnc_segments_keys::left(preview, wrap, segments) && qnc_dev_diagnostics::player_diagnostics_enabled() {
                 qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("story-leave panel={:?} dropped the segment panel's taken edit", self.panel));
             }
         }
-        if segments.take_dropped_sound() {
-            preview.hear_program_draft(None, None, wrap.playhead()); // another edit took over
-        }
+        qnc_segments_keys::dropped(preview, wrap, segments); // another edit took over
         if let Some(answer) = self.keyframes.take() {
             match (self.jump.take(), answer) {
                 (Some(Jump::SourceMark), Ok(frames)) => {
@@ -205,8 +200,8 @@ impl PanelFocus {
                 (None, Ok(_)) => {}
             }
         }
-        let button = (self.panel == Panel::SourceButtons).then(|| self.layout.buttons.get(self.button).cloned()).flatten();
-        FocusView { panel: self.panel, button, pool_step: self.pool_step }
+        let button = (self.panel == Panel::SourceButtons).then(|| self.buttons.chosen().map(str::to_string)).flatten();
+        FocusView { panel: self.panel, button, pool_step: self.pool.last() }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).
@@ -219,7 +214,7 @@ impl PanelFocus {
     /// 2026-10-13: the keys belong to the panel in use).
     pub fn chose_clip(&mut self, wrap: &mut WrapSession) -> bool {
         wrap.leave();
-        self.panel = if std::mem::take(&mut self.opening) { Panel::SourceTimeline } else { Panel::Pool };
+        self.panel = if self.pool.take_opening() { Panel::SourceTimeline } else { Panel::Pool };
         true
     }
 
@@ -286,20 +281,20 @@ impl PanelFocus {
         let panel = self.panel;
         // The dock buttons are part of the source timeline panel (user 2026-10-13): its keys work there too.
         let on_source = matches!(panel, Panel::SourceTimeline | Panel::SourceButtons);
+        let on_segments = panel == Panel::Segments;
         preview.hands_on(); // every key of the montage holds the background work off
-        Some(match action_id {
+        // The order below is the priority of the blocks: the first that takes a key answers it
+        // (the module keeps only this order; each block does its own work).
+        // 1. Whatever the focus: the monitor switch, a click that keeps a source mark, the wheel.
+        match action_id {
             // Monitor Auto | On under the monitor: whatever the focus.
-            qnc_source_preview::MONITOR_AUTO | qnc_source_preview::MONITOR_ON => preview.set_monitor_mode(action_id),
+            qnc_source_preview::MONITOR_AUTO | qnc_source_preview::MONITOR_ON => return Some(preview.set_monitor_mode(action_id)),
             // A left click on the source timeline while IN/OUT is drawn taken keeps it (piece
             // `qnc-source-timeline`): never Enter, which walks the panels.
             qnc_source_timeline::KEEP_MARK => {
                 self.panel = Panel::SourceTimeline;
                 return self.source.route_input(action_id, None, preview, timeline);
             }
-            // A1/A2 by keyboard (user rule 2026-10-01): Ctrl+1, Ctrl+2 take the lane; while it is
-            // taken, its height is expanded over the video row and up/down (or a click) pick its
-            // channel in the column (user 2026-10-14), left turns it off, right on, Ctrl+left/right
-            // set its level (user 2026-10-15); all heard at once, Enter keeps, Escape lets go.
             // The wheel over a panel (user 2026-10-16, piece `qnc-wheel-jog`): that panel takes
             // the keyboard and the wheel is its left/right arrow.
             // Ctrl+wheel is Ctrl+left/right: the level of a taken A1/A2 sound, up louder.
@@ -327,33 +322,18 @@ impl PanelFocus {
                 let arrow = if forward { "step_forward_frame" } else { "step_back_frame" };
                 return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
             }
-            // On the segment panel the same keys take the sound of the stored segment (A1) or
-            // cover (A2) under the Wrap playhead (user 2026-10-16); Enter writes it.
-            // The draft is heard in the program at once (user 2026-10-16), before Enter.
-            // The lane keys are those of every timeline (`qnc_timeline::LaneKey`): the Wrap row's
-            // lanes are driven the same way as the source timeline's.
-            "select_audio_a1" | "select_audio_a2" if panel == Panel::Segments => {
-                let taken = segments.take_part_sound(u8::from(action_id == "select_audio_a2"), wrap.playhead());
-                say_part_lane(segments);
-                taken
+            _ => {}
+        }
+        // 2. The segment panel: the sound of the stored segment (A1) or cover (A2) under the
+        // Wrap playhead (piece `qnc-segments-keys`).
+        if on_segments {
+            if let ControlFlow::Break(answer) = qnc_segments_keys::sound(action_id, (preview, wrap, segments)) {
+                return answer;
             }
-            lane if panel == Panel::Segments
-                && segments.part_sound_taken()
-                && matches!(LaneKey::of(lane), Some(LaneKey::Channel(_) | LaneKey::Off(_) | LaneKey::Level(_))) =>
-            {
-                let key = LaneKey::of(lane).unwrap_or(LaneKey::Drop);
-                let changed = segments.part_sound_lanes().is_some_and(|lanes| qnc_timeline::lane_key(lanes, key));
-                say_part_lane(segments);
-                preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
-                changed
-            }
-            "clear_focus" | "close_player" if panel == Panel::Segments && segments.part_sound_taken() => {
-                let released = segments.release_part_sound();
-                preview.hear_program_draft(None, None, wrap.playhead()); // the stored sound again
-                released
-            }
-            // A1/A2 of the source timeline are its own (piece `qnc-source-timeline`): Ctrl+1,
-            // Ctrl+2 take a lane there; while it is taken its keys belong to it.
+        }
+        // 3. A1/A2 of the source timeline are its own (piece `qnc-source-timeline`): Ctrl+1,
+        // Ctrl+2 take a lane there; while it is taken its keys belong to it.
+        match action_id {
             "select_audio_a1" | "select_audio_a2" => {
                 self.panel = Panel::SourceTimeline; // the lane is on the source timeline
                 return self.source.route(action_id, preview, timeline);
@@ -361,75 +341,19 @@ impl PanelFocus {
             lane if on_source && self.source.lane_taken() && LANE_KEYS.contains(&lane) => {
                 return self.source.route(lane, preview, timeline);
             }
-            // A Sync (user 2026-10-13): stopped, the arrows move its end; Enter writes the
-            // cover, Delete drops the draft, wherever the keyboard is.
-            "step_back_frame" | "step_forward_frame" if segments.sync_drafting() && !preview.player_view().playing() => {
-                let moved = segments.sync_nudge(if action_id == "step_back_frame" { -1 } else { 1 });
-                // The monitor shows the cover's last picture at the new end (user 2026-10-16).
-                if let Some(frame) = segments.sync_window_frame().filter(|_| moved) {
-                    preview.show_program_frame(frame, false);
-                }
-                moved
-            }
-            "activate_focused_item" if segments.sync_drafting() => segments.confirm_source(),
-            "delete_marker" if segments.sync_drafting() => segments.discard_sync(),
-            // A pool tab, by click or Alt+letter, puts the keyboard on the pool tabs.
-            tab if self.layout.tabs.iter().any(|id| id == tab) => {
-                self.tab = self.layout.tabs.iter().position(|id| id == tab).unwrap_or(0);
-                self.panel = Panel::PoolTabs;
-                return None;
-            }
-            // The arrows on the pool tabs choose the tab to the left or right.
-            "step_back_frame" | "step_forward_frame" if panel == Panel::PoolTabs => {
-                let last = self.layout.tabs.len().saturating_sub(1);
-                self.tab = if action_id == "step_back_frame" { self.tab.saturating_sub(1) } else { (self.tab + 1).min(last) };
-                self.pick = self.layout.tabs.get(self.tab).cloned();
-                return None;
-            }
-            // The arrows on the dock buttons move between them, Enter presses one.
-            "step_back_frame" | "step_forward_frame" if panel == Panel::SourceButtons => {
-                let last = self.layout.buttons.len().saturating_sub(1);
-                self.button = if action_id == "step_back_frame" { self.button.saturating_sub(1) } else { (self.button + 1).min(last) };
-                true
-            }
-            "activate_focused_item" if panel == Panel::SourceButtons => {
-                let Some(id) = self.layout.buttons.get(self.button).cloned() else { return Some(false) };
-                if !segments.view().action_enabled(&id) {
-                    return Some(false);
-                }
-                // The button acts as its catalog action from the source timeline it heads.
-                self.panel = Panel::SourceTimeline;
-                let routed = self.route(&id, (preview, wrap, segments, timeline));
-                if self.panel == Panel::SourceTimeline {
-                    self.panel = Panel::SourceButtons;
-                }
-                if routed.is_none() {
-                    self.pick = Some(id);
-                }
-                self.advance(preview, wrap, segments); // Enter goes on round the walk (user 2026-10-13)
-                return routed.map(|_| true);
-            }
-            // Enter on the pool tabs goes on to the pool.
-            "activate_focused_item" if panel == Panel::PoolTabs => self.advance(preview, wrap, segments),
-            // The media pool: the arrows move the card focus, Enter opens the card (and the
-            // clip chosen puts the keyboard on its source timeline).
-            "step_back_frame" | "step_forward_frame" | "step_prev_part" | "step_next_part" | "page_prev" | "page_next" | "activate_focused_item" if panel == Panel::Pool => {
-                let number = self.pool_step.map_or(1, |(_, number)| number + 1);
-                self.pool_step = Some((match action_id {
-                    "step_back_frame" => PoolStep::Left,
-                    "step_forward_frame" => PoolStep::Right,
-                    "step_prev_part" => PoolStep::Up,
-                    "step_next_part" => PoolStep::Down,
-                    "page_prev" => PoolStep::PageUp,
-                    "page_next" => PoolStep::PageDown,
-                    _ => {
-                        self.opening = true;
-                        PoolStep::Open
-                    }
-                }, number));
-                true
-            }
-            "step_prev_part" | "step_next_part" if matches!(panel, Panel::PoolTabs | Panel::SourceButtons) => false,
+            _ => {}
+        }
+        // 4. Sync/B-roll: Space, and a stopped Sync's arrows, Enter, Delete, O (piece `qnc-sync-session`).
+        if let ControlFlow::Break(answer) = qnc_sync_session::route(action_id, (preview, wrap, segments), on_source) {
+            return answer;
+        }
+        // 5. The pool tabs, the media pool and the source dock buttons (pieces `qnc-key-row`,
+        // `qnc-key-list`).
+        if let Some(answer) = self.rows_and_pool(action_id, (preview, wrap, segments, timeline)) {
+            return answer;
+        }
+        // 6. The source timeline and the segment panel.
+        match action_id {
             // Up/Down on a taken edit (user 2026-10-11): to the key picture before or after it,
             // half a second when every picture is one (intra). The answer comes in `poll`.
             "step_prev_part" | "step_next_part"
@@ -438,12 +362,12 @@ impl PanelFocus {
                 let (clip, frame) = (preview.view().clip_id.clone(), qnc_source_mark_focus::taken_picture(timeline));
                 self.jump = Some(Jump::SourceMark);
                 let forward = action_id == "step_next_part";
-                clip.zip(frame).is_some_and(|(clip, frame)| self.keyframes.request(&clip, frame, forward, preview.still_locator()))
+                return Some(clip.zip(frame).is_some_and(|(clip, frame)| self.keyframes.request(&clip, frame, forward, preview.still_locator())));
             }
-            "step_prev_part" | "step_next_part" if panel == Panel::Segments && segments.keyframe_reference().is_some() => {
+            "step_prev_part" | "step_next_part" if on_segments && segments.keyframe_reference().is_some() => {
                 let (clip, frame) = segments.keyframe_reference().unwrap_or_default();
                 self.jump = Some(Jump::Program);
-                self.keyframes.request(&clip, frame, action_id == "step_next_part", preview.still_locator())
+                return Some(self.keyframes.request(&clip, frame, action_id == "step_next_part", preview.still_locator()));
             }
             // Enter is the confirmation of the panel in focus only.
             "activate_focused_item" if on_source => {
@@ -451,56 +375,39 @@ impl PanelFocus {
                 // A taken mark is let go; with nothing to confirm Enter goes on round the walk.
                 let released = self.taken(timeline) && self.source.route("clear_focus", preview, timeline).unwrap_or(false);
                 let back = self.back_to_wrap(segments, wrap, timeline);
-                confirmed || released || back || self.advance(preview, wrap, segments)
+                return Some(confirmed || released || back || self.advance(preview, wrap, segments));
             }
-            "activate_focused_item" if panel == Panel::Segments => {
-                let sound = segments.part_sound_taken();
-                let confirmed = segments.confirm_program();
-                if sound && confirmed {
-                    preview.forget_program_draft(); // written: the program opens from the story
-                }
-                confirmed || self.advance(preview, wrap, segments)
+            "activate_focused_item" if on_segments => {
+                return Some(qnc_segments_keys::confirm(preview, segments) || self.advance(preview, wrap, segments));
             }
-            "activate_focused_item" => false,
+            "activate_focused_item" => return Some(false),
             // A virtual shot (Shift+S or Add SubClip), not by an Enter that confirmed.
-            "save_virtual_shot" if segments.source_waits_enter() || self.source.holds_enter() => false,
+            "save_virtual_shot" if segments.source_waits_enter() || self.source.holds_enter() => return Some(false),
             // Down closes an open large wave off the segment panel (there down is the next segment).
             "step_next_part" if on_source && self.source.view().wave_over_video.is_some() => {
                 return self.source.route(action_id, preview, timeline);
             }
             // Home on the source timeline: the start of the clip (the V label does the same).
-            "playlist_input_start" if on_source => preview.cue(timeline.range_start_frame),
+            "playlist_input_start" if on_source => return Some(preview.cue(timeline.range_start_frame)),
             "focus_next" | "focus_prev" => {
                 let next = cycle(panel, action_id == "focus_next", &self.walk());
-                self.enter(next, preview, wrap, segments)
+                return Some(self.enter(next, preview, wrap, segments));
             }
-            "play_pause" => match segments.sync_space(wrap.is_active()) {
-                SyncSpace::Start(sync) => {
-                    wrap.hold(sync.window.0);
-                    let a2 = segments.kept_lane(1);
-                    let cover = TransientCover {
-                        clip_id: sync.clip_id,
-                        source_in: sync.source_in,
-                        timebase: sync.timebase,
-                        a2_source_channel: a2.channel,
-                        a2_level_db: a2.level_db,
-                        a2_off: a2.off,
-                    };
-                    preview.open_program_window(sync.window, cover)
-                }
-                SyncSpace::Blocked => true,
-                SyncSpace::Play => preview.toggle_play(),
-            },
-            // O closes a running Sync slot wherever the keyboard is (v5).
-            "mark_out" if on_source && segments.finish_sync() => true,
+            _ => {}
+        }
+        // I/O, Ctrl+I/O and Ctrl+Shift+I/O of the segment panel (piece `qnc-segments-keys`).
+        if on_segments {
+            if let ControlFlow::Break(answer) = qnc_segments_keys::marks(action_id, segments, &mut self.source) {
+                return answer;
+            }
+        }
+        Some(match action_id {
             // The application marks IN/OUT. I/O mark the chosen clip from the pool too (user 2026-10-16: a clip chosen in
-            // the pool and played is marked without going to the source timeline); on the
-            // segment panel they do nothing (its edges are Ctrl+I/O).
-            "mark_in" | "mark_out" if panel == Panel::Segments => false,
+            // the pool and played is marked without going to the source timeline).
             "mark_in" => {
                 self.source.set_mark_taken(false);
                 qnc_source_mark_focus::release(timeline); // a new IN lets go of a taken mark
-                segments.arm_sync(); // v5: every IN arms Sync/B-roll
+                qnc_sync_session::armed_by_in(segments); // v5: every IN arms Sync/B-roll
                 return None; // the application marks IN with its still
             }
             "mark_out" => {
@@ -518,28 +425,14 @@ impl PanelFocus {
                 }
                 None => false,
             },
-            // v5 select_mark_in / select_mark_out: Ctrl+I, Ctrl+O take the source IN, OUT; the
-            // arrows move the taken mark, Escape gives the keys back to the playhead.
-            // On the segment panel Ctrl+I, Ctrl+O take the start, the end of the slot under
-            // the Wrap playhead (user 2026-10-13: slots are the montage); Ctrl+Shift+I, O
-            // the start, the end of the segment, whose clip opens on that edge with the
-            // mark taken (user 2026-10-10).
-            "select_mark_in" | "select_mark_out" if panel == Panel::Segments => {
-                segments.take_slot_edge_at_playhead(action_id == "select_mark_in")
-            }
-            "select_segment_start" | "select_segment_end" if panel == Panel::Segments => {
-                let taken = segments.take_edge(action_id == "select_segment_start");
-                self.source.set_mark_taken(taken);
-                taken
-            }
             // Escape drops a taken segment edge at once and goes back to Wrap.
             "clear_focus" | "close_player" if segments.trimming_edge() => {
                 segments.apply_action(action_id);
                 self.back_to_wrap(segments, wrap, timeline)
             }
-            // Ctrl+I/O take IN/OUT of the chosen clip from the pool too (as I/O mark it there,
-            // user 2026-10-17); the keyboard goes to the source timeline, where the arrows and
-            // the wheel move the taken mark.
+            // v5 select_mark_in / select_mark_out: Ctrl+I/O take IN/OUT of the chosen clip from
+            // the pool too (as I/O mark it there, user 2026-10-17); the keyboard goes to the
+            // source timeline, where the arrows and the wheel move the taken mark.
             "select_mark_in" | "select_mark_out" => {
                 self.panel = Panel::SourceTimeline;
                 return self.source.route(action_id, preview, timeline);
@@ -554,27 +447,71 @@ impl PanelFocus {
             "clear_focus" | "close_player" if on_source && segments.view().editing.is_some() => {
                 segments.apply_action(action_id)
             }
-            "step_back_frame" | "step_forward_frame" => {
-                let frames = if action_id == "step_back_frame" {
-                    -1
-                } else {
-                    1
-                };
-                match panel {
-                    Panel::Segments if segments.handles(action_id) => {
-                        segments.apply_action(action_id)
-                    }
-                    Panel::Segments => wrap.step(frames),
-                    // The pool has no arrow keys: they step the source playhead (user rule
-                    // 2026-10-01: the arrows move the playhead one frame, no other key needed).
-                    Panel::SourceTimeline => return self.source.route(action_id, preview, timeline),
-                    Panel::Pool | Panel::PoolTabs | Panel::SourceButtons => false, // the keys act on the panel in focus only
-                }
-            }
+            "step_back_frame" | "step_forward_frame" => match panel {
+                Panel::Segments => qnc_segments_keys::step(action_id, wrap, segments),
+                // The pool has no arrow keys: they step the source playhead (user rule
+                // 2026-10-01: the arrows move the playhead one frame, no other key needed).
+                Panel::SourceTimeline => return self.source.route(action_id, preview, timeline),
+                Panel::Pool | Panel::PoolTabs | Panel::SourceButtons => false, // the keys act on the panel in focus only
+            },
             action if SOURCE_TO_PROGRAM.contains(&action) => segments.apply_action(action),
-            action if segments.handles(action) => {
-                panel == Panel::Segments && segments.apply_action(action)
+            action if segments.handles(action) => on_segments && segments.apply_action(action),
+            _ => return None,
+        })
+    }
+
+    /// The pool tabs, the media pool and the source dock buttons: `Some(answer)` when the
+    /// key is theirs.
+    fn rows_and_pool(
+        &mut self,
+        action_id: &str,
+        (preview, wrap, segments, timeline): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection),
+    ) -> Option<Option<bool>> {
+        let panel = self.panel;
+        let arrow = matches!(action_id, "step_back_frame" | "step_forward_frame");
+        let back = action_id == "step_back_frame";
+        // A pool tab, by click or Alt+letter, puts the keyboard on the pool tabs.
+        if self.tabs.select(action_id) {
+            self.panel = Panel::PoolTabs;
+            return Some(None);
+        }
+        Some(match (panel, action_id) {
+            // The arrows on the pool tabs choose the tab to the left or right.
+            (Panel::PoolTabs, _) if arrow => {
+                self.pick = self.tabs.choose(back).map(str::to_string);
+                return Some(None);
             }
+            // The arrows on the dock buttons move between them, Enter presses one.
+            (Panel::SourceButtons, _) if arrow => {
+                self.buttons.choose(back);
+                Some(true)
+            }
+            (Panel::SourceButtons, "activate_focused_item") => {
+                let Some(id) = self.buttons.chosen().map(str::to_string) else { return Some(Some(false)) };
+                if !segments.view().action_enabled(&id) {
+                    return Some(Some(false));
+                }
+                // The button acts as its catalog action from the source timeline it heads.
+                self.panel = Panel::SourceTimeline;
+                let routed = self.route(&id, (preview, wrap, segments, timeline));
+                if self.panel == Panel::SourceTimeline {
+                    self.panel = Panel::SourceButtons;
+                }
+                if routed.is_none() {
+                    self.pick = Some(id);
+                }
+                self.advance(preview, wrap, segments); // Enter goes on round the walk (user 2026-10-13)
+                routed.map(|_| true)
+            }
+            // Enter on the pool tabs goes on to the pool.
+            (Panel::PoolTabs, "activate_focused_item") => Some(self.advance(preview, wrap, segments)),
+            // The media pool: the arrows move the card focus, Enter opens the card (and the
+            // clip chosen puts the keyboard on its source timeline). The tick key is Ingest's.
+            (Panel::Pool, key) if qnc_key_list::step_of(key).is_some_and(|step| step != PoolStep::Toggle) => {
+                self.pool.press(qnc_key_list::step_of(key).unwrap_or(PoolStep::Open), true);
+                Some(true)
+            }
+            (Panel::PoolTabs | Panel::SourceButtons, "step_prev_part" | "step_next_part") => Some(false),
             _ => return None,
         })
     }
@@ -583,8 +520,8 @@ impl PanelFocus {
     fn walk(&self) -> Vec<Panel> {
         let layout = &self.layout;
         let walk = layout.order.iter().copied().filter(|panel| match panel {
-            Panel::PoolTabs => !layout.tabs.is_empty(),
-            Panel::SourceButtons => !layout.buttons.is_empty(),
+            Panel::PoolTabs => !self.tabs.is_empty(),
+            Panel::SourceButtons => !self.buttons.is_empty(),
             _ => true,
         });
         walk.collect()
@@ -679,25 +616,6 @@ pub fn wheel_action(command: &qnc_program_segments::SegmentCommand) -> Option<&'
         qnc_program_segments::SegmentCommand::Wheel { up, ctrl } => Some(qnc_wheel_jog::Wheel { up: *up, ctrl: *ctrl }.action(WHEEL_SEGMENTS)),
         _ => None,
     }
-}
-
-/// The taken lane of the Wrap row in the status line, in the timeline's words.
-fn say_part_lane(segments: &mut ProgramSegments) {
-    if let Some(message) = segments.part_sound_lanes().map(|lanes| qnc_timeline::lane_message(lanes)) {
-        segments.say(message);
-    }
-}
-
-/// The sound drafted on the Wrap row, as the program plays it before Enter.
-fn sound_draft(segments: &ProgramSegments) -> Option<qnc_source_preview::SoundDraft> {
-    let (lane, id, draft) = segments.part_sound_draft_now()?;
-    Some(qnc_source_preview::SoundDraft { lane, id, channel: draft.channel, level_db: draft.level_db, off: draft.off })
-}
-
-/// The stored sound of the part taken on the Wrap row.
-fn stored_sound(segments: &ProgramSegments) -> Option<qnc_source_preview::SoundDraft> {
-    let (lane, id, stored) = segments.part_sound_stored()?;
-    Some(qnc_source_preview::SoundDraft { lane, id, channel: stored.channel, level_db: stored.level_db, off: stored.off })
 }
 
 #[cfg(test)]

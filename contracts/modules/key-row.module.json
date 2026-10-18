@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.key-row",
+  "module_name": "Key row",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "keyboard.row.choose"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "database.write",
+    "business.workflow"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-key-row",
+  "input": "The catalog action ids of a row of buttons left to right, a left/right arrow or a click.",
+  "output": "The chosen button and its action; the ends hold.",
+  "specification": "User 2026-10-18: Story (qnc-panel-focus) and Ingest (qnc-focus-walk) had each their own copy of the row walk; one block for every form."
+}

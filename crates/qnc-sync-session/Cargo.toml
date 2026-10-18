@@ -1,0 +1,10 @@
+[package]
+name = "qnc-sync-session"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: every key of Sync/B-roll in one place"
+
+[dependencies]
+qnc-program-segments = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-wrap-session = { workspace = true }

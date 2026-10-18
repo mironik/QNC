@@ -3609,6 +3609,8 @@ name = "qnc-focus-walk"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-key-list",
+ "qnc-key-row",
  "qnc-media-card",
  "qnc-source-timeline",
 ]
@@ -3965,11 +3967,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-key-list"
+version = "0.1.0"
+dependencies = [
+ "qnc-media-card",
+]
+
+[[package]]
 name = "qnc-key-preset"
 version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
 ]
+
+[[package]]
+name = "qnc-key-row"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-keyboard-shortcut"
@@ -4267,12 +4280,15 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-dev-diagnostics",
+ "qnc-key-list",
+ "qnc-key-row",
  "qnc-keyframe-nav",
- "qnc-media-card",
  "qnc-program-segments",
+ "qnc-segments-keys",
  "qnc-source-mark-focus",
  "qnc-source-preview",
  "qnc-source-timeline",
+ "qnc-sync-session",
  "qnc-timeline",
  "qnc-wheel-jog",
  "qnc-wrap-session",
@@ -4818,6 +4834,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-segments-keys"
+version = "0.1.0"
+dependencies = [
+ "qnc-program-segments",
+ "qnc-source-preview",
+ "qnc-source-timeline",
+ "qnc-timeline",
+ "qnc-wrap-session",
+]
+
+[[package]]
 name = "qnc-settings-form"
 version = "0.1.0"
 dependencies = [
@@ -5113,6 +5140,15 @@ name = "qnc-sync-cover"
 version = "0.1.0"
 dependencies = [
  "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-sync-session"
+version = "0.1.0"
+dependencies = [
+ "qnc-program-segments",
+ "qnc-source-preview",
+ "qnc-wrap-session",
 ]
 
 [[package]]

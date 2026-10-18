@@ -154,6 +154,10 @@ members = [
     "crates/qnc-artifact-db",
     "crates/qnc-settings-switches",
     "crates/qnc-panel-focus",
+    "crates/qnc-segments-keys",
+    "crates/qnc-sync-session",
+    "crates/qnc-key-list",
+    "crates/qnc-key-row",
     "crates/qnc-program-playlist",
     "crates/qnc-program-input",
     "crates/qnc-segment-panel",
@@ -339,6 +343,10 @@ qnc-program-db = { path = "crates/qnc-program-db" }
 qnc-artifact-db = { path = "crates/qnc-artifact-db" }
 qnc-settings-switches = { path = "crates/qnc-settings-switches" }
 qnc-panel-focus = { path = "crates/qnc-panel-focus" }
+qnc-segments-keys = { path = "crates/qnc-segments-keys" }
+qnc-sync-session = { path = "crates/qnc-sync-session" }
+qnc-key-list = { path = "crates/qnc-key-list" }
+qnc-key-row = { path = "crates/qnc-key-row" }
 qnc-program-playlist = { path = "crates/qnc-program-playlist" }
 qnc-program-input = { path = "crates/qnc-program-input" }
 qnc-segment-panel = { path = "crates/qnc-segment-panel" }

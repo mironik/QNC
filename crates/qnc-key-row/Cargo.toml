@@ -1,0 +1,7 @@
+[package]
+name = "qnc-key-row"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: a row of buttons the arrows walk (pool tabs, dock buttons), the same in every form"
+
+[dependencies]
