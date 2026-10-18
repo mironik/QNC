@@ -4818,3 +4818,10 @@ citaci zauzeti; jos jedan citac ostaje dok donosi barem 10 % vise, zatim run ost
 krece iznova kad citaci ustupe (player, otvoreni klip cita sam) ili nemaju sto citati. `qnc-wave-worker`: pocinje s 2,
 najvise 8 citaca, odluke u `wave.log` (`qnc-wave-worker-pace`); `qnc-filmstrip-worker`: dekodiranja slika istodobno pola
 niti procesora, 2 do 4. Testovi, conformance. Uzivo nije izmjereno.
+Popravak 2026-10-18 (korisnik: "pogledaj log"): dva nova projekta na stiku: test se jednom zaustavio na 3, jednom na 2
+citaca (83,6 s i 94,6 s za 98 klipova), jer je razinu sudio po radu zavrsenom u prozoru od 3 s s 4-6 prolaza, pa su
+odlucivali dugi klipovi (2679 do 30 s, 2002 27 s) i prolazi zapoceti prije promjene razine. `qnc-read-pace`: svaki
+prolaz daje svoju brzinu (sekunde medija kroz svoje trajanje), razina je medijan brzina prolaza zapocetih na njoj puta
+broj citaca, sudi se nakon najmanje 6 takvih prolaza (2 po citacu); prolaz zapocet prije prekida ili promjene razine ne
+broji se (`Round`). `qnc-wave-worker` pamti krug svakog prolaza. Testovi (dugi spori prolaz ne odlucuje razinu),
+conformance. Uzivo nije izmjereno.

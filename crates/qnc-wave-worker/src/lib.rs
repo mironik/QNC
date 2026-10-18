@@ -234,6 +234,8 @@ struct ActiveWaveWorker {
     result: Receiver<WaveOutcome>,
     cancel: Arc<AtomicBool>,
     thread: JoinHandle<()>,
+    /// The pace round the pass started in: it counts only for that round.
+    round: qnc_read_pace::Round,
 }
 
 #[derive(Default)]
@@ -435,6 +437,7 @@ impl TimelineWaveService {
                 continue;
             };
             let worker = self.workers.swap_remove(index);
+            let round = worker.round;
             let _ = worker.thread.join();
             poll.changed = true;
             let current_project = self.context.as_ref().map(WaveContext::project_id);
@@ -452,7 +455,8 @@ impl TimelineWaveService {
                     let ready_before = generated.ready_before;
                     let total_ms = generated.total_ms;
                     if !ready_before {
-                        if let Some(step) = self.pace_mut().finished(generated.work_seconds) {
+                        let seconds = total_ms as f64 / 1000.0;
+                        if let Some(step) = self.pace_mut().finished(round, generated.work_seconds, seconds) {
                             wave_log(|| format!("qnc-wave-worker-pace: {step:?}"));
                         }
                     }
@@ -630,6 +634,7 @@ impl TimelineWaveService {
             let worker_request = request.clone();
             let cancel = Arc::new(AtomicBool::new(false));
             let worker_cancel = cancel.clone();
+            let round = self.pace_mut().round();
             match std::thread::Builder::new()
                 .name("qnc-wave-worker".into())
                 .spawn({
@@ -641,6 +646,7 @@ impl TimelineWaveService {
                     result: receive,
                     cancel,
                     thread,
+                    round,
                 }),
                 Err(error) => {
                     wave_log(|| format!("qnc-wave-worker-error: stage=start error={error}"))
@@ -1172,6 +1178,7 @@ mod tests {
             result: receive,
             cancel: cancel.clone(),
             thread: std::thread::spawn(|| {}),
+            round: qnc_read_pace::ReadPace::new(1, 1).round(),
         });
         service.enqueue(request("other"), false);
         service.enqueue(request("open"), false);
@@ -1198,6 +1205,7 @@ mod tests {
             result: receive,
             cancel: cancel.clone(),
             thread: std::thread::spawn(|| {}),
+            round: qnc_read_pace::ReadPace::new(1, 1).round(),
         });
 
         service.set_playback_priority(true);
