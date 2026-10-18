@@ -4799,3 +4799,5 @@ pokazao da je povlacenje IN-a na source timelineu radilo, a na Wrap retku pritis
 1127, marker nije bio uzet) bio je scrub playheada: doseg neuzetog markera bio je 8 piksela. `qnc-timeline`
 `marker_reach.rs`: svaki marker 16 piksela (klik i povlacenje), uzeti 40; svaki pocetak povlacenja na redu s markerima
 zapisuje u player log pogodak i najblizi marker s udaljenoscu u pikselima (`timeline-drag start`). Uzivo nije provjereno.
+Dopuna 2026-10-18 (korisnik: "zona prihvata je preuska"; log: povlacenje radi, marker uhvacen 1-12 piksela od crte):
+doseg markera 24 piksela, uzetog 60 (`qnc-timeline` `marker_reach.rs`).

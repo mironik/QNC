@@ -9,9 +9,9 @@ use crate::{x_for_frame, TimelineMarkerPin};
 
 /// How far from its line a marker is taken by a click or a drag (live 2026-10-18: 8 pixels
 /// were too precise, a drag a few pixels off scrubbed the playhead instead).
-pub(crate) const MARKER_REACH: f32 = 16.0;
+pub(crate) const MARKER_REACH: f32 = 24.0;
 /// How far from a taken marker a drag still takes it.
-pub(crate) const TAKEN_MARKER_REACH: f32 = 40.0;
+pub(crate) const TAKEN_MARKER_REACH: f32 = 60.0;
 
 /// The marker the pointer at `pos` reaches: a taken one from further away, else the nearest.
 pub(crate) fn marker_in_reach<'a>(track: Rect, range_start: u64, duration: u64, pos: egui::Pos2, markers: &'a [TimelineMarkerPin<'a>]) -> Option<&'a str> {
