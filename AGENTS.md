@@ -4653,3 +4653,11 @@ jednog, a kartica je ogranicena trajanjem citanja. Sada se pocetak slike cita sa
 slike iza njega (i do 60 slika prije zadnjeg cilja, za klip koji zavrsava prije sljedece kljucne slike). Izmjereno na
 kartici: 1489 sa svih 13 slika 15,0 s (67 MB/s). Filmstrip ide uz val (isti prolaz), pa se ubrzava jednako. Testovi
 `qnc-mxf-sound`, `qnc-wave-worker`, conformance.
+Izmjena 2026-10-18 (korisnik: "Podaci klipa se pripremaju nije prihvatljivo, play mora ici odmah"; "daj najbolje
+rjesenje, za konfor rada bitna je brzina, dozvoljeno vise jezgri i niti, da korisnik moze poceti montirati"): (1)
+`qnc-record-completion` uz radnike u redu ima jos jednu nit samo za klip koji preview trazi (`next_wanted`), pa njegov
+zapis ne ceka iza probeova koji vec rade i ne ceka player. (2) `tools/qnc-ingest-worker`: prvo zapisi, pa valovi i
+filmstrip; kartica nakon Selecta cita samo za dovrsetak zapisa (svi klipovi se mogu pustiti prije valova). (3)
+`qnc-source-preview`: klip koji ceka zapis otvara se ponovno svakih 250 ms (prije 1 s), poruka je obicna priprema playera
+(`player.player_getting_ready`, prije hrvatski tekst u kodu), Space se pamti i klip krene cim je spreman. Jezgra playera
+i pravilo jednog probea nisu mijenjani. Testovi, conformance. Uzivo nije izmjereno.

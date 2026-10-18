@@ -174,6 +174,11 @@ fn run_once(root: &Path) -> Result<bool, String> {
             }
             completing.store(false, std::sync::atomic::Ordering::Relaxed);
         });
+        // The records first: every clip can play (and editing start) before the card is read
+        // for waves and filmstrips (user 2026-10-18: speed for editing comes first).
+        while completing.load(std::sync::atomic::Ordering::Relaxed) && !closed.load(std::sync::atomic::Ordering::Relaxed) {
+            std::thread::sleep(Duration::from_millis(100));
+        }
         let artifacts = run_artifacts(root, &lease, &closed, &completing);
         let _ = completion.join();
         if closed.load(std::sync::atomic::Ordering::Relaxed) {

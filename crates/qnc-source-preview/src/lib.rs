@@ -220,6 +220,9 @@ impl std::fmt::Debug for RecordWaker {
     }
 }
 
+/// How often a clip waiting for its record is opened again (its record may be final now).
+const RECORD_RETRY: std::time::Duration = std::time::Duration::from_millis(250);
+
 /// How often a clip waiting for its record wakes the worker again.
 const WAKE_AGAIN: std::time::Duration = std::time::Duration::from_secs(5);
 
@@ -870,7 +873,7 @@ impl SourcePreview {
             .is_some_and(qnc_player_input::is_incomplete_media)
             || (self.player_view.preparing && self.waits_for_record());
         let Some(clip_id) = self.view.clip_id.clone().filter(|_| incomplete) else {
-            if self.record_wait.take().is_some() && self.view.message == RECORD_WAIT {
+            if self.record_wait.take().is_some() && self.view.message == record_wait_text() {
                 self.view.message.clear(); // the record is complete: the wait is over
             }
             return false;
@@ -889,9 +892,9 @@ impl SourcePreview {
             }
         }
         self.record_wait = Some((clip_id.clone(), since, last));
-        self.view.message = RECORD_WAIT.into();
+        self.view.message = record_wait_text().into();
         if now.duration_since(since) > std::time::Duration::from_secs(180)
-            || now.duration_since(last) < std::time::Duration::from_secs(1)
+            || now.duration_since(last) < RECORD_RETRY
         {
             return false;
         }
@@ -972,7 +975,7 @@ impl SourcePreview {
         self.view.video_visible = playback.video_visible;
         // While the record of the shown clip is completed, one steady message, no flashing.
         let waiting = self.waits_for_record() || playback.error.as_deref().is_some_and(qnc_player_input::is_incomplete_media);
-        self.view.monitor_message = if waiting { Some(RECORD_WAIT.into()) } else { playback.error.clone() };
+        self.view.monitor_message = if waiting { Some(record_wait_text().into()) } else { playback.error.clone() };
         self.view.monitor_frame = playback.picture.as_ref().map(|picture| MonitorFrame {
             session_id: picture.header.session_id.to_string(),
             generation: picture.header.output_generation,
@@ -1159,4 +1162,9 @@ fn transport_bindings(context: &PreviewContext) -> Result<Vec<SourceTransportBin
 }
 
 /// What the preview shows while the record of the clip is completed in the background.
-const RECORD_WAIT: &str = "Podaci klipa se pripremaju...";
+/// While a clip's record is completed the preview looks like any player getting ready
+/// (user 2026-10-18: a separate waiting message is not acceptable; Play is kept and goes
+/// as soon as the clip is ready).
+fn record_wait_text() -> &'static str {
+    qnc_ui_text::text("player.player_getting_ready")
+}

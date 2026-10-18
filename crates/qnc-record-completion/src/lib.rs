@@ -183,9 +183,9 @@ pub fn complete_clips(
 ) -> Completion {
     let queue = Mutex::new(waiting.into_iter().map(|clip| (clip, 1)).collect::<VecDeque<_>>());
     let done = Mutex::new(Completion::default());
-    std::thread::scope(|scope| {
-        for _ in 0..run.workers.max(1) {
-            scope.spawn(|| {
+    // One worker takes clips in line; one more only the clip a preview wants, so it never
+    // waits behind the probes already running (user 2026-10-18: Play must go at once).
+    let work = |take: &dyn Fn() -> Option<(CatalogClip, usize)>| {
                 let mut publisher = match ContentWriteTransport::start_leased(content.clone(), run.lease.clone()) {
                     Ok(publisher) => publisher,
                     Err(error) => {
@@ -193,7 +193,7 @@ pub fn complete_clips(
                         return;
                     }
                 };
-                while let Some((clip, tries)) = next(&queue, run) {
+                while let Some((clip, tries)) = take() {
                     let id = clip.id().to_string();
                     let result = complete_clip(parts, clip.clone(), run.cancel)
                         .and_then(|clip| Ok(publish(&mut publisher, clip)?));
@@ -213,10 +213,38 @@ pub fn complete_clips(
                             .push((id, error.to_string())),
                     }
                 }
-            });
+    };
+    std::thread::scope(|scope| {
+        for _ in 0..run.workers.max(1) {
+            scope.spawn(|| work(&|| next(&queue, run)));
         }
+        scope.spawn(|| work(&|| next_wanted(&queue, run)));
     });
     done.into_inner().expect("completion")
+}
+
+/// The clip a preview wants, as soon as it is in line; none once the line is empty. It does
+/// not wait for a player: the player is what waits for this record.
+fn next_wanted(
+    queue: &Mutex<VecDeque<(CatalogClip, usize)>>,
+    run: &Run<'_>,
+) -> Option<(CatalogClip, usize)> {
+    loop {
+        if run.cancel.load(Ordering::Relaxed) {
+            return None;
+        }
+        let wanted = (run.wanted)();
+        {
+            let mut queue = queue.lock().expect("completion queue");
+            if queue.is_empty() {
+                return None;
+            }
+            if let Some(at) = wanted.and_then(|id| queue.iter().position(|(clip, _)| clip.id() == id)) {
+                return queue.remove(at);
+            }
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 /// The next clip: none when cancelled or all are taken; waits while a player works;
