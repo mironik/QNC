@@ -32,37 +32,8 @@ pub use view::{
     MonitorFrame, PreviewView,
 };
 
-/// Finds the QNC root (the directory with `AGENTS.md` and the editorial layout
-/// contract) starting from the executable and the working directory.
-pub fn locate_qnc_root() -> Option<std::path::PathBuf> {
-    let mut starts = Vec::new();
-    if let Ok(exe) = std::env::current_exe() {
-        starts.push(exe);
-    }
-    if let Ok(cwd) = std::env::current_dir() {
-        starts.push(cwd);
-    }
-    for start in starts {
-        let mut current = if start.is_file() {
-            start.parent().map(std::path::PathBuf::from)
-        } else {
-            Some(start)
-        };
-        while let Some(dir) = current {
-            if dir.join("AGENTS.md").is_file()
-                && dir
-                    .join("contracts")
-                    .join("ui")
-                    .join("editorial.layout.json")
-                    .is_file()
-            {
-                return Some(dir);
-            }
-            current = dir.parent().map(std::path::PathBuf::from);
-        }
-    }
-    None
-}
+/// Finds the QNC root: the one finder of the diagnostics block, never a copy of it.
+pub use qnc_dev_diagnostics::locate_qnc_root;
 
 struct Loaded {
     settings: WorkSettings,
@@ -133,6 +104,7 @@ impl EditorialApplication {
     pub fn new(root: impl AsRef<Path>, focus: FocusLayout) -> Self {
         let mut app = Self { focus: PanelFocus::with_layout(focus), ..Self::default() };
         app.bindings = qnc_source_bindings::load(root.as_ref());
+        app.preview.wake_worker_from(root.as_ref());
         match ActiveProjectReader::from_root(root.as_ref()) {
             Ok(reader) => {
                 app.active_project_reader = Some(reader);

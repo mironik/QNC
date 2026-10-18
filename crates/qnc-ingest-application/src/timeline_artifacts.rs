@@ -6,7 +6,6 @@ use super::*;
 
 impl IngestApplication {
     pub(super) fn reset_timeline_artifacts(&mut self) {
-        self.artifacts.reset();
         self.view.timeline_assets = qnc_timeline_assets::SourceTimelineAssets::empty();
     }
 
@@ -21,7 +20,6 @@ impl IngestApplication {
     }
 
     pub(super) fn remove_timeline_artifact_clips(&mut self, clip_ids: &[String]) {
-        self.artifacts.remove_clips(clip_ids);
         self.preview.source_preview_mut().forget_assets(clip_ids);
         if self
             .view
@@ -31,13 +29,5 @@ impl IngestApplication {
         {
             self.view.timeline_assets = qnc_timeline_assets::SourceTimelineAssets::empty();
         }
-    }
-
-    pub(super) fn set_timeline_artifact_playback_priority(&mut self, active: bool) {
-        self.artifacts.set_playback_priority(active);
-    }
-
-    pub(super) fn update_timeline_artifact_playback_priority(&mut self) {
-        self.set_timeline_artifact_playback_priority(self.playback_guard_active());
     }
 }

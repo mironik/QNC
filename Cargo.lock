@@ -3448,6 +3448,7 @@ dependencies = [
  "qnc-content-read",
  "qnc-content-store",
  "qnc-db-broker",
+ "qnc-dev-diagnostics",
  "qnc-image-assets",
  "qnc-media-thumbnail",
  "qnc-panel-focus",
@@ -3657,7 +3658,6 @@ dependencies = [
  "qnc-application-sequence",
  "qnc-camera-adapter",
  "qnc-clip-posters",
- "qnc-content-artifacts",
  "qnc-content-store",
  "qnc-contracts",
  "qnc-dev-diagnostics",
@@ -3786,6 +3786,7 @@ dependencies = [
  "qnc-source-timecode",
  "qnc-ui-text",
  "qnc-work-settings",
+ "qnc-worker-wake",
  "serde_json",
  "tempfile",
 ]
@@ -5033,6 +5034,7 @@ dependencies = [
  "qnc-ui-text",
  "qnc-wave",
  "qnc-work-settings",
+ "qnc-worker-wake",
 ]
 
 [[package]]
@@ -5306,6 +5308,16 @@ dependencies = [
  "tiny_http",
  "ureq",
  "url",
+]
+
+[[package]]
+name = "qnc-worker-wake"
+version = "0.1.0"
+dependencies = [
+ "qnc-active-project-read",
+ "qnc-content-store",
+ "qnc-playback-activity",
+ "qnc-ui-text",
 ]
 
 [[package]]

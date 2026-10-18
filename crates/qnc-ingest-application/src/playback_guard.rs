@@ -27,9 +27,7 @@ impl IngestApplication {
     }
 
     pub(crate) fn apply_playback_guard(&mut self) {
-        let active = self.playback_guard_active();
-        self.set_timeline_artifact_playback_priority(active);
-        if active {
+        if self.playback_guard_active() {
             self.cancel_thumbnail_load();
             self.cancel_source_work_for_playback();
         }

@@ -7,7 +7,6 @@ edition = "2021"
 qnc-source-panel = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-contracts = { workspace = true }
-qnc-content-artifacts = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-focus-walk = { workspace = true }
 qnc-ui-text = { workspace = true }

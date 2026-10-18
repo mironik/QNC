@@ -4635,3 +4635,13 @@ ponovno cita bazu i radi dok ima klipova koji cekaju (klip ciji dovrsetak nije u
 `tools/qnc-ingest-worker` nakon rada ponovno pogleda bazu i radi jos jednom kad zapisi cekaju, ali ne kad cekaju isti
 zapisi kao prije (dovrsetak im nije uspio). Testovi `qnc-record-completion`, conformance. U izoliranoj kopiji radnik je
 pokrenut za projekt `kjhfdtz`: dovrsava zapise koji su cekali.
+Popravak i smanjenje 2026-10-18 (korisnik: "zasto trebam cekati, nije ti procedura u redu, klipovi se ne kopiraju";
+"stvari rjesavati na nivou kocki"; "smanji aplikaciju kroz kocke"): klik na klip ciji zapis ceka dovrsetak nije budio
+pozadinskog radnika, pa se zapis nije dovrsavao, a Space je bio odbijen ("NotFinal"). Nova javna kocka
+`crates/qnc-worker-wake` (+ ugovor): budi radnika aktivnog projekta osim dok mu je najam ziv (kod premjesten iz
+`qnc-ingest-import-worker`, koji ga sada samo koristi). Univerzalni preview (`qnc-source-preview`: `RecordWaker`,
+`wake_worker_from`) budi radnika cim zapis prikazanog klipa ceka i svakih 5 s dok ceka, a radnik taj klip dovrsi prvi;
+Space dok klip ceka zapis pamti Play i pusta klip cim je zapis gotov. Ingest i Story/MA aplikacija samo predaju korijen.
+Smanjeno: iz `qnc-ingest-application` uklonjen nekoristen objekt artefakata (filmstrip i val radi radnik, prikaz cita
+preview), C10 1567 -> 1552; iz `qnc-editorial-application` uklonjena kopija trazenja korijena QNC-a (koristi kocku
+`qnc-dev-diagnostics::locate_qnc_root`), C10 687 -> 660. Testovi, conformance.

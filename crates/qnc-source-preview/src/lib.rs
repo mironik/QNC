@@ -204,6 +204,25 @@ fn draft_output_level(draft: Option<&SoundDraft>, stored: Option<&SoundDraft>) -
     }
 }
 
+/// Wakes the background worker (`qnc-worker-wake`); run off the form's thread.
+#[derive(Clone)]
+pub struct RecordWaker(Arc<dyn Fn() + Send + Sync>);
+
+impl RecordWaker {
+    pub fn new(wake: impl Fn() + Send + Sync + 'static) -> Self {
+        Self(Arc::new(wake))
+    }
+}
+
+impl std::fmt::Debug for RecordWaker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RecordWaker")
+    }
+}
+
+/// How often a clip waiting for its record wakes the worker again.
+const WAKE_AGAIN: std::time::Duration = std::time::Duration::from_secs(5);
+
 pub struct SourcePreview {
     view: PreviewView,
     context: Option<PreviewContext>,
@@ -218,6 +237,9 @@ pub struct SourcePreview {
     touched: Option<std::time::Instant>,
     /// The clip whose record is still completed, since when and the last try.
     record_wait: Option<(String, std::time::Instant, std::time::Instant)>,
+    /// What wakes the background worker that completes the record a shown clip waits for
+    /// (given by the module that composes this preview; it knows where QNC is).
+    record_waker: Option<RecordWaker>,
     /// A cue sent and not yet confirmed, when it was sent, and the latest frame
     /// asked meanwhile: a fast scrub or drag sends one cue at a time, latest wins,
     /// so the player command queue never fills.
@@ -261,6 +283,7 @@ impl Default for SourcePreview {
             play_when_ready: false,
             touched: None,
             record_wait: None,
+            record_waker: None,
             cue_in_flight: None,
             cue_next: None,
             cue_asked: None,
@@ -584,6 +607,12 @@ impl SourcePreview {
             return true;
         };
         let playback = player.view();
+        // A clip whose record is still completed plays as soon as it is (user 2026-10-18:
+        // Space on such a clip was refused).
+        if self.waits_for_record() || playback.error.as_deref().is_some_and(qnc_player_input::is_incomplete_media) {
+            self.play_when_ready = true;
+            return true;
+        }
         if !playback.playing() && !playback.can_start_playback() && playback.error.is_none() {
             // Not ready yet: start as soon as the prepared session is.
             self.play_when_ready = true;
@@ -851,6 +880,14 @@ impl SourcePreview {
             Some((id, since, last)) if *id == clip_id => (*since, *last),
             _ => (now, now),
         };
+        // The worker that completes the record is woken at once and every few seconds while
+        // the clip waits (user 2026-10-18: nothing woke it, the clip never played).
+        let new_wait = since == now;
+        if new_wait || now.duration_since(last) >= WAKE_AGAIN {
+            if let Some(RecordWaker(wake)) = self.record_waker.clone() {
+                let _ = std::thread::Builder::new().name("qnc-record-wake".into()).spawn(move || wake());
+            }
+        }
         self.record_wait = Some((clip_id.clone(), since, last));
         self.view.message = RECORD_WAIT.into();
         if now.duration_since(since) > std::time::Duration::from_secs(180)
@@ -860,6 +897,18 @@ impl SourcePreview {
         }
         self.record_wait = Some((clip_id.clone(), since, now));
         self.open_at(&clip_id, 0)
+    }
+
+    /// What wakes the background worker when a shown clip waits for its record.
+    pub fn set_record_waker(&mut self, waker: RecordWaker) {
+        self.record_waker = Some(waker);
+    }
+
+    /// The background worker of the active project of the QNC `root` (`qnc-worker-wake`)
+    /// is woken when a shown clip waits for its record.
+    pub fn wake_worker_from(&mut self, root: &std::path::Path) {
+        let root = root.to_path_buf();
+        self.set_record_waker(RecordWaker::new(move || _ = qnc_worker_wake::wake_active(&root)));
     }
 
     /// The shown clip is waiting for its record to be completed in the background.
@@ -878,8 +927,8 @@ impl SourcePreview {
                 if let Some(error) = &playback.error {
                     if !self.waits_for_record() && !qnc_player_input::is_incomplete_media(error) {
                         self.view.message = error.clone();
+                        self.play_when_ready = false;
                     }
-                    self.play_when_ready = false;
                 }
                 self.apply_player_view(playback);
                 changed = true;
@@ -896,7 +945,8 @@ impl SourcePreview {
             }
         }
         if self.play_when_ready {
-            if self.player_view.error.is_some() {
+            let waiting = self.player_view.error.as_deref().is_some_and(qnc_player_input::is_incomplete_media);
+            if self.player_view.error.is_some() && !waiting {
                 self.play_when_ready = false;
             } else if self.player_view.can_start_playback() && !self.player_view.playing() {
                 if let Some(player) = &self.player {

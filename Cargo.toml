@@ -124,6 +124,7 @@ members = [
     "crates/qnc-pending-marks",
     "crates/qnc-write-lease",
     "crates/qnc-missing-posters",
+    "crates/qnc-worker-wake",
     "crates/qnc-key-cheatsheet",
     "crates/qnc-desktop-tabs",
     "crates/qnc-key-preset",
@@ -308,6 +309,7 @@ qnc-channel-picker = { path = "crates/qnc-channel-picker" }
 qnc-pending-marks = { path = "crates/qnc-pending-marks" }
 qnc-write-lease = { path = "crates/qnc-write-lease" }
 qnc-missing-posters = { path = "crates/qnc-missing-posters" }
+qnc-worker-wake = { path = "crates/qnc-worker-wake" }
 qnc-key-cheatsheet = { path = "crates/qnc-key-cheatsheet" }
 qnc-desktop-tabs = { path = "crates/qnc-desktop-tabs" }
 qnc-key-preset = { path = "crates/qnc-key-preset" }

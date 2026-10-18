@@ -20,12 +20,10 @@ use qnc_ingest_work_plan::IngestWorkPlan;
 use qnc_work_settings::SettingsReader;
 use std::{
     path::{Path, PathBuf},
-    process::{Command, Stdio},
     sync::atomic::AtomicBool,
 };
 
 /// The name of the executable that runs beside the application.
-pub const WORKER_EXECUTABLE: &str = "qnc-ingest-worker";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImportSummary {
@@ -171,37 +169,6 @@ pub fn run_import(root: &Path, run: &ImportRun<'_>) -> Result<ImportSummary, Str
     outcome.map(|()| summary)
 }
 
-/// Makes sure the worker runs: nothing happens when its lease in the project database is
-/// alive, otherwise the executable beside the running application is started and this
-/// returns at once.
-pub fn launch_worker(root: &Path, target: &ContentTarget) -> Result<(), String> {
-    if qnc_ingest_runtime::is_fresh(target, WORKER, WORKER_FRESH_SECONDS) {
-        return Ok(());
-    }
-    let name = format!("{WORKER_EXECUTABLE}{}", std::env::consts::EXE_SUFFIX);
-    let executable = std::env::current_exe()
-        .map_err(|e| e.to_string())?
-        .with_file_name(&name);
-    if !executable.is_file() {
-        return Err(qnc_ui_text::fill("app.helper_missing", &[("name", &name.to_string()), ("package", "-p qnc-ingest-worker")]));
-    }
-    let mut command = Command::new(executable);
-    command
-        .arg("--root")
-        .arg(root)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        // No console window for a background process.
-        command.creation_flags(0x0800_0000);
-    }
-    let mut child = command.spawn().map_err(|e| e.to_string())?;
-    std::thread::spawn(move || {
-        let _ = child.wait();
-    });
-    Ok(())
-}
+/// Makes sure the worker runs (the wake block's; no copy of it here).
+pub use qnc_worker_wake::{wake as launch_worker, WORKER_EXECUTABLE};
 

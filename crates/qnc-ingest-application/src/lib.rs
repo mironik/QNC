@@ -67,7 +67,6 @@ pub struct IngestApplication {
     selection_writer: qnc_ingest_selection_write::SelectionWriter,
     navigation_requested: bool,
     posters: qnc_clip_posters::ClipPosters,
-    artifacts: qnc_content_artifacts::ProjectArtifacts,
     catalog_stats: Option<CatalogStats>,
     work_plan: Option<IngestWorkPlan>,
     pending_source: Option<String>,
@@ -106,7 +105,7 @@ impl IngestApplication {
     pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
         let mut component = Self::new().with_camera_registry(qnc_ingest_cameras::registry()?);
         component.root = Some(root.as_ref().to_path_buf());
-        component.artifacts.set_host_root(root.as_ref());
+        component.preview.source_preview_mut().wake_worker_from(root.as_ref());
         component.store = Some(IngestStore::open(root.as_ref())?);
         if let Some(mut browser) = component.refresh_sources() {
             let state = browser.roots("local").map(Into::into);
@@ -273,9 +272,9 @@ mod tests {
     #[test]
     fn ingest_never_makes_artifacts_in_its_own_process() {
         let mut component = IngestApplication::default();
+        let before = component.view.message.clone();
         component.wake_artifact_worker();
-        assert!(!component.artifacts.has_pending_work());
-        assert!(!component.artifacts.sync_deferred());
+        assert_eq!(component.view.message, before, "without a root nothing is started");
     }
 
     #[test]

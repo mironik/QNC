@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.worker-wake",
+  "module_name": "Worker wake",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["background.worker.wake"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-worker-wake",
+  "input": "The QNC root and the active project (or its content target).",
+  "output": "The background worker of the project runs: nothing is started while its lease in the project database is alive, otherwise its executable beside the running application.",
+  "specification": "User 2026-10-18: a clip whose record waited for its completion was never completed because nothing woke the worker; the wake is its own block, used by the import, the source preview and any other module."
+}

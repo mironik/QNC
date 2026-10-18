@@ -46,11 +46,9 @@ impl IngestApplication {
         };
         // Cut the old session even when the new clip/settings cannot be prepared.
         self.stop_player();
-        self.set_timeline_artifact_playback_priority(true);
         self.view.preview_clip_id = Some(clip_id.clone());
         self.view.timeline_assets = SourceTimelineAssets::empty_for(&clip_id); // the preview reads them
         if save_state != SaveState::Saved {
-            self.set_timeline_artifact_playback_priority(false);
             self.view.message = "Klip jos nije spremljen u bazu.".into();
             return IngestDispatchResult::accepted(None, true);
         }
@@ -70,7 +68,6 @@ impl IngestApplication {
             .err()
             .unwrap_or_default();
         self.sync_playback_view();
-        self.update_timeline_artifact_playback_priority();
         if !error.is_empty() {
             let mut result = IngestDispatchResult::rejected(error);
             result.request_repaint = true;
@@ -83,7 +80,6 @@ impl IngestApplication {
         self.preview.close();
         self.view.playback = Default::default();
         self.view.timeline = Default::default();
-        self.set_timeline_artifact_playback_priority(false);
     }
 
     pub(super) fn player_action(&mut self, intent: IngestIntent) -> IngestDispatchResult {
