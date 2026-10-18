@@ -1,0 +1,44 @@
+{
+  "module_id": "qnc.module.read-pace",
+  "module_name": "Read pace",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "media.read.readers_by_measure"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "media.read",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "ui.paint",
+    "database.read",
+    "database.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.source-preview",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-read-pace",
+  "input": "The work each finished pass did (seconds of media read) while every reader was busy, and when the readers gave way or had nothing to read.",
+  "output": "How many readers may run now, and each decision (one more is tried, or the run settles). It reads nothing, writes nothing and runs no worker.",
+  "specification": "User 2026-10-18: the number of readers is found by a short test so it adapts to the speed of the reader. The first passes are the test (no extra reading): a level is judged by the work finished per second; one more reader stays while it brings at least a tenth more, then the best level stays for the run."
+}

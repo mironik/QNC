@@ -4809,3 +4809,12 @@ cim korisnik ude u tu zonu marker postaje crven i korisnik ga moze povlaciti"): 
 Dopuna 2026-10-18 (korisnik: "to treba biti i na source timeline"): IN i OUT na source timelineu (sve forme) imaju istu
 zonu kao M markeri: 40 piksela, bliza oznaka, crvena cim je mis u zoni, povlacenje iz cijele zone (prije 6 piksela).
 `qnc-timeline` `marker_reach.rs` `source_mark_in_reach`, test.
+Izvedeno 2026-10-18 (korisnik: "mozemo li jos ubrzati filmstrip i wave, s vise niti i jezgri"; "da"; "broj jezgri i niti
+odrediti kratkim testom kako bi bilo prilagodljivo brzini citaca"): izmjereno na USB 3 stiku (svaka skupina druge
+datoteke, bez cachea): jedan prolaz zvuka i slika filmstripa 1 istodobno 62 MB/s datoteke, 2 istodobno 94, 4 istodobno
+158. Nova javna kocka `crates/qnc-read-pace` (+ ugovor `contracts/modules/read-pace.module.json`; samo odlucuje):
+prvi prolazi su test, bez dodatnog citanja; razina se mjeri radom (sekunde medija) zavrsenim u sekundi dok su svi
+citaci zauzeti; jos jedan citac ostaje dok donosi barem 10 % vise, zatim run ostaje na najboljoj razini; mjerenje
+krece iznova kad citaci ustupe (player, otvoreni klip cita sam) ili nemaju sto citati. `qnc-wave-worker`: pocinje s 2,
+najvise 8 citaca, odluke u `wave.log` (`qnc-wave-worker-pace`); `qnc-filmstrip-worker`: dekodiranja slika istodobno pola
+niti procesora, 2 do 4. Testovi, conformance. Uzivo nije izmjereno.

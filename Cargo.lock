@@ -4769,6 +4769,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-read-pace"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-record-completion"
 version = "0.1.0"
 dependencies = [
@@ -5361,6 +5365,7 @@ dependencies = [
  "qnc-media-stream",
  "qnc-mp4-sound",
  "qnc-mxf-sound",
+ "qnc-read-pace",
  "qnc-transport-resolver",
  "qnc-ui-text",
  "qnc-wave",

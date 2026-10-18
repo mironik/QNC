@@ -1,0 +1,7 @@
+[package]
+name = "qnc-read-pace"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: how many readers of a medium run at once, found by the reading itself (the first passes are the test); it only decides"
+
+[dependencies]

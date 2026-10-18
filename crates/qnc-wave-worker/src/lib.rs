@@ -26,7 +26,10 @@ use std::{
 
 pub const MODULE_ID: &str = "qnc.module.wave-worker";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-const MAX_ACTIVE_WAVE_WORKERS: usize = 2;
+/// One-pass readers at the start of a run; `qnc-read-pace` adds more while they read faster
+/// (measured 2026-10-18 on a USB 3 stick: 1 at a time 62 MB/s of file, 2: 94, 4: 158).
+const FIRST_WAVE_READERS: usize = 2;
+const MOST_WAVE_READERS: usize = 8;
 fn wave_paused_for_playback() -> &'static str {
     qnc_ui_text::text("wave.wave_worker_paused_broadcast_player")
 }
@@ -219,6 +222,8 @@ struct GeneratedWave {
     artifact: WaveArtifactRecord,
     ready_before: bool,
     total_ms: u128,
+    /// Seconds of media this pass read (0 for a wave already stored).
+    work_seconds: f64,
     /// The key pictures of the filmstrip, read in the same pass over the original.
     pictures: Option<qnc_filmstrip::EncodedPictures>,
 }
@@ -246,6 +251,8 @@ pub struct TimelineWaveService {
     /// The clip open in a preview: its pass reads the card alone (user 2026-10-18: two long
     /// passes side by side on one card took 45-55 s each, its filmstrip waited for it).
     preferred: Option<String>,
+    /// How many passes read at once, found by the passes of this run (user 2026-10-18).
+    pace: Option<qnc_read_pace::ReadPace>,
 }
 
 impl fmt::Debug for TimelineWaveService {
@@ -277,6 +284,7 @@ impl TimelineWaveService {
             self.queue.clear();
             self.queued.clear();
             self.publisher = None;
+            self.pace = None;
         }
         self.context = Some(context);
         self.ensure_publisher();
@@ -298,6 +306,7 @@ impl TimelineWaveService {
         }
         self.playback_priority = active;
         if active {
+            self.pace_mut().interrupted();
             self.cancel_active_workers();
         } else {
             self.start_next();
@@ -442,6 +451,11 @@ impl TimelineWaveService {
                     let key = outcome.request.key();
                     let ready_before = generated.ready_before;
                     let total_ms = generated.total_ms;
+                    if !ready_before {
+                        if let Some(step) = self.pace_mut().finished(generated.work_seconds) {
+                            wave_log(|| format!("qnc-wave-worker-pace: {step:?}"));
+                        }
+                    }
                     let peak_count = generated.artifact.peak_count;
                     let a1_count = generated.artifact.a1_peaks.len();
                     let a2_count = generated.artifact.a2_peaks.len();
@@ -577,19 +591,29 @@ impl TimelineWaveService {
             return;
         };
         match self.preferred_alone() {
-            Some(true) => return,
+            Some(true) => {
+                self.pace_mut().interrupted();
+                return;
+            }
             // The preferred clip is first in the queue and starts alone.
             Some(false) => {
+                self.pace_mut().interrupted();
                 self.start_one(&context);
                 return;
             }
             None => {}
         }
-        while self.workers.len() < MAX_ACTIVE_WAVE_WORKERS {
+        while self.workers.len() < self.pace_mut().readers() {
             if !self.start_one(&context) {
+                // Fewer passes than readers: this is not the pace of the medium.
+                self.pace_mut().interrupted();
                 return;
             }
         }
+    }
+
+    fn pace_mut(&mut self) -> &mut qnc_read_pace::ReadPace {
+        self.pace.get_or_insert_with(|| qnc_read_pace::ReadPace::new(FIRST_WAVE_READERS, MOST_WAVE_READERS))
     }
 
     /// Starts the first request of the queue that still needs a wave; false when none.
@@ -714,6 +738,7 @@ fn build_timeline_wave(
                 artifact: record,
                 ready_before: true,
                 total_ms: started.elapsed().as_millis(),
+                work_seconds: 0.0,
                 pictures: None,
             });
         }
@@ -752,6 +777,7 @@ fn build_timeline_wave(
         artifact,
         ready_before: false,
         total_ms: started.elapsed().as_millis(),
+        work_seconds: plan.duration_seconds,
         pictures,
     })
 }

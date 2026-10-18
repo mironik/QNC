@@ -34,7 +34,12 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const THUMB_WIDTH: u32 = 112;
 pub const THUMB_HEIGHT: u32 = 64;
 const SEEK_PREROLL_FRAMES: u64 = 25;
-const MAX_ACTIVE_FILMSTRIP_WORKERS: usize = 2;
+/// Filmstrips decoded at once: half the processor's threads, 2 to 4 (user 2026-10-18: cores
+/// and threads by the machine). Their pictures mostly come from the wave passes, so the
+/// medium is read by the wave readers, not here.
+fn filmstrip_workers() -> usize {
+    std::thread::available_parallelism().map_or(2, |threads| threads.get() / 2).clamp(2, 4)
+}
 const FRAME_PIPELINE_QUEUE: usize = 2;
 fn filmstrip_paused_for_playback() -> &'static str {
     qnc_ui_text::text("filmstrip.filmstrip_paused_broadcast_player")
@@ -582,7 +587,7 @@ impl TimelineFilmstripService {
         let Some(context) = self.context.clone() else {
             return;
         };
-        while self.workers.len() < MAX_ACTIVE_FILMSTRIP_WORKERS {
+        while self.workers.len() < filmstrip_workers() {
             let Some(request) = self.queue.pop_front() else {
                 return;
             };
