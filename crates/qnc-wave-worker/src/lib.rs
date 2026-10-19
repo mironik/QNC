@@ -665,11 +665,15 @@ impl TimelineWaveService {
             let cancel = Arc::new(AtomicBool::new(false));
             let worker_cancel = cancel.clone();
             let readers = self.readers.clone();
+            // Its coarse wave is made (maybe still on its way to the database): the wave of
+            // every frame now (live 2026-10-19: the open clip's coarse wave was made 95 times
+            // over, read again before its own write had landed).
+            let coarse_made = self.coarse.contains(&request.key());
             match std::thread::Builder::new()
                 .name("qnc-wave-worker".into())
                 .spawn({
                     let context = context.clone();
-                    move || run_wave_worker(worker_request, context, readers, worker_cancel, send)
+                    move || run_wave_worker(worker_request, context, readers, coarse_made, worker_cancel, send)
                 }) {
                 Ok(thread) => self.workers.push(ActiveWaveWorker {
                     request,
@@ -752,10 +756,11 @@ fn run_wave_worker(
     request: WaveRequest,
     context: WaveContext,
     readers: Readers,
+    coarse_made: bool,
     cancel: Arc<AtomicBool>,
     send: SyncSender<WaveOutcome>,
 ) {
-    let result = build_timeline_wave(&request, &context, &readers, &cancel);
+    let result = build_timeline_wave(&request, &context, &readers, coarse_made, &cancel);
     let _ = send.send(WaveOutcome { request, result });
 }
 
@@ -763,6 +768,7 @@ fn build_timeline_wave(
     request: &WaveRequest,
     context: &WaveContext,
     readers: &Readers,
+    coarse_made: bool,
     cancel: &AtomicBool,
 ) -> Result<GeneratedWave, String> {
     if cancel.load(Ordering::Acquire) {
@@ -780,7 +786,7 @@ fn build_timeline_wave(
     }
     // A clip without any wave gets the coarse one first (user 2026-10-18: every clip's
     // approximate sound quickly, the complete one later).
-    let coarse_first = stored.is_none();
+    let coarse_first = stored.is_none() && !coarse_made;
     let clip = context
         .content_reader
         .read_clip(&request.clip_id)?

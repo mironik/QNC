@@ -4992,3 +4992,10 @@ citanih kroz sve slike prosjecno 4,3 s po klipu, 44 dulja kroz indeks 5,3 s; kor
 uzimaju intra slike"): zamjenjuje pravilo od 18. 10. "do 10 s ubrzano citanje". `qnc-filmstrip-worker`: svaki klip ciji
 original ima indeks uzima intra sliku najblizu svakoj od 13 pozicija (kod kratkog klipa slika se moze ponoviti); bez
 indeksa sve kao prije. Testovi, conformance. Uzivo nije izmjereno.
+Popravak 2026-10-19 (log stvarne aplikacije: filmstrip 22-253 s, 96 od 122; korisnik: "koliko traje filmstrip"): grubi
+val kliknutog klipa napravljen je 95 puta (drugog 20), petlja je trosila karticu i procesor. Utrka u `qnc-wave-worker`:
+grubi val ide na upis u pozadini, a klip se odmah vraca u red (kliknuti prvi); sljedeci prolaz procita bazu prije upisa,
+ne vidi val i opet radi grubi. Sada radnik predaje prolazu da je grubi val vec napravljen (`coarse_made` iz `coarse`), pa
+taj prolaz radi puni val. Filmstrip s intra slikama i za kratke klipove: prosjecno 4,2 s po klipu uz 4 radnika i petlju
+valova. Testovi, conformance. Uzivo nije izmjereno. Otvoreno: test medija opet nesiguran (14/29/28/15 MB/s, izabrao 2
+citaca).
