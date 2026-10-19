@@ -83,8 +83,7 @@ impl PreviewView {
     }
 }
 
-pub const MONITOR_AUTO: &str = "monitor_auto";
-pub const MONITOR_ON: &str = "monitor_on";
+pub use qnc_monitor::{MONITOR_AUTO, MONITOR_ON};
 
 impl Default for PreviewView {
     fn default() -> Self {

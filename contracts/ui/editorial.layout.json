@@ -267,14 +267,6 @@
           {
             "label": ">",
             "action_id": "play_pause"
-          },
-          {
-            "label": "@story.monitor.auto",
-            "action_id": "monitor_auto"
-          },
-          {
-            "label": "@story.monitor.on",
-            "action_id": "monitor_on"
           }
         ]
       },

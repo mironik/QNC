@@ -27,6 +27,8 @@ pub const ACTIONS: &[&str] = &[
     "playlist_input_start",
     "clear_focus",
     "close_player",
+    "monitor_auto",
+    "monitor_on",
 ];
 
 /// What the keyboard took on the source timeline: a mark taken with Ctrl+I/O or the
@@ -86,6 +88,8 @@ impl SourcePanel {
                 mark_cue(preview, key)
             }
             "playlist_input_start" => preview.cue(timeline.range_start_frame),
+            // The monitor's Auto | On switch (`qnc-monitor`), the same in every form.
+            "monitor_auto" | "monitor_on" => preview.set_monitor_mode(action_id),
             "clear_focus" | "close_player" if self.mark_taken(timeline) => {
                 self.mark_taken = false;
                 mark_cue(preview, qnc_source_mark_focus::release(timeline))

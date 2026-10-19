@@ -5077,6 +5077,7 @@ dependencies = [
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-media-stream",
+ "qnc-monitor",
  "qnc-playback-activity",
  "qnc-player-client",
  "qnc-player-input",

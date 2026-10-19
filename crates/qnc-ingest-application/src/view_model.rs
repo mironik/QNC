@@ -11,6 +11,7 @@ pub struct IngestViewModel {
     pub source_timeline: qnc_source_timeline::SourceTimelineView,
     #[serde(skip)]
     pub playback: qnc_player_client::View,
+    pub monitor_auto: bool,
     #[serde(skip)]
     pub timeline: TimelineProjection,
     #[serde(skip)]
@@ -41,6 +42,7 @@ impl Default for IngestViewModel {
             focus: Default::default(),
             source_timeline: Default::default(),
             playback: Default::default(),
+            monitor_auto: true,
             timeline: Default::default(),
             timeline_assets: SourceTimelineAssets::empty(),
             browser: Default::default(),

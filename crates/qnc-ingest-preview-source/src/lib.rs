@@ -34,6 +34,8 @@ pub struct PreviewView {
     pub playback: qnc_player_client::View,
     pub timeline: qnc_timeline::TimelineProjection,
     pub assets: SourceTimelineAssets,
+    /// The monitor's Auto | On switch (`qnc-monitor`).
+    pub monitor_auto: bool,
 }
 
 #[derive(Clone)]
@@ -141,6 +143,7 @@ impl IngestPreviewSource {
             timeline: view.timeline.clone(),
             assets: view.assets.clone(),
             playback,
+            monitor_auto: view.monitor_auto,
         }
     }
 

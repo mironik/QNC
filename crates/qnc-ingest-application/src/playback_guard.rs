@@ -49,9 +49,7 @@ impl IngestApplication {
     pub(crate) fn playback_guard_rejected(&mut self) -> IngestDispatchResult {
         let message = playback_guard_message();
         self.view.message = message.to_string();
-        let mut result = IngestDispatchResult::rejected(message);
-        result.request_repaint = true;
-        result
+        IngestDispatchResult::rejected_shown(message)
     }
 
     pub(crate) fn playback_guard_blocks_action(action_id: &str) -> bool {

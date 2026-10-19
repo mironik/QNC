@@ -14,7 +14,7 @@ impl IngestApplication {
     /// Copies what the preview reports into the view the form reads.
     pub(super) fn sync_playback_view(&mut self) {
         let preview = self.preview.view();
-        self.view.playback = preview.playback;
+        (self.view.playback, self.view.monitor_auto) = (preview.playback, preview.monitor_auto);
         self.view.timeline = preview.timeline.preserving_source_marks_from(&self.view.timeline);
         // Filmstrip and wave come from the universal preview, read again while the worker makes them.
         let clip = self.view.preview_clip_id.clone().unwrap_or_default();
@@ -69,9 +69,7 @@ impl IngestApplication {
             .unwrap_or_default();
         self.sync_playback_view();
         if !error.is_empty() {
-            let mut result = IngestDispatchResult::rejected(error);
-            result.request_repaint = true;
-            return result;
+            return IngestDispatchResult::rejected_shown(error);
         }
         IngestDispatchResult::accepted(None, true)
     }
@@ -88,9 +86,7 @@ impl IngestApplication {
         if !self.preview.has_player() && !escape {
             let message = "Broadcast Player nije povezan.";
             self.view.message = message.into();
-            let mut result = IngestDispatchResult::rejected(message);
-            result.request_repaint = true;
-            return result;
+            return IngestDispatchResult::rejected_shown(message);
         }
         // The source timeline's keys are the piece every form takes (Play keeps the guard below).
         if intent.action_id != action_ids::PLAY_PAUSE {
@@ -113,9 +109,7 @@ impl IngestApplication {
             Ok(outcome) => outcome,
             Err(error) => {
                 self.view.message = error.clone();
-                let mut result = IngestDispatchResult::rejected(error);
-                result.request_repaint = true;
-                return result;
+                return IngestDispatchResult::rejected_shown(error);
             }
         };
         if outcome.started_playback {
@@ -125,9 +119,7 @@ impl IngestApplication {
             return IngestDispatchResult::accepted(None, true);
         }
         self.view.message = outcome.message.clone();
-        let mut result = IngestDispatchResult::rejected(outcome.message);
-        result.request_repaint = true;
-        result
+        IngestDispatchResult::rejected_shown(outcome.message)
     }
 }
 

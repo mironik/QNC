@@ -55,10 +55,10 @@ pub(super) fn render_preview(
             chrome,
             picture,
             message: view.playback.error.as_deref(),
-            yield_to_external: false,
+            yield_to_external: view.monitor_auto,
         },
         poster,
         label,
-    );
-    None // the monitor gives no intent
+    )
+    .map(IngestIntent::empty) // the monitor's Auto | On switch
 }

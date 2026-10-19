@@ -15,4 +15,9 @@ impl IngestDispatchResult {
         crate::dispatch::trace(|| format!("ingest-refused {message}"));
         Self { accepted: false, message: Some(message), request_repaint: false }
     }
+
+    /// Refused, with the message shown at once.
+    pub(crate) fn rejected_shown(message: impl Into<String>) -> Self {
+        Self { request_repaint: true, ..Self::rejected(message) }
+    }
 }

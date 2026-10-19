@@ -4912,3 +4912,12 @@ Izmjereno po klipu: indeks + 13 intra slika 9,7 s klip ~2,3 s, 68 s klip ~2,0-2,
 (ffmpeg, 13 skokova) 4,2-5,3 s. `qnc-filmstrip-worker` `prefer`: klip otvoren u previewu (`PLAYBACK_CLIP`) ide prvi u
 red i pokrece se odmah uz radnike koji vec rade (jedan radnik vise); `qnc-timeline-artifacts` `prefer` daje prednost i
 valu i filmstripu. I dalje ceka dok player radi. Testovi, conformance. Uzivo nije izmjereno.
+Izmjena 2026-10-19 (korisnik: "kako je nestao Auto i On za monitor.. sve moras drzati u kockama"; "1"): prekidac Monitor
+Auto | On nikad nije bio u Ingestu (8. 10. dodan samo kao gumbi rasporeda Storyja). Sada je dio kocke monitora:
+`qnc-monitor` (`MONITOR_AUTO`, `MONITOR_ON`, `paint_switch`) ga crta u gornjem desnom kutu monitora samo dok radi
+programski izlaz na vanjskom ekranu i vraca kliknutu akciju; `paint_source_monitor` vraca tu akciju. Akcije vozi
+zajednicka kocka tipki source panela (`qnc-source-panel`: `monitor_auto`/`monitor_on` -> `set_monitor_mode`), pa ih
+svaka forma s preview monitorom dobiva istim putem; `qnc-source-preview` ih uzima iz `qnc-monitor`. Ingest prikaz nosi
+`monitor_auto` iz previewa. Iz `contracts/ui/editorial.layout.json` uklonjeni su gumbi `monitor_auto`/`monitor_on`,
+sifre teksta `monitor.auto`/`monitor.on`. Usput: pet ponovljenih "odbij i osvjezi" u `qnc-ingest-application` je jedna
+funkcija (`rejected_shown`); C10 Ingest application 1552 -> 1547. Testovi, conformance. Uzivo nije provjereno (treba HDMI).
