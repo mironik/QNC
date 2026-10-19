@@ -68,7 +68,14 @@ struct Host {
     stdin: ChildStdin,
     screen: Screen,
     sent: Option<Option<PathBuf>>,
+    /// When the monitor last offered a picture.
+    offered_at: Option<Instant>,
 }
+
+/// While the monitor has no picture for less than this (the player prepares again, a clip
+/// opens), the external screen keeps the last one instead of going black (user
+/// 2026-10-19: the HDMI output flashed where the preview monitor showed the poster).
+const HOLD_LAST_PICTURE: Duration = Duration::from_millis(1500);
 
 impl Drop for Host {
     fn drop(&mut self) {
@@ -140,6 +147,12 @@ impl ProgramOutput {
             .filter(|offered| offered.pass == pass)
             .map(|offered| offered.frame_map.to_path_buf());
         let Some(host) = &mut self.host else { return };
+        if current.is_some() {
+            host.offered_at = Some(Instant::now());
+        } else if host.offered_at.is_some_and(|at| at.elapsed() < HOLD_LAST_PICTURE) {
+            ctx.request_repaint_after(HOLD_LAST_PICTURE); // to clear when nothing comes
+            return;
+        }
         if host.sent.as_ref() != Some(&current) {
             let line = match &current {
                 Some(path) => format!("map {}\n", path.display()),
@@ -176,5 +189,5 @@ fn start(screen: Screen) -> Result<Host, String> {
     }
     let mut child = command.spawn().map_err(|error| format!("Program izlaz: {error}"))?;
     let stdin = child.stdin.take().ok_or(qnc_ui_text::text("output.program_output_process_input"))?;
-    Ok(Host { child, stdin, screen, sent: None })
+    Ok(Host { child, stdin, screen, sent: None, offered_at: None })
 }
