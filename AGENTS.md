@@ -4866,3 +4866,12 @@ Select nije nasao nijedan original i nista nije javio. Nova revizija kataloga `c
 diska: 122 originala, 122 proxyja, 122 XML zapisa s tocnim brojem slika; stari katalog 0. `sony-xdcam-mxf` (Clip u
 korijenu) se ne preklapa. Izolirana kopija koristi novi katalog; stvarni `data/ingest-transport.json` jos pokazuje staru
 objavu (postavka racunala, nije dirana). Otvoreno: Select koji ne nade ni karticu ni datoteke ne javlja razlog.
+Popravak i mjerenje 2026-10-19 (korisnik: "pogledaj log i izmjeri brzinu, ovo je citac"; CFexpress citac, 122 klipa
+originala, proxy nebitan): (1) grubi val je provjeravan kao da mora biti potpun, pa je svaki odbijen ("The wave result is
+not ready") i nijedan klip nije dobio val; `qnc-wave-worker` `wave_artifact_valid` (grubi ili puni) i `wave_artifact_ready`
+(samo puni). (2) Test medija: uredaj koji spava prvim citanjem daje 0-2 MB/s (bude se oko 2 s); `qnc-read-pace` jednim
+citanjem probudi uredaj prije mjerenja. Izmjereno mimo cachea: citac uzastopno 421 MB/s, razbacano 1 citac 77 MB/s, 4
+citaca 320, 8 citaca 354 MB/s; probe MXF-a 0,3 s (prvi 2,4 s, budenje). Filmstrip je ogranicen procesorom: 13 intra
+slika XAVC 4:2:2 10-bit dekodira se 1,3-1,7 s po klipu; 4 klipa istodobno 0,92 s, 8 istodobno 0,81 s po klipu (oko
+100-110 s za 122 klipa). Jedan tok svih 13 slika u jednom dekoderu proban i odbacen: na vecini klipova daje 2-7 slicica.
+Razmak izmedu zapisa i filmstripa u probi bio je pustanje klipa (radnici se sklanjaju playeru). Testovi, conformance.

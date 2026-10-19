@@ -49,6 +49,9 @@ pub fn measure(file: &Path, most: usize, cancel: &AtomicBool) -> Result<Option<M
     // earlier one already brought into memory.
     let parts = levels.iter().sum::<usize>() as u64;
     let part = length / parts;
+    // A device asleep takes seconds for its first read (live 2026-10-19: a CFexpress reader
+    // gave 0 MB/s for one reader): one read wakes it before anything is measured.
+    wake(file)?;
     let mut first_part = 0u64;
     let mut rates = Vec::new();
     for &level in &levels {
@@ -81,6 +84,15 @@ fn choose(rates: &[(usize, f64)]) -> usize {
         .iter()
         .find(|(_, rate)| *rate >= best * NEAR_BEST)
         .map_or(1, |(level, _)| *level)
+}
+
+/// One read past the cache at the start of the file.
+fn wake(file: &Path) -> Result<(), String> {
+    let handle = open_uncached(file).map_err(|error| format!("read pace: {error}"))?;
+    let mut buffer = vec![0u8; BLOCK + ALIGN];
+    let skip = buffer.as_ptr().align_offset(ALIGN);
+    read_at(&handle, &mut buffer[skip..skip + BLOCK], 0).map_err(|error| format!("read pace: {error}"))?;
+    Ok(())
 }
 
 fn read_part(file: &Path, start: u64, length: u64, started: Instant) -> Result<u64, String> {

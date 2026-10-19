@@ -777,7 +777,7 @@ fn build_timeline_wave(
     let warning = (!has_a2).then(|| qnc_ui_text::text("wave.source_a2_audio_channel").to_string());
     let mut artifact = qnc_wave::artifact_record_from_lane_peaks(&plan, lane_peaks, warning)?;
     artifact.coarse = coarse;
-    if !wave_artifact_ready(&artifact) {
+    if !wave_artifact_valid(&artifact) {
         return Err(qnc_ui_text::text("wave.wave_result_ready").to_string());
     }
     Ok(GeneratedWave {
@@ -817,9 +817,15 @@ fn test_medium(readers: &Readers, source: &WaveSourceBinding, media: &MediaRepre
     }
 }
 
+/// A stored wave that needs no more work: the wave of every frame.
 fn wave_artifact_ready(record: &WaveArtifactRecord) -> bool {
-    !record.coarse
-        && qnc_wave::validate_artifact(record).is_ok()
+    !record.coarse && wave_artifact_valid(record)
+}
+
+/// A wave that can be stored and shown, coarse or of every frame (live 2026-10-19: every
+/// coarse wave was refused as "not ready" and no clip got a wave).
+fn wave_artifact_valid(record: &WaveArtifactRecord) -> bool {
+    qnc_wave::validate_artifact(record).is_ok()
         && record.render_version == qnc_wave::WAVE_RENDER_VERSION
         && record.peaks().is_some()
 }
