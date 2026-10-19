@@ -318,12 +318,6 @@ fn filmstrip_pictures(
         });
     }
     frames.sort_by_key(|frame| frame.index);
-    // A filmstrip of the first round (first and last picture): the first at the start of
-    // the lane, the last at its end, the places between empty until all are made (user
-    // 2026-10-19).
-    if frames.len() == 2 {
-        frames[1].index = FILMSTRIP_FRAME_COUNT - 1;
-    }
     Ok(Some(FilmstripBackground {
         clip_id: record.clip_id.clone(),
         frames,

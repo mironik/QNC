@@ -4905,3 +4905,10 @@ onemoguciti"): log: aplikacija je radila (crtala, odgovarala), ali od 19:44 nije
 HDMI ekranu, gdje ga prozor programskog izlaza skriva. `qnc-program-output` (`screens::keep_pointer_off`, Windows
 `ClipCursor`): dok radi programski izlaz i QNC je aktivan, pokazivac je zadrzan na ostalim ekranima; cim QNC nije
 aktivan, nema izlaza ili aplikacija zavrsava, pokazivac je slobodan. Ostali OS bez promjene. Testovi, conformance.
+Izmjena 2026-10-19 (korisnik: "napravio prvu i zadnju i nije nastavio... ovo nije dobar put; idemo probati prioritet
+kliknutog klipa"): log je pokazao 675 dvoslikovnih prolaza za 122 klipa (prvi krug se ponavljao), drugi krug gotov tek
+359 s nakon Selecta; filmstrip u dva kruga uklonjen (e8b67a2, 54b37a3), poster u traci dok filmstrip ne postoji ostaje.
+Izmjereno po klipu: indeks + 13 intra slika 9,7 s klip ~2,3 s, 68 s klip ~2,0-2,2 s (duljina ne utjece); stari put
+(ffmpeg, 13 skokova) 4,2-5,3 s. `qnc-filmstrip-worker` `prefer`: klip otvoren u previewu (`PLAYBACK_CLIP`) ide prvi u
+red i pokrece se odmah uz radnike koji vec rade (jedan radnik vise); `qnc-timeline-artifacts` `prefer` daje prednost i
+valu i filmstripu. I dalje ceka dok player radi. Testovi, conformance. Uzivo nije izmjereno.

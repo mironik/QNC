@@ -174,9 +174,10 @@ impl Artifacts {
         }
     }
 
-    /// The clip the user has open gets its wave first.
+    /// The clip the user has open gets its wave and its filmstrip first.
     pub fn prefer(&mut self, clip_id: &str) {
         self.wave.prefer(clip_id);
+        self.filmstrip.prefer(clip_id);
     }
 
     pub fn has_pending_work(&self) -> bool {
