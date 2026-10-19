@@ -272,7 +272,6 @@ fn run_artifacts(
     artifacts.set_host_root(root);
     // Published under the lease, checked by the database owner in the same transaction.
     artifacts.set_write_lease(lease.write_lease());
-    artifacts.hold_filmstrip(completing.load(std::sync::atomic::Ordering::Relaxed));
     artifacts.set_playback_priority(player_works());
     artifacts.sync(&reader, &settings, target.clone(), false)?;
     let deadline = std::time::Instant::now() + Duration::from_secs(60 * 60);
@@ -286,7 +285,6 @@ fn run_artifacts(
         if closed.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(()); // dropping the artifacts cancels their workers
         }
-        artifacts.hold_filmstrip(still_completing);
         // The lists are read again every 3 s while records are completed: a clip whose
         // record became final joins the waves.
         if still_completing && synced.elapsed() >= Duration::from_secs(3) {

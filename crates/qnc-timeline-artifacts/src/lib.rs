@@ -7,7 +7,6 @@
 //! `qnc-timeline-assets`) and the source bindings, so the same component serves Ingest,
 //! Media Assist, Story or any future form, on a local disk, LAN or intranet.
 
-use qnc_import_control::{ImportControl, Order, Work};
 use qnc_filmstrip_worker::{
     FilmstripContentRead, FilmstripContentWriteFactory, FilmstripContext, FilmstripSourceBinding,
     TimelineFilmstripService,
@@ -54,9 +53,6 @@ pub struct Artifacts {
     wave: TimelineWaveService,
     assets: TimelineAssetReader,
     sync_deferred: bool,
-    /// The caller holds the filmstrip (the card serves the records and waves first).
-    filmstrip_held: bool,
-    control: ImportControl,
 }
 
 impl Artifacts {
@@ -103,11 +99,11 @@ impl Artifacts {
             return Ok(());
         }
         self.sync_deferred = false;
-        // The import control first tells each worker whether it may take clips.
-        self.control();
+        // The filmstrip and the waves are workers of their own: neither waits for the
+        // other nor for the records (user 2026-10-19: "the filmstrip comes as soon as it
+        // can, without waiting; these processes are independent workers, like blocks").
         let filmstrip = self.filmstrip.sync_content_db();
         let wave = self.wave.sync_content_db();
-        self.control();
         filmstrip.and(wave)
     }
 
@@ -130,7 +126,6 @@ impl Artifacts {
 
     pub fn poll(&mut self, active_clip_id: Option<&str>) -> Polled {
         let filmstrip = self.filmstrip.poll(active_clip_id);
-        self.control();
         let wave = self.wave.poll(active_clip_id);
         let mut polled = Polled {
             changed: filmstrip.changed || wave.changed,
@@ -149,29 +144,6 @@ impl Artifacts {
     pub fn set_playback_priority(&mut self, active: bool) {
         self.wave.set_playback_priority(active);
         self.filmstrip.set_playback_priority(active);
-    }
-
-    /// The caller still completes records: the filmstrip and the waves wait (the open
-    /// clip's wave does not).
-    pub fn hold_filmstrip(&mut self, held: bool) {
-        self.filmstrip_held = held;
-    }
-
-    /// The import control's orders: records, coarse waves, then filmstrips and full waves
-    /// (together on a fast medium).
-    fn control(&mut self) {
-        let work = Work {
-            records_completing: self.filmstrip_held,
-            coarse_pending: self.wave.coarse_pending(),
-            filmstrip_busy: self.filmstrip.has_pending_work(),
-            medium_parallel: self.wave.medium_parallel(),
-        };
-        for order in self.control.orders(work) {
-            match order {
-                Order::FilmstripRuns(runs) => self.filmstrip.set_on_orders(!runs),
-                Order::WavesRun(runs) => self.wave.set_held(!runs),
-            }
-        }
     }
 
     /// The clip the user has open gets its wave and its filmstrip first.

@@ -4999,3 +4999,9 @@ ne vidi val i opet radi grubi. Sada radnik predaje prolazu da je grubi val vec n
 taj prolaz radi puni val. Filmstrip s intra slikama i za kratke klipove: prosjecno 4,2 s po klipu uz 4 radnika i petlju
 valova. Testovi, conformance. Uzivo nije izmjereno. Otvoreno: test medija opet nesiguran (14/29/28/15 MB/s, izabrao 2
 citaca).
+Izmjena 2026-10-19 (korisnik: "ceka li filmstrip valove? filmstrip treba doci sto prije bez cekanja; ti procesi moraju
+biti samostalni workeri, kao kocke"): zamjenjuje redoslijed od 15., 18. i 19. 10. (zapisi -> grubi valovi -> filmstrip ->
+puni valovi). Filmstrip, valovi i dovrsetak zapisa su samostalni radnici; nitko nikoga ne drzi, svi i dalje ustupaju
+playeru. Kocka `qnc-import-control` (+ ugovor) i lanac `hold_filmstrip` (`qnc-timeline-artifacts`,
+`qnc-content-artifacts`, `tools/qnc-ingest-worker`) uklonjeni. U radnicima filmstripa i vala ostaju neiskoristeni
+`set_on_orders`/`set_held` (zadano: rade). Testovi, conformance. Uzivo nije izmjereno.

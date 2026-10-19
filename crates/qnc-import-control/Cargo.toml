@@ -1,7 +1,0 @@
-[package]
-name = "qnc-import-control"
-version = "0.1.0"
-edition = "2021"
-description = "QNC public piece: the order of the background work after Select and Import (a clip's filmstrip as soon as its wave is done, the rest when waves and records are done); it only decides"
-
-[dependencies]

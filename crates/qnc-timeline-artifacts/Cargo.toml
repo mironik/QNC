@@ -6,6 +6,5 @@ description = "QNC public component: keeps the filmstrip and wave of clips up to
 
 [dependencies]
 qnc-filmstrip-worker = { workspace = true }
-qnc-import-control = { workspace = true }
 qnc-timeline-assets = { workspace = true }
 qnc-wave-worker = { workspace = true }

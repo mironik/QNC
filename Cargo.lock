@@ -3658,10 +3658,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "qnc-import-control"
-version = "0.1.0"
-
-[[package]]
 name = "qnc-ingest"
 version = "0.1.0"
 dependencies = [
@@ -5220,7 +5216,6 @@ name = "qnc-timeline-artifacts"
 version = "0.1.0"
 dependencies = [
  "qnc-filmstrip-worker",
- "qnc-import-control",
  "qnc-timeline-assets",
  "qnc-wave-worker",
 ]
