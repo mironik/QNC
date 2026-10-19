@@ -4883,3 +4883,12 @@ filmstrip; puni valovi citaju uz filmstrip kad test medija pusti 4 ili vise cita
 filmstripa (stik, SD na USB 2.0); val otvorenog klipa nikad ne ceka. `qnc-wave-worker` `coarse_pending` (klipovi bez
 ikakvog vala; klip ciji val ne moze nastati ne zadrzava filmstrip), `medium_parallel`; `qnc-timeline-artifacts`.
 Testovi, conformance. Uzivo nije izmjereno.
+Izmjena 2026-10-19 (korisnik: "brza kartica i brzi citac ne donose puno, sto je uzrok"; "ne 13 puta otvarati nego jednom i
+skakati na unaprijed izracunate lokacije, priblizno"): uzrok je procesor, ne citac (filmstrip cita oko 6 MB po klipu, a
+dekodiranje 13 slika XAVC 4:2:2 10-bit traje 3-4 s po klipu uz 4 istodobno; ffmpeg je za klip do 10 s 13 puta otvarao
+datoteku). `qnc-filmstrip-worker` `extract_once`: za svaki klip ciji original ima indeks (`qnc-mxf-index`), kratki i
+dugi, 13 pozicija su najblize intra slike, a jedan dekoder iz kataloga otvara se jednom i skace s pozicije na poziciju
+(svaki skok dekodira jednu sliku); dekoder koji ne moze skakati (proces) otvara se ponovno na poziciji. Bez indeksa sve
+kao prije. Zamjenjuje pravilo "do 10 s ubrzano citanje" za klipove s indeksom. `tools/qnc-ingest-worker` znacajka
+`libav` (ugradeni dekoder u procesu radnika); izdanje se gradi s `qnc-ingest-worker/libav`. Testovi, conformance. Uzivo
+nije izmjereno.

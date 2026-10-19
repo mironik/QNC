@@ -771,21 +771,25 @@ fn build_timeline_background(
         LocalFilmstripArtifacts::new(&context.filmstrip_root_uri, context.filmstrip_dir.clone())?;
     let ready_before = artifacts.ready(&plan);
     let extract_started = Instant::now();
-    // A clip longer than 10 s takes the intra picture nearest each of its 13 places straight
-    // from the original's own index (user 2026-10-18), a few reads instead of opening the
-    // file thirteen times; a clip up to 10 s is read through by the decoder below.
-    let from_index = (given.is_none() && !ready_before && plan.extraction_mode == FilmstripExtractionMode::KeyframeSeek)
-        .then(|| intra_pictures(&clip, context, cancel))
-        .and_then(|found| match found {
+    // Every clip whose original carries an index: the intra picture nearest each of its 13
+    // places, through one decoder opened once that jumps from place to place (user
+    // 2026-10-19: "open once and jump to the places worked out beforehand, approximately").
+    // Without an index the filmstrip is made as before.
+    let from_index = if given.is_none() && !ready_before {
+        match intra_once(&clip, context, &artifacts, cancel) {
             Ok(found) => found,
+            Err(error) if error == filmstrip_paused_for_playback() => return Err(error),
             Err(error) => {
                 filmstrip_log(|| format!("qnc-filmstrip-worker: clip={} index=failed error={error}", request.clip_id));
                 None
             }
-        });
+        }
+    } else {
+        None
+    };
     // Pictures handed over or read by the index: decoded, the media is not read again.
     // Should that fail, the filmstrip reads the media as before (the reason goes to the log).
-    let from_pictures = match given.or(from_index.as_ref()).filter(|_| !ready_before) {
+    let from_pictures = match given.filter(|_| !ready_before && from_index.is_none()) {
         Some(given) => match filmstrip_from_pictures(&clip, context, given, &artifacts, cancel) {
             Ok(plan) => Some(plan),
             Err(error) if error == filmstrip_paused_for_playback() => return Err(error),
@@ -796,7 +800,7 @@ fn build_timeline_background(
         },
         None => None,
     };
-    let plan = from_pictures.unwrap_or(plan);
+    let plan = from_index.or(from_pictures).unwrap_or(plan);
     if !artifacts.ready(&plan) {
         DecoderFilmstripGenerator::from_installed_decoder_catalog()?.generate_from_sources(
             &context.source_bindings,
@@ -821,44 +825,51 @@ fn build_timeline_background(
     })
 }
 
-/// The intra picture of the original nearest each of the 13 places, read through the file's
-/// own index; `None` when the original is not an MXF whose index and pictures can be used.
-fn intra_pictures(
+/// The filmstrip of the original from the intra picture nearest each of its 13 places,
+/// found in the file's own index and decoded by one decoder opened once; `None` when the
+/// original has no usable index.
+fn intra_once(
     clip: &FilmstripClipRecord,
     context: &FilmstripContext,
+    artifacts: &LocalFilmstripArtifacts,
     cancel: &AtomicBool,
-) -> Result<Option<qnc_filmstrip::EncodedPictures>, String> {
-    let Some(codec) = qnc_filmstrip::original_picture_codec(&clip.snapshot) else {
+) -> Result<Option<FilmstripPlan>, String> {
+    let Some(frames) = qnc_filmstrip::original_picture_frames(&clip.snapshot) else {
         return Ok(None);
     };
-    let Some(targets) = qnc_filmstrip::original_picture_frames(&clip.snapshot) else {
+    let original = &clip.snapshot.metadata.original;
+    let Some(source) = context.source_bindings.iter().find(|source| source.matches_media_uri(&original.media_uri)) else {
         return Ok(None);
     };
-    let original = &clip.snapshot.metadata.original.media_uri;
-    let Some(source) = context.source_bindings.iter().find(|source| source.matches_media_uri(original)) else {
-        return Ok(None);
-    };
-    let Some(path) = source.local_media_path(original)? else {
+    let Some(path) = source.local_media_path(&original.media_uri)? else {
         return Ok(None);
     };
     let Some(index) = qnc_mxf_index::MxfIndex::read(&path)? else {
         return Ok(None);
     };
-    let mut file = fs::File::open(&path).map_err(|error| format!("filmstrip original open: {error}"))?;
-    let mut pictures = Vec::with_capacity(targets.len());
-    for target in targets {
-        if cancel.load(Ordering::Acquire) {
-            return Err(filmstrip_paused_for_playback().into());
-        }
-        let Some(entry) = index.intra_nearest(target) else {
-            return Ok(None);
-        };
-        let Some(picture) = qnc_mxf_index::read_package(&mut file, &index, entry, true, false)?.picture else {
-            return Ok(None);
-        };
-        pictures.push(picture);
+    let plan = qnc_filmstrip::plan_from_original(&clip.snapshot, &context.filmstrip_root_uri, Some(&clip.name))?;
+    if frames.len() != plan.frames.len() {
+        return Ok(None);
     }
-    Ok(Some(qnc_filmstrip::EncodedPictures { codec: codec.to_string(), pictures }))
+    let mut places: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+    for (frame, request) in frames.iter().zip(&plan.frames) {
+        let Some(intra) = index.intra_nearest(*frame) else {
+            return Ok(None);
+        };
+        places.entry(intra as u64).or_default().push(request.index);
+    }
+    let output_paths = artifacts.output_paths(&plan)?;
+    let started = Instant::now();
+    DecoderFilmstripGenerator::from_installed_decoder_catalog()?.extract_once(source, original, &plan, places, &output_paths, cancel)?;
+    filmstrip_log(|| {
+        format!(
+            "qnc-filmstrip-worker: clip={} source=Original mode=IntraOnce frames={} build_ms={}",
+            plan.clip_id,
+            plan.frames.len(),
+            started.elapsed().as_millis()
+        )
+    });
+    Ok(Some(plan))
 }
 
 /// The filmstrip of the original from its key pictures (handed over or read by the
@@ -1123,6 +1134,55 @@ impl DecoderFilmstripGenerator {
                 }
                 if frame != target_frame {
                     return Err("decoder skipped requested filmstrip source frame".into());
+                }
+                pipeline.submit(packet, indices)?;
+                break;
+            }
+        }
+        pipeline.finish()
+    }
+
+    /// One decoder for the clip, opened at the first place and moved to each next one by a
+    /// jump inside it; a decoder that cannot jump (a decoder process) is opened again at the
+    /// place. Each place is an intra picture, so a jump decodes the one picture it needs; the
+    /// first picture at or after the place is taken (`places`: picture -> filmstrip frames).
+    pub fn extract_once(
+        &self,
+        source: &FilmstripSourceBinding,
+        media: &MediaRepresentation,
+        plan: &FilmstripPlan,
+        places: BTreeMap<u64, Vec<usize>>,
+        output_paths: &[PathBuf],
+        cancel: &AtomicBool,
+    ) -> Result<(), String> {
+        let (stream_index, video, origin) = video_stream(media)?;
+        let mut pipeline = FrameWritePipeline::start(video, output_paths)?;
+        let mut decoder: Option<Decoder> = None;
+        for (place, indices) in places {
+            if cancel.load(Ordering::Acquire) {
+                let _ = pipeline.finish();
+                return Err(filmstrip_paused_for_playback().into());
+            }
+            let start = rational_from_frame(place, plan.source_timebase);
+            let jumped = match decoder.as_mut() {
+                Some(open) => open.seek(start.clone()).map_err(|error| error.to_string())?,
+                None => false,
+            };
+            if !jumped {
+                decoder = Some(self.open_decoder(source, media, stream_index, (place > 0).then_some(start))?);
+            }
+            let open = decoder.as_mut().expect("opened");
+            loop {
+                if cancel.load(Ordering::Acquire) {
+                    let _ = pipeline.finish();
+                    return Err(filmstrip_paused_for_playback().into());
+                }
+                let Some(packet) = open.next_packet().map_err(|error| error.to_string())? else {
+                    return Err("decoder ended before filmstrip frame".into());
+                };
+                validate_video_packet(&packet, media, stream_index, video)?;
+                if decoded_frame_number(&packet, origin, plan.source_timebase)? < place {
+                    continue;
                 }
                 pipeline.submit(packet, indices)?;
                 break;

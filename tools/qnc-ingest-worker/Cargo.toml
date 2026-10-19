@@ -20,3 +20,8 @@ qnc-record-completion = { workspace = true }
 qnc-ingest-select = { workspace = true }
 qnc-source-reader = { workspace = true }
 qnc-work-settings = { workspace = true }
+qnc-decoder-catalog = { workspace = true }
+
+[features]
+# The in-process decoder (FFmpeg libraries): a filmstrip's decoder opens once and jumps.
+libav = ["qnc-decoder-catalog/libav"]
