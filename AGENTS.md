@@ -4983,3 +4983,7 @@ kopiran) u panel `qnc-transport-panel` (`BLOCKS`: Play, IN, OUT, Auto, On; natpi
 ugovora rasporeda i modela (`qnc-editorial-layout`, `qnc-ingest-layout`) je uklonjen; raspored daje samo mjesto i sirinu
 (`transport_width`). Panel je isti u svakoj formi. C10: `qnc-editorial-blocks` 302 -> 301, `qnc-ingest-blocks` 825 -> 824.
 Testovi, conformance.
+Prijenos u stvarnu aplikaciju 2026-10-19 (korisnik: "dodaj u aplikaciju da je testiramo, dosad smo radili u zasticenom
+direktoriju"; odabrao "da, oboje" i dijagnostiku): stvarni `data/ingest-transport.json` uskladen s izoliranom kopijom
+(katalog kamera 2026.10.19.1: CFexpress s `XDROOT` u korijenu; probe 2 MB), prethodni spremljen izvan repozitorija;
+`data/dev-diagnostics.json` ukljucuje logove playera, vala i filmstripa. Pokrenuta stvarna aplikacija iz `target/release`.
