@@ -4956,3 +4956,10 @@ rasporeda (Play, IN, OUT) i uvijek Auto | On; `qnc-monitor-panel` crta samo moni
 klip (`shown_clip` u Ingest i Story/MA pogledu), forme samo smjestaju panele po imenima mjesta. Stil reda u
 `qnc-editorial-layout` (`row_style`). C10: `qnc-editorial-blocks` 311 -> 302, `qnc-ingest-blocks` 826 -> 825, Ingest
 application 1546 -> 1542. Testovi (`qnc-board` split, `qnc-transport-panel`), conformance. Uzivo nije provjereno.
+Popravak 2026-10-19 (korisnik: "zasto promjena audio kanala na source timelineu blica na HDMI i preview monitoru";
+"odabir je priprema, tek kad play krene primjenjuju se postavke"): log: svaka promjena kanala uzete trake otvarala je
+novu sesiju playera (oko 0,7 s bez slike na monitoru i HDMI-ju). `qnc-source-preview` (`hear_channels`, `opened_lead`,
+`lead_waits`, `reopen_with_lead`): dok player stoji, izbor kanala mijenja samo prikaz i pamti se; Play ga primjenjuje
+(player se tada priprema na istom mjestu s novim kanalom i svira). Dok svira, promjena se cuje odmah kao prije. Razina i
+dalje ide bez ponovnog otvaranja. Medukorak: korisnik je odredio cilj "player svira sve kanale, a na izlaz idu samo
+odabrani" (preusmjeravanje bez ponovnog otvaranja), ceka otkljucavanje playera. Testovi, conformance.
