@@ -15,6 +15,27 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const MONITOR_AUTO: &str = "monitor_auto";
 pub const MONITOR_ON: &str = "monitor_on";
 
+/// Auto (the default) or On: one choice for every monitor of this application, whichever
+/// form shows it (user 2026-10-19: "set once, not a hundred times within one project");
+/// a choice of this laptop while the application runs, not of a form, clip or project.
+static AUTO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+/// Whether Auto is chosen.
+pub fn auto() -> bool {
+    AUTO.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Chooses Auto or On by the switch action; false for any other action.
+pub fn choose(action_id: &str) -> bool {
+    let auto = match action_id {
+        MONITOR_AUTO => true,
+        MONITOR_ON => false,
+        _ => return false,
+    };
+    AUTO.store(auto, std::sync::atomic::Ordering::Relaxed);
+    true
+}
+
 /// Whether the switch button `action_id` is the one on (`auto`: Auto chosen).
 pub fn switch_on(action_id: &str, auto: bool) -> bool {
     match action_id {

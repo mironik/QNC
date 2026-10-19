@@ -101,7 +101,7 @@ fn render_pool_head(
         })
         .collect();
     let listed = contracts.pool_transport().iter().filter_map(|c| Some((c.label(), c.action_id()?)));
-    let commands = qnc_monitor_panel::controls(listed, &view.preview.monitor()); // the monitor panel's controls
+    let commands = qnc_monitor_panel::controls(listed); // the monitor panel's controls
     let labels: Vec<_> = commands.iter().map(|command| qnc_media_pool_head::RowCommand { label: &command.label, on: command.on }).collect();
     let style = qnc_media_pool_head::RowStyle {
         text: theme.text,

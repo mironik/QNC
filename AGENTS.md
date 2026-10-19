@@ -4943,3 +4943,6 @@ je sada ista kao drugdje (cekanje zapisa ili greska playera). Usput u Ingest apl
 cetiri ista mjesta. C10: `qnc-editorial-blocks` 348 -> 311, `qnc-ingest-blocks` 860 -> 826, Ingest application 1547 ->
 1546. Red ispod monitora (tabovi + kontrole) jos slazu ploce dok tabovi ne prijedu u panel media poola (korak 2).
 Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-19 (korisnik: "ako je ON, ON je u svim formama; glupo je sto puta postavljati"): Auto | On je jedan
+izbor za cijelu aplikaciju u kocki `qnc-monitor` (`auto`, `choose`), ne stanje svakog previewa; `qnc-source-preview` ga
+samo prosljeduje (`set_monitor_mode`), `MonitorState` i `PreviewView` vise nemaju svoj `auto`. Vrijedi dok aplikacija radi.

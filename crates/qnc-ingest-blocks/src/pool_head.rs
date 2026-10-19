@@ -22,7 +22,7 @@ pub(super) fn render_pool_head(
         })
         .collect();
     let listed = head.transport_right.iter().filter_map(|c| Some((c.label(), c.action_id()?)));
-    let commands = qnc_monitor_panel::controls(listed, &view.monitor); // the monitor panel's controls
+    let commands = qnc_monitor_panel::controls(listed); // the monitor panel's controls
     let labels: Vec<_> = commands.iter().map(|command| qnc_media_pool_head::RowCommand { label: &command.label, on: command.on }).collect();
     let style = row_style(theme, head.tab_gap);
     let mut intent = None;

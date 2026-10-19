@@ -65,9 +65,6 @@ pub struct PreviewView {
     pub playing: bool,
     /// Controlled error text of the last failed command; empty otherwise.
     pub message: String,
-    /// Monitor Auto (user 2026-10-08, the default): while the program is on an external
-    /// screen the monitor leaves the picture to it; Monitor On keeps showing it.
-    pub monitor_auto: bool,
     /// The level (dBFS) of A1 and A2 at the player's output, for a meter (user 2026-10-16).
     pub output_levels: [Option<f32>; 2],
 }
@@ -78,21 +75,19 @@ pub struct MonitorState {
     pub frame: Option<MonitorFrame>,
     pub video_visible: bool,
     pub message: Option<String>,
-    /// Monitor Auto (the default) or On.
-    pub auto: bool,
 }
 
 /// The same state: the same picture (session, generation, sequence), not its pixels.
 impl PartialEq for MonitorState {
     fn eq(&self, other: &Self) -> bool {
         let picture = |state: &Self| state.frame.as_ref().map(|frame| (frame.session_id.clone(), frame.generation, frame.sequence));
-        picture(self) == picture(other) && (self.video_visible, &self.message, self.auto) == (other.video_visible, &other.message, other.auto)
+        picture(self) == picture(other) && (self.video_visible, &self.message) == (other.video_visible, &other.message)
     }
 }
 
 impl Default for MonitorState {
     fn default() -> Self {
-        Self { frame: None, video_visible: false, message: None, auto: true }
+        Self { frame: None, video_visible: false, message: None }
     }
 }
 
@@ -103,7 +98,6 @@ impl PreviewView {
             frame: self.monitor_frame.clone(),
             video_visible: self.video_visible,
             message: self.monitor_message.clone(),
-            auto: self.monitor_auto,
         }
     }
 }
@@ -121,7 +115,6 @@ impl Default for PreviewView {
             assets: SourceTimelineAssets::empty(),
             playing: false,
             message: String::new(),
-            monitor_auto: true,
             output_levels: [None, None],
         }
     }
@@ -331,15 +324,10 @@ impl SourcePreview {
         Self::default()
     }
 
-    /// Monitor Auto or On (the switch under the monitor); false for any other action.
+    /// Monitor Auto or On (the switch under the monitor), one choice for every monitor
+    /// (`qnc-monitor`); false for any other action.
     pub fn set_monitor_mode(&mut self, action_id: &str) -> bool {
-        let auto = match action_id {
-            MONITOR_AUTO => true,
-            MONITOR_ON => false,
-            _ => return false,
-        };
-        self.view.monitor_auto = auto;
-        true
+        qnc_monitor::choose(action_id)
     }
 
     pub fn view(&self) -> &PreviewView {
@@ -431,7 +419,6 @@ impl SourcePreview {
         self.player_view = PlayerView::default();
         self.view = PreviewView {
             assets: SourceTimelineAssets::empty(),
-            monitor_auto: self.view.monitor_auto, // a choice of this laptop, not of a clip
             ..PreviewView::default()
         };
         self.report_activity();
