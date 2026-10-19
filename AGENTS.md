@@ -4987,3 +4987,8 @@ Prijenos u stvarnu aplikaciju 2026-10-19 (korisnik: "dodaj u aplikaciju da je te
 direktoriju"; odabrao "da, oboje" i dijagnostiku): stvarni `data/ingest-transport.json` uskladen s izoliranom kopijom
 (katalog kamera 2026.10.19.1: CFexpress s `XDROOT` u korijenu; probe 2 MB), prethodni spremljen izvan repozitorija;
 `data/dev-diagnostics.json` ukljucuje logove playera, vala i filmstripa. Pokrenuta stvarna aplikacija iz `target/release`.
+Izmjena 2026-10-19 (log stvarne aplikacije, CFexpress, 122 klipa: filmstrip 22-193 s nakon Selecta; 78 klipova do 10 s
+citanih kroz sve slike prosjecno 4,3 s po klipu, 44 dulja kroz indeks 5,3 s; korisnik: "da, i kratki klipovi neka
+uzimaju intra slike"): zamjenjuje pravilo od 18. 10. "do 10 s ubrzano citanje". `qnc-filmstrip-worker`: svaki klip ciji
+original ima indeks uzima intra sliku najblizu svakoj od 13 pozicija (kod kratkog klipa slika se moze ponoviti); bez
+indeksa sve kao prije. Testovi, conformance. Uzivo nije izmjereno.

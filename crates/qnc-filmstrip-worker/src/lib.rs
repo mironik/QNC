@@ -792,10 +792,12 @@ fn build_timeline_background(
         LocalFilmstripArtifacts::new(&context.filmstrip_root_uri, context.filmstrip_dir.clone())?;
     let ready_before = artifacts.ready(&plan);
     let extract_started = Instant::now();
-    // A clip longer than 10 s takes the intra picture nearest each of its 13 places straight
-    // from the original's own index (user 2026-10-18), a few reads instead of opening the
-    // file thirteen times; a clip up to 10 s is read through by the decoder below.
-    let from_index = (given.is_none() && !ready_before && plan.extraction_mode == FilmstripExtractionMode::KeyframeSeek)
+    // Every clip, short or long, takes the intra picture nearest each of its 13 places
+    // straight from the original's own index (user 2026-10-18; short clips too, user
+    // 2026-10-19: reading a clip up to 10 s through decoded up to 500 XAVC 10-bit pictures,
+    // 4.3 s a clip); a near place may repeat a picture. Without an index the decoder below
+    // reads as before.
+    let from_index = (given.is_none() && !ready_before)
         .then(|| intra_pictures(&clip, context, cancel))
         .and_then(|found| match found {
             Ok(found) => found,
