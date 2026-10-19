@@ -3932,7 +3932,6 @@ dependencies = [
  "qnc-content-artifacts",
  "qnc-content-read",
  "qnc-content-store",
- "qnc-decoder-catalog",
  "qnc-ingest-import-worker",
  "qnc-ingest-select",
  "qnc-missing-posters",
