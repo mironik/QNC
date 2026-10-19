@@ -13,11 +13,7 @@ pub(super) fn render_preview(
         muted: theme.text_muted,
         font_size: theme.font_ui,
     };
-    let poster = view
-        .clips
-        .iter()
-        .find(|c| Some(&c.clip_id) == view.preview_clip_id.as_ref())
-        .and_then(|clip| qnc_monitor_panel::poster(clip.thumb_uri.as_ref(), clip.thumb_image.as_deref()));
+    let poster = view.shown_clip().and_then(|clip| qnc_monitor_panel::poster(clip.thumb_uri.as_ref(), clip.thumb_image.as_deref()));
     let label = if view.preview_clip_id.is_some() {
         view.current_clip_label()
     } else {

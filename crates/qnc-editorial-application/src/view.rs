@@ -74,13 +74,15 @@ impl EditorialView {
         self.preview.clip_id.as_deref()
     }
 
+    /// The clip in the monitor, if one is chosen.
+    pub fn shown_clip(&self) -> Option<&EditorialClip> {
+        let id = self.chosen_clip_id()?;
+        self.clips.iter().find(|clip| clip.clip_id == id)
+    }
+
     /// Name of the clip in the monitor, if one is chosen.
     pub fn current_clip_label(&self) -> Option<&str> {
-        let id = self.chosen_clip_id()?;
-        self.clips
-            .iter()
-            .find(|clip| clip.clip_id == id)
-            .map(|clip| clip.name.as_str())
+        self.shown_clip().map(|clip| clip.name.as_str())
     }
 
     pub fn action_enabled(&self, action_id: &str) -> bool {

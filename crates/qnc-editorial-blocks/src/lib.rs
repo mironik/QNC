@@ -28,8 +28,7 @@ pub fn render_desktop(
     theme: &Theme,
     view: &EditorialView,
 ) -> Option<EditorialIntent> {
-    let (sizes, faces, names) = (contracts.board_sizes(), theme.board_faces(), contracts.board_names());
-    let board = sizes.standard_layout(&names);
+    let (faces, board) = (theme.board_faces(), contracts.board_layout());
     qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| qnc_dev_diagnostics::timed_block(block, || match block {
         "preview" => render_preview(ui, rect, contracts, theme, view),
         "pool-head" => {
@@ -37,6 +36,7 @@ pub fn render_desktop(
             paint_focus(ui, rect, view.focus.panel == Panel::PoolTabs, theme.focus);
             intent
         }
+        "transport" => render_transport(ui, rect, contracts, theme),
         "clip-cards" => {
             // Clip menu (qnc_v5 media pool): the card grid fills the column under the
             // pool head, down to the dock, on the panel background.
@@ -73,10 +73,7 @@ fn render_preview(
         muted: theme.text_muted,
         font_size: theme.font_ui,
     };
-    let poster = view
-        .chosen_clip_id()
-        .and_then(|id| view.clips.iter().find(|clip| clip.clip_id == id))
-        .and_then(|clip| qnc_monitor_panel::poster(clip.thumb_uri.as_ref(), clip.thumb_image.as_deref()));
+    let poster = view.shown_clip().and_then(|clip| qnc_monitor_panel::poster(clip.thumb_uri.as_ref(), clip.thumb_image.as_deref()));
     let label = view.current_clip_label().unwrap_or(contracts.editorial.preview.empty_label.as_str());
     qnc_trim_overlay::show(ui.ctx(), &view.segments); // the trim zoom, while something is taken
     let id = egui::Id::new(("qnc-monitor", "editorial-source"));
@@ -100,28 +97,24 @@ fn render_pool_head(
             enabled: tab.action_id().is_some_and(|id| view.action_enabled(id)),
         })
         .collect();
-    let listed = contracts.pool_transport().iter().filter_map(|c| Some((c.label(), c.action_id()?)));
-    let commands = qnc_monitor_panel::controls(listed); // the monitor panel's controls
-    let labels: Vec<_> = commands.iter().map(|command| qnc_media_pool_head::RowCommand { label: &command.label, on: command.on }).collect();
-    let style = qnc_media_pool_head::RowStyle {
-        text: theme.text,
-        muted: theme.text_muted,
-        accent: theme.accent,
-        border: theme.border,
-        font_ui: theme.font_ui,
-        control_height: theme.chrome_control_height,
-        tab_gap: 10.0,
-    };
+    let style = contracts.row_style(theme);
     let mut intent = None;
     show_chrome_row(ui, rect, &contracts.dock_style(theme), theme.surface, true, |ui| {
-        intent = match qnc_media_pool_head::show_row(ui, &style, &tabs, &labels) {
+        intent = match qnc_media_pool_head::show_row(ui, &style, &tabs, &[]) {
             Some(qnc_media_pool_head::RowClick::Tab(index)) => tabs_left[index].action_id(),
-            Some(qnc_media_pool_head::RowClick::Command(index)) => Some(commands[index].action_id.as_str()),
-            None => None,
+            _ => None,
         }
         .map(EditorialIntent::action);
     });
     intent
+}
+
+/// The transport panel in its own place (Play, IN, OUT and the monitor's Auto | On).
+fn render_transport(ui: &mut Ui, rect: Rect, contracts: &EditorialContracts, theme: &Theme) -> Option<EditorialIntent> {
+    let (row, chrome) = (contracts.row_style(theme), contracts.dock_style(theme));
+    let look = qnc_transport_panel::TransportLook { row: &row, chrome: &chrome, fill: theme.surface };
+    let listed = contracts.pool_transport().iter().filter_map(|command| Some((command.label(), command.action_id()?)));
+    qnc_transport_panel::show(ui, rect, look, listed).map(|action| EditorialIntent::action(&action))
 }
 
 /// The source dock is the public one; this form only says which clip it shows and which

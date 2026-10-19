@@ -59,6 +59,7 @@
         "action_id": "editorial_tab_virtual"
       }
     ],
+    "transport_width": 290.0,
     "transport_right": [
       {
         "label": ">",
@@ -263,6 +264,7 @@
             "action_id": "editorial_tab_segment"
           }
         ],
+        "transport_width": 180.0,
         "transport_right": [
           {
             "label": ">",

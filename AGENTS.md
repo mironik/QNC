@@ -4946,3 +4946,13 @@ Testovi, conformance. Uzivo nije provjereno.
 Popravak 2026-10-19 (korisnik: "ako je ON, ON je u svim formama; glupo je sto puta postavljati"): Auto | On je jedan
 izbor za cijelu aplikaciju u kocki `qnc-monitor` (`auto`, `choose`), ne stanje svakog previewa; `qnc-source-preview` ga
 samo prosljeduje (`set_monitor_mode`), `MonitorState` i `PreviewView` vise nemaju svoj `auto`. Vrijedi dok aplikacija radi.
+Preuredjen korak 1, 2026-10-19 (korisnik: "da, preuredi po strukturi kocka-modul-panel, ali to ne dozvoljava razlicit
+razmjestaj panela unutar forme"; "dobar put: play i markere in/out mozemo koristiti i na drugoj lokaciji bez ponovnog
+pisanja"): panel je najmanja jedinica koju raspored smjesta. Red ispod monitora su dva mjesta ploce: tabovi poola
+(`pool-head`) i panel transporta (`transport`); `qnc-board` `Layout::split_place` dijeli mjesto, sirina mjesta transporta
+je u ugovoru rasporeda (`pool_head.transport_width`: Ingest i MA 290, Story 180), `board_layout()` u
+`qnc-editorial-layout`/`qnc-ingest-layout`. Nova javna kocka-panel `crates/qnc-transport-panel` (+ ugovor): dugmad iz
+rasporeda (Play, IN, OUT) i uvijek Auto | On; `qnc-monitor-panel` crta samo monitor (bez dugmadi). Pogledi daju prikazani
+klip (`shown_clip` u Ingest i Story/MA pogledu), forme samo smjestaju panele po imenima mjesta. Stil reda u
+`qnc-editorial-layout` (`row_style`). C10: `qnc-editorial-blocks` 311 -> 302, `qnc-ingest-blocks` 826 -> 825, Ingest
+application 1546 -> 1542. Testovi (`qnc-board` split, `qnc-transport-panel`), conformance. Uzivo nije provjereno.

@@ -104,6 +104,19 @@ impl EditorialContracts {
         (order, tabs, buttons)
     }
 
+    /// The look of the row of the pool tabs and of the transport panel.
+    pub fn row_style(&self, theme: &theme::Theme) -> qnc_media_pool_head::RowStyle {
+        qnc_media_pool_head::RowStyle {
+            text: theme.text,
+            muted: theme.text_muted,
+            accent: theme.accent,
+            border: theme.border,
+            font_ui: theme.font_ui,
+            control_height: theme.chrome_control_height,
+            tab_gap: 10.0,
+        }
+    }
+
     /// The look of the source dock of this layout.
     pub fn dock_style(&self, theme: &theme::Theme) -> qnc_source_dock::TimelineDockStyle {
         qnc_source_dock::TimelineDockStyle {
@@ -135,6 +148,13 @@ impl EditorialContracts {
             right: "right-panel",
             dock: "source-dock",
         }
+    }
+
+    /// The board of this group: the standard layout with the row under the monitor in two
+    /// places, the pool tabs (`pool-head`) and the transport panel (`transport`).
+    pub fn board_layout(&self) -> qnc_board::Layout {
+        let width = self.composition().pool_head.transport_width.unwrap_or(self.editorial.pool_head.transport_width);
+        self.board_sizes().standard_layout(&self.board_names()).split_place("pool-head", "transport", width)
     }
 
     /// The sizes of Media Assist and Story on the one desktop board: the monitor keeps
@@ -238,6 +258,8 @@ impl EditorialPreview {
 pub struct EditorialPoolHead {
     pub tabs_left: Vec<TransportCommand>,
     pub transport_right: Vec<TransportCommand>,
+    /// Width of the transport panel's place at the right of the row under the monitor.
+    pub transport_width: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -298,6 +320,7 @@ pub struct GroupComposition {
 pub struct GroupPoolHead {
     pub tabs_left: Option<Vec<TransportCommand>>,
     pub transport_right: Option<Vec<TransportCommand>>,
+    pub transport_width: Option<f32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

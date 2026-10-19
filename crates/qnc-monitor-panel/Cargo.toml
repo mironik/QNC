@@ -2,11 +2,10 @@
 name = "qnc-monitor-panel"
 version = "0.1.0"
 edition = "2021"
-description = "QNC public panel: the preview monitor with its own controls (the picture, poster or message from qnc-monitor, the program output on an external screen, the Auto | On switch); written once, placed by any layout"
+description = "QNC public panel: the preview monitor (the picture, poster or message from qnc-monitor, the program output on an external screen); written once, placed by any layout"
 
 [dependencies]
 eframe = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-source-preview = { workspace = true }
-qnc-ui-text = { workspace = true }

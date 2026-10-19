@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.transport-panel",
+  "module_name": "Transport panel",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.panel.transport"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-transport-panel",
+  "input": "The transport buttons a layout lists (label, catalog action), the place the board gives it and the form's theme.",
+  "output": "The buttons and, always, the monitor's Auto | On switch with the one that is on (qnc-monitor); a click is the catalog action, carried out by qnc-source-panel.",
+  "specification": "User 2026-10-19: a panel is the smallest unit a layout places; the monitor and its transport are separate panels so a layout may arrange them freely."
+}

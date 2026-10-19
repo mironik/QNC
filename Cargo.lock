@@ -3496,6 +3496,7 @@ dependencies = [
  "qnc-source-dock",
  "qnc-source-timeline",
  "qnc-timeline",
+ "qnc-transport-panel",
  "qnc-trim-overlay",
  "qnc-ui-kit",
 ]
@@ -3524,6 +3525,7 @@ dependencies = [
  "qnc-contracts",
  "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
+ "qnc-media-pool-head",
  "qnc-segment-panel",
  "qnc-source-dock",
  "qnc-timeline",
@@ -3725,6 +3727,7 @@ dependencies = [
  "qnc-source-dock",
  "qnc-source-timeline",
  "qnc-timeline",
+ "qnc-transport-panel",
  "qnc-ui-kit",
 ]
 
@@ -4281,7 +4284,6 @@ dependencies = [
  "qnc-image-assets",
  "qnc-monitor",
  "qnc-source-preview",
- "qnc-ui-text",
 ]
 
 [[package]]
@@ -5253,6 +5255,17 @@ dependencies = [
  "qnc-gesture-steps",
  "qnc-wheel-jog",
  "serde_json",
+]
+
+[[package]]
+name = "qnc-transport-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-media-pool-head",
+ "qnc-monitor",
+ "qnc-source-dock",
+ "qnc-ui-text",
 ]
 
 [[package]]

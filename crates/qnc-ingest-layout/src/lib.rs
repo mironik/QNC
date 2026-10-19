@@ -99,6 +99,12 @@ impl IngestContracts {
         qnc_board::BoardNames { monitor: "preview", head: "pool-head", body: "source-browser", right: "clip-cards", dock: "source-dock" }
     }
 
+    /// The board of Ingest: the standard layout with the row under the monitor in two
+    /// places, the pool tabs (`pool-head`) and the transport panel (`transport`).
+    pub fn board_layout(&self) -> qnc_board::Layout {
+        self.board_sizes().standard_layout(&self.board_names()).split_place("pool-head", "transport", self.ingest.pool_head.transport_width)
+    }
+
     /// The sizes of Ingest on the one desktop board: the monitor keeps its picture
     /// shape, the pool head is one chrome row, the dock holds the source timeline.
     pub fn board_sizes(&self) -> qnc_board::BoardSizes {
@@ -200,6 +206,8 @@ pub struct IngestPoolHead {
     pub tabs_left: Vec<TransportCommand>,
     pub tab_gap: f32,
     pub transport_right: Vec<TransportCommand>,
+    /// Width of the transport panel's place at the right of the row under the monitor.
+    pub transport_width: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]

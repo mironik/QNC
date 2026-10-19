@@ -96,16 +96,14 @@ impl IngestViewModel {
         self.total_count().saturating_sub(self.imported_count())
     }
 
+    /// The clip the monitor shows.
+    pub fn shown_clip(&self) -> Option<&ClipView> {
+        let clip_id = self.preview_clip_id.as_deref()?;
+        self.clips.iter().find(|clip| clip.clip_id == clip_id)
+    }
+
     pub fn current_clip_label(&self) -> &str {
-        self.preview_clip_id
-            .as_deref()
-            .and_then(|clip_id| {
-                self.clips
-                    .iter()
-                    .find(|clip| clip.clip_id == clip_id)
-                    .map(|clip| clip.name.as_str())
-            })
-            .unwrap_or(qnc_ui_text::text("ingest.preview.empty"))
+        self.shown_clip().map(|clip| clip.name.as_str()).unwrap_or(qnc_ui_text::text("ingest.preview.empty"))
     }
 
     pub fn status_label(&self) -> String {

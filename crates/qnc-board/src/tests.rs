@@ -148,3 +148,14 @@ fn every_block_is_drawn_even_after_an_earlier_one_answered() {
     assert!(drawn.iter().any(|name| name == "dock"), "the dock is drawn after the right panel answered: {drawn:?}");
     assert_eq!(answer.as_deref(), Some("right"), "the first answer is the board's");
 }
+
+#[test]
+fn a_place_split_in_two_gives_each_panel_its_own_place() {
+    let board = sizes().standard_layout(&NAMES).split_place("head", "transport", 200.0);
+    let s = solved(1000.0, 700.0, sizes());
+    let split = solve(&board, Rect::from_min_size(egui::pos2(0.0, 0.0), Vec2::new(1000.0, 700.0)));
+    let (whole, head, transport) = (s.block("head").unwrap(), split.block("head").unwrap(), split.block("transport").unwrap());
+    assert_eq!((head.left(), transport.right(), transport.width()), (whole.left(), whole.right(), 200.0));
+    assert_eq!(head.right(), transport.left());
+    assert_eq!(sizes().standard_layout(&NAMES).split_place("nowhere", "transport", 200.0), sizes().standard_layout(&NAMES));
+}

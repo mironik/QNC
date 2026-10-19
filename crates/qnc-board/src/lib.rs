@@ -206,6 +206,41 @@ impl BoardSizes {
     }
 }
 
+impl Layout {
+    /// The place of block `name` split in two: `name` keeps the rest on the left, `right`
+    /// takes `width` pixels on the right (two panels side by side, each placed by name).
+    /// Nothing changes when there is no such place or `width` is not positive.
+    pub fn split_place(mut self, name: &str, right: &str, width: f32) -> Self {
+        if width > 0.0 {
+            split_node(&mut self.root, name, right, width);
+        }
+        self
+    }
+}
+
+fn split_node(node: &mut Node, name: &str, right: &str, width: f32) {
+    match node {
+        Node::Block { name: block } if block == name => {
+            let block = |name: &str| Some(Node::Block { name: name.to_string() });
+            *node = Node::Split {
+                axis: Axis::Horizontal,
+                parts: vec![
+                    Part { size: Size::Rest, face: None, node: block(name) },
+                    Part { size: Size::Px { px: width, max_share: None }, face: None, node: block(right) },
+                ],
+            };
+        }
+        Node::Block { .. } => {}
+        Node::Split { parts, .. } => {
+            for part in parts.iter_mut() {
+                if let Some(node) = part.node.as_mut() {
+                    split_node(node, name, right, width);
+                }
+            }
+        }
+    }
+}
+
 /// The desktop: the surface of the active application (block `surface`) over the
 /// footer (block `footer`), so the footer is a place of every board.
 pub fn surface_with_footer(footer_height: f32) -> Layout {

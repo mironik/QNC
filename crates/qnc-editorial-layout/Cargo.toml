@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: validated model of the editorial layout contract (board, preview, pool head, source dock, group compositions)"
 
 [dependencies]
+qnc-media-pool-head = { workspace = true }
 qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-board = { workspace = true }

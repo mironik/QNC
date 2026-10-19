@@ -6,6 +6,7 @@ description = "QNC Media Assist and Story blocks on the desktop board: preview, 
 
 [dependencies]
 qnc-monitor-panel = { workspace = true }
+qnc-transport-panel = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 eframe = { workspace = true }
 qnc-board = { workspace = true }

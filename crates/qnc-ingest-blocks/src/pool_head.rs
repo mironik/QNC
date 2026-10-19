@@ -21,20 +21,25 @@ pub(super) fn render_pool_head(
             enabled: tab.action_id().is_some(),
         })
         .collect();
-    let listed = head.transport_right.iter().filter_map(|c| Some((c.label(), c.action_id()?)));
-    let commands = qnc_monitor_panel::controls(listed); // the monitor panel's controls
-    let labels: Vec<_> = commands.iter().map(|command| qnc_media_pool_head::RowCommand { label: &command.label, on: command.on }).collect();
     let style = row_style(theme, head.tab_gap);
     let mut intent = None;
     qnc_source_dock::show_chrome_row(ui, rect, &dock_style(contracts, theme), theme.surface, true, |ui| {
-        intent = match qnc_media_pool_head::show_row(ui, &style, &tabs, &labels) {
+        intent = match qnc_media_pool_head::show_row(ui, &style, &tabs, &[]) {
             Some(qnc_media_pool_head::RowClick::Tab(index)) => head.tabs_left[index].action_id(),
-            Some(qnc_media_pool_head::RowClick::Command(index)) => Some(commands[index].action_id.as_str()),
-            None => None,
+            _ => None,
         }
         .map(IngestIntent::empty);
     });
     intent
+}
+
+/// The transport panel in its own place (Play, IN, OUT and the monitor's Auto | On).
+pub(super) fn render_transport(ui: &mut Ui, rect: Rect, contracts: &IngestContracts, theme: &Theme) -> Option<IngestIntent> {
+    let head = &contracts.ingest.pool_head;
+    let (row, chrome) = (row_style(theme, head.tab_gap), dock_style(contracts, theme));
+    let look = qnc_transport_panel::TransportLook { row: &row, chrome: &chrome, fill: theme.surface };
+    let listed = head.transport_right.iter().filter_map(|command| Some((command.label(), command.action_id()?)));
+    qnc_transport_panel::show(ui, rect, look, listed).map(|action| IngestIntent::empty(&action))
 }
 
 /// The colours of the public pool head row from the Ingest theme.

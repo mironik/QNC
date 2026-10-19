@@ -112,6 +112,7 @@
       "@pool.tab.segment"
     ],
     "tab_gap": 10.0,
+    "transport_width": 290.0,
     "transport_right": [
       {
         "label": ">",

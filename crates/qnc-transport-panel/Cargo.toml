@@ -1,0 +1,12 @@
+[package]
+name = "qnc-transport-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public panel: the transport buttons a layout lists (Play, IN, OUT ...) and the monitor's Auto | On switch, in their own place of the board"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-media-pool-head = { workspace = true }
+qnc-monitor = { workspace = true }
+qnc-source-dock = { workspace = true }
+qnc-ui-text = { workspace = true }

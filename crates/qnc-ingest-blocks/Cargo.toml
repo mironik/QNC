@@ -6,6 +6,7 @@ description = "QNC Ingest blocks on the desktop board: preview, pool head, sourc
 
 [dependencies]
 qnc-monitor-panel = { workspace = true }
+qnc-transport-panel = { workspace = true }
 eframe = { workspace = true }
 qnc-board = { workspace = true }
 qnc-ingest-application = { workspace = true }
