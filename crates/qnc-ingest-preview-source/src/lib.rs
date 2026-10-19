@@ -9,6 +9,7 @@ use qnc_ingest_store::content::{Access, ContentTarget};
 use qnc_player_input::{PlayerClipRecord, PlayerContentRead};
 use qnc_source_bindings::SourceBinding;
 use qnc_source_preview::{PreviewContext, SourcePreview};
+pub use qnc_source_preview::MonitorState;
 use qnc_timeline_assets::SourceTimelineAssets;
 use qnc_work_settings::{SettingsReader, WorkSettings};
 use std::sync::Arc;
@@ -34,8 +35,8 @@ pub struct PreviewView {
     pub playback: qnc_player_client::View,
     pub timeline: qnc_timeline::TimelineProjection,
     pub assets: SourceTimelineAssets,
-    /// The monitor's Auto | On switch (`qnc-monitor`).
-    pub monitor_auto: bool,
+    /// What the monitor shows (the monitor panel's input).
+    pub monitor: MonitorState,
 }
 
 #[derive(Clone)]
@@ -143,7 +144,7 @@ impl IngestPreviewSource {
             timeline: view.timeline.clone(),
             assets: view.assets.clone(),
             playback,
-            monitor_auto: view.monitor_auto,
+            monitor: view.monitor(),
         }
     }
 

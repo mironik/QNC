@@ -72,10 +72,39 @@ pub struct PreviewView {
     pub output_levels: [Option<f32>; 2],
 }
 
+/// What the monitor shows, the same for every form (the monitor panel's input).
+#[derive(Debug, Clone)]
+pub struct MonitorState {
+    pub frame: Option<MonitorFrame>,
+    pub video_visible: bool,
+    pub message: Option<String>,
+    /// Monitor Auto (the default) or On.
+    pub auto: bool,
+}
+
+/// The same state: the same picture (session, generation, sequence), not its pixels.
+impl PartialEq for MonitorState {
+    fn eq(&self, other: &Self) -> bool {
+        let picture = |state: &Self| state.frame.as_ref().map(|frame| (frame.session_id.clone(), frame.generation, frame.sequence));
+        picture(self) == picture(other) && (self.video_visible, &self.message, self.auto) == (other.video_visible, &other.message, other.auto)
+    }
+}
+
+impl Default for MonitorState {
+    fn default() -> Self {
+        Self { frame: None, video_visible: false, message: None, auto: true }
+    }
+}
+
 impl PreviewView {
-    /// The switch Auto | On under the monitor: which one is on.
-    pub fn monitor_mode_on(&self, action_id: &str) -> bool {
-        qnc_monitor::switch_on(action_id, self.monitor_auto)
+    /// What the monitor shows now.
+    pub fn monitor(&self) -> MonitorState {
+        MonitorState {
+            frame: self.monitor_frame.clone(),
+            video_visible: self.video_visible,
+            message: self.monitor_message.clone(),
+            auto: self.monitor_auto,
+        }
     }
 }
 

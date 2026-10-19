@@ -21,14 +21,15 @@ pub(super) fn render_pool_head(
             enabled: tab.action_id().is_some(),
         })
         .collect();
-    let commands: Vec<_> = head.transport_right.iter().filter(|c| c.action_id().is_some()).collect();
-    let labels: Vec<_> = commands.iter().map(|command| qnc_media_pool_head::RowCommand { label: command.label(), on: command.action_id().is_some_and(|id| qnc_monitor::switch_on(id, view.monitor_auto)) }).collect();
+    let listed = head.transport_right.iter().filter_map(|c| Some((c.label(), c.action_id()?)));
+    let commands = qnc_monitor_panel::controls(listed, &view.monitor); // the monitor panel's controls
+    let labels: Vec<_> = commands.iter().map(|command| qnc_media_pool_head::RowCommand { label: &command.label, on: command.on }).collect();
     let style = row_style(theme, head.tab_gap);
     let mut intent = None;
     qnc_source_dock::show_chrome_row(ui, rect, &dock_style(contracts, theme), theme.surface, true, |ui| {
         intent = match qnc_media_pool_head::show_row(ui, &style, &tabs, &labels) {
             Some(qnc_media_pool_head::RowClick::Tab(index)) => head.tabs_left[index].action_id(),
-            Some(qnc_media_pool_head::RowClick::Command(index)) => commands[index].action_id(),
+            Some(qnc_media_pool_head::RowClick::Command(index)) => Some(commands[index].action_id.as_str()),
             None => None,
         }
         .map(IngestIntent::empty);

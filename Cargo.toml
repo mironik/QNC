@@ -120,6 +120,7 @@ members = [
     "crates/qnc-mxf-index",
     "crates/qnc-mp4-sound",
     "crates/qnc-level-meter",
+    "crates/qnc-monitor-panel",
     "crates/qnc-source-volumes",
     "crates/qnc-board",
     "crates/qnc-channel-picker",
@@ -315,6 +316,7 @@ qnc-read-pace = { path = "crates/qnc-read-pace" }
 qnc-mxf-index = { path = "crates/qnc-mxf-index" }
 qnc-mp4-sound = { path = "crates/qnc-mp4-sound" }
 qnc-level-meter = { path = "crates/qnc-level-meter" }
+qnc-monitor-panel = { path = "crates/qnc-monitor-panel" }
 qnc-source-volumes = { path = "crates/qnc-source-volumes" }
 qnc-board = { path = "crates/qnc-board" }
 qnc-channel-picker = { path = "crates/qnc-channel-picker" }

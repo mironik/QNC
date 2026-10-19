@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.monitor-panel",
+  "module_name": "Monitor panel",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.panel.monitor"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-monitor-panel",
+  "input": "The monitor state of the universal source preview (picture, message, Auto | On), the poster and label of the shown clip, the transport buttons a layout lists for the row under the monitor.",
+  "output": "The monitor painted (qnc-monitor) and the controls of the row under it: the listed buttons and, always, the Auto | On switch with the one that is on. Clicks are catalog actions carried out by qnc-source-panel.",
+  "specification": "User 2026-10-19: panels of blocks, written once, placed by layouts; the monitor panel has its own controls, the same in every form."
+}

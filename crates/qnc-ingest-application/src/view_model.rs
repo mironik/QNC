@@ -5,13 +5,13 @@ pub struct IngestViewModel {
     /// The panel the keyboard acts on, the dock button and the last card grid step.
     #[serde(skip)]
     pub focus: qnc_focus_walk::WalkView,
-    /// Original timecode of the previewed clip (camera XML, else the one probe).
     #[serde(skip)]
     /// What the one source timeline shows besides the clip (lanes, large wave, timecode).
     pub source_timeline: qnc_source_timeline::SourceTimelineView,
     #[serde(skip)]
     pub playback: qnc_player_client::View,
-    pub monitor_auto: bool,
+    #[serde(skip)]
+    pub monitor: qnc_ingest_preview_source::MonitorState,
     #[serde(skip)]
     pub timeline: TimelineProjection,
     #[serde(skip)]
@@ -42,7 +42,7 @@ impl Default for IngestViewModel {
             focus: Default::default(),
             source_timeline: Default::default(),
             playback: Default::default(),
-            monitor_auto: true,
+            monitor: Default::default(),
             timeline: Default::default(),
             timeline_assets: SourceTimelineAssets::empty(),
             browser: Default::default(),

@@ -4927,3 +4927,19 @@ na slici monitora nego opet u redu ispod monitora, desno uz `>` (gdje je bio u S
 `transport_right`, sifre `@monitor.auto`/`@monitor.on`); koji je ukljucen kaze `qnc-monitor::switch_on` (Story preko
 `qnc-source-preview::monitor_mode_on`, Ingest `pool_head`), klik vozi `qnc-source-panel`. Prekidac se vidi uvijek, kao prije.
 `qnc-monitor` vise ne crta prekidac. Media Assist gumbi nisu dirani (predlosci). Testovi, conformance.
+Plan i korak 1, 2026-10-19 (korisnik: "ne govori o Storyju i Ingestu, govori o kocki, modulu i panelu; jednom napisana
+kocka radi svugdje, moze biti u raznim modulima i panelima, ne moze biti u formama"; "da, kreni s korakom 1"): nalaz:
+monitor, red ispod njega, source timeline s dugmadima i media pool slagali su se dvaput (`qnc-ingest-blocks` i
+`qnc-editorial-blocks`), preglednik lokacija dvaput (Ingest i Project), krug fokusa dvaput (`qnc-focus-walk`,
+`qnc-panel-focus`). Plan: kocka (jedna odgovornost) -> panel (javni modul koji slaze kocke u dio zaslona, sa svojim
+tipkama, jednom napisan) -> forma (samo raspored: koji panel na koje mjesto ploce i koja dugmad). Koraci: 1 panel
+monitora, 2 panel media poola, 3 panel source timelinea, 4 panel preglednika lokacija (trazi Project), 5 jedan krug
+fokusa. Korak 1: nova javna kocka-panel `crates/qnc-monitor-panel` (+ `contracts/modules/monitor-panel.module.json`):
+`show` crta monitor iz stanja univerzalnog previewa (`qnc-source-preview::MonitorState`, `PreviewView::monitor`),
+`poster`, `controls` (dugmad reda ispod monitora koja raspored navodi i uvijek prekidac Auto | On s ukljucenim). Obje
+ploce samo pozivaju panel; Auto | On uklonjen iz ugovora rasporeda (`transport_right`), pa ga dobiva svaka forma s
+monitorom, i Media Assist. Ingest prikaz nosi `monitor` (stanje previewa) umjesto `monitor_auto`; poruka monitora u Ingestu
+je sada ista kao drugdje (cekanje zapisa ili greska playera). Usput u Ingest aplikaciji jedna `refuse_shown` umjesto
+cetiri ista mjesta. C10: `qnc-editorial-blocks` 348 -> 311, `qnc-ingest-blocks` 860 -> 826, Ingest application 1547 ->
+1546. Red ispod monitora (tabovi + kontrole) jos slazu ploce dok tabovi ne prijedu u panel media poola (korak 2).
+Testovi, conformance. Uzivo nije provjereno.

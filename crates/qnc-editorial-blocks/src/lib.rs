@@ -8,7 +8,7 @@ use eframe::egui::{
     self, Align, Layout, Rect, Ui,
 };
 
-use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
+use qnc_monitor::MonitorChrome;
 use qnc_source_dock::show_chrome_row;
 use qnc_timeline::TimelineIntent;
 
@@ -73,46 +73,14 @@ fn render_preview(
         muted: theme.text_muted,
         font_size: theme.font_ui,
     };
-    let picture = view
-        .preview
-        .monitor_frame
-        .as_ref()
-        .filter(|_| view.preview.video_visible)
-        .map(|frame| MonitorPicture {
-            session_id: &frame.session_id,
-            generation: frame.generation,
-            sequence: frame.sequence,
-            size: [frame.width, frame.height],
-            rgba: &frame.rgba,
-            frame_map: frame.frame_map.as_ref(),
-        });
     let poster = view
         .chosen_clip_id()
         .and_then(|id| view.clips.iter().find(|clip| clip.clip_id == id))
-        .and_then(|clip| match (&clip.thumb_uri, &clip.thumb_image) {
-            (Some(uri), Some(image)) => Some(MonitorPoster {
-                uri,
-                content_key: image.content_key,
-                size: image.size,
-                rgba: &image.pixels,
-            }),
-            _ => None,
-        });
+        .and_then(|clip| qnc_monitor_panel::poster(clip.thumb_uri.as_ref(), clip.thumb_image.as_deref()));
     let label = view.current_clip_label().unwrap_or(contracts.editorial.preview.empty_label.as_str());
     qnc_trim_overlay::show(ui.ctx(), &view.segments); // the trim zoom, while something is taken
-    qnc_monitor::paint_source_monitor(
-        ui,
-        rect,
-        MonitorSurface {
-            id: egui::Id::new(("qnc-monitor", "editorial-source")),
-            chrome,
-            picture,
-            message: view.preview.monitor_message.as_deref(),
-            yield_to_external: view.preview.monitor_auto,
-        },
-        poster,
-        label,
-    );
+    let id = egui::Id::new(("qnc-monitor", "editorial-source"));
+    qnc_monitor_panel::show(ui, rect, id, chrome, &view.preview.monitor(), poster, label);
     None // the monitor gives no intent
 }
 
@@ -132,14 +100,9 @@ fn render_pool_head(
             enabled: tab.action_id().is_some_and(|id| view.action_enabled(id)),
         })
         .collect();
-    let commands: Vec<_> = contracts.pool_transport().iter().filter(|c| c.action_id().is_some()).collect();
-    let labels: Vec<_> = commands
-        .iter()
-        .map(|command| qnc_media_pool_head::RowCommand {
-            label: command.label(),
-            on: command.action_id().is_some_and(|id| view.preview.monitor_mode_on(id)),
-        })
-        .collect();
+    let listed = contracts.pool_transport().iter().filter_map(|c| Some((c.label(), c.action_id()?)));
+    let commands = qnc_monitor_panel::controls(listed, &view.preview.monitor()); // the monitor panel's controls
+    let labels: Vec<_> = commands.iter().map(|command| qnc_media_pool_head::RowCommand { label: &command.label, on: command.on }).collect();
     let style = qnc_media_pool_head::RowStyle {
         text: theme.text,
         muted: theme.text_muted,
@@ -153,7 +116,7 @@ fn render_pool_head(
     show_chrome_row(ui, rect, &contracts.dock_style(theme), theme.surface, true, |ui| {
         intent = match qnc_media_pool_head::show_row(ui, &style, &tabs, &labels) {
             Some(qnc_media_pool_head::RowClick::Tab(index)) => tabs_left[index].action_id(),
-            Some(qnc_media_pool_head::RowClick::Command(index)) => commands[index].action_id(),
+            Some(qnc_media_pool_head::RowClick::Command(index)) => Some(commands[index].action_id.as_str()),
             None => None,
         }
         .map(EditorialIntent::action);

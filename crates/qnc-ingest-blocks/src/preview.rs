@@ -13,52 +13,17 @@ pub(super) fn render_preview(
         muted: theme.text_muted,
         font_size: theme.font_ui,
     };
-    let picture = view
-        .playback
-        .picture
-        .as_ref()
-        .filter(|_| view.playback.video_visible)
-        .map(|picture| MonitorPicture {
-            session_id: &picture.header.session_id,
-            generation: picture.header.output_generation,
-            sequence: picture.header.sequence,
-            size: [
-                picture.header.width as usize,
-                picture.header.height as usize,
-            ],
-            rgba: &picture.rgba,
-            frame_map: Some(&picture.frame_map),
-        });
     let poster = view
         .clips
         .iter()
         .find(|c| Some(&c.clip_id) == view.preview_clip_id.as_ref())
-        .and_then(|clip| match (&clip.thumb_uri, &clip.thumb_image) {
-            (Some(uri), Some(image)) => Some(MonitorPoster {
-                uri,
-                content_key: image.content_key,
-                size: image.size,
-                rgba: &image.pixels,
-            }),
-            _ => None,
-        });
+        .and_then(|clip| qnc_monitor_panel::poster(clip.thumb_uri.as_ref(), clip.thumb_image.as_deref()));
     let label = if view.preview_clip_id.is_some() {
         view.current_clip_label()
     } else {
         contracts.ingest.preview.empty_label.as_str()
     };
-    qnc_monitor::paint_source_monitor(
-        ui,
-        rect,
-        MonitorSurface {
-            id: egui::Id::new(("qnc-monitor", "ingest-source")),
-            chrome,
-            picture,
-            message: view.playback.error.as_deref(),
-            yield_to_external: view.monitor_auto,
-        },
-        poster,
-        label,
-    );
+    let id = egui::Id::new(("qnc-monitor", "ingest-source"));
+    qnc_monitor_panel::show(ui, rect, id, chrome, &view.monitor, poster, label);
     None // the monitor gives no intent
 }

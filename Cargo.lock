@@ -3489,6 +3489,7 @@ dependencies = [
  "qnc-media-card",
  "qnc-media-pool-head",
  "qnc-monitor",
+ "qnc-monitor-panel",
  "qnc-panel-focus",
  "qnc-program-segments",
  "qnc-segment-panel",
@@ -3720,6 +3721,7 @@ dependencies = [
  "qnc-media-card",
  "qnc-media-pool-head",
  "qnc-monitor",
+ "qnc-monitor-panel",
  "qnc-source-dock",
  "qnc-source-timeline",
  "qnc-timeline",
@@ -4268,6 +4270,17 @@ dependencies = [
  "eframe",
  "qnc-program-output",
  "qnc-ui-kit",
+ "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-monitor-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-image-assets",
+ "qnc-monitor",
+ "qnc-source-preview",
  "qnc-ui-text",
 ]
 

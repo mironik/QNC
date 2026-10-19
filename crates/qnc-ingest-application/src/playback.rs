@@ -14,7 +14,7 @@ impl IngestApplication {
     /// Copies what the preview reports into the view the form reads.
     pub(super) fn sync_playback_view(&mut self) {
         let preview = self.preview.view();
-        (self.view.playback, self.view.monitor_auto) = (preview.playback, preview.monitor_auto);
+        (self.view.playback, self.view.monitor) = (preview.playback, preview.monitor);
         self.view.timeline = preview.timeline.preserving_source_marks_from(&self.view.timeline);
         // Filmstrip and wave come from the universal preview, read again while the worker makes them.
         let clip = self.view.preview_clip_id.clone().unwrap_or_default();
@@ -84,9 +84,7 @@ impl IngestApplication {
         // Without a player only Escape still lets go of what the source timeline took.
         let escape = matches!(intent.action_id.as_str(), "clear_focus" | "close_player");
         if !self.preview.has_player() && !escape {
-            let message = "Broadcast Player nije povezan.";
-            self.view.message = message.into();
-            return IngestDispatchResult::rejected_shown(message);
+            return self.refuse_shown("Broadcast Player nije povezan.".into());
         }
         // The source timeline's keys are the piece every form takes (Play keeps the guard below).
         if intent.action_id != action_ids::PLAY_PAUSE {
@@ -108,8 +106,7 @@ impl IngestApplication {
         let outcome = match self.preview.send_command(command) {
             Ok(outcome) => outcome,
             Err(error) => {
-                self.view.message = error.clone();
-                return IngestDispatchResult::rejected_shown(error);
+                return self.refuse_shown(error);
             }
         };
         if outcome.started_playback {
@@ -118,8 +115,13 @@ impl IngestApplication {
         if outcome.message.is_empty() {
             return IngestDispatchResult::accepted(None, true);
         }
-        self.view.message = outcome.message.clone();
-        IngestDispatchResult::rejected_shown(outcome.message)
+        self.refuse_shown(outcome.message)
+    }
+
+    /// Refused, the message shown in the view at once.
+    pub(super) fn refuse_shown(&mut self, message: String) -> IngestDispatchResult {
+        self.view.message = message.clone();
+        IngestDispatchResult::rejected_shown(message)
     }
 }
 
