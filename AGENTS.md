@@ -4875,3 +4875,11 @@ citaca 320, 8 citaca 354 MB/s; probe MXF-a 0,3 s (prvi 2,4 s, budenje). Filmstri
 slika XAVC 4:2:2 10-bit dekodira se 1,3-1,7 s po klipu; 4 klipa istodobno 0,92 s, 8 istodobno 0,81 s po klipu (oko
 100-110 s za 122 klipa). Jedan tok svih 13 slika u jednom dekoderu proban i odbacen: na vecini klipova daje 2-7 slicica.
 Razmak izmedu zapisa i filmstripa u probi bio je pustanje klipa (radnici se sklanjaju playeru). Testovi, conformance.
+Izmjena 2026-10-19 (korisnik: "korisnici ce imati raznih medija i citaca"; mjereno na CFexpress citacu s klikom na Select
+u korijenu: zapisi 3-18 s, filmstrip 22-118 s, grubi valovi 3 s, puni valovi 121-137 s, sve 122 klipa; `PRIVATE/DATABASE/
+DATABASE.BIN` je kamerina binarna baza s putanjama u `XDROOT`, ne koristi se, `MEDIAPRO.XML` ostaje indeks): redoslijed
+prema mediju. `qnc-import-control` (`Work`): zapisi, pa grubi valovi svih klipova (prvi prolaz testira medij), pa
+filmstrip; puni valovi citaju uz filmstrip kad test medija pusti 4 ili vise citaca (CFexpress, SSD), inace nakon
+filmstripa (stik, SD na USB 2.0); val otvorenog klipa nikad ne ceka. `qnc-wave-worker` `coarse_pending` (klipovi bez
+ikakvog vala; klip ciji val ne moze nastati ne zadrzava filmstrip), `medium_parallel`; `qnc-timeline-artifacts`.
+Testovi, conformance. Uzivo nije izmjereno.

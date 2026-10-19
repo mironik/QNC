@@ -7,7 +7,7 @@
 //! `qnc-timeline-assets`) and the source bindings, so the same component serves Ingest,
 //! Media Assist, Story or any future form, on a local disk, LAN or intranet.
 
-use qnc_import_control::{ImportControl, Order};
+use qnc_import_control::{ImportControl, Order, Work};
 use qnc_filmstrip_worker::{
     FilmstripContentRead, FilmstripContentWriteFactory, FilmstripContext, FilmstripSourceBinding,
     TimelineFilmstripService,
@@ -157,9 +157,16 @@ impl Artifacts {
         self.filmstrip_held = held;
     }
 
-    /// The import control's orders: records, then filmstrips, then waves.
+    /// The import control's orders: records, coarse waves, then filmstrips and full waves
+    /// (together on a fast medium).
     fn control(&mut self) {
-        for order in self.control.orders(self.filmstrip_held, self.filmstrip.has_pending_work()) {
+        let work = Work {
+            records_completing: self.filmstrip_held,
+            coarse_pending: self.wave.coarse_pending(),
+            filmstrip_busy: self.filmstrip.has_pending_work(),
+            medium_parallel: self.wave.medium_parallel(),
+        };
+        for order in self.control.orders(work) {
             match order {
                 Order::FilmstripRuns(runs) => self.filmstrip.set_on_orders(!runs),
                 Order::WavesRun(runs) => self.wave.set_held(!runs),

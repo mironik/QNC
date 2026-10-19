@@ -4,7 +4,7 @@
   "module_version": "0.1.0",
   "module_kind": "library",
   "capabilities": [
-    "import.order.records_filmstrips_waves"
+    "import.order.records_coarse_waves_filmstrips_full_waves"
   ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
@@ -37,7 +37,7 @@
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-import-control",
-  "input": "Whether records are still being completed and whether the filmstrip worker still has work.",
+  "input": "Whether records are still being completed, whether some clip has no wave yet, whether the filmstrip worker has work, and whether the medium serves several readers at once (from the medium test).",
   "output": "Orders: the filmstrip worker takes clips of its own or waits; the wave worker takes clips of its own or makes only the open clip's wave. It reads nothing, writes nothing and runs no worker.",
-  "specification": "User 2026-10-18: records first, then filmstrips (a clip up to 10 s read through, a longer one the intra picture nearest each of 13 places), then waves (a wave reads the sound of every frame). The open clip's wave never waits. Replaces 2026-10-15 (filmstrip after each wave)."
+  "specification": "User 2026-10-19 (\"users will have all kinds of media and readers\"): records, then every clip's coarse wave, then filmstrips; the full waves read with the filmstrips on a medium that serves several readers at once and after them on a slow one. The open clip's wave never waits."
 }
