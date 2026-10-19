@@ -32,6 +32,9 @@ pub(crate) struct Shared {
     /// The gain of each output channel (f32 bits, 1.0 as recorded), applied where the
     /// samples go to the device, so a change is heard at once (user 2026-10-16).
     gains: [AtomicU32; METER_CHANNELS],
+    /// The source channel each output channel plays (user 2026-10-19: a channel chosen
+    /// for A1/A2 is a route, heard in the next callback; nothing is prepared again).
+    routes: [AtomicU32; METER_CHANNELS],
 }
 /// How many output channels the level meter follows.
 pub const METER_CHANNELS: usize = 8;
@@ -61,6 +64,7 @@ impl Shared {
             last_playback_position_ns: AtomicU64::new(0),
             peaks: Default::default(),
             gains: std::array::from_fn(|_| AtomicU32::new(1f32.to_bits())),
+            routes: std::array::from_fn(|channel| AtomicU32::new(channel as u32)),
         }
     }
     /// The gain of the first `gains.len()` output channels; the others keep theirs.
@@ -70,6 +74,12 @@ impl Shared {
         }
     }
     /// The loudest sample of each output channel since the last call, then zero again.
+    /// The source channel of the first `routes.len()` output channels; the others keep theirs.
+    pub fn set_routes(&self, routes: &[u16]) {
+        for (slot, route) in self.routes.iter().zip(routes) {
+            slot.store(u32::from(*route), Ordering::Release);
+        }
+    }
     pub fn take_peaks(&self, channels: usize) -> Vec<f32> {
         self.peaks.iter().take(channels).map(|peak| f32::from_bits(peak.swap(0, Ordering::AcqRel))).collect()
     }
@@ -95,6 +105,8 @@ pub(crate) struct Callback {
     audition: Consumer<f32>,
     shared: Arc<Shared>,
     channels: usize,
+    /// Samples of one queued frame (every source channel).
+    width: usize,
     generation: u64,
     submitted: u64,
 }
@@ -109,6 +121,7 @@ impl Queue {
             audition: audition_out,
             shared: shared.clone(),
             channels: config.format.channels as usize,
+            width: config.width(),
             generation: 0,
             submitted: 0,
         };
@@ -130,7 +143,7 @@ impl Queue {
     /// Sound of one frame step, heard only while the gate is closed (paused); what
     /// does not fit is dropped. It never touches the playout queue or its clock.
     pub fn audition(&mut self, samples: &[f32]) {
-        let channels = self.config.format.channels as usize;
+        let channels = self.config.width();
         let fit = self.audition.slots().min(samples.len());
         let fit = fit - fit % channels.max(1);
         if let Ok(chunk) = self.audition.write_chunk_uninit(fit) {
@@ -194,7 +207,7 @@ impl Queue {
         {
             return Err(Error::new(Code::NotReady, "queue is not accepting samples"));
         }
-        let channels = self.config.format.channels as usize;
+        let channels = self.config.width();
         let frames = samples.len() / channels;
         let next = self
             .next
@@ -296,10 +309,8 @@ impl Queue {
             generation: self.generation,
             status,
             submitted_frames: self.shared.submitted.load(Ordering::Acquire),
-            queued_frames: ((self.config.capacity_frames as usize
-                * self.config.format.channels as usize
-                - self.producer.slots())
-                / self.config.format.channels as usize) as u64,
+            queued_frames: ((self.config.capacity_frames as usize * self.config.width() - self.producer.slots())
+                / self.config.width()) as u64,
             start_to_first_callback_ns: (first != NONE && start != NONE)
                 .then(|| first.saturating_sub(start)),
             first_driver_delay_ns: (first != NONE && delay != NONE).then_some(delay),
@@ -378,6 +389,29 @@ fn samples_to_ns(samples: u64, rate: u32) -> u64 {
 }
 
 impl Callback {
+    /// Queued frames (`width` samples each, in `a` then `b`) into the output channels by
+    /// their routes (no allocation; a plain copy when each output plays its own channel).
+    fn route_into(shared: &Shared, (width, channels): (usize, usize), output: &mut [f32], a: &[f32], b: &[f32]) {
+        let (width, channels) = (width.max(1), channels.max(1));
+        let mut routes = [0usize; METER_CHANNELS];
+        for (channel, route) in routes.iter_mut().enumerate().take(channels.min(METER_CHANNELS)) {
+            *route = (shared.routes[channel].load(Ordering::Acquire) as usize).min(width - 1);
+        }
+        let route = |channel: usize| if channel < METER_CHANNELS { routes[channel] } else { channel.min(width - 1) };
+        if width == channels && (0..channels).all(|channel| route(channel) == channel) {
+            output[..a.len()].copy_from_slice(a);
+            output[a.len()..a.len() + b.len()].copy_from_slice(b);
+            return;
+        }
+        let frames = (a.len() + b.len()) / width;
+        for (frame, out) in output.chunks_exact_mut(channels).take(frames).enumerate() {
+            for (channel, sample) in out.iter_mut().enumerate() {
+                let at = frame * width + route(channel);
+                *sample = if at < a.len() { a[at] } else { b[at - a.len()] };
+            }
+        }
+    }
+
     /// Each output channel times its gain (no allocation; nothing when all are 1.0).
     fn apply_gains(&self, output: &mut [f32]) {
         let channels = self.channels.clamp(1, METER_CHANNELS);
@@ -442,12 +476,11 @@ impl Callback {
         }
         if gate & 1 == 0 {
             // Paused: a frame step may be heard; nothing else plays.
-            let count = self.audition.slots().min(output.len());
-            let count = count - count % self.channels;
+            let count = self.audition.slots().min(output.len() / self.channels * self.width);
+            let count = count - count % self.width;
             if let Ok(chunk) = self.audition.read_chunk(count) {
                 let (a, b) = chunk.as_slices();
-                output[..a.len()].copy_from_slice(a);
-                output[a.len()..a.len() + b.len()].copy_from_slice(b);
+                Self::route_into(&self.shared, (self.width, self.channels), output, a, b);
                 chunk.commit_all();
             }
             self.apply_gains(output);
@@ -467,7 +500,7 @@ impl Callback {
         let end = self.shared.end.load(Ordering::Acquire);
         let remaining = end.saturating_sub(self.submitted).min(usize::MAX as u64) as usize;
         let needed = wanted.min(remaining);
-        let available = self.consumer.slots() / self.channels;
+        let available = self.consumer.slots() / self.width;
         if available < needed {
             self.shared.underrun.store(true, Ordering::Release);
             let _ = self.shared.gate.compare_exchange(
@@ -479,13 +512,12 @@ impl Callback {
             return;
         }
         if needed > 0 {
-            let Ok(chunk) = self.consumer.read_chunk(needed * self.channels) else {
+            let Ok(chunk) = self.consumer.read_chunk(needed * self.width) else {
                 self.shared.device_failed.store(true, Ordering::Release);
                 return;
             };
             let (a, b) = chunk.as_slices();
-            output[..a.len()].copy_from_slice(a);
-            output[a.len()..a.len() + b.len()].copy_from_slice(b);
+            Self::route_into(&self.shared, (self.width, self.channels), output, a, b);
             chunk.commit_all();
         }
         // A concurrent pause invalidates the whole callback, not merely the following one.

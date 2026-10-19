@@ -372,6 +372,7 @@ impl ApplicationHandler for Diagnostic {
                 device_id: None,
                 capacity_frames: 48_000,
                 ready_frames: (SAMPLES * 4) as u32,
+                source_channels: 0,
             })
             .unwrap(),
         ));

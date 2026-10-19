@@ -457,6 +457,11 @@ impl Runtime {
             device.borrow().set_gains(&output::gains_of(levels_percent));
         }
     }
+    /// The source channel each output plays (inventory positions), heard at once; false
+    /// when one is not among the decoded channels.
+    pub fn set_output_routes(&self, routes: &[u16]) -> bool {
+        self.audio.as_ref().is_some_and(|device| device.borrow().set_routes(routes))
+    }
     pub fn take_output_peaks(&self) -> Vec<f32> {
         self.audio.as_ref().map(|device| device.borrow().take_peaks()).unwrap_or_default()
     }

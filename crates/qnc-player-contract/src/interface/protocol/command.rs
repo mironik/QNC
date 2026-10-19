@@ -28,6 +28,12 @@ pub enum BroadcastPlayerProtocolCommand {
     SetOutputLevels {
         levels_percent: Vec<u16>,
     },
+    /// The source channel (zero based, in the saved inventory) each of the first output
+    /// channels plays, heard at once; the player decodes every channel, nothing is
+    /// prepared again (user 2026-10-19).
+    SetOutputRoutes {
+        channels: Vec<u16>,
+    },
 
     Play,
     Pause,
@@ -45,6 +51,7 @@ impl BroadcastPlayerProtocolCommand {
             BroadcastPlayerProtocolCommand::SetPlaybackRequest { .. } => "SetPlaybackRequest",
             BroadcastPlayerProtocolCommand::CueFrame { .. } => "CueFrame",
             BroadcastPlayerProtocolCommand::SetOutputLevels { .. } => "SetOutputLevels",
+            BroadcastPlayerProtocolCommand::SetOutputRoutes { .. } => "SetOutputRoutes",
             BroadcastPlayerProtocolCommand::Play => "Play",
             BroadcastPlayerProtocolCommand::Pause => "Pause",
             BroadcastPlayerProtocolCommand::Stop => "Stop",
@@ -66,6 +73,13 @@ impl BroadcastPlayerProtocolCommand {
             BroadcastPlayerProtocolCommand::SetOutputLevels { levels_percent } => {
                 if levels_percent.is_empty() || levels_percent.len() > 8 || levels_percent.iter().any(|level| *level > 400) {
                     Err("output levels: 1 to 8 channels of 0..400 percent".into())
+                } else {
+                    Ok(())
+                }
+            }
+            BroadcastPlayerProtocolCommand::SetOutputRoutes { channels } => {
+                if channels.is_empty() || channels.len() > 8 || channels.iter().any(|channel| *channel >= 64) {
+                    Err("output routes: 1 to 8 outputs of source channels 0..64".into())
                 } else {
                     Ok(())
                 }

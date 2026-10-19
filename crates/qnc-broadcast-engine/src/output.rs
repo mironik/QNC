@@ -116,7 +116,6 @@ pub(crate) struct DeviceSink {
     source: SourceRuntime,
     generation: Option<u64>,
     channel_map: Option<ChannelMap>,
-    routed: Vec<f32>,
     /// The frame a cue went to: its sound is heard once, frame by frame (user rule
     /// 2026-10-01: stepping by frames is cut by ear).
     audition_frame: Option<u64>,
@@ -138,22 +137,22 @@ impl DeviceSink {
                     source.timebase,
                     format.sample_rate_hz,
                 )?;
-                AudioOutput::open(Config {
+                let map = channel_map.as_ref().expect("validated map");
+                // The queue carries every decoded channel; the device plays the routed ones.
+                let output = AudioOutput::open(Config {
                     version: qnc_audio_output::VERSION.into(),
                     format: Format {
                         sample_rate_hz: format.sample_rate_hz,
-                        channels: channel_map
-                            .as_ref()
-                            .expect("validated map")
-                            .output_channels()
-                            .len() as u16,
+                        channels: map.output_channels().len() as u16,
                     },
                     device_id,
                     capacity_frames: format.sample_rate_hz,
                     ready_frames: u32::try_from(ready).map_err(error)?,
+                    source_channels: map.source_channels(),
                 })
-                .map(|output| Rc::new(RefCell::new(output)))
-                .map_err(error)
+                .map_err(error)?;
+                output.set_routes(map.output_channels());
+                Ok(Rc::new(RefCell::new(output)))
             })
             .transpose()?;
         Ok(Self {
@@ -161,7 +160,6 @@ impl DeviceSink {
             source: source.clone(),
             generation: None,
             channel_map,
-            routed: Vec::new(),
             audition_frame: None,
         })
     }
@@ -207,21 +205,15 @@ impl DeviceSink {
                 generation
             }
         };
-        self.channel_map
-            .as_ref()
-            .ok_or_else(|| error("missing device channel map"))?
-            .route(&packet.payload, &mut self.routed)
-            .map_err(error)?;
-        device
-            .queue(generation, start, &self.routed)
-            .map_err(error)?;
+        // Every decoded channel goes to the device queue; the device plays the routed ones.
+        device.queue(generation, start, &packet.payload).map_err(error)?;
         if self.audition_frame == Some(packet.start_frame) {
             self.audition_frame = None;
             // Exactly the samples of this one frame, no more.
             let end = sample_boundary(packet.start_frame + 1, self.source.timebase, format.sample_rate_hz)?;
-            let width = self.channel_map.as_ref().map_or(1, |map| map.output_channels().len());
+            let width = self.channel_map.as_ref().map_or(1, |map| usize::from(map.source_channels()));
             let samples = (end - start) as usize * width;
-            device.audition(&self.routed[..samples.min(self.routed.len())]);
+            device.audition(&packet.payload[..samples.min(packet.payload.len())]);
         }
         if packet.start_frame + 1 == self.source.duration_frames {
             device.finish(generation).map_err(error)?;

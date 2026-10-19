@@ -4963,3 +4963,16 @@ novu sesiju playera (oko 0,7 s bez slike na monitoru i HDMI-ju). `qnc-source-pre
 (player se tada priprema na istom mjestu s novim kanalom i svira). Dok svira, promjena se cuje odmah kao prije. Razina i
 dalje ide bez ponovnog otvaranja. Medukorak: korisnik je odredio cilj "player svira sve kanale, a na izlaz idu samo
 odabrani" (preusmjeravanje bez ponovnog otvaranja), ceka otkljucavanje playera. Testovi, conformance.
+Izmjena pravila i izvedba 2026-10-19 (korisnik: "player svira sve kanale, ali na izlaz idu samo odabrani"; "ok, tako se
+rjesava problem"; otkljucano: `qnc-broadcast-engine`, `qnc-audio-output`, `qnc-player-contract`, `qnc-player-client`,
+`tools/qnc-player-runner`, `qnc-source-preview`, `qnc-program-output`): zamjenjuje pravilo "dekodira se samo onoliko
+kanala koliko projekt ima izlaza". Player klipa dekodira sve spremljene kanale izvora; projekt (`audio.channels`)
+odreduje broj izlaza, a karta kanala (`ChannelMap`) koji kanal svira na kojem izlazu. `qnc-audio-output`: red nosi sve
+kanale (`Config.source_channels`), poziv uredaja usmjerava (`set_routes`, atomski, bez alokacije; kao razina 16. 10.),
+test. `qnc-broadcast-engine`: `project_audio_layout` bira sve kanale i rute iz `lead_audio_channels`, `DeviceSink` vise ne
+usmjerava pri upisu u red, `set_output_routes`; testovi pravila promijenjeni. Nova naredba ugovora `SetOutputRoutes`
+(runner, klijent `Action::SetOutputRoutes`). `qnc-source-preview` `hear_channels`: promjena kanala je ruta, cuje se odmah
+i u pauzi i dok svira, bez nove pripreme (medukorak e5e6f7c uklonjen). Program (prica) nije mijenjan. Uz to
+`qnc-program-output`: HDMI zadrzava zadnju sliku do 1,5 s dok monitor nema sliku (bljesak pri pripremi playera).
+Testovi, conformance. `qnc-player-acceptance` nije pokrenut (projekti zive kopije su izvan njezina korijena). Uzivo nije
+provjereno.

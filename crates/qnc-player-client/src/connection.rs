@@ -725,8 +725,10 @@ fn update_video_visible(current: bool, has_picture: bool, events: &[Event]) -> b
 
 fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
     // A level needs no position: it is heard at once, playing or not.
-    if let Action::SetOutputLevels(levels) = action {
-        return Ok(Command::SetOutputLevels { levels_percent: levels.to_vec() });
+    match action {
+        Action::SetOutputLevels(levels) => return Ok(Command::SetOutputLevels { levels_percent: levels.to_vec() }),
+        Action::SetOutputRoutes(channels) => return Ok(Command::SetOutputRoutes { channels: channels.to_vec() }),
+        _ => {}
     }
     let carrier = reply
         .events
@@ -758,11 +760,12 @@ fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
             present_frame: true,
         },
         Action::SetOutputLevels(levels) => Command::SetOutputLevels { levels_percent: levels.to_vec() },
+        Action::SetOutputRoutes(channels) => Command::SetOutputRoutes { channels: channels.to_vec() },
     })
 }
 
 fn action_requires_preflight_state(action: Action) -> bool {
-    !matches!(action, Action::Cue(_) | Action::SetOutputLevels(_))
+    !matches!(action, Action::Cue(_) | Action::SetOutputLevels(_) | Action::SetOutputRoutes(_))
 }
 
 fn state_poll_interval(pending_cue_frame: Option<u64>, reply: Option<&EventEnvelope>) -> Duration {

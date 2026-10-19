@@ -215,7 +215,8 @@ impl InputPlan {
             project_audio_layout(
                 &native_audio_streams,
                 native_audio_format.as_ref(),
-                &input.output_audio_channels(),
+                &input.layout.audio_channels,
+                &input.lead_audio_channels,
                 &input.project_audio,
             )?
         } else {
@@ -393,10 +394,16 @@ fn color_space_from_saved(spec: &ConversionSpec) -> Result<ColorSpace> {
     }
 }
 
+/// Every saved channel of the source is decoded (user 2026-10-19: "the player plays all
+/// channels, the outputs are only the chosen ones"); the project sets how many outputs
+/// there are and `routes` (inventory positions; empty: the first ones in order) which
+/// channel each output plays. A route changed later is heard at once, nothing is prepared
+/// again (`AudioOutput::set_routes`).
 fn project_audio_layout(
     native_streams: &[(u32, u16)],
     native: Option<&AudioFormat>,
     saved_channels: &[AudioChannel],
+    routes: &[u16],
     project: &qnc_player_input::ProjectAudio,
 ) -> Result<ProjectAudioLayout> {
     project.validate().map_err(error)?;
@@ -417,7 +424,7 @@ fn project_audio_layout(
     }
     // A1/A2 are mono source lanes. Preserve saved channel identity; never collapse them as stereo.
     let mut selected_streams = Vec::new();
-    for channel in saved_channels.iter().take(usize::from(project.channels)) {
+    for channel in saved_channels {
         let Some((_, source_channels)) = native_streams
             .iter()
             .find(|(stream_index, _)| *stream_index == channel.stream_index)
@@ -448,13 +455,14 @@ fn project_audio_layout(
             sum.checked_add(count)
         })
         .ok_or_else(|| error("selected audio channel inventory overflow"))?;
-    if selected_channels != project.channels {
+    if usize::from(selected_channels) != saved_channels.len() {
         return Err(error(
             "Saved native audio stream inventory cannot satisfy project audio channels.",
         ));
     }
-    let format = AudioFormat::new(native.sample_rate_hz, project.channels).map_err(error)?;
-    let map = qnc_audio_output::ChannelMap::identity(project.channels).map_err(error)?;
+    let outputs = (0..project.channels).map(|output| routes.get(usize::from(output)).copied().unwrap_or(output)).collect();
+    let format = AudioFormat::new(native.sample_rate_hz, selected_channels).map_err(error)?;
+    let map = qnc_audio_output::ChannelMap::new(selected_channels, outputs).map_err(error)?;
     Ok((selected_streams, Some(format), Some(map)))
 }
 
@@ -651,7 +659,7 @@ mod tests {
     }
 
     #[test]
-    fn source_decode_count_comes_from_project_not_full_native_inventory() {
+    fn every_saved_channel_is_decoded_and_the_project_sets_the_outputs() {
         let native = AudioFormat::new(48000, 4).unwrap();
         let streams = [(1, 1), (2, 1), (3, 1), (4, 1)];
         for count in [2, 4] {
@@ -660,24 +668,18 @@ mod tests {
                 sample_rate_hz: 48000,
             };
             let (selected, format, map) =
-                project_audio_layout(&streams, Some(&native), &saved_channels(&streams), &project)
+                project_audio_layout(&streams, Some(&native), &saved_channels(&streams), &[], &project)
                     .unwrap();
-            let format = format.unwrap();
-            let map = map.unwrap();
-            let expected: Vec<_> = streams
-                .iter()
-                .take(usize::from(count))
-                .map(|(stream_index, channels)| audio_plan(*stream_index, *channels, &[0]))
-                .collect();
+            let expected: Vec<_> = streams.iter().map(|(stream_index, channels)| audio_plan(*stream_index, *channels, &[0])).collect();
             assert_eq!(selected, expected);
-            assert_eq!(format.channel_count, count);
-            assert_eq!(map.source_channels(), count);
-            let source = [0.1, 0.2, 0.3, 0.4][..usize::from(count)].to_vec();
-            let mut output = Vec::new();
-            map.route(&source, &mut output).unwrap();
-            assert_eq!(output, source);
-            assert_eq!(native.channel_count, 4);
+            assert_eq!(format.unwrap().channel_count, 4);
+            let map = map.unwrap();
+            assert_eq!(map.source_channels(), 4);
+            assert_eq!(map.output_channels(), (0..count).collect::<Vec<_>>());
         }
+        let project = qnc_player_input::ProjectAudio { channels: 2, sample_rate_hz: 48000 };
+        let (_, _, map) = project_audio_layout(&streams, Some(&native), &saved_channels(&streams), &[3, 2], &project).unwrap();
+        assert_eq!(map.unwrap().output_channels(), &[3, 2], "A1 plays channel 4, A2 channel 3");
     }
     #[test]
     fn project_audio_never_falls_back_to_native_count_or_rate() {
@@ -690,6 +692,7 @@ mod tests {
                 &[(1, 1), (2, 1)],
                 Some(&AudioFormat::new(48000, 2).unwrap()),
                 &saved_channels(&[(1, 1), (2, 1)]),
+                &[],
                 &project,
             )
             .is_err()
@@ -700,16 +703,17 @@ mod tests {
                 &[(1, 1), (2, 1)],
                 Some(&AudioFormat::new(44100, 2).unwrap()),
                 &saved_channels(&[(1, 1), (2, 1)]),
+                &[],
                 &project,
             )
             .is_err()
         );
-        let (streams, format, map) = project_audio_layout(&[], None, &[], &project).unwrap();
+        let (streams, format, map) = project_audio_layout(&[], None, &[], &[], &project).unwrap();
         assert!(streams.is_empty());
         assert_eq!(format, None);
         assert_eq!(map, None);
         project.channels = 0;
-        assert!(project_audio_layout(&[], None, &[], &project).is_err());
+        assert!(project_audio_layout(&[], None, &[], &[], &project).is_err());
     }
     fn fact<T>(value: T) -> Option<qnc_media_metadata::Fact<T>> {
         Some(qnc_media_metadata::Fact {
@@ -758,7 +762,7 @@ mod tests {
         assert_eq!(media, before);
     }
     #[test]
-    fn four_mono_project_two_decodes_only_first_two_streams() {
+    fn four_mono_project_two_decodes_every_stream_and_plays_the_first_two() {
         let media = audio_media();
         let (native_streams, native_format) = native_audio_layout(&media).unwrap();
         let project = qnc_player_input::ProjectAudio {
@@ -769,13 +773,14 @@ mod tests {
             &native_streams,
             native_format.as_ref(),
             &saved_channels(&native_streams),
+            &[],
             &project,
         )
         .unwrap();
         let format = format.unwrap();
         let map = map.unwrap();
-        assert_eq!(streams, [audio_plan(1, 1, &[0]), audio_plan(2, 1, &[0])]);
-        assert_eq!(format, AudioFormat::new(48000, 2).unwrap());
+        assert_eq!(streams, [audio_plan(1, 1, &[0]), audio_plan(2, 1, &[0]), audio_plan(3, 1, &[0]), audio_plan(4, 1, &[0])]);
+        assert_eq!(format, AudioFormat::new(48000, 4).unwrap());
         assert_eq!(map.output_channels(), &[0, 1]);
     }
     #[test]
@@ -787,10 +792,10 @@ mod tests {
             sample_rate_hz: 48000,
         };
         let (plans, format, map) =
-            project_audio_layout(&streams, Some(&native), &saved_channels(&streams), &project)
+            project_audio_layout(&streams, Some(&native), &saved_channels(&streams), &[], &project)
                 .unwrap();
-        assert_eq!(plans, [audio_plan(1, 4, &[0, 1])]);
-        assert_eq!(format.unwrap(), AudioFormat::new(48000, 2).unwrap());
+        assert_eq!(plans, [audio_plan(1, 4, &[0, 1, 2, 3])]);
+        assert_eq!(format.unwrap(), AudioFormat::new(48000, 4).unwrap());
         assert_eq!(map.unwrap().output_channels(), &[0, 1]);
     }
     #[test]

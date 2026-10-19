@@ -16,14 +16,24 @@ pub struct Config {
     pub device_id: Option<String>,
     pub capacity_frames: u32,
     pub ready_frames: u32,
+    /// Channels of each queued frame (every channel of the source; user 2026-10-19: the
+    /// player plays all channels, the outputs take the chosen ones); 0: as the device.
+    #[serde(default)]
+    pub source_channels: u16,
 }
 
 impl Config {
+    /// Samples of one queued frame.
+    pub fn width(&self) -> usize {
+        usize::from(if self.source_channels == 0 { self.format.channels } else { self.source_channels })
+    }
+
     pub(crate) fn validate(&self) -> Result<usize> {
         let f = self.format;
         if self.version != crate::VERSION
             || !(8_000..=384_000).contains(&f.sample_rate_hz)
             || !(1..=64).contains(&f.channels)
+            || self.width() > 64
             || self.ready_frames == 0
             || self.ready_frames > self.capacity_frames
             || self.capacity_frames > f.sample_rate_hz.saturating_mul(2)
@@ -34,7 +44,7 @@ impl Config {
         {
             return Err(Error::new(Code::Contract, "invalid output configuration"));
         }
-        let samples = self.capacity_frames as usize * f.channels as usize;
+        let samples = self.capacity_frames as usize * self.width();
         if samples > 4 * 1024 * 1024 {
             return Err(Error::new(
                 Code::Contract,

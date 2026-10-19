@@ -11,6 +11,7 @@ fn config(channels: u16, capacity: u32, ready: u32) -> Config {
         device_id: None,
         capacity_frames: capacity,
         ready_frames: ready,
+        source_channels: 0,
     }
 }
 fn prepared(channels: u16) -> (Queue, Callback, u64) {
@@ -367,4 +368,23 @@ fn a_gain_set_while_playing_is_heard_in_the_next_callback() {
     q.shared.set_gains(&[0.0, 2.0]);
     c.render(&mut out, 200, Some(5));
     assert_eq!(out, [0.0, 1.0, 0.0, 1.0], "A1 off, A2 twice, at once");
+}
+
+#[test]
+fn the_queue_carries_every_source_channel_and_a_route_change_is_heard_in_the_next_callback() {
+    // Four source channels, two outputs (A1, A2).
+    let (mut q, mut c) = Queue::new(Config { source_channels: 4, ..config(2, 8, 2) }).unwrap();
+    let g = q.reset(10, Status::Preparing).unwrap();
+    c.render(&mut [0.0; 0], 0, None);
+    q.shared.set_routes(&[0, 1]);
+    let frames = [0.1, 0.2, 0.3, 0.4, 0.1, 0.2, 0.3, 0.4, 0.1, 0.2, 0.3, 0.4, 0.1, 0.2, 0.3, 0.4];
+    q.push(g, 10, &frames).unwrap();
+    q.commit(g).unwrap();
+    q.start(g).unwrap();
+    let mut out = [0.0; 4];
+    c.render(&mut out, 100, Some(5));
+    assert_eq!(out, [0.1, 0.2, 0.1, 0.2], "channels 1 and 2");
+    q.shared.set_routes(&[3, 2]);
+    c.render(&mut out, 200, Some(5));
+    assert_eq!(out, [0.4, 0.3, 0.4, 0.3], "channel 4 on A1, 3 on A2, at once");
 }

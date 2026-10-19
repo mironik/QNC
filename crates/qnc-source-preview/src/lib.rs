@@ -280,9 +280,6 @@ pub struct SourcePreview {
     /// The channels of the shown clip heard on output 1 and 2 (A1, A2), when chosen, and
     /// their levels in percent (0: level 0, nothing heard).
     lead: Option<(String, [u16; 2], [u16; 2])>,
-    /// The channels the player was opened with (`None`: the clip's own); a channel chosen
-    /// while it stands waits for Play.
-    opened_lead: Option<[u16; 2]>,
     /// The sound of a segment or cover drafted on the Wrap row, heard in the program.
     program_draft: Option<SoundDraft>,
     /// The program frame asked for while the program was still being prepared: cued once
@@ -315,7 +312,6 @@ impl Default for SourcePreview {
             activity_target: None,
             program: false,
             lead: None,
-            opened_lead: None,
             program_draft: None,
             program_pending: None,
             program_draft_reopened: false,
@@ -507,11 +503,6 @@ impl SourcePreview {
             return false;
         }
         let same_channels = self.lead.as_ref().is_some_and(|(id, channels, _)| *id == clip_id && *channels == [a1, a2]);
-        // The first channels told for a clip opened on its own are the ones it plays
-        // (taking a lane tells them before any is changed).
-        if self.opened_lead.is_none() && !self.lead.as_ref().is_some_and(|(id, ..)| *id == clip_id) {
-            self.opened_lead = Some([a1, a2]);
-        }
         self.lead = lead;
         if self.program {
             return false;
@@ -521,14 +512,13 @@ impl SourcePreview {
         if same_channels && self.set_output_levels([percent(l1), percent(l2)]) {
             return true;
         }
-        // A channel picked while the player stands is only prepared: the timeline shows it,
-        // the player takes it when Play starts (user 2026-10-19: choosing is preparation;
-        // reopening at once blanked the monitor and the HDMI output on every arrow).
-        if !(self.player_view.playing() || self.play_when_ready) {
+        // The player decodes every channel; a channel chosen is a route, heard at once,
+        // playing or not (user 2026-10-19: "the player plays all channels, the outputs are
+        // only the chosen ones"; reopening blanked the monitor and the HDMI output).
+        if self.set_output_routes([a1, a2]) && self.set_output_levels([percent(l1), percent(l2)]) {
             return true;
         }
-        // A channel picked while playing is heard playing on (user 2026-10-14: the draft
-        // channel is played before Enter keeps it).
+        // No player that takes routes (none open yet): it opens on these channels.
         self.reopen_with_lead(&clip_id)
     }
 
@@ -539,14 +529,10 @@ impl SourcePreview {
         let pending = self.cue_next.or(self.cue_in_flight.map(|(frame, _)| frame)).or(self.cue_asked);
         let opening = self.opening_at.as_ref().filter(|(id, _)| id == clip_id).map(|(_, frame)| *frame);
         let frame = pending.or_else(|| self.player_view.confirmed_source_frame()).or(opening).unwrap_or(0);
+        let playing = self.player_view.playing() || self.play_when_ready;
         let prepared = self.prepare_clip(clip_id, frame);
-        self.play_when_ready = true;
+        self.play_when_ready = playing;
         prepared
-    }
-
-    /// Channels chosen while the player stood, not yet in the player.
-    fn lead_waits(&self) -> bool {
-        self.lead.as_ref().is_some_and(|(id, channels, _)| self.view.clip_id.as_ref() == Some(id) && self.opened_lead != Some(*channels))
     }
 
     fn prepare_clip(&mut self, clip_id: &str, first_frame: u64) -> bool {
@@ -557,7 +543,6 @@ impl SourcePreview {
             self.lead = None; // another clip starts on its own channels
         }
         let lead = self.lead.as_ref().map(|(_, lead, levels)| (*lead, *levels));
-        self.opened_lead = lead.map(|(channels, _)| channels);
         // Whoever completes records in the background takes this clip first.
         self.activity.clip(self.activity_target.as_ref(), clip_id);
         let Some(context) = self.context.clone() else {
@@ -654,11 +639,6 @@ impl SourcePreview {
         if self.waits_for_record() || playback.error.as_deref().is_some_and(qnc_player_input::is_incomplete_media) {
             self.play_when_ready = true;
             return true;
-        }
-        // Play takes the channels chosen while the player stood.
-        if !playback.playing() && !self.program && self.lead_waits() {
-            let clip_id = self.view.clip_id.clone().unwrap_or_default();
-            return self.reopen_with_lead(&clip_id);
         }
         if !playback.playing() && !playback.can_start_playback() && playback.error.is_none() {
             // Not ready yet: start as soon as the prepared session is.
@@ -888,6 +868,10 @@ impl SourcePreview {
 
     /// The level of outputs 1 and 2 in percent, heard at once; false when the player
     /// cannot take it now (not prepared yet).
+    fn set_output_routes(&mut self, channels: [u16; 2]) -> bool {
+        self.player.as_ref().is_some_and(|player| player.send(Action::SetOutputRoutes(channels)).is_ok())
+    }
+
     fn set_output_levels(&mut self, levels: [u16; 2]) -> bool {
         self.player.as_ref().is_some_and(|player| player.send(Action::SetOutputLevels(levels)).is_ok())
     }

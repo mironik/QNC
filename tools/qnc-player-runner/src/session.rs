@@ -111,6 +111,12 @@ impl Session {
                         self.player.set_output_levels(&levels_percent);
                         Ok(Vec::new())
                     }
+                    Command::SetOutputRoutes { channels } => {
+                        if !self.player.set_output_routes(&channels) {
+                            return self.rejected(sequence, envelope.request_id, command_name, "output route outside the decoded channels".into());
+                        }
+                        Ok(Vec::new())
+                    }
                     _ => {
                         return self.rejected(
                             sequence,

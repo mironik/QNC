@@ -116,6 +116,15 @@ impl AudioOutput {
     pub fn set_gains(&self, gains: &[f32]) {
         self.queue.shared.set_gains(gains);
     }
+    /// The source channel each of the first `routes.len()` output channels plays, heard at
+    /// once (the next device callback); false when a route is outside the queued frame.
+    pub fn set_routes(&self, routes: &[u16]) -> bool {
+        if routes.iter().any(|route| usize::from(*route) >= self.queue.config.width()) {
+            return false;
+        }
+        self.queue.shared.set_routes(routes);
+        true
+    }
     pub fn take_peaks(&self) -> Vec<f32> {
         self.queue.shared.take_peaks(self.queue.config.format.channels as usize)
     }
