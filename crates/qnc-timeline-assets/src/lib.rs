@@ -246,16 +246,16 @@ pub fn with_poster_filmstrip(
 }
 
 /// The same for the clip on screen, its poster found among `posters` (clip id, loaded
-/// poster) and `made` read from the project settings (`None`: not loaded, treated as made).
+/// poster): the poster stands in the filmstrip lane until the filmstrip is made, and for
+/// good when the project makes none (user 2026-10-19: "show the posters until the
+/// filmstrip is made"; waiting for it looked broken).
 pub fn with_clip_poster<'a>(
     assets: SourceTimelineAssets,
-    settings: Option<&qnc_work_settings::WorkSettings>,
     posters: impl IntoIterator<Item = (&'a str, Option<&'a qnc_image_assets::RgbaImage>)>,
 ) -> SourceTimelineAssets {
-    let made = settings.is_none_or(qnc_work_settings::WorkSettings::filmstrip_made);
     let clip_id = assets.clip_id.clone();
     let poster = posters.into_iter().find(|(id, _)| *id == clip_id).and_then(|(_, poster)| poster);
-    with_poster_filmstrip(assets, made, poster)
+    with_poster_filmstrip(assets, false, poster)
 }
 
 fn read_assets(

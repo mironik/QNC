@@ -20,7 +20,7 @@ impl IngestApplication {
         let clip = self.view.preview_clip_id.clone().unwrap_or_default();
         let assets = if preview.assets.clip_id == clip { preview.assets } else { SourceTimelineAssets::empty_for(&clip) };
         let posters = self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.thumb_image.as_deref()));
-        self.view.timeline_assets = qnc_timeline_assets::with_clip_poster(assets, self.work_plan().map(|plan| &plan.settings), posters);
+        self.view.timeline_assets = qnc_timeline_assets::with_clip_poster(assets, posters);
         self.view.source_timeline = self.source_timeline.sync(self.view.preview_clip_id.as_deref(), self.catalog_target.as_ref()).clone();
     }
 

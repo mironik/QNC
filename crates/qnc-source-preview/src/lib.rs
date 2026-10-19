@@ -429,9 +429,10 @@ impl SourcePreview {
             return;
         };
         let assets = &self.view.assets;
-        // A coarse wave is read again until the wave of every frame replaces it.
+        // A coarse wave, or a filmstrip of its first round (first and last picture), is read
+        // again until the complete one replaces it.
         let complete = assets.clip_id == clip_id
-            && assets.filmstrip_background.is_some()
+            && assets.filmstrip_background.as_ref().is_some_and(|filmstrip| filmstrip.frames.len() >= qnc_filmstrip::FILMSTRIP_FRAME_COUNT)
             && assets.wave.as_ref().is_some_and(|wave| !wave.coarse);
         let now = Instant::now();
         if complete || self.timeline_assets.loading() || self.assets_again_at.is_some_and(|at| now < at) {

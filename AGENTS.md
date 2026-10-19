@@ -4883,3 +4883,15 @@ filmstrip; puni valovi citaju uz filmstrip kad test medija pusti 4 ili vise cita
 filmstripa (stik, SD na USB 2.0); val otvorenog klipa nikad ne ceka. `qnc-wave-worker` `coarse_pending` (klipovi bez
 ikakvog vala; klip ciji val ne moze nastati ne zadrzava filmstrip), `medium_parallel`; `qnc-timeline-artifacts`.
 Testovi, conformance. Uzivo nije izmjereno.
+Izmjena 2026-10-19 (korisnik: "neupotrebljivo sporo... pokazuj postere dok nemas napravljen filmstrip"; "koliko ti treba
+za prvu i zadnju sliku"; "filmstrip radimo u dva reda: prvi samo prvu i zadnju, a kad se svi naprave tako, u drugom
+krugu ostale"): (1) `IntraOnce` (4dae5f8) vracen (5448daa): 10,5 s po klipu, jer intra slike usred XAVC klipa nisu
+oznacene kao tocke za skok (otvoreni GOP), pa dekoder pri svakom skoku krece od pocetka klipa. (2) Poster klipa stoji u
+traci filmstripa dok filmstrip ne postoji, ne samo kad je filmstrip iskljucen (`qnc-timeline-assets` `with_clip_poster`
+bez postavki; Ingest i Story/MA samo poziv). (3) Mjereno na mirnom procesoru: prva i zadnja intra slika kroz indeks
+5-16 ms citanja, dekodiranje obje 0,38 s (pokretanje ffmpega 0,14 s); 13 slika 1,4 s. Filmstrip u dva kruga
+(`qnc-filmstrip-worker`): klip bez ikakvog filmstripa najprije dobiva prvu i zadnju intra sliku (zapis s 2 slike,
+indeksi 0 i 1, pa svaka ispuni pola trake), a kad ih svi klipovi imaju, drugi krug daje svih 13; spreman je samo zapis
+s 13 slika; `qnc-source-preview` ponovno cita filmstrip dok nema svih 13. Bez indeksa sve kao prije. Testovi,
+conformance. Uzivo nije izmjereno. Otvoreno: Wrap redovi (`qnc-program-filmstrip`) jednom procitan filmstrip ne citaju
+ponovno.

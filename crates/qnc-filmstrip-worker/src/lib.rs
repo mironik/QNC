@@ -242,6 +242,8 @@ struct GeneratedFilmstrip {
     ready_before: bool,
     extract_ms: u128,
     total_ms: u128,
+    /// The first round: only the first and the last picture; the clip comes again for all.
+    coarse: bool,
 }
 
 #[derive(Debug)]
@@ -264,6 +266,9 @@ pub struct TimelineFilmstripService {
     /// It makes only the clips it is told (`request`), it looks for none of its own
     /// (import control: each clip after its wave, user 2026-10-15).
     on_orders: bool,
+    /// First-round filmstrips (first and last picture) on their way to the database: their
+    /// clips are not ready.
+    coarse: BTreeSet<String>,
     /// Key pictures handed over with a request (read with the wave), by request key.
     given: std::collections::HashMap<String, Arc<qnc_filmstrip::EncodedPictures>>,
 }
@@ -280,6 +285,7 @@ impl Default for TimelineFilmstripService {
             publisher: None,
             playback_priority: false,
             on_orders: false,
+            coarse: BTreeSet::new(),
             given: std::collections::HashMap::new(),
         }
     }
@@ -375,6 +381,7 @@ impl TimelineFilmstripService {
         }
         let project_id = context.project_id().to_string();
         let mut all_ready = true;
+        let mut second_round = Vec::new();
         let mut after = None;
         loop {
             let page = context.content_reader.list_clips(after.clone())?;
@@ -390,25 +397,26 @@ impl TimelineFilmstripService {
                 if self.ready.contains(&key) {
                     continue;
                 }
-                if let Some(record) = context.content_reader.read_filmstrip(&clip.clip_id)? {
-                    if filmstrip_artifact_ready(&context, &record) {
-                        self.ready.insert(key);
-                        continue;
-                    }
+                let stored = context.content_reader.read_filmstrip(&clip.clip_id)?;
+                if stored.as_ref().is_some_and(|record| filmstrip_artifact_ready(&context, record)) {
+                    self.ready.insert(key);
+                    continue;
                 }
                 all_ready = false;
-                self.enqueue(
-                    FilmstripRequest {
-                        project_id: project_id.clone(),
-                        clip_id: clip.clip_id,
-                    },
-                    clip.priority,
-                );
+                let request = FilmstripRequest { project_id: project_id.clone(), clip_id: clip.clip_id };
+                if stored.is_some() && !clip.priority {
+                    second_round.push(request); // after every clip's first round
+                } else {
+                    self.enqueue(request, clip.priority);
+                }
             }
             if after.as_deref() == Some(next_after.as_str()) {
                 return Err(qnc_ui_text::text("filmstrip.filmstrip_content_paging_did_move").into());
             }
             after = Some(next_after);
+        }
+        for request in second_round {
+            self.enqueue(request, false);
         }
         self.db_complete = all_ready;
         self.start_next();
@@ -446,7 +454,10 @@ impl TimelineFilmstripService {
                     poll.changed = true;
                     match completion.result {
                         Ok(_) => {
-                            self.ready.insert(completion.key);
+                            // A first-round filmstrip stored: its clip comes again for all.
+                            if !self.coarse.remove(&completion.key) {
+                                self.ready.insert(completion.key);
+                            }
                             self.db_complete = false;
                         }
                         Err(error) => {
@@ -499,11 +510,15 @@ impl TimelineFilmstripService {
             match outcome.result {
                 Ok(generated) if current_project == Some(outcome.request.project_id.as_str()) => {
                     let key = outcome.request.key();
+                    if generated.coarse {
+                        self.coarse.insert(key.clone());
+                    }
                     self.queue_publish(key, generated.artifact, matches_active, &mut poll);
                     filmstrip_log(|| {
                         format!(
-                            "qnc-filmstrip-worker-total: clip={} source={:?} mode={:?} ready_before={} extract_ms={} publish=queued total_ms={}",
+                            "qnc-filmstrip-worker-total: clip={} coarse={} source={:?} mode={:?} ready_before={} extract_ms={} publish=queued total_ms={}",
                             outcome.request.clip_id,
+                            generated.coarse,
                             generated.source_kind,
                             generated.extraction_mode,
                             generated.ready_before,
@@ -683,7 +698,7 @@ fn filmstrip_artifact_ready(
     artifact: &FilmstripArtifactRecord,
 ) -> bool {
     if artifact.status != "ready"
-        || artifact.frames.is_empty()
+        || artifact.frames.len() != qnc_filmstrip::FILMSTRIP_FRAME_COUNT
         || artifact.frame_count != artifact.frames.len()
     {
         return false;
@@ -771,11 +786,33 @@ fn build_timeline_background(
         LocalFilmstripArtifacts::new(&context.filmstrip_root_uri, context.filmstrip_dir.clone())?;
     let ready_before = artifacts.ready(&plan);
     let extract_started = Instant::now();
+    // The first round: a clip with no filmstrip at all gets its first and last picture
+    // only (user 2026-10-19: "first only the first and the last, and when all are made so,
+    // the rest in a second round"); about a third of the work of all thirteen.
+    let first_round = given.is_none() && !ready_before && context.content_reader.read_filmstrip(&request.clip_id)?.is_none();
+    if first_round {
+        match first_and_last(&clip, context, &artifacts, cancel) {
+            Ok(Some(coarse)) => {
+                return Ok(GeneratedFilmstrip {
+                    artifact: store_artifact_from_plan(&coarse),
+                    source_kind: coarse.source_kind,
+                    extraction_mode: coarse.extraction_mode,
+                    ready_before: false,
+                    extract_ms: extract_started.elapsed().as_millis(),
+                    total_ms: started.elapsed().as_millis(),
+                    coarse: true,
+                });
+            }
+            Ok(None) => {}
+            Err(error) if error == filmstrip_paused_for_playback() => return Err(error),
+            Err(error) => filmstrip_log(|| format!("qnc-filmstrip-worker: clip={} first_round=failed error={error}", request.clip_id)),
+        }
+    }
     // A clip longer than 10 s takes the intra picture nearest each of its 13 places straight
     // from the original's own index (user 2026-10-18), a few reads instead of opening the
     // file thirteen times; a clip up to 10 s is read through by the decoder below.
     let from_index = (given.is_none() && !ready_before && plan.extraction_mode == FilmstripExtractionMode::KeyframeSeek)
-        .then(|| intra_pictures(&clip, context, cancel))
+        .then(|| qnc_filmstrip::original_picture_frames(&clip.snapshot).map(|targets| intra_pictures(&clip, context, &targets, cancel)).transpose().map(Option::flatten))
         .and_then(|found| match found {
             Ok(found) => found,
             Err(error) => {
@@ -786,7 +823,9 @@ fn build_timeline_background(
     // Pictures handed over or read by the index: decoded, the media is not read again.
     // Should that fail, the filmstrip reads the media as before (the reason goes to the log).
     let from_pictures = match given.or(from_index.as_ref()).filter(|_| !ready_before) {
-        Some(given) => match filmstrip_from_pictures(&clip, context, given, &artifacts, cancel) {
+        Some(given) => match qnc_filmstrip::plan_from_original(&clip.snapshot, &context.filmstrip_root_uri, Some(&clip.name))
+            .and_then(|plan| filmstrip_from_pictures(plan, given, &artifacts, cancel))
+        {
             Ok(plan) => Some(plan),
             Err(error) if error == filmstrip_paused_for_playback() => return Err(error),
             Err(error) => {
@@ -818,7 +857,36 @@ fn build_timeline_background(
         ready_before,
         extract_ms,
         total_ms: started.elapsed().as_millis(),
+        coarse: false,
     })
+}
+
+/// The first round of a clip's filmstrip: its first and last intra picture through the
+/// original's index, shown as two halves of the lane (frames 0 and 1); `None` without an
+/// index.
+fn first_and_last(
+    clip: &FilmstripClipRecord,
+    context: &FilmstripContext,
+    artifacts: &LocalFilmstripArtifacts,
+    cancel: &AtomicBool,
+) -> Result<Option<FilmstripPlan>, String> {
+    let Some(frames) = qnc_filmstrip::original_picture_frames(&clip.snapshot) else {
+        return Ok(None);
+    };
+    let full = qnc_filmstrip::plan_from_original(&clip.snapshot, &context.filmstrip_root_uri, Some(&clip.name))?;
+    let (Some(first), Some(last)) = (full.frames.first(), full.frames.last()) else {
+        return Ok(None);
+    };
+    let last_frame = full.source_duration_frames.saturating_sub(1).max(frames.last().copied().unwrap_or(0));
+    let Some(given) = intra_pictures(clip, context, &[0, last_frame], cancel)? else {
+        return Ok(None);
+    };
+    let mut coarse = full.clone();
+    coarse.frames = vec![
+        FilmstripFrameRequest { index: 0, ..first.clone() },
+        FilmstripFrameRequest { index: 1, ..last.clone() },
+    ];
+    filmstrip_from_pictures(coarse, &given, artifacts, cancel).map(Some)
 }
 
 /// The intra picture of the original nearest each of the 13 places, read through the file's
@@ -826,12 +894,10 @@ fn build_timeline_background(
 fn intra_pictures(
     clip: &FilmstripClipRecord,
     context: &FilmstripContext,
+    targets: &[u64],
     cancel: &AtomicBool,
 ) -> Result<Option<qnc_filmstrip::EncodedPictures>, String> {
     let Some(codec) = qnc_filmstrip::original_picture_codec(&clip.snapshot) else {
-        return Ok(None);
-    };
-    let Some(targets) = qnc_filmstrip::original_picture_frames(&clip.snapshot) else {
         return Ok(None);
     };
     let original = &clip.snapshot.metadata.original.media_uri;
@@ -846,7 +912,7 @@ fn intra_pictures(
     };
     let mut file = fs::File::open(&path).map_err(|error| format!("filmstrip original open: {error}"))?;
     let mut pictures = Vec::with_capacity(targets.len());
-    for target in targets {
+    for &target in targets {
         if cancel.load(Ordering::Acquire) {
             return Err(filmstrip_paused_for_playback().into());
         }
@@ -864,13 +930,11 @@ fn intra_pictures(
 /// The filmstrip of the original from its key pictures (handed over or read by the
 /// index): decoded in one call into the thumbnails of `plan_from_original`.
 fn filmstrip_from_pictures(
-    clip: &FilmstripClipRecord,
-    context: &FilmstripContext,
+    plan: FilmstripPlan,
     given: &qnc_filmstrip::EncodedPictures,
     artifacts: &LocalFilmstripArtifacts,
     cancel: &AtomicBool,
 ) -> Result<FilmstripPlan, String> {
-    let plan = qnc_filmstrip::plan_from_original(&clip.snapshot, &context.filmstrip_root_uri, Some(&clip.name))?;
     if given.pictures.len() != plan.frames.len() {
         return Err(format!("{} pictures for {} filmstrip frames", given.pictures.len(), plan.frames.len()));
     }
