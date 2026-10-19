@@ -862,8 +862,8 @@ fn build_timeline_background(
 }
 
 /// The first round of a clip's filmstrip: its first and last intra picture through the
-/// original's index, shown as two halves of the lane (frames 0 and 1); `None` without an
-/// index.
+/// original's index, stored as frames 0 and 1 (the reader shows the last at the end of
+/// the lane); `None` without an index.
 fn first_and_last(
     clip: &FilmstripClipRecord,
     context: &FilmstripContext,

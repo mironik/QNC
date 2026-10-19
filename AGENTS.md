@@ -4895,3 +4895,8 @@ indeksi 0 i 1, pa svaka ispuni pola trake), a kad ih svi klipovi imaju, drugi kr
 s 13 slika; `qnc-source-preview` ponovno cita filmstrip dok nema svih 13. Bez indeksa sve kao prije. Testovi,
 conformance. Uzivo nije izmjereno. Otvoreno: Wrap redovi (`qnc-program-filmstrip`) jednom procitan filmstrip ne citaju
 ponovno.
+Ispravak 2026-10-19 (korisnik: "prvu stavi na pocetak timelinea, zadnju na kraj"): filmstrip prvog kruga prikazuje se
+prvom slikom na prvom i zadnjom na zadnjem mjestu trake, sredina prazna do drugog kruga (prije: svaka pola trake).
+Zapis u bazi ostaje s rednim brojevima 0 i 1 (`qnc-artifact-db` trazi redom); polozaj daje citac `qnc-timeline-assets`
+(`filmstrip_pictures`), pa vrijedi za source timeline i Wrap redove. Proba: prvi krug za 122 klipa 24-66 s nakon
+Selecta (uz pune valove istodobno, 23-69 s), drugi krug od 72 s.
