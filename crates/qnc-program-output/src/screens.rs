@@ -135,3 +135,36 @@ mod tests {
         assert!(found.iter().any(|screen| screen.primary));
     }
 }
+
+/// Keeps the mouse off the output screen while the application is the one in use (live
+/// 2026-10-19: the pointer ran onto the HDMI screen, where it is hidden, and the
+/// application seemed not to take the mouse): the pointer is held to the other screens.
+/// Released when the application is not in use or there is no output, so other programs
+/// have the whole desktop. Returns whether the pointer is held now.
+#[cfg(windows)]
+pub(crate) fn keep_pointer_off(screens: &[Screen], output: Option<Screen>, in_use: bool, held: bool) -> bool {
+    use windows_sys::Win32::{Foundation::RECT, UI::WindowsAndMessaging::ClipCursor};
+    let area = output.filter(|_| in_use).and_then(|output| {
+        let others: Vec<&Screen> = screens.iter().filter(|screen| **screen != output).collect();
+        let left = others.iter().map(|screen| screen.x).min()?;
+        let top = others.iter().map(|screen| screen.y).min()?;
+        let right = others.iter().map(|screen| screen.x + screen.width as i32).max()?;
+        let bottom = others.iter().map(|screen| screen.y + screen.height as i32).max()?;
+        Some(RECT { left, top, right, bottom })
+    });
+    match area {
+        // Held again every pass: Windows lets go of it when another window comes forward.
+        Some(rect) => unsafe { ClipCursor(&rect) != 0 },
+        None => {
+            if held {
+                unsafe { ClipCursor(std::ptr::null()) };
+            }
+            false
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub(crate) fn keep_pointer_off(_: &[Screen], _: Option<Screen>, _: bool, _: bool) -> bool {
+    false
+}

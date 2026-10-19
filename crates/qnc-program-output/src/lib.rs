@@ -86,6 +86,17 @@ pub struct ProgramOutput {
     host: Option<Host>,
     /// Why the output is off, once (no host executable, no screen list on this OS).
     pub problem: Option<String>,
+    /// Every screen found at the last look.
+    all: Vec<Screen>,
+    /// The mouse is held off the output screen.
+    pointer_held: bool,
+}
+
+impl Drop for ProgramOutput {
+    /// The mouse is let go when the application ends.
+    fn drop(&mut self) {
+        screens::keep_pointer_off(&self.all, None, false, self.pointer_held);
+    }
 }
 
 impl ProgramOutput {
@@ -95,13 +106,18 @@ impl ProgramOutput {
         if self.looked.is_none_or(|at| at.elapsed() >= SCREENS_EVERY) {
             self.looked = Some(Instant::now());
             match screens() {
-                Ok(found) => (self.screen, self.problem) = (output_screen(&found), None),
-                Err(error) => (self.screen, self.problem) = (None, Some(error)),
+                Ok(found) => {
+                    (self.screen, self.problem) = (output_screen(&found), None);
+                    self.all = found;
+                }
+                Err(error) => (self.screen, self.problem, self.all) = (None, Some(error), Vec::new()),
             }
             if self.host.as_mut().is_some_and(|host| host.child.try_wait().ok().flatten().is_some()) {
                 self.host = None; // ended by itself: started again on this look
             }
         }
+        let in_use = ctx.input(|input| input.focused);
+        self.pointer_held = screens::keep_pointer_off(&self.all, self.screen.filter(|_| self.host.is_some()), in_use, self.pointer_held);
         let Some(screen) = self.screen else {
             self.host = None;
             return;

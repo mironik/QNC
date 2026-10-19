@@ -4900,3 +4900,8 @@ prvom slikom na prvom i zadnjom na zadnjem mjestu trake, sredina prazna do drugo
 Zapis u bazi ostaje s rednim brojevima 0 i 1 (`qnc-artifact-db` trazi redom); polozaj daje citac `qnc-timeline-assets`
 (`filmstrip_pictures`), pa vrijedi za source timeline i Wrap redove. Proba: prvi krug za 122 klipa 24-66 s nakon
 Selecta (uz pune valove istodobno, 23-69 s), drugi krug od 72 s.
+Popravak 2026-10-19 (korisnik: "blokirao je, nije prihvacao mis"; "mis je bio pobjegao na vanjski monitor, to treba
+onemoguciti"): log: aplikacija je radila (crtala, odgovarala), ali od 19:44 nije dobila nijedan unos; pokazivac je bio na
+HDMI ekranu, gdje ga prozor programskog izlaza skriva. `qnc-program-output` (`screens::keep_pointer_off`, Windows
+`ClipCursor`): dok radi programski izlaz i QNC je aktivan, pokazivac je zadrzan na ostalim ekranima; cim QNC nije
+aktivan, nema izlaza ili aplikacija zavrsava, pokazivac je slobodan. Ostali OS bez promjene. Testovi, conformance.

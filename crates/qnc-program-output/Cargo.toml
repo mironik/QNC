@@ -9,7 +9,7 @@ qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Gdi"] }
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging"] }
 
 [dev-dependencies]
 qnc-player-contract = { workspace = true }
