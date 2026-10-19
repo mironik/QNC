@@ -59,6 +59,6 @@ pub(super) fn render_preview(
         },
         poster,
         label,
-    )
-    .map(IngestIntent::empty) // the monitor's Auto | On switch
+    );
+    None // the monitor gives no intent
 }

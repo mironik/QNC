@@ -112,8 +112,8 @@ fn render_preview(
         },
         poster,
         label,
-    )
-    .map(EditorialIntent::action) // the monitor's Auto | On switch
+    );
+    None // the monitor gives no intent
 }
 
 fn render_pool_head(

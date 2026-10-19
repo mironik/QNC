@@ -9,11 +9,20 @@ use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKin
 pub const MODULE_ID: &str = "qnc.module.monitor";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The monitor's own switch (catalog actions without a key): Auto leaves the picture to the
-/// program output on an external screen while it runs, On keeps drawing it here. Part of
-/// the monitor, so every form with a preview monitor has it (user 2026-10-19).
+/// The monitor's switch (catalog actions without a key), placed by a form's layout in the
+/// row under the monitor: Auto leaves the picture to the program output on an external
+/// screen while it runs, On keeps drawing it here (user 2026-10-08, 2026-10-19).
 pub const MONITOR_AUTO: &str = "monitor_auto";
 pub const MONITOR_ON: &str = "monitor_on";
+
+/// Whether the switch button `action_id` is the one on (`auto`: Auto chosen).
+pub fn switch_on(action_id: &str, auto: bool) -> bool {
+    match action_id {
+        MONITOR_AUTO => auto,
+        MONITOR_ON => !auto,
+        _ => false,
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MonitorPaint {
@@ -49,8 +58,7 @@ pub struct MonitorSurface<'a> {
     pub picture: Option<MonitorPicture<'a>>,
     pub message: Option<&'a str>,
     /// Monitor Auto (user 2026-10-08): while the program is on an external screen the
-    /// picture is left to it, so a weaker laptop does not draw it twice. The monitor draws
-    /// its Auto | On switch while that screen is there.
+    /// picture is left to it, so a weaker laptop does not draw it twice.
     pub yield_to_external: bool,
 }
 
@@ -133,47 +141,6 @@ pub struct MonitorPoster<'a> {
 /// (e.g. the clip's data is still being prepared while the filmstrip is made) never hides the
 /// poster (user 2026-10-10). The caller only passes what it knows.
 pub fn paint_source_monitor(
-    ui: &mut Ui,
-    rect: Rect,
-    surface: MonitorSurface<'_>,
-    poster: Option<MonitorPoster<'_>>,
-    label: &str,
-) -> Option<&'static str> {
-    let (chrome, auto) = (surface.chrome, surface.yield_to_external);
-    paint_source_view(ui, rect, surface, poster, label);
-    paint_switch(ui, rect, chrome, auto)
-}
-
-/// The Auto | On switch in the top right corner, only while the program output is on an
-/// external screen; the clicked action.
-fn paint_switch(ui: &mut Ui, rect: Rect, chrome: MonitorChrome, auto: bool) -> Option<&'static str> {
-    if !qnc_program_output::showing(ui.ctx()) {
-        return None;
-    }
-    let font = FontId::proportional(chrome.font_size);
-    let mut right = rect.right() - 6.0;
-    let mut clicked = None;
-    for (action, label, on) in [
-        (MONITOR_ON, qnc_ui_text::text("monitor.on"), !auto),
-        (MONITOR_AUTO, qnc_ui_text::text("monitor.auto"), auto),
-    ] {
-        let galley = ui.painter().layout_no_wrap(label.to_string(), font.clone(), chrome.muted);
-        let size = galley.size() + egui::vec2(12.0, 6.0);
-        let button = Rect::from_min_size(egui::pos2(right - size.x, rect.top() + 6.0), size);
-        right = button.left() - 4.0;
-        let response = ui.interact(button, ui.id().with(("qnc-monitor-switch", action)), Sense::click());
-        let fill = if on { chrome.border } else { chrome.fill };
-        ui.painter().rect_filled(button, 2.0, fill);
-        ui.painter().rect_stroke(button, 2.0, Stroke::new(1.0, chrome.border), StrokeKind::Inside);
-        ui.painter().text(button.center(), Align2::CENTER_CENTER, label, font.clone(), if on || response.hovered() { Color32::WHITE } else { chrome.muted });
-        if response.clicked() {
-            clicked = Some(action);
-        }
-    }
-    clicked
-}
-
-fn paint_source_view(
     ui: &mut Ui,
     rect: Rect,
     surface: MonitorSurface<'_>,

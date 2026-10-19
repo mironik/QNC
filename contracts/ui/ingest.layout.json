@@ -124,6 +124,14 @@
       {
         "label": "]",
         "action_id": "mark_out"
+      },
+      {
+        "label": "@monitor.auto",
+        "action_id": "monitor_auto"
+      },
+      {
+        "label": "@monitor.on",
+        "action_id": "monitor_on"
       }
     ],
     "play_pause_playing": "||",

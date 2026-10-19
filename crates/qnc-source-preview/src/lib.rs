@@ -75,11 +75,7 @@ pub struct PreviewView {
 impl PreviewView {
     /// The switch Auto | On under the monitor: which one is on.
     pub fn monitor_mode_on(&self, action_id: &str) -> bool {
-        match action_id {
-            MONITOR_AUTO => self.monitor_auto,
-            MONITOR_ON => !self.monitor_auto,
-            _ => false,
-        }
+        qnc_monitor::switch_on(action_id, self.monitor_auto)
     }
 }
 

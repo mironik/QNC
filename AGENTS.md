@@ -4921,3 +4921,9 @@ svaka forma s preview monitorom dobiva istim putem; `qnc-source-preview` ih uzim
 `monitor_auto` iz previewa. Iz `contracts/ui/editorial.layout.json` uklonjeni su gumbi `monitor_auto`/`monitor_on`,
 sifre teksta `monitor.auto`/`monitor.on`. Usput: pet ponovljenih "odbij i osvjezi" u `qnc-ingest-application` je jedna
 funkcija (`rejected_shown`); C10 Ingest application 1552 -> 1547. Testovi, conformance. Uzivo nije provjereno (treba HDMI).
+Ispravak 2026-10-19 (korisnik: "to je pogresna lokacija, mora biti gdje je bio i prije"): prekidac Auto | On vise nije
+na slici monitora nego opet u redu ispod monitora, desno uz `>` (gdje je bio u Storyju od 8. 10.), i sada i u Ingestu
+(uz `>`, `[`, `]`). Mjesto daje ugovor rasporeda (`contracts/ui/editorial.layout.json` Story, `contracts/ui/ingest.layout.json`,
+`transport_right`, sifre `@monitor.auto`/`@monitor.on`); koji je ukljucen kaze `qnc-monitor::switch_on` (Story preko
+`qnc-source-preview::monitor_mode_on`, Ingest `pool_head`), klik vozi `qnc-source-panel`. Prekidac se vidi uvijek, kao prije.
+`qnc-monitor` vise ne crta prekidac. Media Assist gumbi nisu dirani (predlosci). Testovi, conformance.
