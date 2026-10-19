@@ -38,8 +38,7 @@ pub(super) fn render_transport(ui: &mut Ui, rect: Rect, contracts: &IngestContra
     let head = &contracts.ingest.pool_head;
     let (row, chrome) = (row_style(theme, head.tab_gap), dock_style(contracts, theme));
     let look = qnc_transport_panel::TransportLook { row: &row, chrome: &chrome, fill: theme.surface };
-    let listed = head.transport_right.iter().filter_map(|command| Some((command.label(), command.action_id()?)));
-    qnc_transport_panel::show(ui, rect, look, listed).map(|action| IngestIntent::empty(&action))
+    qnc_transport_panel::show(ui, rect, look).map(|action| IngestIntent::empty(&action))
 }
 
 /// The colours of the public pool head row from the Ingest theme.

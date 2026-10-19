@@ -1,9 +1,9 @@
 //! The transport panel (user 2026-10-19: blocks build modules, modules build panels,
-//! a layout places panels; a panel is written once and works wherever a layout puts it).
-//! It holds the transport buttons the layout lists (Play, IN, OUT ...) and, always, the
-//! monitor's Auto | On switch (one choice for every monitor, `qnc_monitor::auto`), in its
-//! own place of the board, so a layout may put it anywhere. A click is a catalog action
-//! that the shared source panel keys carry out (`qnc-source-panel`).
+//! a layout places panels; a panel is written once and works wherever a layout puts it,
+//! no code is written again). Its blocks are its own and the same everywhere: Play, IN,
+//! OUT and the monitor's Auto | On switch (one choice for every monitor,
+//! `qnc_monitor::auto`). A layout only gives it a place. A click is a catalog action that
+//! the shared source panel keys carry out (`qnc-source-panel`).
 //!
 //! Passive: it keeps no state, plays nothing and reads no database.
 
@@ -31,24 +31,30 @@ pub struct TransportLook<'a> {
     pub fill: Color32,
 }
 
-/// The buttons: the ones the layout lists (label, action), then the Auto | On switch,
-/// with the one that is on.
-pub fn controls<'a>(listed: impl IntoIterator<Item = (&'a str, &'a str)>) -> Vec<Control> {
-    let mut controls: Vec<Control> = listed
-        .into_iter()
-        .filter(|(_, action)| !matches!(*action, MONITOR_AUTO | MONITOR_ON))
-        .map(|(label, action)| Control { label: label.to_string(), action_id: action.to_string(), on: false })
-        .collect();
-    for (action, key) in [(MONITOR_AUTO, "monitor.auto"), (MONITOR_ON, "monitor.on")] {
-        let on = qnc_monitor::switch_on(action, qnc_monitor::auto());
-        controls.push(Control { label: qnc_ui_text::text(key).to_string(), action_id: action.to_string(), on });
-    }
-    controls
+/// The panel's blocks, left to right: (catalog action, label key).
+const BLOCKS: [(&str, &str); 5] = [
+    ("play_pause", "transport.play"),
+    ("mark_in", "transport.mark_in"),
+    ("mark_out", "transport.mark_out"),
+    (MONITOR_AUTO, "monitor.auto"),
+    (MONITOR_ON, "monitor.on"),
+];
+
+/// The buttons, with the one of Auto | On that is on.
+pub fn controls() -> Vec<Control> {
+    BLOCKS
+        .iter()
+        .map(|(action, key)| Control {
+            label: qnc_ui_text::text(key).to_string(),
+            action_id: action.to_string(),
+            on: qnc_monitor::switch_on(action, qnc_monitor::auto()),
+        })
+        .collect()
 }
 
 /// The panel in `rect`; the clicked button's catalog action.
-pub fn show<'a>(ui: &mut Ui, rect: Rect, look: TransportLook<'_>, listed: impl IntoIterator<Item = (&'a str, &'a str)>) -> Option<String> {
-    let controls = controls(listed);
+pub fn show(ui: &mut Ui, rect: Rect, look: TransportLook<'_>) -> Option<String> {
+    let controls = controls();
     let commands: Vec<_> = controls.iter().map(|control| RowCommand { label: &control.label, on: control.on }).collect();
     let mut clicked = None;
     qnc_source_dock::show_chrome_row(ui, rect, look.chrome, look.fill, true, |ui| {
@@ -64,14 +70,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_switch_follows_the_listed_buttons_once_and_one_choice_serves_every_panel() {
-        let listed = [(">", "play_pause"), ("Auto", MONITOR_AUTO)];
+    fn the_panel_has_its_own_blocks_and_one_choice_serves_every_panel() {
         assert!(qnc_monitor::choose(MONITOR_AUTO));
-        let shown: Vec<_> = controls(listed).into_iter().map(|control| (control.action_id, control.on)).collect();
-        let expected = [("play_pause", false), (MONITOR_AUTO, true), (MONITOR_ON, false)].map(|(action, on)| (action.to_string(), on));
+        let shown: Vec<_> = controls().into_iter().map(|control| (control.action_id, control.on)).collect();
+        let expected = [("play_pause", false), ("mark_in", false), ("mark_out", false), (MONITOR_AUTO, true), (MONITOR_ON, false)]
+            .map(|(action, on)| (action.to_string(), on));
         assert_eq!(shown, expected);
         assert!(qnc_monitor::choose(MONITOR_ON));
-        assert!(controls(listed).last().is_some_and(|control| control.on), "On is on everywhere");
+        assert!(controls().last().is_some_and(|control| control.on), "On is on everywhere");
         assert!(qnc_monitor::choose(MONITOR_AUTO));
     }
 }

@@ -31,7 +31,7 @@
   "state_policy": "stateless",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-transport-panel",
-  "input": "The transport buttons a layout lists (label, catalog action), the place the board gives it and the form's theme.",
-  "output": "The buttons and, always, the monitor's Auto | On switch with the one that is on (qnc-monitor); a click is the catalog action, carried out by qnc-source-panel.",
+  "input": "The place the board gives it and the form's theme; its blocks (Play, IN, OUT, Auto | On) are its own, the same everywhere.",
+  "output": "Play, IN, OUT and the monitor's Auto | On switch with the one that is on (qnc-monitor); a click is the catalog action, carried out by qnc-source-panel.",
   "specification": "User 2026-10-19: a panel is the smallest unit a layout places; the monitor and its transport are separate panels so a layout may arrange them freely."
 }

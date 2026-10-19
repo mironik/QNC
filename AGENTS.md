@@ -4976,3 +4976,10 @@ i u pauzi i dok svira, bez nove pripreme (medukorak e5e6f7c uklonjen). Program (
 `qnc-program-output`: HDMI zadrzava zadnju sliku do 1,5 s dok monitor nema sliku (bljesak pri pripremi playera).
 Testovi, conformance. `qnc-player-acceptance` nije pokrenut (projekti zive kopije su izvan njezina korijena). Uzivo nije
 provjereno.
+Ispravak 2026-10-19 (korisnik: "zasto u Story formi monitor nema in/out oznake"; "Story ne koristi, samo kocke, to nije
+sastavni dio Storyja"; "nema ponovnog pisanja koda, samo se kocke slazu u module i panele"): popis dugmadi transporta bio
+je u rasporedu svake forme (`pool_head.transport_right`), a Story ga je imao svoj, samo s Play. Popis je premjesten (ne
+kopiran) u panel `qnc-transport-panel` (`BLOCKS`: Play, IN, OUT, Auto, On; natpisi u rjecniku `transport.*`), a iz oba
+ugovora rasporeda i modela (`qnc-editorial-layout`, `qnc-ingest-layout`) je uklonjen; raspored daje samo mjesto i sirinu
+(`transport_width`). Panel je isti u svakoj formi. C10: `qnc-editorial-blocks` 302 -> 301, `qnc-ingest-blocks` 825 -> 824.
+Testovi, conformance.

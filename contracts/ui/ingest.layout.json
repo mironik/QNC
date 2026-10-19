@@ -113,20 +113,6 @@
     ],
     "tab_gap": 10.0,
     "transport_width": 290.0,
-    "transport_right": [
-      {
-        "label": ">",
-        "action_id": "play_pause"
-      },
-      {
-        "label": "[",
-        "action_id": "mark_in"
-      },
-      {
-        "label": "]",
-        "action_id": "mark_out"
-      }
-    ],
     "play_pause_playing": "||",
     "hidden_transport": [
       "B",

@@ -205,7 +205,6 @@ impl IngestPreviewPane {
 pub struct IngestPoolHead {
     pub tabs_left: Vec<TransportCommand>,
     pub tab_gap: f32,
-    pub transport_right: Vec<TransportCommand>,
     /// Width of the transport panel's place at the right of the row under the monitor.
     pub transport_width: f32,
 }

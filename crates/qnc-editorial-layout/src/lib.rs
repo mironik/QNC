@@ -88,11 +88,6 @@ impl EditorialContracts {
         own.unwrap_or(&self.editorial.pool_head.tabs_left)
     }
 
-    /// Pool head transport buttons of this group, left to right.
-    pub fn pool_transport(&self) -> &[TransportCommand] {
-        let own = self.composition().pool_head.transport_right.as_deref();
-        own.unwrap_or(&self.editorial.pool_head.transport_right)
-    }
 
     /// The Tab walk of this group (user 2026-10-13: it belongs to the form): its panels in
     /// order, the action ids of its pool tabs, the action ids of its source dock buttons
@@ -153,8 +148,7 @@ impl EditorialContracts {
     /// The board of this group: the standard layout with the row under the monitor in two
     /// places, the pool tabs (`pool-head`) and the transport panel (`transport`).
     pub fn board_layout(&self) -> qnc_board::Layout {
-        let width = self.composition().pool_head.transport_width.unwrap_or(self.editorial.pool_head.transport_width);
-        self.board_sizes().standard_layout(&self.board_names()).split_place("pool-head", "transport", width)
+        self.board_sizes().standard_layout(&self.board_names()).split_place("pool-head", "transport", self.editorial.pool_head.transport_width)
     }
 
     /// The sizes of Media Assist and Story on the one desktop board: the monitor keeps
@@ -257,7 +251,6 @@ impl EditorialPreview {
 #[derive(Debug, Clone, Deserialize)]
 pub struct EditorialPoolHead {
     pub tabs_left: Vec<TransportCommand>,
-    pub transport_right: Vec<TransportCommand>,
     /// Width of the transport panel's place at the right of the row under the monitor.
     pub transport_width: f32,
 }
@@ -319,8 +312,6 @@ pub struct GroupComposition {
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct GroupPoolHead {
     pub tabs_left: Option<Vec<TransportCommand>>,
-    pub transport_right: Option<Vec<TransportCommand>>,
-    pub transport_width: Option<f32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -59,21 +59,7 @@
         "action_id": "editorial_tab_virtual"
       }
     ],
-    "transport_width": 290.0,
-    "transport_right": [
-      {
-        "label": ">",
-        "action_id": "play_pause"
-      },
-      {
-        "label": "[",
-        "action_id": "mark_in"
-      },
-      {
-        "label": "]",
-        "action_id": "mark_out"
-      }
-    ]
+    "transport_width": 290.0
   },
   "cover_lengths": [
     {
@@ -262,13 +248,6 @@
           {
             "label": "@pool.tab.segment",
             "action_id": "editorial_tab_segment"
-          }
-        ],
-        "transport_width": 180.0,
-        "transport_right": [
-          {
-            "label": ">",
-            "action_id": "play_pause"
           }
         ]
       },

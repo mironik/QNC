@@ -113,8 +113,7 @@ fn render_pool_head(
 fn render_transport(ui: &mut Ui, rect: Rect, contracts: &EditorialContracts, theme: &Theme) -> Option<EditorialIntent> {
     let (row, chrome) = (contracts.row_style(theme), contracts.dock_style(theme));
     let look = qnc_transport_panel::TransportLook { row: &row, chrome: &chrome, fill: theme.surface };
-    let listed = contracts.pool_transport().iter().filter_map(|command| Some((command.label(), command.action_id()?)));
-    qnc_transport_panel::show(ui, rect, look, listed).map(|action| EditorialIntent::action(&action))
+    qnc_transport_panel::show(ui, rect, look).map(|action| EditorialIntent::action(&action))
 }
 
 /// The source dock is the public one; this form only says which clip it shows and which
