@@ -4858,3 +4858,11 @@ tiho ga zamjenjuje; otvoreni klip dobiva puni val prvi. Zapis vala `qnc-wave` `W
 JSON-u, bez promjene sheme; puni zapis bez polja), `WaveformPeaks.coarse`; `qnc-wave-worker` (grubi zapis nije
 "ready", klip se vraca u red), `qnc-source-preview` i `qnc-program-waveform` citaju grubi val ponovno dok ga puni ne
 zamijeni. Testovi, conformance. Uzivo nije izmjereno.
+Popravak 2026-10-19 (korisnik: "novi disk ne ucitava s njega, rutina ima problem"): disk D: je FX6 CFexpress kartica
+(`XDROOT` u korijenu, 122 klipa s proxyjima); katalog kamera poznavao je Sony XAVC samo kao `PRIVATE/XDROOT` (SD), pa
+Select nije nasao nijedan original i nista nije javio. Nova revizija kataloga `catalogs/camera-patterns/revisions/
+2026.10.19.1.json` -> `camera-patterns-2026.10.19.1.sqlite` (alat `qnc-camera-catalog revise`; stara objava ostaje):
+`sony-xdroot-sd` dobiva korijen `XDROOT` uz `PRIVATE/XDROOT`, datoteke, uloge, grupiranje i probe isti. Provjereno citanjem
+diska: 122 originala, 122 proxyja, 122 XML zapisa s tocnim brojem slika; stari katalog 0. `sony-xdcam-mxf` (Clip u
+korijenu) se ne preklapa. Izolirana kopija koristi novi katalog; stvarni `data/ingest-transport.json` jos pokazuje staru
+objavu (postavka racunala, nije dirana). Otvoreno: Select koji ne nade ni karticu ni datoteke ne javlja razlog.
