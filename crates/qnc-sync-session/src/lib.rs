@@ -39,15 +39,43 @@ pub fn route(
         "activate_focused_item" if segments.sync_drafting() => segments.confirm_source(),
         "delete_marker" if segments.sync_drafting() => segments.discard_sync(),
         "play_pause" => space(preview, wrap, segments),
-        // O closes a running Sync slot wherever the keyboard is (v5).
-        "mark_out" if on_source && segments.finish_sync() => true,
+        // O stops a running Sync (user 2026-10-19): the arrows or the mouse still move its
+        // end, Enter writes the cover.
+        "mark_out" if on_source && segments.sync_drafting() => {
+            preview.pause();
+            true
+        }
         _ => return ControlFlow::Continue(()),
     }))
 }
 
-/// I pressed on the source: every press arms Sync/B-roll (v5 `mark_in_action`).
-pub fn armed_by_in(segments: &mut ProgramSegments) {
-    segments.arm_sync();
+/// I pressed on the source: every press arms Sync/B-roll (v5 `mark_in_action`); pressed
+/// while the source plays, Sync starts at once (user 2026-10-19: "IN chosen on the fly
+/// while it plays, and Sync/B-roll writes the cover").
+pub fn armed_by_in(segments: &mut ProgramSegments, preview: &SourcePreview) {
+    segments.arm_sync(preview.player_view().playing());
+}
+
+/// Once a frame: an IN armed on the fly starts its Sync.
+pub fn poll(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut ProgramSegments) {
+    if segments.take_sync_flight() {
+        space(preview, wrap, segments);
+    }
+}
+
+/// The OUT of a stopped Sync dragged on the source timeline to `value` (a source frame):
+/// its end moves as the arrows move it; false when no stopped Sync takes it.
+pub fn dragged(preview: &mut SourcePreview, segments: &mut ProgramSegments, value: Option<i64>) -> bool {
+    let Some(source_out) = value.and_then(|frame| u64::try_from(frame).ok()) else {
+        return false;
+    };
+    if !segments.sync_drafting() || preview.player_view().playing() || !segments.sync_drag_end(source_out) {
+        return false;
+    }
+    if let Some(frame) = segments.sync_window_frame() {
+        preview.show_program_frame(frame, false);
+    }
+    true
 }
 
 /// Space (v5 `playback_transport_toggle_intent`): a Sync play starts in the Source view once
@@ -80,6 +108,7 @@ mod tests {
     fn without_a_sync_only_space_is_taken_and_it_plays() {
         let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
         for key in ["step_back_frame", "step_forward_frame", "activate_focused_item", "delete_marker", "mark_out", "mark_in"] {
+            // Without a Sync nothing here is Sync's.
             assert_eq!(route(key, (&mut preview, &mut wrap, &mut segments), true), ControlFlow::Continue(()), "{key}");
         }
         assert!(route("play_pause", (&mut preview, &mut wrap, &mut segments), false).is_break());

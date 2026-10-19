@@ -72,9 +72,11 @@ impl SourcePanel {
                 *timeline = timeline.with_source_in_at_confirmed();
                 true
             }
+            // OUT stops the play there (user 2026-10-19).
             "mark_out" => {
                 self.mark_taken = false;
                 *timeline = timeline.with_source_out_at_confirmed();
+                preview.pause();
                 true
             }
             "select_mark_in" | "select_mark_out" => {

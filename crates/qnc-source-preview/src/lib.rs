@@ -626,6 +626,12 @@ impl SourcePreview {
         })
     }
 
+    /// Pauses a playing player; false when it does not play.
+    pub fn pause(&mut self) -> bool {
+        self.play_when_ready = false;
+        self.player_view.playing() && self.send(Action::TogglePlayPause)
+    }
+
     pub fn toggle_play(&mut self) -> bool {
         self.touched = Some(std::time::Instant::now());
         self.cue_asked = None; // Play moves the playhead: arrows count from where it stops

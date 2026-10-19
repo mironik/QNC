@@ -167,6 +167,10 @@ pub struct ProgramSegments {
     sync: qnc_sync_cover::SyncCover,
     /// IN was pressed since the last source (arms Sync).
     sync_in_pressed: bool,
+    /// The last IN was pressed while the source played (Sync starts once it is armed).
+    sync_flight: bool,
+    /// Armed on the fly: Sync starts with the next poll.
+    sync_flight_ready: bool,
     /// The closed Sync slot writes its cover as soon as it is stored (Enter during the
     /// play, or the play reached an M marker or the source OUT).
     sync_commit: bool,

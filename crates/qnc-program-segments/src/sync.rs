@@ -32,9 +32,11 @@ impl ProgramSegments {
             return;
         };
         let pressed = std::mem::take(&mut self.sync_in_pressed);
+        let flight = std::mem::take(&mut self.sync_flight);
         if (previous_in == Some(source_in) && !pressed) || !self.sync.enabled() {
             return;
         }
+        self.sync_flight_ready = flight;
         let rate = |value: i64| u32::try_from(value).unwrap_or(0);
         self.sync.arm(SyncSource {
             clip_id: clip_id.clone(),
@@ -48,8 +50,23 @@ impl ProgramSegments {
 
     /// IN was pressed on the source: every press arms Sync, also on the same
     /// frame (v5 `mark_in_action` -> `arm_source_in`); taken with the next source.
-    pub fn arm_sync(&mut self) {
+    pub fn arm_sync(&mut self, in_flight: bool) {
         self.sync_in_pressed = true;
+        self.sync_flight = in_flight && self.sync.enabled();
+    }
+
+    /// An IN pressed while the source played has armed Sync: it starts now (once).
+    pub fn take_sync_flight(&mut self) -> bool {
+        self.sync_flight_ready && std::mem::take(&mut self.sync_flight_ready)
+    }
+
+    /// The OUT of a stopped Sync dragged to `source_out` on the source timeline.
+    pub fn sync_drag_end(&mut self, source_out: u64) -> bool {
+        if !self.sync.drag_end(source_out) {
+            return false;
+        }
+        self.refresh_view(qnc_ui_text::text("story.msg.sync_stopped").into());
+        true
     }
 
     /// Space: a Sync play starts in the Source view once IN armed it.
@@ -174,6 +191,16 @@ impl ProgramSegments {
         }
         // A running Sync play gives the player back to the whole program.
         self.program_changed |= self.sync.toggle();
+        // Sync on: the Wrap playhead on the nearest M marker, where the cover starts (user
+        // 2026-10-19).
+        if self.sync.enabled() {
+            let playhead = self.playhead.unwrap_or(0);
+            let total = self.view.total_frames;
+            let nearest = self.view.markers.iter().map(|pin| pin.frame).filter(|frame| *frame < total).min_by_key(|frame| frame.abs_diff(playhead));
+            if let Some(frame) = nearest {
+                self.cue_program(frame);
+            }
+        }
         let message = if self.sync.enabled() {
             qnc_ui_text::text("story.msg.sync_on")
         } else {

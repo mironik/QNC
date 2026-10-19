@@ -263,6 +263,18 @@ impl SyncCover {
         true
     }
 
+    /// The end of a stopped Sync at the program frame that plays `source_out` (the OUT
+    /// dragged on the source timeline), kept within the slot as an arrow keeps it.
+    pub fn drag_end(&mut self, source_out: u64) -> bool {
+        let Some(session) = self.active.as_ref() else {
+            return false;
+        };
+        let (num, den) = session.per_source;
+        let end = session.anchor + source_out.saturating_sub(session.source.source_in) * num / den.max(1);
+        let frames = end as i64 - session.end as i64;
+        frames != 0 && self.nudge(frames)
+    }
+
     /// The frame of the playing window that shows the last picture of a stopped Sync's
     /// draft (the window's frames start at 0): the monitor shows the new end when an arrow
     /// moves it (user 2026-10-16). `None` while it plays, or when the end moved before the

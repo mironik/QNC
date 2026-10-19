@@ -5005,3 +5005,13 @@ puni valovi). Filmstrip, valovi i dovrsetak zapisa su samostalni radnici; nitko 
 playeru. Kocka `qnc-import-control` (+ ugovor) i lanac `hold_filmstrip` (`qnc-timeline-artifacts`,
 `qnc-content-artifacts`, `tools/qnc-ingest-worker`) uklonjeni. U radnicima filmstripa i vala ostaju neiskoristeni
 `set_on_orders`/`set_held` (zadano: rade). Testovi, conformance. Uzivo nije izmjereno.
+Izmjena 2026-10-20 (korisnik: "u source timelineu OUT treba zaustaviti play"; "kad je ukljucen Sync/B-roll playhead se
+pozicionira na najblizi marker, gleda polozaj playheada; IN u letu dok traje play i Sync/B-roll pise pokrivalicu; O
+zaustavlja play, tada se jos moze korigirati OUT strelicama ili misem, Enter snima pokrivalicu"): (1) O na source
+timelineu postavi OUT i zaustavi play, u svakoj formi (`qnc-source-panel`; Story kroz `qnc-panel-focus`;
+`qnc-source-preview::pause`). (2) Ukljucen Sync stavlja Wrap playhead na M marker najblizi njegovu polozaju
+(`qnc-program-segments` `toggle_sync`). (3) I pritisnut dok izvor svira postavlja IN i odmah pokrece Sync od tog markera
+(`arm_sync(in_flight)`, `take_sync_flight`, `qnc-sync-session::poll`). (4) O za vrijeme Synca samo zaustavlja (prije je
+zatvarao slot); kraj pokrivalice i dalje pomicu strelice, a sada i povlacenje OUT-a misem na source timelineu
+(`qnc-sync-cover::drag_end`, `qnc-sync-session::dragged`); Enter zapisuje, Delete odbacuje. Testovi (novi:
+`an_in_pressed_while_the_source_plays_starts_sync_once_it_is_armed`), zlatni testovi tipki, conformance. Uzivo nije provjereno.

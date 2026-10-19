@@ -422,7 +422,7 @@ fn sync_starts_from_the_marker_before_the_playhead_after_a_new_in() {
         SyncSpace::Play,
         "Space in Wrap plays"
     );
-    segments.arm_sync();
+    segments.arm_sync(false);
     segments.set_source(marked(12));
     assert!(
         matches!(segments.sync_space(false), SyncSpace::Start(_)),
@@ -710,4 +710,19 @@ fn a_clip_whose_channel_count_was_not_read_is_read_again() {
     let known = counted(&channels);
     assert!(known.contains("read"));
     assert!(!known.contains("missing"), "a count not read is asked again");
+}
+
+#[test]
+fn an_in_pressed_while_the_source_plays_starts_sync_once_it_is_armed() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::ToggleSync);
+    assert!(!segments.take_sync_flight(), "nothing armed yet");
+    segments.arm_sync(true);
+    segments.set_source(marked(13));
+    assert!(segments.take_sync_flight(), "IN in flight starts Sync");
+    assert!(!segments.take_sync_flight(), "once");
+    segments.arm_sync(false);
+    segments.set_source(marked(14));
+    assert!(!segments.take_sync_flight(), "IN while stopped waits for Space");
 }

@@ -189,6 +189,7 @@ impl PanelFocus {
             }
         }
         qnc_segments_keys::dropped(preview, wrap, segments); // another edit took over
+        qnc_sync_session::poll(preview, wrap, segments); // an IN pressed while the source plays starts Sync
         if let Some(answer) = self.keyframes.take() {
             match (self.jump.take(), answer) {
                 (Some(Jump::SourceMark), Ok(frames)) => {
@@ -309,6 +310,8 @@ impl PanelFocus {
                 let intent = event.unsigned().filter(|_| id == "timeline_cue_frame").map_or(TimelineIntent::GoHome, TimelineIntent::CueFrame);
                 Some(Some(self.source.cue(&intent, preview)))
             }
+            // A stopped Sync's OUT is the end of its cover: the mouse moves it as the arrows do.
+            qnc_source_timeline::DRAG_OUT if qnc_sync_session::dragged(preview, segments, event.value) => Some(Some(true)),
             qnc_source_timeline::DRAG_IN | qnc_source_timeline::DRAG_OUT | qnc_source_timeline::CHOOSE_A1_CHANNEL | qnc_source_timeline::CHOOSE_A2_CHANNEL => {
                 self.panel = Panel::SourceTimeline;
                 Some(self.source.route_input(id, event.value, preview, timeline))
@@ -317,7 +320,7 @@ impl PanelFocus {
             // marks IN, so it arms Sync/B-roll as I does.
             qnc_source_timeline::CUT => {
                 self.panel = Panel::SourceTimeline;
-                qnc_sync_session::armed_by_in(segments);
+                qnc_sync_session::armed_by_in(segments, preview);
                 Some(self.source.route_input(id, None, preview, timeline))
             }
             _ => {
@@ -466,12 +469,13 @@ impl PanelFocus {
             "mark_in" => {
                 self.source.set_mark_taken(false);
                 qnc_source_mark_focus::release(timeline); // a new IN lets go of a taken mark
-                qnc_sync_session::armed_by_in(segments); // v5: every IN arms Sync/B-roll
+                qnc_sync_session::armed_by_in(segments, preview); // v5: every IN arms Sync/B-roll
                 return None; // the application marks IN with its still
             }
             "mark_out" => {
                 self.source.set_mark_taken(false);
                 qnc_source_mark_focus::release(timeline);
+                preview.pause(); // OUT stops the play there (user 2026-10-19)
                 return None;
             }
             // v5 navigate_adjacent_source_object: start, IN and OUT in order on the source.
