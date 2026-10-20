@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public passive module: media card and virtualized card grid"
 
 [dependencies]
+qnc-pool-pointer = { workspace = true }
 eframe = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-key-list = { workspace = true }

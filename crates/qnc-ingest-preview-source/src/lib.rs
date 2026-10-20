@@ -125,8 +125,8 @@ impl IngestPreviewSource {
         self.preview.close();
     }
 
-    pub fn poll(&mut self) -> bool {
-        self.preview.poll()
+    pub fn poll(&mut self, pointed: Option<&str>) -> bool {
+        self.preview.poll_pointed(pointed)
     }
 
     pub fn refresh_assets(&mut self) -> bool {

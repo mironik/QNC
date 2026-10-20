@@ -603,6 +603,7 @@ fn grid(
     key: Option<KeyFocus>,
 ) -> Option<CardGridAction> {
     let mut clicked: Option<CardGridAction> = None;
+    let mut pointed = key.as_ref().and_then(|key| input.cards.get(key.index)).map(|card| card.id.to_string());
     let cards = input.cards;
     let muted = style.muted;
     let available_w = ui.available_width().max(metrics.min_card_width);
@@ -686,6 +687,9 @@ fn grid(
                             // the red frame of the chosen clip, so both show.
                             ui.painter().rect_stroke(rect.expand(1.0), 0.0, egui::Stroke::new(3.0, key.color), egui::StrokeKind::Outside);
                         }
+                        if resp.hovered() {
+                            pointed = Some(card.id.to_string());
+                        }
                         if resp.clicked() {
                             let is_checkbox_click = input.features.ticks != Ticks::Off
                                 && resp.interact_pointer_pos().is_some_and(|pos| {
@@ -706,6 +710,9 @@ fn grid(
             ui.add_space(remaining_rows as f32 * row_stride);
         });
 
+    if let Some(pointed) = pointed {
+        qnc_pool_pointer::point(ui.ctx(), &pointed); // its data is read before the click
+    }
     clicked
 }
 

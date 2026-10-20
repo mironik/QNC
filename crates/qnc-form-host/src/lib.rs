@@ -2,7 +2,8 @@
 //! each ran the same loop in their `app.rs`). Once per frame before the form paints: the
 //! player's wake, the application's poll, when to paint (piece `qnc-paint-pace`) and the
 //! keys of the frame as catalog actions (piece `qnc-key-intents`), each dispatched to the
-//! application. It knows no application: one implements `FormApplication`.
+//! application, and the clip the media pool points at (piece `qnc-pool-pointer`). It
+//! knows no application: one implements `FormApplication`.
 
 use std::time::Duration;
 
@@ -18,8 +19,8 @@ pub trait FormApplication {
     /// A player exists (its pictures and states then wake the paint).
     fn has_player(&self) -> bool;
     fn on_player_change(&self, wake: Wake);
-    /// Reads what changed; whether the view changed.
-    fn poll(&mut self) -> bool;
+    /// Reads what changed, with the clip the media pool points at; whether the view changed.
+    fn poll(&mut self, pointed: Option<&str>) -> bool;
     fn playing(&self) -> bool;
     /// The cadence the application asks for.
     fn next_repaint_delay(&self) -> Option<Duration>;
@@ -51,7 +52,7 @@ impl FormHost {
     pub fn before_paint<A: FormApplication>(&mut self, ctx: &Context, application: &mut A, keys: &FormKeys<'_>) {
         let app = &*application;
         self.pace.bind_player(ctx, app.has_player(), |wake| app.on_player_change(wake));
-        let changed = application.poll();
+        let changed = application.poll(qnc_pool_pointer::take(ctx).as_deref());
         self.pace.after_poll(ctx, changed, application.playing(), application.next_repaint_delay());
         for action_id in qnc_key_intents::action_ids_in(ctx, keys.catalog, application.key_scope(), keys.scopes, keys.play_action) {
             dispatch(ctx, application, A::intent_of(action_id));

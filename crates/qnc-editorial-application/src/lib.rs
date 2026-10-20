@@ -183,9 +183,9 @@ impl EditorialApplication {
 
     /// Applies finished background work and the player state. Returns whether
     /// the view changed.
-    pub fn poll(&mut self) -> bool {
+    pub fn poll(&mut self, pointed: Option<&str>) -> bool {
         let mut changed = self.poll_catalog();
-        if self.preview.poll() {
+        if self.preview.poll_pointed(pointed) {
             changed = true;
         }
         for poster in self.posters.poll() {

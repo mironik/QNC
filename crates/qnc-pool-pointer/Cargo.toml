@@ -1,0 +1,8 @@
+[package]
+name = "qnc-pool-pointer"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the clip the media pool points at (mouse over its card, or the keyboard on it), so its data is read before the click"
+
+[dependencies]
+eframe = { workspace = true }

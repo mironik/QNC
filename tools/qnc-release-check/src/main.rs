@@ -66,7 +66,7 @@ fn wait<T>(
 ) -> Option<T> {
     let until = Instant::now() + time;
     while Instant::now() < until {
-        app.poll();
+        app.poll(None);
         if let Some(value) = found(app) {
             return Some(value);
         }

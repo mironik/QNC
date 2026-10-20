@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.pool-pointer",
+  "module_name": "Pool pointer",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "ui.pool.pointer"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-pool-pointer",
+  "input": "The clip id of the card the mouse is over, else the card the keyboard is on, written by the card grid each frame.",
+  "output": "The pointed clip taken once per frame by the form host, and each new pointed clip once (Follow) for whoever reads its data ahead.",
+  "specification": "User 2026-10-20: watch the focus on the media pool; the filmstrip is read into memory if it exists, so a click shows it at once."
+}

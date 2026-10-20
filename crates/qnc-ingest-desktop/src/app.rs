@@ -21,7 +21,7 @@ impl qnc_form_host::FormApplication for Hosted<'_> {
     type Intent = IngestIntent;
     fn has_player(&self) -> bool { self.0.has_player() }
     fn on_player_change(&self, wake: qnc_paint_pace::Wake) { self.0.notify_on_player_change(wake) }
-    fn poll(&mut self) -> bool { self.0.poll() }
+    fn poll(&mut self, pointed: Option<&str>) -> bool { self.0.poll(pointed) }
     fn playing(&self) -> bool { self.0.view().playback.playing() }
     fn next_repaint_delay(&self) -> Option<std::time::Duration> { self.0.next_repaint_delay() }
     fn key_scope(&self) -> Option<&'static str> { self.0.view().focus.key_scope() }

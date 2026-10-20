@@ -162,7 +162,7 @@ mod tests {
     fn wait_for_component(component: &mut IngestApplication) {
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         while component.has_pending_work() {
-            component.poll();
+            component.poll(None);
             assert!(std::time::Instant::now() < deadline);
             std::thread::sleep(Duration::from_millis(5));
         }

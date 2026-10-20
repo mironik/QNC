@@ -67,7 +67,7 @@ fn fixture() -> tempfile::TempDir {
 fn wait(component: &mut IngestApplication) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while component.has_pending_work() {
-        component.poll();
+        component.poll(None);
         assert!(Instant::now() < deadline);
         std::thread::sleep(Duration::from_millis(5));
     }
@@ -156,7 +156,7 @@ fn marking_an_uncommitted_preview_is_local_and_stale_ack_does_not_mark_it_saved(
         error: None,
     })
     .unwrap();
-    component.poll();
+    component.poll(None);
     assert_eq!(component.view.clips[0].save_state, SaveState::Pending);
     assert!(
         component
@@ -169,7 +169,7 @@ fn marking_an_uncommitted_preview_is_local_and_stale_ack_does_not_mark_it_saved(
         error: Some("write failed".into()),
     })
     .unwrap();
-    component.poll();
+    component.poll(None);
     assert_eq!(component.view.clips[0].save_state, SaveState::Failed);
 }
 

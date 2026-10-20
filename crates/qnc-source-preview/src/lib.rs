@@ -216,6 +216,8 @@ pub struct SourcePreview {
     /// When the artifacts of the shown clip are read again while the background worker
     /// still makes them (one read a second; every form the same, user 2026-10-17).
     assets_again_at: Option<Instant>,
+    /// The clip the media pool pointed at last (its assets asked once).
+    pointed: qnc_pool_pointer::Follow,
     play_when_ready: bool,
     /// The last frame step, cue or Play of the user: the machine is theirs a while after.
     touched: Option<std::time::Instant>,
@@ -264,6 +266,7 @@ impl Default for SourcePreview {
             player_view: PlayerView::default(),
             timeline_assets: TimelineAssetReader::default(),
             assets_again_at: None,
+            pointed: qnc_pool_pointer::Follow::default(),
             play_when_ready: false,
             touched: None,
             record_wait: None,
@@ -919,6 +922,16 @@ impl SourcePreview {
 
     /// Applies the player state. Returns whether the view changed.
     pub fn poll(&mut self) -> bool {
+        self.poll_pointed(None)
+    }
+
+    /// The same, with the clip the media pool points at (mouse over its card, or the
+    /// keyboard on it): its filmstrip and wave are read into memory now, so a click on it
+    /// shows them at once (user 2026-10-20).
+    pub fn poll_pointed(&mut self, pointed: Option<&str>) -> bool {
+        if let Some(clip_id) = self.pointed.new_clip(pointed).filter(|clip| self.view.clip_id.as_deref() != Some(*clip)) {
+            self.timeline_assets.request(clip_id, false);
+        }
         let mut changed = self.retry_incomplete_record();
         changed |= self.take_assets();
         self.read_missing_assets();

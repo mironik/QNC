@@ -71,7 +71,7 @@ fn new_filter_accepts_incoming_clips_during_select_without_losing_existing_ones(
     component.selection_session = selection::SelectSession::from_receiver_for_test(receive);
     send.send(selection::Event::Clip(selected_clip("new", false, false)))
         .unwrap();
-    component.poll();
+    component.poll(None);
     assert_eq!(
         component
             .view
@@ -85,7 +85,7 @@ fn new_filter_accepts_incoming_clips_during_select_without_losing_existing_ones(
         ["new".into()].into_iter().collect(),
     ))
     .unwrap();
-    component.poll();
+    component.poll(None);
     assert_eq!(component.view.visible_clips().count(), 0);
     assert_eq!(component.view.clips.len(), 2);
 }

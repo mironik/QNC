@@ -5104,3 +5104,10 @@ Zlatna tablica tipki (830 slucajeva) nepromijenjena. Nova kocka `crates/qnc-form
 (budjenje playera, poll, ritam crtanja, tipke kao akcije kataloga, slanje radnji) preko svojstva `FormApplication`;
 Ingest i Story desktop samo omotaju svoju aplikaciju (`Hosted`). C10 Ingest desktop 76 -> 70, Story desktop 86 -> 82.
 Project desktop (zamrznut) jos ima svoju petlju. Testovi, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-20 (korisnik: "ako vec ima kreiran filmstrip zasto se najprije pokaze poster, pa filmstrip"; "treba
+gledati fokus na media poolu, filmstrip se ucita u memoriju ako postoji, pa ako korisnik klikne odmah prikaze"; "to treba
+biti samostalna kocka"): nova kocka `crates/qnc-pool-pointer` (+ ugovor): mreza kartica (`qnc-media-card`) javlja klip pod
+misem, inace karticu na kojoj je tipkovnica; form host ga preuzima jednom po frameu i predaje aplikaciji u `poll`;
+`Follow` daje svaki novi klip jednom. Univerzalni preview (`qnc-source-preview` `poll_pointed`) tada u pozadini cita
+filmstrip i val tog klipa u memoriju, pa klik pokazuje filmstrip odmah. Klip koji nije bio pokazan i dalje kratko pokaze
+poster. Ingest i Story isto; forme nisu narasle. Testovi, conformance. Uzivo nije provjereno.

@@ -129,6 +129,7 @@ members = [
     "crates/qnc-pool-tabs-panel",
     "crates/qnc-ingest-import-bar",
     "crates/qnc-form-host",
+    "crates/qnc-pool-pointer",
     "crates/qnc-source-volumes",
     "crates/qnc-board",
     "crates/qnc-channel-picker",
@@ -333,6 +334,7 @@ qnc-media-pool-panel = { path = "crates/qnc-media-pool-panel" }
 qnc-pool-tabs-panel = { path = "crates/qnc-pool-tabs-panel" }
 qnc-ingest-import-bar = { path = "crates/qnc-ingest-import-bar" }
 qnc-form-host = { path = "crates/qnc-form-host" }
+qnc-pool-pointer = { path = "crates/qnc-pool-pointer" }
 qnc-source-volumes = { path = "crates/qnc-source-volumes" }
 qnc-board = { path = "crates/qnc-board" }
 qnc-channel-picker = { path = "crates/qnc-channel-picker" }

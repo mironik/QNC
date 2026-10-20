@@ -1,9 +1,9 @@
 use super::*;
 
 impl IngestApplication {
-    pub fn poll(&mut self) -> bool {
+    pub fn poll(&mut self, pointed: Option<&str>) -> bool {
         let mut changed = self.poll_settings();
-        if self.preview.poll() {
+        if self.preview.poll(pointed) {
             self.sync_playback_view();
             let message = self.preview.take_message();
             if !message.is_empty() {
