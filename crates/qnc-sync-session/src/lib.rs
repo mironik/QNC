@@ -18,8 +18,9 @@ pub const MODULE_ID: &str = "qnc.module.sync-session";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// One catalog key: `Break(answer)` when it is Sync's (`answer` as the panel router gives
-/// it: `None` for the application), `Continue` when it is not. `on_source`: the source
-/// timeline (or its dock buttons) has the keyboard.
+/// it: `None` for the application), `Continue` when it is not. `on_source`: a panel
+/// of the source has the keyboard (the source timeline, its buttons or the media pool; not
+/// the segments, where O is a slot edge).
 pub fn route(
     action_id: &str,
     (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments),
@@ -68,8 +69,10 @@ pub fn poll(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut 
     if !segments.sync_drafting() || segments.sync_stopped() {
         preview.stop_sync_bed();
     }
-    // The clip session carries the A1 of the next Sync's window (not while one runs).
-    if !segments.sync_drafting() && !preview.in_program() {
+    // The clip session carries the A1 of the next Sync's window (not while one runs); kept
+    // while the program plays too, so the next clip opened carries the right one (live
+    // 2026-10-20: after Enter the next clip opened with the window of the slot before).
+    if !segments.sync_drafting() {
         preview.want_sync_bed(segments.sync_window_ahead());
     }
 }

@@ -419,7 +419,7 @@ impl PanelFocus {
             _ => {}
         }
         // 4. Sync/B-roll: Space, and a stopped Sync's arrows, Enter, Delete, O (piece `qnc-sync-session`).
-        if let ControlFlow::Break(answer) = qnc_sync_session::route(action_id, (preview, wrap, segments), on_source) {
+        if let ControlFlow::Break(answer) = qnc_sync_session::route(action_id, (preview, wrap, segments), panel != Panel::Segments) {
             return answer;
         }
         // 5. The pool tabs, the media pool and the source dock buttons (pieces `qnc-key-row`,
