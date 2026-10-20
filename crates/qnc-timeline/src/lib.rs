@@ -1328,7 +1328,8 @@ fn mark_drag_intent(response: &egui::Response, track: Rect, input: &TimelineInpu
     if response.drag_started_by(egui::PointerButton::Primary) {
         let at = response.ctx.input(|i| i.pointer.press_origin()).or(response.interact_pointer_pos())?;
         // The zone of the M markers (user 2026-10-18: the same on the source timeline).
-        let marks = ((input.draft_in_frame, input.draft_in_active), (input.draft_out_frame, input.draft_out_active));
+        let (in_grab, out_grab) = grabbable_marks(input);
+        let marks = ((input.draft_in_frame, in_grab), (input.draft_out_frame, out_grab));
         if let Some(in_mark) = source_mark_in_reach(track, range_start, duration, at, marks.0, marks.1) {
             response.ctx.data_mut(|data| data.insert_temp(key, in_mark));
         }
@@ -1341,6 +1342,18 @@ fn mark_drag_intent(response: &egui::Response, track: Rect, input: &TimelineInpu
     }
     response.ctx.data_mut(|data| data.remove::<bool>(key));
     Some(TimelineIntent::KeepMark)
+}
+
+/// Which of IN and OUT the mouse may reach and drag: one the user set, or one taken
+/// (Ctrl+I/O, a right click, Ctrl+wheel). The clip's start and end, shown while the user set
+/// none, are not grabbed by the mouse until taken (user 2026-10-20: "the start and end were
+/// active for dragging without Ctrl or a right click first").
+fn grabbable_marks(input: &TimelineInput<'_>) -> (bool, bool) {
+    let state = input.state;
+    (
+        input.draft_in_active && (state.source_in_frame.is_some() || input.focus == TimelineFocusPaint::In),
+        input.draft_out_active && (state.source_out_frame.is_some() || input.focus == TimelineFocusPaint::Out),
+    )
 }
 
 /// A right click (Ctrl+), unless the right button was held for the wheel (then it was Ctrl
@@ -1697,7 +1710,10 @@ fn paint_in_out_handles(
         .ctx()
         .pointer_hover_pos()
         .filter(|pos| track.y_range().contains(pos.y))
-        .and_then(|pos| source_mark_in_reach(track, range_start, duration, pos, (in_frame, input.draft_in_active), (out_frame, input.draft_out_active)));
+        .and_then(|pos| {
+            let (in_grab, out_grab) = grabbable_marks(input);
+            source_mark_in_reach(track, range_start, duration, pos, (in_frame, in_grab), (out_frame, out_grab))
+        });
     let stroke = |is_in: bool, focus: TimelineFocusPaint| {
         if hovered == Some(is_in) {
             Stroke::new(3.0, input.theme.marker_hover)

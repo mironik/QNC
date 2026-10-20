@@ -5029,3 +5029,8 @@ spremio; ostao je zaustavljen, klik na source timeline nije pomicao playhead (so
 tocak i strelice micali su samo kraj Synca. `qnc-program-segments`: Enter na source timelineu najprije sprema Sync, pa tek
 edit segmenta (`confirm_source`); Replace, Exclude, Purge, novi segment, Undo i Redo zatvaraju otvoreni edit bez upisa
 (`end_edit`). Test `replace_exclude_or_a_new_segment_end_an_open_edit`. Uzivo nije provjereno.
+Popravak 2026-10-20 (korisnik: "kraj i pocetak su aktivni za povlacenje bez da prethodno dam komandu Ctrl ili desni
+klik misa"): na source timelineu (sve forme) pocetak i kraj klipa, koji se pokazuju kao IN/OUT dok korisnik nije
+postavio oznaku, vise se ne hvataju misem ni ne crvene u zoni dok nisu uzeti (Ctrl+I/O, desni klik, Ctrl+kotacic).
+Oznaka koju je korisnik postavio i dalje se vuce izravno iz zone. `qnc-timeline` (`grabbable_marks`). Testovi. Uzivo nije
+provjereno.
