@@ -84,6 +84,20 @@ Prije zahvata u bilo kojoj aplikaciji obvezna je provjera iz odjeljka 4.1.
     pojedinu aplikaciju. Segment/program timeline nije predmet ovog pravila:
     postojeci slot API za segment timeline ostaje dopusten i ne smije se dirati
     dok se radi source timeline.
+11. **Forma je samo layout: mreza mjesta na kojima se prikazuju paneli; paneli sadrze module i kocke.**
+    (Korisnik 2026-10-20.) Hijerarhija je kocka -> modul -> panel -> forma. Kocka ima jednu
+    odgovornost i napisana je jednom; modul slaze kocke; panel je najmanja jedinica koju layout
+    smjesta i jednak je u svakoj formi; forma (ploca, desktop i aplikacijski sloj iste aplikacije,
+    npr. Ingest, Story, Media Assist, Project) samo kaze koji panel ide na koje mjesto mreze i daje
+    mu svoje mjere, tekstove i stanje.
+    - Forma i njezin aplikacijski sloj NE RASTU. Svaka nova mogucnost, i svaki prijevod podataka
+      za panel, ide u postojecu ili novu kocku/modul, nikad u formu ni u aplikacijski sloj. Izvlacenje
+      logike iz forme ne smije je preseliti u aplikacijski sloj: ako mapiranje podataka za panel
+      treba svoj tip, taj tip zivi u kocki, ne u formi ni u aplikaciji.
+    - Ne pise se kod koji vec postoji u kocki; ne kopira se izmedu formi. Dvije forme s istim
+      crtanjem ili istom logikom su greska koja se rjesava kockom.
+    - Granice velicine formi i aplikacijskih slojeva (conformance C10) samo padaju; povecanje se
+      ne nadoknaduje premjestanjem drugog koda, nego se novi kod stavlja u kocku.
 
 ## 1. Tocne putanje
 
