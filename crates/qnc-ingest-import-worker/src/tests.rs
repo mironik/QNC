@@ -558,7 +558,7 @@ fn launching_while_the_lease_in_the_database_is_alive_starts_nothing() {
     let f = fixture();
     let root = std::path::Path::new("unused");
     // No worker executable beside the test binary: this fails if it tries to start one.
-    let _lease = qnc_ingest_runtime::Lease::claim(f.target.clone(), qnc_ingest_runtime::WORKER, qnc_ingest_runtime::WORKER_FRESH_SECONDS)
+    let _lease = qnc_playback_activity::Lease::claim(f.target.clone(), qnc_playback_activity::WORKER, qnc_playback_activity::WORKER_FRESH_SECONDS)
         .unwrap()
         .expect("the lease");
     assert!(launch_worker(root, &f.target).is_ok());
@@ -574,10 +574,10 @@ fn without_a_lease_and_without_its_executable_launching_says_so() {
 #[test]
 fn the_copy_waits_while_the_database_says_a_player_works() {
     let f = fixture();
-    let pause = qnc_ingest_runtime::playback_pause(f.target.clone());
+    let pause = qnc_playback_activity::playback_pause(f.target.clone());
     assert!(!pause());
-    let mut writer = qnc_ingest_runtime::Writer::start(f.target.clone()).unwrap();
-    writer.set(qnc_ingest_runtime::PLAYBACK, "on").unwrap();
+    let mut writer = qnc_playback_activity::Writer::start(f.target.clone()).unwrap();
+    writer.set(qnc_playback_activity::PLAYBACK, "on").unwrap();
     std::thread::sleep(std::time::Duration::from_millis(600));
     assert!(pause());
 }

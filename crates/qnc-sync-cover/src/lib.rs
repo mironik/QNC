@@ -1,17 +1,13 @@
 //! Sync/B-roll capture of a story cover (QNC v5 `components/sync_cover_capture.rs`
 //! and its host in `story.rs`).
 //!
-//! With Sync on, IN on the source arms it; Space in the Source view plays the
-//! program from the M marker at or before the Wrap playhead with the source from
-//! its IN over it as a transient cover (picture and A2, A1 of the story stays).
-//! User rule (2026-09-25): it runs to the source OUT or to the first M marker
-//! after that marker, whichever comes first, and stops there; O stops it earlier.
-//! The source OUT of the slot is IN plus the frames played. Enter confirms the
-//! cover once the slot is stored.
-//!
-//! The Sync plays on the source player (user 2026-10-20): IN is only the number the cover
-//! starts at, the draft follows the playing source frame (`source_window_frame`); no
-//! program window is opened for it.
+//! With Sync on, IN on the source arms it; the source plays on its own player from IN (user
+//! 2026-10-20: IN is only the number the cover starts at, no player is opened), the slot
+//! starts at the M marker at or before the Wrap playhead and the draft follows the playing
+//! source frame (`source_window_frame`); the story's A1 under it plays in the same player.
+//! User rule (2026-09-25): it runs to the source OUT or to the first M marker after that
+//! marker, whichever comes first, and stops there; O stops it earlier. The source OUT of the
+//! slot is IN plus the frames played. Enter confirms the cover once the slot is stored.
 //!
 //! This component owns only the session state and its frame math. It knows no
 //! form, no player, no database and no project: the program model gives it the
@@ -32,14 +28,13 @@ pub struct SyncSource {
     pub timebase: (u32, u32),
 }
 
-/// What the program player plays: the program window `[in, out)` with the source
-/// from its IN as a transient cover (v5 `build_preview`).
+/// A Sync play: the slot `[in, out)` on the program and the source from its IN (v5
+/// `build_preview`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncPreview {
     pub window: (u64, u64),
     pub clip_id: String,
     pub source_in: u64,
-    pub timebase: (u32, u32),
 }
 
 /// A closed Sync slot: program `[start, end)` and the source `[in, out)` played
@@ -190,7 +185,6 @@ impl SyncCover {
             window: (anchor, end),
             clip_id: source.clip_id.clone(),
             source_in,
-            timebase: source.timebase,
         };
         self.armed = None;
         self.pending = None;
@@ -213,7 +207,7 @@ impl SyncCover {
         Ok(preview)
     }
 
-    /// A frame the window program confirmed, as a program frame (v5
+    /// A frame of the window being played (from `source_window_frame`), as a program frame (v5
     /// `absolute_program_frame_from_playback`). Reaching the end of the source
     /// closes the slot (v5 `should_auto_finish`). Outside a Sync play the frame
     /// is returned as it is.
@@ -311,16 +305,6 @@ impl SyncCover {
         frames != 0 && self.nudge(frames)
     }
 
-    /// The frame of the playing window that shows the last picture of a stopped Sync's
-    /// draft (the window's frames start at 0): the monitor shows the new end when an arrow
-    /// moves it (user 2026-10-16). `None` while it plays, or when the end moved before the
-    /// window.
-    pub fn stopped_window_frame(&self) -> Option<u64> {
-        let session = self.active.as_ref().filter(|session| session.restart)?;
-        let last = session.end.checked_sub(1)?;
-        last.checked_sub(session.play_from)
-    }
-
     /// Space on a stopped Sync: the window from its draft end on, the source from where
     /// it got to; `None` when it is not stopped or nothing is left to play.
     pub fn resume(&mut self) -> Option<SyncPreview> {
@@ -336,7 +320,6 @@ impl SyncCover {
             window: (session.end, session.auto_finish),
             clip_id: session.source.clip_id.clone(),
             source_in: session.source.source_in + (session.end - session.anchor) * den / num,
-            timebase: session.source.timebase,
         })
     }
 
@@ -594,9 +577,7 @@ mod tests {
         assert_eq!(sync.draft_end(), Some(28));
         assert!(sync.nudge(3));
         assert_eq!(sync.draft_end(), Some(31), "the arrows move the end");
-        // The window started at 20 (the marker): its frame 10 is program frame 30, the last
-        // picture of the new end; the OUT follows it on the source.
-        assert_eq!(sync.stopped_window_frame(), Some(10), "the monitor shows the new end");
+        // The OUT follows the new end on the source.
         assert_eq!(sync.source_view(), Some((21, Some((10, 21)))));
         let window = sync.resume().expect("space plays on from the end");
         assert_eq!(window.window, (31, 50));
@@ -614,7 +595,6 @@ mod tests {
         assert_eq!(preview.window, (20, 80), "30 source frames are 60 story frames");
         assert_eq!(sync.program_frame(Some(11)), Some(31));
         assert_eq!(sync.source_view(), Some((15, Some((10, 15)))));
-        assert_eq!(sync.stopped_window_frame(), None, "it plays");
         let slot = sync.finish(31).unwrap().clone();
         assert_eq!(slot.source_out, 16, "11 story frames need 6 source pictures");
         // 50p in a 25 story: every other picture.

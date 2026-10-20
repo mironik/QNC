@@ -59,10 +59,6 @@ pub struct Run<'a> {
     pub workers: usize,
     pub wanted: &'a (dyn Fn() -> Option<String> + Sync),
     pub player_works: &'a (dyn Fn() -> bool + Sync),
-    /// Whether the source is busy with other reads (filmstrip and wave): meanwhile
-    /// only the clip a preview wants is completed, the others wait (the card sets
-    /// the pace; two jobs on it at once make both slower).
-    pub card_busy: &'a (dyn Fn() -> bool + Sync),
     pub cancel: &'a AtomicBool,
     /// The lease the records are published under (the background worker's): once it is
     /// lost, the database owner refuses them (external audit 2026-10-17).
@@ -83,7 +79,6 @@ pub fn complete_active_project(
     make_backend: MakeBackend<'_>,
     workers: usize,
     player_works: &(dyn Fn() -> bool + Sync),
-    card_busy: &(dyn Fn() -> bool + Sync),
     cancel: &AtomicBool,
     lease: Option<qnc_content_store::WriteLease>,
 ) -> Result<Completion, String> {
@@ -115,7 +110,6 @@ pub fn complete_active_project(
         workers,
         wanted: &wanted,
         player_works,
-        card_busy,
         cancel,
         lease,
     };
@@ -264,11 +258,10 @@ fn next(
                 return None;
             }
             let at = wanted.and_then(|id| queue.iter().position(|(clip, _)| clip.id() == id));
-            match at {
-                Some(at) => return queue.remove(at),
-                None if !(run.card_busy)() => return queue.pop_front(),
-                None => {}
-            }
+            return match at {
+                Some(at) => queue.remove(at),
+                None => queue.pop_front(),
+            };
         }
         std::thread::sleep(Duration::from_millis(200));
     }

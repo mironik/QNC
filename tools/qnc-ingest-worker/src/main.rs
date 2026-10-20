@@ -128,7 +128,6 @@ fn run_once(root: &Path) -> Result<bool, String> {
     // The card sets the pace (user 2026-10-15: waves as soon as possible): first the
     // records (a wave needs its clip's final record), each clip's wave as soon as its record
     // is final, the filmstrip after them. The completion never gives way to the filmstrip.
-    let card_busy = || false;
     let completing = std::sync::atomic::AtomicBool::new(true);
     // The project database is the truth: once its active project is no longer the one
     // this run started for (closed, or another opened), the run stops and lets its
@@ -159,7 +158,6 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 &make_backend,
                 PROBE_WORKERS,
                 &*player_works,
-                &card_busy,
                 &cancel,
                 Some(lease.write_lease()),
             );

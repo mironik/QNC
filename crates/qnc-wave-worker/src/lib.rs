@@ -29,8 +29,6 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The most one-pass readers at once; how many really run, one short test of the medium
 /// decides (`qnc-read-pace`; user 2026-10-18). Never more than the processor's threads.
 const MOST_WAVE_READERS: usize = 8;
-/// From this many readers on the medium serves the waves and the filmstrips at once.
-const PARALLEL_MEDIUM_READERS: usize = 4;
 
 /// The readers the medium's test found: `None` until the first pass has tested it; then one
 /// pass runs at a time. Shared with the passes, kept for the run (no more testing).
@@ -250,13 +248,8 @@ pub struct TimelineWaveService {
     queue: VecDeque<WaveRequest>,
     queued: BTreeSet<String>,
     workers: Vec<ActiveWaveWorker>,
-    /// Held: only the clip open in a preview gets its wave (the filmstrips go first).
-    held: bool,
     /// Coarse waves on their way to the database: their clips are not ready.
     coarse: BTreeSet<String>,
-    /// Clips queued with no wave stored at all: until they have one (coarse or full) the
-    /// filmstrips wait (user 2026-10-19: every clip's approximate sound first).
-    without_wave: BTreeSet<String>,
     publisher: Option<Box<dyn WaveContentWrite>>,
     playback_priority: bool,
     /// At most this many readers (user 2026-10-20: two while the user edits).
@@ -298,7 +291,6 @@ impl TimelineWaveService {
             self.queued.clear();
             self.publisher = None;
             self.readers = Readers::default();
-            self.without_wave.clear();
         }
         self.context = Some(context);
         self.ensure_publisher();
@@ -312,7 +304,6 @@ impl TimelineWaveService {
         self.queue.clear();
         self.queued.clear();
         self.publisher = None;
-        self.without_wave.clear();
     }
 
     /// While a player plays only the preferred clip's wave is made, alone (user
@@ -373,8 +364,7 @@ impl TimelineWaveService {
                         self.ready.insert(key);
                         continue;
                     }
-                    Some(_) => {}
-                    None => _ = self.without_wave.insert(key),
+                    Some(_) | None => {}
                 }
                 self.enqueue(request, clip.priority);
             }
@@ -394,7 +384,6 @@ impl TimelineWaveService {
             .as_ref()
             .map(|ctx| ctx.project_id().to_string());
         self.queue.retain(|request| !ids.contains(&request.clip_id));
-        self.without_wave.retain(|key| !clip_ids.iter().any(|clip_id| key.ends_with(&format!("::{clip_id}"))));
         self.queued.retain(|key| {
             project_id.as_ref().is_none_or(|project| {
                 !clip_ids
@@ -424,7 +413,6 @@ impl TimelineWaveService {
                                     completion.key
                                 )
                             });
-                            self.without_wave.remove(&completion.key);
                             // A coarse wave stored: its clip waits for the wave of every frame.
                             if !self.coarse.remove(&completion.key) {
                                 self.ready.insert(completion.key);
@@ -492,7 +480,6 @@ impl TimelineWaveService {
                     let publish_state = if ready_before { "ready" } else { "queued" };
                     let coarse = generated.coarse;
                     if generated.ready_before {
-                        self.without_wave.remove(&key);
                         self.ready.insert(key);
                     } else {
                         if coarse {
@@ -542,7 +529,6 @@ impl TimelineWaveService {
                         )
                     });
                     // A clip whose wave cannot be made holds back no filmstrip.
-                    self.without_wave.remove(&outcome.request.key());
                     if matches_active {
                         poll.active_error = Some(error);
                     }
@@ -580,31 +566,6 @@ impl TimelineWaveService {
         let request = self.queue.remove(index).expect("index exists");
         self.queue.push_front(request);
         Some(!self.workers.is_empty()) // the others still stop: it starts once they have
-    }
-
-    /// Some clip has no wave at all yet (its coarse one is still to come).
-    pub fn coarse_pending(&self) -> bool {
-        !self.without_wave.is_empty()
-    }
-
-    /// The medium's test found that it serves several readers at once (a CFexpress or
-    /// SSD reader): the full waves may read while the filmstrips decode. `false` before
-    /// the test and for a slow medium.
-    pub fn medium_parallel(&self) -> bool {
-        self.readers
-            .try_lock()
-            .ok()
-            .and_then(|readers| *readers)
-            .is_some_and(|readers| readers >= PARALLEL_MEDIUM_READERS)
-    }
-
-    /// While held only the clip open in a preview gets its wave; the others wait
-    /// (user 2026-10-18: records, then filmstrips, then waves).
-    pub fn set_held(&mut self, held: bool) {
-        self.held = held;
-        if !held {
-            self.start_next();
-        }
     }
 
     pub fn has_pending_work(&self) -> bool {
@@ -656,7 +617,6 @@ impl TimelineWaveService {
                 self.start_one(&context);
                 return;
             }
-            None if self.held => return,
             None => {}
         }
         // Until the medium is tested one pass runs (it tests first).

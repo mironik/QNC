@@ -264,13 +264,8 @@ pub struct TimelineFilmstripService {
     /// At most this many workers (user 2026-10-20: while the user edits two; measured:
     /// beside a playing player one core of background work costs nothing, two cost stutters).
     cap: Option<usize>,
-    /// It makes only the clips it is told (`request`), it looks for none of its own
-    /// (import control: each clip after its wave, user 2026-10-15).
-    on_orders: bool,
     /// The clip open in a preview.
     preferred: Option<FilmstripRequest>,
-    /// Key pictures handed over with a request (read with the wave), by request key.
-    given: std::collections::HashMap<String, Arc<qnc_filmstrip::EncodedPictures>>,
 }
 
 impl Default for TimelineFilmstripService {
@@ -285,9 +280,7 @@ impl Default for TimelineFilmstripService {
             publisher: None,
             playback_priority: false,
             cap: None,
-            on_orders: false,
             preferred: None,
-            given: std::collections::HashMap::new(),
         }
     }
 }
@@ -362,37 +355,11 @@ impl TimelineFilmstripService {
         }
     }
 
-    /// Only ordered clips (`true`), or every clip without a filmstrip (`false`).
-    pub fn set_on_orders(&mut self, on_orders: bool) {
-        if self.on_orders && !on_orders {
-            self.db_complete = false; // the next poll looks for the rest
-        }
-        self.on_orders = on_orders;
-    }
-
-    /// Make the filmstrip of this clip (an order of the import control); with `pictures`
-    /// it decodes those key pictures of the original instead of reading the media.
-    pub fn request(&mut self, clip_id: &str, pictures: Option<Arc<qnc_filmstrip::EncodedPictures>>) {
-        let Some(context) = self.context.as_ref() else {
-            return;
-        };
-        let request = FilmstripRequest { project_id: context.project_id().to_string(), clip_id: clip_id.to_string() };
-        if let Some(pictures) = pictures {
-            self.given.insert(request.key(), pictures);
-        }
-        self.enqueue(request, false);
-        self.start_next();
-    }
-
     pub fn sync_content_db(&mut self) -> Result<(), String> {
         let Some(context) = self.context.clone() else {
             self.db_complete = true;
             return Ok(());
         };
-        if self.on_orders {
-            self.db_complete = true; // it looks for nothing of its own
-            return Ok(());
-        }
         let project_id = context.project_id().to_string();
         let mut all_ready = true;
         let mut after = None;
@@ -505,9 +472,6 @@ impl TimelineFilmstripService {
             let _ = worker.thread.join();
             poll.changed = true;
             let held = self.playback_priority && Some(&outcome.request) != self.preferred.as_ref();
-            if !held {
-                self.given.remove(&worker.request.key());
-            }
             let current_project = self.context.as_ref().map(FilmstripContext::project_id);
             let matches_active = current_project == Some(outcome.request.project_id.as_str())
                 && active_clip_id == Some(outcome.request.clip_id.as_str());
@@ -640,12 +604,11 @@ impl TimelineFilmstripService {
             let worker_request = request.clone();
             let cancel = Arc::new(AtomicBool::new(false));
             let worker_cancel = cancel.clone();
-            let given = self.given.get(&request.key()).cloned();
             match std::thread::Builder::new()
                 .name("qnc-filmstrip-worker".into())
                 .spawn({
                     let context = context.clone();
-                    move || run_filmstrip_worker(worker_request, context, given, worker_cancel, send)
+                    move || run_filmstrip_worker(worker_request, context, worker_cancel, send)
                 }) {
                 Ok(thread) => self.workers.push(ActiveFilmstripWorker {
                     request,
@@ -777,18 +740,16 @@ fn sanitize_scratch_part(value: &str) -> String {
 fn run_filmstrip_worker(
     request: FilmstripRequest,
     context: FilmstripContext,
-    given: Option<Arc<qnc_filmstrip::EncodedPictures>>,
     cancel: Arc<AtomicBool>,
     send: SyncSender<FilmstripOutcome>,
 ) {
-    let result = build_timeline_background(&request, &context, given.as_deref(), &cancel);
+    let result = build_timeline_background(&request, &context, &cancel);
     let _ = send.send(FilmstripOutcome { request, result });
 }
 
 fn build_timeline_background(
     request: &FilmstripRequest,
     context: &FilmstripContext,
-    given: Option<&qnc_filmstrip::EncodedPictures>,
     cancel: &AtomicBool,
 ) -> Result<GeneratedFilmstrip, String> {
     if cancel.load(Ordering::Acquire) {
@@ -817,7 +778,7 @@ fn build_timeline_background(
     // 2026-10-19: reading a clip up to 10 s through decoded up to 500 XAVC 10-bit pictures,
     // 4.3 s a clip); a near place may repeat a picture. Without an index the decoder below
     // reads as before.
-    let from_index = (given.is_none() && !ready_before)
+    let from_index = (!ready_before)
         .then(|| intra_pictures(&clip, context, cancel))
         .and_then(|found| match found {
             Ok(found) => found,
@@ -826,9 +787,9 @@ fn build_timeline_background(
                 None
             }
         });
-    // Pictures handed over or read by the index: decoded, the media is not read again.
-    // Should that fail, the filmstrip reads the media as before (the reason goes to the log).
-    let from_pictures = match given.or(from_index.as_ref()).filter(|_| !ready_before) {
+    // Pictures read by the index: decoded, the media is not read again. Should that fail,
+    // the filmstrip reads the media as before (the reason goes to the log).
+    let from_pictures = match from_index.as_ref().filter(|_| !ready_before) {
         Some(given) => match filmstrip_from_pictures(&clip, context, given, &artifacts, cancel) {
             Ok(plan) => Some(plan),
             Err(error) if error == filmstrip_paused_for_playback() => return Err(error),
@@ -904,8 +865,8 @@ fn intra_pictures(
     Ok(Some(qnc_filmstrip::EncodedPictures { codec: codec.to_string(), pictures }))
 }
 
-/// The filmstrip of the original from its key pictures (handed over or read by the
-/// index): decoded in one call into the thumbnails of `plan_from_original`.
+/// The filmstrip of the original from its key pictures (read by the index): decoded in one
+/// call into the thumbnails of `plan_from_original`.
 fn filmstrip_from_pictures(
     clip: &FilmstripClipRecord,
     context: &FilmstripContext,

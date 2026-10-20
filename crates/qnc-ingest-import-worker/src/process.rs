@@ -13,7 +13,7 @@ use crate::{run_next, ConfigMediaOpener, ImportQueue, TransportQueue};
 use qnc_ingest_store::content::{ImportedCopy, StoredClip};
 use qnc_media_metadata::MediaRepresentation;
 use qnc_active_project_read::ActiveProjectReader;
-use qnc_ingest_runtime::{Lease, Writer, WORKER, WORKER_FRESH_SECONDS, WORKER_RESULT};
+use qnc_playback_activity::{Lease, Writer, WORKER, WORKER_FRESH_SECONDS, WORKER_RESULT};
 use qnc_ingest_select::selection_config::SelectionConfig;
 use qnc_ingest_store::content::ContentTarget;
 use qnc_ingest_work_plan::IngestWorkPlan;
@@ -59,7 +59,7 @@ impl Project {
             queue: TransportQueue::start_leased(target.clone(), lease)?,
             opener: ConfigMediaOpener::new(
                 sources,
-                qnc_ingest_runtime::playback_pause(target.clone()),
+                qnc_playback_activity::playback_pause(target.clone()),
             ),
         })
     }

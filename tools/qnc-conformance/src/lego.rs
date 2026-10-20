@@ -38,9 +38,8 @@ const APPLICATION_CRATES: [&str; 3] = [
     "qnc-project-application",
 ];
 /// The public port through which a player announces that it prepares or plays.
-/// `qnc-ingest-runtime` is its current name until package B makes it neutral.
-const PLAYBACK_ACTIVITY: [&str; 2] = ["qnc_playback_activity", "qnc_ingest_runtime"];
-const PLAYBACK_ACTIVITY_CRATES: [&str; 2] = ["qnc-playback-activity", "qnc-ingest-runtime"];
+const PLAYBACK_ACTIVITY: [&str; 1] = ["qnc_playback_activity"];
+const PLAYBACK_ACTIVITY_CRATES: [&str; 1] = ["qnc-playback-activity"];
 const SKIPPED_PACKAGES: [&str; 1] = ["qnc-conformance"];
 
 pub(crate) fn check(root: &Path) -> ValidationReport {

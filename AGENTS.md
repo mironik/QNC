@@ -5155,3 +5155,18 @@ player svira rade samo klip otvoren u previewu, sam (ostali se prekidaju i vraca
 dok player svira crta se samo uz njegovu novu sliku (stopa izvora: 25, 30, 50), nikad uz ritam aplikacije
 (`qnc-paint-pace`; mjereno 61 crtanje u sekundi za 50p); `qnc-level-meter` sam trazi crtanje samo dok mu razina pada bez
 novih razina. Testovi, conformance. Uzivo nije provjereno.
+Audit i ciscenje 2026-10-20 (korisnik: "moras napraviti audit, srediti kod, sve svesti na kocke, ne raditi paralelni
+kod"; "nastavi" na prijedlog faza 0-4, sve osim Projecta). Audit (cetiri citanja koda): paralelni kod (raspored radnika
+filmstripa i vala dvaput, fokus Story/Ingest dvaput, veze izvora 4+, otvaranje baze projekta 3, citanje artefakata 2+3,
+timecode/trajanje 4-5, PTS/dB/prvi video tok 3/7/12, pomocni kod tablica baze 5, raspored/tema/korijen/pokretanje
+pomocnih programa/izbor kodera vise puta), logika u aplikacijskim slojevima i posao pri svakom crtanju, putovi unosa.
+Faza 0 (greske): I, O i rez vise ne "uzimaju" oznaku (`qnc-timeline`; sljedeci klik je pomicao playhead tek drugi put);
+klik na Wrap redak dok je nesto uzeto je nova radnja kataloga `segments_keep_edit` (sprema, nikad ne prelazi na drugi
+panel); isti zastoj playera zapisuje se jednom (`qnc-broadcast-engine`, prije 2,7 milijuna redaka); testni programi
+(`target/*/deps` bez `QNC_ROOT`) ne pisu u stvarnu dijagnostiku (`qnc-dev-diagnostics`); cue dok se player priprema
+ceka kao kod programa, jedno polje (`qnc-source-preview` `cue_waiting`). Faza 1 (mrtvi kod): stari Sync kroz prozor price
+(`open_program_window`, `TransientCover`, `window_loader`, `load_program_window`, `with_transient_cover`,
+`sync_window_frame`, `stopped_window_frame`, `SyncPreview.timebase`), filmstrip "po narudzbi" i predane slike
+(`set_on_orders`, `request`, `given`), zadrzavanje vala (`set_held`, `coarse_pending`, `medium_parallel`, `without_wave`),
+`card_busy` u dovrsetku zapisa, kocka `qnc-ingest-runtime` (prosljedjivala `qnc-playback-activity`). Testovi,
+zlatne tablice tipki, conformance.

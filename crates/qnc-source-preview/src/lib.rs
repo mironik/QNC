@@ -17,7 +17,7 @@ use qnc_content_read::ContentReader;
 use qnc_player_client::{Action, Player, View as PlayerView};
 use qnc_player_input::{InputReader, PlayerContentRead, ProgramInput};
 use qnc_player_launcher::SourceTransportBinding;
-pub use qnc_program_input::{SoundDraft, TransientCover};
+pub use qnc_program_input::SoundDraft;
 use qnc_source_bindings::{SourceBinding, TransportBindings};
 use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_timeline_assets::{
@@ -714,7 +714,7 @@ impl SourcePreview {
 
     /// Opens a story program in the same player and monitor, at a program frame.
     /// The source clip, its timeline and artifacts stay shown (v5 Wrap).
-    pub fn open_program(
+    fn open_program(
         &mut self,
         first_frame: u64,
         build: impl FnOnce(&InputReader, &str) -> Result<ProgramInput, String> + Send + 'static,
@@ -803,19 +803,6 @@ impl SourcePreview {
     pub fn forget_program_draft(&mut self) {
         self.program_draft = None;
         self.program_draft_reopened = false;
-    }
-
-    /// Sync/B-roll (v5 `PlayProgram` of the Sync preview): the program window
-    /// `[in, out)` with the source from its IN over it, opened at its first frame
-    /// and played as soon as it is ready. Its frames start at 0.
-    pub fn open_program_window(&mut self, window: (u64, u64), cover: TransientCover) -> bool {
-        let Some(context) = &self.context else {
-            return true;
-        };
-        let project_id = context.settings.project_id.clone();
-        self.open_story(0, move |target| qnc_program_input::window_loader(target, project_id, window, cover));
-        self.play_when_ready = true;
-        true
     }
 
     /// The story program of the active project, its database (the one intermediary of
@@ -917,12 +904,14 @@ impl SourcePreview {
             .flatten()
     }
 
-    /// The level of outputs 1 and 2 in percent, heard at once; false when the player
-    /// cannot take it now (not prepared yet).
+    /// The source channel outputs 1 and 2 play, heard at once; false when the player cannot
+    /// take it now (not prepared yet).
     fn set_output_routes(&mut self, channels: [u16; 2]) -> bool {
         self.player.as_ref().is_some_and(|player| player.send(Action::SetOutputRoutes(channels)).is_ok())
     }
 
+    /// The level of outputs 1 and 2 in percent, heard at once; false when the player cannot
+    /// take it now.
     fn set_output_levels(&mut self, levels: [u16; 2]) -> bool {
         self.player.as_ref().is_some_and(|player| player.send(Action::SetOutputLevels(levels)).is_ok())
     }
@@ -982,7 +971,7 @@ impl SourcePreview {
     }
 
     /// What wakes the background worker when a shown clip waits for its record.
-    pub fn set_record_waker(&mut self, waker: RecordWaker) {
+    fn set_record_waker(&mut self, waker: RecordWaker) {
         self.record_waker = Some(waker);
     }
 
@@ -1106,43 +1095,6 @@ mod tests {
     }
 
     use super::*;
-
-    /// Diagnostics on an isolated copy only (never the project itself): prints the
-    /// sources of every item of a Sync window. QNC_DIAG_ROOT=<copy root>
-    /// QNC_DIAG_CLIP=<cover clip> QNC_DIAG_IN=<source in> QNC_DIAG_END=<window end>.
-    #[test]
-    #[ignore = "reads an isolated copy of a real project"]
-    fn prints_the_items_of_a_sync_window() {
-        let var = |name| std::env::var(name).unwrap();
-        let reader = SettingsReader::from_root(std::path::Path::new(&var("QNC_DIAG_ROOT"))).unwrap();
-        let settings = reader.read().unwrap();
-        let target = qnc_db_broker::ProjectDbTarget::for_project(&reader, &settings).unwrap();
-        let content = Arc::new(content::PlayerContent {
-            target: qnc_content_store::ContentTarget::for_project(&reader, &settings),
-        });
-        let inputs = InputReader::with_content_reader(reader, content);
-        let cover = TransientCover {
-            clip_id: var("QNC_DIAG_CLIP"),
-            source_in: var("QNC_DIAG_IN").parse().unwrap(),
-            timebase: (50, 1),
-            a2_source_channel: 1,
-            a2_level_db: 0,
-            a2_off: false,
-        };
-        let end: u64 = var("QNC_DIAG_END").parse().unwrap();
-        let load = qnc_program_input::window_loader(target, settings.project_id.clone(), (0, end), cover);
-        let program = load(&inputs, &settings.workspace_db_uri).unwrap();
-        for item in &program.playlist.items {
-            println!("item {:?}", item.record_range);
-            for source in &item.sources {
-                println!(
-                    "  {} clip={} layer={:?} in={} routes={:?} media={:?}",
-                    source.source_id, source.clip_id, source.video_layer,
-                    source.source_range.source_in, source.audio_routes, source.media
-                );
-            }
-        }
-    }
 
     #[test]
     fn arrow_presses_add_up_from_the_frame_last_asked_for() {

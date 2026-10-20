@@ -56,23 +56,6 @@ fn with_session(
     Ok(program)
 }
 
-/// A cover played over a program window only (v5 Sync/B-roll preview): the
-/// source from its IN as cover picture and A2 (the channel chosen for A2); the stored
-/// covers of the window give way to it. It is never written.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TransientCover {
-    pub clip_id: String,
-    pub source_in: u64,
-    pub timebase: (u32, u32),
-    /// Source channel (zero based) heard on A2, the one chosen for covers.
-    pub a2_source_channel: u16,
-    /// Level of A2 in dB and A2 off, as set on the source timeline (user 2026-10-16).
-    pub a2_level_db: i8,
-    pub a2_off: bool,
-}
-
-const TRANSIENT_COVER_ID: &str = "sync-cover-preview";
-
 /// The sound of one stored segment (lane 0, A1) or cover (lane 1, A2) as drafted on the
 /// Wrap row, heard before Enter writes it (user 2026-10-16). It is never written here.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -117,7 +100,7 @@ pub fn load_sound_bed(
     clips: &impl ClipInputs,
     window: (u64, u64),
 ) -> Result<ProgramInput, String> {
-    load(target, project_id, clips, Some((window, None)), None)
+    load(target, project_id, clips, Some(window), None)
 }
 
 /// The A1 bed of a window, built where its player is prepared.
@@ -151,52 +134,11 @@ pub fn sound_only(mut playlist: qnc_program_playlist::FlatProgramPlaylist) -> qn
     playlist
 }
 
-/// The program window `[in, out)` of the active project with a transient cover
-/// over it (v5 `build_program_frame_window` + `apply_transient_program_overlay`);
-/// its frames start at 0.
-pub fn load_program_window(
-    target: &ProjectDbTarget,
-    project_id: &str,
-    clips: &impl ClipInputs,
-    window: (u64, u64),
-    cover: &TransientCover,
-) -> Result<ProgramInput, String> {
-    load(target, project_id, clips, Some((window, Some(cover))), None)
-}
-
-/// The stored covers outside the window and the transient cover over all of it.
-pub fn with_transient_cover(
-    covers: &[ProgramCover],
-    (start, end): (u64, u64),
-    cover: &TransientCover,
-) -> Vec<ProgramCover> {
-    covers
-        .iter()
-        .filter(|stored| stored.program_end_frame <= start || stored.program_start_frame >= end)
-        .cloned()
-        .chain(std::iter::once(ProgramCover {
-            cover_id: TRANSIENT_COVER_ID.into(),
-            slot_id: String::new(),
-            clip_id: cover.clip_id.clone(),
-            virtual_shot_id: TRANSIENT_COVER_ID.into(),
-            program_start_frame: start,
-            program_end_frame: end,
-            source_in_frame: cover.source_in,
-            source_out_frame: cover.source_in + end.saturating_sub(start),
-            fps_num: cover.timebase.0,
-            fps_den: cover.timebase.1,
-            a2_source_channel: cover.a2_source_channel,
-            a2_level_db: cover.a2_level_db,
-            a2_off: cover.a2_off,
-        }))
-        .collect()
-}
-
 fn load(
     target: &ProjectDbTarget,
     project_id: &str,
     clips: &impl ClipInputs,
-    window: Option<((u64, u64), Option<&TransientCover>)>,
+    window: Option<(u64, u64)>,
     draft: Option<&SoundDraft>,
 ) -> Result<ProgramInput, String> {
     // One consistent read of the story (external audit 2026-10-17): segments, covers and
@@ -207,9 +149,6 @@ fn load(
         draft.apply(&mut segments, &mut covers);
     }
     let story_rate = snapshot.story_fps.ok_or(qnc_ui_text::text("story.msg.program_is_empty"))?;
-    if let Some((range, Some(cover))) = window {
-        covers = with_transient_cover(&covers, range, cover);
-    }
     let first = segments
         .iter()
         .find(|segment| segment.active)
@@ -224,17 +163,14 @@ fn load(
     let mut input = build_input(project_id, story_rate, &segments, &covers, channels)?;
     input.revision = revision;
     let mut playlist = build_flat_program_playlist(&input, &mut resolver)?;
-    if let Some(((start, end), cover)) = window {
+    // A window is only ever the A1 bed of a Sync (the story under the slot, user 2026-10-20).
+    if let Some((start, end)) = window {
         let range =
             ProgramFrameRange::new(frame(start)?, frame(end)?).map_err(|error| error.message)?;
-        playlist = build_program_frame_window(&playlist, range)?;
-        if cover.is_none() {
-            playlist = sound_only(playlist);
-        }
+        playlist = sound_only(build_program_frame_window(&playlist, range)?);
     }
     let mut input = ProgramInput::new(playlist, resolver.prepared).map_err(|error| error.to_string())?;
-    // The whole story plays its rendered units (a Sync window plays a cover not in the
-    // story: from its sources). Units that cannot be read leave the story to its sources.
+    // The whole story plays its rendered units (the A1 bed of a Sync plays from its sources). Units that cannot be read leave the story to its sources.
     if window.is_none() {
         input.prerendered = prerendered(target);
     }
@@ -284,21 +220,6 @@ pub fn draft_loader(
 {
     move |reader, workspace_db_uri| {
         with_session(reader, workspace_db_uri, |clips| load(&target, &project_id, clips, None, Some(&draft)))
-    }
-}
-
-/// The program window with a transient cover, built where the player is prepared.
-pub fn window_loader(
-    target: ProjectDbTarget,
-    project_id: String,
-    window: (u64, u64),
-    cover: TransientCover,
-) -> impl FnOnce(&qnc_player_input::InputReader, &str) -> Result<ProgramInput, String> + Send + 'static
-{
-    move |reader, workspace_db_uri| {
-        with_session(reader, workspace_db_uri, |clips| {
-            load_program_window(&target, &project_id, clips, window, &cover)
-        })
     }
 }
 

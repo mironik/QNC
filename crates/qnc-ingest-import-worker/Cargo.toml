@@ -12,7 +12,7 @@ qnc-active-project-read = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
 qnc-filmstrip = { workspace = true }
-qnc-ingest-runtime = { workspace = true }
+qnc-playback-activity = { workspace = true }
 qnc-ingest-select = { workspace = true }
 qnc-ingest-store = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }

@@ -1,8 +1,0 @@
-[package]
-name = "qnc-ingest-runtime"
-version = "0.1.0"
-edition = "2021"
-description = "Compatibility re-export of qnc-playback-activity for older Ingest callers"
-
-[dependencies]
-qnc-playback-activity = { workspace = true }
