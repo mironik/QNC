@@ -9,7 +9,7 @@
 
 use std::ops::ControlFlow;
 
-use qnc_program_segments::ProgramSegments;
+use qnc_program_segments::{ProgramSegments, SegmentCommand};
 use qnc_source_preview::{SoundDraft, SourcePreview};
 use qnc_timeline::LaneKey;
 use qnc_wrap_session::WrapSession;
@@ -114,11 +114,20 @@ pub fn marks(
 }
 
 /// The left/right arrow on the segment panel: what it took moves, else the Wrap playhead.
+/// Outside Wrap (the source was last) the step is a click on the Wrap row one frame from
+/// the Wrap playhead, which brings Wrap back (live 2026-10-20: the wheel over the Wrap rows
+/// did nothing after the source timeline had been used).
 pub fn step(action_id: &str, wrap: &mut WrapSession, segments: &mut ProgramSegments) -> bool {
+    let frames = if action_id == "step_back_frame" { -1 } else { 1 };
     if segments.handles(action_id) {
         segments.apply_action(action_id)
+    } else if wrap.is_active() {
+        wrap.step(frames)
+    } else if segments.view().is_empty() {
+        false
     } else {
-        wrap.step(if action_id == "step_back_frame" { -1 } else { 1 })
+        let frame = segments.view().playhead.unwrap_or(0).saturating_add_signed(frames);
+        segments.apply(SegmentCommand::Cue(frame))
     }
 }
 
