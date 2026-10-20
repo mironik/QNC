@@ -119,6 +119,14 @@ impl ProgramSegments {
         self.source_request.take()
     }
 
+    /// The story changed under an open edit (Replace, Exclude, Purge, a new segment, Undo,
+    /// Redo): the edit ends without a write (live 2026-10-20: Edit then Replace left it
+    /// open, and every later Enter went to it).
+    pub(crate) fn end_edit(&mut self) {
+        self.editing = None;
+        self.edge = None;
+    }
+
     /// Escape: the edit is dropped; an edge goes back to where Wrap was.
     pub(crate) fn cancel_edit(&mut self) {
         self.editing = None;

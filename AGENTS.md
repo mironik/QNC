@@ -5022,3 +5022,10 @@ samo kaze sto ceka (`cue_program`). (2) Prica je imala 175 slika i prvi Sync je 
 krenuo je u isti slot i tek je Enter rekao da slot ima B-roll. Sada Space odmah odbija Sync u slot koji vec ima
 pokrivalicu (`sync_space`). Disk ima ~6 GB slobodno: puna debug gradnja pada na PDB datotekama (LNK1318), gradi se s
 manje poslova istodobno. Testovi, conformance.
+Popravak 2026-10-20 (korisnik: "izgubio si kontrole tockom.. pokvario si.. audit napravi"): audit loga pokazao je da
+tocak nije pokvaren sam po sebi: u 12:09 Edit segmenta zavrsen je s Replace umjesto Enterom, edit je ostao otvoren, pa je
+svaki kasniji Enter isao njemu ("The segment is edited on its own clip"). Sync zaustavljen s O zato se nikad nije
+spremio; ostao je zaustavljen, klik na source timeline nije pomicao playhead (source timeline pokazuje kraj Synca), a
+tocak i strelice micali su samo kraj Synca. `qnc-program-segments`: Enter na source timelineu najprije sprema Sync, pa tek
+edit segmenta (`confirm_source`); Replace, Exclude, Purge, novi segment, Undo i Redo zatvaraju otvoreni edit bez upisa
+(`end_edit`). Test `replace_exclude_or_a_new_segment_end_an_open_edit`. Uzivo nije provjereno.

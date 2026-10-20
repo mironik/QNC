@@ -11,13 +11,15 @@ impl ProgramSegments {
     /// Enter on the source timeline: the segment edit or Sync (a taken lane is the source
     /// timeline's own, piece `qnc-source-timeline`).
     pub fn confirm_source(&mut self) -> bool {
-        if self.editing.is_some() {
-            self.commit_edit()
-        } else if self.sync.is_active() || self.sync.holds_enter() {
+        // A Sync is what was just done: its Enter comes first (live 2026-10-20: an edit left
+        // open took the Enter and the stopped Sync could never be saved).
+        if self.sync.is_active() || self.sync.holds_enter() {
             if !self.finish_sync_with_cover() {
                 self.commit_sync(true);
             }
             true
+        } else if self.editing.is_some() {
+            self.commit_edit()
         } else {
             false
         }

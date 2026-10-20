@@ -726,3 +726,15 @@ fn an_in_pressed_while_the_source_plays_starts_sync_once_it_is_armed() {
     segments.set_source(marked(14));
     assert!(!segments.take_sync_flight(), "IN while stopped waits for Space");
 }
+
+#[test]
+fn replace_exclude_or_a_new_segment_end_an_open_edit() {
+    let mut segments = component();
+    let id = segments.view().rows[0].segment_id.clone();
+    for command in [SegmentCommand::Replace(id.clone()), SegmentCommand::Exclude(id.clone()), SegmentCommand::Undo] {
+        assert!(segments.apply(SegmentCommand::Edit(id.clone())));
+        assert!(segments.view().editing.is_some());
+        segments.apply(command);
+        assert_eq!(segments.view().editing, None, "the story changed under the edit: Enter is free again");
+    }
+}

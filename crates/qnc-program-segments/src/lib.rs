@@ -502,6 +502,17 @@ impl ProgramSegments {
 
     fn apply_command(&mut self, command: SegmentCommand) -> bool {
         let playhead = self.playhead.unwrap_or(0);
+        if matches!(
+            command,
+            SegmentCommand::Replace(_)
+                | SegmentCommand::Exclude(_)
+                | SegmentCommand::Purge(_)
+                | SegmentCommand::AddSegment(_)
+                | SegmentCommand::Undo
+                | SegmentCommand::Redo
+        ) {
+            self.end_edit();
+        }
         match command {
             SegmentCommand::Wheel { .. } => return false, // the form turns it into the panel's arrow
             SegmentCommand::Select(segment_id) => self.select(&segment_id),
