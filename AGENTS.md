@@ -5170,3 +5170,23 @@ ceka kao kod programa, jedno polje (`qnc-source-preview` `cue_waiting`). Faza 1 
 (`set_on_orders`, `request`, `given`), zadrzavanje vala (`set_held`, `coarse_pending`, `medium_parallel`, `without_wave`),
 `card_busy` u dovrsetku zapisa, kocka `qnc-ingest-runtime` (prosljedjivala `qnc-playback-activity`). Testovi,
 zlatne tablice tipki, conformance.
+Pravilo unosa (korisnik 2026-10-20, ZAKLJUCANO; "da, odobravam, kreni"): svaki ulaz poziva sifru radnje iz
+`contracts/qnc-keyboard-shortcuts.json`, po istom pravilu kao tipke. Tipka radi odmah; Ctrl+ uzima kontrolu nad
+postojecim (IN, OUT, M marker, slot, A1/A2; M je OUT i IN u jednoj oznaci); Shift+ dodaje; Alt+ skace; Enter potvrda,
+Esc odustani, Delete brise uzeto. Mis: lijevi klik = playhead (na traci u boji pokrivalice bira slot; dok je nesto uzeto
+klik ga najprije sprema kao Enter, pa postavlja playhead); desni klik = Ctrl+ (bliži IN ili OUT, najbliži M marker bez
+obzira na udaljenost, nikad zakljucani pocetni ni zavrsni; na traci u boji slot; A1/A2); povlacenje vuce samo uzeto;
+Shift + lijevi klik = Shift+M (M marker na mjestu klika); srednja tipka = rez; kotacic = strelice lijevo/desno,
+Ctrl+kotacic i kotacic s drzanom desnom tipkom = Ctrl+strelice. Izvedeno: nova kocka `crates/qnc-mouse-map` (+ ugovor
+`contracts/modules/mouse-map.module.json`) jedina cita mapu misa `contracts/input/mouse.json` (pokazivac na panelu ->
+sifra); `qnc-timeline` kaze samo sto je pokazivac napravio (`Keep(frame)`, `AddMarkerAt`, `LaneLabel`,
+`TakeCoverOnStrip`; uklonjeni `SelectMarker`, `TakeSlotEdge`, `slot_hit`), `TimelineInput.holding` (domacin drzi nesto
+uzeto na redu), `TimelineMarkerPin.taken`/`locked`; panel Segmenti i Ingest vise ne odlucuju o kliku. Jedan vlasnik po
+sifri: IN/OUT u Storyju oznacava `qnc-source-panel` (slike IN/OUT prati `qnc-virtual-short-stills::follow`), Play u
+Ingestu ide kroz isti panel (Ingest dodaje samo svoju zastitu; uklonjen `PreviewCommand`/`send_command`), klik na
+source timeline je svugdje `timeline_cue_frame` (uklonjen `ingest_cue_frame`), Story Ctrl+kotacic pomice uzeti IN/OUT.
+Story i MA vise ne citaju opseg tipki `off` (ostaje u katalogu kao preslika qnc_v4); uklonjene mrtve sifre
+`timeline_select_marker`, `ingest_cue_frame`, `ingest_toggle_audio_lane`, `shell_close_active_project`. Zakljucano
+testovima: zlatna tablica misa `crates/qnc-timeline/tests/mouse_matrix.golden`, zlatna tablica tipki (izmijenjeni samo
+retci `mark_in`/`mark_out` i Ctrl+kotacic bez uzetog), `marker_reach` i `qnc-mouse-map` testovi. Promjena bilo kojeg
+odgovora trazi korisnikovu odluku. Uzivo nije provjereno.

@@ -86,36 +86,28 @@ impl IngestApplication {
         if !self.preview.has_player() && !escape {
             return self.refuse_shown("Broadcast Player nije povezan.".into());
         }
-        // The source timeline's keys are the piece every form takes (Play keeps the guard below).
-        if intent.action_id != action_ids::PLAY_PAUSE {
-            if let Some(changed) = self.source_timeline.route(&intent.action_id, self.preview.source_preview_mut(), &mut self.view.timeline) {
-                return IngestDispatchResult::accepted(None, changed);
-            }
-        }
-        let command = match intent.action_id.as_str() {
-            action_ids::PLAY_PAUSE => qnc_ingest_preview_source::PreviewCommand::TogglePlay,
+        // The source timeline's keys, Play among them, are the piece every form takes (user rule
+        // 2026-10-20: one owner per action); Ingest adds only its guard when the play starts.
+        let preview = self.preview.source_preview_mut();
+        let was_playing = preview.player_view().playing();
+        let routed = match intent.action_id.as_str() {
             action_ids::TIMELINE_CUE_FRAME => match intent.payload {
-                IngestPayload::Frame(frame) if frame >= 0 => {
-                    let cue = TimelineIntent::CueFrame(frame as u64); // the same in every form
-                    return IngestDispatchResult::accepted(None, self.source_timeline.cue(&cue, self.preview.source_preview_mut()));
-                }
+                IngestPayload::Frame(frame) if frame >= 0 => Some(self.source_timeline.cue(&TimelineIntent::CueFrame(frame as u64), preview)),
                 _ => return IngestDispatchResult::rejected("Neispravan frame."),
             },
-            _ => return IngestDispatchResult::accepted(None, false), // a source timeline key with nothing to do (Escape)
+            _ => self.source_timeline.route(&intent.action_id, preview, &mut self.view.timeline),
         };
-        let outcome = match self.preview.send_command(command) {
-            Ok(outcome) => outcome,
-            Err(error) => {
-                return self.refuse_shown(error);
-            }
+        let Some(changed) = routed else {
+            return IngestDispatchResult::accepted(None, false); // a source timeline key with nothing to do (Escape)
         };
-        if outcome.started_playback {
+        if intent.action_id == action_ids::PLAY_PAUSE && !was_playing {
             self.apply_playback_guard();
         }
-        if outcome.message.is_empty() {
-            return IngestDispatchResult::accepted(None, true);
+        let message = self.preview.source_preview_mut().take_message();
+        if message.is_empty() {
+            return IngestDispatchResult::accepted(None, changed);
         }
-        self.refuse_shown(outcome.message)
+        self.refuse_shown(message)
     }
 
     /// Refused, the message shown in the view at once.

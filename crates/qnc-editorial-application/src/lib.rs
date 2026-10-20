@@ -378,30 +378,13 @@ impl EditorialApplication {
         changed
     }
 
-    /// The actions of the application itself: library tabs, IN/OUT with their
-    /// stills and saving a short.
+    /// The actions of the application itself: library tabs and saving a short.
     fn application_action(&mut self, action_id: &str) -> bool {
         let picked = self.focus.take_pick(); // an arrow on the pool tabs, Enter on a dock button
         let action_id = picked.as_deref().unwrap_or(action_id);
         match action_id {
             tab if LibraryTab::from_action(tab).is_some() => {
                 self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
-                true
-            }
-            action_ids::MARK_IN => {
-                self.view.preview.timeline =
-                    self.view.preview.timeline.with_source_in_at_confirmed();
-                if let Err(error) = self.short_stills.capture_in(&self.view.preview) {
-                    self.view.preview.message = error;
-                }
-                true
-            }
-            action_ids::MARK_OUT => {
-                self.view.preview.timeline =
-                    self.view.preview.timeline.with_source_out_at_confirmed();
-                if let Err(error) = self.short_stills.capture_out(&self.view.preview) {
-                    self.view.preview.message = error;
-                }
                 true
             }
             action_ids::SAVE_VIRTUAL_SHOT if self.segments.sync_holds_enter() || self.segments.marks_used_by_cover(self.view.preview.clip_id.as_deref(), self.view.preview.timeline.source_in_frame) => true,

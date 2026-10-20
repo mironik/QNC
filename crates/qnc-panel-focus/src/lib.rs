@@ -387,6 +387,17 @@ impl PanelFocus {
             // Ctrl+wheel is Ctrl+left/right: the level of a taken A1/A2 sound, up louder.
             wheel if wheel.starts_with("wheel_") && wheel.contains("_ctrl_") => {
                 self.panel = if wheel.starts_with("wheel_source") { Panel::SourceTimeline } else { Panel::Segments };
+                // On the source timeline with no lane taken, Ctrl+wheel moves the taken IN/OUT or
+                // segment edge, as on the source timeline of every form (audit 2026-10-20: in
+                // Story it did nothing); with nothing taken it does nothing.
+                if self.panel == Panel::SourceTimeline && !self.source.lane_taken() {
+                    if !(self.taken(timeline) || segments.trimming_edge()) {
+                        return Some(false);
+                    }
+                    let forward = wheel.ends_with("back") != qnc_wheel_jog::playhead_up_forward();
+                    let arrow = if forward { "step_forward_frame" } else { "step_back_frame" };
+                    return self.route_on_panel(arrow, (preview, wrap, segments, timeline));
+                }
                 let level = if wheel.ends_with("back") { "lane_level_down" } else { "lane_level_up" };
                 return self.route_on_panel(level, (preview, wrap, segments, timeline));
             }
@@ -491,19 +502,15 @@ impl PanelFocus {
             }
         }
         Some(match action_id {
-            // The application marks IN/OUT. I/O mark the chosen clip from the pool too (user 2026-10-16: a clip chosen in
-            // the pool and played is marked without going to the source timeline).
-            "mark_in" => {
-                self.source.set_mark_taken(false);
-                qnc_source_mark_focus::release(timeline); // a new IN lets go of a taken mark
-                qnc_sync_session::armed_by_in(segments, preview); // v5: every IN arms Sync/B-roll
-                return None; // the application marks IN with its still
-            }
-            "mark_out" => {
-                self.source.set_mark_taken(false);
-                qnc_source_mark_focus::release(timeline);
-                preview.pause(); // OUT stops the play there (user 2026-10-19)
-                return None;
+            // The source timeline marks IN/OUT, as in every form (one owner, piece
+            // `qnc-source-panel`; the stills follow the monitor, `qnc-virtual-short-stills`). I/O mark
+            // the chosen clip from the pool too (user 2026-10-16).
+            "mark_in" | "mark_out" => {
+                qnc_source_mark_focus::release(timeline); // a new mark lets go of a taken one
+                if action_id == "mark_in" {
+                    qnc_sync_session::armed_by_in(segments, preview); // v5: every IN arms Sync/B-roll
+                }
+                return self.source.route(action_id, preview, timeline);
             }
             // v5 navigate_adjacent_source_object: start, IN and OUT in order on the source.
             "navigate_prev_object" | "navigate_next_object" if on_source => return self.source.route(action_id, preview, timeline),
@@ -727,7 +734,7 @@ mod tests {
         focus.set(Panel::SourceTimeline);
         focus.route("activate_focused_item", (&mut preview, &mut wrap, &mut segments, &mut timeline));
         assert_eq!(focus.panel(), Panel::SourceButtons, "nothing to confirm on the source: on to its buttons");
-        assert_eq!(focus.route("mark_in", (&mut preview, &mut wrap, &mut segments, &mut timeline)), None, "I still marks: the buttons are part of the source timeline panel");
+        assert_eq!(focus.route("mark_in", (&mut preview, &mut wrap, &mut segments, &mut timeline)), Some(true), "I still marks: the buttons are part of the source timeline panel");
         focus.set(Panel::PoolTabs);
         assert_eq!(focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline)), None);
         assert_eq!(focus.take_pick().as_deref(), Some("editorial_tab_virtual"), "the right arrow is the next tab");
@@ -735,6 +742,21 @@ mod tests {
         focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
         assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).button.as_deref(), Some("add_ton_segment"));
         assert_eq!(cycle(Panel::SourceTimeline, false, &[Panel::Pool, Panel::SourceTimeline]), Panel::Pool);
+    }
+
+    /// Locked (user rule 2026-10-20): Ctrl+wheel is Ctrl+arrows: a taken IN moves with it.
+    #[test]
+    fn ctrl_wheel_moves_a_taken_in_as_on_every_source_timeline() {
+        let mut focus = PanelFocus::new();
+        let mut preview = SourcePreview::default();
+        let mut wrap = WrapSession::new();
+        let mut segments = ProgramSegments::new();
+        let mut timeline = TimelineProjection { duration_frames: 100, playhead_frame: Some(20), source_in_frame: Some(10), source_out_frame: Some(50), ..Default::default() };
+        focus.set(Panel::SourceTimeline);
+        assert_eq!(focus.route("wheel_source_ctrl_forward", (&mut preview, &mut wrap, &mut segments, &mut timeline)), Some(false), "nothing taken: nothing moves");
+        focus.route("select_mark_in", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        focus.route("wheel_source_ctrl_forward", (&mut preview, &mut wrap, &mut segments, &mut timeline));
+        assert_ne!(timeline.source_in_frame, Some(10), "the taken IN moved a frame");
     }
 
     #[test]
@@ -752,13 +774,13 @@ mod tests {
         focus.set(Panel::SourceTimeline);
         assert_eq!(
             focus.route("mark_in", (&mut preview, &mut wrap, &mut segments, &mut TimelineProjection::default())),
-            None,
-            "the application marks IN"
+            Some(true),
+            "the source timeline marks IN (one owner)"
         );
         focus.set(Panel::Pool);
         assert_eq!(
             focus.route("mark_out", (&mut preview, &mut wrap, &mut segments, &mut TimelineProjection::default())),
-            None,
+            Some(true),
             "a clip chosen in the pool is marked from the pool"
         );
         assert_eq!(

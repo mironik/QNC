@@ -17,19 +17,6 @@ use std::sync::Arc;
 pub const MODULE_ID: &str = "qnc.module.ingest-preview-source";
 pub const VERSION: &str = "0.1.0";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PreviewCommand {
-    TogglePlay,
-    Step(i64),
-    Cue(u64),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PreviewCommandOutcome {
-    pub started_playback: bool,
-    pub message: String,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct PreviewView {
     pub playback: qnc_player_client::View,
@@ -164,34 +151,6 @@ impl IngestPreviewSource {
 
     pub fn play_when_ready(&self) -> bool {
         self.preview.play_when_ready()
-    }
-
-    pub fn send_command(
-        &mut self,
-        command: PreviewCommand,
-    ) -> Result<PreviewCommandOutcome, String> {
-        if !self.preview.has_player() {
-            return Err(qnc_ui_text::text("player.broadcast_player_connected").into());
-        }
-        let started_playback = match command {
-            PreviewCommand::TogglePlay => {
-                let was_playing = self.preview.player_view().playing();
-                self.preview.toggle_play();
-                !was_playing
-            }
-            PreviewCommand::Step(frames) => {
-                self.preview.step(frames);
-                false
-            }
-            PreviewCommand::Cue(frame) => {
-                self.preview.cue(frame);
-                false
-            }
-        };
-        Ok(PreviewCommandOutcome {
-            started_playback,
-            message: self.preview.take_message(),
-        })
     }
 
     pub fn toggle_play(&mut self) -> bool {
