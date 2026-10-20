@@ -163,7 +163,7 @@ impl ProgramFilmstrips {
             if let Some(image) = poster(clip_id) {
                 let assets = qnc_timeline_assets::SourceTimelineAssets::empty_for(clip_id);
                 if let Some(strip) = qnc_timeline_assets::with_poster_filmstrip(assets, false, Some(&image)).filmstrip_background {
-                    self.poster_strips.insert(clip_id.to_string(), Arc::new(strip));
+                    self.poster_strips.insert(clip_id.to_string(), strip);
                 }
             }
         }

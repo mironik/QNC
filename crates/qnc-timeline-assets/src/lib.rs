@@ -38,11 +38,13 @@ impl fmt::Debug for TimelineAssetContext {
     }
 }
 
+/// The filmstrip and wave of a clip, shared (a copy of the view copies two pointers, not 13
+/// pictures and the peaks; audit 2026-10-20: the Story form copied them every frame).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SourceTimelineAssets {
     pub clip_id: String,
-    pub filmstrip_background: Option<FilmstripBackground>,
-    pub wave: Option<WaveformPeaks>,
+    pub filmstrip_background: Option<Arc<FilmstripBackground>>,
+    pub wave: Option<Arc<WaveformPeaks>>,
 }
 
 impl SourceTimelineAssets {
@@ -59,7 +61,7 @@ impl SourceTimelineAssets {
 
     pub fn filmstrip_background(&self) -> Option<&FilmstripBackground> {
         self.filmstrip_background
-            .as_ref()
+            .as_deref()
             .filter(|background| !background.is_empty())
     }
 
@@ -230,19 +232,32 @@ pub fn with_poster_filmstrip(
     let Some(poster) = poster else {
         return assets;
     };
-    let uri = format!("poster:{}", assets.clip_id);
-    assets.filmstrip_background = Some(FilmstripBackground {
-        clip_id: assets.clip_id.clone(),
+    assets.filmstrip_background = Some(poster_strip(&assets.clip_id, poster));
+    assets
+}
+
+/// The poster of a clip in every slot, built once per clip and poster and then shared
+/// (audit 2026-10-20: it was built anew, 13 copies of the poster, in every frame).
+fn poster_strip(clip_id: &str, poster: &qnc_image_assets::RgbaImage) -> Arc<FilmstripBackground> {
+    use std::sync::{Mutex, OnceLock};
+    static BUILT: OnceLock<Mutex<std::collections::HashMap<(String, u64), Arc<FilmstripBackground>>>> = OnceLock::new();
+    let key = (clip_id.to_string(), poster.content_key);
+    let mut built = BUILT.get_or_init(Default::default).lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(strip) = built.get(&key) {
+        return strip.clone();
+    }
+    if built.len() >= 256 {
+        built.clear(); // a long session of many clips: built again as they are shown
+    }
+    let uri = format!("poster:{clip_id}");
+    let strip = Arc::new(FilmstripBackground {
+        clip_id: clip_id.to_string(),
         frames: (0..FILMSTRIP_FRAME_COUNT)
-            .map(|index| FilmstripFrameAsset {
-                index,
-                seek_sec: 0.0,
-                uri: uri.clone(),
-                image: poster.clone(),
-            })
+            .map(|index| FilmstripFrameAsset { index, seek_sec: 0.0, uri: uri.clone(), image: poster.clone() })
             .collect(),
     });
-    assets
+    built.insert(key, strip.clone());
+    strip
 }
 
 /// The same for the clip on screen, its poster found among `posters` (clip id, loaded
@@ -267,10 +282,10 @@ fn read_assets(
     Ok(SourceTimelineAssets {
         clip_id: clip_id.to_string(),
         filmstrip_background: match filmstrip_record {
-            Some(record) => load_filmstrip_background(context, &record)?,
+            Some(record) => load_filmstrip_background(context, &record)?.map(Arc::new),
             None => None,
         },
-        wave: wave_record.and_then(|record| ready_wave(&record)),
+        wave: wave_record.and_then(|record| ready_wave(&record)).map(Arc::new),
     })
 }
 
