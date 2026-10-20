@@ -41,8 +41,8 @@ impl EditorialApp {
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
         let keys = qnc_form_host::FormKeys { catalog: self.form.shortcuts(), scopes: &EDITORIAL_SHORTCUT_SCOPES, play_action: action_ids::PLAY_PAUSE };
         self.host.before_paint(ctx, &mut Hosted(&mut self.application), &keys);
-        self.form.apply_theme(ctx);
-        if let Some(intent) = self.form.show_desktop(ui, frame, self.application.view()) {
+        qnc_dev_diagnostics::timed_block("form-theme", || self.form.apply_theme(ctx));
+        if let Some(intent) = qnc_dev_diagnostics::timed_block("form-paint", || self.form.show_desktop(ui, frame, self.application.view())) {
             qnc_form_host::dispatch(ctx, &mut Hosted(&mut self.application), intent);
         }
     }

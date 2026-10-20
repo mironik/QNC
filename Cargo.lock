@@ -3527,6 +3527,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
+ "qnc-dev-diagnostics",
  "qnc-editorial-application",
  "qnc-editorial-blocks",
  "qnc-editorial-layout",
