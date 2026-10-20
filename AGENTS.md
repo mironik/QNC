@@ -5034,3 +5034,8 @@ klik misa"): na source timelineu (sve forme) pocetak i kraj klipa, koji se pokaz
 postavio oznaku, vise se ne hvataju misem ni ne crvene u zoni dok nisu uzeti (Ctrl+I/O, desni klik, Ctrl+kotacic).
 Oznaka koju je korisnik postavio i dalje se vuce izravno iz zone. `qnc-timeline` (`grabbable_marks`). Testovi. Uzivo nije
 provjereno.
+Popravak 2026-10-20 (korisnik: "pogledaj log"): kotacic (i strelice) iznad Wrap redova, kad nista nije uzeto a zadnje je
+koristen source timeline, nije radio nista (`routed=Some(false)` desetke puta: `WrapSession::step` radi samo u Wrapu).
+Sada je korak tada klik na Wrap red jednu sliku od Wrap playheada, pa se Wrap vraca (`qnc-segments-keys` `step`); prazna
+prica i dalje ne radi nista. Zlatna tablica tipki nepromijenjena. Nalazi loga bez izmjene: testovi pisu `story-key` u
+stvarni `data/diagnostics/player.log` (1,97 GB, bez rotacije); frameovi sucelja Storyja 25-89 ms dok radi prerender.
