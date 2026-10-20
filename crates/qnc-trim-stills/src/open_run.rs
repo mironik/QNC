@@ -17,7 +17,7 @@ use qnc_image_assets::RgbaImage;
 use qnc_media_decode::{DecodeRequest, DecodedFormat, Decoder};
 use qnc_media_metadata::Rational;
 use qnc_program_view::StillPicture;
-use qnc_source_preview::LocatedPicture;
+use qnc_still_locator::LocatedPicture;
 
 /// The size a picture is made at here (the zoom draws up to 480x270).
 const SIZE: [usize; 2] = [480, 270];

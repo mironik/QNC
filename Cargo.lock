@@ -3626,10 +3626,9 @@ name = "qnc-focus-walk"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-key-intents",
  "qnc-key-list",
  "qnc-key-row",
- "qnc-media-card",
- "qnc-source-timeline",
 ]
 
 [[package]]
@@ -3995,9 +3994,6 @@ dependencies = [
 [[package]]
 name = "qnc-key-list"
 version = "0.1.0"
-dependencies = [
- "qnc-media-card",
-]
 
 [[package]]
 name = "qnc-key-preset"
@@ -4025,7 +4021,7 @@ dependencies = [
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
  "qnc-media-metadata",
- "qnc-source-preview",
+ "qnc-still-locator",
  "qnc-ui-text",
 ]
 
@@ -4112,6 +4108,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-image-assets",
+ "qnc-key-list",
  "qnc-ui-kit",
 ]
 
@@ -4278,7 +4275,6 @@ name = "qnc-monitor"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "qnc-program-output",
  "qnc-ui-kit",
  "qnc-ui-text",
 ]
@@ -4290,7 +4286,7 @@ dependencies = [
  "eframe",
  "qnc-image-assets",
  "qnc-monitor",
- "qnc-source-preview",
+ "qnc-program-output",
 ]
 
 [[package]]
@@ -4878,7 +4874,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-level-meter",
  "qnc-program-filmstrip",
- "qnc-program-segments",
+ "qnc-program-view",
  "qnc-program-waveform",
  "qnc-timeline",
  "qnc-ui-text",
@@ -5111,6 +5107,7 @@ dependencies = [
  "qnc-program-input",
  "qnc-source-bindings",
  "qnc-source-contract",
+ "qnc-still-locator",
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-ui-text",
@@ -5152,6 +5149,7 @@ dependencies = [
  "eframe",
  "qnc-action-event",
  "qnc-dev-diagnostics",
+ "qnc-key-intents",
  "qnc-lane-choice",
  "qnc-source-channels",
  "qnc-source-dock",
@@ -5170,6 +5168,19 @@ name = "qnc-source-volumes"
 version = "0.1.0"
 dependencies = [
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "qnc-still-locator"
+version = "0.1.0"
+dependencies = [
+ "qnc-media-metadata",
+ "qnc-media-stream",
+ "qnc-player-input",
+ "qnc-source-bindings",
+ "qnc-source-contract",
+ "qnc-ui-text",
+ "qnc-work-settings",
 ]
 
 [[package]]
@@ -5306,6 +5317,7 @@ dependencies = [
  "qnc-media-stream",
  "qnc-program-view",
  "qnc-source-preview",
+ "qnc-still-locator",
  "qnc-ui-text",
 ]
 

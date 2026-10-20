@@ -7,6 +7,8 @@
 use std::collections::HashMap;
 
 mod pool;
+/// The grid steps belong to the keys of a list (piece `qnc-key-list`); the card grid applies them.
+pub use qnc_key_list::{step_focus, GridStep};
 pub use pool::{show_pool, PoolGrid, PoolItem, PoolLook, PoolMarker, PoolOverlay};
 
 use eframe::egui::{self, Color32, Rect, TextureHandle, Vec2};
@@ -510,39 +512,6 @@ pub enum CardGridAction {
     ToggleSelection(String),
 }
 
-/// A key on a card grid in keyboard focus: the focused card moves, or Enter opens it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GridStep {
-    Left,
-    Right,
-    Up,
-    Down,
-    /// A screen of rows up or down (Page Up, Page Down).
-    PageUp,
-    PageDown,
-    Open,
-    /// The check mark of the focused card (as a click on it).
-    Toggle,
-}
-
-/// The card focused after a move by `step` from `from` in a grid of `count` cards in
-/// `cols` columns with `page_rows` rows on screen; it stays inside the grid.
-pub fn step_focus(from: usize, step: GridStep, cols: usize, count: usize, page_rows: usize) -> usize {
-    let last = count.saturating_sub(1);
-    let cols = cols.max(1);
-    let page = cols * page_rows.max(1);
-    match step {
-        GridStep::PageUp => from.checked_sub(page).unwrap_or(from % cols),
-        GridStep::PageDown if from + page <= last => from + page,
-        GridStep::PageDown => last - (last % cols) + (from % cols).min(last % cols),
-        GridStep::Left => from.saturating_sub(1),
-        GridStep::Right => (from + 1).min(last),
-        GridStep::Up => from.checked_sub(cols).unwrap_or(from),
-        GridStep::Down => if from + cols <= last { from + cols } else { from },
-        GridStep::Open | GridStep::Toggle => from.min(last),
-    }
-}
-
 /// The card grid in keyboard focus (`input.panel_focused`): it keeps its focused card,
 /// draws a thick frame in `color` around it (the chosen clip keeps its own frame), moves
 /// it by `step` and scrolls to it; Enter (`GridStep::Open`) opens the focused card as a
@@ -722,23 +691,6 @@ fn grid(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn the_focused_card_stays_inside_the_grid() {
-        // 7 cards in 3 columns: 0 1 2 / 3 4 5 / 6
-        assert_eq!(step_focus(0, GridStep::Left, 3, 7, 1), 0);
-        assert_eq!(step_focus(2, GridStep::Right, 3, 7, 1), 3);
-        assert_eq!(step_focus(6, GridStep::Right, 3, 7, 1), 6);
-        assert_eq!(step_focus(4, GridStep::Down, 3, 7, 1), 4, "no card under 4");
-        assert_eq!(step_focus(3, GridStep::Down, 3, 7, 1), 6);
-        assert_eq!(step_focus(1, GridStep::Up, 3, 7, 1), 1);
-        assert_eq!(step_focus(5, GridStep::Up, 3, 7, 1), 2);
-        // 20 cards in 2 columns, 3 rows on screen: a page is 6 cards.
-        assert_eq!(step_focus(1, GridStep::PageDown, 2, 20, 3), 7);
-        assert_eq!(step_focus(17, GridStep::PageDown, 2, 20, 3), 19, "the last row, same column");
-        assert_eq!(step_focus(7, GridStep::PageUp, 2, 20, 3), 1);
-        assert_eq!(step_focus(3, GridStep::PageUp, 2, 20, 3), 1, "the first row, same column");
-    }
 
     #[test]
     fn the_pipeline_dots_follow_the_catalog_record_only() {

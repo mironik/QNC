@@ -8,4 +8,4 @@ description = "QNC public panel: the preview monitor (the picture, poster or mes
 eframe = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-monitor = { workspace = true }
-qnc-source-preview = { workspace = true }
+qnc-program-output = { workspace = true }

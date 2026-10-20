@@ -4,7 +4,46 @@
 //! already-confirmed pixels. It does not own a clock, decode media, read a
 //! database, or know which application hosts it.
 
+use std::sync::Arc;
+
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Ui};
+
+/// Confirmed monitor picture (RGBA), as delivered by the player.
+#[derive(Debug, Clone)]
+pub struct MonitorFrame {
+    pub session_id: String,
+    pub generation: u64,
+    pub sequence: u64,
+    pub width: usize,
+    pub height: usize,
+    pub rgba: Arc<[u8]>,
+    /// Where the player writes the pictures of this session (a program output on an
+    /// external screen reads the same map at its own refresh).
+    pub frame_map: Option<Arc<std::path::Path>>,
+}
+
+/// What the monitor shows, the same for every form (the monitor panel's input).
+#[derive(Debug, Clone)]
+pub struct MonitorState {
+    pub frame: Option<MonitorFrame>,
+    pub video_visible: bool,
+    pub message: Option<String>,
+}
+
+/// The same state: the same picture (session, generation, sequence), not its pixels.
+impl PartialEq for MonitorState {
+    fn eq(&self, other: &Self) -> bool {
+        let picture = |state: &Self| state.frame.as_ref().map(|frame| (frame.session_id.clone(), frame.generation, frame.sequence));
+        picture(self) == picture(other) && (self.video_visible, &self.message) == (other.video_visible, &other.message)
+    }
+}
+
+impl Default for MonitorState {
+    fn default() -> Self {
+        Self { frame: None, video_visible: false, message: None }
+    }
+}
+
 
 pub const MODULE_ID: &str = "qnc.module.monitor";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -79,7 +118,8 @@ pub struct MonitorSurface<'a> {
     pub picture: Option<MonitorPicture<'a>>,
     pub message: Option<&'a str>,
     /// Monitor Auto (user 2026-10-08): while the program is on an external screen the
-    /// picture is left to it, so a weaker laptop does not draw it twice.
+    /// picture is left to it, so a weaker laptop does not draw it twice. The caller says
+    /// whether such a screen shows it (the monitor knows no output).
     pub yield_to_external: bool,
 }
 
@@ -96,10 +136,7 @@ pub fn paint_monitor(ui: &mut Ui, rect: Rect, surface: MonitorSurface<'_>) -> Mo
     );
 
     if let Some(picture) = surface.picture {
-        if surface.yield_to_external && qnc_program_output::showing(ui.ctx()) {
-            if let Some(frame_map) = picture.frame_map {
-                qnc_program_output::offer(ui.ctx(), frame_map);
-            }
+        if surface.yield_to_external {
             paint_placeholder(ui, rect, surface.chrome, qnc_ui_text::text("player.picture_hdmi_output"));
             return MonitorPaint::Message;
         }
@@ -111,10 +148,6 @@ pub fn paint_monitor(ui: &mut Ui, rect: Rect, surface: MonitorSurface<'_>) -> Mo
             picture.size,
             picture.rgba,
         ) {
-            // The same pictures go to the program output on an external screen, when one is there.
-            if let Some(frame_map) = picture.frame_map {
-                qnc_program_output::offer(ui.ctx(), frame_map);
-            }
             return MonitorPaint::Picture;
         }
     }

@@ -5,7 +5,7 @@
 
 use eframe::egui::{self, Color32, RichText};
 use qnc_action_event::ActionEvent;
-use qnc_program_segments::SegmentsView;
+use qnc_program_view::SegmentsView;
 use qnc_timeline::TimelineTheme;
 
 
@@ -88,7 +88,7 @@ pub fn show_segment_list(
 /// Uključi on an excluded one. Returns the area they take.
 fn row_buttons(
     ui: &mut egui::Ui,
-    row: &qnc_program_segments::SegmentPart,
+    row: &qnc_program_view::SegmentPart,
     editing: bool,
     command: &mut Option<(&'static str, String)>,
 ) -> egui::Rect {

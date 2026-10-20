@@ -16,7 +16,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use qnc_source_preview::{LocatedPicture, StillLocator};
+use qnc_still_locator::{LocatedPicture, StillLocator};
 
 pub const MODULE_ID: &str = "qnc.module.keyframe-nav";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

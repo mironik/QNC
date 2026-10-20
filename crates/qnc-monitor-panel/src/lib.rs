@@ -11,7 +11,7 @@
 
 use eframe::egui::{self, Rect, Ui};
 use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
-pub use qnc_source_preview::MonitorState;
+pub use qnc_monitor::MonitorState;
 
 pub const MODULE_ID: &str = "qnc.module.monitor-panel";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -33,6 +33,12 @@ pub fn show(ui: &mut Ui, rect: Rect, id: egui::Id, look: MonitorChrome, monitor:
         rgba: &frame.rgba,
         frame_map: frame.frame_map.as_ref(),
     });
-    let surface = MonitorSurface { id, chrome: look, picture, message: monitor.message.as_deref(), yield_to_external: qnc_monitor::auto() };
+    // Auto leaves the picture to the program output while an external screen shows it.
+    let yield_to_external = qnc_monitor::auto() && qnc_program_output::showing(ui.ctx());
+    let surface = MonitorSurface { id, chrome: look, picture, message: monitor.message.as_deref(), yield_to_external };
     qnc_monitor::paint_source_monitor(ui, rect, surface, poster, label);
+    // The same pictures go to the program output on an external screen, when one is there.
+    if let Some(frame_map) = monitor.frame.as_ref().filter(|_| monitor.video_visible).and_then(|frame| frame.frame_map.as_ref()) {
+        qnc_program_output::offer(ui.ctx(), frame_map);
+    }
 }

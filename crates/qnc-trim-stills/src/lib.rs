@@ -31,7 +31,7 @@ mod open_run;
 
 use qnc_image_assets::RgbaImage;
 use qnc_program_view::{SegmentsView, StillPicture};
-use qnc_source_preview::{LocatedPicture, StillLocator};
+use qnc_still_locator::{LocatedPicture, StillLocator};
 
 pub const MODULE_ID: &str = "qnc.module.trim-stills";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

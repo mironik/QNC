@@ -9,7 +9,7 @@
 
 mod content;
 mod still_media;
-pub use still_media::{LocatedPicture, StillLocator};
+pub use qnc_still_locator::{LocatedPicture, StillLocator};
 
 use std::{sync::Arc, time::{Duration, Instant}};
 
@@ -27,20 +27,6 @@ use qnc_work_settings::{ProductArea, SettingsReader, WorkSettings};
 
 pub const MODULE_ID: &str = "qnc.module.source-preview";
 pub const VERSION: &str = "0.1.0";
-
-/// Confirmed monitor picture (RGBA), as delivered by the player.
-#[derive(Debug, Clone)]
-pub struct MonitorFrame {
-    pub session_id: String,
-    pub generation: u64,
-    pub sequence: u64,
-    pub width: usize,
-    pub height: usize,
-    pub rgba: Arc<[u8]>,
-    /// Where the player writes the pictures of this session (a program output on an
-    /// external screen reads the same map at its own refresh).
-    pub frame_map: Option<Arc<std::path::Path>>,
-}
 
 /// A picture of the story program on the monitor.
 #[derive(Debug, Clone)]
@@ -69,28 +55,6 @@ pub struct PreviewView {
     pub output_levels: [Option<f32>; 2],
 }
 
-/// What the monitor shows, the same for every form (the monitor panel's input).
-#[derive(Debug, Clone)]
-pub struct MonitorState {
-    pub frame: Option<MonitorFrame>,
-    pub video_visible: bool,
-    pub message: Option<String>,
-}
-
-/// The same state: the same picture (session, generation, sequence), not its pixels.
-impl PartialEq for MonitorState {
-    fn eq(&self, other: &Self) -> bool {
-        let picture = |state: &Self| state.frame.as_ref().map(|frame| (frame.session_id.clone(), frame.generation, frame.sequence));
-        picture(self) == picture(other) && (self.video_visible, &self.message) == (other.video_visible, &other.message)
-    }
-}
-
-impl Default for MonitorState {
-    fn default() -> Self {
-        Self { frame: None, video_visible: false, message: None }
-    }
-}
-
 impl PreviewView {
     /// What the monitor shows now.
     pub fn monitor(&self) -> MonitorState {
@@ -102,7 +66,7 @@ impl PreviewView {
     }
 }
 
-pub use qnc_monitor::{MONITOR_AUTO, MONITOR_ON};
+pub use qnc_monitor::{MonitorFrame, MonitorState, MONITOR_AUTO, MONITOR_ON};
 
 impl Default for PreviewView {
     fn default() -> Self {

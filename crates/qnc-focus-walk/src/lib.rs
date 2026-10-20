@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 
 use eframe::egui;
-pub use qnc_media_card::GridStep;
+pub use qnc_key_list::GridStep;
 
 pub const MODULE_ID: &str = "qnc.module.focus-walk";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -60,7 +60,7 @@ impl WalkView {
     /// The catalog scope that reads the keys first: the source timeline's own while it (or
     /// its buttons) has the keyboard (piece `qnc-source-timeline`).
     pub fn key_scope(&self) -> Option<&'static str> {
-        matches!(self.panel.as_str(), SOURCE_TIMELINE | SOURCE_BUTTONS).then_some(qnc_source_timeline::KEY_SCOPE)
+        matches!(self.panel.as_str(), SOURCE_TIMELINE | SOURCE_BUTTONS).then_some(qnc_key_intents::SOURCE_TIMELINE_SCOPE)
     }
 
     pub fn is(&self, panel: &str) -> bool {
@@ -237,7 +237,7 @@ pub fn list_focus(
     }
     let fresh = step.filter(|(_, number)| ui.data(|data| data.get_temp::<u64>(applied)) != Some(*number));
     let from = ui.data(|data| data.get_temp::<usize>(key)).or(selected).unwrap_or(0).min(count - 1);
-    let focused = fresh.map_or(from, |(step, _)| qnc_media_card::step_focus(from, step, columns, count, page_rows));
+    let focused = fresh.map_or(from, |(step, _)| qnc_key_list::step_focus(from, step, columns, count, page_rows));
     ui.data_mut(|data| {
         data.insert_temp(key, focused);
         if let Some((_, number)) = fresh {

@@ -7,7 +7,7 @@
 
 use eframe::egui::{self, PointerButton, Pos2, Rect, RichText, Sense, Vec2};
 use qnc_action_event::ActionEvent;
-use qnc_program_segments::SegmentsView;
+use qnc_program_view::SegmentsView;
 use qnc_timeline::TimelineTheme;
 
 pub(crate) const COMPACT_CTRL_H: f32 = 22.0;

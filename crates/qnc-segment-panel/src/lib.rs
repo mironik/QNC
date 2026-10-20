@@ -16,7 +16,7 @@ pub use cover_length::{cover_fill, CoverLengthBand};
 
 use qnc_action_event::ActionEvent;
 use eframe::egui::{self, Color32, RichText, Vec2};
-use qnc_program_segments::{SegmentRow, SegmentsView};
+use qnc_program_view::{SegmentRow, SegmentsView};
 use qnc_timeline::{
     AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent,
     TimelineLayerFlags, TimelineMarkerPin, TimelineMetrics, TimelinePicture, TimelineProjection, TimelineSlotSpan,
@@ -288,11 +288,11 @@ fn paint_program(
     let rate = segments.timebase.unwrap_or((0, 1));
     let labels = shown
         .iter()
-        .map(|cover| qnc_program_segments::duration_label(cover.end_frame - cover.start_frame, rate.0, rate.1))
+        .map(|cover| qnc_program_view::duration_label(cover.end_frame - cover.start_frame, rate.0, rate.1))
         .collect::<Vec<_>>();
     // The cover a Sync is writing, as it grows (user 2026-10-18).
     let draft = segments.sync_draft.filter(|(from, to)| *to > start && *from < end);
-    let draft_label = draft.map(|(from, to)| qnc_program_segments::duration_label(to - from, rate.0, rate.1));
+    let draft_label = draft.map(|(from, to)| qnc_program_view::duration_label(to - from, rate.0, rate.1));
     let draft_span = draft.zip(draft_label.as_deref()).map(|((from, to), label)| TimelineCoverSpan {
         id: "sync-draft",
         start_frame: local(from),

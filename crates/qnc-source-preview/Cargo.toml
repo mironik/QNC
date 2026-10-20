@@ -6,6 +6,7 @@ description = "QNC public component: source preview session for one clip (Broadc
 
 [dependencies]
 qnc-monitor = { workspace = true }
+qnc-still-locator = { workspace = true }
 qnc-worker-wake = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-source-contract = { workspace = true }

@@ -27,7 +27,7 @@ pub use qnc_source_timecode::SourceTimecode;
 
 pub const MODULE_ID: &str = "qnc.module.source-timeline";
 /// The catalog scope of the source timeline's keys, the same in every form.
-pub const KEY_SCOPE: &str = "source_timeline";
+pub const KEY_SCOPE: &str = qnc_key_intents::SOURCE_TIMELINE_SCOPE;
 /// The panel name of the source timeline in the layout contracts (where a click happened).
 pub const PANEL: &str = "source_timeline";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

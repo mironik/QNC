@@ -6,6 +6,9 @@
 use eframe::egui;
 use qnc_keyboard_shortcut::ShortcutCatalog;
 
+/// The catalog scope of the source timeline: its keys are its own on every form.
+pub const SOURCE_TIMELINE_SCOPE: &str = "source_timeline";
+
 /// The preset the active project chose, read in the background once per process (the QNC
 /// root of this process; none without one).
 fn project_preset() -> Option<String> {

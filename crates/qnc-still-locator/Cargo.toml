@@ -1,0 +1,14 @@
+[package]
+name = "qnc-still-locator"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: where this machine reads the picture a clip plays from, for a still of one frame (the player's choice, no probe)"
+
+[dependencies]
+qnc-media-metadata = { workspace = true }
+qnc-player-input = { workspace = true }
+qnc-source-bindings = { workspace = true }
+qnc-work-settings = { workspace = true }
+qnc-source-contract = { workspace = true }
+qnc-media-stream = { workspace = true }
+qnc-ui-text = { workspace = true }

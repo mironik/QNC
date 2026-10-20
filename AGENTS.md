@@ -5068,3 +5068,12 @@ postera koji nedostaju (`qnc-media-thumbnail` `LoadedThumbnail`, `keep_loaded`, 
 Ingest ploca 824 -> 561, Story ploca 301 -> 206, Project ploca 1932 -> 1714, Ingest aplikacija 1542 -> 1538, Story
 aplikacija 649 -> 643; uklonjene iznimke C1 (oba preglednika), C2 boja (Project preglednik), C3 (obje mreze). Testovi,
 conformance. Uzivo nije provjereno. Project je ponovno zamrznut.
+Izvedeno 2026-10-20 (korisnik: "da" na plan kocka -> modul -> panel -> forma, korak 1: samostalnost komponenti):
+`GridStep` i `step_focus` (koraci tipki popisa) iz `qnc-media-card` u kocku `qnc-key-list` (kartice ih koriste, ne
+obrnuto); `qnc-focus-walk` vise ne ovisi o mrezi kartica ni o panelu source timelinea (naziv opsega tipki source
+timelinea je `qnc-key-intents::SOURCE_TIMELINE_SCOPE`); tipovi stanja monitora (`MonitorFrame`, `MonitorState`) iz modula
+playera u kocku `qnc-monitor`, a kocka monitora vise ne poziva HDMI izlaz (to radi panel monitora), pa panel monitora ne
+povlaci player; nova kocka `crates/qnc-still-locator` (+ ugovor): gdje ovo racunalo cita sliku klipa, izdvojeno iz
+`qnc-source-preview`, pa skok na kljucnu sliku (`qnc-keyframe-nav`) ne ovisi o playeru; panel Segmenti ovisi o kocki
+prikaza `qnc-program-view`, ne o modulu price s bazom. Nije izvedeno (trazi Project): `qnc-project-session` jos ovisi o
+Project aplikaciji. Testovi, conformance.
