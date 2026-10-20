@@ -42,7 +42,7 @@ impl IngestApplication {
             action_ids::INGEST_SET_ARCHIVE => self.on_set_archive(intent.payload),
             action_ids::INGEST_SET_AI_MINING => self.on_set_ai_mining(),
             action_ids::INGEST_IMPORT_SELECTED => self.start_import(),
-            action if action == action_ids::INGEST_CUE_FRAME || qnc_source_panel::ACTIONS.contains(&action) || action.starts_with("wheel_source") => self.player_action(intent),
+            action if action == action_ids::TIMELINE_CUE_FRAME || qnc_source_panel::ACTIONS.contains(&action) || action.starts_with("wheel_source") => self.player_action(intent),
             tab @ (action_ids::INGEST_TAB_ALL | action_ids::INGEST_TAB_VIRTUAL) => { self.view.pool_tab = Some(tab.to_string()); IngestDispatchResult::accepted(None, true) } // v5: only the chosen tab changes
             _ => IngestDispatchResult::accepted(Some(qnc_ui_text::text("ingest.msg.action_not_connected").to_string()), true),
         }

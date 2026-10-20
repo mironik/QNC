@@ -8,7 +8,9 @@ use qnc_editorial_application::{action_ids, EditorialApplication, EditorialInten
 
 use crate::EditorialForm;
 
-const EDITORIAL_SHORTCUT_SCOPES: [&str; 2] = ["storyboard", "off"];
+/// Story and Media Assist read the storyboard keys only: the OFF scope belongs to no form of
+/// QNC (user rule 2026-10-20; it stays in the catalog as the qnc_v4 mirror).
+const EDITORIAL_SHORTCUT_SCOPES: [&str; 1] = ["storyboard"];
 
 pub struct EditorialApp {
     form: EditorialForm,

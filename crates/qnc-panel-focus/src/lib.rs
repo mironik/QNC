@@ -302,6 +302,13 @@ impl PanelFocus {
     ) -> Option<Option<bool>> {
         if event.is_at(qnc_segment_panel_name()) {
             self.panel = Panel::Segments;
+            // A left click while something is taken on a Wrap row keeps it (as Enter, without
+            // walking on), then the playhead goes where it was clicked (user rule 2026-10-20).
+            if event.action_id == "segments_keep_edit" {
+                let kept = qnc_segments_keys::confirm(preview, segments);
+                let cued = event.unsigned().is_some_and(|frame| segments.apply(qnc_program_segments::SegmentCommand::Cue(frame)));
+                return Some(Some(kept || cued));
+            }
             // The marker, slot, cover, frame or channel the pointer named (piece
             // `qnc-program-commands`: one map for keys and pointers).
             return match qnc_program_segments::SegmentCommand::from_event(event)? {
@@ -322,6 +329,11 @@ impl PanelFocus {
                 self.to_source(wrap);
                 let intent = event.unsigned().filter(|_| id == "timeline_cue_frame").map_or(TimelineIntent::GoHome, TimelineIntent::CueFrame);
                 Some(Some(self.source.cue(&intent, preview)))
+            }
+            // A left click while IN/OUT or A1/A2 is taken keeps it, then the playhead goes there.
+            qnc_source_timeline::KEEP_MARK => {
+                self.panel = Panel::SourceTimeline;
+                Some(self.source.route_input(id, event.value, preview, timeline))
             }
             // A stopped Sync's OUT is the end of its cover: the mouse moves it as the arrows do.
             qnc_source_timeline::DRAG_OUT if qnc_sync_session::dragged(preview, segments, event.value) => Some(Some(true)),

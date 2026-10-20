@@ -18,6 +18,8 @@ pub struct MarkerPin {
     /// The locked program start or end marker.
     pub locked: bool,
     pub selected: bool,
+    /// Taken for a move (Ctrl+M, a right click): the mouse drags only it.
+    pub taken: bool,
 }
 
 /// The program between two neighbouring M markers, `[start, end)`.
@@ -44,6 +46,7 @@ pub fn resolve(
             frame: marker.program_frame,
             locked: !marker.system_role.is_empty(),
             selected: selected == Some(marker.marker_id.as_str()),
+            taken: false,
         })
         .collect::<Vec<_>>();
     pins.sort_by(|a, b| a.frame.cmp(&b.frame).then(a.marker_id.cmp(&b.marker_id)));

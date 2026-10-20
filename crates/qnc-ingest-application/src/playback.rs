@@ -94,7 +94,7 @@ impl IngestApplication {
         }
         let command = match intent.action_id.as_str() {
             action_ids::PLAY_PAUSE => qnc_ingest_preview_source::PreviewCommand::TogglePlay,
-            action_ids::INGEST_CUE_FRAME => match intent.payload {
+            action_ids::TIMELINE_CUE_FRAME => match intent.payload {
                 IngestPayload::Frame(frame) if frame >= 0 => {
                     let cue = TimelineIntent::CueFrame(frame as u64); // the same in every form
                     return IngestDispatchResult::accepted(None, self.source_timeline.cue(&cue, self.preview.source_preview_mut()));

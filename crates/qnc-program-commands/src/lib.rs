@@ -66,17 +66,10 @@ pub enum SegmentCommand {
     /// The selected marker first, otherwise the selected segment (docs/94 section 2).
     DeleteSelected,
     SelectMarker(String),
-    /// A left click on a Wrap row while something there is taken (a slot, a slot edge, a
-    /// marker, the sound of a segment or cover): the change is kept, as Enter (user
-    /// 2026-10-17: the same as on the source timeline).
-    Keep,
     /// A right click on an M marker: it is taken as with Ctrl+M (user 2026-10-17).
     TakeMarker(String),
     /// A right click in a slot: it is taken as with Ctrl+S.
     TakeSlot(String),
-    /// A right click near an edge of a slot: that edge is taken as with Ctrl+I (`start`) or
-    /// Ctrl+O on that slot.
-    TakeSlotEdge { slot_id: String, start: bool },
     /// A right click on A1 (0) or A2 of a Wrap row: the sound of what lies at the program
     /// frame is taken as with Ctrl+1/Ctrl+2 there.
     TakeSound { lane: u8, frame: u64 },
@@ -113,6 +106,9 @@ pub enum SegmentCommand {
     EditMarker,
     /// Shift+M: always a new marker at the playhead, whatever is selected.
     AddMarker,
+    /// Shift + left click on a Wrap row: the playhead there and a new marker on it (as
+    /// Shift+M; user rule 2026-10-20).
+    AddMarkerAt(u64),
     /// Arrows while a marker is edited: its draft by frames.
     NudgeMarker(i64),
     /// A mouse drag of a marker: its draft on this program frame.
@@ -172,10 +168,9 @@ impl SegmentCommand {
         let (target, value) = (event.target.clone(), event.unsigned());
         Some(match (event.action_id.as_str(), target, value) {
             ("timeline_cue_frame", _, Some(frame)) => Self::Cue(frame),
-            ("timeline_select_marker", Some(id), _) => Self::SelectMarker(id),
             ("select_marker", Some(id), _) => Self::TakeMarker(id),
             ("select_current_marker_slot", Some(id), _) => Self::TakeSlot(id),
-            (edge @ ("select_mark_in" | "select_mark_out"), Some(slot_id), _) => Self::TakeSlotEdge { slot_id, start: edge == "select_mark_in" },
+            ("add_marker_continue", _, Some(frame)) => Self::AddMarkerAt(frame),
             ("timeline_take_cover", Some(cover_id), Some(frame)) => Self::TakeCover { cover_id, frame },
             ("timeline_select_cover", Some(cover_id), Some(frame)) => Self::SelectCover { cover_id, frame },
             ("timeline_select_slot", Some(slot_id), Some(frame)) => Self::SelectSlot { slot_id, frame },
@@ -242,7 +237,8 @@ mod tests {
         let at = |id: &str| ActionEvent::key(id).at("segments");
         assert_eq!(SegmentCommand::from_event(&at("select_marker").with_target("m")), Some(SegmentCommand::TakeMarker("m".into())), "a right click on a marker takes that marker");
         assert_eq!(SegmentCommand::from_event(&at("select_marker")), None, "the key itself acts on the selection");
-        assert_eq!(SegmentCommand::from_event(&at("select_mark_out").with_target("s")), Some(SegmentCommand::TakeSlotEdge { slot_id: "s".into(), start: false }));
+        assert_eq!(SegmentCommand::from_event(&at("add_marker_continue").with_value(12u64)), Some(SegmentCommand::AddMarkerAt(12)), "a click that adds is the adding key, there");
+        assert_eq!(SegmentCommand::from_event(&at("select_mark_out").with_target("s")), None, "a slot edge is taken by its keys only");
         assert_eq!(SegmentCommand::from_event(&at("timeline_cue_frame").with_value(40u64)), Some(SegmentCommand::Cue(40)));
         assert_eq!(SegmentCommand::from_event(&at("select_audio_a2").with_value(7u64)), Some(SegmentCommand::TakeSound { lane: 1, frame: 7 }));
         assert_eq!(SegmentCommand::from_event(&at("source_choose_a1_channel").with_value(3u64)), Some(SegmentCommand::PickChannel { lane: 0, channel: 3 }));

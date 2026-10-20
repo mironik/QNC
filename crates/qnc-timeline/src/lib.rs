@@ -10,7 +10,8 @@ pub use qnc_channel_picker::ChannelChoice;
 
 mod events;
 mod marker_reach;
-use marker_reach::{marker_in_reach, source_mark_in_reach};
+use marker_reach::{marker_for_right_click, marker_to_drag, source_mark_in_reach};
+pub use events::take_marker_drag_event;
 mod lanes;
 pub use events::event;
 pub use lanes::{drafted_choice, lane_choice, lane_key, lane_message, Lane, LaneChoice, LaneKey};
@@ -545,6 +546,11 @@ pub struct TimelineSlotSpan<'a> {
 pub struct TimelineMarkerPin<'a> {
     pub id: &'a str,
     pub frame: u64,
+    /// The taken marker (Ctrl+M, a right click): only it has a zone for the mouse (red,
+    /// dragged).
+    pub taken: bool,
+    /// The locked start or end marker of the program: a right click never takes it.
+    pub locked: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -695,6 +701,9 @@ pub struct TimelineInput<'a> {
     pub trim_playheads: &'a [(u64, &'a str)],
     /// Filmstrip pictures of a banded video row (empty: none).
     pub pictures: &'a [TimelinePicture<'a>],
+    /// On a row with markers: the host holds something taken there (a slot, a slot edge, a
+    /// marker, a sound), so a left click keeps it first (a source timeline knows its own).
+    pub holding: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -705,13 +714,15 @@ pub enum TimelineIntent {
     SelectVirtual { id: String, frame: u64 },
     SelectCover { id: String, frame: u64 },
     SelectMarkerSlot { id: String, frame: u64 },
-    SelectMarker { id: String, frame: u64 },
     /// The source channel (zero based) chosen for A1 in the channel picker.
     ChooseA1Channel(u16),
     /// The source channel (zero based) chosen for A2 in its channel picker.
     ChooseA2Channel(u16),
-    /// A click on the A1 or A2 label: the lane is taken (as Ctrl+1, Ctrl+2).
+    /// A right click on A1 or A2 of a source timeline: the lane is taken (as Ctrl+1, Ctrl+2).
     TakeAudioLane(AudioLane),
+    /// A click on the A1 or A2 label (a button): the lane is taken (as Ctrl+1, Ctrl+2); on a
+    /// row with markers the sound under the playhead in the row, else at its start (`frame`).
+    LaneLabel { lane: AudioLane, frame: Option<u64> },
     /// A click on the V label: Home of the panel (start of the clip or of the program).
     GoHome,
     /// Ctrl+click on the V label of a banded row: filmstrip or narrow video (user
@@ -720,9 +731,12 @@ pub enum TimelineIntent {
     /// The mouse wheel over the timeline (user 2026-10-16: the timeline behaves the same
     /// in every form): one step a frame, Ctrl held or not.
     Wheel(qnc_wheel_jog::Wheel),
-    /// A left click while IN or OUT is taken (Ctrl+I/O): the edit is kept, as Enter (user
-    /// 2026-10-17).
-    KeepMark,
+    /// A left click while something is taken (IN/OUT, A1/A2, a marker, a slot, a sound): it is
+    /// kept, as Enter, and then the playhead goes to `Some` frame (user rule 2026-10-20); `None`
+    /// keeps only (the end of a drag, a click on a label).
+    Keep(Option<u64>),
+    /// Shift + left click on a row with markers: an M marker added there (as Shift+M).
+    AddMarkerAt(u64),
     /// A right click is Ctrl+ (user 2026-10-17: the right mouse button takes what it points
     /// at): IN (`true`) or OUT, whichever is nearer.
     TakeMark(bool),
@@ -731,12 +745,12 @@ pub enum TimelineIntent {
     DragMark { in_mark: bool, frame: u64 },
     /// A right click on an M marker of a row (as Ctrl+M).
     TakeMarker { id: String, frame: u64 },
-    /// A right click in a slot of a row (as Ctrl+S).
+    /// A right click on a cover's colour strip: its slot (as Ctrl+S).
     TakeSlot { id: String, frame: u64 },
-    /// A right click near the start (`true`) or end of a slot (as Ctrl+I/Ctrl+O there).
-    TakeSlotEdge { id: String, start: bool },
-    /// A right click on a cover (as Ctrl+click on it).
+    /// A right click on a cover outside any slot: the cover taken (for Delete).
     TakeCover { id: String, frame: u64 },
+    /// Ctrl + left click on a cover's colour strip: the cover taken (for Delete).
+    TakeCoverOnStrip { id: String, frame: u64 },
     /// A right click on A1 or A2 of a row with markers (a Wrap row): the sound of what lies
     /// there, at that frame (as Ctrl+1/Ctrl+2 there).
     TakeSound { lane: AudioLane, frame: u64 },
@@ -856,6 +870,7 @@ pub fn show_source_player_timeline_with_channel(
                 wave_over_video,
                 trim_playheads: &[],
                 pictures: &[],
+                holding: false,
             },
         );
     });
@@ -1191,11 +1206,7 @@ fn paint_audio_row(
     }
     .filter(|_| input.show_lane_labels);
     if input.show_lane_labels && label_response.clicked() {
-        // A click on A1/A2 takes the lane as Ctrl+1/Ctrl+2 does (user rule 2026-10-01).
-        return match picker {
-            Some(_) => TimelineIntent::TakeAudioLane(lane),
-            None => TimelineIntent::ToggleAudioExpand(lane),
-        };
+        return label_intent(lane, picker.is_some(), input);
     }
     if let Some(take) = take_lane_intent(&[&label_response, &response], track_rect, lane, input) {
         return take;
@@ -1281,11 +1292,7 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
             AudioLane::A2 => input.a2_channel,
             _ => None,
         };
-        // A click on A1/A2 takes the lane as Ctrl+1/Ctrl+2 does (user rule 2026-10-01).
-        return match picker {
-            Some(_) => TimelineIntent::TakeAudioLane(lane),
-            None => TimelineIntent::ToggleAudioExpand(lane),
-        };
+        return label_intent(lane, picker.is_some(), input);
     }
     let band_response = ui.interact(track_rect, ui.make_persistent_id(("qnc_timeline_audio_band", lane.label())), Sense::click());
     if let Some(take) = take_lane_intent(&[&label_response, &band_response], track_rect, lane, input) {
@@ -1294,9 +1301,34 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
     // A left click on the band is a click on the row: the playhead goes there, or a taken edit
     // is kept (audit 2026-10-17: the band took the click and nothing happened).
     match band_response.interact_pointer_pos().filter(|_| band_response.clicked() && input.state.can_cue()) {
-        Some(pos) => TimelineIntent::CueFrame(frame_for_x(track_rect, input.state.range_start(), input.state.duration_frames(), pos.x)),
+        Some(pos) => {
+            let frame = frame_for_x(track_rect, input.state.range_start(), input.state.duration_frames(), pos.x);
+            if holding(input) {
+                TimelineIntent::Keep(Some(frame))
+            } else if input.layers.markers && band_response.ctx.input(|i| i.modifiers.shift) {
+                TimelineIntent::AddMarkerAt(frame)
+            } else {
+                TimelineIntent::CueFrame(frame)
+            }
+        }
         None => TimelineIntent::None,
     }
+}
+
+/// A click on the A1/A2 label (a button) takes the lane as Ctrl+1/Ctrl+2 does (user rule
+/// 2026-10-01): on a row with markers the sound under its playhead (else at its start), and
+/// while something is taken there it keeps it (a left click keeps first). Without a channel
+/// column on a source timeline the label opens the larger wave.
+fn label_intent(lane: AudioLane, picker: bool, input: &TimelineInput<'_>) -> TimelineIntent {
+    if !input.layers.markers {
+        return if picker { TimelineIntent::LaneLabel { lane, frame: None } } else { TimelineIntent::ToggleAudioExpand(lane) };
+    }
+    if input.holding {
+        return TimelineIntent::Keep(None);
+    }
+    let (start, duration) = (input.state.range_start(), input.state.duration_frames());
+    let frame = input.state.playhead_frame.filter(|frame| (start..start + duration).contains(frame)).unwrap_or(start);
+    TimelineIntent::LaneLabel { lane, frame: Some(frame) }
 }
 
 /// A right click on A1/A2 (its label or its track) takes the lane, as Ctrl+1/Ctrl+2: on a
@@ -1340,18 +1372,15 @@ fn mark_drag_intent(response: &egui::Response, track: Rect, input: &TimelineInpu
         return Some(TimelineIntent::DragMark { in_mark, frame });
     }
     response.ctx.data_mut(|data| data.remove::<bool>(key));
-    Some(TimelineIntent::KeepMark)
+    Some(TimelineIntent::Keep(None))
 }
 
-/// Which of IN and OUT the mouse may reach and drag: one the user set, or one taken
-/// (Ctrl+I/O, a right click, Ctrl+wheel). The clip's start and end, shown while the user set
-/// none, are not grabbed by the mouse until taken (user 2026-10-20: "the start and end were
-/// active for dragging without Ctrl or a right click first").
+/// Which of IN and OUT the mouse may drag: only the taken one (Ctrl+I/O, a right click,
+/// Ctrl+wheel; user rule 2026-10-20: a drag moves only what is taken).
 fn grabbable_marks(input: &TimelineInput<'_>) -> (bool, bool) {
-    let state = input.state;
     (
-        input.draft_in_active && (state.source_in_frame.is_some() || input.focus == TimelineFocusPaint::In),
-        input.draft_out_active && (state.source_out_frame.is_some() || input.focus == TimelineFocusPaint::Out),
+        input.draft_in_active && input.focus == TimelineFocusPaint::In,
+        input.draft_out_active && input.focus == TimelineFocusPaint::Out,
     )
 }
 
@@ -1367,9 +1396,21 @@ fn lane_taken(input: &TimelineInput<'_>) -> bool {
     input.a1_channel.is_some_and(|choice| choice.open) || input.a2_channel.is_some_and(|choice| choice.open)
 }
 
-/// A click on the track: a left click while IN or OUT is taken keeps the edit (as Enter);
-/// a right click takes what it points at (as Ctrl+): IN or OUT on the source timeline, an M
-/// marker or a slot on a row with them. `None`: neither.
+/// Whether something is taken on this timeline: IN/OUT or A1/A2 of a source timeline, what
+/// the host holds on a row with markers.
+fn holding(input: &TimelineInput<'_>) -> bool {
+    if input.layers.markers {
+        input.holding
+    } else {
+        input.focus != TimelineFocusPaint::Playhead || lane_taken(input)
+    }
+}
+
+/// A click on the track (user rule 2026-10-20, the mouse map `qnc-mouse-map`): a left click
+/// while something is taken keeps it (as Enter) and the playhead goes there; a right click
+/// takes what it points at (as Ctrl+): the nearer IN or OUT on the source timeline; on a row
+/// with markers the slot on a colour strip, else the nearest M marker (never the locked start
+/// or end). `None`: neither.
 fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineInput<'_>) -> Option<TimelineIntent> {
     let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
     // While IN/OUT or A1/A2 is taken, a press of the left button keeps it, a quick click or a
@@ -1386,12 +1427,13 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
             return Some(TimelineIntent::None); // the release of the press that kept
         }
     }
-    let taken = (input.focus != TimelineFocusPaint::Playhead || lane_taken(input)) && !input.layers.markers;
-    if taken && (response.clicked() || response.drag_started_by(egui::PointerButton::Primary)) {
+    if holding(input) && (response.clicked() || response.drag_started_by(egui::PointerButton::Primary)) {
         if !response.clicked() {
             response.ctx.data_mut(|data| data.insert_temp(kept_key, true));
         }
-        return Some(TimelineIntent::KeepMark);
+        let at = response.ctx.input(|i| i.pointer.press_origin()).or(response.interact_pointer_pos());
+        let frame = at.filter(|_| input.state.can_cue()).map(|pos| frame_for_x(track, range_start, duration, pos.x));
+        return Some(TimelineIntent::Keep(frame));
     }
     if !right_click(response) {
         return None;
@@ -1399,23 +1441,16 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
     let pos = response.interact_pointer_pos()?;
     let frame = frame_for_x(track, range_start, duration, pos.x);
     if input.layers.markers {
-        if let Some(id) = marker_in_reach(track, range_start, duration, pos, input.markers) {
-            return Some(TimelineIntent::TakeMarker { id: id.to_string(), frame });
+        let cover = input.layers.covers.then(|| cover_hit(track, range_start, duration, pos, input.covers, cover_rows(track, input))).flatten();
+        // On a colour strip a right click takes its slot (as Ctrl+S); a cover in no slot is taken.
+        if let Some(cover) = cover {
+            return Some(match slot_of_frame(input.marker_slots, frame) {
+                Some(slot) => TimelineIntent::TakeSlot { id: slot.to_string(), frame },
+                None => TimelineIntent::TakeCover { id: cover.to_string(), frame },
+            });
         }
-        let slot = input.layers.marker_slots.then(|| slot_hit(track, range_start, duration, pos, input.marker_slots, slot_top(input))).flatten();
-        let Some(span) = slot.and_then(|id| input.marker_slots.iter().find(|span| span.id == id)) else {
-            // Outside a slot: a cover (as Ctrl+click on it).
-            let cover = input.layers.covers.then(|| cover_hit(track, range_start, duration, pos, input.covers, cover_rows(track, input))).flatten();
-            return cover.map(|id| TimelineIntent::TakeCover { id: id.to_string(), frame });
-        };
-        // On the colour strip a right click takes the slot (as Ctrl+S); elsewhere it is
-        // Ctrl+I/O: the nearer edge of the slot, the playhead goes there (user 2026-10-17).
-        let on_strip = input.layers.covers && cover_hit(track, range_start, duration, pos, input.covers, cover_rows(track, input)).is_some();
-        if on_strip {
-            return Some(TimelineIntent::TakeSlot { id: span.id.to_string(), frame });
-        }
-        let (x0, x1) = (x_for_frame(track, range_start, duration, span.start_frame), x_for_frame(track, range_start, duration, span.end_frame));
-        return Some(TimelineIntent::TakeSlotEdge { id: span.id.to_string(), start: (pos.x - x0).abs() <= (pos.x - x1).abs() });
+        // Elsewhere the nearest M marker (as Ctrl+M; M is OUT and IN in one mark).
+        return marker_for_right_click(track, range_start, duration, pos, input.markers, false).map(|id| TimelineIntent::TakeMarker { id: id.to_string(), frame });
     }
     if !(input.draft_in_active || input.draft_out_active) {
         return None;
@@ -1971,7 +2006,7 @@ fn paint_markers(
         .ctx()
         .pointer_hover_pos()
         .filter(|pos| track.y_range().contains(pos.y))
-        .and_then(|pos| marker_in_reach(track, range_start, duration, pos, markers));
+        .and_then(|pos| marker_to_drag(track, range_start, duration, pos, markers));
     for marker in markers {
         if marker.id.trim().is_empty() {
             continue;
@@ -2086,7 +2121,7 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
     let active = egui::Id::new(MARKER_DRAG).with(response.id);
     if response.drag_started() {
         let press = ctx.input(|i| i.pointer.press_origin());
-        let hit = press.and_then(|pos| marker_in_reach(track, start, duration, pos, input.markers)).map(str::to_string);
+        let hit = press.and_then(|pos| marker_to_drag(track, start, duration, pos, input.markers)).map(str::to_string);
         // Every drag on a row with markers in the player log: which marker was nearest and
         // how far (live 2026-10-18: a marker drag that scrubbed instead could not be told).
         if qnc_dev_diagnostics::player_diagnostics_enabled() {
@@ -2150,19 +2185,10 @@ fn video_intent_from_response(
         pos.x,
     );
     if response.clicked() {
-        if input.layers.covers && input.layers.markers {
-            if let Some(id) = marker_in_reach(
-                track,
-                input.state.range_start(),
-                input.state.duration_frames(),
-                pos,
-                input.markers,
-            ) {
-                return TimelineIntent::SelectMarker {
-                    id: id.to_string(),
-                    frame,
-                };
-            }
+        let modifiers = response.ctx.input(|i| i.modifiers);
+        // Shift + left click adds an M marker there (as Shift+M; user rule 2026-10-20).
+        if input.layers.markers && modifiers.shift {
+            return TimelineIntent::AddMarkerAt(frame);
         }
         if input.layers.covers {
             if let Some(id) = cover_hit(
@@ -2173,9 +2199,13 @@ fn video_intent_from_response(
                 input.covers,
                 cover_rows(track, input),
             ) {
-                return TimelineIntent::SelectCover {
-                    id: id.to_string(),
-                    frame,
+                // A left click on a colour strip selects its slot; Ctrl takes the cover (for
+                // Delete); a cover in no slot is selected.
+                let id = id.to_string();
+                return match (modifiers.command, slot_of_frame(input.marker_slots, frame)) {
+                    (true, _) => TimelineIntent::TakeCoverOnStrip { id, frame },
+                    (false, Some(slot)) => TimelineIntent::SelectMarkerSlot { id: slot.to_string(), frame },
+                    (false, None) => TimelineIntent::SelectCover { id, frame },
                 };
             }
         }
@@ -2197,6 +2227,11 @@ fn video_intent_from_response(
         }
     }
     TimelineIntent::CueFrame(frame)
+}
+
+/// The slot a program frame lies in.
+fn slot_of_frame<'a>(slots: &'a [TimelineSlotSpan<'a>], frame: u64) -> Option<&'a str> {
+    slots.iter().find(|slot| (slot.start_frame..slot.end_frame).contains(&frame)).map(|slot| slot.id)
 }
 
 fn cover_hit<'a>(
@@ -2247,29 +2282,6 @@ fn cover_strip(input: &TimelineInput<'_>) -> bool {
 /// 2026-10-15).
 fn slot_top(input: &TimelineInput<'_>) -> f32 {
     if input.layers.audio_bands { video_middle_insets(input).0 } else { 0.0 }
-}
-
-fn slot_hit<'a>(
-    track: Rect,
-    range_start: u64,
-    duration: u64,
-    pos: egui::Pos2,
-    slots: &'a [TimelineSlotSpan<'a>],
-    top: f32,
-) -> Option<&'a str> {
-    slots.iter().find_map(|slot| {
-        if slot.end_frame <= slot.start_frame || slot.id.trim().is_empty() {
-            return None;
-        }
-        let x0 = x_for_frame(track, range_start, duration, slot.start_frame);
-        let x1 = x_for_frame(track, range_start, duration, slot.end_frame);
-        let rect = Rect::from_min_max(
-            egui::pos2(x0, track.top() + top + 2.0),
-            egui::pos2(x1.max(x0 + 3.0), track.bottom() - 2.0),
-        )
-        .expand(2.0);
-        rect.contains(pos).then_some(slot.id)
-    })
 }
 
 fn virtual_span_hit<'a>(
@@ -2554,28 +2566,18 @@ mod tests {
         let markers = [TimelineMarkerPin {
             id: "m_mid",
             frame: 75,
+            taken: false,
+            locked: false,
         }];
 
-        assert_eq!(
-            marker_in_reach(track, 50, 100, egui::pos2(150.0, 20.0), &markers),
-            Some("m_mid")
-        );
-        // One wide zone (user 2026-10-18): 30 pixels off still reaches it, 50 does not.
-        assert_eq!(marker_in_reach(track, 50, 100, egui::pos2(180.0, 20.0), &markers), Some("m_mid"));
-        assert_eq!(marker_in_reach(track, 50, 100, egui::pos2(200.0, 20.0), &markers), None);
+        // A right click off the strip takes the nearest marker, however far (user 2026-10-20).
+        assert_eq!(marker_for_right_click(track, 50, 100, egui::pos2(150.0, 20.0), &markers, false), Some("m_mid"));
+        assert_eq!(marker_for_right_click(track, 50, 100, egui::pos2(400.0, 20.0), &markers, false), Some("m_mid"));
         assert_eq!(
             cover_hit(track, 50, 100, egui::pos2(140.0, 8.0), &covers, (2.0, 26.0)),
             Some("cover_mid")
         );
-        assert_eq!(
-            slot_hit(track, 50, 100, egui::pos2(135.0, 55.0), &slots, 0.0),
-            Some("slot_mid")
-        );
-        assert_eq!(
-            slot_hit(track, 50, 100, egui::pos2(135.0, 6.0), &slots, 18.0),
-            None,
-            "with audio bands A1 is the base of the slot, not part of it"
-        );
+        assert_eq!(slot_of_frame(&slots, 70), Some("slot_mid"), "a click on a strip is the slot of its frame");
         assert_eq!(
             virtual_span_hit(track, 50, 100, egui::pos2(150.0, 34.0), &spans, (VIDEO_BAND, VIDEO_FOOT)),
             Some("virtual_b")

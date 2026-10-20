@@ -1,0 +1,64 @@
+source_timeline | CueFrame(5) | timeline_cue_frame value=Some(105) target=None
+source_timeline | SelectVirtual { id: "x", frame: 5 } | timeline_cue_frame value=Some(105) target=None
+source_timeline | Keep(Some(5)) | source_keep_mark value=Some(105) target=None
+source_timeline | Keep(None) | source_keep_mark value=None target=None
+source_timeline | SelectMarkerSlot { id: "x", frame: 5 } | -
+source_timeline | SelectCover { id: "x", frame: 5 } | -
+source_timeline | TakeCoverOnStrip { id: "x", frame: 5 } | -
+source_timeline | AddMarkerAt(5) | -
+source_timeline | GoHome | playlist_input_start value=None target=None
+source_timeline | ToggleVideoMode | -
+source_timeline | LaneLabel { lane: A1, frame: None } | select_audio_a1 value=None target=None
+source_timeline | LaneLabel { lane: A2, frame: Some(5) } | select_audio_a2 value=Some(105) target=None
+source_timeline | ToggleAudioExpand(A1) | -
+source_timeline | ChooseA1Channel(2) | source_choose_a1_channel value=Some(2) target=None
+source_timeline | ChooseA2Channel(2) | source_choose_a2_channel value=Some(2) target=None
+source_timeline | TakeMark(true) | select_mark_in value=None target=None
+source_timeline | TakeMark(false) | select_mark_out value=None target=None
+source_timeline | TakeMarker { id: "x", frame: 5 } | -
+source_timeline | TakeSlot { id: "x", frame: 5 } | -
+source_timeline | TakeCover { id: "x", frame: 5 } | -
+source_timeline | TakeAudioLane(A1) | select_audio_a1 value=None target=None
+source_timeline | TakeAudioLane(A2) | select_audio_a2 value=None target=None
+source_timeline | TakeSound { lane: A1, frame: 5 } | select_audio_a1 value=Some(105) target=None
+source_timeline | TakeSound { lane: A2, frame: 5 } | select_audio_a2 value=Some(105) target=None
+source_timeline | DragMark { in_mark: true, frame: 5 } | source_drag_in value=Some(5) target=None
+source_timeline | DragMark { in_mark: false, frame: 5 } | source_drag_out value=Some(5) target=None
+source_timeline | Cut | source_cut value=None target=None
+source_timeline | Wheel(Wheel { up: false, ctrl: false }) | wheel_source_back value=None target=None
+source_timeline | Wheel(Wheel { up: true, ctrl: false }) | wheel_source_forward value=None target=None
+source_timeline | Wheel(Wheel { up: false, ctrl: true }) | wheel_source_ctrl_back value=None target=None
+source_timeline | Wheel(Wheel { up: true, ctrl: true }) | wheel_source_ctrl_forward value=None target=None
+source_timeline | None | -
+segments | CueFrame(5) | timeline_cue_frame value=Some(105) target=None
+segments | SelectVirtual { id: "x", frame: 5 } | timeline_cue_frame value=Some(105) target=None
+segments | Keep(Some(5)) | segments_keep_edit value=Some(105) target=None
+segments | Keep(None) | segments_keep_edit value=None target=None
+segments | SelectMarkerSlot { id: "x", frame: 5 } | timeline_select_slot value=Some(105) target=Some("x")
+segments | SelectCover { id: "x", frame: 5 } | timeline_select_cover value=Some(105) target=Some("x")
+segments | TakeCoverOnStrip { id: "x", frame: 5 } | timeline_take_cover value=Some(105) target=Some("x")
+segments | AddMarkerAt(5) | add_marker_continue value=Some(105) target=None
+segments | GoHome | playlist_input_start value=None target=None
+segments | ToggleVideoMode | toggle_wrap_video value=None target=None
+segments | LaneLabel { lane: A1, frame: None } | select_audio_a1 value=None target=None
+segments | LaneLabel { lane: A2, frame: Some(5) } | select_audio_a2 value=Some(105) target=None
+segments | ToggleAudioExpand(A1) | -
+segments | ChooseA1Channel(2) | source_choose_a1_channel value=Some(2) target=None
+segments | ChooseA2Channel(2) | source_choose_a2_channel value=Some(2) target=None
+segments | TakeMark(true) | -
+segments | TakeMark(false) | -
+segments | TakeMarker { id: "x", frame: 5 } | select_marker value=None target=Some("x")
+segments | TakeSlot { id: "x", frame: 5 } | select_current_marker_slot value=None target=Some("x")
+segments | TakeCover { id: "x", frame: 5 } | timeline_take_cover value=Some(105) target=Some("x")
+segments | TakeAudioLane(A1) | select_audio_a1 value=None target=None
+segments | TakeAudioLane(A2) | select_audio_a2 value=None target=None
+segments | TakeSound { lane: A1, frame: 5 } | select_audio_a1 value=Some(105) target=None
+segments | TakeSound { lane: A2, frame: 5 } | select_audio_a2 value=Some(105) target=None
+segments | DragMark { in_mark: true, frame: 5 } | -
+segments | DragMark { in_mark: false, frame: 5 } | -
+segments | Cut | add_marker value=None target=None
+segments | Wheel(Wheel { up: false, ctrl: false }) | wheel_segments_back value=None target=None
+segments | Wheel(Wheel { up: true, ctrl: false }) | wheel_segments_forward value=None target=None
+segments | Wheel(Wheel { up: false, ctrl: true }) | wheel_segments_ctrl_back value=None target=None
+segments | Wheel(Wheel { up: true, ctrl: true }) | wheel_segments_ctrl_forward value=None target=None
+segments | None | -

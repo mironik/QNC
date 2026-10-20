@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "description": "The mouse map of QNC (user rule 2026-10-20, locked): what the mouse does on a timeline is one catalog action of contracts/qnc-keyboard-shortcuts.json, the same rule as the keys. A left click places the playhead (on a cover's colour strip it selects the slot); while something is taken a left click keeps it first (as Enter) and then places the playhead. A right click is Ctrl+: it takes what it points at (the nearest IN or OUT, the nearest M marker, the slot on a colour strip, A1/A2); the locked start and end markers are not taken. A drag moves only what is taken. Shift + left click adds (an M marker there, as Shift+M). The middle button is the cut. The wheel is the left/right arrows, Ctrl+wheel (or the wheel with the right button held) Ctrl+left/right. Pointer names are the timeline's (qnc-mouse-map); an action left out means the pointer does nothing on that panel.",
+  "panels": {
+    "source_timeline": {
+      "click": "timeline_cue_frame",
+      "click_holding": "source_keep_mark",
+      "click_v_label": "playlist_input_start",
+      "click_a1_label": "select_audio_a1",
+      "click_a2_label": "select_audio_a2",
+      "click_a1_channel": "source_choose_a1_channel",
+      "click_a2_channel": "source_choose_a2_channel",
+      "right_click_in": "select_mark_in",
+      "right_click_out": "select_mark_out",
+      "right_click_a1": "select_audio_a1",
+      "right_click_a2": "select_audio_a2",
+      "drag_in": "source_drag_in",
+      "drag_out": "source_drag_out",
+      "middle_click": "source_cut",
+      "wheel_back": "wheel_source_back",
+      "wheel_forward": "wheel_source_forward",
+      "ctrl_wheel_back": "wheel_source_ctrl_back",
+      "ctrl_wheel_forward": "wheel_source_ctrl_forward"
+    },
+    "segments": {
+      "click": "timeline_cue_frame",
+      "click_holding": "segments_keep_edit",
+      "click_strip": "timeline_select_slot",
+      "click_cover": "timeline_select_cover",
+      "ctrl_click_strip": "timeline_take_cover",
+      "shift_click": "add_marker_continue",
+      "click_v_label": "playlist_input_start",
+      "ctrl_click_v_label": "toggle_wrap_video",
+      "click_a1_label": "select_audio_a1",
+      "click_a2_label": "select_audio_a2",
+      "click_a1_channel": "source_choose_a1_channel",
+      "click_a2_channel": "source_choose_a2_channel",
+      "right_click_marker": "select_marker",
+      "right_click_strip": "select_current_marker_slot",
+      "right_click_cover": "timeline_take_cover",
+      "right_click_a1": "select_audio_a1",
+      "right_click_a2": "select_audio_a2",
+      "drag_marker": "timeline_drag_marker",
+      "middle_click": "add_marker",
+      "wheel_back": "wheel_segments_back",
+      "wheel_forward": "wheel_segments_forward",
+      "ctrl_wheel_back": "wheel_segments_ctrl_back",
+      "ctrl_wheel_forward": "wheel_segments_ctrl_forward"
+    }
+  }
+}

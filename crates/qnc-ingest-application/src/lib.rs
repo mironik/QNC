@@ -207,7 +207,7 @@ mod tests {
         ];
         for frame in [i64::MIN, 0, 25, i64::MAX] {
             requests.push(IngestIntent::new(
-                action_ids::INGEST_CUE_FRAME,
+                action_ids::TIMELINE_CUE_FRAME,
                 IngestPayload::Frame(frame),
             ));
         }

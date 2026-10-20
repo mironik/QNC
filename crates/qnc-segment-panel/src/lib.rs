@@ -10,9 +10,6 @@
 mod bar;
 mod list;
 
-/// A left click on a Wrap row keeps what is taken there, as Enter does, but never walks the
-/// keyboard on to the next panel (user 2026-10-20, as `source_keep_mark` on the source).
-pub const KEEP_EDIT: &str = "segments_keep_edit";
 
 pub use list::show_segment_list;
 mod cover_length;
@@ -22,7 +19,7 @@ use qnc_action_event::ActionEvent;
 use eframe::egui::{self, Color32, RichText, Vec2};
 use qnc_program_view::{SegmentRow, SegmentsView};
 use qnc_timeline::{
-    AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput, TimelineIntent,
+    AudioLane, TimelineCoverSpan, TimelineFocusPaint, TimelineInput,
     TimelineLayerFlags, TimelineMarkerPin, TimelineMetrics, TimelinePicture, TimelineProjection, TimelineSlotSpan,
     TimelineTheme, TimelineVirtualSpan,
 };
@@ -330,6 +327,8 @@ fn paint_program(
         .map(|pin| TimelineMarkerPin {
             id: &pin.marker_id,
             frame: local(pin.frame),
+            taken: pin.taken,
+            locked: pin.locked,
         })
         .collect::<Vec<_>>();
     // v5 `local_peaks_for_row`: this row's part of the program wave.
@@ -410,61 +409,15 @@ fn paint_program(
             wave_over_video: None,
             trim_playheads: &trim_playheads,
             pictures: &pictures,
+            // Something taken on the row: a left click keeps it first (the mouse map).
+            holding: !segments.trim_frames.is_empty() || segments.part_sound.is_some(),
         },
     );
-    // A pointer on the row is a system action on this panel (the mouse map of every
-    // timeline, `qnc_timeline::event`; user 2026-10-18); the rules below are the panel's own.
+    // A pointer on the row is the action the mouse map gives it on this panel (piece
+    // `qnc-mouse-map`, contracts/input/mouse.json; user rule 2026-10-20): the panel decides
+    // no click itself.
     let row_frame = |frame: u64| start + frame.min(duration);
-    let on_panel = |event: ActionEvent| Some(event.at(PANEL));
-    // Story rows only: a dragged M marker follows the pointer as a draft (Enter confirms).
-    if let Some((marker_id, frame)) = qnc_timeline::take_marker_drag(ui.ctx()) {
-        return on_panel(ActionEvent::key("timeline_drag_marker").with_target(marker_id).with_value(row_frame(frame)));
-    }
-    // A left click while something on the row is taken keeps it, as Enter (user 2026-10-17:
-    // the Wrap rows work as the source timeline: right click takes, wheel moves, left click keeps).
-    let taken = !segments.trim_frames.is_empty() || segments.part_sound.is_some();
-    if taken
-        && matches!(
-            intent,
-            TimelineIntent::CueFrame(_)
-                | TimelineIntent::SelectMarker { .. }
-                | TimelineIntent::SelectCover { .. }
-                | TimelineIntent::SelectMarkerSlot { .. }
-                | TimelineIntent::SelectVirtual { .. }
-        )
-    {
-        return on_panel(ActionEvent::key(KEEP_EDIT));
-    }
-    match intent {
-        // Ctrl+click takes the cover for Delete (Ctrl+ selects); a plain click on the colour
-        // strip selects the slot it covers (user 2026-10-17), else the cover.
-        TimelineIntent::SelectCover { id, frame } => {
-            let slot = segments.covers.iter().find(|cover| cover.cover_id == id).map(|cover| cover.slot_id.clone());
-            let event = match (ui.input(|input| input.modifiers.command), slot) {
-                (true, _) => ActionEvent::key("timeline_take_cover").with_target(id),
-                (false, Some(slot_id)) => ActionEvent::key("timeline_select_slot").with_target(slot_id),
-                (false, None) => ActionEvent::key("timeline_select_cover").with_target(id),
-            };
-            on_panel(event.with_value(row_frame(frame)))
-        }
-        // A left click on the A1/A2 button of a Wrap row, as on the source timeline (user
-        // 2026-10-17): it takes the sound of what lies under the Wrap playhead in this row
-        // (else at its start), as Ctrl+1/Ctrl+2; while a sound is taken it keeps it (Enter).
-        TimelineIntent::TakeAudioLane(lane) | TimelineIntent::ToggleAudioExpand(lane)
-            if matches!(lane, qnc_timeline::AudioLane::A1 | qnc_timeline::AudioLane::A2) =>
-        {
-            if segments.part_sound.is_some() {
-                return on_panel(ActionEvent::key(KEEP_EDIT));
-            }
-            let frame = segments.playhead.filter(|frame| (start..end).contains(frame)).unwrap_or(start);
-            let id = if lane == qnc_timeline::AudioLane::A2 { "select_audio_a2" } else { "select_audio_a1" };
-            on_panel(ActionEvent::key(id).with_value(frame))
-        }
-        // A cut (scissors) on a Wrap row is an M marker at the Wrap playhead, as the M key: two
-        // cuts bound a slot for a cover (user 2026-10-18).
-        TimelineIntent::Cut => on_panel(ActionEvent::key("add_marker")),
-        other => qnc_timeline::event(&other, qnc_wheel_jog::SEGMENTS_ACTIONS, &row_frame).map(|event| event.at(PANEL)),
-    }
+    qnc_timeline::take_marker_drag_event(ui.ctx(), PANEL, &row_frame).or_else(|| qnc_timeline::event(&intent, PANEL, &row_frame))
 }
 
 #[cfg(test)]

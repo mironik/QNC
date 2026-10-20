@@ -4341,6 +4341,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-mouse-map"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-mp4-sound"
 version = "0.1.0"
 
@@ -5317,6 +5324,7 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-filmstrip",
  "qnc-lane-choice",
+ "qnc-mouse-map",
  "qnc-touch-gestures",
  "qnc-touchpad",
  "qnc-ui-kit",

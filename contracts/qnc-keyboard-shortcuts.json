@@ -3,7 +3,6 @@
   "active_preset": "default",
   "actions": {
     "shell_next_group": { "label": "Otvori sljedecu odabranu grupu" },
-    "shell_close_active_project": { "label": "Zatvori aktivni projekt" },
     "project_workflow_group_select": { "label": "Odaberi jednu aplikaciju u grupi radnog toka" },
     "play_pause": {
       "label": "Play / Pauza"
@@ -336,10 +335,10 @@
       "label": "Povlacenje OUT oznake misem na source timelineu"
     },
     "source_keep_mark": {
-      "label": "Lijevi klik na source timeline: uzeti IN/OUT ostaje gdje je i pusta se"
+      "label": "Lijevi klik na source timeline dok je IN/OUT ili A1/A2 uzet: sprema uzeto, zatim playhead na kliknutu sliku"
     },
     "segments_keep_edit": {
-      "label": "Lijevi klik na Wrap redak: uzeti rub slota, marker ili zvuk se sprema (kao Enter, bez prelaska na drugi panel)"
+      "label": "Lijevi klik na Wrap redak dok je nesto uzeto (rub slota, slot, marker, zvuk): sprema (kao Enter, bez prelaska na drugi panel), zatim playhead na kliknutu sliku"
     },
     "source_choose_a1_channel": {
       "label": "Kanal na A1 (klik u stupcu kanala uzete trake, na svakom timelineu)"
@@ -349,9 +348,6 @@
     },
     "timeline_cue_frame": {
       "label": "Klik na timeline: playhead na kliknutu sliku"
-    },
-    "timeline_select_marker": {
-      "label": "Klik na M marker: odabir markera"
     },
     "timeline_select_slot": {
       "label": "Klik na traku pokrivalice: odabir slota, playhead na kliknutu sliku"
@@ -398,12 +394,6 @@
     "program_next_marker": {
       "label": "Panel Segmenti: sljedeci M marker"
     },
-    "ingest_cue_frame": {
-      "label": "Postavi Ingest cue frame"
-    },
-    "ingest_toggle_audio_lane": {
-      "label": "Promijeni Ingest audio lane"
-    },
     "activate_focused_item": {
       "label": "Aktiviraj fokusirani element"
     },
@@ -415,7 +405,11 @@
     "rules": [
       { "keys": "Tipka", "meaning": "Radi odmah: postavlja ili pokreće (IN, OUT, marker, pokrivalica, Play)." },
       { "keys": "Ctrl + tipka", "meaning": "Uzima kontrolu nad nečim što već postoji (IN, OUT, marker, slot, A1/A2). Uzeto mijenjaš strelicama, Enter potvrđuje, Esc odustaje." },
-      { "keys": "Desni klik mišem", "meaning": "Isto kao Ctrl + tipka: uzima ono na što pokazuješ (bliži IN ili OUT, A1/A2, M marker, slot). Kotačić ili strelice mijenjaju uzeto, Enter ili lijevi klik sprema, Esc odustaje." },
+      { "keys": "Lijevi klik mišem", "meaning": "Postavlja playhead. Na traci u boji pokrivalice bira slot. Ako je nešto uzeto, klik ga najprije sprema (kao Enter), pa postavlja playhead." },
+      { "keys": "Desni klik mišem", "meaning": "Isto kao Ctrl + tipka: uzima ono na što pokazuješ: bliži IN ili OUT, najbliži M marker (M je OUT i IN u jednoj oznaci; početni i završni se ne uzimaju), slot na traci u boji, A1/A2. Playhead ide na uzeto. Kotačić ili strelice mijenjaju uzeto, Enter ili lijevi klik sprema, Esc odustaje." },
+      { "keys": "Povlačenje mišem", "meaning": "Vuče samo ono što je uzeto (desnim klikom ili Ctrl + tipkom)." },
+      { "keys": "Shift + lijevi klik", "meaning": "Kao Shift + M: dodaje M marker na mjesto klika." },
+      { "keys": "Srednja tipka / kotačić", "meaning": "Srednja tipka reže (IN i OUT na source timelineu, M marker u segmentima). Kotačić je kao strelice lijevo/desno, Ctrl + kotačić kao Ctrl + strelice." },
       { "keys": "Shift + tipka", "meaning": "Dodaje nešto novo (segment, marker u nastavku, pokrivalica, IN i OUT po trajanju slota)." },
       { "keys": "Alt + strelice", "meaning": "Skače po objektima: marker, slot, segment; na source timelineu početak, IN, OUT." },
       { "keys": "Strelice", "meaning": "Lijevo/desno za jedan frame, a kad je nešto uzeto mijenjaju to; gore/dolje prethodni ili sljedeći blok." },

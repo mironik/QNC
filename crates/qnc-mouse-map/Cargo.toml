@@ -1,0 +1,8 @@
+[package]
+name = "qnc-mouse-map"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the mouse map of every timeline (contracts/input/mouse.json): a pointer on a panel is one catalog action"
+
+[dependencies]
+serde_json = { workspace = true }

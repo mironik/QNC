@@ -130,13 +130,11 @@ impl SourceTimeline {
         self.keys.set_mark_taken(taken);
     }
 
-    /// The system action a pointer intent on the source timeline stands for, on this panel
-    /// (the mouse map of every timeline, `qnc_timeline::event`): a click on A1/A2 is
-    /// Ctrl+1/Ctrl+2, the wheel the arrows (Ctrl+wheel the level), a click on a channel of
-    /// the column [`CHOOSE_A1_CHANNEL`]/[`CHOOSE_A2_CHANNEL`] with the channel, a click on the
-    /// track `timeline_cue_frame` with the frame.
+    /// The system action a pointer intent on the source timeline stands for, on this panel:
+    /// the mouse map's (piece `qnc-mouse-map`, contracts/input/mouse.json; user rule
+    /// 2026-10-20), the same in every form.
     pub fn event_of(intent: &TimelineIntent) -> Option<qnc_action_event::ActionEvent> {
-        qnc_timeline::event(intent, qnc_wheel_jog::SOURCE_ACTIONS, &|frame| frame).map(|event| event.at(PANEL))
+        qnc_timeline::event(intent, PANEL, &|frame| frame)
     }
 
     /// A click on a channel of the column (`action_id` from [`Self::action_of`]), else the
@@ -153,14 +151,19 @@ impl SourceTimeline {
         if action_id == "activate_focused_item" && !self.lane_taken() && self.keys.mark_taken(timeline) {
             return self.keys.route("clear_focus", preview, timeline);
         }
-        if action_id == KEEP_MARK && self.lane_taken() {
-            return self.route_lane("activate_focused_item", preview); // a left click keeps the lane
-        }
         if action_id == KEEP_MARK {
-            // The timeline draws the mark taken: let it go whoever took it.
-            self.keys.set_mark_taken(false);
-            qnc_source_mark_focus::release(timeline);
-            return Some(true);
+            // A left click while something is taken keeps it, then the playhead goes where it
+            // was clicked (user rule 2026-10-20); the end of a drag only keeps.
+            let kept = if self.lane_taken() {
+                self.route_lane("activate_focused_item", preview).unwrap_or(false)
+            } else {
+                // The timeline draws the mark taken: let it go whoever took it.
+                self.keys.set_mark_taken(false);
+                qnc_source_mark_focus::release(timeline);
+                true
+            };
+            let cued = value.and_then(|frame| u64::try_from(frame).ok()).is_some_and(|frame| self.cue(&TimelineIntent::CueFrame(frame), preview));
+            return Some(kept || cued);
         }
         channel
             .and_then(|channel| self.choose_action(action_id, channel, preview))
@@ -443,7 +446,7 @@ mod tests {
 
     #[test]
     fn enter_or_a_left_click_keeps_a_taken_mark_and_a_right_click_takes_one() {
-        assert_eq!(SourceTimeline::event_of(&TimelineIntent::KeepMark).map(|event| event.action_id), Some(KEEP_MARK.into()), "a click is never Enter");
+        assert_eq!(SourceTimeline::event_of(&TimelineIntent::Keep(None)).map(|event| event.action_id), Some(KEEP_MARK.into()), "a click is never Enter");
         assert_eq!(SourceTimeline::event_of(&TimelineIntent::TakeMark(false)).map(|event| event.action_id), Some("select_mark_out".into()));
         // Scissors: two cuts mark the distance, whatever their order; the third starts again.
         let mut source = SourceTimeline::new();
