@@ -87,6 +87,9 @@ pub struct SyncCover {
     /// Source frame under the Sync play, then the source OUT of the closed slot
     /// (v5 `set_source_playhead_frame`).
     source_frame: Option<u64>,
+    /// The play just reached the next M marker or the source OUT (told once: the source
+    /// stops there once, live 2026-10-20: stopping it at every poll blocked Space).
+    reached_end: bool,
 }
 
 impl SyncCover {
@@ -234,6 +237,7 @@ impl SyncCover {
             // It stops there and waits: Enter writes the cover, Delete drops it.
             session.end = session.auto_finish;
             session.restart = true;
+            self.reached_end = true;
             self.source_frame = Some(session.source.source_in + ((session.end - session.anchor) * den).div_ceil(num));
             return Some(session.end.saturating_sub(1));
         }
@@ -252,6 +256,11 @@ impl SyncCover {
         let (num, den) = session.per_source;
         let first = session.source.source_in + (session.play_from - session.anchor) * den / num;
         Some(source_frame.saturating_sub(first) * num / den)
+    }
+
+    /// Whether the play just reached its end (once).
+    pub fn take_reached_end(&mut self) -> bool {
+        std::mem::take(&mut self.reached_end)
     }
 
     /// The program span of a running or stopped Sync's draft, `[anchor, end)` (user

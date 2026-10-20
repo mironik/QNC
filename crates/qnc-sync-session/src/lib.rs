@@ -61,7 +61,7 @@ pub fn poll(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut 
     }
     // The draft reached the next M marker or the source OUT: the source player stops on its
     // last picture (the program window used to end there by itself).
-    if segments.sync_stopped() && preview.player_view().playing() && !preview.in_program() {
+    if segments.take_sync_reached_end() && preview.player_view().playing() && !preview.in_program() {
         preview.pause();
         show_draft_end(preview, segments);
     }

@@ -86,8 +86,10 @@ impl ProgramSegments {
             return SyncSpace::Start(preview);
         }
         if self.sync.at_end() {
+            // The slot is full: Space plays the source on, the draft waits for Enter or Delete
+            // (live 2026-10-20: refusing Space here looked like a blocked player).
             self.refresh_view(qnc_ui_text::text("story.msg.sync_at_end").into());
-            return SyncSpace::Blocked;
+            return SyncSpace::Play;
         }
         if wrap_active || !self.sync.wants_space() {
             return SyncSpace::Play;
@@ -152,6 +154,11 @@ impl ProgramSegments {
         let anchor = markers.clone().filter(|frame| *frame <= playhead).max()?;
         let end = markers.filter(|frame| *frame > anchor).min().unwrap_or(self.view.total_frames);
         Some((anchor, end.min(self.view.total_frames).max(anchor + 1)))
+    }
+
+    /// The Sync play just reached the next M marker or the source OUT (told once).
+    pub fn take_sync_reached_end(&mut self) -> bool {
+        self.sync.take_reached_end()
     }
 
     /// A Sync stopped with its draft (O, the next M marker or the source OUT).
