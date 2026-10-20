@@ -9,6 +9,10 @@
 //! The source OUT of the slot is IN plus the frames played. Enter confirms the
 //! cover once the slot is stored.
 //!
+//! The Sync plays on the source player (user 2026-10-20): IN is only the number the cover
+//! starts at, the draft follows the playing source frame (`source_window_frame`); no
+//! program window is opened for it.
+//!
 //! This component owns only the session state and its frame math. It knows no
 //! form, no player, no database and no project: the program model gives it the
 //! markers, slots and the source, and writes what it asks for.
@@ -238,6 +242,18 @@ impl SyncCover {
         Some(program)
     }
 
+    /// The source frame the source player plays, as a frame of the window being played
+    /// (user 2026-10-20: "the player plays, IN is only the number the cover starts at";
+    /// Sync follows the playing source, it opens no player). A frame before the play's
+    /// first source frame (the source ran out and went back to its start) is 0, which
+    /// ends the play as the window's return to its start does.
+    pub fn source_window_frame(&self, source_frame: u64) -> Option<u64> {
+        let session = self.active.as_ref()?;
+        let (num, den) = session.per_source;
+        let first = session.source.source_in + (session.play_from - session.anchor) * den / num;
+        Some(source_frame.saturating_sub(first) * num / den)
+    }
+
     /// The program span of a running or stopped Sync's draft, `[anchor, end)` (user
     /// 2026-10-18: the cover being written is drawn as it grows).
     pub fn draft_span(&self) -> Option<(u64, u64)> {
@@ -414,6 +430,25 @@ impl SyncCover {
     /// The user pointed elsewhere on the program: a running Sync play stops.
     pub fn cancel(&mut self) -> bool {
         self.active.take().is_some()
+    }
+}
+
+#[cfg(test)]
+mod source_follow_tests {
+    use super::*;
+
+    #[test]
+    fn the_draft_follows_the_playing_source_from_its_in() {
+        let mut sync = SyncCover::new();
+        sync.toggle();
+        sync.arm(SyncSource { clip_id: "c".into(), clip_name: "c".into(), source_in: 100, source_out: 400, duration_frames: 400, timebase: (50, 1) });
+        let preview = sync.start(&[20, 60], 30, 200, (1, 1)).expect("start");
+        assert_eq!(preview.window, (20, 60));
+        assert_eq!(sync.source_window_frame(100), Some(0));
+        let frame = sync.source_window_frame(110);
+        assert_eq!(sync.program_frame(frame), Some(30), "ten source frames after IN");
+        assert_eq!(sync.draft_span(), Some((20, 31)));
+        assert_eq!(sync.source_view().map(|view| view.0), Some(110));
     }
 }
 

@@ -129,10 +129,20 @@ impl ProgramSegments {
     /// closes the slot.
     /// Reaching an M marker or the source OUT, or a pause, only stops it (user
     /// 2026-10-13: only Enter writes the cover, Delete drops the draft).
-    pub fn sync_frame(&mut self, confirmed: Option<u64>) -> Option<u64> {
-        let frame = self.sync.program_frame(confirmed);
+    /// `program`: the frame the program player confirmed; `clip`: the frame the source
+    /// player confirmed, which a Sync follows (user 2026-10-20: it opens no player).
+    pub fn sync_frame(&mut self, program: Option<u64>, clip: Option<u64>) -> Option<u64> {
+        let frame = match self.sync.is_active() {
+            true => self.sync.program_frame(clip.and_then(|frame| self.sync.source_window_frame(frame))),
+            false => program,
+        };
         self.view.sync_draft = self.sync.draft_span();
         frame
+    }
+
+    /// A Sync stopped with its draft (O, the next M marker or the source OUT).
+    pub fn sync_stopped(&self) -> bool {
+        self.sync.stopped()
     }
 
     /// Whether a Sync is running or stopped with a draft that Enter writes, Delete drops.

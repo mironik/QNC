@@ -5111,3 +5111,12 @@ misem, inace karticu na kojoj je tipkovnica; form host ga preuzima jednom po fra
 `Follow` daje svaki novi klip jednom. Univerzalni preview (`qnc-source-preview` `poll_pointed`) tada u pozadini cita
 filmstrip i val tog klipa u memoriju, pa klik pokazuje filmstrip odmah. Klip koji nije bio pokazan i dalje kratko pokaze
 poster. Ingest i Story isto; forme nisu narasle. Testovi, conformance. Uzivo nije provjereno.
+Izmjena 2026-10-20 (korisnik: "player radi, IN odreduje od kojeg timecodea pocinje pokrivalica, to je samo broj, play
+tece; korisnik klikne OUT ili Enter i cita broj; ne treba otvarati nikakve playere kad player vec radi"; izmjereno: IN u
+letu do spremne Sync sesije 1,24 s): zamjenjuje v5 nacin (Sync otvara prozor price s privremenom pokrivalicom u novoj
+sesiji playera). Sync/B-roll svira na playeru izvora: IN u letu ne dira player, nacrt pokrivalice prati potvrdjenu sliku
+izvora (`qnc-sync-cover` `source_window_frame`, `qnc-program-segments` `sync_frame(program, clip)`,
+`qnc-source-preview` `clip_frame`); Space bez playa pusta izvor od IN-a (ili od kraja zaustavljenog nacrta); dolazak do
+M markera ili OUT-a izvora zaustavlja izvor na zadnjoj slici nacrta; strelice i povlacenje OUT-a pokazuju kraj na
+playeru izvora (`qnc-sync-session`). Pauza se ne salje dvaput dok player jos svira (`qnc-source-preview` `pausing`).
+Posljedica: za vrijeme Synca cuje se zvuk izvora, A1 price ispod se ne cuje. Testovi, conformance. Uzivo nije provjereno.

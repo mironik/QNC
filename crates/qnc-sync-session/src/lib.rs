@@ -5,13 +5,13 @@
 //! the draft, wherever the keyboard is; O on the source closes the slot; I arms it.
 //!
 //! The Sync state and its story writes stay in the program model (`qnc-program-segments`,
-//! session math in `qnc-sync-cover`); the program plays in the one preview. This block only
+//! session math in `qnc-sync-cover`); the Sync plays on the source player of the one preview. This block only
 //! decides what a key does while Sync is on. It owns no player, database or form.
 
 use std::ops::ControlFlow;
 
 use qnc_program_segments::{ProgramSegments, SyncSpace};
-use qnc_source_preview::{SourcePreview, TransientCover};
+use qnc_source_preview::SourcePreview;
 use qnc_wrap_session::WrapSession;
 
 pub const MODULE_ID: &str = "qnc.module.sync-session";
@@ -30,11 +30,7 @@ pub fn route(
         // cover, Delete drops the draft, wherever the keyboard is.
         "step_back_frame" | "step_forward_frame" if segments.sync_drafting() && !preview.player_view().playing() => {
             let moved = segments.sync_nudge(if action_id == "step_back_frame" { -1 } else { 1 });
-            // The monitor shows the cover's last picture at the new end (user 2026-10-16).
-            if let Some(frame) = segments.sync_window_frame().filter(|_| moved) {
-                preview.show_program_frame(frame, false);
-            }
-            moved
+            moved && show_draft_end(preview, segments)
         }
         "activate_focused_item" if segments.sync_drafting() => segments.confirm_source(),
         "delete_marker" if segments.sync_drafting() => segments.discard_sync(),
@@ -62,6 +58,12 @@ pub fn poll(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut 
     if segments.take_sync_flight() {
         space(preview, wrap, segments);
     }
+    // The draft reached the next M marker or the source OUT: the source player stops on its
+    // last picture (the program window used to end there by itself).
+    if segments.sync_stopped() && preview.player_view().playing() && !preview.in_program() {
+        preview.pause();
+        show_draft_end(preview, segments);
+    }
 }
 
 /// The OUT of a stopped Sync dragged on the source timeline to `value` (a source frame):
@@ -73,8 +75,14 @@ pub fn dragged(preview: &mut SourcePreview, segments: &mut ProgramSegments, valu
     if !segments.sync_drafting() || preview.player_view().playing() || !segments.sync_drag_end(source_out) {
         return false;
     }
-    if let Some(frame) = segments.sync_window_frame() {
-        preview.show_program_frame(frame, false);
+    show_draft_end(preview, segments)
+}
+
+/// The monitor shows the cover's last picture at the draft's new end (user 2026-10-16): the
+/// source frame before its OUT, on the source player.
+fn show_draft_end(preview: &mut SourcePreview, segments: &ProgramSegments) -> bool {
+    if let Some((out, _)) = segments.sync_source() {
+        preview.cue(out.saturating_sub(1));
     }
     true
 }
@@ -83,18 +91,19 @@ pub fn dragged(preview: &mut SourcePreview, segments: &mut ProgramSegments, valu
 /// IN armed it, a stopped one plays on from its end, else plain play or pause.
 fn space(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut ProgramSegments) -> bool {
     match segments.sync_space(wrap.is_active()) {
+        // The Sync plays on the source player (user 2026-10-20: "the player plays, IN is only
+        // the number the cover starts at; no player is opened while one plays"): an IN on the
+        // fly lets the source play on; else the source plays from IN (or the draft's end).
         SyncSpace::Start(sync) => {
             wrap.hold(sync.window.0);
-            let a2 = segments.kept_lane(1);
-            let cover = TransientCover {
-                clip_id: sync.clip_id,
-                source_in: sync.source_in,
-                timebase: sync.timebase,
-                a2_source_channel: a2.channel,
-                a2_level_db: a2.level_db,
-                a2_off: a2.off,
-            };
-            preview.open_program_window(sync.window, cover)
+            if preview.player_view().playing() && !preview.in_program() {
+                return true;
+            }
+            match preview.in_program() {
+                true => _ = preview.open_at(&sync.clip_id, sync.source_in),
+                false => _ = preview.cue(sync.source_in),
+            }
+            preview.toggle_play()
         }
         SyncSpace::Blocked => true,
         SyncSpace::Play => preview.toggle_play(),

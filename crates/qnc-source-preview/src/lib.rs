@@ -221,6 +221,8 @@ pub struct SourcePreview {
     play_when_ready: bool,
     /// The last frame step, cue or Play of the user: the machine is theirs a while after.
     touched: Option<std::time::Instant>,
+    /// A pause was sent and the player still says it plays: a second pause would play again.
+    pausing: bool,
     /// The clip whose record is still completed, since when and the last try.
     record_wait: Option<(String, std::time::Instant, std::time::Instant)>,
     /// What wakes the background worker that completes the record a shown clip waits for
@@ -269,6 +271,7 @@ impl Default for SourcePreview {
             pointed: qnc_pool_pointer::Follow::default(),
             play_when_ready: false,
             touched: None,
+            pausing: false,
             record_wait: None,
             record_waker: None,
             cue_in_flight: None,
@@ -596,12 +599,15 @@ impl SourcePreview {
     /// Pauses a playing player; false when it does not play.
     pub fn pause(&mut self) -> bool {
         self.play_when_ready = false;
-        self.player_view.playing() && self.send(Action::TogglePlayPause)
+        let send = self.player_view.playing() && !self.pausing;
+        self.pausing |= send;
+        send && self.send(Action::TogglePlayPause)
     }
 
     pub fn toggle_play(&mut self) -> bool {
         self.touched = Some(std::time::Instant::now());
         self.cue_asked = None; // Play moves the playhead: arrows count from where it stops
+        self.pausing = false;
         let Some(player) = &self.player else {
             self.view.message = qnc_ui_text::text("player.broadcast_player_connected").into();
             return true;
@@ -827,6 +833,11 @@ impl SourcePreview {
         timeline
     }
 
+    /// The clip frame the player confirmed, while it plays the clip (not a program).
+    pub fn clip_frame(&self) -> Option<u64> {
+        (!self.program).then(|| self.player_view.confirmed_source_frame()).flatten()
+    }
+
     /// Whether the player plays a program rather than the source clip.
     pub fn in_program(&self) -> bool {
         self.program
@@ -929,6 +940,7 @@ impl SourcePreview {
     /// keyboard on it): its filmstrip and wave are read into memory now, so a click on it
     /// shows them at once (user 2026-10-20).
     pub fn poll_pointed(&mut self, pointed: Option<&str>) -> bool {
+        self.pausing &= self.player_view.playing();
         if let Some(clip_id) = self.pointed.new_clip(pointed).filter(|clip| self.view.clip_id.as_deref() != Some(*clip)) {
             self.timeline_assets.request(clip_id, false);
         }
