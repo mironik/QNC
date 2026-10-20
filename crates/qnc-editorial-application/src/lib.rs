@@ -254,7 +254,7 @@ impl EditorialApplication {
         }
         self.segments.set_playhead(Some(self.wrap.playhead()));
         self.view.focus = self.focus.poll((&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline));
-        self.view.segments = self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames)));
+        self.view.segments = self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames, clip.thumb_image.as_ref())));
         self.trim_stills.fill(&mut self.view.segments, self.preview.still_locator(), self.preview.shown_program_picture().and_then(|s| Some((self.segments.stored_picture_at(s.frame)?, s)))); // edit pictures, the monitor's first
     }
 

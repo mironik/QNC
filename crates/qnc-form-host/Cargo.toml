@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public piece: the host of a form on the desktop (player wake, poll, paint pace, keys dispatched to the application)"
 
 [dependencies]
+qnc-dev-diagnostics = { workspace = true }
 eframe = { workspace = true }
 qnc-pool-pointer = { workspace = true }
 qnc-key-intents = { workspace = true }

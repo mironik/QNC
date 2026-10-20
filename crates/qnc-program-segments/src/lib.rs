@@ -292,8 +292,16 @@ impl ProgramSegments {
 
     /// The view with its program wave; `clips` gives each clip's length in the frames
     /// its IN/OUT use (a clip wave spans the whole clip).
-    pub fn view_with_waves<'a>(&mut self, clips: impl Iterator<Item = (&'a str, u64)>) -> SegmentsView {
-        let durations: std::collections::HashMap<&str, u64> = clips.collect();
+    /// `clips`: each clip's id, length and poster (shown in a Wrap row until its filmstrip is
+    /// made).
+    pub fn view_with_waves<'a>(
+        &mut self,
+        clips: impl Iterator<Item = (&'a str, u64, Option<&'a std::sync::Arc<qnc_image_assets::RgbaImage>>)>,
+    ) -> SegmentsView {
+        let clips: Vec<_> = clips.collect();
+        let posters: std::collections::HashMap<&str, std::sync::Arc<qnc_image_assets::RgbaImage>> =
+            clips.iter().filter_map(|(id, _, poster)| Some((*id, (*poster)?.clone()))).collect();
+        let durations: std::collections::HashMap<&str, u64> = clips.iter().map(|(id, frames, _)| (*id, *frames)).collect();
         if durations.len() != self.clip_frames.len() || durations.iter().any(|(id, frames)| self.clip_frames.get(*id) != Some(frames)) {
             self.clip_frames = durations.iter().map(|(id, frames)| (id.to_string(), *frames)).collect();
             let message = self.view.message.clone();
@@ -304,7 +312,7 @@ impl ProgramSegments {
         view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());
         view.video_compact = self.video_compact;
         if !self.video_compact {
-            view.pictures = self.filmstrips.pictures(&view.picture_placements(), |id| durations.get(id).copied());
+            view.pictures = self.filmstrips.pictures(&view.picture_placements(), |id| durations.get(id).copied(), |id| posters.get(id).cloned());
         }
         // A zoom picture at its clip's first or last frame (user 2026-10-13).
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| durations.get(id).copied());

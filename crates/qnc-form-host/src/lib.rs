@@ -52,11 +52,16 @@ impl FormHost {
     pub fn before_paint<A: FormApplication>(&mut self, ctx: &Context, application: &mut A, keys: &FormKeys<'_>) {
         let app = &*application;
         self.pace.bind_player(ctx, app.has_player(), |wake| app.on_player_change(wake));
-        let changed = application.poll(qnc_pool_pointer::take(ctx).as_deref());
+        // Diagnostics: what the application's poll and the keys cost a second (user
+        // 2026-10-20: a frame of the Story form cost about 15 ms while playing).
+        let pointed = qnc_pool_pointer::take(ctx);
+        let changed = qnc_dev_diagnostics::timed_block("form-poll", || application.poll(pointed.as_deref()));
         self.pace.after_poll(ctx, changed, application.playing(), application.next_repaint_delay());
-        for action_id in qnc_key_intents::action_ids_in(ctx, keys.catalog, application.key_scope(), keys.scopes, keys.play_action) {
-            dispatch(ctx, application, A::intent_of(action_id));
-        }
+        qnc_dev_diagnostics::timed_block("form-keys", || {
+            for action_id in qnc_key_intents::action_ids_in(ctx, keys.catalog, application.key_scope(), keys.scopes, keys.play_action) {
+                dispatch(ctx, application, A::intent_of(action_id));
+            }
+        });
     }
 }
 

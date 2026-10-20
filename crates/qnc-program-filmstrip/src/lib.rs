@@ -108,6 +108,9 @@ pub fn row_pictures(program: &[ProgramPicture], start: u64, end: u64) -> Vec<Pro
 pub struct ProgramFilmstrips {
     reader: Option<Arc<dyn TimelineArtifactRead>>,
     strips: HashMap<String, Arc<FilmstripBackground>>,
+    /// A clip's poster in every slot while its filmstrip is not made yet (user 2026-10-20:
+    /// a Wrap row showed nothing until then; as the source timeline does since 2026-10-19).
+    poster_strips: HashMap<String, Arc<FilmstripBackground>>,
     retry_after: HashMap<String, Instant>,
     read: Arc<Mutex<Vec<(String, Option<FilmstripBackground>)>>>,
     asked: HashSet<String>,
@@ -125,8 +128,14 @@ impl ProgramFilmstrips {
     }
 
     /// The program's pictures for these placements; `duration_frames` gives each clip's
-    /// length in the frames its IN/OUT use.
-    pub fn pictures(&mut self, placements: &[PicturePlacement], duration_frames: impl Fn(&str) -> Option<u64>) -> Vec<ProgramPicture> {
+    /// length in the frames its IN/OUT use, `poster` its poster (shown until its filmstrip
+    /// is made).
+    pub fn pictures(
+        &mut self,
+        placements: &[PicturePlacement],
+        duration_frames: impl Fn(&str) -> Option<u64>,
+        poster: impl Fn(&str) -> Option<Arc<qnc_image_assets::RgbaImage>>,
+    ) -> Vec<ProgramPicture> {
         let now = Instant::now();
         let read = self.read.lock().map(|mut read| std::mem::take(&mut *read)).unwrap_or_default();
         for (clip_id, strip) in read {
@@ -146,15 +155,29 @@ impl ProgramFilmstrips {
             wanted.push(clip_id.to_string());
         }
         self.ask(wanted);
-        let loaded = self.strips.len();
+        for placement in placements {
+            let clip_id = placement.clip_id.as_str();
+            if self.strips.contains_key(clip_id) || self.poster_strips.contains_key(clip_id) {
+                continue;
+            }
+            if let Some(image) = poster(clip_id) {
+                let assets = qnc_timeline_assets::SourceTimelineAssets::empty_for(clip_id);
+                if let Some(strip) = qnc_timeline_assets::with_poster_filmstrip(assets, false, Some(&image)).filmstrip_background {
+                    self.poster_strips.insert(clip_id.to_string(), Arc::new(strip));
+                }
+            }
+        }
+        let loaded = self.strips.len() + self.poster_strips.len();
         if let Some((at, count, pictures)) = &self.composed {
             if at == placements && *count == loaded {
                 return pictures.clone();
             }
         }
+        let poster_only = self.poster_strips.iter().filter(|(id, _)| !self.strips.contains_key(*id));
         let strips = self
             .strips
             .iter()
+            .chain(poster_only)
             .filter_map(|(id, strip)| Some((id.clone(), ClipStrip { strip: strip.clone(), duration_frames: duration_frames(id)? })))
             .collect();
         let pictures = compose(placements, &strips);
@@ -217,6 +240,17 @@ mod tests {
         assert_eq!(shown, [(2, 100, 110), (3, 110, 120), (4, 120, 130)]);
         let row = row_pictures(&pictures, 105, 125);
         assert_eq!(row.iter().map(|p| (p.program_start, p.program_end)).collect::<Vec<_>>(), [(0, 5), (5, 15), (15, 20)]);
+    }
+
+    #[test]
+    fn a_clip_without_a_filmstrip_shows_its_poster_until_the_filmstrip_is_made() {
+        let poster = Arc::new(qnc_image_assets::RgbaImage { size: [1, 1], pixels: vec![9; 4], content_key: 7 });
+        let mut strips = ProgramFilmstrips::new();
+        let at = PicturePlacement { clip_id: "c".into(), program_start: 0, program_end: 130, source_in: 0, source_out: 130 };
+        let pictures = strips.pictures(&[at.clone()], |_| Some(130), |_| Some(poster.clone()));
+        assert_eq!(pictures.len(), 13, "the poster in every slot");
+        assert!(pictures.iter().all(|picture| picture.strip.frames[picture.frame].image.content_key == 7));
+        assert!(strips.pictures(&[at], |_| Some(130), |_| None).len() == 13, "kept until the filmstrip comes");
     }
 
     #[test]

@@ -6,6 +6,7 @@ description = "QNC public component: passive program filmstrip (the stored clip 
 
 [dependencies]
 qnc-timeline-assets = { workspace = true }
+qnc-image-assets = { workspace = true }
 
 [dev-dependencies]
 qnc-image-assets = { workspace = true }

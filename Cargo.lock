@@ -3650,6 +3650,7 @@ name = "qnc-form-host"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-dev-diagnostics",
  "qnc-key-intents",
  "qnc-keyboard-shortcut",
  "qnc-paint-pace",
@@ -4723,6 +4724,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
+ "qnc-image-assets",
  "qnc-lane-choice",
  "qnc-part-sound",
  "qnc-prerender-launch",

@@ -319,7 +319,7 @@ fn at_the_end_of_its_clip_a_slot_edge_does_not_go_further_that_way() {
     }
     // The slot 40..80 ends in the Ton segment 50..100 (clip c1 from 100): its last
     // picture is c1:129; the clip has 131 frames, so it may end one picture later.
-    segments.view_with_waves([("c1", 131u64)].into_iter());
+    segments.view_with_waves([("c1", 131u64, None)].into_iter());
     segments.set_playhead(Some(60));
     assert!(segments.take_slot_edge_at_playhead(false));
     segments.apply_action("step_forward_frame");
