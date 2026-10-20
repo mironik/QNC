@@ -540,18 +540,35 @@ pub fn diagnostics_state() -> DiagnosticsState {
 }
 
 pub fn player_diagnostics_enabled() -> bool {
-    env_flag(PLAYER_ENV).unwrap_or_else(|| cached_settings().player_diagnostics)
+    env_flag(PLAYER_ENV).unwrap_or_else(|| !unit_test() && cached_settings().player_diagnostics)
 }
 
 pub fn filmstrip_diagnostics_enabled() -> bool {
-    env_flag(FILMSTRIP_ENV).unwrap_or_else(|| cached_settings().filmstrip_diagnostics)
+    env_flag(FILMSTRIP_ENV).unwrap_or_else(|| !unit_test() && cached_settings().filmstrip_diagnostics)
 }
 
 pub fn wave_diagnostics_enabled() -> bool {
-    env_flag(WAVE_ENV).unwrap_or_else(|| cached_settings().wave_diagnostics)
+    env_flag(WAVE_ENV).unwrap_or_else(|| !unit_test() && cached_settings().wave_diagnostics)
+}
+
+/// A cargo test binary (it lives in `target/<profile>/deps`) run without an explicit
+/// `QNC_ROOT`: it never writes into the real diagnostics of the repository (audit
+/// 2026-10-20: route tests filled the real player log with thousands of key lines).
+fn unit_test() -> bool {
+    static TEST: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *TEST.get_or_init(|| {
+        env::var_os("QNC_ROOT").is_none()
+            && env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().and_then(|dir| dir.file_name()).map(|name| name == "deps"))
+                .unwrap_or(false)
+    })
 }
 
 pub fn log_line(stream: DiagnosticsStream, message: impl AsRef<str>) {
+    if unit_test() {
+        return;
+    }
     let Some(root) = locate_qnc_root() else {
         return;
     };

@@ -338,6 +338,9 @@
     "source_keep_mark": {
       "label": "Lijevi klik na source timeline: uzeti IN/OUT ostaje gdje je i pusta se"
     },
+    "segments_keep_edit": {
+      "label": "Lijevi klik na Wrap redak: uzeti rub slota, marker ili zvuk se sprema (kao Enter, bez prelaska na drugi panel)"
+    },
     "source_choose_a1_channel": {
       "label": "Kanal na A1 (klik u stupcu kanala uzete trake, na svakom timelineu)"
     },

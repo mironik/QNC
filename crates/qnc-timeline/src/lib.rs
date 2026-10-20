@@ -402,6 +402,9 @@ impl TimelineProjection {
         self.normalize_source_marks()
     }
 
+    /// IN at the confirmed frame. Marking does not take the mark (user 2026-10-20: a mark
+    /// left taken made the next click on the timeline only let it go, so the playhead moved
+    /// on the second click); Ctrl+I/O, a right click or Ctrl+wheel take it.
     pub fn with_source_in_at_confirmed(mut self) -> Self {
         if let Some(frame) = self.confirmed_frame() {
             self.source_in_frame = Some(self.local_frame(frame));
@@ -410,7 +413,6 @@ impl TimelineProjection {
                     self.source_out_frame = Some(self.duration_frames());
                 }
             }
-            self.source_mark_focus = TimelineSourceMarkFocus::In;
         }
         self.normalize_source_marks()
     }
@@ -425,7 +427,6 @@ impl TimelineProjection {
                         .min(self.duration_frames()),
                 ),
             );
-            self.source_mark_focus = TimelineSourceMarkFocus::Out;
         }
         self.normalize_source_marks()
     }
@@ -435,7 +436,6 @@ impl TimelineProjection {
         if let Some(frame) = self.confirmed_frame() {
             self.source_in_frame = Some(self.local_frame(frame));
             self.source_out_frame = None;
-            self.source_mark_focus = TimelineSourceMarkFocus::In;
         }
         self.normalize_source_marks()
     }
@@ -447,7 +447,6 @@ impl TimelineProjection {
             let (earlier, later) = (self.local_frame(first.min(frame)), self.local_frame(first.max(frame)));
             self.source_in_frame = Some(earlier);
             self.source_out_frame = Some(later.max(earlier.saturating_add(1)).min(self.duration_frames()));
-            self.source_mark_focus = TimelineSourceMarkFocus::Out;
         }
         self.normalize_source_marks()
     }
@@ -2385,6 +2384,17 @@ mod tests {
 
         assert_eq!(refreshed.confirmed_frame(), Some(40));
         assert_eq!(refreshed.source_in_frame, Some(20));
+    }
+
+    #[test]
+    fn marking_in_out_or_a_cut_leaves_the_playhead_with_the_click() {
+        let marked = TimelineProjection::new(0, 300).with_playhead(40).with_source_in_at_confirmed();
+        assert_eq!(marked.source_mark_focus, TimelineSourceMarkFocus::Playhead, "I does not take IN");
+        let out = marked.with_playhead(90).with_source_out_at_confirmed();
+        assert_eq!(out.source_mark_focus, TimelineSourceMarkFocus::Playhead, "O does not take OUT");
+        let cut = TimelineProjection::new(0, 300).with_playhead(10).with_first_cut_at_confirmed();
+        let pair = cut.with_playhead(60).with_second_cut_at_confirmed(10);
+        assert_eq!((cut.source_mark_focus, pair.source_mark_focus), (TimelineSourceMarkFocus::Playhead, TimelineSourceMarkFocus::Playhead));
     }
 
     #[test]

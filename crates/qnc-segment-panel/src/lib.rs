@@ -10,6 +10,10 @@
 mod bar;
 mod list;
 
+/// A left click on a Wrap row keeps what is taken there, as Enter does, but never walks the
+/// keyboard on to the next panel (user 2026-10-20, as `source_keep_mark` on the source).
+pub const KEEP_EDIT: &str = "segments_keep_edit";
+
 pub use list::show_segment_list;
 mod cover_length;
 pub use cover_length::{cover_fill, CoverLengthBand};
@@ -429,7 +433,7 @@ fn paint_program(
                 | TimelineIntent::SelectVirtual { .. }
         )
     {
-        return on_panel(ActionEvent::key("activate_focused_item"));
+        return on_panel(ActionEvent::key(KEEP_EDIT));
     }
     match intent {
         // Ctrl+click takes the cover for Delete (Ctrl+ selects); a plain click on the colour
@@ -450,7 +454,7 @@ fn paint_program(
             if matches!(lane, qnc_timeline::AudioLane::A1 | qnc_timeline::AudioLane::A2) =>
         {
             if segments.part_sound.is_some() {
-                return on_panel(ActionEvent::key("activate_focused_item"));
+                return on_panel(ActionEvent::key(KEEP_EDIT));
             }
             let frame = segments.playhead.filter(|frame| (start..end).contains(frame)).unwrap_or(start);
             let id = if lane == qnc_timeline::AudioLane::A2 { "select_audio_a2" } else { "select_audio_a1" };

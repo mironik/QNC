@@ -255,10 +255,11 @@ pub struct SourcePreview {
     lead: Option<(String, [u16; 2], [u16; 2])>,
     /// The sound of a segment or cover drafted on the Wrap row, heard in the program.
     program_draft: Option<SoundDraft>,
-    /// The program frame asked for while the program was still being prepared: cued once
-    /// it is ready, never by opening it again (live 2026-10-16: the wheel over the Wrap rows
-    /// opened the program on every step and the source timeline flashed).
-    program_pending: Option<u64>,
+    /// The frame asked for while the player was still being prepared (a clip or the
+    /// program): cued once it is ready, never by opening it again (live 2026-10-16: the wheel
+    /// over the Wrap rows opened the program on every step; audit 2026-10-20: a click on the
+    /// source timeline while the clip prepared was lost).
+    cue_waiting: Option<u64>,
     /// The program was opened again with the draft (another channel): Escape opens it
     /// again from the story, a level no longer goes to the output.
     program_draft_reopened: bool,
@@ -291,7 +292,7 @@ impl Default for SourcePreview {
             program: false,
             lead: None,
             program_draft: None,
-            program_pending: None,
+            cue_waiting: None,
             program_draft_reopened: false,
         }
     }
@@ -393,7 +394,7 @@ impl SourcePreview {
 
     /// Cuts the current session and clears everything shown.
     pub fn close(&mut self) {
-        (self.cue_in_flight, self.cue_next, self.cue_asked) = (None, None, None);
+        (self.cue_in_flight, self.cue_next, self.cue_asked, self.cue_waiting) = (None, None, None, None);
         self.play_when_ready = false;
         self.program = false;
         if let Some(player) = &self.player {
@@ -666,6 +667,11 @@ impl SourcePreview {
 
     pub fn cue(&mut self, frame: u64) -> bool {
         self.touched = Some(std::time::Instant::now());
+        // A player still being prepared takes the latest frame once it is ready.
+        if self.player.is_some() && !self.player_view.has_confirmed_position() && self.player_view.error.is_none() {
+            self.cue_waiting = Some(frame);
+            return true;
+        }
         if self.cue_in_flight.is_some() {
             self.cue_next = Some(frame);
             return true;
@@ -730,7 +736,7 @@ impl SourcePreview {
             return true;
         };
         self.program = true;
-        self.program_pending = None;
+        self.cue_waiting = None;
         self.play_when_ready = false;
         (self.cue_in_flight, self.cue_next, self.cue_asked) = (None, None, None);
         player.prepare_at(first_frame, program_launch(context, build));
@@ -747,7 +753,7 @@ impl SourcePreview {
             return self.cue(frame);
         }
         if !reopen && self.program && self.player.is_some() && self.player_view.error.is_none() {
-            self.program_pending = Some(frame); // still being prepared: the latest frame waits
+            self.cue_waiting = Some(frame); // still being prepared: the latest frame waits
             return true;
         }
         let Some(context) = &self.context else {
@@ -1026,8 +1032,8 @@ impl SourcePreview {
             self.cue_asked = None;
         }
         self.release_cue();
-        if self.program && self.player_view.has_confirmed_position() {
-            if let Some(frame) = self.program_pending.take() {
+        if self.player_view.has_confirmed_position() {
+            if let Some(frame) = self.cue_waiting.take() {
                 self.cue(frame);
             }
         }

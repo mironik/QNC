@@ -139,6 +139,9 @@ pub struct Runtime {
     clip: Option<(Rc<DecodeInput>, SourceRuntime)>,
     /// The story's A1 under a Sync, on the clip's device (user 2026-10-20).
     sync_bed: Option<sync_bed::SyncBed>,
+    /// The last rebuffer written to the log (reason, frame): the same one is written once,
+    /// not every tick (audit 2026-10-20: 2.7 million lines of one stall a frame).
+    rebuffer_logged: Option<(String, u64)>,
 }
 impl Runtime {
     pub fn open(
@@ -388,6 +391,7 @@ impl Runtime {
             audio_rearm_pending: false,
             clip,
             sync_bed: None,
+            rebuffer_logged: None,
         })
     }
 
@@ -478,6 +482,7 @@ impl Runtime {
             audio_rearm_pending: false,
             clip: None,
             sync_bed: None,
+            rebuffer_logged: None,
         })
     }
     pub fn state(&self) -> &TransportEngineState {
@@ -589,7 +594,7 @@ impl Runtime {
             Ok(events) => events,
             Err(e) if e.kind == BroadcastEngineErrorKind::NotReady => {
                 let frame = self.engine.state().carrier_frame;
-                if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                if self.first_rebuffer("not_ready", frame) {
                     let gpu = self.gpu.borrow();
                     qnc_dev_diagnostics::log_line(
                         qnc_dev_diagnostics::DiagnosticsStream::Player,
@@ -624,6 +629,18 @@ impl Runtime {
         Ok(events)
     }
 
+    /// Whether a rebuffer of `reason` at `frame` is new (written to the log once).
+    fn first_rebuffer(&mut self, reason: &str, frame: u64) -> bool {
+        if !qnc_dev_diagnostics::player_diagnostics_enabled() {
+            return false;
+        }
+        let new = self.rebuffer_logged.as_ref().is_none_or(|(logged, at)| logged != reason || *at != frame);
+        if new {
+            self.rebuffer_logged = Some((reason.to_string(), frame));
+        }
+        new
+    }
+
     /// The audio device stopped for lack of sound.
     fn audio_failed(&self) -> bool {
         self.audio
@@ -634,7 +651,7 @@ impl Runtime {
     /// The sound ran dry: its queue is prepared again and playing goes on once it holds
     /// enough (a later tick finishes it).
     fn rebuffer_audio(&mut self, reason: &str) {
-        if qnc_dev_diagnostics::player_diagnostics_enabled() {
+        if self.first_rebuffer(reason, self.engine.state().carrier_frame) {
             let gpu = self.gpu.borrow();
             qnc_dev_diagnostics::log_line(
                 qnc_dev_diagnostics::DiagnosticsStream::Player,

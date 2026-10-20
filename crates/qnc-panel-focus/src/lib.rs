@@ -456,6 +456,8 @@ impl PanelFocus {
                 return Some(qnc_segments_keys::confirm(preview, segments) || self.advance(preview, wrap, segments));
             }
             "activate_focused_item" => return Some(false),
+            // A click on a Wrap row keeps what is taken there; nothing taken, nothing happens.
+            "segments_keep_edit" => return Some(qnc_segments_keys::confirm(preview, segments)),
             // A virtual shot (Shift+S or Add SubClip), not by an Enter that confirmed.
             "save_virtual_shot" if segments.source_waits_enter() || self.source.holds_enter() => return Some(false),
             // Down closes an open large wave off the segment panel (there down is the next segment).
