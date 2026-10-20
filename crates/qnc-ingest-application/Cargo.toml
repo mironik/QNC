@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-clip-row = { workspace = true }
 qnc-source-panel = { workspace = true }
-qnc-media-card = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-content-store = { workspace = true }

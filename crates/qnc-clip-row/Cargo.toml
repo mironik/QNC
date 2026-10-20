@@ -1,0 +1,11 @@
+[package]
+name = "qnc-clip-row"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: one clip row for every form (name, duration, poster, import state, tick) and its media pool card"
+
+[dependencies]
+qnc-content-read = { workspace = true }
+qnc-image-assets = { workspace = true }
+qnc-media-thumbnail = { workspace = true }
+serde = { workspace = true }

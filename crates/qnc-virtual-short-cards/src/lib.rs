@@ -35,7 +35,7 @@ pub struct VirtualShortCard {
 }
 
 /// The short's card in the media pool (piece `qnc-media-card`).
-impl qnc_media_card::PoolItem for VirtualShortCard {
+impl qnc_clip_row::PoolItem for VirtualShortCard {
     fn card_id(&self) -> &str { &self.shot_id }
     fn card_title(&self) -> &str { &self.name }
     fn card_poster(&self) -> (Option<&str>, Option<&qnc_image_assets::RgbaImage>) { (self.poster_uri.as_deref(), self.poster_image.as_deref()) }

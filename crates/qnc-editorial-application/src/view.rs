@@ -27,32 +27,8 @@ impl LibraryTab {
     }
 }
 
-/// One row of the clip list (summary only).
-#[derive(Debug, Clone, PartialEq)]
-pub struct EditorialClip {
-    pub clip_id: String,
-    pub name: String,
-    pub duration_seconds: f64,
-    pub duration_frames: u64,
-    /// Import finished.
-    pub imported: bool,
-    /// Where the poster is (project folder or source), as the project database says.
-    pub thumb_uri: Option<String>,
-    /// The poster once it is loaded; the form paints a placeholder until then.
-    pub thumb_image: Option<std::sync::Arc<qnc_image_assets::RgbaImage>>,
-    /// The catalog record status; the status dots are made from it by the public card module.
-    pub import_status: String,
-    pub imported_media_uri: String,
-}
-
-/// The clip's card in the media pool (piece `qnc-media-card`).
-impl qnc_media_card::PoolItem for EditorialClip {
-    fn card_id(&self) -> &str { &self.clip_id }
-    fn card_title(&self) -> &str { &self.name }
-    fn card_poster(&self) -> (Option<&str>, Option<&qnc_image_assets::RgbaImage>) { (self.thumb_uri.as_deref(), self.thumb_image.as_deref()) }
-    fn card_seconds(&self) -> f64 { self.duration_seconds }
-    fn card_import(&self) -> (&str, &str) { (&self.import_status, &self.imported_media_uri) }
-}
+/// One row of the clip list: the clip row every form shows (piece `qnc-clip-row`).
+pub use qnc_clip_row::ClipRow as EditorialClip;
 
 #[derive(Clone, Default)]
 pub struct EditorialView {

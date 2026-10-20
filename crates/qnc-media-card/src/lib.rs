@@ -45,11 +45,32 @@ impl StatusDotsMode {
 
 #[derive(Debug, Clone, Copy)]
 pub struct MediaCardFeatures {
-    /// Bottom-left check mark on the thumbnail.
-    pub selection_check: bool,
+    /// Bottom-left check mark on the thumbnail, and what it marks.
+    pub ticks: Ticks,
     /// Top-right dot on the thumbnail.
     pub top_right_marker: bool,
     pub status_dots: StatusDotsMode,
+}
+
+/// What the check mark of a card marks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ticks {
+    Off,
+    /// The chosen card (one at a time).
+    Chosen,
+    /// The cards selected for an action on several (each item says).
+    Selected,
+}
+
+impl Ticks {
+    /// The check mark of a form whose contract only says whether it has one.
+    pub fn chosen_if(on: bool) -> Self {
+        if on {
+            Self::Chosen
+        } else {
+            Self::Off
+        }
+    }
 }
 
 /// Metrics from the UI contract (`media_card`).
@@ -117,7 +138,7 @@ pub struct MediaCardInput<'a> {
     pub top_right_marker: Option<Color32>,
     /// Preview / focus ring. Independent of the check mark.
     pub focused: bool,
-    /// Only painted when `features.selection_check`.
+    /// Only painted when the features have ticks.
     pub checked: bool,
     pub features: MediaCardFeatures,
     pub thumb: Option<&'a TextureHandle>,
@@ -182,7 +203,7 @@ pub fn paint_media_card(
         );
     }
 
-    if input.features.selection_check {
+    if input.features.ticks != Ticks::Off {
         paint_selection_check(ui, thumb_rect, input.checked);
     }
     if input.features.top_right_marker {
@@ -666,7 +687,7 @@ fn grid(
                             ui.painter().rect_stroke(rect.expand(1.0), 0.0, egui::Stroke::new(3.0, key.color), egui::StrokeKind::Outside);
                         }
                         if resp.clicked() {
-                            let is_checkbox_click = input.features.selection_check
+                            let is_checkbox_click = input.features.ticks != Ticks::Off
                                 && resp.interact_pointer_pos().is_some_and(|pos| {
                                     selection_check_hit_rect(rect, metrics).contains(pos)
                                 });
@@ -737,7 +758,7 @@ mod tests {
             focused: false,
             checked: false,
             features: MediaCardFeatures {
-                selection_check: true,
+                ticks: Ticks::Selected,
                 top_right_marker: false,
                 status_dots: mode,
             },

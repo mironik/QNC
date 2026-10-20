@@ -207,7 +207,7 @@ impl Demo {
                 grid_gap: f(&editorial["media_card"]["grid_gap"]),
             },
             features: MediaCardFeatures {
-                selection_check: card["selection_check"].as_bool().unwrap(),
+                ticks: qnc_media_card::Ticks::chosen_if(card["selection_check"].as_bool().unwrap()),
                 top_right_marker: false,
                 status_dots: StatusDotsMode::from_contract(card["status_dots"].as_str().unwrap())
                     .expect("status_dots value"),

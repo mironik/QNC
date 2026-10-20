@@ -3254,6 +3254,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-clip-row"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-read",
+ "qnc-image-assets",
+ "qnc-media-thumbnail",
+ "serde",
+]
+
+[[package]]
 name = "qnc-confirm-dialog"
 version = "0.1.0"
 dependencies = [
@@ -3457,13 +3467,13 @@ dependencies = [
  "qnc-action-event",
  "qnc-active-project-read",
  "qnc-clip-posters",
+ "qnc-clip-row",
  "qnc-content-artifacts",
  "qnc-content-read",
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-image-assets",
- "qnc-media-card",
  "qnc-media-thumbnail",
  "qnc-panel-focus",
  "qnc-pending-marks",
@@ -3681,6 +3691,7 @@ dependencies = [
  "qnc-application-sequence",
  "qnc-camera-adapter",
  "qnc-clip-posters",
+ "qnc-clip-row",
  "qnc-content-store",
  "qnc-contracts",
  "qnc-dev-diagnostics",
@@ -3696,7 +3707,6 @@ dependencies = [
  "qnc-ingest-selection-write",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
- "qnc-media-card",
  "qnc-media-thumbnail",
  "qnc-playback-priority",
  "qnc-player-client",
@@ -3750,6 +3760,7 @@ name = "qnc-ingest-catalog"
 version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
+ "qnc-clip-row",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
@@ -3761,6 +3772,7 @@ dependencies = [
 name = "qnc-ingest-clip-list"
 version = "0.1.0"
 dependencies = [
+ "qnc-clip-row",
  "qnc-ingest-select",
 ]
 
@@ -4107,6 +4119,7 @@ name = "qnc-media-card"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-clip-row",
  "qnc-image-assets",
  "qnc-key-list",
  "qnc-ui-kit",
@@ -5355,8 +5368,8 @@ dependencies = [
 name = "qnc-virtual-short-cards"
 version = "0.1.0"
 dependencies = [
+ "qnc-clip-row",
  "qnc-image-assets",
- "qnc-media-card",
  "qnc-virtual-shots",
 ]
 

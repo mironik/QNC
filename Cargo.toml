@@ -123,6 +123,7 @@ members = [
     "crates/qnc-transport-panel",
     "crates/qnc-dir-browser-panel",
     "crates/qnc-still-locator",
+    "crates/qnc-clip-row",
     "crates/qnc-source-volumes",
     "crates/qnc-board",
     "crates/qnc-channel-picker",
@@ -321,6 +322,7 @@ qnc-monitor-panel = { path = "crates/qnc-monitor-panel" }
 qnc-transport-panel = { path = "crates/qnc-transport-panel" }
 qnc-dir-browser-panel = { path = "crates/qnc-dir-browser-panel" }
 qnc-still-locator = { path = "crates/qnc-still-locator" }
+qnc-clip-row = { path = "crates/qnc-clip-row" }
 qnc-source-volumes = { path = "crates/qnc-source-volumes" }
 qnc-board = { path = "crates/qnc-board" }
 qnc-channel-picker = { path = "crates/qnc-channel-picker" }

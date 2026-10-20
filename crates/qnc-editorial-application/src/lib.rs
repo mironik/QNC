@@ -543,25 +543,9 @@ fn parent_clip(clip: &EditorialClip) -> ParentClip {
 
 /// The new list of imported clips; a poster that is already loaded for the same address is kept.
 fn merge_clips(new: Vec<ClipSummary>, previous: &[EditorialClip]) -> Vec<EditorialClip> {
-    new.into_iter()
-        .map(|clip| {
-            let image = previous
-                .iter()
-                .find(|old| old.clip_id == clip.clip_id && old.thumb_uri == clip.thumbnail_uri)
-                .and_then(|old| old.thumb_image.clone());
-            EditorialClip {
-                clip_id: clip.clip_id,
-                name: clip.name,
-                duration_seconds: clip.duration_seconds,
-                duration_frames: clip.duration_frames,
-                imported: clip.imported,
-                thumb_uri: clip.thumbnail_uri,
-                thumb_image: image,
-                import_status: clip.import_status,
-                imported_media_uri: clip.imported_media_uri.unwrap_or_default(),
-            }
-        })
-        .collect()
+    let mut clips: Vec<EditorialClip> = new.into_iter().map(EditorialClip::from_summary).collect();
+    qnc_media_thumbnail::keep_loaded(&mut clips, previous);
+    clips
 }
 
 fn read_catalog(
@@ -615,6 +599,7 @@ mod tests {
             thumb_image: None,
             import_status: String::new(),
             imported_media_uri: String::new(),
+            ..Default::default()
         }
     }
 
@@ -749,6 +734,7 @@ mod poster_tests {
                 pixels: vec![0, 0, 0, 255],
                 content_key: 1,
             })),
+            ..Default::default()
         }
     }
 

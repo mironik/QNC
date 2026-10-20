@@ -1,20 +1,6 @@
 use super::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum SaveState {
-    Pending,
-    Failed,
-    #[default]
-    Saved,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum ThumbStatus {
-    Ready,
-    Pending,
-    #[default]
-    Missing,
-}
+pub use qnc_clip_row::{SaveState, ThumbStatus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum ClipFilter {

@@ -2,7 +2,7 @@
   "module_id": "qnc.module.still-locator",
   "module_name": "Still locator",
   "module_version": "0.1.0",
-  "module_kind": "media_locator",
+  "module_kind": "library",
   "capabilities": [
     "media.locate_still_picture"
   ],

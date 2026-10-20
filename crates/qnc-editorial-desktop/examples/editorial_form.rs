@@ -54,6 +54,7 @@ fn main() -> eframe::Result<()> {
             thumb_image: None,
             import_status: String::new(),
             imported_media_uri: String::new(),
+            ..Default::default()
         })
         .collect();
     view.preview.timeline = TimelineProjection::new(0, 5000)

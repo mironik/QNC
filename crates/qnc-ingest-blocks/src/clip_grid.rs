@@ -26,7 +26,7 @@ pub(super) fn render_clip_grid(
             grid_gap: grid.grid_gap,
         },
         features: qnc_media_card::MediaCardFeatures {
-            selection_check: true,
+            ticks: qnc_media_card::Ticks::Selected,
             top_right_marker: true,
             status_dots: qnc_media_card::StatusDotsMode::Off,
         },

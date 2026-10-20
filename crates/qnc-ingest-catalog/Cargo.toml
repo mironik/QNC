@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-clip-row = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-ingest-store = { workspace = true }

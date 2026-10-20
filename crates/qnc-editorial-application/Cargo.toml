@@ -14,7 +14,7 @@ qnc-content-store = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-content-read = { workspace = true }
 qnc-image-assets = { workspace = true }
-qnc-media-card = { workspace = true }
+qnc-clip-row = { workspace = true }
 qnc-media-thumbnail = { workspace = true }
 qnc-program-segments = { workspace = true }
 qnc-program-waveform = { workspace = true }

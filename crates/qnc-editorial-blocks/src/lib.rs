@@ -201,7 +201,7 @@ fn render_clip_grid(
             grid_gap: cards.grid_gap,
         },
         features: qnc_media_card::MediaCardFeatures {
-            selection_check: contracts.composition().media_card.selection_check,
+            ticks: qnc_media_card::Ticks::chosen_if(contracts.composition().media_card.selection_check),
             top_right_marker: false,
             status_dots: qnc_media_card::StatusDotsMode::from_contract(&contracts.composition().media_card.status_dots)
                 .unwrap_or(qnc_media_card::StatusDotsMode::Off),

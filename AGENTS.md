@@ -5077,3 +5077,12 @@ povlaci player; nova kocka `crates/qnc-still-locator` (+ ugovor): gdje ovo racun
 `qnc-source-preview`, pa skok na kljucnu sliku (`qnc-keyframe-nav`) ne ovisi o playeru; panel Segmenti ovisi o kocki
 prikaza `qnc-program-view`, ne o modulu price s bazom. Nije izvedeno (trazi Project): `qnc-project-session` jos ovisi o
 Project aplikaciji. Testovi, conformance.
+Izvedeno 2026-10-20 (isti plan, korak 2: redak klipa): nova kocka `crates/qnc-clip-row` (+ ugovor; bez sucelja): jedan
+redak klipa za sve forme (`ClipRow`: naziv, trajanje, poster, stanje uvoza i spremanja, kvacica) sa svojstvom kartice
+`PoolItem` (premjesteno iz `qnc-media-card`, koji ga samo koristi) i posterima (`LoadedThumbnail`). `ClipView` Ingesta i
+`EditorialClip` Storyja/MA samo su to ime za `ClipRow`; katalog (`qnc-ingest-catalog` `CatalogClipItem`) i Select
+dogadjaji (`qnc-ingest-clip-list` `ClipListItem`) ga sami pune, Story ga gradi iz sazetka kataloga
+(`ClipRow::from_summary`). Sto kvacica kartice oznacava (nista, izabrani, odabrani za uvoz) je `qnc-media-card` `Ticks`
+u postojecem polju znacajki, pa forme nisu narasle. C10 spusteno: Ingest aplikacija 1538 -> 1378, Story aplikacija
+643 -> 609. Uz to obrisan debug build (`cargo clean --profile dev`, 51 GiB, uz dozvolu korisnika; disk je bio pun).
+Testovi, conformance. Uzivo nije provjereno.

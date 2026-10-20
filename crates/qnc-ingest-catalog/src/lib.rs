@@ -399,3 +399,36 @@ mod new_after_reload_tests {
         assert_eq!(seen, [("old", true), ("new", false), ("other", true)], "the New filter still shows it");
     }
 }
+
+/// The clip row every form shows (piece `qnc-clip-row`), filled from the catalog.
+impl CatalogClipItem for qnc_clip_row::ClipRow {
+    fn catalog_clip_id(&self) -> &str {
+        &self.clip_id
+    }
+
+    fn catalog_selected(&self) -> bool {
+        self.selected
+    }
+
+    fn catalog_new(&self) -> bool {
+        !self.previously_seen // new for this Select, kept on reload
+    }
+
+    fn from_catalog_row(row: CatalogClipRow) -> Self {
+        qnc_clip_row::ClipRow {
+            clip_id: row.clip_id,
+            name: row.name,
+            duration_seconds: row.duration_seconds,
+            selected: row.selected,
+            imported: row.imported,
+            previously_seen: row.previously_seen,
+            metadata_revision: row.metadata_revision,
+            thumb_uri: row.thumb_uri,
+            thumb_status: match row.thumb_status {
+                CatalogThumbStatus::Pending => qnc_clip_row::ThumbStatus::Pending,
+                CatalogThumbStatus::Missing => qnc_clip_row::ThumbStatus::Missing,
+            },
+            ..Default::default()
+        }
+    }
+}

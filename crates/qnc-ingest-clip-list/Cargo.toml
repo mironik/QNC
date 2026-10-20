@@ -5,4 +5,5 @@ edition = "2021"
 description = "QNC public component: applies Ingest Select events to a clip list; no form, no database, no player"
 
 [dependencies]
+qnc-clip-row = { workspace = true }
 qnc-ingest-select = { workspace = true }
