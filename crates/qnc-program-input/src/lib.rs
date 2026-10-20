@@ -107,6 +107,50 @@ pub fn load_program(
     load(target, project_id, clips, None, None)
 }
 
+/// The A1 of the story under the program window `[in, out)` only (user 2026-10-20: "the
+/// story's A1 must be heard, so the user knows how long to hold the clip"): no picture,
+/// no A2, nothing over it. The Sync's source plays picture and A2 on its own player; this
+/// bed plays beside it. Its frames start at 0.
+pub fn load_sound_bed(
+    target: &ProjectDbTarget,
+    project_id: &str,
+    clips: &impl ClipInputs,
+    window: (u64, u64),
+) -> Result<ProgramInput, String> {
+    load(target, project_id, clips, Some((window, None)), None)
+}
+
+/// The A1 bed of a window, built where its player is prepared.
+pub fn sound_bed_loader(
+    target: ProjectDbTarget,
+    project_id: String,
+    window: (u64, u64),
+) -> impl FnOnce(&qnc_player_input::InputReader, &str) -> Result<ProgramInput, String> + Send + 'static
+{
+    move |reader, workspace_db_uri| {
+        with_session(reader, workspace_db_uri, |clips| load_sound_bed(&target, &project_id, clips, window))
+    }
+}
+
+/// Output 1 (A1) of a playlist only: every picture and every other output goes. A source
+/// left with nothing is dropped; an item left with no source keeps its first (it is played
+/// as it is rather than not at all).
+pub fn sound_only(mut playlist: qnc_program_playlist::FlatProgramPlaylist) -> qnc_program_playlist::FlatProgramPlaylist {
+    for item in &mut playlist.items {
+        let first = item.sources.first().cloned();
+        for source in &mut item.sources {
+            source.video_layer = None;
+            source.source_video_format = None;
+            source.audio_routes.retain(|route| route.output_channel == 0);
+        }
+        item.sources.retain(|source| source.has_audio());
+        if item.sources.is_empty() {
+            item.sources.extend(first);
+        }
+    }
+    playlist
+}
+
 /// The program window `[in, out)` of the active project with a transient cover
 /// over it (v5 `build_program_frame_window` + `apply_transient_program_overlay`);
 /// its frames start at 0.
@@ -117,7 +161,7 @@ pub fn load_program_window(
     window: (u64, u64),
     cover: &TransientCover,
 ) -> Result<ProgramInput, String> {
-    load(target, project_id, clips, Some((window, cover)), None)
+    load(target, project_id, clips, Some((window, Some(cover))), None)
 }
 
 /// The stored covers outside the window and the transient cover over all of it.
@@ -152,7 +196,7 @@ fn load(
     target: &ProjectDbTarget,
     project_id: &str,
     clips: &impl ClipInputs,
-    window: Option<((u64, u64), &TransientCover)>,
+    window: Option<((u64, u64), Option<&TransientCover>)>,
     draft: Option<&SoundDraft>,
 ) -> Result<ProgramInput, String> {
     // One consistent read of the story (external audit 2026-10-17): segments, covers and
@@ -163,7 +207,7 @@ fn load(
         draft.apply(&mut segments, &mut covers);
     }
     let story_rate = snapshot.story_fps.ok_or(qnc_ui_text::text("story.msg.program_is_empty"))?;
-    if let Some((range, cover)) = window {
+    if let Some((range, Some(cover))) = window {
         covers = with_transient_cover(&covers, range, cover);
     }
     let first = segments
@@ -180,10 +224,13 @@ fn load(
     let mut input = build_input(project_id, story_rate, &segments, &covers, channels)?;
     input.revision = revision;
     let mut playlist = build_flat_program_playlist(&input, &mut resolver)?;
-    if let Some(((start, end), _)) = window {
+    if let Some(((start, end), cover)) = window {
         let range =
             ProgramFrameRange::new(frame(start)?, frame(end)?).map_err(|error| error.message)?;
         playlist = build_program_frame_window(&playlist, range)?;
+        if cover.is_none() {
+            playlist = sound_only(playlist);
+        }
     }
     let mut input = ProgramInput::new(playlist, resolver.prepared).map_err(|error| error.to_string())?;
     // The whole story plays its rendered units (a Sync window plays a cover not in the

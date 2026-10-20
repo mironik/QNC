@@ -5038,6 +5038,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-sound-bed"
+version = "0.1.0"
+dependencies = [
+ "qnc-player-client",
+]
+
+[[package]]
 name = "qnc-source-bindings"
 version = "0.1.0"
 dependencies = [
@@ -5181,6 +5188,7 @@ dependencies = [
  "qnc-player-timeline",
  "qnc-pool-pointer",
  "qnc-program-input",
+ "qnc-sound-bed",
  "qnc-source-bindings",
  "qnc-source-contract",
  "qnc-still-locator",

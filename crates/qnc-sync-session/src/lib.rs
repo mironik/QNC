@@ -64,6 +64,13 @@ pub fn poll(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut 
         preview.pause();
         show_draft_end(preview, segments);
     }
+    // The story's A1 plays only under a running Sync; the next Sync's is prepared ahead.
+    if !segments.sync_drafting() || segments.sync_stopped() {
+        preview.stop_sound_bed();
+    }
+    if let Some(window) = segments.sync_window_ahead().filter(|_| !preview.in_program()) {
+        preview.prepare_sound_bed(window);
+    }
 }
 
 /// The OUT of a stopped Sync dragged on the source timeline to `value` (a source frame):
@@ -96,6 +103,9 @@ fn space(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut Pro
         // fly lets the source play on; else the source plays from IN (or the draft's end).
         SyncSpace::Start(sync) => {
             wrap.hold(sync.window.0);
+            // The story's A1 under the slot, prepared before IN (user 2026-10-20: "the
+            // story's A1 must be heard, so the user knows how long to hold the clip").
+            preview.play_sound_bed(sync.window);
             if preview.player_view().playing() && !preview.in_program() {
                 return true;
             }

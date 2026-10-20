@@ -5120,3 +5120,11 @@ izvora (`qnc-sync-cover` `source_window_frame`, `qnc-program-segments` `sync_fra
 M markera ili OUT-a izvora zaustavlja izvor na zadnjoj slici nacrta; strelice i povlacenje OUT-a pokazuju kraj na
 playeru izvora (`qnc-sync-session`). Pauza se ne salje dvaput dok player jos svira (`qnc-source-preview` `pausing`).
 Posljedica: za vrijeme Synca cuje se zvuk izvora, A1 price ispod se ne cuje. Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-20 (korisnik: "ne cuje se A1"; "treba se cuti A1 price, kako bi korisnik mogao znati do kuda treba drzati
+klip"): A1 price ispod Sync slota ne ovisi o IN-u, pa se priprema unaprijed. Nova kocka `crates/qnc-sound-bed` (+ ugovor):
+svoj Broadcast Player za A1 price ispod Sync prozora, pripremljen dok je Sync ukljucen (prozor od M markera na ili prije
+Wrap playheada do sljedeceg; `qnc-program-segments` `sync_window_ahead`), na IN samo krene (bez otvaranja playera);
+staje kad Sync stane. Program prozora je samo A1 (`qnc-program-input` `sound_bed_loader`, `sound_only`: bez slike i bez
+A2). `qnc-source-preview` ga drzi (`prepare_sound_bed`, `play_sound_bed`, `stop_sound_bed`) i dok svira, izlaz 1 playera
+izvora je utisan (A2 izvora ostaje). Odstupanje od 8.2 uz zahtjev korisnika: za vrijeme Synca rade dva playera (izvor i A1
+price), svaki svojim satom. Testovi, conformance. Uzivo nije provjereno.

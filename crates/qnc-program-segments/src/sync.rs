@@ -140,6 +140,20 @@ impl ProgramSegments {
         frame
     }
 
+    /// The window the next Sync would play, while Sync is on and none runs: from the M
+    /// marker at or before the Wrap playhead to the next one (or the end of the story). The
+    /// story's A1 under it is prepared before IN (user 2026-10-20).
+    pub fn sync_window_ahead(&self) -> Option<(u64, u64)> {
+        if !self.sync.enabled() || self.sync.is_active() || self.view.total_frames == 0 {
+            return None;
+        }
+        let playhead = self.playhead.unwrap_or(0);
+        let markers = self.view.markers.iter().map(|pin| pin.frame);
+        let anchor = markers.clone().filter(|frame| *frame <= playhead).max()?;
+        let end = markers.filter(|frame| *frame > anchor).min().unwrap_or(self.view.total_frames);
+        Some((anchor, end.min(self.view.total_frames).max(anchor + 1)))
+    }
+
     /// A Sync stopped with its draft (O, the next M marker or the source OUT).
     pub fn sync_stopped(&self) -> bool {
         self.sync.stopped()
