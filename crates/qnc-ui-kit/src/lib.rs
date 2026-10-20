@@ -10,6 +10,15 @@ pub use raster::{paint_rgba_image, paint_rgba_image_filled};
 pub use raster::paint_stream_frame;
 pub use two_way_switch::show_two_way_switch;
 
+/// The thin frame of what the keyboard is on (a panel, a button, a tab), the same in every
+/// form (user 2026-10-20: three pieces drew their own copy).
+pub fn paint_focus(ui: &eframe::egui::Ui, rect: eframe::egui::Rect, focused: bool, color: eframe::egui::Color32) {
+    if focused {
+        let stroke = eframe::egui::Stroke::new(1.5, color);
+        ui.painter().rect_stroke(rect.shrink(1.0), 0.0, stroke, eframe::egui::StrokeKind::Inside);
+    }
+}
+
 pub const STANDARD_ACTION_BUTTON_WIDTH: f32 = 96.0;
 pub const STANDARD_ACTION_BUTTON_GAP: f32 = 8.0;
 

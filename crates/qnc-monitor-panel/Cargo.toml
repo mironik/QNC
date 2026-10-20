@@ -5,6 +5,9 @@ edition = "2021"
 description = "QNC public panel: the preview monitor (the picture, poster or message from qnc-monitor, the program output on an external screen); written once, placed by any layout"
 
 [dependencies]
+qnc-clip-row = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-theme-styles = { workspace = true }
 eframe = { workspace = true }
 qnc-image-assets = { workspace = true }
 qnc-monitor = { workspace = true }

@@ -102,6 +102,85 @@ pub enum BrowserAction {
     Roots,
 }
 
+/// What the user asked of the browser with its confirm bar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BrowserAnswer {
+    Browser(BrowserAction),
+    Confirm,
+    Cancel,
+}
+
+impl BrowserStyle {
+    /// The browser in the look of the one desktop theme.
+    pub fn from_theme(theme: &qnc_desktop_theme::Theme) -> Self {
+        Self {
+            text: theme.text,
+            muted: theme.text_muted,
+            disabled: theme.text_muted,
+            accent: theme.accent,
+            border: theme.border,
+            danger: theme.danger,
+            focus: theme.focus,
+            font_ui: theme.font_ui,
+            control_height: theme.chrome_control_height,
+        }
+    }
+}
+
+/// The confirm and cancel bar under the browser (its words, whether confirm can be used and
+/// which button the keyboard is on: `Some(true)` confirm, `Some(false)` cancel).
+pub struct ConfirmBar<'a> {
+    pub confirm: &'a str,
+    pub cancel: &'a str,
+    pub can_confirm: bool,
+    pub focused: Option<bool>,
+}
+
+/// The browser on its place with its confirm bar at the bottom, in the look of the one
+/// theme; `pad` is the place's padding.
+pub fn show_with_confirm(
+    ui: &mut Ui,
+    rect: egui::Rect,
+    (theme, pad): (&qnc_desktop_theme::Theme, f32),
+    input: BrowserInput<'_>,
+    labels: &BrowserLabels<'_>,
+    bar: &ConfirmBar<'_>,
+) -> Option<BrowserAnswer> {
+    let bar_top = (rect.bottom() - theme.chrome_control_height - pad).max(rect.top());
+    let bar_rect = egui::Rect::from_min_size(egui::pos2(rect.left(), bar_top), Vec2::new(rect.width(), theme.chrome_control_height));
+    let browser_rect = egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.right(), (bar_rect.top() - 8.0).max(rect.top())));
+    let style = BrowserStyle::from_theme(theme);
+    let asked = ui
+        .scope_builder(egui::UiBuilder::new().max_rect(browser_rect), |ui| {
+            let place = qnc_ui_kit::fill_block(ui, theme.bg);
+            ui.allocate_rect(place, Sense::hover());
+            ui.scope_builder(egui::UiBuilder::new().max_rect(place.shrink(pad)), |ui| show(ui, input, labels, &style)).inner.map(BrowserAnswer::Browser)
+        })
+        .inner;
+    if asked.is_some() {
+        return asked;
+    }
+    ui.scope_builder(egui::UiBuilder::new().max_rect(bar_rect), |ui| {
+        ui.allocate_rect(bar_rect, Sense::hover());
+        let inner = egui::UiBuilder::new().max_rect(bar_rect.shrink(pad)).layout(egui::Layout::right_to_left(egui::Align::Center));
+        ui.scope_builder(inner, |ui| {
+            let response = qnc_ui_kit::show_form_action_bar(ui, &qnc_ui_kit::FormActionBarStyle::new(theme.text, theme.accent, theme.border, theme.font_ui, theme.chrome_control_height), bar.confirm, bar.can_confirm, bar.cancel);
+            for (rect, which) in [(response.confirm_rect, true), (response.cancel_rect, false)] {
+                qnc_ui_kit::paint_focus(ui, rect.unwrap_or(egui::Rect::NOTHING).expand(2.0), bar.focused == Some(which), theme.focus);
+            }
+            if response.confirm_clicked {
+                Some(BrowserAnswer::Confirm)
+            } else if response.cancel_clicked {
+                Some(BrowserAnswer::Cancel)
+            } else {
+                None
+            }
+        })
+        .inner
+    })
+    .inner
+}
+
 pub fn show(ui: &mut Ui, input: BrowserInput<'_>, labels: &BrowserLabels<'_>, style: &BrowserStyle) -> Option<BrowserAction> {
     let mut action = None;
     let tab_style = qnc_media_pool_head::RowStyle {
@@ -268,10 +347,7 @@ fn cell(ui: &mut Ui, words: &str, style: &BrowserStyle) -> egui::Response {
 
 /// The keyboard's frame around what it is on (as the focus walk draws it elsewhere).
 fn paint_focus(ui: &Ui, rect: egui::Rect, on: bool, style: &BrowserStyle) {
-    if on {
-        let frame = rect.expand(3.0).shrink(1.0);
-        ui.painter().rect_stroke(frame, 0.0, egui::Stroke::new(1.5, style.focus), egui::StrokeKind::Inside);
-    }
+    qnc_ui_kit::paint_focus(ui, rect.expand(3.0), on, style.focus);
 }
 
 #[cfg(test)]

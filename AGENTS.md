@@ -5086,3 +5086,13 @@ dogadjaji (`qnc-ingest-clip-list` `ClipListItem`) ga sami pune, Story ga gradi i
 u postojecem polju znacajki, pa forme nisu narasle. C10 spusteno: Ingest aplikacija 1538 -> 1378, Story aplikacija
 643 -> 609. Uz to obrisan debug build (`cargo clean --profile dev`, 51 GiB, uz dozvolu korisnika; disk je bio pun).
 Testovi, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-20 (isti plan, korak 3: paneli Ingesta i Storyja): ploce `qnc-ingest-blocks` i `qnc-editorial-blocks`
+samo smjestaju panele (C10 Ingest ploca 561 -> 155, Story/MA ploca 206 -> 101). Nove kocke i paneli (s ugovorima):
+`qnc-theme-styles` (izgled svake kocke iz jedne teme: timeline, dock, red, gumb, traka potvrde, monitor, kartice; kopije
+u formama i u `qnc-editorial-layout` uklonjene), `qnc-media-pool-panel` (mreza poola na svom mjestu), `qnc-pool-tabs-panel`
+(tabovi poola), `qnc-ingest-import-bar` (traka uvoza u zaglavlju source timelinea). Paneli primaju temu: transport,
+monitor (sam uzima poster prikazanog klipa kroz `PoolItem`), source timeline (`header_actions`: gumbi zaglavlja s
+okvirom fokusa), preglednik lokacija (`show_with_confirm`: preglednik s trakom Select/Cancel; Project i dalje koristi samo
+preglednik). Jedan okvir fokusa `qnc-ui-kit::paint_focus` (tri kopije uklonjene). Conformance "shared UI patterns":
+traka potvrde preglednika se trazi u panelu preglednika, a Ingest forma je ne smije crtati sama. Testovi, conformance.
+Uzivo nije provjereno.

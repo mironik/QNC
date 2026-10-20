@@ -1,0 +1,13 @@
+[package]
+name = "qnc-media-pool-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public panel: the media pool card grid on its place, in the look of the one theme"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-clip-row = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-media-card = { workspace = true }
+qnc-theme-styles = { workspace = true }
+qnc-ui-kit = { workspace = true }

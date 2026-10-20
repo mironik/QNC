@@ -99,32 +99,9 @@ impl EditorialContracts {
         (order, tabs, buttons)
     }
 
-    /// The look of the row of the pool tabs and of the transport panel.
-    pub fn row_style(&self, theme: &theme::Theme) -> qnc_media_pool_head::RowStyle {
-        qnc_media_pool_head::RowStyle {
-            text: theme.text,
-            muted: theme.text_muted,
-            accent: theme.accent,
-            border: theme.border,
-            font_ui: theme.font_ui,
-            control_height: theme.chrome_control_height,
-            tab_gap: 10.0,
-        }
-    }
-
-    /// The look of the source dock of this layout.
-    pub fn dock_style(&self, theme: &theme::Theme) -> qnc_source_dock::TimelineDockStyle {
-        qnc_source_dock::TimelineDockStyle {
-            fill: theme.panel_alt,
-            border: theme.border,
-            text: theme.text,
-            font_ui: theme.font_ui,
-            chrome_row_height: theme.chrome_row_height,
-            chrome_control_height: theme.chrome_control_height,
-            chrome_pad_x: theme.chrome_pad_x,
-            chrome_pad_y: theme.chrome_pad_y,
-            header_timeline_gap: self.editorial.source_dock.header_timeline_gap,
-        }
+    /// The gap between the pool tabs.
+    pub fn tab_gap(&self) -> f32 {
+        10.0
     }
 
     pub fn dock_height(&self) -> f32 {
@@ -285,16 +262,6 @@ pub struct EditorialSourceDock {
 
 /// The panels a group's `tab_order` may name.
 pub const FOCUS_PANELS: [&str; 5] = ["pool_tabs", "pool", "source_timeline", "source_buttons", "segments"];
-
-/// The timeline colours of the editorial theme.
-pub fn timeline_theme(theme: &theme::Theme) -> qnc_timeline::TimelineTheme {
-    qnc_timeline::TimelineTheme::from_qnc_theme(theme.bg, theme.surface, theme.surface_alt, theme.border_soft, theme.text, theme.text_muted, theme.accent)
-}
-
-/// The chrome buttons of the editorial theme.
-pub fn button_style(theme: &theme::Theme) -> qnc_ui_kit::ChromeButtonStyle {
-    qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: theme.chrome_control_height }
-}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct GroupComposition {

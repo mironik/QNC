@@ -10,21 +10,23 @@
 //! Passive: no clock, no decode, no database; the state comes from the preview.
 
 use eframe::egui::{self, Rect, Ui};
-use qnc_monitor::{MonitorChrome, MonitorPicture, MonitorPoster, MonitorSurface};
+use qnc_clip_row::PoolItem;
+use qnc_monitor::{MonitorPicture, MonitorPoster, MonitorSurface};
 pub use qnc_monitor::MonitorState;
 
 pub const MODULE_ID: &str = "qnc.module.monitor-panel";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The poster of the shown clip, when it has one loaded.
-pub fn poster<'a>(uri: Option<&'a String>, image: Option<&'a qnc_image_assets::RgbaImage>) -> Option<MonitorPoster<'a>> {
-    let (uri, image) = (uri?, image?);
-    Some(MonitorPoster { uri, content_key: image.content_key, size: image.size, rgba: &image.pixels })
-}
-
-/// The monitor in `rect`: `id` names the surface (one per place), `label` is shown when
-/// there is nothing else.
-pub fn show(ui: &mut Ui, rect: Rect, id: egui::Id, look: MonitorChrome, monitor: &MonitorState, poster: Option<MonitorPoster<'_>>, label: &str) {
+/// The monitor in `rect`, in the look of the one theme: `id` names the surface (one per
+/// place), `shown` is the clip it shows (its poster until the player has a picture), `label`
+/// is shown when there is nothing else.
+pub fn show(ui: &mut Ui, rect: Rect, id: egui::Id, theme: &qnc_desktop_theme::Theme, monitor: &MonitorState, shown: Option<&dyn PoolItem>, label: &str) {
+    let look = qnc_theme_styles::monitor(theme);
+    let poster = shown.and_then(|item| {
+        let (uri, image) = item.card_poster();
+        let (uri, image) = (uri?, image?);
+        Some(MonitorPoster { uri, content_key: image.content_key, size: image.size, rgba: &image.pixels })
+    });
     let picture = monitor.frame.as_ref().filter(|_| monitor.video_visible).map(|frame| MonitorPicture {
         session_id: &frame.session_id,
         generation: frame.generation,

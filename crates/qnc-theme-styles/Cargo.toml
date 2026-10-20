@@ -1,0 +1,14 @@
+[package]
+name = "qnc-theme-styles"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the look of every piece (timeline, dock, row, buttons, monitor, cards) from the one desktop theme"
+
+[dependencies]
+qnc-desktop-theme = { workspace = true }
+qnc-media-card = { workspace = true }
+qnc-media-pool-head = { workspace = true }
+qnc-monitor = { workspace = true }
+qnc-source-dock = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-ui-kit = { workspace = true }

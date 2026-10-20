@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.theme-styles",
+  "module_name": "Theme styles",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "ui.style.from_theme"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-theme-styles",
+  "input": "The one desktop theme.",
+  "output": "The look of every piece: timeline, dock, row, chrome button, action bar, monitor, cards.",
+  "specification": "User 2026-10-20, rule 11: the forms and their layout models each turned the theme into the same styles."
+}

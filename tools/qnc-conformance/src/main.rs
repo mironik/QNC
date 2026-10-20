@@ -2421,44 +2421,30 @@ fn scan_shared_ui_patterns(root: &Path) -> CheckResult {
 }
 
 fn validate_ingest_browser_uses_shared_action_bar(root: &Path, report: &mut ValidationReport) {
-    let widgets = root
-        .join("crates")
-        .join("qnc-ingest-blocks")
-        .join("src");
-    let browser_file = widgets.join("location_browser.rs");
-    let action_bar_file = widgets.join("browser_action_bar.rs");
-    let (Ok(browser), Ok(action_bar)) = (
-        fs::read_to_string(&browser_file),
-        fs::read_to_string(&action_bar_file),
-    ) else {
-        report.error(format!(
-            "{}: cannot read Ingest surface widgets",
-            display_relative(root, &widgets)
-        ));
+    // The confirm/cancel bar under the browser is the browser panel's own (rule 11), drawn
+    // with qnc-ui-kit; the Ingest form only places the panel and draws no bar of its own.
+    let panel_file = root.join("crates").join("qnc-dir-browser-panel").join("src").join("lib.rs");
+    let form = root.join("crates").join("qnc-ingest-blocks").join("src");
+    let Ok(panel) = fs::read_to_string(&panel_file) else {
+        report.error(format!("{}: cannot read the browser panel", display_relative(root, &panel_file)));
         return;
     };
-
-    if !action_bar.contains("fn render_location_action_bar")
-        || !action_bar.contains("qnc_ui_kit::show_form_action_bar")
-    {
+    if !panel.contains("fn show_with_confirm") || !panel.contains("qnc_ui_kit::show_form_action_bar") {
         report.error(format!(
-            "{}: Ingest browser confirm/cancel bar must use qnc-ui-kit",
-            display_relative(root, &action_bar_file)
+            "{}: the browser confirm/cancel bar must use qnc-ui-kit",
+            display_relative(root, &panel_file)
         ));
     }
-
-    // The browser view is its own file and must not own any marker of the action bar.
-    for forbidden in [
-        "qnc_ui_kit::show_form_action_bar",
-        "INGEST_DIR_CONFIRM",
-        "INGEST_DIR_CANCEL",
-        "confirm_label",
-        "cancel_label",
-    ] {
-        if browser.contains(forbidden) {
+    let Ok(entries) = fs::read_dir(&form) else {
+        report.error(format!("{}: cannot read Ingest surface widgets", display_relative(root, &form)));
+        return;
+    };
+    for entry in entries.flatten() {
+        let text = fs::read_to_string(entry.path()).unwrap_or_default();
+        if text.contains("show_form_action_bar") {
             report.error(format!(
-                "{}: Ingest browser view must not own action bar marker '{forbidden}'",
-                display_relative(root, &browser_file)
+                "{}: the Ingest form must place the browser panel, not draw its own action bar",
+                display_relative(root, &entry.path())
             ));
         }
     }

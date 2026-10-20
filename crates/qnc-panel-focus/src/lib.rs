@@ -10,7 +10,6 @@
 
 use std::ops::ControlFlow;
 
-use eframe::egui;
 use qnc_action_event::ActionEvent;
 use qnc_program_segments::ProgramSegments;
 use qnc_source_preview::SourcePreview;
@@ -642,13 +641,7 @@ const LANE_KEYS: &[&str] = &[
     "close_player",
 ];
 
-pub fn paint_focus(ui: &egui::Ui, rect: egui::Rect, focused: bool, color: egui::Color32) {
-    if focused {
-        let stroke = egui::Stroke::new(1.5, color);
-        ui.painter()
-            .rect_stroke(rect.shrink(1.0), 0.0, stroke, egui::StrokeKind::Inside);
-    }
-}
+pub use qnc_ui_kit::paint_focus;
 
 /// The next or previous panel of the walk, round; the first one from outside it.
 pub fn cycle(panel: Panel, forward: bool, order: &[Panel]) -> Panel {

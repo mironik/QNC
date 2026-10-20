@@ -16,10 +16,10 @@ use std::time::Duration;
 
 use eframe::egui::{Rect, Ui};
 use qnc_lane_choice::{Lane, LaneChoice};
-use qnc_source_dock::{show_timeline_dock, SourceTimeline as DockTimeline, TimelineDockStyle};
+use qnc_source_dock::{show_timeline_dock, SourceTimeline as DockTimeline};
 use qnc_source_panel::SourcePanel;
 use qnc_source_preview::SourcePreview;
-use qnc_timeline::{lane_choice, lane_key, lane_message, AudioLane, TimelineIntent, TimelineProjection, TimelineTheme, LaneKey};
+use qnc_timeline::{lane_choice, lane_key, lane_message, AudioLane, TimelineIntent, TimelineProjection, LaneKey};
 use qnc_timeline_assets::SourceTimelineAssets;
 
 pub use qnc_source_channels::ContentTarget;
@@ -338,18 +338,54 @@ fn wave_over_video(lanes: &LaneChoice) -> Option<(AudioLane, u8)> {
 pub fn show(
     ui: &mut Ui,
     rect: Rect,
-    style: &TimelineDockStyle,
+    (theme, header_gap): (&qnc_desktop_theme::Theme, f32),
     title: &str,
     header: impl FnOnce(&mut Ui),
-    (projection, theme, assets): (&TimelineProjection, TimelineTheme, &SourceTimelineAssets),
+    (projection, assets): (&TimelineProjection, &SourceTimelineAssets),
     view: &SourceTimelineView,
 ) -> TimelineIntent {
-    let timeline = DockTimeline::from_assets(projection, theme, assets)
+    let style = &qnc_theme_styles::dock(theme, header_gap);
+    let timeline = DockTimeline::from_assets(projection, qnc_theme_styles::timeline(theme), assets)
         .with_timecode(view.timecode)
         .with_a1_channel(view.a1)
         .with_a2_channel(view.a2)
         .with_wave_over_video(view.wave_over_video);
     show_timeline_dock(ui, rect, style, title, header, timeline)
+}
+
+/// One action button of the header, as a form lists them (label, catalog action).
+pub struct HeaderAction<'a> {
+    pub label: &'a str,
+    pub action_id: Option<&'a str>,
+    /// The strong button of the header (the form's main action).
+    pub strong: bool,
+}
+
+/// The header's action buttons, right to left as listed, each with its state from the form
+/// (enabled, on) and the frame of the one the keyboard is on; the clicked action.
+pub fn header_actions<'a>(
+    ui: &mut Ui,
+    theme: &qnc_desktop_theme::Theme,
+    actions: impl IntoIterator<Item = HeaderAction<'a>>,
+    enabled: impl Fn(&str) -> bool,
+    on: impl Fn(&str) -> bool,
+    focused: Option<&str>,
+) -> Option<&'a str> {
+    let mut clicked = None;
+    for action in actions {
+        let id = action.action_id.unwrap_or_default();
+        let (enabled, on) = (action.action_id.is_some_and(&enabled), action.action_id.is_some_and(&on));
+        let response = if action.strong {
+            qnc_ui_kit::strong_button(ui, action.label, enabled, theme.accent, theme.chrome_control_height)
+        } else {
+            qnc_ui_kit::chrome_button(ui, action.label, enabled, on, qnc_theme_styles::button(theme))
+        };
+        qnc_ui_kit::paint_focus(ui, response.rect.expand(2.0), action.action_id.is_some() && focused == Some(id), theme.focus);
+        if response.clicked() {
+            clicked = action.action_id;
+        }
+    }
+    clicked
 }
 
 #[cfg(test)]

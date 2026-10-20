@@ -7,10 +7,9 @@
 //!
 //! Passive: it keeps no state, plays nothing and reads no database.
 
-use eframe::egui::{Color32, Rect, Ui};
-use qnc_media_pool_head::{RowClick, RowCommand, RowStyle};
+use eframe::egui::{Rect, Ui};
+use qnc_media_pool_head::{RowClick, RowCommand};
 use qnc_monitor::{MONITOR_AUTO, MONITOR_ON};
-use qnc_source_dock::TimelineDockStyle;
 
 pub const MODULE_ID: &str = "qnc.module.transport-panel";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -24,12 +23,6 @@ pub struct Control {
 }
 
 /// The look of the panel, from the form's theme.
-#[derive(Clone, Copy)]
-pub struct TransportLook<'a> {
-    pub row: &'a RowStyle,
-    pub chrome: &'a TimelineDockStyle,
-    pub fill: Color32,
-}
 
 /// The panel's blocks, left to right: (catalog action, label key).
 const BLOCKS: [(&str, &str); 5] = [
@@ -53,12 +46,14 @@ pub fn controls() -> Vec<Control> {
 }
 
 /// The panel in `rect`; the clicked button's catalog action.
-pub fn show(ui: &mut Ui, rect: Rect, look: TransportLook<'_>) -> Option<String> {
+/// The panel in `rect`, in the look of the one theme (`tab_gap` is the form's measure).
+pub fn show(ui: &mut Ui, rect: Rect, theme: &qnc_desktop_theme::Theme, tab_gap: f32) -> Option<String> {
+    let (row, chrome) = (qnc_theme_styles::row(theme, tab_gap), qnc_theme_styles::dock(theme, 0.0));
     let controls = controls();
     let commands: Vec<_> = controls.iter().map(|control| RowCommand { label: &control.label, on: control.on }).collect();
     let mut clicked = None;
-    qnc_source_dock::show_chrome_row(ui, rect, look.chrome, look.fill, true, |ui| {
-        if let Some(RowClick::Command(index)) = qnc_media_pool_head::show_row(ui, look.row, &[], &commands) {
+    qnc_source_dock::show_chrome_row(ui, rect, &chrome, theme.surface, true, |ui| {
+        if let Some(RowClick::Command(index)) = qnc_media_pool_head::show_row(ui, &row, &[], &commands) {
             clicked = Some(controls[index].action_id.clone());
         }
     });

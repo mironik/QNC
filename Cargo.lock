@@ -3457,7 +3457,9 @@ name = "qnc-dir-browser-panel"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-desktop-theme",
  "qnc-media-pool-head",
+ "qnc-ui-kit",
 ]
 
 [[package]]
@@ -3501,18 +3503,18 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
+ "qnc-clip-row",
  "qnc-dev-diagnostics",
  "qnc-editorial-application",
  "qnc-editorial-layout",
  "qnc-media-card",
- "qnc-media-pool-head",
- "qnc-monitor",
+ "qnc-media-pool-panel",
  "qnc-monitor-panel",
  "qnc-panel-focus",
- "qnc-program-segments",
+ "qnc-pool-tabs-panel",
  "qnc-segment-panel",
- "qnc-source-dock",
  "qnc-source-timeline",
+ "qnc-theme-styles",
  "qnc-timeline",
  "qnc-transport-panel",
  "qnc-trim-overlay",
@@ -3639,6 +3641,7 @@ dependencies = [
  "qnc-key-intents",
  "qnc-key-list",
  "qnc-key-row",
+ "qnc-ui-kit",
 ]
 
 [[package]]
@@ -3731,17 +3734,17 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
+ "qnc-clip-row",
  "qnc-dir-browser-panel",
  "qnc-focus-walk",
  "qnc-ingest-application",
+ "qnc-ingest-import-bar",
  "qnc-ingest-layout",
  "qnc-media-card",
- "qnc-media-pool-head",
- "qnc-monitor",
+ "qnc-media-pool-panel",
  "qnc-monitor-panel",
- "qnc-source-dock",
+ "qnc-pool-tabs-panel",
  "qnc-source-timeline",
- "qnc-timeline",
  "qnc-transport-panel",
  "qnc-ui-kit",
 ]
@@ -3798,6 +3801,17 @@ dependencies = [
  "qnc-board",
  "qnc-ingest-desktop",
  "qnc-shell-desktop-api",
+]
+
+[[package]]
+name = "qnc-ingest-import-bar"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-desktop-theme",
+ "qnc-source-timeline",
+ "qnc-theme-styles",
+ "qnc-ui-kit",
 ]
 
 [[package]]
@@ -4176,6 +4190,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-media-pool-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-clip-row",
+ "qnc-desktop-theme",
+ "qnc-media-card",
+ "qnc-theme-styles",
+ "qnc-ui-kit",
+]
+
+[[package]]
 name = "qnc-media-probe"
 version = "0.1.0"
 dependencies = [
@@ -4297,9 +4323,12 @@ name = "qnc-monitor-panel"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-clip-row",
+ "qnc-desktop-theme",
  "qnc-image-assets",
  "qnc-monitor",
  "qnc-program-output",
+ "qnc-theme-styles",
 ]
 
 [[package]]
@@ -4341,6 +4370,7 @@ dependencies = [
  "qnc-source-timeline",
  "qnc-sync-session",
  "qnc-timeline",
+ "qnc-ui-kit",
  "qnc-wheel-jog",
  "qnc-wrap-session",
 ]
@@ -4507,6 +4537,17 @@ version = "0.1.0"
 dependencies = [
  "qnc-player-contract",
  "qnc-timeline",
+]
+
+[[package]]
+name = "qnc-pool-tabs-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-desktop-theme",
+ "qnc-media-pool-head",
+ "qnc-source-dock",
+ "qnc-theme-styles",
 ]
 
 [[package]]
@@ -5161,6 +5202,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-action-event",
+ "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-key-intents",
  "qnc-lane-choice",
@@ -5170,8 +5212,10 @@ dependencies = [
  "qnc-source-panel",
  "qnc-source-preview",
  "qnc-source-timecode",
+ "qnc-theme-styles",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-ui-kit",
  "qnc-ui-text",
  "qnc-wheel-jog",
 ]
@@ -5229,6 +5273,19 @@ dependencies = [
  "qnc-program-segments",
  "qnc-source-preview",
  "qnc-wrap-session",
+]
+
+[[package]]
+name = "qnc-theme-styles"
+version = "0.1.0"
+dependencies = [
+ "qnc-desktop-theme",
+ "qnc-media-card",
+ "qnc-media-pool-head",
+ "qnc-monitor",
+ "qnc-source-dock",
+ "qnc-timeline",
+ "qnc-ui-kit",
 ]
 
 [[package]]
@@ -5295,9 +5352,11 @@ name = "qnc-transport-panel"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-desktop-theme",
  "qnc-media-pool-head",
  "qnc-monitor",
  "qnc-source-dock",
+ "qnc-theme-styles",
  "qnc-ui-text",
 ]
 

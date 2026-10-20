@@ -1,0 +1,12 @@
+[package]
+name = "qnc-pool-tabs-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public panel: the row of the media pool's tabs on its place, in the look of the one theme"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-media-pool-head = { workspace = true }
+qnc-source-dock = { workspace = true }
+qnc-theme-styles = { workspace = true }

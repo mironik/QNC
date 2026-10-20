@@ -1,0 +1,12 @@
+[package]
+name = "qnc-ingest-import-bar"
+version = "0.1.0"
+edition = "2021"
+description = "QNC panel: the import bar of the source timeline header (status, New | All, import buttons, archive and AI ticks)"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-source-timeline = { workspace = true }
+qnc-theme-styles = { workspace = true }
+qnc-ui-kit = { workspace = true }

@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public block: the keyboard walk over the panels of a form in the order of its layout contract (Tab, Enter, keys of the panel in focus)"
 
 [dependencies]
+qnc-ui-kit = { workspace = true }
 qnc-key-intents = { workspace = true }
 qnc-key-list = { workspace = true }
 qnc-key-row = { workspace = true }

@@ -30,11 +30,7 @@ pub const SOURCE_BUTTONS: &str = "source_buttons";
 const LISTS: [&str; 2] = [BROWSER, CARDS];
 
 /// The passive mark of the focus: a thin frame on top of `rect`. It paints only.
-pub fn paint_focus(ui: &egui::Ui, rect: egui::Rect, focused: bool, color: egui::Color32) {
-    if focused {
-        ui.painter().rect_stroke(rect.shrink(1.0), 0.0, egui::Stroke::new(1.5, color), egui::StrokeKind::Inside);
-    }
-}
+pub use qnc_ui_kit::paint_focus;
 
 /// What became of one key.
 #[derive(Debug, Clone, PartialEq, Eq)]

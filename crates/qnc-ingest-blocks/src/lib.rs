@@ -1,44 +1,39 @@
-//! The Ingest blocks on the desktop board (moved unchanged out of the Ingest form, user
-//! rule 2026-09-30: forms are boards of blocks): preview, pool head, source browser,
-//! clip cards and source dock. They draw the Ingest view and return intents.
+//! The Ingest form on the desktop board (rule 11: a form is only a layout grid of panels).
+//! Each place of the board gets its public panel with the Ingest layout's measures and
+//! texts and the state of the Ingest view; the panel's answer becomes an Ingest intent.
 
-pub(crate) use eframe::egui::{
-    self, Align, Layout, Rect, RichText, Sense, Ui, Vec2,
+use eframe::egui::{self, Rect, Ui};
+
+use qnc_ingest_application::{
+    action_ids, timeline_intent_to_ingest_intent, ClipFilter, ClipView, IngestIntent, IngestPayload, IngestViewModel, SourceKind,
 };
+use qnc_ingest_layout::{theme::Theme, IngestContracts};
 
-pub(crate) use qnc_ingest_application::{
-    action_ids, timeline_intent_to_ingest_intent, ClipFilter, ClipView, IngestIntent,
-    IngestPayload, IngestViewModel, SourceKind,
-};
-pub(crate) use qnc_monitor::MonitorChrome;
-pub(crate) use qnc_timeline::TimelineTheme;
-pub(crate) use qnc_ui_kit::FormActionBarStyle;
+mod panels;
 
-pub(crate) use qnc_ingest_layout::{theme::Theme, IngestContracts, IngestDirBrowser};
-
-mod board;
-mod browser_action_bar;
-mod buttons;
-mod clip_grid;
-mod desktop;
-mod dock_chrome;
-mod location_browser;
-mod player_timeline;
-mod pool_head;
-mod preview;
-mod source_dock;
-mod text;
-
-pub use desktop::render_desktop;
-
-use board::*;
-use browser_action_bar::*;
-use buttons::*;
-use clip_grid::*;
-use dock_chrome::*;
-use location_browser::*;
-use player_timeline::*;
-use pool_head::*;
-use preview::*;
-use source_dock::*;
-use text::*;
+/// Ingest on the one desktop board: preview in the monitor, pool tabs and transport in the
+/// head row, the source browser in the body, the clip cards on the right, the source
+/// timeline in the dock; drawn in `frame` as one layout tree with it.
+pub fn render_desktop(
+    ui: &mut Ui,
+    frame: &mut qnc_board::Frame<'_>,
+    contracts: &IngestContracts,
+    theme: &Theme,
+    view: &IngestViewModel,
+) -> Option<IngestIntent> {
+    let (faces, board) = (theme.board_faces(), contracts.board_layout());
+    // The panel the keyboard is on has a thin frame (the dock buttons are part of the source timeline).
+    let framed = |intent, ui: &Ui, rect, panels: &[&str]| {
+        qnc_ui_kit::paint_focus(ui, rect, panels.iter().any(|panel| view.focus.is(panel)), theme.focus);
+        intent
+    };
+    qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| match block {
+        "preview" => panels::preview(ui, rect, contracts, theme, view),
+        "pool-head" => framed(panels::pool_tabs(ui, rect, contracts, theme, view), ui, rect, &[qnc_focus_walk::POOL_TABS]),
+        "transport" => qnc_transport_panel::show(ui, rect, theme, contracts.ingest.pool_head.tab_gap).map(|action| IngestIntent::empty(&action)),
+        "source-browser" => framed(panels::browser(ui, rect, contracts, theme, view), ui, rect, &[qnc_focus_walk::SOURCE_KINDS, qnc_focus_walk::BROWSER, qnc_focus_walk::BROWSER_BUTTONS]),
+        "clip-cards" => framed(panels::pool(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::CARDS]),
+        "source-dock" => framed(panels::source_dock(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::SOURCE_TIMELINE, qnc_focus_walk::SOURCE_BUTTONS]),
+        _ => None,
+    })
+}

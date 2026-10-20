@@ -5,6 +5,8 @@ edition = "2021"
 description = "QNC public panel: the transport buttons a layout lists (Play, IN, OUT ...) and the monitor's Auto | On switch, in their own place of the board"
 
 [dependencies]
+qnc-desktop-theme = { workspace = true }
+qnc-theme-styles = { workspace = true }
 eframe = { workspace = true }
 qnc-media-pool-head = { workspace = true }
 qnc-monitor = { workspace = true }
