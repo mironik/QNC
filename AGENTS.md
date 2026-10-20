@@ -5128,3 +5128,16 @@ staje kad Sync stane. Program prozora je samo A1 (`qnc-program-input` `sound_bed
 A2). `qnc-source-preview` ga drzi (`prepare_sound_bed`, `play_sound_bed`, `stop_sound_bed`) i dok svira, izlaz 1 playera
 izvora je utisan (A2 izvora ostaje). Odstupanje od 8.2 uz zahtjev korisnika: za vrijeme Synca rade dva playera (izvor i A1
 price), svaki svojim satom. Testovi, conformance. Uzivo nije provjereno.
+Izmjena 2026-10-20 (korisnik: "A1 se cuje, ali to ocito nije broadcast kvaliteta"; log: A1 drugog playera 3-4 slike iza
+slike izvora, dva sata i dva zvucna izlaza; "da, otkljucaj i kreni, napravi to kao dio sync kocke"): zamjenjuje prethodni
+zapis (`qnc-sound-bed`, drugi player, uklonjen). Otkljucano i izvedeno: `qnc-audio-output` (`bed.rs`: mono sloj ispod
+reprodukcije, zvucni uredaj ga pusta na izlazu 1 od zadanog apsolutnog uzorka, u istom pozivu i satu; zakasnjeli uzorci se
+odbacuju, test), `qnc-broadcast-engine` (`ProgramSound` izdvojen iz `ProgramAudio`; `sync_bed.rs`: A1 Sync prozora
+dekodira se unaprijed u sloj uredjaja klipa; `Runtime::with_sync_bed`, `start_sync_bed`, `stop_sync_bed`),
+`qnc-player-contract` (naredbe `StartSyncBed { source_frame, bed_frame }`, `StopSyncBed`), `qnc-player-client`
+(`LaunchInput::Clip.sync_bed`, akcije), `qnc-player-launcher` (`prepare_launch_with_sync_bed`), `tools/qnc-player-runner`
+(`sync_bed` u pokretanju klipa), `qnc-program-input` (`sound_bed_loader`, `sound_only`), `qnc-source-preview` (sesija klipa
+nosi A1 prozora sljedeceg Synca: `want_sync_bed`, ponovno otvaranje samo dok klip miruje; `play_sync_bed`,
+`stop_sync_bed`), `qnc-sync-session` (IN/Space salje `StartSyncBed` od slike IN-a, Sync koji stane salje `StopSyncBed`).
+Jedan player, jedan sat, jedan zvucni izlaz; A1 price pocinje na uzorku slike IN-a. Testovi, conformance. Uzivo nije
+provjereno.

@@ -34,6 +34,15 @@ pub enum BroadcastPlayerProtocolCommand {
     SetOutputRoutes {
         channels: Vec<u16>,
     },
+    /// The story's A1 under a Sync (the bed the session was launched with) plays from the
+    /// sample of clip frame `source_frame` on, from its frame `bed_frame`, in the session's
+    /// own clock and device (user 2026-10-20).
+    StartSyncBed {
+        source_frame: FrameNumber,
+        bed_frame: FrameNumber,
+    },
+    /// The Sync bed stops at once; the clip's own A1 is heard again.
+    StopSyncBed,
 
     Play,
     Pause,
@@ -52,6 +61,8 @@ impl BroadcastPlayerProtocolCommand {
             BroadcastPlayerProtocolCommand::CueFrame { .. } => "CueFrame",
             BroadcastPlayerProtocolCommand::SetOutputLevels { .. } => "SetOutputLevels",
             BroadcastPlayerProtocolCommand::SetOutputRoutes { .. } => "SetOutputRoutes",
+            BroadcastPlayerProtocolCommand::StartSyncBed { .. } => "StartSyncBed",
+            BroadcastPlayerProtocolCommand::StopSyncBed => "StopSyncBed",
             BroadcastPlayerProtocolCommand::Play => "Play",
             BroadcastPlayerProtocolCommand::Pause => "Pause",
             BroadcastPlayerProtocolCommand::Stop => "Stop",
@@ -84,6 +95,7 @@ impl BroadcastPlayerProtocolCommand {
                     Ok(())
                 }
             }
+            BroadcastPlayerProtocolCommand::StartSyncBed { .. } | BroadcastPlayerProtocolCommand::StopSyncBed => Ok(()),
             BroadcastPlayerProtocolCommand::UnloadSource
             | BroadcastPlayerProtocolCommand::Play
             | BroadcastPlayerProtocolCommand::Pause

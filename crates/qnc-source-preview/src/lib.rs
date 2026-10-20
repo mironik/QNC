@@ -223,8 +223,11 @@ pub struct SourcePreview {
     touched: Option<std::time::Instant>,
     /// A pause was sent and the player still says it plays: a second pause would play again.
     pausing: bool,
-    /// The A1 of the story under a Sync, on a player of its own (piece `qnc-sound-bed`).
-    sound_bed: qnc_sound_bed::SoundBed,
+    /// The Sync window whose story A1 the clip session should carry, the one it was launched
+    /// with, and whether the bed was started (user 2026-10-20).
+    bed_wanted: Option<(u64, u64)>,
+    bed_launched: Option<(u64, u64)>,
+    bed_playing: bool,
     /// The clip whose record is still completed, since when and the last try.
     record_wait: Option<(String, std::time::Instant, std::time::Instant)>,
     /// What wakes the background worker that completes the record a shown clip waits for
@@ -274,7 +277,9 @@ impl Default for SourcePreview {
             play_when_ready: false,
             touched: None,
             pausing: false,
-            sound_bed: qnc_sound_bed::SoundBed::default(),
+            bed_wanted: None,
+            bed_launched: None,
+            bed_playing: false,
             record_wait: None,
             record_waker: None,
             cue_in_flight: None,
@@ -545,6 +550,8 @@ impl SourcePreview {
         };
         let clip_id = clip_id.to_string();
         (self.cue_in_flight, self.cue_next, self.cue_asked) = (None, None, None);
+        let bed = self.bed_wanted;
+        (self.bed_launched, self.bed_playing) = (bed, false);
         player.prepare_at(first_frame, move || {
             let sources = transport_bindings(&context)?;
             let executable = qnc_player_launcher::sibling_executable("qnc-broadcast-player")?;
@@ -561,7 +568,15 @@ impl SourcePreview {
                     .map_err(|error| error.to_string())?,
                 None => input,
             };
-            qnc_player_launcher::prepare_launch(input, &sources, executable)
+            // The story's A1 under the Sync window: a clip without it still plays (the bed is
+            // only what the Sync hears).
+            let reader = InputReader::with_content_reader(context.reader.clone(), context.player_content.clone());
+            let bed = bed.and_then(|window| {
+                let target = qnc_db_broker::ProjectDbTarget::for_project(&context.reader, &context.settings).ok()?;
+                let loaded = qnc_program_input::sound_bed_loader(target, context.settings.project_id.clone(), window)(&reader, &context.settings.workspace_db_uri);
+                loaded.map_err(|error| qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("sync-bed not built: {error}"))).ok()
+            });
+            qnc_player_launcher::prepare_launch_with_sync_bed(input, bed, &sources, executable)
         });
         self.apply_player_view(player.view());
         true
@@ -827,56 +842,40 @@ impl SourcePreview {
         timeline
     }
 
-    /// The A1 of the story under the Sync window `[in, out)`, prepared on a player of its own
-    /// before IN (user 2026-10-20: the story's A1 is heard under a Sync, so the user knows how
-    /// long to hold the clip; IN opens no player): nothing when it is prepared already.
-    pub fn prepare_sound_bed(&mut self, window: (u64, u64)) {
-        let Some(context) = self.context.clone() else {
-            return;
-        };
-        if self.sound_bed.window() == Some(window) {
+    /// The Sync window whose story A1 the clip session carries (user 2026-10-20: the story's
+    /// A1 under a Sync, in the clip's own clock and device; IN opens no player). A clip shown
+    /// and not playing opens again with it where it stands; one playing keeps its session.
+    pub fn want_sync_bed(&mut self, window: Option<(u64, u64)>) {
+        if self.bed_wanted == window {
             return;
         }
-        let project_id = context.settings.project_id.clone();
-        let target_context = context.clone();
-        self.sound_bed.prepare(
-            window,
-            program_launch(context, move |reader, workspace_db_uri| {
-                let target = qnc_db_broker::ProjectDbTarget::for_project(&target_context.reader, &target_context.settings)?;
-                qnc_program_input::sound_bed_loader(target, project_id, window)(reader, workspace_db_uri)
-            }),
-        );
+        self.bed_wanted = window;
+        let open_clip = self.view.clip_id.clone().filter(|_| !self.program && self.player.is_some());
+        let idle = !self.player_view.playing() && !self.play_when_ready && !self.player_view.preparing;
+        if let Some(clip_id) = open_clip.filter(|_| idle && window.is_some() && self.bed_launched != window) {
+            self.reopen_with_lead(&clip_id);
+        }
     }
 
-    /// The bed plays the Sync window `[in, out)` (from its frame `in`), under the source; a
-    /// bed prepared for another window is prepared again first. The source's own A1 (output
-    /// 1) is silent meanwhile, its A2 stays.
-    pub fn play_sound_bed(&mut self, window: (u64, u64)) {
-        let prepared = self.sound_bed.window().filter(|(start, end)| *start <= window.0 && window.0 < *end);
-        let offset = match prepared {
-            Some((start, _)) => window.0 - start,
-            None => {
-                self.prepare_sound_bed(window);
-                0
+    /// The story's A1 of the Sync window plays from the sample of clip frame `source_frame`
+    /// on, from the window start `window.0` (sample exact, in the clip's clock); false when the
+    /// session does not carry that window.
+    pub fn play_sync_bed(&mut self, window: (u64, u64), source_frame: u64) -> bool {
+        let Some((start, _)) = self.bed_launched.filter(|(start, end)| *start <= window.0 && window.0 < *end) else {
+            return false;
+        };
+        let sent = self.player.as_ref().is_some_and(|player| player.send(Action::StartSyncBed(source_frame, window.0 - start)).is_ok());
+        self.bed_playing |= sent;
+        sent
+    }
+
+    /// The story's A1 stops at once; the clip's own A1 is heard again.
+    pub fn stop_sync_bed(&mut self) {
+        if std::mem::take(&mut self.bed_playing) {
+            if let Some(player) = &self.player {
+                let _ = player.send(Action::StopSyncBed);
             }
-        };
-        self.sound_bed.play_from(offset);
-        let a2 = self.lead.as_ref().map_or(100, |(_, _, levels)| levels[1]);
-        self.set_output_levels([0, a2]);
-    }
-
-    /// The bed stops; the source's A1 is heard again as chosen.
-    pub fn stop_sound_bed(&mut self) {
-        if self.sound_bed.stop() {
-            let levels = self.lead.as_ref().map_or([100, 100], |(_, _, levels)| *levels);
-            self.set_output_levels(levels);
         }
-    }
-
-    /// The Sync is over: the bed's player goes.
-    pub fn close_sound_bed(&mut self) {
-        self.stop_sound_bed();
-        self.sound_bed.close();
     }
 
     /// The clip frame the player confirmed, while it plays the clip (not a program).
@@ -987,7 +986,6 @@ impl SourcePreview {
     /// shows them at once (user 2026-10-20).
     pub fn poll_pointed(&mut self, pointed: Option<&str>) -> bool {
         self.pausing &= self.player_view.playing();
-        self.sound_bed.poll();
         if let Some(clip_id) = self.pointed.new_clip(pointed).filter(|clip| self.view.clip_id.as_deref() != Some(*clip)) {
             self.timeline_assets.request(clip_id, false);
         }

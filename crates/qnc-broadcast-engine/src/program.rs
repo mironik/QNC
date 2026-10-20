@@ -912,6 +912,12 @@ struct Lane {
 /// Program sound: A1/A2 buses per frame into the project output channels.
 pub(crate) struct ProgramAudio {
     pub sink: DeviceSink,
+    sound: ProgramSound,
+}
+
+/// The samples of a program's frames, A1/A2 buses into the project output channels; it
+/// owns no device (the program's queue, or the Sync bed under a clip, user 2026-10-20).
+pub(crate) struct ProgramSound {
     source: SourceRuntime,
     spans: Vec<AudioSpan>,
     clips: Vec<(InputPlan, Rc<DecodeInput>)>,
@@ -928,6 +934,15 @@ impl ProgramAudio {
         prebuffer_frames: usize,
     ) -> Result<Self> {
         let map = qnc_audio_output::ChannelMap::identity(plan.channels).map_err(error)?;
+        Ok(Self {
+            sink: DeviceSink::open(&plan.source, device_id, Some(map), prebuffer_frames)?,
+            sound: ProgramSound::open(plan, inputs)?,
+        })
+    }
+}
+
+impl ProgramSound {
+    pub fn open(plan: &ProgramPlan, inputs: &[Rc<DecodeInput>]) -> Result<Self> {
         let rate = plan
             .source
             .audio_format
@@ -935,7 +950,6 @@ impl ProgramAudio {
             .map(|format| format.sample_rate_hz)
             .ok_or_else(|| error("program audio format missing"))?;
         Ok(Self {
-            sink: DeviceSink::open(&plan.source, device_id, Some(map), prebuffer_frames)?,
             source: plan.source.clone(),
             spans: plan.audio.clone(),
             clips: plan
@@ -1052,10 +1066,10 @@ impl ProgramAudio {
 impl AudioOutputAdapter for ProgramAudio {
     type AudioPacket = Arc<[f32]>;
     fn cue_audio(&mut self, request: EngineFrameRequest) -> Result<()> {
-        if request.source_id != self.source.source_id || request.timebase != self.source.timebase {
+        if request.source_id != self.sound.source.source_id || request.timebase != self.sound.source.timebase {
             return Err(error("audio seek source mismatch"));
         }
-        seek_start(&self.source, request.frame)?;
+        seek_start(&self.sound.source, request.frame)?;
         Ok(())
     }
     fn prepare_audio(&mut self, _: &EngineSourceHandle) -> Result<Vec<BroadcastEvent>> {
@@ -1065,12 +1079,43 @@ impl AudioOutputAdapter for ProgramAudio {
         &mut self,
         request: EngineFrameRequest,
     ) -> Result<AudioFramePacket<Arc<[f32]>>> {
-        if request.source_id != self.source.source_id || request.timebase != self.source.timebase {
+        if request.source_id != self.sound.source.source_id || request.timebase != self.sound.source.timebase {
             return Err(error("audio request differs from the program"));
         }
-        let frame = request.frame;
-        let start = sample_boundary(frame, request.timebase, self.rate)?;
-        let end = sample_boundary(frame + 1, request.timebase, self.rate)?;
+        let samples = self.sound.render(request.frame)?;
+        Ok(AudioFramePacket {
+            source_id: request.source_id,
+            start_frame: request.frame,
+            frame_count: 1,
+            audio_format: self.sound.source.audio_format.clone(),
+            payload: samples.into(),
+        })
+    }
+    device_sink_adapter!();
+}
+
+impl ProgramSound {
+    /// The output channels of the program, as many as the project has.
+    pub fn channels(&self) -> usize {
+        usize::from(self.channels)
+    }
+
+    /// The program's sample rate.
+    pub fn rate(&self) -> u32 {
+        self.rate
+    }
+
+    /// The program's frames.
+    pub fn duration_frames(&self) -> u64 {
+        self.source.duration_frames
+    }
+
+    /// The interleaved samples of program frame `frame`; a `pending` error while a decoder
+    /// still prepares them.
+    pub fn render(&mut self, frame: u64) -> Result<Vec<f32>> {
+        let timebase = self.source.timebase;
+        let start = sample_boundary(frame, timebase, self.rate)?;
+        let end = sample_boundary(frame + 1, timebase, self.rate)?;
         let frames = usize::try_from(end - start).map_err(error)?;
         let channels = usize::from(self.channels);
         let span = self
@@ -1112,15 +1157,8 @@ impl AudioOutputAdapter for ProgramAudio {
                 samples[index * channels + usize::from(bus.output)] = *value * gain;
             }
         }
-        Ok(AudioFramePacket {
-            source_id: request.source_id,
-            start_frame: frame,
-            frame_count: 1,
-            audio_format: self.source.audio_format.clone(),
-            payload: samples.into(),
-        })
+        Ok(samples)
     }
-    device_sink_adapter!();
 }
 
 /// The saved sound of a clip: its channel inventory (program channel k is entry

@@ -88,6 +88,24 @@ pub fn prepare_launch(
     sources: &[SourceTransportBinding],
     executable: PathBuf,
 ) -> Result<Launch, String> {
+    prepare_launch_with_sync_bed(input, None, sources, executable)
+}
+
+/// A clip with the story's A1 under a Sync window (a sound-only program; user 2026-10-20):
+/// the session decodes it ahead and plays it on `StartSyncBed` in the clip's own clock.
+pub fn prepare_launch_with_sync_bed(
+    input: qnc_player_input::PreparedInput,
+    sync_bed: Option<qnc_player_input::ProgramInput>,
+    sources: &[SourceTransportBinding],
+    executable: PathBuf,
+) -> Result<Launch, String> {
+    let sync_bed = match sync_bed {
+        Some(bed) => {
+            let bindings = program_bindings(&bed, Vec::new(), sources)?;
+            Some((bed, bindings))
+        }
+        None => None,
+    };
     let picture = input.media().map_err(|e| e.to_string())?.media_uri.clone();
     let media_binding = binding_for(&picture, sources)?;
     let sound = &input.audio_media().media_uri;
@@ -107,6 +125,7 @@ pub fn prepare_launch(
             input,
             media_binding,
             sound_binding,
+            sync_bed,
         },
     })
 }
@@ -136,6 +155,23 @@ pub fn prepare_program_launch(
             source_uris.push(source_uri);
         }
     }
+    let media_bindings = program_bindings(&program, source_uris, sources)?;
+    Ok(Launch {
+        executable,
+        input: LaunchInput::Program {
+            program,
+            media_bindings,
+        },
+    })
+}
+
+/// A binding for every media source a program reads (and the sources already in
+/// `source_uris`).
+fn program_bindings(
+    program: &qnc_player_input::ProgramInput,
+    mut source_uris: Vec<String>,
+    sources: &[SourceTransportBinding],
+) -> Result<Vec<qnc_player_client::MediaBinding>, String> {
     for media in program
         .playlist
         .items
@@ -151,7 +187,7 @@ pub fn prepare_program_launch(
             source_uris.push(source_uri);
         }
     }
-    let media_bindings = source_uris
+    source_uris
         .iter()
         .map(|source_uri| {
             sources
@@ -160,14 +196,7 @@ pub fn prepare_program_launch(
                 .map(SourceTransportBinding::media_binding)
                 .ok_or_else(|| "Program source has no transport binding.".to_string())
         })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(Launch {
-        executable,
-        input: LaunchInput::Program {
-            program,
-            media_bindings,
-        },
-    })
+        .collect()
 }
 
 fn binding_for(

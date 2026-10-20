@@ -1,8 +1,0 @@
-[package]
-name = "qnc-sound-bed"
-version = "0.1.0"
-edition = "2021"
-description = "QNC public piece: the story's A1 under a Sync/B-roll, on a Broadcast Player of its own, prepared before IN and played on IN"
-
-[dependencies]
-qnc-player-client = { workspace = true }

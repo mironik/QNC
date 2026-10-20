@@ -28,6 +28,10 @@ pub struct Boot {
     pub sound_binding: Option<Binding>,
     #[serde(default)]
     pub program: Option<ProgramInput>,
+    /// With a clip: the story's A1 under a Sync window (a sound-only program), its media
+    /// bound by `program_bindings` (user 2026-10-20).
+    #[serde(default)]
+    pub sync_bed: Option<ProgramInput>,
     #[serde(default)]
     pub program_bindings: Vec<Binding>,
     pub read_token: String,
@@ -187,7 +191,7 @@ impl Boot {
     pub fn plan(&self) -> crate::Result<Plan> {
         match (&self.input, &self.program) {
             (Some(input), None)
-                if self.media_binding.is_some() && self.program_bindings.is_empty() =>
+                if self.media_binding.is_some() && self.program_bindings.is_empty() == self.sync_bed.is_none() =>
             {
                 Ok(Plan::Clip(InputPlan::new(
                     input,
@@ -198,6 +202,7 @@ impl Boot {
             (None, Some(program))
                 if self.media_binding.is_none()
                     && self.sound_binding.is_none()
+                    && self.sync_bed.is_none()
                     && !self.program_bindings.is_empty() =>
             {
                 Ok(Plan::Program(ProgramPlan::new(program)?))
@@ -209,14 +214,27 @@ impl Boot {
         }
     }
 
+    /// The Sync bed of a clip session, when it was launched with one.
+    pub fn sync_bed_plan(&self) -> crate::Result<Option<ProgramPlan>> {
+        Ok(match &self.sync_bed {
+            Some(bed) => Some(ProgramPlan::new(bed)?),
+            None => None,
+        })
+    }
+
     /// The media opener of the session, taken once.
     pub fn take_opener(&mut self) -> crate::Result<MediaOpener> {
         if let (Some(input), Some(binding)) = (&self.input, self.media_binding.take()) {
-            let Some(sound) = self.sound_binding.take() else {
+            let sound = self.sound_binding.take();
+            if sound.is_none() && self.sync_bed.is_none() {
                 return binding.opener(&input.media()?.media_uri);
-            };
-            // Picture and sound from two sources: each URI goes to its own binding.
-            return program_opener(vec![binding, sound]);
+            }
+            // Picture, sound and the Sync bed may read several sources: each URI goes to
+            // its own binding.
+            let mut bindings = vec![binding];
+            bindings.extend(sound);
+            bindings.extend(std::mem::take(&mut self.program_bindings));
+            return program_opener(bindings);
         }
         program_opener(std::mem::take(&mut self.program_bindings))
     }

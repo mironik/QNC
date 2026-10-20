@@ -5,7 +5,7 @@ edition = "2021"
 description = "QNC public component: source preview session for one clip (Broadcast Player, monitor picture, timeline projection and published timeline artifacts); no form, no application, read-only"
 
 [dependencies]
-qnc-sound-bed = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
 qnc-pool-pointer = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-still-locator = { workspace = true }

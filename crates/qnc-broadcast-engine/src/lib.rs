@@ -7,6 +7,7 @@ mod input;
 mod output;
 mod backfill;
 mod program;
+mod sync_bed;
 pub use decode_input::DecodeMediaAccess;
 use decode_input::{DecodeInput, seek_start};
 pub use input::InputPlan;
@@ -134,6 +135,10 @@ pub struct Runtime {
     epoch: Instant,
     /// An underrun rearm could not start audio yet; retried until it does.
     audio_rearm_pending: bool,
+    /// The clip's media input and source, for a Sync bed over it.
+    clip: Option<(Rc<DecodeInput>, SourceRuntime)>,
+    /// The story's A1 under a Sync, on the clip's device (user 2026-10-20).
+    sync_bed: Option<sync_bed::SyncBed>,
 }
 impl Runtime {
     pub fn open(
@@ -277,6 +282,7 @@ impl Runtime {
             DecodeInput::new_access(plan.media.clone(), decoder_config, open_media)
                 .with_delivery(plan.output_pixel_format.clone(), plan.progressive),
         );
+        let clip = Some((decode_input.clone(), plan.source.clone()));
         let audio_input = Rc::new(decode_input.for_media(plan.audio_media.clone()));
         let audio = Audio::open(
             &plan,
@@ -380,7 +386,35 @@ impl Runtime {
             audio: device,
             epoch: Instant::now(),
             audio_rearm_pending: false,
+            clip,
+            sync_bed: None,
         })
+    }
+
+    /// The story's A1 under a Sync window over this clip's playout (a sound-only program,
+    /// `plan`): decoded ahead, heard from `start_sync_bed` on, in the clip's clock and device.
+    pub fn with_sync_bed(mut self, plan: ProgramPlan) -> Result<Self> {
+        let ((input, source), Some(device)) = (self.clip.as_ref().ok_or_else(|| error("a Sync bed needs a clip"))?, self.audio.clone()) else {
+            return Err(error("a Sync bed needs the clip's audio device"));
+        };
+        self.sync_bed = Some(sync_bed::SyncBed::open(&plan, input, source, device)?);
+        Ok(self)
+    }
+
+    /// The bed's frame `bed_frame` plays from the sample of clip frame `source_frame` on;
+    /// false without a bed.
+    pub fn start_sync_bed(&mut self, source_frame: u64, bed_frame: u64) -> Result<bool> {
+        match self.sync_bed.as_mut() {
+            Some(bed) => bed.start(source_frame, bed_frame).map(|()| true),
+            None => Ok(false),
+        }
+    }
+
+    /// The bed stops at once (the clip's own A1 is heard again).
+    pub fn stop_sync_bed(&mut self) {
+        if let Some(bed) = self.sync_bed.as_mut() {
+            bed.stop();
+        }
     }
 
     /// A story program as one source for the passive monitor: the same transport,
@@ -442,6 +476,8 @@ impl Runtime {
             audio: device,
             epoch: Instant::now(),
             audio_rearm_pending: false,
+            clip: None,
+            sync_bed: None,
         })
     }
     pub fn state(&self) -> &TransportEngineState {
@@ -510,6 +546,9 @@ impl Runtime {
         Ok(events)
     }
     pub fn tick(&mut self) -> Result<Vec<BroadcastEvent>> {
+        if let Some(bed) = self.sync_bed.as_mut() {
+            bed.fill();
+        }
         // The pictures before where the clip stands start once it stood still a moment.
         let back = self.gpu.borrow().back.clone();
         if let Some(back) = back {

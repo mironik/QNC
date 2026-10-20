@@ -77,6 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         root: source_root,
                     },
                     sound_binding: None,
+                    sync_bed: None,
                 },
             })
         }

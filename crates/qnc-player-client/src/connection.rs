@@ -406,6 +406,7 @@ impl Connection {
                 input,
                 media_binding,
                 sound_binding,
+                sync_bed,
             } => {
                 input
                     .validate_for(&input.workspace_db_uri, &input.snapshot.metadata.clip_id)
@@ -419,7 +420,10 @@ impl Connection {
                 (
                     input.snapshot.metadata.clip_id.clone(),
                     timebase,
-                    serde_json::json!({ "input": input, "media_binding": media_binding, "sound_binding": sound_binding }),
+                    match sync_bed {
+                        Some((bed, bindings)) => serde_json::json!({ "input": input, "media_binding": media_binding, "sound_binding": sound_binding, "sync_bed": bed, "program_bindings": bindings }),
+                        None => serde_json::json!({ "input": input, "media_binding": media_binding, "sound_binding": sound_binding }),
+                    },
                 )
             }
             LaunchInput::Program {
@@ -728,6 +732,8 @@ fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
     match action {
         Action::SetOutputLevels(levels) => return Ok(Command::SetOutputLevels { levels_percent: levels.to_vec() }),
         Action::SetOutputRoutes(channels) => return Ok(Command::SetOutputRoutes { channels: channels.to_vec() }),
+        Action::StartSyncBed(source_frame, bed_frame) => return Ok(Command::StartSyncBed { source_frame, bed_frame }),
+        Action::StopSyncBed => return Ok(Command::StopSyncBed),
         _ => {}
     }
     let carrier = reply
@@ -761,11 +767,16 @@ fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
         },
         Action::SetOutputLevels(levels) => Command::SetOutputLevels { levels_percent: levels.to_vec() },
         Action::SetOutputRoutes(channels) => Command::SetOutputRoutes { channels: channels.to_vec() },
+        Action::StartSyncBed(source_frame, bed_frame) => Command::StartSyncBed { source_frame, bed_frame },
+        Action::StopSyncBed => Command::StopSyncBed,
     })
 }
 
 fn action_requires_preflight_state(action: Action) -> bool {
-    !matches!(action, Action::Cue(_) | Action::SetOutputLevels(_) | Action::SetOutputRoutes(_))
+    !matches!(
+        action,
+        Action::Cue(_) | Action::SetOutputLevels(_) | Action::SetOutputRoutes(_) | Action::StartSyncBed(..) | Action::StopSyncBed
+    )
 }
 
 fn state_poll_interval(pending_cue_frame: Option<u64>, reply: Option<&EventEnvelope>) -> Duration {

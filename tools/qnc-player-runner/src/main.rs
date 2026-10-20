@@ -59,6 +59,7 @@ fn run(
             ),
         );
     }
+    let sync_bed = boot.sync_bed_plan()?;
     let opener = boot.take_opener()?;
     let output_config = match &plan {
         Plan::Clip(plan) => plan.output_config(&boot.session_id, boot.source_generation)?,
@@ -82,7 +83,11 @@ fn run(
             Runtime::open_access(plan, output, output_config, decoder, None, opener)?
         }
         (Plan::Clip(plan), None) => {
-            Runtime::open_monitor_access(plan, output_config, decoder, None, opener)?
+            let runtime = Runtime::open_monitor_access(plan, output_config, decoder, None, opener)?;
+            match sync_bed {
+                Some(bed) => runtime.with_sync_bed(bed)?,
+                None => runtime,
+            }
         }
         (Plan::Program(plan), None) => {
             Runtime::open_program_monitor(plan, output_config, decoder, None, opener)?

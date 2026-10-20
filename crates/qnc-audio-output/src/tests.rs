@@ -388,3 +388,40 @@ fn the_queue_carries_every_source_channel_and_a_route_change_is_heard_in_the_nex
     c.render(&mut out, 200, Some(5));
     assert_eq!(out, [0.4, 0.3, 0.4, 0.3], "channel 4 on A1, 3 on A2, at once");
 }
+
+#[test]
+fn a_bed_plays_on_its_output_from_its_sample_position_in_the_same_clock() {
+    // Queue begun at absolute sample 10, two output channels.
+    let (mut q, mut c, g) = prepared(2);
+    q.push(g, 10, &[0.1, 0.2, 0.1, 0.2, 0.1, 0.2, 0.1, 0.2]).unwrap();
+    q.commit(g).unwrap();
+    q.bed.reset(&q.shared);
+    c.render(&mut [0.0; 0], 0, None); // the callback empties the old content
+    assert!(q.bed.ready(&q.shared));
+    assert_eq!(q.bed.push(&q.shared, &[0.5, 0.6, 0.7]), 3);
+    // Bed sample 0 at absolute 11 (the second frame) on output 0.
+    q.bed.start(&q.shared, 11, 0);
+    q.start(g).unwrap();
+    let mut out = [0.0; 4];
+    c.render(&mut out, 1, None);
+    assert_eq!(out, [0.1, 0.2, 0.5, 0.2], "frame 10 the source, frame 11 the bed on output 0, output 1 stays");
+    c.render(&mut out, 2, None);
+    assert_eq!(out, [0.6, 0.2, 0.7, 0.2]);
+    q.bed.stop(&q.shared);
+}
+
+#[test]
+fn a_late_bed_drops_what_it_missed_and_stays_on_its_position() {
+    let (mut q, mut c, g) = prepared(1);
+    q.push(g, 10, &[0.1; 8]).unwrap();
+    q.commit(g).unwrap();
+    q.bed.reset(&q.shared);
+    c.render(&mut [0.0; 0], 0, None);
+    // The bed should have started at absolute 8: two samples are late.
+    q.bed.push(&q.shared, &[0.5, 0.6, 0.7, 0.8]);
+    q.bed.start(&q.shared, 8, 0);
+    q.start(g).unwrap();
+    let mut out = [0.0; 2];
+    c.render(&mut out, 1, None);
+    assert_eq!(out, [0.7, 0.8], "samples 0 and 1 dropped: sample 2 plays at absolute 10");
+}

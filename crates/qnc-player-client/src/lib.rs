@@ -52,6 +52,9 @@ pub enum LaunchInput {
         /// The source of the sound when it is not the source of the picture (an optimized
         /// copy in the project with the sound of the original on the card).
         sound_binding: Option<MediaBinding>,
+        /// The story's A1 under a Sync window (a sound-only program) with a binding for
+        /// each media source it reads; it plays on `Action::StartSyncBed` (user 2026-10-20).
+        sync_bed: Option<(ProgramInput, Vec<MediaBinding>)>,
     },
     Program {
         program: ProgramInput,
@@ -171,6 +174,10 @@ pub enum Action {
     SetOutputLevels([u16; 2]),
     /// The source channel output 1 and 2 (A1, A2) play, heard at once.
     SetOutputRoutes([u16; 2]),
+    /// The Sync bed (the story's A1 under a Sync) plays from the sample of clip frame
+    /// `.0` on, from its frame `.1` (user 2026-10-20).
+    StartSyncBed(u64, u64),
+    StopSyncBed,
 }
 type Loader = Box<dyn FnOnce() -> Result<Launch> + Send>;
 /// Generation, first cued frame and loader of the latest selection.

@@ -1,4 +1,5 @@
 //! Prepared PCM -> device output. No application, database, media decoder or playback clock.
+mod bed;
 mod channel_map;
 mod device;
 pub use channel_map::ChannelMap;
@@ -124,6 +125,28 @@ impl AudioOutput {
         }
         self.queue.shared.set_routes(routes);
         true
+    }
+    /// A new bed content (the story's A1 under a Sync, user 2026-10-20): nothing of it plays
+    /// until `bed_start`; what was handed before is dropped.
+    pub fn bed_reset(&mut self) {
+        self.queue.bed.reset(&self.queue.shared);
+    }
+    /// Room for this many bed samples (mono); none until the previous content is dropped.
+    pub fn bed_room(&self) -> usize {
+        if self.queue.bed.ready(&self.queue.shared) { self.queue.bed.room() } else { 0 }
+    }
+    /// Hands bed samples ahead (mono, in order); the count taken.
+    pub fn bed_push(&mut self, samples: &[f32]) -> usize {
+        self.queue.bed.push(&self.queue.shared, samples)
+    }
+    /// Bed sample 0 plays on output `output` at absolute sample `position` of the playout
+    /// (the sample position the queue was begun with); a late bed drops what it missed.
+    pub fn bed_start(&self, position: u64, output: u16) {
+        self.queue.bed.start(&self.queue.shared, position, output);
+    }
+    /// The bed stops at once; the output plays its routed channel again.
+    pub fn bed_stop(&self) {
+        self.queue.bed.stop(&self.queue.shared);
     }
     pub fn take_peaks(&self) -> Vec<f32> {
         self.queue.shared.take_peaks(self.queue.config.format.channels as usize)

@@ -35,6 +35,10 @@ pub(crate) struct Shared {
     /// The source channel each output channel plays (user 2026-10-19: a channel chosen
     /// for A1/A2 is a route, heard in the next callback; nothing is prepared again).
     routes: [AtomicU32; METER_CHANNELS],
+    /// The absolute sample position of the first sample of the current generation.
+    pub anchor: AtomicU64,
+    /// A bed under the playout (`bed`): the story's A1 under a Sync (user 2026-10-20).
+    pub bed: crate::bed::BedShared,
 }
 /// How many output channels the level meter follows.
 pub const METER_CHANNELS: usize = 8;
@@ -65,6 +69,8 @@ impl Shared {
             peaks: Default::default(),
             gains: std::array::from_fn(|_| AtomicU32::new(1f32.to_bits())),
             routes: std::array::from_fn(|channel| AtomicU32::new(channel as u32)),
+            anchor: AtomicU64::new(0),
+            bed: crate::bed::BedShared::new(),
         }
     }
     /// The gain of the first `gains.len()` output channels; the others keep theirs.
@@ -99,6 +105,7 @@ pub(crate) struct Queue {
     next: u64,
     pub status: Status,
     finished: bool,
+    pub bed: crate::bed::BedProducer,
 }
 pub(crate) struct Callback {
     consumer: Consumer<f32>,
@@ -109,12 +116,17 @@ pub(crate) struct Callback {
     width: usize,
     generation: u64,
     submitted: u64,
+    /// The absolute sample position of the generation's first sample.
+    anchor: u64,
+    bed: crate::bed::BedConsumer,
 }
 impl Queue {
     pub fn new(config: Config) -> Result<(Self, Callback)> {
         let capacity = config.validate()?;
         let (producer, consumer) = RingBuffer::new(capacity);
         let (audition, audition_out) = RingBuffer::new(capacity);
+        // Four seconds of a mono bed.
+        let (bed, bed_out) = crate::bed::bed(config.format.sample_rate_hz as usize * 4);
         let shared = Arc::new(Shared::new());
         let callback = Callback {
             consumer,
@@ -124,6 +136,8 @@ impl Queue {
             width: config.width(),
             generation: 0,
             submitted: 0,
+            anchor: 0,
+            bed: bed_out,
         };
         Ok((
             Self {
@@ -136,6 +150,7 @@ impl Queue {
                 next: 0,
                 status: Status::Paused,
                 finished: false,
+                bed,
             },
             callback,
         ))
@@ -187,6 +202,7 @@ impl Queue {
         self.anchor = anchor;
         self.next = anchor;
         self.finished = false;
+        self.shared.anchor.store(anchor, Ordering::Release);
         self.shared
             .gate
             .store(self.generation << 1, Ordering::Release);
@@ -447,6 +463,7 @@ impl Callback {
     /// Real-time path: no allocation, blocking synchronization, decode, or logging.
     pub fn render(&mut self, output: &mut [f32], now_ns: u64, driver_delay_ns: Option<u64>) {
         output.fill(0.0);
+        self.bed.adopt(&self.shared);
         self.shared
             .callback_frames
             .fetch_max((output.len() / self.channels) as u64, Ordering::Release);
@@ -460,6 +477,7 @@ impl Callback {
             }
             self.generation = generation;
             self.submitted = 0;
+            self.anchor = self.shared.anchor.load(Ordering::Acquire);
             self.shared.submitted.store(0, Ordering::Relaxed);
             self.shared.end.store(NONE, Ordering::Relaxed);
             self.shared.first_ns.store(NONE, Ordering::Relaxed);
@@ -526,6 +544,10 @@ impl Callback {
             return;
         }
         self.apply_gains(output);
+        // The bed over its output, in the same samples and clock (after the gains: its level
+        // is in its samples).
+        let channels = self.channels;
+        self.bed.mix(&self.shared, &mut output[..needed * channels], channels, self.anchor + self.submitted);
         self.note_peaks(output);
         if needed > 0 {
             self.shared.timing_revision.fetch_add(1, Ordering::SeqCst);

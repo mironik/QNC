@@ -111,6 +111,15 @@ impl Session {
                         self.player.set_output_levels(&levels_percent);
                         Ok(Vec::new())
                     }
+                    Command::StartSyncBed { source_frame, bed_frame } => match self.player.start_sync_bed(source_frame, bed_frame) {
+                        Ok(true) => Ok(Vec::new()),
+                        Ok(false) => return self.rejected(sequence, envelope.request_id, command_name, "this session has no Sync bed".into()),
+                        Err(error) => Err(error),
+                    },
+                    Command::StopSyncBed => {
+                        self.player.stop_sync_bed();
+                        Ok(Vec::new())
+                    }
                     Command::SetOutputRoutes { channels } => {
                         if !self.player.set_output_routes(&channels) {
                             return self.rejected(sequence, envelope.request_id, command_name, "output route outside the decoded channels".into());

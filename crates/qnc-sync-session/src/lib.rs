@@ -66,10 +66,11 @@ pub fn poll(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut 
     }
     // The story's A1 plays only under a running Sync; the next Sync's is prepared ahead.
     if !segments.sync_drafting() || segments.sync_stopped() {
-        preview.stop_sound_bed();
+        preview.stop_sync_bed();
     }
-    if let Some(window) = segments.sync_window_ahead().filter(|_| !preview.in_program()) {
-        preview.prepare_sound_bed(window);
+    // The clip session carries the A1 of the next Sync's window (not while one runs).
+    if !segments.sync_drafting() && !preview.in_program() {
+        preview.want_sync_bed(segments.sync_window_ahead());
     }
 }
 
@@ -105,7 +106,7 @@ fn space(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut Pro
             wrap.hold(sync.window.0);
             // The story's A1 under the slot, prepared before IN (user 2026-10-20: "the
             // story's A1 must be heard, so the user knows how long to hold the clip").
-            preview.play_sound_bed(sync.window);
+            preview.play_sync_bed(sync.window, sync.source_in);
             if preview.player_view().playing() && !preview.in_program() {
                 return true;
             }
