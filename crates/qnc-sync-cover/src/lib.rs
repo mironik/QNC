@@ -263,6 +263,17 @@ impl SyncCover {
         true
     }
 
+    /// O stopped the play (user 2026-10-19): the draft keeps its end; the arrows or the
+    /// mouse move it, Space plays on, Enter writes, Delete drops.
+    pub fn stop(&mut self) -> bool {
+        self.active.as_mut().map(|session| session.restart = true).is_some()
+    }
+
+    /// A Sync stopped with its draft (not playing).
+    pub fn stopped(&self) -> bool {
+        self.active.as_ref().is_some_and(|session| session.restart)
+    }
+
     /// The end of a stopped Sync at the program frame that plays `source_out` (the OUT
     /// dragged on the source timeline), kept within the slot as an arrow keeps it.
     pub fn drag_end(&mut self, source_out: u64) -> bool {

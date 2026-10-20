@@ -43,6 +43,7 @@ pub fn route(
         // end, Enter writes the cover.
         "mark_out" if on_source && segments.sync_drafting() => {
             preview.pause();
+            segments.sync_stop();
             true
         }
         _ => return ControlFlow::Continue(()),

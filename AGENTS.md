@@ -5015,3 +5015,10 @@ timelineu postavi OUT i zaustavi play, u svakoj formi (`qnc-source-panel`; Story
 zatvarao slot); kraj pokrivalice i dalje pomicu strelice, a sada i povlacenje OUT-a misem na source timelineu
 (`qnc-sync-cover::drag_end`, `qnc-sync-session::dragged`); Enter zapisuje, Delete odbacuje. Testovi (novi:
 `an_in_pressed_while_the_source_plays_starts_sync_once_it_is_armed`), zlatni testovi tipki, conformance. Uzivo nije provjereno.
+Popravak 2026-10-20 (log probe Synca): (1) klik na Wrap red ponistavao je i zaustavljeni Sync, pa povlacenje OUT-a misem
+vise nije imalo sto pomicati (OUT izvora otisao na 1018). Sada O izricito zaustavlja Sync (`qnc-sync-cover` `stop`,
+`stopped`; `qnc-program-segments` `sync_stop`), a zaustavljeni nacrt ostaje do Entera ili Deletea: klik na Wrap red tada
+samo kaze sto ceka (`cue_program`). (2) Prica je imala 175 slika i prvi Sync je pokrio zadnji slot (98-175); drugi Sync
+krenuo je u isti slot i tek je Enter rekao da slot ima B-roll. Sada Space odmah odbija Sync u slot koji vec ima
+pokrivalicu (`sync_space`). Disk ima ~6 GB slobodno: puna debug gradnja pada na PDB datotekama (LNK1318), gradi se s
+manje poslova istodobno. Testovi, conformance.

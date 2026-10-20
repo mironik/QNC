@@ -798,6 +798,11 @@ impl ProgramSegments {
             return;
         }
         let frame = frame.min(self.view.total_frames);
+        // A stopped Sync's draft stays until Enter or Delete (live 2026-10-19: a click on a
+        // Wrap row lost it, the mouse could not move its end any more).
+        if self.sync.stopped() {
+            return self.refresh_view(qnc_ui_text::text("story.msg.sync_stopped").into());
+        }
         // Pointing elsewhere stops a Sync play: the whole program opens again.
         self.program_changed |= self.sync.cancel();
         self.set_playhead(Some(frame));

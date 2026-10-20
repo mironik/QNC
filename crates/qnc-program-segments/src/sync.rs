@@ -55,6 +55,15 @@ impl ProgramSegments {
         self.sync_flight = in_flight && self.sync.enabled();
     }
 
+    /// O stopped a running Sync: its draft waits for the arrows, the mouse, Enter or Delete.
+    pub fn sync_stop(&mut self) -> bool {
+        if !self.sync.stop() {
+            return false;
+        }
+        self.refresh_view(qnc_ui_text::text("story.msg.sync_stopped").into());
+        true
+    }
+
     /// An IN pressed while the source played has armed Sync: it starts now (once).
     pub fn take_sync_flight(&mut self) -> bool {
         self.sync_flight_ready && std::mem::take(&mut self.sync_flight_ready)
@@ -94,6 +103,13 @@ impl ProgramSegments {
             _ => Err(qnc_ui_text::text("story.msg.program_empty").into()),
         };
         match per_source.and_then(|per_source| self.sync.start(&markers, playhead, total, per_source)) {
+            // A slot that has its B-roll is said at once, not after the play (live
+            // 2026-10-19: the story ended with that slot, Enter then refused it).
+            Ok(preview) if self.stored_slots.iter().any(|slot| slot.start_frame == preview.window.0 && slot.has_cover) => {
+                self.sync.cancel();
+                self.refresh_view(qnc_ui_text::text("story.msg.sync_slot_has_broll").into());
+                SyncSpace::Blocked
+            }
             Ok(preview) => {
                 self.selected_marker = None;
                 self.selected_slot = None;
