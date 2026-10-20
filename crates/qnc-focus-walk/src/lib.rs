@@ -178,6 +178,55 @@ impl FocusWalk {
         }
     }
 
+    /// The steps of the walk for a form that routes its own keys (the Story form): the
+    /// panel goes to `name`, the next or previous panel that has something to take, round.
+    pub fn go_to(&mut self, name: &str) {
+        self.go(name);
+    }
+
+    pub fn next_panel(&mut self, forward: bool) -> bool {
+        self.step_panel(forward)
+    }
+
+    /// The panels in order, those with an empty row left out (what Tab and Enter reach).
+    pub fn reachable(&self) -> Vec<&str> {
+        self.order.iter().map(String::as_str).filter(|name| !(self.rows.contains_key(*name) && self.row(name).is_none())).collect()
+    }
+
+    /// The button chosen in the row panel `panel`; a click or a key that stands for one of
+    /// its actions chooses it; the arrows choose to the left or right (the chosen action).
+    pub fn chosen_in(&self, panel: &str) -> Option<&str> {
+        self.row(panel).and_then(qnc_key_row::KeyRow::chosen)
+    }
+
+    pub fn select_in(&mut self, panel: &str, action_id: &str) -> bool {
+        self.rows.get_mut(panel).is_some_and(|row| row.select(action_id))
+    }
+
+    pub fn choose_in(&mut self, panel: &str, back: bool) -> Option<String> {
+        self.choose(panel, back)
+    }
+
+    pub fn has_row(&self, panel: &str) -> bool {
+        self.row(panel).is_some()
+    }
+
+    /// A key on the list panel `panel` as a numbered step; `opens` when Enter there opens
+    /// an item that takes the keyboard on (a card's clip); the last step.
+    pub fn press_list(&mut self, panel: &str, step: GridStep, opens: bool) {
+        self.list.press(step, opens);
+        self.step_on = panel.to_string();
+    }
+
+    pub fn last_step(&self) -> Option<(GridStep, u64)> {
+        self.list.last()
+    }
+
+    /// Whether the last Enter on a list opened its item (asked once).
+    pub fn take_opening(&mut self) -> bool {
+        self.list.take_opening()
+    }
+
     fn row(&self, panel: &str) -> Option<&qnc_key_row::KeyRow> {
         self.rows.get(panel).filter(|row| !row.is_empty())
     }

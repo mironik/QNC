@@ -11,30 +11,39 @@ use crate::{
 pub struct IngestApp {
     contracts: IngestContracts,
     application: IngestApplication,
-    pace: qnc_paint_pace::PaintPace,
+    host: qnc_form_host::FormHost,
+}
+
+/// The Ingest application as the form host sees it.
+struct Hosted<'a>(&'a mut IngestApplication);
+
+impl qnc_form_host::FormApplication for Hosted<'_> {
+    type Intent = IngestIntent;
+    fn has_player(&self) -> bool { self.0.has_player() }
+    fn on_player_change(&self, wake: qnc_paint_pace::Wake) { self.0.notify_on_player_change(wake) }
+    fn poll(&mut self) -> bool { self.0.poll() }
+    fn playing(&self) -> bool { self.0.view().playback.playing() }
+    fn next_repaint_delay(&self) -> Option<std::time::Duration> { self.0.next_repaint_delay() }
+    fn key_scope(&self) -> Option<&'static str> { self.0.view().focus.key_scope() }
+    fn intent_of(action_id: String) -> IngestIntent { IngestIntent::empty(action_id) }
+    fn dispatch(&mut self, intent: IngestIntent) -> bool { self.0.dispatch(intent).request_repaint }
 }
 
 impl IngestApp {
     pub fn new(root: PathBuf) -> Result<Self, String> {
         let contracts = IngestContracts::load()?;
         let application = IngestApplication::with_store_root(&root)?.with_focus(contracts.focus_names());
-        Ok(Self { contracts, application, pace: qnc_paint_pace::PaintPace::new() })
+        Ok(Self { contracts, application, host: qnc_form_host::FormHost::new() })
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
-        let application = &self.application;
-        let player_exists = application.view().playback.preparing || application.view().playback.reply.is_some();
-        self.pace.bind_player(ctx, player_exists, |wake| application.notify_on_player_change(wake));
-        let changed = self.application.poll();
-        let playing = self.application.view().playback.playing();
-        self.pace.after_poll(ctx, changed, playing, self.application.next_repaint_delay());
-        self.dispatch_keyboard_shortcuts(ctx);
+        let keys = qnc_form_host::FormKeys { catalog: &self.contracts.shortcuts, scopes: &["ingest"], play_action: action_ids::PLAY_PAUSE };
+        self.host.before_paint(ctx, &mut Hosted(&mut self.application), &keys);
         let theme = Theme::from_contract(&self.contracts.shell);
         theme::apply(ctx, &theme);
         // The view is borrowed, not copied: it holds every clip and the timeline data.
-        let intent = qnc_ingest_blocks::render_desktop(ui, frame, &self.contracts, &theme, self.application.view());
-        if let Some(intent) = intent {
-            self.dispatch(ctx, intent);
+        if let Some(intent) = qnc_ingest_blocks::render_desktop(ui, frame, &self.contracts, &theme, self.application.view()) {
+            qnc_form_host::dispatch(ctx, &mut Hosted(&mut self.application), intent);
         }
     }
 
@@ -54,20 +63,6 @@ impl IngestApp {
 
     pub fn navigation_sequence(&self) -> Result<Vec<qnc_ingest_application::SequenceStep>, String> {
         self.application.navigation_sequence()
-    }
-
-    fn dispatch(&mut self, ctx: &egui::Context, intent: IngestIntent) {
-        let result = self.application.dispatch(intent);
-        if result.request_repaint {
-            ctx.request_repaint();
-        }
-    }
-
-    fn dispatch_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
-        let catalog = &self.contracts.shortcuts;
-        for action_id in qnc_key_intents::action_ids_in(ctx, catalog, self.application.view().focus.key_scope(), &["ingest"], action_ids::PLAY_PAUSE) {
-            self.dispatch(ctx, IngestIntent::empty(action_id));
-        }
     }
 }
 

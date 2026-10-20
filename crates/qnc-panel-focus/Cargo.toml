@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: the keyboard map acts on the editorial panel in focus (pool, source timeline, segments)"
 
 [dependencies]
+qnc-focus-walk = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-source-timeline = { workspace = true }
@@ -12,7 +13,6 @@ qnc-wheel-jog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 eframe = { workspace = true }
 qnc-key-list = { workspace = true }
-qnc-key-row = { workspace = true }
 qnc-segments-keys = { workspace = true }
 qnc-sync-session = { workspace = true }
 qnc-program-segments = { workspace = true }

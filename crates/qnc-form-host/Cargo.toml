@@ -1,0 +1,11 @@
+[package]
+name = "qnc-form-host"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the host of a form on the desktop (player wake, poll, paint pace, keys dispatched to the application)"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-key-intents = { workspace = true }
+qnc-keyboard-shortcut = { workspace = true }
+qnc-paint-pace = { workspace = true }

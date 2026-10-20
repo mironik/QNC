@@ -13,27 +13,37 @@ const EDITORIAL_SHORTCUT_SCOPES: [&str; 2] = ["storyboard", "off"];
 pub struct EditorialApp {
     form: EditorialForm,
     application: EditorialApplication,
-    pace: qnc_paint_pace::PaintPace,
+    host: qnc_form_host::FormHost,
+}
+
+/// The editorial application as the form host sees it.
+struct Hosted<'a>(&'a mut EditorialApplication);
+
+impl qnc_form_host::FormApplication for Hosted<'_> {
+    type Intent = EditorialIntent;
+    fn has_player(&self) -> bool { self.0.has_player() }
+    fn on_player_change(&self, wake: qnc_paint_pace::Wake) { self.0.notify_on_player_change(wake) }
+    fn poll(&mut self) -> bool { self.0.poll() }
+    fn playing(&self) -> bool { self.0.view().preview.playing }
+    fn next_repaint_delay(&self) -> Option<std::time::Duration> { self.0.next_repaint_delay() }
+    fn key_scope(&self) -> Option<&'static str> { self.0.view().focus.key_scope() }
+    fn intent_of(action_id: String) -> EditorialIntent { EditorialIntent::action(&action_id) }
+    fn dispatch(&mut self, intent: EditorialIntent) -> bool { self.0.dispatch(intent) }
 }
 
 impl EditorialApp {
     pub fn new(group: &str, root: PathBuf) -> Result<Self, String> {
         let form = EditorialForm::new(group)?;
         let application = EditorialApplication::new(root, form.focus_layout());
-        Ok(Self { form, application, pace: qnc_paint_pace::PaintPace::new() })
+        Ok(Self { form, application, host: qnc_form_host::FormHost::new() })
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
-        let application = &self.application;
-        self.pace.bind_player(ctx, application.has_player(), |wake| application.notify_on_player_change(wake));
-        let changed = self.application.poll();
-        let playing = self.application.view().preview.playing;
-        self.pace.after_poll(ctx, changed, playing, self.application.next_repaint_delay());
-        self.dispatch_keyboard_shortcuts(ctx);
+        let keys = qnc_form_host::FormKeys { catalog: self.form.shortcuts(), scopes: &EDITORIAL_SHORTCUT_SCOPES, play_action: action_ids::PLAY_PAUSE };
+        self.host.before_paint(ctx, &mut Hosted(&mut self.application), &keys);
         self.form.apply_theme(ctx);
-        let intent = self.form.show_desktop(ui, frame, self.application.view());
-        if let Some(intent) = intent {
-            self.dispatch(ctx, intent);
+        if let Some(intent) = self.form.show_desktop(ui, frame, self.application.view()) {
+            qnc_form_host::dispatch(ctx, &mut Hosted(&mut self.application), intent);
         }
     }
 
@@ -44,19 +54,6 @@ impl EditorialApp {
     /// The shell shows or hides this surface.
     pub fn set_active(&mut self, active: bool) {
         self.application.set_active(active);
-    }
-
-    fn dispatch(&mut self, ctx: &egui::Context, intent: EditorialIntent) {
-        if self.application.dispatch(intent) {
-            ctx.request_repaint();
-        }
-    }
-
-    fn dispatch_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
-        let ids = qnc_key_intents::action_ids_in(ctx, self.form.shortcuts(), self.application.view().focus.key_scope(), &EDITORIAL_SHORTCUT_SCOPES, action_ids::PLAY_PAUSE);
-        for action_id in ids {
-            self.dispatch(ctx, EditorialIntent::action(action_id));
-        }
     }
 }
 

@@ -5096,3 +5096,11 @@ okvirom fokusa), preglednik lokacija (`show_with_confirm`: preglednik s trakom S
 preglednik). Jedan okvir fokusa `qnc-ui-kit::paint_focus` (tri kopije uklonjene). Conformance "shared UI patterns":
 traka potvrde preglednika se trazi u panelu preglednika, a Ingest forma je ne smije crtati sama. Testovi, conformance.
 Uzivo nije provjereno.
+Izvedeno 2026-10-20 (isti plan, korak 4: jedan krug fokusa i domacin forme): Story fokus (`qnc-panel-focus`) vise ne vodi
+svoj redoslijed panela, redove tabova i gumba ni korake po karticama: koristi krug `qnc-focus-walk` (Ingestov; javni
+koraci `go_to`, `next_panel`, `reachable`, `chosen_in`, `select_in`, `choose_in`, `press_list`, `last_step`,
+`take_opening`), a svoje zadrzava samo ono sto je price (Wrap, Sync, segmenti); `Panel::name` daje ime panela iz ugovora.
+Zlatna tablica tipki (830 slucajeva) nepromijenjena. Nova kocka `crates/qnc-form-host` (+ ugovor): jedna petlja forme
+(budjenje playera, poll, ritam crtanja, tipke kao akcije kataloga, slanje radnji) preko svojstva `FormApplication`;
+Ingest i Story desktop samo omotaju svoju aplikaciju (`Hosted`). C10 Ingest desktop 76 -> 70, Story desktop 86 -> 82.
+Project desktop (zamrznut) jos ima svoju petlju. Testovi, conformance. Uzivo nije provjereno.

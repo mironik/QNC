@@ -35,6 +35,17 @@ pub enum Panel {
 }
 
 impl Panel {
+    /// The name of the panel in a layout contract and in the focus walk.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::PoolTabs => qnc_focus_walk::POOL_TABS,
+            Self::Pool => qnc_focus_walk::CARDS,
+            Self::SourceTimeline => qnc_focus_walk::SOURCE_TIMELINE,
+            Self::SourceButtons => qnc_focus_walk::SOURCE_BUTTONS,
+            Self::Segments => "segments",
+        }
+    }
+
     /// The panel a layout contract names in its `tab_order`.
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {
@@ -126,30 +137,33 @@ pub struct PanelFocus {
     /// Up/Down on a taken edit: the key picture search and what its answer moves.
     keyframes: qnc_keyframe_nav::KeyframeNav,
     jump: Option<Jump>,
-    layout: FocusLayout,
-    /// The pool tabs and the source dock buttons the arrows walk (piece `qnc-key-row`).
-    tabs: qnc_key_row::KeyRow,
-    buttons: qnc_key_row::KeyRow,
+    /// The one focus walk of every form (piece `qnc-focus-walk`): the panels in the form's
+    /// order, the pool tabs and the source dock buttons the arrows walk, and the keys on the
+    /// media pool as numbered steps for the card grid (a step is not taken on read: one arrow
+    /// fires two catalog actions and every action reads the view again, live 2026-10-13;
+    /// Enter that opened a card puts the keyboard on its source timeline).
+    walk: qnc_focus_walk::FocusWalk,
     /// The catalog action a key on the pool tabs or a dock button stands for; the
     /// caller runs it as its own action (`take_pick`).
     pick: Option<String>,
-    /// The keys on the media pool as numbered steps for the card grid (piece
-    /// `qnc-key-list`). A step is not taken on read: one arrow fires two catalog actions
-    /// (storyboard and off scope) and every action reads the view again (live 2026-10-13).
-    /// Enter that opened a card puts the keyboard on its source timeline.
-    pool: qnc_key_list::KeyList,
+}
+
+/// The walk of a layout: its panels, the pool tabs row and the source dock buttons row.
+fn walk_of(layout: &FocusLayout) -> qnc_focus_walk::FocusWalk {
+    let order = layout.order.iter().map(|panel| panel.name()).collect();
+    let (tabs, buttons) = (layout.tabs.iter().map(String::as_str).collect(), layout.buttons.iter().map(String::as_str).collect());
+    qnc_focus_walk::FocusWalk::new((order, vec![(qnc_focus_walk::POOL_TABS, tabs), (qnc_focus_walk::SOURCE_BUTTONS, buttons)], Vec::new()))
 }
 
 impl PanelFocus {
     pub fn new() -> Self {
-        Self::default()
+        Self { walk: walk_of(&FocusLayout::default()), ..Self::default() }
     }
 
     /// The focus of a form with its Tab walk; it starts on the first panel of the walk.
     pub fn with_layout(layout: FocusLayout) -> Self {
         let panel = layout.order.first().copied().unwrap_or_default();
-        let (tabs, buttons) = (qnc_key_row::KeyRow::new(layout.tabs.clone()), qnc_key_row::KeyRow::new(layout.buttons.clone()));
-        Self { panel, layout, tabs, buttons, ..Self::default() }
+        Self { panel, walk: walk_of(&layout), ..Self::default() }
     }
 
     /// The action a key on the pool tabs or a dock button stood for, once.
@@ -201,8 +215,8 @@ impl PanelFocus {
                 (None, Ok(_)) => {}
             }
         }
-        let button = (self.panel == Panel::SourceButtons).then(|| self.buttons.chosen().map(str::to_string)).flatten();
-        FocusView { panel: self.panel, button, pool_step: self.pool.last() }
+        let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
+        FocusView { panel: self.panel, button, pool_step: self.walk.last_step() }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).
@@ -215,7 +229,7 @@ impl PanelFocus {
     /// 2026-10-13: the keys belong to the panel in use).
     pub fn chose_clip(&mut self, wrap: &mut WrapSession) -> bool {
         wrap.leave();
-        self.panel = if self.pool.take_opening() { Panel::SourceTimeline } else { Panel::Pool };
+        self.panel = if self.walk.take_opening() { Panel::SourceTimeline } else { Panel::Pool };
         true
     }
 
@@ -533,23 +547,23 @@ impl PanelFocus {
         let arrow = matches!(action_id, "step_back_frame" | "step_forward_frame");
         let back = action_id == "step_back_frame";
         // A pool tab, by click or Alt+letter, puts the keyboard on the pool tabs.
-        if self.tabs.select(action_id) {
+        if self.walk.select_in(qnc_focus_walk::POOL_TABS, action_id) {
             self.panel = Panel::PoolTabs;
             return Some(None);
         }
         Some(match (panel, action_id) {
             // The arrows on the pool tabs choose the tab to the left or right.
             (Panel::PoolTabs, _) if arrow => {
-                self.pick = self.tabs.choose(back).map(str::to_string);
+                self.pick = self.walk.choose_in(qnc_focus_walk::POOL_TABS, back);
                 return Some(None);
             }
             // The arrows on the dock buttons move between them, Enter presses one.
             (Panel::SourceButtons, _) if arrow => {
-                self.buttons.choose(back);
+                self.walk.choose_in(qnc_focus_walk::SOURCE_BUTTONS, back);
                 Some(true)
             }
             (Panel::SourceButtons, "activate_focused_item") => {
-                let Some(id) = self.buttons.chosen().map(str::to_string) else { return Some(Some(false)) };
+                let Some(id) = self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string) else { return Some(Some(false)) };
                 if !segments.view().action_enabled(&id) {
                     return Some(Some(false));
                 }
@@ -570,7 +584,7 @@ impl PanelFocus {
             // The media pool: the arrows move the card focus, Enter opens the card (and the
             // clip chosen puts the keyboard on its source timeline). The tick key is Ingest's.
             (Panel::Pool, key) if qnc_key_list::step_of(key).is_some_and(|step| step != PoolStep::Toggle) => {
-                self.pool.press(qnc_key_list::step_of(key).unwrap_or(PoolStep::Open), true);
+                self.walk.press_list(qnc_focus_walk::CARDS, qnc_key_list::step_of(key).unwrap_or(PoolStep::Open), true);
                 Some(true)
             }
             (Panel::PoolTabs | Panel::SourceButtons, "step_prev_part" | "step_next_part") => Some(false),
@@ -580,13 +594,7 @@ impl PanelFocus {
 
     /// The panels Tab and Enter reach: those of the layout that have something to take.
     fn walk(&self) -> Vec<Panel> {
-        let layout = &self.layout;
-        let walk = layout.order.iter().copied().filter(|panel| match panel {
-            Panel::PoolTabs => !self.tabs.is_empty(),
-            Panel::SourceButtons => !self.buttons.is_empty(),
-            _ => true,
-        });
-        walk.collect()
+        self.walk.reachable().into_iter().filter_map(Panel::from_name).collect()
     }
 
     /// Enter with nothing to confirm: on to the next panel of the walk.

@@ -3530,6 +3530,7 @@ dependencies = [
  "qnc-editorial-application",
  "qnc-editorial-blocks",
  "qnc-editorial-layout",
+ "qnc-form-host",
  "qnc-key-intents",
  "qnc-keyboard-shortcut",
  "qnc-paint-pace",
@@ -3642,6 +3643,16 @@ dependencies = [
  "qnc-key-list",
  "qnc-key-row",
  "qnc-ui-kit",
+]
+
+[[package]]
+name = "qnc-form-host"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-key-intents",
+ "qnc-keyboard-shortcut",
+ "qnc-paint-pace",
 ]
 
 [[package]]
@@ -3785,6 +3796,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
+ "qnc-form-host",
  "qnc-ingest-application",
  "qnc-ingest-blocks",
  "qnc-ingest-layout",
@@ -4360,8 +4372,8 @@ dependencies = [
  "eframe",
  "qnc-action-event",
  "qnc-dev-diagnostics",
+ "qnc-focus-walk",
  "qnc-key-list",
- "qnc-key-row",
  "qnc-keyframe-nav",
  "qnc-program-segments",
  "qnc-segments-keys",
