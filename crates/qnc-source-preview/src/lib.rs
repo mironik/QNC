@@ -381,9 +381,14 @@ impl SourcePreview {
         // A clip waiting for its record is not playing: the background completion of that
         // record waits while a player works, so counting the wait as work kept both waiting
         // for ever (2026-10-12: a new project on the originals never played).
-        let works = !self.waits_for_record()
-            && (self.play_when_ready || self.player_view.preparing || self.player_view.playing() || editing);
-        self.activity.update(self.activity_target.as_ref(), works);
+        let playing = self.play_when_ready || self.player_view.preparing || self.player_view.playing();
+        let level = match (self.waits_for_record(), playing, editing) {
+            (true, _, _) => qnc_playback_activity::PlaybackLevel::Idle,
+            (false, true, _) => qnc_playback_activity::PlaybackLevel::Playing,
+            (false, false, true) => qnc_playback_activity::PlaybackLevel::Editing,
+            (false, false, false) => qnc_playback_activity::PlaybackLevel::Idle,
+        };
+        self.activity.update_level(self.activity_target.as_ref(), level);
     }
 
     /// Cuts the current session and clears everything shown.

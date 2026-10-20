@@ -672,6 +672,10 @@ impl ProjectArtifacts {
         }
     }
 
+    pub fn set_cap(&mut self, cap: Option<usize>) {
+        self.artifacts.set_cap(cap);
+    }
+
     pub fn set_playback_priority(&mut self, active: bool) {
         self.artifacts.set_playback_priority(active);
     }

@@ -259,6 +259,8 @@ pub struct TimelineWaveService {
     without_wave: BTreeSet<String>,
     publisher: Option<Box<dyn WaveContentWrite>>,
     playback_priority: bool,
+    /// At most this many readers (user 2026-10-20: two while the user edits).
+    cap: Option<usize>,
     /// The clip open in a preview: its pass reads the card alone (user 2026-10-18: two long
     /// passes side by side on one card took 45-55 s each, its filmstrip waited for it).
     preferred: Option<String>,
@@ -313,14 +315,26 @@ impl TimelineWaveService {
         self.without_wave.clear();
     }
 
+    /// While a player plays only the preferred clip's wave is made, alone (user
+    /// 2026-10-20); everything else waits.
     pub fn set_playback_priority(&mut self, active: bool) {
         if self.playback_priority == active {
             return;
         }
         self.playback_priority = active;
         if active {
-            self.cancel_active_workers();
+            for worker in self.workers.iter().filter(|worker| Some(worker.request.clip_id.as_str()) != self.preferred.as_deref()) {
+                worker.cancel.store(true, Ordering::Release);
+            }
         } else {
+            self.start_next();
+        }
+    }
+
+    /// At most `cap` readers (`None`: as many as the medium test chose).
+    pub fn set_cap(&mut self, cap: Option<usize>) {
+        if self.cap != cap {
+            self.cap = cap;
             self.start_next();
         }
     }
@@ -398,7 +412,7 @@ impl TimelineWaveService {
     pub fn poll(&mut self, active_clip_id: Option<&str>) -> WavePoll {
         let mut poll = WavePoll::empty();
         let current_project = self.context.as_ref().map(WaveContext::project_id);
-        if !self.playback_priority {
+        {
             if let Some(publisher) = &mut self.publisher {
                 for completion in publisher.poll() {
                     poll.changed = true;
@@ -458,7 +472,7 @@ impl TimelineWaveService {
             let current_project = self.context.as_ref().map(WaveContext::project_id);
             let matches_active = current_project == Some(outcome.request.project_id.as_str())
                 && active_clip_id == Some(outcome.request.clip_id.as_str());
-            if self.playback_priority {
+            if self.playback_priority && Some(outcome.request.clip_id.as_str()) != self.preferred.as_deref() {
                 if current_project == Some(outcome.request.project_id.as_str()) {
                     self.enqueue(outcome.request, true);
                 }
@@ -625,12 +639,16 @@ impl TimelineWaveService {
     }
 
     fn start_next(&mut self) {
-        if self.playback_priority {
-            return;
-        }
         let Some(context) = self.context.clone() else {
             return;
         };
+        if self.playback_priority {
+            // A player plays: only the preferred clip's wave, alone.
+            if self.preferred_alone() == Some(false) && self.workers.is_empty() {
+                self.start_one(&context);
+            }
+            return;
+        }
         match self.preferred_alone() {
             Some(true) => return,
             // The preferred clip is first in the queue and starts alone.
@@ -643,6 +661,7 @@ impl TimelineWaveService {
         }
         // Until the medium is tested one pass runs (it tests first).
         let readers = self.readers.try_lock().ok().and_then(|readers| *readers).unwrap_or(1);
+        let readers = readers.min(self.cap.unwrap_or(usize::MAX));
         while self.workers.len() < readers {
             if !self.start_one(&context) {
                 return;

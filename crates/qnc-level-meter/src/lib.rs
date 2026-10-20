@@ -33,11 +33,16 @@ struct Ballistics {
     peak: f32,
     peak_at: f64,
     at: f64,
+    /// The last level given and when it last changed: a level that keeps changing is fed by
+    /// a playing player, whose pictures paint the form (user 2026-10-20: while it plays the
+    /// form paints at the source rate, nothing more).
+    given: f32,
+    given_at: f64,
 }
 
 impl Default for Ballistics {
     fn default() -> Self {
-        Self { shown: FLOOR_DBFS, peak: FLOOR_DBFS, peak_at: 0.0, at: 0.0 }
+        Self { shown: FLOOR_DBFS, peak: FLOOR_DBFS, peak_at: 0.0, at: 0.0, given: FLOOR_DBFS, given_at: 0.0 }
     }
 }
 
@@ -45,6 +50,9 @@ impl Ballistics {
     /// The bar after `now`: up at once to a louder level, down at the fall rate.
     fn step(mut self, level: Option<f32>, now: f64) -> Self {
         let level = level.unwrap_or(FLOOR_DBFS).max(FLOOR_DBFS);
+        if level != self.given {
+            (self.given, self.given_at) = (level, now);
+        }
         let fallen = self.shown - FALL_DB_PER_S * (now - self.at).max(0.0) as f32;
         self.shown = level.max(fallen).max(FLOOR_DBFS);
         if self.shown >= self.peak || now - self.peak_at > HOLD {
@@ -54,7 +62,17 @@ impl Ballistics {
         self.at = now;
         self
     }
+
+    /// The bar still moves on its own: it falls, or a peak mark waits to drop, while no new
+    /// level comes (a fed meter is painted by its feeder).
+    fn moves_alone(&self, now: f64) -> bool {
+        let fed = now - self.given_at < FED_WITHIN;
+        !fed && (self.shown > FLOOR_DBFS || self.peak > FLOOR_DBFS)
+    }
 }
+
+/// A level that changed within this time is being fed.
+const FED_WITHIN: f64 = 0.1;
 
 /// The position (0..1) of a level on the scale.
 pub fn scale(dbfs: f32) -> f32 {
@@ -78,7 +96,7 @@ pub fn show(ui: &mut Ui, id: Id, rect: Rect, lanes: &[(&str, Option<f32>)], styl
         let key = id.with(index);
         let state = ui.data_mut(|data| data.get_temp::<Ballistics>(key)).unwrap_or_default().step(*level, now);
         ui.data_mut(|data| data.insert_temp(key, state));
-        moving |= state.shown > FLOOR_DBFS || state.peak > FLOOR_DBFS;
+        moving |= state.moves_alone(now);
         ui.painter().text(egui::pos2(row.left(), row.center().y), Align2::LEFT_CENTER, *label, FontId::proportional(11.0), style.text);
         ui.painter().rect_filled(bar, 1.0, style.background);
         paint_level(ui, bar, state.shown);
@@ -119,6 +137,19 @@ fn colour(dbfs: f32) -> Color32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_fed_meter_asks_no_paint_of_its_own_a_falling_one_does() {
+        let mut state = Ballistics::default();
+        for (index, level) in [-20.0, -18.0, -22.0].iter().enumerate() {
+            state = state.step(Some(*level), index as f64 * 0.02);
+            assert!(!state.moves_alone(index as f64 * 0.02), "the player feeds it");
+        }
+        state = state.step(Some(-22.0), 0.5);
+        assert!(state.moves_alone(0.5), "the sound stopped: the bar falls on its own");
+        state = state.step(Some(-22.0), 5.0);
+        assert!(state.moves_alone(5.0) == (state.shown > FLOOR_DBFS || state.peak > FLOOR_DBFS));
+    }
 
     #[test]
     fn the_bar_rises_at_once_and_falls_slowly_and_the_peak_holds() {

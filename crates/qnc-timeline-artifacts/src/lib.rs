@@ -141,6 +141,12 @@ impl Artifacts {
     }
 
     /// Both give way to the player.
+    /// At most `cap` filmstrip workers and wave readers each (`None`: as many as they like).
+    pub fn set_cap(&mut self, cap: Option<usize>) {
+        self.wave.set_cap(cap);
+        self.filmstrip.set_cap(cap);
+    }
+
     pub fn set_playback_priority(&mut self, active: bool) {
         self.wave.set_playback_priority(active);
         self.filmstrip.set_playback_priority(active);

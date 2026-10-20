@@ -32,6 +32,59 @@ pub const WORKER_RESULT: &str = "worker_result";
 
 const ON: &str = "on";
 const OFF: &str = "off";
+/// The user edits (a step, a mark, a trim) without the player playing: still "on" for
+/// whoever waits for any player work, a lighter level for the background (user 2026-10-20).
+const EDITING: &str = "on:editing";
+
+/// How much a player works now (user 2026-10-20, measured on a 4 core laptop: beside a
+/// playing player one core of background work costs nothing, two cost stutters).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PlaybackLevel {
+    #[default]
+    Idle,
+    /// The user edits: a step, a mark, a trim (the player does not play).
+    Editing,
+    /// The player prepares or plays.
+    Playing,
+}
+
+impl PlaybackLevel {
+    /// The workers background work may run at this level (`None`: as many as it likes).
+    pub fn background_cap(self) -> Option<usize> {
+        match self {
+            Self::Idle => None,
+            Self::Editing => Some(2),
+            Self::Playing => Some(1),
+        }
+    }
+}
+
+/// The level of player work, refreshed recently enough; asks the database at most twice
+/// a second.
+pub fn playback_level(target: ContentTarget) -> Arc<dyn Fn() -> PlaybackLevel + Send + Sync> {
+    let last: Mutex<Option<(Instant, PlaybackLevel)>> = Mutex::new(None);
+    Arc::new(move || {
+        let mut last = last.lock().expect("level state");
+        if let Some((at, value)) = *last {
+            if at.elapsed() < Duration::from_millis(500) {
+                return value;
+            }
+        }
+        let value = target
+            .open(Access::ReadOnly)
+            .and_then(|mut client| client.get_runtime(PLAYBACK))
+            .ok()
+            .flatten()
+            .filter(|entry| entry.age_seconds <= PLAYBACK_FRESH_SECONDS)
+            .map_or(PlaybackLevel::Idle, |entry| match entry.value.as_str() {
+                ON => PlaybackLevel::Playing,
+                EDITING => PlaybackLevel::Editing,
+                _ => PlaybackLevel::Idle,
+            });
+        *last = Some((Instant::now(), value));
+        value
+    })
+}
 
 /// Playback counts while it was refreshed this recently.
 pub const PLAYBACK_FRESH_SECONDS: i64 = 5;
@@ -249,7 +302,7 @@ pub struct PlaybackReporter {
     target_uri: Option<String>,
     sender: Option<Sender<Report>>,
     thread: Option<JoinHandle<()>>,
-    last: bool,
+    last: PlaybackLevel,
     /// The last clip told, told again by a reporter started anew.
     clip: Option<String>,
     /// When a reporter that stopped (its writer did not open) is started again.
@@ -267,14 +320,19 @@ impl PlaybackReporter {
     /// Call it as often as you like; the database is written when the state changes and
     /// renewed once a second while a player works.
     pub fn update(&mut self, target: Option<&ContentTarget>, active: bool) {
+        self.update_level(target, if active { PlaybackLevel::Playing } else { PlaybackLevel::Idle });
+    }
+
+    /// The same with the level of the work (playing, editing or idle).
+    pub fn update_level(&mut self, target: Option<&ContentTarget>, level: PlaybackLevel) {
         let Some(target) = target else {
             return;
         };
         self.bind(target);
-        if self.last != active {
-            self.last = active;
+        if self.last != level {
+            self.last = level;
             if let Some(sender) = &self.sender {
-                let _ = sender.send(Report::Active(active));
+                let _ = sender.send(Report::Active(level));
             }
         }
     }
@@ -301,7 +359,7 @@ impl PlaybackReporter {
         if self.target_uri.as_deref() != Some(target.uri()) {
             self.stop();
             self.target_uri = Some(target.uri().to_string());
-            (self.last, self.clip, self.retry_at) = (false, None, None);
+            (self.last, self.clip, self.retry_at) = (PlaybackLevel::Idle, None, None);
             self.start(target);
             return;
         }
@@ -318,8 +376,8 @@ impl PlaybackReporter {
                 self.retry_at = None;
                 self.start(target);
                 if let Some(sender) = &self.sender {
-                    if self.last {
-                        let _ = sender.send(Report::Active(true));
+                    if self.last != PlaybackLevel::Idle {
+                        let _ = sender.send(Report::Active(self.last));
                     }
                     if let Some(clip) = &self.clip {
                         let _ = sender.send(Report::Clip(clip.clone()));
@@ -345,9 +403,9 @@ impl PlaybackReporter {
 
 impl Drop for PlaybackReporter {
     fn drop(&mut self) {
-        if self.last {
+        if self.last != PlaybackLevel::Idle {
             if let Some(sender) = &self.sender {
-                let _ = sender.send(Report::Active(false));
+                let _ = sender.send(Report::Active(PlaybackLevel::Idle));
             }
         }
         self.stop();
@@ -356,7 +414,7 @@ impl Drop for PlaybackReporter {
 
 #[derive(Debug)]
 enum Report {
-    Active(bool),
+    Active(PlaybackLevel),
     Clip(String),
 }
 
@@ -374,7 +432,7 @@ fn start_reporter(
                 // what is still to be told is told then (external audit 2026-10-17: a writer
                 // that failed once left the reporter silent for good).
                 let mut writer: Option<Writer> = None;
-                let (mut active, mut clip_to_tell): (Option<bool>, Option<String>) = (None, None);
+                let (mut active, mut clip_to_tell): (Option<PlaybackLevel>, Option<String>) = (None, None);
                 loop {
                     match receive.recv_timeout(RENEW_EVERY) {
                         Ok(Report::Active(state)) => active = Some(state),
@@ -398,7 +456,7 @@ fn start_reporter(
 
 /// Writes what the reporter is to tell: the playback state (renewed while on, written
 /// once when off) and the last clip. Kept to tell again when the write fails.
-fn tell(target: &ContentTarget, writer: &mut Option<Writer>, active: &mut Option<bool>, clip: &mut Option<String>) {
+fn tell(target: &ContentTarget, writer: &mut Option<Writer>, active: &mut Option<PlaybackLevel>, clip: &mut Option<String>) {
     if writer.is_none() {
         *writer = Writer::start(target.clone()).ok();
     }
@@ -407,9 +465,14 @@ fn tell(target: &ContentTarget, writer: &mut Option<Writer>, active: &mut Option
     };
     let mut failed = None;
     if let Some(state) = *active {
-        match open.set(PLAYBACK, if state { ON } else { OFF }) {
+        let value = match state {
+            PlaybackLevel::Playing => ON,
+            PlaybackLevel::Editing => EDITING,
+            PlaybackLevel::Idle => OFF,
+        };
+        match open.set(PLAYBACK, value) {
             // On is renewed every second; off is written once.
-            Ok(()) if !state => *active = None,
+            Ok(()) if state == PlaybackLevel::Idle => *active = None,
             Ok(()) => {}
             Err(error) => failed = Some(error),
         }

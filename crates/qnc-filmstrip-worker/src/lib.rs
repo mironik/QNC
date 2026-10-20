@@ -261,6 +261,9 @@ pub struct TimelineFilmstripService {
     workers: Vec<ActiveFilmstripWorker>,
     publisher: Option<Box<dyn FilmstripContentWrite>>,
     playback_priority: bool,
+    /// At most this many workers (user 2026-10-20: while the user edits two; measured:
+    /// beside a playing player one core of background work costs nothing, two cost stutters).
+    cap: Option<usize>,
     /// It makes only the clips it is told (`request`), it looks for none of its own
     /// (import control: each clip after its wave, user 2026-10-15).
     on_orders: bool,
@@ -281,6 +284,7 @@ impl Default for TimelineFilmstripService {
             workers: Vec::new(),
             publisher: None,
             playback_priority: false,
+            cap: None,
             on_orders: false,
             preferred: None,
             given: std::collections::HashMap::new(),
@@ -333,14 +337,27 @@ impl TimelineFilmstripService {
         self.publisher = None;
     }
 
+    /// While a player plays only the preferred clip (the one a preview has open) is made,
+    /// alone; everything else waits (user 2026-10-20).
     pub fn set_playback_priority(&mut self, active: bool) {
         if self.playback_priority == active {
             return;
         }
         self.playback_priority = active;
         if active {
-            self.cancel_active_workers();
+            let preferred = self.preferred.clone();
+            for worker in self.workers.iter().filter(|worker| Some(&worker.request) != preferred.as_ref()) {
+                worker.cancel.store(true, Ordering::Release);
+            }
         } else {
+            self.start_next();
+        }
+    }
+
+    /// At most `cap` workers (`None`: as many as the machine gives).
+    pub fn set_cap(&mut self, cap: Option<usize>) {
+        if self.cap != cap {
+            self.cap = cap;
             self.start_next();
         }
     }
@@ -443,7 +460,7 @@ impl TimelineFilmstripService {
     pub fn poll(&mut self, active_clip_id: Option<&str>) -> FilmstripPoll {
         let mut poll = FilmstripPoll::empty();
         let current_project = self.context.as_ref().map(FilmstripContext::project_id);
-        if !self.playback_priority {
+        {
             if let Some(publisher) = &mut self.publisher {
                 for completion in publisher.poll() {
                     poll.changed = true;
@@ -487,13 +504,14 @@ impl TimelineFilmstripService {
             let worker = self.workers.swap_remove(index);
             let _ = worker.thread.join();
             poll.changed = true;
-            if !self.playback_priority {
+            let held = self.playback_priority && Some(&outcome.request) != self.preferred.as_ref();
+            if !held {
                 self.given.remove(&worker.request.key());
             }
             let current_project = self.context.as_ref().map(FilmstripContext::project_id);
             let matches_active = current_project == Some(outcome.request.project_id.as_str())
                 && active_clip_id == Some(outcome.request.clip_id.as_str());
-            if self.playback_priority {
+            if held {
                 if current_project == Some(outcome.request.project_id.as_str()) {
                     self.enqueue(outcome.request, true);
                 }
@@ -528,8 +546,8 @@ impl TimelineFilmstripService {
                 Err(_) => self.db_complete = false,
             }
         }
+        self.start_next();
         if !self.playback_priority {
-            self.start_next();
             if self.should_resync_content_db() {
                 match self.sync_content_db() {
                     Ok(()) => poll.changed = true,
@@ -599,15 +617,17 @@ impl TimelineFilmstripService {
     }
 
     fn start_next(&mut self) {
-        if self.playback_priority {
-            return;
-        }
         let Some(context) = self.context.clone() else {
             return;
         };
         // The preferred clip does not wait for a free worker: one more runs for it.
         let preferred_first = self.preferred.as_ref().is_some_and(|preferred| self.queue.front() == Some(preferred));
-        let most = filmstrip_workers() + usize::from(preferred_first);
+        let most = match self.playback_priority {
+            // A player plays: only the preferred clip, alone.
+            true if preferred_first && self.workers.is_empty() => 1,
+            true => return,
+            false => filmstrip_workers().min(self.cap.unwrap_or(usize::MAX)) + usize::from(preferred_first),
+        };
         while self.workers.len() < most {
             let Some(request) = self.queue.pop_front() else {
                 return;

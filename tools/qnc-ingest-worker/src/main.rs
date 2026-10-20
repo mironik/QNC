@@ -267,12 +267,16 @@ fn run_artifacts(
     let target = qnc_content_store::ContentTarget::for_project(&reader, &settings)?;
     // Any player of any form announces itself in the project database; the
     // generators give way while it prepares or plays.
-    let player_works = qnc_playback_activity::playback_pause(target.clone());
+    // While the user edits two workers, while the player plays only the open clip's (user
+    // 2026-10-20: measured, one core beside a playing player costs nothing).
+    let level = qnc_playback_activity::playback_level(target.clone());
+    let player_works = || level() == qnc_playback_activity::PlaybackLevel::Playing;
     let mut artifacts = qnc_content_artifacts::ProjectArtifacts::new();
     artifacts.set_host_root(root);
     // Published under the lease, checked by the database owner in the same transaction.
     artifacts.set_write_lease(lease.write_lease());
     artifacts.set_playback_priority(player_works());
+    artifacts.set_cap(level().background_cap());
     artifacts.sync(&reader, &settings, target.clone(), false)?;
     let deadline = std::time::Instant::now() + Duration::from_secs(60 * 60);
     let mut shown_checked = std::time::Instant::now() - Duration::from_secs(1);
@@ -299,6 +303,7 @@ fn run_artifacts(
             }
         }
         artifacts.set_playback_priority(player_works());
+        artifacts.set_cap(level().background_cap());
         let polled = artifacts.poll(None);
         if let Some(error) = polled.error {
             return Err(error);

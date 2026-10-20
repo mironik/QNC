@@ -54,10 +54,12 @@ enum Paint {
 }
 
 fn paint_when(changed: bool, playing: bool, cadence: Option<Duration>) -> Option<Paint> {
-    if changed && !playing {
-        Some(Paint::Now)
-    } else {
-        cadence.map(Paint::After)
+    match (changed, playing) {
+        // While the player plays only its new pictures paint: the source rate (25 for PAL,
+        // 30 for NTSC, 50 for 50p), not more (user 2026-10-20: 61 paints a second for 50p).
+        (_, true) => None,
+        (true, false) => Some(Paint::Now),
+        (false, false) => cadence.map(Paint::After),
     }
 }
 
@@ -69,7 +71,7 @@ mod tests {
     fn a_change_paints_at_once_unless_the_player_plays() {
         let cadence = Some(Duration::from_millis(40));
         assert_eq!(paint_when(true, false, cadence), Some(Paint::Now));
-        assert_eq!(paint_when(true, true, cadence), Some(Paint::After(Duration::from_millis(40))));
+        assert_eq!(paint_when(true, true, cadence), None, "the player's picture paints it");
         assert_eq!(paint_when(true, true, None), None, "the player's picture wakes it");
         assert_eq!(paint_when(false, false, None), None);
     }

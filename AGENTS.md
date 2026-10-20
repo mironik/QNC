@@ -5141,3 +5141,17 @@ nosi A1 prozora sljedeceg Synca: `want_sync_bed`, ponovno otvaranje samo dok kli
 `stop_sync_bed`), `qnc-sync-session` (IN/Space salje `StartSyncBed` od slike IN-a, Sync koji stane salje `StopSyncBed`).
 Jedan player, jedan sat, jedan zvucni izlaz; A1 price pocinje na uzorku slike IN-a. Testovi, conformance. Uzivo nije
 provjereno.
+Otkljucano i izvedeno 2026-10-20 (korisnik: "idemo testirati koliko treba procesor jezgri za montazu i koliko bi mogli
+koristiti za filmstrip i wave paralelno"; "da, otkljucaj i kreni sa svim tockama"; "ako je PAL vise od 25 osvjezavanja u
+sekundi mozda i ne treba"): mjereno na laptopu (i5-1135G7, 4 jezgre / 8 niti): montaza bez pozadine sucelje 0,85 i player
+0,97 jezgre (medijan; 90 % vremena ukupno 3,5 od 8); pozadina kad radi medijan 2,4, do 5,8 jezgri, ali se dosad za vrijeme
+playa (i 3 s nakon svakog koraka) uopce nije pokretala. Player uz N paralelnih dekodera originala (izolirana kopija,
+`qnc-player-acceptance`): 1 jezgra bez gubitka, 2 jezgre pocinju trzaji, 4 jezgre prica 90 % slika i A/V do 1,8 slike.
+Izvedeno: `qnc-playback-activity` tri razine (`PlaybackLevel`: svira `on`, montira se `on:editing`, miruje; tko ceka bilo
+koji rad playera i dalje ceka obje), `playback_level`, `background_cap` (svira 1, montira se 2, miruje sve),
+`PlaybackReporter::update_level`; `qnc-source-preview` javlja razinu; `qnc-filmstrip-worker` i `qnc-wave-worker` dok
+player svira rade samo klip otvoren u previewu, sam (ostali se prekidaju i vracaju u red), inace najvise `set_cap` radnika;
+`qnc-timeline-artifacts`, `qnc-content-artifacts` (`set_cap`), `tools/qnc-ingest-worker` (cita razinu). Crtanje sucelja:
+dok player svira crta se samo uz njegovu novu sliku (stopa izvora: 25, 30, 50), nikad uz ritam aplikacije
+(`qnc-paint-pace`; mjereno 61 crtanje u sekundi za 50p); `qnc-level-meter` sam trazi crtanje samo dok mu razina pada bez
+novih razina. Testovi, conformance. Uzivo nije provjereno.
