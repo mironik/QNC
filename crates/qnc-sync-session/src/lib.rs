@@ -113,11 +113,11 @@ fn space(preview: &mut SourcePreview, wrap: &mut WrapSession, segments: &mut Pro
             if preview.player_view().playing() && !preview.in_program() {
                 return true;
             }
-            match preview.in_program() {
-                true => _ = preview.open_at(&sync.clip_id, sync.source_in),
-                false => _ = preview.cue(sync.source_in),
+            if preview.in_program() {
+                preview.open_at(&sync.clip_id, sync.source_in);
+                return preview.toggle_play();
             }
-            preview.toggle_play()
+            preview.play_from(sync.source_in)
         }
         SyncSpace::Blocked => true,
         SyncSpace::Play => preview.toggle_play(),

@@ -878,6 +878,17 @@ impl SourcePreview {
         }
     }
 
+    /// The clip plays from `frame`: at once when it stands there, else once the cue to it
+    /// landed (a Play sent behind a cue in flight is refused as not ready).
+    pub fn play_from(&mut self, frame: u64) -> bool {
+        if self.player_view.confirmed_source_frame() == Some(frame) && self.cue_in_flight.is_none() {
+            return self.toggle_play();
+        }
+        self.cue(frame);
+        self.play_when_ready = true;
+        true
+    }
+
     /// The clip frame the player confirmed, while it plays the clip (not a program).
     pub fn clip_frame(&self) -> Option<u64> {
         (!self.program).then(|| self.player_view.confirmed_source_frame()).flatten()
@@ -1019,7 +1030,9 @@ impl SourcePreview {
             let waiting = self.player_view.error.as_deref().is_some_and(qnc_player_input::is_incomplete_media);
             if self.player_view.error.is_some() && !waiting {
                 self.play_when_ready = false;
-            } else if self.player_view.can_start_playback() && !self.player_view.playing() {
+            } else if self.player_view.can_start_playback() && !self.player_view.playing() && self.cue_in_flight.is_none() {
+                // A cue still in flight first lands (live 2026-10-20: Play sent behind it was
+                // refused as not ready).
                 if let Some(player) = &self.player {
                     match player.send(Action::TogglePlayPause) {
                         Ok(()) => self.play_when_ready = false,
