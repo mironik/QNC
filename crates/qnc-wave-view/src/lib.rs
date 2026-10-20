@@ -40,21 +40,56 @@ pub fn paint_wave_peaks_gain(painter: &egui::Painter, rect: Rect, peaks: &[f32],
     if peaks.is_empty() || rect.width() < 2.0 || !painter.clip_rect().intersects(rect) {
         return;
     }
-    painter.add(egui::Shape::mesh(wave_mesh(rect, peaks, gain, color, painter.clip_rect())));
+    painter.add(egui::Shape::Mesh(cached_mesh(painter.ctx(), rect, peaks, gain, color)));
 }
 
-/// The wave as one mesh, a one pixel column per peak range: the same look as a line per
-/// column, built once instead of a line shape per column for the tessellator (user
-/// 2026-10-20: the tessellation of the waves took most of a playing frame).
-fn wave_mesh(rect: Rect, peaks: &[f32], gain: f32, color: Color32, clip: Rect) -> egui::Mesh {
+/// Built meshes, kept while they are painted: a wave changes only with its peaks, its rect,
+/// its level or its colour (user 2026-10-20: a level step builds that one lane again).
+#[derive(Clone, Default)]
+struct WaveMeshes(std::collections::HashMap<u64, (std::sync::Arc<egui::Mesh>, u64)>);
+
+/// Frames a mesh not painted is kept.
+const KEEP_PASSES: u64 = 120;
+
+fn cached_mesh(ctx: &egui::Context, rect: Rect, peaks: &[f32], gain: f32, color: Color32) -> std::sync::Arc<egui::Mesh> {
+    let key = mesh_key(rect, peaks, gain, color);
+    let pass = ctx.cumulative_pass_nr();
+    let store = egui::Id::new("qnc-wave-meshes");
+    ctx.data_mut(|data| {
+        let meshes = data.get_temp_mut_or_default::<WaveMeshes>(store);
+        if let Some((mesh, used)) = meshes.0.get_mut(&key) {
+            *used = pass;
+            return mesh.clone();
+        }
+        meshes.0.retain(|_, (_, used)| pass.saturating_sub(*used) < KEEP_PASSES);
+        let mesh = std::sync::Arc::new(wave_mesh(rect, peaks, gain, color));
+        meshes.0.insert(key, (mesh.clone(), pass));
+        mesh
+    })
+}
+
+/// What makes a mesh: the rect, the level, the colour and every peak (a fast fold of their
+/// bits; a different wave of the same size is another key).
+fn mesh_key(rect: Rect, peaks: &[f32], gain: f32, color: Color32) -> u64 {
+    let mut key: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut fold = |value: u32| key = (key ^ u64::from(value)).wrapping_mul(0x0000_0100_0000_01b3);
+    for value in [rect.min.x, rect.min.y, rect.max.x, rect.max.y, gain] {
+        fold(value.to_bits());
+    }
+    fold(u32::from_le_bytes(color.to_array()));
+    fold(peaks.len() as u32);
+    peaks.iter().for_each(|peak| fold(peak.to_bits()));
+    key
+}
+
+/// The wave as one filled shape: the line through the peaks of each pixel column above the
+/// middle, its mirror below, the band between them filled (two points a column; user
+/// 2026-10-20: cheaper than a column of its own per pixel, and smoother).
+fn wave_mesh(rect: Rect, peaks: &[f32], gain: f32, color: Color32) -> egui::Mesh {
     let mid = rect.center().y;
     let half = rect.height() * 0.48;
     let mut mesh = egui::Mesh::default();
     for (x_index, range) in peak_ranges_for_width(peaks.len(), rect.width()).enumerate() {
-        let x = rect.left() + x_index as f32;
-        if x + 1.0 < clip.left() || x > clip.right() {
-            continue;
-        }
         let max_peak = peaks[range]
             .iter()
             .map(|peak| peak.abs())
@@ -62,11 +97,14 @@ fn wave_mesh(rect: Rect, peaks: &[f32], gain: f32, color: Color32, clip: Rect) -
             .mul_add(gain, 0.0)
             .clamp(0.0, 1.0);
         let amp = max_peak * half;
-        if amp <= 0.0 {
-            continue;
+        let x = rect.left() + x_index as f32 + 0.5;
+        mesh.colored_vertex(egui::pos2(x, mid - amp), color);
+        mesh.colored_vertex(egui::pos2(x, mid + amp), color);
+        if x_index > 0 {
+            let at = 2 * x_index as u32;
+            mesh.add_triangle(at - 2, at - 1, at);
+            mesh.add_triangle(at - 1, at + 1, at);
         }
-        let column = Rect::from_min_max(egui::pos2(x, mid - amp), egui::pos2(x + 1.0, mid + amp));
-        mesh.add_colored_rect(column, color);
     }
     mesh
 }
@@ -97,12 +135,13 @@ mod tests {
     }
 
     #[test]
-    fn a_wave_is_one_column_per_pixel_in_one_mesh() {
+    fn a_wave_is_one_filled_band_two_points_a_column() {
         let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(4.0, 10.0));
-        let mesh = wave_mesh(rect, &[0.5, 0.0, 1.0, 0.25], 1.0, Color32::WHITE, rect);
-        assert_eq!(mesh.vertices.len(), 3 * 4, "a silent column draws nothing");
-        let tallest = mesh.vertices[4..8].iter().map(|v| v.pos.y).fold(f32::MAX, f32::min);
-        assert!((tallest - (5.0 - 4.8)).abs() < 1e-4, "full scale reaches 48 % of the lane above the middle");
+        let mesh = wave_mesh(rect, &[0.5, 0.0, 1.0, 0.25], 1.0, Color32::WHITE);
+        assert_eq!(mesh.vertices.len(), 4 * 2);
+        assert_eq!(mesh.indices.len(), 3 * 6, "two triangles between neighbouring columns");
+        assert!((mesh.vertices[4].pos.y - (5.0 - 4.8)).abs() < 1e-4, "full scale reaches 48 % of the lane above the middle");
+        assert_ne!(mesh_key(rect, &[0.5], 1.0, Color32::WHITE), mesh_key(rect, &[0.5], 2.0, Color32::WHITE), "another level, another mesh");
     }
 
     #[test]

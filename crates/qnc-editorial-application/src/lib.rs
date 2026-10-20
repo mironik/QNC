@@ -185,7 +185,7 @@ impl EditorialApplication {
     /// the view changed.
     pub fn poll(&mut self, pointed: Option<&str>) -> bool {
         let mut changed = self.poll_catalog();
-        if self.preview.poll_pointed(pointed) {
+        if qnc_dev_diagnostics::timed_block("poll-preview", || self.preview.poll_pointed(pointed)) {
             changed = true;
         }
         for poster in self.posters.poll() {
@@ -208,10 +208,10 @@ impl EditorialApplication {
     }
 
     fn sync_preview_view(&mut self) {
-        if self.segments.poll() { self.store_short_stills(None) } // posters of the covers just saved
+        if qnc_dev_diagnostics::timed_block("poll-segments", || self.segments.poll()) { self.store_short_stills(None) } // posters of the covers just saved
         let previous_clip_id = self.view.preview.clip_id.clone();
         let previous_timeline = self.view.preview.timeline;
-        self.view.preview = self.preview.view().clone();
+        self.view.preview = qnc_dev_diagnostics::timed_block("poll-preview-copy", || self.preview.view().clone());
         let assets = std::mem::take(&mut self.view.preview.assets);
         let posters = self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.thumb_image.as_deref()));
         self.view.preview.assets = qnc_timeline_assets::with_clip_poster(assets, posters);
@@ -230,7 +230,7 @@ impl EditorialApplication {
         let timebase = self.preview.player_view().source_timebase();
         let timeline = self.view.preview.timeline;
         let source = self.focus.source_timeline_mut(); // the one source timeline: lanes, channels, timecode
-        self.view.source_timeline = source.sync(self.view.preview.clip_id.as_deref(), self.content_target.as_ref().map(|targets| &targets.0)).clone();
+        self.view.source_timeline = qnc_dev_diagnostics::timed_block("poll-source-sync", || source.sync(self.view.preview.clip_id.as_deref(), self.content_target.as_ref().map(|targets| &targets.0)).clone());
         self.segments.set_source(SourcePick::new(
             self.view.chosen_clip_id(),
             self.view.current_clip_label(),
@@ -253,9 +253,9 @@ impl EditorialApplication {
             None => self.wrap.follow_program(confirmed),
         }
         self.segments.set_playhead(Some(self.wrap.playhead()));
-        self.view.focus = self.focus.poll((&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline));
-        self.view.segments = self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames, clip.thumb_image.as_ref())));
-        self.trim_stills.fill(&mut self.view.segments, self.preview.still_locator(), self.preview.shown_program_picture().and_then(|s| Some((self.segments.stored_picture_at(s.frame)?, s)))); // edit pictures, the monitor's first
+        self.view.focus = qnc_dev_diagnostics::timed_block("poll-focus", || self.focus.poll((&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline)));
+        self.view.segments = qnc_dev_diagnostics::timed_block("poll-segments-view", || self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames, clip.thumb_image.as_ref()))));
+        qnc_dev_diagnostics::timed_block("poll-trim", || self.trim_stills.fill(&mut self.view.segments, self.preview.still_locator(), self.preview.shown_program_picture().and_then(|s| Some((self.segments.stored_picture_at(s.frame)?, s))))); // edit pictures, the monitor's first
     }
 
 
