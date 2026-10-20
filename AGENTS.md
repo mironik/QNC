@@ -5039,3 +5039,18 @@ koristen source timeline, nije radio nista (`routed=Some(false)` desetke puta: `
 Sada je korak tada klik na Wrap red jednu sliku od Wrap playheada, pa se Wrap vraca (`qnc-segments-keys` `step`); prazna
 prica i dalje ne radi nista. Zlatna tablica tipki nepromijenjena. Nalazi loga bez izmjene: testovi pisu `story-key` u
 stvarni `data/diagnostics/player.log` (1,97 GB, bez rotacije); frameovi sucelja Storyja 25-89 ms dok radi prerender.
+Otkljucano i izvedeno 2026-10-20 (korisnik: "pogledaj sto se sve moze iz formi izvuci u kocke i module"; "da, otkljucaj
+Project i kreni s 1 i 2"; Project otkljucan samo za preglednik lokacija): (1) nova javna kocka-panel
+`crates/qnc-dir-browser-panel` (+ `contracts/modules/dir-browser-panel.module.json`): jedini preglednik lokacija (izvori,
+Gore, Diskovi, putanja / koraci putanje / diskovi racunala, mape, greska, ucitavanje, okvir fokusa); crta neutralne retke
+koje forma da i vraca radnju. Ingest (`qnc-ingest-blocks` `location_browser.rs`) i Project (`qnc-project-blocks`
+`location_browser.rs`) samo predaju svoje stanje i tekstove; `browser_entries.rs` i pomocni linkovi Ingesta uklonjeni.
+Boja greske je jedna (`qnc-desktop-theme::danger`), pa je u Projectu sada ista kao u Ingestu. (2) Mreza media poola:
+`qnc-media-card` `show_pool` sam slaze kartice, tockice stanja, oznaku i natpis spremanja iz svojstva `PoolItem` koje
+daju klip Ingesta (`ClipView`), klip Storyja/MA (`EditorialClip`) i short/B-roll (`qnc-virtual-short-cards`); forme vise
+ne grade `CardRow`. Da aplikacijski slojevi ne narastu, duplikati su izasli u kocke: zadrzavanje ucitanih postera i popis
+postera koji nedostaju (`qnc-media-thumbnail` `LoadedThumbnail`, `keep_loaded`, `missing`, test) i citaci izvora
+(`qnc-source-bindings` `TransportBindings::readers`, `SourceBinding::reader`; Story je imao svoju kopiju). C10 spusteno:
+Ingest ploca 824 -> 561, Story ploca 301 -> 206, Project ploca 1932 -> 1714, Ingest aplikacija 1542 -> 1538, Story
+aplikacija 649 -> 643; uklonjene iznimke C1 (oba preglednika), C2 boja (Project preglednik), C3 (obje mreze). Testovi,
+conformance. Uzivo nije provjereno. Project je ponovno zamrznut.

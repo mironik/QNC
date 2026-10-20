@@ -1,5 +1,8 @@
 use super::*;
 
+use qnc_media_card::{CardGridAction, PoolGrid, PoolLook};
+
+/// The media pool: the public pool grid of `qnc-media-card` on this form's place.
 pub(super) fn render_clip_grid(
     ui: &mut Ui,
     contracts: &IngestContracts,
@@ -7,97 +10,44 @@ pub(super) fn render_clip_grid(
     view: &IngestViewModel,
 ) -> Option<IngestIntent> {
     let outer = qnc_ui_kit::fill_block(ui, theme.bg);
-    let rect = outer.shrink(contracts.ingest.board.block_pad);
-
-    let empty_message = empty_grid_message(contracts, view);
-    let clips = view.visible_clips().collect::<Vec<_>>();
-    let rows = clips
-        .iter()
-        .map(|clip| {
-            let marker = if clip.imported {
-                qnc_ingest_layout::rgb(contracts.ingest.clip_grid.imported_marker_rgb)
-            } else {
-                theme.text_muted
-            };
-            qnc_media_card::CardRow {
-                id: clip.clip_id.as_str(),
-                thumb_id: clip.thumb_uri.as_deref().unwrap_or(clip.clip_id.as_str()),
-                title: clip.name.as_str(),
-                duration_sec: clip.duration_seconds,
-                duration_label: "",
-                import_status: if clip.imported { "imported" } else { "" },
-                status_proxy: "",
-                status_original: "",
-                overlay_label: save_state_label(contracts, clip),
-                top_right_marker: Some(marker),
-                checked: clip.selected,
-                rgba_thumb: clip
-                    .thumb_uri
-                    .as_deref()
-                    .zip(clip.thumb_image.as_ref())
-                    .map(|(uri, image)| qnc_media_card::RgbaThumb {
-                        uri,
-                        content_key: image.content_key,
-                        size: image.size,
-                        rgba: &image.pixels,
-                    }),
-            }
-        })
-        .collect::<Vec<_>>();
-    let style = qnc_media_card::CardStyle {
-        raised: theme.surface_alt,
-        surface: theme.surface,
-        border: theme.border,
-        text: theme.text,
-        muted: theme.text_muted,
-        select_red: theme.danger,
+    let grid = &contracts.ingest.clip_grid;
+    let look = PoolLook {
+        style: qnc_media_card::CardStyle {
+            raised: theme.surface_alt,
+            surface: theme.surface,
+            border: theme.border,
+            text: theme.text,
+            muted: theme.text_muted,
+            select_red: theme.danger,
+        },
+        metrics: qnc_media_card::CardMetrics {
+            min_card_width: grid.min_card_width,
+            card_text_height: grid.card_text_height,
+            grid_gap: grid.grid_gap,
+        },
+        features: qnc_media_card::MediaCardFeatures {
+            selection_check: true,
+            top_right_marker: true,
+            status_dots: qnc_media_card::StatusDotsMode::Off,
+        },
+        imported_marker: qnc_ingest_layout::rgb(grid.imported_marker_rgb),
+        not_imported_marker: theme.text_muted,
+        saving: &grid.saving_label,
+        save_failed: &grid.save_failed_label,
+        focus: theme.focus,
     };
-    let metrics = qnc_media_card::CardMetrics {
-        min_card_width: contracts.ingest.clip_grid.min_card_width,
-        card_text_height: contracts.ingest.clip_grid.card_text_height,
-        grid_gap: contracts.ingest.clip_grid.grid_gap,
+    let pool = PoolGrid {
+        rect: outer.shrink(contracts.ingest.board.block_pad),
+        chosen_id: view.preview_clip_id.as_deref().unwrap_or(""),
+        panel_focused: view.focus.is(qnc_focus_walk::CARDS),
+        step: view.focus.step_of(qnc_focus_walk::CARDS),
+        empty_message: empty_grid_message(contracts, view),
+        id_salt: if view.clip_filter == ClipFilter::New { "ingest_grid_new" } else { "ingest_grid_all" },
     };
-    let features = qnc_media_card::MediaCardFeatures {
-        selection_check: true,
-        top_right_marker: true,
-        status_dots: qnc_media_card::StatusDotsMode::Off,
-    };
-    let no_textures = std::collections::HashMap::new();
-    let mut action = None;
-    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-        action = qnc_media_card::show_card_grid_focused(
-            ui,
-            &style,
-            &metrics,
-            &qnc_media_card::CardGridInput {
-                height: rect.height(),
-                selected_id: view.preview_clip_id.as_deref().unwrap_or(""),
-                focused_id: "",
-                panel_focused: view.focus.is(qnc_focus_walk::CARDS),
-                cards: &rows,
-                thumb_textures: &no_textures,
-                tc: &qnc_media_card::minutes_seconds,
-                features,
-                empty_message,
-                id_salt: if view.clip_filter == ClipFilter::New {
-                    "ingest_grid_new"
-                } else {
-                    "ingest_grid_all"
-                },
-            },
-            (view.focus.step_of(qnc_focus_walk::CARDS), theme.focus),
-        );
-    });
-    match action {
-        Some(qnc_media_card::CardGridAction::ToggleSelection(id)) => Some(IngestIntent::new(
-            action_ids::INGEST_CLIP_TOGGLE,
-            IngestPayload::ClipId(id),
-        )),
-        Some(qnc_media_card::CardGridAction::Activate(id)) => Some(IngestIntent::new(
-            action_ids::INGEST_PREVIEW_FOCUS,
-            IngestPayload::ClipId(id),
-        )),
-        None => None,
+    let clips: Vec<&ClipView> = view.visible_clips().collect();
+    match qnc_media_card::show_pool(ui, &clips, &pool, &look)? {
+        CardGridAction::ToggleSelection(id) => Some(IngestIntent::new(action_ids::INGEST_CLIP_TOGGLE, IngestPayload::ClipId(id))),
+        CardGridAction::Activate(id) => Some(IngestIntent::new(action_ids::INGEST_PREVIEW_FOCUS, IngestPayload::ClipId(id))),
     }
 }
 
@@ -113,13 +63,4 @@ fn empty_grid_message<'a>(contracts: &'a IngestContracts, view: &'a IngestViewMo
             &contracts.ingest.clip_grid.empty_message
         }
     })
-}
-
-fn save_state_label<'a>(contracts: &'a IngestContracts, clip: &ClipView) -> &'a str {
-    let grid = &contracts.ingest.clip_grid;
-    match clip.save_state {
-        qnc_ingest_application::SaveState::Pending => &grid.saving_label,
-        qnc_ingest_application::SaveState::Failed => &grid.save_failed_label,
-        _ => "",
-    }
 }

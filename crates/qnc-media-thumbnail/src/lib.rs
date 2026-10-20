@@ -35,6 +35,31 @@ pub trait ThumbnailItem {
     fn set_thumbnail_ready(&mut self, image: Arc<qnc_image_assets::RgbaImage>);
 }
 
+/// An item that holds its poster once it is loaded (user 2026-10-20: each application kept
+/// its own copy of "keep the loaded posters" and "which posters are missing").
+pub trait LoadedThumbnail: ThumbnailItem {
+    fn thumbnail_image(&self) -> Option<&Arc<qnc_image_assets::RgbaImage>>;
+}
+
+/// The items of a new list keep the poster already loaded for the same item and address.
+pub fn keep_loaded<T: LoadedThumbnail>(items: &mut [T], previous: &[T]) {
+    for item in items {
+        let old = previous.iter().find(|old| old.item_id() == item.item_id() && old.thumbnail_uri() == item.thumbnail_uri());
+        if let Some(image) = old.and_then(|old| old.thumbnail_image()).cloned() {
+            item.set_thumbnail_ready(image);
+        }
+    }
+}
+
+/// The posters still to load: (item, address) of every item with an address and no poster.
+pub fn missing<T: LoadedThumbnail>(items: &[T]) -> Vec<(String, String)> {
+    items
+        .iter()
+        .filter(|item| item.thumbnail_image().is_none())
+        .filter_map(|item| Some((item.item_id().to_string(), item.thumbnail_uri()?.to_string())))
+        .collect()
+}
+
 /// A project folder on this machine: posters copied into it are addressed by project
 /// URIs (`<root_uri>/<relative path>`), which are not source references.
 #[derive(Debug, Clone)]
@@ -266,6 +291,7 @@ mod project_read_tests {
         id: String,
         uri: Option<String>,
         ready: bool,
+        image: Option<Arc<qnc_image_assets::RgbaImage>>,
     }
 
     impl ThumbnailItem for Row {
@@ -277,9 +303,29 @@ mod project_read_tests {
             self.uri.as_deref()
         }
 
-        fn set_thumbnail_ready(&mut self, _image: Arc<qnc_image_assets::RgbaImage>) {
+        fn set_thumbnail_ready(&mut self, image: Arc<qnc_image_assets::RgbaImage>) {
             self.ready = true;
+            self.image = Some(image);
         }
+    }
+
+    impl LoadedThumbnail for Row {
+        fn thumbnail_image(&self) -> Option<&Arc<qnc_image_assets::RgbaImage>> {
+            self.image.as_ref()
+        }
+    }
+
+    #[test]
+    fn a_new_list_keeps_loaded_posters_of_the_same_address_and_lists_the_missing() {
+        let image = Arc::new(qnc_image_assets::RgbaImage { size: [1, 1], pixels: vec![0; 4], content_key: 1 });
+        let row = |id: &str, uri: &str| Row { id: id.into(), uri: Some(uri.into()), ..Row::default() };
+        let mut loaded = row("a", "u1");
+        loaded.set_thumbnail_ready(image);
+        let mut new = vec![row("a", "u1"), row("b", "u2"), row("a", "u3")];
+        new[2].id = "c".into();
+        keep_loaded(&mut new, &[loaded]);
+        assert!(new[0].ready && !new[1].ready);
+        assert_eq!(missing(&new), vec![("b".into(), "u2".into()), ("c".into(), "u3".into())]);
     }
 
     #[test]
@@ -306,6 +352,7 @@ mod project_read_tests {
             id: "c1".into(),
             uri: Some("qnc://local/project/p1/products/thumbnails/poster.png".into()),
             ready: false,
+            image: None,
         }];
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
         while service.has_pending_work() {

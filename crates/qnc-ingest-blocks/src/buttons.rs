@@ -1,32 +1,5 @@
 use super::*;
 
-pub(super) fn text_link(ui: &mut Ui, text: &str, enabled: bool, theme: &Theme) -> egui::Response {
-    ui.add_enabled(
-        enabled,
-        Label::new(RichText::new(text).color(if enabled {
-            theme.text
-        } else {
-            theme.text_muted
-        }))
-        .sense(Sense::click()),
-    )
-}
-
-pub(super) fn fixed_text_link(
-    ui: &mut Ui,
-    text: &str,
-    enabled: bool,
-    width: f32,
-    theme: &Theme,
-) -> egui::Response {
-    ui.allocate_ui_with_layout(
-        Vec2::new(width, theme.chrome_control_height),
-        Layout::left_to_right(Align::Center),
-        |ui| text_link(ui, text, enabled, theme),
-    )
-    .inner
-}
-
 pub(super) fn action_button(
     ui: &mut Ui,
     text: &str,

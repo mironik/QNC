@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.dir-browser-panel",
+  "module_name": "Location browser panel",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.panel.dir_browser"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-dir-browser-panel",
+  "input": "The form's browser state as neutral rows (source tabs, path or steps or the computer's disks, folders, error, busy), its words, colours and the keyboard focus its focus walk gives.",
+  "output": "The user's request: a source tab, open a URI, Up or Disks. It owns no browser session and reads no filesystem.",
+  "specification": "User 2026-10-20: a block written once works everywhere; the Ingest and Project forms each drew their own location browser, now both place this one panel."
+}

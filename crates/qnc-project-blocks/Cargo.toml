@@ -12,6 +12,8 @@ qnc-board = { workspace = true }
 qnc-confirm-dialog = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
+qnc-dir-browser-panel = { workspace = true }
+qnc-desktop-theme = { workspace = true }
 qnc-export-preset = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
 qnc-project-application = { workspace = true }

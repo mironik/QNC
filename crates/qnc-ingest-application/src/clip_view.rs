@@ -131,6 +131,10 @@ impl qnc_ingest_clip_list::ClipListItem for ClipView {
     }
 }
 
+impl qnc_media_thumbnail::LoadedThumbnail for ClipView {
+    fn thumbnail_image(&self) -> Option<&std::sync::Arc<qnc_image_assets::RgbaImage>> { self.thumb_image.as_ref() }
+}
+
 impl qnc_media_thumbnail::ThumbnailItem for ClipView {
     fn item_id(&self) -> &str {
         &self.clip_id
@@ -144,4 +148,21 @@ impl qnc_media_thumbnail::ThumbnailItem for ClipView {
         self.thumb_image = Some(image);
         self.thumb_status = ThumbStatus::Ready;
     }
+}
+
+/// The clip's card in the media pool (piece `qnc-media-card`).
+impl qnc_media_card::PoolItem for ClipView {
+    fn card_id(&self) -> &str { &self.clip_id }
+    fn card_title(&self) -> &str { &self.name }
+    fn card_poster(&self) -> (Option<&str>, Option<&qnc_image_assets::RgbaImage>) { (self.thumb_uri.as_deref(), self.thumb_image.as_deref()) }
+    fn card_seconds(&self) -> f64 { self.duration_seconds }
+    fn card_import(&self) -> (&str, &str) { (if self.imported { "imported" } else { "" }, "") }
+    fn card_marker(&self) -> qnc_media_card::PoolMarker {
+        if self.imported { qnc_media_card::PoolMarker::Imported } else { qnc_media_card::PoolMarker::NotImported }
+    }
+    fn card_overlay(&self) -> qnc_media_card::PoolOverlay {
+        use qnc_media_card::PoolOverlay::{None as Clear, SaveFailed, Saving};
+        match self.save_state { SaveState::Pending => Saving, SaveState::Failed => SaveFailed, _ => Clear }
+    }
+    fn card_checked(&self) -> Option<bool> { Some(self.selected) }
 }

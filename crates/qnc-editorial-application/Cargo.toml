@@ -14,6 +14,7 @@ qnc-content-store = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-content-read = { workspace = true }
 qnc-image-assets = { workspace = true }
+qnc-media-card = { workspace = true }
 qnc-media-thumbnail = { workspace = true }
 qnc-program-segments = { workspace = true }
 qnc-program-waveform = { workspace = true }
@@ -28,7 +29,6 @@ qnc-trim-stills = { workspace = true }
 qnc-source-bindings = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-timeline-assets = { workspace = true }
-qnc-source-reader = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-virtual-short-cards = { workspace = true }
 qnc-virtual-short-stills = { workspace = true }

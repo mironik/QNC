@@ -3443,6 +3443,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-dir-browser-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-media-pool-head",
+]
+
+[[package]]
 name = "qnc-editorial-application"
 version = "0.1.0"
 dependencies = [
@@ -3455,6 +3463,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-image-assets",
+ "qnc-media-card",
  "qnc-media-thumbnail",
  "qnc-panel-focus",
  "qnc-pending-marks",
@@ -3464,7 +3473,6 @@ dependencies = [
  "qnc-shot-stills",
  "qnc-source-bindings",
  "qnc-source-preview",
- "qnc-source-reader",
  "qnc-source-timeline",
  "qnc-timeline",
  "qnc-timeline-assets",
@@ -3689,6 +3697,7 @@ dependencies = [
  "qnc-ingest-selection-write",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
+ "qnc-media-card",
  "qnc-media-thumbnail",
  "qnc-playback-priority",
  "qnc-player-client",
@@ -3713,6 +3722,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
+ "qnc-dir-browser-panel",
  "qnc-focus-walk",
  "qnc-ingest-application",
  "qnc-ingest-layout",
@@ -4101,6 +4111,7 @@ name = "qnc-media-card"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-image-assets",
  "qnc-ui-kit",
 ]
 
@@ -4707,7 +4718,9 @@ dependencies = [
  "qnc-board",
  "qnc-confirm-dialog",
  "qnc-contracts",
+ "qnc-desktop-theme",
  "qnc-dir-browser",
+ "qnc-dir-browser-panel",
  "qnc-export-preset",
  "qnc-keyboard-shortcut",
  "qnc-project-application",
@@ -4958,6 +4971,7 @@ name = "qnc-source-bindings"
 version = "0.1.0"
 dependencies = [
  "qnc-contracts",
+ "qnc-source-reader",
  "qnc-source-volumes",
  "qnc-transport-resolver",
  "qnc-ui-text",
@@ -5330,6 +5344,7 @@ name = "qnc-virtual-short-cards"
 version = "0.1.0"
 dependencies = [
  "qnc-image-assets",
+ "qnc-media-card",
  "qnc-virtual-shots",
 ]
 

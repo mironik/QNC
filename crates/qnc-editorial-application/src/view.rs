@@ -45,6 +45,15 @@ pub struct EditorialClip {
     pub imported_media_uri: String,
 }
 
+/// The clip's card in the media pool (piece `qnc-media-card`).
+impl qnc_media_card::PoolItem for EditorialClip {
+    fn card_id(&self) -> &str { &self.clip_id }
+    fn card_title(&self) -> &str { &self.name }
+    fn card_poster(&self) -> (Option<&str>, Option<&qnc_image_assets::RgbaImage>) { (self.thumb_uri.as_deref(), self.thumb_image.as_deref()) }
+    fn card_seconds(&self) -> f64 { self.duration_seconds }
+    fn card_import(&self) -> (&str, &str) { (&self.import_status, &self.imported_media_uri) }
+}
+
 #[derive(Clone, Default)]
 pub struct EditorialView {
     pub library_tab: LibraryTab,

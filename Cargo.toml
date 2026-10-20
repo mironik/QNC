@@ -121,6 +121,7 @@ members = [
     "crates/qnc-level-meter",
     "crates/qnc-monitor-panel",
     "crates/qnc-transport-panel",
+    "crates/qnc-dir-browser-panel",
     "crates/qnc-source-volumes",
     "crates/qnc-board",
     "crates/qnc-channel-picker",
@@ -317,6 +318,7 @@ qnc-mp4-sound = { path = "crates/qnc-mp4-sound" }
 qnc-level-meter = { path = "crates/qnc-level-meter" }
 qnc-monitor-panel = { path = "crates/qnc-monitor-panel" }
 qnc-transport-panel = { path = "crates/qnc-transport-panel" }
+qnc-dir-browser-panel = { path = "crates/qnc-dir-browser-panel" }
 qnc-source-volumes = { path = "crates/qnc-source-volumes" }
 qnc-board = { path = "crates/qnc-board" }
 qnc-channel-picker = { path = "crates/qnc-channel-picker" }

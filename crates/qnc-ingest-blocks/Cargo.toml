@@ -13,6 +13,7 @@ qnc-ingest-application = { workspace = true }
 qnc-ingest-layout = { workspace = true }
 qnc-media-card = { workspace = true }
 qnc-focus-walk = { workspace = true }
+qnc-dir-browser-panel = { workspace = true }
 qnc-media-pool-head = { workspace = true }
 qnc-monitor = { workspace = true }
 qnc-source-dock = { workspace = true }

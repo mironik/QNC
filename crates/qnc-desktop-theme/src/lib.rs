@@ -44,7 +44,7 @@ impl Theme {
             text_muted: rgb(colors.muted),
             accent: rgb(colors.accent),
             focus: rgb(colors.focus),
-            danger: Color32::from_rgb(239, 68, 68),
+            danger: danger(),
             input_bg: rgb(colors.surface),
             surface: rgb(colors.surface),
             surface_alt: rgb(colors.raised),
@@ -57,6 +57,11 @@ impl Theme {
             chrome_pad_y: f32::from(shell.theme_metrics.chrome_pad_y),
         }
     }
+}
+
+/// The colour of an error line (one for every form; the Project form had its own).
+pub fn danger() -> Color32 {
+    Color32::from_rgb(239, 68, 68)
 }
 
 pub fn apply(ctx: &egui::Context, theme: &Theme) {

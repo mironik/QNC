@@ -79,6 +79,27 @@ pub struct TransportBindings {
     pub parallelism: Option<usize>,
 }
 
+impl TransportBindings {
+    /// Readers of the sources this computer can open now (an absent or unreadable one is
+    /// left out); one place for every caller (the Story application had its own copy).
+    pub fn readers(&self) -> Vec<qnc_source_reader::SourceReader> {
+        self.sources.iter().filter_map(SourceBinding::reader).collect()
+    }
+}
+
+impl SourceBinding {
+    /// A reader of this source: local when it has a file here, else remote.
+    pub fn reader(&self) -> Option<qnc_source_reader::SourceReader> {
+        self.resolver().ok()?;
+        if let Some(path) = &self.file {
+            qnc_source_reader::SourceReader::local(&self.uri, path).ok()
+        } else {
+            let token = self.token().ok()??;
+            qnc_source_reader::SourceReader::remote(&self.uri, self.endpoint.as_deref()?, &token).ok()
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegisteredSource {
     pub location: SourceBinding,

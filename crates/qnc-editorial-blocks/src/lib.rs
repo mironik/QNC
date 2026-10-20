@@ -170,159 +170,64 @@ fn render_clip_grid(
     if view.library_tab == LibraryTab::Segment {
         let mut command = None;
         ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-            let segments = &view.segments;
-            command = qnc_segment_panel::show_segment_list(
-                ui,
-                segments,
-                layout::timeline_theme(theme),
-                theme.danger,
-            );
+            command = qnc_segment_panel::show_segment_list(ui, &view.segments, layout::timeline_theme(theme), theme.danger);
         });
         return command.map(EditorialIntent::Action);
     }
+    let cards = &contracts.editorial.media_card;
     let empty_message = if view.loading {
-        contracts.editorial.media_card.loading_message.as_str()
+        cards.loading_message.as_str()
     } else if view.library_tab == LibraryTab::Virtual {
-        contracts.editorial.media_card.virtual_empty_message.as_str()
+        cards.virtual_empty_message.as_str()
     } else if view.library_tab == LibraryTab::Broll {
-        contracts.editorial.media_card.broll_empty_message.as_str()
+        cards.broll_empty_message.as_str()
     } else if !view.message.is_empty() {
         view.message.as_str()
     } else {
-        contracts.editorial.media_card.empty_message.as_str()
+        cards.empty_message.as_str()
     };
-    let short_rows;
-    let clip_rows;
+    let look = qnc_media_card::PoolLook {
+        style: qnc_media_card::CardStyle {
+            raised: theme.surface_alt,
+            surface: theme.surface,
+            border: theme.border,
+            text: theme.text,
+            muted: theme.text_muted,
+            select_red: theme.danger,
+        },
+        metrics: qnc_media_card::CardMetrics {
+            min_card_width: cards.min_card_width,
+            card_text_height: cards.card_text_height,
+            grid_gap: cards.grid_gap,
+        },
+        features: qnc_media_card::MediaCardFeatures {
+            selection_check: contracts.composition().media_card.selection_check,
+            top_right_marker: false,
+            status_dots: qnc_media_card::StatusDotsMode::from_contract(&contracts.composition().media_card.status_dots)
+                .unwrap_or(qnc_media_card::StatusDotsMode::Off),
+        },
+        imported_marker: theme.text_muted,
+        not_imported_marker: theme.text_muted,
+        saving: "",
+        save_failed: "",
+        focus: theme.focus,
+    };
     // Virtual lists the shorts, B-roll the shots of the covers (v5 pool tabs).
     let shot_tab = matches!(view.library_tab, LibraryTab::Virtual | LibraryTab::Broll);
-    let rows: Vec<qnc_media_card::CardRow<'_>> = if shot_tab {
-        short_rows = view
-            .shorts
-            .iter()
-            .filter(|shot| shot.b_roll == (view.library_tab == LibraryTab::Broll))
-            .map(|shot| {
-                let (status_proxy, status_original) = qnc_media_card::pipeline_statuses(
-                    &shot.import_status,
-                    &shot.imported_media_uri,
-                );
-                qnc_media_card::CardRow {
-                    id: shot.shot_id.as_str(),
-                    thumb_id: shot.shot_id.as_str(),
-                    title: shot.name.as_str(),
-                    duration_sec: 0.0,
-                    duration_label: shot.duration_label.as_str(),
-                    import_status: shot.import_status.as_str(),
-                    status_proxy,
-                    status_original,
-                    overlay_label: "",
-                    top_right_marker: None,
-                    checked: view.chosen_shot_id.as_deref() == Some(shot.shot_id.as_str()),
-                    rgba_thumb: shot
-                        .poster_uri
-                        .as_deref()
-                        .zip(shot.poster_image.as_deref())
-                        .map(|(uri, image)| qnc_media_card::RgbaThumb {
-                            uri,
-                            content_key: image.content_key,
-                            size: image.size,
-                            rgba: &image.pixels,
-                        }),
-                }
-            })
-            .collect();
-        short_rows
+    let pool = qnc_media_card::PoolGrid {
+        rect,
+        chosen_id: if shot_tab { view.chosen_shot_id.as_deref().unwrap_or("") } else { view.chosen_clip_id().unwrap_or("") },
+        panel_focused: view.focus.panel == Panel::Pool,
+        step: view.focus.pool_step,
+        empty_message,
+        id_salt: "editorial_clip_grid",
+    };
+    let clicked = if shot_tab {
+        let shots: Vec<_> = view.shorts.iter().filter(|shot| shot.b_roll == (view.library_tab == LibraryTab::Broll)).collect();
+        qnc_media_card::show_pool(ui, &shots, &pool, &look)
     } else {
-        clip_rows = view
-            .clips
-            .iter()
-            .map(|clip| {
-                let (status_proxy, status_original) = qnc_media_card::pipeline_statuses(
-                    &clip.import_status,
-                    &clip.imported_media_uri,
-                );
-                qnc_media_card::CardRow {
-                    id: clip.clip_id.as_str(),
-                    thumb_id: clip.thumb_uri.as_deref().unwrap_or(clip.clip_id.as_str()),
-                    title: clip.name.as_str(),
-                    duration_sec: clip.duration_seconds,
-                    duration_label: "",
-                    import_status: clip.import_status.as_str(),
-                    status_proxy,
-                    status_original,
-                    overlay_label: "",
-                    top_right_marker: None,
-                    checked: view.chosen_clip_id() == Some(clip.clip_id.as_str()),
-                    rgba_thumb: clip
-                        .thumb_uri
-                        .as_deref()
-                        .zip(clip.thumb_image.as_deref())
-                        .map(|(uri, image)| qnc_media_card::RgbaThumb {
-                            uri,
-                            content_key: image.content_key,
-                            size: image.size,
-                            rgba: &image.pixels,
-                        }),
-                }
-            })
-            .collect();
-        clip_rows
+        qnc_media_card::show_pool(ui, &view.clips.iter().collect::<Vec<_>>(), &pool, &look)
     };
-    let style = qnc_media_card::CardStyle {
-        raised: theme.surface_alt,
-        surface: theme.surface,
-        border: theme.border,
-        text: theme.text,
-        muted: theme.text_muted,
-        select_red: theme.danger,
-    };
-    let metrics = qnc_media_card::CardMetrics {
-        min_card_width: contracts.editorial.media_card.min_card_width,
-        card_text_height: contracts.editorial.media_card.card_text_height,
-        grid_gap: contracts.editorial.media_card.grid_gap,
-    };
-    let features = qnc_media_card::MediaCardFeatures {
-        selection_check: contracts.composition().media_card.selection_check,
-        top_right_marker: false,
-        status_dots: qnc_media_card::StatusDotsMode::from_contract(
-            &contracts.composition().media_card.status_dots,
-        )
-        .unwrap_or(qnc_media_card::StatusDotsMode::Off),
-    };
-    let no_textures = std::collections::HashMap::new();
-    let mut action = None;
-    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-        action = qnc_media_card::show_card_grid_focused(
-            ui,
-            &style,
-            &metrics,
-            &qnc_media_card::CardGridInput {
-                height: rect.height(),
-                selected_id: if shot_tab {
-                    view.chosen_shot_id.as_deref().unwrap_or("")
-                } else {
-                    view.chosen_clip_id().unwrap_or("")
-                },
-                focused_id: "",
-                panel_focused: view.focus.panel == Panel::Pool,
-                cards: &rows,
-                thumb_textures: &no_textures,
-                tc: &qnc_media_card::minutes_seconds,
-                features,
-                empty_message,
-                id_salt: "editorial_clip_grid",
-            },
-            (view.focus.pool_step, theme.focus),
-        );
-    });
-    match action {
-        Some(qnc_media_card::CardGridAction::Activate(id))
-        | Some(qnc_media_card::CardGridAction::ToggleSelection(id)) => {
-            if shot_tab {
-                Some(EditorialIntent::PreviewShort(id))
-            } else {
-                Some(EditorialIntent::PreviewClip(id))
-            }
-        }
-        None => None,
-    }
+    let (qnc_media_card::CardGridAction::Activate(id) | qnc_media_card::CardGridAction::ToggleSelection(id)) = clicked?;
+    Some(if shot_tab { EditorialIntent::PreviewShort(id) } else { EditorialIntent::PreviewClip(id) })
 }

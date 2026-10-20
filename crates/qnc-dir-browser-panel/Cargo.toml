@@ -1,0 +1,9 @@
+[package]
+name = "qnc-dir-browser-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public panel: the location browser (sources, Up, Disks, path or disks, folders), drawn the same in every form"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-media-pool-head = { workspace = true }

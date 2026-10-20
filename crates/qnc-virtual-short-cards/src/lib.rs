@@ -34,6 +34,15 @@ pub struct VirtualShortCard {
     pub b_roll: bool,
 }
 
+/// The short's card in the media pool (piece `qnc-media-card`).
+impl qnc_media_card::PoolItem for VirtualShortCard {
+    fn card_id(&self) -> &str { &self.shot_id }
+    fn card_title(&self) -> &str { &self.name }
+    fn card_poster(&self) -> (Option<&str>, Option<&qnc_image_assets::RgbaImage>) { (self.poster_uri.as_deref(), self.poster_image.as_deref()) }
+    fn card_duration_label(&self) -> &str { &self.duration_label }
+    fn card_import(&self) -> (&str, &str) { (&self.import_status, &self.imported_media_uri) }
+}
+
 pub fn build_card(
     row: qnc_virtual_shots::ShortClip,
     parent: Option<ParentClip>,

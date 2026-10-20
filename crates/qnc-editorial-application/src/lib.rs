@@ -19,9 +19,8 @@ use qnc_clip_posters::ClipPosters;
 use qnc_content_read::{CatalogSignature, ClipSummary, ContentReader};
 pub use qnc_panel_focus::{FocusLayout, Panel, PanelFocus};
 use qnc_program_segments::SourcePick;
-use qnc_source_bindings::{SourceBinding, TransportBindings};
+use qnc_source_bindings::TransportBindings;
 use qnc_source_preview::{PreviewContext, SourcePreview};
-use qnc_source_reader::SourceReader;
 use qnc_virtual_short_cards::ParentClip;
 use qnc_virtual_short_stills::VirtualShortStillCache;
 use qnc_work_settings::WorkSettings;
@@ -300,7 +299,7 @@ impl EditorialApplication {
                 });
         if let Ok(bindings) = &self.bindings {
             self.posters
-                .configure(&source_readers(bindings), project_folder);
+                .configure(&bindings.readers(), project_folder);
         }
         if let Some(clips) = loaded.clips {
             self.view.clips = merge_clips(clips, &self.view.clips);
@@ -530,20 +529,6 @@ impl EditorialApplication {
             .iter()
             .find(|clip| clip.clip_id == row.clip_id);
         qnc_virtual_short_cards::build_card(row, parent.map(parent_clip))
-    }
-}
-
-fn source_readers(bindings: &TransportBindings) -> Vec<SourceReader> {
-    bindings.sources.iter().filter_map(source_reader).collect()
-}
-
-fn source_reader(binding: &SourceBinding) -> Option<SourceReader> {
-    binding.resolver().ok()?;
-    if let Some(path) = &binding.file {
-        SourceReader::local(&binding.uri, path).ok()
-    } else {
-        let token = binding.token().ok()??;
-        SourceReader::remote(&binding.uri, binding.endpoint.as_deref()?, &token).ok()
     }
 }
 

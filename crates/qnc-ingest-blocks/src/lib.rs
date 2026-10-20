@@ -3,12 +3,12 @@
 //! clip cards and source dock. They draw the Ingest view and return intents.
 
 pub(crate) use eframe::egui::{
-    self, Align, Label, Layout, Rect, RichText, ScrollArea, Sense, Ui, Vec2,
+    self, Align, Layout, Rect, RichText, Sense, Ui, Vec2,
 };
 
 pub(crate) use qnc_ingest_application::{
     action_ids, timeline_intent_to_ingest_intent, ClipFilter, ClipView, IngestIntent,
-    IngestPayload, IngestViewModel, LocationEntry, SourceKind,
+    IngestPayload, IngestViewModel, SourceKind,
 };
 pub(crate) use qnc_monitor::MonitorChrome;
 pub(crate) use qnc_timeline::TimelineTheme;
@@ -18,7 +18,6 @@ pub(crate) use qnc_ingest_layout::{theme::Theme, IngestContracts, IngestDirBrows
 
 mod board;
 mod browser_action_bar;
-mod browser_entries;
 mod buttons;
 mod clip_grid;
 mod desktop;
@@ -34,7 +33,6 @@ pub use desktop::render_desktop;
 
 use board::*;
 use browser_action_bar::*;
-use browser_entries::*;
 use buttons::*;
 use clip_grid::*;
 use dock_chrome::*;

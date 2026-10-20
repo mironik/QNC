@@ -146,16 +146,9 @@ impl IngestApplication {
                 self.work_plan = Some(plan);
                 if let Some(clips) = loaded.clips {
                     let previous = self.view.clips.clone();
-                    let applied = catalog::apply_catalog_rows(&self.view.clips, clips);
-                    self.view.clips = keep_loaded_thumbnails(applied.clips, &previous);
-                    let thumbnails = self
-                        .view
-                        .clips
-                        .iter()
-                        .filter(|clip| clip.thumb_image.is_none())
-                        .filter_map(|clip| Some((clip.clip_id.clone(), clip.thumb_uri.clone()?)))
-                        .collect();
-                    self.start_thumbnail_load(thumbnails);
+                    self.view.clips = catalog::apply_catalog_rows(&self.view.clips, clips).clips;
+                    qnc_media_thumbnail::keep_loaded(&mut self.view.clips, &previous);
+                    self.start_thumbnail_load(qnc_media_thumbnail::missing(&self.view.clips));
                 }
                 if self.pending_source.is_none() && catalog_was_loaded {
                     if let Some(source) = loaded.source {
@@ -179,20 +172,4 @@ impl IngestApplication {
         }
         true
     }
-}
-
-fn keep_loaded_thumbnails(mut clips: Vec<ClipView>, previous: &[ClipView]) -> Vec<ClipView> {
-    for clip in &mut clips {
-        let Some(old) = previous
-            .iter()
-            .find(|old| old.clip_id == clip.clip_id && old.thumb_uri == clip.thumb_uri)
-        else {
-            continue;
-        };
-        if let Some(image) = old.thumb_image.clone() {
-            clip.thumb_image = Some(image);
-            clip.thumb_status = ThumbStatus::Ready;
-        }
-    }
-    clips
 }

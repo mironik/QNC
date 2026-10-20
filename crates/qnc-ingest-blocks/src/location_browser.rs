@@ -1,141 +1,86 @@
 use super::*;
 
+use qnc_dir_browser_panel::{Body, BrowserAction, BrowserInput, BrowserLabels, BrowserStyle, Entry, Nav};
+
+/// The source tabs in the order of the contract's labels.
+const KINDS: [SourceKind; 3] = [SourceKind::Local, SourceKind::Lan, SourceKind::Internet];
+
+/// The location browser: the public panel `qnc-dir-browser-panel` on this form's place.
 pub(super) fn render_location_browser(
     ui: &mut Ui,
     contracts: &IngestContracts,
     theme: &Theme,
     view: &IngestViewModel,
 ) -> Option<IngestIntent> {
-    let outer = ui.max_rect();
+    let outer = qnc_ui_kit::fill_block(ui, theme.bg);
     ui.allocate_rect(outer, Sense::hover());
-    ui.painter().rect_filled(outer, 0.0, theme.bg);
-    let rect = outer.shrink(contracts.ingest.board.block_pad);
-
-    let source_row_rect = Rect::from_min_size(
-        rect.left_top(),
-        Vec2::new(rect.width(), theme.chrome_control_height),
-    );
-    let nav_rect = Rect::from_min_size(
-        egui::pos2(rect.left(), source_row_rect.bottom() + 8.0),
-        Vec2::new(rect.width(), browser_nav_height(view, theme)),
-    );
-    let error_height = if view.browser.error.is_some() {
-        theme.chrome_control_height + 4.0
-    } else {
-        0.0
+    let labels = &contracts.ingest.dir_browser;
+    let kinds: Vec<&str> = KINDS.iter().map(|kind| source_kind_label(labels, *kind)).collect();
+    let kind = KINDS.iter().position(|kind| *kind == view.source_kind).unwrap_or(0);
+    let empty = match view.source_kind {
+        SourceKind::Local => &labels.empty_local,
+        SourceKind::Lan => &labels.empty_lan,
+        SourceKind::Internet => &labels.empty_internet,
     };
-    let error_rect = Rect::from_min_size(
-        egui::pos2(rect.left(), nav_rect.bottom() + 4.0),
-        Vec2::new(rect.width(), error_height),
-    );
-    let body_top = if view.browser.error.is_some() {
-        error_rect.bottom() + 6.0
-    } else {
-        nav_rect.bottom() + 6.0
-    };
-    let body_rect = Rect::from_min_max(
-        egui::pos2(rect.left(), body_top),
-        egui::pos2(rect.right(), rect.bottom().max(body_top)),
-    );
-
-    let mut intent = None;
-    ui.scope_builder(
-        egui::UiBuilder::new()
-            .max_rect(source_row_rect)
-            .layout(Layout::left_to_right(Align::Center)),
-        |ui| {
-            ui.horizontal(|ui| {
-                ui.label(muted(&contracts.ingest.dir_browser.sources_label, theme));
-                ui.add_space(12.0);
-                for kind in [SourceKind::Local, SourceKind::Lan, SourceKind::Internet] {
-                    let selected = view.source_kind == kind;
-                    let label = source_kind_label(&contracts.ingest.dir_browser, kind);
-                    let response = qnc_media_pool_head::tab(ui, label, selected, &row_style(theme, 0.0));
-                    let chosen = view.focus.is(qnc_focus_walk::SOURCE_KINDS) && view.focus.chosen(kind.action_id());
-                    qnc_focus_walk::paint_focus(ui, response.rect.expand(3.0), chosen, theme.focus);
-                    if response.clicked() && !selected {
-                        intent = Some(IngestIntent::new(
-                            kind.action_id(),
-                            IngestPayload::SourceKind(kind),
-                        ));
-                    }
-                    ui.add_space(10.0);
-                }
-            });
-        },
-    );
-
-    ui.scope_builder(
-        egui::UiBuilder::new()
-            .max_rect(nav_rect)
-            .layout(Layout::left_to_right(Align::Min)),
-        |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-                let up_enabled = view.browser.parent_available;
-                if fixed_text_link(
-                    ui,
-                    &contracts.ingest.dir_browser.up_label,
-                    up_enabled,
-                    42.0,
-                    theme,
-                )
-                .clicked()
-                {
-                    intent = Some(IngestIntent::empty(action_ids::INGEST_DIR_UP));
-                }
-                ui.add_space(12.0);
-                if fixed_text_link(
-                    ui,
-                    &contracts.ingest.dir_browser.disks_label,
-                    !view.browser.busy && !view.command_busy,
-                    58.0,
-                    theme,
-                )
-                .clicked()
-                {
-                    intent = Some(IngestIntent::empty(action_ids::INGEST_DIR_ROOTS));
-                }
-                ui.add_space(12.0);
-                render_browser_head_entries(
-                    ui,
-                    &contracts.ingest.dir_browser,
-                    theme,
-                    view,
-                    &mut intent,
-                );
-            });
-        },
-    );
-
-    if let Some(error) = &view.browser.error {
-        ui.scope_builder(
-            egui::UiBuilder::new()
-                .max_rect(error_rect)
-                .layout(Layout::left_to_right(Align::Center)),
-            |ui| {
-                ui.label(RichText::new(error).color(theme.danger));
-            },
-        );
+    let browser = &view.browser;
+    let mut opened = None;
+    let action = ui
+        .scope_builder(egui::UiBuilder::new().max_rect(outer.shrink(contracts.ingest.board.block_pad)), |ui| {
+            let (focused_entry, open) = qnc_focus_walk::list_keys(ui, "qnc-ingest-browser", browser.entries.len(), &view.focus, qnc_focus_walk::BROWSER);
+            opened = open.and_then(|index| browser.entries.get(index)).map(|entry| entry.qnc_uri.clone());
+            let input = BrowserInput {
+                id_salt: "qnc-ingest-browser",
+                kinds: &kinds,
+                kind,
+                nav: if browser.roots { Nav::Roots { empty } } else { Nav::Path(&browser.path_label) },
+                body: if browser.roots { Body::Nothing } else { Body::Folders },
+                entries: browser
+                    .entries
+                    .iter()
+                    .map(|entry| Entry { name: &entry.name, serial: &entry.serial_number, volume: &entry.volume_name, uri: &entry.qnc_uri })
+                    .collect(),
+                can_up: browser.parent_available,
+                can_disks: !view.command_busy,
+                busy: browser.busy,
+                error: browser.error.as_deref(),
+                max_tree_height: None,
+                focused_kind: view
+                    .focus
+                    .is(qnc_focus_walk::SOURCE_KINDS)
+                    .then(|| KINDS.iter().position(|kind| view.focus.chosen(kind.action_id())))
+                    .flatten(),
+                focused_entry,
+            };
+            let words = BrowserLabels {
+                sources: &labels.sources_label,
+                up: &labels.up_label,
+                disks: &labels.disks_label,
+                empty_folder: &labels.empty_folder,
+                loading: &labels.loading_label,
+            };
+            qnc_dir_browser_panel::show(ui, input, &words, &browser_style(theme))
+        })
+        .inner;
+    match action {
+        Some(BrowserAction::Kind(index)) => KINDS.get(index).map(|kind| IngestIntent::new(kind.action_id(), IngestPayload::SourceKind(*kind))),
+        Some(BrowserAction::Open(uri)) => Some(IngestIntent::new(action_ids::INGEST_DIR_OPEN, IngestPayload::LocationUri(uri))),
+        Some(BrowserAction::Parent) => Some(IngestIntent::empty(action_ids::INGEST_DIR_UP)),
+        Some(BrowserAction::Roots) => Some(IngestIntent::empty(action_ids::INGEST_DIR_ROOTS)),
+        // Enter on a folder opens it as a click.
+        None => opened.map(|uri| IngestIntent::new(action_ids::INGEST_DIR_OPEN, IngestPayload::LocationUri(uri))),
     }
-
-    ui.scope_builder(
-        egui::UiBuilder::new()
-            .max_rect(body_rect)
-            .layout(Layout::top_down(Align::Min)),
-        |ui| {
-            render_browser_body(ui, &contracts.ingest.dir_browser, theme, view, &mut intent);
-        },
-    );
-
-    intent
 }
 
-pub(super) fn browser_nav_height(view: &IngestViewModel, theme: &Theme) -> f32 {
-    if view.browser.roots {
-        let rows = view.browser.entries.len().max(1) as f32;
-        (theme.chrome_control_height * rows) + (4.0 * (rows - 1.0))
-    } else {
-        theme.chrome_control_height
+fn browser_style(theme: &Theme) -> BrowserStyle {
+    BrowserStyle {
+        text: theme.text,
+        muted: theme.text_muted,
+        disabled: theme.text_muted,
+        accent: theme.accent,
+        border: theme.border,
+        danger: theme.danger,
+        focus: theme.focus,
+        font_ui: theme.font_ui,
+        control_height: theme.chrome_control_height,
     }
 }
