@@ -593,6 +593,8 @@
     "project.height": "Height",
     "project.field_order": "Field order",
     "project.color_space": "Color space",
+    "project.audio_edit": "Audio editing",
+    "project.crossfade_frames": "A2 crossfade (frames)",
     "project.keyboard": "Keyboard",
     "project.key_preset": "Key preset",
     "project.original_policy": "Original policy",

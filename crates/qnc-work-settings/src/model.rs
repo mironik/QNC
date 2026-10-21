@@ -158,6 +158,17 @@ impl WorkSettings {
             })
     }
 
+    /// Frames of the crossfade on every A2 cut (user 2026-10-21); a project without it is
+    /// completed when Project opens it, a missing value is a controlled error.
+    pub fn audio_crossfade_frames(&self) -> Result<u16, ReadError> {
+        self.audio
+            .get("crossfade_frames")
+            .and_then(Value::as_u64)
+            .and_then(|value| u16::try_from(value).ok())
+            .filter(|value| *value <= 50)
+            .ok_or_else(|| ReadError::new("audio_crossfade_frames", "The database holds no valid audio.crossfade_frames."))
+    }
+
     pub(crate) fn from_saved(
         project_id: String,
         project_name: String,

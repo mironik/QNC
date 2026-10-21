@@ -314,6 +314,28 @@
           "@project.ignore_fast_news"
         ]
       ],
+      "crossfade_frames": [
+        [
+          "0",
+          "0"
+        ],
+        [
+          "2",
+          "2"
+        ],
+        [
+          "4",
+          "4"
+        ],
+        [
+          "6",
+          "6"
+        ],
+        [
+          "8",
+          "8"
+        ]
+      ],
       "audio_rates": [
         [
           "48000",
@@ -432,6 +454,18 @@
             }
           ]
         }
+      },
+      {
+        "title": "@project.audio_edit",
+        "fields": [
+          {
+            "kind": "integer",
+            "label": "@project.crossfade_frames",
+            "id": "pts_audio_crossfade",
+            "path": "audio.crossfade_frames",
+            "options": "crossfade_frames"
+          }
+        ]
       },
       {
         "title": "@project.keyboard",

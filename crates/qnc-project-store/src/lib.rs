@@ -552,6 +552,7 @@ impl ProjectStore {
         if !workspace_db.is_file() {
             return Err(qnc_ui_text::fill("project.store.folder_invalid", &[("v0", &(project_dir.display()).to_string())]));
         }
+        complete_saved_project_settings(&workspace_db, project_id)?;
         let now = now_str();
         conn.execute(
             "UPDATE projects
@@ -1741,6 +1742,36 @@ fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
     for field in ["filmstrip", "wave"] {
         artifacts.entry(field.to_string()).or_insert_with(|| json!("auto"));
     }
+    // The audio crossfade on every A2 cut (user 2026-10-21: news practice, a few frames).
+    if let Some(audio) = root.get_mut("audio").and_then(Value::as_object_mut) {
+        audio.entry("crossfade_frames".to_string()).or_insert_with(|| json!(DEFAULT_CROSSFADE_FRAMES));
+    }
+    Ok(())
+}
+
+/// The audio crossfade of a project whose template does not say it (the system templates do).
+const DEFAULT_CROSSFADE_FRAMES: u64 = 4;
+
+/// The settings of a project created before a field existed are completed when it is opened
+/// (one short write, only when something is missing; nothing else of the project is touched).
+fn complete_saved_project_settings(workspace_db: &Path, project_id: &str) -> Result<(), String> {
+    let conn = Connection::open(workspace_db).map_err(|error| error.to_string())?;
+    configure_connection(&conn)?;
+    let saved: Option<String> = conn
+        .query_row("SELECT settings_json FROM project_settings WHERE project_id = ?1", params![project_id], |row| row.get(0))
+        .optional()
+        .map_err(|error| error.to_string())?;
+    let Some(saved) = saved else { return Ok(()) };
+    let mut settings = parse_json(&saved, json!({}));
+    complete_project_settings(&mut settings)?;
+    let completed = json_string(&settings)?;
+    if completed != saved {
+        conn.execute(
+            "UPDATE project_settings SET settings_json = ?2, updated_at = ?3 WHERE project_id = ?1",
+            params![project_id, completed, now_str()],
+        )
+        .map_err(|error| error.to_string())?;
+    }
     Ok(())
 }
 
@@ -2876,6 +2907,38 @@ mod tests {
         unlock_project_dir(&project_dir).expect("unlock for delete");
         fs::remove_dir_all(&project_dir).expect("delete after unlock");
         assert!(!project_dir.exists());
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn opening_an_older_project_completes_its_audio_crossfade() {
+        // User 2026-10-21: the A2 crossfade is a project setting; a project made before it
+        // existed gets it when it is opened, other settings untouched.
+        let root = temp_root("crossfade");
+        let store = ProjectStore::open(&root).expect("store");
+        let templates = store.list_project_templates().expect("templates");
+        let row = store
+            .create_project("Stari", &templates[0].template_id, None, &test_selection(&["project", "ingest"]))
+            .expect("project");
+        let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
+        let read = || {
+            let conn = Connection::open(project_dir.join("project.db")).expect("workspace db");
+            let raw: String = conn
+                .query_row("SELECT settings_json FROM project_settings WHERE project_id = ?1", params![row.project_id], |r| r.get(0))
+                .expect("settings");
+            serde_json::from_str::<Value>(&raw).expect("json")
+        };
+        assert_eq!(read()["audio"]["crossfade_frames"], json!(4), "a new project has it from its template");
+        let mut older = read();
+        older["audio"].as_object_mut().unwrap().remove("crossfade_frames");
+        Connection::open(project_dir.join("project.db"))
+            .unwrap()
+            .execute("UPDATE project_settings SET settings_json = ?2 WHERE project_id = ?1", params![row.project_id, older.to_string()])
+            .unwrap();
+        store.open_project(&row.project_id).expect("open");
+        let completed = read();
+        assert_eq!(completed["audio"]["crossfade_frames"], json!(4));
+        assert_eq!(completed["audio"]["channels"], older["audio"]["channels"]);
         cleanup_temp_root(&root);
     }
 

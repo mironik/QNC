@@ -103,6 +103,7 @@
         },
         "audio": {
           "sample_rate": 48000,
+          "crossfade_frames": 4,
           "channels": 2,
           "transcribe_channel": "CH1",
           "atmosphere_channel": "CH2"
@@ -179,6 +180,7 @@
         },
         "audio": {
           "sample_rate": 48000,
+          "crossfade_frames": 4,
           "channels": 2,
           "transcribe_channel": "CH1",
           "atmosphere_channel": "CH2"
@@ -255,6 +257,7 @@
         },
         "audio": {
           "sample_rate": 48000,
+          "crossfade_frames": 4,
           "channels": 2,
           "transcribe_channel": "CH1",
           "atmosphere_channel": "CH2"
@@ -331,6 +334,7 @@
         },
         "audio": {
           "sample_rate": 48000,
+          "crossfade_frames": 4,
           "channels": 2,
           "transcribe_channel": "CH1",
           "atmosphere_channel": "CH2"
