@@ -52,6 +52,10 @@ pub struct ProgramSegment {
     /// (2 for a source of half the story rate, 1/2 for twice; user 2026-10-09).
     #[serde(default)]
     pub duration_frames: u64,
+    /// The picture J of a Ton segment (user 2026-10-21): its picture starts that many story
+    /// frames before its sound, over the end of the segment before; 0 for none.
+    #[serde(default)]
+    pub v_lead_frames: u32,
 }
 
 /// An M marker on the program axis (v5 `story_markers`). `system_role` is
@@ -249,6 +253,8 @@ pub enum Operation {
     SetSegmentSound { segment_id: String, channel: u16, level_db: i8, off: bool },
     /// The sound of a cover on A2 changed later. An UNDO step.
     SetCoverSound { cover_id: String, channel: u16, level_db: i8, off: bool },
+    /// The picture J of a Ton segment (user 2026-10-21), story frames. An UNDO step.
+    SetSegmentPictureLead { segment_id: String, frames: u32 },
     /// The J and L of a cover's A2 (user 2026-10-21), story frames. An UNDO step.
     SetCoverOverlap { cover_id: String, lead_frames: u32, tail_frames: u32 },
     /// v5 `delete_cover`; its B-roll virtual shot stays.
@@ -279,6 +285,7 @@ impl Operation {
                 | Self::SetSegmentSound { .. }
                 | Self::SetCoverSound { .. }
                 | Self::SetCoverOverlap { .. }
+                | Self::SetSegmentPictureLead { .. }
         )
     }
 

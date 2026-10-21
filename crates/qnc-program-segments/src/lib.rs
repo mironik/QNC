@@ -18,6 +18,7 @@ mod nav;
 mod slot_move;
 mod slot_trim;
 mod overlap;
+pub use overlap::OverlapDraft;
 mod marker_edit;
 mod part_sound;
 mod sync;
@@ -458,7 +459,7 @@ impl ProgramSegments {
     /// Whether a keyboard catalog action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
         self.command_for(action_id).is_some()
-            || matches!(action_id, "select_cover_lead" | "select_cover_tail")
+            || matches!(action_id, "select_cover_lead" | "select_cover_tail" | "select_segment_picture_lead")
             || ((self.slot_move.is_some() || self.slot_trim.is_some() || self.overlap.is_some())
                 && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus"))
     }
@@ -470,6 +471,9 @@ impl ProgramSegments {
         }
         if matches!(action_id, "select_cover_lead" | "select_cover_tail") {
             return self.take_overlap(action_id == "select_cover_lead");
+        }
+        if action_id == "select_segment_picture_lead" {
+            return self.take_picture_lead(self.playhead.unwrap_or(0));
         }
         if let Some(done) = self.trim_key(action_id) {
             return done; // a taken slot edge (segment panel)

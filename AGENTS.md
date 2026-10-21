@@ -5256,3 +5256,12 @@ Dopuna 2026-10-21 (korisnik: "neka se J i L cuje odmah, prije Entera"): dok je J
 J/L, Enter ga zapisuje. `qnc-program-input` `SoundDraft.overlap`, `qnc-program-segments` `overlap_draft`,
 `qnc-segments-keys` `overlap`, `qnc-panel-focus` (poziva ga uz `sound`), `qnc-source-preview` (nacrt J/L nikad ne ide
 kao razina izlaza). Svaki korak ponovno slaze program (oko 0,5 s). Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-21 (korisnik: "sada bi trebali i J sliku"; "ne nekoliko slicica, nego da moze proizvoljno"): J slika Ton
+segmenta: slika govornika pocinje prije njegova tona, preko kraja prethodnog segmenta (Off pokazuje govornika umjesto crnog,
+Ton se reze ranije); zvuk oba segmenta ostaje gdje je, pokrivalice prethodnog segmenta ostaju iznad. `qnc-program-db`:
+`story_parts.v_lead_frames` (stare price 0), `SetSegmentPictureLead` (samo Ton, jedan Undo korak); ugovor `picture_lead`.
+`qnc-program-playlist` (`picture_lead.rs`): granica je koliko izvor ima slika prije IN-a i duljina prethodnog segmenta.
+Duljina J/L pokrivalice i J slike vise nije ogranicena na 500 slika (360 000, dva sata pri 50p; granice daju izvor i
+susjedi). Tipka (QNC preset): Ctrl+Shift+J uzme J sliku Ton segmenta pod Wrap playheadom; strelice/kotacic dulje/krace,
+odmah se vidi i cuje, Enter sprema, Esc odustaje (`qnc-program-segments` `overlap.rs` `Kind`, `OverlapDraft`;
+`qnc-program-input` `SoundDraft.picture_lead`). Testovi, conformance. Uzivo nije provjereno.

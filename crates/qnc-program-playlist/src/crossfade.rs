@@ -74,7 +74,7 @@ fn runs(items: &[FlatProgramItem]) -> Vec<Run> {
 }
 
 /// Splits the item that holds `frame` strictly inside into two.
-fn split_at(items: &mut Vec<FlatProgramItem>, frame: i64) -> Result<(), String> {
+pub(crate) fn split_at(items: &mut Vec<FlatProgramItem>, frame: i64) -> Result<(), String> {
     let Some(index) = items.iter().position(|item| item.record_range.in_frame < frame && frame < item.record_range.out_frame) else {
         return Ok(());
     };

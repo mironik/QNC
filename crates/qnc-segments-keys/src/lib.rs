@@ -54,7 +54,7 @@ pub fn overlap(
 ) -> ControlFlow<Option<bool>> {
     let taken = segments.overlap_taken();
     let handled = match action_id {
-        "select_cover_lead" | "select_cover_tail" => true,
+        "select_cover_lead" | "select_cover_tail" | "select_segment_picture_lead" => true,
         "step_back_frame" | "step_forward_frame" | "clear_focus" => taken,
         _ => false,
     };
@@ -68,8 +68,14 @@ pub fn overlap(
 
 /// The J and L drafted on the Wrap row, as the program plays them before Enter.
 fn overlap_draft(segments: &ProgramSegments) -> Option<SoundDraft> {
-    let (id, overlap, (channel, level_db, off)) = segments.overlap_draft()?;
-    Some(SoundDraft { lane: 1, id, channel, level_db, off, overlap: Some(overlap) })
+    Some(match segments.overlap_draft()? {
+        qnc_program_segments::OverlapDraft::Cover { id, overlap, sound: (channel, level_db, off) } => {
+            SoundDraft { lane: 1, id, channel, level_db, off, overlap: Some(overlap), picture_lead: None }
+        }
+        qnc_program_segments::OverlapDraft::Picture { id, frames, sound: (channel, level_db, off) } => {
+            SoundDraft { lane: 0, id, channel, level_db, off, overlap: None, picture_lead: Some(frames) }
+        }
+    })
 }
 
 /// A channel picked in the column of the taken sound (a click, or any device that names
@@ -169,13 +175,13 @@ fn say_part_lane(segments: &mut ProgramSegments) {
 /// The sound drafted on the Wrap row, as the program plays it before Enter.
 fn sound_draft(segments: &ProgramSegments) -> Option<SoundDraft> {
     let (lane, id, draft) = segments.part_sound_draft_now()?;
-    Some(SoundDraft { lane, id, channel: draft.channel, level_db: draft.level_db, off: draft.off, overlap: None })
+    Some(SoundDraft { lane, id, channel: draft.channel, level_db: draft.level_db, off: draft.off, overlap: None, picture_lead: None })
 }
 
 /// The stored sound of the part taken on the Wrap row.
 fn stored_sound(segments: &ProgramSegments) -> Option<SoundDraft> {
     let (lane, id, stored) = segments.part_sound_stored()?;
-    Some(SoundDraft { lane, id, channel: stored.channel, level_db: stored.level_db, off: stored.off, overlap: None })
+    Some(SoundDraft { lane, id, channel: stored.channel, level_db: stored.level_db, off: stored.off, overlap: None, picture_lead: None })
 }
 
 #[cfg(test)]

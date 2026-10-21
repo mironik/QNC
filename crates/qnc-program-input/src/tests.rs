@@ -17,6 +17,7 @@ fn part(id: &str, kind: &str, clip: &str, range: (u64, u64), active: bool) -> Pr
         a1_level_db: 0,
         a1_off: false,
         duration_frames: range.1 - range.0,
+        v_lead_frames: 0,
     }
 }
 
@@ -275,8 +276,8 @@ fn a_cover_longer_than_its_clip_ends_with_its_clip() {
 fn a_sound_draft_changes_only_its_own_segment_or_cover() {
     let mut segments = vec![part("talk", "tonovi", "a", (0, 50), true), part("off", "offovi", "b", (0, 50), true)];
     let mut covers = vec![cover("c1", (10, 20), "s1"), cover("c2", (30, 40), "s2")];
-    SoundDraft { lane: 0, id: "off".into(), channel: 2, level_db: -6, off: false, overlap: None }.apply(&mut segments, &mut covers);
-    SoundDraft { lane: 1, id: "c2".into(), channel: 0, level_db: 3, off: true, overlap: None }.apply(&mut segments, &mut covers);
+    SoundDraft { lane: 0, id: "off".into(), channel: 2, level_db: -6, off: false, overlap: None, picture_lead: None }.apply(&mut segments, &mut covers);
+    SoundDraft { lane: 1, id: "c2".into(), channel: 0, level_db: 3, off: true, overlap: None, picture_lead: None }.apply(&mut segments, &mut covers);
     assert_eq!((segments[0].a1_source_channel, segments[0].a1_level_db), (0, 0), "the other segment stays");
     assert_eq!((segments[1].a1_source_channel, segments[1].a1_level_db, segments[1].a1_off), (2, -6, false));
     assert_eq!((covers[0].a2_level_db, covers[0].a2_off), (0, false), "the other cover stays");

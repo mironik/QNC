@@ -74,6 +74,8 @@ pub struct SoundDraft {
     /// The cover's J and L as drafted on the Wrap row (user 2026-10-21), story frames;
     /// `None` keeps the stored ones.
     pub overlap: Option<(u32, u32)>,
+    /// The segment's picture J as drafted (lane 0); `None` keeps the stored one.
+    pub picture_lead: Option<u32>,
 }
 
 impl SoundDraft {
@@ -81,6 +83,9 @@ impl SoundDraft {
         if self.lane == 0 {
             for segment in segments.iter_mut().filter(|segment| segment.segment_id == self.id) {
                 (segment.a1_source_channel, segment.a1_level_db, segment.a1_off) = (self.channel, self.level_db, self.off);
+                if let Some(frames) = self.picture_lead {
+                    segment.v_lead_frames = frames;
+                }
             }
         } else {
             for cover in covers.iter_mut().filter(|cover| cover.cover_id == self.id) {
@@ -281,6 +286,7 @@ pub fn build_input(
             a1_level_db: segment.a1_level_db,
             a1_off: segment.a1_off,
             covers,
+            v_lead_frames: i64::from(segment.v_lead_frames),
         });
         start += frames;
     }

@@ -173,7 +173,7 @@ const OUTPUT_LEVEL_MAX_PERCENT: u16 = 400;
 fn draft_output_level(draft: Option<&SoundDraft>, stored: Option<&SoundDraft>) -> Option<[u16; 2]> {
     match (draft, stored) {
         (None, _) => Some([100, 100]),
-        (Some(draft), Some(stored)) if draft.channel == stored.channel && draft.overlap == stored.overlap && !stored.off => {
+        (Some(draft), Some(stored)) if draft.channel == stored.channel && draft.overlap == stored.overlap && draft.picture_lead == stored.picture_lead && !stored.off => {
             let gain = if draft.off { 0.0 } else { 10f32.powf(f32::from(draft.level_db - stored.level_db) / 20.0) };
             let percent = (gain * 100.0).round();
             (percent <= f32::from(OUTPUT_LEVEL_MAX_PERCENT)).then(|| {
@@ -1088,7 +1088,7 @@ impl Drop for SourcePreview {
 mod tests {
     #[test]
     fn a_draft_level_beyond_what_the_output_holds_opens_the_program_with_the_draft() {
-        let sound = |level_db: i8| SoundDraft { lane: 0, id: "s".into(), channel: 0, level_db, off: false, overlap: None };
+        let sound = |level_db: i8| SoundDraft { lane: 0, id: "s".into(), channel: 0, level_db, off: false, overlap: None, picture_lead: None };
         assert_eq!(draft_output_level(Some(&sound(-6)), Some(&sound(-12))), Some([200, 100]), "+6 dB is the output's level");
         assert_eq!(draft_output_level(Some(&sound(0)), Some(&sound(-20))), None, "1000 % is not: the draft itself is heard");
         assert_eq!(draft_output_level(None, Some(&sound(-20))), Some([100, 100]), "the stored sound again");

@@ -78,6 +78,7 @@ fn segment(
         a1_level_db: 0,
         a1_off: false,
         covers: Vec::new(),
+        v_lead_frames: 0,
     }
 }
 
@@ -581,4 +582,29 @@ fn a_cover_l_keeps_its_sound_after_its_picture_and_crosses_with_the_next() {
     assert_eq!(a2_at(&playlist, 74)[0].0, "cover:cover-2:tail");
     assert!(a2_at(&playlist, 74)[0].1 < 1.0);
     assert!(a2_at(&playlist, 79).is_empty());
+}
+
+/// Locked (user 2026-10-21): the picture J of a Ton segment shows the speaker before his sound,
+/// over the end of the segment before, as long as wanted within the frames its source has
+/// before its IN; the sound of both segments stays.
+#[test]
+fn a_ton_segment_with_a_picture_j_starts_its_picture_before_its_sound() {
+    let timebase = tb(50);
+    let off = segment("off", "offovi", "voice", (0, 50), (100, 150), timebase);
+    let mut ton = segment("ton", "tonovi", "speaker", (50, 100), (10, 60), timebase);
+    ton.v_lead_frames = 30;
+    let build = input(100, vec![off, ton]);
+    let playlist = build_flat_program_playlist(&build, &mut resolver(&["voice", "speaker"], timebase)).unwrap();
+    let at = |frame: i64| playlist.items.iter().find(|item| item.record_range.in_frame <= frame && frame < item.record_range.out_frame).unwrap();
+    let picture = |frame: i64| {
+        at(frame).sources.iter().find(|source| source.video_layer == Some(ProgramVideoLayer::Base)).map(|source| (source.clip_id.clone(), source.source_range.source_in))
+    };
+    let sound = |frame: i64| {
+        at(frame).sources.iter().find(|source| source.audio_routes.iter().any(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A1)).map(|source| source.clip_id.clone())
+    };
+    // Its source has 10 frames before IN: the picture comes 10 frames early, from frame 0.
+    assert_eq!(picture(39), None, "the Off is black before");
+    assert_eq!(picture(40), Some(("speaker".into(), 0)));
+    assert_eq!(sound(45).as_deref(), Some("voice"), "the Off is still heard");
+    assert_eq!(sound(55).as_deref(), Some("speaker"));
 }

@@ -76,7 +76,7 @@ impl ProgramSegments {
             return Some(Take::SlotEdge(trim.slot_id.clone(), trim.start));
         }
         if let Some(edit) = &self.overlap {
-            return Some(Take::Overlap(edit.cover_id.clone(), edit.lead));
+            return Some(Take::Overlap(edit.id.clone(), edit.kind));
         }
         if let Some((part, _)) = self.part_sound.taken() {
             return Some(Take::Sound(part.lane, part.id.clone()));
@@ -172,8 +172,8 @@ pub(crate) enum Take {
     /// A lane (0 = A1 of a segment, 1 = A2 of a cover) and its part.
     Sound(u8, String),
     Cover(String),
-    /// A cover and whether its J (else its L).
-    Overlap(String, bool),
+    /// A cover's J or L, or a segment's picture J.
+    Overlap(String, crate::overlap::Kind),
 }
 
 impl Take {

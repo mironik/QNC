@@ -15,6 +15,7 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         a1_level_db: 0,
         a1_off: false,
         duration_frames: range.1 - range.0,
+        v_lead_frames: 0,
     }
 }
 
@@ -839,5 +840,25 @@ fn ctrl_j_and_ctrl_l_take_the_overlap_of_the_cover_under_the_wrap_playhead() {
     segments.apply_action("step_forward_frame");
     assert_eq!(segments.view().trim_frames, vec![36], "the stored L of 2, one longer");
     assert!(segments.confirm_program());
+    assert!(!segments.overlap_taken());
+}
+
+/// Locked (user 2026-10-21): Ctrl+Shift+J takes the picture J of the Ton segment under the
+/// Wrap playhead (not the first, not an Off); its length is free.
+#[test]
+fn ctrl_shift_j_takes_the_picture_j_of_a_ton_segment() {
+    let mut segments = component();
+    segments.stored = vec![stored("a", "offovi", (0, 40)), stored("b", "tonovi", (0, 60))];
+    segments.refresh_view(String::new());
+    segments.set_playhead(Some(10));
+    assert!(!segments.apply_action("select_segment_picture_lead"), "the first segment (an Off) has none");
+    segments.set_playhead(Some(50));
+    assert!(segments.apply_action("select_segment_picture_lead"));
+    for _ in 0..600 {
+        segments.apply_action("step_back_frame");
+    }
+    assert!(segments.overlap_draft().is_some());
+    assert_eq!(segments.view().trim_frames, vec![0], "600 frames earlier is past the story start");
+    segments.apply_action("clear_focus");
     assert!(!segments.overlap_taken());
 }

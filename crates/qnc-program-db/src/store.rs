@@ -252,6 +252,7 @@ impl Store {
             Operation::SetCoverSound { cover_id, channel, level_db, off } => {
                 self.set_sound("story_covers", "cover_id", "a2", cover_id, (*channel, lane_level(*level_db)?, *off))
             }
+            Operation::SetSegmentPictureLead { segment_id, frames } => self.set_picture_lead(segment_id, *frames),
             Operation::SetCoverOverlap { cover_id, lead_frames, tail_frames } => {
                 self.set_cover_overlap(cover_id, *lead_frames, *tail_frames)
             }
@@ -1044,7 +1045,8 @@ impl Store {
             .conn
             .prepare(
                 "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num,
-                        fps_den, active, a1_source_channel, duration_frames, a1_level_db, a1_off
+                        fps_den, active, a1_source_channel, duration_frames, a1_level_db, a1_off,
+                        v_lead_frames
                  FROM public_story_parts ORDER BY sort_index, segment_id",
             )
             .map_err(err)?;
@@ -1067,6 +1069,7 @@ impl Store {
                     a1_off: row.get::<_, i64>(12)? != 0,
                     // A story written before the length was kept in story frames: its range.
                     duration_frames: if duration > 0 { duration } else { out_frame.saturating_sub(in_frame) },
+                    v_lead_frames: row.get::<_, i64>(13)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
                 })
             })
             .map_err(err)?
@@ -1247,6 +1250,24 @@ impl Store {
             .map_err(err)?;
         if changed == 0 {
             return Err(format!("{key} not found: {}", id.trim()));
+        }
+        Ok(Data::Changed)
+    }
+
+    /// The picture J of a Ton segment, at most `MAX_OVERLAP_FRAMES`; an Off segment has no picture.
+    fn set_picture_lead(&mut self, segment_id: &str, frames: u32) -> Result<Data> {
+        if frames > MAX_OVERLAP_FRAMES {
+            return Err(qnc_ui_text::fill("story.overlap_too_long", &[("frames", &MAX_OVERLAP_FRAMES.to_string())]));
+        }
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE story_parts SET v_lead_frames = ?1, updated_at = ?2 WHERE part_id = ?3 AND kind = 'tonovi'",
+                params![frames, story_now(), segment_id.trim()],
+            )
+            .map_err(err)?;
+        if changed == 0 {
+            return Err(qnc_ui_text::text("story.picture_lead_ton_only").into());
         }
         Ok(Data::Changed)
     }
@@ -1487,14 +1508,15 @@ fn split_slot_for(conn: &Connection, slot_id: &str, cover_frames: i64) -> Result
     Ok(self::slot_id(&start_marker, &marker_id))
 }
 
-/// The longest J or L of a cover's A2, story frames (10 s at 50p).
-pub(crate) const MAX_OVERLAP_FRAMES: u32 = 500;
+/// The longest J or L, story frames: two hours at 50p, as long as wanted (user 2026-10-21);
+/// the source and the room next to it bound it in the playlist.
+pub(crate) const MAX_OVERLAP_FRAMES: u32 = 360_000;
 
 /// The columns a story of the current schema has; `ensure_story_schema` adds the ones
 /// an older story lacks.
 const SCHEMA_COLUMNS: &[(&str, &[&str])] = &[
     ("story_state", &["story_fps_num", "story_fps_den"]),
-    ("story_parts", &["a1_source_channel", "a1_level_db", "a1_off"]),
+    ("story_parts", &["a1_source_channel", "a1_level_db", "a1_off", "v_lead_frames"]),
     ("story_covers", &["slot_id", "a2_source_channel", "a2_level_db", "a2_off", "a2_lead_frames", "a2_tail_frames"]),
 ];
 
@@ -1579,6 +1601,12 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
             .map_err(err)?;
         }
     }
+    // The picture J of a segment (2026-10-21) is added to existing stories: none.
+    let columns = table_columns(conn, "story_parts")?;
+    if !columns.is_empty() && !columns.iter().any(|column| column == "v_lead_frames") {
+        conn.execute_batch("ALTER TABLE story_parts ADD COLUMN v_lead_frames INTEGER NOT NULL DEFAULT 0;")
+            .map_err(err)?;
+    }
     // The J and L of a cover (2026-10-21) are added to existing stories: none.
     let columns = table_columns(conn, "story_covers")?;
     if !columns.is_empty() && !columns.iter().any(|column| column == "a2_lead_frames") {
@@ -1638,6 +1666,7 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
             a1_source_channel INTEGER NOT NULL DEFAULT 0 CHECK (a1_source_channel >= 0),
             a1_level_db INTEGER NOT NULL DEFAULT 0,
             a1_off INTEGER NOT NULL DEFAULT 0,
+            v_lead_frames INTEGER NOT NULL DEFAULT 0 CHECK (v_lead_frames >= 0),
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -1715,7 +1744,7 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
          SELECT part_id AS segment_id, kind, sort_index, clip_id, in_frame, out_frame,
                 source_fps_num AS fps_num, source_fps_den AS fps_den, active,
                 duration_frames, duration_label, duration_color_key, a1_source_channel,
-                a1_level_db, a1_off
+                a1_level_db, a1_off, v_lead_frames
          FROM story_parts;
          DROP VIEW IF EXISTS public_story_markers;
          CREATE VIEW public_story_markers AS

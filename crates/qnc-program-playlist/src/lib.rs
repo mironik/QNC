@@ -16,6 +16,7 @@
 
 mod contract;
 mod crossfade;
+mod picture_lead;
 
 pub use contract::{
     FlatProgramItem, FlatProgramPlaylist, FlatProgramSource, FrameRange, MediaRef, PlaylistError,
@@ -85,6 +86,8 @@ pub struct ProgramSegmentInput {
     pub a1_level_db: i8,
     pub a1_off: bool,
     pub covers: Vec<ProgramCoverInput>,
+    /// The picture J (Ton only): its picture starts this many frames before its sound.
+    pub v_lead_frames: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,6 +126,7 @@ pub fn build_flat_program_playlist(
     if items.is_empty() {
         return Err("The program is empty.".into());
     }
+    picture_lead::lead_pictures(&mut items, &input.segments, resolver)?;
     let asked: std::collections::HashMap<&str, crossfade::Overlap> = input
         .segments
         .iter()
