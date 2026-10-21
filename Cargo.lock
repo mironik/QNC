@@ -3019,6 +3019,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-alert"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
 name = "qnc-app"
 version = "0.1.0"
 dependencies = [
@@ -4722,6 +4729,7 @@ dependencies = [
 name = "qnc-program-segments"
 version = "0.1.0"
 dependencies = [
+ "qnc-alert",
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
@@ -4747,6 +4755,7 @@ dependencies = [
 name = "qnc-program-view"
 version = "0.1.0"
 dependencies = [
+ "qnc-alert",
  "qnc-image-assets",
  "qnc-program-commands",
  "qnc-program-db",
@@ -4949,6 +4958,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-action-event",
+ "qnc-alert",
  "qnc-dev-diagnostics",
  "qnc-level-meter",
  "qnc-program-filmstrip",

@@ -10,6 +10,7 @@ qnc-wheel-jog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
+qnc-alert = { workspace = true }
 qnc-level-meter = { workspace = true }
 qnc-program-view = { workspace = true }
 qnc-program-waveform = { workspace = true }

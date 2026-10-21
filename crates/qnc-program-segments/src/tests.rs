@@ -656,17 +656,42 @@ fn a_taken_slot_has_trim_playheads_on_its_moved_markers_and_the_playhead_stays()
 }
 
 #[test]
-fn taking_a_marker_lets_go_of_a_taken_slot_one_edit_at_a_time() {
+fn a_new_take_is_refused_with_a_warning_while_another_waits_for_enter() {
+    // Locked (user 2026-10-21): one thing taken at a time; taking something else is refused
+    // with a warning the user cannot miss, and what is taken stays as it was.
     let mut segments = component();
     segments.set_playhead(Some(20));
     segments.apply(SegmentCommand::SelectSlotAtPlayhead);
     assert!(segments.slot_move.is_some());
     let marker = segments.view().markers.iter().find(|pin| pin.frame == 33).expect("marker at 33").marker_id.clone();
-    segments.apply(SegmentCommand::TakeMarker(marker));
-    assert!(segments.slot_move.is_none(), "the slot is let go");
-    assert!(segments.marker_edit.is_some(), "the marker is taken");
+    segments.apply(SegmentCommand::TakeMarker(marker.clone()));
+    assert!(segments.slot_move.is_some(), "the slot stays taken");
+    assert!(segments.marker_edit.is_none(), "the marker is not taken");
+    assert!(segments.view().alert.is_some(), "the warning is shown");
     segments.apply_action("step_forward_frame");
-    assert_eq!(segments.view().trim_frames, vec![34], "the arrows move the marker, not the slot");
+    assert!(segments.view().trim_frames.len() == 2, "the arrows go on moving the slot");
+    segments.apply(SegmentCommand::SelectSlotAtPlayhead);
+    assert!(segments.slot_move.is_some(), "taking again what is taken goes");
+    // Enter or Escape lets it go; then the marker is taken.
+    segments.apply_action("clear_focus");
+    segments.apply(SegmentCommand::CancelMarkerEdit);
+    segments.slot_move = None;
+    segments.apply(SegmentCommand::TakeMarker(marker));
+    assert!(segments.marker_edit.is_some(), "with nothing taken the marker is taken");
+}
+
+#[test]
+fn a_marker_is_not_taken_while_a_sync_waits() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::ToggleSync);
+    segments.arm_sync(false);
+    segments.set_source(marked(13));
+    assert!(matches!(segments.sync_space(false), SyncSpace::Start(_)), "Sync plays");
+    let marker = segments.view().markers.iter().find(|pin| pin.frame == 33).expect("marker at 33").marker_id.clone();
+    segments.apply(SegmentCommand::TakeMarker(marker));
+    assert!(segments.marker_edit.is_none(), "the Sync waits, the marker is not taken");
+    assert!(segments.view().alert.is_some());
 }
 
 #[test]

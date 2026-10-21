@@ -354,14 +354,20 @@ impl AudioOutputAdapter for Audio {
             if request.frame != frame {
                 return Err(error("audio seek target mismatch"));
             }
-            let seek = seek_start(&self.source, frame)?;
-            retire(std::mem::take(&mut self.decoders));
-            for track in &mut self.tracks {
-                track.samples.clear();
-                track.decoded_through = None;
-                track.discard_before = start;
-                self.decoders
-                    .push(self.input.open(track.stream_index, seek)?);
+            // The sound in memory serves the cue; else the decoder opens a little before it.
+            let ahead_frames = frames_of_seconds(self.source.timebase, SOUND_AHEAD_SECONDS);
+            let ahead = sample_boundary(ahead_frames, request.timebase, format.sample_rate_hz)?;
+            if !self.decoders.is_empty() && self.tracks.iter().all(|track| track.can_aim(start, ahead)) {
+                self.tracks.iter_mut().for_each(|track| track.aim(start));
+            } else {
+                let back = frame.saturating_sub(frames_of_seconds(self.source.timebase, SOUND_BACK_SECONDS));
+                let seek = seek_start(&self.source, back)?;
+                let from = sample_boundary(back, request.timebase, format.sample_rate_hz)?;
+                retire(std::mem::take(&mut self.decoders));
+                for track in &mut self.tracks {
+                    track.restart(from, start);
+                    self.decoders.push(self.input.open(track.stream_index, seek)?);
+                }
             }
             self.consumed_through = start;
             self.pending_seek = None;
@@ -377,9 +383,11 @@ impl AudioOutputAdapter for Audio {
         let sample_frames = usize::try_from(end - start).map_err(error)?;
         // Poll each existing decoder fairly; drain nothing until all channels are ready.
         for (track, decoder) in self.tracks.iter_mut().zip(&mut self.decoders) {
-            let needed = sample_frames * track.output_channels();
-            for _ in 0..2 {
-                if track.samples.len() >= needed {
+            // On the way to a cue the decoder catches up faster.
+            let packets = if track.aiming() { 64 } else { 2 };
+            for _ in 0..packets {
+                track.settle();
+                if track.ready(sample_frames) {
                     break;
                 }
                 match decoder.try_next_packet().map_err(error)? {
@@ -392,6 +400,7 @@ impl AudioOutputAdapter for Audio {
                     }
                 }
             }
+            track.settle();
         }
         let samples = interleave_tracks(&mut self.tracks, sample_frames)?;
         self.consumed_through = end;
@@ -426,8 +435,29 @@ pub(crate) fn validate_channel_map(
 }
 
 /// Seconds of decoded sound a track may hold: a program lane reads up to two seconds
-/// ahead of the frame it plays (`program.rs`), with room for the frame itself.
-const PCM_TRACK_SECONDS: usize = 4;
+/// ahead of the frame it plays (`program.rs`), with room for the frame itself and for the
+/// sound before a cue that is decoded on the way to it (`SOUND_BACK_SECONDS`).
+const PCM_TRACK_SECONDS: usize = 6;
+
+/// The sound is heard whenever the playhead moves, back or forward, frame by frame (user
+/// 2026-10-21: some cuts are made by ear). Sound already played stays in memory this long,
+/// so a step back finds it there and no decoder is opened again (live 2026-10-21: every cue
+/// opened the sound decoder anew, 577 times in ten minutes).
+const PCM_HISTORY_SECONDS: usize = 2;
+
+/// A cue outside the sound in memory opens the decoder this much earlier, so the steps back
+/// after it find their sound in memory too.
+pub(crate) const SOUND_BACK_SECONDS: u64 = 1;
+
+/// A cue at most this far after the decoded sound waits for the open decoder to reach it.
+pub(crate) const SOUND_AHEAD_SECONDS: u64 = 1;
+
+/// The frames of `seconds` at `timebase`.
+pub(crate) fn frames_of_seconds(timebase: Timebase, seconds: u64) -> u64 {
+    let num = u64::try_from(timebase.fps_num.max(0)).unwrap_or(0);
+    let den = u64::try_from(timebase.fps_den.max(1)).unwrap_or(1);
+    seconds.saturating_mul(num) / den
+}
 
 pub(crate) struct PcmTrack {
     stream_index: u32,
@@ -436,6 +466,11 @@ pub(crate) struct PcmTrack {
     pub(crate) samples: VecDeque<f32>,
     pub(crate) decoded_through: Option<u64>,
     pub(crate) discard_before: u64,
+    /// Sound taken before the read position, newest last (`PCM_HISTORY_SECONDS`).
+    history: VecDeque<f32>,
+    /// The read position waits for the decoder to reach this sample.
+    target: Option<u64>,
+    rate: Option<u32>,
 }
 impl PcmTrack {
     pub(crate) fn new(plan: &AudioStreamPlan) -> Self {
@@ -452,10 +487,99 @@ impl PcmTrack {
             samples: VecDeque::new(),
             decoded_through: Some(0),
             discard_before: 0,
+            history: VecDeque::new(),
+            target: None,
+            rate: None,
         }
     }
     fn output_channels(&self) -> usize {
         self.selected_channels.len()
+    }
+
+    /// The sample the next take starts at; `None` before a reopened decoder gave any.
+    fn read_position(&self) -> Option<u64> {
+        let pending = (self.samples.len() / self.output_channels().max(1)) as u64;
+        self.decoded_through.map(|end| end.saturating_sub(pending).max(self.discard_before.min(end)))
+    }
+
+    /// Whether `target` is in memory, or at most `ahead` samples after the decoded sound.
+    pub(crate) fn can_aim(&self, target: u64, ahead: u64) -> bool {
+        let channels = self.output_channels().max(1) as u64;
+        match (self.read_position(), self.decoded_through) {
+            (Some(read), Some(end)) => {
+                let back = self.history.len() as u64 / channels;
+                target >= read.saturating_sub(back) && target <= end.saturating_add(ahead)
+            }
+            _ => false,
+        }
+    }
+
+    /// Moves the read position to `target` (`can_aim` holds): from memory at once, or once
+    /// the open decoder reaches it (`settle`).
+    pub(crate) fn aim(&mut self, target: u64) {
+        self.target = Some(target);
+        self.settle();
+    }
+
+    /// A reopened decoder starts at `from` (before the cue) and the read position waits at
+    /// `target`; the sound on the way goes to memory.
+    pub(crate) fn restart(&mut self, from: u64, target: u64) {
+        self.samples.clear();
+        self.history.clear();
+        self.decoded_through = None;
+        self.discard_before = from;
+        self.target = Some(target);
+    }
+
+    /// Whether the read position still waits for the decoder.
+    pub(crate) fn aiming(&self) -> bool {
+        self.target.is_some()
+    }
+
+    /// The read position goes to the target once the sound there is decoded.
+    pub(crate) fn settle(&mut self) {
+        let Some(target) = self.target else { return };
+        let (Some(read), Some(end)) = (self.read_position(), self.decoded_through) else {
+            return;
+        };
+        let channels = self.output_channels();
+        if target >= read {
+            if target > end {
+                return;
+            }
+            let skip = (target - read) as usize * channels;
+            let moved: Vec<f32> = self.samples.drain(..skip.min(self.samples.len())).collect();
+            self.keep(moved);
+        } else {
+            let back = ((read - target) as usize * channels).min(self.history.len());
+            let moved = self.history.split_off(self.history.len() - back);
+            for value in moved.into_iter().rev() {
+                self.samples.push_front(value);
+            }
+        }
+        // Packets from now on all come after the decoded end, past the read position.
+        self.discard_before = target.min(end);
+        self.target = None;
+    }
+
+    /// Whether `frames` sample frames are ready at the read position.
+    pub(crate) fn ready(&self, frames: usize) -> bool {
+        self.target.is_none() && self.samples.len() >= frames * self.output_channels()
+    }
+
+    /// Takes `frames` sample frames (`ready` holds); they stay in memory for a step back.
+    pub(crate) fn take(&mut self, frames: usize) -> Vec<f32> {
+        let count = (frames * self.output_channels()).min(self.samples.len());
+        let taken: Vec<f32> = self.samples.drain(..count).collect();
+        self.keep(taken.clone());
+        taken
+    }
+
+    fn keep(&mut self, played: Vec<f32>) {
+        self.history.extend(played);
+        let limit = self.rate.map_or(0, |rate| rate as usize * self.output_channels() * PCM_HISTORY_SECONDS);
+        let over = self.history.len().saturating_sub(limit);
+        self.history.drain(..over);
     }
     pub(crate) fn push(
         &mut self,
@@ -496,6 +620,7 @@ impl PcmTrack {
                 .checked_add(count)
                 .ok_or_else(|| error("PCM position overflow"))?,
         );
+        self.rate = Some(rate);
         for frame in packet.bytes[skip..].chunks_exact(source_channels * 4) {
             for channel in &self.selected_channels {
                 let offset = usize::from(*channel) * 4;
@@ -514,17 +639,18 @@ pub(crate) fn gains_of(levels: &[u16]) -> Vec<f32> {
 }
 
 fn interleave_tracks(tracks: &mut [PcmTrack], frames: usize) -> Result<Vec<f32>> {
-    if tracks
-        .iter()
-        .any(|track| track.samples.len() < frames * track.output_channels())
-    {
+    if tracks.iter().any(|track| !track.ready(frames)) {
         return Err(pending());
     }
     let channels: usize = tracks.iter().map(PcmTrack::output_channels).sum();
+    let taken: Vec<(usize, Vec<f32>)> = tracks
+        .iter_mut()
+        .map(|track| (track.output_channels(), track.take(frames)))
+        .collect();
     let mut samples = Vec::with_capacity(frames * channels);
-    for _ in 0..frames {
-        for track in tracks.iter_mut() {
-            samples.extend(track.samples.drain(..track.output_channels()));
+    for frame in 0..frames {
+        for (width, track) in &taken {
+            samples.extend_from_slice(&track[frame * width..(frame + 1) * width]);
         }
     }
     Ok(samples)
@@ -598,6 +724,41 @@ mod tests {
         missing.decoded_through = None;
         missing.discard_before = 5;
         assert!(missing.push(pcm(6, &[6.]), "saved", origin, 48000).is_err());
+    }
+
+    /// Locked (user 2026-10-21: the sound is heard whenever the playhead moves, back or
+    /// forward): a cue within the sound in memory is served from it, with no decoder opened
+    /// again; a cue a little ahead waits for the open decoder; anything else is not in reach.
+    #[test]
+    fn a_cue_back_or_forward_within_the_sound_in_memory_needs_no_new_decoder() {
+        let origin = (0, Rational { numerator: 1, denominator: 48000 });
+        let mut track = PcmTrack::new(&track_plan(1, 1, &[0]));
+        track.push(pcm(0, &[0., 1., 2., 3., 4., 5.]), "saved", origin, 48000).unwrap();
+        assert_eq!(track.take(4), [0., 1., 2., 3.]);
+        // Back two samples: from memory, the same sound again.
+        assert!(track.can_aim(2, 0));
+        track.aim(2);
+        assert!(track.ready(2));
+        assert_eq!(track.take(2), [2., 3.]);
+        // Forward past what is decoded, within reach: waits for the decoder, keeps the sound on the way.
+        assert!(track.can_aim(8, 4));
+        track.aim(8);
+        assert!(track.aiming() && !track.ready(1));
+        track.push(pcm(6, &[6., 7., 8., 9.]), "saved", origin, 48000).unwrap();
+        track.settle();
+        assert_eq!(track.take(2), [8., 9.]);
+        track.aim(4);
+        assert_eq!(track.take(3), [4., 5., 6.], "the sound skipped on the way is in memory");
+        // Too far ahead, or before what memory holds: a new decoder.
+        assert!(!track.can_aim(20, 4));
+        let mut fresh = PcmTrack::new(&track_plan(1, 1, &[0]));
+        fresh.push(pcm(0, &[0., 1.]), "saved", origin, 48000).unwrap();
+        fresh.restart(100, 150);
+        assert!(!fresh.can_aim(150, 0) && fresh.aiming());
+        fresh.push(pcm(100, &(0..60).map(|v| v as f32).collect::<Vec<_>>()), "saved", origin, 48000).unwrap();
+        fresh.settle();
+        assert_eq!(fresh.take(1), [50.], "a reopened decoder reads from before the cue");
+        assert!(fresh.can_aim(120, 0), "and the sound before the cue is in memory");
     }
 
     #[test]

@@ -41,6 +41,9 @@ impl ProgramSegments {
         };
         // The channel count of the clip from its stored media record (one lane per channel);
         // not read yet (the record was not final), it is asked again now.
+        if self.refused(crate::confirm::Take::Sound(lane, id.clone())) {
+            return false;
+        }
         let channels = self.clip_channels.get(&clip_id).copied().flatten();
         if channels.is_none() {
             self.reload();

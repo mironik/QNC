@@ -36,6 +36,9 @@ impl ProgramSegments {
     }
 
     fn open_for_edit(&mut self, segment_id: String, take: Option<bool>) {
+        if self.refused(crate::confirm::Take::Segment(segment_id.clone())) {
+            return;
+        }
         let Some(segment) = self.stored.iter().find(|row| row.segment_id == segment_id && row.active) else {
             return self.refresh_view(qnc_ui_text::text("story.msg.segment_edit_only_active").into());
         };

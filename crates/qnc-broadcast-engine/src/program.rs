@@ -970,8 +970,9 @@ impl ProgramSound {
     }
 
     /// Makes the lane of a bus hold the samples of its source frame; false while
-    /// the decoder still prepares them.
-    fn fill_lane(&mut self, key: LaneKey, bus: &Bus, source_frame: u64) -> Result<bool> {
+    /// the decoder still prepares them. A frame outside the sound in memory opens the
+    /// decoder `back` frames earlier, so the steps back after it are in memory too.
+    fn fill_lane(&mut self, key: LaneKey, bus: &Bus, source_frame: u64, back: u64) -> Result<bool> {
         let (plan, input) = &self.clips[bus.clip];
         let start = sample_boundary(source_frame, plan.source.timebase, self.rate)?;
         let end = sample_boundary(source_frame + 1, plan.source.timebase, self.rate)?;
@@ -986,12 +987,22 @@ impl ProgramSound {
             consumed_through: None,
         });
         if lane.consumed_through != Some(start) {
-            diag(format!("program-audio open clip={} stream={} source={source_frame}", bus.clip, bus.stream_index));
-            let decoder = input.open_in_background(bus.stream_index, seek_start(&plan.source, source_frame)?)?;
-            retire(lane.decoder.replace(decoder));
-            lane.track.samples.clear();
-            lane.track.decoded_through = None;
-            lane.track.discard_before = start;
+            // A cue within the sound in memory (back or a little ahead) keeps the decoder
+            // (user 2026-10-21: the sound is heard whenever the playhead moves).
+            let ahead = sample_boundary(
+                crate::output::frames_of_seconds(plan.source.timebase, crate::output::SOUND_AHEAD_SECONDS),
+                plan.source.timebase,
+                self.rate,
+            )?;
+            if lane.consumed_through.is_some() && lane.decoder.is_some() && lane.track.can_aim(start, ahead) {
+                lane.track.aim(start);
+            } else {
+                let from_frame = source_frame.saturating_sub(back);
+                diag(format!("program-audio open clip={} stream={} source={source_frame}", bus.clip, bus.stream_index));
+                let decoder = input.open_in_background(bus.stream_index, seek_start(&plan.source, from_frame)?)?;
+                retire(lane.decoder.replace(decoder));
+                lane.track.restart(sample_boundary(from_frame, plan.source.timebase, self.rate)?, start);
+            }
             lane.consumed_through = Some(start);
         }
         let needed = usize::try_from(end - start).map_err(error)?;
@@ -1010,17 +1021,20 @@ impl ProgramSound {
             .ready()?
         else {
             // Still opening: the sound waits like a decoder with no samples yet.
-            return Ok(lane.track.samples.len() >= needed);
+            return Ok(lane.track.ready(needed));
         };
-        for _ in 0..LANE_PACKETS_PER_CALL {
-            if lane.track.samples.len() >= needed.saturating_add(ahead) {
+        // On the way to a cue the decoder catches up faster.
+        let packets = if lane.track.aiming() { LANE_PACKETS_PER_CALL * 4 } else { LANE_PACKETS_PER_CALL };
+        for _ in 0..packets {
+            lane.track.settle();
+            if !lane.track.aiming() && lane.track.samples.len() >= needed.saturating_add(ahead) {
                 break;
             }
             match decoder.try_next_packet().map_err(error)? {
                 Poll::Pending => break,
                 // Reading ahead reaches the end of the source: an error only when the frame
                 // played now is not there.
-                Poll::Ready(None) if lane.track.samples.len() >= needed => break,
+                Poll::Ready(None) if lane.track.ready(needed) => break,
                 Poll::Ready(None) => return Err(error("audio ended before saved video boundary")),
                 Poll::Ready(Some(packet)) => lane.track.push(
                     packet,
@@ -1030,7 +1044,8 @@ impl ProgramSound {
                 )?,
             }
         }
-        Ok(lane.track.samples.len() >= needed)
+        lane.track.settle();
+        Ok(lane.track.ready(needed))
     }
 
     /// Opens the lanes of the items starting within the lookahead (each one at its
@@ -1056,8 +1071,9 @@ impl ProgramSound {
         if !gone.is_empty() {
             retire(gone);
         }
+        // A lane opened ahead starts at its item, nothing before it is played.
         for (key, bus) in next {
-            self.fill_lane(key, &bus, bus.source_in)?;
+            self.fill_lane(key, &bus, bus.source_in, 0)?;
         }
         Ok(())
     }
@@ -1070,6 +1086,8 @@ impl AudioOutputAdapter for ProgramAudio {
             return Err(error("audio seek source mismatch"));
         }
         seek_start(&self.sound.source, request.frame)?;
+        // The frame a cue went to is heard once, as in a clip (user 2026-10-21).
+        self.sink.audition_at(request.frame);
         Ok(())
     }
     fn prepare_audio(&mut self, _: &EngineSourceHandle) -> Result<Vec<BroadcastEvent>> {
@@ -1127,7 +1145,12 @@ impl ProgramSound {
         let mut ready = true;
         for bus in &span.buses {
             let source_frame = bus.source_in + (frame - span.record_in);
-            ready &= self.fill_lane(lane_key(&span, bus), bus, source_frame)?;
+            let back = crate::output::frames_of_seconds(
+                self.clips[bus.clip].0.source.timebase,
+                crate::output::SOUND_BACK_SECONDS,
+            )
+            .min(source_frame - bus.source_in);
+            ready &= self.fill_lane(lane_key(&span, bus), bus, source_frame, back)?;
         }
         self.open_next_lanes(&span, frame)?;
         if !ready {
@@ -1148,7 +1171,7 @@ impl ProgramSound {
                 let count = usize::try_from(lane_end - lane_start).map_err(error)?;
                 let lane = self.lanes.get_mut(&key).expect("filled lane");
                 debug_assert_eq!(lane.clip, bus.clip);
-                taken.insert(key, lane.track.samples.drain(..count).collect());
+                taken.insert(key, lane.track.take(count));
                 lane.consumed_through = Some(lane_end);
             }
             let source = &taken[&key];

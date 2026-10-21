@@ -128,6 +128,9 @@ pub struct SegmentsView {
     /// The Wrap rows show a narrow video row instead of the filmstrip (Ctrl+click on V,
     /// user 2026-10-15).
     pub video_compact: bool,
+    /// A refusal the user must notice (user 2026-10-21: something new taken while something
+    /// else waits for Enter), drawn by `qnc-alert`.
+    pub alert: Option<qnc_alert::Alert>,
     /// The filmstrip pictures of the program (segments with a picture, covers over
     /// them); empty with a narrow video row.
     pub pictures: Vec<qnc_program_filmstrip::ProgramPicture>,

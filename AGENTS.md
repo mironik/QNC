@@ -5190,3 +5190,23 @@ Story i MA vise ne citaju opseg tipki `off` (ostaje u katalogu kao preslika qnc_
 testovima: zlatna tablica misa `crates/qnc-timeline/tests/mouse_matrix.golden`, zlatna tablica tipki (izmijenjeni samo
 retci `mark_in`/`mark_out` i Ctrl+kotacic bez uzetog), `marker_reach` i `qnc-mouse-map` testovi. Promjena bilo kojeg
 odgovora trazi korisnikovu odluku. Uzivo nije provjereno.
+Promjena pravila i izvedba 2026-10-21 (log zive probe; korisnik: "odbij uzimanje markera i otkljucaj player, ujedno ako
+se pokusa uzeti nesto novo daj upozorenje koje je uocljivo; ton bi se trebao cuti kad god se pomice playhead, unatrag ili
+unaprijed, slicica po slicica, nekad se montira po zvuku"). Nalaz: dok je Sync cekao Enter, desni klik je uzeo M marker
+i kotacic ga je pomicao; Enter je spremio Sync ciji slot vise nije postojao, pa je Sync visio ("The Sync slot is not there
+yet") do Deletea; svaki korak kotacica po Wrap retku otvarao je zvuk programa iznova (577 pokretanja ffmpega u 10 min),
+player je na skok odgovarao 60-500 ms, a program pri koraku nije imao zvuk. (1) Zamjenjuje pravilo od 17. 10. ("svako
+uzimanje pusta prethodno"): dok nesto ceka Enter (Sync koji svira ili ceka Enter, uredivanje segmenta, M marker, slot, rub
+slota, zvuk segmenta ili pokrivalice, uzeta pokrivalica), novo uzimanje necega drugog se odbija; ponovno uzimanje istoga
+prolazi. Odbijanje pokazuje nova pasivna kocka `crates/qnc-alert` (+ ugovor): crvena traka na vrhu sredine ekrana s
+tekstom velikim slovima 3,5 s (`story.msg.take_refused`). `qnc-program-segments` (`confirm.rs` `held`, `refused`,
+`take_of`: provjera prije svake promjene odabira), `qnc-program-view` (`SegmentsView.alert`), `qnc-segment-panel` je crta.
+Uzimanja na source timelineu (Ctrl+I/O, A1/A2) nisu mijenjana; izlazak s panela Segmenti i dalje pusta uzeto kao Esc.
+(2) Otkljucano i izvedeno: `qnc-broadcast-engine` - odsvirani zvuk ostaje u memoriji 2 s (`PcmTrack` `history`), skok
+unatrag ili do 1 s unaprijed sluzi se njime i otvorenim dekoderom (`can_aim`, `aim`, `settle`), skok izvan toga otvara
+dekoder 1 s prije trazene slike (`restart`), pa i koraci unatrag nakon njega nalaze zvuk; isto za klip i za trake programa
+(trake otvorene unaprijed za sljedecu stavku ne citaju unatrag); program pri skoku pusti zvuk te slike kao klip
+(`audition_at`). `qnc-player-client`: niz skokova ide playeru kao zadnji (`next_action`), ostale naredbe redom. Testovi:
+`a_cue_back_or_forward_within_the_sound_in_memory_needs_no_new_decoder`, `a_run_of_cues_goes_as_its_latest...`,
+`a_new_take_is_refused_with_a_warning_while_another_waits_for_enter`, `a_marker_is_not_taken_while_a_sync_waits`.
+Uzivo nije provjereno.

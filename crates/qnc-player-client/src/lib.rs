@@ -165,7 +165,7 @@ fn frame_interval(timebase: Timebase) -> Option<Duration> {
         .div_ceil(u128::try_from(timebase.fps_num).ok()?);
     Some(Duration::from_nanos(u64::try_from(nanos).ok()?))
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     TogglePlayPause,
     Step(i64),
@@ -215,6 +215,8 @@ impl Player {
             .spawn(move || {
                 let mut active: Option<(u64, connection::Connection)> = None;
                 let mut initial_preview: Option<(u64, u64)> = None;
+                // Commands not yet sent; a run of cues goes as its latest (`next_action`).
+                let mut queued: std::collections::VecDeque<(u64, Action)> = std::collections::VecDeque::new();
                 // Diagnostics only: when a selection was taken, to time its way to Ready.
                 let mut timing: Option<(u64, Instant)> = None;
                 loop {
@@ -280,10 +282,8 @@ impl Player {
                         }
                     }
                     if let Some((generation, connection)) = &mut active {
-                        let action = receiver
-                            .try_recv()
-                            .ok()
-                            .and_then(|(g, action)| (g == *generation).then_some(action));
+                        queued.extend(receiver.try_iter());
+                        let action = next_action(&mut queued, *generation);
                         if action.is_some() {
                             // A caller command is newer than the first-picture cue.
                             initial_preview = None;
@@ -318,6 +318,7 @@ impl Player {
                         }
                     } else {
                         while receiver.try_recv().is_ok() {}
+                        queued.clear();
                     }
                     thread::sleep(Duration::from_millis(if active.is_some() { 1 } else { 8 }));
                 }
@@ -376,6 +377,21 @@ impl Player {
         let _ = self.shared.notify.set(Box::new(notify));
     }
 }
+/// The next command for session `generation`: commands of another session are dropped, and
+/// a cue followed by another cue is not sent (live 2026-10-21: the wheel asked for cues
+/// faster than the player answered, so the playhead and its sound lagged further and
+/// further behind the hand). Every other command goes in its order.
+fn next_action(queued: &mut std::collections::VecDeque<(u64, Action)>, generation: u64) -> Option<Action> {
+    queued.retain(|(of, _)| *of == generation);
+    while let Some((_, action)) = queued.pop_front() {
+        let superseded = matches!(action, Action::Cue(_)) && matches!(queued.front(), Some((_, Action::Cue(_))));
+        if !superseded {
+            return Some(action);
+        }
+    }
+    None
+}
+
 fn publish_picture(state: &Shared, generation: u64, picture: Option<Arc<MonitorFrame>>) {
     let mut current = state.view.lock().unwrap();
     if state.generation.load(Ordering::Acquire) != generation {
@@ -486,6 +502,24 @@ mod tests {
             sequence: 1,
             events,
         }
+    }
+
+    /// Locked (live 2026-10-21): a run of cues goes to the player as its latest; nothing
+    /// else is dropped or reordered, and a command of another session never goes.
+    #[test]
+    fn a_run_of_cues_goes_as_its_latest_and_other_commands_keep_their_order() {
+        let mut queued: std::collections::VecDeque<(u64, Action)> = [
+            (1, Action::Cue(10)),
+            (1, Action::Cue(11)),
+            (1, Action::Cue(12)),
+            (1, Action::TogglePlayPause),
+            (0, Action::Cue(99)),
+            (1, Action::Cue(13)),
+            (1, Action::Step(-1)),
+        ]
+        .into();
+        let sent: Vec<Action> = std::iter::from_fn(|| next_action(&mut queued, 1)).collect();
+        assert_eq!(sent, [Action::Cue(12), Action::TogglePlayPause, Action::Cue(13), Action::Step(-1)]);
     }
 
     #[test]

@@ -74,6 +74,8 @@ pub fn show(
     lengths: &[CoverLengthBand],
     levels: [Option<f32>; 2],
 ) -> Option<ActionEvent> {
+    // A refused take, on top of the screen so it is noticed (user 2026-10-21).
+    qnc_alert::show(ui.ctx(), segments.alert.as_ref(), timeline_theme.lane_silent, timeline_theme.text);
     let style = SegmentPanelStyle::from_timeline(timeline_theme);
     let panel_rect = ui.available_rect_before_wrap();
     ui.painter().rect_filled(panel_rect, 0.0, style.surface);

@@ -76,6 +76,9 @@ impl ProgramSegments {
             self.refresh_view(qnc_ui_text::text("story.msg.last_slot_ends_story").into());
             return false;
         }
+        if self.refused(crate::confirm::Take::SlotEdge(slot.slot_id.clone(), start)) {
+            return false;
+        }
         self.let_go_edits(false);
         self.selected_slot = Some(slot.slot_id.clone());
         self.selected_marker = None;

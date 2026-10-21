@@ -40,6 +40,9 @@ impl ProgramSegments {
         else {
             return self.refresh_view(qnc_ui_text::text("story.msg.edge_markers_locked").into());
         };
+        if self.refused(crate::confirm::Take::Marker(marker_id.clone())) {
+            return;
+        }
         // The draft starts where the marker is stored; a refused frame keeps it there.
         self.let_go_edits(false);
         self.selected_marker = Some(marker_id.clone());

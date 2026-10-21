@@ -1,0 +1,8 @@
+[package]
+name = "qnc-alert"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: a warning the user cannot miss, a red band at the top centre of the screen for a few seconds; passive paint only"
+
+[dependencies]
+eframe = { workspace = true }

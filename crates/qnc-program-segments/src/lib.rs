@@ -157,6 +157,8 @@ pub struct ProgramSegments {
     selected_cover: Option<String>,
     /// A taken sound let go by another take (`let_go_edits`), until the panel asks.
     sound_dropped: bool,
+    /// The last refused take (`confirm.rs` `refused`), shown by `qnc-alert`.
+    alert: Option<qnc_alert::Alert>,
     /// What Talking Head, Voice over and covers take from the source view.
     source: SourcePick,
     /// The sound of a stored segment or cover taken on the Wrap row (`part_sound.rs`).
@@ -509,6 +511,12 @@ impl ProgramSegments {
     }
 
     fn apply_command(&mut self, command: SegmentCommand) -> bool {
+        // Nothing new is taken while something else waits for Enter (user 2026-10-21).
+        if let Some(wanted) = self.take_of(&command) {
+            if self.refused(wanted) {
+                return true;
+            }
+        }
         let playhead = self.playhead.unwrap_or(0);
         if matches!(
             command,
@@ -1200,6 +1208,7 @@ impl ProgramSegments {
         let mut view = program(&self.stored, self.selected.as_deref(), self.story_rate);
         (view.undo_depth, view.redo_depth) = self.history;
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());
+        view.alert = self.alert.clone();
         if let Some((marker_id, draft)) = &self.marker_edit {
             // The draft is drawn where the marker is going.
             for pin in view

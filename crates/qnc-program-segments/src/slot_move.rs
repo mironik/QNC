@@ -156,6 +156,9 @@ impl ProgramSegments {
 
     /// Ctrl+S took this slot: the arrows move it from now on.
     pub(crate) fn take_slot_move(&mut self, slot_id: &str) {
+        if self.refused(crate::confirm::Take::Slot(slot_id.to_string())) {
+            return;
+        }
         self.let_go_edits(false);
         self.slot_move = self
             .view
