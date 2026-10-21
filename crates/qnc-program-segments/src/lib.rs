@@ -11,6 +11,7 @@
 //! form and no application, and never plays, probes or opens media.
 
 mod confirm;
+mod zoom;
 mod edit;
 mod nav;
 mod slot_move;
@@ -159,6 +160,8 @@ pub struct ProgramSegments {
     sound_dropped: bool,
     /// The last refused take (`confirm.rs` `refused`), shown by `qnc-alert`.
     alert: Option<qnc_alert::Alert>,
+    /// The slot shown enlarged in the place of the source timeline (`zoom.rs`).
+    zoom_slot: Option<String>,
     /// What Talking Head, Voice over and covers take from the source view.
     source: SourcePick,
     /// The sound of a stored segment or cover taken on the Wrap row (`part_sound.rs`).
@@ -483,6 +486,10 @@ impl ProgramSegments {
                 _ => {}
             }
         }
+        // Escape with nothing taken closes an enlarged slot.
+        if self.zoom_slot.is_some() && matches!(action_id, "clear_focus" | "close_player") && self.held_nothing() {
+            return Some(SegmentCommand::CloseZoom);
+        }
         SegmentCommand::from_action(action_id)
     }
 
@@ -543,6 +550,11 @@ impl ProgramSegments {
             }
             SegmentCommand::Purge(segment_id) => self.write(Operation::PurgeSegment { segment_id }),
             SegmentCommand::ToggleWrapVideo => self.video_compact = !self.video_compact,
+            SegmentCommand::Zoom(slot_id) => self.zoom(slot_id),
+            SegmentCommand::CloseZoom => {
+                self.zoom_slot = None;
+                self.refresh_view(String::new());
+            }
             SegmentCommand::Undo | SegmentCommand::Redo => {
                 self.marker_edit = None;
                 self.slot_trim = None;
@@ -1291,6 +1303,7 @@ impl ProgramSegments {
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);
+        view.zoom = self.zoom_window(&view);
         self.view = view;
     }
 

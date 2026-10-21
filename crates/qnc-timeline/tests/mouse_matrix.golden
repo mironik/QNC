@@ -1,6 +1,7 @@
 source_timeline | CueFrame(5) | timeline_cue_frame value=Some(105) target=None
 source_timeline | SelectVirtual { id: "x", frame: 5 } | timeline_cue_frame value=Some(105) target=None
 source_timeline | OpenVirtual { id: "x", frame: 5 } | -
+source_timeline | OpenSlot { id: "x", frame: 5 } | -
 source_timeline | Keep(Some(5)) | source_keep_mark value=Some(105) target=None
 source_timeline | Keep(None) | source_keep_mark value=None target=None
 source_timeline | SelectMarkerSlot { id: "x", frame: 5 } | -
@@ -34,6 +35,7 @@ source_timeline | None | -
 segments | CueFrame(5) | timeline_cue_frame value=Some(105) target=None
 segments | SelectVirtual { id: "x", frame: 5 } | timeline_cue_frame value=Some(105) target=None
 segments | OpenVirtual { id: "x", frame: 5 } | segment_edit value=Some(105) target=Some("x")
+segments | OpenSlot { id: "x", frame: 5 } | wrap_zoom value=Some(105) target=Some("x")
 segments | Keep(Some(5)) | segments_keep_edit value=Some(105) target=None
 segments | Keep(None) | segments_keep_edit value=None target=None
 segments | SelectMarkerSlot { id: "x", frame: 5 } | timeline_select_slot value=Some(105) target=Some("x")

@@ -379,6 +379,9 @@
     "segment_replace": {
       "label": "Panel Segmenti: zamijeni segment oznacenim izvorom"
     },
+    "wrap_zoom": {
+      "label": "Uvecaj slot pod Wrap playheadom (ili dvokliknut) na mjestu source timelinea: isti Wrap redak, susjedni slotovi po 15 % sirine; Esc zatvara"
+    },
     "segment_edit": {
       "label": "Panel Segmenti: uredi IN/OUT segmenta na source timelineu"
     },
@@ -408,7 +411,7 @@
       { "keys": "Lijevi klik mišem", "meaning": "Postavlja playhead. Na traci u boji pokrivalice bira slot. Ako je nešto uzeto, klik ga najprije sprema (kao Enter), pa postavlja playhead." },
       { "keys": "Desni klik mišem", "meaning": "Isto kao Ctrl + tipka: uzima ono na što pokazuješ: bliži IN ili OUT, najbliži M marker (M je OUT i IN u jednoj oznaci; početni i završni se ne uzimaju), slot na traci u boji, A1/A2. Playhead ide na uzeto. Kotačić ili strelice mijenjaju uzeto, Enter ili lijevi klik sprema, Esc odustaje." },
       { "keys": "Povlačenje mišem", "meaning": "Vuče samo ono što je uzeto (desnim klikom ili Ctrl + tipkom)." },
-      { "keys": "Dvoklik", "meaning": "Na segmentu u Wrap retku: otvara segment na source timelineu (isto kao dugme Edit)." },
+      { "keys": "Dvoklik", "meaning": "Na A1 segmenta u Wrap retku: otvara segment na source timelineu (Edit). Na slici ili A2: uvecava slot na mjestu source timelinea (Ctrl+E), Esc zatvara." },
       { "keys": "Shift + lijevi klik", "meaning": "Kao Shift + M: dodaje M marker na mjesto klika." },
       { "keys": "Srednja tipka / kotačić", "meaning": "Srednja tipka reže (IN i OUT na source timelineu, M marker u segmentima). Kotačić je kao strelice lijevo/desno, Ctrl + kotačić kao Ctrl + strelice." },
       { "keys": "Shift + tipka", "meaning": "Dodaje nešto novo (segment, marker u nastavku, pokrivalica, IN i OUT po trajanju slota)." },
@@ -789,6 +792,13 @@
             "code": "KeyI",
             "shift": true,
             "ctrl": false
+          }
+        ],
+        "wrap_zoom": [
+          {
+            "code": "KeyE",
+            "ctrl": true,
+            "shift": false
           }
         ],
         "select_current_marker_slot": [

@@ -763,3 +763,17 @@ fn replace_exclude_or_a_new_segment_end_an_open_edit() {
         assert_eq!(segments.view().editing, None, "the story changed under the edit: Enter is free again");
     }
 }
+
+#[test]
+fn ctrl_e_enlarges_the_slot_under_the_playhead_and_escape_or_the_same_slot_closes_it() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    assert!(segments.apply_action("wrap_zoom"));
+    let (start, end) = segments.view().zoom.expect("the slot under the playhead is enlarged");
+    assert!(start <= 20 && 20 < end);
+    assert!(segments.apply_action("clear_focus"));
+    assert_eq!(segments.view().zoom, None, "Escape with nothing taken closes it");
+    segments.apply_action("wrap_zoom");
+    segments.apply_action("wrap_zoom");
+    assert_eq!(segments.view().zoom, None, "the same slot again closes it");
+}

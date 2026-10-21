@@ -55,7 +55,7 @@ impl ProgramSegments {
     /// segment (Ctrl+Shift+I/O, Edit) lives on the source timeline and stays.
     /// What waits for Enter now, as the take it is (`Take::key`): a Sync, a segment edit, a
     /// marker, a slot, a slot edge, a sound, a cover.
-    fn held(&self) -> Option<Take> {
+    pub(crate) fn held(&self) -> Option<Take> {
         if self.sync.is_active() || self.sync.holds_enter() {
             return Some(Take::Sync);
         }

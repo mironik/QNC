@@ -613,6 +613,7 @@ fn egui_catalog_key_code(key: &egui::Key) -> Option<String> {
         Key::Num3 => "Digit3",
         Key::P => "KeyP",
         Key::G => "KeyG",
+        Key::E => "KeyE",
         _ => return None,
     };
     Some(code.to_string())
@@ -770,6 +771,7 @@ mod tests {
             Key::Num3,
             Key::P,
             Key::G,
+            Key::E,
         ];
         let known: Vec<(Option<String>, Option<String>)> = keys
             .iter()

@@ -65,6 +65,23 @@ impl SegmentPanelStyle {
 /// The panel name of the segment panel in the layout contracts (where a click happened).
 pub const PANEL: &str = "segments";
 
+/// The enlarged slot in the whole available rectangle (user 2026-10-21: a zoom of part of the
+/// Wrap row, in the place of the source timeline): the same Wrap row of the same program, its
+/// window only narrower; a pointer there is this panel's action, as on its own rows. `None`
+/// when no slot is enlarged.
+pub fn show_zoom(
+    ui: &mut egui::Ui,
+    segments: &SegmentsView,
+    timeline_theme: TimelineTheme,
+    lengths: &[CoverLengthBand],
+) -> Option<Option<ActionEvent>> {
+    let window = segments.zoom?;
+    let rect = ui.available_rect_before_wrap();
+    ui.painter().rect_filled(rect, 0.0, timeline_theme.background);
+    let shown = ui.push_id("qnc_segment_zoom", |ui| paint_program(ui, segments, window, timeline_theme, true, lengths)).inner;
+    Some(shown)
+}
+
 /// Paints the panel into the whole available rectangle. What it gives is a system action
 /// on this panel (user 2026-10-18): a pointer on a Wrap row, a button of its bar.
 pub fn show(

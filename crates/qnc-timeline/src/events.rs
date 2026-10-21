@@ -23,6 +23,7 @@ pub fn event(intent: &TimelineIntent, panel: &str, frame: &dyn Fn(u64) -> u64) -
         TimelineIntent::TakeCoverOnStrip { id, frame: at } => (Pointer::CtrlClickStrip, Some(frame(*at)), Some(id)),
         TimelineIntent::AddMarkerAt(at) => (Pointer::ShiftClick, Some(frame(*at)), None),
         TimelineIntent::OpenVirtual { id, frame: at } => (Pointer::DoubleClick, Some(frame(*at)), Some(id)),
+        TimelineIntent::OpenSlot { id, frame: at } => (Pointer::DoubleClickSlot, Some(frame(*at)), Some(id)),
         TimelineIntent::GoHome => (Pointer::ClickVLabel, None, None),
         TimelineIntent::ToggleVideoMode => (Pointer::CtrlClickVLabel, None, None),
         TimelineIntent::LaneLabel { lane, frame: at } => (if a2(lane) { Pointer::ClickA2Label } else { Pointer::ClickA1Label }, at.map(frame), None),
@@ -89,6 +90,7 @@ mod tests {
         assert_eq!(on(TimelineIntent::Cut, "segments"), Some(("add_marker".into(), None, None)), "the middle button cuts: an M marker");
         assert_eq!(on(TimelineIntent::OpenVirtual { id: "s1".into(), frame: 4 }, "segments"), Some(("segment_edit".into(), Some(104), id("s1"))), "a double click is Edit");
         assert_eq!(on(TimelineIntent::OpenVirtual { id: "s1".into(), frame: 4 }, "source_timeline"), None);
+        assert_eq!(on(TimelineIntent::OpenSlot { id: "m1|m2".into(), frame: 4 }, "segments"), Some(("wrap_zoom".into(), Some(104), id("m1|m2"))), "a double click on the picture enlarges the slot");
         assert_eq!(on(TimelineIntent::Cut, "source_timeline"), Some(("source_cut".into(), None, None)));
         assert_eq!(on(TimelineIntent::ChooseA2Channel(3), "source_timeline"), Some(("source_choose_a2_channel".into(), Some(3), None)));
         assert_eq!(on(TimelineIntent::None, "segments"), None);

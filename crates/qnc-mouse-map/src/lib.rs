@@ -35,8 +35,10 @@ pub enum Pointer {
     CtrlClickStrip,
     /// Shift + left click: an M marker added there.
     ShiftClick,
-    /// A double click on a segment: it opens on the source timeline (user 2026-10-21).
+    /// A double click on a segment (its A1): it opens on the source timeline (user 2026-10-21).
     DoubleClick,
+    /// A double click on the picture or A2 of a slot: the slot enlarged (user 2026-10-21).
+    DoubleClickSlot,
     ClickVLabel,
     CtrlClickVLabel,
     ClickA1Label,
@@ -61,7 +63,7 @@ pub enum Pointer {
 }
 
 impl Pointer {
-    pub const ALL: [Pointer; 28] = [
+    pub const ALL: [Pointer; 29] = [
         Self::Click,
         Self::ClickHolding,
         Self::ClickStrip,
@@ -69,6 +71,7 @@ impl Pointer {
         Self::CtrlClickStrip,
         Self::ShiftClick,
         Self::DoubleClick,
+        Self::DoubleClickSlot,
         Self::ClickVLabel,
         Self::CtrlClickVLabel,
         Self::ClickA1Label,
@@ -102,6 +105,7 @@ impl Pointer {
             Self::CtrlClickStrip => "ctrl_click_strip",
             Self::ShiftClick => "shift_click",
             Self::DoubleClick => "double_click",
+            Self::DoubleClickSlot => "double_click_slot",
             Self::ClickVLabel => "click_v_label",
             Self::CtrlClickVLabel => "ctrl_click_v_label",
             Self::ClickA1Label => "click_a1_label",

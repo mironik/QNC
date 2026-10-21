@@ -35,7 +35,7 @@ pub fn render_desktop(
             let shown = qnc_segment_panel::show(ui, &view.segments, qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths, view.preview.output_levels);
             framed(shown.map(EditorialIntent::Action), ui, rect, &[Panel::Segments])
         }
-        "source-dock" => framed(source_dock(ui, contracts, theme, view), ui, rect, &[Panel::SourceTimeline, Panel::SourceButtons]),
+        "source-dock" => qnc_segment_panel::show_zoom(ui, &view.segments, qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths).map(|shown| framed(shown.map(EditorialIntent::Action), ui, rect, &[Panel::Segments])).unwrap_or_else(|| framed(source_dock(ui, contracts, theme, view), ui, rect, &[Panel::SourceTimeline, Panel::SourceButtons])),
         // Right panel of the other groups: empty, reserved for their functions.
         _ => None,
     }))

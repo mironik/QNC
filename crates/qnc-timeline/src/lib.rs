@@ -715,6 +715,9 @@ pub enum TimelineIntent {
     /// A double click on a segment of a row: it opens on the source timeline (Edit; user
     /// 2026-10-21).
     OpenVirtual { id: String, frame: u64 },
+    /// A double click on the picture or A2 of a row: its slot is shown enlarged in the place of
+    /// the source timeline (user 2026-10-21: "a zoom of a part of the Wrap row").
+    OpenSlot { id: String, frame: u64 },
     SelectCover { id: String, frame: u64 },
     SelectMarkerSlot { id: String, frame: u64 },
     /// The source channel (zero based) chosen for A1 in the channel picker.
@@ -1300,6 +1303,22 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
     let band_response = ui.interact(track_rect, ui.make_persistent_id(("qnc_timeline_audio_band", lane.label())), Sense::click());
     if let Some(take) = take_lane_intent(&[&label_response, &band_response], track_rect, lane, input) {
         return take;
+    }
+    // A double click: on A1 the segment under it opens (Edit; A1 is the base of a slot, user
+    // 2026-10-15), on A2 the slot shows enlarged (user 2026-10-21).
+    if let Some(pos) = band_response.interact_pointer_pos().filter(|_| band_response.double_clicked() && input.layers.markers) {
+        let frame = frame_for_x(track_rect, input.state.range_start(), input.state.duration_frames(), pos.x);
+        let opened = match lane {
+            AudioLane::A1 => input
+                .virtual_spans
+                .iter()
+                .find(|span| (span.start_frame..span.end_frame).contains(&frame))
+                .map(|span| TimelineIntent::OpenVirtual { id: span.id.to_string(), frame }),
+            _ => slot_of_frame(input.marker_slots, frame).map(|id| TimelineIntent::OpenSlot { id: id.to_string(), frame }),
+        };
+        if let Some(opened) = opened {
+            return opened;
+        }
     }
     // A left click on the band is a click on the row: the playhead goes there, or a taken edit
     // is kept (audit 2026-10-17: the band took the click and nothing happened).
@@ -2187,17 +2206,11 @@ fn video_intent_from_response(
         input.state.duration_frames(),
         pos.x,
     );
-    // A double click on a segment opens it (its first click placed the playhead).
-    if response.double_clicked() && input.layers.virtual_spans {
-        if let Some(id) = virtual_span_hit(
-            track,
-            input.state.range_start(),
-            input.state.duration_frames(),
-            pos,
-            input.virtual_spans,
-            video_middle_insets(input),
-        ) {
-            return TimelineIntent::OpenVirtual { id: id.to_string(), frame };
+    // A double click on the picture is its slot, enlarged (its first click placed the
+    // playhead); A1 below the slot is the segment's (`paint_audio_band`).
+    if response.double_clicked() {
+        if let Some(id) = slot_of_frame(input.marker_slots, frame) {
+            return TimelineIntent::OpenSlot { id: id.to_string(), frame };
         }
     }
     if response.clicked() {
