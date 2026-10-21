@@ -52,6 +52,8 @@ pub enum Pointer {
     RightClickCover,
     RightClickA1,
     RightClickA2,
+    /// A right click over A2 of a Wrap row with markers: the nearest M marker, its sound (user 2026-10-21).
+    RightClickMarkerA2,
     DragIn,
     DragOut,
     DragMarker,
@@ -63,7 +65,7 @@ pub enum Pointer {
 }
 
 impl Pointer {
-    pub const ALL: [Pointer; 29] = [
+    pub const ALL: [Pointer; 30] = [
         Self::Click,
         Self::ClickHolding,
         Self::ClickStrip,
@@ -85,6 +87,7 @@ impl Pointer {
         Self::RightClickCover,
         Self::RightClickA1,
         Self::RightClickA2,
+        Self::RightClickMarkerA2,
         Self::DragIn,
         Self::DragOut,
         Self::DragMarker,
@@ -119,6 +122,7 @@ impl Pointer {
             Self::RightClickCover => "right_click_cover",
             Self::RightClickA1 => "right_click_a1",
             Self::RightClickA2 => "right_click_a2",
+            Self::RightClickMarkerA2 => "right_click_marker_a2",
             Self::DragIn => "drag_in",
             Self::DragOut => "drag_out",
             Self::DragMarker => "drag_marker",
@@ -207,7 +211,9 @@ mod tests {
         let source = "source_timeline";
         assert_eq!(map.action(source, Pointer::RightClickIn), Some("select_mark_in"), "the same action as its key");
         assert_eq!(map.action(source, Pointer::RightClickA1), Some("select_audio_a1"), "the same action as its key");
-        assert_eq!(map.action("segments", Pointer::RightClickMarker), Some("select_marker"), "the same action as its key");
+        // User 2026-10-21: over the picture the nearest marker's picture (Ctrl+M then Ctrl+I), over A2 its sound (Ctrl+2).
+        assert_eq!(map.action("segments", Pointer::RightClickMarker), Some("select_mark_in"), "the picture of the nearest marker's cut");
+        assert_eq!(map.action("segments", Pointer::RightClickMarkerA2), Some("select_audio_a2"), "the sound of the nearest marker's cut");
         assert_eq!(map.action("segments", Pointer::RightClickStrip), Some("select_current_marker_slot"), "the same action as its key");
         assert_eq!(map.action("segments", Pointer::ShiftClick), Some("add_marker_continue"), "the same action as its key");
         assert_eq!(map.action("segments", Pointer::Click), Some("timeline_cue_frame"), "a left click is the playhead");

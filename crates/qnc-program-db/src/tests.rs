@@ -1882,3 +1882,33 @@ fn the_story_reader_brings_an_older_story_up_through_its_owner_and_reads_it() {
     let snapshot = crate::StoryReader::open(&target).unwrap().program_snapshot().expect("read after the owner brought it up");
     assert_eq!(snapshot.segments.len(), 3);
 }
+
+/// Locked (user 2026-10-21): a taken M marker moves whole, only its picture or only its A2.
+/// Only the sound: an L of the cover before (later) or a J of the cover after (earlier). Only
+/// the picture: the marker moves and the sound stays where it was (the J/L take the difference).
+#[test]
+fn the_picture_or_the_sound_of_a_marker_cut_moves_alone() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m14) = marker(&mut store, 14).unwrap() else { panic!() };
+    create_cover(&mut store, &slot_at_frame(&path, 5), (1000, 1100)).unwrap();
+    create_cover(&mut store, &slot_at_frame(&path, 20), (2000, 2100)).unwrap();
+    let overlaps = |store: &mut Story| {
+        let mut rows: Vec<_> = covers(store).into_iter().map(|c| (c.program_start_frame, c.a2_lead_frames, c.a2_tail_frames)).collect();
+        rows.sort();
+        rows
+    };
+    run(&mut store, Operation::SetCutSound { marker_id: m14.clone(), offset: -5 }).unwrap();
+    assert_eq!(overlaps(&mut store), vec![(0, 0, 0), (14, 5, 0)], "a J of the cover after");
+    run(&mut store, Operation::SetCutSound { marker_id: m14.clone(), offset: 3 }).unwrap();
+    assert_eq!(overlaps(&mut store), vec![(0, 0, 3), (14, 0, 0)], "an L of the cover before");
+    run(&mut store, Operation::MoveMarkerPicture { marker_id: m14.clone(), program_frame: 18 }).unwrap();
+    // The picture 4 later, the sound where it was: 3 after 14 is 1 before 18.
+    assert_eq!(overlaps(&mut store), vec![(0, 0, 0), (18, 1, 0)]);
+    assert_eq!(markers(&mut store), vec![18]);
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(markers(&mut store), vec![14], "one Undo step");
+    assert_eq!(overlaps(&mut store), vec![(0, 0, 3), (14, 0, 0)]);
+}

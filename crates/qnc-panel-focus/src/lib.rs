@@ -425,10 +425,10 @@ impl PanelFocus {
         // 2. The segment panel: the sound of the stored segment (A1) or cover (A2) under the
         // Wrap playhead (piece `qnc-segments-keys`).
         if on_segments {
-            if let ControlFlow::Break(answer) = qnc_segments_keys::sound(action_id, (preview, wrap, segments)) {
+            if let ControlFlow::Break(answer) = qnc_segments_keys::overlap(action_id, (preview, wrap, segments)) {
                 return answer;
             }
-            if let ControlFlow::Break(answer) = qnc_segments_keys::overlap(action_id, (preview, wrap, segments)) {
+            if let ControlFlow::Break(answer) = qnc_segments_keys::sound(action_id, (preview, wrap, segments)) {
                 return answer;
             }
         }

@@ -37,6 +37,7 @@ fn intents() -> Vec<TimelineIntent> {
         TimelineIntent::TakeAudioLane(AudioLane::A2),
         TimelineIntent::TakeSound { lane: AudioLane::A1, frame: 5 },
         TimelineIntent::TakeSound { lane: AudioLane::A2, frame: 5 },
+        TimelineIntent::TakeMarkerSound { id: id() },
         TimelineIntent::DragMark { in_mark: true, frame: 5 },
         TimelineIntent::DragMark { in_mark: false, frame: 5 },
         TimelineIntent::Cut,

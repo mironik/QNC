@@ -5,8 +5,6 @@
 //! the draft. Enter writes it, Escape drops it. A marker moves only between its
 //! neighbours (docs/94 7a); the locked start and end never move.
 
-use qnc_program_db::Operation;
-
 use crate::{check_move, ProgramSegments};
 
 impl ProgramSegments {
@@ -48,11 +46,15 @@ impl ProgramSegments {
         self.selected_marker = Some(marker_id.clone());
         self.selected_slot = None;
         self.marker_edit = Some((marker_id, pin.frame));
+        self.cut_part = crate::CutPart::Whole;
         self.set_marker_draft(frame);
     }
 
     /// Arrows while editing: the draft one frame back or forward.
     pub(crate) fn nudge_marker(&mut self, frames: i64) {
+        if self.nudge_cut_sound(frames) {
+            return; // only the sound of the cut moves
+        }
         if self.at_clip_end(frames) {
             return;
         }
@@ -96,16 +98,13 @@ impl ProgramSegments {
         let Some((marker_id, frame)) = self.marker_edit.take() else {
             return false;
         };
-        self.marker_committing = true;
-        self.write(Operation::MoveMarker {
-            marker_id,
-            program_frame: frame,
-        });
+        self.commit_cut(marker_id, frame);
         true
     }
 
     /// Escape: the marker stays where it is stored.
     pub(crate) fn cancel_marker_edit(&mut self) {
+        self.cut_part = crate::CutPart::Whole;
         if self.marker_edit.take().is_some() {
             self.refresh_view(qnc_ui_text::text("story.msg.marker_move_cancelled").into());
         }

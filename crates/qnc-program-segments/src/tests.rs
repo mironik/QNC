@@ -813,34 +813,32 @@ fn delete_leaves_a_sync_draft_alone_escape_drops_it() {
     assert!(segments.discard_sync(), "Escape drops it");
 }
 
-/// Locked (user 2026-10-21): Ctrl+J / Ctrl+L take the J or L of the cover under the Wrap
-/// playhead; the arrows make it longer or shorter (never below 0), a trim playhead shows where
-/// the sound starts or ends, Escape drops it; nothing else is taken while it waits.
+/// Locked (user 2026-10-21): an M marker taken (Ctrl+M) moves whole; with it taken Ctrl+2 moves
+/// only its A2 sound (an L of the cover before, a J of the cover after; a trim playhead shows
+/// it), Ctrl+I only its picture, Ctrl+M the whole cut again; Ctrl+1 has no cut there.
 #[test]
-fn ctrl_j_and_ctrl_l_take_the_overlap_of_the_cover_under_the_wrap_playhead() {
+fn a_taken_marker_moves_whole_or_only_its_sound_or_only_its_picture() {
     let mut segments = component();
-    let mut cover = cover("c1", "m1|m2", (15, 33));
-    cover.a2_tail_frames = 2;
-    segments.stored_covers = vec![cover];
+    segments.stored_covers = vec![cover("c0", "S|m1", (0, 15)), cover("c1", "m1|m2", (15, 33))];
     segments.refresh_view(String::new());
-    segments.set_playhead(Some(20));
-    assert!(segments.handles("select_cover_lead"));
-    assert!(segments.apply_action("select_cover_lead"));
+    segments.apply(SegmentCommand::TakeMarker("m1".into()));
+    assert!(segments.editing_marker());
+    assert!(segments.take_cut_part(None, false, 1));
+    assert!(segments.cut_sound_taken());
     segments.apply_action("step_back_frame");
     segments.apply_action("step_back_frame");
-    assert_eq!(segments.view().trim_frames, vec![13], "the J starts the sound 2 frames earlier");
-    segments.apply_action("step_forward_frame");
-    segments.apply_action("step_forward_frame");
-    segments.apply_action("step_forward_frame");
-    assert_eq!(segments.view().trim_frames, vec![15], "never below 0");
-    assert!(!segments.apply(SegmentCommand::SelectSlotAtPlayhead) || segments.overlap_taken(), "nothing else is taken");
+    assert!(segments.view().trim_frames.contains(&13), "the sound 2 frames before the cut: a J");
+    let draft = segments.cut_sound_draft().unwrap();
+    assert!(draft.contains(&("c1".to_string(), (2, 0))) && draft.contains(&("c0".to_string(), (0, 0))), "{draft:?}");
+    assert!(segments.take_cut_part(None, false, 0), "the A1 part is answered");
+    assert!(segments.cut_sound_taken(), "A1 has no cut at a marker: the sound stays taken");
+    assert!(segments.take_cut_part(None, true, 0));
+    assert!(!segments.cut_sound_taken(), "the picture part: only the picture");
     segments.apply_action("clear_focus");
-    assert!(!segments.overlap_taken());
-    assert!(segments.apply_action("select_cover_tail"));
-    segments.apply_action("step_forward_frame");
-    assert_eq!(segments.view().trim_frames, vec![36], "the stored L of 2, one longer");
-    assert!(segments.confirm_program());
-    assert!(!segments.overlap_taken());
+    assert!(!segments.editing_marker());
+    // A right click over A2 near the marker takes it with its sound at once.
+    assert!(segments.apply(SegmentCommand::CutPart { marker_id: "m1".into(), picture: false, lane: 1 }));
+    assert!(segments.cut_sound_taken());
 }
 
 /// Locked (user 2026-10-21): Ctrl+Shift+J takes the picture J of the Ton segment under the

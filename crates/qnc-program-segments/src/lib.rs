@@ -18,6 +18,8 @@ mod nav;
 mod slot_move;
 mod slot_trim;
 mod overlap;
+mod cut_part;
+pub use cut_part::CutPart;
 pub use overlap::OverlapDraft;
 mod marker_edit;
 mod part_sound;
@@ -200,6 +202,8 @@ pub struct ProgramSegments {
     slot_trim: Option<slot_trim::SlotTrim>,
     /// The J or L of a cover taken with Ctrl+J / Ctrl+L (`overlap.rs`).
     overlap: Option<overlap::OverlapEdit>,
+    /// What of the taken marker's cut moves (`cut_part.rs`).
+    cut_part: cut_part::CutPart,
     /// A cover taken with Ctrl+click; Delete removes it.
     cover_taken: Option<String>,
     /// A marker move was confirmed; Enter stays taken until it lands.
@@ -459,7 +463,7 @@ impl ProgramSegments {
     /// Whether a keyboard catalog action belongs to the program.
     pub fn handles(&self, action_id: &str) -> bool {
         self.command_for(action_id).is_some()
-            || matches!(action_id, "select_cover_lead" | "select_cover_tail" | "select_segment_picture_lead")
+            || action_id == "select_segment_picture_lead"
             || ((self.slot_move.is_some() || self.slot_trim.is_some() || self.overlap.is_some())
                 && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus"))
     }
@@ -468,9 +472,6 @@ impl ProgramSegments {
     pub fn apply_action(&mut self, action_id: &str) -> bool {
         if let Some(done) = self.overlap_key(action_id) {
             return done; // a taken J or L of a cover (segment panel)
-        }
-        if matches!(action_id, "select_cover_lead" | "select_cover_tail") {
-            return self.take_overlap(action_id == "select_cover_lead");
         }
         if action_id == "select_segment_picture_lead" {
             return self.take_picture_lead(self.playhead.unwrap_or(0));
@@ -674,7 +675,15 @@ impl ProgramSegments {
                     }
                 }
             }
+            // Ctrl+M on the taken marker: its whole cut moves again (user 2026-10-21).
+            SegmentCommand::EditMarker if self.marker_edit.is_some() => {
+                self.whole_cut();
+                self.refresh_view(qnc_ui_text::text("story.msg.marker_taken").into());
+            }
             SegmentCommand::EditMarker => self.edit_marker(),
+            SegmentCommand::CutPart { marker_id, picture, lane } => {
+                return self.take_cut_part(Some(marker_id), picture, lane);
+            }
             SegmentCommand::AddMarker => {
                 self.marker_edit = None;
                 self.selected_marker = None;
@@ -1293,6 +1302,7 @@ impl ProgramSegments {
         view.source_edit_stills = self.edge_stills();
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
         view.trim_frames.extend(self.overlap.as_ref().map(overlap::OverlapEdit::frame));
+        view.trim_frames.extend(self.cut_sound_frame());
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);
         view.zoom = self.zoom_window(&view);

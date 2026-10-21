@@ -216,6 +216,8 @@ impl Store {
                 marker_id,
                 program_frame,
             } => self.move_marker(marker_id, *program_frame),
+            Operation::MoveMarkerPicture { marker_id, program_frame } => self.move_marker_picture(marker_id, *program_frame),
+            Operation::SetCutSound { marker_id, offset } => self.set_cut_sound(marker_id, *offset),
             Operation::MoveSlot { slot_id, start_frame } => self.move_slot(slot_id, *start_frame),
             Operation::TrimSlot { slot_id, start, frames } => self.trim_slot(slot_id, *start, *frames),
             Operation::DeleteMarker { marker_id } => self.delete_marker(marker_id),
@@ -1252,6 +1254,70 @@ impl Store {
             return Err(format!("{key} not found: {}", id.trim()));
         }
         Ok(Data::Changed)
+    }
+
+    /// The A2 sound of the cut at an M marker: the cover before it (`P`, its slot ends at the
+    /// marker) and the cover after it (`N`, its slot starts there). Their offset is the L of P
+    /// minus the J of N, story frames after the picture cut.
+    fn cut_covers(&self, marker_id: &str) -> Result<(Option<String>, Option<String>, i64)> {
+        let marker_id = marker_id.trim();
+        let side = |filter: &str, column: &str| -> Result<Option<(String, i64)>> {
+            self.conn
+                .query_row(
+                    &format!("SELECT cover_id, {column} FROM story_covers WHERE {filter} LIMIT 1"),
+                    [marker_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()
+                .map_err(err)
+        };
+        let before = side("substr(slot_id, -length(?1) - 1) = '|' || ?1", "a2_tail_frames")?;
+        let after = side("substr(slot_id, 1, length(?1) + 1) = ?1 || '|'", "a2_lead_frames")?;
+        let offset = before.as_ref().map_or(0, |(_, tail)| *tail) - after.as_ref().map_or(0, |(_, lead)| *lead);
+        Ok((before.map(|(id, _)| id), after.map(|(id, _)| id), offset))
+    }
+
+    /// Puts the A2 sound of the cut at `offset`: an L of the cover before (offset > 0) or a J
+    /// of the cover after (offset < 0); a side with no cover cannot take it.
+    fn set_cut_sound(&mut self, marker_id: &str, offset: i64) -> Result<Data> {
+        let (before, after, _) = self.cut_covers(marker_id)?;
+        let bound = i64::from(MAX_OVERLAP_FRAMES);
+        if offset > 0 && before.is_none() || offset < 0 && after.is_none() {
+            return Err(qnc_ui_text::text("story.cut_sound_no_cover").into());
+        }
+        let now = story_now();
+        if let Some(cover) = before {
+            self.conn
+                .execute(
+                    "UPDATE story_covers SET a2_tail_frames = ?1, updated_at = ?2 WHERE cover_id = ?3",
+                    params![offset.clamp(0, bound), now, cover],
+                )
+                .map_err(err)?;
+        }
+        if let Some(cover) = after {
+            self.conn
+                .execute(
+                    "UPDATE story_covers SET a2_lead_frames = ?1, updated_at = ?2 WHERE cover_id = ?3",
+                    params![(-offset).clamp(0, bound), now, cover],
+                )
+                .map_err(err)?;
+        }
+        Ok(Data::Changed)
+    }
+
+    /// The picture cut moves, its A2 sound stays: the offset grows by as much as the marker
+    /// moves back (the side that has no cover keeps what it can).
+    fn move_marker_picture(&mut self, marker_id: &str, program_frame: u64) -> Result<Data> {
+        let from: i64 = self
+            .conn
+            .query_row("SELECT timeline_frame FROM story_markers WHERE marker_id = ?1", [marker_id.trim()], |row| row.get(0))
+            .map_err(err)?;
+        let (_, _, offset) = self.cut_covers(marker_id)?;
+        self.move_marker(marker_id, program_frame)?;
+        let (before, after, _) = self.cut_covers(marker_id)?;
+        let wanted = offset - (program_frame as i64 - from);
+        let kept = if wanted > 0 && before.is_none() || wanted < 0 && after.is_none() { 0 } else { wanted };
+        self.set_cut_sound(marker_id, kept)
     }
 
     /// The picture J of a Ton segment, at most `MAX_OVERLAP_FRAMES`; an Off segment has no picture.

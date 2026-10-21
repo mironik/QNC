@@ -75,6 +75,9 @@ pub enum SegmentCommand {
     /// A right click on A1 (0) or A2 of a Wrap row: the sound of what lies at the program
     /// frame is taken as with Ctrl+1/Ctrl+2 there.
     TakeSound { lane: u8, frame: u64 },
+    /// A right click over the picture (`picture`) or A2 (`lane` 1) of a Wrap row: the nearest
+    /// M marker taken with only that part of its cut moving (user 2026-10-21).
+    CutPart { marker_id: String, picture: bool, lane: u8 },
     /// A click on a channel in the column of the taken A1 (0) or A2 of a Wrap row: that
     /// channel, as up/down picks it (user 2026-10-18: by mouse too).
     PickChannel { lane: u8, channel: u16 },
@@ -195,6 +198,10 @@ impl SegmentCommand {
             (side @ ("step_prev_marker_slot" | "step_next_marker_slot"), _, _) => Self::StepSlot { up: side == "step_prev_marker_slot" },
             (side @ ("program_prev_marker" | "program_next_marker"), _, _) => Self::StepMarker { up: side == "program_prev_marker" },
             (lane @ ("select_audio_a1" | "select_audio_a2"), None, Some(frame)) => Self::TakeSound { lane: u8::from(lane == "select_audio_a2"), frame },
+            (lane @ ("select_audio_a1" | "select_audio_a2"), Some(marker_id), _) => {
+                Self::CutPart { marker_id, picture: false, lane: u8::from(lane == "select_audio_a2") }
+            }
+            ("select_mark_in" | "select_mark_out", Some(marker_id), _) => Self::CutPart { marker_id, picture: true, lane: 0 },
             (lane @ ("source_choose_a1_channel" | "source_choose_a2_channel"), _, Some(channel)) => {
                 Self::PickChannel { lane: u8::from(lane == "source_choose_a2_channel"), channel: u16::try_from(channel).ok()? }
             }
@@ -248,7 +255,10 @@ mod tests {
         assert_eq!(SegmentCommand::from_event(&at("select_marker").with_target("m")), Some(SegmentCommand::TakeMarker("m".into())), "a right click on a marker takes that marker");
         assert_eq!(SegmentCommand::from_event(&at("select_marker")), None, "the key itself acts on the selection");
         assert_eq!(SegmentCommand::from_event(&at("add_marker_continue").with_value(12u64)), Some(SegmentCommand::AddMarkerAt(12)), "a click that adds is the adding key, there");
-        assert_eq!(SegmentCommand::from_event(&at("select_mark_out").with_target("s")), None, "a slot edge is taken by its keys only");
+        // User 2026-10-21: a right click over the picture names the nearest marker: only its picture moves.
+        assert_eq!(SegmentCommand::from_event(&at("select_mark_in").with_target("m")), Some(SegmentCommand::CutPart { marker_id: "m".into(), picture: true, lane: 0 }));
+        assert_eq!(SegmentCommand::from_event(&at("select_audio_a2").with_target("m")), Some(SegmentCommand::CutPart { marker_id: "m".into(), picture: false, lane: 1 }));
+        assert_eq!(SegmentCommand::from_event(&at("select_mark_out")), None, "a slot edge is taken by its keys only");
         assert_eq!(SegmentCommand::from_event(&at("timeline_cue_frame").with_value(40u64)), Some(SegmentCommand::Cue(40)));
         assert_eq!(SegmentCommand::from_event(&at("select_audio_a2").with_value(7u64)), Some(SegmentCommand::TakeSound { lane: 1, frame: 7 }));
         assert_eq!(SegmentCommand::from_event(&at("source_choose_a1_channel").with_value(3u64)), Some(SegmentCommand::PickChannel { lane: 0, channel: 3 }));

@@ -136,6 +136,7 @@ impl ProgramSegments {
     pub(crate) fn let_go_edits(&mut self, keep_sound: bool) {
         self.slot_trim = None;
         self.overlap = None;
+        self.cut_part = crate::CutPart::Whole;
         self.slot_move = None;
         self.marker_edit = None;
         self.cover_taken = None;

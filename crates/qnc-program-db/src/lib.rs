@@ -204,6 +204,14 @@ pub enum Operation {
     /// already on that program frame is refreshed, not duplicated.
     CreateMarker { part_id: String, local_frame: u64 },
     MoveMarker { marker_id: String, program_frame: u64 },
+    /// Only the picture of an M marker's cut moves (user 2026-10-21, Ctrl+I/O on a taken
+    /// marker): the marker goes to `program_frame` and its A2 sound stays where it was (the
+    /// covers' J and L on both sides take the difference). One UNDO step.
+    MoveMarkerPicture { marker_id: String, program_frame: u64 },
+    /// Only the A2 sound of an M marker's cut moves (Ctrl+2 on a taken marker): `offset` story
+    /// frames after the picture cut (an L of the cover before), negative before it (a J of the
+    /// cover after). One UNDO step.
+    SetCutSound { marker_id: String, offset: i64 },
     /// Both markers of the slot move so it starts at `start_frame` (user 2026-10-10).
     MoveSlot { slot_id: String, start_frame: u64 },
     /// A slot longer or shorter by `frames` story frames at its start (`start`) or its
@@ -277,6 +285,8 @@ impl Operation {
                 | Self::MoveSegment { .. }
                 | Self::CreateMarker { .. }
                 | Self::MoveMarker { .. }
+                | Self::MoveMarkerPicture { .. }
+                | Self::SetCutSound { .. }
                 | Self::MoveSlot { .. }
                 | Self::TrimSlot { .. }
                 | Self::DeleteMarker { .. }

@@ -5265,3 +5265,18 @@ Duljina J/L pokrivalice i J slike vise nije ogranicena na 500 slika (360 000, dv
 susjedi). Tipka (QNC preset): Ctrl+Shift+J uzme J sliku Ton segmenta pod Wrap playheadom; strelice/kotacic dulje/krace,
 odmah se vidi i cuje, Enter sprema, Esc odustaje (`qnc-program-segments` `overlap.rs` `Kind`, `OverlapDraft`;
 `qnc-program-input` `SoundDraft.picture_lead`). Testovi, conformance. Uzivo nije provjereno.
+Izmjena 2026-10-21 (korisnik: "M marker je rez cijelog klipa, sluzi kad pomicemo cijeli marker; ako ne pomicemo cijeli
+marker nego samo njegov ton ili njegovu sliku koristimo I/O i 1 ili 2"; "tipkovnica Ctrl+ I/O/M/1/2; desna tipka misa je
+Ctrl+, iznad slike ekvivalent I, iznad tona ekvivalent tona; tocak pomice"): zamjenjuje Ctrl+J / Ctrl+L za J/L pokrivalice
+(uklonjeni iz kataloga). Rez M markera ima dijelove (`qnc-program-segments` `cut_part.rs`, `CutPart`): Ctrl+M uzme
+najblizi marker i strelice/kotacic pomicu cijeli rez (`MoveMarker`); dok je uzet Ctrl+I ili Ctrl+O pomice samo sliku, ton
+ostaje (`MoveMarkerPicture`: marker se pomakne, J/L pokrivalica s obje strane preuzimaju razliku), Ctrl+2 samo ton A2
+(`SetCutSound`: kasnije L pokrivalice prije, ranije J pokrivalice poslije; trim playhead pokazuje ton; nacrt se odmah
+cuje, `SoundDraft.overlaps`), Ctrl+M opet cijeli rez, Ctrl+1: A1 nema rez na markeru (poruka). Mis (`contracts/input/mouse.json`,
+promjena zakljucane mape uz odluku korisnika): desni klik iznad slike Wrap reda = najblizi marker, samo slika
+(`select_mark_in` s ciljem markera); desni klik iznad A2 = najblizi marker, samo ton (`right_click_marker_a2` ->
+`select_audio_a2` s ciljem; `qnc-mouse-map`, `qnc-timeline` `TakeMarkerSound`); desni klik na A1 ostaje zvuk segmenta.
+Zlatna tablica misa: promijenjena 2 retka i dodan 1. J slika segmenta ostaje Ctrl+Shift+J (granica segmenata nije M
+marker). `qnc-program-db` (`MoveMarkerPicture`, `SetCutSound`, jedan Undo korak), `qnc-program-commands`
+(`SegmentCommand::CutPart`), `qnc-segments-keys` (`overlap` prije `sound`), pomoc F1. Testovi, conformance. Uzivo nije
+provjereno.
