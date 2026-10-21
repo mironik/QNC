@@ -345,7 +345,8 @@ fn cover_input(cover: &ProgramCover, story_rate: (u32, u32)) -> Result<ProgramCo
         a2_level_db: cover.a2_level_db,
         a2_off: cover.a2_off,
         active: true,
-        a2_lead_frames: 0,
+        a2_lead_frames: i64::from(cover.a2_lead_frames),
+        a2_tail_frames: i64::from(cover.a2_tail_frames),
     })
 }
 

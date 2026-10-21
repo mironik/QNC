@@ -252,6 +252,9 @@ impl Store {
             Operation::SetCoverSound { cover_id, channel, level_db, off } => {
                 self.set_sound("story_covers", "cover_id", "a2", cover_id, (*channel, lane_level(*level_db)?, *off))
             }
+            Operation::SetCoverOverlap { cover_id, lead_frames, tail_frames } => {
+                self.set_cover_overlap(cover_id, *lead_frames, *tail_frames)
+            }
             Operation::DeleteCover { cover_id } => self.delete_cover(cover_id),
             Operation::SelectCover { cover_id } => self.select_cover(cover_id),
         }
@@ -1111,7 +1114,7 @@ impl Store {
             .prepare(
                 "SELECT cover_id, slot_id, clip_id, virtual_shot_id, timeline_start_frame,
                         timeline_end_frame, source_in_frame, source_out_frame, fps_num, fps_den,
-                        a2_source_channel, a2_level_db, a2_off
+                        a2_source_channel, a2_level_db, a2_off, a2_lead_frames, a2_tail_frames
                  FROM public_story_covers ORDER BY timeline_start_frame, cover_id",
             )
             .map_err(err)?;
@@ -1132,6 +1135,8 @@ impl Store {
                     a2_source_channel: channel(row.get(10)?),
                     a2_level_db: level(row.get(11)?),
                     a2_off: row.get::<_, i64>(12)? != 0,
+                    a2_lead_frames: row.get::<_, i64>(13)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
+                    a2_tail_frames: row.get::<_, i64>(14)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
                 })
             })
             .map_err(err)?
@@ -1242,6 +1247,25 @@ impl Store {
             .map_err(err)?;
         if changed == 0 {
             return Err(format!("{key} not found: {}", id.trim()));
+        }
+        Ok(Data::Changed)
+    }
+
+    /// The J and L of a cover's A2, at most `MAX_OVERLAP_FRAMES` each.
+    fn set_cover_overlap(&mut self, cover_id: &str, lead: u32, tail: u32) -> Result<Data> {
+        if lead > MAX_OVERLAP_FRAMES || tail > MAX_OVERLAP_FRAMES {
+            return Err(qnc_ui_text::fill("story.overlap_too_long", &[("frames", &MAX_OVERLAP_FRAMES.to_string())]));
+        }
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE story_covers SET a2_lead_frames = ?1, a2_tail_frames = ?2, updated_at = ?3
+                 WHERE cover_id = ?4",
+                params![lead, tail, story_now(), cover_id.trim()],
+            )
+            .map_err(err)?;
+        if changed == 0 {
+            return Err(format!("cover_id not found: {}", cover_id.trim()));
         }
         Ok(Data::Changed)
     }
@@ -1463,12 +1487,15 @@ fn split_slot_for(conn: &Connection, slot_id: &str, cover_frames: i64) -> Result
     Ok(self::slot_id(&start_marker, &marker_id))
 }
 
+/// The longest J or L of a cover's A2, story frames (10 s at 50p).
+pub(crate) const MAX_OVERLAP_FRAMES: u32 = 500;
+
 /// The columns a story of the current schema has; `ensure_story_schema` adds the ones
 /// an older story lacks.
 const SCHEMA_COLUMNS: &[(&str, &[&str])] = &[
     ("story_state", &["story_fps_num", "story_fps_den"]),
     ("story_parts", &["a1_source_channel", "a1_level_db", "a1_off"]),
-    ("story_covers", &["slot_id", "a2_source_channel", "a2_level_db", "a2_off"]),
+    ("story_covers", &["slot_id", "a2_source_channel", "a2_level_db", "a2_off", "a2_lead_frames", "a2_tail_frames"]),
 ];
 
 /// A story table lacks a column of the current schema, or the story has no revision yet.
@@ -1551,6 +1578,15 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
             ))
             .map_err(err)?;
         }
+    }
+    // The J and L of a cover (2026-10-21) are added to existing stories: none.
+    let columns = table_columns(conn, "story_covers")?;
+    if !columns.is_empty() && !columns.iter().any(|column| column == "a2_lead_frames") {
+        conn.execute_batch(
+            "ALTER TABLE story_covers ADD COLUMN a2_lead_frames INTEGER NOT NULL DEFAULT 0;
+             ALTER TABLE story_covers ADD COLUMN a2_tail_frames INTEGER NOT NULL DEFAULT 0;",
+        )
+        .map_err(err)?;
     }
     let cover_columns = table_columns(conn, "story_covers")?;
     if !cover_columns.is_empty()
@@ -1661,6 +1697,8 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
             a2_source_channel INTEGER NOT NULL DEFAULT 0 CHECK (a2_source_channel >= 0),
             a2_level_db INTEGER NOT NULL DEFAULT 0,
             a2_off INTEGER NOT NULL DEFAULT 0,
+            a2_lead_frames INTEGER NOT NULL DEFAULT 0 CHECK (a2_lead_frames >= 0),
+            a2_tail_frames INTEGER NOT NULL DEFAULT 0 CHECK (a2_tail_frames >= 0),
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -1699,7 +1737,7 @@ fn ensure_story_schema(conn: &Connection) -> Result<()> {
          SELECT cover_id, slot_id, slot_signature, slot_index, timeline_start_frame,
                 timeline_end_frame, clip_id, virtual_shot_id, source_in_frame, source_out_frame,
                 source_fps_num AS fps_num, source_fps_den AS fps_den, a2_source_channel,
-                a2_level_db, a2_off
+                a2_level_db, a2_off, a2_lead_frames, a2_tail_frames
          FROM story_covers;",
     )
     .map_err(err)?;
@@ -2320,11 +2358,11 @@ fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> Result<()> 
             timeline_end_sec, slot_signature, slot_index, clip_id, virtual_shot_id, title, note,
             in_tc, out_tc, in_seconds, out_seconds, source_in_frame, source_out_frame, source_fps,
             source_fps_num, source_fps_den, sort_index, a2_source_channel, a2_level_db, a2_off,
-            created_at, updated_at)
+            a2_lead_frames, a2_tail_frames, created_at, updated_at)
          SELECT ?1, ?2, ?3, timeline_end_frame, ?4, timeline_end_sec, slot_signature, slot_index,
             clip_id, virtual_shot_id, title, note, ?5, out_tc, ?6, out_seconds, ?7, source_out_frame,
             source_fps, source_fps_num, source_fps_den, sort_index, a2_source_channel, a2_level_db,
-            a2_off, ?8, ?8
+            a2_off, 0, a2_tail_frames, ?8, ?8
          FROM story_covers WHERE cover_id = ?9",
         params![
             format!("cover_{created:x}"),
@@ -2340,7 +2378,7 @@ fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> Result<()> 
     )
     .map_err(err)?;
     conn.execute(
-        "UPDATE story_covers SET source_out_frame = ?1, out_tc = ?2, out_seconds = ?3, updated_at = ?4
+        "UPDATE story_covers SET source_out_frame = ?1, a2_tail_frames = 0, out_tc = ?2, out_seconds = ?3, updated_at = ?4
          WHERE cover_id = ?5",
         params![split.min(source_out), frame_timecode(split, fps), timeline_sec(split, fps), now, cover_id],
     )

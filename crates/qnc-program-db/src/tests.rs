@@ -1407,6 +1407,14 @@ fn a_new_cover_keeps_the_source_channel_chosen_for_a2() {
     run(&mut store, Operation::SetCoverSound { cover_id: cover.cover_id, channel: 1, level_db: -2, off: false }).unwrap();
     let changed = covers(&mut store)[0].clone();
     assert_eq!((changed.a2_source_channel, changed.a2_level_db, changed.a2_off), (1, -2, false));
+    // The J and L of the cover (user 2026-10-21): stored, an Undo step, bounded.
+    assert_eq!((changed.a2_lead_frames, changed.a2_tail_frames), (0, 0));
+    run(&mut store, Operation::SetCoverOverlap { cover_id: changed.cover_id.clone(), lead_frames: 12, tail_frames: 5 }).unwrap();
+    let overlapped = covers(&mut store)[0].clone();
+    assert_eq!((overlapped.a2_lead_frames, overlapped.a2_tail_frames), (12, 5));
+    assert!(run(&mut store, Operation::SetCoverOverlap { cover_id: changed.cover_id.clone(), lead_frames: 501, tail_frames: 0 }).is_err());
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!((covers(&mut store)[0].a2_lead_frames, covers(&mut store)[0].a2_tail_frames), (0, 0));
 }
 
 #[test]

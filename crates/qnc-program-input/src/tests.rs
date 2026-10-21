@@ -35,6 +35,8 @@ fn cover(id: &str, program: (u64, u64), shot: &str) -> ProgramCover {
         a2_source_channel: 1,
         a2_level_db: 0,
         a2_off: false,
+        a2_lead_frames: 0,
+        a2_tail_frames: 0,
     }
 }
 

@@ -102,6 +102,8 @@ pub struct ProgramCoverInput {
     pub active: bool,
     /// Frames the cover's A2 starts before its picture (a J), 0 for the project crossfade only.
     pub a2_lead_frames: i64,
+    /// Frames the cover's A2 goes on after its picture (an L), 0 for none.
+    pub a2_tail_frames: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,13 +123,14 @@ pub fn build_flat_program_playlist(
     if items.is_empty() {
         return Err("The program is empty.".into());
     }
-    let leads: std::collections::HashMap<&str, i64> = input
+    let asked: std::collections::HashMap<&str, crossfade::Overlap> = input
         .segments
         .iter()
         .flat_map(|segment| &segment.covers)
-        .map(|cover| (cover.cover_id.as_str(), cover.a2_lead_frames))
+        .map(|cover| (cover.cover_id.as_str(), crossfade::Overlap { lead: cover.a2_lead_frames, tail: cover.a2_tail_frames }))
         .collect();
-    crossfade::crossfade_a2(&mut items, input.a2_crossfade_frames, |id| leads.get(id).copied().unwrap_or(0))?;
+    let end = items.iter().map(|item| item.record_range.out_frame).max().unwrap_or(0);
+    crossfade::crossfade_a2(&mut items, input.a2_crossfade_frames, |id| asked.get(id).copied().unwrap_or_default(), end)?;
     let playlist = FlatProgramPlaylist {
         playlist_id: input.playlist_id.clone(),
         project_id: input.project_id.clone(),

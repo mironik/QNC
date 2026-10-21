@@ -99,6 +99,7 @@ fn cover(
         a2_off: false,
         active: true,
         a2_lead_frames: 0,
+        a2_tail_frames: 0,
     }
 }
 
@@ -551,4 +552,33 @@ fn a_cover_with_no_frames_before_its_in_rises_over_its_own_frames_and_its_own_j_
     // The second's own J of 10 frames: its sound from 50, under the statement.
     assert_eq!(a2_at(&playlist, 50)[0].0, "cover:cover-2:lead");
     assert!(a2_at(&playlist, 49).iter().all(|(id, _)| id != "cover:cover-2:lead"));
+}
+
+/// Locked (user 2026-10-21): a cover's own L keeps its sound after its picture and the next
+/// cover's sound rises over the same frames; with a J too the window spans both sides of the
+/// cut. An L with no cover after it goes on under the story and falls.
+#[test]
+fn a_cover_l_keeps_its_sound_after_its_picture_and_crosses_with_the_next() {
+    let timebase = tb(50);
+    let mut base = segment("segment-1", "tonovi", "base", (0, 100), (10, 110), timebase);
+    let mut first = cover("cover-1", "first", (20, 50), (100, 130), timebase);
+    first.a2_tail_frames = 6;
+    let mut second = cover("cover-2", "second", (50, 70), (200, 220), timebase);
+    second.a2_lead_frames = 3;
+    second.a2_tail_frames = 8;
+    base.covers = vec![first, second];
+    let mut build = input(100, vec![base]);
+    build.a2_crossfade_frames = 4;
+    let playlist = build_flat_program_playlist(&build, &mut resolver(&["base", "first", "second"], timebase)).unwrap();
+    // The window is 47..56: the second comes in at 47 (its J), the first goes on to 56 (its L).
+    assert!(a2_at(&playlist, 46).iter().all(|(id, _)| id == "cover:cover-1"));
+    assert!(a2_at(&playlist, 48).iter().any(|(id, _)| id == "cover:cover-2:lead"));
+    let after_cut = a2_at(&playlist, 53);
+    assert!(after_cut.iter().any(|(id, _)| id == "cover:cover-1:tail"), "{after_cut:?}");
+    assert!((after_cut.iter().map(|(_, fade)| fade).sum::<f32>() - 1.0).abs() < 1e-6, "{after_cut:?}");
+    assert!(a2_at(&playlist, 57).iter().all(|(id, _)| id == "cover:cover-2"));
+    // The second's L goes on under the statement after 70 and falls to 78.
+    assert_eq!(a2_at(&playlist, 74)[0].0, "cover:cover-2:tail");
+    assert!(a2_at(&playlist, 74)[0].1 < 1.0);
+    assert!(a2_at(&playlist, 79).is_empty());
 }

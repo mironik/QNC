@@ -97,6 +97,12 @@ pub struct ProgramCover {
     pub a2_level_db: i8,
     #[serde(default)]
     pub a2_off: bool,
+    /// The cover's A2 overlap (user 2026-10-21): frames its sound starts before its picture
+    /// (J) and goes on after it (L), story frames; 0 for the project crossfade only.
+    #[serde(default)]
+    pub a2_lead_frames: u32,
+    #[serde(default)]
+    pub a2_tail_frames: u32,
 }
 
 /// The stored Story selection (v5 `story_state`).
@@ -243,6 +249,8 @@ pub enum Operation {
     SetSegmentSound { segment_id: String, channel: u16, level_db: i8, off: bool },
     /// The sound of a cover on A2 changed later. An UNDO step.
     SetCoverSound { cover_id: String, channel: u16, level_db: i8, off: bool },
+    /// The J and L of a cover's A2 (user 2026-10-21), story frames. An UNDO step.
+    SetCoverOverlap { cover_id: String, lead_frames: u32, tail_frames: u32 },
     /// v5 `delete_cover`; its B-roll virtual shot stays.
     DeleteCover { cover_id: String },
     /// v5 `select_cover`.
@@ -270,6 +278,7 @@ impl Operation {
                 | Self::DeleteCover { .. }
                 | Self::SetSegmentSound { .. }
                 | Self::SetCoverSound { .. }
+                | Self::SetCoverOverlap { .. }
         )
     }
 

@@ -320,6 +320,8 @@ fn cover(id: &str, slot_id: &str, frames: (u64, u64)) -> ProgramCover {
         a2_source_channel: 0,
         a2_level_db: 0,
         a2_off: false,
+        a2_lead_frames: 0,
+        a2_tail_frames: 0,
     }
 }
 
@@ -617,6 +619,8 @@ fn a_moved_slot_takes_its_cover_with_it_in_the_edit_pictures() {
         a2_source_channel: 1,
         a2_level_db: 0,
         a2_off: false,
+        a2_lead_frames: 0,
+        a2_tail_frames: 0,
     };
     segments.stored_covers = vec![
         cover("c0", "S|m1", (0, 15), "prev"),
@@ -806,4 +810,34 @@ fn delete_leaves_a_sync_draft_alone_escape_drops_it() {
     assert!(segments.sync_drafting(), "Delete does not drop the draft");
     assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.sync_draft_is_escape"));
     assert!(segments.discard_sync(), "Escape drops it");
+}
+
+/// Locked (user 2026-10-21): Ctrl+J / Ctrl+L take the J or L of the cover under the Wrap
+/// playhead; the arrows make it longer or shorter (never below 0), a trim playhead shows where
+/// the sound starts or ends, Escape drops it; nothing else is taken while it waits.
+#[test]
+fn ctrl_j_and_ctrl_l_take_the_overlap_of_the_cover_under_the_wrap_playhead() {
+    let mut segments = component();
+    let mut cover = cover("c1", "m1|m2", (15, 33));
+    cover.a2_tail_frames = 2;
+    segments.stored_covers = vec![cover];
+    segments.refresh_view(String::new());
+    segments.set_playhead(Some(20));
+    assert!(segments.handles("select_cover_lead"));
+    assert!(segments.apply_action("select_cover_lead"));
+    segments.apply_action("step_back_frame");
+    segments.apply_action("step_back_frame");
+    assert_eq!(segments.view().trim_frames, vec![13], "the J starts the sound 2 frames earlier");
+    segments.apply_action("step_forward_frame");
+    segments.apply_action("step_forward_frame");
+    segments.apply_action("step_forward_frame");
+    assert_eq!(segments.view().trim_frames, vec![15], "never below 0");
+    assert!(!segments.apply(SegmentCommand::SelectSlotAtPlayhead) || segments.overlap_taken(), "nothing else is taken");
+    segments.apply_action("clear_focus");
+    assert!(!segments.overlap_taken());
+    assert!(segments.apply_action("select_cover_tail"));
+    segments.apply_action("step_forward_frame");
+    assert_eq!(segments.view().trim_frames, vec![36], "the stored L of 2, one longer");
+    assert!(segments.confirm_program());
+    assert!(!segments.overlap_taken());
 }

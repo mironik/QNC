@@ -5238,3 +5238,16 @@ smiju dijeliti izlaz samo dok se mijesaju; `a2_crossfade_frames`, `a2_lead_frame
 (`ClipSession::settings`), `qnc-program-input` (`ClipInputs::crossfade_frames`). Aktivni projekt bez postavke ne otvara
 program (kontrolirana greska) dok se ne otvori u Projectu. Nije izvedeno: vlastiti J pokrivalice u bazi (Ctrl+J) i slika
 govornika prije njegova tona. Testovi, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-21 (korisnik: "da, kreni s J i L za svaku pokrivalicu"): svaka pokrivalica ima svoj J (zvuk A2 ulazi prije
+slike) i L (zvuk A2 ostaje nakon slike), u slikama price, 0-500. `qnc-program-db`: stupci `story_covers.a2_lead_frames` i
+`a2_tail_frames` (stare price dobivaju 0 pri otvaranju), operacija `SetCoverOverlap` (jedan Undo korak), podjela pokrivalice
+markerom ostavlja J prvom dijelu i L drugom; ugovor `story.database.json` (`cover_overlap`). `qnc-program-playlist`
+(`crossfade.rs`): na rezu dviju pokrivalica prozor je od J sljedece prije reza do L prethodne poslije reza, preko njega
+prethodni zvuk pada a sljedeci raste; rez bez J i L dobiva `audio.crossfade_frames` kao J; svaka strana koliko izvor ima
+slika (prije IN-a za J, poslije OUT-a za L) i koliko ima mjesta; L bez pokrivalice iza ide pod izjavu i pada.
+`qnc-program-input` predaje oba. Tipke (QNC preset, scope `storyboard`): Ctrl+J uzme J, Ctrl+L uzme L pokrivalice pod Wrap
+playheadom (inace izabrane ili one izabranog slota); lijevo/desno (i kotacic) dulje/krace, bijeli trim playhead pokazuje
+gdje zvuk pocinje ili zavrsava, Enter sprema, Esc odustaje; dok je uzet nista drugo se ne uzima (`qnc-program-segments`
+`overlap.rs`, `Take::Overlap`). Tablica tipki zna J i L. Nije izvedeno: nacrt se cuje tek nakon Entera (program se ponovno
+otvara iz baze), J/L se ne crta na valu Wrap reda, slika govornika prije njegova tona. Testovi, conformance. Uzivo nije
+provjereno.
