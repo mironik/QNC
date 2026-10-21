@@ -428,6 +428,9 @@ impl PanelFocus {
             if let ControlFlow::Break(answer) = qnc_segments_keys::sound(action_id, (preview, wrap, segments)) {
                 return answer;
             }
+            if let ControlFlow::Break(answer) = qnc_segments_keys::overlap(action_id, (preview, wrap, segments)) {
+                return answer;
+            }
         }
         // 3. A1/A2 of the source timeline are its own (piece `qnc-source-timeline`): Ctrl+1,
         // Ctrl+2 take a lane there; while it is taken its keys belong to it.

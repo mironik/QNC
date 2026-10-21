@@ -104,6 +104,19 @@ impl ProgramSegments {
         true
     }
 
+    /// The taken cover, its J and L as drafted and its stored A2 sound (channel, level, off);
+    /// `None` while no J or L is taken or it is as stored.
+    pub fn overlap_draft(&self) -> Option<(String, (u32, u32), (u16, i8, bool))> {
+        let edit = self.overlap.as_ref()?;
+        let frames = edit.frames as u32;
+        let drafted = if edit.lead { (frames, edit.stored.1) } else { (edit.stored.0, frames) };
+        if drafted == edit.stored {
+            return None;
+        }
+        let cover = self.stored_covers.iter().find(|cover| cover.cover_id == edit.cover_id)?;
+        Some((edit.cover_id.clone(), drafted, (cover.a2_source_channel, cover.a2_level_db, cover.a2_off)))
+    }
+
     pub fn overlap_taken(&self) -> bool {
         self.overlap.is_some()
     }

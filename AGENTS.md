@@ -5251,3 +5251,8 @@ gdje zvuk pocinje ili zavrsava, Enter sprema, Esc odustaje; dok je uzet nista dr
 `overlap.rs`, `Take::Overlap`). Tablica tipki zna J i L. Nije izvedeno: nacrt se cuje tek nakon Entera (program se ponovno
 otvara iz baze), J/L se ne crta na valu Wrap reda, slika govornika prije njegova tona. Testovi, conformance. Uzivo nije
 provjereno.
+Dopuna 2026-10-21 (korisnik: "neka se J i L cuje odmah, prije Entera"): dok je J ili L pokrivalice uzet, svaka promjena
+(strelice, kotacic) ponovno otvara program s nacrtom na slici koju pokazuje, kao nacrt zvuka segmenta; Esc vraca spremljeni
+J/L, Enter ga zapisuje. `qnc-program-input` `SoundDraft.overlap`, `qnc-program-segments` `overlap_draft`,
+`qnc-segments-keys` `overlap`, `qnc-panel-focus` (poziva ga uz `sound`), `qnc-source-preview` (nacrt J/L nikad ne ide
+kao razina izlaza). Svaki korak ponovno slaze program (oko 0,5 s). Testovi, conformance. Uzivo nije provjereno.
