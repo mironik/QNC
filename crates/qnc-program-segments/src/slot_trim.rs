@@ -115,7 +115,7 @@ impl ProgramSegments {
             "step_back_frame" => Some(self.nudge_trim(-1)),
             "step_forward_frame" => Some(self.nudge_trim(1)),
             "activate_focused_item" => Some(self.commit_slot_trim()),
-            "clear_focus" | "close_player" => {
+            "clear_focus" => {
                 self.slot_trim = None;
                 self.refresh_view(qnc_ui_text::text("story.msg.slot_trim_cancelled").into());
                 Some(true)

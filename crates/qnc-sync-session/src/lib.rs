@@ -28,13 +28,12 @@ pub fn route(
 ) -> ControlFlow<Option<bool>> {
     ControlFlow::Break(Some(match action_id {
         // A Sync (user 2026-10-13): stopped, the arrows move its end; Enter writes the
-        // cover, Delete drops the draft, wherever the keyboard is.
+        // cover, wherever the keyboard is (Escape drops the draft: `qnc-panel-focus`).
         "step_back_frame" | "step_forward_frame" if segments.sync_drafting() && !preview.player_view().playing() => {
             let moved = segments.sync_nudge(if action_id == "step_back_frame" { -1 } else { 1 });
             moved && show_draft_end(preview, segments)
         }
         "activate_focused_item" if segments.sync_drafting() => segments.confirm_source(),
-        "delete_marker" if segments.sync_drafting() => segments.discard_sync(),
         "play_pause" => space(preview, wrap, segments),
         // O stops a running Sync (user 2026-10-19): the arrows or the mouse still move its
         // end, Enter writes the cover.
@@ -131,7 +130,7 @@ mod tests {
     #[test]
     fn without_a_sync_only_space_is_taken_and_it_plays() {
         let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());
-        for key in ["step_back_frame", "step_forward_frame", "activate_focused_item", "delete_marker", "mark_out", "mark_in"] {
+        for key in ["step_back_frame", "step_forward_frame", "activate_focused_item", "mark_out", "mark_in"] {
             // Without a Sync nothing here is Sync's.
             assert_eq!(route(key, (&mut preview, &mut wrap, &mut segments), true), ControlFlow::Continue(()), "{key}");
         }

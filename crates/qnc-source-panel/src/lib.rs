@@ -26,7 +26,6 @@ pub const ACTIONS: &[&str] = &[
     "navigate_next_object",
     "playlist_input_start",
     "clear_focus",
-    "close_player",
     "monitor_auto",
     "monitor_on",
 ];
@@ -92,7 +91,7 @@ impl SourcePanel {
             "playlist_input_start" => preview.cue(timeline.range_start_frame),
             // The monitor's Auto | On switch (`qnc-monitor`), the same in every form.
             "monitor_auto" | "monitor_on" => preview.set_monitor_mode(action_id),
-            "clear_focus" | "close_player" if self.mark_taken(timeline) => {
+            "clear_focus" if self.mark_taken(timeline) => {
                 self.mark_taken = false;
                 mark_cue(preview, qnc_source_mark_focus::release(timeline))
             }

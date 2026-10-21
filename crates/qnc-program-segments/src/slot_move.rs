@@ -175,7 +175,7 @@ impl ProgramSegments {
         match action_id {
             "step_back_frame" => Some(self.nudge_slot(-1)),
             "step_forward_frame" => Some(self.nudge_slot(1)),
-            "clear_focus" | "close_player" => {
+            "clear_focus" => {
                 self.slot_move = None;
                 self.refresh_view(qnc_ui_text::text("story.msg.slot_move_cancelled").into());
                 Some(true)

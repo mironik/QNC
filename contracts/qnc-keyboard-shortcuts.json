@@ -374,7 +374,7 @@
       "label": "Panel Segmenti: ukljuci iskljuceni segment"
     },
     "segment_purge": {
-      "label": "Panel Segmenti: izbrisi iskljuceni segment"
+      "label": "Trajno izbriši isključeni segment (Ctrl+Delete ili dugme u tabu Segment)"
     },
     "segment_replace": {
       "label": "Panel Segmenti: zamijeni segment oznacenim izvorom"
@@ -418,8 +418,9 @@
       { "keys": "Alt + strelice", "meaning": "Skače po objektima: marker, slot, segment; na source timelineu početak, IN, OUT." },
       { "keys": "Strelice", "meaning": "Lijevo/desno za jedan frame, a kad je nešto uzeto mijenjaju to; gore/dolje prethodni ili sljedeći blok." },
       { "keys": "Enter", "meaning": "Potvrda, uvijek u panelu u fokusu." },
-      { "keys": "Esc", "meaning": "Odustani ili pusti ono što je uzeto." },
-      { "keys": "Delete", "meaning": "Briše odabrano: ono uzeto s Ctrl ili odabrani segment." },
+      { "keys": "Esc", "meaning": "Odustani od onoga što nije zapisano, jedno po pritisku: pusti uzeto, odbaci nacrt Synca, zatvori uređivanje segmenta, zatvori uvećani slot." },
+      { "keys": "Delete", "meaning": "Briše objekt, jedan po pritisku, samo ono uzeto (Ctrl ili desni klik): uzeti M marker, uzeti B-roll ili B-roll odabranog slota. Ctrl+Delete trajno briše isključeni segment." },
+      { "keys": "Backspace", "meaning": "Briše zadnju radnju (Undo); Shift+Backspace je vraća (Redo). U polju za upis teksta briše slovo; u pregledniku lokacija Ingesta znači Gore." },
       { "keys": "Tab / klik", "meaning": "Tipke djeluju samo na panel u fokusu; Tab ili klik mijenja panel." }
     ],
     "groups": [
@@ -552,7 +553,6 @@
         "navigate_next_object": [{ "code": "ArrowRight", "alt": true }],
         "playlist_input_start": [{ "key": "Home", "code": "Home" }],
         "clear_focus": [{ "key": "Escape" }],
-        "close_player": [{ "key": "Escape" }],
         "activate_focused_item": [{ "key": "Enter" }],
         "step_prev_part": [{ "key": "ArrowUp" }],
         "step_next_part": [{ "key": "ArrowDown" }],
@@ -676,19 +676,6 @@
             "alt": true
           }
         ],
-        "delete_part": [
-          {
-            "key": "Delete"
-          },
-          {
-            "key": "Backspace"
-          }
-        ],
-        "close_player": [
-          {
-            "key": "Escape"
-          }
-        ],
         "add_ton_segment": [
           {
             "code": "KeyT",
@@ -773,17 +760,13 @@
         ],
         "delete_marker": [
           {
-            "key": "Delete"
-          },
-          {
-            "key": "Backspace"
-          },
+            "key": "Delete",
+            "ctrl": false
+          }
+        ],
+        "segment_purge": [
           {
             "key": "Delete",
-            "ctrl": true
-          },
-          {
-            "key": "Backspace",
             "ctrl": true
           }
         ],
@@ -830,6 +813,10 @@
             "code": "KeyZ",
             "ctrl": true,
             "shift": false
+          },
+          {
+            "key": "Backspace",
+            "shift": false
           }
         ],
         "redo_object": [
@@ -846,6 +833,10 @@
           {
             "code": "KeyZ",
             "ctrl": true,
+            "shift": true
+          },
+          {
+            "key": "Backspace",
             "shift": true
           }
         ],

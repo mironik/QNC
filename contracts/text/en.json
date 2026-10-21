@@ -132,6 +132,8 @@
     "story.msg.no_slot_under_playhead": "No M-M slot under the playhead",
     "story.msg.no_empty_slot": "No empty M-M slot",
     "story.msg.no_slot_for_length": "No M-M slot for the length",
+    "story.msg.sync_draft_is_escape": "The Sync B-roll is not saved yet · Esc drops it, Enter saves it",
+    "story.msg.purge_needs_excluded": "Ctrl+Delete removes an excluded segment for good · choose one in the Segment tab",
     "story.msg.take_refused": "{held} waits for Enter · Enter saves it, Esc lets it go, then take the next",
     "story.take.sync": "The Sync B-roll",
     "story.take.segment": "The segment edit",

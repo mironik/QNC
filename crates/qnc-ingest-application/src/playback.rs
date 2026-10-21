@@ -82,7 +82,7 @@ impl IngestApplication {
 
     pub(super) fn player_action(&mut self, intent: IngestIntent) -> IngestDispatchResult {
         // Without a player only Escape still lets go of what the source timeline took.
-        let escape = matches!(intent.action_id.as_str(), "clear_focus" | "close_player");
+        let escape = intent.action_id == "clear_focus";
         if !self.preview.has_player() && !escape {
             return self.refuse_shown("Broadcast Player nije povezan.".into());
         }

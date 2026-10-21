@@ -791,3 +791,19 @@ fn one_escape_lets_a_taken_marker_go_and_keeps_the_zoom() {
     assert!(segments.marker_edit.is_none(), "the marker is let go");
     assert!(segments.view().zoom.is_some(), "the zoom stays for the next Escape");
 }
+
+#[test]
+fn delete_leaves_a_sync_draft_alone_escape_drops_it() {
+    // Locked (user 2026-10-21): a Sync draft is not saved, so it is not an object; Delete says
+    // so and keeps it, Escape (`clear_focus`, routed by the panel focus) drops it.
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::ToggleSync);
+    segments.arm_sync(false);
+    segments.set_source(marked(13));
+    assert!(matches!(segments.sync_space(false), SyncSpace::Start(_)));
+    segments.apply_action("delete_marker");
+    assert!(segments.sync_drafting(), "Delete does not drop the draft");
+    assert_eq!(segments.view().message, qnc_ui_text::text("story.msg.sync_draft_is_escape"));
+    assert!(segments.discard_sync(), "Escape drops it");
+}

@@ -824,3 +824,28 @@ mod tests {
             .contains(&"delete_marker"));
     }
 }
+
+#[cfg(test)]
+mod backspace_tests {
+    /// Locked (user 2026-10-21): in the QNC preset of a story Backspace deletes the last action
+    /// (Undo), Shift+Backspace brings it back, Delete removes a taken object, Escape is one action.
+    #[test]
+    fn backspace_is_undo_and_delete_and_escape_have_one_action_each() {
+        let raw: serde_json::Value = serde_json::from_str(include_str!("../../../contracts/qnc-keyboard-shortcuts.json")).unwrap();
+        let scope = &raw["presets"]["default"]["storyboard"];
+        let has = |action: &str, key: &str, shift: bool| {
+            scope[action].as_array().is_some_and(|binds| {
+                binds.iter().any(|b| b["key"] == key && b["shift"].as_bool().unwrap_or(false) == shift)
+            })
+        };
+        assert!(has("undo_object", "Backspace", false));
+        assert!(has("redo_object", "Backspace", true));
+        assert!(has("delete_marker", "Delete", false));
+        let on = |key: &str| scope.as_object().unwrap().iter().filter(|(_, binds)| {
+            binds.as_array().is_some_and(|b| b.iter().any(|b| b["key"] == key && !b["ctrl"].as_bool().unwrap_or(false) && !b["shift"].as_bool().unwrap_or(false)))
+        }).count();
+        assert_eq!(on("Escape"), 1, "Escape is clear_focus only");
+        assert_eq!(on("Delete"), 1, "Delete is one action");
+        assert_eq!(on("Backspace"), 1, "Backspace is Undo only");
+    }
+}

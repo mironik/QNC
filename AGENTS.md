@@ -5210,3 +5210,17 @@ dekoder 1 s prije trazene slike (`restart`), pa i koraci unatrag nakon njega nal
 `a_cue_back_or_forward_within_the_sound_in_memory_needs_no_new_decoder`, `a_run_of_cues_goes_as_its_latest...`,
 `a_new_take_is_refused_with_a_warning_while_another_waits_for_enter`, `a_marker_is_not_taken_while_a_sync_waits`.
 Uzivo nije provjereno.
+Pravilo tipki 2026-10-21 (korisnik: "Backspace brise zadnju radnju, a Delete brise objekt"; "slazem se s tvojim
+prijedlozima"; "staro pravilo" za Delete): (1) Esc je jedna radnja `clear_focus` (`close_player` nema tipku u QNC presetu i
+nijedna kocka ga ne obraduje; u drugim presetima Esc i dalje daje obje sifre, ali radi samo `clear_focus`). Esc odustaje
+od onoga sto nije zapisano, jedno po pritisku, najblize prvo: pusti uzeto (IN/OUT, A1/A2, marker, slot, rub, zvuk,
+pokrivalica), odbaci nacrt Synca koji nije spremljen (prije Delete), odustani od uredivanja segmenta, zatvori uvecani slot.
+(2) Delete brise objekt, samo ono uzeto (pravilo 25. 9. ostaje; klik sam ne naoruzava Delete): uzeti M marker, uzeti
+B-roll, B-roll uzetog ili izabranog slota; nacrt Synca nije objekt (poruka `story.msg.sync_draft_is_escape`). Jedna
+sifra `delete_marker` (Delete; `delete_part` bez tipke u QNC presetu), `qnc-program-segments` `delete.rs`. Ctrl+Delete
+je `segment_purge`: odabrani iskljuceni segment trajno (`PurgeSelected`). (3) Backspace je Undo (`undo_object`),
+Shift+Backspace Redo; Ctrl+Z, Ctrl+Y i Ctrl+R ostaju. U polju za tekst Backspace brise slovo, u Ingestovom pregledniku
+lokacija znaci Gore. Katalog (QNC preset `storyboard`, `source_timeline`), pomoc F1 (pravila Esc, Delete, Backspace),
+conformance iznimke od qnc_v4 (`close_player`, `delete_part`, `delete_marker`, `undo_object`, `redo_object`; oznake akcija
+ostaju v4). Zakljucano testovima `backspace_is_undo_and_delete_and_escape_have_one_action_each` i
+`delete_leaves_a_sync_draft_alone_escape_drops_it`. Uzivo nije provjereno.

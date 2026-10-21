@@ -56,6 +56,8 @@ pub enum SegmentCommand {
     Include(String),
     /// Izbriši: an excluded segment is removed for good.
     Purge(String),
+    /// Ctrl+Delete: the chosen segment, excluded, removed for good.
+    PurgeSelected,
     /// Replace: the segment takes the marked source (clip, IN/OUT) as its base
     /// layer and its length; its kind stays (user rule 2026-09-25).
     Replace(String),
@@ -210,6 +212,7 @@ impl SegmentCommand {
             // scopes); delete_marker holds every delete key in every preset, so only it
             // deletes: one press, one delete (the marker, else the cover, else the segment).
             "delete_marker" => Self::DeleteFocused,
+            "segment_purge" => Self::PurgeSelected,
             "playlist_input_start" => Self::ProgramStart,
             "step_prev_part" => Self::Step { up: true },
             "step_next_part" => Self::Step { up: false },

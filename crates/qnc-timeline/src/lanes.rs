@@ -44,7 +44,7 @@ impl LaneKey {
             "lane_level_down" | "wheel_source_ctrl_back" | "wheel_segments_ctrl_back" => Self::Level(-1),
             "lane_level_up" | "wheel_source_ctrl_forward" | "wheel_segments_ctrl_forward" => Self::Level(1),
             "activate_focused_item" => Self::Keep,
-            "clear_focus" | "close_player" => Self::Drop,
+            "clear_focus" => Self::Drop,
             _ => return None,
         })
     }

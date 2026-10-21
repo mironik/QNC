@@ -523,7 +523,7 @@ impl PanelFocus {
                 None => false,
             },
             // Escape drops a taken segment edge at once and goes back to Wrap.
-            "clear_focus" | "close_player" if segments.trimming_edge() => {
+            "clear_focus" if segments.trimming_edge() => {
                 segments.apply_action(action_id);
                 self.back_to_wrap(segments, wrap, timeline)
             }
@@ -539,9 +539,11 @@ impl PanelFocus {
                 self.source.set_mark_taken(true); // a segment edge opened with its mark taken
                 return self.source.route(action_id, preview, timeline);
             }
-            "clear_focus" | "close_player" if self.taken(timeline) => return self.source.route(action_id, preview, timeline),
+            "clear_focus" if self.taken(timeline) => return self.source.route(action_id, preview, timeline),
+            // Escape gives up what is not saved (user 2026-10-21): after a taken mark, a Sync draft.
+            "clear_focus" if segments.sync_drafting() => segments.discard_sync(),
             // Escape drops the edit of a segment wherever the keyboard is.
-            "clear_focus" | "close_player" if on_source && segments.view().editing.is_some() => {
+            "clear_focus" if on_source && segments.view().editing.is_some() => {
                 segments.apply_action(action_id)
             }
             "step_back_frame" | "step_forward_frame" => match panel {
@@ -667,7 +669,6 @@ const LANE_KEYS: &[&str] = &[
     "lane_level_up",
     "activate_focused_item",
     "clear_focus",
-    "close_player",
 ];
 
 pub use qnc_ui_kit::paint_focus;

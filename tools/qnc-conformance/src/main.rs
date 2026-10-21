@@ -885,6 +885,13 @@ const V4_KEY_EXCEPTIONS: &[(&str, &str, &str)] = &[
     ("default", "off", "save_virtual_shot"),
     // 2026-10-17 (user: Shift+ adds): Shift+B adds a B-roll to the slot, as B does.
     ("default", "storyboard", "quick_overwrite_cover"),
+    // 2026-10-21 (user: "Backspace deletes the last action, Delete deletes an object"; Escape is
+    // one action): Escape is clear_focus only, Delete one object (delete_marker), Backspace Undo.
+    ("default", "storyboard", "close_player"),
+    ("default", "storyboard", "delete_part"),
+    ("default", "storyboard", "delete_marker"),
+    ("default", "storyboard", "undo_object"),
+    ("default", "storyboard", "redo_object"),
 ];
 
 fn v4_key_exception(preset_id: &str, scope_id: &str, action_id: &str) -> bool {

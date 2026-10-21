@@ -35,7 +35,7 @@ pub fn sound(
         {
             draft(LaneKey::of(lane).unwrap_or(LaneKey::Drop), (preview, wrap, segments))
         }
-        "clear_focus" | "close_player" if segments.part_sound_taken() => {
+        "clear_focus" if segments.part_sound_taken() => {
             let released = segments.release_part_sound();
             preview.hear_program_draft(None, None, wrap.playhead()); // the stored sound again
             released

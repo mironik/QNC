@@ -11,6 +11,7 @@
 //! form and no application, and never plays, probes or opens media.
 
 mod confirm;
+mod delete;
 mod zoom;
 mod edit;
 mod nav;
@@ -455,7 +456,7 @@ impl ProgramSegments {
     pub fn handles(&self, action_id: &str) -> bool {
         self.command_for(action_id).is_some()
             || ((self.slot_move.is_some() || self.slot_trim.is_some())
-                && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus" | "close_player"))
+                && matches!(action_id, "step_back_frame" | "step_forward_frame" | "clear_focus"))
     }
 
     /// Applies a keyboard catalog action of the program; false if it is not one.
@@ -472,17 +473,17 @@ impl ProgramSegments {
 
     /// While a marker is edited, the arrows and Escape belong to it.
     fn command_for(&self, action_id: &str) -> Option<SegmentCommand> {
-        if self.cover_taken.is_some() && matches!(action_id, "clear_focus" | "close_player") {
+        if self.cover_taken.is_some() && action_id == "clear_focus" {
             return Some(SegmentCommand::CancelMarkerEdit);
         }
-        if self.editing.is_some() && matches!(action_id, "clear_focus" | "close_player") {
+        if self.editing.is_some() && action_id == "clear_focus" {
             return Some(SegmentCommand::CancelEdit);
         }
         if self.marker_edit.is_some() {
             match action_id {
                 "step_back_frame" => return Some(SegmentCommand::NudgeMarker(-1)),
                 "step_forward_frame" => return Some(SegmentCommand::NudgeMarker(1)),
-                "clear_focus" | "close_player" => return Some(SegmentCommand::CancelMarkerEdit),
+                "clear_focus" => return Some(SegmentCommand::CancelMarkerEdit),
                 _ => {}
             }
         }
@@ -689,34 +690,8 @@ impl ProgramSegments {
                 }
                 self.cancel_marker_edit();
             }
-            SegmentCommand::DeleteFocused => match (self.marker_edit.take(), self.cover_taken.take()) {
-                (Some((marker_id, _)), _) => {
-                    self.selected_marker = None;
-                    self.write(Operation::DeleteMarker { marker_id });
-                }
-                (None, Some(cover_id)) => {
-                    self.selected_cover = None;
-                    self.write(Operation::DeleteCover { cover_id });
-                }
-                // A chosen or taken slot (click on its colour strip, Ctrl+S, right click on the
-                // strip): Ctrl+Delete removes its B-roll; the slot and its M markers stay (user
-                // 2026-10-17: Ctrl+Delete did nothing on a selected slot).
-                (None, None) => {
-                    let slot = self.slot_move.take().map(|taken| taken.slot_id).or_else(|| self.selected_slot.clone());
-                    let cover = slot
-                        .as_deref()
-                        .and_then(|slot_id| self.stored_covers.iter().find(|cover| cover.slot_id == slot_id))
-                        .map(|cover| cover.cover_id.clone());
-                    match (slot, cover) {
-                        (_, Some(cover_id)) => {
-                            self.selected_cover = None;
-                            self.write(Operation::DeleteCover { cover_id });
-                        }
-                        (Some(_), None) => self.refresh_view(qnc_ui_text::text("story.msg.slot_has_no_broll").into()),
-                        (None, None) => self.refresh_view(qnc_ui_text::text("story.msg.take_before_delete").into()),
-                    }
-                }
-            },
+            SegmentCommand::DeleteFocused => self.delete_focused(),
+            SegmentCommand::PurgeSelected => self.purge_selected(),
         }
         true
     }
