@@ -13,6 +13,7 @@ fn intents() -> Vec<TimelineIntent> {
     vec![
         TimelineIntent::CueFrame(5),
         TimelineIntent::SelectVirtual { id: id(), frame: 5 },
+        TimelineIntent::OpenVirtual { id: id(), frame: 5 },
         TimelineIntent::Keep(Some(5)),
         TimelineIntent::Keep(None),
         TimelineIntent::SelectMarkerSlot { id: id(), frame: 5 },

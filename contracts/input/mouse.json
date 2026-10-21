@@ -29,6 +29,7 @@
       "click_cover": "timeline_select_cover",
       "ctrl_click_strip": "timeline_take_cover",
       "shift_click": "add_marker_continue",
+      "double_click": "segment_edit",
       "click_v_label": "playlist_input_start",
       "ctrl_click_v_label": "toggle_wrap_video",
       "click_a1_label": "select_audio_a1",

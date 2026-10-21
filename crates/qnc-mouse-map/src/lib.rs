@@ -7,6 +7,7 @@
 //! - a right click is Ctrl+: it takes what it points at (the nearest IN or OUT, the nearest
 //!   M marker, the slot on a colour strip, A1/A2);
 //! - a drag moves only what is taken; Shift + left click adds; the middle button cuts;
+//! - a double click on a segment opens it on the source timeline (Edit; user 2026-10-21);
 //! - the wheel is the left/right arrows, Ctrl+wheel Ctrl+left/right.
 //!
 //! The timeline says what the pointer did (`Pointer`); this block says which action that is
@@ -34,6 +35,8 @@ pub enum Pointer {
     CtrlClickStrip,
     /// Shift + left click: an M marker added there.
     ShiftClick,
+    /// A double click on a segment: it opens on the source timeline (user 2026-10-21).
+    DoubleClick,
     ClickVLabel,
     CtrlClickVLabel,
     ClickA1Label,
@@ -58,13 +61,14 @@ pub enum Pointer {
 }
 
 impl Pointer {
-    pub const ALL: [Pointer; 27] = [
+    pub const ALL: [Pointer; 28] = [
         Self::Click,
         Self::ClickHolding,
         Self::ClickStrip,
         Self::ClickCover,
         Self::CtrlClickStrip,
         Self::ShiftClick,
+        Self::DoubleClick,
         Self::ClickVLabel,
         Self::CtrlClickVLabel,
         Self::ClickA1Label,
@@ -97,6 +101,7 @@ impl Pointer {
             Self::ClickCover => "click_cover",
             Self::CtrlClickStrip => "ctrl_click_strip",
             Self::ShiftClick => "shift_click",
+            Self::DoubleClick => "double_click",
             Self::ClickVLabel => "click_v_label",
             Self::CtrlClickVLabel => "ctrl_click_v_label",
             Self::ClickA1Label => "click_a1_label",
@@ -203,6 +208,7 @@ mod tests {
         assert_eq!(map.action("segments", Pointer::ShiftClick), Some("add_marker_continue"), "the same action as its key");
         assert_eq!(map.action("segments", Pointer::Click), Some("timeline_cue_frame"), "a left click is the playhead");
         assert_eq!(map.action(source, Pointer::ShiftClick), None, "nothing to add on a source timeline");
+        assert_eq!(map.action("segments", Pointer::DoubleClick), Some("segment_edit"), "a double click is Edit");
     }
 
     #[test]

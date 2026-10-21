@@ -712,6 +712,9 @@ pub enum TimelineIntent {
     CueFrame(u64),
     ToggleAudioExpand(AudioLane),
     SelectVirtual { id: String, frame: u64 },
+    /// A double click on a segment of a row: it opens on the source timeline (Edit; user
+    /// 2026-10-21).
+    OpenVirtual { id: String, frame: u64 },
     SelectCover { id: String, frame: u64 },
     SelectMarkerSlot { id: String, frame: u64 },
     /// The source channel (zero based) chosen for A1 in the channel picker.
@@ -2184,6 +2187,19 @@ fn video_intent_from_response(
         input.state.duration_frames(),
         pos.x,
     );
+    // A double click on a segment opens it (its first click placed the playhead).
+    if response.double_clicked() && input.layers.virtual_spans {
+        if let Some(id) = virtual_span_hit(
+            track,
+            input.state.range_start(),
+            input.state.duration_frames(),
+            pos,
+            input.virtual_spans,
+            video_middle_insets(input),
+        ) {
+            return TimelineIntent::OpenVirtual { id: id.to_string(), frame };
+        }
+    }
     if response.clicked() {
         let modifiers = response.ctx.input(|i| i.modifiers);
         // Shift + left click adds an M marker there (as Shift+M; user rule 2026-10-20).
