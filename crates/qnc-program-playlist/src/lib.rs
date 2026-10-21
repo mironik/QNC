@@ -15,6 +15,7 @@
 //! stand-in formats; missing facts end in an error.
 
 mod contract;
+mod crossfade;
 
 pub use contract::{
     FlatProgramItem, FlatProgramPlaylist, FlatProgramSource, FrameRange, MediaRef, PlaylistError,
@@ -65,6 +66,8 @@ pub struct ProgramPlaylistBuildInput {
     pub audio_layout: ProgramAudioLayout,
     pub duration_frames: i64,
     pub segments: Vec<ProgramSegmentInput>,
+    /// Frames of the crossfade on every A2 cut, the project `audio.crossfade_frames`.
+    pub a2_crossfade_frames: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,6 +100,8 @@ pub struct ProgramCoverInput {
     pub a2_level_db: i8,
     pub a2_off: bool,
     pub active: bool,
+    /// Frames the cover's A2 starts before its picture (a J), 0 for the project crossfade only.
+    pub a2_lead_frames: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,6 +121,13 @@ pub fn build_flat_program_playlist(
     if items.is_empty() {
         return Err("The program is empty.".into());
     }
+    let leads: std::collections::HashMap<&str, i64> = input
+        .segments
+        .iter()
+        .flat_map(|segment| &segment.covers)
+        .map(|cover| (cover.cover_id.as_str(), cover.a2_lead_frames))
+        .collect();
+    crossfade::crossfade_a2(&mut items, input.a2_crossfade_frames, |id| leads.get(id).copied().unwrap_or(0))?;
     let playlist = FlatProgramPlaylist {
         playlist_id: input.playlist_id.clone(),
         project_id: input.project_id.clone(),
@@ -258,7 +270,7 @@ pub fn build_program_frame_window(
     Ok(result)
 }
 
-fn trim_program_item(
+pub(crate) fn trim_program_item(
     item: &FlatProgramItem,
     record_in: i64,
     record_out: i64,
@@ -550,6 +562,8 @@ fn audio_routes(
         source_channel,
         output_channel,
         level_db,
+        fade_in: None,
+        fade_out: None,
     }]
 }
 

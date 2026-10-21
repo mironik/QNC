@@ -57,6 +57,10 @@ pub struct AudioPart {
     /// description at 0, so a unit as recorded keeps the fingerprint it had.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub level_db: i8,
+    /// The A2 crossfade over the unit (user 2026-10-21): the factor per mille at its first
+    /// sample and after its last, linear between; left out without a fade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fade: Option<[u16; 2]>,
 }
 
 fn is_zero(level_db: &i8) -> bool {
@@ -67,6 +71,13 @@ impl AudioPart {
     /// The factor the decoded samples are multiplied by.
     pub fn gain(&self) -> f32 {
         10f32.powf(f32::from(self.level_db) / 20.0)
+    }
+
+    /// The fade factor at `sample` of `samples` of the unit, 1 without a fade.
+    pub fn fade_at(&self, sample: usize, samples: usize) -> f32 {
+        let Some([from, to]) = self.fade else { return 1.0 };
+        let (from, to) = (f32::from(from) / 1000.0, f32::from(to) / 1000.0);
+        from + (to - from) * sample as f32 / samples.max(1) as f32
     }
 }
 
@@ -168,6 +179,7 @@ mod tests {
                 first_sample: 0,
                 origin: (0, Rational { numerator: 1, denominator: 48000 }),
                 level_db,
+                fade: None,
             });
             unit
         };

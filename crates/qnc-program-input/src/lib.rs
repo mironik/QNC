@@ -28,6 +28,8 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The prepared input of a clip of the active project (`qnc-player-input`).
 pub trait ClipInputs {
     fn prepared(&self, clip_id: &str) -> Result<PreparedInput, String>;
+    /// Frames of the A2 crossfade, the project `audio.crossfade_frames` (user 2026-10-21).
+    fn crossfade_frames(&self) -> Result<u16, String>;
 }
 
 /// `qnc-player-input` reader of the active project workspace.
@@ -40,6 +42,10 @@ impl ClipInputs for PlayerClipInputs<'_> {
         self.session
             .load(clip_id)
             .map_err(|error| format!("Klip '{clip_id}': {error}"))
+    }
+
+    fn crossfade_frames(&self) -> Result<u16, String> {
+        self.session.settings().audio_crossfade_frames().map_err(|error| error.to_string())
     }
 }
 
@@ -162,6 +168,7 @@ fn load(
     let covers = fit_covers(covers, &mut resolver, story_rate)?;
     let mut input = build_input(project_id, story_rate, &segments, &covers, channels)?;
     input.revision = revision;
+    input.a2_crossfade_frames = i64::from(clips.crossfade_frames()?);
     let mut playlist = build_flat_program_playlist(&input, &mut resolver)?;
     // A window is only ever the A1 bed of a Sync (the story under the slot, user 2026-10-20).
     if let Some((start, end)) = window {
@@ -283,6 +290,7 @@ pub fn build_input(
             .map_err(|error| error.message)?,
         duration_frames: start,
         segments: inputs,
+        a2_crossfade_frames: 0,
     })
 }
 
@@ -337,6 +345,7 @@ fn cover_input(cover: &ProgramCover, story_rate: (u32, u32)) -> Result<ProgramCo
         a2_level_db: cover.a2_level_db,
         a2_off: cover.a2_off,
         active: true,
+        a2_lead_frames: 0,
     })
 }
 

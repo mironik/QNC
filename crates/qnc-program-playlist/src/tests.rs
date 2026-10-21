@@ -98,6 +98,7 @@ fn cover(
         a2_level_db: 0,
         a2_off: false,
         active: true,
+        a2_lead_frames: 0,
     }
 }
 
@@ -110,6 +111,7 @@ fn input(duration: i64, segments: Vec<ProgramSegmentInput>) -> ProgramPlaylistBu
         audio_layout: ProgramAudioLayout::discrete(2).unwrap(),
         duration_frames: duration,
         segments,
+        a2_crossfade_frames: 0,
     }
 }
 
@@ -203,6 +205,8 @@ fn the_segment_chooses_which_source_channel_is_heard_on_a1() {
             source_channel: 1,
             output_channel: PROGRAM_AUDIO_OUTPUT_A1,
             level_db: 0,
+            fade_in: None,
+            fade_out: None,
         }]
     );
 
@@ -312,6 +316,8 @@ fn transient_overlay_replaces_video_and_a2_but_keeps_a1() {
                 source_channel: 0,
                 output_channel: PROGRAM_AUDIO_OUTPUT_A2,
                 level_db: 0,
+                fade_in: None,
+                fade_out: None,
             }],
             source_audio_channels: 2,
             source_audio_format: new_cover.audio_format,
@@ -480,4 +486,69 @@ fn a_proxy_picture_keeps_the_sound_of_the_original() {
         covered[2].audio_routes[0].output_channel,
         PROGRAM_AUDIO_OUTPUT_A2
     );
+}
+
+/// The A2 routes of the items at `frame`: (source id, fade at that frame).
+fn a2_at(playlist: &FlatProgramPlaylist, frame: i64) -> Vec<(String, f32)> {
+    let item = playlist.items.iter().find(|item| item.record_range.in_frame <= frame && frame < item.record_range.out_frame).unwrap();
+    item.sources
+        .iter()
+        .flat_map(|source| source.audio_routes.iter().map(move |route| (source, route)))
+        .filter(|(_, route)| route.output_channel == PROGRAM_AUDIO_OUTPUT_A2)
+        .map(|(source, route)| (source.source_id.clone(), route.fade_at(frame as f64)))
+        .collect()
+}
+
+/// Locked (user 2026-10-21, news practice): every A2 cut cross-fades; the next cover's sound
+/// comes in before its picture (a J) as far as its source has frames before its IN, the A2
+/// before it falls over the same frames; A1 is never faded; the picture still cuts hard.
+#[test]
+fn a2_cuts_cross_fade_and_the_next_cover_comes_in_before_its_picture() {
+    let timebase = tb(50);
+    let mut base = segment("segment-1", "tonovi", "base", (0, 100), (10, 110), timebase);
+    base.covers = vec![
+        cover("cover-1", "first", (20, 50), (100, 130), timebase),
+        cover("cover-2", "second", (50, 80), (200, 230), timebase),
+    ];
+    let mut build = input(100, vec![base]);
+    build.a2_crossfade_frames = 4;
+    let playlist = build_flat_program_playlist(&build, &mut resolver(&["base", "first", "second"], timebase)).unwrap();
+    // The first comes in under the statement from 16, rising.
+    assert_eq!(a2_at(&playlist, 16), vec![("cover:cover-1:lead".to_string(), 0.0)]);
+    assert!(a2_at(&playlist, 18)[0].1 > 0.0 && a2_at(&playlist, 18)[0].1 < 1.0);
+    assert_eq!(a2_at(&playlist, 30), vec![("cover:cover-1".to_string(), 1.0)]);
+    // At 46..50 both sound: the first falls, the second rises; the picture changes at 50.
+    let crossing = a2_at(&playlist, 48);
+    assert_eq!(crossing.len(), 2);
+    assert!((crossing.iter().map(|(_, fade)| fade).sum::<f32>() - 1.0).abs() < 1e-6, "{crossing:?}");
+    let picture = |frame: i64| {
+        let item = playlist.items.iter().find(|item| item.record_range.in_frame <= frame && frame < item.record_range.out_frame).unwrap();
+        item.sources.iter().find(|source| source.video_layer == Some(ProgramVideoLayer::Cover)).map(|source| source.clip_id.clone())
+    };
+    assert_eq!(picture(49).as_deref(), Some("first"));
+    assert_eq!(picture(50).as_deref(), Some("second"));
+    // The last cover falls over its last frames, nothing after it.
+    assert!(a2_at(&playlist, 78)[0].1 < 1.0);
+    assert!(a2_at(&playlist, 85).is_empty());
+    // A1 is never faded.
+    let a1 = playlist.items.iter().flat_map(|item| &item.sources).flat_map(|source| &source.audio_routes).filter(|route| route.output_channel == PROGRAM_AUDIO_OUTPUT_A1);
+    assert!(a1.into_iter().all(|route| !route.fades()));
+}
+
+#[test]
+fn a_cover_with_no_frames_before_its_in_rises_over_its_own_frames_and_its_own_j_is_longer() {
+    let timebase = tb(50);
+    let mut base = segment("segment-1", "tonovi", "base", (0, 100), (10, 110), timebase);
+    let mut late = cover("cover-2", "second", (60, 90), (200, 230), timebase);
+    late.a2_lead_frames = 10;
+    base.covers = vec![cover("cover-1", "first", (20, 50), (0, 30), timebase), late];
+    let mut build = input(100, vec![base]);
+    build.a2_crossfade_frames = 4;
+    let playlist = build_flat_program_playlist(&build, &mut resolver(&["base", "first", "second"], timebase)).unwrap();
+    // No frames before IN 0: it rises over 20..24 on its own picture.
+    assert_eq!(a2_at(&playlist, 19), Vec::<(String, f32)>::new());
+    assert!(a2_at(&playlist, 21)[0].1 < 1.0);
+    // The second's own J of 10 frames: its sound from 50, under the statement.
+    assert_eq!(a2_at(&playlist, 50)[0].0, "cover:cover-2:lead");
+    assert!(a2_at(&playlist, 49).iter().all(|(id, _)| id != "cover:cover-2:lead"));
 }

@@ -389,6 +389,11 @@ pub struct ClipSession<'a> {
 }
 
 impl ClipSession<'_> {
+    /// The project settings this session read (one read for all its clips).
+    pub fn settings(&self) -> &WorkSettings {
+        &self.settings
+    }
+
     pub fn load(&self, clip_id: &str) -> Result<PreparedInput> {
         qnc_media_records::valid_id(clip_id)
             .map_err(|e| InputError::InvalidRecord(e.to_string()))?;

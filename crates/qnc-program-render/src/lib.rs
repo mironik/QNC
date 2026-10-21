@@ -373,7 +373,8 @@ fn sound_of(
                     return Err(qnc_ui_text::text("render.source_sound_skips_samples").into());
                 }
                 let offset = usize::from(part.channel_index) * 4;
-                pcm[slot * channels + output] = f32::from_le_bytes(frame[offset..offset + 4].try_into().expect("sample")) * gain;
+                // Two A2 sounds of a crossfade share the output: they add up (user 2026-10-21).
+                pcm[slot * channels + output] += f32::from_le_bytes(frame[offset..offset + 4].try_into().expect("sample")) * gain * part.fade_at(slot, samples);
                 filled += 1;
             }
         }

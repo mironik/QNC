@@ -38,6 +38,8 @@ fn source(
                 source_channel,
                 output_channel,
                 level_db: 0,
+                fade_in: None,
+                fade_out: None,
             })
             .into_iter()
             .collect(),
@@ -161,7 +163,7 @@ fn buses_take_the_chosen_saved_channel_to_a1_and_a2() {
         stream_index: 2,
         channel_index: 0,
         stream_channels: 1,
-        level_db: 0,
+        level_db: 0, fade_in: None, fade_out: None
     };
     assert_eq!(
         audio[0].buses,
@@ -182,7 +184,7 @@ fn buses_take_the_chosen_saved_channel_to_a1_and_a2() {
                 stream_index: 1,
                 channel_index: 0,
                 stream_channels: 2,
-                level_db: 0,
+                level_db: 0, fade_in: None, fade_out: None
             },
         ],
         "the segment keeps A1 under the cover; the cover is heard on A2"
@@ -215,7 +217,7 @@ fn a_cover_has_its_own_lane_so_its_sound_opens_before_the_cut() {
         stream_index: 1,
         channel_index: 0,
         stream_channels: 4,
-        level_db: 0,
+        level_db: 0, fade_in: None, fade_out: None
     };
     let span = |record_in, bus| AudioSpan {
         record_in,
@@ -252,7 +254,7 @@ fn the_picture_decoder_of_the_next_cover_opens_two_seconds_ahead() {
 
 #[test]
 fn a_cover_cut_in_two_opens_its_sound_once_at_its_first_part() {
-    let bus = |clip, source_in| Bus { output: 1, clip, source_in, stream_index: 2, channel_index: 0, stream_channels: 1, level_db: 0 };
+    let bus = |clip, source_in| Bus { output: 1, clip, source_in, stream_index: 2, channel_index: 0, stream_channels: 1, level_db: 0 , fade_in: None, fade_out: None};
     let span = |record_in, record_out, buses| AudioSpan { record_in, record_out, buses };
     // The cover 2878..3088 over the end of a segment (2961): two items, the same lane.
     let spans = vec![
@@ -265,4 +267,19 @@ fn a_cover_cut_in_two_opens_its_sound_once_at_its_first_part() {
     assert_eq!(next[0].1.source_in, 19, "opened where the cover starts");
     let both = next_lanes(&spans, &[], 2800, 3000);
     assert_eq!(both.len(), 1, "the second part continues the same lane");
+}
+
+/// Locked (user 2026-10-21): a crossfading lane rises and falls linearly over its program
+/// frames, and a unit carries the factors at its ends.
+#[test]
+fn a_crossfading_bus_rises_and_falls_over_its_frames() {
+    let bus = Bus { output: 1, clip: 0, source_in: 0, stream_index: 2, channel_index: 0, stream_channels: 1, level_db: 0, fade_in: Some((10, 14)), fade_out: Some((40, 44)) };
+    assert_eq!(bus.fade_at(9.0), 0.0);
+    assert_eq!(bus.fade_at(12.0), 0.5);
+    assert_eq!(bus.fade_at(20.0), 1.0);
+    assert_eq!(bus.fade_at(42.0), 0.5);
+    assert_eq!(bus.fade_at(44.0), 0.0);
+    assert_eq!(bus.fade_over(10, 14), Some([0, 1000]));
+    let plain = Bus { fade_in: None, fade_out: None, ..bus };
+    assert_eq!(plain.fade_over(10, 14), None);
 }

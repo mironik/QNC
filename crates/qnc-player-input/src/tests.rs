@@ -939,6 +939,8 @@ fn program_of(
                         source_channel: 1,
                         output_channel: 0,
                         level_db: 0,
+                        fade_in: None,
+                        fade_out: None,
                     }],
                 ),
             ],

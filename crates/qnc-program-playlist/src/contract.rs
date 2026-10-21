@@ -174,12 +174,30 @@ pub struct ProgramAudioRoute {
     /// has no route: its output is silent.
     #[serde(default)]
     pub level_db: i8,
+    /// The lane rises from silence over program frames `[in, out)` (user 2026-10-21: the
+    /// A2 crossfade); full after `out`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fade_in: Option<(i64, i64)>,
+    /// The lane falls to silence over program frames `[in, out)`; silent after `out`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fade_out: Option<(i64, i64)>,
 }
 
 impl ProgramAudioRoute {
     /// The factor the source samples are multiplied by.
     pub fn gain(&self) -> f32 {
         10f32.powf(f32::from(self.level_db) / 20.0)
+    }
+
+    /// The fade factor at program position `frame` (a fractional frame: a sample inside it),
+    /// 1 without fades.
+    pub fn fade_at(&self, frame: f64) -> f32 {
+        let ramp = |(from, to): (i64, i64)| ((frame - from as f64) / (to - from).max(1) as f64).clamp(0.0, 1.0) as f32;
+        self.fade_in.map_or(1.0, ramp) * self.fade_out.map_or(1.0, |fade| 1.0 - ramp(fade))
+    }
+
+    pub fn fades(&self) -> bool {
+        self.fade_in.is_some() || self.fade_out.is_some()
     }
 }
 
@@ -425,7 +443,10 @@ impl FlatProgramItem {
                 video_layers.push(layer);
             }
             for route in &source.audio_routes {
-                if audio_channels.contains(&route.output_channel) {
+                // Two sounds share an output only while they cross-fade (user 2026-10-21).
+                let crossing = route.fades()
+                    && self.sources.iter().flat_map(|other| &other.audio_routes).filter(|other| other.output_channel == route.output_channel).all(ProgramAudioRoute::fades);
+                if audio_channels.contains(&route.output_channel) && !crossing {
                     return Err(PlaylistError::new(
                         "duplicate_program_audio_bus",
                         format!(

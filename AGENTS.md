@@ -5224,3 +5224,17 @@ lokacija znaci Gore. Katalog (QNC preset `storyboard`, `source_timeline`), pomoc
 conformance iznimke od qnc_v4 (`close_player`, `delete_part`, `delete_marker`, `undo_object`, `redo_object`; oznake akcija
 ostaju v4). Zakljucano testovima `backspace_is_undo_and_delete_and_escape_have_one_action_each` i
 `delete_leaves_a_sync_draft_alone_escape_drops_it`. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-21 (korisnik: "ton pokrivalice da udje u J na ton-izjavu, da ne bi skok slike i A2 bio
+odjednom"; news praksa: slika rez, ambijent pokrivalice nikad ne skace; "da, otkljucaj Project i kreni"): (1) Project
+postavka `audio.crossfade_frames` (sistemski templatei 4; Advanced "Audio editing" 0/2/4/6/8; stariji projekt je dobiva
+pri otvaranju u Projectu; `qnc-work-settings::audio_crossfade_frames` cita strogo, najvise 50). Project je ponovno
+zamrznut. (2) Svaki rez A2 pokrivalice ima crossfade: zvuk pokrivalice krece `crossfade_frames` prije svoje slike (J,
+koliko izvor ima slika prije IN-a i koliko ima mjesta), raste, a A2 prije nje (ako ide do reza) pada preko istih slika;
+bez rucke zvuk raste preko svojih prvih slika; A2 bez pokrivalice iza pada preko svojih zadnjih. A1 price se nikad ne
+mijesa. `qnc-program-playlist` (`crossfade.rs`; ruta zvuka nosi `fade_in`/`fade_out` u slikama programa, dvije rute
+smiju dijeliti izlaz samo dok se mijesaju; `a2_crossfade_frames`, `a2_lead_frames` pokrivalice, zasad 0),
+`qnc-broadcast-engine` (trake se zbrajaju s rampom; granice rampe su rezovi jedinica prerendera),
+`qnc-render-unit` (`AudioPart.fade`, u otisku samo kad postoji), `qnc-program-render`, `qnc-player-input`
+(`ClipSession::settings`), `qnc-program-input` (`ClipInputs::crossfade_frames`). Aktivni projekt bez postavke ne otvara
+program (kontrolirana greska) dok se ne otvori u Projectu. Nije izvedeno: vlastiti J pokrivalice u bazi (Ctrl+J) i slika
+govornika prije njegova tona. Testovi, conformance. Uzivo nije provjereno.
