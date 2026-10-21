@@ -487,7 +487,9 @@ impl ProgramSegments {
             }
         }
         // Escape with nothing taken closes an enlarged slot.
-        if self.zoom_slot.is_some() && matches!(action_id, "clear_focus" | "close_player") && self.held_nothing() {
+        // Only `clear_focus`: Escape also gives `close_player` (two catalog actions on one key, live
+        // 2026-10-21: one Escape let a marker go and closed the zoom too).
+        if self.zoom_slot.is_some() && action_id == "clear_focus" && self.held_nothing() {
             return Some(SegmentCommand::CloseZoom);
         }
         SegmentCommand::from_action(action_id)

@@ -777,3 +777,17 @@ fn ctrl_e_enlarges_the_slot_under_the_playhead_and_escape_or_the_same_slot_close
     segments.apply_action("wrap_zoom");
     assert_eq!(segments.view().zoom, None, "the same slot again closes it");
 }
+
+#[test]
+fn one_escape_lets_a_taken_marker_go_and_keeps_the_zoom() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply_action("wrap_zoom");
+    let marker = segments.view().markers.iter().find(|pin| pin.frame == 33).expect("marker at 33").marker_id.clone();
+    segments.apply(SegmentCommand::TakeMarker(marker));
+    // Escape gives both of its catalog actions, one after the other.
+    segments.apply_action("clear_focus");
+    segments.apply_action("close_player");
+    assert!(segments.marker_edit.is_none(), "the marker is let go");
+    assert!(segments.view().zoom.is_some(), "the zoom stays for the next Escape");
+}
