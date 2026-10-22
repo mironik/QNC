@@ -341,7 +341,9 @@ fn paint_program(
             start_frame: local(cover.start_frame),
             end_frame: local(cover.end_frame),
             // The strip of a cover shows while it or its slot is chosen (drawing only).
-            selected: cover.selected || segments.selected_slot().is_some_and(|slot| slot.slot_id == cover.slot_id),
+            selected: cover.selected
+                || segments.selected_slot().is_some_and(|slot| slot.slot_id == cover.slot_id)
+                || segments.part_sound.as_ref().is_some_and(|part| part.lane == 1 && part.id == cover.cover_id),
             pending: false,
             fill: cover_fill(cover.end_frame - cover.start_frame, segments.timebase, lengths),
             label: Some(label.as_str()),

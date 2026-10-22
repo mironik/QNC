@@ -5327,3 +5327,10 @@ retku na kojem je uzet zvuk segmenta ili pokrivalice (`qnc-timeline`). Testovi, 
 Dopuna 2026-10-22 (korisnik: "i dalje samo prvi segment, a trebao bi sve Wrap segmente"): dok je uzet A1 ili A2
 segmenta ili pokrivalice, zoom te trake prikazuje se na svim Wrap retcima; stupac kanala ostaje samo na retku
 uzetog dijela (`qnc-segment-panel` `wave_over_video`). Conformance. Uzivo nije provjereno.
+Dopuna 2026-10-22 (korisnik: "da bi ton bio funkcionalan trebamo i njemu dodati slot polje; klik na slot polje
+jedne pokrivalice: glasnoca i ulazni kanal samo za tu pokrivalicu, ostali zadrzavaju svoju postavu"): dok je zoom
+A2 otvoren, na dnu zooma svakog Wrap retka je traka svake pokrivalice (polje slota tona), uvijek vidljiva; uzeta
+je uokvirena crveno. Lijevi klik na traku uzima ton te pokrivalice; prethodno uzeta se najprije sprema kao Enter
+(`qnc-timeline` `zoom_strip_rows`/`paint_zoom_strips`, `qnc-program-segments` `take_part_sound`). Kanal i razina
+vec su zapis svake pokrivalice (`a2_source_channel`, `a2_level_db`, `a2_off`); globalne postave A2 u prici nema
+(nova pokrivalica uzima kanal i razinu sa source timelinea). Testovi, conformance. Uzivo nije provjereno.

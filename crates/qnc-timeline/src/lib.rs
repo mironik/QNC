@@ -1102,6 +1102,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         if let Some((lane, peaks, level)) = zoom {
             if let Some(rect) = grown(lane, video) {
                 paint_wave_over_video(ui, rect, peaks, level, lane_gain(&input, lane), &input);
+                paint_zoom_strips(ui, split_label_track(video, input.metrics.label_width).1, &input);
                 // The M markers are the layer over the zoom (user 2026-10-22).
                 if input.layers.markers {
                     let track = split_label_track(video, input.metrics.label_width).1;
@@ -1508,6 +1509,15 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
             return Some(TimelineIntent::None); // the release of the press that kept
         }
     }
+    // A left click on a cover's strip in the A2 zoom takes that cover's sound (user
+    // 2026-10-22), the one taken before is kept first by its owner.
+    if response.clicked() {
+        if let (Some(rows), Some(pos)) = (zoom_strip_rows(track, input), response.interact_pointer_pos()) {
+            if cover_hit(track, range_start, duration, pos, input.covers, rows).is_some() {
+                return Some(TimelineIntent::TakeSound { lane: AudioLane::A2, frame: frame_for_x(track, range_start, duration, pos.x) });
+            }
+        }
+    }
     if holding(input) && (response.clicked() || response.drag_started_by(egui::PointerButton::Primary)) {
         if !response.clicked() {
             response.ctx.data_mut(|data| data.insert_temp(kept_key, true));
@@ -1548,8 +1558,49 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
 /// part under it (a band as high with audio bands).
 /// Whether a lane's zoom is drawn over the video row (a taken lane open, or a wave over video).
 fn lane_zoomed(input: &TimelineInput<'_>) -> bool {
+    zoomed_lane(input).is_some()
+}
+
+/// The lane whose zoom is drawn over the video row.
+fn zoomed_lane(input: &TimelineInput<'_>) -> Option<AudioLane> {
     let open = |choice: Option<ChannelChoice>| choice.is_some_and(|c| c.open);
-    input.wave_over_video.is_some() || (input.layers.audio_a1 && open(input.a1_channel)) || (input.layers.audio_a2 && open(input.a2_channel))
+    if input.layers.audio_a1 && open(input.a1_channel) {
+        return Some(AudioLane::A1);
+    }
+    if input.layers.audio_a2 && open(input.a2_channel) {
+        return Some(AudioLane::A2);
+    }
+    input.wave_over_video.map(|(lane, _)| lane)
+}
+
+/// The slot field of the A2 zoom on a Wrap row (user 2026-10-22: the sound of one cover is set
+/// by a click on its strip): a strip at the bottom of the zoom over the picture's place.
+fn zoom_strip_rows(track: Rect, input: &TimelineInput<'_>) -> Option<(f32, f32)> {
+    (input.layers.audio_bands && input.layers.covers && zoomed_lane(input) == Some(AudioLane::A2)).then(|| {
+        let bottom = track.bottom() - video_middle_insets(input).1;
+        (bottom - COVER_STRIP, bottom)
+    })
+}
+
+/// The covers' strips over the A2 zoom, always shown; the taken one framed.
+fn paint_zoom_strips(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>) {
+    let Some((top, bottom)) = zoom_strip_rows(track, input) else {
+        return;
+    };
+    let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
+    for cover in input.covers.iter().filter(|cover| cover.end_frame > cover.start_frame && !cover.pending) {
+        let x0 = x_for_frame(track, range_start, duration, cover.start_frame);
+        let x1 = x_for_frame(track, range_start, duration, cover.end_frame);
+        let rect = Rect::from_min_max(egui::pos2(x0, top), egui::pos2(x1.max(x0 + 3.0), bottom));
+        let fill = cover.fill.unwrap_or(input.theme.shot_range);
+        ui.painter().rect_filled(rect, 1.0, fill.linear_multiply(if cover.selected { 0.9 } else { 0.55 }));
+        if cover.selected {
+            ui.painter().rect_stroke(rect, 1.0, Stroke::new(2.0, input.theme.marker_hover), StrokeKind::Inside);
+        }
+        if let Some(label) = cover.label.filter(|_| rect.width() >= 34.0) {
+            ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, FontId::proportional(10.0), Color32::BLACK);
+        }
+    }
 }
 
 fn video_middle_insets(input: &TimelineInput<'_>) -> (f32, f32) {

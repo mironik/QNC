@@ -41,6 +41,11 @@ impl ProgramSegments {
         };
         // The channel count of the clip from its stored media record (one lane per channel);
         // not read yet (the record was not final), it is asked again now.
+        // Another part's sound on the same lane taken by its slot field: the one taken is kept
+        // first, as Enter (user 2026-10-22: the A2 zoom's strips switch from cover to cover).
+        if self.part_sound.taken().is_some_and(|(part, _)| part.lane == lane && part.id != id) {
+            self.commit_part_sound();
+        }
         if self.refused(crate::confirm::Take::Sound(lane, id.clone())) {
             return false;
         }
