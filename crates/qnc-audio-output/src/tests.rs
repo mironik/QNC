@@ -425,3 +425,20 @@ fn a_late_bed_drops_what_it_missed_and_stays_on_its_position() {
     c.render(&mut out, 1, None);
     assert_eq!(out, [0.7, 0.8], "samples 0 and 1 dropped: sample 2 plays at absolute 10");
 }
+
+/// Locked (user 2026-10-22): the level of one part of the playout (one cover's A2) is heard at
+/// once, only over its samples and its output; the rest keeps its level.
+#[test]
+fn a_part_gain_is_heard_at_once_only_over_its_samples_and_output() {
+    let (mut q, mut c, g) = prepared(2);
+    q.push(g, 10, &[0.5; 8]).unwrap();
+    q.commit(g).unwrap();
+    q.start(g).unwrap();
+    q.shared.set_part_gain(Some((1, 11, 13, 2.0)));
+    let mut out = [0.0; 4];
+    c.render(&mut out, 100, Some(5));
+    assert_eq!(out, [0.5, 0.5, 0.5, 1.0], "sample 11 of A2 louder, A1 as recorded");
+    c.render(&mut out, 200, Some(5));
+    assert_eq!(out, [0.5, 1.0, 0.5, 0.5], "sample 12 still in the part, 13 after it");
+    q.shared.set_part_gain(None);
+}

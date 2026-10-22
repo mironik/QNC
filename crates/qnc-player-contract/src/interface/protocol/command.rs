@@ -43,6 +43,16 @@ pub enum BroadcastPlayerProtocolCommand {
     },
     /// The Sync bed stops at once; the clip's own A1 is heard again.
     StopSyncBed,
+    /// One part of a program (frames `[from_frame, to_frame)` on output `output`) heard
+    /// `gain_db` louder than stored, or silent (`off`), at once; nothing is prepared again
+    /// (user 2026-10-22: the level of one cover). `from_frame == to_frame` clears it.
+    SetPartLevel {
+        output: u16,
+        from_frame: FrameNumber,
+        to_frame: FrameNumber,
+        gain_db: i16,
+        off: bool,
+    },
 
     Play,
     Pause,
@@ -63,6 +73,7 @@ impl BroadcastPlayerProtocolCommand {
             BroadcastPlayerProtocolCommand::SetOutputRoutes { .. } => "SetOutputRoutes",
             BroadcastPlayerProtocolCommand::StartSyncBed { .. } => "StartSyncBed",
             BroadcastPlayerProtocolCommand::StopSyncBed => "StopSyncBed",
+            BroadcastPlayerProtocolCommand::SetPartLevel { .. } => "SetPartLevel",
             BroadcastPlayerProtocolCommand::Play => "Play",
             BroadcastPlayerProtocolCommand::Pause => "Pause",
             BroadcastPlayerProtocolCommand::Stop => "Stop",
@@ -96,6 +107,13 @@ impl BroadcastPlayerProtocolCommand {
                 }
             }
             BroadcastPlayerProtocolCommand::StartSyncBed { .. } | BroadcastPlayerProtocolCommand::StopSyncBed => Ok(()),
+            BroadcastPlayerProtocolCommand::SetPartLevel { output, from_frame, to_frame, gain_db, .. } => {
+                if *output >= 8 || from_frame > to_frame || !(-100..=100).contains(gain_db) {
+                    Err("part level: output 0..8, from <= to, -100..100 dB".into())
+                } else {
+                    Ok(())
+                }
+            }
             BroadcastPlayerProtocolCommand::UnloadSource
             | BroadcastPlayerProtocolCommand::Play
             | BroadcastPlayerProtocolCommand::Pause

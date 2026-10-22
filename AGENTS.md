@@ -5341,3 +5341,13 @@ jedne pokrivalice ili segmenta (`qnc-source-preview` `draft_output_level`), a va
 kanala, razine i iskljucenosti samo tog dijela (`qnc-program-segments` `view_with_waves`; `qnc-timeline` na Wrap
 retku ne skalira cijeli val). Zamjenjuje precac iz 16. 10. (razina izlaza do Entera). Svaki korak ponovno slaze
 program (oko 0,5 s). Testovi, conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-22 (korisnik: "da, otkljucaj i kreni s rjesenjem 1"; log: svaki korak kotacica
+ponovno je pokretao player programa, ~1 s + 1,8 s, cuo se samo prvi ili zadnji): otkljucani `qnc-player-contract`,
+`qnc-player-client`, `tools/qnc-player-runner`, `qnc-broadcast-engine` i, nuzno, `qnc-audio-output`. Nova naredba
+playera `SetPartLevel { output, from_frame, to_frame, gain_db, off }`: jedan dio programa (raspon slika pokrivalice na
+A2 ili segmenta na A1) cuje se `gain_db` glasnije od spremljenog ili utisan, odmah; zvucni uredaj ga primjenjuje u
+povratnom pozivu samo na uzorke tog raspona i tog izlaza (`qnc-audio-output` `set_part_gain`, test), pa vrijedi i za
+prerenderirane dijelove; `from == to` ga brise. `qnc-source-preview` `hear_part_level`; `qnc-segments-keys`: promjena
+samo razine ili ukljucenosti uzetog zvuka ide tom naredbom (kontinuirano s kotacicem), promjena kanala i dalje otvara
+program s nacrtom; Esc, odlazak s panela i drugo uzimanje je brisu. J i L oko pokrivalice ne prate nacrt do Entera.
+Testovi, conformance. Uzivo nije provjereno. Player je ponovno zakljucan.

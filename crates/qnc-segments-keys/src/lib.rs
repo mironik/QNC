@@ -37,6 +37,7 @@ pub fn sound(
         }
         "clear_focus" if segments.part_sound_taken() => {
             let released = segments.release_part_sound();
+            preview.hear_part_level(None);
             preview.hear_program_draft(None, None, wrap.playhead()); // the stored sound again
             released
         }
@@ -93,8 +94,32 @@ pub fn pick(
 fn draft(key: LaneKey, (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments)) -> bool {
     let changed = segments.part_sound_lanes().is_some_and(|lanes| qnc_timeline::lane_key(lanes, key));
     say_part_lane(segments);
-    preview.hear_program_draft(sound_draft(segments), stored_sound(segments), wrap.playhead());
+    // Only its level or off changed: the player hears that part alone at once, continuous
+    // with the wheel (user 2026-10-22); another channel opens the program with the draft.
+    let (draft, stored) = (sound_draft(segments), stored_sound(segments));
+    let live = match (&draft, &stored, part_span(segments)) {
+        (Some(draft), Some(stored), Some((output, from, to))) if draft.channel == stored.channel && !stored.off && !preview.program_drafted() => {
+            preview.hear_part_level(Some((output, from, to, i16::from(draft.level_db) - i16::from(stored.level_db), draft.off)))
+        }
+        _ => false,
+    };
+    if !live {
+        preview.hear_part_level(None);
+        preview.hear_program_draft(draft, stored, wrap.playhead());
+    }
     changed
+}
+
+/// The output and program frames of the part taken on the Wrap row: a segment on A1, a
+/// cover on A2.
+fn part_span(segments: &ProgramSegments) -> Option<(u16, u64, u64)> {
+    let (lane, id, _) = segments.part_sound_draft_now()?;
+    let view = segments.view();
+    if lane == 0 {
+        view.rows.iter().find(|row| row.segment_id == id).map(|row| (0, row.start_frame, row.end_frame))
+    } else {
+        view.covers.iter().find(|cover| cover.cover_id == id).map(|cover| (1, cover.start_frame, cover.end_frame))
+    }
 }
 
 /// The keyboard left the segment panel (a click, Tab or Enter): what it took is dropped and
@@ -102,6 +127,7 @@ fn draft(key: LaneKey, (preview, wrap, segments): (&mut SourcePreview, &mut Wrap
 pub fn left(preview: &mut SourcePreview, wrap: &WrapSession, segments: &mut ProgramSegments) -> bool {
     if segments.part_sound_taken() || segments.overlap_taken() || segments.cut_sound_taken() {
         segments.release_part_sound();
+        preview.hear_part_level(None);
         preview.hear_program_draft(None, None, wrap.playhead());
     }
     segments.leave_panel()
@@ -110,6 +136,7 @@ pub fn left(preview: &mut SourcePreview, wrap: &WrapSession, segments: &mut Prog
 /// Another edit took over from a sound draft: the stored sound is heard again.
 pub fn dropped(preview: &mut SourcePreview, wrap: &WrapSession, segments: &mut ProgramSegments) {
     if segments.take_dropped_sound() {
+        preview.hear_part_level(None);
         preview.hear_program_draft(None, None, wrap.playhead());
     }
 }

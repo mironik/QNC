@@ -120,6 +120,14 @@ impl Session {
                         self.player.stop_sync_bed();
                         Ok(Vec::new())
                     }
+                    Command::SetPartLevel { output, from_frame, to_frame, gain_db, off } => {
+                        let part = (from_frame < to_frame).then_some((output, from_frame, to_frame, gain_db, off));
+                        match self.player.set_part_level(part) {
+                            Ok(true) => Ok(Vec::new()),
+                            Ok(false) => return self.rejected(sequence, envelope.request_id, command_name, "this session plays no program".into()),
+                            Err(error) => Err(error),
+                        }
+                    }
                     Command::SetOutputRoutes { channels } => {
                         if !self.player.set_output_routes(&channels) {
                             return self.rejected(sequence, envelope.request_id, command_name, "output route outside the decoded channels".into());

@@ -35,6 +35,13 @@ pub(crate) struct Shared {
     /// The source channel each output channel plays (user 2026-10-19: a channel chosen
     /// for A1/A2 is a route, heard in the next callback; nothing is prepared again).
     routes: [AtomicU32; METER_CHANNELS],
+    /// One part of the playout with its own gain on one output channel (user 2026-10-22:
+    /// the level of one cover is heard at once, not the whole output): the output (NONE_PART
+    /// for none), absolute samples `[start, end)` and the gain (f32 bits).
+    part_output: AtomicU32,
+    part_start: AtomicU64,
+    part_end: AtomicU64,
+    part_gain: AtomicU32,
     /// The absolute sample position of the first sample of the current generation.
     pub anchor: AtomicU64,
     /// A bed under the playout (`bed`): the story's A1 under a Sync (user 2026-10-20).
@@ -42,6 +49,8 @@ pub(crate) struct Shared {
 }
 /// How many output channels the level meter follows.
 pub const METER_CHANNELS: usize = 8;
+/// No part with its own gain.
+const NONE_PART: u32 = u32::MAX;
 impl Shared {
     fn new() -> Self {
         Self {
@@ -69,6 +78,10 @@ impl Shared {
             peaks: Default::default(),
             gains: std::array::from_fn(|_| AtomicU32::new(1f32.to_bits())),
             routes: std::array::from_fn(|channel| AtomicU32::new(channel as u32)),
+            part_output: AtomicU32::new(NONE_PART),
+            part_start: AtomicU64::new(0),
+            part_end: AtomicU64::new(0),
+            part_gain: AtomicU32::new(1f32.to_bits()),
             anchor: AtomicU64::new(0),
             bed: crate::bed::BedShared::new(),
         }
@@ -77,6 +90,17 @@ impl Shared {
     pub fn set_gains(&self, gains: &[f32]) {
         for (slot, gain) in self.gains.iter().zip(gains) {
             slot.store(gain.max(0.0).to_bits(), Ordering::Release);
+        }
+    }
+    /// Output channel `output` over absolute samples `[start, end)` times `gain`, heard at
+    /// once; `None` clears it.
+    pub fn set_part_gain(&self, part: Option<(u16, u64, u64, f32)>) {
+        self.part_output.store(NONE_PART, Ordering::Release);
+        if let Some((output, start, end, gain)) = part {
+            self.part_start.store(start, Ordering::Relaxed);
+            self.part_end.store(end, Ordering::Relaxed);
+            self.part_gain.store(gain.max(0.0).to_bits(), Ordering::Relaxed);
+            self.part_output.store(u32::from(output), Ordering::Release);
         }
     }
     /// The loudest sample of each output channel since the last call, then zero again.
@@ -445,6 +469,22 @@ impl Callback {
         }
     }
 
+    /// The part with its own gain over the samples from absolute `position` on (no
+    /// allocation; nothing when there is none or it is not in them).
+    fn apply_part_gain(&self, output: &mut [f32], position: u64) {
+        let channel = self.shared.part_output.load(Ordering::Acquire);
+        if channel == NONE_PART || channel as usize >= self.channels {
+            return;
+        }
+        let (start, end) = (self.shared.part_start.load(Ordering::Relaxed), self.shared.part_end.load(Ordering::Relaxed));
+        let gain = f32::from_bits(self.shared.part_gain.load(Ordering::Relaxed));
+        for (index, frame) in output.chunks_exact_mut(self.channels.max(1)).enumerate() {
+            if (start..end).contains(&(position + index as u64)) {
+                frame[channel as usize] *= gain;
+            }
+        }
+    }
+
     /// The loudest sample of each channel of what goes to the device (no allocation).
     fn note_peaks(&self, output: &[f32]) {
         let channels = self.channels.clamp(1, METER_CHANNELS);
@@ -544,6 +584,7 @@ impl Callback {
             return;
         }
         self.apply_gains(output);
+        self.apply_part_gain(&mut output[..needed * self.channels], self.anchor + self.submitted);
         // The bed over its output, in the same samples and clock (after the gains: its level
         // is in its samples).
         let channels = self.channels;

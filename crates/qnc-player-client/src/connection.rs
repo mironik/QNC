@@ -734,6 +734,7 @@ fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
         Action::SetOutputRoutes(channels) => return Ok(Command::SetOutputRoutes { channels: channels.to_vec() }),
         Action::StartSyncBed(source_frame, bed_frame) => return Ok(Command::StartSyncBed { source_frame, bed_frame }),
         Action::StopSyncBed => return Ok(Command::StopSyncBed),
+        Action::SetPartLevel(output, from_frame, to_frame, gain_db, off) => return Ok(Command::SetPartLevel { output, from_frame, to_frame, gain_db, off }),
         _ => {}
     }
     let carrier = reply
@@ -769,13 +770,14 @@ fn action_command(reply: &EventEnvelope, action: Action) -> Result<Command> {
         Action::SetOutputRoutes(channels) => Command::SetOutputRoutes { channels: channels.to_vec() },
         Action::StartSyncBed(source_frame, bed_frame) => Command::StartSyncBed { source_frame, bed_frame },
         Action::StopSyncBed => Command::StopSyncBed,
+        Action::SetPartLevel(output, from_frame, to_frame, gain_db, off) => Command::SetPartLevel { output, from_frame, to_frame, gain_db, off },
     })
 }
 
 fn action_requires_preflight_state(action: Action) -> bool {
     !matches!(
         action,
-        Action::Cue(_) | Action::SetOutputLevels(_) | Action::SetOutputRoutes(_) | Action::StartSyncBed(..) | Action::StopSyncBed
+        Action::Cue(_) | Action::SetOutputLevels(_) | Action::SetOutputRoutes(_) | Action::StartSyncBed(..) | Action::StopSyncBed | Action::SetPartLevel(..)
     )
 }
 

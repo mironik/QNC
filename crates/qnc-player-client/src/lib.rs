@@ -178,6 +178,9 @@ pub enum Action {
     /// `.0` on, from its frame `.1` (user 2026-10-20).
     StartSyncBed(u64, u64),
     StopSyncBed,
+    /// One part of the program (frames `.1..2` on output `.0`) heard `.3` dB louder than
+    /// stored, or silent (`.4`), at once (user 2026-10-22); `.1 == .2` clears it.
+    SetPartLevel(u16, u64, u64, i16, bool),
 }
 type Loader = Box<dyn FnOnce() -> Result<Launch> + Send>;
 /// Generation, first cued frame and loader of the latest selection.

@@ -785,6 +785,23 @@ impl SourcePreview {
         true
     }
 
+    /// One part of the playing program (frames `[from, to)` on output `output`) heard
+    /// `gain_db` louder than stored, or silent, at once in the player (user 2026-10-22: the
+    /// level of one cover, nothing is prepared again); `None` clears it. False without a
+    /// program player.
+    pub fn hear_part_level(&mut self, part: Option<(u16, u64, u64, i16, bool)>) -> bool {
+        if !self.program {
+            return false;
+        }
+        let (output, from, to, gain_db, off) = part.unwrap_or((0, 0, 0, 0, false));
+        self.player.as_ref().is_some_and(|player| player.send(Action::SetPartLevel(output, from, to, gain_db, off)).is_ok())
+    }
+
+    /// The program plays a drafted story (opened again with a draft), not the stored one.
+    pub fn program_drafted(&self) -> bool {
+        self.program_draft.is_some()
+    }
+
     /// The draft was written (Enter): the stored story now holds it, the program opens
     /// again from it as after every write.
     pub fn forget_program_draft(&mut self) {

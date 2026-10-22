@@ -139,6 +139,8 @@ pub struct Runtime {
     clip: Option<(Rc<DecodeInput>, SourceRuntime)>,
     /// The story's A1 under a Sync, on the clip's device (user 2026-10-20).
     sync_bed: Option<sync_bed::SyncBed>,
+    /// A program's timebase and sample rate: a part of it gets its own level by frames.
+    program_clock: Option<(Timebase, u32)>,
     /// The last rebuffer written to the log (reason, frame): the same one is written once,
     /// not every tick (audit 2026-10-20: 2.7 million lines of one stall a frame).
     rebuffer_logged: Option<(String, u64)>,
@@ -391,6 +393,7 @@ impl Runtime {
             audio_rearm_pending: false,
             clip,
             sync_bed: None,
+            program_clock: None,
             rebuffer_logged: None,
         })
     }
@@ -482,6 +485,7 @@ impl Runtime {
             audio_rearm_pending: false,
             clip: None,
             sync_bed: None,
+            program_clock: source.audio_format.as_ref().map(|format| (source.timebase, format.sample_rate_hz)),
             rebuffer_logged: None,
         })
     }
@@ -497,6 +501,23 @@ impl Runtime {
         if let Some(device) = &self.audio {
             device.borrow().set_gains(&output::gains_of(levels_percent));
         }
+    }
+    /// One part of a program, frames `[from, to)` on output `output`, heard `gain_db` louder
+    /// (off: silent) than stored, at once in the device (user 2026-10-22: the level of one
+    /// cover, not the whole output); `None` clears it. False without a program.
+    pub fn set_part_level(&self, part: Option<(u16, u64, u64, i16, bool)>) -> Result<bool> {
+        let (Some(device), Some((timebase, rate))) = (&self.audio, self.program_clock) else {
+            return Ok(false);
+        };
+        let part = match part {
+            Some((output, from, to, gain_db, off)) => {
+                let gain = if off { 0.0 } else { 10f32.powf(f32::from(gain_db) / 20.0) };
+                Some((output, sample_boundary(from, timebase, rate)?, sample_boundary(to, timebase, rate)?, gain))
+            }
+            None => None,
+        };
+        device.borrow().set_part_gain(part);
+        Ok(true)
     }
     /// The source channel each output plays (inventory positions), heard at once; false
     /// when one is not among the decoded channels.
