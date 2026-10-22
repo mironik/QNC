@@ -5321,3 +5321,6 @@ val A1/A2 vec izabranog kanala svakog segmenta i pokrivalice, a timeline ga je p
 (kanal 1 -> val A1 reda, kanali 3 i 4 -> prazno). Na retku s pojasevima (Wrap) traka i zoom crtaju svoj val;
 nacrt kanala uzetog segmenta ili pokrivalice slaze val programa iz izabranog kanala prije crtanja
 (`qnc-timeline` `lane_peaks`, `qnc-program-segments` `view_with_waves`). Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-22 (korisnik: "zoom tona radi samo na prvom segmentu, treba raditi na svim segmentima"): zoom tona
+i stupac kanala uzete trake bili su vezani uz oznake traka, koje ima samo prvi Wrap redak. Sada rade na svakom
+retku na kojem je uzet zvuk segmenta ili pokrivalice (`qnc-timeline`). Testovi, conformance. Uzivo nije provjereno.

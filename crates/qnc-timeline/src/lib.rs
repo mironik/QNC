@@ -1073,7 +1073,7 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     }
     let taken = [(AudioLane::A1, a1_row, input.a1_channel), (AudioLane::A2, a2_row, input.a2_channel)]
         .into_iter()
-        .find_map(|(lane, row, choice)| Some((lane, row?, choice.filter(|c| c.open && input.show_lane_labels)?)));
+        .find_map(|(lane, row, choice)| Some((lane, row?, choice.filter(|c| c.open)?)));
     // The zoom is the lane itself grown over the video row up to the other audio lane
     // (user 2026-10-14): a taken lane shows its draft channel, a zoomed one its channel.
     let grown = |lane: AudioLane, video: Rect| match lane {
@@ -1548,7 +1548,7 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
 /// part under it (a band as high with audio bands).
 /// Whether a lane's zoom is drawn over the video row (a taken lane open, or a wave over video).
 fn lane_zoomed(input: &TimelineInput<'_>) -> bool {
-    let open = |choice: Option<ChannelChoice>| choice.is_some_and(|c| c.open && input.show_lane_labels);
+    let open = |choice: Option<ChannelChoice>| choice.is_some_and(|c| c.open);
     input.wave_over_video.is_some() || (input.layers.audio_a1 && open(input.a1_channel)) || (input.layers.audio_a2 && open(input.a2_channel))
 }
 
