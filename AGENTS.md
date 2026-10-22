@@ -5356,3 +5356,16 @@ projekta"): Ingest je na promjenu projekta (i kad se sakrije) zatvarao player i 
 ne i sliku monitora u svom prikazu, pa je slika zatvorenog projekta ostajala. `qnc-ingest-application`
 `stop_player` brise i monitor. Story/MA monitor cita stanje izravno iz previewa, koji ga pri promjeni projekta
 brise. Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-22 (korisnik: "nova kartica, nova kamera"; "ne vezati konfiguraciju s brojem kartice;
+konfiguracija je vezana s kamerom"): Sony ILME-FX3A SD kartica (`PRIVATE/M4ROOT`, MEDIAPRO.XML MediaProfile 2.30,
+CLIP/*.MP4 AVC50 4:2:2 s *M01.XML, SUB/*S03.MP4 HEVC proxy, THMBNL) nije dala nijedan klip iz dva razloga.
+(1) Katalog kamera: uzorak `sony-m4root-sd` nije imao indeks ni Sony selektore, pa ga nijedan citac indeksa nije
+slagao. Nova revizija `catalogs/camera-patterns/revisions/2026.10.22.1.json` -> `camera-patterns-2026.10.22.1.sqlite`
+(alat `qnc-camera-catalog revise`; stare objave ostaju): MEDIAPRO.XML kao indeks i isti MediaProfile/NonRealTimeMeta
+selektori kao XDROOT, korijen `PRIVATE/M4ROOT`. (2) Konfiguracija racunala `data/ingest-transport.json` imala je
+izvor G: vezan uz serijski broj stare kartice, pa je nova kartica na istom slovu dala "source volume serial
+changed". Upis stare kartice uklonjen (kopija prijasnje datoteke u scratchpadu), postavka racunala pokazuje na
+novu reviziju kataloga. Kod nije mijenjan (pokusaj u `qnc-source-bindings` vracen). Provjera na izoliranoj kopiji
+projekta `novi-test-5` (kartica samo citana, stvarni projekt nediran): Select 9 klipova s trajanjima iz XML-a,
+bez probea, 2,1-2,3 s. Otvoreno (ceka odluku korisnika): izvori i URI medija u bazi i dalje nose serijski broj
+volumena (`qnc://local/source/volume-<serijski>`), pa svaki disk koji sustav vidi postaje izvor po broju.
