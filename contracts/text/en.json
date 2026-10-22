@@ -150,6 +150,7 @@
     "story.msg.last_slot_ends_story": "The last slot ends with the story: move its start M marker.",
     "story.msg.slot_trim_cancelled": "Slot change cancelled.",
     "story.msg.overlap_cancelled": "J/L change cancelled.",
+    "story.msg.cut_part_zoom_only": "The picture or the sound of an M marker's cut moves alone only in the enlarged slot (a double click on the slot); here the marker moves whole.",
     "story.msg.cut_picture_taken": "Only the picture of the M marker's cut moves, its sound stays. Left/right: earlier/later, Enter saves, Esc cancels.",
     "story.msg.cut_sound_taken": "Only the A2 sound of the M marker's cut moves: {frames} frames from the picture cut (minus: J, plus: L). Left/right: earlier/later, Enter saves, Esc cancels.",
     "story.msg.a1_no_cut": "A1 is the story's segment: an M marker is no cut of it. Ctrl+2 moves the A2 sound of the cut.",

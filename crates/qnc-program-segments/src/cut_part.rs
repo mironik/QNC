@@ -3,8 +3,10 @@
 //! 2". Ctrl+M (or a right click) takes the nearest marker whole: the arrows and the wheel move
 //! picture and sound together. With the marker taken, Ctrl+I or Ctrl+O moves only its picture
 //! (the sound stays: a J or L of the picture), Ctrl+2 only its A2 sound (an L of the cover
-//! before, a J of the cover after); Ctrl+M again the whole cut. A right click over the picture
-//! takes the nearest marker's picture, over A2 its sound. Enter writes it, Escape drops it.
+//! before, a J of the cover after); Ctrl+M again the whole cut. A right click is the whole
+//! marker; a second one on the taken marker over the picture its picture, over A2 its sound.
+//! Parts only in the enlarged slot (user 2026-10-22: "Ctrl+M on the Wrap row or in the zoom,
+//! the picture and the sound alone only in the zoom"). Enter writes it, Escape drops it.
 //! A1 is the story's segment: an M marker is no cut of it.
 
 use qnc_program_db::Operation;
@@ -25,6 +27,11 @@ impl ProgramSegments {
     /// Ctrl+I/O (`picture`) or Ctrl+1/2 (`lane`) while a marker is taken, or a right click
     /// (`marker_id`) that takes that marker first. False when no marker is taken.
     pub fn take_cut_part(&mut self, marker_id: Option<String>, picture: bool, lane: u8) -> bool {
+        // Only in the enlarged slot (user 2026-10-22): on a Wrap row the marker moves whole.
+        if self.zoom_slot.is_none() && (marker_id.is_some() || self.marker_edit.is_some()) {
+            self.refresh_view(qnc_ui_text::text("story.msg.cut_part_zoom_only").into());
+            return true;
+        }
         if let Some(marker_id) = marker_id {
             if self.marker_edit.as_ref().map(|(id, _)| id) != Some(&marker_id) {
                 let Some(frame) = self.stored_markers.iter().find(|marker| marker.marker_id == marker_id).map(|marker| marker.program_frame) else {

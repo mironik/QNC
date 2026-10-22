@@ -35,6 +35,7 @@ pub fn event(intent: &TimelineIntent, panel: &str, frame: &dyn Fn(u64) -> u64) -
         TimelineIntent::TakeCover { id, frame: at } => (Pointer::RightClickCover, Some(frame(*at)), Some(id)),
         TimelineIntent::TakeAudioLane(lane) => (if a2(lane) { Pointer::RightClickA2 } else { Pointer::RightClickA1 }, None, None),
         TimelineIntent::TakeMarkerSound { id } => (Pointer::RightClickMarkerA2, None, Some(id)),
+        TimelineIntent::TakeMarkerPicture { id } => (Pointer::RightClickTakenMarker, None, Some(id)),
         TimelineIntent::TakeSound { lane, frame: at } => (if a2(lane) { Pointer::RightClickA2 } else { Pointer::RightClickA1 }, Some(frame(*at)), None),
         // IN or OUT dragged: the clip's own frame, never mapped.
         TimelineIntent::DragMark { in_mark, frame: at } => (if *in_mark { Pointer::DragIn } else { Pointer::DragOut }, Some(*at), None),
@@ -79,7 +80,8 @@ mod tests {
         let row = |frame: u64| 100 + frame;
         let on = |intent: TimelineIntent, panel: &str| event(&intent, panel, &row).map(|event| (event.action_id, event.value, event.target));
         let id = |text: &str| Some(text.to_string());
-        assert_eq!(on(TimelineIntent::TakeMarker { id: "m1".into(), frame: 5 }, "segments"), Some(("select_mark_in".into(), None, id("m1"))), "a right click over the picture takes the nearest marker's picture (user 2026-10-21)");
+        assert_eq!(on(TimelineIntent::TakeMarker { id: "m1".into(), frame: 5 }, "segments"), Some(("select_marker".into(), None, id("m1"))), "a right click takes the nearest marker whole (user 2026-10-22)");
+        assert_eq!(on(TimelineIntent::TakeMarkerPicture { id: "m1".into() }, "segments"), Some(("select_mark_in".into(), None, id("m1"))), "a second right click on the taken marker: its picture");
         assert_eq!(on(TimelineIntent::TakeSlot { id: "s1".into(), frame: 5 }, "segments"), Some(("select_current_marker_slot".into(), None, id("s1"))), "a right click on the strip takes the slot");
         assert_eq!(on(TimelineIntent::CueFrame(7), "segments"), Some(("timeline_cue_frame".into(), Some(107), None)), "left click = the playhead");
         assert_eq!(on(TimelineIntent::Keep(Some(7)), "segments"), Some(("segments_keep_edit".into(), Some(107), None)), "kept, then the playhead");

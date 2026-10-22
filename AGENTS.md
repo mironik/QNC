@@ -5280,3 +5280,14 @@ Zlatna tablica misa: promijenjena 2 retka i dodan 1. J slika segmenta ostaje Ctr
 marker). `qnc-program-db` (`MoveMarkerPicture`, `SetCutSound`, jedan Undo korak), `qnc-program-commands`
 (`SegmentCommand::CutPart`), `qnc-segments-keys` (`overlap` prije `sound`), pomoc F1. Testovi, conformance. Uzivo nije
 provjereno.
+Ispravak 2026-10-22 (korisnik: "desni klik misem treba uzimati cijeli marker, to se najcesce radi; za izbor
+samostalne slike ili tona treba dodati nesto"; "Ctrl+M moze raditi u segmentu ili u zumu segmenta, a kontrola
+posebno tona i slike u J i L verziji samo u zoom verziji"): desni klik na Wrap retku i u uvecanom slotu uzima
+najblizi M marker cijeli (`right_click_marker` -> `select_marker`, kao prije 21. 10.). Samo slika ili samo ton reza
+rade samo u uvecanom slotu: tamo drugi desni klik na vec uzeti marker iznad slike daje sliku
+(`right_click_taken_marker` -> `select_mark_in`, `qnc-timeline` `TakeMarkerPicture`), iznad A2 njegov ton
+(`right_click_marker_a2`, sada samo za uzeti marker; inace desni klik na A2 je zvuk pokrivalice kao prije);
+na Wrap retku drugi desni klik ponovno uzima cijeli marker (`qnc-segment-panel` `cut_parts`). Ctrl+I/O i Ctrl+2
+s uzetim markerom izvan uvecanog slota samo javljaju poruku `story.msg.cut_part_zoom_only`
+(`qnc-program-segments` `take_cut_part`). Zlatna tablica misa: 1 redak promijenjen. Testovi, conformance.
+Uzivo nije provjereno.

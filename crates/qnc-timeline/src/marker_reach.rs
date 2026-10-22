@@ -35,6 +35,13 @@ pub(crate) fn marker_for_right_click<'a>(track: Rect, range_start: u64, duration
         .map(|(id, _)| id)
 }
 
+/// The taken marker when it is the nearest one to `pos` (a second right click on it takes its
+/// picture or its sound alone, user 2026-10-22).
+pub(crate) fn taken_marker_for_right_click<'a>(track: Rect, range_start: u64, duration: u64, pos: egui::Pos2, markers: &'a [TimelineMarkerPin<'a>]) -> Option<&'a str> {
+    let nearest = marker_for_right_click(track, range_start, duration, pos, markers, false)?;
+    markers.iter().any(|marker| marker.taken && marker.id == nearest).then_some(nearest)
+}
+
 /// The marker a drag at `pos` takes, and the one red under the pointer: only the taken
 /// marker, within `MARKER_REACH` of its line.
 pub(crate) fn marker_to_drag<'a>(track: Rect, range_start: u64, duration: u64, pos: egui::Pos2, markers: &'a [TimelineMarkerPin<'a>]) -> Option<&'a str> {

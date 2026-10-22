@@ -813,9 +813,10 @@ fn delete_leaves_a_sync_draft_alone_escape_drops_it() {
     assert!(segments.discard_sync(), "Escape drops it");
 }
 
-/// Locked (user 2026-10-21): an M marker taken (Ctrl+M) moves whole; with it taken Ctrl+2 moves
-/// only its A2 sound (an L of the cover before, a J of the cover after; a trim playhead shows
-/// it), Ctrl+I only its picture, Ctrl+M the whole cut again; Ctrl+1 has no cut there.
+/// Locked (user 2026-10-21, 2026-10-22): an M marker taken (Ctrl+M) moves whole, on a Wrap row
+/// and in the enlarged slot; only in the enlarged slot, with it taken, Ctrl+2 moves only its A2
+/// sound (an L of the cover before, a J of the cover after; a trim playhead shows it), Ctrl+I
+/// only its picture, Ctrl+M the whole cut again; Ctrl+1 has no cut there.
 #[test]
 fn a_taken_marker_moves_whole_or_only_its_sound_or_only_its_picture() {
     let mut segments = component();
@@ -823,6 +824,11 @@ fn a_taken_marker_moves_whole_or_only_its_sound_or_only_its_picture() {
     segments.refresh_view(String::new());
     segments.apply(SegmentCommand::TakeMarker("m1".into()));
     assert!(segments.editing_marker());
+    assert!(segments.take_cut_part(None, false, 1), "answered on a Wrap row");
+    assert!(!segments.cut_sound_taken(), "on a Wrap row the marker moves whole only");
+    segments.set_playhead(Some(20));
+    segments.apply_action("wrap_zoom");
+    assert!(segments.view().zoom.is_some());
     assert!(segments.take_cut_part(None, false, 1));
     assert!(segments.cut_sound_taken());
     segments.apply_action("step_back_frame");

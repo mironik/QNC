@@ -10,7 +10,7 @@ pub use qnc_channel_picker::ChannelChoice;
 
 mod events;
 mod marker_reach;
-use marker_reach::{marker_for_right_click, marker_to_drag, source_mark_in_reach};
+use marker_reach::{marker_for_right_click, marker_to_drag, source_mark_in_reach, taken_marker_for_right_click};
 pub use events::take_marker_drag_event;
 mod lanes;
 pub use events::event;
@@ -760,9 +760,12 @@ pub enum TimelineIntent {
     /// A right click on A1 or A2 of a row with markers (a Wrap row): the sound of what lies
     /// there, at that frame (as Ctrl+1/Ctrl+2 there).
     TakeSound { lane: AudioLane, frame: u64 },
-    /// A right click on A2 of a Wrap row with M markers: the nearest marker, only its sound
-    /// moving (user 2026-10-21).
+    /// A second right click over A2 near the taken M marker: only its sound moves (user
+    /// 2026-10-22: a right click takes the whole marker, a second one its part). The row's
+    /// owner decides whether it has parts (only the enlarged slot has).
     TakeMarkerSound { id: String },
+    /// A second right click over the picture near the taken M marker: only its picture moves.
+    TakeMarkerPicture { id: String },
     /// A cut (scissors) at the playhead of a source timeline: the middle mouse button, a
     /// touchpad's three-finger tap set to it, a two-finger tap on a touch screen (user
     /// 2026-10-18: two cuts mark IN and OUT, the earlier IN, the later OUT).
@@ -1366,9 +1369,9 @@ fn take_lane_intent(responses: &[&egui::Response], track: Rect, lane: AudioLane,
     if input.layers.markers {
         let pos = clicked.interact_pointer_pos()?;
         let (start, duration) = (input.state.range_start(), input.state.duration_frames());
-        // Over A2 the nearest M marker's sound (user 2026-10-21); A1 has no cut at a marker.
+        // Over A2 near the taken M marker: only its sound (user 2026-10-22); A1 has no cut at a marker.
         if matches!(lane, AudioLane::A2) {
-            if let Some(id) = marker_for_right_click(track, start, duration, pos, input.markers, false) {
+            if let Some(id) = taken_marker_for_right_click(track, start, duration, pos, input.markers) {
                 return Some(TimelineIntent::TakeMarkerSound { id: id.to_string() });
             }
         }
@@ -1481,7 +1484,11 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
                 None => TimelineIntent::TakeCover { id: cover.to_string(), frame },
             });
         }
-        // Elsewhere the nearest M marker (as Ctrl+M; M is OUT and IN in one mark).
+        // Near the taken M marker only its picture (user 2026-10-22: a second right click).
+        if let Some(id) = taken_marker_for_right_click(track, range_start, duration, pos, input.markers) {
+            return Some(TimelineIntent::TakeMarkerPicture { id: id.to_string() });
+        }
+        // Elsewhere the nearest M marker, whole (as Ctrl+M; M is OUT and IN in one mark).
         return marker_for_right_click(track, range_start, duration, pos, input.markers, false).map(|id| TimelineIntent::TakeMarker { id: id.to_string(), frame });
     }
     if !(input.draft_in_active || input.draft_out_active) {

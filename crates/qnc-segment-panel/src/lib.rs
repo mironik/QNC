@@ -78,7 +78,7 @@ pub fn show_zoom(
     let window = segments.zoom?;
     let rect = ui.available_rect_before_wrap();
     ui.painter().rect_filled(rect, 0.0, timeline_theme.background);
-    let shown = ui.push_id("qnc_segment_zoom", |ui| paint_program(ui, segments, window, timeline_theme, true, lengths)).inner;
+    let shown = ui.push_id("qnc_segment_zoom", |ui| paint_program(ui, segments, window, timeline_theme, true, lengths, true)).inner;
     Some(shown)
 }
 
@@ -179,7 +179,7 @@ pub fn show(
                 // click area, so rows sharing one id would lose their clicks.
                 let overview = ui
                     .push_id("qnc_segment_program_overview", |ui| {
-                        paint_program(ui, segments, (0, total), timeline_theme, true, lengths)
+                        paint_program(ui, segments, (0, total), timeline_theme, true, lengths, false)
                     })
                     .inner;
                 command = command.take().or(overview);
@@ -244,7 +244,7 @@ fn paint_row(
 ) -> Option<ActionEvent> {
     let window = (row.start_frame, row.end_frame);
     ui.push_id(("qnc_segment_row", &row.segment_id), |ui| {
-        paint_program(ui, segments, window, theme, row.start_frame == 0, lengths)
+        paint_program(ui, segments, window, theme, row.start_frame == 0, lengths, false)
     })
     .inner
 }
@@ -257,6 +257,7 @@ fn paint_program(
     theme: TimelineTheme,
     lane_labels: bool,
     lengths: &[CoverLengthBand],
+    cut_parts: bool,
 ) -> Option<ActionEvent> {
     let duration = end.saturating_sub(start).max(1);
     let local = |frame: u64| frame.clamp(start, end) - start;
@@ -432,6 +433,14 @@ fn paint_program(
             holding: !segments.trim_frames.is_empty() || segments.part_sound.is_some(),
         },
     );
+    // The picture or the sound of a marker's cut alone only in the enlarged slot (user
+    // 2026-10-22); on a Wrap row a second right click takes the marker whole again.
+    let intent = match intent {
+        qnc_timeline::TimelineIntent::TakeMarkerPicture { id } | qnc_timeline::TimelineIntent::TakeMarkerSound { id } if !cut_parts => {
+            qnc_timeline::TimelineIntent::TakeMarker { id, frame: 0 }
+        }
+        other => other,
+    };
     // A pointer on the row is the action the mouse map gives it on this panel (piece
     // `qnc-mouse-map`, contracts/input/mouse.json; user rule 2026-10-20): the panel decides
     // no click itself.

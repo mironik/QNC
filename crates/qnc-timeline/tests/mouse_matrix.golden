@@ -52,7 +52,7 @@ segments | ChooseA1Channel(2) | source_choose_a1_channel value=Some(2) target=No
 segments | ChooseA2Channel(2) | source_choose_a2_channel value=Some(2) target=None
 segments | TakeMark(true) | -
 segments | TakeMark(false) | -
-segments | TakeMarker { id: "x", frame: 5 } | select_mark_in value=None target=Some("x")
+segments | TakeMarker { id: "x", frame: 5 } | select_marker value=None target=Some("x")
 segments | TakeSlot { id: "x", frame: 5 } | select_current_marker_slot value=None target=Some("x")
 segments | TakeCover { id: "x", frame: 5 } | timeline_take_cover value=Some(105) target=Some("x")
 segments | TakeAudioLane(A1) | select_audio_a1 value=None target=None
