@@ -5351,3 +5351,8 @@ prerenderirane dijelove; `from == to` ga brise. `qnc-source-preview` `hear_part_
 samo razine ili ukljucenosti uzetog zvuka ide tom naredbom (kontinuirano s kotacicem), promjena kanala i dalje otvara
 program s nacrtom; Esc, odlazak s panela i drugo uzimanje je brisu. J i L oko pokrivalice ne prate nacrt do Entera.
 Testovi, conformance. Uzivo nije provjereno. Player je ponovno zakljucan.
+Popravak 2026-10-22 (korisnik: "stari projekt je zatvoren, novi otvoren, a u monitoru stoji slika iz starog
+projekta"): Ingest je na promjenu projekta (i kad se sakrije) zatvarao player i brisao stanje playa i timelinea, ali
+ne i sliku monitora u svom prikazu, pa je slika zatvorenog projekta ostajala. `qnc-ingest-application`
+`stop_player` brise i monitor. Story/MA monitor cita stanje izravno iz previewa, koji ga pri promjeni projekta
+brise. Testovi, conformance. Uzivo nije provjereno.

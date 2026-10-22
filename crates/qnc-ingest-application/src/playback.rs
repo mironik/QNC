@@ -76,8 +76,8 @@ impl IngestApplication {
 
     pub(super) fn stop_player(&mut self) {
         self.preview.close();
-        self.view.playback = Default::default();
-        self.view.timeline = Default::default();
+        // The monitor too: a picture of the closed project stayed on it (log 2026-10-22).
+        (self.view.playback, self.view.monitor, self.view.timeline) = Default::default();
     }
 
     pub(super) fn player_action(&mut self, intent: IngestIntent) -> IngestDispatchResult {
