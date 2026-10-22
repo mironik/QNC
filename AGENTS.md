@@ -5311,3 +5311,8 @@ Dopuna 2026-10-22 (korisnik: "kad je zoom pohranjen, ako nakon toga korisnik kli
 zoom i prikazuje source"): kad tipkovnica prijede na media pool ili njegove tabove (klik, Tab, Enter), uvecani
 slot se zatvara i source timeline je ponovno vidljiv (`qnc-panel-focus` `poll`, `SegmentCommand::CloseZoom`).
 Uzeto u zoomu i dalje se odbacuje odlaskom s panela kao do sada. Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-22 (korisnik: "kad se timeline prebaci u prikaz audio zoom ne prikazuju se markeri"; "bolje je
+da ispod markera imas dva sloja prikaza, slike i zooma: prikazuje se ili filmstrip ili ton"): markeri su sloj iznad
+prikaza; ispod njih je ili slika (filmstrip) ili zoom tona. Dok je zoom tona prikazan, markeri i razdvojeni rezovi
+crtaju se jednom, iznad njega (`qnc-timeline` `lane_zoomed`). Vrijedi za source timeline i Wrap retke. Testovi,
+conformance. Uzivo nije provjereno.

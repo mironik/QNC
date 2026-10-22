@@ -1101,6 +1101,13 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         if let Some((lane, peaks, level)) = zoom {
             if let Some(rect) = grown(lane, video) {
                 paint_wave_over_video(ui, rect, peaks, level, lane_gain(&input, lane), &input);
+                // The M markers are the layer over the zoom (user 2026-10-22).
+                if input.layers.markers {
+                    let track = split_label_track(video, input.metrics.label_width).1;
+                    let (start, duration) = (input.state.range_start(), input.state.duration_frames());
+                    paint_markers(ui, track, start, duration, input.markers, &input);
+                    paint_a1_splits(ui, track, start, duration, &input);
+                }
             }
         }
     }
@@ -1538,6 +1545,12 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
 
 /// The insets of the light middle of the video row: the dark band above it and the dark
 /// part under it (a band as high with audio bands).
+/// Whether a lane's zoom is drawn over the video row (a taken lane open, or a wave over video).
+fn lane_zoomed(input: &TimelineInput<'_>) -> bool {
+    let open = |choice: Option<ChannelChoice>| choice.is_some_and(|c| c.open && input.show_lane_labels);
+    input.wave_over_video.is_some() || (input.layers.audio_a1 && open(input.a1_channel)) || (input.layers.audio_a2 && open(input.a2_channel))
+}
+
 fn video_middle_insets(input: &TimelineInput<'_>) -> (f32, f32) {
     if input.layers.audio_bands {
         let band = input.metrics.audio_height;
@@ -1749,7 +1762,9 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
                 true,
             );
         }
-        if input.layers.markers {
+        // The markers are the layer over the picture or a lane's zoom (user 2026-10-22: under
+        // them either the filmstrip or the sound): with a zoom they are drawn over it.
+        if input.layers.markers && !lane_zoomed(input) {
             paint_markers(ui, track, range_start, duration, input.markers, input);
             paint_a1_splits(ui, track, range_start, duration, input);
         }
