@@ -163,26 +163,13 @@ impl PreviewContext {
 
 /// How long after a frame step, cue or Play the user still counts as working.
 const HANDS_ON: std::time::Duration = std::time::Duration::from_secs(3);
-/// The most an output level may be raised by the player's `SetOutputLevels` (its contract).
-const OUTPUT_LEVEL_MAX_PERCENT: u16 = 400;
 
-/// The output levels (A1, A2) that make a drafted sound heard as the written edit will be:
-/// `None` when the output's level cannot do it (another channel, a part stored off, or more
-/// than the player's 400 %: stored -20 dB, draft 0 dB is 1000 %), so the program opens
-/// with the draft itself (external audit 2026-10-17).
-fn draft_output_level(draft: Option<&SoundDraft>, stored: Option<&SoundDraft>) -> Option<[u16; 2]> {
-    match (draft, stored) {
-        (None, _) => Some([100, 100]),
-        (Some(draft), Some(stored)) if draft.channel == stored.channel && draft.overlaps == stored.overlaps && draft.picture_lead == stored.picture_lead && !stored.off => {
-            let gain = if draft.off { 0.0 } else { 10f32.powf(f32::from(draft.level_db - stored.level_db) / 20.0) };
-            let percent = (gain * 100.0).round();
-            (percent <= f32::from(OUTPUT_LEVEL_MAX_PERCENT)).then(|| {
-                let percent = percent as u16;
-                if draft.lane == 0 { [percent, 100] } else { [100, percent] }
-            })
-        }
-        _ => None,
-    }
+/// The output levels (A1, A2) while a sound is drafted on a Wrap row: none. A whole output's
+/// level changes every segment or cover on that lane (live 2026-10-22: the A2 level of one
+/// cover was heard on the whole program), so the program opens with the draft itself; with no
+/// draft the outputs go back to as recorded.
+fn draft_output_level(draft: Option<&SoundDraft>, _stored: Option<&SoundDraft>) -> Option<[u16; 2]> {
+    draft.is_none().then_some([100, 100])
 }
 
 /// Wakes the background worker (`qnc-worker-wake`); run off the form's thread.
@@ -1087,9 +1074,9 @@ impl Drop for SourcePreview {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn a_draft_level_beyond_what_the_output_holds_opens_the_program_with_the_draft() {
+    fn a_drafted_level_opens_the_program_with_the_draft_never_the_whole_output() {
         let sound = |level_db: i8| SoundDraft { lane: 0, id: "s".into(), channel: 0, level_db, off: false, overlaps: Vec::new(), picture_lead: None };
-        assert_eq!(draft_output_level(Some(&sound(-6)), Some(&sound(-12))), Some([200, 100]), "+6 dB is the output's level");
+        assert_eq!(draft_output_level(Some(&sound(-6)), Some(&sound(-12))), None, "never the whole output: only this part's sound (live 2026-10-22)");
         assert_eq!(draft_output_level(Some(&sound(0)), Some(&sound(-20))), None, "1000 % is not: the draft itself is heard");
         assert_eq!(draft_output_level(None, Some(&sound(-20))), Some([100, 100]), "the stored sound again");
     }

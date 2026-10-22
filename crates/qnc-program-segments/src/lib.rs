@@ -322,13 +322,13 @@ impl ProgramSegments {
             self.refresh_view(message);
         }
         let (mut segments, mut covers) = self.view.wave_placements();
-        // A taken part's wave is its drafted channel (the log 2026-10-22: the zoom of A2 was
-        // empty, the row's wave knows only the stored channels).
+        // A taken part's wave is its drafted channel, level and off, that part alone (the log
+        // 2026-10-22: the zoom of A2 was empty; a drafted level scaled the whole row).
         if let Some((lane, id, draft)) = self.part_sound_draft_now() {
             let index = if lane == 0 { self.view.rows.iter().position(|row| row.segment_id == id) } else { self.view.covers.iter().position(|cover| cover.cover_id == id) };
             let placements = if lane == 0 { &mut segments } else { &mut covers };
             if let Some(placement) = index.and_then(|index| placements.get_mut(index)) {
-                placement.channel = draft.channel;
+                (placement.channel, placement.level_db, placement.off) = (draft.channel, draft.level_db, draft.off);
             }
         }
         let mut view = self.view.clone();

@@ -2853,9 +2853,10 @@ fn channel_peaks<'a>(input: &TimelineInput<'a>, channel: u16) -> &'a [f32] {
 fn lane_peaks<'a>(input: &TimelineInput<'a>, choice: Option<ChannelChoice>, own: &'a [f32]) -> &'a [f32] {
     // A lane that is off is heard as nothing, so its wave is flat. A banded row (a Wrap row)
     // gets its lanes' waves already of the chosen channels: it has no other channels to pick.
+    // The banded row's wave is already each part's channel, level and off as drafted.
     choice.map_or(own, |choice| match () {
-        _ if choice.silent() => &[],
         _ if input.layers.audio_bands => own,
+        _ if choice.silent() => &[],
         _ => channel_peaks(input, choice.selected),
     })
 }
@@ -2863,6 +2864,9 @@ fn lane_peaks<'a>(input: &TimelineInput<'a>, choice: Option<ChannelChoice>, own:
 /// The level a lane is heard at (its channel choice's dB, 0 when it is off); 1 without a
 /// choice.
 fn lane_gain(input: &TimelineInput<'_>, lane: AudioLane) -> f32 {
+    if input.layers.audio_bands {
+        return 1.0; // a Wrap row's wave holds each part's level already (live 2026-10-22)
+    }
     let choice = match lane {
         AudioLane::A1 => input.a1_channel,
         AudioLane::A2 => input.a2_channel,

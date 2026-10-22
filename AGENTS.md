@@ -5334,3 +5334,10 @@ je uokvirena crveno. Lijevi klik na traku uzima ton te pokrivalice; prethodno uz
 (`qnc-timeline` `zoom_strip_rows`/`paint_zoom_strips`, `qnc-program-segments` `take_part_sound`). Kanal i razina
 vec su zapis svake pokrivalice (`a2_source_channel`, `a2_level_db`, `a2_off`); globalne postave A2 u prici nema
 (nova pokrivalica uzima kanal i razinu sa source timelinea). Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-22 (korisnik: "krivo, ovo je podesavanje glasnoce cijelog projekta, treba opcija samo za audio
+odabranog slota"; log: `SetOutputLevels [100, 112..200]`): nacrt razine zvuka segmenta ili pokrivalice na Wrap
+retku vise ne ide na razinu cijelog izlaza A1/A2 (to je mijenjalo cijeli program). Program se otvara s nacrtom te
+jedne pokrivalice ili segmenta (`qnc-source-preview` `draft_output_level`), a val programa slaze se s nacrtom
+kanala, razine i iskljucenosti samo tog dijela (`qnc-program-segments` `view_with_waves`; `qnc-timeline` na Wrap
+retku ne skalira cijeli val). Zamjenjuje precac iz 16. 10. (razina izlaza do Entera). Svaki korak ponovno slaze
+program (oko 0,5 s). Testovi, conformance. Uzivo nije provjereno.
