@@ -1179,6 +1179,14 @@ fn paint_trim_playheads(ui: &mut egui::Ui, outer: Rect, input: &TimelineInput<'_
         ui.painter().rect_filled(rect, 2.0, input.theme.background);
         ui.painter().galley(egui::pos2(left + 2.0, track.top() + 1.0), text, color);
     }
+    // A taken marker's red stays over the trim playhead at its frame (the log 2026-10-22: the
+    // white line hid it).
+    if input.layers.markers {
+        let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
+        for marker in input.markers.iter().filter(|marker| marker.taken) {
+            paint_taken_marker(ui, track, x_for_frame(track, range_start, duration, marker.frame), marker.part, input);
+        }
+    }
 }
 
 fn next_row(next_top: &mut f32, left: f32, right: f32, height: f32, gap: f32) -> Rect {
@@ -2067,20 +2075,12 @@ fn paint_markers(
         // With audio bands a marker belongs to the covers: its line runs over the video and
         // A2, never over A1, and it has no "M" over A1's wave (user 2026-10-15).
         let top = track.top() + slot_top(input);
-        // Where its picture ends and its A2 sound begins.
-        let sound_top = track.bottom() - video_middle_insets(input).1;
         ui.painter().line_segment(
             [egui::pos2(x, top), egui::pos2(x, track.bottom())],
             Stroke::new(width, color),
         );
-        // A taken marker is red (user 2026-10-22): whole, or only the part that moves.
         if marker.taken {
-            let (from, to) = match marker.part {
-                TimelineMarkerPart::Whole => (top, track.bottom()),
-                TimelineMarkerPart::Picture => (top, sound_top),
-                TimelineMarkerPart::Sound => (sound_top, track.bottom()),
-            };
-            ui.painter().line_segment([egui::pos2(x, from), egui::pos2(x, to)], Stroke::new(2.0, input.theme.marker_hover));
+            paint_taken_marker(ui, track, x, marker.part, input);
         }
         if !input.layers.audio_bands {
             ui.painter().text(
@@ -2092,6 +2092,19 @@ fn paint_markers(
             );
         }
     }
+}
+
+/// A taken marker is red (user 2026-10-22): whole, or only the part that moves (its picture
+/// or its A2 sound); thicker than a trim playhead so it shows over one at the same frame.
+fn paint_taken_marker(ui: &mut egui::Ui, track: Rect, x: f32, part: TimelineMarkerPart, input: &TimelineInput<'_>) {
+    let top = track.top() + slot_top(input);
+    let sound_top = track.bottom() - video_middle_insets(input).1;
+    let (from, to) = match part {
+        TimelineMarkerPart::Whole => (top, track.bottom()),
+        TimelineMarkerPart::Picture => (top, sound_top),
+        TimelineMarkerPart::Sound => (sound_top, track.bottom()),
+    };
+    ui.painter().line_segment([egui::pos2(x, from), egui::pos2(x, to)], Stroke::new(3.0, input.theme.marker_hover));
 }
 
 fn paint_range_outline(
