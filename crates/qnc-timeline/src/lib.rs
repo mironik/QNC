@@ -1085,7 +1085,8 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
         let zoom = match taken {
             Some((lane, _, choice)) => {
                 let level = input.wave_over_video.filter(|(over, _)| *over == lane).map_or(1, |(_, level)| level.max(1));
-                Some((lane, if choice.silent() { &[] } else { channel_peaks(&input, choice.selected) }, level))
+                let own = if lane == AudioLane::A1 { input.a1_peaks } else { input.a2_peaks };
+                Some((lane, lane_peaks(&input, Some(choice), own), level))
             }
             None => input.wave_over_video.map(|(lane, level)| {
                 let peaks = match lane {
@@ -2799,8 +2800,13 @@ fn channel_peaks<'a>(input: &TimelineInput<'a>, channel: u16) -> &'a [f32] {
 /// A lane with a channel choice draws the wave of its chosen channel (the draft while
 /// taken); without one, its own peaks.
 fn lane_peaks<'a>(input: &TimelineInput<'a>, choice: Option<ChannelChoice>, own: &'a [f32]) -> &'a [f32] {
-    // A lane that is off is heard as nothing, so its wave is flat.
-    choice.map_or(own, |choice| if choice.silent() { &[] } else { channel_peaks(input, choice.selected) })
+    // A lane that is off is heard as nothing, so its wave is flat. A banded row (a Wrap row)
+    // gets its lanes' waves already of the chosen channels: it has no other channels to pick.
+    choice.map_or(own, |choice| match () {
+        _ if choice.silent() => &[],
+        _ if input.layers.audio_bands => own,
+        _ => channel_peaks(input, choice.selected),
+    })
 }
 
 /// The level a lane is heard at (its channel choice's dB, 0 when it is off); 1 without a

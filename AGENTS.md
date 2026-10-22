@@ -5316,3 +5316,8 @@ da ispod markera imas dva sloja prikaza, slike i zooma: prikazuje se ili filmstr
 prikaza; ispod njih je ili slika (filmstrip) ili zoom tona. Dok je zoom tona prikazan, markeri i razdvojeni rezovi
 crtaju se jednom, iznad njega (`qnc-timeline` `lane_zoomed`). Vrijedi za source timeline i Wrap retke. Testovi,
 conformance. Uzivo nije provjereno.
+Popravak 2026-10-22 (korisnik: "na segmentu kad se klikne na A2 prikaze se prazan zoom tona"): Wrap redak dobiva
+val A1/A2 vec izabranog kanala svakog segmenta i pokrivalice, a timeline ga je ponovno birao po broju kanala
+(kanal 1 -> val A1 reda, kanali 3 i 4 -> prazno). Na retku s pojasevima (Wrap) traka i zoom crtaju svoj val;
+nacrt kanala uzetog segmenta ili pokrivalice slaze val programa iz izabranog kanala prije crtanja
+(`qnc-timeline` `lane_peaks`, `qnc-program-segments` `view_with_waves`). Testovi, conformance. Uzivo nije provjereno.
