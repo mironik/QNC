@@ -1228,6 +1228,8 @@ impl ProgramSegments {
                 .iter_mut()
                 .filter(|pin| &pin.marker_id == marker_id)
             {
+                pin.origin = Some(pin.frame);
+                pin.sound_at = self.cut_sound_frame();
                 pin.frame = *draft;
                 pin.taken = true;
                 pin.taken_part = match self.cut_part {

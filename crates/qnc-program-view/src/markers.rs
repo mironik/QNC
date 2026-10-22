@@ -32,6 +32,10 @@ pub struct MarkerPin {
     pub taken: bool,
     /// Its part that moves, while taken.
     pub taken_part: TakenPart,
+    /// While taken: where it is stored (drawn white, user 2026-10-22) and, its sound taken,
+    /// where its A2 sound's cut is going (drawn red).
+    pub origin: Option<u64>,
+    pub sound_at: Option<u64>,
 }
 
 /// The program between two neighbouring M markers, `[start, end)`.
@@ -60,6 +64,8 @@ pub fn resolve(
             selected: selected == Some(marker.marker_id.as_str()),
             taken: false,
             taken_part: TakenPart::Whole,
+            origin: None,
+            sound_at: None,
         })
         .collect::<Vec<_>>();
     pins.sort_by(|a, b| a.frame.cmp(&b.frame).then(a.marker_id.cmp(&b.marker_id)));

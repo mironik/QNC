@@ -364,6 +364,8 @@ fn paint_program(
                 qnc_program_view::TakenPart::Picture => qnc_timeline::TimelineMarkerPart::Picture,
                 qnc_program_view::TakenPart::Sound => qnc_timeline::TimelineMarkerPart::Sound,
             },
+            origin: pin.origin.filter(|frame| (start..=end).contains(frame)).map(local),
+            sound_at: pin.sound_at.filter(|frame| (start..=end).contains(frame)).map(local),
         })
         .collect::<Vec<_>>();
     // v5 `local_peaks_for_row`: this row's part of the program wave.

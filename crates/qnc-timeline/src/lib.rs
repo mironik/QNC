@@ -554,6 +554,10 @@ pub struct TimelineMarkerPin<'a> {
     /// Its part that moves while taken: red is the whole line, or only its picture's or its
     /// sound's (A2) part (user 2026-10-22).
     pub part: TimelineMarkerPart,
+    /// While taken: where it is stored, drawn white (user 2026-10-22: the original stays, the
+    /// red is what moves), and where its taken A2 sound's cut is going.
+    pub origin: Option<u64>,
+    pub sound_at: Option<u64>,
 }
 
 /// The part of a taken M marker that moves.
@@ -1169,10 +1173,20 @@ fn paint_trim_playheads(ui: &mut egui::Ui, outer: Rect, input: &TimelineInput<'_
     );
     let (_, track) = split_label_track(row, input.metrics.label_width);
     let duration = input.state.duration_frames();
+    // Where a taken marker's red is, the trim playhead gives only its label (the red line is
+    // the moving cut, user 2026-10-22).
+    let red = |frame: u64| {
+        input.layers.markers
+            && input.markers.iter().any(|marker| {
+                marker.taken && (match marker.part { TimelineMarkerPart::Sound => marker.sound_at.unwrap_or(marker.frame), _ => marker.frame }) == frame
+            })
+    };
     for (frame, label) in input.trim_playheads {
         let x = x_for_local_frame(track, duration, *frame);
         let color = input.theme.text;
-        ui.painter().line_segment([egui::pos2(x, track.top()), egui::pos2(x, track.bottom())], Stroke::new(2.0, color));
+        if !red(*frame) {
+            ui.painter().line_segment([egui::pos2(x, track.top()), egui::pos2(x, track.bottom())], Stroke::new(2.0, color));
+        }
         let text = ui.painter().layout_no_wrap(label.to_string(), FontId::proportional(11.0), color);
         let left = (x + 3.0).min(track.right() - text.size().x - 2.0).max(track.left());
         let rect = Rect::from_min_size(egui::pos2(left, track.top() + 1.0), text.size() + Vec2::new(4.0, 0.0));
@@ -1184,7 +1198,7 @@ fn paint_trim_playheads(ui: &mut egui::Ui, outer: Rect, input: &TimelineInput<'_
     if input.layers.markers {
         let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
         for marker in input.markers.iter().filter(|marker| marker.taken) {
-            paint_taken_marker(ui, track, x_for_frame(track, range_start, duration, marker.frame), marker.part, input);
+            paint_taken_marker(ui, track, taken_x(track, range_start, duration, marker), marker.part, input);
         }
     }
 }
@@ -2075,13 +2089,18 @@ fn paint_markers(
         // With audio bands a marker belongs to the covers: its line runs over the video and
         // A2, never over A1, and it has no "M" over A1's wave (user 2026-10-15).
         let top = track.top() + slot_top(input);
+        if marker.taken {
+            // The original stays white where it is stored; the red is what moves.
+            if let Some(origin) = marker.origin.map(|frame| x_for_frame(track, range_start, duration, frame)) {
+                ui.painter().line_segment([egui::pos2(origin, top), egui::pos2(origin, track.bottom())], Stroke::new(1.5, input.theme.text));
+            }
+            paint_taken_marker(ui, track, taken_x(track, range_start, duration, marker), marker.part, input);
+            continue;
+        }
         ui.painter().line_segment(
             [egui::pos2(x, top), egui::pos2(x, track.bottom())],
             Stroke::new(width, color),
         );
-        if marker.taken {
-            paint_taken_marker(ui, track, x, marker.part, input);
-        }
         if !input.layers.audio_bands {
             ui.painter().text(
                 egui::pos2(x + 3.0, track.top() + 2.0),
@@ -2092,6 +2111,16 @@ fn paint_markers(
             );
         }
     }
+}
+
+/// Where the moving part of a taken marker is: its sound's cut when the sound is taken, else
+/// the marker's draft.
+fn taken_x(track: Rect, range_start: u64, duration: u64, marker: &TimelineMarkerPin<'_>) -> f32 {
+    let frame = match marker.part {
+        TimelineMarkerPart::Sound => marker.sound_at.unwrap_or(marker.frame),
+        _ => marker.frame,
+    };
+    x_for_frame(track, range_start, duration, frame)
 }
 
 /// A taken marker is red (user 2026-10-22): whole, or only the part that moves (its picture
@@ -2651,6 +2680,8 @@ mod tests {
             taken: false,
             locked: false,
             part: TimelineMarkerPart::Whole,
+            origin: None,
+            sound_at: None,
         }];
 
         // A right click off the strip takes the nearest marker, however far (user 2026-10-20).
