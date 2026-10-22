@@ -5324,3 +5324,6 @@ nacrt kanala uzetog segmenta ili pokrivalice slaze val programa iz izabranog kan
 Popravak 2026-10-22 (korisnik: "zoom tona radi samo na prvom segmentu, treba raditi na svim segmentima"): zoom tona
 i stupac kanala uzete trake bili su vezani uz oznake traka, koje ima samo prvi Wrap redak. Sada rade na svakom
 retku na kojem je uzet zvuk segmenta ili pokrivalice (`qnc-timeline`). Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-22 (korisnik: "i dalje samo prvi segment, a trebao bi sve Wrap segmente"): dok je uzet A1 ili A2
+segmenta ili pokrivalice, zoom te trake prikazuje se na svim Wrap retcima; stupac kanala ostaje samo na retku
+uzetog dijela (`qnc-segment-panel` `wave_over_video`). Conformance. Uzivo nije provjereno.

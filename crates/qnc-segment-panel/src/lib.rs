@@ -450,7 +450,9 @@ fn paint_program(
             video_background: None,
             a1_channel: part_choice(0),
             a2_channel: part_choice(1),
-            wave_over_video: None,
+            // A taken A1 or A2 zooms its lane on every Wrap row (user 2026-10-22), the channel
+            // column only on the row of the taken part.
+            wave_over_video: segments.part_sound.as_ref().map(|part| (if part.lane == 0 { AudioLane::A1 } else { AudioLane::A2 }, 1)),
             trim_playheads: &trim_playheads,
             a1_splits: &a1_splits,
             pictures: &pictures,
