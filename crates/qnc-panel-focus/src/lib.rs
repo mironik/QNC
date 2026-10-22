@@ -196,10 +196,16 @@ impl PanelFocus {
         (preview, wrap, segments, timeline): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection),
     ) -> FocusView {
         // What the segment panel took is its own: left by a click, Tab or Enter, it is dropped.
-        if std::mem::replace(&mut self.last_panel, self.panel) == Panel::Segments && self.panel != Panel::Segments {
+        let last = std::mem::replace(&mut self.last_panel, self.panel);
+        if last == Panel::Segments && self.panel != Panel::Segments {
             if qnc_segments_keys::left(preview, wrap, segments) && qnc_dev_diagnostics::player_diagnostics_enabled() {
                 qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("story-leave panel={:?} dropped the segment panel's taken edit", self.panel));
             }
+        }
+        // The media pool chosen: the enlarged slot closes and the source timeline is back (user
+        // 2026-10-22).
+        if last != self.panel && matches!(self.panel, Panel::Pool | Panel::PoolTabs) && segments.view().zoom.is_some() {
+            segments.apply(qnc_program_segments::SegmentCommand::CloseZoom);
         }
         qnc_segments_keys::dropped(preview, wrap, segments); // another edit took over
         qnc_sync_session::poll(preview, wrap, segments); // an IN pressed while the source plays starts Sync

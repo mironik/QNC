@@ -5307,3 +5307,7 @@ rubu; rez koji nije razdvojen ostaje obican (`qnc-program-view` `MarkerPin.origi
 `TimelineMarkerPin.origin`/`sound_at`). Isto za A1: J slike Ton segmenta stalno crveno, rez slike preko slike i rez
 tona preko A1 (`SegmentsView.a1_splits`, `TimelineInput.a1_splits`, `qnc-program-segments` `picture_leads`).
 Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-22 (korisnik: "kad je zoom pohranjen, ako nakon toga korisnik klikne na media pool zatvara se
+zoom i prikazuje source"): kad tipkovnica prijede na media pool ili njegove tabove (klik, Tab, Enter), uvecani
+slot se zatvara i source timeline je ponovno vidljiv (`qnc-panel-focus` `poll`, `SegmentCommand::CloseZoom`).
+Uzeto u zoomu i dalje se odbacuje odlaskom s panela kao do sada. Testovi, conformance. Uzivo nije provjereno.
