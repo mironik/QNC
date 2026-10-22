@@ -6,7 +6,7 @@
 //! module keeps no state and knows no application.
 
 mod timeline_dock;
-pub use timeline_dock::{show_chrome_row, show_timeline_dock, SourceTimeline, TimelineDockStyle};
+pub use timeline_dock::{show_chrome_row, show_timeline_dock, show_timeline_dock_with, SourceTimeline, TimelineDockStyle};
 
 use eframe::egui::{self, Color32, RichText, Vec2};
 

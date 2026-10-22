@@ -82,6 +82,16 @@ pub fn show_zoom(
     Some(shown)
 }
 
+/// The enlarged slot as a body a dock draws under its header in place of its timeline (user
+/// 2026-10-22: the dock's buttons stay); `None` when no slot is enlarged.
+pub fn zoom_body<'a>(
+    segments: &'a SegmentsView,
+    timeline_theme: TimelineTheme,
+    lengths: &'a [CoverLengthBand],
+) -> Option<impl FnMut(&mut egui::Ui) -> Option<ActionEvent> + 'a> {
+    segments.zoom.map(|_| move |ui: &mut egui::Ui| show_zoom(ui, segments, timeline_theme, lengths).flatten())
+}
+
 /// Paints the panel into the whole available rectangle. What it gives is a system action
 /// on this panel (user 2026-10-18): a pointer on a Wrap row, a button of its bar.
 pub fn show(
@@ -349,6 +359,11 @@ fn paint_program(
             frame: local(pin.frame),
             taken: pin.taken,
             locked: pin.locked,
+            part: match pin.taken_part {
+                qnc_program_view::TakenPart::Whole => qnc_timeline::TimelineMarkerPart::Whole,
+                qnc_program_view::TakenPart::Picture => qnc_timeline::TimelineMarkerPart::Picture,
+                qnc_program_view::TakenPart::Sound => qnc_timeline::TimelineMarkerPart::Sound,
+            },
         })
         .collect::<Vec<_>>();
     // v5 `local_peaks_for_row`: this row's part of the program wave.

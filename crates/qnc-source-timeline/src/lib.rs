@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use eframe::egui::{Rect, Ui};
 use qnc_lane_choice::{Lane, LaneChoice};
-use qnc_source_dock::{show_timeline_dock, SourceTimeline as DockTimeline};
+use qnc_source_dock::SourceTimeline as DockTimeline;
 use qnc_source_panel::SourcePanel;
 use qnc_source_preview::SourcePreview;
 use qnc_timeline::{lane_choice, lane_key, lane_message, AudioLane, TimelineIntent, TimelineProjection, LaneKey};
@@ -347,13 +347,37 @@ pub fn show(
     (projection, assets): (&TimelineProjection, &SourceTimelineAssets),
     view: &SourceTimelineView,
 ) -> TimelineIntent {
+    show_with(ui, rect, (theme, header_gap), title, header, (projection, assets), view, None).0
+}
+
+/// What a form draws under the header in place of the timeline, and its answer.
+pub type Instead<'a> = dyn FnMut(&mut Ui) -> Option<qnc_action_event::ActionEvent> + 'a;
+
+/// As `show`, with `instead` drawn under the header in place of the timeline (the enlarged
+/// slot keeps the header and its buttons).
+#[allow(clippy::too_many_arguments)]
+pub fn show_with(
+    ui: &mut Ui,
+    rect: Rect,
+    (theme, header_gap): (&qnc_desktop_theme::Theme, f32),
+    title: &str,
+    header: impl FnOnce(&mut Ui),
+    (projection, assets): (&TimelineProjection, &SourceTimelineAssets),
+    view: &SourceTimelineView,
+    instead: Option<&mut Instead<'_>>,
+) -> (TimelineIntent, Option<qnc_action_event::ActionEvent>) {
     let style = &qnc_theme_styles::dock(theme, header_gap);
     let timeline = DockTimeline::from_assets(projection, qnc_theme_styles::timeline(theme), assets)
         .with_timecode(view.timecode)
         .with_a1_channel(view.a1)
         .with_a2_channel(view.a2)
         .with_wave_over_video(view.wave_over_video);
-    show_timeline_dock(ui, rect, style, title, header, timeline)
+    let mut answer = None;
+    let slot = &mut answer;
+    let mut drawn = instead.map(|instead| move |ui: &mut Ui| *slot = instead(ui));
+    let intent = qnc_source_dock::show_timeline_dock_with(ui, rect, style, title, header, timeline, drawn.as_mut().map(|draw| draw as &mut dyn FnMut(&mut Ui)));
+    drop(drawn);
+    (intent, answer)
 }
 
 /// One action button of the header, as a form lists them (label, catalog action).

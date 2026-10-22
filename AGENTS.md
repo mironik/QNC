@@ -5291,3 +5291,11 @@ na Wrap retku drugi desni klik ponovno uzima cijeli marker (`qnc-segment-panel` 
 s uzetim markerom izvan uvecanog slota samo javljaju poruku `story.msg.cut_part_zoom_only`
 (`qnc-program-segments` `take_cut_part`). Zlatna tablica misa: 1 redak promijenjen. Testovi, conformance.
 Uzivo nije provjereno.
+Popravak i dopuna 2026-10-22 (korisnik: "iz Storyja si izbacio dugmad za Talking Head, Voice over, B-roll i
+Sync/B-roll"; "ako je uzet Ctrl+M cijeli marker je crven, ako je narednim Ctrl+ uzeta slika crven je samo marker
+slike, a ako ton samo marker tona"): uvecani slot (od `d1a1506`) zamjenjivao je cijeli source dock pa i dugmad
+zaglavlja. Sada se crta ispod zaglavlja na mjestu timelinea, dugmad i IN/OUT ostaju (`qnc-source-dock`
+`show_timeline_dock_with`, `qnc-source-timeline` `show_with`/`Instead`, `qnc-segment-panel` `zoom_body`). Uzeti M
+marker je crven: cijeli, samo dio slike (video) ili samo dio tona (A2) prema uzetom dijelu reza
+(`qnc-timeline` `TimelineMarkerPin.part`, `qnc-program-view` `TakenPart`). Testovi, conformance (C10 ploce
+Storyja ostaje 101). Uzivo nije provjereno.

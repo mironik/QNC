@@ -35,7 +35,7 @@ pub fn render_desktop(
             let shown = qnc_segment_panel::show(ui, &view.segments, qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths, view.preview.output_levels);
             framed(shown.map(EditorialIntent::Action), ui, rect, &[Panel::Segments])
         }
-        "source-dock" => qnc_segment_panel::show_zoom(ui, &view.segments, qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths).map(|shown| framed(shown.map(EditorialIntent::Action), ui, rect, &[Panel::Segments])).unwrap_or_else(|| framed(source_dock(ui, contracts, theme, view), ui, rect, &[Panel::SourceTimeline, Panel::SourceButtons])),
+        "source-dock" => framed(source_dock(ui, contracts, theme, view), ui, rect, if view.segments.zoom.is_some() { &[Panel::Segments, Panel::SourceButtons] } else { &[Panel::SourceTimeline, Panel::SourceButtons] }),
         // Right panel of the other groups: empty, reserved for their functions.
         _ => None,
     }))
@@ -56,10 +56,9 @@ fn pool_tabs(ui: &mut Ui, rect: Rect, contracts: &EditorialContracts, theme: &Th
 
 /// The one source timeline with this group's action buttons in its header.
 fn source_dock(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &EditorialView) -> Option<EditorialIntent> {
-    let rect = ui.available_rect_before_wrap();
+    let (rect, mut clicked) = (ui.available_rect_before_wrap(), None);
     let label = view.current_clip_label().unwrap_or(&contracts.editorial.source_dock.clip_label_fallback);
     let actions = contracts.composition().source_dock.actions_rtl.iter().map(|action| qnc_source_timeline::HeaderAction { label: action.label(), action_id: action.action_id(), strong: false });
-    let mut clicked = None;
     let header = |ui: &mut Ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
@@ -67,11 +66,13 @@ fn source_dock(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view:
             clicked = qnc_source_timeline::header_actions(ui, theme, actions, enabled, on, view.focus.button.as_deref());
         });
     };
-    let dock = (theme, contracts.editorial.source_dock.header_timeline_gap);
-    let intent = qnc_source_timeline::show(ui, rect, dock, label, header, (&view.preview.timeline, &view.preview.assets), &view.source_timeline);
+    // The enlarged slot under the header in place of the timeline: the buttons stay (user 2026-10-22).
+    let mut zoom = qnc_segment_panel::zoom_body(&view.segments, qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths);
+    let (dock, instead) = ((theme, contracts.editorial.source_dock.header_timeline_gap), zoom.as_mut().map(|zoom| zoom as &mut qnc_source_timeline::Instead));
+    let (intent, zoomed) = qnc_source_timeline::show_with(ui, rect, dock, label, header, (&view.preview.timeline, &view.preview.assets), &view.source_timeline, instead);
     // A click on A1/A2 and the wheel are the source timeline's own catalog actions.
     match intent {
-        TimelineIntent::None => clicked.map(EditorialIntent::action),
+        TimelineIntent::None => zoomed.map(EditorialIntent::Action).or(clicked.map(EditorialIntent::action)),
         intent => qnc_source_timeline::SourceTimeline::event_of(&intent).map(EditorialIntent::Action).or(clicked.map(EditorialIntent::action)),
     }
 }

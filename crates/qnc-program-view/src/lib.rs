@@ -10,7 +10,7 @@ pub use edit_stills::{edit_stills, mark_clip_edges, program_picture, trim_stills
 
 pub use markers::{
     check_move, first_empty_slot, neighbour_marker, neighbour_segment, neighbour_slot,
-    program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot,
+    program_frame, resolve, slot_at, slots, source_at, MarkerPin, Slot, TakenPart,
 };
 pub use qnc_program_commands::{SegmentCommand, SegmentKind};
 

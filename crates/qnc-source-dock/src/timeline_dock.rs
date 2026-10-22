@@ -147,6 +147,21 @@ pub fn show_timeline_dock(
     add_header: impl FnOnce(&mut Ui),
     timeline: SourceTimeline<'_>,
 ) -> TimelineIntent {
+    show_timeline_dock_with(ui, rect, style, clip_label, add_header, timeline, None)
+}
+
+/// The dock with its header (label, IN/OUT, the form's buttons) and, in place of the
+/// timeline, `instead` drawn under the header when given (user 2026-10-22: the enlarged slot
+/// must not take the header's buttons away).
+pub fn show_timeline_dock_with(
+    ui: &mut Ui,
+    rect: Rect,
+    style: &TimelineDockStyle,
+    clip_label: &str,
+    add_header: impl FnOnce(&mut Ui),
+    timeline: SourceTimeline<'_>,
+    instead: Option<&mut dyn FnMut(&mut Ui)>,
+) -> TimelineIntent {
     ui.painter().rect_filled(rect, 0.0, style.fill);
     ui.painter().line_segment(
         [rect.left_top(), rect.right_top()],
@@ -189,6 +204,11 @@ pub fn show_timeline_dock(
         }
         add_header(ui);
     });
+    if let Some(instead) = instead {
+        let area = Rect::from_min_max(egui::pos2(rect.left(), timeline_top), rect.max);
+        ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| instead(ui));
+        return TimelineIntent::None;
+    }
     qnc_timeline::show_source_player_timeline_with_channel(
         ui,
         timeline_rect,

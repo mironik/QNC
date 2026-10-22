@@ -1230,6 +1230,11 @@ impl ProgramSegments {
             {
                 pin.frame = *draft;
                 pin.taken = true;
+                pin.taken_part = match self.cut_part {
+                    CutPart::Whole => qnc_program_view::TakenPart::Whole,
+                    CutPart::Picture => qnc_program_view::TakenPart::Picture,
+                    CutPart::Sound { .. } => qnc_program_view::TakenPart::Sound,
+                };
             }
         }
         if !known(

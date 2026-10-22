@@ -10,6 +10,16 @@ use qnc_program_db::{ProgramMarker, ProgramSlot};
 
 use crate::{SegmentRow, SegmentsView};
 
+/// What of a taken M marker's cut moves (user 2026-10-22: the whole marker is red, only its
+/// picture's part or only its sound's part when one of them is taken).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TakenPart {
+    #[default]
+    Whole,
+    Picture,
+    Sound,
+}
+
 /// An M marker on the program axis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkerPin {
@@ -20,6 +30,8 @@ pub struct MarkerPin {
     pub selected: bool,
     /// Taken for a move (Ctrl+M, a right click): the mouse drags only it.
     pub taken: bool,
+    /// Its part that moves, while taken.
+    pub taken_part: TakenPart,
 }
 
 /// The program between two neighbouring M markers, `[start, end)`.
@@ -47,6 +59,7 @@ pub fn resolve(
             locked: !marker.system_role.is_empty(),
             selected: selected == Some(marker.marker_id.as_str()),
             taken: false,
+            taken_part: TakenPart::Whole,
         })
         .collect::<Vec<_>>();
     pins.sort_by(|a, b| a.frame.cmp(&b.frame).then(a.marker_id.cmp(&b.marker_id)));

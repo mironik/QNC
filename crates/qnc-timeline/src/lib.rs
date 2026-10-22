@@ -551,6 +551,18 @@ pub struct TimelineMarkerPin<'a> {
     pub taken: bool,
     /// The locked start or end marker of the program: a right click never takes it.
     pub locked: bool,
+    /// Its part that moves while taken: red is the whole line, or only its picture's or its
+    /// sound's (A2) part (user 2026-10-22).
+    pub part: TimelineMarkerPart,
+}
+
+/// The part of a taken M marker that moves.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TimelineMarkerPart {
+    #[default]
+    Whole,
+    Picture,
+    Sound,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2055,10 +2067,21 @@ fn paint_markers(
         // With audio bands a marker belongs to the covers: its line runs over the video and
         // A2, never over A1, and it has no "M" over A1's wave (user 2026-10-15).
         let top = track.top() + slot_top(input);
+        // Where its picture ends and its A2 sound begins.
+        let sound_top = track.bottom() - video_middle_insets(input).1;
         ui.painter().line_segment(
             [egui::pos2(x, top), egui::pos2(x, track.bottom())],
             Stroke::new(width, color),
         );
+        // A taken marker is red (user 2026-10-22): whole, or only the part that moves.
+        if marker.taken {
+            let (from, to) = match marker.part {
+                TimelineMarkerPart::Whole => (top, track.bottom()),
+                TimelineMarkerPart::Picture => (top, sound_top),
+                TimelineMarkerPart::Sound => (sound_top, track.bottom()),
+            };
+            ui.painter().line_segment([egui::pos2(x, from), egui::pos2(x, to)], Stroke::new(2.0, input.theme.marker_hover));
+        }
         if !input.layers.audio_bands {
             ui.painter().text(
                 egui::pos2(x + 3.0, track.top() + 2.0),
@@ -2614,6 +2637,7 @@ mod tests {
             frame: 75,
             taken: false,
             locked: false,
+            part: TimelineMarkerPart::Whole,
         }];
 
         // A right click off the strip takes the nearest marker, however far (user 2026-10-20).
