@@ -836,6 +836,8 @@ fn a_taken_marker_moves_whole_or_only_its_sound_or_only_its_picture() {
     assert!(segments.view().trim_frames.contains(&13), "the sound 2 frames before the cut: a J");
     let draft = segments.cut_sound_draft().unwrap();
     assert!(draft.contains(&("c1".to_string(), (2, 0))) && draft.contains(&("c0".to_string(), (0, 0))), "{draft:?}");
+    assert!(segments.apply(SegmentCommand::CutPart { marker_id: "m1".into(), picture: false, lane: 1 }));
+    assert_eq!(segments.cut_sound_draft(), Some(draft.clone()), "the sound taken again keeps its draft");
     assert!(segments.take_cut_part(None, false, 0), "the A1 part is answered");
     assert!(segments.cut_sound_taken(), "A1 has no cut at a marker: the sound stays taken");
     assert!(segments.take_cut_part(None, true, 0));

@@ -86,10 +86,10 @@ impl ProgramSegments {
             self.marker_edit = before;
             return self.refresh_view(qnc_ui_text::text("story.msg.clip_at_end").into());
         }
-        self.refresh_view(
-            qnc_ui_text::text("story.msg.marker_taken")
-                .into(),
-        );
+        // Only its picture moving says so on every step (the log 2026-10-22: the whole marker's
+        // words came back after the first step).
+        let words = if self.cut_part == crate::CutPart::Picture { "story.msg.cut_picture_taken" } else { "story.msg.marker_taken" };
+        self.refresh_view(qnc_ui_text::text(words).into());
         self.cue_program(frame);
     }
 

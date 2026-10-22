@@ -52,6 +52,10 @@ impl ProgramSegments {
             self.refresh_view(qnc_ui_text::text("story.msg.a1_no_cut").into());
             return true;
         }
+        // The sound taken again (a second right click on it) keeps its draft (the log 2026-10-22).
+        if matches!(self.cut_part, CutPart::Sound { .. }) {
+            return self.say_cut("story.msg.cut_sound_taken");
+        }
         // Only the sound: the picture goes back to where it is stored.
         if stored.is_some_and(|stored| stored != draft) {
             self.marker_edit = Some((marker_id.clone(), stored.unwrap_or(draft)));
