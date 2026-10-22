@@ -5369,3 +5369,11 @@ novu reviziju kataloga. Kod nije mijenjan (pokusaj u `qnc-source-bindings` vrace
 projekta `novi-test-5` (kartica samo citana, stvarni projekt nediran): Select 9 klipova s trajanjima iz XML-a,
 bez probea, 2,1-2,3 s. Otvoreno (ceka odluku korisnika): izvori i URI medija u bazi i dalje nose serijski broj
 volumena (`qnc://local/source/volume-<serijski>`), pa svaki disk koji sustav vidi postaje izvor po broju.
+Popravak 2026-10-22 (korisnik: "trenutni zapis FX3A ne prepoznaje MP4 originalni video"; dvije kartice u istom
+uvozu namjerno): zapisi FX3A originala nikad nisu postali konacni ("record-completion" sukob): vrijeme snimanja iz
+XML-a kamere (`2026-10-19T16:56:10+02:00`) i iz ffprobea (`2026-10-19T14:56:10Z`) isti je trenutak u drugoj zoni,
+a spajanje zapisa usporedivalo ih je kao tekst. `qnc-media-metadata-compose` `equivalent`: `creation_time` se
+usporeduje kao trenutak (`instant_ms`), zapis kamere s njezinom zonom ostaje; test. `tools/qnc-ingest-worker`
+gresku dovrsetka zapisa pise i u player log (`record-completion failed`), ne samo na nevidljivi stderr.
+Provjera na izoliranoj kopiji (kartica samo citana, stvarni projekt nediran): svih 9 FX3A zapisa konacno,
+9 valova, 9 filmstripova, 9 postera. Testovi, conformance. Uzivo nije provjereno.

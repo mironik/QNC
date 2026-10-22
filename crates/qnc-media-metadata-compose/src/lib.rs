@@ -257,7 +257,44 @@ fn equivalent(a: &Value, b: &Value, field: &str) -> bool {
             return b.split(',').any(|alias| alias == a);
         }
     }
+    // The same moment in another zone (camera sidecar `+02:00`, ffprobe `Z`; live
+    // 2026-10-22: an FX3A original never got a final record).
+    if field == "creation_time" {
+        if let (Some(a), Some(b)) = (a.as_str().and_then(instant_ms), b.as_str().and_then(instant_ms)) {
+            return a == b;
+        }
+    }
     false
+}
+
+/// Milliseconds since 1970 of an ISO 8601 / RFC 3339 time `YYYY-MM-DDTHH:MM:SS[.f](Z|+HH:MM|-HH:MM)`;
+/// `None` for anything else (then the text itself is compared).
+fn instant_ms(text: &str) -> Option<i64> {
+    let (date, rest) = text.trim().split_once(['T', ' '])?;
+    let mut date = date.split('-').map(|part| part.parse::<i64>().ok());
+    let (year, month, day) = (date.next()??, date.next()??, date.next()??);
+    let zone_at = rest.find(['Z', 'z', '+', '-'])?;
+    let (clock, zone) = rest.split_at(zone_at);
+    let (whole, fraction) = clock.split_once('.').unwrap_or((clock, ""));
+    let mut clock = whole.split(':').map(|part| part.parse::<i64>().ok());
+    let (hour, minute, second) = (clock.next()??, clock.next()??, clock.next()??);
+    let millis = format!("{fraction:0<3}").get(..3)?.parse::<i64>().ok()?;
+    let offset = match zone {
+        "Z" | "z" => 0,
+        zone => {
+            let sign = if zone.starts_with('-') { -1 } else { 1 };
+            let (hours, minutes) = zone[1..].split_once(':').unwrap_or((zone[1..].get(..2)?, zone[1..].get(2..)?));
+            sign * (hours.parse::<i64>().ok()? * 60 + minutes.parse::<i64>().ok()?)
+        }
+    };
+    // Days from the civil date (H. Hinnant's algorithm).
+    let y = if month <= 2 { year - 1 } else { year };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    Some(((days * 86_400 + hour * 3_600 + minute * 60 + second - offset * 60) * 1_000) + millis)
 }
 
 #[cfg(test)]

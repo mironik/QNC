@@ -10,6 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 qnc-missing-posters = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-content-artifacts = { workspace = true }
 qnc-content-read = { workspace = true }

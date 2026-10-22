@@ -165,9 +165,14 @@ fn run_once(root: &Path) -> Result<bool, String> {
                 Ok(done) => {
                     for (clip, error) in done.failed {
                         eprintln!("zapis klipa {clip} nije dovrsen: {error}");
+                        // Also where the logs are read (live 2026-10-22: an FX3A record failed unseen).
+                        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("record-completion failed clip={clip} error={error}"));
                     }
                 }
-                Err(error) => eprintln!("dovrsetak zapisa nije uspio: {error}"),
+                Err(error) => {
+                    eprintln!("dovrsetak zapisa nije uspio: {error}");
+                    qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("record-completion failed error={error}"));
+                }
             }
             // Once more now the records are final: a clip whose record had no timing at
             // Select gets its poster from the start of the clip.

@@ -183,3 +183,13 @@ fn complete_camera_snapshot_needs_no_probe() {
     };
     assert!(required_probes(&s).unwrap().is_empty());
 }
+
+/// Locked (live 2026-10-22, FX3A): the camera sidecar and ffprobe give the same moment of
+/// creation in other zones; that is no conflict.
+#[test]
+fn the_same_creation_moment_in_another_zone_is_no_conflict() {
+    use serde_json::json;
+    assert!(super::equivalent(&json!("2026-10-19T16:56:10+02:00"), &json!("2026-10-19T14:56:10.000000Z"), "creation_time"));
+    assert!(!super::equivalent(&json!("2026-10-19T16:56:10+02:00"), &json!("2026-10-19T16:56:10.000000Z"), "creation_time"));
+    assert!(super::equivalent(&json!("2026-01-01T00:30:00-01:00"), &json!("2026-01-01T01:30:00Z"), "creation_time"));
+}
