@@ -94,7 +94,7 @@ impl Executor {
         // The first pictures are decoded only when the stream summary does not state the
         // colour (XDCAM MXF keeps it in the MPEG-2 headers only); a summary that states it
         // needs nothing more (user 2026-10-18: the decode doubled every FX6 probe).
-        if summary_lacks_colour(&json) {
+        if summary_lacks_picture_facts(&json) {
             let frames = self.read_json(frame_arguments(&self.config), &file)?;
             if let (Some(object), Some(frames)) = (json.as_object_mut(), frames.get("frames")) {
                 object.insert("frames".into(), frames.clone());
@@ -138,8 +138,9 @@ impl Executor {
     }
 }
 
-/// Whether a picture stream of the summary leaves its colour (primaries or matrix) unknown.
-pub(crate) fn summary_lacks_colour(json: &serde_json::Value) -> bool {
+/// Whether a picture stream of the summary leaves its colour (primaries or matrix) or its
+/// field order unknown (FX3A HEVC proxy, user 2026-10-23).
+pub(crate) fn summary_lacks_picture_facts(json: &serde_json::Value) -> bool {
     let known = |stream: &serde_json::Value, field: &str| {
         stream.get(field).and_then(|v| v.as_str()).is_some_and(|v| !v.is_empty() && v != "unknown")
     };
@@ -147,7 +148,7 @@ pub(crate) fn summary_lacks_colour(json: &serde_json::Value) -> bool {
         streams
             .iter()
             .filter(|stream| stream.get("codec_type").and_then(|v| v.as_str()) == Some("video"))
-            .any(|stream| !known(stream, "color_primaries") || !known(stream, "color_space"))
+            .any(|stream| !known(stream, "color_primaries") || !known(stream, "color_space") || !known(stream, "field_order"))
     })
 }
 
@@ -197,9 +198,10 @@ pub(crate) fn run_command(command: &mut Command, timeout: Duration) -> Result<Ve
     bytes
 }
 
-/// The packets read from the start of the file for the colour of the first pictures: the
-/// sound of a frame of eight channels and its picture fit with room to spare.
-pub(crate) const FIRST_PACKETS: &str = "%+#32";
+/// The packets read from the start of the file for the colour and scan of the first
+/// pictures. An MP4 interleaves its sound in long runs: 32 packets of the FX3A proxy were
+/// all sound and gave no picture, 64 gave pictures (2026-10-23); 128 leaves room.
+pub(crate) const FIRST_PACKETS: &str = "%+#128";
 
 pub(crate) fn arguments(config: &OwnerConfig) -> Vec<String> {
     [
@@ -255,7 +257,7 @@ pub(crate) fn frame_arguments(config: &OwnerConfig) -> Vec<String> {
         "-read_intervals",
         FIRST_PACKETS,
         "-show_entries",
-        "frame=stream_index,media_type,color_primaries,color_transfer,color_space,color_range",
+        "frame=stream_index,media_type,color_primaries,color_transfer,color_space,color_range,interlaced_frame,top_field_first",
         "-of",
         "json",
     ]

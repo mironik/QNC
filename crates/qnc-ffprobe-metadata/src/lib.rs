@@ -53,7 +53,7 @@ pub fn read(text: &str, media_uri: &str, document_uri: &str, evidence_id: &str) 
         return Err(Error::InvalidDocument);
     }
     // The first decoded pictures of the same call (`-show_frames` bounded to the first
-    // packets): only their colour is read, when the stream summary does not know it.
+    // packets): only their colour and scan are read, when the stream summary does not know them.
     let frames = match root.get("frames") {
         None | Some(Value::Null) => &[][..],
         Some(Value::Array(frames)) if frames.len() <= 256 => frames.as_slice(),
@@ -229,6 +229,32 @@ impl Reader<'_> {
         }
         Ok(summary)
     }
+    /// The scan of a picture stream from its first decoded pictures: progressive, or the
+    /// field that comes first. `None` when no picture says it or they disagree.
+    fn frame_scan(&self, index: u32, frames: &[Value]) -> Result<Option<Fact<ScanMode>>> {
+        let mut found: Option<Fact<ScanMode>> = None;
+        for (i, frame) in frames.iter().enumerate() {
+            if frame.get("stream_index").and_then(Value::as_u64) != Some(u64::from(index)) {
+                continue;
+            }
+            let path = format!("/frames/{i}");
+            let Some(interlaced) = self.integer::<u8>(frame, "interlaced_frame", &path)? else {
+                continue;
+            };
+            let mode = match (interlaced.value, self.integer::<u8>(frame, "top_field_first", &path)?.map(|f| f.value)) {
+                (0, _) => self.fact(&interlaced.locator, ScanMode::Progressive),
+                (1, Some(1)) => self.fact(&format!("{path}/top_field_first"), ScanMode::InterlacedTopFieldFirst),
+                (1, Some(0)) => self.fact(&format!("{path}/top_field_first"), ScanMode::InterlacedBottomFieldFirst),
+                _ => return Err(Error::InvalidField(interlaced.locator)),
+            };
+            match &found {
+                Some(first) if first.value != mode.value => return Ok(None),
+                Some(_) => {}
+                None => found = Some(mode),
+            }
+        }
+        Ok(found)
+    }
     fn video(&self, stream: &Value, path: &str, index: u32, frames: &[Value]) -> Result<VideoMetadata> {
         let rate = self.ratio(stream, "avg_frame_rate", path)?.or(self.ratio(
             stream,
@@ -292,6 +318,12 @@ impl Reader<'_> {
             };
             Some(self.fact(&f.locator, mode))
         });
+        // The summary may not know it (FX3A HEVC proxy: "unknown"); then the first decoded
+        // pictures of the stream do, when they all agree (user 2026-10-23).
+        let scan_mode = match scan_mode {
+            Some(mode) => Some(mode),
+            None => self.frame_scan(index, frames)?,
+        };
         let mut rotation = None;
         let mut declared = false;
         if let Some(sides) = stream.get("side_data_list") {

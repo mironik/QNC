@@ -342,3 +342,30 @@ fn colour_unknown_everywhere_stays_unspecified() {
     };
     assert_eq!(v.color.primaries.as_ref().unwrap().value, Signal::Unspecified, "another stream's picture is not this one's");
 }
+#[test]
+fn scan_unknown_in_the_summary_comes_from_the_first_pictures_when_they_agree() {
+    // FX3A HEVC proxy: the stream summary says field_order "unknown", the pictures are progressive.
+    let mut f = fixture();
+    f["streams"][0]["field_order"] = "unknown".into();
+    let index = f["streams"][0]["index"].clone();
+    let scan = |f: &serde_json::Value| {
+        let p = parse(f);
+        let StreamDetails::Video(v) = &p.media.streams[0].details else {
+            panic!()
+        };
+        v.scan_mode.as_ref().map(|s| (s.value, s.locator.clone()))
+    };
+    f["frames"] = serde_json::json!([
+        {"stream_index": 99, "media_type": "audio"},
+        {"stream_index": index, "media_type": "video", "interlaced_frame": 0, "top_field_first": 0},
+        {"stream_index": index, "media_type": "video", "interlaced_frame": 0, "top_field_first": 0}
+    ]);
+    assert_eq!(scan(&f), Some((ScanMode::Progressive, "/frames/1/interlaced_frame".into())));
+    f["frames"][2]["interlaced_frame"] = 1.into();
+    f["frames"][2]["top_field_first"] = 1.into();
+    assert_eq!(scan(&f), None, "pictures that disagree say nothing");
+    f["frames"] = serde_json::json!([{"stream_index": index, "interlaced_frame": 1, "top_field_first": 1}]);
+    assert_eq!(scan(&f), Some((ScanMode::InterlacedTopFieldFirst, "/frames/0/top_field_first".into())));
+    f["streams"][0]["field_order"] = "progressive".into();
+    assert_eq!(scan(&f).unwrap().0, ScanMode::Progressive, "a known summary stays");
+}

@@ -44,10 +44,12 @@ fn single_full_call_not_per_field_or_frame_scan() {
     for forbidden in ["-count_frames", "-show_packets", "-show_streams"] {
         assert!(!frames.iter().any(|a| a == forbidden));
     }
-    let stated = serde_json::json!({"streams": [{"codec_type": "video", "color_primaries": "bt709", "color_space": "bt709"}]});
-    let unknown = serde_json::json!({"streams": [{"codec_type": "video", "color_primaries": "unknown", "color_space": "bt709"}]});
-    assert!(!process::summary_lacks_colour(&stated), "FX6: the summary states the colour");
-    assert!(process::summary_lacks_colour(&unknown), "XDCAM: the colour is read from the first pictures");
+    let stated = serde_json::json!({"streams": [{"codec_type": "video", "color_primaries": "bt709", "color_space": "bt709", "field_order": "progressive"}]});
+    let unknown = serde_json::json!({"streams": [{"codec_type": "video", "color_primaries": "unknown", "color_space": "bt709", "field_order": "progressive"}]});
+    let no_scan = serde_json::json!({"streams": [{"codec_type": "video", "color_primaries": "bt709", "color_space": "bt709", "field_order": "unknown"}]});
+    assert!(!process::summary_lacks_picture_facts(&stated), "FX6: the summary states the colour and scan");
+    assert!(process::summary_lacks_picture_facts(&unknown), "XDCAM: the colour is read from the first pictures");
+    assert!(process::summary_lacks_picture_facts(&no_scan), "FX3A HEVC proxy: the scan is read from the first pictures");
     assert_eq!(
         args.iter()
             .filter(|a| a.as_str() == "-show_streams")

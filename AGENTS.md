@@ -5377,3 +5377,14 @@ usporeduje kao trenutak (`instant_ms`), zapis kamere s njezinom zonom ostaje; te
 gresku dovrsetka zapisa pise i u player log (`record-completion failed`), ne samo na nevidljivi stderr.
 Provjera na izoliranoj kopiji (kartica samo citana, stvarni projekt nediran): svih 9 FX3A zapisa konacno,
 9 valova, 9 filmstripova, 9 postera. Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-23 (korisnik: "sada ingest dugme ne vodi na sljedecu formu"; "ti si pokvario u prethodnom koraku"):
+nakon popravka od 22. 10. (FX3A zapisi postaju konacni) 9 FX3A zapisa bilo je `final` ali `partial`: proxy (HEVC Main 10)
+nije imao `scan_mode`, jer ffprobe sazetak kaze `field_order=unknown`. Red uvoza takav zapis odbija (konacan, probe-an i
+nepotpun), pa je Uvezi javio gresku i nije presao na Story. Sada isti jedini probe (`qnc-media-probe`) cita prve slike i
+kad sazetak ne zna redoslijed polja (`summary_lacks_picture_facts`, polja slike `interlaced_frame`, `top_field_first`),
+a `qnc-ffprobe-metadata` (`frame_scan`) uzima nacin snimanja iz prvih slika toka kad se sve slazu (inace ostaje
+nenaveden). Granica prvih paketa 32 -> 128 (MP4 slaze zvuk u dugim nizovima: 32 paketa FX3A proxyja bila su samo zvuk).
+Izolirana kopija (kartica samo citana, stvarni projekt nepromijenjen): cisti Select FX3A kartice i radnik daju 9 zapisa
+`final/complete` (prije `partial`). Zapisi stvarnog projekta koji su vec konacni ostaju (jedan probe po mediju); novi
+projekt ih daje ispravno. Testovi `qnc-ffprobe-metadata` (novi
+`scan_unknown_in_the_summary_comes_from_the_first_pictures_when_they_agree`), `qnc-media-probe`, conformance.
