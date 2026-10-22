@@ -104,6 +104,9 @@ pub struct SegmentsView {
     /// Program frames of the edits being moved (a taken slot's two markers, a taken
     /// marker): the trim playheads, drawn beside the player's own.
     pub trim_frames: Vec<u64>,
+    /// The A1 cuts whose picture is away from their sound (the picture J of a Ton segment):
+    /// (picture frame, sound frame) on the program, drawn red always (user 2026-10-22).
+    pub a1_splits: Vec<(u64, u64)>,
     /// Sync/B-roll is on.
     pub sync_enabled: bool,
     /// The cover a Sync is writing, `[start, end)` on the program, until Enter or Delete

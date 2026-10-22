@@ -1221,6 +1221,12 @@ impl ProgramSegments {
         (view.undo_depth, view.redo_depth) = self.history;
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());
         view.alert = self.alert.clone();
+        // A cut whose A2 sound is stored away from its picture (a J or an L) shows it always
+        // (user 2026-10-22: the moved red cut stays visible).
+        for pin in view.markers.iter_mut() {
+            let offset = self.cut_offset(&pin.marker_id);
+            pin.sound_at = (offset != 0).then(|| pin.frame.saturating_add_signed(offset));
+        }
         if let Some((marker_id, draft)) = &self.marker_edit {
             // The draft is drawn where the marker is going.
             for pin in view
@@ -1229,7 +1235,7 @@ impl ProgramSegments {
                 .filter(|pin| &pin.marker_id == marker_id)
             {
                 pin.origin = Some(pin.frame);
-                pin.sound_at = self.cut_sound_frame();
+                pin.sound_at = self.cut_sound_frame().or(pin.sound_at);
                 pin.frame = *draft;
                 pin.taken = true;
                 pin.taken_part = match self.cut_part {
@@ -1310,6 +1316,7 @@ impl ProgramSegments {
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
         view.trim_frames.extend(self.overlap.as_ref().map(overlap::OverlapEdit::frame));
         view.trim_frames.extend(self.cut_sound_frame());
+        view.a1_splits = self.picture_leads();
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);
         view.zoom = self.zoom_window(&view);

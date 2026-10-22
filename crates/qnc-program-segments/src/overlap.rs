@@ -49,6 +49,23 @@ pub struct OverlapDraft {
 }
 
 impl ProgramSegments {
+    /// Every Ton segment's picture J as (picture frame, sound frame), the taken one as drafted;
+    /// at most as long as the segment before it (the playlist bounds it by the source too).
+    pub(crate) fn picture_leads(&self) -> Vec<(u64, u64)> {
+        let rows = &self.view.rows;
+        rows.iter()
+            .enumerate()
+            .skip(1)
+            .filter_map(|(index, row)| {
+                let drafted = self.overlap.as_ref().filter(|edit| edit.id == row.segment_id).map(|edit| edit.frames.max(0) as u64);
+                let stored = self.stored.iter().find(|segment| segment.segment_id == row.segment_id).map_or(0, |segment| u64::from(segment.v_lead_frames));
+                let previous = &rows[index - 1];
+                let lead = drafted.unwrap_or(stored).min(previous.end_frame.saturating_sub(previous.start_frame));
+                (row.kind == crate::SegmentKind::Ton && lead > 0).then(|| (row.start_frame - lead, row.start_frame))
+            })
+            .collect()
+    }
+
     /// Ctrl+Shift+J on the segment panel: the picture J of the Ton segment under the Wrap
     /// playhead, else of the chosen one. False when there is none or it is the first.
     pub fn take_picture_lead(&mut self, frame: u64) -> bool {

@@ -71,7 +71,7 @@ impl ProgramSegments {
     }
 
     /// The A2 offset of a marker's cut: the L of the cover before minus the J of the cover after.
-    fn cut_offset(&self, marker_id: &str) -> i64 {
+    pub(crate) fn cut_offset(&self, marker_id: &str) -> i64 {
         let (before, after) = self.cut_covers(marker_id);
         before.map_or(0, |cover| i64::from(cover.a2_tail_frames)) - after.map_or(0, |cover| i64::from(cover.a2_lead_frames))
     }

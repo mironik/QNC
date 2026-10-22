@@ -5299,3 +5299,11 @@ zaglavlja. Sada se crta ispod zaglavlja na mjestu timelinea, dugmad i IN/OUT ost
 marker je crven: cijeli, samo dio slike (video) ili samo dio tona (A2) prema uzetom dijelu reza
 (`qnc-timeline` `TimelineMarkerPin.part`, `qnc-program-view` `TakenPart`). Testovi, conformance (C10 ploce
 Storyja ostaje 101). Uzivo nije provjereno.
+Dopuna 2026-10-22 (korisnik: "pomaknuti crveni rez bi trajno trebao biti vidljiv"; "isto i za video koji je
+samostalno pomaknut, ako je cijeli marker onda nije potrebno"; "isto treba vrijediti i za kanal A1"): uzeti marker
+ostaje bijel na spremljenom mjestu, crveno je ono sto se mice. Spremljeni rez M markera ciji je ton A2 odmaknut od
+slike (J ili L pokrivalice) crven je stalno: dio preko slike na rezu slike, dio preko A2 na rezu tona, spojeni na
+rubu; rez koji nije razdvojen ostaje obican (`qnc-program-view` `MarkerPin.origin`/`sound_at`, `qnc-timeline`
+`TimelineMarkerPin.origin`/`sound_at`). Isto za A1: J slike Ton segmenta stalno crveno, rez slike preko slike i rez
+tona preko A1 (`SegmentsView.a1_splits`, `TimelineInput.a1_splits`, `qnc-program-segments` `picture_leads`).
+Testovi, conformance. Uzivo nije provjereno.

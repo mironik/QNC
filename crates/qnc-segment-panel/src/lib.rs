@@ -414,6 +414,13 @@ fn paint_program(
             qnc_timeline::drafted_choice(now, part.channels, true, stored)
         })
     };
+    // The A1 split cuts of this row, its own frames.
+    let a1_splits = segments
+        .a1_splits
+        .iter()
+        .filter(|(picture, sound)| (start..=end).contains(picture) || (start..=end).contains(sound))
+        .map(|&(picture, sound)| (local(picture), local(sound)))
+        .collect::<Vec<_>>();
     let intent = qnc_timeline::show(
         ui,
         TimelineInput {
@@ -445,6 +452,7 @@ fn paint_program(
             a2_channel: part_choice(1),
             wave_over_video: None,
             trim_playheads: &trim_playheads,
+            a1_splits: &a1_splits,
             pictures: &pictures,
             // Something taken on the row: a left click keeps it first (the mouse map).
             holding: !segments.trim_frames.is_empty() || segments.part_sound.is_some(),

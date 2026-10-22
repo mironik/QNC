@@ -715,6 +715,9 @@ pub struct TimelineInput<'a> {
     /// Trim playheads: the local frames of the edits being moved and their labels; the
     /// player's playhead stays where it is.
     pub trim_playheads: &'a [(u64, &'a str)],
+    /// A1 cuts whose picture is away from their sound, local (picture, sound) frames: red
+    /// always (user 2026-10-22).
+    pub a1_splits: &'a [(u64, u64)],
     /// Filmstrip pictures of a banded video row (empty: none).
     pub pictures: &'a [TimelinePicture<'a>],
     /// On a row with markers: the host holds something taken there (a slot, a slot edge, a
@@ -897,6 +900,7 @@ pub fn show_source_player_timeline_with_channel(
                 a2_channel,
                 wave_over_video,
                 trim_playheads: &[],
+                a1_splits: &[],
                 pictures: &[],
                 holding: false,
             },
@@ -1747,6 +1751,7 @@ fn paint_video_layers(ui: &mut egui::Ui, track: Rect, input: &TimelineInput<'_>)
         }
         if input.layers.markers {
             paint_markers(ui, track, range_start, duration, input.markers, input);
+            paint_a1_splits(ui, track, range_start, duration, input);
         }
     }
     if input.layers.in_out {
@@ -2097,10 +2102,17 @@ fn paint_markers(
             paint_taken_marker(ui, track, taken_x(track, range_start, duration, marker), marker.part, input);
             continue;
         }
-        ui.painter().line_segment(
-            [egui::pos2(x, top), egui::pos2(x, track.bottom())],
-            Stroke::new(width, color),
-        );
+        // A cut whose A2 sound is away from its picture (a J or an L): the line over the
+        // picture, the sound's cut red on A2 (user 2026-10-22).
+        let bottom = if marker.sound_at.is_some() { track.bottom() - video_middle_insets(input).1 } else { track.bottom() };
+        // A split cut is red in both parts (user 2026-10-22); a whole one keeps its colour.
+        let (width, color) = if marker.sound_at.is_some() { (2.0, input.theme.marker_hover) } else { (width, color) };
+        ui.painter().line_segment([egui::pos2(x, top), egui::pos2(x, bottom)], Stroke::new(width, color));
+        if let Some(sound) = marker.sound_at {
+            let sound = x_for_frame(track, range_start, duration, sound);
+            ui.painter().line_segment([egui::pos2(sound, bottom), egui::pos2(sound, track.bottom())], Stroke::new(2.0, input.theme.marker_hover));
+            ui.painter().line_segment([egui::pos2(x.min(sound), bottom), egui::pos2(x.max(sound), bottom)], Stroke::new(1.0, input.theme.marker_hover));
+        }
         if !input.layers.audio_bands {
             ui.painter().text(
                 egui::pos2(x + 3.0, track.top() + 2.0),
@@ -2110,6 +2122,20 @@ fn paint_markers(
                 color,
             );
         }
+    }
+}
+
+/// The A1 cuts split in two (the picture J of a Ton segment): the picture's cut red over the
+/// picture, the sound's red over A1, joined at the edge between them (user 2026-10-22).
+fn paint_a1_splits(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u64, input: &TimelineInput<'_>) {
+    let edge = track.top() + slot_top(input);
+    let picture_bottom = track.bottom() - video_middle_insets(input).1;
+    let stroke = Stroke::new(2.0, input.theme.marker_hover);
+    for &(picture, sound) in input.a1_splits {
+        let (picture, sound) = (x_for_frame(track, range_start, duration, picture), x_for_frame(track, range_start, duration, sound));
+        ui.painter().line_segment([egui::pos2(picture, edge), egui::pos2(picture, picture_bottom)], stroke);
+        ui.painter().line_segment([egui::pos2(sound, track.top()), egui::pos2(sound, edge)], stroke);
+        ui.painter().line_segment([egui::pos2(picture.min(sound), edge), egui::pos2(picture.max(sound), edge)], Stroke::new(1.0, input.theme.marker_hover));
     }
 }
 
