@@ -5623,3 +5623,15 @@ postera; run: preuzimanje iz reda; queue: red uvoza kroz pisca), `qnc-ingest-sel
 SubClipa (`Answer.open`, IN/OUT oznake u preview-sourceu). Broj testova svake kocke isti kao prije (application 31,
 import-worker 22, select 18, store 3, catalog 3, selection-write 3, clip-list 2, preview-source 1). C10 Ingest
 aplikacija 1133 -> 1129. `selection_config.rs` (306 redaka, model postavki izvora) ostaje jedna datoteka. Conformance.
+Audit i podjela 2026-10-23 (korisnik: "napravi isti audit i podjelu za Story"): cisto premjestanje bez promjene
+ponasanja; svaka datoteka jedna odgovornost. `qnc-program-db`: `store.rs` (2896 redaka) u `store/` po radnjama
+(segments, markers, reads, sound, covers, cover_split, schema, rules, spans, slots, order, checks), model zahtjeva i
+zapisa u `model.rs`, testovi po temama u `tests/` (segment, marker, slot, cover, sound, store). `qnc-program-segments`:
+`lib.rs` 1379 -> 418 (story_read, commands, select, create, writes, refresh). `qnc-panel-focus`: panel, route, walk,
+tests. `qnc-program-playlist`: build, overlay, window. `qnc-program-input`: load, build, media. `qnc-trim-stills`:
+worker, tests. `qnc-segment-panel`: header, program, tests. `qnc-program-view`: program, testovi. `qnc-virtual-shots`:
+`store/` schema, rows. `qnc-sync-cover`: testovi u svoje datoteke. `qnc-editorial-application`: samo testovi izvan
+`lib.rs`; podjela radnog koda bila bi digla C10 (573 -> 584, zaglavlja novih datoteka), pa je vracena. Broj testova
+svake kocke isti kao prije (program-db 40, program-segments 53, playlist 17, editorial-application 11, sync-cover 10,
+virtual-shots 8, panel-focus 7 i zlatna tablica tipki, program-input 6, trim-stills 4, program-view 4,
+segment-panel 2). Conformance. Debug gradnja cijelog workspacea nije prosla zbog punog diska (povezivac).
