@@ -56,7 +56,8 @@ impl Project {
             .unwrap_or_default();
         Ok(Self {
             dir,
-            queue: TransportQueue::start_leased(target.clone(), lease)?,
+            queue: TransportQueue::start_leased(target.clone(), lease)?
+                .with_parts(qnc_db_broker::ProjectDbTarget::for_project(reader, &plan.settings)?),
             opener: ConfigMediaOpener::new(
                 sources,
                 qnc_playback_activity::playback_pause(target.clone()),
@@ -114,6 +115,17 @@ impl ImportQueue for RunQueue<'_, '_> {
 
     fn heartbeat(&mut self, clip_id: &str) -> Result<(), String> {
         self.queue.heartbeat(clip_id)
+    }
+
+    fn parts(&mut self, clip_id: &str) -> Result<Vec<qnc_ingest_parts::Part>, String> {
+        self.queue.parts(clip_id)
+    }
+
+    fn finish_with_parts(&mut self, clip_id: String, parts: Vec<qnc_ingest_store::content::ImportedPart>) -> Result<(), String> {
+        if !self.run.allowed() {
+            return Err(qnc_ui_text::text("import.lease_lost").into());
+        }
+        self.queue.finish_with_parts(clip_id, parts)
     }
 
     fn finish_import(

@@ -46,6 +46,14 @@ impl MediaOpener for ConfigMediaOpener {
         media_uri: &str,
         file: &std::path::Path,
     ) -> Result<qnc_media_metadata::MediaRepresentation, String> {
+        self.probe_new_file(media_uri, file).map(|(media, _)| media)
+    }
+
+    fn describe_with_evidence(
+        &self,
+        media_uri: &str,
+        file: &std::path::Path,
+    ) -> Result<(qnc_media_metadata::MediaRepresentation, qnc_media_metadata::Evidence), String> {
         self.probe_new_file(media_uri, file)
     }
 
@@ -90,7 +98,7 @@ impl ConfigMediaOpener {
         &self,
         media_uri: &str,
         file: &std::path::Path,
-    ) -> Result<qnc_media_metadata::MediaRepresentation, String> {
+    ) -> Result<(qnc_media_metadata::MediaRepresentation, qnc_media_metadata::Evidence), String> {
         let (executable, probe_size_bytes, analyze_duration_us) = self
             .sources
             .iter()
@@ -110,7 +118,9 @@ impl ConfigMediaOpener {
             timeout_ms: 30_000,
             probe_size_bytes,
             analyze_duration_us,
-            demuxers: vec!["mov".into()],
+            // The demuxer of the file the import made: an optimized copy or an MP4 part is
+            // QuickTime, an MXF part is MXF.
+            demuxers: vec![demuxer_of(file).into()],
         })
         .map_err(|e| e.to_string())?;
         let request_id = uuid_like(media_uri);
@@ -124,8 +134,15 @@ impl ConfigMediaOpener {
             })
             .map_err(|e| e.to_string())?;
         qnc_ffprobe_metadata::read(&report.json, media_uri, &document_uri, "ffprobe-optimized")
-            .map(|parsed| parsed.media)
+            .map(|parsed| (parsed.media, parsed.evidence))
             .map_err(|e| e.to_string())
+    }
+}
+
+fn demuxer_of(file: &std::path::Path) -> &'static str {
+    match file.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
+        Some("mxf") => "mxf",
+        _ => "mov",
     }
 }
 

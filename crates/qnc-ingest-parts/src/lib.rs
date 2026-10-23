@@ -92,6 +92,16 @@ impl TableModule for Attached {
     }
 }
 
+/// The parts of clip `clip_id`, read once (the import reads them for the clip it takes).
+pub fn read_parts(target: &ProjectDbTarget, clip_id: &str) -> Result<Vec<Part>> {
+    let mut client = target.open(Access::ReadOnly, vec![PartsModule::factory()])?;
+    let value = client.execute(MODULE_ID, serde_json::to_value(Operation::List).map_err(|e| e.to_string())?)?;
+    match serde_json::from_value::<Data>(value).map_err(|e| e.to_string())? {
+        Data::Parts(parts) => Ok(parts.into_iter().filter(|part| part.clip_id == clip_id).collect()),
+        _ => Err(qnc_ui_text::text("parts.not_ready").into()),
+    }
+}
+
 /// The parts of the active project as a surface shows them: read and written through one
 /// serial writer of the project database, never waited for on the caller's thread.
 #[derive(Debug, Default)]

@@ -64,6 +64,8 @@ members = [
     "crates/qnc-form-pieces",
     "crates/qnc-pool-marks",
     "crates/qnc-ingest-pieces",
+    "crates/qnc-mxf-cut",
+    "crates/qnc-mp4-cut",
     "crates/qnc-ingest-clip-list",
     "crates/qnc-ingest-select",
     "crates/qnc-media-thumbnail",
@@ -287,6 +289,8 @@ qnc-ingest-parts = { path = "crates/qnc-ingest-parts" }
 qnc-form-pieces = { path = "crates/qnc-form-pieces" }
 qnc-pool-marks = { path = "crates/qnc-pool-marks" }
 qnc-ingest-pieces = { path = "crates/qnc-ingest-pieces" }
+qnc-mxf-cut = { path = "crates/qnc-mxf-cut" }
+qnc-mp4-cut = { path = "crates/qnc-mp4-cut" }
 qnc-ingest-clip-list = { path = "crates/qnc-ingest-clip-list" }
 qnc-ingest-import-worker = { path = "crates/qnc-ingest-import-worker" }
 qnc-ingest-select = { path = "crates/qnc-ingest-select" }

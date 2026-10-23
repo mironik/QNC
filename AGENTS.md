@@ -5549,3 +5549,25 @@ akcija `ingest_subclip_delete` Delete; layout Ingesta: dugme Add SubClip u traci
 Testovi `qnc-form-pieces` (1), `qnc-pool-marks` (1), `qnc-ingest-parts` (2), `qnc-ingest-application` (31; test kroz cijelu
 aplikaciju: Shift+S, tab SubClip, klik otvara klip), conformance, release build. Uzivo nije provjereno. Nije izvedeno (korak
 6b): Uvezi jos kopira cijeli klip; kopija samo dijelova (stream copy, 1 s rezerve, svaki dio svoj klip) je sljedeci korak.
+Izvedeno 2026-10-23 (korisnik: "da, kreni s korakom 6b"; "ne mov, mora biti kao original"; "treba i poster"; "uzmi
+timekodove intra slicica"; "B, kreni s qnc-mxf-cut"): korak 6b, Uvezi za klip s dijelovima. Mjereno: ffmpeg stream copy u
+MXF za XAVC Long GOP pise krive vremenske oznake (obican citac gubi trecinu slika), u MOV/MP4 s edit listom broj slika ne
+odgovara stvarnom. Zato: nova javna kocka `crates/qnc-mxf-cut` (+ ugovor): dio frame-wrapped MXF originala kao MXF iste vrste
+iz bajtova originala - zaglavlje s metapodacima (trajanja i pocetni timecode dijela), novi indeks (temporal/key frame offset,
+slice offset), paketi od intra slike na ili prije IN-a (vodece slike te grupe izostavljene; zvuk, sistemski element i ANC
+svake slike iz paketa njezina mjesta u vremenu), footer i RIP; nista se ne dekodira. Nova javna kocka `crates/qnc-mp4-cut`
+(+ ugovor): MP4/QuickTime stream copy ffmpegom iz kataloga dekodera od intra slike, vodece slike i paketi od iduce intra
+slike izbaceni (`noise` bsf), zvuk zavrsava sa slikom, timecode prve slike upisan. `qnc-ingest-import-worker` (`parts.rs`):
+klip s dijelovima se ne uvozi; svaki dio (1 s rezerve) se reze u `original/` projekta, opisuje jednim probeom nove datoteke
+(demuxer po vrsti datoteke), postaje svoj uvezeni klip bez proxyja, s posterom sa svog IN-a (`qnc-poster-create`).
+`qnc-content-store`: operacija `FinishWithParts` (dijelovi upisani i uvezeni, klip vracen u neuvezen i bez stare adrese
+medija; sve ili nista). `qnc-ingest-parts::read_parts`; red uvoza cita dijelove (`TransportQueue::with_parts`, `RunQueue`).
+`qnc-content-artifacts`: mapa projekta je izvor za filmstrip i val (kao u previewu). `tools/qnc-ingest-worker`: nakon uvoza
+koji je nesto uvezao jos jedan prolaz filmstripa i vala. Provjereno (kartice D: i G: samo citane, izolirana kopija):
+izrez MXF 3396 (IN 450..950): 526 slika, sve tocno 434..959 originala, bez upozorenja, zvuk uzorak po uzorak isti (kanali
+1 i 4), timecode 06:14:58:00; izrez MP4 C0013: 168 slika tocno, zvuk tocno od uzorka 144x960; jedan rad radnika: 3 dijela
+uvezena s posterom, filmstripom i valom za 8 s; player pusta dijelove kao original (isti kratki trzaj na pocetku ima i
+original od slike 0). Testovi `qnc-mxf-cut` (3, i na pravom originalu), `qnc-mp4-cut` (2), `qnc-content-store` (31),
+`qnc-ingest-parts` (2), `qnc-ingest-import-worker` (22), conformance, release build. Nije izvedeno: Sonyjev privatni XML
+unutar MXF zaglavlja (NRT) zadrzava trajanje cijelog klipa; dio klipa na LAN/Intranet izvoru (rez trazi lokalni original);
+uzivo kroz sucelje nije provjereno.

@@ -1,0 +1,26 @@
+{
+  "module_id": "qnc.module.mxf-cut",
+  "module_name": "MXF part cut",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["media.cut.mxf"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "player.command", "database.write"],
+  "forbidden_dependencies": [
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.player-client",
+    "qnc.module.ui-widget",
+    "qnc.module.timeline"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-mxf-cut",
+  "input": "A local frame-wrapped MXF original (read only), its index (qnc-mxf-index) and the frames of the part; a destination in the project folder.",
+  "output": "The part as an MXF of the original kind: the header partition with its metadata (durations and the start timecode of the part), a new index (temporal and key frame offsets, slice offsets), the content packages from the intra picture at or before the IN (leading pictures of that group left out; sound, system item and data of each frame from its place in time) and a footer with the random index pack. Nothing decoded, nothing probed.",
+  "specification": "AGENTS.md 2026-10-23: Ingest into blocks, step 6b (Ingest SubClip)."
+}

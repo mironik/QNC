@@ -3931,19 +3931,28 @@ dependencies = [
  "qnc-camera-profiles",
  "qnc-content-read",
  "qnc-contracts",
+ "qnc-db-broker",
+ "qnc-decoder-catalog",
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-filmstrip",
+ "qnc-frame-timebase",
  "qnc-import-fit",
+ "qnc-ingest-parts",
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-metadata",
  "qnc-media-optimize",
  "qnc-media-probe",
+ "qnc-media-records",
  "qnc-media-stream",
  "qnc-missing-posters",
+ "qnc-mp4-cut",
+ "qnc-mxf-cut",
+ "qnc-mxf-index",
  "qnc-playback-activity",
+ "qnc-poster-create",
  "qnc-sony-metadata",
  "qnc-source-reader",
  "qnc-source-timecode",
@@ -4504,8 +4513,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-mp4-cut"
+version = "0.1.0"
+dependencies = [
+ "qnc-ui-text",
+]
+
+[[package]]
 name = "qnc-mp4-sound"
 version = "0.1.0"
+
+[[package]]
+name = "qnc-mxf-cut"
+version = "0.1.0"
+dependencies = [
+ "qnc-mxf-index",
+ "qnc-ui-text",
+]
 
 [[package]]
 name = "qnc-mxf-index"

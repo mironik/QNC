@@ -518,6 +518,36 @@ impl ContentStore {
                 }
                 Ok(Data::Changed)
             }
+            Operation::FinishWithParts { clip_id, parts } => {
+                if parts.is_empty() || parts.len() > 256 {
+                    return Err(qnc_ui_text::text("db.import_result_missing").into());
+                }
+                let tx = qnc_write_lease::begin_write(&mut self.conn).map_err(err)?;
+                for part in parts {
+                    qnc_contracts::parse_qnc_uri(&part.media_uri).map_err(err)?;
+                    if part.clip.id() == clip_id || part.clip.snapshot.binding.original_uri != part.media_uri {
+                        return Err(qnc_ui_text::text("db.existing_clip_id_must_take_another").into());
+                    }
+                    Self::write_clip(&tx, &part.clip)?;
+                    tx.execute(
+                        "UPDATE clips SET import_status='imported',imported_media_uri=?2,import_error=NULL,selected=0 WHERE clip_id=?1",
+                        params![part.clip.id(), part.media_uri],
+                    )
+                    .map_err(err)?;
+                }
+                // The clip itself is not imported: nothing of an earlier import of it stays.
+                let sql = if self.has_copy_of {
+                    "UPDATE clips SET import_status='detected',import_error=NULL,selected=0,imported_media_uri=NULL,imported_copy_of=NULL,optimized_json=NULL WHERE clip_id=?1 AND import_status='processing'"
+                } else {
+                    "UPDATE clips SET import_status='detected',import_error=NULL,selected=0,imported_media_uri=NULL WHERE clip_id=?1 AND import_status='processing'"
+                };
+                let n = tx.execute(sql, params![clip_id]).map_err(err)?;
+                if n != 1 {
+                    return Err(qnc_ui_text::text("db.import_job_taken_already_finished").into());
+                }
+                tx.commit().map_err(err)?;
+                Ok(Data::Changed)
+            }
             Operation::FinishImport {
                 clip_id,
                 media_uri,

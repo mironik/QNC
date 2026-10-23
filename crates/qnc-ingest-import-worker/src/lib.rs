@@ -16,6 +16,7 @@
 //! With the media the poster is copied too. Not done here: proxy generation (transcode).
 
 mod config;
+mod parts;
 mod optimize;
 
 pub use config::ConfigMediaOpener;
@@ -62,6 +63,10 @@ pub trait MediaOpener: Send + Sync {
     fn describe(&self, _media_uri: &str, _file: &Path) -> Result<MediaRepresentation, String> {
         Err(qnc_ui_text::text("import.new_file_cannot_be_described_this").into())
     }
+    /// Like `describe`, with the evidence of the probe (a part becomes a clip of its own).
+    fn describe_with_evidence(&self, _media_uri: &str, _file: &Path) -> Result<(MediaRepresentation, qnc_media_metadata::Evidence), String> {
+        Err(qnc_ui_text::text("import.new_file_cannot_be_described_this").into())
+    }
 }
 
 /// The queue of the content database seen by the executor.
@@ -70,6 +75,14 @@ pub trait ImportQueue {
     /// Tells the queue this clip is still being imported (renews its lease).
     fn heartbeat(&mut self, _clip_id: &str) -> Result<(), String> {
         Ok(())
+    }
+    /// The parts marked for this clip (Ingest SubClip); none: the clip is imported whole.
+    fn parts(&mut self, _clip_id: &str) -> Result<Vec<qnc_ingest_parts::Part>, String> {
+        Ok(Vec::new())
+    }
+    /// The claimed clip imported as its parts.
+    fn finish_with_parts(&mut self, _clip_id: String, _parts: Vec<qnc_ingest_store::content::ImportedPart>) -> Result<(), String> {
+        Err(qnc_ui_text::text("db.import_result_missing").into())
     }
     fn finish_import(
         &mut self,
@@ -385,6 +398,21 @@ pub fn run_next(
         return Ok(None);
     };
     let clip_id = clip.clip.id().to_string();
+    let parts = queue.parts(&clip_id)?;
+    if !parts.is_empty() {
+        let result = match parts::import_parts(&clip, &parts, plan, project_dir, opener, cancel) {
+            Ok(imported) => {
+                let uris = imported.iter().map(|part| part.media_uri.clone()).collect::<Vec<_>>().join(" ");
+                queue.finish_with_parts(clip_id.clone(), imported)?;
+                Ok(uris)
+            }
+            Err(error) => {
+                queue.finish_import(clip_id.clone(), None, None, None, None, Some(error.chars().take(4000).collect()))?;
+                Err(error)
+            }
+        };
+        return Ok(Some(Outcome { clip_id, result, thumbnail_uri: None }));
+    }
     let imported = import_media(&clip, plan, project_dir, opener, cancel, &mut || {
         let _ = queue.heartbeat(&clip_id);
     });
@@ -441,6 +469,8 @@ mod tests;
 pub struct TransportQueue {
     transport: qnc_ingest_store::content::ContentWriteTransport,
     sequence: u64,
+    /// The project database whose Ingest SubClip parts the import reads.
+    parts: Option<qnc_db_broker::ProjectDbTarget>,
 }
 
 impl TransportQueue {
@@ -458,7 +488,14 @@ impl TransportQueue {
             transport: qnc_ingest_store::content::ContentWriteTransport::start_leased(target, lease)
                 .map_err(|e| e.to_string())?,
             sequence: 0,
+            parts: None,
         })
+    }
+
+    /// The queue reads the parts of each clip it takes from this project database.
+    pub fn with_parts(mut self, target: qnc_db_broker::ProjectDbTarget) -> Self {
+        self.parts = Some(target);
+        self
     }
 
     fn next_key(&mut self, what: &str) -> String {
@@ -500,6 +537,19 @@ impl TransportQueue {
 }
 
 impl ImportQueue for TransportQueue {
+    fn parts(&mut self, clip_id: &str) -> Result<Vec<qnc_ingest_parts::Part>, String> {
+        match &self.parts {
+            Some(target) => qnc_ingest_parts::read_parts(target, clip_id),
+            None => Ok(Vec::new()),
+        }
+    }
+
+    fn finish_with_parts(&mut self, clip_id: String, parts: Vec<qnc_ingest_store::content::ImportedPart>) -> Result<(), String> {
+        let key = self.next_key("parts");
+        self.transport.finish_with_parts(key.clone(), clip_id, parts).map_err(|e| e.to_string())?;
+        self.wait(&key).map(|_| ())
+    }
+
     fn heartbeat(&mut self, clip_id: &str) -> Result<(), String> {
         let key = self.next_key("beat");
         self.transport

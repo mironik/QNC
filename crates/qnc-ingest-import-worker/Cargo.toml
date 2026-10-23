@@ -26,6 +26,15 @@ qnc-media-optimize = { workspace = true }
 qnc-media-probe = { workspace = true }
 qnc-ffprobe-metadata = { workspace = true }
 qnc-source-timecode = { workspace = true }
+qnc-ingest-parts = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-mxf-index = { workspace = true }
+qnc-mxf-cut = { workspace = true }
+qnc-mp4-cut = { workspace = true }
+qnc-decoder-catalog = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-poster-create = { workspace = true }
+qnc-frame-timebase = { workspace = true }
 
 [dev-dependencies]
 qnc-camera-adapter = { workspace = true }

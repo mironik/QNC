@@ -47,6 +47,8 @@ fn a_saved_part_is_listed_with_its_own_id_and_a_deleted_one_is_gone() {
     wait(&mut parts);
     let ids: Vec<_> = parts.parts().iter().map(|part| part.part_id.as_str()).collect();
     assert_eq!(ids, ["c1-part-02", "c1-part-03"], "an id is never used again");
+    assert_eq!(read_parts(&target, "c1").unwrap().len(), 2, "the import reads them too");
+    assert!(read_parts(&target, "c2").unwrap().is_empty());
 }
 
 #[test]
