@@ -2,23 +2,28 @@ use super::*;
 
 impl IngestApplication {
     pub(crate) fn settings_failed(&mut self, error: String) {
+        self.project.fail(error);
+        self.clear_project_view();
+        self.show_project_status();
+    }
+
+    /// Nothing of a closed or another project stays on view.
+    fn clear_project_view(&mut self) {
         self.stop_player();
         self.posters.reset(); // the clips go: a reopened project loads its posters again
-        self.work_plan = None;
-        self.catalog_target = None;
-        self.select_target = None;
-        self.catalog_stats = None;
         self.view.clips.clear();
         self.view.timeline = Default::default();
         self.reset_timeline_artifacts();
         self.view.clip_filter = ClipFilter::All;
         self.view.preview_clip_id = None;
         self.pending_source = None;
-        self.catalog_loader.cancel();
-        self.view.work_settings_loading = false;
-        self.view.work_settings_ready = false;
-        self.view.work_settings_error = Some(error);
         self.view.ai_mining = false;
+    }
+
+    fn show_project_status(&mut self) {
+        let status = self.project.status();
+        (self.view.work_settings_loading, self.view.work_settings_ready) = (status.loading, status.ready);
+        self.view.work_settings_error = status.error.clone();
     }
 
     pub fn refresh_active_project(&mut self) -> IngestDispatchResult {
@@ -32,143 +37,77 @@ impl IngestApplication {
             self.stop_player();
             return IngestDispatchResult::accepted(None, false);
         }
-        let Some(Ok(snapshot)) = self.active_project_reader.as_ref().map(|r| r.read()) else {
-            return self.refresh_active_project();
-        };
-        let active_project = snapshot.project_id;
-        let loaded_project = self
-            .work_plan
-            .as_ref()
-            .map(|plan| plan.settings.project_id.as_str());
-        if loaded_project != Some(active_project.as_str()) {
+        if self.project.is_current() != Some(true) {
             return self.refresh_active_project();
         }
         self.request_missing_thumbnails();
         IngestDispatchResult::accepted(None, true)
     }
 
-    pub(crate) fn load_work_settings(
-        &mut self,
-        pending_source: Option<String>,
-    ) -> IngestDispatchResult {
+    pub(crate) fn load_work_settings(&mut self, pending_source: Option<String>) -> IngestDispatchResult {
         self.load_work_settings_inner(pending_source, false)
     }
 
-    pub(crate) fn load_work_settings_inner(
-        &mut self,
-        pending_source: Option<String>,
-        retain_loaded_workspace: bool,
-    ) -> IngestDispatchResult {
-        if self.catalog_loader.is_busy()
-            || self.selection_writer.is_busy()
-            || self.selection_session.has_pending_work()
-        {
-            if retain_loaded_workspace && pending_source.is_none() && self.catalog_loader.is_busy()
-            {
-                return IngestDispatchResult::accepted(None, true);
-            }
-            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.settings_reading"));
-        }
-        let Some(active_project) = self.active_project_reader.clone() else {
-            self.settings_failed(qnc_ui_text::text("ingest.msg.no_settings_reader_configured").into());
-            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.no_settings_reader_configured"));
-        };
-        let keep_current_view =
-            retain_loaded_workspace && pending_source.is_none() && self.work_plan.is_some();
-        let retained_workspace = keep_current_view
-            .then(|| {
-                self.work_plan
-                    .as_ref()
-                    .map(|p| p.settings.workspace_db_uri.clone())
-            })
-            .flatten();
-        let retained_stats = keep_current_view
-            .then(|| self.catalog_stats.clone())
-            .flatten();
-        self.pending_source = pending_source;
-        if !keep_current_view {
+    pub(crate) fn load_work_settings_inner(&mut self, pending_source: Option<String>, retain_loaded_workspace: bool) -> IngestDispatchResult {
+        let others_busy = self.selection_writer.is_busy() || self.selection_session.has_pending_work();
+        let error_before = self.project.status().error.clone();
+        let started = self.project.start(retain_loaded_workspace && pending_source.is_none(), others_busy);
+        if let qnc_ingest_project::Start::Started { keep_view: false } = started {
             self.stop_player();
             self.cancel_thumbnail_load();
-            self.view.work_settings_loading = true;
-            self.view.work_settings_ready = false;
         }
-        self.view.work_settings_error = None;
-        if let Err(error) =
-            self.catalog_loader
-                .start(active_project, retained_workspace, retained_stats)
-        {
-            self.settings_failed(error);
+        if matches!(started, qnc_ingest_project::Start::Started { .. }) {
+            self.pending_source = pending_source;
         }
-        IngestDispatchResult::accepted(None, true)
+        if self.project.status().error.is_some() && self.project.status().error != error_before {
+            self.clear_project_view(); // no active project reader, or the load did not start
+        }
+        self.show_project_status();
+        match started {
+            qnc_ingest_project::Start::Refused(error) => IngestDispatchResult::rejected(error),
+            _ => IngestDispatchResult::accepted(None, true),
+        }
     }
 
     pub(crate) fn poll_settings(&mut self) -> bool {
-        let Some(result) = self.catalog_loader.poll() else {
+        let Some(result) = self.project.poll() else {
             return false;
         };
-        self.view.work_settings_loading = false;
-        match result {
-            Ok(loaded) => {
-                let plan = loaded.plan;
-                let catalog_was_loaded = loaded.clips.is_some();
-                // A new project must never inherit the preceding project's selection/preview.
-                if self.work_plan.as_ref().map(|p| &p.settings.project_id)
-                    != Some(&plan.settings.project_id)
-                {
-                    self.posters.reset();
-                    self.view.clips.clear();
-                    self.view.clip_filter = ClipFilter::All;
-                    self.view.preview_clip_id = None;
-                    self.reset_timeline_artifacts();
-                    self.stop_player();
-                    self.view.selected_source_uri = None;
-                    self.view.browser.chosen = Default::default();
-                    self.catalog_stats = None;
-                }
-                self.view.ai_mining = plan.settings.ai_enabled();
-                self.view.archive_original_available = false;
-                self.view.archive_original = false;
-                self.view.work_settings_ready = true;
-                self.select_target = match self.settings_reader.as_ref() {
-                    Some(reader) => {
-                        match qnc_ingest_select::SelectTarget::for_project(reader, &plan.settings) {
-                            Ok(target) => Some(target),
-                            Err(error) => {
-                                self.settings_failed(error);
-                                return true;
-                            }
-                        }
-                    }
-                    None => None,
-                };
-                self.catalog_target = Some(loaded.target);
-                self.catalog_stats = Some(loaded.stats);
-                self.work_plan = Some(plan);
-                if let Some(clips) = loaded.clips {
-                    let previous = self.view.clips.clone();
-                    self.view.clips = catalog::apply_catalog_rows(&self.view.clips, clips).clips;
-                    qnc_media_thumbnail::keep_loaded(&mut self.view.clips, &previous);
-                    self.start_thumbnail_load(qnc_media_thumbnail::missing(&self.view.clips));
-                }
-                if self.pending_source.is_none() && catalog_was_loaded {
-                    if let Some(source) = loaded.source {
-                        self.view.selected_source_uri = Some(source.uri);
-                        self.view.browser.chosen = qnc_source_browse::SourceMetadata { name: source.name, serial_number: source.serial_number, volume_name: source.volume_name };
-                    } else {
-                        self.view.selected_source_uri = None;
-                        self.view.browser.chosen = Default::default();
-                    }
-                }
-                self.wake_artifact_worker();
-                if let Some(uri) = self.pending_source.take() {
-                    if self.playback_guard_active() {
-                        self.view.message = playback_guard_message().to_string();
-                    } else {
-                        self.confirm_source_selection(uri);
-                    }
-                }
+        let loaded = match result {
+            Ok(loaded) => loaded,
+            Err(error) => {
+                self.settings_failed(error);
+                return true;
             }
-            Err(error) => self.settings_failed(error),
+        };
+        // A new project must never inherit the preceding project's selection/preview.
+        if loaded.project_changed {
+            self.clear_project_view();
+            self.view.selected_source_uri = None;
+            self.view.browser.chosen = Default::default();
+        }
+        self.show_project_status();
+        let ai = self.project.plan().is_some_and(|plan| plan.settings.ai_enabled());
+        (self.view.ai_mining, self.view.archive_original_available, self.view.archive_original) = (ai, false, false);
+        let catalog_was_loaded = loaded.clips.is_some();
+        if let Some(clips) = loaded.clips {
+            let previous = self.view.clips.clone();
+            self.view.clips = catalog::apply_catalog_rows(&self.view.clips, clips).clips;
+            qnc_media_thumbnail::keep_loaded(&mut self.view.clips, &previous);
+            self.start_thumbnail_load(qnc_media_thumbnail::missing(&self.view.clips));
+        }
+        if self.pending_source.is_none() && catalog_was_loaded {
+            let source = loaded.source;
+            self.view.selected_source_uri = source.as_ref().map(|source| source.uri.clone());
+            self.view.browser.chosen = source.map(|source| qnc_source_browse::SourceMetadata { name: source.name, serial_number: source.serial_number, volume_name: source.volume_name }).unwrap_or_default();
+        }
+        self.wake_artifact_worker();
+        if let Some(uri) = self.pending_source.take() {
+            if self.playback_guard_active() {
+                self.view.message = playback_guard_message().to_string();
+            } else {
+                self.confirm_source_selection(uri);
+            }
         }
         true
     }

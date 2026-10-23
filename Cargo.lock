@@ -3778,6 +3778,7 @@ dependencies = [
  "qnc-ingest-clip-list",
  "qnc-ingest-import-worker",
  "qnc-ingest-preview-source",
+ "qnc-ingest-project",
  "qnc-ingest-select",
  "qnc-ingest-selection-write",
  "qnc-ingest-store",
@@ -3958,6 +3959,21 @@ dependencies = [
  "qnc-source-preview",
  "qnc-timeline",
  "qnc-timeline-assets",
+ "qnc-ui-text",
+ "qnc-work-settings",
+]
+
+[[package]]
+name = "qnc-ingest-project"
+version = "0.1.0"
+dependencies = [
+ "qnc-active-project-read",
+ "qnc-application-sequence",
+ "qnc-ingest-catalog",
+ "qnc-ingest-select",
+ "qnc-ingest-store",
+ "qnc-ingest-work-plan",
+ "qnc-media-thumbnail",
  "qnc-ui-text",
  "qnc-work-settings",
 ]

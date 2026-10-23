@@ -20,6 +20,7 @@ qnc-choice-box = { workspace = true }
 qnc-playback-priority = { workspace = true }
 qnc-source-browse = { workspace = true }
 qnc-ingest-catalog = { workspace = true }
+qnc-ingest-project = { workspace = true }
 qnc-ingest-clip-list = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-camera-adapter = { workspace = true }

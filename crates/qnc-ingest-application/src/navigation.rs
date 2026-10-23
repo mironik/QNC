@@ -19,14 +19,6 @@ impl IngestApplication {
 
     /// The order of the project's applications, from its public database view.
     pub fn navigation_sequence(&self) -> Result<Vec<SequenceStep>, String> {
-        let reader = self
-            .settings_reader
-            .as_ref()
-            .ok_or(qnc_ui_text::text("ingest.msg.no_settings_reader"))?;
-        let plan = self
-            .work_plan
-            .as_ref()
-            .ok_or(qnc_ui_text::text("ingest.msg.settings_unavailable"))?;
-        qnc_application_sequence::read(reader, &plan.settings)
+        self.project.application_sequence()
     }
 }

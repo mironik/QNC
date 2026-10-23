@@ -2,15 +2,13 @@
 use std::sync::mpsc;
 use std::{path::Path, time::Duration};
 
-use qnc_active_project_read::ActiveProjectReader;
 use qnc_ingest_catalog as catalog;
 use qnc_ingest_select as selection;
 use qnc_ingest_select::selection_config;
-use qnc_ingest_store::{content::CatalogStats, IngestStore, SourceSelectionRecord};
+use qnc_ingest_store::{IngestStore, SourceSelectionRecord};
 pub use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
 use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_timeline_assets::SourceTimelineAssets;
-use qnc_work_settings::SettingsReader;
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
@@ -58,17 +56,11 @@ pub struct IngestApplication {
     view: IngestViewModel,
     dispatch_log: Vec<String>,
     store: Option<IngestStore>,
-    settings_reader: Option<SettingsReader>,
-    active_project_reader: Option<ActiveProjectReader>,
-    catalog_loader: catalog::CatalogLoader,
-    catalog_target: Option<qnc_ingest_store::content::ContentTarget>,
-    /// The project database (content and records) Select and the artifacts write into.
-    select_target: Option<qnc_ingest_select::SelectTarget>,
+    /// The active project: work plan, catalog, project database targets (piece `qnc-ingest-project`).
+    project: qnc_ingest_project::IngestProject,
     selection_writer: qnc_ingest_selection_write::SelectionWriter,
     navigation_requested: bool,
     posters: qnc_clip_posters::ClipPosters,
-    catalog_stats: Option<CatalogStats>,
-    work_plan: Option<IngestWorkPlan>,
     pending_source: Option<String>,
     selection_config: Option<selection_config::SelectionConfig>,
     selection_config_error: Option<String>,
@@ -112,14 +104,11 @@ impl IngestApplication {
             component.browse.connect(browser);
             component.apply_source_browser_result(state);
         }
-        match ActiveProjectReader::from_root(root.as_ref()) {
-            Ok(active_project) => {
-                component.settings_reader = Some(active_project.settings_reader().clone());
-                component.active_project_reader = Some(active_project);
-                // Active project comes from the DB, not from a disk scan or Project call.
-                component.load_work_settings(None);
-            }
-            Err(error) => component.settings_failed(error.to_string()),
+        // Active project comes from the DB, not from a disk scan or Project call.
+        component.project = qnc_ingest_project::IngestProject::from_root(root.as_ref());
+        match component.project.status().error.clone() {
+            Some(error) => component.settings_failed(error),
+            None => _ = component.load_work_settings(None),
         }
         Ok(component)
     }

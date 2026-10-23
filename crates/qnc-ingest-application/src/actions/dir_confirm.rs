@@ -26,7 +26,7 @@ impl IngestApplication {
         if self.playback_guard_active() {
             return self.playback_guard_rejected();
         }
-        if self.work_plan.is_none() {
+        if self.work_plan().is_none() {
             return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.settings_unavailable"));
         }
         if qnc_contracts::parse_qnc_uri(&uri).is_err() {
@@ -75,7 +75,7 @@ impl IngestApplication {
             return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_gone"));
         };
         let Some(config) = self.selection_config.clone() else { return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.no_select_config")) };
-        let Some(target) = self.select_target.clone() else { return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.catalog_unavailable")) };
+        let Some(target) = self.project.select_target().cloned() else { return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.catalog_unavailable")) };
         match self
             .selection_session
             .start(config, selected, target, self.camera_registry.clone())

@@ -1,0 +1,16 @@
+[package]
+name = "qnc-ingest-project"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the project an Ingest surface works on, read from the active project database (work plan, clip catalog, project database targets, project folder, application order); no form, no writes"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+qnc-active-project-read = { workspace = true }
+qnc-application-sequence = { workspace = true }
+qnc-ingest-catalog = { workspace = true }
+qnc-ingest-select = { workspace = true }
+qnc-ingest-store = { workspace = true }
+qnc-ingest-work-plan = { workspace = true }
+qnc-media-thumbnail = { workspace = true }
+qnc-work-settings = { workspace = true }

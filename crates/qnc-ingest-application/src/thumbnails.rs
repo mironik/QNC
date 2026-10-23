@@ -20,11 +20,7 @@ impl IngestApplication {
             return;
         }
         let sources = self.selection_config.as_ref().map(|c| c.source_readers()).unwrap_or_default();
-        let project = self
-            .settings_reader
-            .as_ref()
-            .zip(self.work_plan.as_ref())
-            .and_then(|(reader, plan)| catalog::project_folder(reader, plan));
+        let project = self.project.project_folder();
         if sources.is_empty() && project.is_none() {
             return;
         }

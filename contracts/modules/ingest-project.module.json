@@ -1,0 +1,47 @@
+{
+  "module_id": "qnc.module.ingest-project",
+  "module_name": "Ingest Project",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "runtime_crate": "qnc-ingest-project",
+  "capabilities": [
+    "ingest.project.load",
+    "ingest.project.targets",
+    "ingest.project.application_sequence"
+  ],
+  "input_contract_version": "0.2.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "project.workflow",
+    "project.settings.write",
+    "source.scan.roles",
+    "source.bytes.read",
+    "camera.metadata.read",
+    "media.probe.full",
+    "ffprobe",
+    "player.playback",
+    "timeline.paint",
+    "filmstrip.generate",
+    "wave.generate",
+    "application.db.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.dir-browser",
+    "qnc.module.scanner",
+    "qnc.module.source-reader",
+    "qnc.module.media-probe",
+    "qnc.module.ffprobe-metadata",
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.timeline",
+    "qnc.module.ui-widget"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "project_settings_policy": "read_only_via_work_settings",
+  "ui_policy": "no_form_or_paint_code",
+  "specification": "User 2026-10-23 (Ingest into blocks, step 1): the active project of an Ingest surface, its work plan and clip catalog loaded off the caller thread, the project database targets of the catalog and Select, the catalog statistics, the project folder and the order of the project applications. Every load reads the database again; a failure keeps nothing of the previous project."
+}

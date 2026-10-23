@@ -5486,3 +5486,13 @@ IN-a ili IN-a i OUT-a kreiramo subklip, neki zavrse kao segmenti, neki kao SubCl
 SubClip bez vlastitog OUT-a ide do kraja klipa (`qnc-timeline` `visible_source_marks`, vec tako). Taj kraj je granica iza
 zadnje slike, pa kocka `qnc-shot-stills` za OUT sliku na njoj uzima zadnju sliku klipa; frame bez slike javlja
 `stills.past_clip_end`. Test, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-23 (korisnik: "ingest treba razbiti na kocke"; "da, otkljucaj i kreni s korakom 1"; plan u 6 koraka:
+1 projekt, 2 preview, 3 Select, 4 uvoz, 5 posteri, 6 Ingest SubClip `qnc-ingest-parts`): korak 1. Nova javna kocka
+`crates/qnc-ingest-project` (+ ugovor `contracts/modules/ingest-project.module.json`): projekt na kojem Ingest radi -
+aktivni projekt iz baze, ucitavanje radnih postavki i kataloga izvan niti sucelja (`CatalogLoader`), ciljevi kataloga i
+Selecta u bazi projekta, statistika kataloga, mapa projekta i slijed aplikacija; stanje ucitavanja (`ProjectStatus`),
+`start` (provjera prikazanog projekta, odbija promjenu dok Select ili uvoz pisu), `poll` (kaze je li projekt drugi),
+`fail` (nista od prethodnog projekta ne ostaje). Nista nije izvor istine: svako ucitavanje ponovno cita bazu.
+`qnc-ingest-application` drzi samo `project` umjesto sedam polja i zove kocku (`settings.rs`, `state.rs`, `navigation.rs`,
+`thumbnails.rs`, `playback.rs`, `dir_confirm.rs`, `import_selected.rs`); ponasanje isto. C10 Ingest aplikacija 1354 -> 1265.
+Testovi `qnc-ingest-project` (2), `qnc-ingest-application` (31), conformance, release build. Uzivo nije provjereno.

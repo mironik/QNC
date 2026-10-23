@@ -6,9 +6,7 @@ impl IngestApplication {
     }
 
     pub fn work_plan(&self) -> Option<&IngestWorkPlan> {
-        self.work_plan
-            .as_ref()
-            .filter(|_| self.view.work_settings_ready)
+        self.project.plan()
     }
 
     pub fn footer_status(&self) -> &str {
@@ -27,7 +25,7 @@ impl IngestApplication {
         self.view.work_settings_loading
             || self.view.command_busy
             || self.view.browser.busy
-            || self.catalog_loader.is_busy()
+            || self.project.is_loading()
             || self.selection_writer.is_busy()
             || self.posters.has_pending_work()
             || self.selection_session.has_pending_work()

@@ -6,7 +6,7 @@ impl IngestApplication {
     /// copied and where is decided by the project settings in the work plan; the media is read
     /// through the transport of its source (local, LAN or intranet).
     pub(crate) fn start_import(&mut self) -> IngestDispatchResult {
-        let Some(plan) = &self.work_plan else {
+        let Some(plan) = self.project.plan() else {
             return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.settings_unavailable"));
         };
         let needs = qnc_import_fit::Needs::of(&plan.settings);
@@ -16,7 +16,7 @@ impl IngestApplication {
         if self.selection_writer.is_busy() {
             return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.import_running"));
         }
-        let Some(target) = self.catalog_target.clone() else {
+        let Some(target) = self.project.catalog_target().cloned() else {
             return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.catalog_unavailable"));
         };
         let writing = match needs {
@@ -48,7 +48,7 @@ impl IngestApplication {
     /// the selected clips and the project settings and does what the settings say.
     pub(crate) fn begin_import(&mut self) -> Result<(), String> {
         let root = self.root.clone().ok_or(qnc_ui_text::text("ingest.msg.import_no_root"))?;
-        let target = self.catalog_target.clone().ok_or(qnc_ui_text::text("ingest.msg.catalog_unavailable"))?;
+        let target = self.project.catalog_target().cloned().ok_or(qnc_ui_text::text("ingest.msg.catalog_unavailable"))?;
         self.worker.start(&root, &target)
     }
 }

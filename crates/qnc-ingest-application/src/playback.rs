@@ -21,7 +21,7 @@ impl IngestApplication {
         let assets = if preview.assets.clip_id == clip { preview.assets } else { SourceTimelineAssets::empty_for(&clip) };
         let posters = self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.thumb_image.as_deref()));
         self.view.timeline_assets = qnc_timeline_assets::with_clip_poster(assets, posters);
-        self.view.source_timeline = self.source_timeline.sync(self.view.preview_clip_id.as_deref(), self.catalog_target.as_ref()).clone();
+        self.view.source_timeline = self.source_timeline.sync(self.view.preview_clip_id.as_deref(), self.project.catalog_target()).clone();
     }
 
     pub(super) fn prepare_preview(&mut self, clip_id: String) -> IngestDispatchResult {
@@ -53,10 +53,10 @@ impl IngestApplication {
             return IngestDispatchResult::accepted(None, true);
         }
         let (Some(reader), Some(plan), Some(config), Some(content_target)) = (
-            self.settings_reader.clone(),
+            self.project.reader().cloned(),
             self.work_plan(),
             self.selection_config.clone(),
-            self.catalog_target.clone(),
+            self.project.catalog_target().cloned(),
         ) else {
             return IngestDispatchResult::accepted(None, true);
         };
