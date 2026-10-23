@@ -5481,3 +5481,8 @@ projekt pusta kroz katalog dekodera (`qnc-still-locator`, isto kao zoom reza; be
 `qnc-virtual-shots` kao prije, greska se upisuje kao razlog i u player log (`shot-stills`); nakon zapisa pool ponovno cita
 kadrove. `qnc-virtual-short-stills`: `captured`, `write_still_image`, `read_jpeg`. Ugovor `shot-stills.module.json`
 (dekodiranje kroz katalog dopusteno). C10 Story aplikacija 593 -> 588. Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-23 (korisnik: "svaki klip je virtualan, svaki ima globalni IN i OUT (pocetak i kraj); dodavanjem novog
+IN-a ili IN-a i OUT-a kreiramo subklip, neki zavrse kao segmenti, neki kao SubClip u SubClip tabu, a neki u B-roll"):
+SubClip bez vlastitog OUT-a ide do kraja klipa (`qnc-timeline` `visible_source_marks`, vec tako). Taj kraj je granica iza
+zadnje slike, pa kocka `qnc-shot-stills` za OUT sliku na njoj uzima zadnju sliku klipa; frame bez slike javlja
+`stills.past_clip_end`. Test, conformance. Uzivo nije provjereno.

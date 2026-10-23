@@ -136,7 +136,13 @@ fn write(locator: Option<&StillLocator>, job: &Job) -> Result<Vec<String>, Strin
     for ((frame, captured), name) in job.pictures.iter().zip(["in.jpg", "out.jpg"]) {
         let picture = match captured {
             Some(picture) => picture.clone(),
-            None => decode(locator, &job.clip, *frame)?,
+            // The OUT of a SubClip without its own OUT is the end of the clip, the bound
+            // after its last picture (user 2026-10-23: every clip is virtual, its IN and OUT
+            // are its start and end): that still is the last picture.
+            None => decode(locator, &job.clip, *frame).or_else(|error| match frame.checked_sub(1) {
+                Some(last) if name == "out.jpg" => decode(locator, &job.clip, last),
+                _ => Err(error),
+            })?,
         };
         qnc_virtual_short_stills::write_still_image(&picture, &dir.join(name))?;
         uris.push(format!("{}/{}/{name}", uri.trim_end_matches('/'), job.shot));
@@ -162,7 +168,8 @@ fn decode(locator: Option<&StillLocator>, clip: &str, frame: u64) -> Result<Rgba
         std::fs::create_dir_all(&scratch).map_err(|error| error.to_string())?;
         let cancel = AtomicBool::new(false);
         extractor.extract_run_with_cancel(&place.file, seek, 1, [STILL_WIDTH, STILL_HEIGHT], &scratch, &cancel)?;
-        let bytes = std::fs::read(scratch.join("000.jpg")).map_err(|error| error.to_string())?;
+        // No picture is written at or past the end of the media.
+        let bytes = std::fs::read(scratch.join("000.jpg")).map_err(|_| qnc_ui_text::text("stills.past_clip_end").to_string())?;
         qnc_virtual_short_stills::read_jpeg(&bytes)
     })();
     let _ = std::fs::remove_dir_all(&scratch);
@@ -204,6 +211,7 @@ mod tests {
         let picture = RgbaImage::from_pixel(4, 2, qnc_virtual_short_stills::image_pixel([0, 0, 0, 255]));
         // The OUT at the end of the clip was never on the monitor and no clip is open here.
         let error = write(None, &job(dir.path(), vec![(10, Some(picture)), (500, None)], Some(500))).unwrap_err();
-        assert!(error.contains("500"), "{error}");
+        // The OUT at the clip end falls back to its last picture, which is tried too.
+        assert!(error.contains("499"), "{error}");
     }
 }
