@@ -7,7 +7,7 @@
 //! placeholder; nothing is invented and nothing is written.
 
 use qnc_image_assets::RgbaImage;
-use qnc_media_thumbnail::{ProjectFolder, ThumbnailBatchService, ThumbnailEvent, ThumbnailRequest};
+use qnc_media_thumbnail::{LoadedThumbnail, ProjectFolder, ThumbnailBatchService, ThumbnailEvent, ThumbnailRequest};
 use qnc_source_reader::SourceReader;
 use std::{
     collections::HashSet,
@@ -174,6 +174,27 @@ impl ClipPosters {
 
     pub fn has_pending_work(&self) -> bool {
         self.service.has_pending_work()
+    }
+
+    /// Asks for the posters `items` still lack (an address and no picture); `chosen` first.
+    pub fn request_missing<T: LoadedThumbnail>(&mut self, items: &[T], chosen: Option<&str>) {
+        self.request(qnc_media_thumbnail::missing(items), chosen);
+    }
+
+    /// The pictures that arrived, put on their items; those of no item are returned.
+    pub fn poll_into<T: LoadedThumbnail>(&mut self, items: &mut [T]) -> (bool, Vec<Poster>) {
+        let mut changed = false;
+        let mut others = Vec::new();
+        for poster in self.poll() {
+            match items.iter_mut().find(|item| item.item_id() == poster.clip_id) {
+                Some(item) => {
+                    item.set_thumbnail_ready(poster.image);
+                    changed = true;
+                }
+                None => others.push(poster),
+            }
+        }
+        (changed, others)
     }
 }
 
@@ -358,5 +379,16 @@ mod missing_tests {
         assert!(!posters.missing_due(false));
         posters.watch = Some((Instant::now() - WATCH_FOR - WATCH_EVERY, Instant::now() - WATCH_EVERY));
         assert!(!posters.missing_due(true), "it gives up after three minutes");
+    }
+
+    #[test]
+    fn the_posters_items_lack_are_asked_for_and_a_poll_without_pictures_changes_nothing() {
+        let row = |id: &str, uri: Option<&str>| qnc_clip_row::ClipRow { clip_id: id.into(), thumb_uri: uri.map(Into::into), ..Default::default() };
+        let mut items = vec![row("a", Some("qnc://local/source/s/file/a.jpg")), row("b", None)];
+        let mut posters = ClipPosters::new();
+        posters.request_missing(&items, Some("a"));
+        assert_eq!(posters.wanted, [("a".to_string(), "qnc://local/source/s/file/a.jpg".to_string())], "only an item with an address");
+        let (changed, others) = posters.poll_into(&mut items);
+        assert!(!changed && others.is_empty());
     }
 }

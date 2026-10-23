@@ -10,4 +10,5 @@ qnc-media-thumbnail = { workspace = true }
 qnc-source-reader = { workspace = true }
 
 [dev-dependencies]
+qnc-clip-row = { workspace = true }
 tempfile = "3"

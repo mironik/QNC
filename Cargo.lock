@@ -3277,6 +3277,7 @@ dependencies = [
 name = "qnc-clip-posters"
 version = "0.1.0"
 dependencies = [
+ "qnc-clip-row",
  "qnc-image-assets",
  "qnc-media-thumbnail",
  "qnc-source-reader",

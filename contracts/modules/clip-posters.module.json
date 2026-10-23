@@ -3,7 +3,7 @@
   "module_name": "Clip posters",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["clip.posters"],
+  "capabilities": ["clip.posters", "clip.posters.request-missing", "clip.posters.apply"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "supported_os": ["windows", "linux", "macos"],

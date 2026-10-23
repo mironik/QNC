@@ -5524,3 +5524,10 @@ sucelja; klipovi na putu daju izbor), zatim se budi pozadinska aplikacija (`Impo
 zadaju svoje budenje kroz `with_wake`); ovisnosti `qnc-import-fit` i `qnc-ingest-import-worker` vise nisu u aplikaciji.
 C10 Ingest aplikacija 1204 -> 1162. Testovi `qnc-ingest-import-run` (1), `qnc-ingest-application` (31), conformance,
 release build. Uzivo nije provjereno.
+Izvedeno 2026-10-23 (korisnik: "da, kreni s korakom 5"; Ingest u kocke): korak 5. Posteri vec imaju svoju kocku
+`qnc-clip-posters`; ono sto su Ingest i Story/MA aplikacija svaka pisala sama (popis postera koji nedostaju i stavljanje
+stiglih slika na klipove) sada je u njoj jednom: `request_missing` (klipovi s adresom postera i bez slike, odabrani prvi) i
+`poll_into` (stigle slike na svoje klipove; one bez klipa, npr. shortovi u Storyju, vracaju se pozivatelju). Ugovor modula:
+nove sposobnosti. Ingest i Story/MA aplikacija samo pozivaju kocku. C10 Ingest aplikacija 1162 -> 1142, Story/MA aplikacija
+588 -> 573. Testovi `qnc-clip-posters` (8, novi test), `qnc-ingest-application` (31), `qnc-editorial-application` (11),
+conformance, release build. Uzivo nije provjereno.

@@ -187,19 +187,10 @@ impl EditorialApplication {
         if qnc_dev_diagnostics::timed_block("poll-preview", || self.preview.poll_pointed(pointed)) {
             changed = true;
         }
-        for poster in self.posters.poll() {
-            let clips = &mut self.view.clips;
-            changed |= match clips.iter_mut().find(|clip| clip.clip_id == poster.clip_id) {
-                Some(clip) => {
-                    clip.thumb_image = Some(poster.image);
-                    true
-                }
-                None => qnc_virtual_short_cards::apply_poster(
-                    &mut self.view.shorts,
-                    &poster.clip_id,
-                    poster.image,
-                ),
-            };
+        let (applied, others) = self.posters.poll_into(&mut self.view.clips);
+        changed |= applied;
+        for poster in others {
+            changed |= qnc_virtual_short_cards::apply_poster(&mut self.view.shorts, &poster.clip_id, poster.image);
         }
         if self.short_stills.take_published() { self.reload_shorts() } // a poster was written
         changed |= self.pool_shots.take().map(|rows| self.apply_shorts(rows)).is_some();
@@ -336,13 +327,7 @@ impl EditorialApplication {
 
     /// Asks for the posters the list still lacks; the chosen clip goes first (v5 order).
     fn request_posters(&mut self) {
-        let mut wanted: Vec<(String, String)> = self
-            .view
-            .clips
-            .iter()
-            .filter(|clip| clip.thumb_image.is_none())
-            .filter_map(|clip| Some((clip.clip_id.clone(), clip.thumb_uri.clone()?)))
-            .collect();
+        let mut wanted = qnc_media_thumbnail::missing(&self.view.clips);
         wanted.extend(qnc_virtual_short_cards::poster_requests(&self.view.shorts));
         self.posters.request(wanted, self.view.chosen_clip_id());
     }

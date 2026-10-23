@@ -2,14 +2,7 @@ use super::*;
 
 impl IngestApplication {
     pub fn request_missing_thumbnails(&mut self) {
-        let clips = self
-            .view
-            .clips
-            .iter()
-            .filter(|clip| clip.thumb_image.is_none())
-            .filter_map(|clip| Some((clip.clip_id.clone(), clip.thumb_uri.clone()?)))
-            .collect::<Vec<_>>();
-        self.start_thumbnail_load(clips);
+        self.start_thumbnail_load(qnc_media_thumbnail::missing(&self.view.clips));
     }
 
     pub(crate) fn start_thumbnail_load(&mut self, clips: Vec<(String, String)>) {
@@ -39,19 +32,6 @@ impl IngestApplication {
         if self.posters.missing_due(self.view.clips.iter().any(|clip| clip.thumb_uri.is_none())) {
             let _ = self.refresh_active_project();
         }
-        let mut changed = false;
-        for poster in self.posters.poll() {
-            if let Some(clip) = self
-                .view
-                .clips
-                .iter_mut()
-                .find(|clip| clip.clip_id == poster.clip_id)
-            {
-                clip.thumb_image = Some(poster.image);
-                clip.thumb_status = ThumbStatus::Ready;
-                changed = true;
-            }
-        }
-        changed
+        self.posters.poll_into(&mut self.view.clips).0
     }
 }
