@@ -3985,7 +3985,6 @@ dependencies = [
  "qnc-image-assets",
  "qnc-ingest-select",
  "qnc-ingest-store",
- "qnc-pending-marks",
  "qnc-player-client",
  "qnc-player-input",
  "qnc-player-timeline",

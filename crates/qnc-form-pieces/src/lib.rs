@@ -42,8 +42,6 @@ pub struct Answer {
     pub message: Option<String>,
     /// The action was refused (its message says why).
     pub refused: bool,
-    /// The preview opens this clip with these IN/OUT.
-    pub open: Option<(String, (u64, u64))>,
 }
 
 impl Answer {
@@ -52,7 +50,7 @@ impl Answer {
     }
 
     pub fn refused(message: impl Into<String>) -> Self {
-        Self { changed: true, message: Some(message.into()), refused: true, open: None }
+        Self { changed: true, message: Some(message.into()), refused: true }
     }
 
     pub fn said(message: impl Into<String>) -> Self {
@@ -63,7 +61,6 @@ impl Answer {
         self.changed |= other.changed;
         self.refused |= other.refused;
         self.message = other.message.or(self.message.take());
-        self.open = other.open.or(self.open.take());
     }
 }
 

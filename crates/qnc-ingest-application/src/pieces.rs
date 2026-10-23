@@ -31,10 +31,6 @@ impl IngestApplication {
 
     fn answered(&mut self, answer: Answer) -> IngestDispatchResult {
         self.view.pool_rows = self.pieces.rows(self.view.pool_tab.as_deref(), &self.view.clips);
-        if let Some((clip_id, marks)) = answer.open {
-            self.preview.mark(&clip_id, marks);
-            return self.prepare_preview(clip_id);
-        }
         match answer.message {
             Some(message) if answer.refused => self.refuse_shown(message),
             Some(message) => {
