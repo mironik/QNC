@@ -42,7 +42,7 @@ impl IngestApplication {
     /// The sources of this computer read again (a disk attached since is one) and their
     /// browser; the reason when they cannot be read.
     pub(crate) fn refresh_sources(&mut self) -> Option<qnc_source_browse::TransportBrowserSession> {
-        let loaded = self.project.selection_config(self.root.as_ref()?).and_then(|config| Ok((config.browser()?, config)));
+        let loaded = selection_config::SelectionConfig::load(self.root.as_ref()?).and_then(|config| Ok((config.browser()?, config)));
         let (browser, config) = loaded.map_err(|error| self.selection_config_error = Some(error.to_string())).ok()?;
         (self.selection_config, self.selection_config_error) = (Some(config), None);
         Some(browser)

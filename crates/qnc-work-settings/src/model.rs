@@ -99,9 +99,6 @@ pub struct ProductLocations {
     /// The prerender of the story (user 2026-10-12); a project made before it has none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prerender: Option<String>,
-    /// The card of the Ingest SubClip parts (user 2026-10-23); a project made before it has none.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub subclips: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -219,11 +216,6 @@ impl WorkSettings {
                     .and_then(|products| products.get("prerender"))
                     .map(|_| required_text(saved.get("products").ok_or_else(incomplete)?, "prerender"))
                     .transpose()?,
-                subclips: saved
-                    .get("products")
-                    .and_then(|products| products.get("subclips"))
-                    .map(|_| required_text(saved.get("products").ok_or_else(incomplete)?, "subclips"))
-                    .transpose()?,
             },
             input: object(&saved, "input")?,
             playback: object(&saved, "playback")?,
@@ -271,9 +263,6 @@ impl WorkSettings {
         }
         for value in self.products.all_relative_paths() {
             validate_relative_product_path(value)?;
-        }
-        if let Some(subclips) = &self.products.subclips {
-            validate_relative_product_path(subclips)?;
         }
         if let Some(prerender) = &self.products.prerender {
             validate_relative_product_path(prerender)?;
@@ -335,15 +324,6 @@ impl WorkSettings {
             project_dir.join(relative),
             format!("{}/{}", self.output_root_uri.trim_end_matches('/'), relative.trim_matches('/')),
         ))
-    }
-
-    /// The folder of the Ingest SubClip parts card in the project folder, and its path from
-    /// the project folder; a project made before it has none (a controlled error, no default).
-    pub fn subclips_location(&self, project_dir: &Path) -> Result<(PathBuf, String), ReadError> {
-        let relative = self.products.subclips.as_deref().ok_or_else(|| {
-            ReadError::new("products_subclips", "The project has no SubClip folder (products.subclips); open it once in Project.")
-        })?;
-        Ok((project_dir.join(relative), relative.trim_matches('/').to_string()))
     }
 
     /// The project folder as a media source: media copied into the project (an imported

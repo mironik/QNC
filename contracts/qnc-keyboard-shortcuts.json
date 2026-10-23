@@ -292,12 +292,6 @@
     "ingest_import_cancel": {
       "label": "Uvezi: odustani"
     },
-    "ingest_tab_virtual": {
-      "label": "Ingest pool: tab Virtual"
-    },
-    "ingest_subclip_delete": {
-      "label": "Ingest: obrisi odabrani SubClip (dio klipa koji se uvozi)"
-    },
     "toggle_focused_item": {
       "label": "Kvacica na kartici u fokusu (dodaj ili makni iz izbora)"
     },
@@ -459,8 +453,6 @@
         ]
       },
       "ingest": {
-        "save_virtual_shot": [{ "code": "KeyS", "shift": true, "ctrl": false }],
-        "ingest_subclip_delete": [{ "key": "Delete", "ctrl": false }],
         "select_audio_a1": [{ "code": "Digit1", "ctrl": true, "shift": false }],
         "select_audio_a2": [{ "code": "Digit2", "ctrl": true, "shift": false }],
         "lane_level_down": [{ "code": "ArrowLeft", "key": "ArrowLeft", "ctrl": true, "shift": false }],
@@ -517,9 +509,6 @@
         ],
         "ingest_tab_all": [
           { "code": "KeyA", "alt": true }
-        ],
-        "ingest_tab_virtual": [
-          { "code": "KeyS", "alt": true }
         ],
         "ingest_source_kind_local": [
           { "code": "Digit1", "alt": true }

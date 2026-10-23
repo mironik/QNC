@@ -3696,8 +3696,6 @@ version = "0.1.0"
 dependencies = [
  "qnc-clip-row",
  "qnc-db-broker",
- "qnc-still-locator",
- "serde",
 ]
 
 [[package]]
@@ -3933,31 +3931,19 @@ dependencies = [
  "qnc-camera-profiles",
  "qnc-content-read",
  "qnc-contracts",
- "qnc-db-broker",
- "qnc-decoder-catalog",
- "qnc-dev-diagnostics",
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-filmstrip",
- "qnc-frame-timebase",
  "qnc-import-fit",
- "qnc-ingest-cameras",
- "qnc-ingest-parts",
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-metadata",
  "qnc-media-optimize",
  "qnc-media-probe",
- "qnc-media-records",
  "qnc-media-stream",
  "qnc-missing-posters",
- "qnc-mp4-cut",
- "qnc-mxf-cut",
- "qnc-mxf-index",
  "qnc-playback-activity",
- "qnc-poster-create",
- "qnc-sony-card-write",
  "qnc-sony-metadata",
  "qnc-source-reader",
  "qnc-source-timecode",
@@ -3983,29 +3969,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "qnc-ingest-parts"
-version = "0.1.0"
-dependencies = [
- "qnc-clip-row",
- "qnc-content-read",
- "qnc-db-broker",
- "qnc-form-pieces",
- "qnc-image-assets",
- "qnc-shot-stills",
- "qnc-still-locator",
- "qnc-ui-text",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
 name = "qnc-ingest-pieces"
 version = "0.1.0"
 dependencies = [
  "qnc-form-pieces",
- "qnc-ingest-parts",
  "qnc-pool-marks",
 ]
 
@@ -4521,23 +4488,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "qnc-mp4-cut"
-version = "0.1.0"
-dependencies = [
- "qnc-ui-text",
-]
-
-[[package]]
 name = "qnc-mp4-sound"
 version = "0.1.0"
-
-[[package]]
-name = "qnc-mxf-cut"
-version = "0.1.0"
-dependencies = [
- "qnc-mxf-index",
- "qnc-ui-text",
-]
 
 [[package]]
 name = "qnc-mxf-index"
@@ -5252,14 +5204,6 @@ dependencies = [
  "qnc-virtual-short-stills",
  "qnc-virtual-shots",
  "qnc-work-settings",
- "tempfile",
-]
-
-[[package]]
-name = "qnc-sony-card-write"
-version = "0.1.0"
-dependencies = [
- "qnc-ui-text",
  "tempfile",
 ]
 

@@ -85,7 +85,7 @@ pub(super) fn pool(ui: &mut Ui, contracts: &IngestContracts, theme: &Theme, view
         _ if view.work_settings_loading => &grid.loading_settings_message,
         _ if view.clip_filter == ClipFilter::New => &grid.empty_new_message,
         _ if view.command_busy || view.selected_source_uri.is_some() => &view.message,
-        _ => view.pool_empty(&grid.empty_message),
+        _ => &grid.empty_message,
     });
     let now = qnc_media_pool_panel::PoolNow {
         chosen_id: view.preview_clip_id.as_deref().unwrap_or(""),

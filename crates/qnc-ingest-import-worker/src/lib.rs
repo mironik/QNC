@@ -16,13 +16,12 @@
 //! With the media the poster is copied too. Not done here: proxy generation (transcode).
 
 mod config;
-mod parts;
 mod optimize;
 
 pub use config::ConfigMediaOpener;
 mod process;
 
-pub use process::{parts_waiting, ImportRun, 
+pub use process::{ImportRun, 
     launch_worker, run_import, run_service, ImportSummary, WORKER_EXECUTABLE,
 };
 
@@ -71,14 +70,6 @@ pub trait ImportQueue {
     /// Tells the queue this clip is still being imported (renews its lease).
     fn heartbeat(&mut self, _clip_id: &str) -> Result<(), String> {
         Ok(())
-    }
-    /// The parts marked for this clip (Ingest SubClip); none: the clip is imported whole.
-    fn parts(&mut self, _clip_id: &str) -> Result<Vec<qnc_ingest_parts::Part>, String> {
-        Ok(Vec::new())
-    }
-    /// A claimed clip with parts is not imported whole: its parts come from their own card.
-    fn finish_as_parts(&mut self, _clip_id: String) -> Result<(), String> {
-        Err(qnc_ui_text::text("db.import_result_missing").into())
     }
     fn finish_import(
         &mut self,
@@ -153,11 +144,6 @@ pub fn action_for(clip: &StoredClip, plan: &IngestWorkPlan) -> Result<Action, St
     let original = binding.original_uri.clone();
     let proxy = binding.proxy_uri.clone();
     match plan.media {
-        // Media already in the project folder (the card of the Ingest SubClip parts) is linked
-        // where it is, whatever the project copies from cards.
-        _ if plan.settings.project_media_source_uri().is_ok_and(|project| original.starts_with(&format!("{project}/"))) => {
-            Ok(Action::Link { media_uri: original })
-        }
         IngestMedia::Link => {
             let media_uri = match plan.playback_input {
                 PlaybackInput::Original => original,
@@ -399,12 +385,6 @@ pub fn run_next(
         return Ok(None);
     };
     let clip_id = clip.clip.id().to_string();
-    // A clip with parts is not imported whole (Ingest SubClip): its parts come in from
-    // their own card, cut before the queue is taken.
-    if !queue.parts(&clip_id)?.is_empty() {
-        queue.finish_as_parts(clip_id.clone())?;
-        return Ok(Some(Outcome { clip_id, result: Ok(String::new()), thumbnail_uri: None }));
-    }
     let imported = import_media(&clip, plan, project_dir, opener, cancel, &mut || {
         let _ = queue.heartbeat(&clip_id);
     });
@@ -461,8 +441,6 @@ mod tests;
 pub struct TransportQueue {
     transport: qnc_ingest_store::content::ContentWriteTransport,
     sequence: u64,
-    /// The project database whose Ingest SubClip parts the import reads.
-    parts: Option<qnc_db_broker::ProjectDbTarget>,
 }
 
 impl TransportQueue {
@@ -480,14 +458,7 @@ impl TransportQueue {
             transport: qnc_ingest_store::content::ContentWriteTransport::start_leased(target, lease)
                 .map_err(|e| e.to_string())?,
             sequence: 0,
-            parts: None,
         })
-    }
-
-    /// The queue reads the parts of each clip it takes from this project database.
-    pub fn with_parts(mut self, target: qnc_db_broker::ProjectDbTarget) -> Self {
-        self.parts = Some(target);
-        self
     }
 
     fn next_key(&mut self, what: &str) -> String {
@@ -518,13 +489,6 @@ impl TransportQueue {
         self.wait(&key).map(|_| ())
     }
 
-    /// Ticks the clips (the clips of a parts card Select has just recorded).
-    pub fn select(&mut self, clip_ids: Vec<String>) -> Result<(), String> {
-        let key = self.next_key("select");
-        self.transport.select(key.clone(), clip_ids, true).map_err(|e| e.to_string())?;
-        self.wait(&key).map(|_| ())
-    }
-
     /// Puts the selected, ready clips into the queue.
     pub fn queue_selected(&mut self, needs: qnc_import_fit::Needs) -> Result<(), String> {
         let key = self.next_key("queue");
@@ -536,19 +500,6 @@ impl TransportQueue {
 }
 
 impl ImportQueue for TransportQueue {
-    fn parts(&mut self, clip_id: &str) -> Result<Vec<qnc_ingest_parts::Part>, String> {
-        match &self.parts {
-            Some(target) => qnc_ingest_parts::read_parts(target, clip_id),
-            None => Ok(Vec::new()),
-        }
-    }
-
-    fn finish_as_parts(&mut self, clip_id: String) -> Result<(), String> {
-        let key = self.next_key("parts");
-        self.transport.finish_as_parts(key.clone(), clip_id).map_err(|e| e.to_string())?;
-        self.wait(&key).map(|_| ())
-    }
-
     fn heartbeat(&mut self, clip_id: &str) -> Result<(), String> {
         let key = self.next_key("beat");
         self.transport

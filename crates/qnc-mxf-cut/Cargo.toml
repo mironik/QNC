@@ -1,9 +1,0 @@
-[package]
-name = "qnc-mxf-cut"
-version = "0.1.0"
-edition = "2021"
-description = "QNC public piece: a part of a frame-wrapped MXF original written as an MXF of the same kind (bytes of the original, from an intra picture, new index, durations and start timecode); nothing decoded"
-
-[dependencies]
-qnc-ui-text = { workspace = true }
-qnc-mxf-index = { workspace = true }

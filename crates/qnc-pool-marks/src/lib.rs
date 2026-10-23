@@ -53,7 +53,7 @@ mod tests {
         let row = |id: &str, seen| ClipRow { clip_id: id.into(), previously_seen: seen, ..Default::default() };
         let (mut clips, mut tab) = (vec![row("a", false), row("b", true)], None);
         let mut marks = MARKS;
-        let mut now = Now { clips: &mut clips, tab: &mut tab, only_new: true, chosen: None, marks: None, project: None, stills: None };
+        let mut now = Now { clips: &mut clips, tab: &mut tab, only_new: true, chosen: None, marks: None, project: None };
         assert!(marks.act("toggle", Some("b"), &mut now).is_some_and(|answer| !answer.refused));
         assert!(marks.act("toggle", Some("x"), &mut now).is_some_and(|answer| answer.refused));
         marks.act("all", None, &mut now);

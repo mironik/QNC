@@ -37,11 +37,9 @@
       "ingest_dir_cancel"
     ],
     "pool_tabs": [
-      "ingest_tab_all",
-      "ingest_tab_virtual"
+      "ingest_tab_all"
     ],
     "source_buttons": [
-      "save_virtual_shot",
       "ingest_clear_selection",
       "ingest_select_all",
       "ingest_import_selected"
@@ -102,13 +100,10 @@
       {
         "label": "@pool.tab.all",
         "action_id": "ingest_tab_all"
-      },
-      {
-        "label": "@pool.tab.subclip",
-        "action_id": "ingest_tab_virtual"
       }
     ],
     "hidden_tabs": [
+      "@pool.tab.subclip",
       "@pool.tab.broll",
       "@pool.tab.segment"
     ],
@@ -193,10 +188,6 @@
       {
         "label": "@ingest.import",
         "action_id": "ingest_import_selected"
-      },
-      {
-        "label": "@ingest.add_subclip",
-        "action_id": "save_virtual_shot"
       },
       "@ingest.filter"
     ],

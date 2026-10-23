@@ -150,12 +150,6 @@ fn write(locator: Option<&StillLocator>, job: &Job) -> Result<Vec<String>, Strin
     Ok(uris)
 }
 
-/// One exact frame of a clip at still size, decoded as the stills of a shot are (an Ingest
-/// SubClip part shows the picture at its IN, user 2026-10-23).
-pub fn decode_still(locator: &StillLocator, clip: &str, frame: u64) -> Result<RgbaImage, String> {
-    decode(Some(locator), clip, frame)
-}
-
 /// One exact frame of the clip from the media the project plays, through the decoder
 /// catalog; no probe, nothing written but a scratch file of the system that is removed.
 fn decode(locator: Option<&StillLocator>, clip: &str, frame: u64) -> Result<RgbaImage, String> {

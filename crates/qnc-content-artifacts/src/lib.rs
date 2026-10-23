@@ -554,11 +554,7 @@ impl ProjectArtifacts {
         content_target: ContentTarget,
     ) -> Result<(), String> {
         self.configure_assets(reader, settings)?;
-        let mut source_bindings = self.source_bindings()?;
-        // The project folder is a source too: media the import made there (an Ingest SubClip
-        // part is an original of its own there) is read through it, as the preview does.
-        let project = reader.local_workspace_dir(settings).ok().flatten().zip(settings.project_media_source_uri().ok());
-        source_bindings.extend(project.map(|(dir, uri)| SourceBinding { uri, file: Some(dir), endpoint: None, token_env: None }));
+        let source_bindings = self.source_bindings()?;
         if source_bindings.is_empty() {
             self.artifacts.reset();
             return Ok(());

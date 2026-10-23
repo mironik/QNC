@@ -60,13 +60,9 @@ members = [
     "crates/qnc-ingest-project",
     "crates/qnc-ingest-select-run",
     "crates/qnc-ingest-import-run",
-    "crates/qnc-ingest-parts",
     "crates/qnc-form-pieces",
     "crates/qnc-pool-marks",
     "crates/qnc-ingest-pieces",
-    "crates/qnc-mxf-cut",
-    "crates/qnc-mp4-cut",
-    "crates/qnc-sony-card-write",
     "crates/qnc-ingest-clip-list",
     "crates/qnc-ingest-select",
     "crates/qnc-media-thumbnail",
@@ -286,13 +282,9 @@ qnc-ingest-catalog = { path = "crates/qnc-ingest-catalog" }
 qnc-ingest-project = { path = "crates/qnc-ingest-project" }
 qnc-ingest-select-run = { path = "crates/qnc-ingest-select-run" }
 qnc-ingest-import-run = { path = "crates/qnc-ingest-import-run" }
-qnc-ingest-parts = { path = "crates/qnc-ingest-parts" }
 qnc-form-pieces = { path = "crates/qnc-form-pieces" }
 qnc-pool-marks = { path = "crates/qnc-pool-marks" }
 qnc-ingest-pieces = { path = "crates/qnc-ingest-pieces" }
-qnc-mxf-cut = { path = "crates/qnc-mxf-cut" }
-qnc-mp4-cut = { path = "crates/qnc-mp4-cut" }
-qnc-sony-card-write = { path = "crates/qnc-sony-card-write" }
 qnc-ingest-clip-list = { path = "crates/qnc-ingest-clip-list" }
 qnc-ingest-import-worker = { path = "crates/qnc-ingest-import-worker" }
 qnc-ingest-select = { path = "crates/qnc-ingest-select" }

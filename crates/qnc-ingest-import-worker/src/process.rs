@@ -51,13 +51,12 @@ impl Project {
             .map_err(|e| e.to_string())?
             .ok_or(qnc_ui_text::text("import.import_needs_local_access_project_folder"))?;
         // Link needs no source; a copy from an unconfigured source fails per clip.
-        let sources = SelectionConfig::for_project(root, reader, &plan.settings)
+        let sources = SelectionConfig::load(root)
             .map(|config| config.sources)
             .unwrap_or_default();
         Ok(Self {
             dir,
-            queue: TransportQueue::start_leased(target.clone(), lease)?
-                .with_parts(qnc_db_broker::ProjectDbTarget::for_project(reader, &plan.settings)?),
+            queue: TransportQueue::start_leased(target.clone(), lease)?,
             opener: ConfigMediaOpener::new(
                 sources,
                 qnc_playback_activity::playback_pause(target.clone()),
@@ -117,17 +116,6 @@ impl ImportQueue for RunQueue<'_, '_> {
         self.queue.heartbeat(clip_id)
     }
 
-    fn parts(&mut self, clip_id: &str) -> Result<Vec<qnc_ingest_parts::Part>, String> {
-        self.queue.parts(clip_id)
-    }
-
-    fn finish_as_parts(&mut self, clip_id: String) -> Result<(), String> {
-        if !self.run.allowed() {
-            return Err(qnc_ui_text::text("import.lease_lost").into());
-        }
-        self.queue.finish_as_parts(clip_id)
-    }
-
     fn finish_import(
         &mut self,
         clip_id: String,
@@ -146,14 +134,6 @@ impl ImportQueue for RunQueue<'_, '_> {
 
 /// The import of one Uvezi under the lease the caller holds (the background application
 /// also builds the artifacts under it), for the project the lease was taken for only.
-/// Whether Ingest SubClip parts of the active project wait to be cut.
-pub fn parts_waiting(root: &Path) -> Result<bool, String> {
-    let active_project = ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
-    let snapshot = active_project.read().map_err(|e| e.to_string())?;
-    let target = qnc_db_broker::ProjectDbTarget::for_project(active_project.settings_reader(), &snapshot.settings)?;
-    Ok(!qnc_ingest_parts::read_uncut(&target)?.is_empty())
-}
-
 pub fn run_import(root: &Path, run: &ImportRun<'_>) -> Result<ImportSummary, String> {
     let active_project = ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
     let snapshot = active_project.read().map_err(|e| e.to_string())?;
@@ -168,11 +148,6 @@ pub fn run_import(root: &Path, run: &ImportRun<'_>) -> Result<ImportSummary, Str
         failed: 0,
     };
     let mut project = Project::open(root, &reader, &plan, &target, Some(run.lease.write_lease()))?;
-    // The Ingest SubClip parts first: cut onto their card, selected and queued like a card.
-    if let Err(error) = crate::parts::bring_in(root, &reader, &plan, &project.dir, &project.opener, &target, &mut project.queue, Some(run.lease.write_lease()), run.cancel) {
-        eprintln!("dijelovi nisu uvezeni: {error}");
-        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("ingest-part failed error={error}"));
-    }
     let outcome = loop {
         let mut queue = RunQueue { queue: &mut project.queue, run };
         match run_next(&mut queue, &plan, &project.dir, &project.opener, run.cancel) {

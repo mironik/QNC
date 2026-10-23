@@ -46,9 +46,6 @@ const PRODUCT_DIRECTORY_FIELDS: &[(&str, &str)] = &[
     ("b_roll_virtual_clips", "products/b_roll_virtual_clips"),
     // The prerender of the story in the delivery format (user 2026-10-12).
     ("prerender", "products/prerender"),
-    // The card of the Ingest SubClip parts, cut from the originals (user 2026-10-23: a
-    // folder of its own, so it never collides with originals copied into `original`).
-    ("subclips", "SubClip"),
 ];
 /// Product folders that are caches (user 2026-10-13): inside the protected project their
 /// files may be deleted and replaced (old prerender units go with their name); the

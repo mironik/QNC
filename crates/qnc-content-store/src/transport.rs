@@ -259,10 +259,6 @@ impl ContentClient {
     pub fn set_poster(&mut self, clip_id: String, thumbnail_uri: String) -> Result<()> {
         self.execute(Operation::SetPoster { clip_id, thumbnail_uri }).map(|_| ())
     }
-    /// A claimed clip with parts is not imported whole (Ingest SubClip).
-    pub fn finish_as_parts(&mut self, clip_id: String) -> Result<()> {
-        self.execute(Operation::FinishAsParts { clip_id }).map(|_| ())
-    }
     pub fn finish_import(
         &mut self,
         clip_id: String,
@@ -435,11 +431,6 @@ impl ContentWriteTransport {
     }
 
     /// Records the outcome of one import: the imported media URI or an error.
-    /// A claimed clip with parts is not imported whole (Ingest SubClip).
-    pub fn finish_as_parts(&mut self, key: String, clip_id: String) -> Result<()> {
-        self.send_operation(key, Operation::FinishAsParts { clip_id })
-    }
-
     pub fn finish_import(
         &mut self,
         key: String,
@@ -601,10 +592,6 @@ fn execute_write_command(
         }
         Operation::SetPoster { clip_id, thumbnail_uri } => {
             client.set_poster(clip_id, thumbnail_uri)?;
-            Ok(ContentWriteData::Changed)
-        }
-        Operation::FinishAsParts { clip_id } => {
-            client.finish_as_parts(clip_id)?;
             Ok(ContentWriteData::Changed)
         }
         _ => Err("Nepodrzana content write transport operacija.".into()),

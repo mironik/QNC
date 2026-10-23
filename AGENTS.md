@@ -5602,3 +5602,13 @@ cijelog klipa (pocetak klipa) i krivo trajanje (redak klipa u Ingestu nema broj 
 iz spremljene brzine klipa (`qnc-content-read::clip_timing_on`), a slika kartice neizrezanog dijela je slika s njegova IN-a,
 dekodirana u pozadini kao slike SubClipa u Storyju (`qnc-shot-stills::decode_still`; `qnc-form-pieces` `Now.stills`).
 Testovi, conformance, release build. Uzivo nije provjereno.
+Napusteno 2026-10-23 (korisnik: "ne cini mi se ovo elegantnim rjesenjem... napustio bi za sada ovu mogucnost SubClipa,
+iskljucio bi ga i iz tab prikaza u ingestu"): Ingest SubClip (dijelovi klipa koji se uvoze sami) je uklonjen iz aplikacije.
+Cijeli rad ostaje pod lokalnom git oznakom `subclip-parts-2026-10-23` (commit ec6f86c: `qnc-ingest-parts`, `qnc-mxf-cut`,
+`qnc-mp4-cut`, `qnc-sony-card-write`, kartica dijelova u `SubClip/`, `products.subclips`) i moze se vratiti. Vraceni su
+commitovi 0da0e6d, 532c651 i ec6f86c (njihovi zapisi u AGENTS.md ostaju kao povijest); iz koraka 6a uklonjeni su kocka
+`qnc-ingest-parts` i njezini ugovori, tab SubClip u Ingestu (u `hidden_tabs` rasporeda), dugme Add SubClip, Ingest prečaci
+Shift+S, Delete i Alt+S te akcije `ingest_tab_virtual` i `ingest_subclip_delete`. Ostaje opceniti prolaz forme kroz kocke
+(`qnc-form-pieces`, `qnc-pool-marks`, `qnc-ingest-pieces`) i koraci 1-5 podjele Ingesta. Projekti koji su u
+`products` vec dobili `subclips` i mapu `SubClip` zadrzavaju ih (podatak se ne cita). C10 Ingest aplikacija 1137 -> 1133.
+Testovi, conformance.

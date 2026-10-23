@@ -21,6 +21,6 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-ingest-pieces",
   "input": "Nothing: the list of the pieces of the Ingest form with the action ids of its catalog and layout contract.",
-  "output": "The pieces of Ingest in the order they are asked (pool marks, Ingest SubClip parts).",
+  "output": "The pieces of Ingest in the order they are asked (pool marks).",
   "specification": "AGENTS.md 2026-10-23: Ingest into blocks, step 6 (way B)."
 }

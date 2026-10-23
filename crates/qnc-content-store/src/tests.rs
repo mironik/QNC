@@ -1096,17 +1096,3 @@ fn a_write_under_a_lease_another_took_is_refused_and_writes_nothing() {
     let claimed = leased(&mut store, "b", Operation::ClaimNext).unwrap();
     assert!(matches!(claimed, Data::Claimed(Some(_))), "the clip stayed queued for the holder");
 }
-
-#[test]
-fn a_clip_with_parts_is_not_imported_whole() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("db");
-    let mut store = claimed_store(&path);
-    run(&mut store, Operation::FinishAsParts { clip_id: "c1".into() }).unwrap();
-    let db = Connection::open(&path).unwrap();
-    let status: (String, Option<String>, bool) = db
-        .query_row("SELECT import_status, imported_media_uri, selected FROM clips WHERE clip_id='c1'", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
-        .unwrap();
-    assert_eq!(status, ("detected".into(), None, false));
-    assert!(run(&mut store, Operation::FinishAsParts { clip_id: "c1".into() }).is_err(), "only a claimed clip");
-}

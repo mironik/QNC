@@ -2,9 +2,8 @@
 name = "qnc-ingest-pieces"
 version = "0.1.0"
 edition = "2021"
-description = "QNC public list: the pieces of the Ingest form in the order they are asked (pool marks, Ingest SubClip parts)"
+description = "QNC public list: the pieces of the Ingest form in the order they are asked (pool marks)"
 
 [dependencies]
 qnc-form-pieces = { workspace = true }
-qnc-ingest-parts = { workspace = true }
 qnc-pool-marks = { workspace = true }

@@ -136,23 +136,6 @@ impl ContentReader {
         rows.collect::<rusqlite::Result<Vec<String>>>().map_err(|error| error.to_string())
     }
 
-    /// The clips of source `source_uri` not imported yet whose names are `names` (the clips of
-    /// the Ingest SubClip parts card as Select recorded them).
-    pub fn not_imported_named(&self, source_uri: &str, names: &[String]) -> Result<Vec<String>, String> {
-        let conn = self.open()?;
-        if !has_view(&conn, "public_clips")? {
-            return Ok(Vec::new());
-        }
-        let mut statement = conn
-            .prepare("SELECT clip_id, name FROM public_clips WHERE source_uri = ?1 AND import_status IN ('detected', 'failed') ORDER BY clip_id LIMIT ?2")
-            .map_err(|error| error.to_string())?;
-        let rows = statement
-            .query_map(rusqlite::params![source_uri, MAX_CLIPS as i64], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
-            .map_err(|error| error.to_string())?;
-        let rows = rows.collect::<rusqlite::Result<Vec<_>>>().map_err(|error| error.to_string())?;
-        Ok(rows.into_iter().filter(|(_, name)| names.contains(name)).map(|(id, _)| id).collect())
-    }
-
     /// The poster each clip of the catalog has now (the card's, the project's or none),
     /// imported or not: what the poster block brings into the project right after Select
     /// (user 2026-10-18). Empty when the catalog keeps no posters.

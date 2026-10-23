@@ -518,21 +518,6 @@ impl ContentStore {
                 }
                 Ok(Data::Changed)
             }
-            Operation::FinishAsParts { clip_id } => {
-                let tx = qnc_write_lease::begin_write(&mut self.conn).map_err(err)?;
-                // The clip itself is not imported: nothing of an earlier import of it stays.
-                let sql = if self.has_copy_of {
-                    "UPDATE clips SET import_status='detected',import_error=NULL,selected=0,imported_media_uri=NULL,imported_copy_of=NULL,optimized_json=NULL WHERE clip_id=?1 AND import_status='processing'"
-                } else {
-                    "UPDATE clips SET import_status='detected',import_error=NULL,selected=0,imported_media_uri=NULL WHERE clip_id=?1 AND import_status='processing'"
-                };
-                let n = tx.execute(sql, params![clip_id]).map_err(err)?;
-                if n != 1 {
-                    return Err(qnc_ui_text::text("db.import_job_taken_already_finished").into());
-                }
-                tx.commit().map_err(err)?;
-                Ok(Data::Changed)
-            }
             Operation::FinishImport {
                 clip_id,
                 media_uri,

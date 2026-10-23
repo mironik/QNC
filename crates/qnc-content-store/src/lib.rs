@@ -240,13 +240,7 @@ pub enum Operation {
         optimized: Option<qnc_media_metadata::MediaRepresentation>,
         error: Option<String>,
     },
-    /// A claimed clip with parts (Ingest SubClip, user 2026-10-23) is not imported whole:
-    /// it goes back to detected and unticked; its parts come in from their own card.
-    FinishAsParts {
-        clip_id: String,
-    },
 }
-
 impl Operation {
     pub fn is_write(&self) -> bool {
         !matches!(

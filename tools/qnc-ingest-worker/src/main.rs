@@ -76,19 +76,17 @@ fn import_while(
     running: &std::sync::atomic::AtomicBool,
     closed: &std::sync::atomic::AtomicBool,
     run: &qnc_ingest_import_worker::ImportRun<'_>,
-) -> Result<usize, String> {
-    let mut imported = 0;
+) -> Result<(), String> {
     loop {
         if closed.load(std::sync::atomic::Ordering::Relaxed) {
-            return Ok(imported);
+            return Ok(());
         }
         let last = !running.load(std::sync::atomic::Ordering::Relaxed);
-        // Clips in the queue, or Ingest SubClip parts not cut yet (their clip may be imported already).
-        if import_waiting(root)? || qnc_ingest_import_worker::parts_waiting(root).unwrap_or(false) {
-            imported += qnc_ingest_import_worker::run_import(root, run)?.imported;
+        if import_waiting(root)? {
+            qnc_ingest_import_worker::run_import(root, run)?;
         }
         if last {
-            return Ok(imported);
+            return Ok(());
         }
         std::thread::sleep(Duration::from_secs(1));
     }
@@ -116,7 +114,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
     // v5 media probe job: a card record gets what playback lacks, once, in the
     // background, so a preview of a clip not yet imported plays. Beside the artifacts
     // only the clip a preview wants; the others after them, several at once.
-    let config = qnc_ingest_select::selection_config::SelectionConfig::for_project(root, &reader, &snapshot.settings)
+    let config = qnc_ingest_select::selection_config::SelectionConfig::load(root)
         .map_err(|error| error.to_string())?;
     let make_backend = |source_uri: &str, media: &[qnc_source_reader::SourceReference]| {
         let source = config
@@ -216,15 +214,6 @@ fn run_once(root: &Path) -> Result<bool, String> {
             artifacts.and_then(|()| run_artifacts(root, &lease, &closed, &std::sync::atomic::AtomicBool::new(false)));
         running.store(false, std::sync::atomic::Ordering::Relaxed);
         let import = import.join().map_err(|_| "Uvoz je pao.".to_string())?;
-        // An import makes clips of its own (the parts of an Ingest SubClip, cut into the
-        // project): their filmstrips and waves are made now, not at the next start.
-        let artifacts = match &import {
-            Ok(imported) if *imported > 0 && !closed.load(std::sync::atomic::Ordering::Relaxed) => {
-                artifacts.and_then(|()| run_artifacts(root, &lease, &closed, &std::sync::atomic::AtomicBool::new(false)))
-            }
-            _ => artifacts,
-        };
-        let import = import.map(|_| ());
         // Once more after the import: a clip imported before its record was final could not
         // get its poster at Uvezi (user 2026-10-18).
         if !closed.load(std::sync::atomic::Ordering::Relaxed) {

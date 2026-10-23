@@ -110,9 +110,7 @@ impl ConfigMediaOpener {
             timeout_ms: 30_000,
             probe_size_bytes,
             analyze_duration_us,
-            // The demuxer of the file the import made: an optimized copy or an MP4 part is
-            // QuickTime, an MXF part is MXF.
-            demuxers: vec![demuxer_of(file).into()],
+            demuxers: vec!["mov".into()],
         })
         .map_err(|e| e.to_string())?;
         let request_id = uuid_like(media_uri);
@@ -128,13 +126,6 @@ impl ConfigMediaOpener {
         qnc_ffprobe_metadata::read(&report.json, media_uri, &document_uri, "ffprobe-optimized")
             .map(|parsed| parsed.media)
             .map_err(|e| e.to_string())
-    }
-}
-
-fn demuxer_of(file: &std::path::Path) -> &'static str {
-    match file.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
-        Some("mxf") => "mxf",
-        _ => "mov",
     }
 }
 

@@ -1,8 +1,0 @@
-[package]
-name = "qnc-mp4-cut"
-version = "0.1.0"
-edition = "2021"
-description = "QNC public piece: a part of an MP4 or QuickTime original in the container of the original (stream copy from an intra picture, leading pictures dropped, timecode of its first frame)"
-
-[dependencies]
-qnc-ui-text = { workspace = true }

@@ -12,7 +12,7 @@ impl IngestApplication {
         if self.playback_guard_active() {
             return self.playback_guard_rejected();
         }
-        let writing = self.import.start(&plan.settings, self.project.catalog_target().cloned(), &self.view.clips, !self.view.pieces.ready.is_empty());
+        let writing = self.import.start(&plan.settings, self.project.catalog_target().cloned(), &self.view.clips);
         self.started(writing)
     }
 

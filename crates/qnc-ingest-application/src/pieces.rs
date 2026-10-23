@@ -11,7 +11,7 @@ impl IngestApplication {
         let view = &mut self.view;
         let project = self.project.select_target().map(|target| &target.records);
         let only_new = view.clip_filter == ClipFilter::New;
-        let now = Now { clips: &mut view.clips, tab: &mut view.pool_tab, only_new, chosen: view.preview_clip_id.as_deref(), marks, project, stills: self.preview.source_preview_mut().still_locator() };
+        let now = Now { clips: &mut view.clips, tab: &mut view.pool_tab, only_new, chosen: view.preview_clip_id.as_deref(), marks, project };
         (&mut self.pieces, now)
     }
 
@@ -30,7 +30,7 @@ impl IngestApplication {
     }
 
     fn answered(&mut self, answer: Answer) -> IngestDispatchResult {
-        self.view.pieces = self.pieces.shown(self.view.pool_tab.as_deref(), &self.view.clips);
+        self.view.pool_rows = self.pieces.rows(self.view.pool_tab.as_deref(), &self.view.clips);
         if let Some((clip_id, marks)) = answer.open {
             self.preview.mark(&clip_id, marks);
             return self.prepare_preview(clip_id);
