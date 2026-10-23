@@ -381,8 +381,129 @@ impl Drop for FramePump {
         self.stop();
     }
 }
-pub(super) struct Connection {
+/// One Broadcast Player process serving one session after another (`--monitor-host`, user
+/// 2026-10-23: a click on another clip must not start the player again). The client keeps it
+/// between selections; every session still has its own identity, tokens, control wire and frame
+/// map, and the previous session is closed in the process before the next one is opened.
+pub(super) struct HostProcess {
     child: ChildGuard,
+    stdin: std::process::ChildStdin,
+    lines: mpsc::Receiver<Vec<u8>>,
+    errors: Arc<Mutex<Vec<u8>>>,
+    executable: PathBuf,
+}
+
+pub(super) type SharedHost = Arc<Mutex<HostProcess>>;
+
+impl HostProcess {
+    /// The process of `host` when it still runs `executable`, else a new one.
+    fn serving(host: &mut Option<SharedHost>, executable: &std::path::Path) -> Result<SharedHost> {
+        let alive = host.as_ref().is_some_and(|process| {
+            let mut process = process.lock().unwrap();
+            process.executable == executable && process.child.0.try_wait().ok().flatten().is_none()
+        });
+        if !alive {
+            *host = Some(Arc::new(Mutex::new(Self::start(executable)?)));
+        }
+        Ok(host.clone().expect("a player process"))
+    }
+
+    fn start(executable: &std::path::Path) -> Result<Self> {
+        let mut command = Process::new(executable);
+        command
+            .arg("--monitor-host")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000);
+        }
+        let mut child = ChildGuard(command.spawn().map_err(|e| format!("Broadcast Player: {e}"))?);
+        let stderr = child.0.stderr.take().ok_or("missing player error pipe")?;
+        let errors = Arc::new(Mutex::new(Vec::new()));
+        let log = errors.clone();
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stderr);
+            let mut buffer = [0; 1024];
+            while let Ok(n) = reader.read(&mut buffer) {
+                if n == 0 {
+                    break;
+                }
+                if qnc_dev_diagnostics::player_diagnostics_enabled() {
+                    qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, String::from_utf8_lossy(&buffer[..n]));
+                }
+                let mut text = log.lock().unwrap();
+                if text.len() >= 8192 {
+                    text.clear(); // the last words of the process count, not its first
+                }
+                let keep = n.min(8192usize.saturating_sub(text.len()));
+                text.extend_from_slice(&buffer[..keep]);
+            }
+        });
+        let stdout = child.0.stdout.take().ok_or("missing player startup pipe")?;
+        let stdin = child.0.stdin.take().ok_or("missing player input pipe")?;
+        let (send, lines) = mpsc::channel();
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stdout);
+            loop {
+                let mut line = Vec::new();
+                match (&mut reader).take(8193).read_until(b'\n', &mut line) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {
+                        if send.send(line).is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+        Ok(Self { child, stdin, lines, errors, executable: executable.to_path_buf() })
+    }
+
+    /// Hands the process the bootstrap of a session; its hello.
+    fn open_session(&mut self, boot: &[u8], session: &str, generation: u64) -> Result<serde_json::Value> {
+        self.stdin.write_all(boot).and_then(|()| self.stdin.write_all(b"\n")).and_then(|()| self.stdin.flush()).map_err(|e| format!("Player startup failed: {e}"))?;
+        let until = Instant::now() + Duration::from_secs(10);
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            let line = self.lines.recv_timeout(left).map_err(|_| {
+                format!("Player startup timed out. {}", String::from_utf8_lossy(&self.errors.lock().unwrap()))
+            })?;
+            if line.is_empty() || line.len() > 8192 {
+                return Err(format!("Player startup failed: {}", String::from_utf8_lossy(&self.errors.lock().unwrap())));
+            }
+            let said: serde_json::Value = serde_json::from_slice(&line).map_err(|e| e.to_string())?;
+            if said.get("session_ended").is_some() {
+                continue; // the end of an earlier session
+            }
+            if said["contract_version"] != VERSION || said["session_id"] != session || said["source_generation"] != generation {
+                return Err("Player startup identity mismatch.".into());
+            }
+            return Ok(said);
+        }
+    }
+
+    /// Waits until the process says `session` ended; `false` when it did not in `within`.
+    fn session_ended(&mut self, session: &str, within: Duration) -> bool {
+        let until = Instant::now() + within;
+        while let Ok(line) = self.lines.recv_timeout(until.saturating_duration_since(Instant::now())) {
+            let said: serde_json::Value = serde_json::from_slice(&line).unwrap_or_default();
+            if said["session_ended"] == session {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn running(&mut self) -> bool {
+        self.child.0.try_wait().ok().flatten().is_none()
+    }
+}
+
+pub(super) struct Connection {
+    process: SharedHost,
     control: PlayerWireClient,
     frames: FramePump,
     frame_map_path: PathBuf,
@@ -397,7 +518,7 @@ pub(super) struct Connection {
     first_video_measurement: Option<FirstVideoMeasurement>,
 }
 impl Connection {
-    pub fn launch(launch: Launch, generation: u64, picture_sink: PictureSink) -> Result<Self> {
+    pub fn launch(launch: Launch, generation: u64, picture_sink: PictureSink, host: &mut Option<SharedHost>) -> Result<Self> {
         let session = uuid::Uuid::new_v4().to_string();
         let read = uuid::Uuid::new_v4().to_string();
         let write = uuid::Uuid::new_v4().to_string();
@@ -455,74 +576,16 @@ impl Connection {
         if boot.len() > 4 * 1024 * 1024 {
             return Err("Player bootstrap exceeds limit.".into());
         }
-        let mut command = Process::new(&launch.executable);
-        command
-            .arg("--monitor-output")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
-        let mut child = ChildGuard(
-            command
-                .spawn()
-                .map_err(|e| format!("Broadcast Player: {e}"))?,
-        );
-        let stderr = child.0.stderr.take().ok_or("missing player error pipe")?;
-        let errors = Arc::new(Mutex::new(Vec::new()));
-        let log = errors.clone();
-        thread::spawn(move || {
-            let mut reader = BufReader::new(stderr);
-            let mut buffer = [0; 1024];
-            while let Ok(n) = reader.read(&mut buffer) {
-                if n == 0 {
-                    break;
-                }
-                if qnc_dev_diagnostics::player_diagnostics_enabled() {
-                    qnc_dev_diagnostics::log_line(
-                        qnc_dev_diagnostics::DiagnosticsStream::Player,
-                        String::from_utf8_lossy(&buffer[..n]),
-                    );
-                }
-                let mut text = log.lock().unwrap();
-                let keep = n.min(8192usize.saturating_sub(text.len()));
-                text.extend_from_slice(&buffer[..keep]);
+        let process = HostProcess::serving(host, &launch.executable)?;
+        let hello = process.lock().unwrap().open_session(&boot, &session, generation);
+        let hello = match hello {
+            Ok(hello) => hello,
+            Err(error) => {
+                // A process that did not open the session is not trusted with the next one.
+                *host = None;
+                return Err(error);
             }
-        });
-        let stdout = child.0.stdout.take().ok_or("missing player startup pipe")?;
-        let stdin = child.0.stdin.take().ok_or("missing player input pipe")?;
-        let (send, receive) = mpsc::sync_channel(1);
-        thread::spawn(move || {
-            let mut input = stdin;
-            let result = (|| -> std::io::Result<Vec<u8>> {
-                input.write_all(&boot)?;
-                drop(input);
-                let mut line = Vec::new();
-                BufReader::new(stdout.take(8193)).read_until(b'\n', &mut line)?;
-                Ok(line)
-            })();
-            let _ = send.send(result);
-        });
-        let line = receive
-            .recv_timeout(Duration::from_secs(10))
-            .map_err(|_| "Player startup timed out.")?
-            .map_err(|e| e.to_string())?;
-        if line.is_empty() || line.len() > 8192 {
-            return Err(format!(
-                "Player startup failed: {}",
-                String::from_utf8_lossy(&errors.lock().unwrap())
-            ));
-        }
-        let hello: serde_json::Value = serde_json::from_slice(&line).map_err(|e| e.to_string())?;
-        if hello["contract_version"] != VERSION
-            || hello["session_id"] != session
-            || hello["source_generation"] != generation
-        {
-            return Err("Player startup identity mismatch.".into());
-        }
+        };
         let wire_url = hello["wire_url"]
             .as_str()
             .ok_or("missing player wire endpoint")?;
@@ -538,7 +601,7 @@ impl Connection {
             source_generation: generation,
         };
         Ok(Self {
-            child,
+            process,
             control,
             frames: FramePump::start(
                 frame_reader,
@@ -586,13 +649,7 @@ impl Connection {
         }))
     }
     pub fn poll(&mut self, action: Option<Action>) -> Result<View> {
-        if self
-            .child
-            .0
-            .try_wait()
-            .map_err(|e| e.to_string())?
-            .is_some()
-        {
+        if !self.process.lock().unwrap().running() {
             return Err("Player protocol: process closed.".into());
         }
         let control_start = Instant::now();
@@ -697,13 +754,13 @@ fn report_first_video_measurement(
 
 impl Drop for Connection {
     fn drop(&mut self) {
+        // The session ends in its process; a process that does not say so in time is stopped,
+        // so nothing of this session can reach the next one.
         let _ = self.command(Command::Shutdown);
-        let until = Instant::now() + Duration::from_secs(2);
-        while Instant::now() < until {
-            if self.child.0.try_wait().ok().flatten().is_some() {
-                break;
-            }
-            thread::sleep(Duration::from_millis(10));
+        let mut process = self.process.lock().unwrap();
+        if !process.session_ended(&self.query.session_id, Duration::from_secs(2)) {
+            let _ = process.child.0.kill();
+            let _ = process.child.0.wait();
         }
         self.frames.stop();
         let _ = fs::remove_file(&self.frame_map_path);

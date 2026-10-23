@@ -217,6 +217,8 @@ impl Player {
             .name("player-client".into())
             .spawn(move || {
                 let mut active: Option<(u64, connection::Connection)> = None;
+                // The one player process the sessions of this client run in (user 2026-10-23).
+                let mut host: Option<connection::SharedHost> = None;
                 let mut initial_preview: Option<(u64, u64)> = None;
                 // Commands not yet sent; a run of cues goes as its latest (`next_action`).
                 let mut queued: std::collections::VecDeque<(u64, Action)> = std::collections::VecDeque::new();
@@ -254,7 +256,7 @@ impl Player {
                                 Arc::new(move |picture| {
                                     publish_picture(&state, generation, picture)
                                 })
-                            });
+                            }, &mut host);
                             timing_line(
                                 generation,
                                 &format!(

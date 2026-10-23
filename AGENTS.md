@@ -5443,3 +5443,17 @@ citane, stvarni projekt nepromijenjen) s katalogom prebacenim na dodatak: 155 za
 D: 24,2 s kroz dodatak prema 16,3 s ugradeno (pretvaranje zapisa u JSON). Testovi ugovora `qnc-ingest-application` dobili
 su isporucene kataloge u testni korijen. Conformance. Nije izvedeno: korak 2 (ugovor `qnc-packets` za sve sto dekoder radi,
 alat za prihvat dekodera), korak 3 (popis verzija dodataka i programa).
+Otkljucano i izvedeno 2026-10-23 (korisnik: "nakon klika na klip u media poolu sporo se pojavljuje playhead na source
+timelineu; ne bi smjelo biti naknadnih probea, niti ponovnog pokretanja Broadcast Playera"; "da, otkljucaj i kreni"):
+log: probea nakon Selecta nema, ali klijent playera je pri svakom kliku gasio proces playera i pokretao novi (pokretanje
+0,6-1,1 s do prve pozicije, spreman 1,5-2,2 s). Sada jedan proces playera sluzi sesiju za sesijom:
+`tools/qnc-player-runner` ima nacin `--monitor-host` (svaki redak na stdin je pokretanje jedne sesije; sesija se otvara i
+radi kao do sada, a kad zavrsi (Shutdown, novije pokretanje, kraj stdin) sve njezino se zatvori prije sljedece i javi se
+`session_ended`; proces zavrsava sa stdin). `qnc-player-client` (`HostProcess`) drzi taj proces kroz izbore klipova:
+stara sesija se zatvara u procesu prije nove (proces koji to ne javi u 2 s se gasi), svaka sesija i dalje ima svoj
+identitet, tokene, upravljacku vezu i frame mapu; proces koji nije otvorio sesiju se ne koristi za sljedecu. Pravilo 8.2
+(klik na drugi klip prekida staru sesiju i zvuk, nista od nje ne prelazi u novu) ostaje. Izmjereno na izoliranoj kopiji
+(kartice samo citane): prva sesija kao prije (pokretanje procesa), svaka sljedeca do prve pozicije playheada 0,22-0,31 s
+(prije 0,6-1,1 s), spreman 0,64-0,88 s (prije 1,5-2,2 s); playback klipova PASS (Mironik 3401 95,7 %, rupa 148 ms).
+Nije izvedeno: pretvarac slike na grafickoj (`qnc-gpu-raster`, ~0,1 s po sesiji) se jos otvara za svaku sesiju (kocka
+nije otkljucana). Testovi `qnc-player-client`, `qnc-player-runner`, conformance. Uzivo kroz sucelje nije provjereno.

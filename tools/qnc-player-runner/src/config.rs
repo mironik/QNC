@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const MAX_BOOT_BYTES: u64 = 4 * 1024 * 1024;
+pub(crate) const MAX_BOOT_BYTES: u64 = 4 * 1024 * 1024;
 type MediaOpener = Box<dyn FnMut(&str) -> io::Result<DecodeMediaAccess> + Send>;
 
 #[derive(Deserialize)]
@@ -163,10 +163,14 @@ impl Boot {
     pub fn read(input: impl Read) -> crate::Result<Self> {
         let mut bytes = Vec::new();
         input.take(MAX_BOOT_BYTES + 1).read_to_end(&mut bytes)?;
+        Self::from_bytes(&bytes)
+    }
+    /// One bootstrap, as a whole stdin or as one line of a hosting process.
+    pub fn from_bytes(bytes: &[u8]) -> crate::Result<Self> {
         if bytes.len() as u64 > MAX_BOOT_BYTES {
             return Err("player bootstrap too large".into());
         }
-        let boot: Self = serde_json::from_slice(&bytes)?;
+        let boot: Self = serde_json::from_slice(bytes)?;
         boot.validate()?;
         Ok(boot)
     }

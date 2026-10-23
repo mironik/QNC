@@ -438,11 +438,14 @@ fn main() -> Result<()> {
         };
         SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
     }
-    let _ = PROCESS_START.set(process_start);
+    *PROCESS_START.lock().unwrap() = Some(process_start);
     let args = std::env::args_os().skip(1).collect::<Vec<_>>();
+    if args == ["--monitor-host"] {
+        return host_sessions();
+    }
     if args != ["--native-output"] && args != ["--monitor-output"] {
         return Err(
-            "Usage: qnc-broadcast-player --native-output; bounded bootstrap JSON on stdin".into(),
+            "Usage: qnc-broadcast-player --native-output | --monitor-output | --monitor-host; bounded bootstrap JSON on stdin".into(),
         );
     }
     let boot = Boot::read(io::stdin().lock())?;
@@ -485,13 +488,66 @@ mod tests {
     }
 }
 
+/// One player process for one session after another (user 2026-10-23: a click on another clip
+/// must not start the Broadcast Player again). Each stdin line is the bootstrap of a session;
+/// the session is opened, answers its hello and runs exactly as a process of its own, and when
+/// it ends (Shutdown, a newer bootstrap, the end of stdin) everything of it is closed before the
+/// next one is opened, and `{"session_ended": ...}` is said. The process ends with stdin. What
+/// the process keeps between sessions is only what it is: no picture, sound or state of a session.
+fn host_sessions() -> Result<()> {
+    use std::io::{BufRead, Read};
+    let (lines, next) = std::sync::mpsc::channel::<Option<Vec<u8>>>();
+    let stop = Arc::new(AtomicBool::new(false));
+    let reader_stop = stop.clone();
+    thread::Builder::new().name("player-host-stdin".into()).spawn(move || {
+        let mut input = io::BufReader::new(io::stdin().lock());
+        loop {
+            let mut line = Vec::new();
+            let read = (&mut input).take(config::MAX_BOOT_BYTES + 2).read_until(b'\n', &mut line);
+            // A newer bootstrap or the end of stdin ends the running session.
+            reader_stop.store(true, Ordering::Release);
+            match read {
+                Ok(0) | Err(_) => {
+                    let _ = lines.send(None);
+                    break;
+                }
+                Ok(_) => {
+                    if lines.send(Some(line)).is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    })?;
+    while let Ok(Some(line)) = next.recv() {
+        stop.store(false, Ordering::Release);
+        let boot = match Boot::from_bytes(line.trim_ascii()) {
+            Ok(boot) => boot,
+            Err(error) => {
+                eprintln!("player host: {error}");
+                continue;
+            }
+        };
+        let (session_id, generation) = (boot.session_id.clone(), boot.source_generation);
+        // Stages of each session count from its bootstrap.
+        *PROCESS_START.lock().unwrap() = Some(Instant::now());
+        stage("boot_read");
+        if let Err(error) = run(boot, None, stop.clone()) {
+            eprintln!("player session {session_id}: {error}");
+        }
+        println!("{}", serde_json::json!({ "session_ended": session_id, "source_generation": generation }));
+        io::stdout().flush()?;
+    }
+    Ok(())
+}
+
 /// When the process started (diagnostics only).
-static PROCESS_START: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+static PROCESS_START: Mutex<Option<Instant>> = Mutex::new(None);
 
 /// Milliseconds from the process start to a stage of opening (diagnostics only).
 fn stage(name: &str) {
     if qnc_dev_diagnostics::player_diagnostics_enabled() {
-        let ms = PROCESS_START.get().map_or(0, |start| start.elapsed().as_millis());
+        let ms = PROCESS_START.lock().unwrap().map_or(0, |start| start.elapsed().as_millis());
         qnc_dev_diagnostics::log_line(
             qnc_dev_diagnostics::DiagnosticsStream::Player,
             format!("player-stage {name} ms={ms}"),
