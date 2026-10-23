@@ -212,6 +212,76 @@ mod tests {
     }
 }
 
+/// The GPU device of this process, kept between converters (user 2026-10-23: a click on another
+/// clip must not open the GPU again). One device and one compiled raster pipeline serve every
+/// converter; each converter still has its own buffers, parameters and bindings. A device that
+/// failed or was lost is not kept: the next converter opens a new one.
+struct SharedDevice {
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    adapter_name: String,
+    pipeline: wgpu::ComputePipeline,
+    failed: Arc<AtomicBool>,
+}
+
+static SHARED: std::sync::Mutex<Option<Arc<SharedDevice>>> = std::sync::Mutex::new(None);
+
+fn shared_device(limits: &wgpu::Limits) -> Result<Arc<SharedDevice>, ConversionError> {
+    let mut shared = SHARED.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(device) = shared.as_ref().filter(|d| !d.failed.load(Ordering::Acquire)) {
+        return Ok(device.clone());
+    }
+    let instance = wgpu::Instance::default();
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        force_fallback_adapter: false,
+        compatible_surface: None,
+    }))
+    .ok_or_else(|| gpu_error("no adapter"))?;
+    let info = adapter.get_info();
+    if info.device_type == wgpu::DeviceType::Cpu {
+        return Err(gpu_error("software adapter is not a GPU raster backend"));
+    }
+    let (device, queue) = pollster::block_on(adapter.request_device(
+        &wgpu::DeviceDescriptor {
+            label: Some("qnc-pixel-convert"),
+            required_features: wgpu::Features::empty(),
+            required_limits: limits.clone(),
+            memory_hints: wgpu::MemoryHints::MemoryUsage,
+        },
+        None,
+    ))
+    .map_err(gpu_error)?;
+    let failed = Arc::new(AtomicBool::new(false));
+    let on_error = failed.clone();
+    device.on_uncaptured_error(Box::new(move |_| {
+        on_error.store(true, Ordering::Release);
+    }));
+    let on_loss = failed.clone();
+    device.set_device_lost_callback(move |_, _| {
+        on_loss.store(true, Ordering::Release);
+    });
+    device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("SDR-raster"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("gpu.wgsl").into()),
+    });
+    let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        label: Some("SDR-raster"),
+        layout: None,
+        module: &shader,
+        entry_point: Some("convert"),
+        compilation_options: Default::default(),
+        cache: None,
+    });
+    if let Some(error) = pollster::block_on(device.pop_error_scope()) {
+        return Err(gpu_error(error));
+    }
+    let device = Arc::new(SharedDevice { device, queue, adapter_name: info.name, pipeline, failed });
+    *shared = Some(device.clone());
+    Ok(device)
+}
+
 fn gpu_error(error: impl std::fmt::Display) -> ConversionError {
     ConversionError::Library(format!("GPU raster: {error}"))
 }
@@ -225,13 +295,6 @@ impl GpuRasterConverter {
         if input_bytes + output_bytes * 3 > MAX_BYTES as u64 {
             return Err(ConversionError::Budget);
         }
-        let instance = wgpu::Instance::default();
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            force_fallback_adapter: false,
-            compatible_surface: None,
-        }))
-        .ok_or_else(|| gpu_error("no adapter"))?;
         let limits = wgpu::Limits::default();
         if input_bytes.max(output_bytes) > u64::from(limits.max_storage_buffer_binding_size)
             || size[0].div_ceil(8).max(size[1].div_ceil(8))
@@ -239,30 +302,11 @@ impl GpuRasterConverter {
         {
             return Err(ConversionError::Budget);
         }
-        let info = adapter.get_info();
-        if info.device_type == wgpu::DeviceType::Cpu {
-            return Err(gpu_error("software adapter is not a GPU raster backend"));
-        }
-        let adapter_name = info.name;
-        let (device, queue) = pollster::block_on(adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                label: Some("qnc-pixel-convert"),
-                required_features: wgpu::Features::empty(),
-                required_limits: limits,
-                memory_hints: wgpu::MemoryHints::MemoryUsage,
-            },
-            None,
-        ))
-        .map_err(gpu_error)?;
-        let failed = Arc::new(AtomicBool::new(false));
-        let on_error = failed.clone();
-        device.on_uncaptured_error(Box::new(move |_| {
-            on_error.store(true, Ordering::Release);
-        }));
-        let on_loss = failed.clone();
-        device.set_device_lost_callback(move |_, _| {
-            on_loss.store(true, Ordering::Release);
-        });
+        let shared = shared_device(&limits)?;
+        let (device, queue, adapter_name, failed) = (shared.device.clone(), shared.queue.clone(), shared.adapter_name.clone(), shared.failed.clone());
+        // The error scope of a shared device is one stack: one converter is prepared at a time.
+        static PREPARING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _preparing = PREPARING.lock().unwrap_or_else(|e| e.into_inner());
         device.push_error_scope(wgpu::ErrorFilter::Validation);
         let buffer = |label, size, usage| {
             device.create_buffer(&wgpu::BufferDescriptor {
@@ -320,18 +364,7 @@ impl GpuRasterConverter {
             contents: &params,
             usage: wgpu::BufferUsages::UNIFORM,
         });
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("SDR-raster"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("gpu.wgsl").into()),
-        });
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("SDR-raster"),
-            layout: None,
-            module: &shader,
-            entry_point: Some("convert"),
-            compilation_options: Default::default(),
-            cache: None,
-        });
+        let pipeline = shared.pipeline.clone();
         let bindings = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("raster-slots"),
             layout: &pipeline.get_bind_group_layout(0),

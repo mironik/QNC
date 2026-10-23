@@ -5457,3 +5457,10 @@ identitet, tokene, upravljacku vezu i frame mapu; proces koji nije otvorio sesij
 (prije 0,6-1,1 s), spreman 0,64-0,88 s (prije 1,5-2,2 s); playback klipova PASS (Mironik 3401 95,7 %, rupa 148 ms).
 Nije izvedeno: pretvarac slike na grafickoj (`qnc-gpu-raster`, ~0,1 s po sesiji) se jos otvara za svaku sesiju (kocka
 nije otkljucana). Testovi `qnc-player-client`, `qnc-player-runner`, conformance. Uzivo kroz sucelje nije provjereno.
+Otkljucano i izvedeno 2026-10-23 (korisnik: "da, otkljucaj qnc-gpu-raster i napravi"): `qnc-gpu-raster` drzi jedan
+graficki uredaj i jedan prevedeni raster pipeline po procesu (`shared_device`); svaki pretvarac i dalje ima svoje
+spremnike, parametre i veze. Uredaj koji javi gresku ili se izgubi ne zadrzava se, sljedeci pretvarac otvara novi; jedan
+pretvarac se priprema u isto vrijeme (stog gresaka uredaja je jedan). Izmjereno na izoliranoj kopiji (isti proces playera,
+promjena klipa): do prve pozicije 0,20-0,24 s, spreman 0,61-0,72 s; pretvarac se vise ne ceka (priprema traje koliko i
+zvucni uredaj, ~85 ms). Mironik 3401 (MXF s kartice D:) jednom je otvaranje trajalo 2,15 s i A/V na pocetku do 2,8 slike;
+to je citanje kartice, ne pretvarac. Testovi `qnc-gpu-raster` (i oni koji traze GPU), conformance.
