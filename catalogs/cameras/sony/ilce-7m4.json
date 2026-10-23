@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "id": "sony-ilce-7m4",
+  "version": 1,
+  "manufacturer": "Sony",
+  "model": "ILCE-7M4",
+  "reader": "camera.sony.index.read",
+  "layouts": ["sony-m4root-sd"],
+  "recognise": [
+    { "element": "Device", "attribute": "modelName", "equals": "ILCE-7M4" },
+    { "element": "System", "attribute": "systemKind", "prefix": "ILCE-7M4" }
+  ],
+  "procedure": { "metadata": "declared_when_complete" },
+  "notes": "Documented M4ROOT layout; not yet observed on a card."
+}

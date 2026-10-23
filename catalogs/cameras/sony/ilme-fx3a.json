@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "id": "sony-ilme-fx3a",
+  "version": 1,
+  "manufacturer": "Sony",
+  "model": "ILME-FX3A",
+  "reader": "camera.sony.index.read",
+  "layouts": ["sony-m4root-sd"],
+  "recognise": [
+    { "element": "Device", "attribute": "modelName", "equals": "ILME-FX3A" },
+    { "element": "System", "attribute": "systemKind", "prefix": "ILME-FX3A" }
+  ],
+  "procedure": { "metadata": "declared_when_complete" },
+  "notes": "Observed 2026-10-22 (SD, PRIVATE/M4ROOT): XAVC-M4 MP4 originals (H.264 4:2:2), HEVC proxies in SUB, M01 sidecars."
+}

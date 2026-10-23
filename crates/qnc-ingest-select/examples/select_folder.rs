@@ -38,7 +38,7 @@ fn main() -> Result<(), String> {
     let selected = SourceReference::new(&source, &relative).map_err(|e| e.to_string())?;
     println!("project {} folder {}", snapshot.settings.project_id, selected.uri());
     let target = SelectTarget::for_project(settings, &snapshot.settings)?;
-    let registry = Arc::new(qnc_ingest_cameras::registry()?);
+    let registry = Arc::new(qnc_ingest_cameras::registry(&root)?);
     let mut session = SelectSession::default();
     session.start(config, selected, target, registry)?;
     loop {

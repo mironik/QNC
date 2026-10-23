@@ -1,0 +1,16 @@
+[package]
+name = "qnc-camera-profile-adapter"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the camera adapter of a record format driven by camera profiles (text files); recognises the camera of each clip, writes the profile into its record and applies the profile's procedure"
+
+[dependencies]
+qnc-camera-adapter = { workspace = true }
+qnc-camera-profiles = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-source-contract = { workspace = true }
+qnc-source-groups = { workspace = true }
+
+[dev-dependencies]
+qnc-sony-metadata = { workspace = true }
+serde_json = { workspace = true }

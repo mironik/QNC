@@ -48,7 +48,8 @@ qnc-ingest-cameras = { workspace = true }
 qnc-source-reader = { workspace = true }
 rusqlite = { workspace = true }
 qnc-camera-generic-file = { workspace = true }
-qnc-camera-sony-fx6-v6 = { workspace = true }
+qnc-camera-profiles = { workspace = true }
+qnc-camera-profile-adapter = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-sony-metadata = { workspace = true }
 image = { version = "0.25.10", default-features = false, features = ["jpeg"] }

@@ -1,0 +1,14 @@
+[package]
+name = "qnc-camera-profiles"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: camera profiles, one text file per camera model, kept in the camera database of this computer; recognises the camera of a card's records"
+
+[dependencies]
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+xml-rs = "0.8.29"
+
+[dev-dependencies]
+tempfile = "3"

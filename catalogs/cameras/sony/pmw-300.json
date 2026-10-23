@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "id": "sony-pmw-300",
+  "version": 1,
+  "manufacturer": "Sony",
+  "model": "PMW-300",
+  "reader": "camera.sony.index.read",
+  "layouts": ["sony-xdcam-mxf"],
+  "recognise": [
+    { "element": "Device", "attribute": "modelName", "prefix": "PMW-300" },
+    { "element": "System", "attribute": "systemKind", "prefix": "PMW-300" }
+  ],
+  "procedure": { "metadata": "declared_when_complete" },
+  "notes": "Observed 2026-10-16 (XDCAM disk, XDROOT/MEDIAPRO.XML, Clip/*.MXF MPEG HD 35 1080i50); the disk links no thumbnails."
+}

@@ -5402,3 +5402,26 @@ Ingest media). Nova pasivna kocka `crates/qnc-choice-box` (+ ugovor): info prozo
 aplikacija 1363 -> 1354); ploca Ingesta ista (155). Testovi `qnc-import-fit` (stvarni FX3A zapis), `qnc-content-store`,
 `qnc-ingest-selection-write`, `qnc-ingest-import-worker`, `qnc-ingest-select`, `qnc-program-db`, `qnc-ingest-application`,
 conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-23 (korisnik: "za svaku kameru posebna kocka, kako bi mogli dodavati nove kamere bez
+diranja koda; kocka koja cita podatke s kamere i usporeduje ih s json datotekama u kojima je zapisana procedura za tu
+kameru; inicijalni podaci u tekstu, koje aplikacija moze procitati i zapisati trajno u bazu"; "da, otkljucaj i kreni"):
+kamera je tekstualni profil, jedna JSON datoteka po modelu (`catalogs/cameras/<proizvodac>/<model>.json`, README u mapi):
+id i verzija, proizvodac, model, format zapisa (`reader`), rasporedi kartice iz kataloga kamera, pravila prepoznavanja
+(atribut elementa u zapisima kartice, `equals` ili `prefix`) i postupak (`declared_when_complete` ili `probe_once`).
+Prvi profili: Sony ILME-FX6V, ILME-FX3A, ILCE-7M4, PMW-300 i zadani profil formata Sony MediaProfile (kartica cijeg modela
+nijedan profil ne zna). Nova javna kocka `crates/qnc-camera-profiles` (+ ugovor): cita profile, ispravne trajno upisuje u
+bazu kamera ovog racunala `data/qnc-cameras.db` (jedini pisac; samo nove ili promijenjene datoteke, po otisku teksta),
+datoteka s greskom se ne uzima i ide u log (`camera-profile refused`), zadnji ispravni zapis ostaje; prepoznaje kameru iz
+zapisa kartice. Nova javna kocka `crates/qnc-camera-profile-adapter` (+ ugovor): adapter jednog formata zapisa po
+profilima; zapis svakog klipa dobiva profil kojim je procitan (`qnc.camera:profile` = `<id>@<verzija>`, lokator
+`camera-profile:recognised` ili `camera-profile:default`), pa projekt zna kako je klip procitan i bez tog profila.
+`qnc-camera-adapter`: sucelje formata `RecordFormat` (format zna format, ne kameru), `pattern_ids` vraca popis (rasporedi
+iz profila). `qnc-sony-metadata`: `SonyMediaProfile` je format (citac indeksa, sidecari, poster, zapis), kamere u njemu
+nema. `qnc-ingest-cameras::registry(root)` slaze formate s profilima. Uklonjen `qnc-camera-sony-fx6-v6` (+ ugovor).
+Conformance: `qnc-camera-profiles` na popisu javnih DB vlasnika. Nova kamera poznatog formata je samo nova datoteka; novi
+format je nova kocka. Provjera na izoliranoj kopiji (kartice D: FX6V CFexpress i G: FX3A samo citane, stvarni projekt
+nepromijenjen): Select s novim putem daje 155 zapisa jednakih onima starog koda osim oznake profila (FX6V 146, FX3A 9,
+svi prepoznati), pozadinski radnik ih dovrsava (155 konacnih i potpunih, oznaka ostaje). Testovi `qnc-camera-profiles`,
+`qnc-camera-profile-adapter`, `qnc-ingest-cameras`, `qnc-ingest-select`, `qnc-ingest-import-worker`,
+`qnc-record-completion`, conformance. Nije izvedeno: upozorenje u Ingestu za karticu nepoznatog modela (zasad samo u
+zapisu klipa), PMW-300 nije proban (disk nije bio spojen).

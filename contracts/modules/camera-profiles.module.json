@@ -1,0 +1,40 @@
+{
+  "module_id": "qnc.module.camera-profiles",
+  "module_name": "Camera profiles",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "camera.profiles",
+    "camera.recognise"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "media.read",
+    "card.write",
+    "project.database.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-camera-profiles",
+  "input": "The text camera profiles of the QNC root (catalogs/cameras, one JSON file per camera model); the XML texts of a card's records.",
+  "output": "The profiles kept in the camera database of this computer (data/qnc-cameras.db, of which this block is the only writer), the files refused with why, and the camera of a card's records (its profile, or the record format's default).",
+  "specification": "User 2026-10-23: a block reads the camera's records and compares them with text files in which the procedure for that camera is written; the initial data are text, the application reads them and writes them permanently into the database. A file with an error is not taken; the last valid record of its profile stays."
+}

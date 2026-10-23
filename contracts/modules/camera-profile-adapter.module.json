@@ -1,0 +1,39 @@
+{
+  "module_id": "qnc.module.camera-profile-adapter",
+  "module_name": "Camera profile adapter",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "camera.adapter"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "media.read",
+    "database.read",
+    "database.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-camera-profile-adapter",
+  "input": "A record format block (for example the Sony MediaProfile index with its sidecars) and the camera profiles of its reader.",
+  "output": "The camera adapter of that format: the format's record of each clip with the profile it was read with (qnc.camera:profile, <id>@<version>) and the profile's procedure (declared or one probe).",
+  "specification": "User 2026-10-23: new cameras are added without touching the code. A card whose camera no profile knows is read with the format's default profile, and its record says so."
+}

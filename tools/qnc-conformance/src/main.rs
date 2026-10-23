@@ -1912,6 +1912,8 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-project-store/",
         "crates/qnc-project-close/",
         "crates/qnc-camera-patterns/",
+        // The only writer of the camera database of this computer (text profiles kept there).
+        "crates/qnc-camera-profiles/",
         "crates/qnc-work-settings/",
         "crates/qnc-virtual-shots/",
         // The serial writer of the project database: it opens the transaction of a write

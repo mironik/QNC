@@ -8,6 +8,7 @@ qnc-contracts = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-source-contract.workspace = true
 qnc-source-groups.workspace = true
+qnc-camera-adapter = { workspace = true }
 serde = { workspace = true }
 xml-rs = "0.8.29"
 percent-encoding = "2"

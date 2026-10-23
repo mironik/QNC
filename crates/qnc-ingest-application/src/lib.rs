@@ -103,7 +103,7 @@ impl IngestApplication {
     }
 
     pub fn with_store_root(root: impl AsRef<Path>) -> Result<Self, String> {
-        let mut component = Self::new().with_camera_registry(qnc_ingest_cameras::registry()?);
+        let mut component = Self::new().with_camera_registry(qnc_ingest_cameras::registry(root.as_ref())?);
         component.root = Some(root.as_ref().to_path_buf());
         component.preview.source_preview_mut().wake_worker_from(root.as_ref());
         component.store = Some(IngestStore::open(root.as_ref())?);

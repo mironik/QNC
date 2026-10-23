@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "id": "sony-ilme-fx6v",
+  "version": 1,
+  "manufacturer": "Sony",
+  "model": "ILME-FX6V",
+  "reader": "camera.sony.index.read",
+  "layouts": ["sony-xdroot-sd"],
+  "recognise": [
+    { "element": "Device", "attribute": "modelName", "equals": "ILME-FX6V" },
+    { "element": "System", "attribute": "systemKind", "prefix": "ILME-FX6V" }
+  ],
+  "procedure": { "metadata": "declared_when_complete" },
+  "notes": "Observed 2026-10-21 (CFexpress, XDROOT in the root) and SD (PRIVATE/XDROOT): XAVC MXF originals, MP4 proxies, M01 sidecars."
+}

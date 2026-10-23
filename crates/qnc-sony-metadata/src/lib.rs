@@ -10,6 +10,26 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 pub use xml::MAX_XML_BYTES;
 
+/// The Sony MediaProfile record format: the `MEDIAPRO.XML` index with `NonRealTimeMeta`
+/// sidecars (XDROOT, M4ROOT, XDCAM). The camera is told by its profile, not here.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SonyMediaProfile;
+
+impl qnc_camera_adapter::RecordFormat for SonyMediaProfile {
+    fn index(&self) -> &dyn qnc_source_groups::IndexReader {
+        &SonyIndexReader
+    }
+    fn documents(&self, group: &qnc_source_groups::GroupProposal) -> Vec<qnc_source_contract::SourceReference> {
+        metadata_references(group)
+    }
+    fn thumbnail(&self, group: &qnc_source_groups::GroupProposal) -> Option<qnc_source_contract::SourceReference> {
+        thumbnail_reference(group)
+    }
+    fn metadata(&self, clip_id: &str, group: &qnc_source_groups::GroupProposal, documents: &[qnc_source_groups::IndexDocument]) -> Result<qnc_media_metadata::ClipMetadata, String> {
+        read_group_metadata(clip_id, group, documents)
+    }
+}
+
 pub const INDEX_NAMESPACE: &str = "http://xmlns.sony.net/pro/metadata/mediaprofile";
 pub const SIDECAR_NAMESPACE: &str = "urn:schemas-professionalDisc:nonRealTimeMeta:ver.2.20";
 

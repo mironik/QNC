@@ -3233,14 +3233,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "qnc-camera-sony-fx6-v6"
+name = "qnc-camera-profile-adapter"
 version = "0.1.0"
 dependencies = [
  "qnc-camera-adapter",
+ "qnc-camera-profiles",
  "qnc-media-metadata",
  "qnc-sony-metadata",
  "qnc-source-contract",
  "qnc-source-groups",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-camera-profiles"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "xml-rs",
 ]
 
 [[package]]
@@ -3796,11 +3809,15 @@ dependencies = [
 
 [[package]]
 name = "qnc-ingest-cameras"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "qnc-camera-adapter",
  "qnc-camera-generic-file",
- "qnc-camera-sony-fx6-v6",
+ "qnc-camera-profile-adapter",
+ "qnc-camera-profiles",
+ "qnc-dev-diagnostics",
+ "qnc-sony-metadata",
+ "tempfile",
 ]
 
 [[package]]
@@ -3867,7 +3884,8 @@ version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
  "qnc-camera-adapter",
- "qnc-camera-sony-fx6-v6",
+ "qnc-camera-profile-adapter",
+ "qnc-camera-profiles",
  "qnc-content-read",
  "qnc-contracts",
  "qnc-dir-browser",
@@ -3883,6 +3901,7 @@ dependencies = [
  "qnc-media-stream",
  "qnc-missing-posters",
  "qnc-playback-activity",
+ "qnc-sony-metadata",
  "qnc-source-reader",
  "qnc-source-timecode",
  "qnc-ui-text",
@@ -3936,7 +3955,8 @@ dependencies = [
  "qnc-camera-detector",
  "qnc-camera-generic-file",
  "qnc-camera-patterns",
- "qnc-camera-sony-fx6-v6",
+ "qnc-camera-profile-adapter",
+ "qnc-camera-profiles",
  "qnc-contracts",
  "qnc-db-broker",
  "qnc-decoder-catalog",
@@ -4922,7 +4942,8 @@ version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
  "qnc-camera-adapter",
- "qnc-camera-sony-fx6-v6",
+ "qnc-camera-profile-adapter",
+ "qnc-camera-profiles",
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-ingest-select",
@@ -4931,6 +4952,7 @@ dependencies = [
  "qnc-media-record-db",
  "qnc-playback-activity",
  "qnc-record-probe",
+ "qnc-sony-metadata",
  "qnc-source-index-db",
  "qnc-source-reader",
  "qnc-ui-text",
@@ -5073,6 +5095,7 @@ name = "qnc-sony-metadata"
 version = "0.1.0"
 dependencies = [
  "percent-encoding",
+ "qnc-camera-adapter",
  "qnc-contracts",
  "qnc-media-metadata",
  "qnc-source-contract",

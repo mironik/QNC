@@ -1,0 +1,13 @@
+{
+  "format_version": 1,
+  "id": "sony-mediaprofile-default",
+  "version": 1,
+  "manufacturer": "Sony",
+  "model": "",
+  "default_for_reader": true,
+  "reader": "camera.sony.index.read",
+  "layouts": [],
+  "recognise": [],
+  "procedure": { "metadata": "declared_when_complete" },
+  "notes": "A Sony MediaProfile card whose camera no profile recognises: read as the format says, with a warning."
+}

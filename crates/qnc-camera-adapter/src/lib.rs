@@ -29,7 +29,7 @@ pub trait CameraAdapter: Send + Sync {
     /// Stable identity of this adapter.
     fn adapter_id(&self) -> &str;
     /// Camera catalog patterns (`pattern_id`) this adapter serves.
-    fn pattern_ids(&self) -> &[&'static str];
+    fn pattern_ids(&self) -> Vec<&str>;
     /// Parser of the recording index; its `reader_id` links groups to this adapter.
     fn index(&self) -> &dyn IndexReader;
     /// Documents that carry the metadata of one verified group.
@@ -52,6 +52,17 @@ pub trait CameraAdapter: Send + Sync {
     fn files(&self) -> Option<&dyn FileReader> {
         None
     }
+}
+
+/// A record format a card may carry (for example the Sony MediaProfile index with its
+/// NonRealTimeMeta sidecars): it knows the format, not the camera. A camera is a text profile
+/// (`qnc-camera-profiles`) read by the adapter of its format; a new camera of a known format
+/// needs no code, a new format is a new block implementing this.
+pub trait RecordFormat: Send + Sync {
+    fn index(&self) -> &dyn IndexReader;
+    fn documents(&self, group: &GroupProposal) -> Vec<SourceReference>;
+    fn thumbnail(&self, group: &GroupProposal) -> Option<SourceReference>;
+    fn metadata(&self, clip_id: &str, group: &GroupProposal, documents: &[IndexDocument]) -> Result<ClipMetadata, String>;
 }
 
 /// Does the record of the original carry the facts a probe would state: for video
@@ -121,7 +132,7 @@ impl CameraRegistry {
         let taken: BTreeSet<&str> = self
             .adapters
             .iter()
-            .flat_map(|a| a.pattern_ids().iter().copied())
+            .flat_map(|a| a.pattern_ids())
             .collect();
         if let Some(pattern) = adapter.pattern_ids().iter().find(|p| taken.contains(**p)) {
             return Err(format!(
@@ -198,8 +209,8 @@ mod tests {
         fn adapter_id(&self) -> &str {
             self.id
         }
-        fn pattern_ids(&self) -> &[&'static str] {
-            self.patterns
+        fn pattern_ids(&self) -> Vec<&str> {
+            self.patterns.to_vec()
         }
         fn index(&self) -> &dyn IndexReader {
             &self.reader

@@ -127,8 +127,8 @@ impl qnc_camera_adapter::CameraAdapter for TestCamera {
     fn adapter_id(&self) -> &str {
         "camera.test.sony"
     }
-    fn pattern_ids(&self) -> &[&'static str] {
-        TEST_PATTERNS
+    fn pattern_ids(&self) -> Vec<&str> {
+        TEST_PATTERNS.to_vec()
     }
     fn index(&self) -> &dyn qnc_source_groups::IndexReader {
         &qnc_sony_metadata::SonyIndexReader

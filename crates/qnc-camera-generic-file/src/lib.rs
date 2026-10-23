@@ -65,8 +65,8 @@ impl CameraAdapter for GenericFile {
         ADAPTER_ID
     }
 
-    fn pattern_ids(&self) -> &[&'static str] {
-        PATTERNS
+    fn pattern_ids(&self) -> Vec<&str> {
+        PATTERNS.to_vec()
     }
 
     fn index(&self) -> &dyn IndexReader {

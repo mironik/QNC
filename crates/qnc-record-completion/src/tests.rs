@@ -5,7 +5,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 fn fx6() -> CameraRegistry {
     let mut registry = CameraRegistry::new();
     registry
-        .register(Arc::new(qnc_camera_sony_fx6_v6::SonyFx6V6::new()))
+        .register(Arc::new(qnc_camera_profile_adapter::ProfileAdapter::new(Arc::new(qnc_sony_metadata::SonyMediaProfile), &qnc_camera_profiles::read_profiles(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../catalogs/cameras")).0).unwrap()))
         .unwrap();
     registry
 }
