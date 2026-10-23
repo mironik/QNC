@@ -2,6 +2,9 @@ use super::*;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IngestViewModel {
+    /// Selected clips are in the way of what the project uses: the user chooses (user 2026-10-23).
+    #[serde(skip)]
+    pub import_choice: Option<qnc_choice_box::Choice>,
     /// The panel the keyboard acts on, the dock button and the last card grid step.
     #[serde(skip)]
     pub focus: qnc_focus_walk::WalkView,
@@ -40,6 +43,7 @@ impl Default for IngestViewModel {
         Self {
             source_kind: SourceKind::Local,
             focus: Default::default(),
+            import_choice: None,
             source_timeline: Default::default(),
             playback: Default::default(),
             monitor: Default::default(),

@@ -42,6 +42,7 @@ tempfile = { version = "3", optional = true }
 qnc-sony-metadata = { workspace = true, optional = true }
 
 [dev-dependencies]
+qnc-import-fit = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-ingest-cameras = { workspace = true }
 qnc-source-reader = { workspace = true }

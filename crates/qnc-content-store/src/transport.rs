@@ -243,8 +243,8 @@ impl ContentClient {
         self.execute(Operation::Select { clip_ids, selected })
             .map(|_| ())
     }
-    pub fn queue_selected(&mut self) -> Result<()> {
-        self.execute(Operation::QueueSelected).map(|_| ())
+    pub fn queue_selected(&mut self, needs: qnc_import_fit::Needs) -> Result<()> {
+        self.execute(Operation::QueueSelected { needs }).map(|_| ())
     }
     pub fn claim_next(&mut self) -> Result<Option<StoredClip>> {
         match self.execute(Operation::ClaimNext)? {
@@ -401,8 +401,8 @@ impl ContentWriteTransport {
     }
 
     /// Puts the selected, ready clips into the import queue.
-    pub fn queue_selected(&mut self, key: String) -> Result<()> {
-        self.send_operation(key, Operation::QueueSelected)
+    pub fn queue_selected(&mut self, key: String, needs: qnc_import_fit::Needs) -> Result<()> {
+        self.send_operation(key, Operation::QueueSelected { needs })
     }
 
     /// Takes the next queued clip for import (`Claimed`).
@@ -561,8 +561,8 @@ fn execute_write_command(
             client.select(clip_ids, selected)?;
             Ok(ContentWriteData::Changed)
         }
-        Operation::QueueSelected => {
-            client.queue_selected()?;
+        Operation::QueueSelected { needs } => {
+            client.queue_selected(needs)?;
             Ok(ContentWriteData::Changed)
         }
         Operation::ClaimNext => Ok(ContentWriteData::Claimed(

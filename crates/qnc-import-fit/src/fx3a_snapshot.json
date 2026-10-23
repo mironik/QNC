@@ -1,0 +1,1224 @@
+{
+ "binding": {
+  "source_index_uri": "qnc://local/db/source_index",
+  "source_record_id": "452a095b-2bc8-416f-8a91-ac2b6124cdc1",
+  "original_uri": "qnc://local/source/volume-30616164/file/PRIVATE/M4ROOT/CLIP/C0017%2EMP4",
+  "proxy_uri": "qnc://local/source/volume-30616164/file/PRIVATE/M4ROOT/SUB/C0017S03%2EMP4"
+ },
+ "revision": 2,
+ "phase": "final",
+ "completeness": "complete",
+ "metadata": {
+  "contract_id": "qnc.media.metadata",
+  "contract_version": "0.2.0",
+  "clip_id": "clip-452a095b-2bc8-416f-8a91-ac2b6124cdc1",
+  "evidence": [
+   {
+    "id": "index-original",
+    "kind": "camera_metadata",
+    "document_uri": "qnc://local/artifact/camera-document/8e5c8c8218c3fcfbb3947460a89b66cfe98635373f56ae5b7d9e3537b1f99d83/volume-30616164/file/PRIVATE/M4ROOT/MEDIAPRO%2EXML",
+    "media_uri": "qnc://local/source/volume-30616164/file/PRIVATE/M4ROOT/CLIP/C0017%2EMP4"
+   },
+   {
+    "id": "index-proxy",
+    "kind": "camera_metadata",
+    "document_uri": "qnc://local/artifact/camera-document/8e5c8c8218c3fcfbb3947460a89b66cfe98635373f56ae5b7d9e3537b1f99d83/volume-30616164/file/PRIVATE/M4ROOT/MEDIAPRO%2EXML",
+    "media_uri": "qnc://local/source/volume-30616164/file/PRIVATE/M4ROOT/SUB/C0017S03%2EMP4"
+   },
+   {
+    "id": "sidecar-original",
+    "kind": "camera_metadata",
+    "document_uri": "qnc://local/artifact/camera-document/f5dd4799c3795b3dca86272179e21901c60df8f6e202cc1db410342359cc1fbe/volume-30616164/file/PRIVATE/M4ROOT/CLIP/C0017M01%2EXML",
+    "media_uri": "qnc://local/source/volume-30616164/file/PRIVATE/M4ROOT/CLIP/C0017%2EMP4"
+   },
+   {
+    "id": "ffprobe-0",
+    "kind": "ffprobe",
+    "document_uri": "qnc://local/artifact/probe-10fe9855-a0df-4520-bf1d-c58d479d9064",
+    "media_uri": "qnc://local/source/volume-30616164/file/PRIVATE/M4ROOT/CLIP/C0017%2EMP4"
+   },
+   {
+    "id": "ffprobe-1",
+    "kind": "ffprobe",
+    "document_uri": "qnc://local/artifact/probe-065aa10d-d533-4650-a5c8-d2fb7c4cdf91",
+    "media_uri": "qnc://local/source/volume-30616164/file/PRIVATE/M4ROOT/SUB/C0017S03%2EMP4"
+   }
+  ],
+  "original": {
+   "media_uri": "qnc://local/source/volume-30616164/file/PRIVATE/M4ROOT/CLIP/C0017%2EMP4",
+   "container": {
+    "value": "mp4",
+    "evidence_id": "index-original",
+    "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@type"
+   },
+   "duration_seconds": {
+    "value": {
+     "numerator": 168,
+     "denominator": 25
+    },
+    "evidence_id": "sidecar-original",
+    "locator": "/NonRealTimeMeta[1]/Duration[1]/@value"
+   },
+   "streams_complete": {
+    "value": true,
+    "evidence_id": "ffprobe-0",
+    "locator": "/streams"
+   },
+   "streams": [
+    {
+     "index": {
+      "value": 0,
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/0/index"
+     },
+     "codec": {
+      "value": {
+       "state": "known",
+       "value": "h264"
+      },
+      "evidence_id": "sidecar-original",
+      "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoFrame[1]/@videoCodec"
+     },
+     "profile": {
+      "value": "High 4:2:2",
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/0/profile"
+     },
+     "time_base": {
+      "value": {
+       "numerator": 1,
+       "denominator": 50000
+      },
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/0/time_base"
+     },
+     "start_pts": {
+      "value": 0,
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/0/start_pts"
+     },
+     "duration_ts": {
+      "value": 336000,
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/0/duration_ts"
+     },
+     "details": {
+      "kind": "video",
+      "metadata": {
+       "width": {
+        "value": 1920,
+        "evidence_id": "sidecar-original",
+        "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoLayout[1]/@pixel"
+       },
+       "height": {
+        "value": 1080,
+        "evidence_id": "sidecar-original",
+        "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoLayout[1]/@numOfVerticalLine"
+       },
+       "frame_rate": {
+        "value": {
+         "fps_num": 50,
+         "fps_den": 1
+        },
+        "evidence_id": "sidecar-original",
+        "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoFrame[1]/@formatFps"
+       },
+       "frame_rate_mode": {
+        "value": "constant",
+        "evidence_id": "sidecar-original",
+        "locator": "/NonRealTimeMeta[1]/Duration[1]/@value"
+       },
+       "frame_count": {
+        "value": {
+         "accuracy": "exact",
+         "frames": 336
+        },
+        "evidence_id": "sidecar-original",
+        "locator": "/NonRealTimeMeta[1]/Duration[1]/@value"
+       },
+       "scan_mode": {
+        "value": "progressive",
+        "evidence_id": "sidecar-original",
+        "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoFrame[1]/@formatFps"
+       },
+       "pixel_format": {
+        "value": "yuv422p10le",
+        "evidence_id": "ffprobe-0",
+        "locator": "/streams/0/pix_fmt"
+       },
+       "sample_aspect_ratio": {
+        "value": {
+         "numerator": 1,
+         "denominator": 1
+        },
+        "evidence_id": "sidecar-original",
+        "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoLayout[1]/@aspectRatio"
+       },
+       "rotation_degrees": {
+        "value": {
+         "state": "unspecified"
+        },
+        "evidence_id": "ffprobe-0",
+        "locator": "/streams/0"
+       },
+       "color": {
+        "primaries": {
+         "value": {
+          "state": "known",
+          "value": "bt709"
+         },
+         "evidence_id": "ffprobe-0",
+         "locator": "/streams/0/color_primaries"
+        },
+        "transfer": {
+         "value": {
+          "state": "known",
+          "value": "bt709"
+         },
+         "evidence_id": "ffprobe-0",
+         "locator": "/streams/0/color_transfer"
+        },
+        "matrix": {
+         "value": {
+          "state": "known",
+          "value": "bt709"
+         },
+         "evidence_id": "ffprobe-0",
+         "locator": "/streams/0/color_space"
+        },
+        "range": {
+         "value": {
+          "state": "known",
+          "value": "tv"
+         },
+         "evidence_id": "ffprobe-0",
+         "locator": "/streams/0/color_range"
+        }
+       }
+      }
+     }
+    },
+    {
+     "index": {
+      "value": 1,
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/1/index"
+     },
+     "codec": {
+      "value": {
+       "state": "known",
+       "value": "pcm_s16be"
+      },
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/1/codec_name"
+     },
+     "profile": null,
+     "time_base": {
+      "value": {
+       "numerator": 1,
+       "denominator": 48000
+      },
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/1/time_base"
+     },
+     "start_pts": {
+      "value": 0,
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/1/start_pts"
+     },
+     "duration_ts": {
+      "value": 322560,
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/1/duration_ts"
+     },
+     "details": {
+      "kind": "audio",
+      "metadata": {
+       "sample_rate_hz": {
+        "value": 48000,
+        "evidence_id": "ffprobe-0",
+        "locator": "/streams/1/sample_rate"
+       },
+       "channels": {
+        "value": 2,
+        "evidence_id": "ffprobe-0",
+        "locator": "/streams/1/channels"
+       },
+       "sample_format": {
+        "value": {
+         "state": "known",
+         "value": "s16"
+        },
+        "evidence_id": "ffprobe-0",
+        "locator": "/streams/1/sample_fmt"
+       },
+       "channel_layout": {
+        "value": {
+         "state": "unspecified"
+        },
+        "evidence_id": "ffprobe-0",
+        "locator": "/streams/1/channel_layout"
+       },
+       "bits_per_sample": {
+        "value": 16,
+        "evidence_id": "ffprobe-0",
+        "locator": "/streams/1/bits_per_sample"
+       }
+      }
+     }
+    },
+    {
+     "index": {
+      "value": 2,
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/2/index"
+     },
+     "codec": {
+      "value": {
+       "state": "unspecified"
+      },
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/2/codec_name"
+     },
+     "profile": null,
+     "time_base": {
+      "value": {
+       "numerator": 1,
+       "denominator": 50000
+      },
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/2/time_base"
+     },
+     "start_pts": {
+      "value": 0,
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/2/start_pts"
+     },
+     "duration_ts": {
+      "value": 336000,
+      "evidence_id": "ffprobe-0",
+      "locator": "/streams/2/duration_ts"
+     },
+     "details": {
+      "kind": "other",
+      "metadata": {
+       "stream_type": {
+        "value": "data",
+        "evidence_id": "ffprobe-0",
+        "locator": "/streams/2/codec_type"
+       }
+      }
+     }
+    }
+   ],
+   "tags": {
+    "creation_time": {
+     "value": "2026-10-19T17:03:02+02:00",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/CreationDate[1]/@value"
+    },
+    "ffprobe:/format/tags/compatible_brands": {
+     "value": "XAVCmp42iso6",
+     "evidence_id": "ffprobe-0",
+     "locator": "/format/tags/compatible_brands"
+    },
+    "ffprobe:/format/tags/creation_time": {
+     "value": "2026-10-19T15:03:02.000000Z",
+     "evidence_id": "ffprobe-0",
+     "locator": "/format/tags/creation_time"
+    },
+    "ffprobe:/format/tags/major_brand": {
+     "value": "XAVC",
+     "evidence_id": "ffprobe-0",
+     "locator": "/format/tags/major_brand"
+    },
+    "ffprobe:/format/tags/minor_version": {
+     "value": "17506303",
+     "evidence_id": "ffprobe-0",
+     "locator": "/format/tags/minor_version"
+    },
+    "ffprobe:/streams/0/codec_tag": {
+     "value": "0x31637661",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/0/codec_tag"
+    },
+    "ffprobe:/streams/0/codec_tag_string": {
+     "value": "avc1",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/0/codec_tag_string"
+    },
+    "ffprobe:/streams/0/tags/creation_time": {
+     "value": "2026-10-19T15:03:02.000000Z",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/0/tags/creation_time"
+    },
+    "ffprobe:/streams/0/tags/encoder": {
+     "value": "AVC Coding",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/0/tags/encoder"
+    },
+    "ffprobe:/streams/0/tags/handler_name": {
+     "value": "Video Media Handler",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/0/tags/handler_name"
+    },
+    "ffprobe:/streams/0/tags/language": {
+     "value": "und",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/0/tags/language"
+    },
+    "ffprobe:/streams/1/codec_tag": {
+     "value": "0x736f7774",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/1/codec_tag"
+    },
+    "ffprobe:/streams/1/codec_tag_string": {
+     "value": "twos",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/1/codec_tag_string"
+    },
+    "ffprobe:/streams/1/tags/creation_time": {
+     "value": "2026-10-19T15:03:02.000000Z",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/1/tags/creation_time"
+    },
+    "ffprobe:/streams/1/tags/handler_name": {
+     "value": "Sound Media Handler",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/1/tags/handler_name"
+    },
+    "ffprobe:/streams/1/tags/language": {
+     "value": "und",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/1/tags/language"
+    },
+    "ffprobe:/streams/2/codec_tag": {
+     "value": "0x646d7472",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/2/codec_tag"
+    },
+    "ffprobe:/streams/2/codec_tag_string": {
+     "value": "rtmd",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/2/codec_tag_string"
+    },
+    "ffprobe:/streams/2/tags/creation_time": {
+     "value": "2026-10-19T15:03:02.000000Z",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/2/tags/creation_time"
+    },
+    "ffprobe:/streams/2/tags/handler_name": {
+     "value": "Timed Metadata Media Handler",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/2/tags/handler_name"
+    },
+    "ffprobe:/streams/2/tags/language": {
+     "value": "und",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/2/tags/language"
+    },
+    "ffprobe:/streams/2/tags/timecode": {
+     "value": "00:02:17:14",
+     "evidence_id": "ffprobe-0",
+     "locator": "/streams/2/tags/timecode"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@aspectRatio": {
+     "value": "16:9",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@aspectRatio"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@audioType": {
+     "value": "LPCM16",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@audioType"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@ch": {
+     "value": "2",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@ch"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@dur": {
+     "value": "336",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@dur"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@fps": {
+     "value": "50p",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@fps"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@offset": {
+     "value": "0",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@offset"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@status": {
+     "value": "none",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@status"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@type": {
+     "value": "MP4",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@type"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@umid": {
+     "value": "060A2B340101010501010D4313000000D07D261D321306DEF03E05FFFE235954",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@umid"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@uri": {
+     "value": "./CLIP/C0017.MP4",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@uri"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/@videoType": {
+     "value": "AVC50_1920_1080_H422P@L42",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/@videoType"
+    },
+    "sony.index:/MediaProfile[1]/Properties[1]/Attached[1]/@mediaId": {
+     "value": "00000000957296C25954F03E05FFFE23",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Properties[1]/Attached[1]/@mediaId"
+    },
+    "sony.index:/MediaProfile[1]/Properties[1]/Attached[1]/@mediaKind": {
+     "value": "AffordableMemoryCard",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Properties[1]/Attached[1]/@mediaKind"
+    },
+    "sony.index:/MediaProfile[1]/Properties[1]/Attached[1]/@mediaName": {
+     "value": "",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Properties[1]/Attached[1]/@mediaName"
+    },
+    "sony.index:/MediaProfile[1]/Properties[1]/System[1]/@masterVersion": {
+     "value": "XAVC-M4@2.00.00",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Properties[1]/System[1]/@masterVersion"
+    },
+    "sony.index:/MediaProfile[1]/Properties[1]/System[1]/@systemId": {
+     "value": "F03E05FFFE235954",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Properties[1]/System[1]/@systemId"
+    },
+    "sony.index:/MediaProfile[1]/Properties[1]/System[1]/@systemKind": {
+     "value": "ILME-FX3A",
+     "evidence_id": "index-original",
+     "locator": "/MediaProfile[1]/Properties[1]/System[1]/@systemKind"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/@lastUpdate": {
+     "value": "2026-10-19T17:03:09+02:00",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/@lastUpdate"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[1]/@name": {
+     "value": "ImagerControlInformation",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[1]/@name"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[1]/Event[1]/@frameCount": {
+     "value": "0",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[1]/Event[1]/@frameCount"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[1]/Event[1]/@status": {
+     "value": "start",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[1]/Event[1]/@status"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[2]/@name": {
+     "value": "LensControlInformation",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[2]/@name"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[2]/Event[1]/@frameCount": {
+     "value": "0",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[2]/Event[1]/@frameCount"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[2]/Event[1]/@status": {
+     "value": "start",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[2]/Event[1]/@status"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[3]/@name": {
+     "value": "DistortionCorrection",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[3]/@name"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[3]/Event[1]/@frameCount": {
+     "value": "0",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[3]/Event[1]/@frameCount"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[3]/Event[1]/@status": {
+     "value": "start",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[3]/Event[1]/@status"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[4]/@name": {
+     "value": "Gyroscope",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[4]/@name"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[4]/Event[1]/@frameCount": {
+     "value": "0",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[4]/Event[1]/@frameCount"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[4]/Event[1]/@status": {
+     "value": "start",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[4]/Event[1]/@status"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[5]/@name": {
+     "value": "Accelerometor",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[5]/@name"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[5]/Event[1]/@frameCount": {
+     "value": "0",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[5]/Event[1]/@frameCount"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[5]/Event[1]/@status": {
+     "value": "start",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/ChangeTable[5]/Event[1]/@status"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/@name": {
+     "value": "CameraUnitMetadataSet",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/@name"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[1]/@name": {
+     "value": "CaptureGammaEquation",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[1]/@name"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[1]/@value": {
+     "value": "nxcam-still",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[1]/@value"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[2]/@name": {
+     "value": "CaptureColorPrimaries",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[2]/@name"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[2]/@value": {
+     "value": "rec709",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[2]/@value"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[3]/@name": {
+     "value": "CodingEquations",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[3]/@name"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[3]/@value": {
+     "value": "rec709",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AcquisitionRecord[1]/Group[1]/Item[3]/@value"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AudioFormat[1]/@numOfChannel": {
+     "value": "2",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AudioFormat[1]/@numOfChannel"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[1]/@audioCodec": {
+     "value": "LPCM16",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[1]/@audioCodec"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[1]/@port": {
+     "value": "DIRECT",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[1]/@port"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[1]/@trackDst": {
+     "value": "CH1",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[1]/@trackDst"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[2]/@audioCodec": {
+     "value": "LPCM16",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[2]/@audioCodec"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[2]/@port": {
+     "value": "DIRECT",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[2]/@port"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[2]/@trackDst": {
+     "value": "CH2",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/AudioFormat[1]/AudioRecPort[2]/@trackDst"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/CreationDate[1]/@value": {
+     "value": "2026-10-19T17:03:02+02:00",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/CreationDate[1]/@value"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/Device[1]/@manufacturer": {
+     "value": "Sony",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/Device[1]/@manufacturer"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/Device[1]/@modelName": {
+     "value": "ILME-FX3A",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/Device[1]/@modelName"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/Device[1]/@serialNo": {
+     "value": "4294967295",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/Device[1]/@serialNo"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/Duration[1]/@value": {
+     "value": "336",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/Duration[1]/@value"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/KlvPacketTable[1]/KlvPacket[1]/@frameCount": {
+     "value": "0",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/KlvPacketTable[1]/KlvPacket[1]/@frameCount"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/KlvPacketTable[1]/KlvPacket[1]/@key": {
+     "value": "060E2B34010101050301020A02000000",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/KlvPacketTable[1]/KlvPacket[1]/@key"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/KlvPacketTable[1]/KlvPacket[1]/@lengthValue": {
+     "value": "095F5265635374617274",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/KlvPacketTable[1]/KlvPacket[1]/@lengthValue"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/KlvPacketTable[1]/KlvPacket[1]/@status": {
+     "value": "spot",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/KlvPacketTable[1]/KlvPacket[1]/@status"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/Lens[1]/@modelName": {
+     "value": "FE 24-240mm F3.5-6.3 OSS",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/Lens[1]/@modelName"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/LtcChangeTable[1]/@halfStep": {
+     "value": "true",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/LtcChangeTable[1]/@halfStep"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/LtcChangeTable[1]/@tcFps": {
+     "value": "25",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/LtcChangeTable[1]/@tcFps"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[1]/@frameCount": {
+     "value": "0",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[1]/@frameCount"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[1]/@status": {
+     "value": "increment",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[1]/@status"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[1]/@value": {
+     "value": "07170200",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[1]/@value"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[2]/@frameCount": {
+     "value": "335",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[2]/@frameCount"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[2]/@status": {
+     "value": "end",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[2]/@status"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[2]/@value": {
+     "value": "24230280",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/LtcChangeTable[1]/LtcChange[2]/@value"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/RecordingMode[1]/@cacheRec": {
+     "value": "false",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/RecordingMode[1]/@cacheRec"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/RecordingMode[1]/@type": {
+     "value": "normal",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/RecordingMode[1]/@type"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/SubStream[1]/@codec": {
+     "value": "HEVC_Proxy_1920_1080_M10P@L41MT",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/SubStream[1]/@codec"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/TargetMaterial[1]/@umidRef": {
+     "value": "060A2B340101010501010D4313000000D07D261D321306DEF03E05FFFE235954",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/TargetMaterial[1]/@umidRef"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/VideoFormat[1]/VideoFrame[1]/@captureFps": {
+     "value": "50.00p",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoFrame[1]/@captureFps"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/VideoFormat[1]/VideoFrame[1]/@formatFps": {
+     "value": "50p",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoFrame[1]/@formatFps"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/VideoFormat[1]/VideoFrame[1]/@videoCodec": {
+     "value": "AVC50_1920_1080_H422P@L42",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoFrame[1]/@videoCodec"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/VideoFormat[1]/VideoLayout[1]/@aspectRatio": {
+     "value": "16:9",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoLayout[1]/@aspectRatio"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/VideoFormat[1]/VideoLayout[1]/@numOfVerticalLine": {
+     "value": "1080",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoLayout[1]/@numOfVerticalLine"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/VideoFormat[1]/VideoLayout[1]/@pixel": {
+     "value": "1920",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoLayout[1]/@pixel"
+    },
+    "sony.sidecar:/NonRealTimeMeta[1]/VideoFormat[1]/VideoRecPort[1]/@port": {
+     "value": "DIRECT",
+     "evidence_id": "sidecar-original",
+     "locator": "/NonRealTimeMeta[1]/VideoFormat[1]/VideoRecPort[1]/@port"
+    }
+   }
+  },
+  "proxy": {
+   "media_uri": "qnc://local/source/volume-30616164/file/PRIVATE/M4ROOT/SUB/C0017S03%2EMP4",
+   "container": {
+    "value": "mp4",
+    "evidence_id": "index-proxy",
+    "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@type"
+   },
+   "duration_seconds": {
+    "value": {
+     "numerator": 168,
+     "denominator": 25
+    },
+    "evidence_id": "ffprobe-1",
+    "locator": "/format/duration"
+   },
+   "streams_complete": {
+    "value": true,
+    "evidence_id": "ffprobe-1",
+    "locator": "/streams"
+   },
+   "streams": [
+    {
+     "index": {
+      "value": 0,
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/0/index"
+     },
+     "codec": {
+      "value": {
+       "state": "known",
+       "value": "hevc"
+      },
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/0/codec_name"
+     },
+     "profile": {
+      "value": "Main 10",
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/0/profile"
+     },
+     "time_base": {
+      "value": {
+       "numerator": 1,
+       "denominator": 50000
+      },
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/0/time_base"
+     },
+     "start_pts": {
+      "value": 0,
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/0/start_pts"
+     },
+     "duration_ts": {
+      "value": 336000,
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/0/duration_ts"
+     },
+     "details": {
+      "kind": "video",
+      "metadata": {
+       "width": {
+        "value": 1920,
+        "evidence_id": "index-proxy",
+        "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@videoType"
+       },
+       "height": {
+        "value": 1080,
+        "evidence_id": "index-proxy",
+        "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@videoType"
+       },
+       "frame_rate": {
+        "value": {
+         "fps_num": 50,
+         "fps_den": 1
+        },
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/0/avg_frame_rate"
+       },
+       "frame_rate_mode": {
+        "value": "unknown",
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/0"
+       },
+       "frame_count": {
+        "value": {
+         "accuracy": "exact",
+         "frames": 336
+        },
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/0/nb_frames"
+       },
+       "scan_mode": {
+        "value": "progressive",
+        "evidence_id": "ffprobe-1",
+        "locator": "/frames/0/interlaced_frame"
+       },
+       "pixel_format": {
+        "value": "yuv420p10le",
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/0/pix_fmt"
+       },
+       "sample_aspect_ratio": {
+        "value": {
+         "numerator": 1,
+         "denominator": 1
+        },
+        "evidence_id": "index-proxy",
+        "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@aspectRatio"
+       },
+       "rotation_degrees": {
+        "value": {
+         "state": "unspecified"
+        },
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/0"
+       },
+       "color": {
+        "primaries": {
+         "value": {
+          "state": "known",
+          "value": "bt709"
+         },
+         "evidence_id": "ffprobe-1",
+         "locator": "/streams/0/color_primaries"
+        },
+        "transfer": {
+         "value": {
+          "state": "known",
+          "value": "bt709"
+         },
+         "evidence_id": "ffprobe-1",
+         "locator": "/streams/0/color_transfer"
+        },
+        "matrix": {
+         "value": {
+          "state": "known",
+          "value": "bt709"
+         },
+         "evidence_id": "ffprobe-1",
+         "locator": "/streams/0/color_space"
+        },
+        "range": {
+         "value": {
+          "state": "known",
+          "value": "tv"
+         },
+         "evidence_id": "ffprobe-1",
+         "locator": "/streams/0/color_range"
+        }
+       }
+      }
+     }
+    },
+    {
+     "index": {
+      "value": 1,
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/1/index"
+     },
+     "codec": {
+      "value": {
+       "state": "known",
+       "value": "aac"
+      },
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/1/codec_name"
+     },
+     "profile": null,
+     "time_base": {
+      "value": {
+       "numerator": 1,
+       "denominator": 48000
+      },
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/1/time_base"
+     },
+     "start_pts": {
+      "value": 0,
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/1/start_pts"
+     },
+     "duration_ts": {
+      "value": 322560,
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/1/duration_ts"
+     },
+     "details": {
+      "kind": "audio",
+      "metadata": {
+       "sample_rate_hz": {
+        "value": 48000,
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/1/sample_rate"
+       },
+       "channels": {
+        "value": 2,
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/1/channels"
+       },
+       "sample_format": {
+        "value": {
+         "state": "known",
+         "value": "fltp"
+        },
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/1/sample_fmt"
+       },
+       "channel_layout": {
+        "value": {
+         "state": "known",
+         "value": "stereo"
+        },
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/1/channel_layout"
+       },
+       "bits_per_sample": null
+      }
+     }
+    },
+    {
+     "index": {
+      "value": 2,
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/2/index"
+     },
+     "codec": {
+      "value": {
+       "state": "unspecified"
+      },
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/2/codec_name"
+     },
+     "profile": null,
+     "time_base": {
+      "value": {
+       "numerator": 1,
+       "denominator": 50000
+      },
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/2/time_base"
+     },
+     "start_pts": {
+      "value": 0,
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/2/start_pts"
+     },
+     "duration_ts": {
+      "value": 336000,
+      "evidence_id": "ffprobe-1",
+      "locator": "/streams/2/duration_ts"
+     },
+     "details": {
+      "kind": "other",
+      "metadata": {
+       "stream_type": {
+        "value": "data",
+        "evidence_id": "ffprobe-1",
+        "locator": "/streams/2/codec_type"
+       }
+      }
+     }
+    }
+   ],
+   "tags": {
+    "creation_time": {
+     "value": "2026-10-19T15:03:02.000000Z",
+     "evidence_id": "ffprobe-1",
+     "locator": "/format/tags/creation_time"
+    },
+    "ffprobe:/format/tags/compatible_brands": {
+     "value": "XAVCmp42nrasiso6",
+     "evidence_id": "ffprobe-1",
+     "locator": "/format/tags/compatible_brands"
+    },
+    "ffprobe:/format/tags/creation_time": {
+     "value": "2026-10-19T15:03:02.000000Z",
+     "evidence_id": "ffprobe-1",
+     "locator": "/format/tags/creation_time"
+    },
+    "ffprobe:/format/tags/major_brand": {
+     "value": "XAVC",
+     "evidence_id": "ffprobe-1",
+     "locator": "/format/tags/major_brand"
+    },
+    "ffprobe:/format/tags/minor_version": {
+     "value": "17506303",
+     "evidence_id": "ffprobe-1",
+     "locator": "/format/tags/minor_version"
+    },
+    "ffprobe:/streams/0/codec_tag": {
+     "value": "0x31637668",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/0/codec_tag"
+    },
+    "ffprobe:/streams/0/codec_tag_string": {
+     "value": "hvc1",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/0/codec_tag_string"
+    },
+    "ffprobe:/streams/0/tags/creation_time": {
+     "value": "2026-10-19T15:03:02.000000Z",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/0/tags/creation_time"
+    },
+    "ffprobe:/streams/0/tags/encoder": {
+     "value": "HEVC Coding",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/0/tags/encoder"
+    },
+    "ffprobe:/streams/0/tags/handler_name": {
+     "value": "Video Media Handler",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/0/tags/handler_name"
+    },
+    "ffprobe:/streams/0/tags/language": {
+     "value": "und",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/0/tags/language"
+    },
+    "ffprobe:/streams/1/codec_tag": {
+     "value": "0x6134706d",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/1/codec_tag"
+    },
+    "ffprobe:/streams/1/codec_tag_string": {
+     "value": "mp4a",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/1/codec_tag_string"
+    },
+    "ffprobe:/streams/1/tags/creation_time": {
+     "value": "2026-10-19T15:03:02.000000Z",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/1/tags/creation_time"
+    },
+    "ffprobe:/streams/1/tags/handler_name": {
+     "value": "Sound Media Handler",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/1/tags/handler_name"
+    },
+    "ffprobe:/streams/1/tags/language": {
+     "value": "und",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/1/tags/language"
+    },
+    "ffprobe:/streams/2/codec_tag": {
+     "value": "0x646d7472",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/2/codec_tag"
+    },
+    "ffprobe:/streams/2/codec_tag_string": {
+     "value": "rtmd",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/2/codec_tag_string"
+    },
+    "ffprobe:/streams/2/tags/creation_time": {
+     "value": "2026-10-19T15:03:02.000000Z",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/2/tags/creation_time"
+    },
+    "ffprobe:/streams/2/tags/handler_name": {
+     "value": "Timed Metadata Media Handler",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/2/tags/handler_name"
+    },
+    "ffprobe:/streams/2/tags/language": {
+     "value": "und",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/2/tags/language"
+    },
+    "ffprobe:/streams/2/tags/timecode": {
+     "value": "00:02:17:14",
+     "evidence_id": "ffprobe-1",
+     "locator": "/streams/2/tags/timecode"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@aspectRatio": {
+     "value": "16:9",
+     "evidence_id": "index-proxy",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@aspectRatio"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@audioType": {
+     "value": "AAC-LC",
+     "evidence_id": "index-proxy",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@audioType"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@ch": {
+     "value": "2",
+     "evidence_id": "index-proxy",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@ch"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@type": {
+     "value": "MP4",
+     "evidence_id": "index-proxy",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@type"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@umid": {
+     "value": "060A2B340101010501010D4313FF0000D07D261D321306DEF03E05FFFE235954",
+     "evidence_id": "index-proxy",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@umid"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@uri": {
+     "value": "./SUB/C0017S03.MP4",
+     "evidence_id": "index-proxy",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@uri"
+    },
+    "sony.index:/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@videoType": {
+     "value": "HEVC_Proxy_1920_1080_M10P@L41MT",
+     "evidence_id": "index-proxy",
+     "locator": "/MediaProfile[1]/Contents[1]/Material[6]/Proxy[1]/@videoType"
+    }
+   }
+  }
+ },
+ "report": {
+  "issues": []
+ },
+ "recorded_at_unix_ms": 1792707003732
+}

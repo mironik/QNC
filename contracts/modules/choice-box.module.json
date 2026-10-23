@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.choice-box",
+  "module_name": "Choice box",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.choice"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-choice-box",
+  "input": "A title, what is in the way, the items it is about, how it can be solved and the options as catalog actions with labels; the theme.",
+  "output": "An info box in the middle of the screen over everything; the action of the option the user clicked.",
+  "specification": "User 2026-10-23: when a project setting is in conflict with the state of the card, it is said in an info box with a solution and a choice."
+}

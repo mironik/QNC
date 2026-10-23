@@ -190,7 +190,7 @@ fn batch_publication_is_atomic_and_inventory_removal_is_guarded() {
     stale.revision += 1;
     assert!(writer.remove_missing(vec![stale]).unwrap().is_empty());
     writer.select(vec!["second".into()], true).unwrap();
-    writer.queue_selected().unwrap();
+    writer.queue_selected(qnc_import_fit::Needs::original_only()).unwrap();
     assert_eq!(writer.remove_missing(inventory).unwrap(), vec!["first"]);
     let rows = writer.list(None).unwrap();
     assert_eq!(rows.len(), 1);
@@ -385,7 +385,7 @@ fn public_output_survives_restart_without_touching_project_settings() {
     assert_eq!(clips.len(), 1);
     assert!(clips[0].selected);
     assert_eq!(clips[0].clip.serial_number, "serial-123");
-    assert!(run(&mut store, Operation::QueueSelected).is_err());
+    assert!(run(&mut store, Operation::QueueSelected { needs: qnc_import_fit::Needs::original_only() }).is_err());
     let db = Connection::open(&path).unwrap();
     let settings_db = Connection::open(&path).unwrap();
     assert_eq!(
@@ -423,7 +423,7 @@ fn concurrent_writers_keep_journal_and_claim_a_clip_once() {
         },
     )
     .unwrap();
-    run(&mut first, Operation::QueueSelected).unwrap();
+    run(&mut first, Operation::QueueSelected { needs: qnc_import_fit::Needs::original_only() }).unwrap();
     let worker = std::thread::spawn(move || run(&mut second, Operation::ClaimNext).unwrap());
     let local = run(&mut first, Operation::ClaimNext).unwrap();
     let remote = worker.join().unwrap();
@@ -451,7 +451,7 @@ fn reselection_preserves_import_and_never_replaces_final_metadata() {
         },
     )
     .unwrap();
-    run(&mut store, Operation::QueueSelected).unwrap();
+    run(&mut store, Operation::QueueSelected { needs: qnc_import_fit::Needs::original_only() }).unwrap();
     assert!(matches!(
         run(&mut store, Operation::ClaimNext).unwrap(),
         Data::Claimed(Some(_))
@@ -691,7 +691,7 @@ fn lan_and_intranet_use_same_authenticated_db_contract() {
         let mut reader =
             ContentClient::from_remote(&resolver, &uri, Access::ReadOnly, "test-read").unwrap();
         assert_eq!(reader.list(None).unwrap().len(), 1);
-        assert!(reader.queue_selected().is_err());
+        assert!(reader.queue_selected(qnc_import_fit::Needs::original_only()).is_err());
         thread.join().unwrap();
     }
 }
@@ -728,7 +728,7 @@ fn queue(clip: CatalogClip) -> Result<Data> {
         },
     )
     .unwrap();
-    run(&mut store, Operation::QueueSelected)
+    run(&mut store, Operation::QueueSelected { needs: qnc_import_fit::Needs::original_only() })
 }
 
 #[test]
@@ -760,7 +760,7 @@ fn claimed_store(path: &std::path::Path) -> ContentStore {
         },
     )
     .unwrap();
-    run(&mut store, Operation::QueueSelected).unwrap();
+    run(&mut store, Operation::QueueSelected { needs: qnc_import_fit::Needs::original_only() }).unwrap();
     assert!(matches!(
         run(&mut store, Operation::ClaimNext).unwrap(),
         Data::Claimed(Some(_))
@@ -1076,7 +1076,7 @@ fn a_write_under_a_lease_another_took_is_refused_and_writes_nothing() {
     let mut store = ContentStore::open_owner_binding(&path, URI, Access::ReadWrite).unwrap();
     run(&mut store, Operation::Publish(Box::new(clip("c1")))).unwrap();
     run(&mut store, Operation::Select { clip_ids: vec!["c1".into()], selected: true }).unwrap();
-    run(&mut store, Operation::QueueSelected).unwrap();
+    run(&mut store, Operation::QueueSelected { needs: qnc_import_fit::Needs::original_only() }).unwrap();
     let claim = |store: &mut ContentStore, owner: &str| {
         run(store, Operation::Lease { key: "worker".into(), owner: owner.into(), act: LeaseAct::Claim, max_age_seconds: 60 })
             .unwrap()

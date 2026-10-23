@@ -29,8 +29,8 @@ impl IngestApplication {
                     }
                 },
                 Err(error) => {
-                    self.view.command_busy = false;
-                    self.view.message = error;
+                    (self.view.command_busy, self.view.message) = (false, error);
+                    self.view.import_choice = self.selection_writer.choice().cloned(); // clips in the way: the user chooses
                 }
             }
             changed = true;

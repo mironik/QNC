@@ -125,7 +125,7 @@ fn fixture_with(queued: bool) -> Fixture {
         qnc_ingest_store::content::ContentTarget::from_owner_binding(&content, DB_URI).unwrap();
     client.select(ids.clone(), true).unwrap();
     if queued {
-        client.queue_selected().unwrap();
+        client.queue_selected(qnc_import_fit::Needs::original_only()).unwrap();
     }
     let first = client.read(&ids[0]).unwrap().unwrap();
     let original = first.clip.snapshot.binding.original_uri.clone();
@@ -393,7 +393,7 @@ fn the_write_transport_queues_the_selected_clips_and_hands_them_out_once() {
         f.client.claim_next().unwrap().is_none(),
         "nothing queued yet"
     );
-    queue_selected(f.target.clone()).unwrap();
+    queue_selected(f.target.clone(), qnc_import_fit::Needs::original_only()).unwrap();
     let mut queue = TransportQueue::start(f.target.clone()).unwrap();
     let first = queue.claim_next().unwrap().unwrap();
     let second = queue.claim_next().unwrap().unwrap();
@@ -547,7 +547,7 @@ fn a_later_uvezi_imports_only_the_clips_that_are_not_imported_yet() {
         .unwrap();
     assert!(first.result.is_ok());
     // A later Uvezi selects both again: only the difference is queued and imported.
-    queue_selected(f.target.clone()).unwrap();
+    queue_selected(f.target.clone(), qnc_import_fit::Needs::original_only()).unwrap();
     let outcomes = drain(&mut f.client, &plan, &project, &opener, &nothing()).unwrap();
     assert_eq!(outcomes.len(), 1);
     assert_ne!(outcomes[0].clip_id, first.clip_id);

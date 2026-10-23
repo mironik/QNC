@@ -151,7 +151,7 @@ fn claimed_store(path: &Path) -> Story {
         },
     )
     .unwrap();
-    content(path, ContentOperation::QueueSelected).unwrap();
+    content(path, ContentOperation::QueueSelected { needs: qnc_import_fit::Needs::original_only() }).unwrap();
     assert!(matches!(
         content(path, ContentOperation::ClaimNext).unwrap(),
         ContentData::Claimed(Some(_))

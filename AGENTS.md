@@ -5388,3 +5388,17 @@ Izolirana kopija (kartica samo citana, stvarni projekt nepromijenjen): cisti Sel
 `final/complete` (prije `partial`). Zapisi stvarnog projekta koji su vec konacni ostaju (jedan probe po mediju); novi
 projekt ih daje ispravno. Testovi `qnc-ffprobe-metadata` (novi
 `scan_unknown_in_the_summary_comes_from_the_first_pictures_when_they_agree`), `qnc-media-probe`, conformance.
+Otkljucano i izvedeno 2026-10-23 (korisnik: "da, otkljucaj i napravi; ako je postavka projekta u koliziji sa stanjem
+kartice, to treba dati u info box i ponuditi rjesenje s opcijom izbora"): uvoz provjerava samo ono sto projekt koristi.
+Nova kocka `crates/qnc-import-fit` (+ ugovor; cisto pravilo nad spremljenim zapisom): original se uvijek koristi (zvuk i
+export), proxy samo kad ga projekt pusta (`playback.input` proxy, ili proxy if available kad ga klip ima) ili kopira
+(`storage.ingest_media` proxy); praznina u reprezentaciji koju projekt ne koristi ne zaustavlja uvoz; zapis kartice
+(faza kamera) i dalje se dovrsava u pozadini. `qnc-content-store`: `QueueSelected { needs }`, red uvoza odbija samo klipove
+koji ne odgovaraju projektu i imenuje ih. `qnc-ingest-selection-write`: prije upisa provjeri odabrane klipove; kad su neki
+na putu nista ne pise i daje izbor (`start_import`, `choice`, `answer`; akcije kataloga `ingest_import_skip_conflicts` i
+`ingest_import_cancel`): uvezi ostale ili odustani, uz objasnjenje i rjesenje u postavkama Projecta (Playback input ili
+Ingest media). Nova pasivna kocka `crates/qnc-choice-box` (+ ugovor): info prozor u sredini ekrana, crta ga traka uvoza
+(`qnc-ingest-import-bar`, polje `detail`). Provjera odabira premjestena iz Ingest aplikacije u pisca odabira (C10 Ingest
+aplikacija 1363 -> 1354); ploca Ingesta ista (155). Testovi `qnc-import-fit` (stvarni FX3A zapis), `qnc-content-store`,
+`qnc-ingest-selection-write`, `qnc-ingest-import-worker`, `qnc-ingest-select`, `qnc-program-db`, `qnc-ingest-application`,
+conformance. Uzivo nije provjereno.

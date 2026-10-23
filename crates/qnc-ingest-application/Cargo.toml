@@ -15,6 +15,8 @@ qnc-dev-diagnostics = { workspace = true }
 qnc-ingest-preview-source = { workspace = true }
 qnc-application-sequence = { workspace = true }
 qnc-ingest-selection-write = { workspace = true }
+qnc-import-fit = { workspace = true }
+qnc-choice-box = { workspace = true }
 qnc-playback-priority = { workspace = true }
 qnc-source-browse = { workspace = true }
 qnc-ingest-catalog = { workspace = true }

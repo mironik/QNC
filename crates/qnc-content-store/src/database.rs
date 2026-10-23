@@ -359,7 +359,7 @@ impl ContentStore {
                 tx.commit().map_err(err)?;
                 Ok(Data::Changed)
             }
-            Operation::QueueSelected => {
+            Operation::QueueSelected { needs } => {
                 let tx = qnc_write_lease::begin_write(&mut self.conn)
                     .map_err(err)?;
                 let mut stmt = tx.prepare(&format!("SELECT {} FROM clips WHERE selected != 0", stored_columns(self.has_copy_of))).map_err(err)?;
@@ -372,11 +372,9 @@ impl ContentStore {
                 if clips.is_empty() {
                     return Err(qnc_ui_text::text("ingest.msg.no_clips_selected").into());
                 }
-                if clips.iter().any(|c| !ready(c)) {
-                    return Err(
-                        qnc_ui_text::text("db.chosen_clip_finished_metadata_database_new")
-                            .into(),
-                    );
+                let blocked: Vec<&str> = clips.iter().filter(|c| !ready(c, *needs)).map(|c| c.clip.name.as_str()).collect();
+                if !blocked.is_empty() {
+                    return Err(qnc_ui_text::fill("db.clips_do_not_serve_the_project", &[("clips", &blocked.join(", "))]).into());
                 }
                 tx.execute("UPDATE clips SET import_status='queued',import_error=NULL WHERE selected != 0 AND import_status IN ('detected','failed')", []).map_err(err)?;
                 tx.commit().map_err(err)?;

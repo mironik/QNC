@@ -3251,6 +3251,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-choice-box"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-desktop-theme",
+ "qnc-theme-styles",
+ "qnc-ui-kit",
+]
+
+[[package]]
 name = "qnc-clip-posters"
 version = "0.1.0"
 dependencies = [
@@ -3324,6 +3334,7 @@ name = "qnc-content-store"
 version = "0.1.0"
 dependencies = [
  "qnc-contracts",
+ "qnc-import-fit",
  "qnc-json-transport",
  "qnc-media-metadata",
  "qnc-media-records",
@@ -3699,6 +3710,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-import-fit"
+version = "0.1.0"
+dependencies = [
+ "qnc-media-metadata",
+ "qnc-media-records",
+ "qnc-work-settings",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-ingest"
 version = "0.1.0"
 dependencies = [
@@ -3714,6 +3736,7 @@ dependencies = [
  "qnc-active-project-read",
  "qnc-application-sequence",
  "qnc-camera-adapter",
+ "qnc-choice-box",
  "qnc-clip-posters",
  "qnc-clip-row",
  "qnc-content-store",
@@ -3722,6 +3745,7 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-focus-walk",
  "qnc-image-assets",
+ "qnc-import-fit",
  "qnc-ingest-cameras",
  "qnc-ingest-catalog",
  "qnc-ingest-clip-list",
@@ -3830,6 +3854,7 @@ name = "qnc-ingest-import-bar"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-choice-box",
  "qnc-desktop-theme",
  "qnc-source-timeline",
  "qnc-theme-styles",
@@ -3848,6 +3873,7 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-filmstrip",
+ "qnc-import-fit",
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
@@ -3917,6 +3943,7 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-image-assets",
+ "qnc-import-fit",
  "qnc-ingest-cameras",
  "qnc-ingest-store",
  "qnc-media-metadata",
@@ -3947,6 +3974,9 @@ dependencies = [
 name = "qnc-ingest-selection-write"
 version = "0.1.0"
 dependencies = [
+ "qnc-choice-box",
+ "qnc-clip-row",
+ "qnc-import-fit",
  "qnc-ingest-store",
  "qnc-ui-text",
 ]
@@ -4648,6 +4678,7 @@ dependencies = [
  "qnc-content-read",
  "qnc-content-store",
  "qnc-db-broker",
+ "qnc-import-fit",
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-ui-text",

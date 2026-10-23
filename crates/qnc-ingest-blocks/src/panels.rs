@@ -121,7 +121,7 @@ pub(super) fn source_dock(ui: &mut Ui, contracts: &IngestContracts, theme: &Them
     let status = view.status_label();
     let now = ImportBarNow {
         status: &status,
-        status_detail: &view.message,
+        detail: (&view.message, view.import_choice.as_ref()),
         filter_all: view.clip_filter == ClipFilter::All,
         focused: view.focus.button.as_deref(),
         archive_available: view.archive_original_available,

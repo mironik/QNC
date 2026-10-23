@@ -108,6 +108,8 @@ members = [
     "crates/qnc-trim-stills",
     "crates/qnc-trim-overlay",
     "crates/qnc-alert",
+    "crates/qnc-import-fit",
+    "crates/qnc-choice-box",
     "crates/qnc-keyframe-nav",
     "crates/qnc-playback-activity",
     "crates/qnc-program-segments",
@@ -314,6 +316,8 @@ qnc-poster-create = { path = "crates/qnc-poster-create" }
 qnc-trim-stills = { path = "crates/qnc-trim-stills" }
 qnc-trim-overlay = { path = "crates/qnc-trim-overlay" }
 qnc-alert = { path = "crates/qnc-alert" }
+qnc-import-fit = { path = "crates/qnc-import-fit" }
+qnc-choice-box = { path = "crates/qnc-choice-box" }
 qnc-keyframe-nav = { path = "crates/qnc-keyframe-nav" }
 qnc-playback-activity = { path = "crates/qnc-playback-activity" }
 qnc-program-segments = { path = "crates/qnc-program-segments" }

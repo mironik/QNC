@@ -195,7 +195,8 @@ pub enum Operation {
         clip_ids: Vec<String>,
         selected: bool,
     },
-    QueueSelected,
+    /// The selected clips that serve what the project uses (`needs`, user 2026-10-23).
+    QueueSelected { needs: qnc_import_fit::Needs },
     ClaimNext,
     /// The importer still works on this clip: renews its lease.
     Heartbeat {
@@ -340,22 +341,11 @@ pub(crate) fn project_id(uri: &str) -> Result<String> {
     Ok(id.into())
 }
 
-/// A clip can be imported when its metadata is final and either complete or declared
-/// by the card: a final record without probe evidence is never probed to fill it, so
-/// waiting for more would wait forever. A probed record that is still partial stays
-/// blocked.
-pub(crate) fn ready(clip: &StoredClip) -> bool {
-    let snapshot = &clip.clip.snapshot;
-    // A card record (camera phase, no probe evidence) is queued: the import needs only
-    // its media references, and what playback lacks is completed in the background
-    // (v5). A probed record that is still partial stays blocked.
-    (snapshot.phase == Phase::Final
-        && snapshot.completeness == qnc_media_records::Completeness::Complete)
-        || !snapshot
-            .metadata
-            .evidence
-            .iter()
-            .any(|e| e.kind == qnc_media_records::EvidenceKind::Ffprobe)
+/// A clip can be imported when its record serves what the project uses (`qnc-import-fit`):
+/// a card record is completed in the background (v5), a gap in a representation the
+/// project does not use is not in the way (user 2026-10-23).
+pub(crate) fn ready(clip: &StoredClip, needs: qnc_import_fit::Needs) -> bool {
+    qnc_import_fit::conflict(&clip.clip.snapshot, needs).is_none()
 }
 
 #[cfg(test)]

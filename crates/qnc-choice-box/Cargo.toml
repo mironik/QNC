@@ -1,0 +1,11 @@
+[package]
+name = "qnc-choice-box"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: an info box over the screen that says what is in the way, names the clips, offers what can be done and returns the chosen action; passive paint only"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-theme-styles = { workspace = true }
+qnc-ui-kit = { workspace = true }

@@ -490,10 +490,10 @@ impl TransportQueue {
     }
 
     /// Puts the selected, ready clips into the queue.
-    pub fn queue_selected(&mut self) -> Result<(), String> {
+    pub fn queue_selected(&mut self, needs: qnc_import_fit::Needs) -> Result<(), String> {
         let key = self.next_key("queue");
         self.transport
-            .queue_selected(key.clone())
+            .queue_selected(key.clone(), needs)
             .map_err(|e| e.to_string())?;
         self.wait(&key).map(|_| ())
     }
@@ -538,6 +538,6 @@ impl ImportQueue for TransportQueue {
 }
 
 /// Queues the selected clips through the write transport of `target`.
-pub fn queue_selected(target: qnc_ingest_store::content::ContentTarget) -> Result<(), String> {
-    TransportQueue::start(target)?.queue_selected()
+pub fn queue_selected(target: qnc_ingest_store::content::ContentTarget, needs: qnc_import_fit::Needs) -> Result<(), String> {
+    TransportQueue::start(target)?.queue_selected(needs)
 }

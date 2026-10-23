@@ -27,7 +27,9 @@ pub struct ImportBarSpec<'a> {
 /// What the bar shows now (from the form's view).
 pub struct ImportBarNow<'a> {
     pub status: &'a str,
-    pub status_detail: &'a str,
+    /// The message behind the status, and the choice the user is asked for, if any (user
+    /// 2026-10-23: a project setting in conflict with the card is said in an info box).
+    pub detail: (&'a str, Option<&'a qnc_choice_box::Choice>),
     /// All (`true`) or New (`false`) is chosen.
     pub filter_all: bool,
     pub focused: Option<&'a str>,
@@ -56,7 +58,10 @@ pub fn show(
     let mut asked = None;
     ui.add_space(10.0);
     if spec.show_import_actions && !now.status.is_empty() {
-        ui.label(RichText::new(now.status).color(theme.text_muted)).on_hover_text(now.status_detail);
+        ui.label(RichText::new(now.status).color(theme.text_muted)).on_hover_text(now.detail.0);
+    }
+    if let Some(action) = now.detail.1.and_then(|choice| qnc_choice_box::show(ui.ctx(), theme, choice)) {
+        asked = Some(ImportBarAction::Action(action));
     }
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
         ui.spacing_mut().item_spacing.x = 8.0;

@@ -286,6 +286,12 @@
     "ingest_tab_all": {
       "label": "Ingest pool: tab All"
     },
+    "ingest_import_skip_conflicts": {
+      "label": "Uvezi: uvezi ostale klipove, bez onih koji ne odgovaraju postavkama projekta"
+    },
+    "ingest_import_cancel": {
+      "label": "Uvezi: odustani"
+    },
     "ingest_tab_virtual": {
       "label": "Ingest pool: tab Virtual"
     },

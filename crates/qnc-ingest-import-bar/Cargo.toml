@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC panel: the import bar of the source timeline header (status, New | All, import buttons, archive and AI ticks)"
 
 [dependencies]
+qnc-choice-box = { workspace = true }
 eframe = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-source-timeline = { workspace = true }

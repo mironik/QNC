@@ -7,6 +7,7 @@ description = "QNC project content database store and transport"
 [dependencies]
 qnc-ui-text = { workspace = true }
 qnc-write-lease = { workspace = true }
+qnc-import-fit = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-json-transport = { workspace = true }
 qnc-media-records = { workspace = true }

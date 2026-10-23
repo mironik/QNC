@@ -768,7 +768,7 @@ fn a_declared_clip_from_the_card_can_be_selected_and_queued_for_import_without_a
     )
     .unwrap();
     client.select(ids, true).unwrap();
-    client.queue_selected().unwrap();
+    client.queue_selected(qnc_import_fit::Needs::original_only()).unwrap();
     assert!(client.claim_next().unwrap().is_some());
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }

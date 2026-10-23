@@ -1,0 +1,14 @@
+[package]
+name = "qnc-import-fit"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: whether a clip's stored media record serves what the project uses (original, proxy), and what is in the way when it does not; pure rule, no I/O"
+
+[dependencies]
+qnc-media-records = { workspace = true }
+qnc-work-settings = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+qnc-media-metadata = { workspace = true }
