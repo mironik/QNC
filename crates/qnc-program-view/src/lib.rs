@@ -247,10 +247,14 @@ impl SegmentsView {
 
     /// v5 `quick_cover_target`: the selected slot, while it has no cover.
     pub fn quick_cover_slot(&self) -> Result<&Slot, String> {
-        let slot = self
-            .selected_slot()
-            .or_else(|| self.slot_at_playhead())
-            .ok_or(qnc_ui_text::text("story.msg.pick_slot_for_broll"))?;
+        // A chosen slot that already has a B-roll gives way to the empty slot under the
+        // Wrap playhead (user 2026-10-23: after Sync the playhead is in the next slot).
+        let empty_at_playhead = self.slot_at_playhead().filter(|slot| !slot.has_cover);
+        let slot = match self.selected_slot() {
+            Some(slot) if slot.has_cover => empty_at_playhead.unwrap_or(slot),
+            Some(slot) => slot,
+            None => self.slot_at_playhead().ok_or(qnc_ui_text::text("story.msg.pick_slot_for_broll"))?,
+        };
         if slot.has_cover {
             return Err(qnc_ui_text::text("story.msg.slot_has_broll").into());
         }
@@ -424,4 +428,27 @@ pub fn cover_spans(covers: &[ProgramCover], selected: Option<&str>, story_rate: 
             a2_off: cover.a2_off,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod quick_cover_tests {
+    use super::*;
+
+    fn slot(id: &str, start: u64, end: u64, has_cover: bool, selected: bool) -> Slot {
+        Slot { slot_id: id.into(), start_frame: start, end_frame: end, has_cover, selected }
+    }
+
+    #[test]
+    fn a_chosen_slot_with_a_b_roll_gives_way_to_the_empty_slot_under_the_playhead() {
+        let mut view = SegmentsView {
+            slots: vec![slot("s1", 0, 100, true, true), slot("s2", 100, 200, false, false)],
+            playhead: Some(150),
+            ..Default::default()
+        };
+        assert_eq!(view.quick_cover_slot().unwrap().slot_id, "s2");
+        view.playhead = Some(50);
+        assert!(view.quick_cover_slot().is_err(), "nothing empty to take: it says so");
+        view.slots[0].has_cover = false;
+        assert_eq!(view.quick_cover_slot().unwrap().slot_id, "s1");
+    }
 }

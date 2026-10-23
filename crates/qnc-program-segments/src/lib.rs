@@ -645,8 +645,10 @@ impl ProgramSegments {
                 let inside = self.view.slots.iter().any(|slot| {
                     self.selected_slot.as_deref() == Some(slot.slot_id.as_str()) && (slot.start_frame..slot.end_frame).contains(&frame)
                 });
-                if !inside {
-                    self.selected_slot = None;
+                // The stored selection goes too, or a later reread brings it back (user
+                // 2026-10-23: after Sync the B-roll button did nothing).
+                if !inside && self.selected_slot.take().is_some() {
+                    self.write(Operation::SelectSlot { slot_id: String::new() });
                 }
                 self.drop_selected_cover();
                 self.cue_at(frame)
@@ -673,7 +675,8 @@ impl ProgramSegments {
                 // The B-roll button (and P) also puts the marked source into the empty slot,
                 // the chosen one or the one under the Wrap playhead, as B does (user 2026-10-17:
                 // "the B-roll button does not work").
-                if !sync && self.source.marks.is_some() && self.view.quick_cover_slot().is_ok() {
+                // When it cannot, it says why instead of doing nothing.
+                if !sync && self.source.marks.is_some() {
                     self.cover_from_source(false);
                 }
             }

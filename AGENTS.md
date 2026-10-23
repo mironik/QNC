@@ -5464,3 +5464,11 @@ pretvarac se priprema u isto vrijeme (stog gresaka uredaja je jedan). Izmjereno 
 promjena klipa): do prve pozicije 0,20-0,24 s, spreman 0,61-0,72 s; pretvarac se vise ne ceka (priprema traje koliko i
 zvucni uredaj, ~85 ms). Mironik 3401 (MXF s kartice D:) jednom je otvaranje trajalo 2,15 s i A/V na pocetku do 2,8 slike;
 to je citanje kartice, ne pretvarac. Testovi `qnc-gpu-raster` (i oni koji traze GPU), conformance.
+Popravak 2026-10-23 (korisnik: "izgubili smo funkciju b-roll... provjeri kako je radio juce, kako danas"): kod B-rolla
+nije mijenjan od 22. 10.; log projekta test-kocka1 pokazuje 9 pokrivalica danas napravljenih, a dugme B-roll tiho ne
+radi nista kad je izabran slot koji vec ima B-roll. Sync na Enter zapisuje izbor svog slota u bazu (`SelectSlot`),
+klik koji samo postavlja playhead pustao je izbor samo u memoriji, pa ga je sljedece citanje price vratilo, a nakon
+Synca playhead stoji u sljedecem (praznom) slotu. Sada: klik koji napusta izabrani slot brise i izbor u bazi
+(`qnc-program-segments` Cue); B, P i dugme B-roll uzimaju prazni slot pod Wrap playheadom kad izabrani slot vec ima
+B-roll (`qnc-program-view` `quick_cover_slot`, test); dugme B-roll s oznacenim izvorom uvijek kaze zasto nije stavilo
+pokrivalicu. Testovi, conformance. Uzivo nije provjereno.
