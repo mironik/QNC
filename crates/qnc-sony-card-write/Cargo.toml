@@ -1,0 +1,11 @@
+[package]
+name = "qnc-sony-card-write"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the parts of a Sony MediaProfile clip written as a card of their own (MEDIAPRO.XML entry, M01.XML with length, UMID and timecode of the part, thumbnail); the original card is only read"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

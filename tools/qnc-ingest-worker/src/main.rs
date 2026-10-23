@@ -83,7 +83,8 @@ fn import_while(
             return Ok(imported);
         }
         let last = !running.load(std::sync::atomic::Ordering::Relaxed);
-        if import_waiting(root)? {
+        // Clips in the queue, or Ingest SubClip parts not cut yet (their clip may be imported already).
+        if import_waiting(root)? || qnc_ingest_import_worker::parts_waiting(root).unwrap_or(false) {
             imported += qnc_ingest_import_worker::run_import(root, run)?.imported;
         }
         if last {
@@ -115,7 +116,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
     // v5 media probe job: a card record gets what playback lacks, once, in the
     // background, so a preview of a clip not yet imported plays. Beside the artifacts
     // only the clip a preview wants; the others after them, several at once.
-    let config = qnc_ingest_select::selection_config::SelectionConfig::load(root)
+    let config = qnc_ingest_select::selection_config::SelectionConfig::for_project(root, &reader, &snapshot.settings)
         .map_err(|error| error.to_string())?;
     let make_backend = |source_uri: &str, media: &[qnc_source_reader::SourceReference]| {
         let source = config

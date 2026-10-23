@@ -58,6 +58,21 @@ impl Store {
                 Ok(Data::Changed)
             }
             Operation::List => self.list(),
+            Operation::Select { part_id, selected } => {
+                let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+                tx.execute("UPDATE ingest_parts SET selected = ?2 WHERE part_id = ?1", params![part_id, *selected]).map_err(err)?;
+                tx.commit().map_err(err)?;
+                Ok(Data::Changed)
+            }
+            Operation::MarkCut { part_id, cut_name } => {
+                if cut_name.trim().is_empty() || cut_name.contains(['/', '\\']) {
+                    return Err(qnc_ui_text::text("parts.needs_in_and_out").into());
+                }
+                let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+                tx.execute("UPDATE ingest_parts SET cut_name = ?2 WHERE part_id = ?1", params![part_id, cut_name]).map_err(err)?;
+                tx.commit().map_err(err)?;
+                Ok(Data::Changed)
+            }
         }
     }
 
@@ -90,6 +105,8 @@ impl Store {
             name: format!("{clip_name} P{number:02}"),
             in_frame,
             out_frame,
+            cut_name: None,
+            selected: true,
         };
         tx.execute(
             "INSERT INTO ingest_parts (part_id, clip_id, name, in_frame, out_frame, created_at_utc)
@@ -105,7 +122,7 @@ impl Store {
         let mut statement = self
             .conn
             .prepare_cached(&format!(
-                "SELECT part_id, clip_id, name, in_frame, out_frame FROM public_ingest_parts ORDER BY created_at_utc, part_id LIMIT {MAX_PARTS}"
+                "SELECT part_id, clip_id, name, in_frame, out_frame, cut_name, selected FROM public_ingest_parts ORDER BY created_at_utc, part_id LIMIT {MAX_PARTS}"
             ))
             .map_err(err)?;
         let mut rows = statement.query([]).map_err(err)?;
@@ -118,6 +135,8 @@ impl Store {
                 name: row.get(2).map_err(err)?,
                 in_frame: frame(3)?,
                 out_frame: frame(4)?,
+                cut_name: row.get(5).map_err(err)?,
+                selected: row.get(6).map_err(err)?,
             });
         }
         Ok(Data::Parts(parts))
@@ -130,6 +149,12 @@ impl Store {
 }
 
 fn ensure_schema(conn: &Connection) -> Result<()> {
+    // A development table of an earlier form is removed, never converted (no migrations).
+    if object_exists(conn, "table", "ingest_parts")?
+        && conn.query_row("SELECT COUNT(*) FROM pragma_table_info('ingest_parts') WHERE name='selected'", [], |r| r.get::<_, i64>(0)).map_err(err)? == 0
+    {
+        conn.execute_batch("DROP VIEW IF EXISTS public_ingest_parts; DROP TABLE ingest_parts;").map_err(err)?;
+    }
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS ingest_part_numbers (
             clip_id TEXT PRIMARY KEY,
@@ -142,10 +167,12 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
             in_frame INTEGER NOT NULL CHECK (in_frame >= 0),
             out_frame INTEGER NOT NULL,
             created_at_utc TEXT NOT NULL,
+            cut_name TEXT,
+            selected INTEGER NOT NULL DEFAULT 1,
             CHECK (out_frame > in_frame)
         );
         CREATE VIEW IF NOT EXISTS public_ingest_parts AS
-        SELECT part_id, clip_id, name, in_frame, out_frame, created_at_utc FROM ingest_parts;",
+        SELECT part_id, clip_id, name, in_frame, out_frame, created_at_utc, cut_name, selected FROM ingest_parts;",
     )
     .map_err(err)
 }

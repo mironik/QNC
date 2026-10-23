@@ -99,6 +99,16 @@ impl IngestProject {
         qnc_ingest_catalog::project_folder(reader, plan)
     }
 
+    /// The sources Select can read: those of this computer and, once the project is loaded,
+    /// its folder (user 2026-10-23: the card of the Ingest SubClip parts is a disk of its own
+    /// in the browser, named without any operating system's drive name).
+    pub fn selection_config(&self, root: &std::path::Path) -> Result<qnc_ingest_select::SelectionConfig, Box<dyn std::error::Error + Send + Sync>> {
+        match self.reader.as_ref().zip(self.plan()) {
+            Some((reader, plan)) => qnc_ingest_select::SelectionConfig::for_project(root, reader, &plan.settings),
+            None => qnc_ingest_select::SelectionConfig::load(root),
+        }
+    }
+
     /// The order of the project's applications, from its public database view.
     pub fn application_sequence(&self) -> Result<Vec<qnc_application_sequence::SequenceStep>, String> {
         let reader = self.reader.as_ref().ok_or(qnc_ui_text::text("ingest.msg.no_settings_reader"))?;

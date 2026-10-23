@@ -90,6 +90,8 @@
     "cut.no_intra_before_in": "No intra picture at or before the IN of the part.",
     "cut.interrupted": "Cutting the part was interrupted.",
     "cut.not_mp4": "The original is not an MP4 or QuickTime file.",
+    "card.clip_not_in_mediapro": "The clip is not listed in the MEDIAPRO.XML of its card.",
+    "source.project_folder": "Project {project} (SubClip)",
     "cut.container_not_supported": "Parts of an original of this kind cannot be cut yet (only MXF, MP4 and QuickTime).",
     "cut.needs_local_original": "A part is cut from an original on this computer (local or mounted).",
     "cut.frames_differ": "The cut part has {cut} frames, the plan {plan}.",

@@ -22,7 +22,7 @@ mod optimize;
 pub use config::ConfigMediaOpener;
 mod process;
 
-pub use process::{ImportRun, 
+pub use process::{parts_waiting, ImportRun, 
     launch_worker, run_import, run_service, ImportSummary, WORKER_EXECUTABLE,
 };
 
@@ -63,10 +63,6 @@ pub trait MediaOpener: Send + Sync {
     fn describe(&self, _media_uri: &str, _file: &Path) -> Result<MediaRepresentation, String> {
         Err(qnc_ui_text::text("import.new_file_cannot_be_described_this").into())
     }
-    /// Like `describe`, with the evidence of the probe (a part becomes a clip of its own).
-    fn describe_with_evidence(&self, _media_uri: &str, _file: &Path) -> Result<(MediaRepresentation, qnc_media_metadata::Evidence), String> {
-        Err(qnc_ui_text::text("import.new_file_cannot_be_described_this").into())
-    }
 }
 
 /// The queue of the content database seen by the executor.
@@ -80,8 +76,8 @@ pub trait ImportQueue {
     fn parts(&mut self, _clip_id: &str) -> Result<Vec<qnc_ingest_parts::Part>, String> {
         Ok(Vec::new())
     }
-    /// The claimed clip imported as its parts.
-    fn finish_with_parts(&mut self, _clip_id: String, _parts: Vec<qnc_ingest_store::content::ImportedPart>) -> Result<(), String> {
+    /// A claimed clip with parts is not imported whole: its parts come from their own card.
+    fn finish_as_parts(&mut self, _clip_id: String) -> Result<(), String> {
         Err(qnc_ui_text::text("db.import_result_missing").into())
     }
     fn finish_import(
@@ -157,6 +153,11 @@ pub fn action_for(clip: &StoredClip, plan: &IngestWorkPlan) -> Result<Action, St
     let original = binding.original_uri.clone();
     let proxy = binding.proxy_uri.clone();
     match plan.media {
+        // Media already in the project folder (the card of the Ingest SubClip parts) is linked
+        // where it is, whatever the project copies from cards.
+        _ if plan.settings.project_media_source_uri().is_ok_and(|project| original.starts_with(&format!("{project}/"))) => {
+            Ok(Action::Link { media_uri: original })
+        }
         IngestMedia::Link => {
             let media_uri = match plan.playback_input {
                 PlaybackInput::Original => original,
@@ -398,20 +399,11 @@ pub fn run_next(
         return Ok(None);
     };
     let clip_id = clip.clip.id().to_string();
-    let parts = queue.parts(&clip_id)?;
-    if !parts.is_empty() {
-        let result = match parts::import_parts(&clip, &parts, plan, project_dir, opener, cancel) {
-            Ok(imported) => {
-                let uris = imported.iter().map(|part| part.media_uri.clone()).collect::<Vec<_>>().join(" ");
-                queue.finish_with_parts(clip_id.clone(), imported)?;
-                Ok(uris)
-            }
-            Err(error) => {
-                queue.finish_import(clip_id.clone(), None, None, None, None, Some(error.chars().take(4000).collect()))?;
-                Err(error)
-            }
-        };
-        return Ok(Some(Outcome { clip_id, result, thumbnail_uri: None }));
+    // A clip with parts is not imported whole (Ingest SubClip): its parts come in from
+    // their own card, cut before the queue is taken.
+    if !queue.parts(&clip_id)?.is_empty() {
+        queue.finish_as_parts(clip_id.clone())?;
+        return Ok(Some(Outcome { clip_id, result: Ok(String::new()), thumbnail_uri: None }));
     }
     let imported = import_media(&clip, plan, project_dir, opener, cancel, &mut || {
         let _ = queue.heartbeat(&clip_id);
@@ -526,6 +518,13 @@ impl TransportQueue {
         self.wait(&key).map(|_| ())
     }
 
+    /// Ticks the clips (the clips of a parts card Select has just recorded).
+    pub fn select(&mut self, clip_ids: Vec<String>) -> Result<(), String> {
+        let key = self.next_key("select");
+        self.transport.select(key.clone(), clip_ids, true).map_err(|e| e.to_string())?;
+        self.wait(&key).map(|_| ())
+    }
+
     /// Puts the selected, ready clips into the queue.
     pub fn queue_selected(&mut self, needs: qnc_import_fit::Needs) -> Result<(), String> {
         let key = self.next_key("queue");
@@ -544,9 +543,9 @@ impl ImportQueue for TransportQueue {
         }
     }
 
-    fn finish_with_parts(&mut self, clip_id: String, parts: Vec<qnc_ingest_store::content::ImportedPart>) -> Result<(), String> {
+    fn finish_as_parts(&mut self, clip_id: String) -> Result<(), String> {
         let key = self.next_key("parts");
-        self.transport.finish_with_parts(key.clone(), clip_id, parts).map_err(|e| e.to_string())?;
+        self.transport.finish_as_parts(key.clone(), clip_id).map_err(|e| e.to_string())?;
         self.wait(&key).map(|_| ())
     }
 

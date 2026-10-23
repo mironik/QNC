@@ -31,6 +31,9 @@ qnc-db-broker = { workspace = true }
 qnc-mxf-index = { workspace = true }
 qnc-mxf-cut = { workspace = true }
 qnc-mp4-cut = { workspace = true }
+qnc-sony-card-write = { workspace = true }
+qnc-ingest-cameras = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
 qnc-decoder-catalog = { workspace = true }
 qnc-media-records = { workspace = true }
 qnc-poster-create = { workspace = true }

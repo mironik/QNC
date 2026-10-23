@@ -3696,6 +3696,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-clip-row",
  "qnc-db-broker",
+ "serde",
 ]
 
 [[package]]
@@ -3933,11 +3934,13 @@ dependencies = [
  "qnc-contracts",
  "qnc-db-broker",
  "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
  "qnc-dir-browser",
  "qnc-ffprobe-metadata",
  "qnc-filmstrip",
  "qnc-frame-timebase",
  "qnc-import-fit",
+ "qnc-ingest-cameras",
  "qnc-ingest-parts",
  "qnc-ingest-select",
  "qnc-ingest-store",
@@ -3953,6 +3956,7 @@ dependencies = [
  "qnc-mxf-index",
  "qnc-playback-activity",
  "qnc-poster-create",
+ "qnc-sony-card-write",
  "qnc-sony-metadata",
  "qnc-source-reader",
  "qnc-source-timecode",
@@ -5244,6 +5248,14 @@ dependencies = [
  "qnc-virtual-short-stills",
  "qnc-virtual-shots",
  "qnc-work-settings",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-sony-card-write"
+version = "0.1.0"
+dependencies = [
+ "qnc-ui-text",
  "tempfile",
 ]
 

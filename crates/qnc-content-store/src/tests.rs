@@ -1098,20 +1098,15 @@ fn a_write_under_a_lease_another_took_is_refused_and_writes_nothing() {
 }
 
 #[test]
-fn a_clip_imported_as_its_parts_leaves_the_parts_imported_and_itself_not() {
+fn a_clip_with_parts_is_not_imported_whole() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     let mut store = claimed_store(&path);
-    let part = clip("c1-part-01");
-    let media_uri = part.snapshot.binding.original_uri.clone();
-    let finish = |parts: Vec<ImportedPart>| Operation::FinishWithParts { clip_id: "c1".into(), parts };
-    assert!(run(&mut store, finish(Vec::new())).is_err(), "a clip with no part is not finished this way");
-    run(&mut store, finish(vec![ImportedPart { clip: part.clone(), media_uri: media_uri.clone() }])).unwrap();
+    run(&mut store, Operation::FinishAsParts { clip_id: "c1".into() }).unwrap();
     let db = Connection::open(&path).unwrap();
-    let status = |id: &str| -> (String, Option<String>, bool) {
-        db.query_row("SELECT import_status, imported_media_uri, selected FROM clips WHERE clip_id=?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap()
-    };
-    assert_eq!(status("c1-part-01"), ("imported".into(), Some(media_uri.clone()), false));
-    assert_eq!(status("c1"), ("detected".into(), None, false), "the clip itself is not imported");
-    assert!(run(&mut store, finish(vec![ImportedPart { clip: part, media_uri }])).is_err(), "only a claimed clip");
+    let status: (String, Option<String>, bool) = db
+        .query_row("SELECT import_status, imported_media_uri, selected FROM clips WHERE clip_id='c1'", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+        .unwrap();
+    assert_eq!(status, ("detected".into(), None, false));
+    assert!(run(&mut store, Operation::FinishAsParts { clip_id: "c1".into() }).is_err(), "only a claimed clip");
 }

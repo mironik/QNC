@@ -49,6 +49,9 @@ fn a_saved_part_is_listed_with_its_own_id_and_a_deleted_one_is_gone() {
     assert_eq!(ids, ["c1-part-02", "c1-part-03"], "an id is never used again");
     assert_eq!(read_parts(&target, "c1").unwrap().len(), 2, "the import reads them too");
     assert!(read_parts(&target, "c2").unwrap().is_empty());
+    PartsWriter::start(target.clone()).unwrap().mark_cut("c1-part-02", "Mironik 2002_01").unwrap();
+    let uncut: Vec<_> = read_uncut(&target).unwrap().into_iter().map(|part| part.part_id).collect();
+    assert_eq!(uncut, ["c1-part-03"], "a cut part is not cut again");
 }
 
 #[test]

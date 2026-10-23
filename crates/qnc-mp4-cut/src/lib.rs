@@ -26,7 +26,8 @@ pub fn intra_at_or_before(ffmpeg: &Path, source: &Path, from: u64, (num, den): (
 
 /// Writes frames `first..to` of `source` to `dest` (`first` from [`intra_at_or_before`]),
 /// with `timecode` (HH:MM:SS:FF of its first frame) when the original has one.
-pub fn write(ffmpeg: &Path, source: &Path, dest: &Path, (first, to): (u64, u64), rate: (u64, u64), timecode: Option<&str>, cancel: &AtomicBool) -> Result<(), String> {
+/// Returns the frames of the part.
+pub fn write(ffmpeg: &Path, source: &Path, dest: &Path, (first, to): (u64, u64), rate: (u64, u64), timecode: Option<&str>, cancel: &AtomicBool) -> Result<u64, String> {
     if to <= first {
         return Err(qnc_ui_text::text("cut.range_outside_clip").into());
     }
@@ -43,12 +44,14 @@ pub fn write(ffmpeg: &Path, source: &Path, dest: &Path, (first, to): (u64, u64),
     let end = packets.iter().find(|p| p.2 && p.1 as f64 * base >= end_time - 1e-6);
     let mut drop = String::from("lt(pts\\,0)");
     let mut length = seconds(to - first, rate);
+    let mut frames = packets.iter().filter(|p| p.1 >= 0).count() as u64;
     if let Some((dts, pts, _)) = end {
         drop = format!("lt(pts\\,0)+gte(dts\\,{dts})");
         // Sound ends with the last picture: the pictures kept are those before it in time.
         let _ = pts;
         let kept = packets.iter().filter(|p| p.1 >= 0 && p.0 < *dts).count() as u64;
         length = seconds(kept, rate);
+        frames = kept;
     }
     let partial = dest.with_extension("partial");
     let mut command = Command::new(ffmpeg);
@@ -65,7 +68,8 @@ pub fn write(ffmpeg: &Path, source: &Path, dest: &Path, (first, to): (u64, u64),
     command.args(["-f", format]).arg(&partial).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
     background(&mut command);
     let result = wait(command.spawn().map_err(|e| format!("ffmpeg cut: {e}"))?, cancel)
-        .and_then(|_| std::fs::rename(&partial, dest).map_err(|e| e.to_string()));
+        .and_then(|_| std::fs::rename(&partial, dest).map_err(|e| e.to_string()))
+        .map(|()| frames);
     if result.is_err() {
         let _ = std::fs::remove_file(&partial);
     }

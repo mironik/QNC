@@ -31,6 +31,17 @@ pub struct Part {
     pub name: String,
     pub in_frame: u64,
     pub out_frame: u64,
+    /// The name of its file on the parts card in the project once it is cut (the original
+    /// name and its number, user 2026-10-23); `None` until Uvezi cuts it.
+    #[serde(default)]
+    pub cut_name: Option<String>,
+    /// Ticked for Uvezi (user 2026-10-23: a new part is ticked; the user may untick it).
+    #[serde(default = "ticked")]
+    pub selected: bool,
+}
+
+fn ticked() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -42,6 +53,10 @@ pub enum Operation {
     Delete { part_id: String },
     /// Every part of the project, oldest first.
     List,
+    /// The part is cut: its file on the parts card is `cut_name`.
+    MarkCut { part_id: String, cut_name: String },
+    /// The part is ticked for Uvezi or not.
+    Select { part_id: String, selected: bool },
 }
 
 impl Operation {
@@ -102,6 +117,40 @@ pub fn read_parts(target: &ProjectDbTarget, clip_id: &str) -> Result<Vec<Part>> 
     }
 }
 
+/// The parts ticked and not cut yet, of every clip (Uvezi cuts them).
+pub fn read_uncut(target: &ProjectDbTarget) -> Result<Vec<Part>> {
+    let mut client = target.open(Access::ReadOnly, vec![PartsModule::factory()])?;
+    let value = client.execute(MODULE_ID, serde_json::to_value(Operation::List).map_err(|e| e.to_string())?)?;
+    match serde_json::from_value::<Data>(value).map_err(|e| e.to_string())? {
+        Data::Parts(parts) => Ok(parts.into_iter().filter(|part| part.cut_name.is_none() && part.selected).collect()),
+        _ => Err(qnc_ui_text::text("parts.not_ready").into()),
+    }
+}
+
+/// Writes of the parts by the import, through the one serial writer of the project database.
+#[derive(Debug, Clone)]
+pub struct PartsWriter(ProjectDbWriter);
+
+impl PartsWriter {
+    pub fn start(target: ProjectDbTarget) -> Result<Self> {
+        Ok(Self(ProjectDbWriter::start(target, vec![PartsModule::factory()])?))
+    }
+
+    /// The same writer whose writes are made under `lease` (a worker that lost it writes nothing).
+    pub fn leased(self, lease: qnc_db_broker::WriteLease) -> Self {
+        Self(self.0.leased(lease))
+    }
+
+    pub fn mark_cut(&self, part_id: &str, cut_name: &str) -> Result<()> {
+        let operation = Operation::MarkCut { part_id: part_id.into(), cut_name: cut_name.into() };
+        match serde_json::from_value::<Data>(self.0.call(MODULE_ID, serde_json::to_value(operation).map_err(|e| e.to_string())?)?) {
+            Ok(Data::Changed) => Ok(()),
+            Ok(_) => Err(qnc_ui_text::text("parts.not_ready").into()),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+}
+
 /// The parts of the active project as a surface shows them: read and written through one
 /// serial writer of the project database, never waited for on the caller's thread.
 #[derive(Debug, Default)]
@@ -146,6 +195,11 @@ impl IngestParts {
         }
         let operation = Operation::Save { clip_id: clip_id.into(), clip_name: clip_name.into(), in_frame, out_frame };
         self.ask(operation, true)
+    }
+
+    /// Ticks or unticks a part for Uvezi.
+    pub fn select(&mut self, part_id: &str, selected: bool) -> Result<()> {
+        self.ask(Operation::Select { part_id: part_id.into(), selected }, true)
     }
 
     pub fn delete(&mut self, part_id: &str) -> Result<()> {

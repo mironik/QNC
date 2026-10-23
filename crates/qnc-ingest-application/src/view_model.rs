@@ -26,8 +26,8 @@ pub struct IngestViewModel {
     pub clips: Vec<ClipView>,
     pub clip_filter: ClipFilter,
     pub pool_tab: Option<String>, // chosen pool head tab (action id); None = the first
-    /// The rows a piece shows on the chosen tab instead of the clip list (Ingest SubClips).
-    pub pool_rows: Option<Vec<ClipView>>,
+    /// What the pieces show: rows of the chosen tab (Ingest SubClips), actions they have work for.
+    pub pieces: qnc_form_pieces::Shown,
     pub preview_clip_id: Option<String>,
     pub archive_original: bool,
     pub archive_original_available: bool,
@@ -56,7 +56,7 @@ impl Default for IngestViewModel {
             clips: Vec::new(),
             clip_filter: ClipFilter::All,
             pool_tab: None,
-            pool_rows: None,
+            pieces: Default::default(),
             preview_clip_id: None,
             archive_original: false,
             archive_original_available: false,
@@ -74,7 +74,7 @@ impl Default for IngestViewModel {
 impl IngestViewModel {
     pub fn action_enabled(&self, action_id: &str) -> bool {
         match action_id {
-            action_ids::INGEST_IMPORT_SELECTED => self.selected_count() > 0 && !self.command_busy,
+            action_ids::INGEST_IMPORT_SELECTED => (self.selected_count() > 0 || self.pieces.ready.iter().any(|ready| ready == action_id)) && !self.command_busy,
             action_ids::INGEST_CLEAR_SELECTION => self.visible_clips().any(|clip| clip.selected),
             action_ids::INGEST_SELECT_ALL => self.visible_clips().next().is_some(),
             _ => !self.command_busy,
@@ -89,12 +89,12 @@ impl IngestViewModel {
 
     /// What the pool shows: the rows of the chosen tab's piece, else the visible clips.
     pub fn pool_clips(&self) -> Vec<&ClipView> {
-        self.pool_rows.as_ref().map_or_else(|| self.visible_clips().collect(), |rows| rows.iter().collect())
+        self.pieces.rows.as_ref().map_or_else(|| self.visible_clips().collect(), |rows| rows.iter().collect())
     }
 
     /// The text of an empty pool: a tab of a piece says how its rows are made.
     pub fn pool_empty<'a>(&self, clips: &'a str) -> &'a str {
-        if self.pool_rows.is_some() { qnc_ui_text::text("ingest.pool.subclip_empty") } else { clips }
+        if self.pieces.rows.is_some() { qnc_ui_text::text("ingest.pool.subclip_empty") } else { clips }
     }
 
     pub fn total_count(&self) -> usize {

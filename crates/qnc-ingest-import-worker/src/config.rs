@@ -46,14 +46,6 @@ impl MediaOpener for ConfigMediaOpener {
         media_uri: &str,
         file: &std::path::Path,
     ) -> Result<qnc_media_metadata::MediaRepresentation, String> {
-        self.probe_new_file(media_uri, file).map(|(media, _)| media)
-    }
-
-    fn describe_with_evidence(
-        &self,
-        media_uri: &str,
-        file: &std::path::Path,
-    ) -> Result<(qnc_media_metadata::MediaRepresentation, qnc_media_metadata::Evidence), String> {
         self.probe_new_file(media_uri, file)
     }
 
@@ -98,7 +90,7 @@ impl ConfigMediaOpener {
         &self,
         media_uri: &str,
         file: &std::path::Path,
-    ) -> Result<(qnc_media_metadata::MediaRepresentation, qnc_media_metadata::Evidence), String> {
+    ) -> Result<qnc_media_metadata::MediaRepresentation, String> {
         let (executable, probe_size_bytes, analyze_duration_us) = self
             .sources
             .iter()
@@ -134,7 +126,7 @@ impl ConfigMediaOpener {
             })
             .map_err(|e| e.to_string())?;
         qnc_ffprobe_metadata::read(&report.json, media_uri, &document_uri, "ffprobe-optimized")
-            .map(|parsed| (parsed.media, parsed.evidence))
+            .map(|parsed| parsed.media)
             .map_err(|e| e.to_string())
     }
 }

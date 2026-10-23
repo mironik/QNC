@@ -5571,3 +5571,25 @@ original od slike 0). Testovi `qnc-mxf-cut` (3, i na pravom originalu), `qnc-mp4
 `qnc-ingest-parts` (2), `qnc-ingest-import-worker` (22), conformance, release build. Nije izvedeno: Sonyjev privatni XML
 unutar MXF zaglavlja (NRT) zadrzava trajanje cijelog klipa; dio klipa na LAN/Intranet izvoru (rez trazi lokalni original);
 uzivo kroz sucelje nije provjereno.
+Promjena i izvedba 2026-10-23 (korisnik: "od izrezanih djelova kreiraj karticu sa XML datotekama kao na originalnom disku, s
+originalnim nazivom + n broj, ista procedura uvoza kao s originala"; "da, sva cetiri"; "novi SubClip dir, jer kod kopiranja
+originala bila bi kolizija"; "SubClipovi automatski cekirani, korisnik ih moze iskljuciti"; "ne Windows oznake"; otkljucan
+Project samo za lokaciju): zamjenjuje izravni upis dijelova u katalog (`FinishWithParts`, uklonjen). Postavke projekta:
+`products.subclips` = `SubClip` (`qnc-project-store` PRODUCT_DIRECTORY_FIELDS, novi projekt dobiva mapu, stari pri otvaranju
+u Projectu; `qnc-work-settings` `subclips_location`). Uvezi: svaki oznaceni neizrezani dio (`qnc-ingest-parts`: stupci
+`cut_name`, `selected`, novi dio oznacen; operacije MarkCut, Select; `read_uncut`, `PartsWriter`; razvojna tablica bez tih
+stupaca se brise) reze se na karticu dijelova `SubClip/<oznaka medija>_<serijski broj>/` u rasporedu originalne kartice,
+naziv original + broj (`Mironik 3396_01.MXF`); Sony kartica dobiva dokumente kroz novu kocku `crates/qnc-sony-card-write`
+(+ ugovor): stavka MEDIAPRO.XML (datoteka, trajanje, UMID s brojem instance dijela, bez proxyja), M01.XML (UMID-ovi,
+Duration, LtcChangeTable od prve slike, frameCount tablica unutar dijela) i poster sa svog IN-a (Thmbnl/T01). Zatim radnik
+napravi Select te kartice istim citacem kamere kao za pravu karticu i stavi njezine klipove u red; medij koji je vec u mapi
+projekta uvoz samo povezuje (`action_for`). Klip s dijelovima se ne uvozi cijeli (`qnc-content-store` FinishAsParts).
+`qnc-ingest-select` `SelectionConfig::for_project` (mapa projekta kao izvor; koriste ga radnik, uvoz, dovrsetak zapisa i
+izbornik diskova Ingesta: ulaz "Project <naziv> (SubClip)"); `qnc-content-read` `not_imported_named`. Tab SubClip: kvacica
+dijela (PartsPiece prije PoolMarks), izrezani dio je svoj uvezeni klip (poster s IN-a); Uvezi je dostupan i kad su oznaceni
+samo dijelovi (`qnc-form-pieces` `Shown` s `ready`, `ImportRun::start` budi pozadinu). Radnik reze dijelove i kad u redu
+nema klipova (`parts_waiting`). Provjereno na izoliranoj kopiji (kartice D: FX6 i G: FX3A samo citane): kartice
+`card_a8155186/XDROOT` i `card_30616164/PRIVATE/M4ROOT`, Select procita trajanja iz XML-a (526, 264), dijelovi uvezeni s
+posterom, filmstripom i valom u jednom radu (12 s), neoznaceni dio nije izrezan. Testovi `qnc-sony-card-write` (3),
+`qnc-ingest-parts`, `qnc-content-store`, `qnc-ingest-import-worker`, `qnc-ingest-application`, conformance, release build.
+Uzivo kroz sucelje nije provjereno.

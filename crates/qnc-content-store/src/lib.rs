@@ -240,21 +240,11 @@ pub enum Operation {
         optimized: Option<qnc_media_metadata::MediaRepresentation>,
         error: Option<String>,
     },
-    /// The parts of a claimed clip were cut into the project (Ingest SubClip, user
-    /// 2026-10-23): each part is its own imported clip; the clip itself goes back to
-    /// detected and unticked, so Story sees only its parts. All or nothing.
-    FinishWithParts {
+    /// A claimed clip with parts (Ingest SubClip, user 2026-10-23) is not imported whole:
+    /// it goes back to detected and unticked; its parts come in from their own card.
+    FinishAsParts {
         clip_id: String,
-        parts: Vec<ImportedPart>,
     },
-}
-
-/// One part of a clip cut into the project: its catalog record and its media there.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ImportedPart {
-    pub clip: CatalogClip,
-    pub media_uri: String,
 }
 
 impl Operation {

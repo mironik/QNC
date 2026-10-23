@@ -13,18 +13,21 @@ pub struct IngestPieces(pub Pieces);
 impl Default for IngestPieces {
     fn default() -> Self {
         Self(Pieces::new(vec![
+            // The parts first: a tick of a part card is the part's.
+            Box::new(qnc_ingest_parts::PartsPiece::new(qnc_ingest_parts::PartActions {
+                save: "save_virtual_shot",
+                delete: "ingest_subclip_delete",
+                open: "ingest_preview_focus",
+                tab: "ingest_tab_virtual",
+                toggle: "ingest_clip_toggle",
+                import: "ingest_import_selected",
+            })),
             Box::new(qnc_pool_marks::PoolMarks {
                 toggle: "ingest_clip_toggle",
                 all: "ingest_select_all",
                 clear: "ingest_clear_selection",
                 tabs: &["ingest_tab_all", "ingest_tab_virtual"],
             }),
-            Box::new(qnc_ingest_parts::PartsPiece::new(qnc_ingest_parts::PartActions {
-                save: "save_virtual_shot",
-                delete: "ingest_subclip_delete",
-                open: "ingest_preview_focus",
-                tab: "ingest_tab_virtual",
-            })),
         ]))
     }
 }

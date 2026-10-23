@@ -78,10 +78,24 @@ pub trait Piece: std::fmt::Debug + Send {
         Answer::default()
     }
 
+    /// The actions this piece has work for now (Uvezi while its parts wait), so the form offers them.
+    fn ready(&self) -> Vec<&'static str> {
+        Vec::new()
+    }
+
     /// The rows the pool shows on `tab` instead of the clip list, when the tab is this piece's.
     fn rows(&self, _tab: &str, _clips: &[ClipRow]) -> Option<Vec<ClipRow>> {
         None
     }
+}
+
+/// What the pieces of a form show it.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Shown {
+    /// The rows the pool shows on the chosen tab instead of the clip list.
+    pub rows: Option<Vec<ClipRow>>,
+    /// The actions a piece has work for (the form offers them).
+    pub ready: Vec<String>,
 }
 
 /// The pieces of a form, in the order they are asked.
@@ -104,6 +118,11 @@ impl Pieces {
             answer.join(piece.poll(now));
         }
         answer
+    }
+
+    /// What the pieces show now: the rows of the chosen tab and the actions they have work for.
+    pub fn shown(&self, tab: Option<&str>, clips: &[ClipRow]) -> Shown {
+        Shown { rows: self.rows(tab, clips), ready: self.0.iter().flat_map(|piece| piece.ready()).map(str::to_string).collect() }
     }
 
     /// The rows of the chosen tab, `None` when the clip list is shown.

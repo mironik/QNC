@@ -231,6 +231,35 @@ impl SelectionConfig {
         }
         Ok(config)
     }
+    /// The sources of this computer and the folder of the project (`reader`, `settings`) as
+    /// one more: where media the project holds is read (the Ingest SubClip parts card).
+    pub fn for_project(root: &Path, reader: &qnc_work_settings::SettingsReader, settings: &qnc_work_settings::WorkSettings) -> Result<Self> {
+        let config = Self::load(root)?;
+        let folder = reader.local_workspace_dir(settings).ok().flatten().zip(settings.project_media_source_uri().ok());
+        Ok(match folder {
+            Some((dir, uri)) => config.with_project_folder(dir, uri, qnc_ui_text::fill("source.project_folder", &[("project", &settings.project_name)])),
+            None => config,
+        })
+    }
+
+    /// The folder of the active project as one more source (user 2026-10-23: the card of
+    /// the Ingest SubClip parts in its `original` folder is selected like any card). It is
+    /// read with the probe of this computer's local sources; without one it is not added.
+    pub fn with_project_folder(mut self, dir: PathBuf, uri: String, name: String) -> Self {
+        let probe = self.sources.iter().find(|s| matches!(s.probe, ProbeConfig::Local { .. })).map(|s| s.probe.clone());
+        if let Some(probe) = probe.filter(|_| !self.sources.iter().any(|s| s.location.uri == uri)) {
+            self.sources.push(SourceConfig {
+                location: Binding { uri, file: Some(dir), endpoint: None, token_env: None },
+                name,
+                serial_number: String::new(),
+                volume_name: String::new(),
+                scope: qnc_camera_detector::SourceScope::CardRelative,
+                probe,
+            });
+        }
+        self
+    }
+
     pub fn browser(&self) -> Result<TransportBrowserSession> {
         // Only the disks attached now are offered: a registered disk that is not attached is
         // not listed (user 2026-10-16), and comes back when it is. Without a list of the

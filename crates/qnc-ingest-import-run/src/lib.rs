@@ -32,11 +32,14 @@ pub enum Written {
 pub struct ImportRun {
     writer: SelectionWriter,
     wake: Arc<Wake>,
+    /// Nothing ticked to write, but other work waits (ticked Ingest SubClip parts): the
+    /// background is woken at the next poll.
+    wake_only: bool,
 }
 
 impl Default for ImportRun {
     fn default() -> Self {
-        Self { writer: SelectionWriter::default(), wake: Arc::new(qnc_ingest_import_worker::launch_worker) }
+        Self { writer: SelectionWriter::default(), wake: Arc::new(qnc_ingest_import_worker::launch_worker), wake_only: false }
     }
 }
 
@@ -62,11 +65,16 @@ impl ImportRun {
     }
 
     /// Uvezi with the clips the form shows: `Ok(true)` while the selection is written,
-    /// `Ok(false)` when nothing was to be written.
-    pub fn start(&mut self, settings: &WorkSettings, target: Option<ContentTarget>, clips: &[ClipRow]) -> Result<bool, String> {
+    /// `Ok(false)` when nothing was to be written. `others`: other work waits for Uvezi
+    /// (ticked Ingest SubClip parts), so with no clip ticked the background is only woken.
+    pub fn start(&mut self, settings: &WorkSettings, target: Option<ContentTarget>, clips: &[ClipRow], others: bool) -> Result<bool, String> {
         let needs = qnc_import_fit::Needs::of(settings)?;
         if self.writer.is_busy() {
             return Err(qnc_ui_text::text("ingest.msg.import_running").into());
+        }
+        if others && !clips.iter().any(|clip| clip.selected) {
+            self.wake_only = true;
+            return Ok(true);
         }
         let target = target.ok_or(qnc_ui_text::text("ingest.msg.catalog_unavailable"))?;
         self.writer.start_import(target, clips, needs).map(|()| true)
@@ -86,6 +94,12 @@ impl ImportRun {
 
     /// The finished write of the selection, `None` while it runs or none runs.
     pub fn poll(&mut self, root: Option<&Path>, target: Option<&ContentTarget>) -> Option<Written> {
+        if std::mem::take(&mut self.wake_only) {
+            return Some(match self.wake(root, target) {
+                Ok(()) => Written::HandedOver,
+                Err(error) => Written::WorkerFailed(error),
+            });
+        }
         Some(match self.writer.poll()? {
             Ok(_) => match self.wake(root, target) {
                 Ok(()) => Written::HandedOver,

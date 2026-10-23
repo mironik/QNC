@@ -1,0 +1,26 @@
+{
+  "module_id": "qnc.module.sony-card-write",
+  "module_name": "Sony card write",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["card.write.sony-mediaprofile"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "player.command", "database.write"],
+  "forbidden_dependencies": [
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.player-client",
+    "qnc.module.ui-widget",
+    "qnc.module.timeline"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-sony-card-write",
+  "input": "The original Sony MediaProfile card (read only: MEDIAPRO.XML, the clip M01.XML), the part (its number, the frame it starts on, its frames) and its poster; the folder of the parts card in the project.",
+  "output": "The documents of the part on the parts card: its MEDIAPRO.XML entry (file named after the original with its number, length, a UMID of its own by instance number, no proxy), its M01.XML (UMIDs, Duration, LtcChangeTable from its first frame, frame counts of the change tables inside it) and its thumbnail; the original card is never written.",
+  "specification": "AGENTS.md 2026-10-23: Ingest into blocks, step 6b (Ingest SubClip)."
+}

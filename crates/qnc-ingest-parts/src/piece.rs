@@ -1,7 +1,9 @@
 //! The parts as a piece of a form (way B of 2026-10-23): Add SubClip saves the IN/OUT the
 //! source timeline shows as a part of the clip on the preview, the parts tab shows the
-//! parts as cards (the poster of their clip), a click on one opens its clip with its IN/OUT
-//! and Delete removes the chosen one. The action ids are the form's, given at composition.
+//! parts as cards, ticked for Uvezi (user 2026-10-23: a new part is ticked, the user may
+//! untick it); a part not cut yet shows the poster of its clip and opens its clip with its
+//! IN/OUT, a part cut and imported is shown as its own clip of the parts card. Delete removes
+//! the chosen part. The action ids are the form's, given at composition.
 
 use crate::IngestParts;
 use qnc_clip_row::ClipRow;
@@ -16,6 +18,10 @@ pub struct PartActions {
     pub open: &'static str,
     /// The pool tab that shows the parts.
     pub tab: &'static str,
+    /// The tick of a card (its payload is the card id).
+    pub toggle: &'static str,
+    /// Uvezi: ready while a ticked part waits to be cut.
+    pub import: &'static str,
 }
 
 #[derive(Debug)]
@@ -51,6 +57,11 @@ impl Piece for PartsPiece {
             let part = self.chosen.take()?;
             return Some(self.parts.delete(&part).map_or_else(Answer::refused, |()| Answer::changed()));
         }
+        if action_id == actions.toggle {
+            let part = self.parts.parts().iter().find(|part| Some(part.part_id.as_str()) == payload && part.cut_name.is_none())?;
+            let (id, selected) = (part.part_id.clone(), !part.selected);
+            return Some(self.parts.select(&id, selected).map_or_else(Answer::refused, |()| Answer::changed()));
+        }
         if action_id == actions.open {
             let part = self.parts.parts().iter().find(|part| Some(part.part_id.as_str()) == payload)?;
             self.chosen = Some(part.part_id.clone());
@@ -65,10 +76,19 @@ impl Piece for PartsPiece {
         Answer { changed, message: self.parts.take_message(), ..Answer::default() }
     }
 
-    /// The parts as cards: the name and length of the part, the poster of its clip.
+    fn ready(&self) -> Vec<&'static str> {
+        let waiting = self.parts.parts().iter().any(|part| part.selected && part.cut_name.is_none());
+        if waiting { vec![self.actions.import] } else { Vec::new() }
+    }
+
+    /// The parts as cards: a part cut is its own clip of the parts card; a part not cut yet
+    /// has the name and length of the part, the poster of its clip and its tick.
     fn rows(&self, tab: &str, clips: &[ClipRow]) -> Option<Vec<ClipRow>> {
         (tab == self.actions.tab).then(|| {
             let rows = self.parts.parts().iter().filter_map(|part| {
+                if let Some(cut) = &part.cut_name {
+                    return clips.iter().find(|clip| &clip.name == cut).cloned();
+                }
                 let clip = clips.iter().find(|clip| clip.clip_id == part.clip_id)?;
                 let frames = part.out_frame - part.in_frame;
                 let seconds = clip.duration_seconds * frames as f64 / clip.duration_frames.max(1) as f64;
@@ -77,7 +97,8 @@ impl Piece for PartsPiece {
                     name: part.name.clone(),
                     duration_seconds: seconds,
                     duration_frames: frames,
-                    selected: false,
+                    selected: part.selected,
+                    imported: false,
                     ..clip.clone()
                 })
             });
