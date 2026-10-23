@@ -39,34 +39,23 @@ impl IngestApplication {
             self.apply_source_browser_result(result);
             changed = true;
         }
-        for event in self.selection_session.poll(64) {
-            changed = true;
-            let outcome = qnc_ingest_clip_list::apply_select_event(
-                &mut self.view.clips,
-                self.view.preview_clip_id.as_deref(),
-                &mut self.selection_events,
-                event,
-            );
-            if let Some(count) = outcome.warning_count {
-                self.view.select_warning_count = count;
-            }
-            if let Some(message) = outcome.message {
-                self.view.message = message;
-            }
-            if !outcome.removed_ids.is_empty() {
-                self.remove_timeline_artifact_clips(&outcome.removed_ids);
-            }
-            if outcome.preview_removed {
-                self.view.preview_clip_id = None;
-                self.stop_player();
-            }
-            if outcome.finished {
-                self.view.command_busy = false;
-                if outcome.finished_ok {
-                    // The background completes the card records playback still lacks (v5)
-                    // and makes the filmstrip and wave: one generator.
-                    self.view.message = self.begin_import().err().unwrap_or_default();
-                }
+        let polled = self.select.poll(&mut self.view.clips, self.view.preview_clip_id.as_deref());
+        changed |= polled.changed;
+        self.view.select_warning_count = polled.warning_count.unwrap_or(self.view.select_warning_count);
+        self.view.message = polled.message.unwrap_or(std::mem::take(&mut self.view.message));
+        if !polled.removed_ids.is_empty() {
+            self.remove_timeline_artifact_clips(&polled.removed_ids);
+        }
+        if polled.preview_removed {
+            self.view.preview_clip_id = None;
+            self.stop_player();
+        }
+        if let Some(ok) = polled.finished {
+            self.view.command_busy = false;
+            if ok {
+                // The background completes the card records playback still lacks (v5)
+                // and makes the filmstrip and wave: one generator.
+                self.view.message = self.begin_import().err().unwrap_or_default();
             }
         }
         changed

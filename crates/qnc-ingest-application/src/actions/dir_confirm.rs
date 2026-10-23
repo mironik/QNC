@@ -32,21 +32,8 @@ impl IngestApplication {
         if qnc_contracts::parse_qnc_uri(&uri).is_err() {
             return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.source_not_qnc_uri"));
         }
-        let display_name = if !self.view.browser.chosen.name.trim().is_empty() {
-            self.view.browser.chosen.name.clone()
-        } else if !self.view.browser.path_label.trim().is_empty() {
-            self.view.browser.path_label.clone()
-        } else {
-            uri.clone()
-        };
-        let record = SourceSelectionRecord {
-            source_uri: uri.clone(),
-            source_kind: source_kind_id(self.view.source_kind).to_string(),
-            display_name,
-            serial_number: self.view.browser.chosen.serial_number.clone(),
-            volume_name: self.view.browser.chosen.volume_name.clone(),
-            private_local_path: self.browse.selected_private_local_path(&uri),
-        };
+        let (browser, private) = (&self.view.browser, self.browse.selected_private_local_path(&uri));
+        let record = qnc_ingest_select_run::source_record(&uri, source_kind_id(self.view.source_kind), &browser.chosen, &browser.path_label, private);
 
         if let Some(store) = self.store.as_mut() {
             match store.record_source_selection(&record) {
@@ -76,12 +63,8 @@ impl IngestApplication {
         };
         let Some(config) = self.selection_config.clone() else { return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.no_select_config")) };
         let Some(target) = self.project.select_target().cloned() else { return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.catalog_unavailable")) };
-        match self
-            .selection_session
-            .start(config, selected, target, self.camera_registry.clone())
-        {
+        match self.select.start(config, selected, target) {
             Ok(()) => {
-                self.selection_events.reset();
                 self.view.select_warning_count = 0;
                 self.view.command_busy = true;
                 self.view.message = qnc_ui_text::text("ingest.msg.select_started").into();

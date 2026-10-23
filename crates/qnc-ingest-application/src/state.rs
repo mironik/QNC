@@ -28,7 +28,7 @@ impl IngestApplication {
             || self.project.is_loading()
             || self.selection_writer.is_busy()
             || self.posters.has_pending_work()
-            || self.selection_session.has_pending_work()
+            || self.select.is_busy()
             || self.preview.play_when_ready()
     }
 

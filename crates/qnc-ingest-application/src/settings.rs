@@ -49,7 +49,7 @@ impl IngestApplication {
     }
 
     pub(crate) fn load_work_settings_inner(&mut self, pending_source: Option<String>, retain_loaded_workspace: bool) -> IngestDispatchResult {
-        let others_busy = self.selection_writer.is_busy() || self.selection_session.has_pending_work();
+        let others_busy = self.selection_writer.is_busy() || self.select.is_busy();
         let error_before = self.project.status().error.clone();
         let started = self.project.start(retain_loaded_workspace && pending_source.is_none(), others_busy);
         if let qnc_ingest_project::Start::Started { keep_view: false } = started {

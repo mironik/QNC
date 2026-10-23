@@ -1,0 +1,26 @@
+{
+  "module_id": "qnc.module.ingest-select-run",
+  "module_name": "Ingest Select run",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ingest.select.run", "ingest.select.source-record"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["player.command", "timeline.paint"],
+  "forbidden_dependencies": [
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.player-client",
+    "qnc.module.ui-widget",
+    "qnc.module.timeline"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_write_transports_only",
+  "runtime_crate": "qnc-ingest-select-run",
+  "input": "The chosen source (URI, kind, medium name, serial, volume), the Select config, the project database target and the cameras of this machine.",
+  "output": "The record of the chosen source, a running Select (its writes go through the public project write transport of qnc-ingest-select) and its events applied to the clip list the form shows.",
+  "specification": "AGENTS.md 2026-10-23: Ingest into blocks, step 3."
+}

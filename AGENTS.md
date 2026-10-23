@@ -5507,3 +5507,11 @@ teksta u kodu idu kroz rjecnik (`ingest.msg.clip_not_found`, `ingest.msg.clip_no
 `player.broadcast_player_connected`, novi `ingest.msg.invalid_frame`). C10 Ingest aplikacija 1265 -> 1235. Testovi
 `qnc-ingest-preview-source` (1, novi), `qnc-ingest-application` (31; test istog klipa sada ide kroz kocku),
 conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-23 (korisnik: "da, kreni s korakom 3"; Ingest u kocke): korak 3. Nova javna kocka
+`crates/qnc-ingest-select-run` (+ ugovor `contracts/modules/ingest-select-run.module.json`): jedan Select izvora u Ingestu -
+zapis odabranog izvora (`source_record`: naziv medija, inace mapa koju preglednik pokazuje, inace URI), Select sesija s
+kamerama ovog racunala (`SelectRun`: `with_cameras`, `start`, `is_busy`, `cancel`) i njezini dogadaji primijenjeni na popis
+klipova (`poll` daje `Polled`: poruka, broj upozorenja, uklonjeni klipovi, je li uklonjen klip na previewu, kraj Selecta).
+Sam rad ostaje `qnc-ingest-select`, pravila popisa `qnc-ingest-clip-list`; zapis u bazu ide kroz javni pisac Selecta.
+`qnc-ingest-application` drzi samo `select` umjesto tri polja i poziva kocku. C10 Ingest aplikacija 1235 -> 1204. Testovi
+`qnc-ingest-select-run` (2), `qnc-ingest-application` (31), conformance, release build. Uzivo nije provjereno.

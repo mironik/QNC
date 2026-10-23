@@ -34,8 +34,8 @@ impl IngestApplication {
     }
 
     pub(crate) fn cancel_source_work_for_playback(&mut self) {
-        if self.selection_session.has_pending_work() {
-            self.selection_session.cancel();
+        if self.select.is_busy() {
+            self.select.cancel();
             self.view.command_busy = false;
             self.view.message = playback_guard_message().to_string();
         }

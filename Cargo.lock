@@ -3780,6 +3780,7 @@ dependencies = [
  "qnc-ingest-preview-source",
  "qnc-ingest-project",
  "qnc-ingest-select",
+ "qnc-ingest-select-run",
  "qnc-ingest-selection-write",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
@@ -4024,6 +4025,19 @@ dependencies = [
  "tempfile",
  "tiny_http",
  "uuid",
+]
+
+[[package]]
+name = "qnc-ingest-select-run"
+version = "0.1.0"
+dependencies = [
+ "qnc-camera-adapter",
+ "qnc-clip-row",
+ "qnc-ingest-clip-list",
+ "qnc-ingest-select",
+ "qnc-ingest-store",
+ "qnc-source-browse",
+ "qnc-source-reader",
 ]
 
 [[package]]

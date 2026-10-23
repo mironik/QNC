@@ -3,9 +3,10 @@ use std::sync::mpsc;
 use std::{path::Path, time::Duration};
 
 use qnc_ingest_catalog as catalog;
+#[cfg(test)]
 use qnc_ingest_select as selection;
 use qnc_ingest_select::selection_config;
-use qnc_ingest_store::{IngestStore, SourceSelectionRecord};
+use qnc_ingest_store::IngestStore;
 pub use qnc_ingest_work_plan::{IngestMedia, IngestWorkPlan, PlaybackInput};
 use qnc_timeline::{TimelineIntent, TimelineProjection};
 use qnc_timeline_assets::SourceTimelineAssets;
@@ -65,11 +66,10 @@ pub struct IngestApplication {
     selection_config: Option<selection_config::SelectionConfig>,
     selection_config_error: Option<String>,
     browse: qnc_source_browse::SourceBrowse,
-    selection_session: selection::SelectSession,
+    /// One Select of a source (piece `qnc-ingest-select-run`).
+    select: qnc_ingest_select_run::SelectRun,
     root: Option<std::path::PathBuf>,
     worker: worker_launch::WorkerLauncher,
-    camera_registry: std::sync::Arc<qnc_camera_adapter::CameraRegistry>,
-    selection_events: qnc_ingest_clip_list::SelectEventState,
     /// The keyboard walk over the panels (the form's layout contract gives the order).
     walk: qnc_focus_walk::FocusWalk,
 }
@@ -87,7 +87,7 @@ impl IngestApplication {
 
     /// Replaces the cameras Select can read (composition root only).
     pub fn with_camera_registry(mut self, registry: qnc_camera_adapter::CameraRegistry) -> Self {
-        self.camera_registry = std::sync::Arc::new(registry);
+        self.select = std::mem::take(&mut self.select).with_cameras(registry);
         self
     }
 
@@ -116,7 +116,7 @@ impl Drop for IngestApplication {
         self.stop_player();
         self.cancel_thumbnail_load();
         self.selection_writer.cancel();
-        self.selection_session.cancel();
+        self.select.cancel();
     }
 }
 

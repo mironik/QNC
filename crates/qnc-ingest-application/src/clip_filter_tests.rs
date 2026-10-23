@@ -47,7 +47,7 @@ fn filter_projects_existing_catalog_without_changing_selection_or_preview() {
             assert!(!component.has_pending_work());
             assert!(!component.project.is_loading());
             assert!(!component.selection_writer.is_busy());
-            assert!(!component.selection_session.has_pending_work());
+            assert!(!component.select.is_busy());
             assert!(!component.browse.is_busy());
         }
     }
@@ -68,7 +68,7 @@ fn new_filter_accepts_incoming_clips_during_select_without_losing_existing_ones(
     );
     assert_eq!(component.view.visible_clips().count(), 0);
     let (send, receive) = mpsc::channel();
-    component.selection_session = selection::SelectSession::from_receiver_for_test(receive);
+    component.select = qnc_ingest_select_run::SelectRun::from_session_for_test(selection::SelectSession::from_receiver_for_test(receive));
     send.send(selection::Event::Clip(selected_clip("new", false, false)))
         .unwrap();
     component.poll(None);

@@ -149,7 +149,7 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
         "qnc://intranet/test/source/remote"
     );
     assert!(!component.preview.has_player());
-    assert!(!component.selection_session.has_pending_work());
+    assert!(!component.select.is_busy());
     assert!(component.work_plan().is_some());
 }
 
@@ -157,7 +157,7 @@ fn unavailable_card_does_not_disable_registered_browser_or_start_player() {
 fn marking_an_uncommitted_preview_is_local_and_stale_ack_does_not_mark_it_saved() {
     let mut component = IngestApplication::default();
     let (send, receive) = mpsc::sync_channel(8);
-    component.selection_session = selection::SelectSession::from_receiver_for_test(receive);
+    component.select = qnc_ingest_select_run::SelectRun::from_session_for_test(selection::SelectSession::from_receiver_for_test(receive));
     send.send(selection::Event::Clip(selection::SelectedClip {
         clip_id: "clip-pending".into(),
         metadata_revision: 2,

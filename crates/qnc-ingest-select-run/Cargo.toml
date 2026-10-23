@@ -1,0 +1,19 @@
+[package]
+name = "qnc-ingest-select-run"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: one Select of a source in Ingest (source record, Select session, its events on the clip list)"
+
+[features]
+test-support = ["qnc-ingest-select/test-support"]
+
+[dependencies]
+qnc-camera-adapter = { workspace = true }
+qnc-ingest-clip-list = { workspace = true }
+qnc-ingest-select = { workspace = true }
+qnc-ingest-store = { workspace = true }
+qnc-source-browse = { workspace = true }
+qnc-source-reader = { workspace = true }
+
+[dev-dependencies]
+qnc-clip-row = { workspace = true }
