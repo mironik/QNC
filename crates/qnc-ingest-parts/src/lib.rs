@@ -23,7 +23,7 @@ pub type Result<T> = std::result::Result<T, String>;
 
 /// One marked part of a source clip: frames `in_frame..out_frame` of it (OUT is the bound
 /// after the last picture of the part).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Part {
     pub part_id: String,
@@ -38,6 +38,9 @@ pub struct Part {
     /// Ticked for Uvezi (user 2026-10-23: a new part is ticked; the user may untick it).
     #[serde(default = "ticked")]
     pub selected: bool,
+    /// Its length in seconds at the stored frame rate of its clip (0 when it is not stored).
+    #[serde(default)]
+    pub seconds: f64,
 }
 
 fn ticked() -> bool {

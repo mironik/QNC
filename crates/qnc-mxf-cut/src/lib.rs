@@ -92,10 +92,11 @@ pub fn write(source: &Path, index: &MxfIndex, plan: &Plan, dest: &Path, cancel: 
     for (j, s) in plan.stored.iter().enumerate() {
         position[*s] = j;
     }
-    // The packages go to a scratch file beside the part first (a long part does not stay in
-    // memory); the index that points at them is written before them in the part.
-    let essence = dest.with_extension("essence.partial");
-    let partial = dest.with_extension("partial");
+    // The packages go to a scratch file of the system first (a long part does not stay in
+    // memory); the index that points at them is written before them in the part. The part is
+    // written under its own name: a protected project folder allows no rename or delete.
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let essence = std::env::temp_dir().join(format!("qnc-mxf-cut-{}-{}.essence", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
     let written = (|| -> Result<(), String> {
         let mut scratch = BufWriter::new(File::create(&essence).map_err(|e| e.to_string())?);
         let mut entries = Vec::with_capacity(plan.stored.len());
@@ -124,7 +125,7 @@ pub fn write(source: &Path, index: &MxfIndex, plan: &Plan, dest: &Path, cancel: 
         let index_bytes = template.segments(index.rate, &entries, layout.kag)?;
         let footer_at = layout.index_at + index_bytes.len() as u64 + offset;
         patch_partition(&mut header[..layout.pack_len], footer_at, index_bytes.len() as u64)?;
-        let mut out = BufWriter::new(File::create(&partial).map_err(|e| e.to_string())?);
+        let mut out = BufWriter::new(File::create(dest).map_err(|e| e.to_string())?);
         out.write_all(&header).map_err(|e| e.to_string())?;
         out.write_all(&index_bytes).map_err(|e| e.to_string())?;
         std::io::copy(&mut File::open(&essence).map_err(|e| e.to_string())?, &mut out).map_err(|e| e.to_string())?;
@@ -132,13 +133,7 @@ pub fn write(source: &Path, index: &MxfIndex, plan: &Plan, dest: &Path, cancel: 
         out.flush().map_err(|e| e.to_string())
     })();
     let _ = std::fs::remove_file(&essence);
-    match written.and_then(|()| std::fs::rename(&partial, dest).map_err(|e| e.to_string())) {
-        Ok(()) => Ok(()),
-        Err(error) => {
-            let _ = std::fs::remove_file(&partial);
-            Err(error)
-        }
-    }
+    written
 }
 
 /// Where stored picture `stored` of the original is in the part.

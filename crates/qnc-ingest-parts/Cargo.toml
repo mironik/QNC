@@ -9,6 +9,9 @@ qnc-ui-text = { workspace = true }
 qnc-content-read = { workspace = true }
 qnc-clip-row = { workspace = true }
 qnc-form-pieces = { workspace = true }
+qnc-image-assets = { workspace = true }
+qnc-shot-stills = { workspace = true }
+qnc-still-locator = { workspace = true }
 qnc-db-broker = { workspace = true }
 rusqlite = { workspace = true, features = ["hooks"] }
 serde = { workspace = true }

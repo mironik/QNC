@@ -107,6 +107,7 @@ impl Store {
             out_frame,
             cut_name: None,
             selected: true,
+            seconds: 0.0,
         };
         tx.execute(
             "INSERT INTO ingest_parts (part_id, clip_id, name, in_frame, out_frame, created_at_utc)
@@ -137,7 +138,14 @@ impl Store {
                 out_frame: frame(4)?,
                 cut_name: row.get(5).map_err(err)?,
                 selected: row.get(6).map_err(err)?,
+                seconds: 0.0,
             });
+        }
+        // The length of each part at the stored frame rate of its clip (C11: the one reader).
+        for part in &mut parts {
+            if let Ok(Some((_, (num, den)))) = qnc_content_read::clip_timing_on(&self.conn, &part.clip_id) {
+                part.seconds = (part.out_frame - part.in_frame) as f64 * f64::from(den) / f64::from(num.max(1));
+            }
         }
         Ok(Data::Parts(parts))
     }

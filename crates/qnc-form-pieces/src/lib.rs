@@ -25,6 +25,8 @@ pub struct Now<'a> {
     pub marks: Option<(u64, u64)>,
     /// The project database of the loaded project.
     pub project: Option<&'a ProjectDbTarget>,
+    /// Where this computer reads a picture of a clip (a piece may show a frame of it).
+    pub stills: Option<qnc_still_locator::StillLocator>,
 }
 
 impl Now<'_> {
@@ -152,7 +154,7 @@ mod tests {
     fn the_first_piece_that_takes_an_action_answers_and_others_pass() {
         let mut pieces = Pieces::new(vec![Box::new(Echo)]);
         let (mut clips, mut tab) = (Vec::new(), None);
-        let mut now = Now { clips: &mut clips, tab: &mut tab, only_new: false, chosen: None, marks: None, project: None };
+        let mut now = Now { clips: &mut clips, tab: &mut tab, only_new: false, chosen: None, marks: None, project: None, stills: None };
         assert_eq!(pieces.act("echo", Some("hi"), &mut now).and_then(|answer| answer.message).as_deref(), Some("hi"));
         assert!(pieces.act("other", None, &mut now).is_none());
         assert_eq!(pieces.rows(Some("echo_tab"), &[]), Some(Vec::new()));

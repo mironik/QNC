@@ -8,3 +8,4 @@ description = "QNC public piece: the generic pass of a form's application layer 
 qnc-clip-row = { workspace = true }
 qnc-db-broker = { workspace = true }
 serde = { workspace = true }
+qnc-still-locator = { workspace = true }

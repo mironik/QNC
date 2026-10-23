@@ -5593,3 +5593,12 @@ nema klipova (`parts_waiting`). Provjereno na izoliranoj kopiji (kartice D: FX6 
 posterom, filmstripom i valom u jednom radu (12 s), neoznaceni dio nije izrezan. Testovi `qnc-sony-card-write` (3),
 `qnc-ingest-parts`, `qnc-content-store`, `qnc-ingest-import-worker`, `qnc-ingest-application`, conformance, release build.
 Uzivo kroz sucelje nije provjereno.
+Popravak 2026-10-23 (korisnik testirao: "na krivom mjestu prikaz"; log: "ingest-part cut failed ... Access is denied"): rez dijela
+pisao je u privremenu datoteku i preimenovao je, a zasticena mapa projekta (ACL deny delete) ne dopusta preimenovanje ni
+brisanje. `qnc-mxf-cut` pise dio odmah pod konacnim imenom, a pomocnu datoteku paketa drzi u privremenoj mapi sustava;
+`qnc-mp4-cut` pise ffmpegom odmah u konacnu datoteku. Ponovni pokusaj prepisuje datoteku. Provjereno na izoliranoj kopiji
+s istom zastitom (icacls deny DE,DC): oba dijela izrezana i uvezena. Kartica dijela u tabu SubClip pokazivala je poster
+cijelog klipa (pocetak klipa) i krivo trajanje (redak klipa u Ingestu nema broj slika): `qnc-ingest-parts` racuna trajanje
+iz spremljene brzine klipa (`qnc-content-read::clip_timing_on`), a slika kartice neizrezanog dijela je slika s njegova IN-a,
+dekodirana u pozadini kao slike SubClipa u Storyju (`qnc-shot-stills::decode_still`; `qnc-form-pieces` `Now.stills`).
+Testovi, conformance, release build. Uzivo nije provjereno.

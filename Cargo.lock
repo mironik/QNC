@@ -3696,6 +3696,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-clip-row",
  "qnc-db-broker",
+ "qnc-still-locator",
  "serde",
 ]
 
@@ -3989,6 +3990,9 @@ dependencies = [
  "qnc-content-read",
  "qnc-db-broker",
  "qnc-form-pieces",
+ "qnc-image-assets",
+ "qnc-shot-stills",
+ "qnc-still-locator",
  "qnc-ui-text",
  "rusqlite",
  "serde",

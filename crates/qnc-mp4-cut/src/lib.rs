@@ -53,7 +53,7 @@ pub fn write(ffmpeg: &Path, source: &Path, dest: &Path, (first, to): (u64, u64),
         length = seconds(kept, rate);
         frames = kept;
     }
-    let partial = dest.with_extension("partial");
+    // Written under its own name: a protected project folder allows no rename or delete.
     let mut command = Command::new(ffmpeg);
     command
         .args(["-y", "-hide_banner", "-nostdin", "-v", "error", "-ss", &seconds(first, rate), "-i"])
@@ -65,14 +65,10 @@ pub fn write(ffmpeg: &Path, source: &Path, dest: &Path, (first, to): (u64, u64),
     if let Some(timecode) = timecode {
         command.args(["-timecode", timecode]);
     }
-    command.args(["-f", format]).arg(&partial).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
+    command.args(["-f", format]).arg(dest).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
     background(&mut command);
     let result = wait(command.spawn().map_err(|e| format!("ffmpeg cut: {e}"))?, cancel)
-        .and_then(|_| std::fs::rename(&partial, dest).map_err(|e| e.to_string()))
         .map(|()| frames);
-    if result.is_err() {
-        let _ = std::fs::remove_file(&partial);
-    }
     result
 }
 
