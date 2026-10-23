@@ -1,0 +1,26 @@
+{
+  "module_id": "qnc.module.ingest-import-run",
+  "module_name": "Ingest import run",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ingest.import.start", "ingest.import.choice", "ingest.import.wake-worker"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["player.command", "timeline.paint"],
+  "forbidden_dependencies": [
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.player-client",
+    "qnc.module.ui-widget",
+    "qnc.module.timeline"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_write_transports_only",
+  "runtime_crate": "qnc-ingest-import-run",
+  "input": "The project work settings, the project content target, the clips the form shows (their marks) and the QNC root.",
+  "output": "The selection checked against what the project uses and written once through qnc-ingest-selection-write (or a choice when clips are in the way), then the background application woken; no media copied here.",
+  "specification": "AGENTS.md 2026-10-23: Ingest into blocks, step 4."
+}

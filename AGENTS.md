@@ -5515,3 +5515,12 @@ klipova (`poll` daje `Polled`: poruka, broj upozorenja, uklonjeni klipovi, je li
 Sam rad ostaje `qnc-ingest-select`, pravila popisa `qnc-ingest-clip-list`; zapis u bazu ide kroz javni pisac Selecta.
 `qnc-ingest-application` drzi samo `select` umjesto tri polja i poziva kocku. C10 Ingest aplikacija 1235 -> 1204. Testovi
 `qnc-ingest-select-run` (2), `qnc-ingest-application` (31), conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-23 (korisnik: "da, kreni s korakom 4"; Ingest u kocke): korak 4. Nova javna kocka
+`crates/qnc-ingest-import-run` (+ ugovor `contracts/modules/ingest-import-run.module.json`): Uvezi u Ingestu - oznaceni
+klipovi se provjere prema onome sto projekt koristi i jednom upisu u bazu (`qnc-ingest-selection-write`, izvan niti
+sucelja; klipovi na putu daju izbor), zatim se budi pozadinska aplikacija (`ImportRun`: `start`, `answer`, `wake`, `poll` daje
+`Written`: predano radniku, radnik se nije dao probuditi, ili nije upisano uz izbor). Kocka ne kopira medij (to radi radnik).
+`qnc-ingest-application` drzi samo `import` umjesto pisca odabira i pokretaca radnika; `worker_launch.rs` uklonjen (testovi
+zadaju svoje budenje kroz `with_wake`); ovisnosti `qnc-import-fit` i `qnc-ingest-import-worker` vise nisu u aplikaciji.
+C10 Ingest aplikacija 1204 -> 1162. Testovi `qnc-ingest-import-run` (1), `qnc-ingest-application` (31), conformance,
+release build. Uzivo nije provjereno.

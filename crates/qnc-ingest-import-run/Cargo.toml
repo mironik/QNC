@@ -1,0 +1,15 @@
+[package]
+name = "qnc-ingest-import-run"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: Uvezi in Ingest (the selection checked and written once, then the background application woken)"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+qnc-choice-box = { workspace = true }
+qnc-clip-row = { workspace = true }
+qnc-import-fit = { workspace = true }
+qnc-ingest-import-worker = { workspace = true }
+qnc-ingest-selection-write = { workspace = true }
+qnc-ingest-store = { workspace = true }
+qnc-work-settings = { workspace = true }

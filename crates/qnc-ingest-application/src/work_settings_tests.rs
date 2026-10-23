@@ -517,7 +517,7 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
     // Uvezi is where the marks become active code: the whole selection is written once.
     let launched = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let counter = launched.clone();
-    restarted.worker = crate::worker_launch::WorkerLauncher::with(move |_root, _target| {
+    restarted.import = qnc_ingest_import_run::ImportRun::default().with_wake(move |_root, _target| {
         counter.fetch_add(1, Ordering::SeqCst);
         Ok(())
     });

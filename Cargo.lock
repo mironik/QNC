@@ -3772,16 +3772,14 @@ dependencies = [
  "qnc-dir-browser",
  "qnc-focus-walk",
  "qnc-image-assets",
- "qnc-import-fit",
  "qnc-ingest-cameras",
  "qnc-ingest-catalog",
  "qnc-ingest-clip-list",
- "qnc-ingest-import-worker",
+ "qnc-ingest-import-run",
  "qnc-ingest-preview-source",
  "qnc-ingest-project",
  "qnc-ingest-select",
  "qnc-ingest-select-run",
- "qnc-ingest-selection-write",
  "qnc-ingest-store",
  "qnc-ingest-work-plan",
  "qnc-media-thumbnail",
@@ -3896,6 +3894,20 @@ dependencies = [
  "qnc-source-timeline",
  "qnc-theme-styles",
  "qnc-ui-kit",
+]
+
+[[package]]
+name = "qnc-ingest-import-run"
+version = "0.1.0"
+dependencies = [
+ "qnc-choice-box",
+ "qnc-clip-row",
+ "qnc-import-fit",
+ "qnc-ingest-import-worker",
+ "qnc-ingest-selection-write",
+ "qnc-ingest-store",
+ "qnc-ui-text",
+ "qnc-work-settings",
 ]
 
 [[package]]

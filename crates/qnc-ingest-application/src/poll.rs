@@ -15,23 +15,16 @@ impl IngestApplication {
         if !self.playback_guard_active() {
             changed |= self.poll_thumbnails();
         }
-        if let Some(result) = self.selection_writer.poll() {
-            match result {
-                Ok(_) => match self.begin_import() {
-                    Ok(()) => {
-                        self.view.command_busy = false;
-                        self.view.message = qnc_ui_text::text("ingest.msg.import_handed_over").into();
-                        self.request_navigation_after_import();
-                    }
-                    Err(error) => {
-                        self.view.command_busy = false;
-                        self.view.message = error;
-                    }
-                },
-                Err(error) => {
-                    (self.view.command_busy, self.view.message) = (false, error);
-                    self.view.import_choice = self.selection_writer.choice().cloned(); // clips in the way: the user chooses
+        if let Some(written) = self.import.poll(self.root.as_deref(), self.project.catalog_target()) {
+            self.view.command_busy = false;
+            match written {
+                qnc_ingest_import_run::Written::HandedOver => {
+                    self.view.message = qnc_ui_text::text("ingest.msg.import_handed_over").into();
+                    self.request_navigation_after_import();
                 }
+                qnc_ingest_import_run::Written::WorkerFailed(error) => self.view.message = error,
+                // Clips in the way: the user chooses.
+                qnc_ingest_import_run::Written::Failed { error, choice } => (self.view.message, self.view.import_choice) = (error, choice),
             }
             changed = true;
         }

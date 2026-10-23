@@ -42,7 +42,7 @@ impl IngestApplication {
             action_ids::INGEST_SET_ARCHIVE => self.on_set_archive(intent.payload),
             action_ids::INGEST_SET_AI_MINING => self.on_set_ai_mining(),
             action_ids::INGEST_IMPORT_SELECTED => self.start_import(),
-            answer if qnc_ingest_selection_write::ANSWERS.contains(&answer) => self.answer_import(answer),
+            answer if qnc_ingest_import_run::ANSWERS.contains(&answer) => self.answer_import(answer),
             action if action == action_ids::TIMELINE_CUE_FRAME || qnc_source_panel::ACTIONS.contains(&action) || action.starts_with("wheel_source") => self.player_action(intent),
             tab @ (action_ids::INGEST_TAB_ALL | action_ids::INGEST_TAB_VIRTUAL) => { self.view.pool_tab = Some(tab.to_string()); IngestDispatchResult::accepted(None, true) } // v5: only the chosen tab changes
             _ => IngestDispatchResult::accepted(Some(qnc_ui_text::text("ingest.msg.action_not_connected").to_string()), true),
@@ -67,7 +67,7 @@ impl IngestApplication {
                 | action_ids::INGEST_DIR_CONFIRM
                 | action_ids::INGEST_DIR_CANCEL
         );
-        let busy = self.selection_writer.is_busy()
+        let busy = self.import.is_busy()
             || self.view.command_busy
             || self.view.browser.busy
             || (self.pending_source.is_some() && action_id != action_ids::INGEST_DIR_CANCEL);

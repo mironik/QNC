@@ -14,8 +14,7 @@ qnc-ui-text = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-ingest-preview-source = { workspace = true }
 qnc-application-sequence = { workspace = true }
-qnc-ingest-selection-write = { workspace = true }
-qnc-import-fit = { workspace = true }
+qnc-ingest-import-run = { workspace = true }
 qnc-choice-box = { workspace = true }
 qnc-playback-priority = { workspace = true }
 qnc-source-browse = { workspace = true }
@@ -25,7 +24,6 @@ qnc-ingest-clip-list = { workspace = true }
 qnc-ingest-work-plan = { workspace = true }
 qnc-camera-adapter = { workspace = true }
 qnc-ingest-cameras = { workspace = true }
-qnc-ingest-import-worker = { workspace = true }
 qnc-ingest-select = { workspace = true }
 qnc-ingest-select-run = { workspace = true }
 qnc-source-timeline = { workspace = true }

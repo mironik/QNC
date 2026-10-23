@@ -35,7 +35,6 @@ mod timeline_projection;
 mod view_model;
 #[cfg(test)]
 mod work_settings_tests;
-mod worker_launch;
 
 pub mod action_ids;
 pub use clip_state::{ClipFilter, SaveState, ThumbStatus};
@@ -59,7 +58,8 @@ pub struct IngestApplication {
     store: Option<IngestStore>,
     /// The active project: work plan, catalog, project database targets (piece `qnc-ingest-project`).
     project: qnc_ingest_project::IngestProject,
-    selection_writer: qnc_ingest_selection_write::SelectionWriter,
+    /// Uvezi: the selection written once, then the background woken (piece `qnc-ingest-import-run`).
+    import: qnc_ingest_import_run::ImportRun,
     navigation_requested: bool,
     posters: qnc_clip_posters::ClipPosters,
     pending_source: Option<String>,
@@ -69,7 +69,6 @@ pub struct IngestApplication {
     /// One Select of a source (piece `qnc-ingest-select-run`).
     select: qnc_ingest_select_run::SelectRun,
     root: Option<std::path::PathBuf>,
-    worker: worker_launch::WorkerLauncher,
     /// The keyboard walk over the panels (the form's layout contract gives the order).
     walk: qnc_focus_walk::FocusWalk,
 }
@@ -115,7 +114,7 @@ impl Drop for IngestApplication {
     fn drop(&mut self) {
         self.stop_player();
         self.cancel_thumbnail_load();
-        self.selection_writer.cancel();
+        self.import.cancel();
         self.select.cancel();
     }
 }

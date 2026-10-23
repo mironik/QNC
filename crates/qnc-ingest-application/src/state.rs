@@ -26,7 +26,7 @@ impl IngestApplication {
             || self.view.command_busy
             || self.view.browser.busy
             || self.project.is_loading()
-            || self.selection_writer.is_busy()
+            || self.import.is_busy()
             || self.posters.has_pending_work()
             || self.select.is_busy()
             || self.preview.play_when_ready()
