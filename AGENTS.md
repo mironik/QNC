@@ -5612,3 +5612,14 @@ Shift+S, Delete i Alt+S te akcije `ingest_tab_virtual` i `ingest_subclip_delete`
 (`qnc-form-pieces`, `qnc-pool-marks`, `qnc-ingest-pieces`) i koraci 1-5 podjele Ingesta. Projekti koji su u
 `products` vec dobili `subclips` i mapu `SubClip` zadrzavaju ih (podatak se ne cita). C10 Ingest aplikacija 1137 -> 1133.
 Testovi, conformance.
+Audit i podjela 2026-10-23 (korisnik: "ingest moras napraviti audit i podjeliti na kocke, bez razloga drzis kod u jednoj
+datoteci"): cisto premjestanje bez promjene ponasanja; svaka datoteka jedna odgovornost. `qnc-ingest-catalog` (rows,
+read, loader, folder, tests), `qnc-ingest-clip-list` (events, row, tests), `qnc-ingest-selection-write` (conflicts,
+write, tests), `qnc-ingest-preview-source` (content, panel, tests), `qnc-ingest-layout` (contracts: ucitavanje i
+provjera ugovora; model: modeli rasporeda), `qnc-ingest-import-worker` (plan: sto i kamo; copy: kopija medija i
+postera; run: preuzimanje iz reda; queue: red uvoza kroz pisca), `qnc-ingest-select` (types, session, run),
+`qnc-ingest-store` (records, store, validate, ids, tests), `qnc-ingest-application` (testovi iz lib.rs u
+`app_tests.rs`, testovi postavki po temama u `work_settings_tests/`: catalog, settings, source). Uklonjeni ostaci
+SubClipa (`Answer.open`, IN/OUT oznake u preview-sourceu). Broj testova svake kocke isti kao prije (application 31,
+import-worker 22, select 18, store 3, catalog 3, selection-write 3, clip-list 2, preview-source 1). C10 Ingest
+aplikacija 1133 -> 1129. `selection_config.rs` (306 redaka, model postavki izvora) ostaje jedna datoteka. Conformance.

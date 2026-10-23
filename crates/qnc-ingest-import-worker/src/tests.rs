@@ -5,7 +5,7 @@ use qnc_ingest_work_plan::IngestWorkPlan;
 use std::{
     collections::BTreeMap,
     io::Cursor,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc},
 };
 
 const DB_URI: &str = "qnc://local/db/ingest_content/p1";
