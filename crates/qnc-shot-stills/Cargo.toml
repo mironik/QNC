@@ -2,7 +2,7 @@
 name = "qnc-shot-stills"
 version = "0.1.0"
 edition = "2021"
-description = "QNC public block: the stills of a saved virtual shot (IN/OUT of a short, the poster of a B-roll shot of a cover) written to the project product folder and published through the virtual shots table module"
+description = "QNC public block: the stills of a saved virtual shot (IN/OUT of a short, the poster of a B-roll shot of a cover), the monitor picture or else the frame decoded through the decoder catalog, written to the project product folder and published through the virtual shots table module"
 
 [dependencies]
 qnc-ui-text = { workspace = true }
@@ -10,3 +10,10 @@ qnc-db-broker = { workspace = true }
 qnc-virtual-short-stills = { workspace = true }
 qnc-virtual-shots = { workspace = true }
 qnc-work-settings = { workspace = true }
+qnc-decoder-catalog = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-still-locator = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

@@ -5472,3 +5472,12 @@ Synca playhead stoji u sljedecem (praznom) slotu. Sada: klik koji napusta izabra
 (`qnc-program-segments` Cue); B, P i dugme B-roll uzimaju prazni slot pod Wrap playheadom kad izabrani slot vec ima
 B-roll (`qnc-program-view` `quick_cover_slot`, test); dugme B-roll s oznacenim izvorom uvijek kaze zasto nije stavilo
 pokrivalicu. Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-23 (korisnik: "sub-clip nije kreirao poster subclipa"; "to treba biti kocka pa se nece gubiti kad se nesto
+drugo popravlja"): SubClip spremljen s IN-om i zadanim OUT-om (kraj klipa, pravilo 17. 10.) nije dobio poster, jer su
+slike IN/OUT bile samo one koje je monitor pokazao na tim mjestima, a kraj klipa monitor nikad nije pokazao. Kocka
+`qnc-shot-stills` (`ShotStills`) sada je jedino mjesto slika spremljenog kadra: pamti slike monitora (`follow`), a za
+svaku sliku shorta (IN, OUT) i poster pokrivalice uzima sliku monitora tog framea, inace taj frame dekodira iz medija koji
+projekt pusta kroz katalog dekodera (`qnc-still-locator`, isto kao zoom reza; bez probea), u pozadinskoj niti; zapis kroz
+`qnc-virtual-shots` kao prije, greska se upisuje kao razlog i u player log (`shot-stills`); nakon zapisa pool ponovno cita
+kadrove. `qnc-virtual-short-stills`: `captured`, `write_still_image`, `read_jpeg`. Ugovor `shot-stills.module.json`
+(dekodiranje kroz katalog dopusteno). C10 Story aplikacija 593 -> 588. Testovi, conformance. Uzivo nije provjereno.

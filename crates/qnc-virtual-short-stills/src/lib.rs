@@ -16,6 +16,18 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const STILL_WIDTH: u32 = 512;
 pub const STILL_HEIGHT: u32 = 288;
 
+pub use image::RgbaImage;
+
+/// One pixel of a picture (for building pictures without the image crate).
+pub fn image_pixel(rgba: [u8; 4]) -> image::Rgba<u8> {
+    image::Rgba(rgba)
+}
+
+/// A JPEG read as a picture (the frame a decoder wrote).
+pub fn read_jpeg(bytes: &[u8]) -> Result<RgbaImage, String> {
+    image::load_from_memory(bytes).map(|picture| picture.to_rgba8()).map_err(|error| error.to_string())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredShortStills {
     pub in_uri: String,
@@ -98,6 +110,15 @@ impl VirtualShortStillCache {
         if at_out {
             self.out_still = Some(still);
         }
+    }
+
+    /// The picture the monitor showed at this frame of the clip, when it was captured.
+    pub fn captured(&self, clip_id: &str, frame: u64) -> Option<RgbaImage> {
+        [&self.in_still, &self.out_still]
+            .into_iter()
+            .flatten()
+            .find(|still| still.clip_id == clip_id && still.frame == frame)
+            .and_then(|still| RgbaImage::from_raw(still.width as u32, still.height as u32, still.rgba.to_vec()))
     }
 
     pub fn has_pair_for(&self, clip_id: &str, in_frame: u64, out_frame: u64) -> bool {
@@ -213,7 +234,12 @@ fn write_still(still: &CandidateStill, path: &Path) -> Result<(), String> {
     let source =
         image::RgbaImage::from_raw(still.width as u32, still.height as u32, still.rgba.to_vec())
             .ok_or_else(|| qnc_ui_text::text("stills.rgba_picture_does_have_expected_size").to_string())?;
-    let fitted = fit_to_canvas(&source);
+    write_still_image(&source, path)
+}
+
+/// Writes a picture as a still: fitted on the still canvas, JPEG.
+pub fn write_still_image(source: &RgbaImage, path: &Path) -> Result<(), String> {
+    let fitted = fit_to_canvas(source);
     let file = fs::File::create(path).map_err(|error| format!("virtual short still: {error}"))?;
     let mut writer = BufWriter::new(file);
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut writer, 90)

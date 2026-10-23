@@ -455,6 +455,7 @@
     "player.invalid_filmstrip_record": "Invalid filmstrip record.",
     "stills.out_pictures_were_taken_saved_subclip": "The IN/OUT pictures were not taken for the saved SubClip.",
     "stills.picture_available": "The IN picture is not available.",
+    "stills.picture_not_decoded": "The picture of frame {frame} could not be decoded: {error}",
     "stills.out_picture_available": "The OUT picture is not available.",
     "stills.picture_b_roll_taken": "The IN picture of the B-roll was not taken.",
     "stills.clip_open_broadcast_player": "The clip is not open in the Broadcast Player.",

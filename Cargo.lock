@@ -5123,10 +5123,15 @@ name = "qnc-shot-stills"
 version = "0.1.0"
 dependencies = [
  "qnc-db-broker",
+ "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
+ "qnc-source-preview",
+ "qnc-still-locator",
  "qnc-ui-text",
  "qnc-virtual-short-stills",
  "qnc-virtual-shots",
  "qnc-work-settings",
+ "tempfile",
 ]
 
 [[package]]

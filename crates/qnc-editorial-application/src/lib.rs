@@ -22,7 +22,6 @@ use qnc_program_segments::SourcePick;
 use qnc_source_bindings::TransportBindings;
 use qnc_source_preview::{PreviewContext, SourcePreview};
 use qnc_virtual_short_cards::ParentClip;
-use qnc_virtual_short_stills::VirtualShortStillCache;
 use qnc_work_settings::WorkSettings;
 
 pub use view::{
@@ -64,7 +63,7 @@ pub struct EditorialApplication {
     /// IN/OUT a clip opens with (a short, an edited segment) once its timeline is ready.
     pending_marks: qnc_pending_marks::PendingMarks,
     trim_stills: qnc_trim_stills::TrimStills,
-    short_stills: VirtualShortStillCache,
+    short_stills: qnc_shot_stills::ShotStills,
     pool_shots: qnc_virtual_shots::PoolShotsReader,
     segments: qnc_program_segments::ProgramSegments,
     wrap: qnc_wrap_session::WrapSession,
@@ -87,7 +86,7 @@ impl Default for EditorialApplication {
             project_dir: None,
             pending_marks: qnc_pending_marks::PendingMarks::new(),
             trim_stills: qnc_trim_stills::TrimStills::new(),
-            short_stills: VirtualShortStillCache::default(),
+            short_stills: Default::default(),
             pool_shots: Default::default(),
             segments: qnc_program_segments::ProgramSegments::new(),
             wrap: qnc_wrap_session::WrapSession::new(),
@@ -202,6 +201,7 @@ impl EditorialApplication {
                 ),
             };
         }
+        if self.short_stills.take_published() { self.reload_shorts() } // a poster was written
         changed |= self.pool_shots.take().map(|rows| self.apply_shorts(rows)).is_some();
         self.sync_preview_view();
         changed
@@ -445,14 +445,9 @@ impl EditorialApplication {
         let (Some((_, target)), Some(settings)) = (&self.content_target, &self.current_settings) else {
             return;
         };
-        let place = qnc_shot_stills::Place { target, settings, project_dir: self.project_dir.as_deref() };
-        let stored = match short {
-            Some((shot, clip, marks)) => place.short(&self.short_stills, shot, clip, marks),
-            None => place.covers(&self.short_stills, self.segments.take_created_cover_shots()),
-        };
-        if let Err(error) = stored {
-            self.view.preview.message = error;
-        }
+        let place = qnc_shot_stills::Place { target, settings, project_dir: self.project_dir.as_deref(), locator: self.preview.still_locator() };
+        let covers = if short.is_none() { self.segments.take_created_cover_shots() } else { Vec::new() };
+        self.short_stills.store(place, short, covers);
     }
 
     fn open_short(&mut self, shot_id: &str) -> bool {
