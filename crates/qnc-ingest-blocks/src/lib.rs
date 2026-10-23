@@ -5,7 +5,7 @@
 use eframe::egui::{self, Rect, Ui};
 
 use qnc_ingest_application::{
-    action_ids, timeline_intent_to_ingest_intent, ClipFilter, ClipView, IngestIntent, IngestPayload, IngestViewModel, SourceKind,
+    action_ids, timeline_intent_to_ingest_intent, ClipFilter, IngestIntent, IngestPayload, IngestViewModel, SourceKind,
 };
 use qnc_ingest_layout::{theme::Theme, IngestContracts};
 

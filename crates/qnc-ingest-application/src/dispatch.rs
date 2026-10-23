@@ -24,6 +24,9 @@ impl IngestApplication {
         if let Some(refused) = self.refuse(&intent.action_id) {
             return refused;
         }
+        if let Some(answered) = self.piece_act(&intent) {
+            return answered;
+        }
         match intent.action_id.as_str() {
             action_ids::INGEST_RELOAD => self.on_reload(),
             action_ids::INGEST_SET_CLIP_FILTER => self.on_set_clip_filter(intent.payload),
@@ -35,16 +38,12 @@ impl IngestApplication {
             action_ids::INGEST_DIR_OPEN => self.on_dir_open(intent.payload),
             action_ids::INGEST_DIR_CONFIRM => self.on_dir_confirm(intent.payload),
             action_ids::INGEST_DIR_CANCEL => self.on_dir_cancel(),
-            action_ids::INGEST_SELECT_ALL => self.on_select_all(),
-            action_ids::INGEST_CLEAR_SELECTION => self.on_clear_selection(),
-            action_ids::INGEST_CLIP_TOGGLE => self.on_toggle_clip(intent.payload),
             action_ids::INGEST_PREVIEW_FOCUS => self.on_preview_focus(intent.payload),
             action_ids::INGEST_SET_ARCHIVE => self.on_set_archive(intent.payload),
             action_ids::INGEST_SET_AI_MINING => self.on_set_ai_mining(),
             action_ids::INGEST_IMPORT_SELECTED => self.start_import(),
             answer if qnc_ingest_import_run::ANSWERS.contains(&answer) => self.answer_import(answer),
             action if action == action_ids::TIMELINE_CUE_FRAME || qnc_source_panel::ACTIONS.contains(&action) || action.starts_with("wheel_source") => self.player_action(intent),
-            tab @ (action_ids::INGEST_TAB_ALL | action_ids::INGEST_TAB_VIRTUAL) => { self.view.pool_tab = Some(tab.to_string()); IngestDispatchResult::accepted(None, true) } // v5: only the chosen tab changes
             _ => IngestDispatchResult::accepted(Some(qnc_ui_text::text("ingest.msg.action_not_connected").to_string()), true),
         }
     }

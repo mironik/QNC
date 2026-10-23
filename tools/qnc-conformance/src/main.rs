@@ -1909,6 +1909,8 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-program-db/",
         "crates/qnc-artifact-db/",
         "crates/qnc-prerender-db/",
+        // The parts of source clips marked in Ingest (copied alone at import).
+        "crates/qnc-ingest-parts/",
         "crates/qnc-project-store/",
         "crates/qnc-project-close/",
         "crates/qnc-camera-patterns/",

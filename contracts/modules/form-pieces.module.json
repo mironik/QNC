@@ -1,0 +1,26 @@
+{
+  "module_id": "qnc.module.form-pieces",
+  "module_name": "Form pieces",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["form.pieces.act", "form.pieces.poll", "form.pieces.pool-rows"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["player.command", "timeline.paint"],
+  "forbidden_dependencies": [
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.player-client",
+    "qnc.module.ui-widget",
+    "qnc.module.timeline"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-form-pieces",
+  "input": "The actions and polls of a form, what a piece sees of it (clip list, chosen pool tab, filter New, clip on the preview, IN/OUT of the source timeline, project database target).",
+  "output": "The answer of the first piece that takes an action (changed, message, refused, a clip to open with IN/OUT) and the rows a piece shows on its pool tab; no form, no application, no database of its own.",
+  "specification": "AGENTS.md 2026-10-23: Ingest into blocks, step 6 (way B)."
+}

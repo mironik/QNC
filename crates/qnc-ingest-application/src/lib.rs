@@ -29,6 +29,7 @@ mod poll;
 mod settings;
 mod source_kind;
 mod state;
+mod pieces;
 mod thumbnails;
 mod timeline_artifacts;
 mod timeline_projection;
@@ -71,6 +72,8 @@ pub struct IngestApplication {
     root: Option<std::path::PathBuf>,
     /// The keyboard walk over the panels (the form's layout contract gives the order).
     walk: qnc_focus_walk::FocusWalk,
+    /// The pieces of the form (way B: a new possibility is a new piece, `qnc-ingest-pieces`).
+    pieces: qnc_ingest_pieces::IngestPieces,
 }
 
 impl IngestApplication {

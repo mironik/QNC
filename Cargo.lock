@@ -3691,6 +3691,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-form-pieces"
+version = "0.1.0"
+dependencies = [
+ "qnc-clip-row",
+ "qnc-db-broker",
+]
+
+[[package]]
 name = "qnc-format-sony"
 version = "0.1.0"
 dependencies = [
@@ -3772,11 +3780,13 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-dir-browser",
  "qnc-focus-walk",
+ "qnc-form-pieces",
  "qnc-image-assets",
  "qnc-ingest-cameras",
  "qnc-ingest-catalog",
  "qnc-ingest-clip-list",
  "qnc-ingest-import-run",
+ "qnc-ingest-pieces",
  "qnc-ingest-preview-source",
  "qnc-ingest-project",
  "qnc-ingest-select",
@@ -3959,6 +3969,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-ingest-parts"
+version = "0.1.0"
+dependencies = [
+ "qnc-clip-row",
+ "qnc-content-read",
+ "qnc-db-broker",
+ "qnc-form-pieces",
+ "qnc-ui-text",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-ingest-pieces"
+version = "0.1.0"
+dependencies = [
+ "qnc-form-pieces",
+ "qnc-ingest-parts",
+ "qnc-pool-marks",
+]
+
+[[package]]
 name = "qnc-ingest-preview-source"
 version = "0.1.0"
 dependencies = [
@@ -3967,6 +4001,7 @@ dependencies = [
  "qnc-image-assets",
  "qnc-ingest-select",
  "qnc-ingest-store",
+ "qnc-pending-marks",
  "qnc-player-client",
  "qnc-player-input",
  "qnc-player-timeline",
@@ -4682,6 +4717,15 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "qnc-pool-marks"
+version = "0.1.0"
+dependencies = [
+ "qnc-clip-row",
+ "qnc-form-pieces",
+ "qnc-ui-text",
 ]
 
 [[package]]

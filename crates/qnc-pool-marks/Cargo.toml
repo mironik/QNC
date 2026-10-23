@@ -1,0 +1,12 @@
+[package]
+name = "qnc-pool-marks"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the marks of a media pool (tick, all, none, chosen tab) as a piece of a form"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+qnc-form-pieces = { workspace = true }
+
+[dev-dependencies]
+qnc-clip-row = { workspace = true }

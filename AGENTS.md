@@ -5531,3 +5531,21 @@ stiglih slika na klipove) sada je u njoj jednom: `request_missing` (klipovi s ad
 nove sposobnosti. Ingest i Story/MA aplikacija samo pozivaju kocku. C10 Ingest aplikacija 1162 -> 1142, Story/MA aplikacija
 588 -> 573. Testovi `qnc-clip-posters` (8, novi test), `qnc-ingest-application` (31), `qnc-editorial-application` (11),
 conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-23 (korisnik: "da, kreni s korakom 6"; "da, zasebna tablica, i B"; Ingest u kocke): korak 6a. Nacin B:
+aplikacijski sloj forme prolazi kroz svoje kocke, nova mogucnost je nova kocka, ne novi redak aplikacije. Nova javna kocka
+`crates/qnc-form-pieces` (+ ugovor): sucelje `Piece` (radnja s id-em iz kataloga i njezin klip, poll, redovi poola za tab
+kocke) i `Pieces` (prva kocka koja uzme radnju odgovara); kocka vidi samo popis klipova, odabrani tab, filtar Novi, klip na
+previewu, IN/OUT source timelinea i bazu projekta. Nova kocka `crates/qnc-pool-marks` (+ ugovor): kvacica, sve, nista i
+odabrani tab poola (iz Ingest aplikacije premjesteni `toggle_clip.rs`, `select_all.rs`, `clear_selection.rs` i krak taba).
+Nova kocka `crates/qnc-ingest-pieces` (+ ugovor): samo popis kocki Ingesta s id-evima akcija. Ingest SubClip: nova kocka
+`crates/qnc-ingest-parts` (+ ugovor modula i baze `contracts/databases/ingest-parts.database.json`), zasebna tablica
+`ingest_parts` (odluka korisnika: ne `virtual_shots`, jer SaveShort prima samo uvezene klipove i Story bi ih pokazao kao
+SubClip) kroz posrednika baze: dio je IN..OUT klipa iz kataloga, unutar spremljene duljine (`qnc-content-read`), id
+`<klip>-part-NN` se nikad ne ponavlja; `PartsPiece`: Shift+S i dugme Add SubClip spremaju IN/OUT klipa na previewu i otvaraju
+tab SubClip, tab pokazuje dijelove kao kartice (poster njihova klipa), klik na dio otvara njegov klip s IN/OUT (pending marks
+u `qnc-ingest-preview-source`), Delete brise odabrani dio. Katalog (QNC preset, Ingest): `save_virtual_shot` Shift+S, nova
+akcija `ingest_subclip_delete` Delete; layout Ingesta: dugme Add SubClip u traci source timelinea i u redu fokusa. Conformance:
+`qnc-ingest-parts` na popisu javnih DB vlasnika. C10 Ingest aplikacija 1142 -> 1137 (s novom mogucnoscu), ploca 155 ista.
+Testovi `qnc-form-pieces` (1), `qnc-pool-marks` (1), `qnc-ingest-parts` (2), `qnc-ingest-application` (31; test kroz cijelu
+aplikaciju: Shift+S, tab SubClip, klik otvara klip), conformance, release build. Uzivo nije provjereno. Nije izvedeno (korak
+6b): Uvezi jos kopira cijeli klip; kopija samo dijelova (stream copy, 1 s rezerve, svaki dio svoj klip) je sljedeci korak.

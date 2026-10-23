@@ -174,7 +174,7 @@ fn marking_an_uncommitted_preview_is_local_and_stale_ack_does_not_mark_it_saved(
     assert_eq!(component.view.clips[0].save_state, SaveState::Pending);
     assert!(
         component
-            .select_clips(vec!["clip-pending".into()], true)
+            .dispatch(IngestIntent::new(action_ids::INGEST_CLIP_TOGGLE, IngestPayload::ClipId("clip-pending".into())))
             .accepted
     );
     assert_eq!(component.view.clips[0].save_state, SaveState::Pending);
@@ -552,6 +552,25 @@ fn catalog_selection_and_source_metadata_survive_restart_and_project_switch_with
             .unwrap()
             .selected
     );
+    // Ingest SubClip (way B, user 2026-10-23): Shift+S saves the IN/OUT of the clip on the
+    // preview as a part, the SubClip tab shows it and a click on it opens its clip.
+    // The card records of this fixture carry no length; a real card's do (camera XML).
+    project.execute("UPDATE clips SET duration_frames = 500 WHERE clip_id = ?1", [&id]).unwrap();
+    restarted.view.preview_clip_id = Some(id.clone());
+    (restarted.view.timeline.source_in_frame, restarted.view.timeline.source_out_frame) = (Some(2), Some(4));
+    assert!(restarted.dispatch(IngestIntent::empty("save_virtual_shot")).accepted);
+    assert_eq!(restarted.view.pool_tab.as_deref(), Some(action_ids::INGEST_TAB_VIRTUAL));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while restarted.view.pool_clips().is_empty() && Instant::now() < deadline {
+        restarted.poll(None);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let part = restarted.view.pool_clips().first().map(|row| (row.clip_id.clone(), row.duration_frames)).expect("the part is shown");
+    assert_eq!(part, (format!("{id}-part-01"), 2));
+    assert!(restarted.dispatch(IngestIntent::new(action_ids::INGEST_PREVIEW_FOCUS, IngestPayload::ClipId(part.0))).accepted);
+    assert_eq!(restarted.view.preview_clip_id.as_deref(), Some(id.as_str()), "a part opens its clip");
+    restarted.dispatch(IngestIntent::empty(action_ids::INGEST_TAB_ALL));
+    assert_eq!(restarted.view.pool_clips().len(), restarted.view.visible_clips().count());
     let registry = Connection::open(root.path().join("data/qnc-projects.db")).unwrap();
     registry
         .execute("UPDATE app_settings SET value='p2'", [])

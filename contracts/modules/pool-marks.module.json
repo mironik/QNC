@@ -1,0 +1,26 @@
+{
+  "module_id": "qnc.module.pool-marks",
+  "module_name": "Pool marks",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["pool.marks.tick", "pool.marks.all", "pool.marks.none", "pool.marks.tab"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["player.command", "timeline.paint"],
+  "forbidden_dependencies": [
+    "qnc.module.broadcast-player",
+    "qnc.module.broadcast-engine",
+    "qnc.module.player-client",
+    "qnc.module.ui-widget",
+    "qnc.module.timeline"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-pool-marks",
+  "input": "The action ids of the form for a tick, all, none and the pool tabs; the clip list and the chosen tab.",
+  "output": "Ticks on the clip list (a mark of the view only, no thread, no database) and the chosen pool tab.",
+  "specification": "AGENTS.md 2026-10-23: Ingest into blocks, step 6 (way B)."
+}

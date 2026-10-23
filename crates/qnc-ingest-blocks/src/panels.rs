@@ -85,7 +85,7 @@ pub(super) fn pool(ui: &mut Ui, contracts: &IngestContracts, theme: &Theme, view
         _ if view.work_settings_loading => &grid.loading_settings_message,
         _ if view.clip_filter == ClipFilter::New => &grid.empty_new_message,
         _ if view.command_busy || view.selected_source_uri.is_some() => &view.message,
-        _ => &grid.empty_message,
+        _ => view.pool_empty(&grid.empty_message),
     });
     let now = qnc_media_pool_panel::PoolNow {
         chosen_id: view.preview_clip_id.as_deref().unwrap_or(""),
@@ -94,7 +94,7 @@ pub(super) fn pool(ui: &mut Ui, contracts: &IngestContracts, theme: &Theme, view
         empty_message,
         id_salt: if view.clip_filter == ClipFilter::New { "ingest_grid_new" } else { "ingest_grid_all" },
     };
-    let clips: Vec<&ClipView> = view.visible_clips().collect();
+    let clips = view.pool_clips();
     match qnc_media_pool_panel::show(ui, theme, &spec, &now, &clips)? {
         CardGridAction::ToggleSelection(id) => Some(IngestIntent::new(action_ids::INGEST_CLIP_TOGGLE, IngestPayload::ClipId(id))),
         CardGridAction::Activate(id) => Some(IngestIntent::new(action_ids::INGEST_PREVIEW_FOCUS, IngestPayload::ClipId(id))),

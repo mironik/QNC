@@ -26,6 +26,8 @@ pub struct IngestViewModel {
     pub clips: Vec<ClipView>,
     pub clip_filter: ClipFilter,
     pub pool_tab: Option<String>, // chosen pool head tab (action id); None = the first
+    /// The rows a piece shows on the chosen tab instead of the clip list (Ingest SubClips).
+    pub pool_rows: Option<Vec<ClipView>>,
     pub preview_clip_id: Option<String>,
     pub archive_original: bool,
     pub archive_original_available: bool,
@@ -54,6 +56,7 @@ impl Default for IngestViewModel {
             clips: Vec::new(),
             clip_filter: ClipFilter::All,
             pool_tab: None,
+            pool_rows: None,
             preview_clip_id: None,
             archive_original: false,
             archive_original_available: false,
@@ -82,6 +85,16 @@ impl IngestViewModel {
         self.clips
             .iter()
             .filter(|clip| self.clip_filter == ClipFilter::All || !clip.previously_seen)
+    }
+
+    /// What the pool shows: the rows of the chosen tab's piece, else the visible clips.
+    pub fn pool_clips(&self) -> Vec<&ClipView> {
+        self.pool_rows.as_ref().map_or_else(|| self.visible_clips().collect(), |rows| rows.iter().collect())
+    }
+
+    /// The text of an empty pool: a tab of a piece says how its rows are made.
+    pub fn pool_empty<'a>(&self, clips: &'a str) -> &'a str {
+        if self.pool_rows.is_some() { qnc_ui_text::text("ingest.pool.subclip_empty") } else { clips }
     }
 
     pub fn total_count(&self) -> usize {

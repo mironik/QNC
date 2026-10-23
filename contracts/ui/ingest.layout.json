@@ -41,6 +41,7 @@
       "ingest_tab_virtual"
     ],
     "source_buttons": [
+      "save_virtual_shot",
       "ingest_clear_selection",
       "ingest_select_all",
       "ingest_import_selected"
@@ -192,6 +193,10 @@
       {
         "label": "@ingest.import",
         "action_id": "ingest_import_selected"
+      },
+      {
+        "label": "@ingest.add_subclip",
+        "action_id": "save_virtual_shot"
       },
       "@ingest.filter"
     ],

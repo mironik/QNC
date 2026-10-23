@@ -110,6 +110,8 @@ pub struct IngestPreviewSource {
     /// The one source timeline every form embeds (piece `qnc-source-timeline`).
     source_timeline: qnc_source_timeline::SourceTimeline,
     chosen: Option<String>,
+    /// The IN/OUT a clip opens with (an Ingest SubClip), put on its timeline once it is there.
+    marks: qnc_pending_marks::PendingMarks,
 }
 
 impl IngestPreviewSource {
@@ -164,10 +166,20 @@ impl IngestPreviewSource {
         Shown {
             playback: view.playback,
             monitor: view.monitor,
-            timeline: view.timeline.preserving_source_marks_from(previous),
+            timeline: self.marked(clip, view.timeline.preserving_source_marks_from(previous)),
             assets: qnc_timeline_assets::with_clip_poster(assets, posters),
             source_timeline: self.source_timeline.sync(clip, catalog).clone(),
         }
+    }
+
+    /// `clip_id` opens with IN/OUT `marks` (an Ingest SubClip of it).
+    pub fn mark(&mut self, clip_id: &str, marks: (u64, u64)) {
+        self.marks.set(clip_id, marks, None);
+    }
+
+    fn marked(&mut self, clip: Option<&str>, mut timeline: qnc_timeline::TimelineProjection) -> qnc_timeline::TimelineProjection {
+        self.marks.apply(clip, &mut timeline);
+        timeline
     }
 
     /// The A1/A2 lanes and marks of the source timeline (Ctrl+1/2, a taken lane, a channel click);

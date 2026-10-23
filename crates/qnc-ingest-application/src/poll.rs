@@ -2,7 +2,7 @@ use super::*;
 
 impl IngestApplication {
     pub fn poll(&mut self, pointed: Option<&str>) -> bool {
-        let mut changed = self.poll_settings();
+        let mut changed = self.poll_settings() | self.piece_poll();
         if self.preview.poll(pointed) {
             self.sync_playback_view();
             let message = self.preview.take_message();

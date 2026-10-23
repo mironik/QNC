@@ -1,0 +1,9 @@
+[package]
+name = "qnc-form-pieces"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the generic pass of a form's application layer through its pieces (actions, polls, pool rows)"
+
+[dependencies]
+qnc-clip-row = { workspace = true }
+qnc-db-broker = { workspace = true }
