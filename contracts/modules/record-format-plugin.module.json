@@ -1,0 +1,39 @@
+{
+  "module_id": "qnc.module.record-format-plugin",
+  "module_name": "Record-format plug-in",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "camera.record-format.plugin"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "media.read",
+    "database.read",
+    "database.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-record-format-plugin",
+  "input": "A record-format plug-in program (contract qnc.record-format 1, contracts/plugins/record-format.v1.json).",
+  "output": "That plug-in as a record format of the application (index groups, clip documents, card thumbnail, clip record), and the side a plug-in program serves.",
+  "specification": "User 2026-10-23: a new camera record format is a plug-in and one line in the catalog of formats; the application is not rebuilt. The plug-in gets texts and references only."
+}

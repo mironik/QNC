@@ -6,9 +6,22 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// The camera profiles and the catalog of record formats shipped with QNC, into a test root.
+fn shipped_catalogs(root: &std::path::Path) {
+    let shipped = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for dir in ["catalogs/cameras/sony", "catalogs/record-formats"] {
+        fs::create_dir_all(root.join(dir)).unwrap();
+        for entry in fs::read_dir(shipped.join(dir)).unwrap() {
+            let path = entry.unwrap().path();
+            fs::copy(&path, root.join(dir).join(path.file_name().unwrap())).unwrap();
+        }
+    }
+}
+
 fn fixture() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     fs::create_dir(root.path().join("data")).unwrap();
+    shipped_catalogs(root.path());
     let db = Connection::open(root.path().join("data/qnc-projects.db")).unwrap();
     db.execute_batch(
         "CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT);

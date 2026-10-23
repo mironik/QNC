@@ -1,0 +1,17 @@
+[package]
+name = "qnc-format-sony"
+version = "0.1.0"
+edition = "2021"
+description = "QNC record-format plug-in: the Sony MediaProfile record format (MEDIAPRO.XML index with NonRealTimeMeta sidecars) as its own program"
+
+[dependencies]
+qnc-record-format-plugin = { workspace = true }
+qnc-sony-metadata = { workspace = true }
+
+[dev-dependencies]
+qnc-camera-adapter = { workspace = true }
+qnc-plugin-process = { workspace = true }
+qnc-source-contract = { workspace = true }
+qnc-source-groups = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }

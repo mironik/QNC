@@ -1,0 +1,21 @@
+{
+  "contract": "qnc.record-format",
+  "version": 1,
+  "purpose": "A camera record format as a plug-in program beside the application (user 2026-10-23). A new format is a plug-in and one line in catalogs/record-formats/catalog.json; the application is not rebuilt. The camera itself is a text profile (catalogs/cameras).",
+  "transport": "JSON lines: one JSON object per line on the plug-in's stdin (from the application) and stdout (to the application), UTF-8. stderr is not read. No line longer than 64 MiB.",
+  "handshake": {
+    "application": { "contract": "qnc.record-format", "version": 1 },
+    "plugin": { "contract": "qnc.record-format", "version": 1, "plugin_id": "a stable id", "plugin_version": "its version", "about": { "reader_id": "the reader id the camera profiles name", "namespace": "the index namespace" } },
+    "rule": "The application refuses a plug-in that answers another contract or version, does not answer in time, or names another reader than its catalog line."
+  },
+  "request": { "id": "a number, one answer per request, same id", "op": "one of the operations", "body": "the operation's input" },
+  "answer": { "id": "the request's id", "ok": "the operation's output, when it succeeded", "error": "why it did not" },
+  "operations": {
+    "read_index": { "body": { "root": "SourceReference of the recording root", "document": "IndexDocument: the index's reference and text" }, "ok": "[GroupProposal]: the recordings the index names" },
+    "documents": { "body": { "group": "GroupProposal" }, "ok": "[SourceReference]: the records of the clip the application reads and gives to metadata" },
+    "thumbnail": { "body": { "group": "GroupProposal" }, "ok": "SourceReference or null: the card thumbnail the index links" },
+    "metadata": { "body": { "clip_id": "the clip", "group": "GroupProposal", "documents": "[IndexDocument]: the index and the clip's records as text" }, "ok": "ClipMetadata (qnc.media.metadata): the camera's record of the clip, as the format reads it" }
+  },
+  "limits": "A plug-in is given texts and references only, never a path or an open file: it reads nothing else and writes nothing. It is started at its first request, serves a job and is stopped when it has had nothing to do for 30 s or when the application no longer needs it. Its answers are the format's; the camera profile and the procedure are applied by the application.",
+  "types": "SourceReference, IndexDocument and GroupProposal are those of qnc-source-contract and qnc-source-groups; ClipMetadata is that of qnc-media-metadata, serialized as the application stores them."
+}

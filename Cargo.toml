@@ -110,6 +110,9 @@ members = [
     "crates/qnc-import-fit",
     "crates/qnc-camera-profiles",
     "crates/qnc-camera-profile-adapter",
+    "crates/qnc-plugin-process",
+    "crates/qnc-record-format-plugin",
+    "tools/qnc-format-sony",
     "crates/qnc-choice-box",
     "crates/qnc-keyframe-nav",
     "crates/qnc-playback-activity",
@@ -319,6 +322,8 @@ qnc-alert = { path = "crates/qnc-alert" }
 qnc-import-fit = { path = "crates/qnc-import-fit" }
 qnc-camera-profiles = { path = "crates/qnc-camera-profiles" }
 qnc-camera-profile-adapter = { path = "crates/qnc-camera-profile-adapter" }
+qnc-plugin-process = { path = "crates/qnc-plugin-process" }
+qnc-record-format-plugin = { path = "crates/qnc-record-format-plugin" }
 qnc-choice-box = { path = "crates/qnc-choice-box" }
 qnc-keyframe-nav = { path = "crates/qnc-keyframe-nav" }
 qnc-playback-activity = { path = "crates/qnc-playback-activity" }

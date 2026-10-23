@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "formats": [
+    {
+      "reader_id": "camera.sony.index.read",
+      "kind": "builtin",
+      "name": "sony-mediaprofile",
+      "notes": "Sony MediaProfile: MEDIAPRO.XML index with NonRealTimeMeta sidecars (XDROOT, M4ROOT, XDCAM). The same format as a plug-in is the program qnc-format-sony: { \"kind\": \"plugin\", \"program\": \"qnc-format-sony\", \"contract_version\": 1, \"timeout_ms\": 10000 }."
+    }
+  ]
+}

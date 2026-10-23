@@ -1,0 +1,9 @@
+[package]
+name = "qnc-plugin-process"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: a plug-in as its own program speaking a versioned contract as JSON lines; started at its first request, stopped when idle, refused when it speaks another contract"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

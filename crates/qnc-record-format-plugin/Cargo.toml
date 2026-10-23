@@ -1,0 +1,14 @@
+[package]
+name = "qnc-record-format-plugin"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: a camera record format as a plug-in program (contract qnc.record-format 1): the client that is a record format of the application, and the side a plug-in program serves"
+
+[dependencies]
+qnc-camera-adapter = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-plugin-process = { workspace = true }
+qnc-source-contract = { workspace = true }
+qnc-source-groups = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

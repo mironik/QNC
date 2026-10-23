@@ -5425,3 +5425,21 @@ svi prepoznati), pozadinski radnik ih dovrsava (155 konacnih i potpunih, oznaka 
 `qnc-camera-profile-adapter`, `qnc-ingest-cameras`, `qnc-ingest-select`, `qnc-ingest-import-worker`,
 `qnc-record-completion`, conformance. Nije izvedeno: upozorenje u Ingestu za karticu nepoznatog modela (zasad samo u
 zapisu klipa), PMW-300 nije proban (disk nije bio spojen).
+Otkljucano i izvedeno 2026-10-23 (korisnik: "kocke bi mogle biti nesto kao dll, tako da aplikacija bude lakse
+servisirana"; plan razina: podaci, dodaci kao zasebni programi s verzioniranim ugovorom, kocke u gradnji; "da, otkljucaj i
+kreni s korakom 1"): formati kamera mogu biti dodaci. Ugovor `contracts/plugins/record-format.v1.json`
+(`qnc.record-format` 1: JSON redovi na stdin/stdout; dogovor o ugovoru i verziji; pitanja `read_index`, `documents`,
+`thumbnail`, `metadata`; dodatak dobiva samo tekst i reference, nikad putanju ni datoteku). Nova javna kocka
+`crates/qnc-plugin-process` (+ ugovor): pokrene program dodatka uz aplikaciju, provjeri ugovor i verziju, jedan proces za
+posao, vrijeme odgovora i velicina izlaza, zaustavi ga nakon 30 s bez posla; dodatak koji ne odgovara ili govori drugi
+ugovor je kontrolirana greska, bez zamjenskog puta. Nova javna kocka `crates/qnc-record-format-plugin` (+ ugovor): dodatak
+kao format zapisa aplikacije (`PluginFormat`) i strana koju program dodatka sluzi (`serve`). Novi program
+`tools/qnc-format-sony`: format Sony MediaProfile kao dodatak. Katalog formata `catalogs/record-formats/catalog.json`
+(ugraden ili dodatak; Sony ostaje ugraden); `qnc-ingest-cameras::registry` slaze formate iz kataloga s profilima kamera,
+format koji se ne moze koristiti ide u log (`record-format refused`). Nova kamera poznatog formata je samo profil, novi
+format je dodatak i redak u katalogu, bez nove gradnje aplikacije. Dokaz: testovi `qnc-format-sony` (dodatak odgovara isto
+kao ugradeni format; drugi ugovor i nepostojeci program su odbijeni); izolirana kopija (kartice D: FX6V i G: FX3A samo
+citane, stvarni projekt nepromijenjen) s katalogom prebacenim na dodatak: 155 zapisa jednakih ugradenom formatu; Select
+D: 24,2 s kroz dodatak prema 16,3 s ugradeno (pretvaranje zapisa u JSON). Testovi ugovora `qnc-ingest-application` dobili
+su isporucene kataloge u testni korijen. Conformance. Nije izvedeno: korak 2 (ugovor `qnc-packets` za sve sto dekoder radi,
+alat za prihvat dekodera), korak 3 (popis verzija dodataka i programa).

@@ -3690,6 +3690,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-format-sony"
+version = "0.1.0"
+dependencies = [
+ "qnc-camera-adapter",
+ "qnc-plugin-process",
+ "qnc-record-format-plugin",
+ "qnc-sony-metadata",
+ "qnc-source-contract",
+ "qnc-source-groups",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-frame-timebase"
 version = "0.1.0"
 dependencies = [
@@ -3809,14 +3823,18 @@ dependencies = [
 
 [[package]]
 name = "qnc-ingest-cameras"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "qnc-camera-adapter",
  "qnc-camera-generic-file",
  "qnc-camera-profile-adapter",
  "qnc-camera-profiles",
  "qnc-dev-diagnostics",
+ "qnc-plugin-process",
+ "qnc-record-format-plugin",
  "qnc-sony-metadata",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 
@@ -4614,6 +4632,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-plugin-process"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-pool-pointer"
 version = "0.1.0"
 dependencies = [
@@ -4956,6 +4982,19 @@ dependencies = [
  "qnc-source-index-db",
  "qnc-source-reader",
  "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-record-format-plugin"
+version = "0.1.0"
+dependencies = [
+ "qnc-camera-adapter",
+ "qnc-media-metadata",
+ "qnc-plugin-process",
+ "qnc-source-contract",
+ "qnc-source-groups",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
