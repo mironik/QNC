@@ -72,9 +72,6 @@ pub struct IngestApplication {
     selection_events: qnc_ingest_clip_list::SelectEventState,
     /// The keyboard walk over the panels (the form's layout contract gives the order).
     walk: qnc_focus_walk::FocusWalk,
-    /// The one source timeline every form embeds (piece `qnc-source-timeline`): its keys,
-    /// wheel, A1/A2 lanes and the clip's timecode.
-    source_timeline: qnc_source_timeline::SourceTimeline,
 }
 
 impl IngestApplication {
@@ -187,7 +184,7 @@ mod tests {
         component.view.preview_clip_id = Some("existing-preview".into());
         component.view.clip_filter = ClipFilter::New;
         let mut expected = component.view().clone();
-        expected.message = "Broadcast Player nije povezan.".into();
+        expected.message = qnc_ui_text::text("player.broadcast_player_connected").into();
         let mut requests = vec![
             IngestIntent::empty(action_ids::PLAY_PAUSE),
             IngestIntent::empty(action_ids::PLAY_PAUSE),

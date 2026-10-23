@@ -3,6 +3,7 @@
 //! adapts the Ingest content database to that universal preview.
 
 use super::*;
+use qnc_ingest_preview_source::{Chosen, OpenFrom};
 #[cfg(test)]
 use qnc_player_client::Player;
 
@@ -13,63 +14,35 @@ impl IngestApplication {
 
     /// Copies what the preview reports into the view the form reads.
     pub(super) fn sync_playback_view(&mut self) {
-        let preview = self.preview.view();
-        (self.view.playback, self.view.monitor) = (preview.playback, preview.monitor);
-        self.view.timeline = preview.timeline.preserving_source_marks_from(&self.view.timeline);
-        // Filmstrip and wave come from the universal preview, read again while the worker makes them.
-        let clip = self.view.preview_clip_id.clone().unwrap_or_default();
-        let assets = if preview.assets.clip_id == clip { preview.assets } else { SourceTimelineAssets::empty_for(&clip) };
         let posters = self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.thumb_image.as_deref()));
-        self.view.timeline_assets = qnc_timeline_assets::with_clip_poster(assets, posters);
-        self.view.source_timeline = self.source_timeline.sync(self.view.preview_clip_id.as_deref(), self.project.catalog_target()).clone();
+        let shown = self.preview.shown(self.view.preview_clip_id.as_deref(), &self.view.timeline, posters, self.project.catalog_target());
+        (self.view.playback, self.view.monitor, self.view.timeline) = (shown.playback, shown.monitor, shown.timeline);
+        (self.view.timeline_assets, self.view.source_timeline) = (shown.assets, shown.source_timeline);
     }
 
     pub(super) fn prepare_preview(&mut self, clip_id: String) -> IngestDispatchResult {
-        if self.view.preview_clip_id.as_deref() == Some(&clip_id)
-            && self.view.playback.error.is_none()
-            && (self.view.playback.preparing || self.view.playback.reply.is_some())
-        {
-            // The player session is already right, but the artifacts of the clip may
-            // have changed (filmstrip or wave finished): never keep a stale timeline.
-            self.preview.refresh_assets();
-            self.sync_playback_view();
-            return IngestDispatchResult::accepted(None, true);
-        }
-        let Some(save_state) = self
-            .view
-            .clips
-            .iter()
-            .find(|c| c.clip_id == clip_id)
-            .map(|c| c.save_state)
-        else {
-            return IngestDispatchResult::rejected("Clip nije pronadjen.");
+        let Some(save_state) = self.view.clips.iter().find(|c| c.clip_id == clip_id).map(|c| c.save_state) else {
+            return IngestDispatchResult::rejected(qnc_ui_text::text("ingest.msg.clip_not_found"));
         };
-        // Cut the old session even when the new clip/settings cannot be prepared.
-        self.stop_player();
-        self.view.preview_clip_id = Some(clip_id.clone());
-        self.view.timeline_assets = SourceTimelineAssets::empty_for(&clip_id); // the preview reads them
-        if save_state != SaveState::Saved {
-            self.view.message = "Klip jos nije spremljen u bazu.".into();
-            return IngestDispatchResult::accepted(None, true);
-        }
-        let (Some(reader), Some(plan), Some(config), Some(content_target)) = (
-            self.project.reader().cloned(),
-            self.work_plan(),
-            self.selection_config.clone(),
-            self.project.catalog_target().cloned(),
-        ) else {
-            return IngestDispatchResult::accepted(None, true);
+        let config = self.selection_config.clone();
+        let from = match (self.project.reader().cloned(), self.work_plan(), config.as_ref(), self.project.catalog_target().cloned()) {
+            (Some(reader), Some(plan), Some(config), Some(target)) => Some(OpenFrom { reader, settings: plan.settings.clone(), config, target }),
+            _ => None,
         };
-        self.preview
-            .configure(reader, plan.settings.clone(), &config, content_target);
-        let error = self
-            .preview
-            .open_saved_clip(&clip_id, save_state == SaveState::Saved)
-            .err()
-            .unwrap_or_default();
-        self.sync_playback_view();
-        if !error.is_empty() {
-            return IngestDispatchResult::rejected_shown(error);
+        let chosen = self.preview.choose(&clip_id, save_state == SaveState::Saved, from);
+        if chosen != Chosen::Refreshed {
+            (self.view.playback, self.view.monitor, self.view.timeline) = Default::default();
+            self.view.preview_clip_id = Some(clip_id.clone());
+            self.view.timeline_assets = SourceTimelineAssets::empty_for(&clip_id); // the preview reads them
+        }
+        match chosen {
+            Chosen::NotSaved => self.view.message = qnc_ui_text::text("ingest.msg.clip_not_saved").into(),
+            Chosen::Waiting => {}
+            Chosen::Failed(error) => {
+                self.sync_playback_view();
+                return IngestDispatchResult::rejected_shown(error);
+            }
+            Chosen::Refreshed | Chosen::Opened => self.sync_playback_view(),
         }
         IngestDispatchResult::accepted(None, true)
     }
@@ -81,21 +54,14 @@ impl IngestApplication {
     }
 
     pub(super) fn player_action(&mut self, intent: IngestIntent) -> IngestDispatchResult {
-        // Without a player only Escape still lets go of what the source timeline took.
-        let escape = intent.action_id == "clear_focus";
-        if !self.preview.has_player() && !escape {
-            return self.refuse_shown("Broadcast Player nije povezan.".into());
-        }
         // The source timeline's keys, Play among them, are the piece every form takes (user rule
         // 2026-10-20: one owner per action); Ingest adds only its guard when the play starts.
-        let preview = self.preview.source_preview_mut();
-        let was_playing = preview.player_view().playing();
-        let routed = match intent.action_id.as_str() {
-            action_ids::TIMELINE_CUE_FRAME => match intent.payload {
-                IngestPayload::Frame(frame) if frame >= 0 => Some(self.source_timeline.cue(&TimelineIntent::CueFrame(frame as u64), preview)),
-                _ => return IngestDispatchResult::rejected("Neispravan frame."),
-            },
-            _ => self.source_timeline.route(&intent.action_id, preview, &mut self.view.timeline),
+        let was_playing = self.preview.player_view().playing();
+        let frame = if let IngestPayload::Frame(frame) = intent.payload { Some(frame) } else { None };
+        let routed = match self.preview.route(&intent.action_id, frame, &mut self.view.timeline) {
+            Ok(routed) => routed,
+            Err(error) if self.preview.has_player() => return IngestDispatchResult::rejected(error),
+            Err(error) => return self.refuse_shown(error),
         };
         let Some(changed) = routed else {
             return IngestDispatchResult::accepted(None, false); // a source timeline key with nothing to do (Escape)
@@ -171,11 +137,15 @@ mod preview_refresh_tests {
     #[test]
     fn choosing_the_clip_that_is_already_prepared_still_refreshes_its_timeline_artifacts() {
         let mut app = IngestApplication::new();
-        app.view.preview_clip_id = Some("clip-1".into());
-        app.view.playback.preparing = true;
-        assert!(app.view.timeline_assets.clip_id.is_empty());
+        app.view.clips = vec![ClipView { clip_id: "clip-1".into(), save_state: SaveState::Pending, ..Default::default() }];
+        assert!(app.prepare_preview("clip-1".into()).accepted);
+        // The session of that clip prepares: choosing it again keeps it and reads its artifacts.
+        queue_play(&mut app);
+        app.preview.poll(None);
+        app.view.timeline_assets = SourceTimelineAssets::empty();
         let result = app.prepare_preview("clip-1".into());
         assert!(result.accepted);
+        assert!(app.preview.play_when_ready(), "the preparing session was kept");
         assert_eq!(app.view.timeline_assets.clip_id, "clip-1");
     }
 }

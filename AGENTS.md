@@ -5496,3 +5496,14 @@ Selecta u bazi projekta, statistika kataloga, mapa projekta i slijed aplikacija;
 `qnc-ingest-application` drzi samo `project` umjesto sedam polja i zove kocku (`settings.rs`, `state.rs`, `navigation.rs`,
 `thumbnails.rs`, `playback.rs`, `dir_confirm.rs`, `import_selected.rs`); ponasanje isto. C10 Ingest aplikacija 1354 -> 1265.
 Testovi `qnc-ingest-project` (2), `qnc-ingest-application` (31), conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-23 (korisnik: "da, kreni s korakom 2"; Ingest u kocke): korak 2. Kocka `qnc-ingest-preview-source` je panel
+previewa Ingesta: drzi i jedini source timeline (`qnc-source-timeline`), izbor klipa (`choose`: stara sesija se prekida
+prije nove i kad novi klip nije spremljen ili projekt nije ucitan; isti klip koji se priprema ili je spreman samo ponovno
+cita artefakte; `Chosen`), ono sto forma pokazuje od previewa i source timelinea (`shown`: IN/OUT ostaju, klip bez
+filmstripa pokazuje poster u traci) i tipke i klik source timelinea (`route`, `route_input`; bez playera samo Esc).
+Ugovor modula: nove sposobnosti, `session_local`, uklonjena zabrana `player.command` (tipke source timelinea idu
+univerzalnom previewu, kao i prije kroz aplikaciju). `qnc-ingest-application` samo poziva kocku; tri preostala hrvatska
+teksta u kodu idu kroz rjecnik (`ingest.msg.clip_not_found`, `ingest.msg.clip_not_saved`,
+`player.broadcast_player_connected`, novi `ingest.msg.invalid_frame`). C10 Ingest aplikacija 1265 -> 1235. Testovi
+`qnc-ingest-preview-source` (1, novi), `qnc-ingest-application` (31; test istog klipa sada ide kroz kocku),
+conformance, release build. Uzivo nije provjereno.

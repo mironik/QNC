@@ -3950,6 +3950,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-content-artifacts",
  "qnc-content-store",
+ "qnc-image-assets",
  "qnc-ingest-select",
  "qnc-ingest-store",
  "qnc-player-client",
@@ -3957,6 +3958,7 @@ dependencies = [
  "qnc-player-timeline",
  "qnc-source-bindings",
  "qnc-source-preview",
+ "qnc-source-timeline",
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-ui-text",

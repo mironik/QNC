@@ -79,6 +79,7 @@
     "ingest.msg.missing_bool": "The value is missing.",
     "ingest.msg.missing_filter": "The clip filter is missing.",
     "ingest.msg.clip_not_found": "Clip not found.",
+    "ingest.msg.invalid_frame": "Invalid frame.",
     "ingest.msg.source_selected_at": "Source selected: {time}",
     "ingest.status.warnings": "{clips} clips; {warnings} warnings",
     "ingest.status.select": "Select: {clips} clips",

@@ -6,6 +6,8 @@ description = "QNC public adapter: Ingest content database as a source for the u
 
 [dependencies]
 qnc-ui-text = { workspace = true }
+qnc-image-assets = { workspace = true }
+qnc-source-timeline = { workspace = true }
 qnc-content-artifacts = { workspace = true }
 qnc-content-store = { workspace = true }
 qnc-ingest-select = { workspace = true }
