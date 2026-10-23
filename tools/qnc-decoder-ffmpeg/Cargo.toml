@@ -1,0 +1,10 @@
+[package]
+name = "qnc-decoder-ffmpeg"
+version = "0.1.0"
+edition = "2021"
+description = "QNC decoder plug-in: the decoder jobs besides playback (contract qnc.decoder-jobs 1) done by the ffmpeg executable the decoder catalog registers, as its own program"
+
+[dependencies]
+qnc-decoder-jobs = { workspace = true }
+qnc-ffmpeg-decode = { workspace = true }
+qnc-frame-timebase = { workspace = true }

@@ -3397,9 +3397,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-decoder-acceptance"
+version = "0.1.0"
+dependencies = [
+ "qnc-decoder-jobs",
+ "qnc-ffmpeg-decode",
+ "qnc-frame-timebase",
+ "qnc-plugin-process",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-decoder-catalog"
 version = "0.1.0"
 dependencies = [
+ "qnc-decoder-jobs",
  "qnc-ffmpeg-decode",
  "qnc-frame-timebase",
  "qnc-libav-decode",
@@ -3409,6 +3422,25 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-decoder-ffmpeg"
+version = "0.1.0"
+dependencies = [
+ "qnc-decoder-jobs",
+ "qnc-ffmpeg-decode",
+ "qnc-frame-timebase",
+]
+
+[[package]]
+name = "qnc-decoder-jobs"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "qnc-plugin-process",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

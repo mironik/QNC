@@ -65,7 +65,15 @@ pub struct Answer {
     pub ok: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// A part of the answer that is still coming (a line with a part is not the answer's end).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part: Option<Value>,
 }
+
+/// The request the application writes to stop the job of request `body` (a number).
+pub const CANCEL: &str = "cancel";
+/// How long a plug-in has to end a cancelled job before its process is stopped.
+pub const CANCEL_GRACE: Duration = Duration::from_secs(2);
 
 /// How the application reaches one plug-in.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,22 +150,78 @@ impl Plugin {
 
     /// Asks `op` with `body`; the plug-in's answer, or its error.
     pub fn call(&self, op: &str, body: Value) -> Result<Value, String> {
+        let never = std::sync::atomic::AtomicBool::new(false);
+        self.call_parts(op, body, &never, &mut |_| Err("a part where none is asked for".into()))
+    }
+
+    /// Asks `op` with `body` and hands every part of the answer to `on_part` as it comes; the
+    /// timeout holds between two lines. When `cancel` is set the plug-in is asked to stop the job
+    /// and, when it does not end it in [`CANCEL_GRACE`], its process is stopped.
+    pub fn call_parts(
+        &self,
+        op: &str,
+        body: Value,
+        cancel: &std::sync::atomic::AtomicBool,
+        on_part: &mut dyn FnMut(Value) -> Result<(), String>,
+    ) -> Result<Value, String> {
+        use std::sync::atomic::Ordering;
         let mut guard = self.running.lock().unwrap_or_else(|e| e.into_inner());
         let running = self.started(&mut guard)?;
         let id = running.next_id;
         running.next_id += 1;
-        let asked = send(&mut running.stdin, &Request { id, op: op.into(), body }).and_then(|()| receive::<Answer>(&running.lines, self.spec.timeout));
-        let answer = match asked {
-            Ok(answer) => answer,
-            Err(error) => {
-                *guard = None; // a plug-in that broke is started again at the next request
-                return Err(format!("plug-in {}: {error}", self.spec.executable.display()));
+        let program = self.spec.executable.display().to_string();
+        if let Err(error) = send(&mut running.stdin, &Request { id, op: op.into(), body }) {
+            *guard = None; // a plug-in that broke is started again at the next request
+            return Err(format!("plug-in {program}: {error}"));
+        }
+        let mut cancelled_at: Option<Instant> = None;
+        let mut last_line = Instant::now();
+        let answer = loop {
+            if cancelled_at.is_none() && cancel.load(Ordering::Relaxed) {
+                if send(&mut running.stdin, &Request { id: 0, op: CANCEL.into(), body: id.into() }).is_err() {
+                    *guard = None;
+                    return Err("cancelled".into());
+                }
+                cancelled_at = Some(Instant::now());
+            }
+            if cancelled_at.is_some_and(|at| at.elapsed() >= CANCEL_GRACE) {
+                *guard = None;
+                return Err("cancelled".into());
+            }
+            let answer = match receive::<Answer>(&running.lines, Duration::from_millis(100)) {
+                Ok(answer) => answer,
+                Err(error) if error.starts_with(NO_ANSWER) => {
+                    if last_line.elapsed() >= self.spec.timeout {
+                        *guard = None;
+                        return Err(format!("plug-in {program}: no answer in {} ms", self.spec.timeout.as_millis()));
+                    }
+                    continue;
+                }
+                Err(error) => {
+                    *guard = None;
+                    return Err(format!("plug-in {program}: {error}"));
+                }
+            };
+            last_line = Instant::now();
+            if answer.id != id {
+                *guard = None;
+                return Err(format!("plug-in {program} answered request {} for {id}", answer.id));
+            }
+            match answer.part {
+                Some(part) if cancelled_at.is_none() => {
+                    if let Err(error) = on_part(part) {
+                        // A refused part ends the job as a cancel does.
+                        *guard = None;
+                        return Err(error);
+                    }
+                }
+                Some(_) => {}
+                None => break answer,
             }
         };
         running.used = Instant::now();
-        if answer.id != id {
-            *guard = None;
-            return Err(format!("plug-in {} answered request {} for {id}", self.spec.executable.display(), answer.id));
+        if cancelled_at.is_some() {
+            return Err("cancelled".into());
         }
         match (answer.ok, answer.error) {
             (_, Some(error)) => Err(error),
@@ -237,10 +301,12 @@ fn send(stdin: &mut ChildStdin, message: &impl Serialize) -> Result<(), String> 
     stdin.write_all(&line).and_then(|()| stdin.flush()).map_err(|e| format!("the plug-in does not listen: {e}"))
 }
 
+const NO_ANSWER: &str = "no answer in";
+
 fn receive<T: serde::de::DeserializeOwned>(lines: &Receiver<Result<String, String>>, timeout: Duration) -> Result<T, String> {
     let line = match lines.recv_timeout(timeout) {
         Ok(line) => line?,
-        Err(RecvTimeoutError::Timeout) => return Err(format!("no answer in {} ms", timeout.as_millis())),
+        Err(RecvTimeoutError::Timeout) => return Err(format!("{NO_ANSWER} {} ms", timeout.as_millis())),
         Err(RecvTimeoutError::Disconnected) => return Err("the plug-in ended".into()),
     };
     serde_json::from_str(line.trim_end()).map_err(|e| format!("an answer outside the contract: {e}"))
@@ -249,11 +315,54 @@ fn receive<T: serde::de::DeserializeOwned>(lines: &Receiver<Result<String, Strin
 /// The plug-in's side: says who it is when the application's contract and version are `ready`'s,
 /// then answers each request with `handle` until stdin ends.
 pub fn serve(ready: Ready, mut handle: impl FnMut(&str, Value) -> Result<Value, String>) -> Result<(), String> {
-    let stdin = std::io::stdin();
+    serve_parts(ready, |op, body, _, _| handle(op, body))
+}
+
+/// Whether the application cancelled the running job of [`serve_parts`].
+pub type Cancelled = std::sync::atomic::AtomicBool;
+/// Sends a part of the running job's answer before its end.
+pub type PartSender<'a> = dyn FnMut(Value) -> Result<(), String> + 'a;
+
+/// [`serve`] for jobs that answer in parts or can be cancelled: one job at a time; a [`CANCEL`]
+/// request for the running job sets the flag `handle` is given, and the job ends early.
+pub fn serve_parts(
+    ready: Ready,
+    mut handle: impl FnMut(&str, Value, &Cancelled, &mut PartSender) -> Result<Value, String>,
+) -> Result<(), String> {
+    use std::sync::atomic::{AtomicU64, Ordering};
     let mut stdout = std::io::stdout().lock();
-    let mut lines = stdin.lock().lines();
+    // Lines are read beside the job, so that a cancel reaches the job that runs.
+    let current = Arc::new(AtomicU64::new(0));
+    let cancelled = Arc::new(Cancelled::new(false));
+    let (send_line, lines) = mpsc::channel::<Result<String, String>>();
+    {
+        let (current, cancelled) = (current.clone(), cancelled.clone());
+        std::thread::Builder::new()
+            .name("qnc-plugin-requests".into())
+            .spawn(move || {
+                let stdin = std::io::stdin();
+                for line in stdin.lock().lines() {
+                    let line = line.map_err(|e| e.to_string());
+                    if let Ok(text) = &line {
+                        if let Ok(cancel) = serde_json::from_str::<Request>(text) {
+                            if cancel.op == CANCEL {
+                                if cancel.body.as_u64() == Some(current.load(Ordering::SeqCst)) {
+                                    cancelled.store(true, Ordering::SeqCst);
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                    if send_line.send(line).is_err() {
+                        break;
+                    }
+                }
+            })
+            .map_err(|e| e.to_string())?;
+    }
+    let mut lines = lines.into_iter();
     let hello: Hello = match lines.next() {
-        Some(line) => serde_json::from_str(&line.map_err(|e| e.to_string())?).map_err(|e| e.to_string())?,
+        Some(line) => serde_json::from_str(&line?).map_err(|e| e.to_string())?,
         None => return Ok(()),
     };
     let mut answer = ready.clone();
@@ -263,11 +372,30 @@ pub fn serve(ready: Ready, mut handle: impl FnMut(&str, Value) -> Result<Value, 
     }
     write_line(&mut stdout, &answer)?;
     for line in lines {
-        let line = line.map_err(|e| e.to_string())?;
-        let request: Request = serde_json::from_str(&line).map_err(|e| e.to_string())?;
-        let answer = match handle(&request.op, request.body) {
-            Ok(ok) => Answer { id: request.id, ok: Some(ok), error: None },
-            Err(error) => Answer { id: request.id, ok: None, error: Some(error) },
+        let request: Request = serde_json::from_str(&line?).map_err(|e| e.to_string())?;
+        cancelled.store(false, Ordering::SeqCst);
+        current.store(request.id, Ordering::SeqCst);
+        let id = request.id;
+        let mut parts_failed: Option<String> = None;
+        let result = {
+            let out = &mut stdout;
+            let failed = &mut parts_failed;
+            let mut send_part = |part: Value| {
+                let sent = write_line(out, &Answer { id, ok: None, error: None, part: Some(part) });
+                if let Err(error) = &sent {
+                    *failed = Some(error.clone());
+                }
+                sent
+            };
+            handle(&request.op, request.body, &cancelled, &mut send_part)
+        };
+        current.store(0, Ordering::SeqCst);
+        if let Some(error) = parts_failed {
+            return Err(error);
+        }
+        let answer = match result {
+            Ok(ok) => Answer { id, ok: Some(ok), error: None, part: None },
+            Err(error) => Answer { id, ok: None, error: Some(error), part: None },
         };
         write_line(&mut stdout, &answer)?;
     }

@@ -9,6 +9,7 @@ qnc-frame-timebase.workspace = true
 qnc-media-decode.workspace = true
 qnc-media-stream.workspace = true
 qnc-ffmpeg-decode.workspace = true
+qnc-decoder-jobs.workspace = true
 qnc-libav-decode = { path = "../qnc-libav-decode", optional = true }
 serde.workspace = true
 serde_json.workspace = true

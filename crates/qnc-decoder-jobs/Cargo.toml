@@ -1,0 +1,11 @@
+[package]
+name = "qnc-decoder-jobs"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the decoder jobs besides playback (filmstrip pictures, trim pictures, key pictures, sound for the wave, pictures and sound already read) as a plug-in program (contract qnc.decoder-jobs 1): the client the decoder catalog uses and the side a decoder plug-in program serves"
+
+[dependencies]
+base64 = "0.22"
+qnc-plugin-process = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true, features = ["float_roundtrip"] }

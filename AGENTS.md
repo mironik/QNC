@@ -5635,3 +5635,21 @@ worker, tests. `qnc-segment-panel`: header, program, tests. `qnc-program-view`: 
 svake kocke isti kao prije (program-db 40, program-segments 53, playlist 17, editorial-application 11, sync-cover 10,
 virtual-shots 8, panel-focus 7 i zlatna tablica tipki, program-input 6, trim-stills 4, program-view 4,
 segment-panel 2). Conformance. Debug gradnja cijelog workspacea nije prosla zbog punog diska (povezivac).
+Otkljucano i izvedeno 2026-10-23 (korisnik: "da, obrisi debug cache i kreni s korakom 2"; korak 2 plana dodataka: dekoder
+kao dodatak): nalaz: dekoder kao zaseban program (`qnc_packets_v1`, docs/70) pokrivao je samo reprodukciju; svih sest
+ostalih poslova dekodera (slike filmstripa, niz slika reza, kljucne slike, zvuk za val, vec procitan zvuk i slike) zvalo je
+ffmpeg naredbu izravno, pa bi drugi dekoder pokvario filmstrip, val i zoom reza. Izvedeno: ugovor
+`contracts/plugins/decoder-jobs.v1.json` (`qnc.decoder-jobs` 1), nova javna kocka `crates/qnc-decoder-jobs` (+ ugovor
+modula; strana aplikacije s vise procesa za istodobne poslove i strana programa), `qnc-plugin-process` dobio odgovor u
+dijelovima i prekid posla (`call_parts`, `serve_parts`, `CANCEL`; postojeci `call`/`serve` isti, dodatak formata kamera
+nepromijenjen), referentni program `tools/qnc-decoder-ffmpeg` (isti ffmpeg kod kao dosad), `qnc-decoder-catalog`: unos
+`"jobs": { "program": ... }` salje sve te poslove tom programu (bez njega kao prije; program koji nije uz aplikaciju je
+kontrolirana greska, bez zamjene), zadani `qnc.ffmpeg` u `catalogs/decoders/catalog.json` ga ima. Alat
+`tools/qnc-decoder-acceptance`: svaki posao ugradeno i kroz program na mediju samo za citanje (slike bajt po bajt, kljucne
+slike, zvuk bit po bit), prekid, drugi ugovor odbijen. Brojevi u ugovoru tocni (`serde_json` `float_roundtrip`; bez toga se
+vremena kljucnih slika razlikuju u zadnjem bitu). Conformance: granica playera dopusta `qnc-decoder-jobs` i
+`qnc-plugin-process` katalogu i programu playera (nova granica koju korak trazi). Provjereno: prihvat FX6 MXF (D:) i FX3A
+MP4 (G:) ACCEPTED, release: zvuk 27 s / 4 kanala 205 ms ugradeno, 245 ms kroz program, slike isto; zivi testovi
+`qnc-trim-stills` i `qnc-keyframe-nav` kroz instalirani katalog; testovi kocki koje koriste te poslove. Nije izvedeno:
+korak 3 (popis verzija dodataka i programa); reprodukcija i dalje ide kroz ugradeni put (`qnc_packets_v1` postoji, program
+za nju nije napisan). Debug cache obrisan uz dozvolu korisnika (50,9 GB).

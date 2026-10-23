@@ -164,3 +164,24 @@ cargo check -p qnc-media-decode -p qnc-ffmpeg-decode -p qnc-decoder-catalog -p q
 cargo run -p qnc-conformance
 cargo build -p qnc-player-runner -p qnc-ingest
 ```
+
+## Decoder jobs besides playback (2026-10-23)
+
+User 2026-10-23: blocks like a DLL, so that a change in one block cannot break another.
+Before this step only playback could reach a decoder program (`qnc_packets_v1`); the
+other six decoder jobs (filmstrip pictures, trim pictures, key pictures, sound for the
+wave, sound and pictures already read) called the ffmpeg executable directly, so another
+decoder broke the filmstrip, the wave and the trim zoom. Now a registration names its jobs
+program, `"jobs": { "program": "qnc-decoder-ffmpeg" }`, and every one of those jobs goes
+to it through the contract `qnc.decoder-jobs` 1 (`contracts/plugins/decoder-jobs.v1.json`,
+block `qnc-decoder-jobs`, transport `qnc-plugin-process` with answers in parts and cancel).
+`tools/qnc-decoder-ffmpeg` is the reference program (the same ffmpeg work as before).
+A missing program is a controlled error; nothing falls back to another decoder. Without
+`jobs` a registration works as before.
+
+Acceptance: `tools/qnc-decoder-acceptance --plugin <program> --decoder <ffmpeg> --media <file>
+--fps n/d --duration s [--container c --streams 1,2 --channels n]` does each job built in and
+through the program and compares (pictures byte for byte, key pictures, sound bit for bit),
+cancels a job and checks that another contract is refused. Measured 2026-10-23 on media only
+read: Sony FX6 XAVC MXF (card D:) and FX3A MP4 (card G:) ACCEPTED; release build, 27 s of
+4-channel sound 205 ms built in, 245 ms through the program; filmstrip pictures the same time.

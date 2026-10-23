@@ -37,12 +37,27 @@ pub struct Registration {
     pub containers: Vec<String>,
     pub codecs: Vec<String>,
     pub pixel_formats: Vec<String>,
+    /// The program beside the application that does this decoder's jobs besides playback
+    /// (contract `qnc.decoder-jobs` 1): with it every such job goes to that program, without it
+    /// the jobs are done by the registration's own driver as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jobs: Option<JobsPlugin>,
+}
+
+/// The jobs program of a registration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JobsPlugin {
+    /// Its program name (no path), found beside the application.
+    pub program: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectedDeployment {
     pub id: String,
     pub driver: Driver,
     pub executable: PathBuf,
+    /// The jobs program of the registration, when it has one.
+    pub jobs: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -61,6 +76,8 @@ pub enum FilmstripExtractMode {
 #[derive(Debug, Clone)]
 pub struct LocalFilmstripExtractor {
     deployment: SelectedDeployment,
+    /// The decoder's jobs program; every job below goes to it when it is there.
+    jobs: Option<Arc<qnc_decoder_jobs::JobsClient>>,
 }
 
 impl LocalFilmstripExtractor {
@@ -96,6 +113,17 @@ impl LocalFilmstripExtractor {
         temp_dir: &Path,
         cancel: &AtomicBool,
     ) -> std::result::Result<(), String> {
+        if let Some(jobs) = &self.jobs {
+            let job = qnc_decoder_jobs::Run {
+                decoder: self.deployment.executable.clone(),
+                media: source.into(),
+                start_sec,
+                count,
+                thumb: thumb_size,
+                out_dir: temp_dir.into(),
+            };
+            return jobs.run(&job, cancel);
+        }
         match &self.deployment.driver {
             Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::extract_frame_run_with_cancel(
                 &self.deployment.executable,
@@ -126,6 +154,9 @@ impl LocalFilmstripExtractor {
             "aac" => "aac",
             other => return Err(format!("no sound decoding for codec {other}")),
         };
+        if let Some(jobs) = &self.jobs {
+            return jobs.audio_bytes(self.deployment.executable.clone(), demuxer, &bytes, channels, cancel, on_samples);
+        }
         match &self.deployment.driver {
             Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => {
                 qnc_ffmpeg_decode::audio_bytes_with_cancel(&self.deployment.executable, demuxer, bytes, channels, cancel, on_samples)
@@ -143,14 +174,24 @@ impl LocalFilmstripExtractor {
         cancel: &AtomicBool,
         on_samples: &mut dyn FnMut(&[f32]) -> std::result::Result<(), String>,
     ) -> std::result::Result<(), String> {
-        if matches!(self.deployment.driver, Driver::QncPacketsV1 { .. }) {
-            return Err("selected decoder does not read local audio".into());
-        }
         let container = media
             .container
             .as_ref()
             .map(|container| container.value.as_str())
             .ok_or("audio pass needs the saved container")?;
+        if let Some(jobs) = &self.jobs {
+            let job = qnc_decoder_jobs::AudioStreams {
+                decoder: self.deployment.executable.clone(),
+                media: source.into(),
+                container: container.into(),
+                streams: streams.to_vec(),
+                channels,
+            };
+            return jobs.audio_streams(&job, cancel, on_samples);
+        }
+        if matches!(self.deployment.driver, Driver::QncPacketsV1 { .. }) {
+            return Err("selected decoder does not read local audio".into());
+        }
         qnc_ffmpeg_decode::audio_streams_with_cancel(
             &self.deployment.executable,
             source,
@@ -171,6 +212,10 @@ impl LocalFilmstripExtractor {
         duration_sec: f64,
         cancel: &AtomicBool,
     ) -> std::result::Result<Vec<f64>, String> {
+        if let Some(jobs) = &self.jobs {
+            let job = qnc_decoder_jobs::KeyPictures { decoder: self.deployment.executable.clone(), media: source.into(), start_sec, duration_sec };
+            return jobs.key_pictures(&job, cancel);
+        }
         match &self.deployment.driver {
             Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::key_pictures_with_cancel(
                 &self.deployment.executable,
@@ -199,6 +244,16 @@ impl LocalFilmstripExtractor {
             "mpeg2video" => "mpegvideo",
             other => return Err(format!("no picture decoding for codec {other}")),
         };
+        if let Some(jobs) = &self.jobs {
+            let job = qnc_decoder_jobs::DecodePictures {
+                decoder: self.deployment.executable.clone(),
+                demuxer: demuxer.into(),
+                pictures: pictures.to_vec(),
+                thumb: thumb_size,
+                out_dir: temp_dir.into(),
+            };
+            return jobs.decode_pictures(&job, cancel);
+        }
         match &self.deployment.driver {
             Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::decode_pictures_with_cancel(
                 &self.deployment.executable,
@@ -222,6 +277,25 @@ impl LocalFilmstripExtractor {
         temp_dir: &Path,
         cancel: &AtomicBool,
     ) -> std::result::Result<(), String> {
+        if let Some(jobs) = &self.jobs {
+            let job = qnc_decoder_jobs::Frames {
+                decoder: self.deployment.executable.clone(),
+                media: source.into(),
+                seconds: frames.iter().map(|frame| frame.seek_sec).collect(),
+                frame_rate: (
+                    u32::try_from(source_timebase.fps_num).map_err(|_| "frame rate out of range")?,
+                    u32::try_from(source_timebase.fps_den).map_err(|_| "frame rate out of range")?,
+                ),
+                mode: match mode {
+                    FilmstripExtractMode::RandomSeek => qnc_decoder_jobs::PictureMode::Random,
+                    FilmstripExtractMode::KeyframeSeek => qnc_decoder_jobs::PictureMode::Keyframe,
+                    FilmstripExtractMode::ExactSeek => qnc_decoder_jobs::PictureMode::Exact,
+                },
+                thumb: thumb_size,
+                out_dir: temp_dir.into(),
+            };
+            return jobs.frames(&job, cancel);
+        }
         match &self.deployment.driver {
             Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => qnc_ffmpeg_decode::extract_filmstrip_frames_with_cancel(
                 &self.deployment.executable,
@@ -330,6 +404,9 @@ impl Catalog {
             {
                 return Err(bad("unknown GPU decoder"));
             }
+            if a.jobs.as_ref().is_some_and(|jobs| !id_valid(&jobs.program)) {
+                return Err(bad("invalid decoder jobs program"));
+            }
             if let Driver::QncPacketsV1 { args } = &a.driver
                 && (args.len() > 32 || args.iter().any(|s| s.len() > 4096 || s.contains('\0')))
             {
@@ -429,6 +506,7 @@ impl Catalog {
             id: registration.id.clone(),
             driver: registration.driver.clone(),
             executable: registration.executable_path(directory)?,
+            jobs: registration.jobs.as_ref().map(|jobs| jobs.program.clone()),
         })
     }
 }
@@ -607,12 +685,30 @@ pub fn installed_deployment() -> Result<SelectedDeployment> {
 
 pub fn installed_filmstrip_extractor() -> Result<Option<LocalFilmstripExtractor>> {
     let deployment = installed_deployment()?;
+    if let Some(program) = &deployment.jobs {
+        let jobs = jobs_client(program)?;
+        return Ok(Some(LocalFilmstripExtractor { deployment, jobs: Some(jobs) }));
+    }
     Ok(match deployment.driver {
         Driver::FfmpegCliV1 | Driver::FfmpegHwaccelV1 { .. } | Driver::LibavV1 => {
-            Some(LocalFilmstripExtractor { deployment })
+            Some(LocalFilmstripExtractor { deployment, jobs: None })
         }
         Driver::QncPacketsV1 { .. } => None,
     })
+}
+
+/// One client (and its kept processes) per jobs program in this process. A program that is not
+/// beside the application is a controlled error: the jobs are not given to another decoder.
+fn jobs_client(program: &str) -> Result<Arc<qnc_decoder_jobs::JobsClient>> {
+    static CLIENTS: std::sync::OnceLock<std::sync::Mutex<std::collections::BTreeMap<String, Arc<qnc_decoder_jobs::JobsClient>>>> =
+        std::sync::OnceLock::new();
+    let mut clients = CLIENTS.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(client) = clients.get(program) {
+        return Ok(client.clone());
+    }
+    let client = Arc::new(qnc_decoder_jobs::JobsClient::beside_application(program).map_err(bad)?);
+    clients.insert(program.into(), client.clone());
+    Ok(client)
 }
 
 fn installed_catalog() -> Result<(Catalog, PathBuf)> {

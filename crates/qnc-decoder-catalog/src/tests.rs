@@ -198,3 +198,17 @@ fn a_saved_medium_no_decoder_declares_is_refused_with_its_format() {
     let mp3 = saved_media("mxf", ("mpeg2video", "yuv422p"), "mp3");
     assert!(c.refusal(dir.path(), &mp3).is_some(), "sound no decoder declares");
 }
+#[test]
+fn the_shipped_decoder_names_its_jobs_program_and_a_program_name_with_a_path_is_refused() {
+    let (dir, c) = local_catalog();
+    let deployment = c.selected_deployment(dir.path()).unwrap();
+    assert_eq!(deployment.jobs.as_deref(), Some("qnc-decoder-ffmpeg"), "every job besides playback goes to the jobs program");
+    for bad_name in ["", "../qnc-decoder-ffmpeg", "tools/decoder", "a b"] {
+        let mut c = catalog();
+        c.adapters[0].jobs = Some(JobsPlugin { program: bad_name.into() });
+        assert!(c.validate().is_err(), "{bad_name:?} is not a program name");
+    }
+    let mut c = catalog();
+    c.adapters[0].jobs = None;
+    c.validate().unwrap();
+}

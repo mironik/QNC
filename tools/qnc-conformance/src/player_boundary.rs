@@ -227,10 +227,16 @@ fn forbidden_dependency(owner: &str, dependency: &str) -> bool {
                 | "qnc-decoder-catalog"
                 | "qnc-ffmpeg-decode"
                 | "qnc-libav-decode"
+                // The decoder jobs plug-in the catalog reaches (no decoding in this process).
+                | "qnc-decoder-jobs"
+                | "qnc-plugin-process"
         ) && forbidden_dependency("qnc-broadcast-engine", dependency);
     }
     if owner == "qnc-decoder-catalog" {
-        return !matches!(dependency, "qnc-decoder-catalog" | "qnc-ffmpeg-decode" | "qnc-libav-decode")
+        return !matches!(
+            dependency,
+            "qnc-decoder-catalog" | "qnc-ffmpeg-decode" | "qnc-libav-decode" | "qnc-decoder-jobs" | "qnc-plugin-process"
+        )
             && forbidden_dependency("qnc-libav-decode", dependency);
     }
     // The in-process decoder adapter: the CLI adapter it shares its filters with and the

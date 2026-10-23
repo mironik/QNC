@@ -1,0 +1,13 @@
+[package]
+name = "qnc-decoder-acceptance"
+version = "0.1.0"
+edition = "2021"
+description = "QNC tool: acceptance of a decoder jobs plug-in (contract qnc.decoder-jobs 1) against the built-in decoder on a medium that is only read"
+
+[dependencies]
+qnc-decoder-jobs = { workspace = true }
+qnc-ffmpeg-decode = { workspace = true }
+qnc-frame-timebase = { workspace = true }
+qnc-plugin-process = { workspace = true }
+serde_json = { workspace = true }
+tempfile = "3"

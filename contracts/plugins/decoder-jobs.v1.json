@@ -1,0 +1,20 @@
+{
+  "contract": "qnc.decoder-jobs",
+  "version": 1,
+  "purpose": "The jobs a decoder does for QNC besides playback, as a plug-in program beside the application (user 2026-10-23: blocks like a DLL, so that a change in one block cannot break another). Playback reaches a decoder program through qnc_packets_v1 (docs/70). A decoder registration of catalogs/decoders/catalog.json names its jobs program with \"jobs\": { \"program\": \"<name>\" }; then every job below goes to that program and none is done by another decoder.",
+  "transport": "The JSON lines of qnc.module.plugin-process: the application's hello, the plug-in's ready, then one request at a time. A job may answer in parts (lines with \"part\") before its answer. A request { \"id\": 0, \"op\": \"cancel\", \"body\": <id> } stops the running job; a plug-in that does not end it in 2 s is stopped.",
+  "handshake": {
+    "application": { "contract": "qnc.decoder-jobs", "version": 1 },
+    "plugin": { "contract": "qnc.decoder-jobs", "version": 1, "plugin_id": "a stable id", "plugin_version": "its version" }
+  },
+  "operations": {
+    "frames": { "body": "{ decoder, media, seconds: [f64], frame_rate: [num, den], mode: random | keyframe | exact, thumb: [w, h], out_dir }", "ok": "null; the pictures are 000.jpg, 001.jpg... in out_dir" },
+    "run": { "body": "{ decoder, media, start_sec, count, thumb, out_dir }", "ok": "null; count consecutive pictures from the exact picture at start_sec in out_dir" },
+    "key_pictures": { "body": "{ decoder, media, start_sec, duration_sec }", "ok": "[f64]: the presentation times (s) of the key pictures" },
+    "audio_streams": { "body": "{ decoder, media, container, streams: [u32], channels }", "part": "{ samples: base64 of interleaved f32 little-endian }", "ok": "null" },
+    "audio_bytes": { "body": "{ decoder, demuxer, bytes: base64, channels }", "part": "{ samples }", "ok": "null" },
+    "decode_pictures": { "body": "{ decoder, demuxer, pictures: [path], thumb, out_dir }", "ok": "null; 000.jpg... in out_dir" }
+  },
+  "rules": "media is the local file of a stored medium the plug-in only reads; out_dir is an empty temporary folder of the application, the only place it writes; decoder is the executable the catalog registers (host configuration). What is asked for comes from the stored record: the plug-in probes nothing and decides nothing about the media. Numbers are exact (no lost bits). An error is an answer, never a different result.",
+  "acceptance": "tools/qnc-decoder-acceptance: every job against the built-in decoder on a medium that is only read (pictures byte for byte, key pictures, sound bit for bit), a cancelled job ends in time, another contract is refused."
+}
