@@ -1,18 +1,29 @@
 use super::*;
 
+/// The header row keeps to the panel's width (user 2026-10-24: at a larger zoom the values,
+/// laid right to left, pushed the whole panel over the monitor): the values are clipped
+/// after the title, never grow the panel.
 pub(crate) fn header(ui: &mut egui::Ui, segments: &SegmentsView, style: SegmentPanelStyle) {
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(qnc_ui_text::text("story.ui.segments")).color(style.text).strong());
-        if segments.is_empty() {
-            return;
-        }
+    let height = HEADER_VALUE_SIZE + 10.0;
+    let (row, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), height), egui::Sense::hover());
+    let clip = row.intersect(ui.clip_rect());
+    let mut left = ui.new_child(egui::UiBuilder::new().max_rect(row).layout(egui::Layout::left_to_right(egui::Align::Center)));
+    left.set_clip_rect(clip);
+    let title = left.label(RichText::new(qnc_ui_text::text("story.ui.segments")).color(style.text).strong()).rect;
+    if segments.is_empty() {
+        return;
+    }
+    let values = egui::Rect::from_min_max(egui::pos2((title.right() + 14.0).min(row.right()), row.top()), row.max);
+    let mut right = ui.new_child(egui::UiBuilder::new().max_rect(values).layout(egui::Layout::left_to_right(egui::Align::Center)));
+    right.set_clip_rect(values.intersect(clip));
+    let ui = &mut right;
+    {
         let playhead = segments.playhead.unwrap_or(0);
         let segment_frames = segments
             .segment_at(playhead)
             .or_else(|| segments.selected())
             .map(SegmentRow::duration_frames)
             .unwrap_or(0);
-        ui.add_space(14.0);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             value(ui, &segments.timecode(segments.total_frames), style.total);
             label(ui, qnc_ui_text::text("source.duration"), style.muted);
@@ -39,7 +50,7 @@ pub(crate) fn header(ui: &mut egui::Ui, segments: &SegmentsView, style: SegmentP
                 label(ui, "A1", style.muted);
             }
         });
-    });
+    }
 }
 
 pub(crate) fn label(ui: &mut egui::Ui, text: &str, color: Color32) {

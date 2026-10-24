@@ -5812,3 +5812,10 @@ tada i drzao ga do ponovnog otvaranja projekta; Ingest ga cita iznova kad se otv
 jesu); `qnc-source-preview` ga koristi pri svakom pokretanju playera (klip, program, Sync, izvan niti sucelja), pa vrijedi za
 sve forme, a `qnc-still-locator` (slike reza) samo kad izvor klipa nije na procitanom popisu. Test
 `a_disk_attached_after_the_sources_were_read_is_added_and_a_known_one_kept`, conformance. Uzivo nije provjereno.
+Popravak 2026-10-24 (korisnik: "ako idem u povecavanje prikaza Story izlazi iz Story panela, pomaknut je obrub oko panela;
+vrati ga na pravo mjesto i smanji debljinu linije, neka bude diskretna"; otkljucani `qnc-segment-panel`, `qnc-ui-kit`):
+zaglavlje panela Segmenti (A1/A2 LUFS, Segment, Playhead, Duration) slagalo se zdesna u istom redu kao naslov, pa je
+vrijednost koja ne stane rastezala cijeli panel ulijevo preko monitora (i bez povecanja: naslov i LUFS su se preklapali),
+a okvir fokusa ostao je na mjestu panela. Sada je zaglavlje red tocno sirine panela: naslov lijevo, vrijednosti iza njega
+odrezane na panelu, nikad sire; tijelo panela nikad nije sire od njegova mjesta. Okvir fokusa (`qnc-ui-kit::paint_focus`,
+sve forme) je 1 px, boja fokusa prigusena, na rubu mjesta panela. Testovi, conformance. Uzivo nije provjereno.

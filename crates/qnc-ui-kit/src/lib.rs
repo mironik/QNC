@@ -14,8 +14,9 @@ pub use two_way_switch::show_two_way_switch;
 /// form (user 2026-10-20: three pieces drew their own copy).
 pub fn paint_focus(ui: &eframe::egui::Ui, rect: eframe::egui::Rect, focused: bool, color: eframe::egui::Color32) {
     if focused {
-        let stroke = eframe::egui::Stroke::new(1.5, color);
-        ui.painter().rect_stroke(rect.shrink(1.0), 0.0, stroke, eframe::egui::StrokeKind::Inside);
+        // Thin and discreet (user 2026-10-24).
+        let stroke = eframe::egui::Stroke::new(1.0, color.gamma_multiply(0.7));
+        ui.painter().rect_stroke(rect, 0.0, stroke, eframe::egui::StrokeKind::Inside);
     }
 }
 

@@ -156,7 +156,8 @@ pub fn show(
                 });
                 return;
             }
-            let body = ui.available_rect_before_wrap();
+            // Never wider than the panel's place, whatever its contents asked for.
+            let body = ui.available_rect_before_wrap().intersect(content_rect);
             // The bar and a whole program row, its A2 band included (user 2026-10-15).
             let overview = TimelineMetrics::default().outer_height(layers(segments.video_compact), AudioLane::None);
             let playlist_top = body.bottom() - (PLAYLIST_BAR_H + overview).min(body.height());
