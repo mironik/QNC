@@ -155,6 +155,8 @@ pub struct ProgramSegments {
     normalize: bool,
     /// The open export box (user 2026-10-24).
     export: Option<qnc_export_choice::ExportChoice>,
+    /// The export running in the background (`qnc-export`).
+    export_run: qnc_export_launch::ExportRun,
     /// The program's loudness and what it was measured for (placements, waves, rate).
     loudness: Option<(LoudnessKey, qnc_program_loudness::ProgramLoudness)>,
     /// The Wrap rows show a narrow video row instead of the filmstrip.

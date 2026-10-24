@@ -116,14 +116,19 @@ impl ProgramSegments {
             }
             SegmentCommand::ExportCancel => self.export = None,
             SegmentCommand::ExportConfirm => {
-                // What is exported is chosen; the export itself is the next step.
-                let picked = self.export.take().and_then(|export| export.picked());
-                let name = match picked {
-                    Some(qnc_export_choice::Picked::Xml) => qnc_ui_text::text("export.to_xml").to_string(),
-                    Some(qnc_export_choice::Picked::Setting { label, .. }) => label,
-                    None => return true,
+                let Some(picked) = self.export.take().and_then(|export| export.picked()) else {
+                    return true;
                 };
-                self.refresh_view(qnc_ui_text::fill("story.msg.export_chosen", &[("name", &name)]));
+                // Export to XML runs in the background (`qnc-export`); the video exports are
+                // the next step.
+                let message = match picked.kind {
+                    qnc_export_choice::Kind::Xml => {
+                        self.export_run.start(&["--xml"]); // one at a time: a running one goes on
+                        qnc_ui_text::text("export.running").to_string()
+                    }
+                    _ => qnc_ui_text::fill("export.not_yet", &[("name", &picked.label)]),
+                };
+                self.refresh_view(message);
             }
             SegmentCommand::ToggleNormalize => {
                 self.normalize = !self.normalize;

@@ -4,32 +4,10 @@
 //! Nothing is read from a host database, so a copied project plays anywhere.
 
 use qnc_content_read::ContentReader;
-use qnc_content_store::{Access, ContentTarget};
-use qnc_player_input::{PlayerClipRecord, PlayerContentRead};
 use qnc_timeline_assets::TimelineArtifactRead;
 
-#[derive(Clone)]
-pub(crate) struct PlayerContent {
-    /// The content database of the active project; its error is shown on open.
-    pub target: Result<ContentTarget, String>,
-}
-
-impl PlayerContentRead for PlayerContent {
-    fn read_clip(&self, clip_id: &str) -> Result<Option<PlayerClipRecord>, String> {
-        let target = self.target.as_ref().map_err(Clone::clone)?;
-        let stored = target.open(Access::ReadOnly)?.read(clip_id)?;
-        Ok(stored.map(|stored| PlayerClipRecord {
-            name: stored.clip.name,
-            snapshot: stored.clip.snapshot,
-            imported_media_uri: stored.imported_media_uri,
-            imported_copy_of: stored.imported_copy_of.map(|copy| match copy {
-                qnc_content_store::ImportedCopy::Original => qnc_player_input::Representation::Original,
-                qnc_content_store::ImportedCopy::Proxy => qnc_player_input::Representation::Proxy,
-            }),
-            imported_optimized: stored.imported_optimized,
-        }))
-    }
-}
+/// The clip records of the active project (block `qnc-player-clip-content`).
+pub(crate) use qnc_player_clip_content::PlayerClipContent as PlayerContent;
 
 #[derive(Clone)]
 pub(crate) struct ArtifactReader {

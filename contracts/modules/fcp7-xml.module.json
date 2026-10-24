@@ -1,0 +1,38 @@
+{
+  "module_id": "qnc.module.fcp7-xml",
+  "module_name": "Fcp7 xml",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "export.xml.fcp7"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "filesystem.read",
+    "filesystem.write",
+    "media.probe",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-fcp7-xml",
+  "input": "The story's flat program playlist and each clip's original file (path on this computer, length, start timecode, picture size, sound channels).",
+  "output": "The text of a Final Cut Pro 7 XML (xmeml 5) sequence: segments on V1 and A1, covers on V2 and A2, source channel and level per piece, contiguous pieces of a clip joined, every clip one file.",
+  "specification": "User 2026-10-24: Export to XML (FCP7) into the project export folder."
+}

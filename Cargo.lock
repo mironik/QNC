@@ -3634,6 +3634,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-export"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+ "qnc-db-broker",
+ "qnc-dev-diagnostics",
+ "qnc-fcp7-xml",
+ "qnc-media-stream",
+ "qnc-player-clip-content",
+ "qnc-player-input",
+ "qnc-program-input",
+ "qnc-source-bindings",
+ "qnc-work-settings",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-export-box"
 version = "0.1.0"
 dependencies = [
@@ -3652,12 +3669,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-export-launch"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-export-preset"
 version = "0.1.0"
 dependencies = [
  "qnc-settings-path",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "qnc-fcp7-xml"
+version = "0.1.0"
+dependencies = [
+ "qnc-program-playlist",
 ]
 
 [[package]]
@@ -4678,6 +4706,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-player-clip-content"
+version = "0.1.0"
+dependencies = [
+ "qnc-content-store",
+ "qnc-player-input",
+]
+
+[[package]]
 name = "qnc-player-contract"
 version = "0.3.0"
 dependencies = [
@@ -4818,6 +4854,7 @@ dependencies = [
  "qnc-media-metadata",
  "qnc-media-stream",
  "qnc-playback-activity",
+ "qnc-player-clip-content",
  "qnc-player-input",
  "qnc-prerender-db",
  "qnc-prerender-launch",
@@ -4961,6 +4998,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-export-choice",
+ "qnc-export-launch",
  "qnc-image-assets",
  "qnc-lane-choice",
  "qnc-part-sound",
@@ -5446,6 +5484,7 @@ dependencies = [
  "qnc-monitor",
  "qnc-playback-activity",
  "qnc-player-client",
+ "qnc-player-clip-content",
  "qnc-player-input",
  "qnc-player-launcher",
  "qnc-player-timeline",

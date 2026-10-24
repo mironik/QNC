@@ -1,0 +1,18 @@
+[package]
+name = "qnc-export"
+version = "0.1.0"
+edition = "2021"
+description = "QNC tool: export of the active project's story (FCP7 XML into the project's export folder); reads the project database and media only"
+
+[dependencies]
+qnc-content-store.workspace = true
+qnc-db-broker.workspace = true
+qnc-dev-diagnostics.workspace = true
+qnc-fcp7-xml.workspace = true
+qnc-media-stream.workspace = true
+qnc-player-input.workspace = true
+qnc-program-input.workspace = true
+qnc-player-clip-content.workspace = true
+qnc-source-bindings.workspace = true
+qnc-work-settings.workspace = true
+serde_json.workspace = true

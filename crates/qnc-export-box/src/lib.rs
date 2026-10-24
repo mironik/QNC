@@ -46,8 +46,8 @@ pub fn show(ctx: &egui::Context, choice: &ExportChoice, style: ExportBoxStyle) -
                     ui.label(RichText::new(qnc_ui_text::text("common.export")).color(style.text).size(style.font + 4.0).strong());
                     ui.add_space(8.0);
                     for (index, option) in choice.options.iter().enumerate() {
-                        if index == 1 {
-                            // Export to XML apart from the export settings.
+                        if option.kind == qnc_export_choice::Kind::Original {
+                            // The settings rendered from the originals, apart from XML and Express.
                             ui.add_space(4.0);
                             ui.separator();
                             ui.label(RichText::new(qnc_ui_text::text("export.settings")).color(style.muted).size(style.font));
@@ -64,7 +64,11 @@ pub fn show(ctx: &egui::Context, choice: &ExportChoice, style: ExportBoxStyle) -
                             label = format!("{label}  ({})", qnc_ui_text::text("export.default"));
                         }
                         let color = if chosen { style.text } else { style.muted };
-                        ui.painter().text(rect.left_center() + Vec2::new(8.0, 0.0), Align2::LEFT_CENTER, label, egui::FontId::proportional(style.font), color);
+                        // Original is stressed (user 2026-10-24).
+                        let stressed = option.kind == qnc_export_choice::Kind::Original;
+                        let color = if stressed { style.text } else { color };
+                        let font = egui::FontId::proportional(if stressed { style.font + 1.0 } else { style.font });
+                        ui.painter().text(rect.left_center() + Vec2::new(8.0, 0.0), Align2::LEFT_CENTER, label, font, color);
                         if response.double_clicked() {
                             answer = Some(Answer::Export);
                         } else if response.clicked() {

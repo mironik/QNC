@@ -5754,3 +5754,19 @@ Export i Cancel; klik bira, dvoklik izvozi. `qnc-source-preview::export_settings
 drzi izbor (`open_export`, `ExportChoose`, `ExportConfirm`, `ExportCancel`). Akcije kataloga `export_open`,
 `export_choose`, `export_confirm`, `export_cancel` (bez tipki). Sam export jos nije izveden: potvrda samo kaze sto je
 odabrano. Testovi `qnc-export-choice`, `qnc-program-segments`, conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-24 (korisnik: "FCP7 XML u mapu exporta; za video odmah ispod XML Express (navedi postavke prerender
+videa, npr. HD 1080 PAL p50 4:2:0 ili onaj koji je stvarno koristen; ako GPU moze dekodirati 4:2:2, prilagodis); ispod
+Postavke s naglaskom Original, a ispod default i ostale"): prozor exporta (`qnc-export-choice`, `qnc-export-box`) ima
+redom Export to XML, Express s formatom prerendera iz postavki predaje projekta (format i kroma po kodeku: H.264 4:2:0,
+XDCAM HD422 4:2:2; prerender radi u tom formatu), zatim odvojeno "Settings (rendered from the originals)": Original
+(istaknut), projektova postavka kao default i odabrana, pa ostale. Export to XML: nova javna kocka `crates/qnc-fcp7-xml`
+(+ ugovor): ravna playlista price kao FCP7 XML (xmeml 5): segmenti V1/A1, pokrivalice V2/A2, izvorni kanal i razina
+(Audio Levels) po komadu, uzastopni komadi istog klipa spojeni, svaki klip jedna datoteka (original na ovom racunalu,
+`pathurl`, pocetni timecode). Novi alat `tools/qnc-export --xml` (prica kao je cita player, bez upisa u bazu; XML
+`<projekt>_<revizija price>.xml` u mapu exporta projekta `export.directory`) i nova kocka `crates/qnc-export-launch`
+(+ ugovor; pokrece alat u svojoj niti, ishod se preuzima). `qnc-program-segments`: Export s XML-om pokrece izvoz i
+javlja "Exporting..." pa put ili gresku; Express, Original i postavke jos samo javljaju da su sljedeci korak. Nova kocka
+`crates/qnc-player-clip-content` (+ ugovor): jedini citac zapisa klipova za player ulaz; dvije dosadasnje kopije (preview,
+prerender) uklonjene. Provjereno na izoliranoj kopiji aktivnog projekta (`iso3`, baze kopirane, kartica samo citana):
+XML ispravan (xml parser), 4 clip itema, putanje na originale na kartici, timecode 06:35:53:24. Testovi, conformance,
+release build. Kroz sucelje nije provjereno.

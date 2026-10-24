@@ -1,8 +1,10 @@
-//! What the Export button offers (user 2026-10-24): first, apart, Export to XML; then every
-//! export setting the project has (the built-in presets and the project's own), the one the
-//! project is set to marked as default and chosen; when the project's export values match no
-//! preset, they are offered first as the project's settings. The user may pick any. It reads
-//! no database (it gets the project's `export` as saved), exports and writes nothing.
+//! What the Export button offers (user 2026-10-24): Export to XML; right under it Express, the
+//! prerendered story as it is (its format named, e.g. HD 1080p50 4:2:0); then the settings,
+//! rendered from the camera originals: Original first and stressed, then the project's export
+//! setting marked as default and chosen, then every other one (the built-in presets and the
+//! project's own). When the project's export values match no preset they are offered as the
+//! project's settings, as default. It reads no database (it gets the project's `export` as
+//! saved), exports and writes nothing.
 
 use serde_json::Value;
 
@@ -11,24 +13,35 @@ pub const MODULE_ID: &str = "qnc.module.export-choice";
 /// The id of the project's own export values when they are no preset.
 pub const PROJECT_SETTINGS: &str = "project";
 
+/// What a line exports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kind {
+    Xml,
+    /// The story's prerender put together, in the project's delivery format.
+    Express,
+    /// Rendered from the originals in the format of the originals.
+    Original,
+    /// Rendered from the originals in an export setting.
+    Setting,
+}
+
 /// One line of the choice.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportOption {
-    /// `xml`, a preset id, or `project`.
+    pub kind: Kind,
+    /// `xml`, `express`, `original`, a preset id, or `project`.
     pub id: String,
     pub label: String,
     /// The project's export setting.
     pub default: bool,
-    /// Export to XML (shown apart, at the top).
-    pub xml: bool,
 }
 
 /// What was picked.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Picked {
-    Xml,
-    /// An export setting: its id and what it is called.
-    Setting { id: String, label: String },
+pub struct Picked {
+    pub kind: Kind,
+    pub id: String,
+    pub label: String,
 }
 
 /// The open choice.
@@ -44,26 +57,22 @@ impl ExportChoice {
         let settings = serde_json::json!({ "export": export });
         let current = export.get("preset").and_then(Value::as_str).unwrap_or_default();
         let presets = qnc_export_preset::presets(&settings);
-        let mut options = vec![ExportOption {
-            id: "xml".into(),
-            label: qnc_ui_text::text("export.to_xml").into(),
-            default: false,
-            xml: true,
-        }];
-        if !presets.iter().any(|preset| preset.id == current) {
-            options.push(ExportOption {
-                id: PROJECT_SETTINGS.into(),
-                label: qnc_ui_text::text("export.project_settings").into(),
-                default: true,
-                xml: false,
-            });
+        let line = |kind, id: &str, label: String, default| ExportOption { kind, id: id.into(), label, default };
+        let mut options = vec![
+            line(Kind::Xml, "xml", qnc_ui_text::text("export.to_xml").into(), false),
+            line(Kind::Express, "express", qnc_ui_text::fill("export.express", &[("format", &prerender_format(export))]), false),
+            line(Kind::Original, "original", qnc_ui_text::text("export.original").into(), false),
+        ];
+        let mut settings_lines: Vec<ExportOption> = presets
+            .into_iter()
+            .map(|preset| line(Kind::Setting, &preset.id, preset.name, preset.id == current))
+            .collect();
+        if !settings_lines.iter().any(|option| option.default) {
+            settings_lines.insert(0, line(Kind::Setting, PROJECT_SETTINGS, qnc_ui_text::text("export.project_settings").into(), true));
         }
-        options.extend(presets.into_iter().map(|preset| ExportOption {
-            default: preset.id == current,
-            id: preset.id,
-            label: preset.name,
-            xml: false,
-        }));
+        // The default right under Original, then the others.
+        settings_lines.sort_by_key(|option| !option.default);
+        options.extend(settings_lines);
         let chosen = options.iter().position(|option| option.default).unwrap_or(0);
         Self { options, chosen }
     }
@@ -84,11 +93,20 @@ impl ExportChoice {
 
     pub fn picked(&self) -> Option<Picked> {
         let option = self.options.get(self.chosen)?;
-        Some(match option.xml {
-            true => Picked::Xml,
-            false => Picked::Setting { id: option.id.clone(), label: option.label.clone() },
-        })
+        Some(Picked { kind: option.kind, id: option.id.clone(), label: option.label.clone() })
     }
+}
+
+/// The format the prerender makes, from the project's delivery settings: e.g. `HD 1080p50
+/// 4:2:0` (the H.264 delivery is 4:2:0, XDCAM HD422 4:2:2).
+fn prerender_format(export: &Value) -> String {
+    let format = export.get("format").and_then(Value::as_str).unwrap_or_default();
+    let chroma = match export.get("video_codec").and_then(Value::as_str).unwrap_or_default() {
+        "h264" => "4:2:0",
+        codec if codec.contains("422") => "4:2:2",
+        _ => "",
+    };
+    format!("{format} {chroma}").trim().to_string()
 }
 
 #[cfg(test)]
@@ -96,24 +114,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn xml_comes_first_and_the_project_setting_is_the_chosen_default() {
-        let choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "h264_1080p50" }));
-        assert!(choice.options[0].xml);
-        let default: Vec<_> = choice.options.iter().filter(|option| option.default).collect();
-        assert_eq!(default.len(), 1);
-        assert_eq!(default[0].id, "h264_1080p50");
-        assert_eq!(choice.picked(), Some(Picked::Setting { id: "h264_1080p50".into(), label: default[0].label.clone() }));
-        assert!(choice.options.iter().any(|option| option.id == "xdcam_hd422_50i"), "every preset is offered");
+    fn xml_express_original_then_the_default_chosen_then_the_others() {
+        let choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "xdcam_hd422_50i", "format": "HD 1080p50", "video_codec": "h264" }));
+        let kinds: Vec<Kind> = choice.options.iter().take(4).map(|option| option.kind).collect();
+        assert_eq!(kinds, [Kind::Xml, Kind::Express, Kind::Original, Kind::Setting]);
+        assert!(choice.options[1].label.contains("HD 1080p50 4:2:0"), "{}", choice.options[1].label);
+        assert_eq!((choice.options[3].id.as_str(), choice.options[3].default), ("xdcam_hd422_50i", true));
+        assert_eq!(choice.chosen, 3);
+        assert_eq!(choice.options.iter().filter(|option| option.default).count(), 1);
+        assert!(choice.options.iter().any(|option| option.id == "h264_1080p50"), "every preset is offered");
     }
 
     #[test]
     fn values_of_no_preset_are_offered_as_the_project_settings() {
-        let mut choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "manual", "format": "HD 1080i50" }));
-        assert_eq!((choice.options[1].id.as_str(), choice.options[1].default), (PROJECT_SETTINGS, true));
-        assert_eq!(choice.chosen, 1);
-        choice.step(true);
-        assert_eq!(choice.picked(), Some(Picked::Xml));
-        choice.step(true);
-        assert_eq!(choice.chosen, 0, "it stays in the list");
+        let mut choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "manual", "format": "HD 1080i50", "video_codec": "mpeg2_422_50mbit" }));
+        assert!(choice.options[1].label.contains("4:2:2"));
+        assert_eq!((choice.options[3].id.as_str(), choice.options[3].default), (PROJECT_SETTINGS, true));
+        for _ in 0..5 {
+            choice.step(true);
+        }
+        assert_eq!(choice.picked().unwrap().kind, Kind::Xml, "it stays in the list");
     }
 }

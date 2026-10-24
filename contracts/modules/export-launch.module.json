@@ -1,0 +1,38 @@
+{
+  "module_id": "qnc.module.export-launch",
+  "module_name": "Export launch",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "export.launch"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "filesystem.read",
+    "filesystem.write",
+    "media.probe",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-export-launch",
+  "input": "The arguments of an export (e.g. --xml).",
+  "output": "The qnc-export executable started beside the application on its own thread; the path written or the error, taken when it is there.",
+  "specification": "User 2026-10-24: the export runs without the form waiting."
+}

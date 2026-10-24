@@ -67,6 +67,15 @@ impl ProgramSegments {
 
     /// Applies finished writes and rereads the program. Returns whether it changed.
     pub fn poll(&mut self) -> bool {
+        // The outcome of an export (user 2026-10-24).
+        let exported = self.export_run.take().map(|outcome| match outcome {
+            Ok(path) => qnc_ui_text::fill("export.xml_written", &[("path", &path)]),
+            Err(error) => qnc_ui_text::fill("export.failed", &[("error", &error)]),
+        });
+        if let Some(message) = exported {
+            self.refresh_view(message);
+            return true;
+        }
         let read = self.take_read();
         let mut message = String::new();
         let mut landed = false;

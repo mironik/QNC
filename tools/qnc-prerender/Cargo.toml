@@ -22,6 +22,7 @@ qnc-prerender-db.workspace = true
 qnc-prerender-launch.workspace = true
 qnc-playback-activity.workspace = true
 qnc-dev-diagnostics.workspace = true
+qnc-player-clip-content.workspace = true
 
 [features]
 # The in-process video decoder (FFMPEG_DIR, LIBCLANG_PATH), as the player has it.

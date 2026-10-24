@@ -23,10 +23,10 @@ use std::{
 };
 
 use qnc_broadcast_engine::ProgramPlan;
-use qnc_content_store::{Access, ContentTarget};
+use qnc_content_store::ContentTarget;
 use qnc_media_metadata::MediaRepresentation;
 use qnc_media_stream::{CodecEndpoint, LocalSource, MediaStream, SourceReference};
-use qnc_player_input::{InputReader, PlayerClipRecord, PlayerContentRead};
+use qnc_player_input::InputReader;
 use qnc_prerender_db::{PrerenderReader, PrerenderWriter, RenderedUnit};
 use qnc_program_render::Delivery;
 use qnc_work_settings::SettingsReader;
@@ -34,26 +34,7 @@ use qnc_work_settings::SettingsReader;
 type Result<T> = std::result::Result<T, String>;
 
 /// The clip records of the active project, read only (as the player's preview reads them).
-struct PlayerContent {
-    target: std::result::Result<ContentTarget, String>,
-}
-
-impl PlayerContentRead for PlayerContent {
-    fn read_clip(&self, clip_id: &str) -> std::result::Result<Option<PlayerClipRecord>, String> {
-        let target = self.target.as_ref().map_err(Clone::clone)?;
-        let stored = target.open(Access::ReadOnly)?.read(clip_id)?;
-        Ok(stored.map(|stored| PlayerClipRecord {
-            name: stored.clip.name,
-            snapshot: stored.clip.snapshot,
-            imported_media_uri: stored.imported_media_uri,
-            imported_copy_of: stored.imported_copy_of.map(|copy| match copy {
-                qnc_content_store::ImportedCopy::Original => qnc_player_input::Representation::Original,
-                qnc_content_store::ImportedCopy::Proxy => qnc_player_input::Representation::Proxy,
-            }),
-            imported_optimized: stored.imported_optimized,
-        }))
-    }
-}
+use qnc_player_clip_content::PlayerClipContent as PlayerContent;
 
 fn main() {
     if let Err(error) = run() {

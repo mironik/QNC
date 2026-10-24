@@ -140,6 +140,10 @@ members = [
     "crates/qnc-program-loudness",
     "crates/qnc-export-choice",
     "crates/qnc-export-box",
+    "crates/qnc-fcp7-xml",
+    "crates/qnc-player-clip-content",
+    "crates/qnc-export-launch",
+    "tools/qnc-export",
     "crates/qnc-monitor-panel",
     "crates/qnc-transport-panel",
     "crates/qnc-dir-browser-panel",
@@ -363,6 +367,9 @@ qnc-loudness = { path = "crates/qnc-loudness" }
 qnc-program-loudness = { path = "crates/qnc-program-loudness" }
 qnc-export-choice = { path = "crates/qnc-export-choice" }
 qnc-export-box = { path = "crates/qnc-export-box" }
+qnc-fcp7-xml = { path = "crates/qnc-fcp7-xml" }
+qnc-player-clip-content = { path = "crates/qnc-player-clip-content" }
+qnc-export-launch = { path = "crates/qnc-export-launch" }
 qnc-monitor-panel = { path = "crates/qnc-monitor-panel" }
 qnc-transport-panel = { path = "crates/qnc-transport-panel" }
 qnc-dir-browser-panel = { path = "crates/qnc-dir-browser-panel" }

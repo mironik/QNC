@@ -1,0 +1,9 @@
+[package]
+name = "qnc-player-clip-content"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the clip records of the active project, read only, as the player input reads them (one reader for the preview, the prerender and the export)"
+
+[dependencies]
+qnc-content-store = { workspace = true }
+qnc-player-input = { workspace = true }

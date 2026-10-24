@@ -1,0 +1,38 @@
+{
+  "module_id": "qnc.module.player-clip-content",
+  "module_name": "Project clip content",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "content.clip.read"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "filesystem.read",
+    "filesystem.write",
+    "media.probe",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-player-clip-content",
+  "input": "The content database target of the active project.",
+  "output": "The saved clip record, its media record and what its import made, as the player input reads them.",
+  "specification": "One reader for the preview, the prerender and the export (2026-10-24: two copies before)."
+}
