@@ -73,14 +73,14 @@ impl ProgramSegments {
             .view
             .rows
             .iter()
-            .position(|row| row.start_frame <= frame && frame < row.end_frame)
-            .or_else(|| self.view.rows.iter().position(|row| row.selected));
+            .position(|row| Some(row) == self.view.user_segment_at(frame))
+            .or_else(|| self.view.rows.iter().position(|row| !row.lead && row.selected));
         let Some(index) = found else {
             self.refresh_view(qnc_ui_text::text("story.msg.no_segment_at_playhead").into());
             return false;
         };
         let row = &self.view.rows[index];
-        if row.kind != crate::SegmentKind::Ton || index == 0 {
+        if row.kind != crate::SegmentKind::Ton || index == 0 || self.view.rows[index - 1].lead {
             self.refresh_view(qnc_ui_text::text("story.picture_lead_ton_only").into());
             return false;
         }

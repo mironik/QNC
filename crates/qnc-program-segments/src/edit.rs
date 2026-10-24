@@ -53,8 +53,8 @@ impl ProgramSegments {
         let playhead = self.playhead.unwrap_or(0);
         let row = self
             .view
-            .segment_at(playhead)
-            .or_else(|| self.view.rows.iter().find(|row| self.selected.as_ref() == Some(&row.segment_id)))
+            .user_segment_at(playhead)
+            .or_else(|| self.view.rows.iter().find(|row| !row.lead && self.selected.as_ref() == Some(&row.segment_id)))
             .cloned();
         let Some(row) = row else {
             self.refresh_view(qnc_ui_text::text("story.msg.no_segment_to_trim").into());

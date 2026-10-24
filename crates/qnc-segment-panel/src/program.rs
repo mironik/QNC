@@ -22,7 +22,11 @@ pub(crate) fn paint_program(
     let labels = segments
         .rows
         .iter()
-        .map(|row| format!("{} {}", row.kind.label(), row.duration_label))
+        .map(|row| match row.lead {
+            // The lead-in and lead-out (user 2026-10-24), glued to the user's segment.
+            true => format!("{} {}", qnc_ui_text::text("story.lead"), row.duration_label),
+            false => format!("{} {}", row.kind.label(), row.duration_label),
+        })
         .collect::<Vec<_>>();
     let spans = segments
         .rows
@@ -145,7 +149,7 @@ pub(crate) fn paint_program(
     let part_choice = |lane: u8| {
         let stored = if lane == 0 {
             segments.part_sound.as_ref().and_then(|part| {
-                segments.rows.iter().find(|row| row.segment_id == part.id && row.start_frame == start).map(|row| row.a1_level_db)
+                segments.wrap_rows().into_iter().find(|(window, row)| row.segment_id == part.id && window.0 == start).map(|(_, row)| row.a1_level_db)
             })
         } else {
             segments.part_sound.as_ref().and_then(|part| {

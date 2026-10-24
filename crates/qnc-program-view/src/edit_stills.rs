@@ -220,6 +220,7 @@ mod tests {
             duration_label: String::new(),
             duration_color_key: "under_3",
             selected: false,
+            lead: false,
         };
         let slot = |id: &str, start, end| Slot { slot_id: id.into(), start_frame: start, end_frame: end, has_cover: id == "s2", selected: false };
         let slots = vec![slot("s1", 0, 15), slot("s2", 15, 33), slot("s3", 33, 40)];

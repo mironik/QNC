@@ -5691,3 +5691,10 @@ nisu mijenjani (lead je obican segment). Testovi `qnc-program-db` (4 nova), `qnc
 `qnc-program-input`, `qnc-work-settings`, `qnc-project-store`, `qnc-editorial-application`, conformance, release build.
 Uzivo nije provjereno. Aktivni projekt dobiva postavku lead-ina tek kad se otvori u Projectu; do tada se prica ne mijenja.
 Project je ponovno zamrznut.
+Izmjena prikaza 2026-10-24 (korisnik: "lead i out segmenti trebaju se ljepiti na prvi korisnicki segment i na zadnji
+korisnicki segment, a ne biti samostalni segmenti"): Wrap redovi panela Segmenti su redovi korisnickih segmenata; prvi
+red pocinje s lead-inom, zadnji zavrsava s lead-outom (`qnc-program-view` `SegmentsView::wrap_rows`, `SegmentRow.lead`;
+`qnc-segment-panel` crta red po prozoru iz `wrap_rows`, lead ima oznaku "Lead"). Slika ili zvuk na lead-inu pripadaju
+prvom segmentu, na lead-outu zadnjem (`user_segment_at`: Ctrl+Shift+I/O, Ctrl+1, Ctrl+Shift+J); gore/dolje preskacu
+leadove. Baza (`qnc-program-db`) nije mijenjana. Testovi `qnc-program-view` (novi), `qnc-program-segments`,
+`qnc-segment-panel`, `qnc-panel-focus`, conformance, release build. Uzivo nije provjereno.

@@ -168,9 +168,9 @@ pub fn show(
                         // A newly chosen segment (Up/Down, user 2026-10-17) is scrolled into view.
                         let shown_key = egui::Id::new("qnc_segment_panel_scrolled_to");
                         let shown: Option<String> = ui.ctx().data(|data| data.get_temp(shown_key));
-                        for row in &segments.rows {
+                        for (window, row) in segments.wrap_rows() {
                             let top = ui.cursor().top();
-                            let row_command = paint_row(ui, segments, row, timeline_theme, lengths);
+                            let row_command = paint_row(ui, segments, row, window, timeline_theme, lengths);
                             if row.selected && shown.as_deref() != Some(row.segment_id.as_str()) {
                                 let rect = egui::Rect::from_min_max(egui::pos2(stack.left(), top), egui::pos2(stack.right(), ui.cursor().top()));
                                 ui.scroll_to_rect(rect, None);
@@ -215,12 +215,12 @@ fn paint_row(
     ui: &mut egui::Ui,
     segments: &SegmentsView,
     row: &SegmentRow,
+    window: (u64, u64),
     theme: TimelineTheme,
     lengths: &[CoverLengthBand],
 ) -> Option<ActionEvent> {
-    let window = (row.start_frame, row.end_frame);
     ui.push_id(("qnc_segment_row", &row.segment_id), |ui| {
-        paint_program(ui, segments, window, theme, row.start_frame == 0, lengths, false)
+        paint_program(ui, segments, window, theme, window.0 == 0, lengths, false)
     })
     .inner
 }

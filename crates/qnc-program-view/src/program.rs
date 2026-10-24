@@ -50,6 +50,7 @@ pub fn program(
             duration_label: duration_label(frames, rate_num, rate_den),
             duration_color_key: duration_color_key(frames, rate_num, rate_den),
             selected: selected == Some(segment.segment_id.as_str()),
+            lead: !segment.lead.is_empty(),
         });
         start += frames;
     }

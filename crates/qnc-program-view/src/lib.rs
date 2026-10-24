@@ -38,6 +38,9 @@ pub struct SegmentRow {
     /// `under_3`, `under_5`, `under_7` or `over_7` seconds (v5 duration marks).
     pub duration_color_key: &'static str,
     pub selected: bool,
+    /// The automatic lead-in or lead-out (user 2026-10-24): shown glued to the first or last
+    /// segment of the user, never edited.
+    pub lead: bool,
 }
 
 impl SegmentRow {
@@ -278,6 +281,34 @@ impl SegmentsView {
             .or_else(|| self.selected_cover().map(|cover| cover.slot_id.as_str()))
             .or_else(|| self.slot_at_playhead().map(|slot| slot.slot_id.as_str()))
             .ok_or_else(|| qnc_ui_text::text("story.msg.pick_slot_for_broll").into())
+    }
+
+    /// The Wrap rows (user 2026-10-24: the lead-in and lead-out are glued to the first and last
+    /// segment of the user): each user segment with the program window it is drawn in, which
+    /// for the first one starts with the lead-in and for the last one ends with the lead-out.
+    pub fn wrap_rows(&self) -> Vec<((u64, u64), &SegmentRow)> {
+        let mut shown: Vec<((u64, u64), &SegmentRow)> = Vec::new();
+        let mut lead_from = None;
+        for row in &self.rows {
+            if !row.lead {
+                shown.push(((lead_from.take().unwrap_or(row.start_frame), row.end_frame), row));
+            } else if let Some(last) = shown.last_mut() {
+                last.0 .1 = row.end_frame;
+            } else {
+                lead_from.get_or_insert(row.start_frame);
+            }
+        }
+        shown
+    }
+
+    /// The segment of the user a program frame belongs to: a frame of the lead-in belongs to
+    /// the first segment, of the lead-out to the last one (they are glued to them).
+    pub fn user_segment_at(&self, program_frame: u64) -> Option<&SegmentRow> {
+        self.wrap_rows()
+            .into_iter()
+            .find(|((start, end), _)| (*start..*end).contains(&program_frame))
+            .map(|(_, row)| row)
+            .or_else(|| self.rows.iter().rev().find(|row| !row.lead).filter(|_| program_frame >= self.total_frames))
     }
 
     /// The segment that holds a program frame; at or after the end, the last one.

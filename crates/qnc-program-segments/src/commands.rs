@@ -264,22 +264,23 @@ impl ProgramSegments {
     }
 
     pub(crate) fn step(&mut self, up: bool) {
+        // The segments of the user; the lead-in and lead-out are glued to them.
+        let rows: Vec<_> = self.view.rows.iter().filter(|row| !row.lead).collect();
         let from = self
             .selected
             .as_deref()
-            .and_then(|id| self.view.rows.iter().find(|row| row.segment_id == id));
+            .and_then(|id| rows.iter().position(|row| row.segment_id == id));
         let target = match from {
-            Some(row) => {
-                let index = self.view.rows.iter().position(|r| r == row).unwrap_or(0);
+            Some(index) => {
                 let next = if up {
                     index.saturating_sub(1)
                 } else {
-                    (index + 1).min(self.view.rows.len() - 1)
+                    (index + 1).min(rows.len() - 1)
                 };
-                self.view.rows.get(next)
+                rows.get(next).copied()
             }
-            None if up => self.view.rows.last(),
-            None => self.view.rows.first(),
+            None if up => rows.last().copied(),
+            None => rows.first().copied(),
         };
         if let Some(segment_id) = target.map(|row| row.segment_id.clone()) {
             self.select(&segment_id);

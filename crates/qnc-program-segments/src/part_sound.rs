@@ -15,10 +15,8 @@ impl ProgramSegments {
     pub fn take_part_sound(&mut self, lane: u8, frame: u64) -> bool {
         let found = if lane == 0 {
             self.view
-                .rows
-                .iter()
-                .find(|row| row.start_frame <= frame && frame < row.end_frame)
-                .or_else(|| self.view.rows.iter().find(|row| row.selected))
+                .user_segment_at(frame)
+                .or_else(|| self.view.rows.iter().find(|row| !row.lead && row.selected))
                 .map(|row| {
                     let kept = Lane { channel: row.a1_source_channel, off: row.a1_off, level_db: row.a1_level_db };
                     (row.segment_id.clone(), row.clip_id.clone(), kept)

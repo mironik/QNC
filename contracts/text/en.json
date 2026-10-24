@@ -562,6 +562,7 @@
     "story.cover_timebase_differs": "B-roll '{cover}': the editorial timebase {editorial} does not match the stored probe timebase {stored}.",
     "story.out_after_in": "OUT must be at least one frame after IN.",
     "story.lead_settings_missing": "The project settings hold no valid lead-in and lead-out (export.lead_in_seconds, export.tail_seconds); open the project in Project.",
+    "story.lead": "Lead",
     "story.lead_is_automatic": "The lead-in and lead-out follow the first and last segment; they are not edited.",
     "app.group_a_needs_app": "Group a must have a chosen application.",
     "story.marker_inside_story": "An M marker must be inside the length of the story ({seconds} s).",
