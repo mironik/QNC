@@ -368,6 +368,7 @@ impl QncShell {
             active_tab: self.active_tab.clone(),
             theme: self.theme_id,
             status: self.footer_status().to_string(),
+            link: self.embedded_apps.get(&self.active_tab).and_then(|component| component.footer_link()).map(str::to_string),
             project_open: self.tabs.project_open,
             intent: None,
         }
@@ -377,6 +378,11 @@ impl QncShell {
         match intent {
             FooterIntent::Activate(tab_id) => self.activate_tab(&tab_id),
             FooterIntent::CloseProject => self.close_active_project(),
+            FooterIntent::OpenLink(file) => {
+                if let Err(error) = qnc_status_line::open(&file) {
+                    self.status = error;
+                }
+            }
             FooterIntent::Theme(theme) => {
                 self.theme_id = theme;
                 apply_visuals(ctx, &self.layout);
@@ -436,6 +442,7 @@ struct FooterBlock {
     active_tab: String,
     theme: ThemeId,
     status: String,
+    link: Option<String>,
     project_open: bool,
     intent: Option<FooterIntent>,
 }
@@ -446,7 +453,7 @@ impl qnc_board::FrameBlocks for FooterBlock {
             return;
         }
         let tabs: Vec<(&str, &str)> = self.tabs.iter().map(|(id, label)| (id.as_str(), label.as_str())).collect();
-        let input = FooterInput { tabs: &tabs, active_tab: &self.active_tab, theme: self.theme, status: &self.status, project_open: self.project_open };
+        let input = FooterInput { tabs: &tabs, active_tab: &self.active_tab, theme: self.theme, status: &self.status, link: self.link.as_deref(), project_open: self.project_open };
         self.intent = qnc_shell_footer::show(ui, rect, &self.style, &self.palette, input);
     }
 }

@@ -85,7 +85,7 @@ fn choosing_a_clip_without_a_project_reports_it_in_the_footer() {
     app.view.clips = vec![clip("a", "Prvi")];
     assert!(app.dispatch(EditorialIntent::PreviewClip("a".into())));
     assert_eq!(app.view().chosen_clip_id(), Some("a"));
-    assert_eq!(app.footer_status(), qnc_ui_text::text("player.work_settings_project_loaded"));
+    assert_eq!(app.footer_status().text, qnc_ui_text::text("player.work_settings_project_loaded"));
     assert!(!app.has_player());
 }
 
@@ -98,10 +98,10 @@ fn transport_without_a_player_says_so() {
         action_ids::STEP_FORWARD_FRAME,
     ] {
         app.dispatch(EditorialIntent::action(action));
-        assert_eq!(app.footer_status(), qnc_ui_text::text("player.broadcast_player_connected"));
+        assert_eq!(app.footer_status().text, qnc_ui_text::text("player.broadcast_player_connected"));
     }
     app.dispatch(EditorialIntent::action(qnc_action_event::ActionEvent::key("timeline_cue_frame").with_value(10u64).at("source_timeline")));
-    assert_eq!(app.footer_status(), qnc_ui_text::text("player.broadcast_player_connected"));
+    assert_eq!(app.footer_status().text, qnc_ui_text::text("player.broadcast_player_connected"));
 }
 
 #[test]

@@ -13,7 +13,6 @@
     "export.written": "Exported: {path}",
     "export.failed": "Export failed: {error}",
     "export.running": "Exporting...",
-    "export.not_yet": "{name}: this export is the next step; Export to XML and Express are ready",
     "export.default": "default",
     "common.loading": "Loading...",
     "common.saving": "Saving...",

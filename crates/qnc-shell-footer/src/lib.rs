@@ -80,6 +80,8 @@ pub struct FooterInput<'a> {
     pub active_tab: &'a str,
     pub theme: ThemeId,
     pub status: &'a str,
+    /// The file the status speaks of: the status is its link (user 2026-10-24).
+    pub link: Option<&'a str>,
     /// A project is open: Close project is shown (v5: not without a project).
     pub project_open: bool,
 }
@@ -90,6 +92,8 @@ pub enum FooterIntent {
     Activate(String),
     CloseProject,
     Theme(ThemeId),
+    /// Show this file in the OS file browser.
+    OpenLink(String),
 }
 
 /// Draws the footer in `rect`.
@@ -148,13 +152,19 @@ pub fn show(
                         intent = Some(FooterIntent::CloseProject);
                     }
                 }
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(input.status).size(style.font_ui).color(palette.muted),
-                    )
-                    .truncate(),
-                )
-                .on_hover_text(input.status);
+                let text = RichText::new(input.status).size(style.font_ui);
+                match input.link {
+                    Some(link) => {
+                        let label = egui::Label::new(text.color(palette.text).underline()).truncate().sense(egui::Sense::click());
+                        let response = ui.add(label).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(link);
+                        if response.clicked() {
+                            intent = Some(FooterIntent::OpenLink(link.to_string()));
+                        }
+                    }
+                    None => {
+                        ui.add(egui::Label::new(text.color(palette.muted)).truncate()).on_hover_text(input.status);
+                    }
+                }
             });
         });
     });

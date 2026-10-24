@@ -5819,3 +5819,21 @@ vrijednost koja ne stane rastezala cijeli panel ulijevo preko monitora (i bez po
 a okvir fokusa ostao je na mjestu panela. Sada je zaglavlje red tocno sirine panela: naslov lijevo, vrijednosti iza njega
 odrezane na panelu, nikad sire; tijelo panela nikad nije sire od njegova mjesta. Okvir fokusa (`qnc-ui-kit::paint_focus`,
 sve forme) je 1 px, boja fokusa prigusena, na rubu mjesta panela. Testovi, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-24 (korisnik: "nastavi s exportom originala"; odabrao "XDCAM HD422 MXF"; "dodaj link u statusnoj liniji
+gdje prikazujes da je export zavrsio"): export Original i sve postavke exporta iz prozora Export. Originali su XAVC H.264
+4:2:2 10-bit, a ffmpeg ovog racunala (LGPL) nema koder za njega, pa je Original XDCAM HD422 50 Mbit (MPEG-2 4:2:2, 8-bit)
+u MXF OP1a pri slici i zvuku same price (velicina prve slike, stopa price, izlazi zvuka projekta).
+`qnc-export-choice` `delivery_values` (`StoryFormat`): vrijednosti predaje izabranog retka (original, postavke projekta ili
+preset preko postavki projekta). `tools/qnc-export --render <id>`: isti put kao Express (dijelovi iz prerendera kad su u
+istom formatu, inace renderirani iz originala u privremenu mapu), spajanje i pravilo glasnoce `qnc-unit-join`, izlaz
+`<projekt>_<revizija>_<id>.mxf` u mapi exporta. `qnc-program-segments`: Original i postavke pokrecu `--render`; tekst
+`export.not_yet` uklonjen. Popravak u `qnc-program-render`: koder XDCAM nikad nije radio (ffmpeg odbija zatvoreni GOP uz
+prepoznavanje scena; dodan `-sc_threshold 1000000000`), a greska kodera sada se javlja umjesto "pipe has been ended".
+Link: nova kocka `crates/qnc-status-line` (+ ugovor; tekst statusa s datotekom o kojoj govori, otvaranje datoteke u
+pregledniku datoteka OS-a: Explorer, Finder, mapa na Linuxu); `qnc-shell-desktop-api` `footer_link`, `qnc-shell-footer`
+(status s linkom je podcrtan i klikom salje `OpenLink`), `qnc-desktop` (otvara ga), `qnc-program-view`
+`SegmentsView.exported_file` (dok poruka kaze da je export gotov), `qnc-editorial-application`/`-desktop` `footer_status`
+daje `Status`, Story i MA adapteri `footer_link`. C10 editorial aplikacija 573 -> 571. Provjereno na izoliranoj kopiji
+(kartica samo citana): Original 4 dijela za 45 s, MXF s MPEG-2 4:2:2 1920x1080p50, 2124 slike (kao Express), A1 -27,4 doveden
+na -23,0 LUFS (ffmpeg ebur128), dvije mono trake PCM 24-bit. Testovi, conformance. Link kroz sucelje nije provjeren.
+Interlaced preset (npr. `xdcam_hd422_50i`) i dalje daje kontroliranu gresku (render jos ne radi isprepletenu predaju).

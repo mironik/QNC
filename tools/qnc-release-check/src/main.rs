@@ -27,7 +27,7 @@ fn main() -> Result<(), String> {
     .ok_or("no clip shown")?;
     app.dispatch(EditorialIntent::PreviewClip(clip.clone()));
     wait(&mut app, Duration::from_secs(5), |_| None::<()>);
-    println!("opened {clip}: {}", app.footer_status());
+    println!("opened {clip}: {}", app.footer_status().text);
     qnc_project_close::CloseProjectComponent::from_root(&root).close_active_project()?;
     wait(&mut app, Duration::from_secs(3), |_| None::<()>);
     let db = dir.join("project.db");

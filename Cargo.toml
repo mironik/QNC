@@ -140,6 +140,7 @@ members = [
     "crates/qnc-unit-join",
     "crates/qnc-program-loudness",
     "crates/qnc-export-choice",
+    "crates/qnc-status-line",
     "crates/qnc-export-box",
     "crates/qnc-fcp7-xml",
     "crates/qnc-player-clip-content",
@@ -368,6 +369,7 @@ qnc-loudness = { path = "crates/qnc-loudness" }
 qnc-unit-join = { path = "crates/qnc-unit-join" }
 qnc-program-loudness = { path = "crates/qnc-program-loudness" }
 qnc-export-choice = { path = "crates/qnc-export-choice" }
+qnc-status-line = { path = "crates/qnc-status-line" }
 qnc-export-box = { path = "crates/qnc-export-box" }
 qnc-fcp7-xml = { path = "crates/qnc-fcp7-xml" }
 qnc-player-clip-content = { path = "crates/qnc-player-clip-content" }

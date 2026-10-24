@@ -40,6 +40,10 @@ impl ShellDesktopApp for Adapter {
     }
 
     fn footer_status(&self) -> Option<&str> {
-        Some(self.app.footer_status())
+        Some(self.app.footer_status().text)
+    }
+
+    fn footer_link(&self) -> Option<&str> {
+        self.app.footer_status().link
     }
 }

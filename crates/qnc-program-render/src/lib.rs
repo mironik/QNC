@@ -93,7 +93,7 @@ impl Delivery {
                 vec![
                     "-c:v", "mpeg2video", "-profile:v", "0", "-level:v", "2",
                     "-b:v", "50M", "-minrate", "50M", "-maxrate", "50M", "-bufsize", "17825792",
-                    "-flags", "+cgop", "-bf", "0", "-dc", "10", "-intra_vlc", "1", "-non_linear_quant", "1",
+                    "-flags", "+cgop", "-sc_threshold", "1000000000", "-bf", "0", "-dc", "10", "-intra_vlc", "1", "-non_linear_quant", "1",
                     "-qmin", "1", "-qmax", "12",
                 ],
             ),
@@ -454,10 +454,11 @@ fn encode_picture(
         let _ = child.kill();
     }
     let output = child.wait_with_output().map_err(|e| e.to_string())?;
-    fed?;
-    if !output.status.success() {
+    // An encoder that stopped is the reason a feed broke: its own words, not the broken pipe.
+    if !output.status.success() && !cancel.load(std::sync::atomic::Ordering::Relaxed) {
         return Err(qnc_ui_text::fill("render.encoder_error", &[("error", String::from_utf8_lossy(&output.stderr).trim())]));
     }
+    fed?;
     Ok(())
 }
 

@@ -11,6 +11,7 @@ qnc-media-metadata.workspace = true
 qnc-prerender-db.workspace = true
 qnc-program-render.workspace = true
 qnc-unit-join.workspace = true
+qnc-export-choice.workspace = true
 qnc-content-store.workspace = true
 qnc-db-broker.workspace = true
 qnc-dev-diagnostics.workspace = true

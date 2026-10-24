@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.status-line",
+  "module_name": "Status line",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.status.text", "ui.status.link"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-status-line",
+  "input": "The messages of a surface in order, each with the local file it speaks of when it has one.",
+  "output": "The status shown (the first message that says something, with its link); opening a link shows the file in the OS file browser.",
+  "specification": "User 2026-10-24: the status line that says an export is finished has a link to the exported file."
+}

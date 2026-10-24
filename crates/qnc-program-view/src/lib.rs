@@ -129,6 +129,8 @@ pub struct SegmentsView {
     pub redo_depth: u64,
     /// Last controlled error of a read or write; empty otherwise.
     pub message: String,
+    /// The file an export just wrote, while `message` says so (user 2026-10-24: a link).
+    pub exported_file: Option<String>,
     /// The segment being edited (Edit in the Segment tab), until Enter or Escape.
     pub editing: Option<String>,
     /// The program wave (A1 segments, A2 covers) from the stored clip waves.

@@ -117,13 +117,11 @@ impl EditorialApplication {
     }
 
     /// Text for the shell footer: the last preview error, else the catalog state.
-    pub fn footer_status(&self) -> &str {
+    pub fn footer_status(&self) -> qnc_status_line::Status<'_> {
         // The story's answer first (live 2026-10-18: a refused segment said why only under
-        // the player's message, so nothing seemed to happen).
-        [&self.view.segments.message, &self.view.preview.message]
-            .into_iter()
-            .find(|message| !message.is_empty())
-            .unwrap_or(&self.view.message)
+        // the player's message, so nothing seemed to happen); an export's with its file.
+        let (segments, preview) = (&self.view.segments, &self.view.preview);
+        qnc_status_line::first(&[(&segments.message, segments.exported_file.as_deref()), (&preview.message, None)], &self.view.message)
     }
 
     pub fn has_player(&self) -> bool {

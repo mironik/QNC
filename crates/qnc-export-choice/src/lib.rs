@@ -97,6 +97,55 @@ impl ExportChoice {
     }
 }
 
+/// The picture and sound of the story itself: what Original keeps.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StoryFormat {
+    pub width: u32,
+    pub height: u32,
+    pub fps: f64,
+    pub audio_channels: u16,
+    pub audio_sample_rate: u32,
+}
+
+/// The delivery values a picked line renders in, as the project's `export` keeps them:
+/// `original` is XDCAM HD422 50 Mbit (MPEG-2 4:2:2) in MXF at the story's own picture and
+/// sound (user 2026-10-24: the originals' XAVC 4:2:2 10-bit has no encoder here, MXF is what
+/// TV houses take); `project` the project's export as saved; a preset id that preset's values
+/// over the project's export. XML and Express have none.
+pub fn delivery_values(id: &str, export: &Value, story: StoryFormat) -> Result<Value, String> {
+    let mut values = export.clone();
+    let object = values.as_object_mut().ok_or("The project has no export settings.")?;
+    match id {
+        "xml" | "express" => return Err(format!("'{id}' renders no delivery")),
+        PROJECT_SETTINGS => {}
+        "original" => {
+            let rate = if story.fps.fract().abs() < 1e-6 { format!("{}", story.fps as u32) } else { format!("{:.2}", story.fps) };
+            for (key, value) in [
+                ("format", Value::from(format!("{}p{rate} 4:2:2", story.height))),
+                ("video_codec", Value::from("mpeg2_422_50mbit")),
+                ("container", Value::from("mxf")),
+                ("width", Value::from(story.width)),
+                ("height", Value::from(story.height)),
+                ("fps", Value::from(story.fps)),
+                ("field_order", Value::from("progressive")),
+                ("audio_channels", Value::from(story.audio_channels)),
+                ("audio_sample_rate", Value::from(story.audio_sample_rate)),
+            ] {
+                object.insert(key.into(), value);
+            }
+        }
+        preset => {
+            let settings = serde_json::json!({ "export": export });
+            let found = qnc_export_preset::presets(&settings).into_iter().find(|candidate| candidate.id == preset);
+            let preset_values = found.ok_or_else(|| format!("unknown export setting '{preset}'"))?.values;
+            for (key, value) in preset_values.as_object().into_iter().flatten() {
+                object.insert(key.clone(), value.clone());
+            }
+        }
+    }
+    Ok(values)
+}
+
 /// The format the prerender makes, from the project's delivery settings: e.g. `HD 1080p50
 /// 4:2:0` (the H.264 delivery is 4:2:0, XDCAM HD422 4:2:2).
 fn prerender_format(export: &Value) -> String {
@@ -123,6 +172,20 @@ mod tests {
         assert_eq!(choice.chosen, 3);
         assert_eq!(choice.options.iter().filter(|option| option.default).count(), 1);
         assert!(choice.options.iter().any(|option| option.id == "h264_1080p50"), "every preset is offered");
+    }
+
+    #[test]
+    fn original_is_xdcam_hd422_at_the_storys_own_format_and_a_preset_lays_its_values_over_the_project() {
+        let export = serde_json::json!({ "preset": "h264_1080p50", "video_codec": "h264", "width": 1280, "fps": 25, "audio_channels": 2, "audio_sample_rate": 48000, "directory": "export" });
+        let story = StoryFormat { width: 1920, height: 1080, fps: 50.0, audio_channels: 4, audio_sample_rate: 48000 };
+        let original = delivery_values("original", &export, story).unwrap();
+        assert_eq!(original["video_codec"], "mpeg2_422_50mbit");
+        assert_eq!((original["width"].as_u64(), original["fps"].as_f64(), original["audio_channels"].as_u64()), (Some(1920), Some(50.0), Some(4)));
+        assert_eq!((original["field_order"].as_str(), original["directory"].as_str()), (Some("progressive"), Some("export")));
+        assert_eq!(delivery_values(PROJECT_SETTINGS, &export, story).unwrap(), export);
+        let preset = delivery_values("h264_1080p50", &serde_json::json!({ "video_codec": "mpeg2_422_50mbit" }), story).unwrap();
+        assert_eq!(preset["video_codec"], "h264");
+        assert!(delivery_values("express", &export, story).is_err());
     }
 
     #[test]

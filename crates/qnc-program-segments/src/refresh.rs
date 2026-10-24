@@ -98,6 +98,8 @@ impl ProgramSegments {
             }
             _ => message,
         };
+        // The written file is the message's link while the message says so (user 2026-10-24).
+        view.exported_file = self.exported.as_ref().filter(|(said, _)| *said == view.message).map(|(_, file)| file.clone());
         view.editing = self.editing.clone();
         view.edit_stills = match &self.slot_trim {
             Some(trim) => qnc_program_view::trim_stills(&view, &slots(&self.stored_slots, None), &trim.slot_id, trim.start, trim.frames),

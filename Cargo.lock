@@ -3458,6 +3458,7 @@ dependencies = [
  "qnc-project-desktop-adapter",
  "qnc-shell-desktop-api",
  "qnc-shell-footer",
+ "qnc-status-line",
  "qnc-ui-text",
  "rusqlite",
  "serde",
@@ -3550,6 +3551,7 @@ dependencies = [
  "qnc-source-bindings",
  "qnc-source-preview",
  "qnc-source-timeline",
+ "qnc-status-line",
  "qnc-timeline",
  "qnc-timeline-assets",
  "qnc-trim-stills",
@@ -3599,6 +3601,7 @@ dependencies = [
  "qnc-key-intents",
  "qnc-keyboard-shortcut",
  "qnc-paint-pace",
+ "qnc-status-line",
  "qnc-timeline",
 ]
 
@@ -3642,6 +3645,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
+ "qnc-export-choice",
  "qnc-fcp7-xml",
  "qnc-media-metadata",
  "qnc-media-stream",
@@ -4348,6 +4352,7 @@ dependencies = [
  "qnc-board",
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
+ "qnc-status-line",
 ]
 
 [[package]]
@@ -4358,6 +4363,7 @@ dependencies = [
  "qnc-board",
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
+ "qnc-status-line",
 ]
 
 [[package]]
@@ -4376,6 +4382,7 @@ dependencies = [
  "qnc-board",
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
+ "qnc-status-line",
 ]
 
 [[package]]
@@ -5566,6 +5573,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-status-line"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-still-locator"
 version = "0.1.0"
 dependencies = [
@@ -5595,6 +5606,7 @@ dependencies = [
  "qnc-board",
  "qnc-editorial-desktop",
  "qnc-shell-desktop-api",
+ "qnc-status-line",
 ]
 
 [[package]]

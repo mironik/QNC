@@ -119,17 +119,14 @@ impl ProgramSegments {
                 let Some(picked) = self.export.take().and_then(|export| export.picked()) else {
                     return true;
                 };
-                // Export to XML and Express run in the background (`qnc-export`); the exports
-                // rendered from the originals are the next step.
-                let message = match picked.kind {
-                    qnc_export_choice::Kind::Xml | qnc_export_choice::Kind::Express => {
-                        let what = if picked.kind == qnc_export_choice::Kind::Xml { "--xml" } else { "--express" };
-                        self.export_run.start(&[what]); // one at a time: a running one goes on
-                        qnc_ui_text::text("export.running").to_string()
-                    }
-                    _ => qnc_ui_text::fill("export.not_yet", &[("name", &picked.label)]),
+                // Every export runs in the background (`qnc-export`), one at a time: a running
+                // one goes on. Original and the settings are rendered from the originals.
+                let _ = match picked.kind {
+                    qnc_export_choice::Kind::Xml => self.export_run.start(&["--xml"]),
+                    qnc_export_choice::Kind::Express => self.export_run.start(&["--express"]),
+                    qnc_export_choice::Kind::Original | qnc_export_choice::Kind::Setting => self.export_run.start(&["--render", &picked.id]),
                 };
-                self.refresh_view(message);
+                self.refresh_view(qnc_ui_text::text("export.running").to_string());
             }
             SegmentCommand::ToggleNormalize => {
                 self.normalize = !self.normalize;

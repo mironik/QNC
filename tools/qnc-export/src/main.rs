@@ -9,7 +9,11 @@
 //! into the system's temporary folder; A1 and A2 keep the user's levels within the project's
 //! loudness rule (`audio.loudness`), else they are brought to it.
 //!
-//! `qnc-export (--xml | --express) [--root <QNC root>]`
+//! `--render <id>`: the story rendered from the originals in a delivery (`original`: XDCAM
+//! HD422 MXF at the story's own picture, `project`, or an export preset), put together as
+//! Express is; units the prerender made in the same format are taken from it.
+//!
+//! `qnc-export (--xml | --express | --render <id>) [--root <QNC root>]`
 
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
@@ -40,11 +44,12 @@ fn run() -> Result<PathBuf> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--xml" | "--express" => what = Some(arg),
+            "--render" => what = Some(format!("--render={}", args.next().ok_or("--render needs an export setting")?)),
             "--root" => root = Some(PathBuf::from(args.next().ok_or("--root needs a value")?)),
             other => return Err(format!("unknown argument {other}")),
         }
     }
-    let what = what.ok_or("--xml or --express")?;
+    let what = what.ok_or("--xml, --express or --render <id>")?;
     let root = root.or_else(qnc_dev_diagnostics::locate_qnc_root).ok_or("QNC root missing (--root, QNC_ROOT or beside the executable)")?;
     let reader = SettingsReader::from_root(&root).map_err(|e| e.to_string())?;
     let settings = reader.read().map_err(|e| e.to_string())?;
@@ -60,7 +65,13 @@ fn run() -> Result<PathBuf> {
     roots.push((settings.project_media_source_uri().map_err(|e| e.to_string())?, project_dir.clone()));
 
     if what == "--express" {
-        return express(&settings, &program, &target, &project_dir, &folder, roots);
+        let delivery = qnc_program_render::Delivery::from_export(&settings.export)?;
+        return deliver(&settings, &program, delivery, "express", &target, &project_dir, &folder, roots);
+    }
+    if let Some(id) = what.strip_prefix("--render=") {
+        let values = qnc_export_choice::delivery_values(id, &settings.export, story_format(&program))?;
+        let delivery = qnc_program_render::Delivery::from_export(&values)?;
+        return deliver(&settings, &program, delivery, &file_name(id), &target, &project_dir, &folder, roots);
     }
     let mut files = BTreeMap::new();
     for (clip_id, input) in &program.clips {
@@ -93,11 +104,29 @@ fn run() -> Result<PathBuf> {
     Ok(path)
 }
 
-/// The prerender of the story put together (Express): its units in order, from the
-/// project's prerender when made there, else rendered now into the system's temporary folder.
-fn express(
+/// The picture and sound of the story itself: the frame size of its first picture, its rate,
+/// its sound outputs.
+fn story_format(program: &qnc_player_input::ProgramInput) -> qnc_export_choice::StoryFormat {
+    let picture = program.playlist.items.iter().flat_map(|item| &item.sources).find_map(|source| source.source_video_format);
+    let rate = program.playlist.program_timebase;
+    qnc_export_choice::StoryFormat {
+        width: picture.map_or(0, |format| format.width),
+        height: picture.map_or(0, |format| format.height),
+        fps: rate.fps_num as f64 / rate.fps_den.max(1) as f64,
+        audio_channels: program.playlist.audio_layout.channel_count,
+        audio_sample_rate: program.project_audio.sample_rate_hz,
+    }
+}
+
+/// The story's units in `delivery` put together: from the project's prerender when made
+/// there in the same format, else rendered now from the originals into the system's
+/// temporary folder.
+#[allow(clippy::too_many_arguments)]
+fn deliver(
     settings: &qnc_work_settings::WorkSettings,
     program: &qnc_player_input::ProgramInput,
+    delivery: qnc_program_render::Delivery,
+    suffix: &str,
     target: &qnc_db_broker::ProjectDbTarget,
     project_dir: &std::path::Path,
     folder: &std::path::Path,
@@ -105,7 +134,7 @@ fn express(
 ) -> Result<PathBuf> {
     let units = qnc_broadcast_engine::ProgramPlan::for_render(program).and_then(|plan| plan.render_units()).map_err(|e| e.to_string())?;
     let ffmpeg = qnc_decoder_catalog::installed_deployment().map_err(|e| e.to_string())?.executable;
-    let delivery = qnc_program_render::Delivery::from_export(&settings.export)?.on(&ffmpeg);
+    let delivery = delivery.on(&ffmpeg);
     let loudness = settings.audio_loudness().map_err(|e| e.to_string())?;
     let (prerender, _) = settings.prerender_location(project_dir).map_err(|e| e.to_string())?;
     let fingerprints: Vec<String> = units.iter().map(|unit| delivery.fingerprint(unit)).collect();
@@ -139,13 +168,13 @@ fn express(
             true_peak_dbtp: loudness.true_peak_dbtp,
             tolerance_lu: loudness.tolerance_lu,
         };
-        let out = folder.join(format!("{}_{}_express.mxf", file_name(&settings.project_name), program.playlist.revision));
+        let out = folder.join(format!("{}_{}_{suffix}.mxf", file_name(&settings.project_name), program.playlist.revision));
         let joined = qnc_unit_join::join(&files, sound, rule, &ffmpeg, &out)?;
         let lane = |name: &str, lane: &qnc_unit_join::LaneOutcome| {
             let measured = lane.measured_lufs.map_or("silence".into(), |lufs| format!("{lufs:.1} LUFS"));
             format!("{name} {measured}, {:.1} dBTP, gain {:+.1} dB", lane.true_peak_dbtp, lane.gain_db)
         };
-        eprintln!("express: {} units, {}; {}", files.len(), lane("A1", &joined.a1), lane("A2", &joined.a2));
+        eprintln!("{suffix}: {} units, {}; {}", files.len(), lane("A1", &joined.a1), lane("A2", &joined.a2));
         Ok(joined.path)
     })();
     let _ = std::fs::remove_dir_all(&scratch);

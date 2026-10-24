@@ -36,6 +36,11 @@ pub trait ShellDesktopApp {
         None
     }
 
+    /// A local file the footer status speaks of, shown as a link (user 2026-10-24).
+    fn footer_link(&self) -> Option<&str> {
+        None
+    }
+
     fn on_activated(&mut self) {}
 
     /// The surface is no longer shown: it releases its player and stops telling the

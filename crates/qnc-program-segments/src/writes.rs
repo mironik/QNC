@@ -69,7 +69,11 @@ impl ProgramSegments {
     pub fn poll(&mut self) -> bool {
         // The outcome of an export (user 2026-10-24).
         let exported = self.export_run.take().map(|outcome| match outcome {
-            Ok(path) => qnc_ui_text::fill("export.written", &[("path", &path)]),
+            Ok(path) => {
+                let message = qnc_ui_text::fill("export.written", &[("path", &path)]);
+                self.exported = Some((message.clone(), path));
+                message
+            }
             Err(error) => qnc_ui_text::fill("export.failed", &[("error", &error)]),
         });
         if let Some(message) = exported {

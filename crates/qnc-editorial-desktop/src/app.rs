@@ -49,7 +49,7 @@ impl EditorialApp {
         }
     }
 
-    pub fn footer_status(&self) -> &str {
+    pub fn footer_status(&self) -> qnc_status_line::Status<'_> {
         self.application.footer_status()
     }
 
