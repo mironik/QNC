@@ -5785,3 +5785,11 @@ izlaz `<projekt>_<revizija>_express.mov` u mapi izvoza projekta. Gumb Export: Ex
 -27,4 LUFS doveden na -23,0 (ffmpeg ebur128 potvrdjuje -23,0), A2 tisina bez pojacanja. Original nije izveden: originali su
 XAVC H.264 4:2:2 10-bit, a ffmpeg ovog racunala (LGPL, Intel QSV) nema koder za H.264 4:2:2 10-bit (ima ProRes, DNxHR,
 MPEG-2); zamjenski kodek se ne bira bez odluke korisnika. Testovi, conformance. Uzivo kroz sucelje nije provjereno.
+Izmjena 2026-10-24 (korisnik: "export prerendera bi bio bolji u MXF jer TV kuce preferiraju njega"): Express izlaz je
+MXF OP1a umjesto MOV (`qnc-unit-join`, `tools/qnc-export`: `<projekt>_<revizija>_express.mxf`). Slika (H.264 prerendera,
+bez B-slika) kopira se bez ponovnog kodiranja; svaki izlaz zvuka je svoja mono traka PCM 24-bit kao kod kamera (A1, A2,
+...); izlaz bez pojacanja izdvaja se uzorak po uzorak, A1/A2 izvan pravila glasnoce dobivaju pojacanje. Provjereno
+(izolirana kopija `iso3`): ffmpeg MXF muxer s H.264 daje 2124 slike bajt za bajt iste kao prerender, ton bit po bit,
+OP1a; Express 4 dijela 36 s, A1 -23,0 LUFS (ffmpeg ebur128). Probano i XDCAM HD422 50 Mbit 1080p50 u MXF (2124 slike,
+4:2:2) za kasniji export iz originala. Otvoreno: pocetni timecode datoteke je 00:00:00:00 (mnoge TV kuce traze
+10:00:00:00; ceka odluku i postavku projekta). Testovi, conformance.

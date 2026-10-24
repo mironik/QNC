@@ -4,7 +4,9 @@
 //! sound is measured (EBU R 128 / BS.1770-4, `qnc-loudness`): A1 (output 1) and A2 (output 2)
 //! keep the user's levels when they are within the target's tolerance and under the true peak
 //! limit, otherwise each gets the gain that brings it to its target (lowered so its true peak
-//! stays at the limit) and only the sound is encoded again (PCM). Every other output is kept
+//! stays at the limit). The file is MXF OP1a (user 2026-10-24: TV houses prefer it), the
+//! pictures copied, every sound output its own mono PCM 24-bit track (as the cameras write
+//! them; an output without gain is copied sample for sample). Every other output is kept
 //! as it is. It reads the unit files only and writes one file, `out`, under its final name (a
 //! project folder allows no rename); the list of the units waits in the system's temporary
 //! folder. It reads no database and decodes no picture.
@@ -51,7 +53,7 @@ pub struct Sound {
     pub channels: u16,
 }
 
-/// Puts `units` (MOV files, one picture stream and one PCM stream each) together into `out`.
+/// Puts `units` (MOV files, one picture stream and one PCM stream each) together into `out` (MXF).
 pub fn join(units: &[PathBuf], sound: Sound, rule: LoudnessRule, ffmpeg: &Path, out: &Path) -> Result<Joined> {
     if units.is_empty() {
         return Err("No unit to put together.".into());
@@ -124,20 +126,19 @@ fn measure(list: &Path, sound: Sound, ffmpeg: &Path) -> Result<Vec<(Option<f64>,
         .collect())
 }
 
-/// The joined file: the pictures copied; the sound copied too, or with A1/A2 gains as PCM.
+/// The joined file (MXF OP1a): the pictures copied, every output a mono track, A1/A2 at
+/// their gains.
 fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Path) -> Result<()> {
     let mut command = Command::new(ffmpeg);
     command
         .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i"])
         .arg(list)
-        .args(["-map", "0:v:0", "-map", "0:a:0", "-c:v", "copy"]);
-    match gains_db.iter().all(|gain| *gain == 0.0) {
-        true => command.args(["-c:a", "copy"]),
-        false => command.args(["-af", &pan(sound.channels, gains_db), "-c:a", "pcm_s24le"]),
-    };
+        .args(["-filter_complex", &mono_tracks(sound.channels, gains_db), "-map", "0:v:0"]);
+    for channel in 0..sound.channels {
+        command.args(["-map", &format!("[a{channel}]")]);
+    }
     let output = command
-        // The index at the start (as every unit): the file opens without reading to its end.
-        .args(["-movflags", "+faststart", "-f", "mov"])
+        .args(["-c:v", "copy", "-c:a", "pcm_s24le", "-f", "mxf"])
         .arg(out)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -150,12 +151,17 @@ fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Pat
     Ok(())
 }
 
-/// Every output to itself, A1 and A2 at their gains.
-fn pan(channels: u16, gains_db: [f64; 2]) -> String {
-    let mut text = format!("pan={channels}c");
+/// Every output its own mono track `[aN]`; A1 and A2 at their gains, an output without gain
+/// only picked out (sample for sample).
+fn mono_tracks(channels: u16, gains_db: [f64; 2]) -> String {
+    let split: String = (0..channels).map(|channel| format!("[s{channel}]")).collect();
+    let mut text = format!("[0:a:0]asplit={channels}{split}");
     for channel in 0..usize::from(channels) {
-        let gain = gains_db.get(channel).map_or(1.0, |db| 10f64.powf(db / 20.0));
-        text.push_str(&format!("|c{channel}={gain:.6}*c{channel}"));
+        let gain = match gains_db.get(channel) {
+            Some(db) if *db != 0.0 => format!("{:.6}*", 10f64.powf(db / 20.0)),
+            _ => String::new(),
+        };
+        text.push_str(&format!(";[s{channel}]pan=mono|c0={gain}c{channel}[a{channel}]"));
     }
     text
 }
@@ -169,9 +175,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_list_names_every_unit_in_order_and_the_pan_touches_only_a1_and_a2() {
+    fn the_list_names_every_unit_in_order_and_every_output_is_a_mono_track() {
         let text = list_text(&[PathBuf::from(r"C:\a\b.mov"), PathBuf::from("/x/it's.mov")]);
         assert_eq!(text, "file 'C:/a/b.mov'\nfile '/x/it'\\''s.mov'\n");
-        assert_eq!(pan(4, [6.0, 0.0]), "pan=4c|c0=1.995262*c0|c1=1.000000*c1|c2=1.000000*c2|c3=1.000000*c3");
+        assert_eq!(
+            mono_tracks(3, [6.0, 0.0]),
+            "[0:a:0]asplit=3[s0][s1][s2];[s0]pan=mono|c0=1.995262*c0[a0];[s1]pan=mono|c0=c1[a1];[s2]pan=mono|c0=c2[a2]"
+        );
     }
 }

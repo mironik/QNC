@@ -139,7 +139,7 @@ fn express(
             true_peak_dbtp: loudness.true_peak_dbtp,
             tolerance_lu: loudness.tolerance_lu,
         };
-        let out = folder.join(format!("{}_{}_express.mov", file_name(&settings.project_name), program.playlist.revision));
+        let out = folder.join(format!("{}_{}_express.mxf", file_name(&settings.project_name), program.playlist.revision));
         let joined = qnc_unit_join::join(&files, sound, rule, &ffmpeg, &out)?;
         let lane = |name: &str, lane: &qnc_unit_join::LaneOutcome| {
             let measured = lane.measured_lufs.map_or("silence".into(), |lufs| format!("{lufs:.1} LUFS"));
