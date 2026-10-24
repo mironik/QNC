@@ -291,6 +291,7 @@ fn a_new_project_has_ebu_loudness_on_a1_and_a2_and_a_two_second_tail_and_nothing
     assert_eq!((loudness.a1_lufs, loudness.a2_lufs, loudness.true_peak_dbtp, loudness.tolerance_lu), (-23.0, -23.0, -1.0, 0.5));
     assert_eq!(settings.export_tail_seconds().unwrap(), 2.0);
     assert_eq!(settings.export_lead_in_seconds().unwrap(), 2.0);
+    assert_eq!(settings.export_start_timecode().unwrap(), "10:00:00:00");
     // The client's own values are read as saved.
     settings.audio["loudness"]["a2_lufs"] = json!(-27);
     settings.export["tail_seconds"] = json!(5);
@@ -305,4 +306,8 @@ fn a_new_project_has_ebu_loudness_on_a1_and_a2_and_a_two_second_tail_and_nothing
     assert!(settings.export_tail_seconds().is_err());
     settings.export.as_object_mut().unwrap().remove("lead_in_seconds");
     assert!(settings.export_lead_in_seconds().is_err());
+    settings.export["start_timecode"] = json!("25:00:00:00");
+    assert!(settings.export_start_timecode().is_err());
+    settings.export.as_object_mut().unwrap().remove("start_timecode");
+    assert!(settings.export_start_timecode().is_err());
 }

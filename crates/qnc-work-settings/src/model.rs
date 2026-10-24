@@ -214,6 +214,22 @@ impl WorkSettings {
             .ok_or_else(|| ReadError::new("export_lead_in_seconds", "The database holds no valid export.lead_in_seconds."))
     }
 
+    /// The timecode of the first frame of an export, HH:MM:SS:FF (user 2026-10-24: a project
+    /// setting, 10:00:00:00 by default); a missing or malformed value is a controlled error.
+    pub fn export_start_timecode(&self) -> Result<String, ReadError> {
+        self.export
+            .get("start_timecode")
+            .and_then(Value::as_str)
+            .filter(|text| {
+                let parts: Vec<&str> = text.split(':').collect();
+                parts.len() == 4
+                    && parts.iter().all(|part| part.len() == 2 && part.bytes().all(|b| b.is_ascii_digit()))
+                    && parts.iter().zip([24, 60, 60, 60]).all(|(part, limit)| part.parse::<u32>().is_ok_and(|n| n < limit))
+            })
+            .map(str::to_string)
+            .ok_or_else(|| ReadError::new("export_start_timecode", "The database holds no valid export.start_timecode."))
+    }
+
     pub(crate) fn from_saved(
         project_id: String,
         project_name: String,

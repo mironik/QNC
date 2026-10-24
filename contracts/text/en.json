@@ -638,6 +638,7 @@
     "project.loudness_tolerance": "Tolerance (LU)",
     "project.lead_in_seconds": "Lead-in (s)",
     "project.tail_seconds": "Lead-out / tail (s)",
+    "project.start_timecode": "Start timecode",
     "project.keyboard": "Keyboard",
     "project.key_preset": "Key preset",
     "project.original_policy": "Original policy",

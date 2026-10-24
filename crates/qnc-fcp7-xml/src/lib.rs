@@ -82,8 +82,11 @@ fn push(track: &mut Vec<Piece>, piece: Piece) {
 }
 
 /// The text of the sequence `name` of the program, its clips' files by clip id.
-pub fn sequence(name: &str, playlist: &FlatProgramPlaylist, files: &BTreeMap<String, ClipFile>) -> Result<String, String> {
+/// `start_timecode` (HH:MM:SS:FF, the project's setting) is the timecode of the sequence's first
+/// frame.
+pub fn sequence(name: &str, playlist: &FlatProgramPlaylist, files: &BTreeMap<String, ClipFile>, start_timecode: &str) -> Result<String, String> {
     let rate = rate(playlist.program_timebase.fps_num, playlist.program_timebase.fps_den);
+    let start_frame = timecode_frame(start_timecode, rate_fps(&rate))?;
     let [v1, v2, a1, a2] = tracks(playlist);
     let (width, height) = files.values().next().map_or((1920, 1080), |file| (file.width, file.height));
     let mut ids = BTreeMap::new();
@@ -95,7 +98,7 @@ pub fn sequence(name: &str, playlist: &FlatProgramPlaylist, files: &BTreeMap<Str
     let w = &mut out;
     writeln!(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE xmeml>\n<xmeml version=\"5\">").ok();
     writeln!(w, "<sequence id=\"sequence-1\">\n<name>{}</name>\n<duration>{}</duration>\n{rate}", escape(name), playlist.duration_frames).ok();
-    writeln!(w, "<timecode>{rate}<string>00:00:00:00</string><frame>0</frame><displayformat>NDF</displayformat></timecode>").ok();
+    writeln!(w, "<timecode>{rate}<string>{start_timecode}</string><frame>{start_frame}</frame><displayformat>NDF</displayformat></timecode>").ok();
     writeln!(w, "<media>\n<video>\n<format><samplecharacteristics>{rate}<width>{width}</width><height>{height}</height></samplecharacteristics></format>").ok();
     for track in [&v1, &v2] {
         writeln!(w, "<track>").ok();
@@ -177,6 +180,15 @@ fn timecode(frame: i64, fps: i64) -> String {
     format!("{:02}:{:02}:{:02}:{:02}", seconds / 3600 % 24, seconds / 60 % 60, seconds % 60, frame % fps)
 }
 
+/// The frame of a timecode HH:MM:SS:FF at `fps` whole frames per second.
+fn timecode_frame(text: &str, fps: i64) -> Result<i64, String> {
+    let parts: Vec<i64> = text.split(':').map(|part| part.parse::<i64>()).collect::<Result<_, _>>().map_err(|_| format!("Not a timecode: {text}"))?;
+    match parts.as_slice() {
+        [h, m, s, f] if (0..24).contains(h) && (0..60).contains(m) && (0..60).contains(s) && (0..fps).contains(f) => Ok(((h * 60 + m) * 60 + s) * fps + f),
+        _ => Err(format!("Not a timecode at {fps} frames per second: {text}")),
+    }
+}
+
 /// `file://localhost/` and the path with `/` and the characters a URL may not hold escaped.
 fn path_url(path: &std::path::Path) -> String {
     let text = path.to_string_lossy().replace('\\', "/");
@@ -239,7 +251,8 @@ mod tests {
         };
         let file = |name: &str| ClipFile { name: name.into(), path: format!("D:/Clip/{name} 1.MXF").into(), duration_frames: 1000, timecode_start: Some(90_000), width: 1920, height: 1080, audio_channels: 4 };
         let files = BTreeMap::from([("a".to_string(), file("a")), ("b".to_string(), file("b"))]);
-        let xml = sequence("Story & co", &playlist, &files).unwrap();
+        let xml = sequence("Story & co", &playlist, &files, "10:00:00:00").unwrap();
+        assert!(xml.contains("<string>10:00:00:00</string><frame>1800000</frame>"), "the start timecode of the sequence");
         assert_eq!(xml.matches("<clipitem").count(), 4, "V1 a, V2 b, A1 a, A2 b: {xml}");
         assert!(xml.contains("<start>0</start><end>150</end><in>10</in><out>160</out>"), "a goes on: one item");
         assert!(xml.contains("<trackindex>2</trackindex>"), "A1 is channel 2 of a");

@@ -100,7 +100,7 @@ fn run() -> Result<PathBuf> {
             },
         );
     }
-    let text = qnc_fcp7_xml::sequence(&settings.project_name, &program.playlist, &files)?;
+    let text = qnc_fcp7_xml::sequence(&settings.project_name, &program.playlist, &files, &settings.export_start_timecode().map_err(|e| e.to_string())?)?;
     let path = folder.join(format!("{}_{}.xml", file_name(&settings.project_name), program.playlist.revision));
     std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(path)
@@ -146,6 +146,7 @@ fn deliver(
         false => Vec::new(),
     };
     let delivery = if delivery.interlaced { delivery.intermediate(story_fps) } else { delivery };
+    let start_timecode = settings.export_start_timecode().map_err(|e| e.to_string())?;
     let loudness = settings.audio_loudness().map_err(|e| e.to_string())?;
     let (prerender, _) = settings.prerender_location(project_dir).map_err(|e| e.to_string())?;
     let fingerprints: Vec<String> = units.iter().map(|unit| delivery.fingerprint(unit)).collect();
@@ -182,7 +183,7 @@ fn deliver(
             tolerance_lu: loudness.tolerance_lu,
         };
         let out = folder.join(format!("{}_{}_{suffix}.mxf", file_name(&settings.project_name), program.playlist.revision));
-        let joined = qnc_unit_join::join(&files, sound, rule, &ffmpeg, &out, &picture)?;
+        let joined = qnc_unit_join::join(&files, sound, rule, &ffmpeg, &out, &picture, &start_timecode)?;
         let lane = |name: &str, lane: &qnc_unit_join::LaneOutcome| {
             let measured = lane.measured_lufs.map_or("silence".into(), |lufs| format!("{lufs:.1} LUFS"));
             format!("{name} {measured}, {:.1} dBTP, gain {:+.1} dB", lane.true_peak_dbtp, lane.gain_db)

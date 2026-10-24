@@ -5855,3 +5855,13 @@ Popravak 2026-10-24 (korisnik: "link ne vodi na exportiranu datoteku"): put expo
 (`...\exports/projekti\<datoteka>`, `export.directory` je zapisan s `/`), a Explorer s `/select,` takav put ne nade i
 otvori drugu mapu. `tools/qnc-export` (`export_folder`) i `qnc-status-line` (`open`) slazu put sa separatorom ovog OS-a.
 Provjereno: izolirana kopija daje `...\exports\projekti\test_ukupni_11.xml`; testovi. Klik kroz sucelje nije provjeren.
+Otkljucano i izvedeno 2026-10-24 (korisnik: "timecode 10:00:00:00 kao postavka projekta"; Project otkljucan samo za tu
+postavku): `export.start_timecode` (HH:MM:SS:FF) je timecode prve slike svakog exporta. Seed svih sistemskih predlozaka
+10:00:00:00, `qnc-project-store` ga dopunjuje starijem projektu pri otvaranju (test), Advanced blok Export izbor "Start
+timecode" (10:00:00:00, 01:00:00:00, 00:00:00:00; `start_timecodes` u ugovoru, rjecnik `project.start_timecode`);
+`qnc-work-settings` `export_start_timecode` cita strogo (nedostaje ili neispravan: kontrolirana greska, test). MXF
+exporti (Express, Original, postavke, i isprepletena predaja) ga upisuju (`qnc-unit-join` `join(.., start_timecode)`,
+ffmpeg `-timecode`), XML (FCP7) kao timecode sekvence (`qnc-fcp7-xml` `sequence(.., start_timecode)`, frame po stopi
+price). Aktivni projekt bez postavke ne exportira dok se ne otvori u Projectu. Provjereno na izoliranoj kopiji: Original
+i XDCAM HD422 50i MXF `timecode=10:00:00:00`, XML `10:00:00:00` / frame 1800000. Testovi, conformance. Project je
+ponovno zamrznut.

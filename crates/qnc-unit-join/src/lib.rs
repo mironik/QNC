@@ -55,8 +55,9 @@ pub struct Sound {
 
 /// Puts `units` (MOV files, one picture stream and one PCM stream each) together into `out`
 /// (MXF). `picture` empty copies the pictures; else it is how they are encoded once (an
-/// interlaced delivery from its lossless progressive units, user 2026-10-24).
-pub fn join(units: &[PathBuf], sound: Sound, rule: LoudnessRule, ffmpeg: &Path, out: &Path, picture: &[String]) -> Result<Joined> {
+/// interlaced delivery from its lossless progressive units, user 2026-10-24). `start_timecode`
+/// (HH:MM:SS:FF, the project's setting) is the timecode of the first frame of the file.
+pub fn join(units: &[PathBuf], sound: Sound, rule: LoudnessRule, ffmpeg: &Path, out: &Path, picture: &[String], start_timecode: &str) -> Result<Joined> {
     if units.is_empty() {
         return Err("No unit to put together.".into());
     }
@@ -71,7 +72,7 @@ pub fn join(units: &[PathBuf], sound: Sound, rule: LoudnessRule, ffmpeg: &Path, 
             LaneOutcome { measured_lufs: lufs, true_peak_dbtp: peak, gain_db: qnc_loudness::export_gain(lufs, peak, target, rule.tolerance_lu, rule.true_peak_dbtp) }
         };
         let (a1, a2) = (lane(0, rule.a1_lufs), lane(1, rule.a2_lufs));
-        write(&list, sound, [a1.gain_db, a2.gain_db], ffmpeg, out, picture)?;
+        write(&list, sound, [a1.gain_db, a2.gain_db], ffmpeg, out, picture, start_timecode)?;
         Ok(Joined { path: out.to_path_buf(), a1, a2 })
     });
     let _ = std::fs::remove_file(&list);
@@ -130,7 +131,7 @@ fn measure(list: &Path, sound: Sound, ffmpeg: &Path) -> Result<Vec<(Option<f64>,
 
 /// The joined file (MXF OP1a): the pictures copied, every output a mono track, A1/A2 at
 /// their gains.
-fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Path, picture: &[String]) -> Result<()> {
+fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Path, picture: &[String], start_timecode: &str) -> Result<()> {
     let mut command = Command::new(ffmpeg);
     command
         .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i"])
@@ -144,7 +145,7 @@ fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Pat
         false => command.args(picture),
     };
     let output = command
-        .args(["-c:a", "pcm_s24le", "-f", "mxf"])
+        .args(["-c:a", "pcm_s24le", "-timecode", start_timecode, "-f", "mxf"])
         .arg(out)
         .stdin(Stdio::null())
         .stdout(Stdio::null())

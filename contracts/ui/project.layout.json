@@ -317,6 +317,7 @@
       "lufs": [["-23", "-23 (EBU R 128)"], ["-24", "-24 (ATSC A/85)"], ["-16", "-16"], ["-27", "-27"]],
       "true_peak": [["-1", "-1 (EBU R 128)"], ["-2", "-2"], ["-3", "-3"]],
       "loudness_tolerance": [["0.5", "0.5"], ["1", "1"]],
+      "start_timecodes": [["10:00:00:00", "10:00:00:00"], ["01:00:00:00", "01:00:00:00"], ["00:00:00:00", "00:00:00:00"]],
       "tail_seconds": [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["5", "5"], ["10", "10"]],
       "crossfade_frames": [
         [
@@ -525,6 +526,13 @@
             "id": "pts_export_tail",
             "path": "export.tail_seconds",
             "options": "tail_seconds"
+          },
+          {
+            "kind": "choice",
+            "label": "@project.start_timecode",
+            "id": "pts_export_start_tc",
+            "path": "export.start_timecode",
+            "options": "start_timecodes"
           },
           {
             "kind": "choice",
