@@ -172,7 +172,7 @@ pub struct ProgramSegments {
     /// The last refused take (`confirm.rs` `refused`), shown by `qnc-alert`.
     alert: Option<qnc_alert::Alert>,
     /// The slot shown enlarged in the place of the source timeline (`zoom.rs`).
-    zoom_slot: Option<String>,
+    zoom_slot: Option<zoom::ZoomOn>,
     /// What Talking Head, Voice over and covers take from the source view.
     source: SourcePick,
     /// The sound of a stored segment or cover taken on the Wrap row (`part_sound.rs`).

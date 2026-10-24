@@ -195,7 +195,14 @@ pub fn show(
                     .push_id("qnc_segment_program_overview", |ui| {
                         paint_program(ui, segments, (0, total), timeline_theme, true, lengths, false)
                     })
-                    .inner;
+                    .inner
+                    // A double click on the program row enlarges the whole program (user 2026-10-24).
+                    .map(|mut event| {
+                        if event.action_id == "wrap_zoom" {
+                            event.action_id = "program_zoom".into();
+                        }
+                        event
+                    });
                 command = command.take().or(overview);
             });
         },

@@ -126,9 +126,12 @@ pub enum SegmentCommand {
     /// Edit (user rule 2026-10-01): the segment opens in the source timeline with its
     /// IN/OUT; I/O move them, Enter writes them, Escape drops the edit.
     Edit(String),
-    /// The slot (`None`: under the Wrap playhead) shown enlarged in the place of the source
-    /// timeline; the same slot again closes it (user 2026-10-21).
-    Zoom(Option<String>),
+    /// What a double click (or the key, at the Wrap playhead) enlarges in the place of the
+    /// source timeline (user 2026-10-24): a slot with a cover with part of its neighbours, else
+    /// the segment there; the same again closes it.
+    Zoom { slot: Option<String>, frame: Option<u64> },
+    /// The whole program enlarged (a double click on the program row).
+    ProgramZoom,
     /// The enlarged slot closes (Escape with nothing taken).
     CloseZoom,
     /// Escape while a segment is edited.
@@ -192,7 +195,8 @@ impl SegmentCommand {
             ("segment_purge", Some(id), _) => Self::Purge(id),
             ("segment_replace", Some(id), _) => Self::Replace(id),
             ("segment_edit", Some(id), _) => Self::Edit(id),
-            ("wrap_zoom", Some(id), _) => Self::Zoom(Some(id)),
+            ("wrap_zoom", slot, frame) => Self::Zoom { slot, frame },
+            ("program_zoom", _, _) => Self::ProgramZoom,
             (side @ ("segment_move_up" | "segment_move_down"), _, _) => Self::Move { up: side == "segment_move_up" },
             (side @ ("step_prev_segment" | "step_next_segment"), _, _) => Self::Step { up: side == "step_prev_segment" },
             (side @ ("step_prev_marker_slot" | "step_next_marker_slot"), _, _) => Self::StepSlot { up: side == "step_prev_marker_slot" },
@@ -236,7 +240,7 @@ impl SegmentCommand {
             "undo_object" => Self::Undo,
             "redo_object" => Self::Redo,
             "toggle_wrap_video" => Self::ToggleWrapVideo,
-            "wrap_zoom" => Self::Zoom(None),
+            "wrap_zoom" => Self::Zoom { slot: None, frame: None },
             "cover_mode_covers" => Self::CoverMode { sync: false },
             "cover_mode_sync" => Self::CoverMode { sync: true },
             _ => return None,

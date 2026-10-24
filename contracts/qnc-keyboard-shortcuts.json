@@ -386,7 +386,10 @@
       "label": "Uzmi J sliku Ton segmenta pod Wrap playheadom: slika govornika prije njegova tona; lijevo/desno dulje/krace, Enter sprema"
     },
     "wrap_zoom": {
-      "label": "Uvecaj slot pod Wrap playheadom (ili dvokliknut) na mjestu source timelinea: isti Wrap redak, susjedni slotovi po 15 % sirine; Esc zatvara"
+      "label": "Uvecaj na mjestu source timelinea ono pod Wrap playheadom (ili dvokliknuto): pokrivalicu sa susjedima po 15 % sirine, inace segment; Esc zatvara"
+    },
+    "program_zoom": {
+      "label": "Uvecaj cijeli program na mjestu source timelinea (dvoklik na redak programa); Esc zatvara"
     },
     "segment_edit": {
       "label": "Panel Segmenti: uredi IN/OUT segmenta na source timelineu"

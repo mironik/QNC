@@ -5705,3 +5705,11 @@ segment s iskljucenim A1 nema izvor zvuka; stavka bez izvora je crno i tisina (p
 je vec tako svirao. `qnc-program-input` `sound_only` vise ne vraca prvi izvor praznoj stavci. Test
 `an_off_with_a1_off_is_black_and_silence_also_under_a_cover`, testovi playliste, program-input, enginea, rendera,
 conformance, release build. Uzivo nije provjereno.
+Dopuna 2026-10-24 (korisnik: "kad se dublklikom radi zum segmenta, onda se segment prikazuje u timeline; ako se radi zoom
+program timeline, onda se on prikazuje; ako pokrivalica onda pokrivalica i dio predhodnog i narednog klipa"): zoom na
+mjestu source timelinea vise nije uvijek slot (prica bez korisnickih markera ima jedan slot preko cijelog programa, pa
+je dvoklik uvijek pokazivao sve). `qnc-program-segments` (`zoom.rs` `ZoomOn`): dvoklik (ili Ctrl+E na Wrap playheadu)
+na slot s pokrivalicom povecava slot sa susjedima po 15 %, drugdje segment na tom mjestu (sa zalijepljenim leadom);
+dvoklik na redak programa povecava cijeli program (nova akcija kataloga `program_zoom` bez tipke, `qnc-segment-panel`
+je daje s retka programa; `qnc-program-commands` `Zoom { slot, frame }`, `ProgramZoom`). Isto ponovno zatvara, Esc
+zatvara. Test, conformance, release build. Uzivo nije provjereno.

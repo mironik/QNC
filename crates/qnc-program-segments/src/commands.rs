@@ -109,7 +109,8 @@ impl ProgramSegments {
             }
             SegmentCommand::Purge(segment_id) => self.write(Operation::PurgeSegment { segment_id }),
             SegmentCommand::ToggleWrapVideo => self.video_compact = !self.video_compact,
-            SegmentCommand::Zoom(slot_id) => self.zoom(slot_id),
+            SegmentCommand::Zoom { slot, frame } => self.zoom(slot, frame),
+            SegmentCommand::ProgramZoom => self.zoom_program(),
             SegmentCommand::CloseZoom => {
                 self.zoom_slot = None;
                 self.refresh_view(String::new());

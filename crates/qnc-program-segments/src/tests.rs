@@ -869,3 +869,17 @@ fn ctrl_shift_j_takes_the_picture_j_of_a_ton_segment() {
     segments.apply_action("clear_focus");
     assert!(!segments.overlap_taken());
 }
+
+#[test]
+fn a_double_click_enlarges_a_cover_with_its_neighbours_else_the_segment_and_the_program_row_the_program() {
+    // User 2026-10-24: a cover with part of the slots before and after, a segment alone, the program whole.
+    let mut segments = component();
+    segments.apply(SegmentCommand::Zoom { slot: Some("S|m1".into()), frame: Some(5) });
+    assert_eq!(segments.view().zoom, Some((0, 18)), "the covered slot S-m1 and 15 % beside it");
+    segments.apply(SegmentCommand::Zoom { slot: Some("m1|m2".into()), frame: Some(20) });
+    assert_eq!(segments.view().zoom, Some((10, 30)), "no cover there: segment b");
+    segments.apply(SegmentCommand::ProgramZoom);
+    assert_eq!(segments.view().zoom, Some((0, 40)));
+    segments.apply(SegmentCommand::ProgramZoom);
+    assert_eq!(segments.view().zoom, None, "the same again closes it");
+}
