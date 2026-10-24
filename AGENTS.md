@@ -5892,3 +5892,15 @@ iskljucivanje N ponovno otvara pricu na istom mjestu. Prerender ostaje bez norma
 imaju drugi otisak i renderiraju se za export). Provjereno na izoliranoj kopiji projekta (baza kopirana citanjem, kartica samo
 citana): 8 od 12 pokrivalica -22,9 do -23,5 LUFS, preostale 4 dignute za punih 12 dB (izabrani kanal tih klipova je tih) na
 -26 do -32. Testovi, conformance. Uzivo kroz sucelje nije provjereno.
+Otkljucano i izvedeno 2026-10-24 (korisnik: "napravi CBR Expres export"; "da, otkljucaj Project i kreni s 35 Mbit/s CBR"):
+H.264 prerender (pa i Express, koji ga spaja bez ponovnog kodiranja) kodira se na stalnom bitrateu iz postavke projekta
+`export.video_bitrate_mbps` (seed svih sistemskih predlozaka 35, razina XAVC Long 35 / XDCAM HD 35 za 4:2:0;
+`qnc-project-store` je dopunjuje starijem projektu pri otvaranju, test; Advanced Export "H.264 bitrate CBR (Mbit/s)" 25/35/50,
+`video_bitrates` u ugovoru, rjecnik). `qnc-program-render`: `Delivery.bitrate_mbps` (H.264 bez nje je kontrolirana greska),
+`encoder.rs` svaki koder u CBR (`-b:v`/`-minrate`/`-maxrate` isti; QSV, NVENC `-rc cbr`, AMF `-rc cbr`, VideoToolbox
+`-constant_bit_rate`, libx264 `nal-hrd=cbr`), spremnik cetvrt sekunde, poceti napola pun (s jednom sekundom spojeni dijelovi
+skakali su 32-43 Mbit/s po sekundi); `UNIT_FORMAT` 4 (postojeci dijelovi jednom se renderiraju ponovno). Prozor exporta pise
+"Express: HD 1080p50 4:2:0 35 Mbit/s CBR" (`qnc-export-choice`). XDCAM HD422 ostaje 50 Mbit/s CBR. Izmjereno na izoliranoj
+kopiji (kartica samo citana): jedan klip QSV 34,7-36,4 Mbit/s po sekundi; Express price od 29 dijelova slika prosjek 35,6,
+po sekundi 34,0-40,5 (vrhovi na pocetku dijelova), datoteka ukupno 38,5 Mbit/s sa zvukom. Aktivni projekt bez postavke ne
+radi prerender ni Express dok se ne otvori u Projectu. Testovi, conformance. Project je ponovno zamrznut.

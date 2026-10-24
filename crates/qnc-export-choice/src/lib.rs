@@ -150,12 +150,18 @@ pub fn delivery_values(id: &str, export: &Value, story: StoryFormat) -> Result<V
 /// 4:2:0` (the H.264 delivery is 4:2:0, XDCAM HD422 4:2:2).
 fn prerender_format(export: &Value) -> String {
     let format = export.get("format").and_then(Value::as_str).unwrap_or_default();
-    let chroma = match export.get("video_codec").and_then(Value::as_str).unwrap_or_default() {
+    let codec = export.get("video_codec").and_then(Value::as_str).unwrap_or_default();
+    let chroma = match codec {
         "h264" => "4:2:0",
         codec if codec.contains("422") => "4:2:2",
         _ => "",
     };
-    format!("{format} {chroma}").trim().to_string()
+    // An H.264 prerender is encoded at the project's constant bitrate (user 2026-10-24).
+    let bitrate = match (codec, export.get("video_bitrate_mbps").and_then(Value::as_u64)) {
+        ("h264", Some(mbps)) => format!("{mbps} Mbit/s CBR"),
+        _ => String::new(),
+    };
+    format!("{format} {chroma} {bitrate}").trim().to_string()
 }
 
 #[cfg(test)]

@@ -29,7 +29,7 @@ pub type Result<T> = std::result::Result<T, String>;
 /// The format of a rendered unit: MOV, picture stream 0 without B pictures and with the
 /// time scale of the program rate, PCM stream 1, BT.709 limited range, timestamps from 0.
 /// Its description (`unit_media`) is written, never probed.
-pub const UNIT_FORMAT: u32 = 3;
+pub const UNIT_FORMAT: u32 = 4;
 
 /// The codec of the lossless progressive units of an interlaced delivery (never a prerender).
 const INTERMEDIATE: &str = "ffv1_intermediate";
@@ -47,6 +47,8 @@ pub struct Delivery {
     pub top_first: bool,
     pub audio_sample_rate: u32,
     pub audio_channels: u16,
+    /// The constant bitrate of an H.264 delivery in Mbit/s (`export.video_bitrate_mbps`).
+    pub bitrate_mbps: Option<u32>,
     /// The export block as saved (part of every unit's fingerprint).
     pub saved: Value,
     /// The encoder of this computer (`on`), part of the fingerprint too: units of other
@@ -69,9 +71,13 @@ impl Delivery {
             top_first: field_order != "lower_first",
             audio_sample_rate: number("audio_sample_rate").map(|v| v as u32).ok_or_else(|| missing("audio_sample_rate"))?,
             audio_channels: number("audio_channels").map(|v| v as u16).ok_or_else(|| missing("audio_channels"))?,
+            bitrate_mbps: number("video_bitrate_mbps").filter(|mbps| (1.0..=400.0).contains(mbps)).map(|mbps| mbps as u32),
             saved: export.clone(),
             encoder: None,
         };
+        if delivery.video_codec == "h264" && delivery.bitrate_mbps.is_none() {
+            return Err(missing("video_bitrate_mbps"));
+        }
         if delivery.width == 0 || delivery.height == 0 || delivery.fps <= 0.0 || delivery.audio_channels == 0 {
             return Err(qnc_ui_text::text("render.export_settings_have_invalid_format").into());
         }
@@ -93,7 +99,13 @@ impl Delivery {
         self.supported()?;
         let gop = self.fps.round().max(1.0) as u32;
         let (layout, args): (&str, Vec<&str>) = match self.video_codec.as_str() {
-            "h264" => encoder::H264::here(ffmpeg).args(),
+            "h264" => {
+                let mbps = self.bitrate_mbps.ok_or_else(|| qnc_ui_text::fill("render.export_setting_missing", &[("key", "video_bitrate_mbps")]))?;
+                let (layout, args) = encoder::H264::here(ffmpeg).args(mbps);
+                let mut args = args;
+                args.extend(["-g".to_string(), gop.to_string()]);
+                return Ok((layout.to_string(), args));
+            }
             // Lossless, every picture its own (put together without encoding again).
             INTERMEDIATE => return Ok(("yuv422p".into(), ["-c:v", "ffv1", "-level", "3", "-slices", "24", "-slicecrc", "0", "-g", "1"].map(String::from).to_vec())),
             _ => (

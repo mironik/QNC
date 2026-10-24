@@ -1755,6 +1755,9 @@ fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
         export.entry("lead_in_seconds".to_string()).or_insert_with(|| json!(DEFAULT_LEAD_IN_SECONDS));
         // The timecode of the first frame of an export (user 2026-10-24: 10:00:00:00 by default).
         export.entry("start_timecode".to_string()).or_insert_with(|| json!(DEFAULT_START_TIMECODE));
+        // The constant bitrate of an H.264 prerender and Express (user 2026-10-24: 35 Mbit/s,
+        // the level of XAVC Long 35 and XDCAM HD 35).
+        export.entry("video_bitrate_mbps".to_string()).or_insert_with(|| json!(DEFAULT_VIDEO_BITRATE_MBPS));
     }
     Ok(())
 }
@@ -1767,6 +1770,9 @@ const DEFAULT_LEAD_IN_SECONDS: u64 = 2;
 
 /// The start timecode of an export of a project whose template does not say it.
 const DEFAULT_START_TIMECODE: &str = "10:00:00:00";
+
+/// The H.264 delivery bitrate of a project whose template does not say it (Mbit/s, CBR).
+const DEFAULT_VIDEO_BITRATE_MBPS: u64 = 35;
 
 /// EBU R 128: -23 LUFS integrated on A1 and on A2, -1 dBTP true peak, +-0.5 LU.
 fn default_loudness() -> Value {
@@ -2957,12 +2963,14 @@ mod tests {
         assert_eq!(read()["export"]["tail_seconds"], json!(2));
         assert_eq!(read()["export"]["lead_in_seconds"], json!(2));
         assert_eq!(read()["export"]["start_timecode"], json!("10:00:00:00"));
+        assert_eq!(read()["export"]["video_bitrate_mbps"], json!(35));
         let mut older = read();
         older["audio"].as_object_mut().unwrap().remove("crossfade_frames");
         older["audio"].as_object_mut().unwrap().remove("loudness");
         older["export"].as_object_mut().unwrap().remove("tail_seconds");
         older["export"].as_object_mut().unwrap().remove("lead_in_seconds");
         older["export"].as_object_mut().unwrap().remove("start_timecode");
+        older["export"].as_object_mut().unwrap().remove("video_bitrate_mbps");
         Connection::open(project_dir.join("project.db"))
             .unwrap()
             .execute("UPDATE project_settings SET settings_json = ?2 WHERE project_id = ?1", params![row.project_id, older.to_string()])
@@ -2974,6 +2982,7 @@ mod tests {
         assert_eq!(completed["export"]["tail_seconds"], json!(2));
         assert_eq!(completed["export"]["lead_in_seconds"], json!(2));
         assert_eq!(completed["export"]["start_timecode"], json!("10:00:00:00"));
+        assert_eq!(completed["export"]["video_bitrate_mbps"], json!(35));
         assert_eq!(completed["audio"]["channels"], older["audio"]["channels"]);
         cleanup_temp_root(&root);
     }

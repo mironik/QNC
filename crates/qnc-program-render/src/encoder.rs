@@ -32,16 +32,33 @@ impl H264 {
         }
     }
 
-    /// The picture layout the encoder takes and its arguments (delivery quality). No B
-    /// pictures: decode order is picture order, so a unit's timestamps start at 0 and its
-    /// description is known without probing it.
-    pub(crate) fn args(self) -> (&'static str, Vec<&'static str>) {
+    /// The picture layout the encoder takes and its arguments: constant bitrate `mbps` Mbit/s
+    /// (user 2026-10-24: a CBR delivery, 35 by default). No B pictures: decode order is
+    /// picture order, so a unit's timestamps start at 0 and its description is known without
+    /// probing it.
+    pub(crate) fn args(self, mbps: u32) -> (&'static str, Vec<String>) {
+        // A buffer of a quarter second, started half full: every unit (a story has many, some
+        // only frames long) keeps to the rate from its first picture on, so the units put
+        // together stay constant (measured 2026-10-24: with a one second buffer the joined
+        // file swung 32-43 Mbit/s per second at 35, each unit spending its full buffer).
+        let (rate, buffer, start) = (format!("{mbps}M"), format!("{}k", mbps * 250), format!("{}k", mbps * 125));
+        let cbr = |args: &[&str]| {
+            args.iter()
+                .map(|arg| match *arg {
+                    "RATE" => rate.clone(),
+                    "BUFFER" => buffer.clone(),
+                    "START" => start.clone(),
+                    other => other.to_string(),
+                })
+                .collect::<Vec<String>>()
+        };
         match self {
-            Self::IntelQsv => ("nv12", vec!["-c:v", "h264_qsv", "-preset", "medium", "-global_quality", "18", "-look_ahead", "0", "-profile:v", "high", "-bf", "0"]),
-            Self::NvidiaNvenc => ("yuv420p", vec!["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "18", "-profile:v", "high", "-bf", "0"]),
-            Self::AmdAmf => ("yuv420p", vec!["-c:v", "h264_amf", "-quality", "quality", "-rc", "cqp", "-qp_i", "18", "-qp_p", "20", "-profile:v", "high", "-bf", "0"]),
-            Self::AppleVideoToolbox => ("yuv420p", vec!["-c:v", "h264_videotoolbox", "-q:v", "70", "-profile:v", "high", "-allow_sw", "0", "-bf", "0"]),
-            Self::Software => ("yuv420p", vec!["-c:v", "libx264", "-preset", "superfast", "-crf", "16", "-profile:v", "high", "-flags", "+cgop", "-sc_threshold", "0", "-bf", "0"]),
+            // Quick Sync takes a constant bitrate when the target is also the floor and the ceiling.
+            Self::IntelQsv => ("nv12", cbr(&["-c:v", "h264_qsv", "-preset", "medium", "-b:v", "RATE", "-minrate", "RATE", "-maxrate", "RATE", "-bufsize", "BUFFER", "-rc_init_occupancy", "START", "-look_ahead", "0", "-profile:v", "high", "-bf", "0"])),
+            Self::NvidiaNvenc => ("yuv420p", cbr(&["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "cbr", "-b:v", "RATE", "-maxrate", "RATE", "-bufsize", "BUFFER", "-rc_init_occupancy", "START", "-profile:v", "high", "-bf", "0"])),
+            Self::AmdAmf => ("yuv420p", cbr(&["-c:v", "h264_amf", "-quality", "quality", "-rc", "cbr", "-b:v", "RATE", "-maxrate", "RATE", "-bufsize", "BUFFER", "-rc_init_occupancy", "START", "-profile:v", "high", "-bf", "0"])),
+            Self::AppleVideoToolbox => ("yuv420p", cbr(&["-c:v", "h264_videotoolbox", "-b:v", "RATE", "-maxrate", "RATE", "-constant_bit_rate", "1", "-profile:v", "high", "-allow_sw", "0", "-bf", "0"])),
+            Self::Software => ("yuv420p", cbr(&["-c:v", "libx264", "-preset", "superfast", "-b:v", "RATE", "-minrate", "RATE", "-maxrate", "RATE", "-bufsize", "BUFFER", "-rc_init_occupancy", "START", "-x264-params", "nal-hrd=cbr", "-profile:v", "high", "-flags", "+cgop", "-sc_threshold", "0", "-bf", "0"])),
         }
     }
 
@@ -60,7 +77,7 @@ impl H264 {
 
 /// A test encode of a few frames of a generated picture: does this encoder work here?
 fn works(ffmpeg: &Path, encoder: H264) -> bool {
-    let (layout, args) = encoder.args();
+    let (layout, args) = encoder.args(35);
     Command::new(ffmpeg)
         .args(["-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=50", "-frames:v", "5"])
         .args(["-vf", &format!("format={layout}")])

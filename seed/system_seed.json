@@ -87,6 +87,7 @@
         "export": {
           "lead_in_seconds": 2,
           "start_timecode": "10:00:00:00",
+          "video_bitrate_mbps": 35,
           "tail_seconds": 2,
           "directory": "",
           "default_mode": "original",
@@ -173,6 +174,7 @@
         "export": {
           "lead_in_seconds": 2,
           "start_timecode": "10:00:00:00",
+          "video_bitrate_mbps": 35,
           "tail_seconds": 2,
           "directory": "",
           "default_mode": "xdcam",
@@ -259,6 +261,7 @@
         "export": {
           "lead_in_seconds": 2,
           "start_timecode": "10:00:00:00",
+          "video_bitrate_mbps": 35,
           "tail_seconds": 2,
           "directory": "",
           "default_mode": "original",
@@ -345,6 +348,7 @@
         "export": {
           "lead_in_seconds": 2,
           "start_timecode": "10:00:00:00",
+          "video_bitrate_mbps": 35,
           "tail_seconds": 2,
           "directory": "",
           "default_mode": "xml_master",
