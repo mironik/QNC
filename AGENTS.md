@@ -5865,3 +5865,16 @@ ffmpeg `-timecode`), XML (FCP7) kao timecode sekvence (`qnc-fcp7-xml` `sequence(
 price). Aktivni projekt bez postavke ne exportira dok se ne otvori u Projectu. Provjereno na izoliranoj kopiji: Original
 i XDCAM HD422 50i MXF `timecode=10:00:00:00`, XML `10:00:00:00` / frame 1800000. Testovi, conformance. Project je
 ponovno zamrznut.
+Izvedeno 2026-10-24 (korisnik: "ako je u storyju za neki klip odredio da na A2 kanalu bude 3 audio kanal kamere, onda za
+taj klip u pokrivalici treba koristiti 3 kanal; defaultna postavka je 2 kanal kamere, ali korisnik mora moci za svaku
+pokrivalicu izabrati bilo koji kanal; isto tako i za A1"; "promjena kanala moze se napraviti i u zoom opciji storyja"):
+zvuk A1/A2 (kanal kamere, ukljucen/iskljucen, razina) koji se zadrzi na source timelineu (Enter, klik na kanal) pamti se
+po klipu u bazi projekta. Nova javna kocka `crates/qnc-clip-sound` (+ ugovor modula `clip-sound.module.json` i baze
+`clip-sound.database.json`): modul tablica posrednika, tablica `clip_sound` i pogled `public_clip_sound`; `ClipSounds`
+cita u pozadini jednom po klipu i pise bez cekanja kroz serijskog pisca. `qnc-source-timeline` (`sync` prima preview):
+klip koji ima zapis pocinje na svom zvuku (samo kanali koje klip ima), inace A1 kanal 1, A2 kanal 2; zadani zvuk klipa
+bez zapisa se ne pise. Novi segment i pokrivalica tog klipa uzimaju taj zvuk (kao do sada uzimaju zadrzani zvuk source
+timelinea); napravljeni segment ili pokrivalica zadrzavaju svoj zvuk, koji se i dalje mijenja zasebno na Wrap retku i u
+zoomu. Vrijedi u svakoj formi sa source timelineom (Story, MA, Ingest). `qnc-source-preview` `project_target` (iz
+konteksta, izvan niti sucelja). Conformance: `qnc-clip-sound` na popisu javnih DB vlasnika. Testovi, conformance.
+Uzivo nije provjereno.

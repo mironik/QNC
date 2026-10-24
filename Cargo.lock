@@ -3295,6 +3295,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-clip-sound"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-dev-diagnostics",
+ "qnc-ui-text",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-confirm-dialog"
 version = "0.1.0"
 dependencies = [
@@ -5550,6 +5563,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-action-event",
+ "qnc-clip-sound",
  "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-key-intents",

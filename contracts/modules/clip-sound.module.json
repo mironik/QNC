@@ -1,0 +1,45 @@
+{
+  "module_id": "qnc.module.clip-sound",
+  "module_name": "Clip Sound Table",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "db.clip_sound.read",
+    "db.clip_sound.write"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": [
+    "local",
+    "lan",
+    "intranet"
+  ],
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "module_dependencies": [
+    "qnc.module.db-broker"
+  ],
+  "forbidden_calls": [
+    "media.decode",
+    "media.probe.full",
+    "file.write",
+    "playback.clock"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.broadcast-player-core"
+  ],
+  "adapter_policy": "The A1/A2 sound chosen for each clip on the source timeline (camera channel, on/off, level in dB; A1 channel 1 and A2 channel 2 when a clip has none kept) as a table module of the project database intermediary (qnc-db-broker): clip_sound and the view public_clip_sound. A new segment or cover of the clip takes it; a segment or cover keeps its own sound once made. It owns only its table and is written only through the intermediary.",
+  "specification": "AGENTS.md"
+}

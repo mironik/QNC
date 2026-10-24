@@ -110,7 +110,7 @@ impl IngestPreviewSource {
             monitor: view.monitor,
             timeline: view.timeline.preserving_source_marks_from(previous),
             assets: qnc_timeline_assets::with_clip_poster(assets, posters),
-            source_timeline: self.source_timeline.sync(clip, catalog).clone(),
+            source_timeline: self.source_timeline.sync(clip, catalog, &mut self.preview).clone(),
         }
     }
 

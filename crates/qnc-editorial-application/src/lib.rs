@@ -219,7 +219,7 @@ impl EditorialApplication {
         let timebase = self.preview.player_view().source_timebase();
         let timeline = self.view.preview.timeline;
         let source = self.focus.source_timeline_mut(); // the one source timeline: lanes, channels, timecode
-        self.view.source_timeline = qnc_dev_diagnostics::timed_block("poll-source-sync", || source.sync(self.view.preview.clip_id.as_deref(), self.content_target.as_ref().map(|targets| &targets.0)).clone());
+        self.view.source_timeline = qnc_dev_diagnostics::timed_block("poll-source-sync", || source.sync(self.view.preview.clip_id.as_deref(), self.content_target.as_ref().map(|targets| &targets.0), &mut self.preview).clone());
         self.segments.set_source(SourcePick::new(
             self.view.chosen_clip_id(),
             self.view.current_clip_label(),

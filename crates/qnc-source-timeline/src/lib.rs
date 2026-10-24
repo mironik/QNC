@@ -67,6 +67,10 @@ pub struct SourceTimeline {
     keys: SourcePanel,
     lanes: LaneChoice,
     channels: qnc_source_channels::SourceChannels,
+    /// The A1/A2 sound kept for each clip in the project database (user 2026-10-24).
+    sounds: qnc_clip_sound::ClipSounds,
+    /// The shown clip's kept sound is applied (or it has none).
+    sound_known: bool,
     timecodes: qnc_source_timecode::SourceTimecodes,
     clip: Option<String>,
     message: String,
@@ -81,16 +85,19 @@ impl SourceTimeline {
     }
 
     /// Once a frame: the shown clip and the project content its stored record is read
-    /// from. Another clip starts on A1 channel 1 and A2 channel 2 (user rule 2026-10-01).
-    pub fn sync(&mut self, clip_id: Option<&str>, content: Option<&ContentTarget>) -> &SourceTimelineView {
+    /// from. Another clip starts on the A1/A2 sound kept for it in the project database,
+    /// else on A1 channel 1 and A2 channel 2 (user rules 2026-10-01, 2026-10-24).
+    pub fn sync(&mut self, clip_id: Option<&str>, content: Option<&ContentTarget>, preview: &mut SourcePreview) -> &SourceTimelineView {
         if self.clip.as_deref() != clip_id {
             self.clip = clip_id.map(str::to_string);
             self.first_cut = None; // a pair of cuts belongs to its clip
             self.lanes.new_clip();
+            self.sound_known = false;
             self.message.clear();
         }
         let count = self.channels.for_clip(content, clip_id);
         self.lanes.set_channels(count);
+        self.apply_kept_sound(count, preview);
         let timecode = self.timecodes.for_clip(content, clip_id);
         self.refresh(timecode);
         &self.view
@@ -310,8 +317,53 @@ impl SourceTimeline {
         Some(self.after_lane(changed, preview))
     }
 
+    /// The sound kept for the shown clip, once it and the clip's channel count are read,
+    /// unless a lane is taken; a channel the clip does not have is not taken. The preview
+    /// hears it.
+    fn apply_kept_sound(&mut self, count: Option<u16>, preview: &mut SourcePreview) {
+        if self.sound_known || self.lane_taken() {
+            return;
+        }
+        let Some(count) = count else {
+            return;
+        };
+        let Some(kept) = self.sounds.for_clip(preview.project_target(), self.clip.as_deref()) else {
+            return;
+        };
+        self.sound_known = true;
+        if let Some(kept) = kept.filter(|kept| kept.a1.channel < count && kept.a2.channel < count) {
+            let lane = |sound: qnc_clip_sound::LaneSound| Lane { channel: sound.channel, off: sound.off, level_db: sound.level_db };
+            self.lanes.keep(0, lane(kept.a1));
+            self.lanes.keep(1, lane(kept.a2));
+            self.after_lane(true, preview);
+        }
+    }
+
+    /// What the lanes keep now is kept for the shown clip (a lane kept with Enter or a
+    /// channel clicked), so the clip is heard the same next time and its new segments and
+    /// covers take it.
+    fn keep_sound(&mut self, preview: &SourcePreview) {
+        let (Some(clip_id), Some(target), true) = (self.clip.clone(), preview.project_target(), self.sound_known) else {
+            return;
+        };
+        if self.lane_taken() {
+            return;
+        }
+        let lane = |kept: Lane| qnc_clip_sound::LaneSound { channel: kept.channel, off: kept.off, level_db: kept.level_db };
+        let [a1, a2] = self.kept_lanes();
+        let sound = qnc_clip_sound::ClipSound { clip_id, a1: lane(a1), a2: lane(a2) };
+        let default = |channel: u16| qnc_clip_sound::LaneSound { channel, off: false, level_db: 0 };
+        if sound.a1 == default(0) && sound.a2 == default(1) && self.sounds.for_clip(Some(target), self.clip.as_deref()) == Some(None) {
+            return; // the default of a clip that keeps nothing is not written
+        }
+        self.sounds.keep(target, sound);
+    }
+
     /// The preview hears what the lanes play now; the view follows.
     fn after_lane(&mut self, changed: bool, preview: &mut SourcePreview) -> bool {
+        if changed {
+            self.keep_sound(preview);
+        }
         let heard = preview.hear_channels(self.lanes.audible());
         let timecode = self.view.timecode;
         self.refresh(timecode);
@@ -525,7 +577,7 @@ mod tests {
         source.route("step_next_part", &mut preview, &mut timeline);
         source.route("activate_focused_item", &mut preview, &mut timeline);
         assert_eq!(source.kept(0).channel, 1);
-        source.sync(Some("b"), None);
+        source.sync(Some("b"), None, &mut SourcePreview::new());
         assert_eq!((source.kept(0).channel, source.kept(1).channel), (0, 1), "A1 on channel 1, A2 on channel 2");
     }
 }

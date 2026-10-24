@@ -394,6 +394,8 @@
     "player.invalid_clip_name_player_input": "Invalid clip name in the player input.",
     "player.player_content_reader_missing": "The player content reader is missing.",
     "db.project_prerender_initialised": "The project prerender is not initialised.",
+    "db.clip_sound_reply": "Wrong answer of the clip sound table.",
+    "db.clip_sound_invalid": "Not a valid A1/A2 sound of a clip.",
     "db.invalid_prerender_unit": "Invalid prerender unit.",
     "story.invalid_reply_story": "Invalid reply of the story.",
     "story.project_story_initialised": "The project story is not initialised.",

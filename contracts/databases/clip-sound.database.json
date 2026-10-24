@@ -1,0 +1,23 @@
+{
+  "database_id": "qnc.db.clip_sound",
+  "database_owner": "project",
+  "owner_application": "qnc.module.clip-sound",
+  "ownership_rule": "The project owns this database; no application owns it or its table. The A1/A2 sound of a clip reaches it only through the one intermediary of the project database (qnc.module.db-broker), whose table module qnc.module.clip-sound owns it.",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/project_db",
+  "tables": [
+    "clip_sound"
+  ],
+  "public_read_views": [
+    "public_clip_sound"
+  ],
+  "write_owner": "qnc.module.clip-sound",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "default": "A clip without a row hears A1 on camera channel 1 and A2 on channel 2 (channel 1 when it has one), on at their recorded level.",
+    "use": "A new segment (A1) or cover (A2) of the clip takes the sound kept here; once made it keeps its own sound, changeable on its own."
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-10-24T00:00:00Z",
+  "updated_at": "2026-10-24T00:00:00Z"
+}

@@ -97,6 +97,9 @@ pub struct PreviewContext {
     /// Where this preview says a player works: resolved with the context, so taking the
     /// context on the form thread reads no database (external audit 2026-10-17).
     activity_target: Option<qnc_content_store::ContentTarget>,
+    /// The project database (the source timeline keeps each clip's A1/A2 sound there),
+    /// resolved with the context, off the form thread.
+    project_target: Option<qnc_db_broker::ProjectDbTarget>,
 }
 
 impl PreviewContext {
@@ -109,6 +112,7 @@ impl PreviewContext {
         artifacts: Option<Arc<dyn TimelineArtifactRead>>,
     ) -> Self {
         let activity_target = qnc_content_store::ContentTarget::for_project(&reader, &settings).ok();
+        let project_target = qnc_db_broker::ProjectDbTarget::for_project(&reader, &settings).ok();
         Self {
             reader,
             settings,
@@ -117,6 +121,7 @@ impl PreviewContext {
             artifacts,
             notice: None,
             activity_target,
+            project_target,
         }
     }
 
@@ -144,6 +149,7 @@ impl PreviewContext {
         };
         let target = qnc_content_store::ContentTarget::for_project(&reader, &settings);
         let activity_target = target.clone().ok();
+        let project_target = qnc_db_broker::ProjectDbTarget::for_project(&reader, &settings).ok();
         let player_content = Arc::new(content::PlayerContent { target });
         Self {
             reader,
@@ -153,6 +159,7 @@ impl PreviewContext {
             artifacts,
             notice,
             activity_target,
+            project_target,
         }
     }
 
@@ -478,6 +485,11 @@ impl SourcePreview {
     /// 2026-10-01) and their levels (1: as recorded, 0: level 0; user 2026-10-14): the
     /// clip is prepared again on its confirmed frame. In a story program the choice waits
     /// for the clip.
+    /// The project database of the context, when the preview has one.
+    pub fn project_target(&self) -> Option<&qnc_db_broker::ProjectDbTarget> {
+        self.context.as_ref()?.project_target.as_ref()
+    }
+
     pub fn hear_channels(&mut self, ((a1, a2), (l1, l2)): ((u16, u16), (f32, f32))) -> bool {
         let Some(clip_id) = self.view.clip_id.clone() else {
             return false;

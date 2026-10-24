@@ -91,6 +91,7 @@ members = [
     "crates/qnc-render-unit",
     "crates/qnc-program-render",
     "crates/qnc-prerender-db",
+    "crates/qnc-clip-sound",
     "crates/qnc-prerender-launch",
     "tools/qnc-prerender",
     "crates/qnc-ffprobe-metadata",
@@ -325,6 +326,7 @@ qnc-mxf-sound = { path = "crates/qnc-mxf-sound" }
 qnc-render-unit = { path = "crates/qnc-render-unit" }
 qnc-program-render = { path = "crates/qnc-program-render" }
 qnc-prerender-db = { path = "crates/qnc-prerender-db" }
+qnc-clip-sound = { path = "crates/qnc-clip-sound" }
 qnc-prerender-launch = { path = "crates/qnc-prerender-launch" }
 qnc-ffprobe-metadata = { path = "crates/qnc-ffprobe-metadata" }
 qnc-media-metadata-compose = { path = "crates/qnc-media-metadata-compose" }
