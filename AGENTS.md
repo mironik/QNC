@@ -5671,3 +5671,23 @@ ako se uklapaju u pravilo): Project otkljucan samo za te dvije postavke. `seed/s
 natpisi u rjecniku; `qnc-work-settings` `audio_loudness()` (`Loudness`) i `export_tail_seconds()` citaju strogo (test).
 Project je ponovno zamrznut. Nije izvedeno (ceka): mjerenje glasnoce, prekidac normalizacije u previewu, primjena u exportu
 (export jos ne postoji).
+Otkljucano i izvedeno 2026-10-24 (korisnik: "lead/out treba se automatski dodati na pocetku prvog segmenta i na kraju
+zadnjeg segmenta prilikom montaze"; "ako je prvi segment off, dodaje se crno i tisina, ako je ton, dodaje se samo slika";
+"pokrivalica pocinje od pocetka lead in i pokriva lead in i pocetak offa"; lead-in je zasebna postavka; "tretiraj ih kao
+veoma kratke segmente"; v5 to nema): Project otkljucan samo za postavku `export.lead_in_seconds` (seed svih sistemskih
+predlozaka 2 s, `qnc-project-store` je dopunjuje starijem projektu pri otvaranju, Advanced polje "Lead-in (s)" uz
+"Lead-out / tail (s)", rjecnik; `qnc-work-settings` `export_lead_in_seconds` strogo). `qnc-program-db`: lead-in i
+lead-out su redovi `story_parts` s oznakom `lead` (`in`/`out`, stupac dodan postojecim pricama), koje vlasnik baze nakon
+svake izmjene price slaze iz prvog i zadnjeg segmenta i postavki projekta (`store/leads.rs` `sync_leads`, prvi korak
+`finalize_story`; postavke cita iz `public_project_settings`, nedostaju li - kontrolirana greska i nista se ne upisuje):
+uz Off crno i tisina (Off s A1 iskljucenim), uz Ton slika njegova klipa prije IN-a odnosno iza OUT-a bez tona (Ton s A1
+iskljucenim); koliko klip nema slika, ostatak je crn. Redovi se prepisuju samo kad se razlikuju; promjena duljine
+lead-ina pomice korisnicke markere za razliku. Pocetni marker je na pocetku lead-ina, zavrsni na kraju lead-outa, pa prvi
+i zadnji slot (i pokrivalica u njima, uz pravilo "bez rupe") pokrivaju lead. Brisanje, ukljucivanje, zamjena,
+skracivanje, premjestanje, zvuk i J slika leada se odbijaju (`story.lead_is_automatic`); redoslijed segmenata, novi
+segment i premjestanje ne vide leadove. `public_story_parts` i `ProgramSegment` nose `lead`, `sort_index` je mjesto u
+prici. `qnc-program-view`: lead se ne prikazuje u tabu Segment, Wrap redovi ga imaju. Player, playlista i prerender
+nisu mijenjani (lead je obican segment). Testovi `qnc-program-db` (4 nova), `qnc-program-view`, `qnc-program-segments`,
+`qnc-program-input`, `qnc-work-settings`, `qnc-project-store`, `qnc-editorial-application`, conformance, release build.
+Uzivo nije provjereno. Aktivni projekt dobiva postavku lead-ina tek kad se otvori u Projectu; do tada se prica ne mijenja.
+Project je ponovno zamrznut.

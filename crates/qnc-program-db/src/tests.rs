@@ -17,7 +17,7 @@ fn database(path: &Path) {
     let conn = Connection::open(path).unwrap();
     conn.execute_batch(
         "CREATE TABLE project_settings(project_id TEXT,settings_json TEXT);
-        INSERT INTO project_settings VALUES('p1','{\"storage\":{\"ingest_media\":\"link\"}}');
+        INSERT INTO project_settings VALUES('p1','{\"storage\":{\"ingest_media\":\"link\"},\"export\":{\"lead_in_seconds\":0,\"tail_seconds\":0}}');
         CREATE VIEW public_project_settings AS SELECT * FROM project_settings;",
     )
     .unwrap();
@@ -451,3 +451,4 @@ mod slot_tests;
 mod cover_tests;
 mod sound_tests;
 mod store_tests;
+mod lead_tests;

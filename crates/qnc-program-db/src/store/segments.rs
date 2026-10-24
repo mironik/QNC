@@ -46,7 +46,7 @@ impl Store {
         let story_fps = f64::from(rate.0) / f64::from(rate.1);
         let next: i64 = tx
             .query_row(
-                "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM story_parts",
+                "SELECT COALESCE(MAX(sort_index) + 1, 0) FROM story_parts WHERE lead = ''",
                 [],
                 |row| row.get(0),
             )

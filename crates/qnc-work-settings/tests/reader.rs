@@ -290,6 +290,7 @@ fn a_new_project_has_ebu_loudness_on_a1_and_a2_and_a_two_second_tail_and_nothing
     let loudness = settings.audio_loudness().unwrap();
     assert_eq!((loudness.a1_lufs, loudness.a2_lufs, loudness.true_peak_dbtp, loudness.tolerance_lu), (-23.0, -23.0, -1.0, 0.5));
     assert_eq!(settings.export_tail_seconds().unwrap(), 2.0);
+    assert_eq!(settings.export_lead_in_seconds().unwrap(), 2.0);
     // The client's own values are read as saved.
     settings.audio["loudness"]["a2_lufs"] = json!(-27);
     settings.export["tail_seconds"] = json!(5);
@@ -302,4 +303,6 @@ fn a_new_project_has_ebu_loudness_on_a1_and_a2_and_a_two_second_tail_and_nothing
     assert!(settings.audio_loudness().is_err());
     settings.export.as_object_mut().unwrap().remove("tail_seconds");
     assert!(settings.export_tail_seconds().is_err());
+    settings.export.as_object_mut().unwrap().remove("lead_in_seconds");
+    assert!(settings.export_lead_in_seconds().is_err());
 }

@@ -4,7 +4,7 @@ use super::*;
 /// an older story lacks.
 pub(crate) const SCHEMA_COLUMNS: &[(&str, &[&str])] = &[
     ("story_state", &["story_fps_num", "story_fps_den"]),
-    ("story_parts", &["a1_source_channel", "a1_level_db", "a1_off", "v_lead_frames"]),
+    ("story_parts", &["a1_source_channel", "a1_level_db", "a1_off", "v_lead_frames", "lead"]),
     ("story_covers", &["slot_id", "a2_source_channel", "a2_level_db", "a2_off", "a2_lead_frames", "a2_tail_frames"]),
 ];
 
@@ -95,6 +95,13 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
         conn.execute_batch("ALTER TABLE story_parts ADD COLUMN v_lead_frames INTEGER NOT NULL DEFAULT 0;")
             .map_err(err)?;
     }
+    // The lead-in and lead-out (2026-10-24) are added to existing stories: the owner adds
+    // them on the next edit.
+    let columns = table_columns(conn, "story_parts")?;
+    if !columns.is_empty() && !columns.iter().any(|column| column == "lead") {
+        conn.execute_batch("ALTER TABLE story_parts ADD COLUMN lead TEXT NOT NULL DEFAULT '';")
+            .map_err(err)?;
+    }
     // The J and L of a cover (2026-10-21) are added to existing stories: none.
     let columns = table_columns(conn, "story_covers")?;
     if !columns.is_empty() && !columns.iter().any(|column| column == "a2_lead_frames") {
@@ -155,6 +162,7 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
             a1_level_db INTEGER NOT NULL DEFAULT 0,
             a1_off INTEGER NOT NULL DEFAULT 0,
             v_lead_frames INTEGER NOT NULL DEFAULT 0 CHECK (v_lead_frames >= 0),
+            lead TEXT NOT NULL DEFAULT '' CHECK (lead IN ('', 'in', 'out')),
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
          );
@@ -232,7 +240,7 @@ pub(crate) fn ensure_story_schema(conn: &Connection) -> Result<()> {
          SELECT part_id AS segment_id, kind, sort_index, clip_id, in_frame, out_frame,
                 source_fps_num AS fps_num, source_fps_den AS fps_den, active,
                 duration_frames, duration_label, duration_color_key, a1_source_channel,
-                a1_level_db, a1_off, v_lead_frames
+                a1_level_db, a1_off, v_lead_frames, lead
          FROM story_parts;
          DROP VIEW IF EXISTS public_story_markers;
          CREATE VIEW public_story_markers AS

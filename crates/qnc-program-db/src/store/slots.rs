@@ -3,6 +3,7 @@ use super::*;
 /// v5 `finalize_story_mutation` under the v5 rule: boundary markers, slots from
 /// adjacent markers, covers bound to their slot again, selection kept valid.
 pub(crate) fn finalize_story(conn: &Connection) -> Result<()> {
+    sync_leads(conn)?;
     ensure_boundary_markers(conn)?;
     recompute_marker_slots(conn)?;
     rebind_covers(conn)?;

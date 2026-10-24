@@ -18,6 +18,7 @@ fn part(id: &str, kind: &str, clip: &str, range: (u64, u64), active: bool) -> Pr
         a1_off: false,
         duration_frames: range.1 - range.0,
         v_lead_frames: 0,
+        lead: String::new(),
     }
 }
 

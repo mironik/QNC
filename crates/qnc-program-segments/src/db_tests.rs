@@ -21,9 +21,9 @@ fn store_with_story(file: &std::path::Path) -> Vec<String> {
     {
         let conn = rusqlite::Connection::open(file).unwrap();
         conn.execute_batch(
-            "CREATE TABLE project_settings (project_id TEXT);
-             INSERT INTO project_settings (project_id) VALUES ('p1');
-             CREATE VIEW public_project_settings AS SELECT project_id FROM project_settings;",
+            "CREATE TABLE project_settings (project_id TEXT, settings_json TEXT);
+             INSERT INTO project_settings VALUES ('p1', '{\"export\":{\"lead_in_seconds\":0,\"tail_seconds\":0}}');
+             CREATE VIEW public_project_settings AS SELECT project_id, settings_json FROM project_settings;",
         )
         .unwrap();
     }

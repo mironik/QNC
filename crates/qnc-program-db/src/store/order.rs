@@ -130,7 +130,7 @@ pub(crate) fn shift_markers_from(conn: &Connection, from: i64, delta: i64, fps: 
 /// excluded segment comes back where it was.
 pub(crate) fn all_segment_order(conn: &Connection) -> Result<Vec<(String, bool)>> {
     let mut statement = conn
-        .prepare("SELECT part_id, active FROM story_parts ORDER BY sort_index, rowid")
+        .prepare("SELECT part_id, active FROM story_parts WHERE lead = '' ORDER BY sort_index, rowid")
         .map_err(err)?;
     let rows = statement
         .query_map([], |row| {

@@ -34,6 +34,10 @@ pub struct ProgramSegment {
     /// frames before its sound, over the end of the segment before; 0 for none.
     #[serde(default)]
     pub v_lead_frames: u32,
+    /// `in` or `out` for the automatic lead-in and lead-out (user 2026-10-24), empty for a
+    /// segment of the user; a lead is not edited.
+    #[serde(default)]
+    pub lead: String,
 }
 
 /// An M marker on the program axis (v5 `story_markers`). `system_role` is

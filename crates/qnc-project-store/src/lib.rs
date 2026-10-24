@@ -1751,12 +1751,17 @@ fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
     // The lead-out after the end of the story (user 2026-10-24: 2 s unless the client asks other).
     if let Some(export) = root.get_mut("export").and_then(Value::as_object_mut) {
         export.entry("tail_seconds".to_string()).or_insert_with(|| json!(DEFAULT_TAIL_SECONDS));
+        // The lead-in before the start of the story (user 2026-10-24: its own setting, 2 s).
+        export.entry("lead_in_seconds".to_string()).or_insert_with(|| json!(DEFAULT_LEAD_IN_SECONDS));
     }
     Ok(())
 }
 
 /// The lead-out of a project whose template does not say it (the system templates do).
 const DEFAULT_TAIL_SECONDS: u64 = 2;
+
+/// The lead-in of a project whose template does not say it (the system templates do).
+const DEFAULT_LEAD_IN_SECONDS: u64 = 2;
 
 /// EBU R 128: -23 LUFS integrated on A1 and on A2, -1 dBTP true peak, +-0.5 LU.
 fn default_loudness() -> Value {
@@ -2945,10 +2950,12 @@ mod tests {
         assert_eq!(read()["audio"]["crossfade_frames"], json!(4), "a new project has it from its template");
         assert_eq!(read()["audio"]["loudness"]["a1_lufs"], json!(-23), "EBU R 128 from its template");
         assert_eq!(read()["export"]["tail_seconds"], json!(2));
+        assert_eq!(read()["export"]["lead_in_seconds"], json!(2));
         let mut older = read();
         older["audio"].as_object_mut().unwrap().remove("crossfade_frames");
         older["audio"].as_object_mut().unwrap().remove("loudness");
         older["export"].as_object_mut().unwrap().remove("tail_seconds");
+        older["export"].as_object_mut().unwrap().remove("lead_in_seconds");
         Connection::open(project_dir.join("project.db"))
             .unwrap()
             .execute("UPDATE project_settings SET settings_json = ?2 WHERE project_id = ?1", params![row.project_id, older.to_string()])
@@ -2958,6 +2965,7 @@ mod tests {
         assert_eq!(completed["audio"]["crossfade_frames"], json!(4));
         assert_eq!(completed["audio"]["loudness"], json!({ "a1_lufs": -23, "a2_lufs": -23, "true_peak_dbtp": -1, "tolerance_lu": 0.5 }));
         assert_eq!(completed["export"]["tail_seconds"], json!(2));
+        assert_eq!(completed["export"]["lead_in_seconds"], json!(2));
         assert_eq!(completed["audio"]["channels"], older["audio"]["channels"]);
         cleanup_temp_root(&root);
     }

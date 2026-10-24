@@ -40,18 +40,21 @@ impl Store {
             .prepare(
                 "SELECT segment_id, kind, sort_index, clip_id, in_frame, out_frame, fps_num,
                         fps_den, active, a1_source_channel, duration_frames, a1_level_db, a1_off,
-                        v_lead_frames
+                        v_lead_frames, lead
                  FROM public_story_parts ORDER BY sort_index, segment_id",
             )
             .map_err(err)?;
+        let mut ordinal = 0u32;
         let rows = statement
             .query_map([], |row| {
+                // The place in the story (a lead-in sorts before every segment).
+                ordinal += 1;
                 let (in_frame, out_frame) = (row.get::<_, i64>(4)?.max(0) as u64, row.get::<_, i64>(5)?.max(0) as u64);
                 let duration = row.get::<_, i64>(10)?.max(0) as u64;
                 Ok(ProgramSegment {
                     segment_id: row.get(0)?,
                     kind: row.get(1)?,
-                    sort_index: row.get::<_, i64>(2)?.max(0) as u32,
+                    sort_index: ordinal - 1,
                     clip_id: row.get(3)?,
                     in_frame,
                     out_frame,
@@ -64,6 +67,7 @@ impl Store {
                     // A story written before the length was kept in story frames: its range.
                     duration_frames: if duration > 0 { duration } else { out_frame.saturating_sub(in_frame) },
                     v_lead_frames: row.get::<_, i64>(13)?.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32,
+                    lead: row.get(14)?,
                 })
             })
             .map_err(err)?

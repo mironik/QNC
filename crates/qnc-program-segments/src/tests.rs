@@ -16,6 +16,7 @@ fn stored(id: &str, kind: &str, range: (u64, u64)) -> ProgramSegment {
         a1_off: false,
         duration_frames: range.1 - range.0,
         v_lead_frames: 0,
+        lead: String::new(),
     }
 }
 

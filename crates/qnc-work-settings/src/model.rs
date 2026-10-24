@@ -204,6 +204,16 @@ impl WorkSettings {
             .ok_or_else(|| ReadError::new("export_tail_seconds", "The database holds no valid export.tail_seconds."))
     }
 
+    /// The lead-in before the start of the story in seconds (user 2026-10-24: its own setting,
+    /// 2 s by default); a missing value is a controlled error.
+    pub fn export_lead_in_seconds(&self) -> Result<f64, ReadError> {
+        self.export
+            .get("lead_in_seconds")
+            .and_then(Value::as_f64)
+            .filter(|seconds| seconds.is_finite() && (0.0..=600.0).contains(seconds))
+            .ok_or_else(|| ReadError::new("export_lead_in_seconds", "The database holds no valid export.lead_in_seconds."))
+    }
+
     pub(crate) fn from_saved(
         project_id: String,
         project_name: String,

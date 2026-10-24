@@ -9,6 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod checks;
 mod cover_split;
 mod covers;
+mod leads;
 mod markers;
 mod order;
 mod reads;
@@ -21,6 +22,7 @@ mod spans;
 
 pub(crate) use checks::*;
 pub(crate) use cover_split::*;
+pub(crate) use leads::*;
 pub(crate) use order::*;
 pub(crate) use rules::*;
 pub use rules::story_per_source;
@@ -179,6 +181,18 @@ impl Store {
     }
 
     fn dispatch(&mut self, operation: &Operation) -> Result<Data> {
+        // The lead-in and lead-out are kept by the owner (user 2026-10-24), never edited.
+        match operation {
+            Operation::DeleteSegment { segment_id }
+            | Operation::IncludeSegment { segment_id }
+            | Operation::ReplaceSegment { segment_id, .. }
+            | Operation::TrimSegment { segment_id, .. }
+            | Operation::PurgeSegment { segment_id }
+            | Operation::MoveSegment { segment_id, .. }
+            | Operation::SetSegmentSound { segment_id, .. }
+            | Operation::SetSegmentPictureLead { segment_id, .. } => refuse_lead(&self.conn, segment_id)?,
+            _ => {}
+        }
         match operation {
             Operation::UndoStory => {
                 crate::undo::step(&self.conn, true)?;

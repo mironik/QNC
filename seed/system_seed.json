@@ -85,6 +85,7 @@
           "original_policy": "link_when_available"
         },
         "export": {
+          "lead_in_seconds": 2,
           "tail_seconds": 2,
           "directory": "",
           "default_mode": "original",
@@ -169,6 +170,7 @@
           "original_policy": "link_when_available"
         },
         "export": {
+          "lead_in_seconds": 2,
           "tail_seconds": 2,
           "directory": "",
           "default_mode": "xdcam",
@@ -253,6 +255,7 @@
           "original_policy": "ignore_for_fast_news"
         },
         "export": {
+          "lead_in_seconds": 2,
           "tail_seconds": 2,
           "directory": "",
           "default_mode": "original",
@@ -337,6 +340,7 @@
           "original_policy": "link_when_available"
         },
         "export": {
+          "lead_in_seconds": 2,
           "tail_seconds": 2,
           "directory": "",
           "default_mode": "xml_master",

@@ -22,13 +22,17 @@ pub fn program(
             continue;
         };
         let frames = segment.duration_frames;
-        parts.push(SegmentPart {
+        // The lead-in and lead-out (user 2026-10-24) are rows of the program, not segments of
+        // the Segment tab: the user does not edit them.
+        if segment.lead.is_empty() {
+            parts.push(SegmentPart {
             segment_id: segment.segment_id.clone(),
             kind,
             duration_label: duration_label(frames, rate_num, rate_den),
             active: segment.active,
             selected: segment.active && selected == Some(segment.segment_id.as_str()),
-        });
+            });
+        }
         if !segment.active {
             continue;
         }
