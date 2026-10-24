@@ -15,6 +15,9 @@ use qnc_source_groups::{GroupProposal, IndexDocument, IndexReader};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 
+mod catalog;
+pub use catalog::{FormatCatalog, FormatEntry, FormatKind, FORMAT_CATALOG};
+
 pub const MODULE_ID: &str = "qnc.module.record-format-plugin";
 pub const CONTRACT: &str = "qnc.record-format";
 pub const CONTRACT_VERSION: u32 = 1;

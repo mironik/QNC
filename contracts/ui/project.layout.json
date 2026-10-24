@@ -314,6 +314,10 @@
           "@project.ignore_fast_news"
         ]
       ],
+      "lufs": [["-23", "-23 (EBU R 128)"], ["-24", "-24 (ATSC A/85)"], ["-16", "-16"], ["-27", "-27"]],
+      "true_peak": [["-1", "-1 (EBU R 128)"], ["-2", "-2"], ["-3", "-3"]],
+      "loudness_tolerance": [["0.5", "0.5"], ["1", "1"]],
+      "tail_seconds": [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["5", "5"], ["10", "10"]],
       "crossfade_frames": [
         [
           "0",
@@ -468,6 +472,39 @@
         ]
       },
       {
+        "title": "@project.loudness",
+        "fields": [
+          {
+            "kind": "number",
+            "label": "@project.a1_lufs",
+            "id": "pts_loudness_a1",
+            "path": "audio.loudness.a1_lufs",
+            "options": "lufs"
+          },
+          {
+            "kind": "number",
+            "label": "@project.a2_lufs",
+            "id": "pts_loudness_a2",
+            "path": "audio.loudness.a2_lufs",
+            "options": "lufs"
+          },
+          {
+            "kind": "number",
+            "label": "@project.true_peak",
+            "id": "pts_loudness_peak",
+            "path": "audio.loudness.true_peak_dbtp",
+            "options": "true_peak"
+          },
+          {
+            "kind": "number",
+            "label": "@project.loudness_tolerance",
+            "id": "pts_loudness_tolerance",
+            "path": "audio.loudness.tolerance_lu",
+            "options": "loudness_tolerance"
+          }
+        ]
+      },
+      {
         "title": "@project.keyboard",
         "block": "keyboard_preset",
         "label": "@project.key_preset"
@@ -475,6 +512,13 @@
       {
         "title": "@common.export",
         "fields": [
+          {
+            "kind": "number",
+            "label": "@project.tail_seconds",
+            "id": "pts_export_tail",
+            "path": "export.tail_seconds",
+            "options": "tail_seconds"
+          },
           {
             "kind": "choice",
             "label": "@project.mode",

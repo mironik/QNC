@@ -1,0 +1,13 @@
+[package]
+name = "qnc-installed-versions"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: what is installed and what works with what - the plug-in programs (their id, version and contract, and whether the application takes them), the decoders of the decoder catalog, and the programs beside the application"
+
+[dependencies]
+qnc-decoder-catalog = { workspace = true }
+qnc-decoder-jobs = { workspace = true }
+qnc-plugin-process = { workspace = true }
+qnc-record-format-plugin = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

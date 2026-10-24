@@ -4157,6 +4157,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-installed-versions"
+version = "0.1.0"
+dependencies = [
+ "qnc-decoder-catalog",
+ "qnc-decoder-jobs",
+ "qnc-plugin-process",
+ "qnc-record-format-plugin",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-json-transport"
 version = "0.1.0"
 dependencies = [
@@ -5649,6 +5661,15 @@ version = "0.1.0"
 dependencies = [
  "qnc-dev-diagnostics",
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-versions"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+ "qnc-installed-versions",
  "serde_json",
 ]
 

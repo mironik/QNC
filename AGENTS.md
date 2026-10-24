@@ -5653,3 +5653,21 @@ MP4 (G:) ACCEPTED, release: zvuk 27 s / 4 kanala 205 ms ugradeno, 245 ms kroz pr
 `qnc-trim-stills` i `qnc-keyframe-nav` kroz instalirani katalog; testovi kocki koje koriste te poslove. Nije izvedeno:
 korak 3 (popis verzija dodataka i programa); reprodukcija i dalje ide kroz ugradeni put (`qnc_packets_v1` postoji, program
 za nju nije napisan). Debug cache obrisan uz dozvolu korisnika (50,9 GB).
+Izvedeno 2026-10-24 (korisnik: "nastavi s tockom 3"; plan dodataka, korak 3: popis verzija): nova javna kocka
+`crates/qnc-installed-versions` i alat `tools/qnc-versions` (`--json`): svaki dodatak iz kataloga (format kamera, program
+poslova dekodera) upitan tko je (id, verzija, ugovor) i prihvaca li ga aplikacija; svaki dekoder kataloga dekodera s izvrsnom
+datotekom i njezinom verzijom (`-version` za ffmpeg obitelj) i ulogom (selected/preferred) te programom poslova; programi
+`qnc-*` uz aplikaciju (velicina, datum). Nista ne mijenja i nista ne bira. Citac kataloga formata premjesten (ne kopiran) iz
+`qnc-ingest-cameras` u `qnc-record-format-plugin` (`FormatCatalog`, `FORMAT_CATALOG`); `qnc-decoder-catalog`
+`installed_catalog` i `Registration::executable_path` su javni. Nije izvedeno: obicni programi aplikacije ne govore svoju
+verziju (prikazani su velicinom i datumom); verzija vrijedi za dodatke i dekodere.
+Otkljucano i izvedeno 2026-10-24 (korisnik: "trebali bi u projekt postavke uvesti Lead-out / Tail vrijeme (default) koje korisnik
+moze promjeniti..., takoder i nivo normalizacije tona na A1 i A2 prema EBU standardu (default) s mogucnosti promjene"; odluke:
+tail 2 s; A1 i A2 zasebno; u previewu ukljucivanje i iskljucivanje precacem; export slijedi razine koje je korisnik namjestio
+ako se uklapaju u pravilo): Project otkljucan samo za te dvije postavke. `seed/system_seed.json` (svi sistemski predlosci):
+`export.tail_seconds` = 2, `audio.loudness` = { a1_lufs -23, a2_lufs -23, true_peak_dbtp -1, tolerance_lu 0.5 } (EBU R 128);
+`qnc-project-store` dopunjuje ih starijem projektu pri otvaranju (test); `contracts/ui/project.layout.json` Advanced: blok
+"Loudness (EBU R 128)" (cilj A1, cilj A2, vrh, tolerancija) i "Lead-out / tail (s)" u bloku Export, izbori u ugovoru,
+natpisi u rjecniku; `qnc-work-settings` `audio_loudness()` (`Loudness`) i `export_tail_seconds()` citaju strogo (test).
+Project je ponovno zamrznut. Nije izvedeno (ceka): mjerenje glasnoce, prekidac normalizacije u previewu, primjena u exportu
+(export jos ne postoji).

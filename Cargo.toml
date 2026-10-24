@@ -122,6 +122,8 @@ members = [
     "crates/qnc-decoder-jobs",
     "tools/qnc-decoder-ffmpeg",
     "tools/qnc-decoder-acceptance",
+    "crates/qnc-installed-versions",
+    "tools/qnc-versions",
     "crates/qnc-choice-box",
     "crates/qnc-keyframe-nav",
     "crates/qnc-playback-activity",
@@ -340,6 +342,7 @@ qnc-camera-profile-adapter = { path = "crates/qnc-camera-profile-adapter" }
 qnc-plugin-process = { path = "crates/qnc-plugin-process" }
 qnc-record-format-plugin = { path = "crates/qnc-record-format-plugin" }
 qnc-decoder-jobs = { path = "crates/qnc-decoder-jobs" }
+qnc-installed-versions = { path = "crates/qnc-installed-versions" }
 qnc-choice-box = { path = "crates/qnc-choice-box" }
 qnc-keyframe-nav = { path = "crates/qnc-keyframe-nav" }
 qnc-playback-activity = { path = "crates/qnc-playback-activity" }

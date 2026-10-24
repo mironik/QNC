@@ -85,6 +85,7 @@
           "original_policy": "link_when_available"
         },
         "export": {
+          "tail_seconds": 2,
           "directory": "",
           "default_mode": "original",
           "preset": "h264_1080p50",
@@ -104,6 +105,12 @@
         "audio": {
           "sample_rate": 48000,
           "crossfade_frames": 4,
+          "loudness": {
+            "a1_lufs": -23,
+            "a2_lufs": -23,
+            "true_peak_dbtp": -1,
+            "tolerance_lu": 0.5
+          },
           "channels": 2,
           "transcribe_channel": "CH1",
           "atmosphere_channel": "CH2"
@@ -162,6 +169,7 @@
           "original_policy": "link_when_available"
         },
         "export": {
+          "tail_seconds": 2,
           "directory": "",
           "default_mode": "xdcam",
           "preset": "xdcam_hd422_50i",
@@ -181,6 +189,12 @@
         "audio": {
           "sample_rate": 48000,
           "crossfade_frames": 4,
+          "loudness": {
+            "a1_lufs": -23,
+            "a2_lufs": -23,
+            "true_peak_dbtp": -1,
+            "tolerance_lu": 0.5
+          },
           "channels": 2,
           "transcribe_channel": "CH1",
           "atmosphere_channel": "CH2"
@@ -239,6 +253,7 @@
           "original_policy": "ignore_for_fast_news"
         },
         "export": {
+          "tail_seconds": 2,
           "directory": "",
           "default_mode": "original",
           "preset": "h264_1080p50",
@@ -258,6 +273,12 @@
         "audio": {
           "sample_rate": 48000,
           "crossfade_frames": 4,
+          "loudness": {
+            "a1_lufs": -23,
+            "a2_lufs": -23,
+            "true_peak_dbtp": -1,
+            "tolerance_lu": 0.5
+          },
           "channels": 2,
           "transcribe_channel": "CH1",
           "atmosphere_channel": "CH2"
@@ -316,6 +337,7 @@
           "original_policy": "link_when_available"
         },
         "export": {
+          "tail_seconds": 2,
           "directory": "",
           "default_mode": "xml_master",
           "preset": "xdcam_hd422_50i",
@@ -335,6 +357,12 @@
         "audio": {
           "sample_rate": 48000,
           "crossfade_frames": 4,
+          "loudness": {
+            "a1_lufs": -23,
+            "a2_lufs": -23,
+            "true_peak_dbtp": -1,
+            "tolerance_lu": 0.5
+          },
           "channels": 2,
           "transcribe_channel": "CH1",
           "atmosphere_channel": "CH2"

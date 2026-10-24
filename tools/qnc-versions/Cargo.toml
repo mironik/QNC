@@ -1,0 +1,10 @@
+[package]
+name = "qnc-versions"
+version = "0.1.0"
+edition = "2021"
+description = "QNC tool: prints what is installed and what works with what (plug-ins, decoders, programs beside the application); --json for the report as JSON"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-installed-versions = { workspace = true }
+serde_json = { workspace = true }

@@ -5,40 +5,12 @@
 //! of this computer and handed to the adapter of their format.
 
 use qnc_camera_adapter::{CameraRegistry, RecordFormat};
-use serde::Deserialize;
 use std::{path::Path, sync::Arc, time::Duration};
 
 pub const MODULE_ID: &str = "qnc.module.ingest-cameras";
 pub const VERSION: &str = "0.3.0";
-/// The catalog of record formats, under the QNC root.
-pub const FORMAT_CATALOG: &str = "catalogs/record-formats/catalog.json";
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Catalog {
-    version: u32,
-    formats: Vec<Entry>,
-}
-
-/// One format (serde cannot refuse unknown fields beside a flattened kind; the kind refuses its own).
-#[derive(Debug, Deserialize)]
-struct Entry {
-    reader_id: String,
-    #[serde(flatten)]
-    kind: Kind,
-    #[serde(default)]
-    #[allow(dead_code)]
-    notes: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-enum Kind {
-    /// A format built into this application.
-    Builtin { name: String },
-    /// A format as a plug-in program beside the application.
-    Plugin { program: String, contract_version: u32, timeout_ms: u64 },
-}
+pub use qnc_record_format_plugin::FORMAT_CATALOG;
+use qnc_record_format_plugin::{FormatCatalog, FormatEntry as Entry, FormatKind as Kind};
 
 /// The record formats built into this application, by their catalog name.
 fn builtin(name: &str) -> Option<Arc<dyn RecordFormat>> {
@@ -76,11 +48,7 @@ pub fn registry(root: &Path) -> Result<CameraRegistry, String> {
     for refused in &synced.refused {
         log(format!("camera-profile refused {refused}"));
     }
-    let text = std::fs::read_to_string(root.join(FORMAT_CATALOG)).map_err(|e| format!("{FORMAT_CATALOG}: {e}"))?;
-    let catalog: Catalog = serde_json::from_str(&text).map_err(|e| format!("{FORMAT_CATALOG}: {e}"))?;
-    if catalog.version != 1 {
-        return Err(format!("{FORMAT_CATALOG}: version {} is not 1", catalog.version));
-    }
+    let catalog = FormatCatalog::read(root)?;
     let mut registry = CameraRegistry::new();
     for entry in &catalog.formats {
         let adapter = format(entry).and_then(|format| qnc_camera_profile_adapter::ProfileAdapter::new(format, &synced.profiles));

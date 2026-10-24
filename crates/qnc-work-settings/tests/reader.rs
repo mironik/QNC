@@ -281,3 +281,25 @@ fn the_project_settings_decide_whether_filmstrip_and_wave_are_made() {
     assert!(settings.artifact_mode(ArtifactKind::Filmstrip).is_err());
     assert!(settings.artifact_mode(ArtifactKind::Wave).is_err());
 }
+
+#[test]
+fn a_new_project_has_ebu_loudness_on_a1_and_a2_and_a_two_second_tail_and_nothing_is_guessed() {
+    let root = fixture();
+    let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
+    let mut settings = reader.read().unwrap();
+    let loudness = settings.audio_loudness().unwrap();
+    assert_eq!((loudness.a1_lufs, loudness.a2_lufs, loudness.true_peak_dbtp, loudness.tolerance_lu), (-23.0, -23.0, -1.0, 0.5));
+    assert_eq!(settings.export_tail_seconds().unwrap(), 2.0);
+    // The client's own values are read as saved.
+    settings.audio["loudness"]["a2_lufs"] = json!(-27);
+    settings.export["tail_seconds"] = json!(5);
+    assert_eq!(settings.audio_loudness().unwrap().a2_lufs, -27.0);
+    assert_eq!(settings.export_tail_seconds().unwrap(), 5.0);
+    // Missing or impossible values are refused, never defaulted.
+    settings.audio["loudness"]["a1_lufs"] = json!(12);
+    assert!(settings.audio_loudness().is_err());
+    settings.audio.as_object_mut().unwrap().remove("loudness");
+    assert!(settings.audio_loudness().is_err());
+    settings.export.as_object_mut().unwrap().remove("tail_seconds");
+    assert!(settings.export_tail_seconds().is_err());
+}

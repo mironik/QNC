@@ -511,7 +511,8 @@ impl Catalog {
     }
 }
 impl Registration {
-    fn executable_path(&self, directory: &Path) -> Result<PathBuf> {
+    /// The installed executable of this registration, or why it cannot run here.
+    pub fn executable_path(&self, directory: &Path) -> Result<PathBuf> {
         if !self.supported_os.iter().any(|s| s == std::env::consts::OS)
             || !self
                 .supported_cpu
@@ -711,7 +712,8 @@ fn jobs_client(program: &str) -> Result<Arc<qnc_decoder_jobs::JobsClient>> {
     Ok(client)
 }
 
-fn installed_catalog() -> Result<(Catalog, PathBuf)> {
+/// The decoder catalog of this host and its folder (`QNC_DECODER_CATALOG`, else beside the program).
+pub fn installed_catalog() -> Result<(Catalog, PathBuf)> {
     let path = if let Some(path) = std::env::var_os("QNC_DECODER_CATALOG") {
         if path.is_empty() {
             return Err(bad("empty decoder catalog override"));

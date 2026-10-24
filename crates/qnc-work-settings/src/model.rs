@@ -4,6 +4,16 @@ use std::path::{Component, Path, PathBuf};
 
 pub const VERSION: &str = "0.1.0";
 
+/// The loudness a delivered story keeps (EBU R 128 by default): integrated loudness of A1 and
+/// of A2, the highest true peak and how far a lane may lie from its target.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Loudness {
+    pub a1_lufs: f64,
+    pub a2_lufs: f64,
+    pub true_peak_dbtp: f64,
+    pub tolerance_lu: f64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PlaybackInput {
@@ -167,6 +177,31 @@ impl WorkSettings {
             .and_then(|value| u16::try_from(value).ok())
             .filter(|value| *value <= 50)
             .ok_or_else(|| ReadError::new("audio_crossfade_frames", "The database holds no valid audio.crossfade_frames."))
+    }
+
+    /// The loudness targets of A1 and A2 (user 2026-10-24: EBU R 128 by default, changeable in
+    /// the project); a missing or unlikely value is a controlled error, never a default here.
+    pub fn audio_loudness(&self) -> Result<Loudness, ReadError> {
+        let bad = || ReadError::new("audio_loudness", "The database holds no valid audio.loudness.");
+        let loudness = self.audio.get("loudness").ok_or_else(bad)?;
+        let number = |key: &str| loudness.get(key).and_then(Value::as_f64).filter(|value| value.is_finite()).ok_or_else(bad);
+        let target = |key: &str| number(key).and_then(|lufs| if (-70.0..=0.0).contains(&lufs) { Ok(lufs) } else { Err(bad()) });
+        let true_peak_dbtp = number("true_peak_dbtp")?;
+        let tolerance_lu = number("tolerance_lu")?;
+        if !(-20.0..=0.0).contains(&true_peak_dbtp) || !(0.0..=10.0).contains(&tolerance_lu) {
+            return Err(bad());
+        }
+        Ok(Loudness { a1_lufs: target("a1_lufs")?, a2_lufs: target("a2_lufs")?, true_peak_dbtp, tolerance_lu })
+    }
+
+    /// The lead-out after the end of the story in seconds (user 2026-10-24: 2 s by default,
+    /// the client may ask other); a missing value is a controlled error.
+    pub fn export_tail_seconds(&self) -> Result<f64, ReadError> {
+        self.export
+            .get("tail_seconds")
+            .and_then(Value::as_f64)
+            .filter(|seconds| seconds.is_finite() && (0.0..=600.0).contains(seconds))
+            .ok_or_else(|| ReadError::new("export_tail_seconds", "The database holds no valid export.tail_seconds."))
     }
 
     pub(crate) fn from_saved(

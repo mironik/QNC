@@ -1745,8 +1745,22 @@ fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
     // The audio crossfade on every A2 cut (user 2026-10-21: news practice, a few frames).
     if let Some(audio) = root.get_mut("audio").and_then(Value::as_object_mut) {
         audio.entry("crossfade_frames".to_string()).or_insert_with(|| json!(DEFAULT_CROSSFADE_FRAMES));
+        // The loudness of A1 and A2 (user 2026-10-24: EBU R 128 by default, each changeable).
+        audio.entry("loudness".to_string()).or_insert_with(default_loudness);
+    }
+    // The lead-out after the end of the story (user 2026-10-24: 2 s unless the client asks other).
+    if let Some(export) = root.get_mut("export").and_then(Value::as_object_mut) {
+        export.entry("tail_seconds".to_string()).or_insert_with(|| json!(DEFAULT_TAIL_SECONDS));
     }
     Ok(())
+}
+
+/// The lead-out of a project whose template does not say it (the system templates do).
+const DEFAULT_TAIL_SECONDS: u64 = 2;
+
+/// EBU R 128: -23 LUFS integrated on A1 and on A2, -1 dBTP true peak, +-0.5 LU.
+fn default_loudness() -> Value {
+    json!({ "a1_lufs": -23, "a2_lufs": -23, "true_peak_dbtp": -1, "tolerance_lu": 0.5 })
 }
 
 /// The audio crossfade of a project whose template does not say it (the system templates do).
@@ -2929,8 +2943,12 @@ mod tests {
             serde_json::from_str::<Value>(&raw).expect("json")
         };
         assert_eq!(read()["audio"]["crossfade_frames"], json!(4), "a new project has it from its template");
+        assert_eq!(read()["audio"]["loudness"]["a1_lufs"], json!(-23), "EBU R 128 from its template");
+        assert_eq!(read()["export"]["tail_seconds"], json!(2));
         let mut older = read();
         older["audio"].as_object_mut().unwrap().remove("crossfade_frames");
+        older["audio"].as_object_mut().unwrap().remove("loudness");
+        older["export"].as_object_mut().unwrap().remove("tail_seconds");
         Connection::open(project_dir.join("project.db"))
             .unwrap()
             .execute("UPDATE project_settings SET settings_json = ?2 WHERE project_id = ?1", params![row.project_id, older.to_string()])
@@ -2938,6 +2956,8 @@ mod tests {
         store.open_project(&row.project_id).expect("open");
         let completed = read();
         assert_eq!(completed["audio"]["crossfade_frames"], json!(4));
+        assert_eq!(completed["audio"]["loudness"], json!({ "a1_lufs": -23, "a2_lufs": -23, "true_peak_dbtp": -1, "tolerance_lu": 0.5 }));
+        assert_eq!(completed["export"]["tail_seconds"], json!(2));
         assert_eq!(completed["audio"]["channels"], older["audio"]["channels"]);
         cleanup_temp_root(&root);
     }
