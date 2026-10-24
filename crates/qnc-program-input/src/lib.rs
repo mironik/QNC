@@ -104,6 +104,9 @@ impl SoundDraft {
 mod build;
 mod load;
 mod media;
+mod normalize;
+
+pub use qnc_program_loudness::CoverRule;
 
 pub use build::*;
 pub use load::*;

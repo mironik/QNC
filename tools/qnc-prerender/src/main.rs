@@ -333,7 +333,7 @@ fn story_units(
     settings: &qnc_work_settings::WorkSettings,
     inputs: &InputReader,
 ) -> Result<Vec<qnc_render_unit::RenderUnit>> {
-    let program = qnc_program_input::loader(target.clone(), settings.project_id.clone())(inputs, &settings.workspace_db_uri)?;
+    let program = qnc_program_input::loader(target.clone(), settings.project_id.clone(), None)(inputs, &settings.workspace_db_uri)?;
     ProgramPlan::for_render(&program)
         .and_then(|plan| plan.render_units())
         .map_err(|e| e.to_string())

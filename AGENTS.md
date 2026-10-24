@@ -5878,3 +5878,17 @@ timelinea); napravljeni segment ili pokrivalica zadrzavaju svoj zvuk, koji se i 
 zoomu. Vrijedi u svakoj formi sa source timelineom (Story, MA, Ingest). `qnc-source-preview` `project_target` (iz
 konteksta, izvan niti sucelja). Conformance: `qnc-clip-sound` na popisu javnih DB vlasnika. Testovi, conformance.
 Uzivo nije provjereno.
+Izvedeno 2026-10-24 (korisnik: "A2 nije normaliziran i neke pokrivalice iskacu iz pravila"; odluke: najvise +12 dB po
+pokrivalici; vrijedi za export i preview N): mjereno u `test_ukupni_42`: A2 cijeli -23,0 LUFS, a pojedine pokrivalice od -20
+do -38 LUFS, jer je export dizao samo A2 kao cjelinu. Sada svaka pokrivalica sama ulazi u pravilo A2 projekta (cilj,
+tolerancija, granica vrha): `qnc-program-loudness` `cover_gain` i `CoverRule` (pokrivalica izmjerena sama, od svoje prve
+slike, iz odsjecaka glasnoce spremljenih s valom klipa, na razini koju je korisnik dao; unutar tolerancije 0, inace cijeli dB
+do cilja, dizanje najvise `COVER_GAIN_MAX_DB` 12 dB i nikad preko granice vrha; iskljucena, tiha ili neizmjerena
+pokrivalica ostaje kako je montirana; test), `qnc-program-input` (`normalize.rs`: pojacanje ide na razinu pokrivalice dok se
+gradi program, pa ga cuju player, render i export jednako; `loader`/`draft_loader`/`load_program` primaju
+`Option<CoverRule>`; nista se ne pise u bazu). `tools/qnc-export` gradi program s pravilom (XML, Express, Original,
+postavke); `qnc-source-preview` uz ukljucen N otvara pricu s pravilom (A1 i dalje cijeli, kao prije), a ukljucivanje ili
+iskljucivanje N ponovno otvara pricu na istom mjestu. Prerender ostaje bez normalizacije (dijelovi s promijenjenom razinom
+imaju drugi otisak i renderiraju se za export). Provjereno na izoliranoj kopiji projekta (baza kopirana citanjem, kartica samo
+citana): 8 od 12 pokrivalica -22,9 do -23,5 LUFS, preostale 4 dignute za punih 12 dB (izabrani kanal tih klipova je tih) na
+-26 do -32. Testovi, conformance. Uzivo kroz sucelje nije provjereno.

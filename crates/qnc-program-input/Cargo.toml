@@ -15,3 +15,8 @@ qnc-media-metadata = { workspace = true }
 qnc-player-input = { workspace = true }
 qnc-program-playlist = { workspace = true }
 qnc-source-timecode = { workspace = true }
+qnc-artifact-db = { workspace = true }
+qnc-loudness = { workspace = true }
+qnc-program-loudness = { workspace = true }
+qnc-program-waveform = { workspace = true }
+qnc-wave = { workspace = true }

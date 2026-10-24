@@ -4951,15 +4951,20 @@ dependencies = [
 name = "qnc-program-input"
 version = "0.1.0"
 dependencies = [
+ "qnc-artifact-db",
  "qnc-db-broker",
  "qnc-frame-timebase",
+ "qnc-loudness",
  "qnc-media-metadata",
  "qnc-player-input",
  "qnc-prerender-db",
  "qnc-program-db",
+ "qnc-program-loudness",
  "qnc-program-playlist",
+ "qnc-program-waveform",
  "qnc-source-timecode",
  "qnc-ui-text",
+ "qnc-wave",
  "serde_json",
 ]
 

@@ -5,8 +5,9 @@ pub fn load_program(
     target: &ProjectDbTarget,
     project_id: &str,
     clips: &impl ClipInputs,
+    normalize: Option<CoverRule>,
 ) -> Result<ProgramInput, String> {
-    load(target, project_id, clips, None, None)
+    load(target, project_id, clips, None, None, normalize)
 }
 
 /// The A1 of the story under the program window `[in, out)` only (user 2026-10-20: "the
@@ -19,7 +20,7 @@ pub fn load_sound_bed(
     clips: &impl ClipInputs,
     window: (u64, u64),
 ) -> Result<ProgramInput, String> {
-    load(target, project_id, clips, Some(window), None)
+    load(target, project_id, clips, Some(window), None, None)
 }
 
 /// The A1 bed of a window, built where its player is prepared.
@@ -54,6 +55,7 @@ pub(crate) fn load(
     clips: &impl ClipInputs,
     window: Option<(u64, u64)>,
     draft: Option<&SoundDraft>,
+    normalize: Option<CoverRule>,
 ) -> Result<ProgramInput, String> {
     // One consistent read of the story (external audit 2026-10-17): segments, covers and
     // rate of the same revision, never an old segment with a new cover.
@@ -73,7 +75,11 @@ pub(crate) fn load(
         story_rate,
     };
     let channels = resolver.prepared(&first.clip_id)?.project_audio.channels;
-    let covers = fit_covers(covers, &mut resolver, story_rate)?;
+    let mut covers = fit_covers(covers, &mut resolver, story_rate)?;
+    // Every cover on its own within the loudness rule (user 2026-10-24), when asked.
+    if let Some(rule) = normalize {
+        normalize::normalize_covers(target, &mut covers, &mut resolver, story_rate, rule)?;
+    }
     let mut input = build_input(project_id, story_rate, &segments, &covers, channels)?;
     input.revision = revision;
     input.a2_crossfade_frames = i64::from(clips.crossfade_frames()?);
@@ -115,13 +121,15 @@ pub(crate) fn prerendered(target: &ProjectDbTarget) -> Vec<qnc_player_input::Pre
 /// The program of the active project, built where the player is prepared (off
 /// the form thread): the story from its database, every clip through the
 /// player input reader of the workspace.
+/// `normalize`: every cover's A2 brought into this rule (user 2026-10-24), `None` as edited.
 pub fn loader(
     target: ProjectDbTarget,
     project_id: String,
+    normalize: Option<CoverRule>,
 ) -> impl FnOnce(&qnc_player_input::InputReader, &str) -> Result<ProgramInput, String> + Send + 'static
 {
     move |reader, workspace_db_uri| {
-        with_session(reader, workspace_db_uri, |clips| load_program(&target, &project_id, clips))
+        with_session(reader, workspace_db_uri, |clips| load_program(&target, &project_id, clips, normalize))
     }
 }
 /// The program with the drafted sound of one segment or cover, built where the player
@@ -131,9 +139,10 @@ pub fn draft_loader(
     target: ProjectDbTarget,
     project_id: String,
     draft: SoundDraft,
+    normalize: Option<CoverRule>,
 ) -> impl FnOnce(&qnc_player_input::InputReader, &str) -> Result<ProgramInput, String> + Send + 'static
 {
     move |reader, workspace_db_uri| {
-        with_session(reader, workspace_db_uri, |clips| load(&target, &project_id, clips, None, Some(&draft)))
+        with_session(reader, workspace_db_uri, |clips| load(&target, &project_id, clips, None, Some(&draft), normalize))
     }
 }

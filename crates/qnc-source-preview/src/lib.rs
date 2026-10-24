@@ -773,8 +773,8 @@ impl SourcePreview {
         let Some(context) = &self.context else {
             return true;
         };
-        let project_id = context.settings.project_id.clone();
-        self.open_story(frame, move |target| qnc_program_input::loader(target, project_id))
+        let (project_id, rule) = (context.settings.project_id.clone(), self.cover_rule());
+        self.open_story(frame, move |target| qnc_program_input::loader(target, project_id, rule))
     }
     /// The sound of a segment or cover drafted on the Wrap row is heard at once (user
     /// 2026-10-16). Its level or off against the stored sound (`stored`, the same part)
@@ -800,13 +800,13 @@ impl SourcePreview {
         let Some(context) = &self.context else {
             return false;
         };
-        let project_id = context.settings.project_id.clone();
+        let (project_id, rule) = (context.settings.project_id.clone(), self.cover_rule());
         let pending = self.cue_next.or(self.cue_in_flight.map(|(frame, _)| frame)).or(self.cue_asked);
         let frame = pending.or_else(|| self.program_frame()).unwrap_or(frame);
         let playing = self.player_view.playing() || self.play_when_ready;
         match draft {
-            Some(draft) => self.open_story(frame, move |target| qnc_program_input::draft_loader(target, project_id, draft)),
-            None => self.open_story(frame, move |target| qnc_program_input::loader(target, project_id)),
+            Some(draft) => self.open_story(frame, move |target| qnc_program_input::draft_loader(target, project_id, draft, rule)),
+            None => self.open_story(frame, move |target| qnc_program_input::loader(target, project_id, rule)),
         };
         self.play_when_ready = playing;
         true
@@ -968,22 +968,37 @@ impl SourcePreview {
         self.context.as_ref().map(|context| context.settings.export.clone())
     }
 
-    /// The program's A1 and A2 brought to the project's loudness targets (user 2026-10-24)
-    /// from their measured loudness (`None`: as edited); a side not measured keeps its level.
-    /// Heard at once while a program plays. False when nothing changed.
+    /// The program's A1 brought to the project's loudness target from its measured loudness,
+    /// and every cover's A2 on its own into the rule (user 2026-10-24: no cover stands out),
+    /// `None`: as edited; A1 not measured keeps its level. A1 is heard at once; the covers open
+    /// the playing program again with their gains where it stands. False when nothing changed.
     pub fn normalize_program(&mut self, measured: Option<[Option<f64>; 2]>) -> bool {
         let targets = self.context.as_ref().and_then(|context| context.settings.audio_loudness().ok());
         let gains = measured.zip(targets).map(|(measured, targets)| {
-            let gain = |target: f64, measured: Option<f64>| {
-                measured.map_or(0.0, |lufs| (target - lufs).clamp(-NORMALIZE_MAX_DB, NORMALIZE_MAX_DB))
-            };
-            [gain(targets.a1_lufs, measured[0]), gain(targets.a2_lufs, measured[1])]
+            let a1 = measured[0].map_or(0.0, |lufs| (targets.a1_lufs - lufs).clamp(-NORMALIZE_MAX_DB, NORMALIZE_MAX_DB));
+            [a1, 0.0] // A2 is brought in cover by cover as the program is built
         });
         if self.normalize == gains {
             return false;
         }
+        let covers_changed = self.normalize.is_some() != gains.is_some();
         self.normalize = gains;
+        if covers_changed && self.program {
+            let frame = self.program_frame().unwrap_or(0);
+            let playing = self.player_view.playing() || self.play_when_ready;
+            self.show_program_frame(frame, true);
+            self.play_when_ready = playing;
+            return true;
+        }
         self.send_program_levels()
+    }
+
+    /// The rule every cover's A2 is built into while normalising is on (the project's A2
+    /// target, tolerance and peak limit); `None` as edited.
+    fn cover_rule(&self) -> Option<qnc_program_input::CoverRule> {
+        self.normalize?;
+        let loudness = self.context.as_ref()?.settings.audio_loudness().ok()?;
+        Some(qnc_program_input::CoverRule { target_lufs: loudness.a2_lufs, tolerance_lu: loudness.tolerance_lu, limit_dbtp: loudness.true_peak_dbtp })
     }
 
     /// The program's output levels to the player when it has not got them yet.

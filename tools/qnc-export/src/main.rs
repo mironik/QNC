@@ -59,7 +59,10 @@ fn run() -> Result<PathBuf> {
 
     let target = qnc_db_broker::ProjectDbTarget::for_project(&reader, &settings)?;
     let inputs = InputReader::with_content_reader(reader.clone(), Arc::new(PlayerClipContent { target: ContentTarget::for_project(&reader, &settings) }));
-    let program = qnc_program_input::loader(target.clone(), settings.project_id.clone())(&inputs, &settings.workspace_db_uri)?;
+    // Every cover's A2 on its own within the project's loudness rule (user 2026-10-24).
+    let loudness = settings.audio_loudness().map_err(|e| e.to_string())?;
+    let rule = qnc_program_input::CoverRule { target_lufs: loudness.a2_lufs, tolerance_lu: loudness.tolerance_lu, limit_dbtp: loudness.true_peak_dbtp };
+    let program = qnc_program_input::loader(target.clone(), settings.project_id.clone(), Some(rule))(&inputs, &settings.workspace_db_uri)?;
 
     let bindings = qnc_source_bindings::load(&root)?;
     let mut roots: Vec<(String, PathBuf)> = bindings.sources.iter().filter_map(|b| b.file.clone().map(|file| (b.uri.clone(), file))).collect();
