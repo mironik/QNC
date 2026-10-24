@@ -107,6 +107,26 @@ pub fn show(
 ) -> Option<ActionEvent> {
     // A refused take, on top of the screen so it is noticed (user 2026-10-21).
     qnc_alert::show(ui.ctx(), segments.alert.as_ref(), timeline_theme.lane_silent, timeline_theme.text);
+    // The export box over everything (user 2026-10-24): its answer is this panel's action.
+    let export = segments.export.as_ref().and_then(|choice| {
+        let style = qnc_export_box::ExportBoxStyle {
+            background: timeline_theme.background,
+            border: timeline_theme.border,
+            text: timeline_theme.text,
+            muted: timeline_theme.muted,
+            chosen: timeline_theme.focus,
+            font: 15.0,
+        };
+        qnc_export_box::show(ui.ctx(), choice, style)
+    });
+    if let Some(answer) = export {
+        let event = match answer {
+            qnc_export_box::Answer::Choose(index) => ActionEvent::key("export_choose").with_value(index as i64),
+            qnc_export_box::Answer::Export => ActionEvent::key("export_confirm"),
+            qnc_export_box::Answer::Cancel => ActionEvent::key("export_cancel"),
+        };
+        return Some(event.at(PANEL));
+    }
     let style = SegmentPanelStyle::from_timeline(timeline_theme);
     let panel_rect = ui.available_rect_before_wrap();
     ui.painter().rect_filled(panel_rect, 0.0, style.surface);

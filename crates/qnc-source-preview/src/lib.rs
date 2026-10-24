@@ -951,6 +951,11 @@ impl SourcePreview {
         [level(levels[0], gains[0]), level(levels[1], gains[1])]
     }
 
+    /// The export settings of the active project as saved (`export`), for the export box.
+    pub fn export_settings(&self) -> Option<serde_json::Value> {
+        self.context.as_ref().map(|context| context.settings.export.clone())
+    }
+
     /// The program's A1 and A2 brought to the project's loudness targets (user 2026-10-24)
     /// from their measured loudness (`None`: as edited); a side not measured keeps its level.
     /// Heard at once while a program plays. False when nothing changed.

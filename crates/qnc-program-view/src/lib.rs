@@ -137,6 +137,8 @@ pub struct SegmentsView {
     /// normalises them to the project's targets.
     pub loudness: Option<qnc_program_loudness::ProgramLoudness>,
     pub normalize: bool,
+    /// The open export box (user 2026-10-24).
+    pub export: Option<qnc_export_choice::ExportChoice>,
     /// The Wrap rows show a narrow video row instead of the filmstrip (Ctrl+click on V,
     /// user 2026-10-15).
     pub video_compact: bool,

@@ -109,6 +109,22 @@ impl ProgramSegments {
             }
             SegmentCommand::Purge(segment_id) => self.write(Operation::PurgeSegment { segment_id }),
             SegmentCommand::ToggleWrapVideo => self.video_compact = !self.video_compact,
+            SegmentCommand::ExportChoose(index) => {
+                if let Some(export) = self.export.as_mut() {
+                    export.choose(index);
+                }
+            }
+            SegmentCommand::ExportCancel => self.export = None,
+            SegmentCommand::ExportConfirm => {
+                // What is exported is chosen; the export itself is the next step.
+                let picked = self.export.take().and_then(|export| export.picked());
+                let name = match picked {
+                    Some(qnc_export_choice::Picked::Xml) => qnc_ui_text::text("export.to_xml").to_string(),
+                    Some(qnc_export_choice::Picked::Setting { label, .. }) => label,
+                    None => return true,
+                };
+                self.refresh_view(qnc_ui_text::fill("story.msg.export_chosen", &[("name", &name)]));
+            }
             SegmentCommand::ToggleNormalize => {
                 self.normalize = !self.normalize;
                 let measured = self.loudness.as_ref().map(|(_, measured)| *measured).unwrap_or_default();
@@ -272,6 +288,13 @@ impl ProgramSegments {
             SegmentCommand::PurgeSelected => self.purge_selected(),
         }
         true
+    }
+
+    /// Up or down in the open export box.
+    pub fn export_step(&mut self, up: bool) {
+        if let Some(export) = self.export.as_mut() {
+            export.step(up);
+        }
     }
 
     pub(crate) fn step(&mut self, up: bool) {

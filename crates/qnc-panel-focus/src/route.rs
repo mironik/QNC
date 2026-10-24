@@ -17,6 +17,25 @@ impl PanelFocus {
         let event = event.into();
         let action_id = event.action_id.as_str();
         let panel = self.panel;
+        // The Export button opens the box of the project's export settings (user 2026-10-24);
+        // while it is open its keys are its own.
+        if action_id == "export_open" {
+            if let Some(export) = pieces.0.export_settings() {
+                pieces.2.open_export(&export);
+            }
+            return Some(true);
+        }
+        if pieces.2.export_open() && event.at.is_none() {
+            use qnc_program_segments::SegmentCommand;
+            match action_id {
+                "step_prev_part" | "step_prev_segment" | "page_prev" => pieces.2.export_step(true),
+                "step_next_part" | "step_next_segment" | "page_next" => pieces.2.export_step(false),
+                "activate_focused_item" => _ = pieces.2.apply(SegmentCommand::ExportConfirm),
+                "clear_focus" | "close_player" => _ = pieces.2.apply(SegmentCommand::ExportCancel),
+                _ => {}
+            }
+            return Some(true);
+        }
         let routed = match self.pointer(&event, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3)) {
             Some(answer) => answer,
             None => self.route_on_panel(action_id, (&mut *pieces.0, &mut *pieces.1, &mut *pieces.2, &mut *pieces.3)),

@@ -19,6 +19,8 @@ qnc-virtual-shots = { workspace = true }
 qnc-sync-cover = { workspace = true }
 qnc-program-waveform = { workspace = true }
 qnc-program-loudness = { workspace = true }
+qnc-export-choice = { workspace = true }
+serde_json = { workspace = true }
 qnc-program-filmstrip = { workspace = true }
 qnc-source-timecode = { workspace = true }
 qnc-content-store = { workspace = true }

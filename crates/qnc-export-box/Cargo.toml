@@ -1,0 +1,10 @@
+[package]
+name = "qnc-export-box"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the export box over the screen - Export to XML apart, the project's export settings with the default marked, Export and Cancel; passive paint only"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-export-choice = { workspace = true }
+qnc-ui-text = { workspace = true }

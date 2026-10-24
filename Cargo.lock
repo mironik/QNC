@@ -3634,6 +3634,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-export-box"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-export-choice",
+ "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-export-choice"
+version = "0.1.0"
+dependencies = [
+ "qnc-export-preset",
+ "qnc-ui-text",
+ "serde_json",
+]
+
+[[package]]
 name = "qnc-export-preset"
 version = "0.1.0"
 dependencies = [
@@ -4942,6 +4960,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-db-broker",
  "qnc-dev-diagnostics",
+ "qnc-export-choice",
  "qnc-image-assets",
  "qnc-lane-choice",
  "qnc-part-sound",
@@ -4958,6 +4977,7 @@ dependencies = [
  "qnc-ui-text",
  "qnc-virtual-shots",
  "rusqlite",
+ "serde_json",
  "tempfile",
 ]
 
@@ -4966,6 +4986,7 @@ name = "qnc-program-view"
 version = "0.1.0"
 dependencies = [
  "qnc-alert",
+ "qnc-export-choice",
  "qnc-image-assets",
  "qnc-program-commands",
  "qnc-program-db",
@@ -5188,6 +5209,7 @@ dependencies = [
  "qnc-action-event",
  "qnc-alert",
  "qnc-dev-diagnostics",
+ "qnc-export-box",
  "qnc-level-meter",
  "qnc-program-filmstrip",
  "qnc-program-view",
@@ -5438,6 +5460,7 @@ dependencies = [
  "qnc-wave",
  "qnc-work-settings",
  "qnc-worker-wake",
+ "serde_json",
 ]
 
 [[package]]

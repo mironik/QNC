@@ -173,6 +173,10 @@ pub enum SegmentCommand {
     /// The preview normalises A1 and A2 of the program to the project's loudness targets, or
     /// plays them as edited (user 2026-10-24: a key turns it on and off).
     ToggleNormalize,
+    /// The export box (user 2026-10-24): a line chosen, export with it, or closed.
+    ExportChoose(usize),
+    ExportConfirm,
+    ExportCancel,
 }
 
 impl SegmentCommand {
@@ -200,6 +204,9 @@ impl SegmentCommand {
             ("segment_edit", Some(id), _) => Self::Edit(id),
             ("wrap_zoom", slot, frame) => Self::Zoom { slot, frame },
             ("program_zoom", _, _) => Self::ProgramZoom,
+            ("export_choose", _, Some(index)) => Self::ExportChoose(usize::try_from(index).ok()?),
+            ("export_confirm", _, _) => Self::ExportConfirm,
+            ("export_cancel", _, _) => Self::ExportCancel,
             (side @ ("segment_move_up" | "segment_move_down"), _, _) => Self::Move { up: side == "segment_move_up" },
             (side @ ("step_prev_segment" | "step_next_segment"), _, _) => Self::Step { up: side == "step_prev_segment" },
             (side @ ("step_prev_marker_slot" | "step_next_marker_slot"), _, _) => Self::StepSlot { up: side == "step_prev_marker_slot" },

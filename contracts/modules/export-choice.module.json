@@ -1,0 +1,38 @@
+{
+  "module_id": "qnc.module.export-choice",
+  "module_name": "Export choice",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "export.choice"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "filesystem.read",
+    "filesystem.write",
+    "media.probe",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-export-choice",
+  "input": "The project's export settings as saved (export.*, its preset and its own presets).",
+  "output": "Export to XML first, then every export setting (built-in presets and the project ones; the project values that match no preset as the project settings), the project one marked default and chosen; up, down, choose, what is picked.",
+  "specification": "User 2026-10-24: the Export button opens a box with every export setting of the project, the current one as default, any may be chosen; Export to XML apart at the top."
+}

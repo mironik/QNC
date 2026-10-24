@@ -138,8 +138,10 @@ pub(crate) fn show(
                 ui.spacing_mut().button_padding = Vec2::new(6.0, 1.0);
                 // Export of the story (user 2026-10-08: moved here from under the monitor, where
                 // Sync/B-roll was; that went to the source dock as a switch with Pokrivalice).
-                // Not done yet, so offered disabled.
-                let _ = action_button(ui, qnc_ui_text::text("story.export_hires"), false, theme);
+                // It opens the box of the project's export settings (user 2026-10-24).
+                if clicked(action_button(ui, qnc_ui_text::text("story.export_hires"), !segments.is_empty(), theme)) {
+                    command = Some("export_open");
+                }
                 // Right to left: Redo, then Undo, left of Export HI-res.
                 for (label, target) in [(qnc_ui_text::text("story.ui.redo"), "redo_object"), (qnc_ui_text::text("story.ui.undo"), "undo_object")] {
                     let enabled = segments.action_enabled(target);

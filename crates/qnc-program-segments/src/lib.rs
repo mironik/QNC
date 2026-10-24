@@ -153,6 +153,8 @@ pub struct ProgramSegments {
     /// The preview normalises the program's A1 and A2 (user 2026-10-24); off when the
     /// application starts.
     normalize: bool,
+    /// The open export box (user 2026-10-24).
+    export: Option<qnc_export_choice::ExportChoice>,
     /// The program's loudness and what it was measured for (placements, waves, rate).
     loudness: Option<(LoudnessKey, qnc_program_loudness::ProgramLoudness)>,
     /// The Wrap rows show a narrow video row instead of the filmstrip.
@@ -349,6 +351,7 @@ impl ProgramSegments {
         view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());
         view.loudness = self.loudness_of(&view, segments, covers);
         view.normalize = self.normalize;
+        view.export = self.export.clone();
         view.video_compact = self.video_compact;
         if !self.video_compact {
             view.pictures = self.filmstrips.pictures(&view.picture_placements(), |id| durations.get(id).copied(), |id| posters.get(id).cloned());
@@ -380,6 +383,17 @@ impl ProgramSegments {
         });
         self.loudness = Some((key, measured));
         Some(measured)
+    }
+
+    /// The Export button (user 2026-10-24): the box with Export to XML and every export setting
+    /// of the project, `export` as the project saved it.
+    pub fn open_export(&mut self, export: &serde_json::Value) {
+        self.export = Some(qnc_export_choice::ExportChoice::from_settings(export));
+    }
+
+    /// Whether the export box is open (it takes the keys).
+    pub fn export_open(&self) -> bool {
+        self.export.is_some()
     }
 
     /// What the preview normalises to the project's targets: the measured A1 and A2, while

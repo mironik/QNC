@@ -1,0 +1,10 @@
+[package]
+name = "qnc-export-choice"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: what the Export button offers - Export to XML apart, then every export setting of the project with the project's one as the chosen default"
+
+[dependencies]
+qnc-export-preset = { workspace = true }
+qnc-ui-text = { workspace = true }
+serde_json = { workspace = true }

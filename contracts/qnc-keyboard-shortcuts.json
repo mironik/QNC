@@ -139,6 +139,18 @@
     "wheel_segments_ctrl_forward": {
       "label": "Ctrl+kotacic iznad panela Segmenti: razina uzetog zvuka segmenta ili pokrivalice vise"
     },
+    "export_open": {
+      "label": "Export: prozor s Export to XML i svim postavkama exporta projekta"
+    },
+    "export_choose": {
+      "label": "Export: odabir postavke u prozoru exporta"
+    },
+    "export_confirm": {
+      "label": "Export: izvezi odabranim"
+    },
+    "export_cancel": {
+      "label": "Export: zatvori prozor"
+    },
     "toggle_loudness_normalize": {
       "label": "Preview: glasnoca A1 i A2 price na cilj projekta (EBU R 128) ili kako je montirano"
     },

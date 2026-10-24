@@ -894,3 +894,16 @@ fn n_turns_normalising_the_loudness_on_and_off() {
     assert!(segments.apply_action("toggle_loudness_normalize"));
     assert_eq!(segments.normalization(), None);
 }
+
+#[test]
+fn the_export_box_opens_with_the_project_setting_chosen_and_says_what_is_exported() {
+    // User 2026-10-24: Export opens a box of the project's export settings, its own as default.
+    let mut segments = component();
+    segments.open_export(&serde_json::json!({ "preset": "h264_1080p50" }));
+    assert!(segments.export_open());
+    segments.export_step(true);
+    segments.apply(SegmentCommand::ExportChoose(0));
+    assert!(segments.apply(SegmentCommand::ExportConfirm));
+    assert!(!segments.export_open());
+    assert!(segments.view().message.contains(qnc_ui_text::text("export.to_xml")), "{}", segments.view().message);
+}

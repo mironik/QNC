@@ -1,0 +1,38 @@
+{
+  "module_id": "qnc.module.export-box",
+  "module_name": "Export box",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.paint.export_box"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "filesystem.read",
+    "filesystem.write",
+    "media.probe",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-export-box",
+  "input": "The export choice and colours.",
+  "output": "A box over the screen with Export to XML apart, the settings with the default marked and the chosen lit, Export and Cancel; the answer of a click.",
+  "specification": "User 2026-10-24: the overlay of the Export button."
+}

@@ -5741,3 +5741,16 @@ cilj uzima iz projekta (`audio_loudness`), pojacanje (cilj - izmjereno, najvise 
 playera dok svira prica (uz nacrt razine, preko njega), i svakom novom otvaranju price. Izvorni klip na source timelineu se
 ne normalizira; izbor vrijedi dok aplikacija radi. Testovi `qnc-program-loudness`, `qnc-program-segments` (N),
 `qnc-source-preview` (razina), conformance, release build. Uzivo nije provjereno. Nije izvedeno: primjena u exportu.
+Izvedeno 2026-10-24 (korisnik: "nastavi s exportom; klik na dugme exporta otvara overlay info box s popisom svih postavki
+exporta koje postoje u projektu; trenutno postavljene oznacene kao default, ali korisnik moze odabrati bilo koju iz
+postojecih predefiniranih; izdvojen na samom pocetku prikaz Export to XML"): dugme Export HI-res u traci panela Segmenti
+je ukljuceno kad prica ima segmente i salje novu akciju kataloga `export_open`. Nova javna kocka `crates/qnc-export-choice`
+(+ ugovor): Export to XML prvi, zatim sve postavke exporta projekta (ugradeni preseti iz `contracts/export_profiles.json`
+i projektovi vlastiti kroz `qnc-export-preset`), projektova (`export.preset`) oznacena kao default i odabrana; vrijednosti
+koje ne odgovaraju nijednom presetu nude se kao "Project export settings" (default). Nova pasivna kocka
+`crates/qnc-export-box` (+ ugovor): prozor u sredini ekrana, XML odvojen crtom, default oznacen, odabrani osvijetljen,
+Export i Cancel; klik bira, dvoklik izvozi. `qnc-source-preview::export_settings` daje `export` iz postavki projekta,
+`qnc-panel-focus` otvara prozor i dok je otvoren gore/dolje biraju, Enter izvozi, Esc zatvara; `qnc-program-segments`
+drzi izbor (`open_export`, `ExportChoose`, `ExportConfirm`, `ExportCancel`). Akcije kataloga `export_open`,
+`export_choose`, `export_confirm`, `export_cancel` (bez tipki). Sam export jos nije izveden: potvrda samo kaze sto je
+odabrano. Testovi `qnc-export-choice`, `qnc-program-segments`, conformance, release build. Uzivo nije provjereno.
