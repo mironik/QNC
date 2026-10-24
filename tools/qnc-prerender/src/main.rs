@@ -333,7 +333,12 @@ fn story_units(
     settings: &qnc_work_settings::WorkSettings,
     inputs: &InputReader,
 ) -> Result<Vec<qnc_render_unit::RenderUnit>> {
-    let program = qnc_program_input::loader(target.clone(), settings.project_id.clone(), None)(inputs, &settings.workspace_db_uri)?;
+    // Every cover's A2 within the loudness rule, as the export builds it (user 2026-10-25:
+    // the Express export took long, re-rendering every unit whose cover the export
+    // normalised and the prerender had not).
+    let loudness = settings.audio_loudness().map_err(|e| e.to_string())?;
+    let rule = qnc_program_input::CoverRule { target_lufs: loudness.a2_lufs, tolerance_lu: loudness.tolerance_lu, limit_dbtp: loudness.true_peak_dbtp };
+    let program = qnc_program_input::loader(target.clone(), settings.project_id.clone(), Some(rule))(inputs, &settings.workspace_db_uri)?;
     ProgramPlan::for_render(&program)
         .and_then(|plan| plan.render_units())
         .map_err(|e| e.to_string())

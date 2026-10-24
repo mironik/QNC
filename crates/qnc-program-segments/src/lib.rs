@@ -150,8 +150,9 @@ pub struct ProgramSegments {
     waves: qnc_program_waveform::ProgramWaves,
     /// The stored filmstrips of the clips the program shows (Wrap row pictures).
     filmstrips: qnc_program_filmstrip::ProgramFilmstrips,
-    /// The preview normalises the program's A1 and A2 (user 2026-10-24); off when the
-    /// application starts.
+    /// The preview normalises the program's A1 and A2 (user 2026-10-24); on when the
+    /// application starts (2026-10-25: the preview hears what the export gives and plays the
+    /// prerender, which is normalised as the export).
     normalize: bool,
     /// The open export box (user 2026-10-24).
     export: Option<qnc_export_choice::ExportChoice>,
@@ -285,7 +286,7 @@ fn counted(channels: &ClipChannels) -> std::collections::HashSet<String> {
 
 impl ProgramSegments {
     pub fn new() -> Self {
-        Self::default()
+        Self { normalize: true, ..Self::default() }
     }
 
     /// Points to the project database of the active project (its story and the

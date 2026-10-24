@@ -5904,3 +5904,12 @@ skakali su 32-43 Mbit/s po sekundi); `UNIT_FORMAT` 4 (postojeci dijelovi jednom 
 kopiji (kartica samo citana): jedan klip QSV 34,7-36,4 Mbit/s po sekundi; Express price od 29 dijelova slika prosjek 35,6,
 po sekundi 34,0-40,5 (vrhovi na pocetku dijelova), datoteka ukupno 38,5 Mbit/s sa zvukom. Aktivni projekt bez postavke ne
 radi prerender ni Express dok se ne otvori u Projectu. Testovi, conformance. Project je ponovno zamrznut.
+Popravak 2026-10-25 (korisnik: "export prerendera je extremno dug"; log: Express 87 s za pricu od 41 s): prerender je
+dijelove radio bez normalizacije pokrivalica, a export s njom, pa su dijelovi pokrivalica s pojacanjem imali drugi otisak i
+Express ih je ponovno renderirao iz originala; uz to je radio usporedno s prerenderom koji je bio u tijeku. Sada
+`tools/qnc-prerender` gradi pricu s istim pravilom pokrivalica kao export (`CoverRule` iz postavki projekta), N u previewu je
+ukljucen pri pokretanju (`qnc-program-segments`, preview cuje sto daje export i pusta prerender), Express dok je najam
+prerendera ziv ceka njegove dijelove (najvise 10 min, `prerendered_units`) umjesto da ih renderira drugi put, a svaki export
+pise u player log broj dijelova, koliko je iz prerendera, trajanje i glasnocu (`export ...`). Izmjereno na izoliranoj kopiji
+(kartica samo citana): prerender cijele price 2 min 4 s (29 dijelova, iz originala s kartice), Express zatim 3,3 s (29 od 29
+iz prerendera; prije 60-87 s). Testovi, conformance. Uzivo nije provjereno.

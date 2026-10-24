@@ -70,13 +70,15 @@ fn run() -> Result<PathBuf> {
 
     if what == "--express" {
         let delivery = qnc_program_render::Delivery::from_export(&settings.export)?;
-        return deliver(&settings, &program, delivery, "express", true, &target, &project_dir, &folder, roots);
+        // The project's runtime record says whether its prerender is at work.
+        let content = ContentTarget::for_project(&reader, &settings).ok();
+        return deliver(&settings, &program, delivery, "express", content.as_ref(), &target, &project_dir, &folder, roots);
     }
     if let Some(id) = what.strip_prefix("--render=") {
         let values = qnc_export_choice::delivery_values(id, &settings.export, story_format(&program))?;
         let delivery = qnc_program_render::Delivery::from_export(&values)?;
         // From the camera originals, never the prerender (user 2026-10-24).
-        return deliver(&settings, &program, delivery, &file_name(id), false, &target, &project_dir, &folder, roots);
+        return deliver(&settings, &program, delivery, &file_name(id), None, &target, &project_dir, &folder, roots);
     }
     let mut files = BTreeMap::new();
     for (clip_id, input) in &program.clips {
@@ -134,7 +136,7 @@ fn deliver(
     program: &qnc_player_input::ProgramInput,
     delivery: qnc_program_render::Delivery,
     suffix: &str,
-    from_prerender: bool,
+    from_prerender: Option<&ContentTarget>,
     target: &qnc_db_broker::ProjectDbTarget,
     project_dir: &std::path::Path,
     folder: &std::path::Path,
@@ -153,10 +155,12 @@ fn deliver(
     let loudness = settings.audio_loudness().map_err(|e| e.to_string())?;
     let (prerender, _) = settings.prerender_location(project_dir).map_err(|e| e.to_string())?;
     let fingerprints: Vec<String> = units.iter().map(|unit| delivery.fingerprint(unit)).collect();
+    let started = std::time::Instant::now();
     let made: std::collections::HashSet<String> = match from_prerender {
-        true => qnc_prerender_db::PrerenderReader::open(target)?.rendered(fingerprints.clone())?.into_iter().map(|unit| unit.fingerprint).collect(),
-        false => Default::default(),
+        Some(content) => prerendered_units(target, content, &fingerprints)?,
+        None => Default::default(),
     };
+    let from_prerender_count = made.len();
     let scratch = std::env::temp_dir().join(format!("qnc-export-{}", std::process::id()));
     let result = (|| {
         let mut files = Vec::with_capacity(units.len());
@@ -191,11 +195,37 @@ fn deliver(
             let measured = lane.measured_lufs.map_or("silence".into(), |lufs| format!("{lufs:.1} LUFS"));
             format!("{name} {measured}, {:.1} dBTP, gain {:+.1} dB", lane.true_peak_dbtp, lane.gain_db)
         };
-        eprintln!("{suffix}: {} units, {}; {}", files.len(), lane("A1", &joined.a1), lane("A2", &joined.a2));
+        let line = format!(
+            "{suffix}: {} units ({} from the prerender), {:.1} s, {}; {}",
+            files.len(),
+            from_prerender_count,
+            started.elapsed().as_secs_f64(),
+            lane("A1", &joined.a1),
+            lane("A2", &joined.a2)
+        );
+        eprintln!("{line}");
+        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("export {line}"));
         Ok(joined.path)
     })();
     let _ = std::fs::remove_dir_all(&scratch);
     result
+}
+
+/// The prerendered units among `fingerprints`. While the project's prerender is at work (its
+/// lease is alive) the export waits for it, up to ten minutes, instead of rendering the same
+/// units a second time beside it (user 2026-10-25: the Express export took long); what is
+/// still missing then is rendered by the export.
+fn prerendered_units(target: &qnc_db_broker::ProjectDbTarget, content: &ContentTarget, fingerprints: &[String]) -> Result<std::collections::HashSet<String>> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(600);
+    loop {
+        let made: std::collections::HashSet<String> =
+            qnc_prerender_db::PrerenderReader::open(target)?.rendered(fingerprints.to_vec())?.into_iter().map(|unit| unit.fingerprint).collect();
+        let working = qnc_playback_activity::is_fresh(content, qnc_prerender_launch::LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS);
+        if made.len() == fingerprints.len() || !working || std::time::Instant::now() >= deadline {
+            return Ok(made);
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
 }
 
 /// The project's export folder (`export.directory`: inside the project when relative).

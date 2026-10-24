@@ -905,12 +905,13 @@ fn a_double_click_enlarges_a_cover_with_its_neighbours_else_the_segment_and_the_
 #[test]
 fn n_turns_normalising_the_loudness_on_and_off() {
     // User 2026-10-24: a key turns the preview's loudness normalisation on and off.
+    // On when the application starts (2026-10-25: as the export and the prerender).
     let mut segments = component();
-    assert_eq!(segments.normalization(), None);
-    assert!(segments.apply_action("toggle_loudness_normalize"));
     assert!(segments.normalization().is_some());
     assert!(segments.apply_action("toggle_loudness_normalize"));
     assert_eq!(segments.normalization(), None);
+    assert!(segments.apply_action("toggle_loudness_normalize"));
+    assert!(segments.normalization().is_some());
 }
 
 #[test]
