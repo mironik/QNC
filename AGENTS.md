@@ -5837,3 +5837,17 @@ daje `Status`, Story i MA adapteri `footer_link`. C10 editorial aplikacija 573 -
 (kartica samo citana): Original 4 dijela za 45 s, MXF s MPEG-2 4:2:2 1920x1080p50, 2124 slike (kao Express), A1 -27,4 doveden
 na -23,0 LUFS (ffmpeg ebur128), dvije mono trake PCM 24-bit. Testovi, conformance. Link kroz sucelje nije provjeren.
 Interlaced preset (npr. `xdcam_hd422_50i`) i dalje daje kontroliranu gresku (render jos ne radi isprepletenu predaju).
+Izvedeno 2026-10-24 (korisnik: "export XDCAM treba ici iz originala, ne iz prerendera"; "tekst Exporting + naziv formata
+exporta treba biti crvene boje, kad zavrsi zelene"; log: izbor XDCAM HD422 50i javio je "Prerender does not make interlaced
+delivery yet"): (1) `tools/qnc-export --render` (Original i sve postavke) renderira svaki dio iz originala, nikad ne uzima
+prerender; prerender koristi samo Express. (2) Isprepletena predaja: dijelovi se renderiraju bez gubitka kao progresivni
+dijelovi u stopi price (FFV1, `qnc-program-render` `Delivery::intermediate`), a pri spajanju (`qnc-unit-join` `join`,
+argument `picture`) slika se kodira jednom: prica dvostruke stope daje svakoj slici jedno polje (`interlace`, redoslijed
+polja iz `field_order`), prica iste stope oba polja jedne slike; XDCAM HD422 50 Mbit s `+ildct+ilme`, GOP 12
+(`Delivery::interlaced_encode`); interlaced H.264 jasna greska (`render.interlaced_codec`). (3) Status: "Exporting
+<naziv formata>..." crveno dok radi i kad export ne uspije, "Exported: ..." zeleno s linkom. `qnc-status-line` `Tone`
+(Plain, Alert, Done) i `Status::plain`, `qnc-program-view` `SegmentsView.export_alert` i `status()`,
+`qnc-program-segments` (`export_alert`), `qnc-shell-desktop-api` `footer_tone`, `qnc-shell-footer` (boja po tonu),
+`qnc-desktop`, Story i MA adapteri. Provjereno na izoliranoj kopiji (kartica samo citana): 50i 4 dijela za 2 min,
+MXF MPEG-2 4:2:2 1920x1080, 25/1, field_order tt, 1062 slike (2124 slike price / 2), idet 301 od 301 TFF, A1 -23,0 LUFS
+(ffmpeg ebur128); Original iz originala i dalje radi. Testovi, conformance. Kroz sucelje nije provjereno.

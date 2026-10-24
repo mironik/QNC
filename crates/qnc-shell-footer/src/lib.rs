@@ -82,6 +82,8 @@ pub struct FooterInput<'a> {
     pub status: &'a str,
     /// The file the status speaks of: the status is its link (user 2026-10-24).
     pub link: Option<&'a str>,
+    /// Red while work runs or failed, green when done (user 2026-10-24).
+    pub tone: qnc_status_line::Tone,
     /// A project is open: Close project is shown (v5: not without a project).
     pub project_open: bool,
 }
@@ -153,16 +155,21 @@ pub fn show(
                     }
                 }
                 let text = RichText::new(input.status).size(style.font_ui);
+                let tone = match input.tone {
+                    qnc_status_line::Tone::Plain => None,
+                    qnc_status_line::Tone::Alert => Some(Color32::from_rgb(239, 68, 68)),
+                    qnc_status_line::Tone::Done => Some(Color32::from_rgb(34, 197, 94)),
+                };
                 match input.link {
                     Some(link) => {
-                        let label = egui::Label::new(text.color(palette.text).underline()).truncate().sense(egui::Sense::click());
+                        let label = egui::Label::new(text.color(tone.unwrap_or(palette.text)).underline()).truncate().sense(egui::Sense::click());
                         let response = ui.add(label).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(link);
                         if response.clicked() {
                             intent = Some(FooterIntent::OpenLink(link.to_string()));
                         }
                     }
                     None => {
-                        ui.add(egui::Label::new(text.color(palette.muted)).truncate()).on_hover_text(input.status);
+                        ui.add(egui::Label::new(text.color(tone.unwrap_or(palette.muted))).truncate()).on_hover_text(input.status);
                     }
                 }
             });

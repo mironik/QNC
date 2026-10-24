@@ -11,7 +11,8 @@
 //!
 //! `--render <id>`: the story rendered from the originals in a delivery (`original`: XDCAM
 //! HD422 MXF at the story's own picture, `project`, or an export preset), put together as
-//! Express is; units the prerender made in the same format are taken from it.
+//! Express is, always from the originals (user 2026-10-24: never the prerender); an
+//! interlaced delivery (50i) is encoded once from lossless progressive units.
 //!
 //! `qnc-export (--xml | --express | --render <id>) [--root <QNC root>]`
 
@@ -66,12 +67,13 @@ fn run() -> Result<PathBuf> {
 
     if what == "--express" {
         let delivery = qnc_program_render::Delivery::from_export(&settings.export)?;
-        return deliver(&settings, &program, delivery, "express", &target, &project_dir, &folder, roots);
+        return deliver(&settings, &program, delivery, "express", true, &target, &project_dir, &folder, roots);
     }
     if let Some(id) = what.strip_prefix("--render=") {
         let values = qnc_export_choice::delivery_values(id, &settings.export, story_format(&program))?;
         let delivery = qnc_program_render::Delivery::from_export(&values)?;
-        return deliver(&settings, &program, delivery, &file_name(id), &target, &project_dir, &folder, roots);
+        // From the camera originals, never the prerender (user 2026-10-24).
+        return deliver(&settings, &program, delivery, &file_name(id), false, &target, &project_dir, &folder, roots);
     }
     let mut files = BTreeMap::new();
     for (clip_id, input) in &program.clips {
@@ -118,15 +120,18 @@ fn story_format(program: &qnc_player_input::ProgramInput) -> qnc_export_choice::
     }
 }
 
-/// The story's units in `delivery` put together: from the project's prerender when made
-/// there in the same format, else rendered now from the originals into the system's
-/// temporary folder.
+/// The story's units in `delivery` put together: with `from_prerender` (Express) from the
+/// project's prerender when made there in the same format, else rendered now from the
+/// originals into the system's temporary folder. An interlaced delivery is rendered as
+/// lossless progressive units at the story's rate and encoded once when they are put
+/// together (its fields from pairs of the story's pictures).
 #[allow(clippy::too_many_arguments)]
 fn deliver(
     settings: &qnc_work_settings::WorkSettings,
     program: &qnc_player_input::ProgramInput,
     delivery: qnc_program_render::Delivery,
     suffix: &str,
+    from_prerender: bool,
     target: &qnc_db_broker::ProjectDbTarget,
     project_dir: &std::path::Path,
     folder: &std::path::Path,
@@ -135,11 +140,19 @@ fn deliver(
     let units = qnc_broadcast_engine::ProgramPlan::for_render(program).and_then(|plan| plan.render_units()).map_err(|e| e.to_string())?;
     let ffmpeg = qnc_decoder_catalog::installed_deployment().map_err(|e| e.to_string())?.executable;
     let delivery = delivery.on(&ffmpeg);
+    let story_fps = story_format(program).fps;
+    let picture = match delivery.interlaced {
+        true => delivery.interlaced_encode(&ffmpeg, story_fps)?,
+        false => Vec::new(),
+    };
+    let delivery = if delivery.interlaced { delivery.intermediate(story_fps) } else { delivery };
     let loudness = settings.audio_loudness().map_err(|e| e.to_string())?;
     let (prerender, _) = settings.prerender_location(project_dir).map_err(|e| e.to_string())?;
     let fingerprints: Vec<String> = units.iter().map(|unit| delivery.fingerprint(unit)).collect();
-    let made: std::collections::HashSet<String> =
-        qnc_prerender_db::PrerenderReader::open(target)?.rendered(fingerprints.clone())?.into_iter().map(|unit| unit.fingerprint).collect();
+    let made: std::collections::HashSet<String> = match from_prerender {
+        true => qnc_prerender_db::PrerenderReader::open(target)?.rendered(fingerprints.clone())?.into_iter().map(|unit| unit.fingerprint).collect(),
+        false => Default::default(),
+    };
     let scratch = std::env::temp_dir().join(format!("qnc-export-{}", std::process::id()));
     let result = (|| {
         let mut files = Vec::with_capacity(units.len());
@@ -169,7 +182,7 @@ fn deliver(
             tolerance_lu: loudness.tolerance_lu,
         };
         let out = folder.join(format!("{}_{}_{suffix}.mxf", file_name(&settings.project_name), program.playlist.revision));
-        let joined = qnc_unit_join::join(&files, sound, rule, &ffmpeg, &out)?;
+        let joined = qnc_unit_join::join(&files, sound, rule, &ffmpeg, &out, &picture)?;
         let lane = |name: &str, lane: &qnc_unit_join::LaneOutcome| {
             let measured = lane.measured_lufs.map_or("silence".into(), |lufs| format!("{lufs:.1} LUFS"));
             format!("{name} {measured}, {:.1} dBTP, gain {:+.1} dB", lane.true_peak_dbtp, lane.gain_db)

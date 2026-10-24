@@ -74,7 +74,11 @@ impl ProgramSegments {
                 self.exported = Some((message.clone(), path));
                 message
             }
-            Err(error) => qnc_ui_text::fill("export.failed", &[("error", &error)]),
+            Err(error) => {
+                let message = qnc_ui_text::fill("export.failed", &[("error", &error)]);
+                self.export_alert = Some(message.clone());
+                message
+            }
         });
         if let Some(message) = exported {
             self.refresh_view(message);

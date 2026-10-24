@@ -7,21 +7,41 @@ use std::path::Path;
 
 pub const MODULE_ID: &str = "qnc.module.status-line";
 
+/// How the status line colours its text (user 2026-10-24: an export running is red, a
+/// finished one green).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Tone {
+    #[default]
+    Plain,
+    /// Work going on, or a failure: red.
+    Alert,
+    /// Work done: green.
+    Done,
+}
+
 /// What the status line shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Status<'a> {
     pub text: &'a str,
     /// A local file the text speaks of.
     pub link: Option<&'a str>,
+    pub tone: Tone,
 }
 
-/// The first message that says something, with its link.
-pub fn first<'a>(messages: &[(&'a str, Option<&'a str>)], otherwise: &'a str) -> Status<'a> {
+impl<'a> Status<'a> {
+    /// A text without a link, in the line's own colour.
+    pub fn plain(text: &'a str) -> Self {
+        Self { text, ..Default::default() }
+    }
+}
+
+/// The first message that says something, with its link and tone.
+pub fn first<'a>(messages: &[Status<'a>], otherwise: &'a str) -> Status<'a> {
     messages
         .iter()
-        .find(|(text, _)| !text.is_empty())
-        .map(|&(text, link)| Status { text, link })
-        .unwrap_or(Status { text: otherwise, link: None })
+        .find(|status| !status.text.is_empty())
+        .copied()
+        .unwrap_or(Status { text: otherwise, link: None, tone: Tone::Plain })
 }
 
 /// Shows `file` in the file browser of this OS, chosen in its folder.
@@ -62,9 +82,10 @@ mod tests {
 
     #[test]
     fn the_first_message_that_says_something_keeps_its_link() {
-        let status = first(&[("", Some("a")), ("Exported: x.mxf", Some("x.mxf")), ("player", None)], "catalog");
-        assert_eq!(status, Status { text: "Exported: x.mxf", link: Some("x.mxf") });
-        assert_eq!(first(&[("", None)], "catalog"), Status { text: "catalog", link: None });
+        let done = Status { text: "Exported: x.mxf", link: Some("x.mxf"), tone: Tone::Done };
+        let status = first(&[Status { text: "", link: Some("a"), tone: Tone::Alert }, done, Status { text: "player", ..Default::default() }], "catalog");
+        assert_eq!(status, done);
+        assert_eq!(first(&[Status::default()], "catalog"), Status { text: "catalog", link: None, tone: Tone::Plain });
         assert!(open("Z:/no/such/file.mxf").is_err());
     }
 }

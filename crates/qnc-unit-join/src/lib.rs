@@ -53,8 +53,10 @@ pub struct Sound {
     pub channels: u16,
 }
 
-/// Puts `units` (MOV files, one picture stream and one PCM stream each) together into `out` (MXF).
-pub fn join(units: &[PathBuf], sound: Sound, rule: LoudnessRule, ffmpeg: &Path, out: &Path) -> Result<Joined> {
+/// Puts `units` (MOV files, one picture stream and one PCM stream each) together into `out`
+/// (MXF). `picture` empty copies the pictures; else it is how they are encoded once (an
+/// interlaced delivery from its lossless progressive units, user 2026-10-24).
+pub fn join(units: &[PathBuf], sound: Sound, rule: LoudnessRule, ffmpeg: &Path, out: &Path, picture: &[String]) -> Result<Joined> {
     if units.is_empty() {
         return Err("No unit to put together.".into());
     }
@@ -69,7 +71,7 @@ pub fn join(units: &[PathBuf], sound: Sound, rule: LoudnessRule, ffmpeg: &Path, 
             LaneOutcome { measured_lufs: lufs, true_peak_dbtp: peak, gain_db: qnc_loudness::export_gain(lufs, peak, target, rule.tolerance_lu, rule.true_peak_dbtp) }
         };
         let (a1, a2) = (lane(0, rule.a1_lufs), lane(1, rule.a2_lufs));
-        write(&list, sound, [a1.gain_db, a2.gain_db], ffmpeg, out)?;
+        write(&list, sound, [a1.gain_db, a2.gain_db], ffmpeg, out, picture)?;
         Ok(Joined { path: out.to_path_buf(), a1, a2 })
     });
     let _ = std::fs::remove_file(&list);
@@ -128,7 +130,7 @@ fn measure(list: &Path, sound: Sound, ffmpeg: &Path) -> Result<Vec<(Option<f64>,
 
 /// The joined file (MXF OP1a): the pictures copied, every output a mono track, A1/A2 at
 /// their gains.
-fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Path) -> Result<()> {
+fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Path, picture: &[String]) -> Result<()> {
     let mut command = Command::new(ffmpeg);
     command
         .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i"])
@@ -137,8 +139,12 @@ fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Pat
     for channel in 0..sound.channels {
         command.args(["-map", &format!("[a{channel}]")]);
     }
+    match picture.is_empty() {
+        true => command.args(["-c:v", "copy"]),
+        false => command.args(picture),
+    };
     let output = command
-        .args(["-c:v", "copy", "-c:a", "pcm_s24le", "-f", "mxf"])
+        .args(["-c:a", "pcm_s24le", "-f", "mxf"])
         .arg(out)
         .stdin(Stdio::null())
         .stdout(Stdio::null())

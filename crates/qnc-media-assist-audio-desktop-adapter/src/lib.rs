@@ -46,4 +46,8 @@ impl ShellDesktopApp for Adapter {
     fn footer_link(&self) -> Option<&str> {
         self.app.footer_status().link
     }
+
+    fn footer_tone(&self) -> qnc_status_line::Tone {
+        self.app.footer_status().tone
+    }
 }

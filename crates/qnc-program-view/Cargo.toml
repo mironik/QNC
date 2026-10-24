@@ -6,6 +6,7 @@ description = "QNC public piece: what a form shows of a story program (segments,
 
 [dependencies]
 qnc-ui-text = { workspace = true }
+qnc-status-line = { workspace = true }
 qnc-alert = { workspace = true }
 qnc-program-commands = { workspace = true }
 qnc-program-db = { workspace = true }

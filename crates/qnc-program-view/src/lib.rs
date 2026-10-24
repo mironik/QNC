@@ -131,6 +131,8 @@ pub struct SegmentsView {
     pub message: String,
     /// The file an export just wrote, while `message` says so (user 2026-10-24: a link).
     pub exported_file: Option<String>,
+    /// `message` says an export is running or failed (user 2026-10-24: shown red).
+    pub export_alert: bool,
     /// The segment being edited (Edit in the Segment tab), until Enter or Escape.
     pub editing: Option<String>,
     /// The program wave (A1 segments, A2 covers) from the stored clip waves.
@@ -163,6 +165,17 @@ pub struct SegmentsView {
 }
 
 impl SegmentsView {
+    /// The story's line of the status: its message, a finished export's file as the link
+    /// and green, an export running or failed red (user 2026-10-24).
+    pub fn status(&self) -> qnc_status_line::Status<'_> {
+        let tone = match (&self.exported_file, self.export_alert) {
+            (Some(_), _) => qnc_status_line::Tone::Done,
+            (None, true) => qnc_status_line::Tone::Alert,
+            _ => qnc_status_line::Tone::Plain,
+        };
+        qnc_status_line::Status { text: &self.message, link: self.exported_file.as_deref(), tone }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
     }

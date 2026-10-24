@@ -5045,6 +5045,7 @@ dependencies = [
  "qnc-program-loudness",
  "qnc-program-waveform",
  "qnc-source-timecode",
+ "qnc-status-line",
  "qnc-ui-text",
 ]
 
@@ -5315,6 +5316,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-board",
+ "qnc-status-line",
  "qnc-ui-text",
 ]
 
@@ -5323,6 +5325,7 @@ name = "qnc-shell-footer"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-status-line",
  "qnc-ui-text",
 ]
 

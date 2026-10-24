@@ -159,6 +159,8 @@ pub struct ProgramSegments {
     export_run: qnc_export_launch::ExportRun,
     /// The message of the last finished export and the file it wrote (its link).
     exported: Option<(String, String)>,
+    /// The message of an export running or failed (shown red, user 2026-10-24).
+    export_alert: Option<String>,
     /// The program's loudness and what it was measured for (placements, waves, rate).
     loudness: Option<(LoudnessKey, qnc_program_loudness::ProgramLoudness)>,
     /// The Wrap rows show a narrow video row instead of the filmstrip.

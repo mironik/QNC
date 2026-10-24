@@ -31,6 +31,9 @@ pub type Result<T> = std::result::Result<T, String>;
 /// Its description (`unit_media`) is written, never probed.
 pub const UNIT_FORMAT: u32 = 3;
 
+/// The codec of the lossless progressive units of an interlaced delivery (never a prerender).
+const INTERMEDIATE: &str = "ffv1_intermediate";
+
 /// The delivery format of the project (`export.*`), strictly: what this block cannot
 /// render is refused with a reason, never replaced.
 #[derive(Debug, Clone, PartialEq)]
@@ -40,6 +43,8 @@ pub struct Delivery {
     pub height: u32,
     pub fps: f64,
     pub interlaced: bool,
+    /// The upper field first (`field_order` `upper_first`), when interlaced.
+    pub top_first: bool,
     pub audio_sample_rate: u32,
     pub audio_channels: u16,
     /// The export block as saved (part of every unit's fingerprint).
@@ -61,6 +66,7 @@ impl Delivery {
             height: number("height").map(|v| v as u32).ok_or_else(|| missing("height"))?,
             fps: number("fps").ok_or_else(|| missing("fps"))?,
             interlaced: field_order != "progressive",
+            top_first: field_order != "lower_first",
             audio_sample_rate: number("audio_sample_rate").map(|v| v as u32).ok_or_else(|| missing("audio_sample_rate"))?,
             audio_channels: number("audio_channels").map(|v| v as u16).ok_or_else(|| missing("audio_channels"))?,
             saved: export.clone(),
@@ -76,7 +82,7 @@ impl Delivery {
     /// The delivery codec is one this block renders (checked when the settings are read).
     fn supported(&self) -> Result<()> {
         match self.video_codec.as_str() {
-            "h264" | "mpeg2_422_50mbit" => Ok(()),
+            "h264" | "mpeg2_422_50mbit" | INTERMEDIATE => Ok(()),
             other => Err(format!("Prerender jos ne zna kodek predaje '{other}'.")),
         }
     }
@@ -88,6 +94,8 @@ impl Delivery {
         let gop = self.fps.round().max(1.0) as u32;
         let (layout, args): (&str, Vec<&str>) = match self.video_codec.as_str() {
             "h264" => encoder::H264::here(ffmpeg).args(),
+            // Lossless, every picture its own (put together without encoding again).
+            INTERMEDIATE => return Ok(("yuv422p".into(), ["-c:v", "ffv1", "-level", "3", "-slices", "24", "-slicecrc", "0", "-g", "1"].map(String::from).to_vec())),
             _ => (
                 "yuv422p",
                 vec![
@@ -101,6 +109,50 @@ impl Delivery {
         let mut args: Vec<String> = args.into_iter().map(str::to_string).collect();
         args.extend(["-g".to_string(), gop.to_string()]);
         Ok((layout.to_string(), args))
+    }
+
+    /// The progressive units an interlaced delivery is made from (user 2026-10-24): the
+    /// story's own pictures at its own rate, lossless, so the delivery is encoded once, when
+    /// the units are put together (`interlaced_encode`).
+    pub fn intermediate(&self, story_fps: f64) -> Delivery {
+        let mut units = self.clone();
+        (units.video_codec, units.fps, units.interlaced, units.encoder) = (INTERMEDIATE.into(), story_fps, false, Some(INTERMEDIATE.into()));
+        units
+    }
+
+    /// The picture encoding of an interlaced delivery from its progressive units: a story
+    /// at twice the delivery's rate gives each picture a field (50p -> 50i, upper field
+    /// first as the delivery says); a story at the delivery's rate gives both fields of one
+    /// picture (progressive segmented frame). Only XDCAM HD422 is encoded interlaced here.
+    pub fn interlaced_encode(&self, ffmpeg: &Path, story_fps: f64) -> Result<Vec<String>> {
+        if !self.interlaced {
+            return Err("The delivery is progressive.".into());
+        }
+        if self.video_codec != "mpeg2_422_50mbit" {
+            return Err(qnc_ui_text::fill("render.interlaced_codec", &[("codec", &self.video_codec)]));
+        }
+        let field = if self.top_first { "tff" } else { "bff" };
+        let (layout, mut args) = self.encoder_args(ffmpeg)?;
+        let pairs = if (story_fps - 2.0 * self.fps).abs() < 0.01 {
+            format!("interlace=scan={field}:lowpass=0,")
+        } else if (story_fps - self.fps).abs() < 0.01 {
+            String::new()
+        } else {
+            return Err(qnc_ui_text::fill("render.rate_not_delivery", &[("story", &format!("{story_fps:.3}")), ("delivery", &format!("{:.3}", self.fps))]));
+        };
+        for arg in args.iter_mut().filter(|arg| *arg == "+cgop") {
+            *arg = "+cgop+ildct+ilme".into();
+        }
+        // The GOP of XDCAM HD422 interlaced: twelve frames.
+        if let Some(at) = args.iter().position(|arg| arg == "-g") {
+            args[at + 1] = "12".into();
+        }
+        let size = format!("{}x{}", self.width, self.height);
+        let mut all: Vec<String> = vec!["-vf".into(), format!("{pairs}scale={size}:flags=bicubic:interl=1,format={layout},setsar=1,setfield={field}")];
+        all.extend(args);
+        all.extend(["-top", if self.top_first { "1" } else { "0" }, "-alternate_scan", "1"].map(String::from));
+        all.extend(UNIT_TAGS.map(String::from));
+        Ok(all)
     }
 
     /// The layout asked of the decoder: 4:2:0 for a 4:2:0 delivery (converted in the

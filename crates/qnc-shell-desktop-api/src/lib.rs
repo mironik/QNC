@@ -41,6 +41,11 @@ pub trait ShellDesktopApp {
         None
     }
 
+    /// How the footer colours the status (user 2026-10-24: export running red, done green).
+    fn footer_tone(&self) -> qnc_status_line::Tone {
+        qnc_status_line::Tone::Plain
+    }
+
     fn on_activated(&mut self) {}
 
     /// The surface is no longer shown: it releases its player and stops telling the

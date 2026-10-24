@@ -923,5 +923,7 @@ fn the_export_box_opens_with_the_project_setting_chosen_and_says_what_is_exporte
     segments.apply(SegmentCommand::ExportChoose(0));
     assert!(segments.apply(SegmentCommand::ExportConfirm));
     assert!(!segments.export_open());
-    assert_eq!(segments.view().message, qnc_ui_text::text("export.running"), "XML is exported in the background");
+    let running = qnc_ui_text::fill("export.running", &[("format", qnc_ui_text::text("export.to_xml"))]);
+    assert_eq!(segments.view().message, running, "XML is exported in the background, its format named");
+    assert!(segments.view().export_alert, "an export running is shown red");
 }

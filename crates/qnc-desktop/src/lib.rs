@@ -369,6 +369,7 @@ impl QncShell {
             theme: self.theme_id,
             status: self.footer_status().to_string(),
             link: self.embedded_apps.get(&self.active_tab).and_then(|component| component.footer_link()).map(str::to_string),
+            tone: self.embedded_apps.get(&self.active_tab).map(|component| component.footer_tone()).unwrap_or_default(),
             project_open: self.tabs.project_open,
             intent: None,
         }
@@ -443,6 +444,7 @@ struct FooterBlock {
     theme: ThemeId,
     status: String,
     link: Option<String>,
+    tone: qnc_status_line::Tone,
     project_open: bool,
     intent: Option<FooterIntent>,
 }
@@ -453,7 +455,7 @@ impl qnc_board::FrameBlocks for FooterBlock {
             return;
         }
         let tabs: Vec<(&str, &str)> = self.tabs.iter().map(|(id, label)| (id.as_str(), label.as_str())).collect();
-        let input = FooterInput { tabs: &tabs, active_tab: &self.active_tab, theme: self.theme, status: &self.status, link: self.link.as_deref(), project_open: self.project_open };
+        let input = FooterInput { tabs: &tabs, active_tab: &self.active_tab, theme: self.theme, status: &self.status, link: self.link.as_deref(), tone: self.tone, project_open: self.project_open };
         self.intent = qnc_shell_footer::show(ui, rect, &self.style, &self.palette, input);
     }
 }

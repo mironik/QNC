@@ -120,8 +120,8 @@ impl EditorialApplication {
     pub fn footer_status(&self) -> qnc_status_line::Status<'_> {
         // The story's answer first (live 2026-10-18: a refused segment said why only under
         // the player's message, so nothing seemed to happen); an export's with its file.
-        let (segments, preview) = (&self.view.segments, &self.view.preview);
-        qnc_status_line::first(&[(&segments.message, segments.exported_file.as_deref()), (&preview.message, None)], &self.view.message)
+        let preview = qnc_status_line::Status::plain(&self.view.preview.message);
+        qnc_status_line::first(&[self.view.segments.status(), preview], &self.view.message)
     }
 
     pub fn has_player(&self) -> bool {

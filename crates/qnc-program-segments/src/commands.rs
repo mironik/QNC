@@ -126,7 +126,10 @@ impl ProgramSegments {
                     qnc_export_choice::Kind::Express => self.export_run.start(&["--express"]),
                     qnc_export_choice::Kind::Original | qnc_export_choice::Kind::Setting => self.export_run.start(&["--render", &picked.id]),
                 };
-                self.refresh_view(qnc_ui_text::text("export.running").to_string());
+                // "Exporting" with the format's name, red until it is done (user 2026-10-24).
+                let running = qnc_ui_text::fill("export.running", &[("format", &picked.label)]);
+                self.export_alert = Some(running.clone());
+                self.refresh_view(running);
             }
             SegmentCommand::ToggleNormalize => {
                 self.normalize = !self.normalize;
