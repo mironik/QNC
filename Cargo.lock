@@ -4883,6 +4883,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-program-loudness"
+version = "0.1.0"
+dependencies = [
+ "qnc-loudness",
+ "qnc-program-waveform",
+]
+
+[[package]]
 name = "qnc-program-output"
 version = "0.1.0"
 dependencies = [
@@ -4941,6 +4949,7 @@ dependencies = [
  "qnc-program-commands",
  "qnc-program-db",
  "qnc-program-filmstrip",
+ "qnc-program-loudness",
  "qnc-program-view",
  "qnc-program-waveform",
  "qnc-source-channels",
@@ -4961,6 +4970,7 @@ dependencies = [
  "qnc-program-commands",
  "qnc-program-db",
  "qnc-program-filmstrip",
+ "qnc-program-loudness",
  "qnc-program-waveform",
  "qnc-source-timecode",
  "qnc-ui-text",
@@ -4970,7 +4980,9 @@ dependencies = [
 name = "qnc-program-waveform"
 version = "0.1.0"
 dependencies = [
+ "qnc-loudness",
  "qnc-timeline-assets",
+ "qnc-wave",
 ]
 
 [[package]]

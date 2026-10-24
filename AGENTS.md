@@ -5728,3 +5728,16 @@ pojacanje, true peak, koeficijenti), `qnc-wave` (mjerenje u prolazu, rupa), osta
 (C0013: -22,96 / -22,9 LUFS, -4,87 / -4,9 dBTP; Mironik 3396 kanali 3 i 4: -40,70 / -40,7 i -38,97 / -39,0 LUFS).
 Conformance, release build. Nije izvedeno: glasnoca programa (A1/A2 price iz odsjecaka klipova), prekidac normalizacije
 u previewu, primjena u exportu.
+Izvedeno 2026-10-24 (korisnik: "nastavi s glasnocom price i precacem u previewu"): nova javna kocka
+`crates/qnc-program-loudness` (+ `contracts/modules/program-loudness.module.json`): integrirana glasnoca (LUFS) i true
+peak (dBTP) A1 i A2 price iz odsjecaka od 100 ms izmjerenih s valom svakog klipa; segmenti na A1, pokrivalice na A2, po
+izvornom IN/OUT-u, sa svojom razinom (iskljuceno je tisina, pa ni leadovi ne spustaju glasnocu); crossfade i J/L se ne
+racunaju. `qnc-program-waveform` uz val cita i glasnocu klipa (val bez nje cita ponovno dok ga radnik ne napravi s
+njom), `qnc-program-segments` je racuna kad se program, valovi ili stopa promijene (i s nacrtom zvuka), a
+`SegmentsView.loudness`/`normalize` ih nose. Zaglavlje panela Segmenti pokazuje A1 i A2 u LUFS (`~` dok nije sve
+izmjereno) i NORM dok je normalizacija ukljucena. Tipka N (nova akcija kataloga `toggle_loudness_normalize`, QNC preset,
+scope storyboard, s bilo kojeg panela) ukljucuje i iskljucuje normalizaciju; `qnc-source-preview::normalize_program`
+cilj uzima iz projekta (`audio_loudness`), pojacanje (cilj - izmjereno, najvise +-12 dB) daje izlaznoj razini A1/A2
+playera dok svira prica (uz nacrt razine, preko njega), i svakom novom otvaranju price. Izvorni klip na source timelineu se
+ne normalizira; izbor vrijedi dok aplikacija radi. Testovi `qnc-program-loudness`, `qnc-program-segments` (N),
+`qnc-source-preview` (razina), conformance, release build. Uzivo nije provjereno. Nije izvedeno: primjena u exportu.

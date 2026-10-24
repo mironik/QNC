@@ -24,7 +24,7 @@ fn a_lane_is_drawn_at_its_level_and_flat_when_off() {
 }
 
 fn wave(lanes: Vec<Vec<f32>>, duration_frames: u64) -> ClipWave {
-    ClipWave { lanes, duration_frames }
+    ClipWave { lanes, duration_frames, loudness: Vec::new() }
 }
 
 // v5 `base_segments_map_source_peaks_to_program_a1`.

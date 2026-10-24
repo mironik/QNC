@@ -6,3 +6,5 @@ description = "QNC public component: passive program waveform (A1 segments, A2 c
 
 [dependencies]
 qnc-timeline-assets = { workspace = true }
+qnc-loudness = { workspace = true }
+qnc-wave = { workspace = true }

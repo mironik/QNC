@@ -56,7 +56,12 @@ impl Placement {
 pub struct ClipWave {
     pub lanes: Vec<Vec<f32>>,
     pub duration_frames: u64,
+    /// The loudness of each channel measured with the wave (user 2026-10-24), when it was.
+    pub loudness: Vec<Option<qnc_loudness::ChannelLoudness>>,
 }
+
+/// What was read of a clip's wave: its lanes, whether it is the coarse one, its loudness.
+type ReadWave = (Vec<Vec<f32>>, bool, Vec<Option<qnc_loudness::ChannelLoudness>>);
 
 impl ClipWave {
     /// The lane of `channel`; channel 1 falls back to the next lane (v5
@@ -166,7 +171,7 @@ pub struct ProgramWaves {
     waves: HashMap<String, ClipWave>,
     retry_after: HashMap<String, Instant>,
     /// Waves read on the reading thread, by clip (None: not there yet), until taken.
-    read: Arc<std::sync::Mutex<Vec<(String, Option<(Vec<Vec<f32>>, bool)>)>>>,
+    read: Arc<std::sync::Mutex<Vec<(String, Option<ReadWave>)>>>,
     /// Clips whose wave is still the coarse one: read again until every frame's comes.
     coarse: std::collections::HashSet<String>,
     /// Grows with every wave taken in: the composed program is made again.
@@ -199,17 +204,19 @@ impl ProgramWaves {
         for (clip_id, lanes) in read {
             self.asked.remove(&clip_id);
             match (lanes, duration_frames(&clip_id)) {
-                (Some((lanes, coarse)), Some(duration_frames)) if duration_frames > 0 => {
-                    if coarse {
+                (Some((lanes, coarse, loudness)), Some(duration_frames)) if duration_frames > 0 => {
+                    // A wave without loudness (made before it was measured) is read again
+                    // until the worker makes it with it, as a coarse one.
+                    if coarse || loudness.iter().all(Option::is_none) {
                         self.coarse.insert(clip_id.clone());
                         self.retry_after.insert(clip_id.clone(), now + WAVE_RETRY_DELAY);
                     } else {
                         self.coarse.remove(&clip_id);
                     }
-                    if self.waves.get(&clip_id).is_none_or(|wave| wave.lanes != lanes) {
+                    if self.waves.get(&clip_id).is_none_or(|wave| wave.lanes != lanes || wave.loudness != loudness) {
                         self.revision += 1;
                     }
-                    self.waves.insert(clip_id, ClipWave { lanes, duration_frames });
+                    self.waves.insert(clip_id, ClipWave { lanes, duration_frames, loudness });
                 }
                 _ => _ = self.retry_after.insert(clip_id, now + WAVE_RETRY_DELAY),
             }
@@ -244,6 +251,17 @@ impl ProgramWaves {
         self.waves.get(clip_id).and_then(|wave| u16::try_from(wave.lanes.len()).ok()).filter(|count| *count > 0)
     }
 
+    /// The loudness of each channel of a clip measured with its wave and the clip's length
+    /// in frames; `None` before its wave is read.
+    pub fn clip_loudness(&self, clip_id: &str) -> Option<(&[Option<qnc_loudness::ChannelLoudness>], u64)> {
+        self.waves.get(clip_id).map(|wave| (wave.loudness.as_slice(), wave.duration_frames))
+    }
+
+    /// Grows with every wave taken in.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
     /// Whether waves are still being read.
     pub fn reading(&self) -> bool {
         !self.asked.is_empty()
@@ -273,13 +291,18 @@ impl ProgramWaves {
     }
 }
 
-fn read_wave(reader: &dyn TimelineArtifactRead, clip_id: &str) -> Option<(Vec<Vec<f32>>, bool)> {
+fn read_wave(reader: &dyn TimelineArtifactRead, clip_id: &str) -> Option<ReadWave> {
     let record = reader.read_wave(clip_id).ok()??;
     let peaks = record.peaks()?;
     let coarse = peaks.coarse;
     let lanes = [peaks.a1_peaks, peaks.a2_peaks, peaks.a3_peaks, peaks.a4_peaks];
     let lanes: Vec<Vec<f32>> = lanes.into_iter().collect();
-    lanes.iter().any(|lane| !lane.is_empty()).then_some((lanes, coarse))
+    let order = [qnc_wave::WaveLane::A1, qnc_wave::WaveLane::A2, qnc_wave::WaveLane::A3, qnc_wave::WaveLane::A4];
+    let loudness = order
+        .iter()
+        .map(|lane| record.loudness.iter().find(|measured| measured.lane == *lane).map(|measured| measured.measured.clone()))
+        .collect();
+    lanes.iter().any(|lane| !lane.is_empty()).then_some((lanes, coarse, loudness))
 }
 
 #[cfg(test)]

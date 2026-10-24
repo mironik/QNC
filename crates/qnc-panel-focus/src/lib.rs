@@ -28,7 +28,7 @@ pub use panel::*;
 
 /// Actions of the segment panel that also run from the other panels: they use
 /// the source the user marked (v5 dispatches them whatever the focus).
-const SOURCE_TO_PROGRAM: [&str; 6] = [
+const SOURCE_TO_PROGRAM: [&str; 7] = [
     "add_ton_segment",
     "add_off_segment",
     "quick_overwrite_cover",
@@ -36,6 +36,8 @@ const SOURCE_TO_PROGRAM: [&str; 6] = [
     // The switch Pokrivalice | Sync/B-roll sits on the source dock (user 2026-10-08).
     "cover_mode_covers",
     "cover_mode_sync",
+    // Normalising the program's loudness in the preview, from any panel (user 2026-10-24).
+    "toggle_loudness_normalize",
 ];
 
 /// What the answer of a key picture search moves.
@@ -130,6 +132,7 @@ impl PanelFocus {
         }
         qnc_segments_keys::dropped(preview, wrap, segments); // another edit took over
         qnc_sync_session::poll(preview, wrap, segments); // an IN pressed while the source plays starts Sync
+        preview.normalize_program(segments.normalization()); // the program's A1/A2 to the project's targets
         if let Some(answer) = self.keyframes.take() {
             match (self.jump.take(), answer) {
                 (Some(Jump::SourceMark), Ok(frames)) => {

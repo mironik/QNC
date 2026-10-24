@@ -18,6 +18,7 @@ qnc-part-sound = { workspace = true }
 qnc-virtual-shots = { workspace = true }
 qnc-sync-cover = { workspace = true }
 qnc-program-waveform = { workspace = true }
+qnc-program-loudness = { workspace = true }
 qnc-program-filmstrip = { workspace = true }
 qnc-source-timecode = { workspace = true }
 qnc-content-store = { workspace = true }

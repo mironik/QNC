@@ -109,6 +109,16 @@ impl ProgramSegments {
             }
             SegmentCommand::Purge(segment_id) => self.write(Operation::PurgeSegment { segment_id }),
             SegmentCommand::ToggleWrapVideo => self.video_compact = !self.video_compact,
+            SegmentCommand::ToggleNormalize => {
+                self.normalize = !self.normalize;
+                let measured = self.loudness.as_ref().map(|(_, measured)| *measured).unwrap_or_default();
+                let lufs = |value: Option<f64>| value.map_or("--".to_string(), |lufs| format!("{lufs:.1}"));
+                let message = match self.normalize {
+                    true => qnc_ui_text::fill("story.msg.normalize_on", &[("a1", &lufs(measured.a1_lufs)), ("a2", &lufs(measured.a2_lufs))]),
+                    false => qnc_ui_text::text("story.msg.normalize_off").to_string(),
+                };
+                self.refresh_view(message);
+            }
             SegmentCommand::Zoom { slot, frame } => self.zoom(slot, frame),
             SegmentCommand::ProgramZoom => self.zoom_program(),
             SegmentCommand::CloseZoom => {

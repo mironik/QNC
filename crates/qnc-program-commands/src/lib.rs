@@ -170,6 +170,9 @@ pub enum SegmentCommand {
     Redo,
     /// Ctrl+click on V of a Wrap row: filmstrip or narrow video row (user 2026-10-15).
     ToggleWrapVideo,
+    /// The preview normalises A1 and A2 of the program to the project's loudness targets, or
+    /// plays them as edited (user 2026-10-24: a key turns it on and off).
+    ToggleNormalize,
 }
 
 impl SegmentCommand {
@@ -240,6 +243,7 @@ impl SegmentCommand {
             "undo_object" => Self::Undo,
             "redo_object" => Self::Redo,
             "toggle_wrap_video" => Self::ToggleWrapVideo,
+            "toggle_loudness_normalize" => Self::ToggleNormalize,
             "wrap_zoom" => Self::Zoom { slot: None, frame: None },
             "cover_mode_covers" => Self::CoverMode { sync: false },
             "cover_mode_sync" => Self::CoverMode { sync: true },

@@ -1,0 +1,38 @@
+{
+  "module_id": "qnc.module.program-loudness",
+  "module_name": "Program loudness",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "audio.loudness.program"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "filesystem.read",
+    "filesystem.write",
+    "media.probe",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-program-loudness",
+  "input": "The A1 parts (segments) and A2 parts (covers) of a story on the program axis with their source IN/OUT, channel, level and off; the 100 ms loudness segments measured with each clip wave; the story rate.",
+  "output": "The gated integrated loudness (LUFS) and true peak (dBTP) of A1 and of A2 of the program, and whether every part that sounds was measured.",
+  "specification": "User 2026-10-24: the loudness of the story, normalised in the preview to the project targets (EBU R 128). Composed from what was measured; it reads, plays and writes nothing."
+}

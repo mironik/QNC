@@ -139,6 +139,9 @@
     "wheel_segments_ctrl_forward": {
       "label": "Ctrl+kotacic iznad panela Segmenti: razina uzetog zvuka segmenta ili pokrivalice vise"
     },
+    "toggle_loudness_normalize": {
+      "label": "Preview: glasnoca A1 i A2 price na cilj projekta (EBU R 128) ili kako je montirano"
+    },
     "toggle_wrap_video": {
       "label": "Wrap redovi: filmstrip ili uska video traka (Ctrl+klik na V)"
     },
@@ -788,6 +791,13 @@
           {
             "code": "KeyE",
             "ctrl": true,
+            "shift": false
+          }
+        ],
+        "toggle_loudness_normalize": [
+          {
+            "code": "KeyN",
+            "ctrl": false,
             "shift": false
           }
         ],

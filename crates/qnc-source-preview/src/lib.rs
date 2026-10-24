@@ -250,7 +250,17 @@ pub struct SourcePreview {
     /// The program was opened again with the draft (another channel): Escape opens it
     /// again from the story, a level no longer goes to the output.
     program_draft_reopened: bool,
+    /// The gains in dB that bring the program's A1 and A2 to the project's loudness targets,
+    /// while normalising is on (user 2026-10-24); the player's output level takes them.
+    normalize: Option<[f64; 2]>,
+    /// The level of outputs 1 and 2 of the program in percent before normalising (a drafted
+    /// level), and what the player was last given.
+    program_levels: [u16; 2],
+    levels_sent: Option<[u16; 2]>,
 }
+
+/// The most a normalising gain gives or takes in dB (the output level holds up to 400 %).
+const NORMALIZE_MAX_DB: f64 = 12.0;
 
 impl Default for SourcePreview {
     fn default() -> Self {
@@ -281,6 +291,9 @@ impl Default for SourcePreview {
             program_draft: None,
             cue_waiting: None,
             program_draft_reopened: false,
+            normalize: None,
+            program_levels: [100, 100],
+            levels_sent: None,
         }
     }
 }
@@ -384,6 +397,7 @@ impl SourcePreview {
         (self.cue_in_flight, self.cue_next, self.cue_asked, self.cue_waiting) = (None, None, None, None);
         self.play_when_ready = false;
         self.program = false;
+        self.levels_sent = None;
         if let Some(player) = &self.player {
             player.close();
         }
@@ -725,6 +739,7 @@ impl SourcePreview {
         self.program = true;
         self.cue_waiting = None;
         self.play_when_ready = false;
+        (self.program_levels, self.levels_sent) = ([100, 100], None);
         (self.cue_in_flight, self.cue_next, self.cue_asked) = (None, None, None);
         player.prepare_at(first_frame, program_launch(context, build));
         let view = player.view();
@@ -915,9 +930,59 @@ impl SourcePreview {
     }
 
     /// The level of outputs 1 and 2 in percent, heard at once; false when the player cannot
-    /// take it now.
+    /// take it now. A program's level is normalised on top while normalising is on.
     fn set_output_levels(&mut self, levels: [u16; 2]) -> bool {
-        self.player.as_ref().is_some_and(|player| player.send(Action::SetOutputLevels(levels)).is_ok())
+        let levels = match self.program {
+            true => {
+                self.program_levels = levels;
+                self.normalized(levels)
+            }
+            false => levels,
+        };
+        let sent = self.player.as_ref().is_some_and(|player| player.send(Action::SetOutputLevels(levels)).is_ok());
+        self.levels_sent = sent.then_some(levels).or(self.levels_sent);
+        sent
+    }
+
+    /// `levels` with the normalising gains on them, within what the output holds.
+    fn normalized(&self, levels: [u16; 2]) -> [u16; 2] {
+        let gains = self.normalize.unwrap_or_default();
+        let level = |percent: u16, db: f64| (f64::from(percent) * 10f64.powf(db / 20.0)).round().clamp(0.0, 400.0) as u16;
+        [level(levels[0], gains[0]), level(levels[1], gains[1])]
+    }
+
+    /// The program's A1 and A2 brought to the project's loudness targets (user 2026-10-24)
+    /// from their measured loudness (`None`: as edited); a side not measured keeps its level.
+    /// Heard at once while a program plays. False when nothing changed.
+    pub fn normalize_program(&mut self, measured: Option<[Option<f64>; 2]>) -> bool {
+        let targets = self.context.as_ref().and_then(|context| context.settings.audio_loudness().ok());
+        let gains = measured.zip(targets).map(|(measured, targets)| {
+            let gain = |target: f64, measured: Option<f64>| {
+                measured.map_or(0.0, |lufs| (target - lufs).clamp(-NORMALIZE_MAX_DB, NORMALIZE_MAX_DB))
+            };
+            [gain(targets.a1_lufs, measured[0]), gain(targets.a2_lufs, measured[1])]
+        });
+        if self.normalize == gains {
+            return false;
+        }
+        self.normalize = gains;
+        self.send_program_levels()
+    }
+
+    /// The program's output levels to the player when it has not got them yet.
+    fn send_program_levels(&mut self) -> bool {
+        if !self.program || !self.player_view.has_confirmed_position() {
+            return false;
+        }
+        let levels = self.normalized(self.program_levels);
+        if self.levels_sent == Some(levels) {
+            return false;
+        }
+        let sent = self.player.as_ref().is_some_and(|player| player.send(Action::SetOutputLevels(levels)).is_ok());
+        if sent {
+            self.levels_sent = Some(levels);
+        }
+        sent
     }
 
     fn send(&mut self, action: Action) -> bool {
@@ -1025,6 +1090,8 @@ impl SourcePreview {
             self.cue_asked = None;
         }
         self.release_cue();
+        // A program opened (again) gets its normalised levels once the player is ready.
+        changed |= self.send_program_levels();
         if self.player_view.has_confirmed_position() {
             if let Some(frame) = self.cue_waiting.take() {
                 self.cue(frame);
@@ -1090,6 +1157,19 @@ impl Drop for SourcePreview {
 
 #[cfg(test)]
 mod tests {
+    /// Normalising multiplies the program's output level by the gain to the target (user
+    /// 2026-10-24), within what the output holds.
+    #[test]
+    fn a_normalising_gain_is_on_top_of_the_program_level_within_the_output() {
+        let mut preview = super::SourcePreview::new();
+        preview.normalize = Some([6.0, -6.0]);
+        assert_eq!(preview.normalized([100, 100]), [200, 50]);
+        preview.normalize = Some([12.0, 0.0]);
+        assert_eq!(preview.normalized([200, 100]), [400, 100], "the output holds at most 400 %");
+        preview.normalize = None;
+        assert_eq!(preview.normalized([100, 80]), [100, 80]);
+    }
+
     #[test]
     fn a_drafted_level_opens_the_program_with_the_draft_never_the_whole_output() {
         let sound = |level_db: i8| SoundDraft { lane: 0, id: "s".into(), channel: 0, level_db, off: false, overlaps: Vec::new(), picture_lead: None };

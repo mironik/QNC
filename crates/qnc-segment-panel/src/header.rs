@@ -24,6 +24,20 @@ pub(crate) fn header(ui: &mut egui::Ui, segments: &SegmentsView, style: SegmentP
             ui.add_space(18.0);
             value(ui, &segments.timecode(segment_frames), style.segment);
             label(ui, qnc_ui_text::text("pool.tab.segment"), style.muted);
+            // The loudness of A1 and A2 (user 2026-10-24: EBU R 128), NORM while the preview
+            // normalises them to the project's targets.
+            if let Some(measured) = segments.loudness {
+                ui.add_space(18.0);
+                if segments.normalize {
+                    value(ui, qnc_ui_text::text("story.ui.normalized"), style.playhead);
+                }
+                let lufs = |value: Option<f64>| value.map_or("--".to_string(), |lufs| format!("{lufs:.1}"));
+                let mark = if measured.complete { "" } else { "~" };
+                value(ui, &format!("{mark}{} LUFS", lufs(measured.a2_lufs)), style.segment);
+                label(ui, "A2", style.muted);
+                value(ui, &format!("{mark}{}", lufs(measured.a1_lufs)), style.segment);
+                label(ui, "A1", style.muted);
+            }
         });
     });
 }

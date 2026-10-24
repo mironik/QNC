@@ -133,6 +133,10 @@ pub struct SegmentsView {
     pub editing: Option<String>,
     /// The program wave (A1 segments, A2 covers) from the stored clip waves.
     pub peaks: qnc_program_waveform::ProgramPeaks,
+    /// The loudness of A1 and A2 (user 2026-10-24: EBU R 128), and whether the preview
+    /// normalises them to the project's targets.
+    pub loudness: Option<qnc_program_loudness::ProgramLoudness>,
+    pub normalize: bool,
     /// The Wrap rows show a narrow video row instead of the filmstrip (Ctrl+click on V,
     /// user 2026-10-15).
     pub video_compact: bool,

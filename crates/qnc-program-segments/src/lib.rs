@@ -133,6 +133,9 @@ pub struct NewSegment {
     pub a1_off: bool,
 }
 
+/// What a measured loudness belongs to: program length, rate, waves read, A1 and A2 parts.
+type LoudnessKey = (u64, (u32, u32), u64, Vec<qnc_program_waveform::Placement>, Vec<qnc_program_waveform::Placement>);
+
 /// The program of the active project: read, written and turned into a view.
 #[derive(Default)]
 pub struct ProgramSegments {
@@ -147,6 +150,11 @@ pub struct ProgramSegments {
     waves: qnc_program_waveform::ProgramWaves,
     /// The stored filmstrips of the clips the program shows (Wrap row pictures).
     filmstrips: qnc_program_filmstrip::ProgramFilmstrips,
+    /// The preview normalises the program's A1 and A2 (user 2026-10-24); off when the
+    /// application starts.
+    normalize: bool,
+    /// The program's loudness and what it was measured for (placements, waves, rate).
+    loudness: Option<(LoudnessKey, qnc_program_loudness::ProgramLoudness)>,
     /// The Wrap rows show a narrow video row instead of the filmstrip.
     video_compact: bool,
     project_id: String,
@@ -339,6 +347,8 @@ impl ProgramSegments {
         }
         let mut view = self.view.clone();
         view.peaks = self.waves.peaks(view.total_frames, &segments, &covers, |id| durations.get(id).copied());
+        view.loudness = self.loudness_of(&view, segments, covers);
+        view.normalize = self.normalize;
         view.video_compact = self.video_compact;
         if !self.video_compact {
             view.pictures = self.filmstrips.pictures(&view.picture_placements(), |id| durations.get(id).copied(), |id| posters.get(id).cloned());
@@ -347,6 +357,36 @@ impl ProgramSegments {
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| durations.get(id).copied());
         qnc_program_view::mark_clip_edges(&mut view.source_edit_stills, |id| durations.get(id).copied());
         view
+    }
+
+    /// The loudness of A1 and A2 as heard (drafts too), measured again only when the program,
+    /// the waves read or the rate changed.
+    fn loudness_of(
+        &mut self,
+        view: &SegmentsView,
+        segments: Vec<qnc_program_waveform::Placement>,
+        covers: Vec<qnc_program_waveform::Placement>,
+    ) -> Option<qnc_program_loudness::ProgramLoudness> {
+        let rate = view.timebase?;
+        let key = (view.total_frames, rate, self.waves.revision(), segments, covers);
+        if let Some((kept, measured)) = &self.loudness {
+            if *kept == key {
+                return Some(*measured);
+            }
+        }
+        let waves = &self.waves;
+        let measured = qnc_program_loudness::measure(key.0, rate, &key.3, &key.4, |id| {
+            waves.clip_loudness(id).map(|(channels, duration_frames)| qnc_program_loudness::ClipMeasure { channels, duration_frames })
+        });
+        self.loudness = Some((key, measured));
+        Some(measured)
+    }
+
+    /// What the preview normalises to the project's targets: the measured A1 and A2, while
+    /// normalising is on.
+    pub fn normalization(&self) -> Option<[Option<f64>; 2]> {
+        let measured = self.loudness.as_ref().map(|(_, measured)| *measured).unwrap_or_default();
+        self.normalize.then_some([measured.a1_lufs, measured.a2_lufs])
     }
 
     pub fn has_pending_work(&self) -> bool {
