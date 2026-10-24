@@ -759,6 +759,24 @@ fn an_in_pressed_while_the_source_plays_starts_sync_once_it_is_armed() {
 }
 
 #[test]
+fn an_in_on_the_fly_while_a_sync_plays_starts_it_again_from_that_in() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::ToggleSync);
+    segments.arm_sync(false);
+    segments.set_source(marked(13));
+    let SyncSpace::Start(first) = segments.sync_space(false) else { panic!("Sync starts") };
+    assert_eq!(first.source_in, 13);
+    // Live 2026-10-24: I while the Sync plays reached it as Space and paused it after one frame.
+    segments.arm_sync(true);
+    segments.set_source(marked(17));
+    assert!(segments.take_sync_flight(), "the IN on the fly starts the Sync");
+    let SyncSpace::Start(again) = segments.sync_space(false) else { panic!("it starts again, not a pause") };
+    assert_eq!(again.source_in, 17, "from the new IN");
+    assert_eq!(again.window.0, first.window.0, "from the same marker");
+}
+
+#[test]
 fn replace_exclude_or_a_new_segment_end_an_open_edit() {
     let mut segments = component();
     let id = segments.view().rows[0].segment_id.clone();

@@ -37,6 +37,12 @@ impl ProgramSegments {
             return;
         }
         self.sync_flight_ready = flight;
+        // An IN on the fly while a Sync already plays starts it again from this IN (live
+        // 2026-10-24: the IN reached the running Sync as Space, paused the source and left a
+        // cover of one frame).
+        if flight && self.sync.is_active() && !self.sync.stopped() {
+            self.sync.cancel();
+        }
         let rate = |value: i64| u32::try_from(value).unwrap_or(0);
         self.sync.arm(SyncSource {
             clip_id: clip_id.clone(),
@@ -167,6 +173,11 @@ impl ProgramSegments {
     }
 
     /// Whether a Sync is running or stopped with a draft that Enter writes, Delete drops.
+    /// Sync on and an IN armed it: Space starts the Sync play.
+    pub fn sync_armed(&self) -> bool {
+        self.sync.wants_space()
+    }
+
     pub fn sync_drafting(&self) -> bool {
         self.sync.is_active()
     }
@@ -213,8 +224,11 @@ impl ProgramSegments {
 
     /// The source frame the source timeline shows during Sync, and the IN/OUT of
     /// a closed Sync slot (v5 `set_source_playhead_frame`).
+    /// Only on the Sync's own clip (live 2026-10-24: a Sync waiting for Enter put its IN/OUT
+    /// on the source timeline of every clip chosen in the pool).
     pub fn sync_source(&self) -> Option<(u64, Option<(u64, u64)>)> {
-        self.sync.source_view()
+        let own = self.sync.source_clip().is_some_and(|clip| self.source.clip_id.as_deref() == Some(clip));
+        own.then(|| self.sync.source_view()).flatten()
     }
 
     /// Enter is taken by a running Sync play, a closed Sync slot or its cover write.

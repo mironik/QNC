@@ -120,7 +120,7 @@ impl PanelFocus {
             // marks IN, so it arms Sync/B-roll as I does.
             qnc_source_timeline::CUT => {
                 self.panel = Panel::SourceTimeline;
-                qnc_sync_session::armed_by_in(segments, preview);
+                qnc_sync_session::armed_by_in(segments, preview, wrap);
                 Some(self.source.route_input(id, None, preview, timeline))
             }
             _ => {
@@ -286,7 +286,7 @@ impl PanelFocus {
             "mark_in" | "mark_out" => {
                 qnc_source_mark_focus::release(timeline); // a new mark lets go of a taken one
                 if action_id == "mark_in" {
-                    qnc_sync_session::armed_by_in(segments, preview); // v5: every IN arms Sync/B-roll
+                    qnc_sync_session::armed_by_in(segments, preview, wrap); // v5: every IN arms Sync/B-roll
                 }
                 return self.source.route(action_id, preview, timeline);
             }

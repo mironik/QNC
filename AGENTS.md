@@ -5793,3 +5793,14 @@ bez B-slika) kopira se bez ponovnog kodiranja; svaki izlaz zvuka je svoja mono t
 OP1a; Express 4 dijela 36 s, A1 -23,0 LUFS (ffmpeg ebur128). Probano i XDCAM HD422 50 Mbit 1080p50 u MXF (2124 slike,
 4:2:2) za kasniji export iz originala. Otvoreno: pocetni timecode datoteke je 00:00:00:00 (mnoge TV kuce traze
 10:00:00:00; ceka odluku i postavku projekta). Testovi, conformance.
+Popravak 2026-10-24 (korisnik: "pokvario si montazu sync/b-roll"; "bilo koji klip da odaberem na media poolu on postavlja
+source timeline ovako"; "provjeri gdje si zeznuo"): log i baza stvarnog projekta (samo citanje) pokazali su tri greske Sync
+puta; danasnje izmjene (leadovi, zoom, glasnoca, export) nisu dirale Sync kocke, a sva tri uzroka su u kodu od 20. 10.:
+(1) I u letu dok Sync vec svira stizao je Syncu kao Space, pa je zaustavio izvor nakon jedne slike i ostavio pokrivalicu od
+jedne slike (505-506 u projektu); sada I u letu dok Sync svira pocinje Sync ispocetka od tog IN-a, od istog markera
+(`qnc-program-segments` `arm_sync_on_new_in`, test `an_in_on_the_fly_while_a_sync_plays_starts_it_again_from_that_in`).
+(2) Sync koji ceka Enter crtao je svoj IN/OUT na source timelineu svakog klipa izabranog u poolu; sada samo na svom klipu
+(`qnc-sync-cover` `source_clip`, `qnc-program-segments` `sync_source`). (3) Ukljucivanje Synca stavlja Wrap playhead na
+najblizi marker, pa je Space nakon IN-a pustao pricu umjesto Synca; IN koji naoruza Sync sada izlazi iz Wrapa
+(`qnc-sync-session` `armed_by_in`, `qnc-program-segments` `sync_armed`). Testovi, zlatna tablica tipki, conformance.
+Uzivo nije provjereno.

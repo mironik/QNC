@@ -49,8 +49,13 @@ pub fn route(
 /// I pressed on the source: every press arms Sync/B-roll (v5 `mark_in_action`); pressed
 /// while the source plays, Sync starts at once (user 2026-10-19: "IN chosen on the fly
 /// while it plays, and Sync/B-roll writes the cover").
-pub fn armed_by_in(segments: &mut ProgramSegments, preview: &SourcePreview) {
+/// The IN is the source's: an armed Sync leaves Wrap (live 2026-10-24: Sync on put the Wrap
+/// playhead on the nearest marker, so Space after IN played the story, not the Sync).
+pub fn armed_by_in(segments: &mut ProgramSegments, preview: &SourcePreview, wrap: &mut WrapSession) {
     segments.arm_sync(preview.player_view().playing());
+    if segments.sync_armed() {
+        wrap.leave();
+    }
 }
 
 /// Once a frame: an IN armed on the fly starts its Sync.

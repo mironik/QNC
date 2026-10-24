@@ -419,6 +419,15 @@ impl SyncCover {
         ))
     }
 
+    /// The clip the Sync's IN and OUT belong to (its play, closed slot or cover waiting).
+    pub fn source_clip(&self) -> Option<&str> {
+        let source = match &self.active {
+            Some(session) => &session.source,
+            None => &self.pending.as_ref().or(self.ready.as_ref().map(|(_, slot)| slot))?.source,
+        };
+        Some(source.clip_id.as_str())
+    }
+
     /// The user pointed elsewhere on the program: a running Sync play stops.
     pub fn cancel(&mut self) -> bool {
         self.active.take().is_some()
