@@ -13,7 +13,6 @@
 //! `qnc-prerender [--root <QNC root>] [--units <n> (at most n, then end)] [--list 1]`
 
 use std::{
-    io,
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -25,7 +24,7 @@ use std::{
 use qnc_broadcast_engine::ProgramPlan;
 use qnc_content_store::ContentTarget;
 use qnc_media_metadata::MediaRepresentation;
-use qnc_media_stream::{CodecEndpoint, LocalSource, MediaStream, SourceReference};
+use qnc_media_stream::SourceReference;
 use qnc_player_input::InputReader;
 use qnc_prerender_db::{PrerenderReader, PrerenderWriter, RenderedUnit};
 use qnc_program_render::Delivery;
@@ -99,7 +98,7 @@ fn run() -> Result<()> {
         .collect();
     let project_source = settings.project_media_source_uri().map_err(|e| e.to_string())?;
     roots.push((project_source.clone(), project_dir.clone()));
-    let access = move |media: &MediaRepresentation| media_access(&roots, media);
+    let access = move |media: &MediaRepresentation| qnc_program_render::local_access(&roots, media);
     let decoders = qnc_decoder_catalog::installed_config().map_err(|e| e.to_string())?;
     // The encoder is the ffmpeg of the installed decoder catalog (the player's toolchain).
     let ffmpeg = qnc_decoder_catalog::installed_deployment().map_err(|e| e.to_string())?.executable;
@@ -346,23 +345,4 @@ fn say(line: String) {
     if qnc_dev_diagnostics::player_diagnostics_enabled() {
         qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("prerender {line}"));
     }
-}
-
-/// The endpoint of a medium of the story: its QNC URI bound to a local root of this host
-/// (a card source or the project folder), the same binding the player gets.
-fn media_access(roots: &[(String, PathBuf)], media: &MediaRepresentation) -> io::Result<(CodecEndpoint, String)> {
-    let invalid = |message: String| io::Error::new(io::ErrorKind::InvalidInput, message);
-    let reference = SourceReference::from_uri(&media.media_uri).map_err(|e| invalid(e.to_string()))?;
-    let (source_uri, root) = roots
-        .iter()
-        .find(|(uri, _)| uri == reference.source_uri())
-        .ok_or_else(|| invalid(format!("no binding for {}", reference.source_uri())))?;
-    let root = root.canonicalize()?;
-    let path = root.join(reference.relative_path()).canonicalize()?;
-    if !path.starts_with(&root) || !path.is_file() {
-        return Err(invalid("media escapes its source binding".into()));
-    }
-    let source = LocalSource::new(source_uri, &root).map_err(|e| invalid(e.to_string()))?;
-    let stamp = MediaStream::local(&source, &media.media_uri)?.info().storage_stamp.clone();
-    Ok((CodecEndpoint::for_local_file(path, &media.media_uri)?, stamp))
 }

@@ -1,0 +1,8 @@
+[package]
+name = "qnc-unit-join"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: rendered units of a story put together into one file (pictures and sound copied), A1/A2 brought to the project's loudness rule only when outside it"
+
+[dependencies]
+qnc-loudness = { workspace = true }

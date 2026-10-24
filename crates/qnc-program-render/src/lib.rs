@@ -489,5 +489,24 @@ fn next_picture(
     }
 }
 
+/// The endpoint of a medium of the story: its QNC URI bound to a local root of this host
+/// (a card source or the project folder), the same binding the player gets.
+pub fn local_access(roots: &[(String, std::path::PathBuf)], media: &MediaRepresentation) -> io::Result<(CodecEndpoint, String)> {
+    let invalid = |message: String| io::Error::new(io::ErrorKind::InvalidInput, message);
+    let reference = qnc_media_stream::SourceReference::from_uri(&media.media_uri).map_err(|e| invalid(e.to_string()))?;
+    let (source_uri, root) = roots
+        .iter()
+        .find(|(uri, _)| uri == reference.source_uri())
+        .ok_or_else(|| invalid(format!("no binding for {}", reference.source_uri())))?;
+    let root = root.canonicalize()?;
+    let path = root.join(reference.relative_path()).canonicalize()?;
+    if !path.starts_with(&root) || !path.is_file() {
+        return Err(invalid("media escapes its source binding".into()));
+    }
+    let source = qnc_media_stream::LocalSource::new(source_uri, &root).map_err(|e| invalid(e.to_string()))?;
+    let stamp = qnc_media_stream::MediaStream::local(&source, &media.media_uri)?.info().storage_stamp.clone();
+    Ok((CodecEndpoint::for_local_file(path, &media.media_uri)?, stamp))
+}
+
 #[cfg(test)]
 mod tests;

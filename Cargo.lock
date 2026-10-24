@@ -3637,15 +3637,21 @@ dependencies = [
 name = "qnc-export"
 version = "0.1.0"
 dependencies = [
+ "qnc-broadcast-engine",
  "qnc-content-store",
  "qnc-db-broker",
+ "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
  "qnc-fcp7-xml",
+ "qnc-media-metadata",
  "qnc-media-stream",
  "qnc-player-clip-content",
  "qnc-player-input",
+ "qnc-prerender-db",
  "qnc-program-input",
+ "qnc-program-render",
  "qnc-source-bindings",
+ "qnc-unit-join",
  "qnc-work-settings",
  "serde_json",
 ]
@@ -5743,6 +5749,13 @@ dependencies = [
  "qnc-dev-diagnostics",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "qnc-unit-join"
+version = "0.1.0"
+dependencies = [
+ "qnc-loudness",
 ]
 
 [[package]]

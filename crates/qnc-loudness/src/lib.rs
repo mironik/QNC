@@ -125,6 +125,20 @@ pub fn energy_gain(db: f64) -> f64 {
     10f64.powf(db / 10.0)
 }
 
+/// The gain in dB an export gives a lane (user 2026-10-24): none when its loudness is within
+/// `tolerance_lu` of `target_lufs` and its true peak at most `limit_dbtp` (the user's levels
+/// are kept), else what brings it to the target, lowered so the true peak stays at the limit.
+/// A lane where nothing passes the gates (silence) gets none.
+pub fn export_gain(measured_lufs: Option<f64>, true_peak_dbtp: f64, target_lufs: f64, tolerance_lu: f64, limit_dbtp: f64) -> f64 {
+    let Some(measured) = measured_lufs else {
+        return 0.0;
+    };
+    if (measured - target_lufs).abs() <= tolerance_lu && true_peak_dbtp <= limit_dbtp {
+        return 0.0;
+    }
+    (target_lufs - measured).min(limit_dbtp - true_peak_dbtp)
+}
+
 /// dB of a linear peak (dBTP for a true peak).
 pub fn peak_db(peak: f64) -> f64 {
     if peak <= 0.0 {
@@ -219,6 +233,16 @@ impl TruePeak {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn an_export_keeps_levels_within_the_rule_and_brings_the_others_to_the_target() {
+        use super::export_gain;
+        assert_eq!(export_gain(Some(-23.3), -4.0, -23.0, 0.5, -1.0), 0.0, "within the tolerance: kept");
+        assert_eq!(export_gain(Some(-30.0), -10.0, -23.0, 0.5, -1.0), 7.0, "too quiet: to the target");
+        assert_eq!(export_gain(Some(-30.0), -3.0, -23.0, 0.5, -1.0), 2.0, "the true peak limits the gain");
+        assert_eq!(export_gain(Some(-23.0), 0.5, -23.0, 0.5, -1.0), -1.5, "over the peak: lowered to the limit");
+        assert_eq!(export_gain(None, f64::NEG_INFINITY, -23.0, 0.5, -1.0), 0.0, "silence: nothing");
+    }
+
     use super::*;
 
     fn sine(meter: &mut Meter, rate: u32, hz: f64, amplitude: f64, seconds: f64, phase: f64) {

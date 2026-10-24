@@ -137,6 +137,7 @@ members = [
     "crates/qnc-mp4-sound",
     "crates/qnc-level-meter",
     "crates/qnc-loudness",
+    "crates/qnc-unit-join",
     "crates/qnc-program-loudness",
     "crates/qnc-export-choice",
     "crates/qnc-export-box",
@@ -364,6 +365,7 @@ qnc-mxf-index = { path = "crates/qnc-mxf-index" }
 qnc-mp4-sound = { path = "crates/qnc-mp4-sound" }
 qnc-level-meter = { path = "crates/qnc-level-meter" }
 qnc-loudness = { path = "crates/qnc-loudness" }
+qnc-unit-join = { path = "crates/qnc-unit-join" }
 qnc-program-loudness = { path = "crates/qnc-program-loudness" }
 qnc-export-choice = { path = "crates/qnc-export-choice" }
 qnc-export-box = { path = "crates/qnc-export-box" }

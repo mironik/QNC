@@ -2,9 +2,15 @@
 name = "qnc-export"
 version = "0.1.0"
 edition = "2021"
-description = "QNC tool: export of the active project's story (FCP7 XML into the project's export folder); reads the project database and media only"
+description = "QNC tool: export of the active project's story (FCP7 XML, or the prerender put together, into the project's export folder); reads the project database and media only"
 
 [dependencies]
+qnc-broadcast-engine.workspace = true
+qnc-decoder-catalog.workspace = true
+qnc-media-metadata.workspace = true
+qnc-prerender-db.workspace = true
+qnc-program-render.workspace = true
+qnc-unit-join.workspace = true
 qnc-content-store.workspace = true
 qnc-db-broker.workspace = true
 qnc-dev-diagnostics.workspace = true
@@ -16,3 +22,7 @@ qnc-player-clip-content.workspace = true
 qnc-source-bindings.workspace = true
 qnc-work-settings.workspace = true
 serde_json.workspace = true
+
+[features]
+# The decoder of the player process (FFmpeg libraries), as the prerender has it.
+libav = ["qnc-decoder-catalog/libav"]

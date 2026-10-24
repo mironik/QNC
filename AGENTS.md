@@ -5770,3 +5770,18 @@ javlja "Exporting..." pa put ili gresku; Express, Original i postavke jos samo j
 prerender) uklonjene. Provjereno na izoliranoj kopiji aktivnog projekta (`iso3`, baze kopirane, kartica samo citana):
 XML ispravan (xml parser), 4 clip itema, putanje na originale na kartici, timecode 06:35:53:24. Testovi, conformance,
 release build. Kroz sucelje nije provjereno.
+Izvedeno 2026-10-24 (korisnik: "da, Express tako, Original tako, nastavi"): Express izvoz. Nova javna kocka
+`crates/qnc-unit-join` (+ ugovor `contracts/modules/unit-join.module.json`): gotovi dijelovi prerendera price redom spojeni u
+jednu datoteku ffmpegom kataloga dekodera (slika i zvuk kopirani, bez ponovnog renderiranja); prije spajanja mjeri spojeni
+zvuk (`qnc-loudness`, EBU R 128 / BS.1770-4); A1 (izlaz 1) i A2 (izlaz 2) zadrzavaju korisnikove razine kad su unutar cilja
++- tolerancije i ispod granice vrha, inace svaki dobiva pojacanje do svog cilja, smanjeno da vrh ostane na granici
+(`qnc-loudness::export_gain`, test), i samo se zvuk ponovno pise (PCM 24-bit); ostali izlazi ostaju. Datoteka se pise
+jednom pod konacnim imenom (mapa projekta ne dopusta preimenovanje). `tools/qnc-export --express`: dijelovi price kao u
+prerenderu (isti otisci); dio koji prerender jos nema renderira se samo za izvoz u privremenu mapu sustava i brise poslije;
+izlaz `<projekt>_<revizija>_express.mov` u mapi izvoza projekta. Gumb Export: Express se pokrece kao XML
+(`qnc-program-segments`), poruka `export.written`. Citanje medija za render (`local_access`) premjesteno iz
+`tools/qnc-prerender` u `qnc-program-render` (jedna kopija za prerender i izvoz). Provjereno na izoliranoj kopiji `iso3`
+(kartica samo citana): 4 dijela renderirana iz originala za 40 s, 2124 slike i 2039040 uzoraka (tocno 960 po slici), A1
+-27,4 LUFS doveden na -23,0 (ffmpeg ebur128 potvrdjuje -23,0), A2 tisina bez pojacanja. Original nije izveden: originali su
+XAVC H.264 4:2:2 10-bit, a ffmpeg ovog racunala (LGPL, Intel QSV) nema koder za H.264 4:2:2 10-bit (ima ProRes, DNxHR,
+MPEG-2); zamjenski kodek se ne bira bez odluke korisnika. Testovi, conformance. Uzivo kroz sucelje nije provjereno.

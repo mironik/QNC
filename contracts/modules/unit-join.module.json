@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.unit-join",
+  "module_name": "Unit join",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "export.join_units",
+    "audio.loudness.export_rule"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.probe",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-unit-join",
+  "input": "The rendered unit files of a story in order (MOV: one picture stream, one PCM stream), the sound rate and outputs, the project's loudness rule (audio.loudness) and the ffmpeg of the installed decoder catalog.",
+  "output": "One MOV file under its final name: pictures copied; sound copied when A1 and A2 are within target +- tolerance and under the true peak limit, else A1/A2 at the gain that brings them to the target (limited by the true peak), PCM 24-bit; the measured loudness, true peak and gain of A1 and A2.",
+  "specification": "User 2026-10-24: Express export puts the prerender together without rendering again; the user's levels are kept when they fit the EBU rule."
+}
