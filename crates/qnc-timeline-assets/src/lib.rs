@@ -341,7 +341,7 @@ fn filmstrip_pictures(
 
 fn ready_wave(record: &WaveArtifactRecord) -> Option<WaveformPeaks> {
     qnc_wave::validate_artifact(record).ok()?;
-    (record.render_version == qnc_wave::WAVE_RENDER_VERSION)
+    qnc_wave::shown_render_version(record.render_version)
         .then(|| record.peaks())
         .flatten()
 }
@@ -399,6 +399,7 @@ mod tests {
             warning: None,
             render_version: qnc_wave::WAVE_RENDER_VERSION,
             coarse: false,
+            loudness: Vec::new(),
         };
 
         let peaks = ready_wave(&record).expect("ready wave");

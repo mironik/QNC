@@ -1,0 +1,8 @@
+[package]
+name = "qnc-loudness"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: loudness of a sound channel after EBU R 128 / ITU-R BS.1770-4 (K-weighting, 100 ms segments, gated integrated loudness, 4x true peak)"
+
+[dependencies]
+serde = { workspace = true }

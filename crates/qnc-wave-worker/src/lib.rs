@@ -784,14 +784,24 @@ fn build_timeline_wave(
     // The filmstrip reads its own pictures before the waves (user 2026-10-18: up to 10 s a
     // clip is read through, a longer one gives the intra picture nearest each of 13 places),
     // so the pass reads only the sound.
-    let (lane_peaks, coarse) = match coarse_first.then(|| decode_wave(&plan, media, source, true, cancel)).transpose()?.flatten() {
+    let (lanes, coarse) = match coarse_first.then(|| decode_wave(&plan, media, source, true, cancel)).transpose()?.flatten() {
         Some(lanes) => (lanes, true),
         None => (decode_wave(&plan, media, source, false, cancel)?.ok_or("wave: no full wave")?, false),
     };
-    let has_a2 = lane_peaks.iter().any(|(lane, _)| *lane == WaveLane::A2);
+    let has_a2 = lanes.iter().any(|(lane, ..)| *lane == WaveLane::A2);
     let warning = (!has_a2).then(|| qnc_ui_text::text("wave.source_a2_audio_channel").to_string());
+    let mut lane_peaks = Vec::new();
+    let mut loudness = Vec::new();
+    for (lane, peaks, measured) in lanes {
+        lane_peaks.push((lane, peaks));
+        // The loudness of the wave of every frame (user 2026-10-24); a coarse wave has none.
+        if let Some(measured) = measured.filter(|_| !coarse) {
+            loudness.push(qnc_wave::LaneLoudness { lane, measured });
+        }
+    }
     let mut artifact = qnc_wave::artifact_record_from_lane_peaks(&plan, lane_peaks, warning)?;
     artifact.coarse = coarse;
+    artifact.loudness = loudness;
     if !wave_artifact_valid(&artifact) {
         return Err(qnc_ui_text::text("wave.wave_result_ready").to_string());
     }
@@ -832,16 +842,17 @@ fn test_medium(readers: &Readers, source: &WaveSourceBinding, media: &MediaRepre
     }
 }
 
-/// A stored wave that needs no more work: the wave of every frame.
+/// A stored wave that needs no more work: the wave of every frame, of the current version
+/// (with the loudness of its channels; a wave of version 2 is made again for it).
 fn wave_artifact_ready(record: &WaveArtifactRecord) -> bool {
-    !record.coarse && wave_artifact_valid(record)
+    !record.coarse && record.render_version == qnc_wave::WAVE_RENDER_VERSION && wave_artifact_valid(record)
 }
 
 /// A wave that can be stored and shown, coarse or of every frame (live 2026-10-19: every
 /// coarse wave was refused as "not ready" and no clip got a wave).
 fn wave_artifact_valid(record: &WaveArtifactRecord) -> bool {
     qnc_wave::validate_artifact(record).is_ok()
-        && record.render_version == qnc_wave::WAVE_RENDER_VERSION
+        && qnc_wave::shown_render_version(record.render_version)
         && record.peaks().is_some()
 }
 
@@ -851,7 +862,7 @@ fn decode_wave(
     source: &WaveSourceBinding,
     coarse: bool,
     cancel: &AtomicBool,
-) -> Result<Option<Vec<(WaveLane, Vec<f32>)>>, String> {
+) -> Result<Option<Vec<(WaveLane, Vec<f32>, Option<qnc_loudness::ChannelLoudness>)>>, String> {
     let streams = plan
         .channels
         .iter()
@@ -923,12 +934,13 @@ fn decode_wave(
     read.map_err(|error| if cancel.load(Ordering::Acquire) { wave_paused_for_playback().into() } else { error })?;
     let by_lane = parts
         .into_iter()
-        .flat_map(|(_, collector)| collector.finish())
+        .flat_map(|(_, collector)| collector.finish_measured())
+        .map(|(lane, peaks, loudness)| (lane, (peaks, loudness)))
         .collect::<BTreeMap<_, _>>();
     if !by_lane.contains_key(&WaveLane::A1) {
         return Err(qnc_ui_text::text("wave.wave_got_a1_channel").to_string());
     }
-    Ok(Some(by_lane.into_iter().collect()))
+    Ok(Some(by_lane.into_iter().map(|(lane, (peaks, loudness))| (lane, peaks, loudness)).collect()))
 }
 
 /// The selected decoder must declare the saved format of every stream it reads (no silent

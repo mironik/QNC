@@ -13,7 +13,14 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// 2: the wave is always made from the original (user 2026-10-14: most camera operators do not
 /// record a proxy, and the original has every channel A1/A2 can pick); waves of version 1 came
 /// from a two channel proxy and are made again.
-pub const WAVE_RENDER_VERSION: i64 = 2;
+/// 3: the wave of every frame keeps the loudness of every channel (user 2026-10-24: A1/A2
+/// normalised after EBU R 128); a wave of version 2 is still shown and is made again for it.
+pub const WAVE_RENDER_VERSION: i64 = 3;
+
+/// The versions of a wave that may be shown (the current one, and 2 until it is made again).
+pub fn shown_render_version(version: i64) -> bool {
+    (2..=WAVE_RENDER_VERSION).contains(&version)
+}
 pub const WAVE_PEAK_BUCKETS: usize = 1200;
 pub const MAX_WAVE_PEAK_BUCKETS: usize = 9600;
 
@@ -122,6 +129,18 @@ pub struct WaveArtifactRecord {
     /// wave of every frame replaces it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub coarse: bool,
+    /// The loudness of each lane's channel (`qnc-loudness`), measured in the same pass as the
+    /// wave of every frame; none for a coarse wave or a channel whose sound came with gaps.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub loudness: Vec<LaneLoudness>,
+}
+
+/// The loudness of the channel of one lane.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LaneLoudness {
+    pub lane: WaveLane,
+    pub measured: qnc_loudness::ChannelLoudness,
 }
 
 impl WaveArtifactRecord {
@@ -286,6 +305,7 @@ pub fn artifact_record_from_peaks4(
         warning,
         render_version: WAVE_RENDER_VERSION,
         coarse: false,
+        loudness: Vec::new(),
     };
     validate_artifact(&record)?;
     Ok(record)
@@ -303,7 +323,13 @@ pub fn validate_artifact(artifact: &WaveArtifactRecord) -> Result<(), String> {
     ) {
         return Err("Neispravan wave status.".into());
     }
-    if artifact.render_version != WAVE_RENDER_VERSION {
+    for (index, lane) in artifact.loudness.iter().enumerate() {
+        lane.measured.validate()?;
+        if artifact.loudness[..index].iter().any(|other| other.lane == lane.lane) {
+            return Err(qnc_ui_text::text("wave.wave_duplicated_lane_record").into());
+        }
+    }
+    if !shown_render_version(artifact.render_version) {
         return Err("Nepodrzana wave render verzija.".into());
     }
     if !(8_000..=768_000).contains(&artifact.source_sample_rate_hz) {
@@ -367,7 +393,7 @@ impl StreamPeakCollector {
                 Ok((
                     channel.lane,
                     channel.channel_index,
-                    ChannelPeakCollector::new(plan.duration_sample_frames, plan.peak_count),
+                    ChannelPeakCollector::new(plan.duration_sample_frames, plan.peak_count, channel.sample_rate_hz),
                 ))
             })
             .collect::<Result<Vec<_>, String>>()?;
@@ -421,9 +447,17 @@ impl StreamPeakCollector {
     }
 
     pub fn finish(self) -> Vec<(WaveLane, Vec<f32>)> {
+        self.finish_measured().into_iter().map(|(lane, peaks, _)| (lane, peaks)).collect()
+    }
+
+    /// The peaks of every lane and its loudness, when its sound came whole and in order.
+    pub fn finish_measured(self) -> Vec<(WaveLane, Vec<f32>, Option<qnc_loudness::ChannelLoudness>)> {
         self.selected
             .into_iter()
-            .map(|(lane, _, collector)| (lane, collector.finish()))
+            .map(|(lane, _, collector)| {
+                let (peaks, loudness) = collector.finish();
+                (lane, peaks, loudness)
+            })
             .collect()
     }
 }
@@ -488,17 +522,28 @@ fn sample_frame_count(byte_len: usize, source_channels: u32) -> Result<u64, Stri
     Ok((byte_len / stride) as u64)
 }
 
-#[derive(Debug)]
 struct ChannelPeakCollector {
     expected_sample_frames: u64,
     peaks: Vec<f32>,
+    /// The loudness of the channel while its samples come in order from the first; a gap
+    /// (the coarse wave of the intra frames) leaves it unmeasured.
+    meter: Option<qnc_loudness::Meter>,
+    next_sample_frame: u64,
+}
+
+impl std::fmt::Debug for ChannelPeakCollector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChannelPeakCollector").field("peaks", &self.peaks.len()).field("measured", &self.meter.is_some()).finish()
+    }
 }
 
 impl ChannelPeakCollector {
-    fn new(expected_sample_frames: u64, peak_count: usize) -> Self {
+    fn new(expected_sample_frames: u64, peak_count: usize, sample_rate_hz: u32) -> Self {
         Self {
             expected_sample_frames,
             peaks: vec![0.0; peak_count],
+            meter: qnc_loudness::Meter::new(sample_rate_hz).ok(),
+            next_sample_frame: 0,
         }
     }
 
@@ -514,11 +559,20 @@ impl ChannelPeakCollector {
             bucket.min((self.peaks.len() - 1) as u128) as usize
         };
         self.peaks[bucket] = self.peaks[bucket].max(sample.abs().clamp(0.0, 1.0));
+        if sample_frame == self.next_sample_frame {
+            if let Some(meter) = self.meter.as_mut() {
+                meter.push(sample);
+            }
+            self.next_sample_frame += 1;
+        } else {
+            self.meter = None;
+        }
         Ok(())
     }
 
-    fn finish(self) -> Vec<f32> {
-        self.peaks
+    fn finish(self) -> (Vec<f32>, Option<qnc_loudness::ChannelLoudness>) {
+        let whole = self.next_sample_frame > 0;
+        (self.peaks, self.meter.filter(|_| whole).map(qnc_loudness::Meter::finish))
     }
 }
 
@@ -931,6 +985,31 @@ mod tests {
 
         assert_eq!(result[0], (WaveLane::A1, vec![0.3, 0.7, 1.0]));
         assert_eq!(result[1], (WaveLane::A2, vec![0.4, 0.6, 0.9]));
+    }
+
+    /// The pass of the wave of every frame measures each channel's loudness (user 2026-10-24);
+    /// sound that comes with a gap is left unmeasured.
+    #[test]
+    fn a_whole_pass_measures_the_loudness_of_each_channel_and_a_gap_leaves_it_out() {
+        let mut plan = plan_from_snapshot(&snapshot(vec![video_stream(), audio_stream(1, 2)]), "qnc://local/db/ingest_content/p1/wave").unwrap();
+        let rate = plan.channels[0].sample_rate_hz as usize;
+        plan.duration_sample_frames = rate as u64;
+        let mut bytes = Vec::new();
+        for n in 0..rate {
+            let a = (0.1 * (2.0 * std::f64::consts::PI * 997.0 * n as f64 / rate as f64).sin()) as f32;
+            bytes.extend(a.to_le_bytes());
+            bytes.extend(0f32.to_le_bytes());
+        }
+        let mut collector = StreamPeakCollector::new(&plan, 1).unwrap();
+        collector.push_f32le_interleaved(&bytes).unwrap();
+        let lanes = collector.finish_measured();
+        let a1 = lanes[0].2.as_ref().expect("A1 measured");
+        assert_eq!(a1.energies.len(), 10, "one second in 100 ms segments");
+        let energies: Vec<f64> = a1.energies.iter().map(|e| f64::from(*e)).collect();
+        assert!((qnc_loudness::integrated(&energies).unwrap() + 23.0).abs() < 0.3);
+        let mut gap = StreamPeakCollector::new(&plan, 1).unwrap();
+        gap.push_f32le_interleaved_at(10, &bytes[..8]).unwrap();
+        assert!(gap.finish_measured()[0].2.is_none());
     }
 
     #[test]

@@ -8,5 +8,6 @@ description = "Shared QNC waveform planning and peak model"
 qnc-ui-text = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-media-records = { workspace = true }
+qnc-loudness = { workspace = true }
 serde = { workspace = true }
 

@@ -1,0 +1,39 @@
+{
+  "module_id": "qnc.module.loudness",
+  "module_name": "Loudness",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "audio.loudness.measure",
+    "audio.loudness.integrate"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "filesystem.read",
+    "filesystem.write",
+    "media.probe",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-loudness",
+  "input": "The samples of one mono channel in order and their sample rate; for the integrated loudness, a run of 100 ms segment energies (already multiplied by their gains).",
+  "output": "Per 100 ms segment the mean square of the K-weighted signal and the 4x oversampled true peak (EBU R 128 / ITU-R BS.1770-4); the gated integrated loudness (-70 LUFS absolute, -10 LU relative) of any run of segments.",
+  "specification": "User 2026-10-24: A1 and A2 normalised to the project's EBU R 128 targets. Measured once in the pass of the wave of every frame; any stretch of the program at any gain is measured again from the segments, without reading the sound."
+}

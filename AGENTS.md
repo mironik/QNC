@@ -5713,3 +5713,18 @@ na slot s pokrivalicom povecava slot sa susjedima po 15 %, drugdje segment na to
 dvoklik na redak programa povecava cijeli program (nova akcija kataloga `program_zoom` bez tipke, `qnc-segment-panel`
 je daje s retka programa; `qnc-program-commands` `Zoom { slot, frame }`, `ProgramZoom`). Isto ponovno zatvara, Esc
 zatvara. Test, conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-24 (korisnik: "nastavi s mjerenjem glasnoce"; plan normalizacije A1/A2 po EBU R 128, korak 1 i 2):
+nova javna kocka `crates/qnc-loudness` (+ `contracts/modules/loudness.module.json`): mjeri jedan mono kanal po
+ITU-R BS.1770-4 (K-filtar za svaku frekvenciju uzorkovanja; na 48 kHz koeficijenti standarda), za svakih 100 ms cuva
+srednji kvadrat K-filtriranog signala i true peak (4x interpolator standarda); iz tih odsjecaka bilo koji dio programa
+uz bilo koje pojacanje daje integriranu glasnocu (blokovi 400 ms svakih 100 ms, apsolutni prag -70 LUFS, relativni
+-10 LU) bez ponovnog citanja zvuka. Otkljucani `qnc-wave` i `qnc-wave-worker` (zamrznuti, odjeljak 17; korisnik je
+odobrio plan u kojem je to navedeno): mjeri se u istom prolazu kao val svake slike (kartica se ne cita jos jednom),
+`WaveArtifactRecord.loudness` (po traci `LaneLoudness`), `WAVE_RENDER_VERSION` 3; val verzije 2 i dalje se prikazuje
+(`shown_render_version`, i u `qnc-timeline-assets`), a radnik ga jednom napravi ponovno da dobije glasnocu. Grubi val i
+zvuk s rupom nemaju mjerenje. Provjereno: testovi `qnc-loudness` (sinus -20 dBFS = -23 LUFS na 48 i 44,1 kHz, pragovi,
+pojacanje, true peak, koeficijenti), `qnc-wave` (mjerenje u prolazu, rupa), ostali testovi vala; primjer
+`qnc-loudness/examples/measure_raw.rs` na pravim klipovima s kartica (samo citanje) daje isto sto ffmpeg `ebur128`
+(C0013: -22,96 / -22,9 LUFS, -4,87 / -4,9 dBTP; Mironik 3396 kanali 3 i 4: -40,70 / -40,7 i -38,97 / -39,0 LUFS).
+Conformance, release build. Nije izvedeno: glasnoca programa (A1/A2 price iz odsjecaka klipova), prekidac normalizacije
+u previewu, primjena u exportu.
