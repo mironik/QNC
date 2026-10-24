@@ -229,6 +229,24 @@ pub fn with_attached(bindings: &mut TransportBindings, volumes: &[qnc_source_vol
     }
 }
 
+/// Sources read once, with the disks attached now added (user 2026-10-24: a card that
+/// vanished for a moment while a project opened stayed missing for that form until the
+/// project was opened again). A disk already among them is kept as it is.
+pub fn with_mounted(sources: &[SourceBinding]) -> Vec<SourceBinding> {
+    with_volumes(sources, &qnc_source_volumes::mounted())
+}
+
+fn with_volumes(sources: &[SourceBinding], volumes: &[qnc_source_volumes::Volume]) -> Vec<SourceBinding> {
+    let mut all = sources.to_vec();
+    for volume in volumes {
+        let uri = volume.source_uri();
+        if !all.iter().any(|source| source.uri == uri) {
+            all.push(SourceBinding { uri, file: Some(volume.root.clone()), endpoint: None, token_env: None });
+        }
+    }
+    all
+}
+
 /// `E:` as the source's name.
 fn volume_label(volume: &qnc_source_volumes::Volume) -> String {
     volume.root.to_string_lossy().trim_end_matches(['\\', '/']).to_string()
@@ -342,6 +360,17 @@ mod tests {
         assert_eq!(new.location.uri, "qnc://local/source/volume-7e80f1fb");
         assert_eq!((new.name.as_deref(), new.serial_number.as_deref()), (Some("E:"), Some("7e80f1fb")));
         assert!(new.probe.is_some(), "the probe of the local sources");
+    }
+
+    #[test]
+    fn a_disk_attached_after_the_sources_were_read_is_added_and_a_known_one_kept() {
+        let volume = |root: &str, serial: &str| qnc_source_volumes::Volume { root: PathBuf::from(root), serial_number: serial.into(), volume_name: None };
+        let read = vec![SourceBinding { uri: "qnc://local/source/volume-0e1dd2b8".into(), file: Some(PathBuf::from("C:/")), endpoint: None, token_env: None }];
+        let all = with_volumes(&read, &[volume("C:\\", "0e1dd2b8"), volume("D:\\", "a8155186")]);
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].file.as_deref(), Some(Path::new("C:/")), "the one already read is kept");
+        assert_eq!(all[1].uri, "qnc://local/source/volume-a8155186");
+        assert_eq!(all[1].file.as_deref(), Some(Path::new("D:\\")));
     }
 
     const BASE: &str = "C:/qnc/data";

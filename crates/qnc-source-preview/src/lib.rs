@@ -1288,8 +1288,7 @@ fn transport_bindings(context: &PreviewContext) -> Result<Vec<SourceTransportBin
         .flatten()
         .zip(context.settings.project_media_source_uri().ok())
         .map(|(dir, uri)| SourceTransportBinding::local(uri, dir));
-    let mut bindings = context
-        .sources
+    let mut bindings = qnc_source_bindings::with_mounted(&context.sources)
         .iter()
         .map(|binding| {
             if let Some(root) = &binding.file {

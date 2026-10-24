@@ -99,12 +99,16 @@ impl StillLocator {
             .flatten()
             .zip(self.settings.project_media_source_uri().ok())
             .map(|(dir, uri)| (uri, dir));
-        let (source_uri, root) = self
-            .sources
-            .iter()
-            .filter_map(|binding| Some((binding.uri.clone(), binding.file.clone()?)))
-            .chain(project)
-            .find(|(uri, _)| uri == reference.source_uri())
+        let local = |sources: &[qnc_source_bindings::SourceBinding]| {
+            sources
+                .iter()
+                .filter_map(|binding| Some((binding.uri.clone(), binding.file.clone()?)))
+                .chain(project.clone())
+                .find(|(uri, _)| uri == reference.source_uri())
+        };
+        // A disk attached after the sources were read is looked for only when it is missing.
+        let (source_uri, root) = local(&self.sources)
+            .or_else(|| local(&qnc_source_bindings::with_mounted(&self.sources)))
             .ok_or(qnc_ui_text::text("player.clip_media_available_locally_picture"))?;
         let root = root.canonicalize().map_err(|error| error.to_string())?;
         let file = root.join(reference.relative_path()).canonicalize().map_err(|error| error.to_string())?;

@@ -5804,3 +5804,11 @@ jedne slike (505-506 u projektu); sada I u letu dok Sync svira pocinje Sync ispo
 najblizi marker, pa je Space nakon IN-a pustao pricu umjesto Synca; IN koji naoruza Sync sada izlazi iz Wrapa
 (`qnc-sync-session` `armed_by_in`, `qnc-program-segments` `sync_armed`). Testovi, zlatna tablica tipki, conformance.
 Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-24 (korisnik: "u ingest source timeline ima, u story source timeline nema"; "da, otkljucaj i
+napravi"): u Storyju se od 18:55 nije otvorio nijedan player. Pri otvaranju projekta kartica D: je na tren nestala iz sustava
+(radnik vala: "A device which does not exist was specified", os error 433), a Story je popis spojenih diskova procitao bas
+tada i drzao ga do ponovnog otvaranja projekta; Ingest ga cita iznova kad se otvori popis diskova pa je radio. Sada
+`qnc-source-bindings::with_mounted` popisu izvora procitanom jednom dodaje diskove spojene sada (postojeci ostaju kakvi
+jesu); `qnc-source-preview` ga koristi pri svakom pokretanju playera (klip, program, Sync, izvan niti sucelja), pa vrijedi za
+sve forme, a `qnc-still-locator` (slike reza) samo kad izvor klipa nije na procitanom popisu. Test
+`a_disk_attached_after_the_sources_were_read_is_added_and_a_known_one_kept`, conformance. Uzivo nije provjereno.
