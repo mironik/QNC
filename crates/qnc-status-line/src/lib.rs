@@ -46,11 +46,13 @@ pub fn first<'a>(messages: &[Status<'a>], otherwise: &'a str) -> Status<'a> {
 
 /// Shows `file` in the file browser of this OS, chosen in its folder.
 pub fn open(file: &str) -> Result<(), String> {
-    let path = Path::new(file);
+    // One separator of this OS throughout (live 2026-10-24: `exports/projekti` in a Windows
+    // path left Explorer in another folder).
+    let path: std::path::PathBuf = Path::new(file).components().collect();
     if !path.exists() {
         return Err(format!("{file}: not found"));
     }
-    let mut command = browser(path);
+    let mut command = browser(&path);
     command.spawn().map(|_| ()).map_err(|error| format!("{file}: {error}"))
 }
 

@@ -5851,3 +5851,7 @@ polja iz `field_order`), prica iste stope oba polja jedne slike; XDCAM HD422 50 
 `qnc-desktop`, Story i MA adapteri. Provjereno na izoliranoj kopiji (kartica samo citana): 50i 4 dijela za 2 min,
 MXF MPEG-2 4:2:2 1920x1080, 25/1, field_order tt, 1062 slike (2124 slike price / 2), idet 301 od 301 TFF, A1 -23,0 LUFS
 (ffmpeg ebur128); Original iz originala i dalje radi. Testovi, conformance. Kroz sucelje nije provjereno.
+Popravak 2026-10-24 (korisnik: "link ne vodi na exportiranu datoteku"): put exporta bio je mjesovit
+(`...\exports/projekti\<datoteka>`, `export.directory` je zapisan s `/`), a Explorer s `/select,` takav put ne nade i
+otvori drugu mapu. `tools/qnc-export` (`export_folder`) i `qnc-status-line` (`open`) slazu put sa separatorom ovog OS-a.
+Provjereno: izolirana kopija daje `...\exports\projekti\test_ukupni_11.xml`; testovi. Klik kroz sucelje nije provjeren.

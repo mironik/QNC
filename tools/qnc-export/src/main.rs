@@ -204,6 +204,8 @@ fn export_folder(export: &serde_json::Value, project_dir: &std::path::Path) -> R
         absolute if absolute.is_absolute() => absolute,
         relative => project_dir.join(relative),
     };
+    // One separator of this OS throughout (the setting is written with `/`).
+    let folder: PathBuf = folder.components().collect();
     std::fs::create_dir_all(&folder).map_err(|e| format!("{}: {e}", folder.display()))?;
     Ok(folder)
 }
