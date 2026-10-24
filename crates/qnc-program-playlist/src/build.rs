@@ -10,7 +10,9 @@ pub(crate) fn flat_items_for_segment(
     }
     let base_media = resolver.resolve(clip_id)?;
     let is_off = segment.kind.trim().eq_ignore_ascii_case("offovi");
-    let has_base_audio = is_off || base_media.has_audio;
+    // A1 switched off (by the user, or a lead-in/lead-out) has no sound to route: an Off with
+    // A1 off is black and silence (live 2026-10-24: its empty sound refused the whole story).
+    let has_base_audio = (is_off || base_media.has_audio) && !segment.a1_off;
     let segment_start = segment.record_range.in_frame;
     let segment_end = segment.record_range.out_frame;
     let mut items = Vec::new();

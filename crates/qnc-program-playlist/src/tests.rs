@@ -608,3 +608,18 @@ fn a_ton_segment_with_a_picture_j_starts_its_picture_before_its_sound() {
     assert_eq!(sound(45).as_deref(), Some("voice"), "the Off is still heard");
     assert_eq!(sound(55).as_deref(), Some("speaker"));
 }
+
+#[test]
+fn an_off_with_a1_off_is_black_and_silence_also_under_a_cover() {
+    // The lead-in before an Off (user 2026-10-24) and an Off the user switched off: live, its
+    // empty sound refused the whole story.
+    let timebase = tb(50);
+    let mut lead = segment("lead_in_0", "offovi", "base", (0, 100), (10, 110), timebase);
+    lead.a1_off = true;
+    lead.covers = vec![cover("cover-1", "cover", (0, 60), (100, 160), timebase)];
+    let ton = segment("segment-1", "tonovi", "base", (100, 200), (10, 110), timebase);
+    let playlist = build_flat_program_playlist(&input(200, vec![lead, ton]), &mut resolver(&["base", "cover"], timebase)).unwrap();
+    assert_eq!(playlist.items[0].sources.len(), 1, "the cover only, no A1");
+    assert_eq!(playlist.items[0].sources[0].video_layer, Some(ProgramVideoLayer::Cover));
+    assert!(playlist.items[1].sources.is_empty(), "black and silence");
+}

@@ -5698,3 +5698,10 @@ red pocinje s lead-inom, zadnji zavrsava s lead-outom (`qnc-program-view` `Segme
 prvom segmentu, na lead-outu zadnjem (`user_segment_at`: Ctrl+Shift+I/O, Ctrl+1, Ctrl+Shift+J); gore/dolje preskacu
 leadove. Baza (`qnc-program-db`) nije mijenjana. Testovi `qnc-program-view` (novi), `qnc-program-segments`,
 `qnc-segment-panel`, `qnc-panel-focus`, conformance, release build. Uzivo nije provjereno.
+Popravak 2026-10-24 (korisnik: "ne pleja segmente"; log: "Program source 'part:lead_in_0:base_audio' has no active video
+or audio output"): Off s iskljucenim A1 (lead-in/lead-out, a i Off koji je korisnik iskljucio, od 16. 10.) dobivao je u
+playlisti izvor zvuka bez izlaza, pa je provjera odbijala cijelu pricu (player i prerender). `qnc-program-playlist`:
+segment s iskljucenim A1 nema izvor zvuka; stavka bez izvora je crno i tisina (provjera vise ne trazi izvor); engine ju
+je vec tako svirao. `qnc-program-input` `sound_only` vise ne vraca prvi izvor praznoj stavci. Test
+`an_off_with_a1_off_is_black_and_silence_also_under_a_cover`, testovi playliste, program-input, enginea, rendera,
+conformance, release build. Uzivo nije provjereno.

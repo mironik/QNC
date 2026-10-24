@@ -420,12 +420,7 @@ impl FlatProgramItem {
                 "Program item_id must not be blank.",
             ));
         }
-        if self.sources.is_empty() {
-            return Err(PlaylistError::new(
-                "empty_program_item",
-                format!("Program item '{}' has no sources.", self.item_id),
-            ));
-        }
+        // An item without sources is black and silence (an Off whose A1 is off).
         let mut video_layers = Vec::new();
         let mut audio_channels = Vec::new();
         for source in &self.sources {

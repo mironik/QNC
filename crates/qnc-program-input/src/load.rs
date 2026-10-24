@@ -35,20 +35,15 @@ pub fn sound_bed_loader(
 }
 
 /// Output 1 (A1) of a playlist only: every picture and every other output goes. A source
-/// left with nothing is dropped; an item left with no source keeps its first (it is played
-/// as it is rather than not at all).
+/// left with nothing is dropped; an item left with no source is silence.
 pub fn sound_only(mut playlist: qnc_program_playlist::FlatProgramPlaylist) -> qnc_program_playlist::FlatProgramPlaylist {
     for item in &mut playlist.items {
-        let first = item.sources.first().cloned();
         for source in &mut item.sources {
             source.video_layer = None;
             source.source_video_format = None;
             source.audio_routes.retain(|route| route.output_channel == 0);
         }
         item.sources.retain(|source| source.has_audio());
-        if item.sources.is_empty() {
-            item.sources.extend(first);
-        }
     }
     playlist
 }
