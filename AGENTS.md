@@ -6115,3 +6115,8 @@ gore/dolje biraju, lijevo/desno tab. `qnc-export-choice` (`Standard`, `shown`, `
 `qnc-program-commands` (`ExportTab`), `qnc-program-segments` (`export_tab`, stopa price iz baze), `qnc-panel-focus`,
 `qnc-segment-panel`, rjecnik. Probne XML/AAF datoteke u mapi exporta projekta nisu obrisane: mapa projekta je zasticena
 od brisanja (zastita nije dirana). Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-25 (korisnik: "drzi se kolor palete koju koristimo i stila koji koristimo, ovo odskace"): prozor exporta
+crta se bojama i dijelovima teme aplikacije (`qnc-desktop-theme`): okvir kao info prozor (`qnc-choice-box`), tabovi PAL i
+NTSC kao tabovi poola (`qnc-media-pool-head::tab`), Export kao jaki gumb (`strong_button`), Cancel kao chrome gumb,
+font teme; vlastite boje (`ExportBoxStyle`) i zaobljeni okviri redaka uklonjeni. `qnc-segment-panel::show` prima temu
+aplikacije umjesto teme timelinea.

@@ -3691,7 +3691,11 @@ name = "qnc-export-box"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-desktop-theme",
  "qnc-export-choice",
+ "qnc-media-pool-head",
+ "qnc-theme-styles",
+ "qnc-ui-kit",
  "qnc-ui-text",
 ]
 
@@ -5345,6 +5349,7 @@ dependencies = [
  "eframe",
  "qnc-action-event",
  "qnc-alert",
+ "qnc-desktop-theme",
  "qnc-dev-diagnostics",
  "qnc-export-box",
  "qnc-export-choice",
@@ -5352,6 +5357,7 @@ dependencies = [
  "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
+ "qnc-theme-styles",
  "qnc-timeline",
  "qnc-ui-kit",
  "qnc-ui-text",

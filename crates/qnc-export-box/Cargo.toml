@@ -7,4 +7,8 @@ description = "QNC public piece: the export box over the screen - Export to XML 
 [dependencies]
 eframe = { workspace = true }
 qnc-export-choice = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-theme-styles = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-media-pool-head = { workspace = true }
 qnc-ui-text = { workspace = true }

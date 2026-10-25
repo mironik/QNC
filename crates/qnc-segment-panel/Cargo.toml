@@ -8,6 +8,8 @@ description = "QNC public passive UI component: the Segmenti panel (program timi
 qnc-ui-kit = { workspace = true }
 qnc-export-box = { workspace = true }
 qnc-export-choice = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-theme-styles = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-wheel-jog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

@@ -101,24 +101,15 @@ pub fn zoom_body<'a>(
 pub fn show(
     ui: &mut egui::Ui,
     segments: &SegmentsView,
-    timeline_theme: TimelineTheme,
+    theme: &qnc_desktop_theme::Theme,
     lengths: &[CoverLengthBand],
     levels: [Option<f32>; 2],
 ) -> Option<ActionEvent> {
+    let timeline_theme = qnc_theme_styles::timeline(theme);
     // A refused take, on top of the screen so it is noticed (user 2026-10-21).
     qnc_alert::show(ui.ctx(), segments.alert.as_ref(), timeline_theme.lane_silent, timeline_theme.text);
     // The export box over everything (user 2026-10-24): its answer is this panel's action.
-    let export = segments.export.as_ref().and_then(|choice| {
-        let style = qnc_export_box::ExportBoxStyle {
-            background: timeline_theme.background,
-            border: timeline_theme.border,
-            text: timeline_theme.text,
-            muted: timeline_theme.muted,
-            chosen: timeline_theme.focus,
-            font: 15.0,
-        };
-        qnc_export_box::show(ui.ctx(), choice, style)
-    });
+    let export = segments.export.as_ref().and_then(|choice| qnc_export_box::show(ui.ctx(), theme, choice));
     if let Some(answer) = export {
         let event = match answer {
             qnc_export_box::Answer::Choose(index) => ActionEvent::key("export_choose").with_value(index as i64),

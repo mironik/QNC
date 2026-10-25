@@ -32,7 +32,7 @@ pub fn render_desktop(
         "transport" => qnc_transport_panel::show(ui, rect, theme, contracts.tab_gap()).map(|action| EditorialIntent::action(&action)),
         "clip-cards" => framed(pool(ui, contracts, theme, view), ui, rect, &[Panel::Pool]),
         "right-panel" if contracts.composition().right_panel == "segment_panel" => {
-            let shown = qnc_segment_panel::show(ui, &view.segments, qnc_theme_styles::timeline(theme), &contracts.editorial.cover_lengths, view.preview.output_levels);
+            let shown = qnc_segment_panel::show(ui, &view.segments, theme, &contracts.editorial.cover_lengths, view.preview.output_levels);
             framed(shown.map(EditorialIntent::Action), ui, rect, &[Panel::Segments])
         }
         "source-dock" => framed(source_dock(ui, contracts, theme, view), ui, rect, if view.segments.zoom.is_some() { &[Panel::Segments, Panel::SourceButtons] } else { &[Panel::SourceTimeline, Panel::SourceButtons] }),
