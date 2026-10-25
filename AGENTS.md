@@ -6181,3 +6181,11 @@ izlaza (`output.cannot_start`), poruke baze price (`story.purge_only_excluded`, 
 `story.last_slot_ends_with_story`) i nazivi slika prozora reza (`story.still.slot_first`, `story.still.slot_last`).
 Testovi `qnc-program-db` (46), `qnc-program-view`, `qnc-program-segments` (60), `qnc-desktop`, `qnc-program-output`,
 `qnc-ui-text`, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-25 (audit, korisnik "nastavi sa sitnima"): (1) `tools/qnc-prerender`: dio koji nije uspio (npr. kartica
+na trenutak nestala) ponovno se pokusava nakon minute (`RETRY_FAILED`), a ne tek pri novom pokretanju prerendera.
+(2) `qnc-player-client`: frame mapa sesije koja se ne otvori brise se odmah (`MapFile`), a mape starije od dana
+(aplikacija ugasena silom) brisu se jednom pri prvoj sesiji procesa (`sweep_old_frame_maps`); prije je svako odbijeno
+otvaranje ostavljalo ~64 MB u TEMP-u. (3) `tools/qnc-export`: Express ne ceka prerender koji minutu ne napravi nijedan
+dio (stoji iza playera ili radi dijelove koje export ne trazi); preostale dijelove renderira sam. Nije izvedeno (trazi
+odluku): pomak pokrivalice kod omjera 2:1 i dalje ovisi o broju Entera (pola slike izvora pri neparnom pomaku).
+Testovi `qnc-player-client` (18), gradnja `qnc-prerender`, `qnc-export`, conformance. Uzivo nije provjereno.

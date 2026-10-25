@@ -250,11 +250,19 @@ fn deliver(
 /// still missing then is rendered by the export.
 fn prerendered_units(target: &qnc_db_broker::ProjectDbTarget, content: &ContentTarget, fingerprints: &[String]) -> Result<std::collections::HashSet<String>> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(600);
+    // A prerender that makes no unit for this long is waiting too (behind a player, on
+    // units no export asks for; audit 2026-10-25): the export renders the rest itself.
+    let stalled_after = std::time::Duration::from_secs(60);
+    let (mut last_count, mut last_progress) = (usize::MAX, std::time::Instant::now());
     loop {
         let made: std::collections::HashSet<String> =
             qnc_prerender_db::PrerenderReader::open(target)?.rendered(fingerprints.to_vec())?.into_iter().map(|unit| unit.fingerprint).collect();
+        if made.len() != last_count {
+            (last_count, last_progress) = (made.len(), std::time::Instant::now());
+        }
         let working = qnc_playback_activity::is_fresh(content, qnc_prerender_launch::LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS);
-        if made.len() == fingerprints.len() || !working || std::time::Instant::now() >= deadline {
+        let stalled = last_progress.elapsed() >= stalled_after;
+        if made.len() == fingerprints.len() || !working || stalled || std::time::Instant::now() >= deadline {
             return Ok(made);
         }
         std::thread::sleep(std::time::Duration::from_secs(1));

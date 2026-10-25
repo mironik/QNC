@@ -121,7 +121,10 @@ fn run() -> Result<()> {
     // Every write is made under the lease, checked by the database owner in the same
     // transaction (external audit 2026-10-17).
     let writer = PrerenderWriter::start(target.clone())?.leased(lease.write_lease());
-    let (mut idle_since, mut done_now, mut failed) = (Instant::now(), 0usize, std::collections::HashSet::new());
+    let (mut idle_since, mut done_now) = (Instant::now(), 0usize);
+    // A unit that failed waits a minute before it is tried again (audit 2026-10-25: a card gone
+    // for a moment kept it out until the prerender started again).
+    let mut failed: std::collections::HashMap<String, Instant> = Default::default();
     let mut pruned: Option<Vec<String>> = None;
     loop {
         if !lease.held() {
@@ -161,7 +164,7 @@ fn run() -> Result<()> {
         let next = units
             .iter()
             .zip(&fingerprints)
-            .find(|(_, fingerprint)| !rendered.contains(*fingerprint) && !failed.contains(*fingerprint));
+            .find(|(_, fingerprint)| !rendered.contains(*fingerprint) && failed.get(*fingerprint).is_none_or(|at| at.elapsed() > RETRY_FAILED));
         let Some((unit, fingerprint)) = next else {
             // Every unit of the story is there: the units it no longer has go (once per story).
             // Not while an export puts units together: it may still read one the story left.
@@ -263,7 +266,7 @@ fn run() -> Result<()> {
             }
             (Err(error), Stopped::No) => {
                 say(format!("unit {}..{} failed: {error}", unit.record_in, unit.record_out));
-                failed.insert(fingerprint.clone());
+                failed.insert(fingerprint.clone(), Instant::now());
             }
         }
     }
@@ -335,6 +338,8 @@ fn partial_name(fingerprint: &str) -> String {
 use qnc_prerender_launch::{EXPORT_LEASE, LEASE};
 /// After a player stops, the prerender waits this long before it works again.
 const SETTLE: Duration = Duration::from_secs(2);
+/// How long a unit that failed waits before it is tried again.
+const RETRY_FAILED: Duration = Duration::from_secs(60);
 /// With nothing to render this long the prerender ends (the story wakes it again).
 const IDLE_END: Duration = Duration::from_secs(60);
 

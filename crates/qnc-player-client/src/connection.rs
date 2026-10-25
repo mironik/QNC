@@ -570,6 +570,9 @@ impl Connection {
         };
         let frame_map_path = frame_map_path(&session);
         LatestFrameWriter::create(&frame_map_path, MONITOR_PREVIEW_FRAME_CAPACITY)?;
+        // Gone with the session that does not open (audit 2026-10-25: every refused open left
+        // ~64 MB in the temporary folder); kept once it does.
+        let mut left_behind = MapFile(Some(frame_map_path.clone()));
         let frame_reader = LatestFrameReader::open(&frame_map_path)?;
         let mut boot = serde_json::json!({
             "contract_version": VERSION, "session_id": session, "source_generation": generation,
@@ -607,6 +610,7 @@ impl Connection {
             session_id: session,
             source_generation: generation,
         };
+        left_behind.0 = None;
         Ok(Self {
             process,
             control,
@@ -774,7 +778,38 @@ impl Drop for Connection {
     }
 }
 
+/// The frame map of a session not yet open: removed unless the session opens.
+struct MapFile(Option<PathBuf>);
+
+impl Drop for MapFile {
+    fn drop(&mut self) {
+        if let Some(path) = self.0.take() {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
+/// Frame maps a day old or more: left by an application that was killed. Swept once per
+/// process before its first session.
+fn sweep_old_frame_maps() {
+    static SWEPT: std::sync::Once = std::sync::Once::new();
+    SWEPT.call_once(|| {
+        let Ok(entries) = fs::read_dir(std::env::temp_dir()) else { return };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let old = entry
+                .metadata()
+                .and_then(|meta| meta.modified())
+                .is_ok_and(|modified| modified.elapsed().is_ok_and(|age| age > Duration::from_secs(24 * 3600)));
+            if name.starts_with("qnc-player-frame-") && name.ends_with(".map") && old {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+    });
+}
+
 fn frame_map_path(session: &str) -> PathBuf {
+    sweep_old_frame_maps();
     std::env::temp_dir().join(format!(
         "qnc-player-frame-{session}-{}.map",
         uuid::Uuid::new_v4()
