@@ -10,7 +10,7 @@
     "C10 size ceiling (runtime lines)|qnc-ingest-application": 1129,
     "C10 size ceiling (runtime lines)|qnc-ingest-blocks": 155,
     "C10 size ceiling (runtime lines)|qnc-ingest-desktop": 70,
-    "C10 size ceiling (runtime lines)|qnc-project-application": 147,
+    "C10 size ceiling (runtime lines)|qnc-project-application": 123,
     "C10 size ceiling (runtime lines)|qnc-project-blocks": 1714,
     "C10 size ceiling (runtime lines)|qnc-project-desktop": 67,
     "C11 second catalog reader|qnc-ingest-catalog": 1,

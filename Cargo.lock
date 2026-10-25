@@ -3522,6 +3522,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-dir-browse-jobs"
+version = "0.1.0"
+dependencies = [
+ "qnc-dir-browser",
+ "qnc-store-jobs",
+]
+
+[[package]]
 name = "qnc-dir-browser"
 version = "0.1.0"
 dependencies = [
@@ -5133,6 +5141,7 @@ name = "qnc-project-application"
 version = "0.1.0"
 dependencies = [
  "qnc-application-selection",
+ "qnc-dir-browse-jobs",
  "qnc-dir-browser",
  "qnc-project-jobs",
  "qnc-project-store",

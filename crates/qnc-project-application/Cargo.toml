@@ -8,6 +8,7 @@ description = "QNC Project application composition root: owns the Project store,
 qnc-ui-text = { workspace = true }
 qnc-application-selection = { workspace = true }
 qnc-dir-browser = { workspace = true }
+qnc-dir-browse-jobs = { workspace = true }
 qnc-project-store = { workspace = true }
 qnc-project-jobs = { workspace = true }
 qnc-store-jobs = { workspace = true }

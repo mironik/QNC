@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.dir-browse-jobs",
+  "module_name": "Location browser in the background",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["dir.list.background"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "player.command", "business.workflow"],
+  "forbidden_dependencies": [],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-dir-browse-jobs",
+  "input": "A browsing step: the roots, a private start path, a folder by its QNC URI, or the parent.",
+  "output": "Each step's listing in the order sent, taken without waiting; the private path of the folder shown, for its confirm; whether a step still runs.",
+  "specification": "Audit 2026-10-25: the Project form listed drives and folders on the form thread, so a sleeping disk froze it. The browser session lives in the background thread of qnc-store-jobs; nothing here knows a form or an application."
+}

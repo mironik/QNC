@@ -6,6 +6,7 @@ mod project_component;
 use std::path::PathBuf;
 
 pub use project_component::{ProjectBrowserTarget, ProjectComponent};
+pub use qnc_dir_browse_jobs::BrowseStep;
 pub use qnc_project_jobs::{ProjectsState, Reply, Request, TemplatesState};
 pub use qnc_project_store::{ProjectNavigationStep, ProjectRow, ProjectTemplateRow};
 

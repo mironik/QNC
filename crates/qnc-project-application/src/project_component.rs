@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use qnc_application_selection::ApplicationSelection;
-use qnc_dir_browser::{BrowserState, DirectoryBrowserSession};
+use qnc_dir_browse_jobs::{BackgroundBrowser, BrowseStep};
+use qnc_dir_browser::BrowserState;
 use qnc_project_jobs::{Answer, Reply, Request};
 use qnc_project_store::{ProjectNavigationStep, ProjectStore};
 use qnc_store_jobs::StoreJobs;
@@ -18,8 +19,8 @@ pub enum ProjectBrowserTarget {
 pub struct ProjectComponent {
     pub applications: ApplicationSelection,
     jobs: StoreJobs<Result<ProjectStore, String>, Answer>,
-    projects_root_browser: DirectoryBrowserSession,
-    export_dir_browser: DirectoryBrowserSession,
+    projects_root_browser: BackgroundBrowser,
+    export_dir_browser: BackgroundBrowser,
     navigation: Option<(String, Result<Vec<ProjectNavigationStep>, String>)>,
     navigation_pending: bool,
 }
@@ -29,8 +30,8 @@ impl ProjectComponent {
         Self {
             applications: ApplicationSelection::new(root),
             jobs: qnc_project_jobs::start(root.to_path_buf()),
-            projects_root_browser: DirectoryBrowserSession::default(),
-            export_dir_browser: DirectoryBrowserSession::default(),
+            projects_root_browser: BackgroundBrowser::start("qnc-project-root-browser"),
+            export_dir_browser: BackgroundBrowser::start("qnc-project-export-browser"),
             navigation: None,
             navigation_pending: false,
         }
@@ -80,7 +81,7 @@ impl ProjectComponent {
 
     /// Whether a request still waits for its reply.
     pub fn busy(&self) -> bool {
-        self.jobs.busy()
+        self.jobs.busy() || self.projects_root_browser.busy() || self.export_dir_browser.busy()
     }
 
     pub fn take_navigation_trigger(&mut self) -> bool {
@@ -95,58 +96,32 @@ impl ProjectComponent {
         }
     }
 
-    pub fn load_browser_roots(
-        &mut self,
-        target: ProjectBrowserTarget,
-    ) -> Result<BrowserState, String> {
-        self.browser_session_mut(target).load_roots()
+    /// Sends a step to the browser `target`; its listing comes with `poll_browsers`.
+    pub fn browse(&mut self, target: ProjectBrowserTarget, step: BrowseStep) {
+        self.browser_mut(target).browse(step);
     }
 
-    pub fn open_browser_private_path(
-        &mut self,
-        target: ProjectBrowserTarget,
-        path: impl AsRef<Path>,
-    ) -> Result<BrowserState, String> {
-        self.browser_session_mut(target).open_private_path(path)
+    /// The listings that came, each with its browser, in the order of their steps.
+    pub fn poll_browsers(&mut self) -> Vec<(ProjectBrowserTarget, Result<BrowserState, String>)> {
+        let mut listings = Vec::new();
+        for target in [ProjectBrowserTarget::ProjectsRoot, ProjectBrowserTarget::ExportDir] {
+            listings.extend(self.browser_mut(target).poll().into_iter().map(|listing| (target, listing)));
+        }
+        listings
     }
 
-    pub fn open_browser_uri(
-        &mut self,
-        target: ProjectBrowserTarget,
-        uri: &str,
-    ) -> Result<BrowserState, String> {
-        self.browser_session_mut(target).open_uri(uri)
-    }
-
-    pub fn open_browser_parent(
-        &mut self,
-        target: ProjectBrowserTarget,
-    ) -> Result<BrowserState, String> {
-        self.browser_session_mut(target).open_parent()
-    }
-
-    pub fn browser_private_path_for_uri(
-        &self,
-        target: ProjectBrowserTarget,
-        uri: &str,
-    ) -> Option<PathBuf> {
-        self.browser_session(target).path_for_uri(uri)
-    }
-
-    fn browser_session_mut(
-        &mut self,
-        target: ProjectBrowserTarget,
-    ) -> &mut DirectoryBrowserSession {
+    /// The private path of the folder the browser `target` shows, when it is `uri`.
+    pub fn browser_private_path_for_uri(&self, target: ProjectBrowserTarget, uri: &str) -> Option<PathBuf> {
         match target {
-            ProjectBrowserTarget::ProjectsRoot => &mut self.projects_root_browser,
-            ProjectBrowserTarget::ExportDir => &mut self.export_dir_browser,
+            ProjectBrowserTarget::ProjectsRoot => self.projects_root_browser.path_for_uri(uri),
+            ProjectBrowserTarget::ExportDir => self.export_dir_browser.path_for_uri(uri),
         }
     }
 
-    fn browser_session(&self, target: ProjectBrowserTarget) -> &DirectoryBrowserSession {
+    fn browser_mut(&mut self, target: ProjectBrowserTarget) -> &mut BackgroundBrowser {
         match target {
-            ProjectBrowserTarget::ProjectsRoot => &self.projects_root_browser,
-            ProjectBrowserTarget::ExportDir => &self.export_dir_browser,
+            ProjectBrowserTarget::ProjectsRoot => &mut self.projects_root_browser,
+            ProjectBrowserTarget::ExportDir => &mut self.export_dir_browser,
         }
     }
 }

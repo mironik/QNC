@@ -2263,7 +2263,7 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
                     ));
                 }
             }
-            if !contents.contains("DirectoryBrowserSession") {
+            if !contents.contains("DirectoryBrowserSession") && !contents.contains("qnc_dir_browse_jobs::") {
                 report.error(
                     "crates/qnc-project-application/src/project_component.rs: Project component must use the shared qnc-dir-browser session"
                         .to_string(),

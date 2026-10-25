@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use qnc_dir_browser::BrowserState;
 use qnc_project_application::{
-    ProjectBrowserTarget, ProjectComponent, ProjectRow, ProjectTemplateRow, ProjectsState, Reply,
+    BrowseStep, ProjectBrowserTarget, ProjectComponent, ProjectRow, ProjectTemplateRow, ProjectsState, Reply,
     Request, TemplatesState,
 };
 use serde_json::Value;
@@ -394,9 +394,13 @@ impl ProjectSession {
     /// Returns whether one came.
     pub fn poll(&mut self) -> bool {
         let replies = self.component.poll();
-        let came = !replies.is_empty();
+        let mut came = !replies.is_empty();
         for reply in replies {
             self.apply_reply(reply);
+        }
+        for (target, listing) in self.component.poll_browsers() {
+            self.apply_browser_listing(target, listing);
+            came = true;
         }
         came
     }
@@ -507,29 +511,13 @@ impl ProjectSession {
 
     fn open_projects_root_uri(&mut self, uri: &str) {
         if self.projects_root_browser.kind == LocationSourceKind::Local {
-            self.projects_root_browser.busy = true;
-            self.projects_root_browser.error = None;
-            match self
-                .component
-                .open_browser_uri(ProjectBrowserTarget::ProjectsRoot, uri)
-            {
-                Ok(browser) => self.apply_projects_root_listing(browser),
-                Err(error) => self.set_projects_root_browser_error(error),
-            }
+            self.browse(ProjectBrowserTarget::ProjectsRoot, BrowseStep::Uri(uri.into()));
         }
     }
 
     fn open_projects_root_parent(&mut self) {
         if self.projects_root_browser.kind == LocationSourceKind::Local {
-            self.projects_root_browser.busy = true;
-            self.projects_root_browser.error = None;
-            match self
-                .component
-                .open_browser_parent(ProjectBrowserTarget::ProjectsRoot)
-            {
-                Ok(browser) => self.apply_projects_root_listing(browser),
-                Err(error) => self.set_projects_root_browser_error(error),
-            }
+            self.browse(ProjectBrowserTarget::ProjectsRoot, BrowseStep::Parent);
         }
     }
 
@@ -580,29 +568,13 @@ impl ProjectSession {
 
     fn open_export_dir_uri(&mut self, uri: &str) {
         if self.export_dir_browser.kind == LocationSourceKind::Local {
-            self.export_dir_browser.busy = true;
-            self.export_dir_browser.error = None;
-            match self
-                .component
-                .open_browser_uri(ProjectBrowserTarget::ExportDir, uri)
-            {
-                Ok(browser) => self.apply_export_dir_listing(browser),
-                Err(error) => self.set_export_dir_browser_error(error),
-            }
+            self.browse(ProjectBrowserTarget::ExportDir, BrowseStep::Uri(uri.into()));
         }
     }
 
     fn open_export_dir_parent(&mut self) {
         if self.export_dir_browser.kind == LocationSourceKind::Local {
-            self.export_dir_browser.busy = true;
-            self.export_dir_browser.error = None;
-            match self
-                .component
-                .open_browser_parent(ProjectBrowserTarget::ExportDir)
-            {
-                Ok(browser) => self.apply_export_dir_listing(browser),
-                Err(error) => self.set_export_dir_browser_error(error),
-            }
+            self.browse(ProjectBrowserTarget::ExportDir, BrowseStep::Parent);
         }
     }
 
@@ -639,61 +611,44 @@ impl ProjectSession {
     }
 
     fn load_projects_root_browser(&mut self, start: Option<PathBuf>) {
-        self.projects_root_browser.busy = true;
-        self.projects_root_browser.error = None;
-        let result = if let Some(path) = start {
-            self.component
-                .open_browser_private_path(ProjectBrowserTarget::ProjectsRoot, path)
-        } else {
-            self.component
-                .load_browser_roots(ProjectBrowserTarget::ProjectsRoot)
-        };
-        match result {
-            Ok(browser) => self.apply_projects_root_listing(browser),
-            Err(error) => self.set_projects_root_browser_error(error),
-        }
+        self.browse(ProjectBrowserTarget::ProjectsRoot, start.map_or(BrowseStep::Roots, BrowseStep::Path));
     }
 
     fn load_export_dir_browser(&mut self, start: Option<PathBuf>) {
-        self.export_dir_browser.busy = true;
-        self.export_dir_browser.error = None;
-        let result = if let Some(path) = start {
-            self.component
-                .open_browser_private_path(ProjectBrowserTarget::ExportDir, path)
-        } else {
-            self.component
-                .load_browser_roots(ProjectBrowserTarget::ExportDir)
-        };
-        match result {
-            Ok(browser) => self.apply_export_dir_listing(browser),
-            Err(error) => self.set_export_dir_browser_error(error),
+        self.browse(ProjectBrowserTarget::ExportDir, start.map_or(BrowseStep::Roots, BrowseStep::Path));
+    }
+
+    /// A browser step runs in the background; its listing is applied by `poll`.
+    fn browse(&mut self, target: ProjectBrowserTarget, step: BrowseStep) {
+        let state = self.browser_state_mut(target);
+        state.busy = true;
+        state.error = None;
+        self.component.browse(target, step);
+    }
+
+    fn browser_state_mut(&mut self, target: ProjectBrowserTarget) -> &mut LocationBrowserState {
+        match target {
+            ProjectBrowserTarget::ProjectsRoot => &mut self.projects_root_browser,
+            ProjectBrowserTarget::ExportDir => &mut self.export_dir_browser,
         }
     }
 
-    fn apply_projects_root_listing(&mut self, browser: BrowserState) {
-        Self::apply_location_listing(&mut self.projects_root_browser, browser);
-    }
-
-    fn apply_export_dir_listing(&mut self, browser: BrowserState) {
-        Self::apply_location_listing(&mut self.export_dir_browser, browser);
+    fn apply_browser_listing(&mut self, target: ProjectBrowserTarget, listing: Result<BrowserState, String>) {
+        let state = self.browser_state_mut(target);
+        match listing {
+            Ok(browser) => Self::apply_location_listing(state, browser),
+            Err(error) => {
+                state.error = Some(error);
+                state.browser.entries.clear();
+                state.busy = false;
+            }
+        }
     }
 
     fn apply_location_listing(browser_state: &mut LocationBrowserState, browser: BrowserState) {
         browser_state.browser = browser;
         browser_state.error = None;
         browser_state.busy = false;
-    }
-
-    fn set_projects_root_browser_error(&mut self, error: String) {
-        self.projects_root_browser.error = Some(error);
-        self.projects_root_browser.browser.entries.clear();
-        self.projects_root_browser.busy = false;
-    }
-
-    fn set_export_dir_browser_error(&mut self, error: String) {
-        self.export_dir_browser.error = Some(error);
-        self.export_dir_browser.browser.entries.clear();
-        self.export_dir_browser.busy = false;
     }
 
     fn perform_open_project(&mut self, index: usize) {

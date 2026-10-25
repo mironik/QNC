@@ -6039,3 +6039,15 @@ zajedno s rednim brojem, pa je svaki poll bio "promjena", ona je trazila novo cr
 isto stanje ono s istom sesijom, generacijom, dogadajima, pripremom, slikom i greskom (`same_player_state`, kao
 `same_state` klijenta). Test `a_reply_with_only_a_new_sequence_is_the_same_player_state`, conformance, release build;
 uzivo: Story na mirovanju 3-4 crtanja u sekundi.
+Izvedeno 2026-10-25 (korisnik: "pogledaj log, i nastavi sredivati aplikaciju prema rezultatima audita"): log nakon
+popravka crtanja u mirovanju je uredan (Story u mirovanju 2 crtanja u sekundi, bez gresaka zvuka i playera; jedini zastoj
+sucelja od 451 ms poklopio se s istodobnim zastojem niti playera od 310 ms, sto upucuje na zastoj sustava ili kartice).
+Stavka audita "preglednik lokacija lista mape na niti sucelja": Project je popis diskova i mapa (mapa projekata, mapa
+exporta) citao na niti sucelja, pa je disk koji spava zamrzavao formu. Nova javna kocka `crates/qnc-dir-browse-jobs`
+(+ ugovor `contracts/modules/dir-browse-jobs.module.json`): sesija `qnc-dir-browser` zivi u pozadinskoj niti
+`qnc-store-jobs`, koraci (korijeni, mapa, roditelj, pocetna putanja) idu redom, popis se preuzima bez cekanja, uz njega
+privatna putanja prikazane mape za potvrdu. `qnc-project-application` (`browse`, `poll_browsers`), `qnc-project-session`
+(popis primjenjuje `poll`, koji forma vec zove svaki frame). Ingest vec lista kroz `qnc-source-browse` u pozadini.
+`tools/qnc-conformance` pravilo Project granice prihvaca zajednicku sesiju i kroz tu kocku. C10 `qnc-project-application`
+147 -> 123. Testovi (`qnc-dir-browse-jobs`, Project kocke, conformance 26), release build. Uzivo kroz sucelje nije
+provjereno. Project je ponovno zamrznut.

@@ -1,0 +1,9 @@
+[package]
+name = "qnc-dir-browse-jobs"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: a location browser whose listings run on their own thread, so a slow or sleeping disk never freezes a form"
+
+[dependencies]
+qnc-dir-browser = { workspace = true }
+qnc-store-jobs = { workspace = true }
