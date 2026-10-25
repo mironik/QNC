@@ -222,14 +222,14 @@ impl ProjectStore {
     pub fn set_selected_template(&self, template_id: &str) -> Result<(), String> {
         let template_id = template_id.trim();
         if template_id.is_empty() {
-            return Err("template_id je prazan.".to_string());
+            return Err(qnc_ui_text::text("project.store.template_id_empty").to_string());
         }
         let conn = self.open_registry()?;
         init_registry_schema(&conn)?;
         ensure_templates_seeded(&conn)?;
         sanitize_project_templates(&conn)?;
         if get_template(&conn, template_id)?.is_none() {
-            return Err(format!("Template '{template_id}' ne postoji."));
+            return Err(qnc_ui_text::fill("project.store.template_missing", &[("id", template_id)]));
         }
         set_local_setting(&conn, SELECTED_TEMPLATE_KEY, template_id)
     }
@@ -241,7 +241,7 @@ impl ProjectStore {
         sanitize_project_templates(&conn)?;
         let template_id = selected_template_id(&conn)?;
         let template = get_template(&conn, &template_id)?
-            .ok_or_else(|| format!("Template '{template_id}' ne postoji."))?;
+            .ok_or_else(|| qnc_ui_text::fill("project.store.template_missing", &[("id", &template_id)]))?;
         Ok(ProjectTemplateSettings {
             template_id,
             settings: template.settings,
@@ -270,7 +270,7 @@ impl ProjectStore {
             base_template_id.trim().to_string()
         };
         let base = get_template(&conn, &base_template_id)?
-            .ok_or_else(|| format!("Template '{base_template_id}' ne postoji."))?;
+            .ok_or_else(|| qnc_ui_text::fill("project.store.template_missing", &[("id", &base_template_id)]))?;
         let mut settings = settings.cloned().unwrap_or_else(|| base.settings.clone());
         apply_application_selection(&mut settings, selection)?;
         strip_template_project_locations(&mut settings);
@@ -306,14 +306,14 @@ impl ProjectStore {
     pub fn delete_user_template(&self, template_id: &str) -> Result<(), String> {
         let template_id = template_id.trim();
         if template_id.is_empty() {
-            return Err("template_id je prazan.".to_string());
+            return Err(qnc_ui_text::text("project.store.template_id_empty").to_string());
         }
 
         let mut conn = self.open_registry()?;
         init_registry_schema(&conn)?;
         ensure_templates_seeded(&conn)?;
         let template = get_template(&conn, template_id)?
-            .ok_or_else(|| format!("Template '{template_id}' ne postoji."))?;
+            .ok_or_else(|| qnc_ui_text::fill("project.store.template_missing", &[("id", template_id)]))?;
         if template.system {
             return Err(qnc_ui_text::text("project.store.system_template_kept").to_string());
         }
@@ -372,7 +372,7 @@ impl ProjectStore {
             template_id.trim().to_string()
         };
         let mut template = get_template(&conn, &template_id)?
-            .ok_or_else(|| format!("Template '{template_id}' ne postoji."))?;
+            .ok_or_else(|| qnc_ui_text::fill("project.store.template_missing", &[("id", &template_id)]))?;
         if let Some(settings) = settings {
             template.settings = settings.clone();
         }
@@ -532,7 +532,7 @@ impl ProjectStore {
     pub fn open_project(&self, project_id: &str) -> Result<(), String> {
         let project_id = project_id.trim();
         if project_id.is_empty() {
-            return Err("project_id je prazan.".to_string());
+            return Err(qnc_ui_text::text("project.store.project_id_empty").to_string());
         }
         let conn = self.open_registry()?;
         init_registry_schema(&conn)?;
@@ -544,7 +544,7 @@ impl ProjectStore {
             )
             .map_err(|error| error.to_string())?;
         if exists == 0 {
-            return Err(format!("Projekt '{project_id}' ne postoji."));
+            return Err(qnc_ui_text::fill("project.store.project_missing", &[("id", project_id)]));
         }
         self.navigation_sequence(project_id)?;
         let project_dir = project_dir_from_conn(&conn, &self.projects_root, project_id)?;
@@ -568,7 +568,7 @@ impl ProjectStore {
     pub fn delete_project(&self, project_id: &str) -> Result<ProjectRow, String> {
         let project_id = project_id.trim();
         if project_id.is_empty() {
-            return Err("project_id je prazan.".to_string());
+            return Err(qnc_ui_text::text("project.store.project_id_empty").to_string());
         }
 
         let mut conn = self.open_registry()?;
@@ -592,7 +592,7 @@ impl ProjectStore {
             )
             .optional()
             .map_err(|error| error.to_string())?
-            .ok_or_else(|| format!("Projekt '{project_id}' ne postoji."))?;
+            .ok_or_else(|| qnc_ui_text::fill("project.store.project_missing", &[("id", project_id)]))?;
         let project_dir = project_dir_from_conn(&conn, &self.projects_root, project_id)?;
         let workspace_db = self.project_workspace_db_path(project_id, &project_dir)?;
         validate_project_delete_dir(project_id, &project_dir, &workspace_db)?;

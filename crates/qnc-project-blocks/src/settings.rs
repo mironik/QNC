@@ -171,7 +171,7 @@ impl Blocks<'_> {
             .unwrap_or_else(|| "—".to_string());
         ui.set_max_width(content_w);
         ui.label(
-            RichText::new("RADNI TOK")
+            RichText::new(qnc_ui_text::text("project.workflow_title"))
                 .size(settings.label_font_size)
                 .strong()
                 .color(t.muted),

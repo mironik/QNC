@@ -121,7 +121,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
             .sources
             .iter()
             .find(|source| source.location.uri == source_uri)
-            .ok_or("Izvor klipa nije spojen na ovo racunalo.")?;
+            .ok_or_else(|| qnc_ui_text::text("worker.source_not_connected").to_string())?;
         source.backend(media).map_err(|error| error.to_string())
     };
     let cancel = std::sync::atomic::AtomicBool::new(false);
@@ -213,7 +213,7 @@ fn run_once(root: &Path) -> Result<bool, String> {
         let artifacts =
             artifacts.and_then(|()| run_artifacts(root, &lease, &closed, &std::sync::atomic::AtomicBool::new(false)));
         running.store(false, std::sync::atomic::Ordering::Relaxed);
-        let import = import.join().map_err(|_| "Uvoz je pao.".to_string())?;
+        let import = import.join().map_err(|_| qnc_ui_text::text("worker.import_crashed").to_string())?;
         // Once more after the import: a clip imported before its record was final could not
         // get its poster at Uvezi (user 2026-10-18).
         if !closed.load(std::sync::atomic::Ordering::Relaxed) {
@@ -312,7 +312,7 @@ fn run_artifacts(
             return Err(error);
         }
         if std::time::Instant::now() > deadline {
-            return Err("Filmstrip/wave pozadinski proces nije zavrsio u roku.".into());
+            return Err(qnc_ui_text::text("worker.artifacts_timeout").into());
         }
         std::thread::sleep(Duration::from_millis(20));
     }

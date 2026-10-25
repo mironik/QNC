@@ -158,8 +158,8 @@ pub fn run_import(root: &Path, run: &ImportRun<'_>) -> Result<ImportSummary, Str
         }
     };
     let result = match &outcome {
-        Ok(()) => format!("uvezeno {}, neuspjelo {}", summary.imported, summary.failed),
-        Err(error) => format!("greska: {error}"),
+        Ok(()) => qnc_ui_text::fill("import.result_done", &[("imported", &summary.imported.to_string()), ("failed", &summary.failed.to_string())]),
+        Err(error) => qnc_ui_text::fill("import.result_error", &[("error", error)]),
     };
     if run.lease.confirm() {
         if let Ok(mut writer) = Writer::start(target) {

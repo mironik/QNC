@@ -98,18 +98,22 @@ pub fn apply_select_event<T: ClipListItem>(
         selection::Event::Finished(result) => {
             let finished_ok = result.is_ok();
             let message = match result {
-                Ok(summary) if state.warning_count() == 0 => format!(
-                    "Select: {} postojećih; {} obrađenih; {} uklonjenih ({:.1} s).",
-                    summary.unchanged,
-                    summary.processed,
-                    summary.removed,
-                    summary.elapsed_ms as f64 / 1000.0
+                Ok(summary) if state.warning_count() == 0 => qnc_ui_text::fill(
+                    "ingest.msg.select_done",
+                    &[
+                        ("unchanged", &summary.unchanged.to_string()),
+                        ("processed", &summary.processed.to_string()),
+                        ("removed", &summary.removed.to_string()),
+                        ("seconds", &format!("{:.1}", summary.elapsed_ms as f64 / 1000.0)),
+                    ],
                 ),
-                Ok(_) => format!(
-                    "Select: {} klipova; {} upozorenja. {}",
-                    clips.len(),
-                    state.warning_count(),
-                    state.last_warning.as_deref().unwrap_or_default()
+                Ok(_) => qnc_ui_text::fill(
+                    "ingest.msg.select_done_warnings",
+                    &[
+                        ("clips", &clips.len().to_string()),
+                        ("warnings", &state.warning_count().to_string()),
+                        ("last", state.last_warning.as_deref().unwrap_or_default()),
+                    ],
                 ),
                 Err(error) => {
                     state.add_warning(error.clone());

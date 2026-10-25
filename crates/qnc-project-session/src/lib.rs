@@ -356,7 +356,7 @@ impl ProjectSession {
         match self.component.load_projects() {
             Ok(projects) => self.apply_projects_state(projects),
             Err(error) => {
-                self.status = format!("DB: {error}");
+                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
             }
         }
     }
@@ -374,7 +374,7 @@ impl ProjectSession {
                 self.apply_projects_state(created.projects);
             }
             Err(error) => {
-                self.status = format!("DB: {error}");
+                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
             }
         }
     }
@@ -383,7 +383,7 @@ impl ProjectSession {
         match self.component.load_templates() {
             Ok(templates) => self.apply_templates_state(templates),
             Err(error) => {
-                self.status = format!("DB: {error}");
+                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
             }
         }
     }
@@ -393,10 +393,10 @@ impl ProjectSession {
             Ok(templates) => {
                 self.apply_templates_state(templates);
                 self.picker_open = false;
-                self.status = format!("Template: {}", self.selected_template_name());
+                self.status = qnc_ui_text::fill("project.msg.template_chosen", &[("name", &self.selected_template_name())]);
             }
             Err(error) => {
-                self.status = format!("DB: {error}");
+                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
             }
         }
     }
@@ -424,10 +424,10 @@ impl ProjectSession {
                 self.template_draft_description.clear();
                 self.export_preset_draft_name.clear();
                 self.apply_templates_state(created.templates);
-                self.status = format!("Template: {}", self.selected_template_name());
+                self.status = qnc_ui_text::fill("project.msg.template_chosen", &[("name", &self.selected_template_name())]);
             }
             Err(error) => {
-                self.status = format!("DB: {error}");
+                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
             }
         }
     }
@@ -534,7 +534,7 @@ impl ProjectSession {
                 self.status = qnc_ui_text::text("project.msg.projects_root_set").to_string();
             }
             Err(error) => {
-                self.status = format!("DB: {error}");
+                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
             }
         }
     }
@@ -689,7 +689,7 @@ impl ProjectSession {
                 self.apply_projects_state(projects);
             }
             Err(error) => {
-                self.status = format!("DB: {error}");
+                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
             }
         }
     }
@@ -711,7 +711,7 @@ impl ProjectSession {
                 self.apply_projects_state(deleted.projects);
             }
             Err(error) => {
-                self.status = format!("DB: {error}");
+                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
             }
         }
     }
@@ -736,7 +736,7 @@ impl ProjectSession {
             }
             Err(error) => {
                 self.delete_template_candidate = None;
-                self.status = format!("DB: {error}");
+                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
             }
         }
     }

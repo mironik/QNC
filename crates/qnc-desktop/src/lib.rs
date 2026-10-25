@@ -181,11 +181,11 @@ impl QncShell {
         match (factory.create)(self.qnc_root.clone()) {
             Ok(component) => {
                 self.embedded_apps.insert(app.tab_id.clone(), component);
-                self.status = format!("{} otvoren u QNC desktopu.", app.label);
+                self.status = qnc_ui_text::fill("shell.app_opened", &[("app", &app.label)]);
                 true
             }
             Err(error) => {
-                self.status = format!("{} nije otvoren: {error}", app.label);
+                self.status = qnc_ui_text::fill("shell.app_not_opened", &[("app", &app.label), ("error", &error)]);
                 false
             }
         }

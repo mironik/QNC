@@ -3999,6 +3999,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-clip-row",
  "qnc-ingest-select",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4252,6 +4253,7 @@ dependencies = [
  "qnc-playback-activity",
  "qnc-record-completion",
  "qnc-source-reader",
+ "qnc-ui-text",
  "qnc-work-settings",
 ]
 
