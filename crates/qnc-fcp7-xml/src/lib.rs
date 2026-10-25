@@ -170,23 +170,25 @@ fn rate(num: i64, den: i64) -> String {
     format!("<rate><timebase>{timebase}</timebase><ntsc>{}</ntsc></rate>", if ntsc { "TRUE" } else { "FALSE" })
 }
 
+/// The whole frames per second of a `<rate>` this file wrote (never a guessed rate).
 fn rate_fps(rate: &str) -> i64 {
-    rate.split("<timebase>").nth(1).and_then(|rest| rest.split('<').next()).and_then(|n| n.parse().ok()).unwrap_or(25)
+    rate.split("<timebase>")
+        .nth(1)
+        .and_then(|rest| rest.split('<').next())
+        .and_then(|n| n.parse().ok())
+        .expect("a <rate> written by rate()")
 }
 
+/// HH:MM:SS:FF of a frame (`qnc-source-timecode` holds the one rule).
 fn timecode(frame: i64, fps: i64) -> String {
-    let fps = fps.max(1);
-    let seconds = frame / fps;
-    format!("{:02}:{:02}:{:02}:{:02}", seconds / 3600 % 24, seconds / 60 % 60, seconds % 60, frame % fps)
+    qnc_source_timecode::format_frames(frame.max(0) as u64, fps.clamp(1, i64::from(u32::MAX)) as u32)
 }
 
 /// The frame of a timecode HH:MM:SS:FF at `fps` whole frames per second.
 fn timecode_frame(text: &str, fps: i64) -> Result<i64, String> {
-    let parts: Vec<i64> = text.split(':').map(|part| part.parse::<i64>()).collect::<Result<_, _>>().map_err(|_| format!("Not a timecode: {text}"))?;
-    match parts.as_slice() {
-        [h, m, s, f] if (0..24).contains(h) && (0..60).contains(m) && (0..60).contains(s) && (0..fps).contains(f) => Ok(((h * 60 + m) * 60 + s) * fps + f),
-        _ => Err(format!("Not a timecode at {fps} frames per second: {text}")),
-    }
+    qnc_source_timecode::parse_timecode(text, fps.clamp(1, i64::from(u32::MAX)) as u32)
+        .map(|frame| frame as i64)
+        .ok_or_else(|| format!("Not a timecode at {fps} frames per second: {text}"))
 }
 
 /// `file://localhost/` and the path with `/` and the characters a URL may not hold escaped.

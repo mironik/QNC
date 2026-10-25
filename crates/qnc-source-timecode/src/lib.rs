@@ -184,7 +184,12 @@ fn probe_start(tags: &[(&str, &str)], fps: u32) -> Option<u64> {
     timecode_frames(value, fps)
 }
 
-/// HH:MM:SS:FF at the clip rate as frames; drop-frame is not supported.
+/// HH:MM:SS:FF at `fps` as frames (the one parser: the source, the export); drop-frame is
+/// not supported.
+pub fn parse_timecode(value: &str, fps: u32) -> Option<u64> {
+    timecode_frames(value, fps)
+}
+
 fn timecode_frames(value: &str, fps: u32) -> Option<u64> {
     let value = value.trim();
     if value.contains(';') || value.contains('.') {

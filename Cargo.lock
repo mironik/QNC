@@ -3717,6 +3717,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-gain",
  "qnc-program-playlist",
+ "qnc-source-timecode",
 ]
 
 [[package]]
