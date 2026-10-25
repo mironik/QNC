@@ -87,11 +87,10 @@ fn push(track: &mut Vec<Piece>, piece: Piece) {
 
 /// A track holds one clip item at a time (FCP7 XML; Resolve and Edius drop or refuse overlapping
 /// items). Where the next piece starts under the last one (an A2 crossfade, a J or an L) the
-/// last is cut where the next starts and the overlap becomes a cross fade from that edit,
-/// played from the last piece's media after its new out.
-fn without_overlaps(mut pieces: Vec<Piece>) -> (Vec<Piece>, Vec<(i64, i64)>) {
+/// last is cut where the next starts: a clean cut, no transition (Edius played no sound in an
+/// item after a cross fade, 2026-10-25).
+fn without_overlaps(mut pieces: Vec<Piece>) -> Vec<Piece> {
     pieces.sort_by_key(|piece| piece.record.0);
-    let mut transitions = Vec::new();
     for index in 1..pieces.len() {
         let next_start = pieces[index].record.0;
         let last = &mut pieces[index - 1];
@@ -102,16 +101,13 @@ fn without_overlaps(mut pieces: Vec<Piece>) -> (Vec<Piece>, Vec<(i64, i64)>) {
         let kept = (next_start - last.record.0).max(1);
         let cut = last.record.0 + kept;
         last.source.1 -= last.record.1 - cut;
-        let end = last.record.1;
         last.record.1 = cut;
-        if cut == next_start && end > cut {
-            transitions.push((cut, end.min(pieces[index].record.1)));
-        } else {
+        if cut != next_start {
             pieces[index].source.0 += cut - next_start;
             pieces[index].record.0 = cut;
         }
     }
-    (pieces, transitions)
+    pieces
 }
 
 /// The text of the sequence `name` of the program, its clips' files by clip id.
@@ -153,12 +149,7 @@ pub fn sequence(
     writeln!(w, "<outputs><group><index>1</index><numchannels>1</numchannels><downmix>0</downmix><channel><index>1</index></channel></group><group><index>2</index><numchannels>1</numchannels><downmix>0</downmix><channel><index>2</index></channel></group></outputs>").ok();
     for (output, track) in [(1, a1), (2, a2)] {
         writeln!(w, "<track>").ok();
-        let (pieces, transitions) = without_overlaps(track);
-        let mut transitions = transitions.into_iter().peekable();
-        for piece in &pieces {
-            while let Some((start, end)) = transitions.next_if(|(start, _)| *start <= piece.record.0) {
-                writeln!(w, "<transitionitem>{rate}<start>{start}</start><end>{end}</end><alignment>start</alignment><effect><name>Cross Fade (+3dB)</name><effectid>KGAudioTransCrossFade3dB</effectid><effecttype>transition</effecttype><mediatype>audio</mediatype></effect></transitionitem>").ok();
-            }
+        for piece in &without_overlaps(track) {
             item += 1;
             clip_item(w, item, piece, &rate, files, &ids, Some(output))?;
         }
@@ -321,15 +312,14 @@ mod tests {
     }
 
     /// Edius and Resolve 2026-10-25: two A2 items side by side under a crossfade; one channel
-    /// track of a file that said it had one track of four.
+    /// track of a file that said it had one track of four. Then Edius: no transitions, clean cuts.
     #[test]
-    fn an_a2_crossfade_is_a_cut_and_a_cross_fade_and_every_channel_is_its_own_track() {
+    fn an_a2_crossfade_is_a_clean_cut_and_every_channel_is_its_own_track() {
         let piece = |clip: &str, record: (i64, i64), source: (i64, i64)| Piece { clip_id: clip.into(), record, source, channel: 1, level_db: 0 };
-        let (pieces, transitions) = without_overlaps(vec![piece("b", (182, 359), (31, 208)), piece("a", (0, 186), (54, 240))]);
+        let pieces = without_overlaps(vec![piece("b", (182, 359), (31, 208)), piece("a", (0, 186), (54, 240))]);
         assert_eq!(pieces[0].record, (0, 182), "the last is cut where the next starts");
         assert_eq!(pieces[0].source, (54, 236));
         assert_eq!(pieces[1].record, (182, 359));
-        assert_eq!(transitions, vec![(182, 186)], "the overlap is a cross fade from that edit");
 
         let file = ClipFile { name: "a".into(), path: "D:/a.MXF".into(), duration_frames: 1000, timecode_start: None, width: 1920, height: 1080, audio_channels: 4, audio_sample_rate: 48000 };
         let mut text = String::new();

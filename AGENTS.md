@@ -6078,3 +6078,8 @@ nije dopusten ili nije datoteka ne ceka se. Pokusaji idu u player log (`card-ret
 programu playera. Otvaranje price ide u pozadinskoj niti dekodera, pa cekanje ne zaustavlja sat; priprema klipa ceka
 najvise toliko. Test `a_card_gone_for_a_moment_is_opened_again_a_missing_medium_is_not`, conformance, release build.
 Uzivo nije provjereno (kartica nije namjerno vadena).
+Popravak 2026-10-25 (korisnik: u Resolveu otvoren XML; "u ediusu neki A2 ne daju ton iako se vidi da ima krivulje"; "izbaci
+prijelaze i ostavi ciste rezove"): kanal 2 svih pet pokrivalica ima ton na kartici (izmjereno, -24,5 do -33 dB) i XML
+pokazuje na njega, a tihe su bile pokrivalice iza Cross Fade prijelaza. `qnc-fcp7-xml` (`without_overlaps`): preklapanje na
+traci je cisti rez na pocetku sljedeceg klipa, bez `<transitionitem>`. Crossfade ostaje u playeru, prerenderu i MXF exportu.
+Test, conformance, release build. U Resolveu i Ediusu nije provjereno.
