@@ -314,7 +314,8 @@
           "@project.ignore_fast_news"
         ]
       ],
-      "lufs": [["-23", "-23 (EBU R 128)"], ["-24", "-24 (ATSC A/85)"], ["-16", "-16"], ["-27", "-27"]],
+      "lufs_a1": [["-16", "-16"], ["-18", "-18"], ["-20", "-20"], ["-23", "-23 (EBU R 128)"], ["-24", "-24 (ATSC A/85)"]],
+      "lufs_a2": [["-20", "-20"], ["-23", "-23 (EBU R 128)"], ["-26", "-26"], ["-28", "-28"], ["-30", "-30"]],
       "true_peak": [["-1", "-1 (EBU R 128)"], ["-2", "-2"], ["-3", "-3"]],
       "loudness_tolerance": [["0.5", "0.5"], ["1", "1"]],
       "video_bitrates": [["25", "25"], ["35", "35"], ["50", "50"]],
@@ -481,14 +482,14 @@
             "label": "@project.a1_lufs",
             "id": "pts_loudness_a1",
             "path": "audio.loudness.a1_lufs",
-            "options": "lufs"
+            "options": "lufs_a1"
           },
           {
             "kind": "number",
             "label": "@project.a2_lufs",
             "id": "pts_loudness_a2",
             "path": "audio.loudness.a2_lufs",
-            "options": "lufs"
+            "options": "lufs_a2"
           },
           {
             "kind": "number",

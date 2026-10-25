@@ -5928,3 +5928,9 @@ stalno odbijala ("The wave record is too large"); klip je imao samo grubi val be
 `qnc-artifact-db`: zapis vala smije imati do pola najvece poruke transporta baze (8 MB, oko sat vremena 4 kanala); zapis
 filmstripa ostaje 256 KB. Provjereno na izoliranoj kopiji: radnik je spremio puni val 3452 s glasnocom sva 4 kanala.
 Testovi, conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-25 (korisnik: "neke TV kuce traze A1 na oko -20, a A2 treba biti tisi"; "da, otkljucaj Project i
+prosiri izbornike"; Project otkljucan samo za izbornike cilja glasnoce): Project Advanced Loudness ima zasebne izbornike
+cilja: A1 `lufs_a1` -16, -18, -20, -23 (EBU R 128), -24 (ATSC A/85); A2 `lufs_a2` -20, -23 (EBU R 128), -26, -28, -30
+(`contracts/ui/project.layout.json`; zajednicki `lufs` uklonjen). Zadano ostaje -23/-23 iz seeda; spremljena vrijednost
+izvan liste i dalje se prikazuje i vrijedi. Normalizacija u previewu (NORM), prerenderu i exportu vec cita cilj A1 i A2
+zasebno. Testovi, conformance. Project je ponovno zamrznut.
