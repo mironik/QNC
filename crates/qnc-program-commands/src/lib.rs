@@ -175,6 +175,8 @@ pub enum SegmentCommand {
     ToggleNormalize,
     /// The export box (user 2026-10-24): a line chosen, export with it, or closed.
     ExportChoose(usize),
+    /// The PAL (false) or NTSC (true) tab of the export box (user 2026-10-25).
+    ExportTab(bool),
     ExportConfirm,
     ExportCancel,
 }
@@ -205,6 +207,7 @@ impl SegmentCommand {
             ("wrap_zoom", slot, frame) => Self::Zoom { slot, frame },
             ("program_zoom", _, _) => Self::ProgramZoom,
             ("export_choose", _, Some(index)) => Self::ExportChoose(usize::try_from(index).ok()?),
+            ("export_tab", _, Some(ntsc)) => Self::ExportTab(ntsc == 1),
             ("export_confirm", _, _) => Self::ExportConfirm,
             ("export_cancel", _, _) => Self::ExportCancel,
             (side @ ("segment_move_up" | "segment_move_down"), _, _) => Self::Move { up: side == "segment_move_up" },

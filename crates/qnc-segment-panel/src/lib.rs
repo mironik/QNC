@@ -122,6 +122,7 @@ pub fn show(
     if let Some(answer) = export {
         let event = match answer {
             qnc_export_box::Answer::Choose(index) => ActionEvent::key("export_choose").with_value(index as i64),
+            qnc_export_box::Answer::Tab(tab) => ActionEvent::key("export_tab").with_value(i64::from(tab == qnc_export_choice::Standard::Ntsc)),
             qnc_export_box::Answer::Export => ActionEvent::key("export_confirm"),
             qnc_export_box::Answer::Cancel => ActionEvent::key("export_cancel"),
         };

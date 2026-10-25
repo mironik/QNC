@@ -116,6 +116,7 @@ impl ProgramSegments {
                     export.choose(index);
                 }
             }
+            SegmentCommand::ExportTab(ntsc) => self.export_tab(ntsc),
             SegmentCommand::ExportCancel => self.export = None,
             SegmentCommand::ExportConfirm => {
                 let Some(picked) = self.export.take().and_then(|export| export.picked()) else {

@@ -30,6 +30,9 @@ impl PanelFocus {
             match action_id {
                 "step_prev_part" | "step_prev_segment" | "page_prev" => pieces.2.export_step(true),
                 "step_next_part" | "step_next_segment" | "page_next" => pieces.2.export_step(false),
+                // Left and right: the PAL and NTSC tabs (user 2026-10-25).
+                "step_back_frame" => pieces.2.export_tab(false),
+                "step_forward_frame" => pieces.2.export_tab(true),
                 "activate_focused_item" => _ = pieces.2.apply(SegmentCommand::ExportConfirm),
                 "clear_focus" | "close_player" => _ = pieces.2.apply(SegmentCommand::ExportCancel),
                 _ => {}

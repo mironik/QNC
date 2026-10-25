@@ -145,6 +145,9 @@
     "export_choose": {
       "label": "Export: odabir postavke u prozoru exporta"
     },
+    "export_tab": {
+      "label": "Export: tab PAL ili NTSC u prozoru exporta (strelice lijevo i desno)"
+    },
     "export_confirm": {
       "label": "Export: izvezi odabranim"
     },

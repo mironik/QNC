@@ -6104,3 +6104,14 @@ FCP7 XML-a ne preuzima kanal kamere po klipu ni kad uveze XML koji je sam izveza
 datoteke s 4 ili 16 kanala, s vezama ili bez njih: A2 bez kanala, cuje se kanal 1). Resolveov AAF kanal zapisuje po klipu
 (SourceClip na slot kanala izvora), ali uvoz u Resolve nije dovrsen. Export to XML ostaje FCP7 kakav jest (Edius svira
 sve pokrivalice); AAF za Resolve je odgoden.
+Izmjena 2026-10-25 (korisnik: "preuredi export prozor, dodaj mu tabove PAL i NTSC, pa podijeli popis exporta po grupama;
+exporti koji nisu napravljeni, zasivi ih; export XML i Prerender izdvoji iznad tabova PAL i NTSC"): prozor exporta ima
+gore Export to XML i Express (prerender), ispod tabove PAL (25 i 50) i NTSC (ostale stope), a u tabu postavke po grupama
+Original, XDCAM HD422 (MXF), H.264, DNxHD (Avid), Other; default je prvi u svojoj grupi. Postavka u kojoj se ova prica jos
+ne moze izvesti zasivljena je s oznakom "not made yet" i ne moze se izabrati (ni klikom ni strelicama): kodek koji render
+ne radi (DNxHD, isprepleteni H.264) ili stopa koja nije stopa price (isprepletena XDCAM i pola stope price). Strelice
+gore/dolje biraju, lijevo/desno tab. `qnc-export-choice` (`Standard`, `shown`, `set_tab`, `available`, `group`;
+`from_settings` prima stopu price), `qnc-export-box` (tabovi i grupe, `Answer::Tab`), akcija kataloga `export_tab`,
+`qnc-program-commands` (`ExportTab`), `qnc-program-segments` (`export_tab`, stopa price iz baze), `qnc-panel-focus`,
+`qnc-segment-panel`, rjecnik. Probne XML/AAF datoteke u mapi exporta projekta nisu obrisane: mapa projekta je zasticena
+od brisanja (zastita nije dirana). Testovi, conformance. Uzivo nije provjereno.

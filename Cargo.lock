@@ -5347,6 +5347,7 @@ dependencies = [
  "qnc-alert",
  "qnc-dev-diagnostics",
  "qnc-export-box",
+ "qnc-export-choice",
  "qnc-level-meter",
  "qnc-program-filmstrip",
  "qnc-program-view",

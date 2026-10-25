@@ -1,10 +1,11 @@
-//! What the Export button offers (user 2026-10-24): Export to XML; right under it Express, the
-//! prerendered story as it is (its format named, e.g. HD 1080p50 4:2:0); then the settings,
-//! rendered from the camera originals: Original first and stressed, then the project's export
-//! setting marked as default and chosen, then every other one (the built-in presets and the
-//! project's own). When the project's export values match no preset they are offered as the
-//! project's settings, as default. It reads no database (it gets the project's `export` as
-//! saved), exports and writes nothing.
+//! What the Export button offers (user 2026-10-24, 2026-10-25): apart at the top Export to
+//! XML and Express, the prerendered story as it is (its format named, e.g. HD 1080p50 4:2:0);
+//! under them two tabs, PAL and NTSC, each with the settings rendered from the camera
+//! originals in groups (Original, XDCAM HD422, H.264, DNxHD): Original first, the project's
+//! export setting marked as default. A setting this story cannot be exported in yet (its
+//! codec or its rate) is greyed and cannot be chosen. When the project's export values match
+//! no preset they are offered as the project's settings, as default. It reads no database (it
+//! gets the project's `export` as saved and the story's rate), exports and writes nothing.
 
 use serde_json::Value;
 
@@ -25,6 +26,31 @@ pub enum Kind {
     Setting,
 }
 
+/// The tab of a setting, by its rate: 25 and 50 are PAL, the others NTSC.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Standard {
+    #[default]
+    Pal,
+    Ntsc,
+}
+
+impl Standard {
+    pub fn of_rate(fps: f64) -> Self {
+        if (fps - 25.0).abs() < 0.01 || (fps - 50.0).abs() < 0.01 {
+            Self::Pal
+        } else {
+            Self::Ntsc
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        qnc_ui_text::text(match self {
+            Self::Pal => "export.tab.pal",
+            Self::Ntsc => "export.tab.ntsc",
+        })
+    }
+}
+
 /// One line of the choice.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportOption {
@@ -34,6 +60,12 @@ pub struct ExportOption {
     pub label: String,
     /// The project's export setting.
     pub default: bool,
+    /// The tab it is in; `None` above the tabs (XML, Express).
+    pub standard: Option<Standard>,
+    /// The group heading it is under in its tab.
+    pub group: String,
+    /// Whether this story can be exported in it; greyed when not.
+    pub available: bool,
 }
 
 /// What was picked.
@@ -49,50 +81,130 @@ pub struct Picked {
 pub struct ExportChoice {
     pub options: Vec<ExportOption>,
     pub chosen: usize,
+    /// The tab shown.
+    pub tab: Standard,
+}
+
+/// The group heading of a codec.
+fn group_of(codec: &str) -> String {
+    qnc_ui_text::text(match codec {
+        "mpeg2_422_50mbit" => "export.group.xdcam",
+        "h264" => "export.group.h264",
+        codec if codec.starts_with("dnxhd") => "export.group.dnxhd",
+        _ => "export.group.other",
+    })
+    .into()
+}
+
+/// Whether a story at `story_fps` is exported in these values: the codecs the render makes
+/// (H.264, XDCAM HD422), progressive at the story's rate, interlaced (XDCAM only) at the
+/// story's rate or half of it. An unknown story rate leaves the rate to the render.
+fn renders(values: &Value, story_fps: Option<f64>) -> bool {
+    let codec = values.get("video_codec").and_then(Value::as_str).unwrap_or_default();
+    let fps = values.get("fps").and_then(Value::as_f64).unwrap_or_default();
+    let interlaced = values.get("field_order").and_then(Value::as_str).is_some_and(|order| order != "progressive");
+    let codec_made = match codec {
+        "h264" => !interlaced,
+        "mpeg2_422_50mbit" => true,
+        _ => false,
+    };
+    let near = |a: f64, b: f64| (a - b).abs() < 0.01;
+    let rate_made = story_fps.is_none_or(|story| near(story, fps) || (interlaced && near(story, 2.0 * fps)));
+    codec_made && rate_made
 }
 
 impl ExportChoice {
-    /// The choice for a project whose export settings are `export` (as saved).
-    pub fn from_settings(export: &Value) -> Self {
+    /// The choice for a project whose export settings are `export` (as saved), for a story
+    /// at `story_fps` (unknown while it has no segment).
+    pub fn from_settings(export: &Value, story_fps: Option<f64>) -> Self {
         let settings = serde_json::json!({ "export": export });
         let current = export.get("preset").and_then(Value::as_str).unwrap_or_default();
         let presets = qnc_export_preset::presets(&settings);
-        let line = |kind, id: &str, label: String, default| ExportOption { kind, id: id.into(), label, default };
+        let line = |kind, id: &str, label: String, default, values: &Value| ExportOption {
+            kind,
+            id: id.into(),
+            label,
+            default,
+            standard: Some(Standard::of_rate(values.get("fps").and_then(Value::as_f64).unwrap_or_default())),
+            group: group_of(values.get("video_codec").and_then(Value::as_str).unwrap_or_default()),
+            available: renders(values, story_fps),
+        };
+        let top = |kind, id: &str, label: String| ExportOption { kind, id: id.into(), label, default: false, standard: None, group: String::new(), available: true };
         let mut options = vec![
-            line(Kind::Xml, "xml", qnc_ui_text::text("export.to_xml").into(), false),
-            line(Kind::Express, "express", qnc_ui_text::fill("export.express", &[("format", &prerender_format(export))]), false),
-            line(Kind::Original, "original", qnc_ui_text::text("export.original").into(), false),
+            top(Kind::Xml, "xml", qnc_ui_text::text("export.to_xml").into()),
+            top(Kind::Express, "express", qnc_ui_text::fill("export.express", &[("format", &prerender_format(export))])),
+            ExportOption {
+                kind: Kind::Original,
+                id: "original".into(),
+                label: qnc_ui_text::text("export.original").into(),
+                default: false,
+                standard: Some(Standard::of_rate(story_fps.unwrap_or(50.0))),
+                group: qnc_ui_text::text("export.group.original").into(),
+                available: true,
+            },
         ];
         let mut settings_lines: Vec<ExportOption> = presets
             .into_iter()
-            .map(|preset| line(Kind::Setting, &preset.id, preset.name, preset.id == current))
+            .map(|preset| {
+                let mut values = export.clone();
+                if let (Some(object), Some(over)) = (values.as_object_mut(), preset.values.as_object()) {
+                    object.extend(over.clone());
+                }
+                line(Kind::Setting, &preset.id, preset.name, preset.id == current, &values)
+            })
             .collect();
         if !settings_lines.iter().any(|option| option.default) {
-            settings_lines.insert(0, line(Kind::Setting, PROJECT_SETTINGS, qnc_ui_text::text("export.project_settings").into(), true));
+            settings_lines.insert(0, line(Kind::Setting, PROJECT_SETTINGS, qnc_ui_text::text("export.project_settings").into(), true, export));
         }
-        // The default right under Original, then the others.
-        settings_lines.sort_by_key(|option| !option.default);
+        // By group in a fixed order, the default first in its group.
+        let order = ["export.group.xdcam", "export.group.h264", "export.group.dnxhd", "export.group.other"].map(qnc_ui_text::text);
+        settings_lines.sort_by_key(|option| (order.iter().position(|group| *group == option.group), !option.default));
         options.extend(settings_lines);
-        let chosen = options.iter().position(|option| option.default).unwrap_or(0);
-        Self { options, chosen }
+        let chosen = options.iter().position(|option| option.default && option.available).unwrap_or(0);
+        let tab = options[chosen].standard.unwrap_or(options[2].standard.unwrap_or_default());
+        Self { options, chosen, tab }
     }
 
-    /// Up (`up`) or down the list, staying in it.
+    /// The lines shown, in order: above the tabs, then the tab's.
+    pub fn shown(&self) -> Vec<usize> {
+        (0..self.options.len()).filter(|&index| self.options[index].standard.is_none_or(|standard| standard == self.tab)).collect()
+    }
+
+    /// Up (`up`) or down the lines shown that can be chosen, staying in them.
     pub fn step(&mut self, up: bool) {
+        let open: Vec<usize> = self.shown().into_iter().filter(|&index| self.options[index].available).collect();
+        let Some(at) = open.iter().position(|&index| index == self.chosen) else {
+            self.chosen = open.first().copied().unwrap_or(0);
+            return;
+        };
         self.chosen = match up {
-            true => self.chosen.saturating_sub(1),
-            false => (self.chosen + 1).min(self.options.len().saturating_sub(1)),
+            true => open[at.saturating_sub(1)],
+            false => open[(at + 1).min(open.len() - 1)],
         };
     }
 
+    /// A line shown that can be chosen.
     pub fn choose(&mut self, index: usize) {
-        if index < self.options.len() {
+        if self.shown().contains(&index) && self.options[index].available {
             self.chosen = index;
         }
     }
 
+    /// Another tab; a line of the tab left goes to the default of the new one, else its
+    /// first that can be chosen, else the top.
+    pub fn set_tab(&mut self, tab: Standard) {
+        self.tab = tab;
+        if self.options.get(self.chosen).is_some_and(|option| option.standard.is_none_or(|standard| standard == tab)) {
+            return;
+        }
+        let open = |option: &ExportOption| option.standard == Some(tab) && option.available;
+        self.chosen = (self.options.iter().position(|option| open(option) && option.default))
+            .or_else(|| self.options.iter().position(open))
+            .unwrap_or(0);
+    }
+
     pub fn picked(&self) -> Option<Picked> {
-        let option = self.options.get(self.chosen)?;
+        let option = self.options.get(self.chosen).filter(|option| option.available)?;
         Some(Picked { kind: option.kind, id: option.id.clone(), label: option.label.clone() })
     }
 }
@@ -170,7 +282,7 @@ mod tests {
 
     #[test]
     fn xml_express_original_then_the_default_chosen_then_the_others() {
-        let choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "xdcam_hd422_50i", "format": "HD 1080p50", "video_codec": "h264" }));
+        let choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "xdcam_hd422_50i", "format": "HD 1080p50", "video_codec": "h264" }), Some(50.0));
         let kinds: Vec<Kind> = choice.options.iter().take(4).map(|option| option.kind).collect();
         assert_eq!(kinds, [Kind::Xml, Kind::Express, Kind::Original, Kind::Setting]);
         assert!(choice.options[1].label.contains("HD 1080p50 4:2:0"), "{}", choice.options[1].label);
@@ -196,12 +308,46 @@ mod tests {
 
     #[test]
     fn values_of_no_preset_are_offered_as_the_project_settings() {
-        let mut choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "manual", "format": "HD 1080i50", "video_codec": "mpeg2_422_50mbit" }));
+        let mut choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "manual", "format": "HD 1080i50", "video_codec": "mpeg2_422_50mbit", "fps": 25.0, "field_order": "upper_first" }), Some(50.0));
         assert!(choice.options[1].label.contains("4:2:2"));
         assert_eq!((choice.options[3].id.as_str(), choice.options[3].default), (PROJECT_SETTINGS, true));
         for _ in 0..5 {
             choice.step(true);
         }
         assert_eq!(choice.picked().unwrap().kind, Kind::Xml, "it stays in the list");
+    }
+
+    #[test]
+    fn pal_and_ntsc_tabs_in_groups_and_what_this_story_cannot_be_exported_in_is_greyed() {
+        // User 2026-10-25: XML and Express above the tabs, the settings by group, not made greyed.
+        let mut choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "h264_1080p50", "video_codec": "h264", "fps": 50.0, "field_order": "progressive" }), Some(50.0));
+        assert_eq!(choice.tab, Standard::Pal);
+        let shown: Vec<&str> = choice.shown().into_iter().map(|index| choice.options[index].id.as_str()).collect();
+        assert_eq!(&shown[..3], ["xml", "express", "original"]);
+        assert!(!shown.contains(&"h264_1080p30"), "NTSC is in the other tab");
+        let option = |choice: &ExportChoice, id: &str| choice.options.iter().find(|option| option.id == id).unwrap().clone();
+        assert!(option(&choice, "xdcam_hd422_50i").available, "50p gives 50i");
+        assert!(option(&choice, "h264_1080p50").available);
+        assert!(!option(&choice, "dnxhd_hq").available, "DNxHD is not made");
+        assert!(!option(&choice, "h264_1080p30").available, "no rate conversion");
+        let groups: Vec<String> = choice.shown().into_iter().skip(2).map(|index| choice.options[index].group.clone()).collect();
+        let mut seen: Vec<String> = Vec::new();
+        for group in groups {
+            if seen.last() != Some(&group) {
+                assert!(!seen.contains(&group), "a group is together: {seen:?} {group}");
+                seen.push(group);
+            }
+        }
+        let dnxhd = choice.options.iter().position(|option| option.id == "dnxhd_hq").unwrap();
+        let before = choice.chosen;
+        choice.choose(dnxhd);
+        assert_eq!(choice.chosen, before, "a greyed line is not chosen");
+        choice.set_tab(Standard::Ntsc);
+        assert!(choice.shown().iter().all(|&index| choice.options[index].standard != Some(Standard::Pal)));
+        assert_eq!(choice.chosen, 0, "nothing of NTSC can be made from 50p: the top");
+        for _ in 0..10 {
+            choice.step(false);
+        }
+        assert!(choice.options[choice.chosen].available);
     }
 }
