@@ -782,17 +782,17 @@ fn delayed_video_does_not_block_contiguous_audio_refill_but_cannot_miss_due_fram
     engine.prepare().unwrap();
     engine.play(0).unwrap();
     let horizon = engine.healthy_buffer_frames() as u64;
+    // The sound runs ahead of the pictures up to its own lead (audit 2026-10-25).
+    let lead = engine.audio_lead_frames() as u64;
     trace.pending_decode.set(true);
     trace.take();
     for frame in 0..horizon {
         engine.tick(u128::from(frame) * 20_000_000).unwrap();
         assert_eq!(engine.state.carrier_frame, frame);
         assert_eq!(engine.playout.next_video_frame, Some(horizon));
-        assert_eq!(
-            engine.playout.next_audio_frame,
-            Some(frame.saturating_sub(1) + horizon + 1)
-        );
-        assert!(engine.playout.audio.len() <= horizon as usize + 2);
+        let next_audio = engine.playout.next_audio_frame.unwrap();
+        assert!(next_audio >= frame + horizon && next_audio <= frame + lead + 1, "{next_audio}");
+        assert!(engine.playout.audio.len() <= lead as usize + 2);
         assert!(engine.playout.video.len() <= horizon as usize);
     }
     assert!(engine.playout_output.queued.last().unwrap() > &horizon);
@@ -965,4 +965,19 @@ fn a_cue_shows_its_picture_before_the_audio_and_play_still_waits_for_the_audio()
     engine.prepare().unwrap();
     assert!(engine.state().play_ready);
     assert_eq!(engine.state().carrier_frame, 7);
+}
+
+#[test]
+fn a_rearm_too_near_the_range_end_ends_the_play_at_the_boundary_instead_of_waiting() {
+    let (mut engine, _trace) = engine();
+    engine.load_source(&source_runtime(), None).unwrap();
+    engine.prepare().unwrap();
+    engine.play(0).unwrap();
+    // The sound ran dry two frames before the OUT: no preroll can fill before it.
+    let end = engine.current_range().unwrap().end_frame;
+    engine.state.carrier_frame = end - 2;
+    engine.rearm_audio_after_underrun().unwrap();
+    assert_ne!(engine.state.status, TransportStatus::Playing, "the clock does not stand in Playing");
+    let events = engine.tick(0).unwrap();
+    assert!(events.iter().any(|event| matches!(event, BroadcastEvent::PlaybackBoundaryReached { .. })));
 }

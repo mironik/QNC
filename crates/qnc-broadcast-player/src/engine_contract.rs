@@ -11,6 +11,8 @@ pub enum BroadcastEngineErrorKind {
     VideoDecode,
     VideoPresent,
     AudioOutput,
+    /// The sound device ran dry during a tick: the sound is prepared again, the play goes on.
+    AudioUnderrun,
     Schedule,
     NotReady,
     Contract,
@@ -58,6 +60,7 @@ impl BroadcastEngineError {
             },
             BroadcastEngineErrorKind::VideoPresent
             | BroadcastEngineErrorKind::AudioOutput
+            | BroadcastEngineErrorKind::AudioUnderrun
             | BroadcastEngineErrorKind::Schedule
             | BroadcastEngineErrorKind::NotReady
             | BroadcastEngineErrorKind::Contract => BroadcastEvent::PlaybackError {

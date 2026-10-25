@@ -183,6 +183,9 @@ where
     }
 }
 
+/// Seconds of sound queued ahead of the shown picture while playing.
+const AUDIO_LEAD_SECONDS: f64 = 1.5;
+
 pub struct TransportEngine<S, V, O>
 where
     S: SourceOpenAdapter,
@@ -199,6 +202,9 @@ where
     min_prebuffer_frames: usize,
     state: TransportEngineState,
     playout: PlayoutBuffer<V::VideoFrame, O::AudioPacket>,
+    /// Events of a play that ended outside a tick (a rearm at the range end), given by the
+    /// next tick.
+    later_events: Vec<BroadcastEvent>,
 }
 
 impl<S, V, A, P> TransportEngine<S, V, SplitAvPlayoutOutput<A, P>>
@@ -220,6 +226,7 @@ where
             min_prebuffer_frames: MIN_PLAYOUT_BUFFER_FRAMES,
             state: TransportEngineState::default(),
             playout: PlayoutBuffer::default(),
+            later_events: Vec::new(),
         }
     }
 }
@@ -242,6 +249,7 @@ where
             min_prebuffer_frames: MIN_PLAYOUT_BUFFER_FRAMES,
             state: TransportEngineState::default(),
             playout: PlayoutBuffer::default(),
+            later_events: Vec::new(),
         }
     }
 
@@ -262,6 +270,9 @@ where
         }
         if self.require_source()?.audio_format.is_none() {
             return Ok(());
+        }
+        if self.too_near_the_end()? {
+            return self.end_at_boundary();
         }
         let carrier = self.state.carrier_frame;
         let end = carrier
@@ -285,8 +296,26 @@ where
         if self.require_source()?.audio_format.is_none() {
             return Ok(());
         }
+        if self.too_near_the_end()? {
+            return self.end_at_boundary();
+        }
         self.playout_output.commit_playout_preroll()?;
         self.playout_output.start_playout()?;
+        Ok(())
+    }
+
+    /// Whether the sound ran dry so near the end of the range that a new preroll cannot be
+    /// filled before it (audit 2026-10-25: the rearm then waited forever, the clock stood).
+    fn too_near_the_end(&self) -> Result<bool, BroadcastEngineError> {
+        let left = self.current_range()?.end_frame.saturating_sub(self.state.carrier_frame);
+        Ok(left <= self.healthy_buffer_frames() as u64)
+    }
+
+    /// The play ends at the range boundary as it would have a moment later; its events go
+    /// out with the next tick.
+    fn end_at_boundary(&mut self) -> Result<(), BroadcastEngineError> {
+        let events = self.apply_playback_boundary()?;
+        self.later_events.extend(events);
         Ok(())
     }
 
@@ -548,7 +577,7 @@ where
         &mut self,
         now_tick: ClockTick,
     ) -> Result<Vec<BroadcastEvent>, BroadcastEngineError> {
-        let mut events = Vec::new();
+        let mut events = std::mem::take(&mut self.later_events);
         if self.clock.is_none() {
             if self.state.source.is_some()
                 && !matches!(self.state.status, TransportStatus::Empty)
@@ -572,7 +601,12 @@ where
             return Ok(events);
         };
         match self.tick_playing(now_tick) {
-            Ok(events) => Ok(events),
+            Ok(more) => {
+                events.extend(more);
+                Ok(events)
+            }
+            // The sound ran dry within the tick: still Playing, the runtime prepares it again.
+            Err(error) if error.kind == BroadcastEngineErrorKind::AudioUnderrun => Err(error),
             Err(error) => {
                 let recoverable = error.kind == BroadcastEngineErrorKind::NotReady;
                 let _ = self.suspend_motion();
@@ -919,7 +953,7 @@ where
         let queue_through = self
             .state
             .carrier_frame
-            .saturating_add(u64::try_from(self.healthy_buffer_frames()).unwrap_or(u64::MAX))
+            .saturating_add(u64::try_from(self.audio_lead_frames()).unwrap_or(u64::MAX))
             .min(range.end_frame - 1);
         let frames = self
             .playout
@@ -1064,6 +1098,16 @@ where
         // Each lane has its own bounded cursor. Pending video cannot starve PCM,
         // and pending audio cannot prevent video preparation within this horizon.
         if source.audio_format.is_some() {
+            // While playing the sound runs further ahead than the pictures (audit
+            // 2026-10-25: with 0.64 s a picture that waited longer emptied the device).
+            let end_frame = if matches!(self.state.status, TransportStatus::Playing) {
+                anchor_frame
+                    .saturating_add(self.audio_lead_frames() as u64 + 1)
+                    .min(self.current_range()?.end_frame)
+                    .max(end_frame)
+            } else {
+                end_frame
+            };
             let mut frame = self
                 .playout
                 .next_audio_frame
@@ -1123,6 +1167,16 @@ where
             return Ok(self.playout.video.contains_key(&frame));
         }
         Ok(self.playout.has_ready_frame(source, frame))
+    }
+
+    /// How far the sound is queued ahead of the shown picture while playing: 1.5 s, at
+    /// least the healthy buffer (the device ring holds 2 s).
+    fn audio_lead_frames(&self) -> usize {
+        let lead = self.state.source.as_ref().map_or(0, |source| {
+            let timebase = source.timebase;
+            (AUDIO_LEAD_SECONDS * timebase.fps_num as f64 / timebase.fps_den.max(1) as f64).ceil() as usize
+        });
+        lead.max(self.healthy_buffer_frames())
     }
 
     fn healthy_buffer_frames(&self) -> usize {
@@ -1789,7 +1843,8 @@ mod tests {
         assert!(engine.playout.video.contains_key(&4));
         assert!(engine.playout.primed_audio.contains(&4));
         assert!(!engine.playout.video.contains_key(&5));
-        assert!(!engine.playout.primed_audio.contains(&5));
+        // The sound runs further ahead than the pictures while playing (audit 2026-10-25).
+        assert!(engine.playout.primed_audio.contains(&5));
     }
 
     #[test]

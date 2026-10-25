@@ -5973,3 +5973,16 @@ i vise se ne trazi (`qnc-fine-wave` `Chunk.frames`, `answers`, `Ask::within`, te
 (`fine-wave read ... ms= ok=`). Izmjereno na izoliranoj kopiji (kartica samo citana): 3396 kod pocetka i kod kraja klipa
 (1376 slika) po jedno citanje kanala, 0,14-0,44 s (prvo 2,3 s, budenje kartice), zvuk do kraja klipa. Conformance.
 Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-25 (audit cijele aplikacije; korisnik: "da, kreni redom od 1, otkljucavam Project"): korak 1,
+greske playera. (1) Zvuk koji se isprazni usred takta (ne na pocetku) gasio je sesiju: greska upisa u red bila je Contract,
+engine je pauzirao i Play vise nije radio. Sada je to zasebna vrsta `BroadcastEngineErrorKind::AudioUnderrun`
+(`qnc-broadcast-engine` `audio_error`), transport ostaje u Playing i zvuk se priprema ponovno kao kod praznog zvuka na pocetku
+takta (`qnc-broadcast-player` `tick`). (2) Prazan zvuk manje od 16 slika prije OUT-a cekao je zauvijek (sat stoji u Playing):
+tada play zavrsava na granici raspona kao malo kasnije (`too_near_the_end`, `end_at_boundary`, dogadaji iduceg takta; test).
+(3) Zvuk je bio samo 0,64 s ispred prikazane slike, pa je svaki zastoj slike dulji od toga praznio uredaj; sada 1,5 s
+(`AUDIO_LEAD_SECONDS`, `audio_lead_frames`; spremnik uredaja 2 s). Razina, rute i dio razine i dalje se primjenjuju u pozivu
+uredaja, odmah. Nije mijenjano: nakon praznog zvuka zvuk krece od prikazane slike (slika i zvuk ostaju zajedno; ako je slika
+stajala dulje od zalihe, dio zvuka se cuje ponovno). Dva testa koja su zakljucavala staro pravilo (zvuk koliko i slika)
+prilagodena. Provjereno: testovi `qnc-broadcast-player` (80), `qnc-broadcast-engine`, `qnc-audio-output`, conformance;
+`qnc-player-acceptance` na izoliranoj kopiji: prica od 0 i od 600 100 % slika (jednom trzaj 85 ms), A/V -0,2 slike; klip 3396
+1-3 trzaja oko slike 470 jednako kao stari kod (izmjereno istim alatom prije izmjene: 1-4 trzaja). Uzivo nije provjereno.

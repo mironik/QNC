@@ -633,7 +633,7 @@ impl Runtime {
             // The sound ran dry within this tick (a tick that took long): the same rebuffer as
             // one found at its start, not the end of the play (live 2026-10-12: the story
             // stopped at a cover where a tick took 0.5 s).
-            Err(_) if self.audio_failed() => {
+            Err(e) if e.kind == BroadcastEngineErrorKind::AudioUnderrun || self.audio_failed() => {
                 self.rebuffer_audio("audio_underrun_in_tick");
                 return Ok(Vec::new());
             }

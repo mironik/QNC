@@ -146,7 +146,8 @@ impl DeviceSink {
                         channels: map.output_channels().len() as u16,
                     },
                     device_id,
-                    capacity_frames: format.sample_rate_hz,
+                    // Two seconds: the sound runs 1.5 s ahead of the picture while playing.
+                    capacity_frames: format.sample_rate_hz * 2,
                     ready_frames: u32::try_from(ready).map_err(error)?,
                     source_channels: map.source_channels(),
                 })
@@ -200,13 +201,13 @@ impl DeviceSink {
         let generation = match self.generation {
             Some(generation) => generation,
             None => {
-                let generation = device.begin(start).map_err(error)?;
+                let generation = device.begin(start).map_err(audio_error)?;
                 self.generation = Some(generation);
                 generation
             }
         };
         // Every decoded channel goes to the device queue; the device plays the routed ones.
-        device.queue(generation, start, &packet.payload).map_err(error)?;
+        device.queue(generation, start, &packet.payload).map_err(audio_error)?;
         if self.audition_frame == Some(packet.start_frame) {
             self.audition_frame = None;
             // Exactly the samples of this one frame, no more.
@@ -216,7 +217,7 @@ impl DeviceSink {
             device.audition(&packet.payload[..samples.min(packet.payload.len())]);
         }
         if packet.start_frame + 1 == self.source.duration_frames {
-            device.finish(generation).map_err(error)?;
+            device.finish(generation).map_err(audio_error)?;
         }
         Ok(Vec::new())
     }
@@ -413,6 +414,17 @@ impl AudioOutputAdapter for Audio {
         })
     }
     device_sink_adapter!();
+}
+
+/// An error of the sound device: running dry is its own kind, the play prepares the sound
+/// again instead of stopping (audit 2026-10-25).
+fn audio_error(e: qnc_audio_output::Error) -> BroadcastEngineError {
+    let kind = if e.code == qnc_audio_output::Code::Underrun {
+        BroadcastEngineErrorKind::AudioUnderrun
+    } else {
+        BroadcastEngineErrorKind::Contract
+    };
+    BroadcastEngineError::new(kind, e.to_string())
 }
 
 pub(crate) fn validate_channel_map(
