@@ -6091,3 +6091,11 @@ razina kao `adjust-volume` u dB, kanal kamere kao `audio-channel-source` (ostali
 `media-rep`; glavna linija je A1 (samo zvuk) s prazninama, V1, V2 i A2 su spojeni klipovi na trakama 1, 2 i -1; klip
 koji se koristi samo kao zvuk dobiva velicinu slike sekvence. `tools/qnc-export --xml`, ugovor modula (`export.xml.fcpx`).
 Provjereno na izoliranoj kopiji: datoteka je ispravan XML. U Resolveu, Ediusu i Final Cutu nije provjereno.
+Izmjena 2026-10-25 (korisnik: FCP X "edius ne podrzava format, resolve razbaca audio kanale na 8 traka i cuje se samo
+prvi"; "ok"; u Ediusu se cuju obje probne verzije, bez razine i s razinom u dB, ali "razine ne utjecu na audio"): Export
+to XML vise ne pise `.fcpxml` (`qnc-fcp7-xml` modul `fcpx.rs`, `tools/qnc-export`, sposobnost `export.xml.fcpx`
+uklonjeni). FCP7 XML vise nema filtar Audio Levels: Edius omjer (1 = 0 dB) cita drukcije i pokrivalice ostaju tihe, a dB
+ne primjenjuje; razina ostaje u prici, playeru i MXF exportima, u XML-u se ne prenosi. Svaki kanal datoteke je mono
+(`<layout>mono</layout>`, `<channellabel>discrete</channellabel>`), pokusaj da Resolve uzme izabrani kanal kamere
+umjesto prvog na oba izlaza. Provjereno na izoliranoj kopiji: XML ispravan, bez filtra razine. U Resolveu i Ediusu nije
+provjereno.

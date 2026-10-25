@@ -10,9 +10,6 @@ use std::fmt::Write as _;
 
 use qnc_program_playlist::{FlatProgramPlaylist, ProgramVideoLayer};
 
-mod fcpx;
-pub use fcpx::fcpxml;
-
 pub const MODULE_ID: &str = "qnc.module.fcp7-xml";
 
 /// A clip's file: its original on this computer.
@@ -182,14 +179,8 @@ fn clip_item(
     }
     if audio.is_some() {
         writeln!(w, "<sourcetrack><mediatype>audio</mediatype><trackindex>{}</trackindex></sourcetrack>", piece.channel + 1).ok();
-        if piece.level_db != 0 {
-            let gain = qnc_gain::db_to_gain(f64::from(piece.level_db));
-            writeln!(
-                w,
-                "<filter><effect><name>Audio Levels</name><effectid>audiolevels</effectid><effectcategory>audiolevels</effectcategory><effecttype>audiolevels</effecttype><mediatype>audio</mediatype><parameter><parameterid>level</parameterid><name>Level</name><valuemin>0</valuemin><valuemax>3.98109</valuemax><value>{gain:.5}</value></parameter></effect></filter>"
-            )
-            .ok();
-        }
+        // No level filter: Edius 2026-10-25 read the FCP7 level as something else (covers
+        // silent) and applied none in dB; the level stays in the story and the MXF exports.
     }
     writeln!(w, "</clipitem>").ok();
     Ok(())
@@ -207,7 +198,7 @@ fn file_element(w: &mut String, id: &str, file: &ClipFile, rate: &str) {
         rate => format!("<samplecharacteristics><samplerate>{rate}</samplerate></samplecharacteristics>"),
     };
     for channel in 1..=file.audio_channels {
-        writeln!(w, "<audio>{characteristics}<channelcount>1</channelcount><audiochannel><sourcechannel>{channel}</sourcechannel></audiochannel></audio>").ok();
+        writeln!(w, "<audio>{characteristics}<channelcount>1</channelcount><layout>mono</layout><audiochannel><sourcechannel>{channel}</sourcechannel><channellabel>discrete</channellabel></audiochannel></audio>").ok();
     }
     writeln!(w, "</media>\n</file>").ok();
 }
@@ -307,7 +298,7 @@ mod tests {
         assert_eq!(xml.matches("<clipitem").count(), 4, "V1 a, V2 b, A1 a, A2 b: {xml}");
         assert!(xml.contains("<start>0</start><end>150</end><in>10</in><out>160</out>"), "a goes on: one item");
         assert!(xml.contains("<trackindex>2</trackindex>"), "A1 is channel 2 of a");
-        assert!(xml.contains("<value>1.99526</value>"), "+6 dB");
+        assert!(!xml.contains("audiolevels"), "no level filter");
         assert!(xml.contains("file://localhost/D:/Clip/a%201.MXF"));
         assert!(xml.contains("<string>00:30:00:00</string>"));
         assert!(xml.contains("Story &amp; co"));

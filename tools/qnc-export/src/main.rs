@@ -109,10 +109,6 @@ fn run() -> Result<PathBuf> {
     let start = settings.export_start_timecode().map_err(|e| e.to_string())?;
     let rate = program.project_audio.sample_rate_hz;
     let base = format!("{}_{}", file_name(&settings.project_name), program.playlist.revision);
-    // FCP X beside FCP7 (user 2026-10-25: Edius read the FCP7 level otherwise).
-    let fcpx = folder.join(format!("{base}.fcpxml"));
-    let text = qnc_fcp7_xml::fcpxml(&settings.project_name, &program.playlist, &files, &start, rate)?;
-    std::fs::write(&fcpx, text).map_err(|e| format!("{}: {e}", fcpx.display()))?;
     let text = qnc_fcp7_xml::sequence(&settings.project_name, &program.playlist, &files, &start, rate)?;
     let path = folder.join(format!("{base}.xml"));
     std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
