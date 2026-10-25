@@ -6083,3 +6083,11 @@ prijelaze i ostavi ciste rezove"): kanal 2 svih pet pokrivalica ima ton na karti
 pokazuje na njega, a tihe su bile pokrivalice iza Cross Fade prijelaza. `qnc-fcp7-xml` (`without_overlaps`): preklapanje na
 traci je cisti rez na pocetku sljedeceg klipa, bez `<transitionitem>`. Crossfade ostaje u playeru, prerenderu i MXF exportu.
 Test, conformance, release build. U Resolveu i Ediusu nije provjereno.
+Izvedeno 2026-10-25 (korisnik: u Ediusu se cuje samo treca pokrivalica na A2; probne datoteke bez razine i s razinom u dB
+rade u Ediusu; "pokusaj export po pravilu FCP X"): nalaz: Edius FCP7 `Audio Levels` (omjer, 1 = 0 dB) ne cita kao omjer,
+pa je cula samo pokrivalica s razinom iznad 1 (+4 dB). Export to XML sada uz `.xml` (FCP7) pise i `.fcpxml` (Final Cut Pro
+X, verzija 1.10) iste revizije u mapu exporta: `qnc-fcp7-xml` modul `fcpx.rs` (`fcpxml`): vrijeme u racionalnim sekundama,
+razina kao `adjust-volume` u dB, kanal kamere kao `audio-channel-source` (ostali kanali iskljuceni), original kao
+`media-rep`; glavna linija je A1 (samo zvuk) s prazninama, V1, V2 i A2 su spojeni klipovi na trakama 1, 2 i -1; klip
+koji se koristi samo kao zvuk dobiva velicinu slike sekvence. `tools/qnc-export --xml`, ugovor modula (`export.xml.fcpx`).
+Provjereno na izoliranoj kopiji: datoteka je ispravan XML. U Resolveu, Ediusu i Final Cutu nije provjereno.

@@ -10,6 +10,9 @@ use std::fmt::Write as _;
 
 use qnc_program_playlist::{FlatProgramPlaylist, ProgramVideoLayer};
 
+mod fcpx;
+pub use fcpx::fcpxml;
+
 pub const MODULE_ID: &str = "qnc.module.fcp7-xml";
 
 /// A clip's file: its original on this computer.

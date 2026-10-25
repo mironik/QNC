@@ -4,7 +4,8 @@
   "module_version": "0.1.0",
   "module_kind": "library",
   "capabilities": [
-    "export.xml.fcp7"
+    "export.xml.fcp7",
+    "export.xml.fcpx"
   ],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
