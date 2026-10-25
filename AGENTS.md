@@ -5920,3 +5920,11 @@ rjecniku (`story.ui.normalize_hint`). Player log: `story-normalize on|off` s izm
 `story-normalize on|off (project opened)` pri otvaranju projekta (`qnc-program-segments`). Popravak: otvaranje projekta
 vracalo je panel na zadano stanje i iskljucivalo normalizaciju (N je zato bio iskljucen iako je od 25. 10. ukljucen pri
 pokretanju); sada izbor korisnika ostaje (test). Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-25 (korisnik: "pogledaj log... dugme normalizacije treba imati izgled kao i drugi dugmi (npr. B-roll)"):
+(1) dugme NORM crta se kao prekidac B-roll | Sync/B-roll (`qnc-ui-kit::chrome_button`, ukljuceno u boji fokusa;
+`qnc-segment-panel` ovisi o `qnc-ui-kit`). (2) Log je pokazao `story-normalize ... a1_lufs=None`: puni val segmenta
+Mironik 3452 (4,8 min) s glasnocom bio je veci od granice zapisa vala (256 KB), pa ga je radnik racunao iznova i baza ga je
+stalno odbijala ("The wave record is too large"); klip je imao samo grubi val bez glasnoce, pa A1 nije bio izmjeren.
+`qnc-artifact-db`: zapis vala smije imati do pola najvece poruke transporta baze (8 MB, oko sat vremena 4 kanala); zapis
+filmstripa ostaje 256 KB. Provjereno na izoliranoj kopiji: radnik je spremio puni val 3452 s glasnocom sva 4 kanala.
+Testovi, conformance. Uzivo nije provjereno.

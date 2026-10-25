@@ -7,8 +7,13 @@ use rusqlite::{params, Connection, OptionalExtension};
 /// The tables this module owns; it writes no other.
 const OWNED: [&str; 3] = ["filmstrip_artifacts", "filmstrip_frames", "wave_artifacts"];
 
-/// Largest stored record (as before: the content page budget).
+/// Largest stored filmstrip record (as before: the content page budget).
 const MAX_RECORD_BYTES: usize = 16 * 1024 * 1024 / 64;
+/// Largest stored wave record: it carries the loudness of every 100 ms of each channel
+/// (2026-10-24), about 90 KB a minute of four channels, so an hour-long clip fits; half of
+/// the largest message of the project database transport (2026-10-25: a 4.8 min clip's full
+/// wave was refused again and again at the old 256 KB, its A1 never measured).
+const MAX_WAVE_RECORD_BYTES: usize = qnc_db_broker::MAX_BYTES / 2;
 
 pub(crate) struct Store {
     conn: Connection,
@@ -215,7 +220,7 @@ impl Store {
             return Err(qnc_ui_text::text("artifact.wave_record_does_belong_stored_original").into());
         }
         let json = serde_json::to_string(artifact).map_err(err)?;
-        if json.len() > MAX_RECORD_BYTES {
+        if json.len() > MAX_WAVE_RECORD_BYTES {
             return Err(qnc_ui_text::text("artifact.wave_record_too_large").into());
         }
         let now = utc_stamp();

@@ -55,7 +55,9 @@ pub(crate) fn show(
         qnc_level_meter::show(ui, ui.make_persistent_id("qnc_segment_level_meter"), meter.shrink2(Vec2::new(0.0, 1.0)), &lanes, style);
         in_rect(ui, norm, egui::Layout::left_to_right(egui::Align::Center), |ui| {
             ui.spacing_mut().button_padding = Vec2::new(6.0, 1.0);
-            let button = flash_button(ui, qnc_ui_text::text("story.ui.normalized"), true, segments.normalize, theme);
+            // The look of the B-roll | Sync/B-roll switch (user 2026-10-25): on in the focus colour.
+            let style = qnc_ui_kit::ChromeButtonStyle { text: theme.text, border: theme.border, focus: theme.focus, height: COMPACT_CTRL_H };
+            let button = qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("story.ui.normalized"), true, segments.normalize, style);
             if clicked(button.on_hover_text(qnc_ui_text::text("story.ui.normalize_hint"))) {
                 command = Some("toggle_loudness_normalize"); // the N key
             }
