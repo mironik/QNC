@@ -3771,6 +3771,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-fine-wave"
+version = "0.1.0"
+dependencies = [
+ "qnc-decoder-catalog",
+ "qnc-dev-diagnostics",
+ "qnc-media-decode",
+ "qnc-media-metadata",
+ "qnc-media-stream",
+ "qnc-program-waveform",
+ "qnc-still-locator",
+]
+
+[[package]]
 name = "qnc-focus-walk"
 version = "0.1.0"
 dependencies = [
@@ -4712,7 +4725,9 @@ dependencies = [
  "qnc-active-project-read",
  "qnc-content-read",
  "qnc-dev-diagnostics",
+ "qnc-fine-wave",
  "qnc-program-output",
+ "qnc-program-waveform",
  "qnc-source-bindings",
  "qnc-source-preview",
  "serde_json",
@@ -5758,6 +5773,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
+ "qnc-fine-wave",
  "qnc-frame-timebase",
  "qnc-image-assets",
  "qnc-media-decode",

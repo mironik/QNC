@@ -468,6 +468,15 @@ impl TimelineProjection {
             .min(self.duration_frames())
     }
 
+    /// The source mark taken (Ctrl+I/O, a right click): `Some(true)` IN, `Some(false)` OUT.
+    pub fn taken_source_mark(&self) -> Option<bool> {
+        match self.source_mark_focus {
+            TimelineSourceMarkFocus::In => Some(true),
+            TimelineSourceMarkFocus::Out => Some(false),
+            TimelineSourceMarkFocus::Playhead => None,
+        }
+    }
+
     /// IN/OUT the source timeline paints. A confirmed player source shows the
     /// whole clip at once, the same way v5 does, until a mark replaces that end.
     pub fn visible_source_marks(&self) -> Option<(u64, u64)> {

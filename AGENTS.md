@@ -5947,3 +5947,20 @@ izoliranoj kopiji (kartica samo citana): 12 dijelova umjesto 29, render oko 41 s
 A2 Expressa bit po bit isti kao s 29 dijelova; prica iz prerendera 2x PASS 100 %, bez trzaja (iz izvora s kartice, bez
 prerendera, 95 % i 18-25 trzaja). Testovi (`units_are_cut_where_the_picture_changes_and_a_crossfade_lies_inside_one`),
 conformance. Uzivo kroz sucelje nije provjereno.
+Izvedeno 2026-10-25 (korisnik: "s alatima koje imamo veoma je tesko precizno rezati ton, posebno kad se zeli izbaciti slovo
+ili kratka rijec"; "postojeci alati, ali prosireni: zoom koji imamo na segmentima (desni klik skoci na najblizi marker, zoom dvije
+slike s markerom izmedju njih) primijeniti i na IN/OUT source timelinea; tom zoomu dodati zoom audija s tankim playholderom koji
+prolazi izmedju dvije slike i dijeli audio prikaz"): spremljeni val ima 1200 tocaka po klipu (cetvrt sekunde na klipu od pet
+minuta). (1) Trim zoom i za IN/OUT source timelinea: dok je IN ili OUT uzet (Ctrl+I/O, desni klik, Ctrl+kotacic), prozor u
+sredini ekrana pokazuje za IN zadnju sliku prije i prvu sliku IN-a, za OUT zadnju sliku do OUT-a i prvu iza njega; rez je
+izmedju njih (`qnc-timeline` `taken_source_mark`, `qnc-program-segments` `SourcePick.taken`, `source_stills`; rjecnik
+`story.still.before_in`, `in_first`, `out_last`, `after_out`). Rub segmenta (Ctrl+Shift+I/O) i dalje pokazuje svoje slike.
+(2) Ispod slika svakog trim zooma (slot, marker, rub, IN/OUT) su A1 i A2 sekundu prije i poslije reza, s tankom crvenom linijom
+reza koja prolazi izmedju dviju slika i kroz oba vala (`qnc-trim-overlay`; visina vala u dB od -54 dBFS, pa se tihi govor i
+pauza poslije rijeci razlikuju). Za source IN/OUT valovi su kanali koje A1/A2 source timelinea cuju, za pricu segmenti na A1 i
+pokrivalice na A2 sa svojom razinom (`qnc-program-segments` `zoom_sound`, `qnc-program-view` `ZoomSound`). Nova javna kocka
+`crates/qnc-fine-wave` (+ ugovor `contracts/modules/fine-wave.module.json`): fini val citan iz originala kamere na ovom racunalu
+oko reza (1,5 s rezerve) kroz katalog dekodera u pozadini, uzorci u memoriji, vrh po stupcu prozora (900); bez probea, bez
+baze. `qnc-still-locator` `locate_sound` (spremljeni zvucni tokovi originala), `qnc-trim-stills` ga puni. `tools/qnc-player-acceptance
+--fine-wave NAZIV` mjeri citanje. Izmjereno na izoliranoj kopiji (kartica samo citana): 3396 oko slike 400, prvi kanal 2,6 s
+(budenje kartice), ostali 0,17-0,24 s. Ingest nema trim zoom (nije u ovom koraku). Testovi, conformance. Uzivo nije provjereno.

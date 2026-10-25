@@ -89,6 +89,19 @@ pub struct PartSoundView {
     pub level_db: i8,
 }
 
+/// The sound around the cut of the trim zoom (user 2026-10-25: "zoom the audio so the
+/// boundary of a word is seen"): the window `[from, to)` of its axis (the program's frames,
+/// or a clip's own for a source IN/OUT), the cut, the pieces of sound A1 and A2 play there,
+/// and their peaks per column, per mille (empty until read).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ZoomSound {
+    pub from: u64,
+    pub to: u64,
+    pub cut: u64,
+    pub lanes: [Vec<qnc_program_waveform::Placement>; 2],
+    pub peaks: [Vec<u16>; 2],
+}
+
 /// What a form shows: the program in order, its markers and slots, timebase,
 /// length and the program playhead confirmed by the player.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -106,6 +119,9 @@ pub struct SegmentsView {
     /// The same for a segment edge taken with Ctrl+I/O, on the source timeline: the
     /// marker frame is the source frame of the moved IN or OUT.
     pub source_edit_stills: Vec<EditStill>,
+    /// The sound around the cut the trim zoom shows (user 2026-10-25), its fine peaks filled
+    /// in by whoever reads them.
+    pub zoom_sound: Option<ZoomSound>,
     /// Program frames of the edits being moved (a taken slot's two markers, a taken
     /// marker): the trim playheads, drawn beside the player's own.
     pub trim_frames: Vec<u64>,

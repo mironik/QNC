@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.fine-wave",
+  "module_name": "Fine wave of a cut",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.trim.fine_wave"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "database.write", "player.command", "business.workflow"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.content-store"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-fine-wave",
+  "input": "The pieces of sound a lane plays in a window around a cut (qnc-program-waveform placements: clip, camera channel, frames, level, off) and the preview's StillLocator (the stored sound streams of the clip's original on this machine).",
+  "output": "A peak per column of the window, composed from the samples of those pieces read in the background through the decoder catalog, a second and a half around what is needed, kept in memory (6 chunks per clip channel); loading while anything is still being read.",
+  "specification": "User 2026-10-25: cutting a letter or a short word needs the sound zoomed; the stored wave has 1200 points per clip. Shown by qnc-trim-overlay under the trim zoom's pictures with a thin line through the cut."
+}

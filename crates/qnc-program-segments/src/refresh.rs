@@ -106,7 +106,7 @@ impl ProgramSegments {
             Some(trim) => qnc_program_view::trim_stills(&view, &slots(&self.stored_slots, None), &trim.slot_id, trim.start, trim.frames),
             None => qnc_program_view::edit_stills(&view, &slots(&self.stored_slots, None), &self.edit_moves()),
         };
-        view.source_edit_stills = self.edge_stills();
+        view.source_edit_stills = self.source_stills();
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
         view.trim_frames.extend(self.overlap.as_ref().map(overlap::OverlapEdit::frame));
         view.trim_frames.extend(self.cut_sound_frame());
@@ -114,6 +114,7 @@ impl ProgramSegments {
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);
         view.zoom = self.zoom_window(&view);
+        view.zoom_sound = self.zoom_sound(&view);
         self.view = view;
     }
 

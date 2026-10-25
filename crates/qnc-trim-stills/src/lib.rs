@@ -45,6 +45,8 @@ const RUN_BACK: u64 = 12;
 const RUN: u32 = 25;
 /// Pictures kept in memory (about 230 KB each).
 const KEPT: usize = 160;
+/// Columns of the zoom's fine wave (about one per pixel of the window).
+const ZOOM_COLUMNS: usize = 900;
 /// A pass taking longer is cancelled and the worker starts again.
 const STUCK: Duration = Duration::from_secs(8);
 
@@ -81,6 +83,8 @@ pub struct TrimStills {
     /// Each place's last picture and the way its frame last moved (+1, -1), for making
     /// the next pictures ahead of the arrow.
     moving: HashMap<String, (StillPicture, i8)>,
+    /// The fine wave of the zoom's cut (user 2026-10-25), read around it from the original.
+    fine: qnc_fine_wave::FineWave,
 }
 
 impl TrimStills {
@@ -130,6 +134,13 @@ impl TrimStills {
         }
         if view.edit_stills.is_empty() && view.source_edit_stills.is_empty() {
             self.shown.clear();
+        }
+        // The sound under the pictures: a peak per column of each lane, per mille.
+        if let Some(sound) = view.zoom_sound.as_mut() {
+            for lane in 0..2 {
+                let (peaks, _) = self.fine.lane_peaks(&locator, &sound.lanes[lane], sound.from, sound.to, ZOOM_COLUMNS);
+                sound.peaks[lane] = peaks.iter().map(|peak| (peak * 1000.0).round() as u16).collect();
+            }
         }
         for still in view.edit_stills.iter_mut().chain(view.source_edit_stills.iter_mut()) {
             still.image = still.picture.as_ref().and_then(|picture| self.cache.get(picture).cloned());
@@ -241,7 +252,7 @@ impl TrimStills {
 
     /// Whether a picture is being made (the caller repaints soon).
     pub fn loading(&self) -> bool {
-        self.job.is_some()
+        self.job.is_some() || self.fine.loading()
     }
 
     fn take_finished(&mut self) -> bool {

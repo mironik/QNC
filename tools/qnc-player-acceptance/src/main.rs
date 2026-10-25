@@ -30,10 +30,12 @@ struct Args {
     hdmi: bool,
     /// Clips play from this frame (a pan where the user saw it).
     start: u64,
+    /// Clips whose fine wave around `start` is read as the trim zoom reads it.
+    fine_wave: Vec<String>,
 }
 
 fn args() -> Result<Args, String> {
-    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), jumps: Vec::new(), back: Vec::new(), program_back: Vec::new(), scrub: Vec::new(), seconds: 10, hdmi: false, start: 0 };
+    let mut parsed = Args { root: PathBuf::new(), clips: Vec::new(), program_from: Vec::new(), steps: Vec::new(), jumps: Vec::new(), back: Vec::new(), program_back: Vec::new(), scrub: Vec::new(), seconds: 10, hdmi: false, start: 0, fine_wave: Vec::new() };
     let mut list = std::env::args().skip(1);
     while let Some(arg) = list.next() {
         if arg == "--hdmi" {
@@ -52,6 +54,7 @@ fn args() -> Result<Args, String> {
             "--program-back" => parsed.program_back.push(value.parse().map_err(|_| "--program-back FRAME")?),
             "--start" => parsed.start = value.parse().map_err(|_| "--start FRAME")?,
             "--seconds" => parsed.seconds = value.parse().map_err(|_| "--seconds N")?,
+            "--fine-wave" => parsed.fine_wave.push(value),
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -528,6 +531,38 @@ fn program_back(preview: &mut SourcePreview, run: &mut Steps, start: u64) {
     run.burst_ms = Some(0);
 }
 
+/// The fine wave of a second on each side of `at`, read as the trim zoom reads it: how long
+/// until it is there, and the peaks of each camera channel (user 2026-10-25).
+fn fine_wave(preview: &SourcePreview, clip_id: &str, name: &str, at: u64) {
+    let Some(locator) = preview.still_locator() else {
+        println!("fine wave {name}: no locator");
+        return;
+    };
+    let (from, to) = (at.saturating_sub(50), at + 50);
+    for channel in 0..4u16 {
+        let piece = qnc_program_waveform::Placement {
+            clip_id: clip_id.to_string(),
+            channel,
+            program_start: from,
+            program_end: to,
+            source_in: from,
+            source_out: to,
+            level_db: 0,
+            off: false,
+        };
+        let mut wave = qnc_fine_wave::FineWave::new();
+        let started = Instant::now();
+        let mut peaks = wave.lane_peaks(&locator, std::slice::from_ref(&piece), from, to, 900).0;
+        while wave.loading() && started.elapsed() < Duration::from_secs(20) {
+            std::thread::sleep(Duration::from_millis(10));
+            peaks = wave.lane_peaks(&locator, std::slice::from_ref(&piece), from, to, 900).0;
+        }
+        let loud = peaks.iter().filter(|peak| **peak > 0.01).count();
+        let top = peaks.iter().copied().fold(0f32, f32::max);
+        println!("fine wave {name} ch{} frames {from}..{to}: {} ms, {loud} of {} columns sound, peak {top:.3}", channel + 1, started.elapsed().as_millis(), peaks.len());
+    }
+}
+
 fn percentile(values: &[u128], p: f64) -> u128 {
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
@@ -635,6 +670,12 @@ fn main() -> Result<(), String> {
             None => run.error = Some("no such clip".into()),
         }
         step_runs.push(run);
+    }
+    for wanted in &args.fine_wave {
+        match clips.iter().find(|clip| clip.name.contains(wanted.as_str())) {
+            Some(clip) => fine_wave(&preview, &clip.clip_id, wanted, args.start),
+            None => println!("fine wave {wanted}: no such clip"),
+        }
     }
     preview.close();
     std::thread::sleep(Duration::from_millis(300));

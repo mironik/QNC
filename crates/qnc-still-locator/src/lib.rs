@@ -44,6 +44,41 @@ impl LocatedPicture {
     }
 }
 
+/// Where this machine reads a clip's sound (the camera original, as the player hears it,
+/// user 2026-10-25: the fine wave of the trim zoom): the local file, its saved record, each
+/// audio stream in order with its channel count (camera channel k is the k-th channel of
+/// them), and the saved start and rate of the picture, which place a clip frame in time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LocatedSound {
+    pub file: PathBuf,
+    pub media: qnc_media_metadata::MediaRepresentation,
+    pub stamp: String,
+    /// `(stream index, channels, sample rate)` of every audio stream, in order.
+    pub streams: Vec<(u32, u16, u32)>,
+    pub fps: (u32, u32),
+    /// The time of clip frame 0 in seconds of the media's timestamps.
+    pub frame_zero_seconds: f64,
+}
+
+impl LocatedSound {
+    /// The stream, the channel inside it and the stream's width of camera channel `channel`.
+    pub fn channel(&self, channel: u16) -> Option<(u32, u16, u16, u32)> {
+        let mut first = 0u16;
+        for (index, channels, rate) in &self.streams {
+            if channel < first + channels {
+                return Some((*index, channel - first, *channels, *rate));
+            }
+            first += channels;
+        }
+        None
+    }
+
+    /// The time of clip frame `frame` (seconds of the media's timestamps).
+    pub fn seconds_of(&self, frame: f64) -> f64 {
+        self.frame_zero_seconds + frame * f64::from(self.fps.1) / f64::from(self.fps.0.max(1))
+    }
+}
+
 /// Finds the picture of a clip of the project the preview works in; cheap to clone and
 /// safe on another thread (it holds no player, no open database).
 #[derive(Clone)]
@@ -86,6 +121,33 @@ impl StillLocator {
         let stream_index = stream.index.as_ref().map(|index| index.value).ok_or(qnc_ui_text::text("player.clip_stored_video_stream_index"))?;
         let (file, stamp) = self.local_file(&media.media_uri)?;
         Ok(LocatedPicture { file, fps, start, media: media.clone(), stream_index, stamp })
+    }
+
+    /// The sound of a clip: its camera original on this machine (no probe).
+    pub fn locate_sound(&self, clip_id: &str) -> Result<LocatedSound, String> {
+        let picture = self.locate(clip_id)?;
+        let input = InputReader::with_content_reader(self.reader.clone(), self.content.clone())
+            .load(&self.settings.workspace_db_uri, clip_id)
+            .map_err(|error| error.to_string())?;
+        let media = input.audio_media().clone();
+        let streams = media
+            .streams
+            .iter()
+            .filter_map(|stream| match &stream.details {
+                StreamDetails::Audio(audio) => Some((
+                    stream.index.as_ref()?.value,
+                    u16::try_from(audio.channels.as_ref()?.value).ok()?,
+                    audio.sample_rate_hz.as_ref()?.value,
+                )),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if streams.is_empty() {
+            return Err(qnc_ui_text::text("player.clip_stored_audio_stream").into());
+        }
+        let (file, stamp) = self.local_file(&media.media_uri)?;
+        let (pts, (num, den)) = picture.start;
+        Ok(LocatedSound { file, media, stamp, streams, fps: picture.fps, frame_zero_seconds: pts as f64 * num as f64 / den.max(1) as f64 })
     }
 
     /// The media URI on a local binding of this machine: a source or the project folder,

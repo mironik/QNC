@@ -1,0 +1,14 @@
+[package]
+name = "qnc-fine-wave"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the fine wave of a cut for the trim zoom, read from the camera original around the cut through the decoder catalog, kept in memory, a peak per column; no probe, no database"
+
+[dependencies]
+qnc-decoder-catalog = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-media-decode = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-media-stream = { workspace = true }
+qnc-program-waveform = { workspace = true }
+qnc-still-locator = { workspace = true }

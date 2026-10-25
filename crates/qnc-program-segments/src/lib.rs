@@ -89,6 +89,9 @@ pub struct SourcePick {
     pub lanes: [qnc_lane_choice::Lane; 2],
     /// The source timeline holds the current Enter (a lane taken or just kept).
     pub holds_enter: bool,
+    /// The source mark taken on the source timeline: `Some(true)` IN, `Some(false)` OUT
+    /// (user 2026-10-25: its trim zoom, as an M marker's).
+    pub taken: Option<bool>,
 }
 
 impl SourcePick {
@@ -108,7 +111,14 @@ impl SourcePick {
             timebase,
             lanes: [qnc_lane_choice::Lane::default(), qnc_lane_choice::Lane { channel: 1, ..Default::default() }],
             holds_enter: false,
+            taken: None,
         }
+    }
+
+    /// The source mark taken on the source timeline (IN `Some(true)`, OUT `Some(false)`).
+    pub fn with_taken(mut self, taken: Option<bool>) -> Self {
+        self.taken = taken;
+        self
     }
 
     /// The lanes the source timeline keeps and whether it holds the Enter.
@@ -441,7 +451,8 @@ impl ProgramSegments {
             .then_some(self.source.in_mark)
             .flatten();
         self.source = source;
-        self.view.source_edit_stills = self.edge_stills();
+        self.view.source_edit_stills = self.source_stills();
+        self.view.zoom_sound = self.zoom_sound(&self.view);
         self.arm_sync_on_new_in(previous_in);
     }
 

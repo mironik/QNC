@@ -7,6 +7,7 @@ description = "QNC public piece: decodes the edit pictures of a trim (the exact 
 [dependencies]
 qnc-ui-text = { workspace = true }
 qnc-decoder-catalog = { workspace = true }
+qnc-fine-wave = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-frame-timebase = { workspace = true }
 qnc-image-assets = { workspace = true }

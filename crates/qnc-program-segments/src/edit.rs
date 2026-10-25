@@ -107,6 +107,67 @@ impl ProgramSegments {
         stills
     }
 
+    /// The pictures of the source timeline's trim zoom: a segment edge's, else those of the
+    /// taken IN or OUT (user 2026-10-25: as an M marker's, the picture before the cut and the
+    /// one after it, the cut between them).
+    pub(crate) fn source_stills(&self) -> Vec<qnc_program_view::EditStill> {
+        use qnc_program_view::{EditStill, StillPicture};
+        let edge = self.edge_stills();
+        if !edge.is_empty() {
+            return edge;
+        }
+        let (Some(clip_id), Some(taken), Some((in_frame, out_frame))) = (self.source.clip_id.as_ref(), self.source.taken, self.source.marks) else {
+            return Vec::new();
+        };
+        let picture = |frame: u64| Some(StillPicture { clip_id: clip_id.clone(), source_frame: frame });
+        let mut stills = Vec::new();
+        if taken {
+            if in_frame > 0 {
+                stills.push(EditStill::new(in_frame, false, picture(in_frame - 1)).labelled(qnc_ui_text::text("story.still.before_in")));
+            }
+            stills.push(EditStill::new(in_frame, true, picture(in_frame)).labelled(qnc_ui_text::text("story.still.in_first")).at_cut());
+        } else {
+            stills.push(EditStill::new(out_frame, false, picture(out_frame.saturating_sub(1))).labelled(qnc_ui_text::text("story.still.out_last")).at_cut());
+            if out_frame < self.source.duration_frames {
+                stills.push(EditStill::new(out_frame, true, picture(out_frame)).labelled(qnc_ui_text::text("story.still.after_out")));
+            }
+        }
+        stills
+    }
+
+    /// The sound around the cut of the trim zoom (user 2026-10-25: "zoom the audio so the
+    /// boundary is seen", a thin line through the cut): a second on each side of it, on the
+    /// clip's own frames for a source cut (A1 and A2 as the source timeline hears them), on
+    /// the program's for a cut of the story (its segments on A1, its covers on A2).
+    pub(crate) fn zoom_sound(&self, view: &qnc_program_view::SegmentsView) -> Option<qnc_program_view::ZoomSound> {
+        let cut_of = |stills: &[qnc_program_view::EditStill]| stills.iter().find(|still| still.cut).or(stills.first()).map(|still| still.marker_frame);
+        let second = |(num, den): (u64, u64)| (num as f64 / den.max(1) as f64).round().max(1.0) as u64;
+        if let Some(cut) = cut_of(&view.source_edit_stills) {
+            let clip_id = self.source.clip_id.clone()?;
+            let (num, den) = self.source.timebase?;
+            let half = second((num.max(0) as u64, den.max(1) as u64));
+            let (from, to) = (cut.saturating_sub(half), (cut + half).min(self.source.duration_frames.max(cut + 1)));
+            let lane = |lane: &qnc_lane_choice::Lane| qnc_program_waveform::Placement {
+                clip_id: clip_id.clone(),
+                channel: lane.channel,
+                program_start: from,
+                program_end: to,
+                source_in: from,
+                source_out: to,
+                level_db: lane.level_db,
+                off: lane.off,
+            };
+            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], peaks: Default::default() });
+        }
+        let cut = cut_of(&view.edit_stills)?;
+        let (num, den) = view.timebase?;
+        let half = second((u64::from(num), u64::from(den)));
+        let (from, to) = (cut.saturating_sub(half), (cut + half).min(view.total_frames.max(cut + 1)));
+        let (segments, covers) = view.wave_placements();
+        let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < to && from < at.program_end).collect();
+        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], peaks: Default::default() })
+    }
+
     /// Whether a segment edge taken from the segment panel waits for Enter or Escape.
     pub fn trimming_edge(&self) -> bool {
         self.edge.is_some() && self.editing.is_some()

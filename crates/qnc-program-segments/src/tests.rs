@@ -928,3 +928,21 @@ fn the_export_box_opens_with_the_project_setting_chosen_and_says_what_is_exporte
     assert_eq!(segments.view().message, running, "XML is exported in the background, its format named");
     assert!(segments.view().export_alert, "an export running is shown red");
 }
+
+#[test]
+fn a_taken_in_or_out_shows_the_pictures_around_its_cut_and_a_second_of_sound_each_side() {
+    let mut segments = component();
+    let pick = |taken| SourcePick::new(Some("clip-c"), Some("C"), Some((300, 450)), (Some(300), 600), Some((50, 1))).with_taken(taken);
+    segments.set_source(pick(None));
+    assert!(segments.view().source_edit_stills.is_empty() && segments.view().zoom_sound.is_none(), "nothing taken");
+    segments.set_source(pick(Some(true)));
+    let frames = |segments: &ProgramSegments| -> Vec<_> {
+        segments.view().source_edit_stills.iter().map(|still| (still.picture.as_ref().map(|p| p.source_frame), still.cut)).collect()
+    };
+    assert_eq!(frames(&segments), vec![(Some(299), false), (Some(300), true)], "before IN, IN first");
+    let sound = segments.view().zoom_sound.clone().expect("the sound of the IN");
+    assert_eq!((sound.from, sound.cut, sound.to), (250, 300, 350), "a second each side on the clip's frames");
+    assert_eq!((sound.lanes[0][0].channel, sound.lanes[1][0].channel), (0, 1), "A1 and A2 as the source timeline hears them");
+    segments.set_source(pick(Some(false)));
+    assert_eq!(frames(&segments), vec![(Some(449), true), (Some(450), false)], "OUT last, after OUT");
+}
