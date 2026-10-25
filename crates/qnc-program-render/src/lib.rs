@@ -404,8 +404,11 @@ fn sound_of(
         }
         let mut decoder = open(&part.media, part.stream_index, part.start, None, false, None, decoders, access)?;
         let width = usize::from(part.stream_channels);
+        // The part's place in the unit (a crossfade inside the unit of its picture).
+        let (part_from, part_to) = part.span(samples as u64);
+        let (offset_in_unit, part_samples) = (part_from as usize, (part_to - part_from) as usize);
         let mut filled = 0usize;
-        while filled < samples {
+        while filled < part_samples {
             if cancel.load(Ordering::Relaxed) {
                 return Err(qnc_ui_text::text("render.prerender_interrupted").into());
             }
@@ -430,7 +433,7 @@ fn sound_of(
                     continue;
                 }
                 let slot = usize::try_from(sample - part.first_sample).map_err(|e| e.to_string())?;
-                if slot >= samples {
+                if slot >= part_samples {
                     break;
                 }
                 if slot != filled {
@@ -438,7 +441,7 @@ fn sound_of(
                 }
                 let offset = usize::from(part.channel_index) * 4;
                 // Two A2 sounds of a crossfade share the output: they add up (user 2026-10-21).
-                pcm[slot * channels + output] += f32::from_le_bytes(frame[offset..offset + 4].try_into().expect("sample")) * gain * part.fade_at(slot, samples);
+                pcm[(offset_in_unit + slot) * channels + output] += f32::from_le_bytes(frame[offset..offset + 4].try_into().expect("sample")) * gain * part.fade_at(slot, part_samples);
                 filled += 1;
             }
         }

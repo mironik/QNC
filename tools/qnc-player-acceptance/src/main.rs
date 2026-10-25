@@ -563,6 +563,9 @@ fn main() -> Result<(), String> {
     let log_root = qnc_dev_diagnostics::locate_qnc_root().unwrap_or_else(|| args.root.clone());
     let mut preview = SourcePreview::new();
     preview.configure(PreviewContext::new(settings.clone(), snapshot.settings.clone(), content, bindings));
+    // The story is heard as Story hears it at start (2026-10-25: normalising on, so the story
+    // plays the prerender, which is normalised as the export).
+    preview.normalize_program(Some([None, None]));
 
     let mut hdmi = if args.hdmi { Some(Hdmi::start()?) } else { None };
     let mut runs = Vec::new();

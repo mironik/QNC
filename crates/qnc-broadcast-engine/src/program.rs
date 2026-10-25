@@ -232,19 +232,15 @@ fn with_prerendered(
             record_out: to,
             video: picture.video.map(|(clip, source_in)| (clip, source_in + piece(picture.record_in))),
         });
-        let sound = audio
-            .iter()
-            .find(|span| span.record_in <= from && from < span.record_out)
-            .ok_or_else(|| error("program part without a sound span"))?;
-        cut_audio.push(AudioSpan {
-            record_in: from,
-            record_out: to,
-            buses: sound
-                .buses
-                .iter()
-                .map(|bus| Bus { source_in: bus.source_in + piece(sound.record_in), ..*bus })
-                .collect(),
-        });
+        // A unit may hold several sound spans (a crossfade inside it): each keeps its place.
+        for sound in audio.iter().filter(|span| span.record_in < to && from < span.record_out) {
+            let (a, b) = (sound.record_in.max(from), sound.record_out.min(to));
+            cut_audio.push(AudioSpan {
+                record_in: a,
+                record_out: b,
+                buses: sound.buses.iter().map(|bus| Bus { source_in: bus.source_in + (a - sound.record_in), ..*bus }).collect(),
+            });
+        }
     }
     Ok((clips, cut_video, cut_audio))
 }
@@ -277,9 +273,12 @@ impl ProgramPlan {
         Self::new(&original_pictures(input)?)
     }
 
-    /// The story as prerender units: a unit between every two cuts of picture or sound,
-    /// each described as this plan plays it (the decoder's seek start, the origin and the
-    /// rate that place each picture and sample).
+    /// The story as prerender units: a unit between every two cuts of the picture (user
+    /// 2026-10-25: a crossfade of a few frames was a unit of its own, each costing as much as
+    /// a long one), each described as this plan plays it (the decoder's seek start, the
+    /// origin and the rate that place each picture and sample). The sound inside a unit is
+    /// placed where it sounds: a part starting or ending inside the unit, or fading there,
+    /// is its own piece of the unit's sound.
     pub fn render_units(&self) -> Result<Vec<qnc_render_unit::RenderUnit>> {
         let rate = self
             .source
@@ -288,18 +287,7 @@ impl ProgramPlan {
             .ok_or_else(|| error("program has no audio format"))?
             .sample_rate_hz;
         let program = self.source.timebase;
-        let mut cuts: Vec<u64> = self
-            .video
-            .iter()
-            .flat_map(|span| [span.record_in, span.record_out])
-            .chain(self.audio.iter().flat_map(|span| [span.record_in, span.record_out]))
-            .chain(self.audio.iter().flat_map(|span| span.buses.iter()).flat_map(|bus| {
-                [bus.fade_in, bus.fade_out].into_iter().flatten().flat_map(|(a, b)| [a, b])
-            }))
-            .filter(|frame| *frame <= self.source.duration_frames)
-            .collect();
-        cuts.sort_unstable();
-        cuts.dedup();
+        let cuts = unit_cuts(&self.video, &self.audio, self.source.duration_frames);
         let mut units = Vec::new();
         for pair in cuts.windows(2) {
             let (from, to) = (pair[0], pair[1]);
@@ -323,42 +311,120 @@ impl ProgramPlan {
                 }
                 _ => None,
             };
-            let audio = match self.audio.iter().find(|span| span.record_in <= from && from < span.record_out) {
-                Some(span) => span
-                    .buses
-                    .iter()
-                    .map(|bus| {
-                        let plan = &self.clips[bus.clip];
-                        let first = bus.source_in + (from - span.record_in);
-                        Ok(qnc_render_unit::AudioPart {
-                            output: bus.output,
-                            media: plan.audio_media.clone(),
-                            stream_index: bus.stream_index,
-                            channel_index: bus.channel_index,
-                            stream_channels: bus.stream_channels,
-                            start: seek_start(&plan.source, first)?,
-                            first_sample: sample_boundary(first, plan.source.timebase, rate)?,
-                            origin: plan.audio_origin,
-                            level_db: bus.level_db,
-                            fade: bus.fade_over(from, to),
-                        })
-                    })
-                    .collect::<Result<Vec<_>>>()?,
-                None => Vec::new(),
-            };
+            let unit_start = sample_boundary(from, program, rate)?;
+            let samples = sample_boundary(to, program, rate)? - unit_start;
+            let mut audio = Vec::new();
+            for (bus, span_in, a, b) in sound_pieces(&self.audio, from, to) {
+                let plan = &self.clips[bus.clip];
+                let first = bus.source_in + (a - span_in);
+                let (at, end) = (sample_boundary(a, program, rate)? - unit_start, sample_boundary(b, program, rate)? - unit_start);
+                let whole = at == 0 && end == samples;
+                audio.push(qnc_render_unit::AudioPart {
+                    output: bus.output,
+                    media: plan.audio_media.clone(),
+                    stream_index: bus.stream_index,
+                    channel_index: bus.channel_index,
+                    stream_channels: bus.stream_channels,
+                    start: seek_start(&plan.source, first)?,
+                    first_sample: sample_boundary(first, plan.source.timebase, rate)?,
+                    origin: plan.audio_origin,
+                    level_db: bus.level_db,
+                    fade: bus.fade_over(a, b),
+                    at_sample: at,
+                    length: (!whole).then_some(end - at),
+                });
+            }
             units.push(qnc_render_unit::RenderUnit {
                 record_in: from,
                 record_out: to,
                 program_rate: qnc_media_metadata::FrameTimebase { fps_num: program.fps_num, fps_den: program.fps_den },
                 sample_rate: rate,
                 channels: self.channels,
-                samples: sample_boundary(to, program, rate)? - sample_boundary(from, program, rate)?,
+                samples,
                 video,
                 audio,
             });
         }
         Ok(units)
     }
+}
+
+/// Where the units of a story are cut: where the picture changes (another clip, a jump in
+/// the source, black to picture), never where only the sound does; frames without a picture
+/// span are cut at their sound spans as before.
+fn unit_cuts(video: &[VideoSpan], audio: &[AudioSpan], duration: u64) -> Vec<u64> {
+    let mut spans: Vec<&VideoSpan> = video.iter().collect();
+    spans.sort_by_key(|span| span.record_in);
+    let mut cuts = vec![0, duration];
+    let mut previous: Option<&VideoSpan> = None;
+    for span in spans {
+        let continues = previous.is_some_and(|before| {
+            before.record_out == span.record_in
+                && match (before.video, span.video) {
+                    (None, None) => true,
+                    (Some((clip, source_in)), Some((next_clip, next_in))) => {
+                        clip == next_clip && source_in + (before.record_out - before.record_in) == next_in
+                    }
+                    _ => false,
+                }
+        });
+        if !continues {
+            cuts.push(span.record_in);
+        }
+        cuts.push(span.record_out);
+        previous = Some(span);
+    }
+    // A span's end is a cut only where the next span does not continue it.
+    let continued: Vec<u64> = video
+        .iter()
+        .filter(|span| {
+            video.iter().any(|next| {
+                next.record_in == span.record_out
+                    && match (span.video, next.video) {
+                        (None, None) => true,
+                        (Some((clip, source_in)), Some((next_clip, next_in))) => {
+                            clip == next_clip && source_in + (span.record_out - span.record_in) == next_in
+                        }
+                        _ => false,
+                    }
+            })
+        })
+        .map(|span| span.record_out)
+        .collect();
+    cuts.retain(|frame| !continued.contains(frame));
+    for span in audio {
+        for frame in [span.record_in, span.record_out] {
+            if !video.iter().any(|v| v.record_in <= frame && frame < v.record_out) && !continued.contains(&frame) {
+                cuts.push(frame);
+            }
+        }
+    }
+    cuts.retain(|frame| *frame <= duration);
+    cuts.sort_unstable();
+    cuts.dedup();
+    cuts
+}
+
+/// The sound of program frames `[from, to)`: every bus of every sound span over it, cut where
+/// the span begins or ends and where the bus's fade begins or ends, as (bus, the span's first
+/// frame, piece start, piece end).
+fn sound_pieces(audio: &[AudioSpan], from: u64, to: u64) -> Vec<(Bus, u64, u64, u64)> {
+    let mut pieces = Vec::new();
+    for span in audio.iter().filter(|span| span.record_in < to && from < span.record_out) {
+        let (a, b) = (span.record_in.max(from), span.record_out.min(to));
+        for bus in &span.buses {
+            let mut edges = vec![a, b];
+            for (start, end) in [bus.fade_in, bus.fade_out].into_iter().flatten() {
+                edges.extend([start, end].into_iter().filter(|frame| a < *frame && *frame < b));
+            }
+            edges.sort_unstable();
+            edges.dedup();
+            for pair in edges.windows(2) {
+                pieces.push((*bus, span.record_in, pair[0], pair[1]));
+            }
+        }
+    }
+    pieces
 }
 
 struct Worker {

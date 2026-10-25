@@ -283,3 +283,26 @@ fn a_crossfading_bus_rises_and_falls_over_its_frames() {
     let plain = Bus { fade_in: None, fade_out: None, ..bus };
     assert_eq!(plain.fade_over(10, 14), None);
 }
+
+/// A crossfade is no unit of its own (user 2026-10-25): units are cut where the picture
+/// changes; a picture going on across items stays one unit, and its sound keeps its pieces.
+#[test]
+fn units_are_cut_where_the_picture_changes_and_a_crossfade_lies_inside_one() {
+    let span = |record_in, record_out, video| VideoSpan { record_in, record_out, video };
+    // Clip 0 from 0, its cover clip 1 from 40 over 40..80 (items cut at 36 and 40 by the
+    // crossfade), then black.
+    let video = [span(0, 36, Some((0, 100))), span(36, 40, Some((0, 136))), span(40, 80, Some((1, 0))), span(80, 100, None)];
+    let bus = |output, clip, source_in, fade_in| Bus { output, clip, source_in, stream_index: 0, channel_index: 0, stream_channels: 1, level_db: 0, fade_in, fade_out: None };
+    let audio = [
+        AudioSpan { record_in: 0, record_out: 36, buses: vec![bus(0, 0, 100, None)] },
+        AudioSpan { record_in: 36, record_out: 40, buses: vec![bus(0, 0, 136, None), bus(1, 1, 0, Some((36, 40)))] },
+        AudioSpan { record_in: 40, record_out: 100, buses: vec![bus(0, 0, 140, None)] },
+    ];
+    assert_eq!(unit_cuts(&video, &audio, 100), vec![0, 40, 80, 100], "36 is a cut of the sound only");
+    let pieces = sound_pieces(&audio, 0, 40);
+    let places: Vec<(u16, u64, u64)> = pieces.iter().map(|(bus, _, a, b)| (bus.output, *a, *b)).collect();
+    assert_eq!(places, vec![(0, 0, 36), (0, 36, 40), (1, 36, 40)], "the crossfade keeps its place in the unit");
+    // A jump in the same clip's source is a cut.
+    let jump = [span(0, 10, Some((0, 0))), span(10, 20, Some((0, 50)))];
+    assert_eq!(unit_cuts(&jump, &[], 20), vec![0, 10, 20]);
+}

@@ -5934,3 +5934,16 @@ cilja: A1 `lufs_a1` -16, -18, -20, -23 (EBU R 128), -24 (ATSC A/85); A2 `lufs_a2
 (`contracts/ui/project.layout.json`; zajednicki `lufs` uklonjen). Zadano ostaje -23/-23 iz seeda; spremljena vrijednost
 izvan liste i dalje se prikazuje i vrijedi. Normalizacija u previewu (NORM), prerenderu i exportu vec cita cilj A1 i A2
 zasebno. Testovi, conformance. Project je ponovno zamrznut.
+Izvedeno 2026-10-25 (korisnik: "da, ubrzaj prerender, crossfade u susjedni dio"; "tekuci projekt je za A2 postavljen na -30,
+znaci li to da odabir ne radi"): (1) Odabir radi: aktivni projekt je `novi--33333` i u njegovoj bazi je A2 -30 LUFS (ranije
+sam citao `test ukupni`). (2) Prerender: jedinice price rezu se samo gdje se slika mijenja (drugi klip, skok u izvoru, crno
+i slika), ne gdje se mijenja samo zvuk; crossfade od nekoliko slika vise nije zaseban dio (svaki je imao fiksni trosak
+1,1-1,7 s). `qnc-broadcast-engine` (`unit_cuts`, `sound_pieces`: zvuk unutar jedinice na svom mjestu, rezan gdje pocinje,
+zavrsava ili mu pocinje/zavrsava fade; `with_prerendered` za jedinicu bez gotovog dijela uzima sve zvucne dijelove unutar nje),
+`qnc-render-unit` (`AudioPart.at_sample`, `length`, `span`; izostavljeni kad dio traje cijelu jedinicu, pa jedinice bez
+crossfadea zadrzavaju otisak), `qnc-program-render` (dio zvuka puni samo svoje mjesto u jedinici). `tools/qnc-player-acceptance`
+otvara pricu s ukljucenim N kao Story (inace prica ne odgovara normaliziranom prerenderu i svira iz izvora). Izmjereno na
+izoliranoj kopiji (kartica samo citana): 12 dijelova umjesto 29, render oko 41 s umjesto oko 64 s; Express 1,3 s; zvuk A1 i
+A2 Expressa bit po bit isti kao s 29 dijelova; prica iz prerendera 2x PASS 100 %, bez trzaja (iz izvora s kartice, bez
+prerendera, 95 % i 18-25 trzaja). Testovi (`units_are_cut_where_the_picture_changes_and_a_crossfade_lies_inside_one`),
+conformance. Uzivo kroz sucelje nije provjereno.
