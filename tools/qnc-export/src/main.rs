@@ -101,11 +101,12 @@ fn run() -> Result<PathBuf> {
                 width: video.map_or(0, |format| format.width),
                 height: video.map_or(0, |format| format.height),
                 audio_channels: sources.iter().map(|source| source.source_audio_channels).max().unwrap_or(0),
+                audio_sample_rate: sources.iter().find_map(|source| source.source_audio_format).map_or(0, |format| format.sample_rate_hz),
                 path,
             },
         );
     }
-    let text = qnc_fcp7_xml::sequence(&settings.project_name, &program.playlist, &files, &settings.export_start_timecode().map_err(|e| e.to_string())?)?;
+    let text = qnc_fcp7_xml::sequence(&settings.project_name, &program.playlist, &files, &settings.export_start_timecode().map_err(|e| e.to_string())?, program.project_audio.sample_rate_hz)?;
     let path = folder.join(format!("{}_{}.xml", file_name(&settings.project_name), program.playlist.revision));
     std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(path)

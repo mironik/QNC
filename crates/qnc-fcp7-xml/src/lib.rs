@@ -24,6 +24,8 @@ pub struct ClipFile {
     pub width: u32,
     pub height: u32,
     pub audio_channels: u16,
+    /// The sample rate of its sound, 0 when the record does not say.
+    pub audio_sample_rate: u32,
 }
 
 /// One piece on a track: record and source frames, the source channel for sound, its level.
@@ -64,27 +66,65 @@ fn tracks(playlist: &FlatProgramPlaylist) -> [Vec<Piece>; 4] {
     tracks
 }
 
-/// Adds a piece, joined to the last one when it goes on in the same clip.
+/// Adds a piece, joined to an earlier one that goes on in the same clip (under a crossfade two
+/// pieces of a track run side by side, so it is not always the last one).
 fn push(track: &mut Vec<Piece>, piece: Piece) {
-    if let Some(last) = track.last_mut() {
-        let goes_on = last.clip_id == piece.clip_id
+    let goes_on = |last: &Piece| {
+        last.clip_id == piece.clip_id
             && last.record.1 == piece.record.0
             && last.source.1 == piece.source.0
             && last.channel == piece.channel
-            && last.level_db == piece.level_db;
-        if goes_on {
-            last.record.1 = piece.record.1;
-            last.source.1 = piece.source.1;
-            return;
-        }
+            && last.level_db == piece.level_db
+    };
+    let from = track.len().saturating_sub(2);
+    if let Some(last) = track[from..].iter_mut().rev().find(|last| goes_on(last)) {
+        last.record.1 = piece.record.1;
+        last.source.1 = piece.source.1;
+        return;
     }
     track.push(piece);
+}
+
+/// A track holds one clip item at a time (FCP7 XML; Resolve and Edius drop or refuse overlapping
+/// items). Where the next piece starts under the last one (an A2 crossfade, a J or an L) the
+/// last is cut where the next starts and the overlap becomes a cross fade from that edit,
+/// played from the last piece's media after its new out.
+fn without_overlaps(mut pieces: Vec<Piece>) -> (Vec<Piece>, Vec<(i64, i64)>) {
+    pieces.sort_by_key(|piece| piece.record.0);
+    let mut transitions = Vec::new();
+    for index in 1..pieces.len() {
+        let next_start = pieces[index].record.0;
+        let last = &mut pieces[index - 1];
+        let overlap = last.record.1 - next_start;
+        if overlap <= 0 {
+            continue;
+        }
+        let kept = (next_start - last.record.0).max(1);
+        let cut = last.record.0 + kept;
+        last.source.1 -= last.record.1 - cut;
+        let end = last.record.1;
+        last.record.1 = cut;
+        if cut == next_start && end > cut {
+            transitions.push((cut, end.min(pieces[index].record.1)));
+        } else {
+            pieces[index].source.0 += cut - next_start;
+            pieces[index].record.0 = cut;
+        }
+    }
+    (pieces, transitions)
 }
 
 /// The text of the sequence `name` of the program, its clips' files by clip id.
 /// `start_timecode` (HH:MM:SS:FF, the project's setting) is the timecode of the sequence's first
 /// frame.
-pub fn sequence(name: &str, playlist: &FlatProgramPlaylist, files: &BTreeMap<String, ClipFile>, start_timecode: &str) -> Result<String, String> {
+/// `sample_rate` is the project's sound.
+pub fn sequence(
+    name: &str,
+    playlist: &FlatProgramPlaylist,
+    files: &BTreeMap<String, ClipFile>,
+    start_timecode: &str,
+    sample_rate: u32,
+) -> Result<String, String> {
     let rate = rate(playlist.program_timebase.fps_num, playlist.program_timebase.fps_den);
     let start_frame = timecode_frame(start_timecode, rate_fps(&rate))?;
     let [v1, v2, a1, a2] = tracks(playlist);
@@ -109,9 +149,16 @@ pub fn sequence(name: &str, playlist: &FlatProgramPlaylist, files: &BTreeMap<Str
         writeln!(w, "</track>").ok();
     }
     writeln!(w, "</video>\n<audio>\n<numOutputChannels>2</numOutputChannels>").ok();
-    for (output, track) in [(1, &a1), (2, &a2)] {
+    writeln!(w, "<format><samplecharacteristics><depth>24</depth><samplerate>{sample_rate}</samplerate></samplecharacteristics></format>").ok();
+    writeln!(w, "<outputs><group><index>1</index><numchannels>1</numchannels><downmix>0</downmix><channel><index>1</index></channel></group><group><index>2</index><numchannels>1</numchannels><downmix>0</downmix><channel><index>2</index></channel></group></outputs>").ok();
+    for (output, track) in [(1, a1), (2, a2)] {
         writeln!(w, "<track>").ok();
-        for piece in track {
+        let (pieces, transitions) = without_overlaps(track);
+        let mut transitions = transitions.into_iter().peekable();
+        for piece in &pieces {
+            while let Some((start, end)) = transitions.next_if(|(start, _)| *start <= piece.record.0) {
+                writeln!(w, "<transitionitem>{rate}<start>{start}</start><end>{end}</end><alignment>start</alignment><effect><name>Cross Fade (+3dB)</name><effectid>KGAudioTransCrossFade3dB</effectid><effecttype>transition</effecttype><mediatype>audio</mediatype></effect></transitionitem>").ok();
+            }
             item += 1;
             clip_item(w, item, piece, &rate, files, &ids, Some(output))?;
         }
@@ -160,7 +207,15 @@ fn file_element(w: &mut String, id: &str, file: &ClipFile, rate: &str) {
         writeln!(w, "<timecode>{rate}<string>{}</string><frame>{start}</frame><displayformat>NDF</displayformat></timecode>", timecode(start, rate_fps(rate))).ok();
     }
     writeln!(w, "<media><video><samplecharacteristics>{rate}<width>{}</width><height>{}</height></samplecharacteristics></video>", file.width, file.height).ok();
-    writeln!(w, "<audio><channelcount>{}</channelcount></audio></media>\n</file>", file.audio_channels.max(1)).ok();
+    // One mono track per channel: a clip item's `trackindex` is the channel it plays.
+    let characteristics = match file.audio_sample_rate {
+        0 => String::new(),
+        rate => format!("<samplecharacteristics><samplerate>{rate}</samplerate></samplecharacteristics>"),
+    };
+    for channel in 1..=file.audio_channels {
+        writeln!(w, "<audio>{characteristics}<channelcount>1</channelcount><audiochannel><sourcechannel>{channel}</sourcechannel></audiochannel></audio>").ok();
+    }
+    writeln!(w, "</media>\n</file>").ok();
 }
 
 /// `<rate>`: the whole frames per second and whether it is an NTSC rate.
@@ -251,9 +306,9 @@ mod tests {
                 item((150, 200), vec![]),
             ],
         };
-        let file = |name: &str| ClipFile { name: name.into(), path: format!("D:/Clip/{name} 1.MXF").into(), duration_frames: 1000, timecode_start: Some(90_000), width: 1920, height: 1080, audio_channels: 4 };
+        let file = |name: &str| ClipFile { name: name.into(), path: format!("D:/Clip/{name} 1.MXF").into(), duration_frames: 1000, timecode_start: Some(90_000), width: 1920, height: 1080, audio_channels: 4, audio_sample_rate: 48000 };
         let files = BTreeMap::from([("a".to_string(), file("a")), ("b".to_string(), file("b"))]);
-        let xml = sequence("Story & co", &playlist, &files, "10:00:00:00").unwrap();
+        let xml = sequence("Story & co", &playlist, &files, "10:00:00:00", 48000).unwrap();
         assert!(xml.contains("<string>10:00:00:00</string><frame>1800000</frame>"), "the start timecode of the sequence");
         assert_eq!(xml.matches("<clipitem").count(), 4, "V1 a, V2 b, A1 a, A2 b: {xml}");
         assert!(xml.contains("<start>0</start><end>150</end><in>10</in><out>160</out>"), "a goes on: one item");
@@ -263,5 +318,24 @@ mod tests {
         assert!(xml.contains("<string>00:30:00:00</string>"));
         assert!(xml.contains("Story &amp; co"));
         assert_eq!(xml.matches("<file id=\"file-1\">").count(), 1, "a file is written once");
+    }
+
+    /// Edius and Resolve 2026-10-25: two A2 items side by side under a crossfade; one channel
+    /// track of a file that said it had one track of four.
+    #[test]
+    fn an_a2_crossfade_is_a_cut_and_a_cross_fade_and_every_channel_is_its_own_track() {
+        let piece = |clip: &str, record: (i64, i64), source: (i64, i64)| Piece { clip_id: clip.into(), record, source, channel: 1, level_db: 0 };
+        let (pieces, transitions) = without_overlaps(vec![piece("b", (182, 359), (31, 208)), piece("a", (0, 186), (54, 240))]);
+        assert_eq!(pieces[0].record, (0, 182), "the last is cut where the next starts");
+        assert_eq!(pieces[0].source, (54, 236));
+        assert_eq!(pieces[1].record, (182, 359));
+        assert_eq!(transitions, vec![(182, 186)], "the overlap is a cross fade from that edit");
+
+        let file = ClipFile { name: "a".into(), path: "D:/a.MXF".into(), duration_frames: 1000, timecode_start: None, width: 1920, height: 1080, audio_channels: 4, audio_sample_rate: 48000 };
+        let mut text = String::new();
+        file_element(&mut text, "file-1", &file, &rate(50, 1));
+        assert_eq!(text.matches("<channelcount>1</channelcount>").count(), 4);
+        assert!(text.contains("<samplerate>48000</samplerate></samplecharacteristics>"));
+        assert!(text.contains("<sourcechannel>4</sourcechannel>"));
     }
 }

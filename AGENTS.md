@@ -6051,3 +6051,13 @@ privatna putanja prikazane mape za potvrdu. `qnc-project-application` (`browse`,
 `tools/qnc-conformance` pravilo Project granice prihvaca zajednicku sesiju i kroz tu kocku. C10 `qnc-project-application`
 147 -> 123. Testovi (`qnc-dir-browse-jobs`, Project kocke, conformance 26), release build. Uzivo kroz sucelje nije
 provjereno. Project je ponovno zamrznut.
+Popravak 2026-10-25 (korisnik: "exportirani xml resolve 21 ne ucitava, a u ediusu prva pokrivalica ne pleja ton iako se vidi
+da postoji"): u XML-u (`novi--33333_59.xml`, samo citano) pokrivalice na A2 preklapale su se za 3-4 slike (crossfade, J), a
+FCP7 XML na jednoj traci smije imati samo jedan klip u isto vrijeme; datoteka je zvuk opisivala kao jednu traku s 4 kanala,
+a klip na A2 trazio je `trackindex` 2 (traku koja po tom opisu ne postoji); sekvenca nije imala format zvuka. Baza i XML
+biraju dobar kanal (kanal 2 klipa 3449 ima ton, -24,5 dB; 3427 je na kanalu 2 doista tih, -90 dB). `qnc-fcp7-xml`: klip
+koji pocne pod prethodnim rezu se na pocetku sljedeceg, a preklapanje je Cross Fade (+3dB) prijelaz od tog reza
+(`without_overlaps`, `<transitionitem>`); svaki kanal datoteke je svoja mono traka (`<audio>` s `channelcount` 1,
+`sourcechannel` i frekvencijom iz spremljenog zapisa, `ClipFile.audio_sample_rate`); sekvenca ima `samplecharacteristics`
+(24-bit, frekvencija projekta) i dva izlaza. `tools/qnc-export` predaje frekvencije. Provjereno na izoliranoj kopiji: XML
+ispravan (parser), A2 12 klipova i 10 prijelaza, bez preklapanja. Test. U Resolveu i Ediusu nije provjereno.
