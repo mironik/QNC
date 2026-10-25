@@ -5998,3 +5998,19 @@ segmenta zatvaraju otvoreni edit. (5) Oznake markera, segmenata i pokrivalica ne
 (`unique_stamp`). Testovi `qnc-program-db` (45), `qnc-program-segments` (60), zlatna tablica tipki, conformance. Nije
 izvedeno iz audita (niska vaznost): razlika jedne slike izvora izmedu nacrta i upisa rolla pri 2:1, rez pokrivalice na
 neparnoj slici pri 2:1, provjera susjeda u bazi pri pomaku markera. Uzivo nije provjereno.
+Izvedeno 2026-10-25 (audit, koraci 3-5): (3) Kopirani kod u jednu kocku: nova javna kocka `crates/qnc-gain` (+ ugovor;
+dB kao pojacanje, prije 13 kopija; granica playera je dopusta, cista aritmetika); korijen QNC-a jedno pravilo
+`qnc-dev-diagnostics::resolve_qnc_root` (ljuska, Project, Ingest, Story i MA; postuje QNC_ROOT, nevaljani QNC_ROOT nije
+korijen, nikad radni direktorij; Ingest je prije padao na radni direktorij, samostalne aplikacije nisu postovale QNC_ROOT);
+pokretanje pomocnih programa kroz `qnc-plugin-process` (`beside_application`, `background_command`) umjesto tri kopije;
+XML export formatira i cita timecode kroz `qnc-source-timecode` (`parse_timecode`), bez izmisljenih 25 fps. Nije spojeno
+(promijenilo bi izgled ili dira vlasnike baza): tema ljuske i formi (ljuska crta drugim bojama i razmacima), otvaranje
+SQLite baze u sedam vlasnika, zrcalni radnici filmstripa i vala. (4) Nova javna kocka `crates/qnc-short-save` (+ ugovor):
+spremanje SubClipa s provjerama i upisom u pozadini (prije je upis cekao bazu na niti sucelja); kartice SubClipova slaze
+`qnc-virtual-short-cards::cards`; C10 Story aplikacija 571 -> 528. Nije izvedeno: dijeljenje `qnc-panel-focus` i
+usklajivanje previewa iz Story aplikacije. (5) Project otkljucan (korisnik "otkljucavam Project"): tekstovi Projecta
+(`DB:`, `Template:`, "RADNI TOK", greske spremista), Select poruke Ingesta, ishod uvoza i poruke radnika i ljuske idu
+kroz rjecnik. `qnc-project-close` nije mijenjan: AGENTS.md odjeljak 3 izricito mu dopusta isprazniti `active_project_id`.
+Nije izvedeno: rad Projecta s bazom izvan niti sucelja (log: 100-300 ms zastoja pri otvaranju i kreiranju), boje tema
+Soft/HighContrast u ugovor ljuske (ljuska nije otkljucana). Testovi dotaknutih kocki, conformance, release build. Project
+je ponovno zamrznut.
