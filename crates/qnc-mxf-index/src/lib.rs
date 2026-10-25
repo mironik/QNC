@@ -265,7 +265,14 @@ fn be(bytes: &[u8]) -> u64 {
     bytes.iter().fold(0u64, |value, byte| (value << 8) | u64::from(*byte))
 }
 
+/// The most one read of this block takes: a length from the file past it is a broken file,
+/// not an allocation (audit 2026-10-25: a KLV length of 2^64 aborted the worker).
+const MAX_ITEM: usize = 256 << 20;
+
 fn read_at(file: &mut File, at: u64, length: usize) -> Result<Vec<u8>, String> {
+    if length > MAX_ITEM {
+        return Err(format!("mxf index: an item of {length} bytes is past what a file holds"));
+    }
     file.seek(SeekFrom::Start(at)).map_err(|error| format!("mxf index seek: {error}"))?;
     let mut bytes = vec![0u8; length];
     file.read_exact(&mut bytes).map_err(|error| format!("mxf index read: {error}"))?;
@@ -296,7 +303,8 @@ fn segment(value: &[u8], next: u64) -> Result<Option<((i32, i32), Vec<Entry>)>, 
             0x3f0a if length >= 8 => {
                 let count = be(&item[0..4]) as usize;
                 let size = be(&item[4..8]) as usize;
-                if size < 11 || item.len() < 8 + count * size {
+                let table = count.checked_mul(size).and_then(|bytes| bytes.checked_add(8));
+                if size < 11 || table.is_none_or(|table| item.len() < table) {
                     return Ok(None);
                 }
                 entries = Some(
@@ -382,6 +390,18 @@ fn essence_start(file: &mut File, from: u64, size: u64) -> Result<Option<u64>, S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Audit 2026-10-25: a KLV length from a broken file aborted the worker on allocation.
+    #[test]
+    fn a_length_past_any_file_is_an_error_not_an_allocation() {
+        let path = std::env::temp_dir().join(format!("qnc-mxf-index-test-{}", std::process::id()));
+        std::fs::write(&path, [0u8; 16]).unwrap();
+        let mut file = File::open(&path).unwrap();
+        assert!(read_at(&mut file, 0, usize::MAX).is_err());
+        assert_eq!(read_at(&mut file, 0, 16).unwrap().len(), 16);
+        drop(file);
+        std::fs::remove_file(&path).unwrap();
+    }
 
     fn entry(flags: u8, stream_offset: u64) -> Entry {
         Entry { temporal_offset: 0, key_frame_offset: 0, flags, stream_offset }

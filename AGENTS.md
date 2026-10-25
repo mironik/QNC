@@ -6155,3 +6155,18 @@ tab stope predaje projekta (prije izmisljenih 50). (9) Pojacanje pokrivalice zao
 `cover_gain`), pa vrh nikad ne prelazi granicu. Testovi `qnc-export-choice` (5), `qnc-program-loudness`, `qnc-unit-join`,
 `qnc-program-segments` (60), `qnc-panel-focus`, `qnc-source-preview`, conformance; Express na izoliranoj kopiji (12
 dijelova, bez zaostale radne datoteke). Uzivo kroz sucelje nije provjereno.
+Izvedeno 2026-10-25 (audit, korisnik "nastavi" na tocke 10-13): (10) Klip ciji probe trajno ne uspije drzao je
+`final=0`, pa je `tools/qnc-ingest-worker` svake sekunde pokretao novi krug dovrsetka (s posterima i zapisom u log):
+radnik pamti zapise koje je krug ostavio nedovrsene i novi krug pokrece tek kad ceka neki drugi klip. (11) Duljine iz
+datoteke s kartice vise ne mogu srusiti radnika ni pojesti memoriju: `qnc-mxf-index` citanje vece od 256 MB je greska,
+velicina tablice indeksa racuna se bez preljeva; `qnc-mp4-sound` broj uzoraka (najvise 32 M) i velicina uzorka (najvise
+64 MB) iz tablice, slika izvan tablice i kratki `esds` su greska ili "nema trake", ne pad. Testovi
+`a_length_past_any_file_is_an_error_not_an_allocation`, `a_broken_sample_table_is_no_track_not_an_allocation`.
+(12) `qnc-media-readahead`: datoteka koja nije otvorena otvara se izvan zajednicke brave (budenje kartice nije
+zaustavljalo sve dekodere), a citanje koje ne uspije pusta vezu na tu datoteku, pa ponovno otvaranje nakon kratkog
+nestanka kartice dobiva novu. (13) Prica: nakon svake izmjene korisnicki markeri prije pocetka ili na/iza kraja price
+brisu se sa svojim slotovima, a markeri na istoj slici spajaju (kraci lead-out vise ne ostavlja marker i slot iza kraja;
+`qnc-program-db` `drop_markers_past_the_story`, `finalize_story`); brisanje segmenta nikad ne izabire lead. Test
+`a_shorter_lead_out_takes_the_markers_past_the_new_end_with_it`. Testovi `qnc-program-db` (46), `qnc-program-segments`
+(60), `qnc-mp4-sound`, `qnc-mxf-index`, `qnc-mxf-sound`, `qnc-media-readahead`, `qnc-ingest-worker`, conformance. Uzivo
+nije provjereno.

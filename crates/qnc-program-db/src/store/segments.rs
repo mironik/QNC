@@ -191,7 +191,8 @@ impl Store {
         if selected == segment_id {
             let neighbour: String = tx
                 .query_row(
-                    "SELECT part_id FROM story_parts WHERE part_id != ?1 AND active != 0
+                    // Never a lead (audit 2026-10-25): they go and come with the segments.
+                    "SELECT part_id FROM story_parts WHERE part_id != ?1 AND active != 0 AND lead = ''
                      ORDER BY ABS(sort_index - ?2) ASC, sort_index ASC LIMIT 1",
                     params![segment_id, deleted_sort],
                     |row| row.get(0),

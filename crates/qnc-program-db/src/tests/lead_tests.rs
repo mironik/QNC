@@ -101,3 +101,21 @@ fn a_story_without_lead_settings_is_not_edited() {
     assert!(refused.contains("lead_in_seconds"), "{refused}");
     assert!(segments(&mut store).is_empty());
 }
+
+/// Audit 2026-10-25: a shorter lead-out left a user's marker past the end of the story,
+/// and its slot past the program.
+#[test]
+fn a_shorter_lead_out_takes_the_markers_past_the_new_end_with_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    set_leads(&path, 0.0, 2.0);
+    create_segment(&mut store, "offovi", (300, 400), (50, 1)).unwrap();
+    // In the lead-out: the segment is 0..100, the lead-out 100..200.
+    marker(&mut store, 150).unwrap();
+    assert_eq!(markers(&mut store), vec![150]);
+    // No lead-out any more: the next edit makes the story 0..100, the marker at 150 goes.
+    set_leads(&path, 0.0, 0.0);
+    marker(&mut store, 50).unwrap();
+    assert_eq!(markers(&mut store), vec![50]);
+}

@@ -5,9 +5,31 @@ use super::*;
 pub(crate) fn finalize_story(conn: &Connection) -> Result<()> {
     sync_leads(conn)?;
     ensure_boundary_markers(conn)?;
+    // A shorter lead-in or lead-out (audit 2026-10-25) can leave a user's marker on a
+    // boundary or past the end: past the story it goes, on one frame with another they are one.
+    drop_markers_past_the_story(conn)?;
+    merge_coincident_markers(conn)?;
     recompute_marker_slots(conn)?;
     rebind_covers(conn)?;
     normalize_story_selection(conn)
+}
+
+/// The user's markers before the story's first frame or at or after its end, with their
+/// slots and covers.
+fn drop_markers_past_the_story(conn: &Connection) -> Result<()> {
+    let duration: i64 = active_part_spans(conn)?.iter().map(|part| part.frames).sum();
+    let outside = {
+        let mut statement = conn
+            .prepare("SELECT marker_id FROM story_markers WHERE system_role = '' AND (timeline_frame < 0 OR timeline_frame >= ?1)")
+            .map_err(err)?;
+        let rows = statement
+            .query_map([duration], |row| row.get::<_, String>(0))
+            .map_err(err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(err)?;
+        rows
+    };
+    delete_markers_with_slots(conn, &outside)
 }
 
 /// v5 `recompute_marker_slots`: one slot between every two adjacent markers,

@@ -19,6 +19,10 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The largest single read: a longer run of sound samples is read in parts.
 const MAX_READ: u64 = 8 << 20;
+/// The largest single sample and the most samples a track is taken to have: lengths from the
+/// file past them are a broken file, not an allocation (audit 2026-10-25).
+const MAX_SAMPLE: u32 = 64 << 20;
+const MAX_SAMPLES: usize = 32 << 20;
 
 /// One track of the file, in the order of the file's tracks (the stream index FFmpeg gives).
 #[derive(Debug, Clone, Default)]
@@ -111,7 +115,10 @@ pub fn read_sound_and_pictures(
         let mut value = Vec::new();
         for (target, wanted) in targets.iter().enumerate() {
             let number = video.key_at_or_after(*wanted).ok_or("mp4: the picture track is empty")?;
-            let (place, length) = video.samples[number as usize];
+            let (place, length) = *video.samples.get(number as usize).ok_or("mp4: no such picture")?;
+            if length > MAX_SAMPLE {
+                return Err("mp4: a picture sample is past what a file holds".into());
+            }
             value.resize(length as usize, 0);
             read_at(&mut file, place, &mut value)?;
             on_picture(target, number, &value)?;
@@ -130,6 +137,9 @@ pub fn read_sound_and_pictures(
         while end < track.samples.len() && track.samples[end].0 == start + length && length < MAX_READ {
             length += u64::from(track.samples[end].1);
             end += 1;
+        }
+        if length > u64::from(MAX_SAMPLE) + MAX_READ {
+            return Err("mp4: a sound sample is past what a file holds".into());
         }
         buffer.resize(length as usize, 0);
         read_at(&mut file, start, &mut buffer)?;
@@ -257,6 +267,9 @@ fn track(data: &[u8], start: usize, end: usize) -> Option<Track> {
     }
     let (stsz, _) = table(b"stsz")?;
     let (fixed, count) = (u32_at(data, stsz + 4)?, u32_at(data, stsz + 8)? as usize);
+    if count > MAX_SAMPLES || fixed > MAX_SAMPLE {
+        return None;
+    }
     let sizes: Vec<u32> = if fixed != 0 {
         vec![fixed; count]
     } else {
@@ -319,7 +332,7 @@ fn sample_entry(data: &[u8], at: usize, end: usize, track: &mut Track) {
         let esds = child(data, body + skip, entry_end, &[b"esds"])
             .or_else(|| child(data, body + skip, entry_end, &[b"wave", b"esds"]));
         if let Some((esds, esds_end)) = esds {
-            track.aac_config = decoder_specific_info(&data[esds + 4..esds_end]);
+            track.aac_config = data.get(esds + 4..esds_end).and_then(decoder_specific_info);
         }
     }
 }
@@ -382,6 +395,30 @@ fn decoder_specific_info(descriptors: &[u8]) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn boxed(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
+        let mut out = ((body.len() + 8) as u32).to_be_bytes().to_vec();
+        out.extend_from_slice(kind);
+        out.extend_from_slice(body);
+        out
+    }
+
+    /// Audit 2026-10-25: a sample count from a broken file allocated up to 16 GB.
+    #[test]
+    fn a_broken_sample_table_is_no_track_not_an_allocation() {
+        let mut hdlr = vec![0u8; 8];
+        hdlr.extend_from_slice(b"soun");
+        let mut stsz = vec![0u8; 4];
+        stsz.extend_from_slice(&1u32.to_be_bytes());
+        stsz.extend_from_slice(&u32::MAX.to_be_bytes());
+        let stbl = boxed(b"stbl", &boxed(b"stsz", &stsz));
+        let minf = boxed(b"minf", &stbl);
+        let mut mdia_body = boxed(b"hdlr", &hdlr);
+        mdia_body.extend_from_slice(&minf);
+        let trak = boxed(b"trak", &boxed(b"mdia", &mdia_body));
+        let (start, end) = box_body(&trak, 0).unwrap();
+        assert!(track(&trak, start, end).is_none());
+    }
 
     #[test]
     fn an_aac_frame_gets_the_adts_header_of_its_config() {

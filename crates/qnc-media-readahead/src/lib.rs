@@ -154,12 +154,26 @@ impl MediaReader {
     /// A stream over a file, read through this reader; the file is opened for reading
     /// only. Streams of the same file share its blocks.
     pub fn open(&self, path: &Path) -> io::Result<Stream> {
-        let mut state = lock(&self.shared);
-        let file = match state.by_path.get(path).copied() {
-            Some(file) => file,
-            None => {
+        // A file not open yet is opened outside the lock: a card that wakes takes seconds,
+        // and every decoder of the process waits on the lock (audit 2026-10-25).
+        let known = lock(&self.shared).by_path.contains_key(path);
+        let opened = match known {
+            true => None,
+            false => {
                 let handle = File::open(path)?;
                 let len = handle.metadata()?.len();
+                Some((handle, len))
+            }
+        };
+        let mut state = lock(&self.shared);
+        let file = match (state.by_path.get(path).copied(), opened) {
+            (Some(file), _) => file,
+            // Gone from the map while it was being opened (a failed read): open it now.
+            (None, None) => {
+                drop(state);
+                return self.open(path);
+            }
+            (None, Some((handle, len))) => {
                 state.next_id += 1;
                 let id = state.next_id;
                 state.files.insert(
@@ -398,6 +412,9 @@ fn run(shared: std::sync::Weak<Shared>, alive: std::sync::Weak<()>, reads_ahead:
                         state.failed.insert((job.file_id, block), message.clone());
                     }
                 }
+                // The handle may be dead (the card gone for a moment): a stream opened after
+                // this opens the file again instead of sharing it (audit 2026-10-25).
+                state.by_path.retain(|_, id| *id != job.file_id);
             }
         }
         drop(state);
