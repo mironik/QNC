@@ -32,6 +32,9 @@ struct Chunk {
     from_seconds: f64,
     rate: u32,
     samples: Vec<f32>,
+    /// The clip frames this chunk was read for: whatever the media gave there is all there
+    /// is (a clip starts or ends inside them), so it is never asked again.
+    frames: (u64, u64),
 }
 
 impl Chunk {
@@ -42,6 +45,12 @@ impl Chunk {
     fn covers(&self, from: f64, to: f64) -> bool {
         self.from_seconds <= from && to <= self.to_seconds()
     }
+
+    /// Whether this chunk answers clip frames `[first, last)`: its samples cover them, or it
+    /// was read for them (the media has no more sound there).
+    fn answers(&self, first: u64, last: u64, seconds: impl Fn(f64) -> f64) -> bool {
+        (self.frames.0 <= first && last <= self.frames.1) || self.covers(seconds(first as f64), seconds(last as f64))
+    }
 }
 
 /// A read of `(clip, camera channel)` over clip frames `[from, to)`.
@@ -51,6 +60,13 @@ struct Ask {
     channel: u16,
     from: u64,
     to: u64,
+}
+
+impl Ask {
+    /// Whether this read is of the clip channel and covers clip frames `[first, last)`.
+    fn within(&self, clip_id: &str, channel: u16, first: u64, last: u64) -> bool {
+        self.clip_id == clip_id && self.channel == channel && self.from <= first && last <= self.to
+    }
 }
 
 type Done = (Ask, Result<(Chunk, (f64, (u32, u32))), String>);
@@ -65,7 +81,9 @@ pub struct FineWave {
     /// Reads queued or running (the worker takes the newest first).
     wanted: Arc<Mutex<Vec<Ask>>>,
     asked: HashSet<Ask>,
-    failed: HashSet<(String, u16)>,
+    /// Reads that failed: only their frames are not asked again (another part of the same
+    /// clip channel still is).
+    failed: Vec<Ask>,
     done: Option<mpsc::Receiver<Done>>,
     sender: Option<mpsc::Sender<Done>>,
     running: bool,
@@ -106,9 +124,9 @@ impl FineWave {
                 continue;
             };
             let seconds = |frame: f64| zero + frame * f64::from(fps.1) / f64::from(fps.0.max(1));
-            let chunk = self.chunks.get(&key).and_then(|chunks| chunks.iter().find(|chunk| chunk.covers(seconds(first as f64), seconds(last as f64))));
+            let chunk = self.chunks.get(&key).and_then(|chunks| chunks.iter().find(|chunk| chunk.answers(first, last, seconds)));
             let Some(chunk) = chunk.cloned() else {
-                complete &= self.failed.contains(&key);
+                complete &= self.failed.iter().any(|ask| ask.within(&piece.clip_id, piece.channel, first, last));
                 self.ask(locator, &piece.clip_id, piece.channel, first, last);
                 continue;
             };
@@ -135,10 +153,7 @@ impl FineWave {
         if self.project.as_deref() != Some(locator.project_id()) {
             *self = Self { project: Some(locator.project_id().to_string()), ..Self::default() };
         }
-        if self.failed.contains(&(clip_id.to_string(), channel)) {
-            return;
-        }
-        let covered = self.asked.iter().any(|ask| ask.clip_id == clip_id && ask.channel == channel && ask.from <= first && last <= ask.to);
+        let covered = self.asked.iter().chain(&self.failed).any(|ask| ask.within(clip_id, channel, first, last));
         if covered {
             return;
         }
@@ -174,7 +189,12 @@ impl FineWave {
             loop {
                 let Some(ask) = wanted.lock().ok().and_then(|mut wanted| wanted.pop()) else { break };
                 let place = located.entry(ask.clip_id.clone()).or_insert_with(|| locator.locate_sound(&ask.clip_id)).clone();
+                let started = std::time::Instant::now();
                 let result = place.and_then(|place| read(&place, &ask).map(|chunk| (chunk, (place.frame_zero_seconds, place.fps))));
+                qnc_dev_diagnostics::log_line(
+                    qnc_dev_diagnostics::DiagnosticsStream::Player,
+                    format!("fine-wave read {} ch{} frames {}..{} ms={} ok={}", ask.clip_id, ask.channel + 1, ask.from, ask.to, started.elapsed().as_millis(), result.is_ok()),
+                );
                 if sender.send((ask, result)).is_err() {
                     break;
                 }
@@ -210,7 +230,7 @@ impl FineWave {
                 }
                 Err(error) => {
                     qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("fine-wave {} ch{}: {error}", ask.clip_id, ask.channel + 1));
-                    self.failed.insert((ask.clip_id.clone(), ask.channel));
+                    self.failed.push(ask.clone());
                 }
             }
             self.asked.remove(&ask);
@@ -242,7 +262,15 @@ fn read(place: &LocatedSound, ask: &Ask) -> Result<Chunk, String> {
     let mut decoder = Decoder::open_endpoint(request, endpoint, place.stamp.clone(), config).map_err(|error| error.to_string())?;
     let (want_from, want_to) = (place.seconds_of(ask.from as f64), place.seconds_of(ask.to as f64));
     let mut chunk: Option<Chunk> = None;
-    while let Some(packet) = decoder.next_packet().map_err(|error| error.to_string())? {
+    loop {
+        let packet = match decoder.next_packet() {
+            Ok(Some(packet)) => packet,
+            Ok(None) => break,
+            // Past the end of the clip the decoder refuses: the sound read so far is all
+            // there is (an OUT near the clip's end).
+            Err(_) if chunk.is_some() => break,
+            Err(error) => return Err(error.to_string()),
+        };
         let DecodedFormat::Audio { sample_rate_hz, channels, .. } = &packet.format else { continue };
         if *channels != u32::from(width) || *sample_rate_hz != rate {
             return Err("the decoded sound is not the stored format".into());
@@ -257,7 +285,7 @@ fn read(place: &LocatedSound, ask: &Ask) -> Result<Chunk, String> {
             .map(|frame| f32::from_le_bytes(frame[usize::from(inside) * 4..usize::from(inside) * 4 + 4].try_into().expect("sample")));
         match &mut chunk {
             Some(chunk) => chunk.samples.extend(samples),
-            None => chunk = Some(Chunk { from_seconds: at, rate, samples: samples.collect() }),
+            None => chunk = Some(Chunk { from_seconds: at, rate, samples: samples.collect(), frames: (ask.from, ask.to) }),
         }
         if chunk.as_ref().is_some_and(|chunk| chunk.to_seconds() >= want_to) {
             break;
@@ -277,9 +305,18 @@ mod tests {
 
     #[test]
     fn a_chunk_covers_the_seconds_of_its_samples() {
-        let chunk = Chunk { from_seconds: 10.0, rate: 48_000, samples: vec![0.0; 96_000] };
+        let chunk = Chunk { from_seconds: 10.0, rate: 48_000, samples: vec![0.0; 96_000], frames: (500, 600) };
         assert!(chunk.covers(10.5, 11.9));
         assert!(!chunk.covers(9.9, 11.0));
         assert!(!chunk.covers(10.0, 12.1));
+    }
+
+    #[test]
+    fn a_chunk_read_for_frames_answers_them_even_where_the_media_has_no_sound() {
+        // The end of a clip: the read stopped at the end of the media, short of the asked part.
+        let chunk = Chunk { from_seconds: 10.0, rate: 48_000, samples: vec![0.0; 48_000], frames: (500, 600) };
+        let seconds = |frame: f64| frame / 50.0;
+        assert!(chunk.answers(520, 590, seconds), "asked once, never again");
+        assert!(!chunk.answers(590, 610, seconds), "frames past the read are asked");
     }
 }

@@ -5964,3 +5964,12 @@ oko reza (1,5 s rezerve) kroz katalog dekodera u pozadini, uzorci u memoriji, vr
 baze. `qnc-still-locator` `locate_sound` (spremljeni zvucni tokovi originala), `qnc-trim-stills` ga puni. `tools/qnc-player-acceptance
 --fine-wave NAZIV` mjeri citanje. Izmjereno na izoliranoj kopiji (kartica samo citana): 3396 oko slike 400, prvi kanal 2,6 s
 (budenje kartice), ostali 0,17-0,24 s. Ingest nema trim zoom (nije u ovom koraku). Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-25 (korisnik: "pogledaj log, nije bas robusno"): fini val reza nije bio pouzdan na rubovima klipa.
+(1) Citanje koje ide preko kraja klipa dekoder odbija ("timestamp outside saved duration"); greska je oznacavala cijeli kanal
+klipa kao neuspio do kraja rada, pa taj kanal vise nikad nije imao fini val. Sada se pamti samo neuspjeli dio, a zvuk procitan
+do kraja klipa se zadrzava. (2) Komad koji mediji ne mogu dati do kraja trazenog dijela (pocetak ili kraj klipa) trazio se
+ponovno u svakom crtanju, pa se kartica citala u krug i sucelje je stalno crtalo. Sada komad pamti slike za koje je procitan
+i vise se ne trazi (`qnc-fine-wave` `Chunk.frames`, `answers`, `Ask::within`, test). Svako citanje pise u player log
+(`fine-wave read ... ms= ok=`). Izmjereno na izoliranoj kopiji (kartica samo citana): 3396 kod pocetka i kod kraja klipa
+(1376 slika) po jedno citanje kanala, 0,14-0,44 s (prvo 2,3 s, budenje kartice), zvuk do kraja klipa. Conformance.
+Uzivo nije provjereno.
