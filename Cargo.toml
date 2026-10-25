@@ -28,6 +28,8 @@ members = [
     "crates/qnc-frame-timebase",
     "crates/qnc-gain",
     "crates/qnc-short-save",
+    "crates/qnc-store-jobs",
+    "crates/qnc-project-jobs",
     "crates/qnc-player-contract",
     "crates/qnc-player-frame-transport",
     "crates/qnc-player-input",
@@ -265,6 +267,8 @@ qnc-editorial-shell = { path = "crates/qnc-editorial-shell" }
 qnc-frame-timebase = { path = "crates/qnc-frame-timebase" }
 qnc-gain = { path = "crates/qnc-gain" }
 qnc-short-save = { path = "crates/qnc-short-save" }
+qnc-store-jobs = { path = "crates/qnc-store-jobs" }
+qnc-project-jobs = { path = "crates/qnc-project-jobs" }
 qnc-player-contract = { path = "crates/qnc-player-contract" }
 qnc-player-frame-transport = { path = "crates/qnc-player-frame-transport" }
 qnc-player-input = { path = "crates/qnc-player-input" }

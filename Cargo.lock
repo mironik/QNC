@@ -5134,7 +5134,9 @@ version = "0.1.0"
 dependencies = [
  "qnc-application-selection",
  "qnc-dir-browser",
+ "qnc-project-jobs",
  "qnc-project-store",
+ "qnc-store-jobs",
  "qnc-ui-text",
  "serde_json",
 ]
@@ -5197,6 +5199,17 @@ dependencies = [
  "qnc-board",
  "qnc-project-desktop",
  "qnc-shell-desktop-api",
+]
+
+[[package]]
+name = "qnc-project-jobs"
+version = "0.1.0"
+dependencies = [
+ "qnc-application-catalog",
+ "qnc-project-store",
+ "qnc-store-jobs",
+ "qnc-ui-text",
+ "serde_json",
 ]
 
 [[package]]
@@ -5666,6 +5679,10 @@ dependencies = [
  "qnc-ui-text",
  "qnc-work-settings",
 ]
+
+[[package]]
+name = "qnc-store-jobs"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-story"

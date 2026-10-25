@@ -6014,3 +6014,16 @@ kroz rjecnik. `qnc-project-close` nije mijenjan: AGENTS.md odjeljak 3 izricito m
 Nije izvedeno: rad Projecta s bazom izvan niti sucelja (log: 100-300 ms zastoja pri otvaranju i kreiranju), boje tema
 Soft/HighContrast u ugovor ljuske (ljuska nije otkljucana). Testovi dotaknutih kocki, conformance, release build. Project
 je ponovno zamrznut.
+Otkljucano i izvedeno 2026-10-25 (korisnik: "napravi rad Projecta s bazom izvan niti sucelja"; Project otkljucan za to):
+Project forma je otvaranje spremista, popis projekata i templatea, kreiranje, otvaranje i brisanje projekta, izbor, kreiranje i
+brisanje templatea te mapu projekata radila na niti sucelja (log: 100-300 ms zastoja). Nova javna kocka
+`crates/qnc-store-jobs` (+ ugovor; jedna pozadinska nit vlasnik spremista, poslovi redom kojim su poslani, odgovori se
+preuzimaju bez cekanja; ne zna ni spremiste ni aplikaciju) i nova kocka `crates/qnc-project-jobs` (+ ugovor; zahtjevi i
+odgovori Project forme, izvode se u toj niti nad `ProjectStore` koji se tamo i otvara; otvoren ili kreiran projekt tamo
+procita i slijed aplikacija za prelazak desktopa). `qnc-project-application` `ProjectComponent` salje zahtjeve (`request`,
+`poll`, `busy`), `qnc-project-session` primjenjuje odgovore kad stignu (`poll`, `apply_reply`), forma (`qnc-project-desktop`)
+ih preuzima svaki frame i trazi crtanje dok posao traje. C10 `qnc-project-application` 237 -> 147. Nije mijenjano: preglednik
+lokacija (`qnc-dir-browser`) i dalje lista mape na niti sucelja. Provjereno: testovi `qnc-store-jobs`, `qnc-project-jobs`
+(odgovori redom iz pozadinske niti na privremenom korijenu), `qnc-project-store`, `qnc-desktop`, conformance, release build;
+pokretanje aplikacije bez ijednog sporog framea u logu. Uzivo kroz sucelje (kreiranje, otvaranje, brisanje) nije provjereno.
+Project je ponovno zamrznut.

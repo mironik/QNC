@@ -5,10 +5,8 @@ mod project_component;
 
 use std::path::PathBuf;
 
-pub use project_component::{
-    ProjectBrowserTarget, ProjectComponent, ProjectCreated, ProjectDeleted, ProjectsState,
-    TemplatesState, UserTemplateCreated,
-};
+pub use project_component::{ProjectBrowserTarget, ProjectComponent};
+pub use qnc_project_jobs::{ProjectsState, Reply, Request, TemplatesState};
 pub use qnc_project_store::{ProjectNavigationStep, ProjectRow, ProjectTemplateRow};
 
 use qnc_project_store::ProjectStore;
@@ -20,9 +18,9 @@ pub fn validate_embedded_contracts() -> Result<(), String> {
 pub fn open_project_component(
     project_root: impl Into<PathBuf>,
 ) -> Result<ProjectComponent, String> {
-    let root = project_root.into();
-    let store = ProjectStore::open(&root)?;
-    Ok(ProjectComponent::new(store, &root))
+    // The store opens in the background worker; a failure is the reply of every request.
+    ProjectStore::validate_embedded_contracts()?;
+    Ok(ProjectComponent::new(&project_root.into()))
 }
 
 /// Footer/status label for the selected project row.

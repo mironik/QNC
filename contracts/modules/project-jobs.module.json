@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.project-jobs",
+  "module_name": "Project registry work in the background",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["project.registry.jobs"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe"],
+  "state_policy": "owned_by_calling_application",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-project-jobs",
+  "input": "The QNC root and the Project form's requests: list, create, open, delete projects; list, choose, create, delete templates; the projects root.",
+  "output": "The state the form shows (projects, templates, projects root) or the error, and for an opened or created project its application sequence; every request runs in one background worker owning the Project store (qnc-store-jobs), in the order sent.",
+  "specification": "Audit 2026-10-25: the Project form did this work on the form thread (100-300 ms)."
+}

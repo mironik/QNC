@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 
 use qnc_dir_browser::BrowserState;
 use qnc_project_application::{
-    ProjectBrowserTarget, ProjectComponent, ProjectRow, ProjectTemplateRow, ProjectsState,
-    TemplatesState,
+    ProjectBrowserTarget, ProjectComponent, ProjectRow, ProjectTemplateRow, ProjectsState, Reply,
+    Request, TemplatesState,
 };
 use serde_json::Value;
 
@@ -173,7 +173,8 @@ impl ProjectSession {
     /// `ready_text` is the list status of the layout contract; `known_actions` the Project
     /// action ids of the keyboard catalog (an intent outside it is refused).
     pub fn new(component: ProjectComponent, ready_text: String, known_actions: BTreeSet<String>) -> Self {
-        let projects_root = component.projects_root_display();
+        // Shown once the registry answers (piece `qnc-project-jobs`).
+        let projects_root = String::new();
         let mut session = Self {
             component,
             project_name: String::new(),
@@ -353,52 +354,23 @@ impl ProjectSession {
     }
 
     fn refresh_projects(&mut self) {
-        match self.component.load_projects() {
-            Ok(projects) => self.apply_projects_state(projects),
-            Err(error) => {
-                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
-            }
-        }
+        self.component.request(Request::LoadProjects);
     }
 
     fn perform_create_project(&mut self) {
         let settings = self.settings_draft_for_save();
-        match self.component.create_project(
-            &self.project_name,
-            &self.selected_template_id,
-            &settings,
-        ) {
-            Ok(created) => {
-                self.project_name.clear();
-                self.status = qnc_ui_text::fill("project.msg.opened", &[("name", &created.project.name)]);
-                self.apply_projects_state(created.projects);
-            }
-            Err(error) => {
-                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
-            }
+        let (name, template_id) = (self.project_name.clone(), self.selected_template_id.clone());
+        if let Err(error) = self.component.create_project(&name, &template_id, &settings) {
+            self.status = db_error(error);
         }
     }
 
     fn refresh_templates(&mut self) {
-        match self.component.load_templates() {
-            Ok(templates) => self.apply_templates_state(templates),
-            Err(error) => {
-                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
-            }
-        }
+        self.component.request(Request::LoadTemplates);
     }
 
     fn perform_select_template(&mut self, template_id: &str) {
-        match self.component.select_template(template_id) {
-            Ok(templates) => {
-                self.apply_templates_state(templates);
-                self.picker_open = false;
-                self.status = qnc_ui_text::fill("project.msg.template_chosen", &[("name", &self.selected_template_name())]);
-            }
-            Err(error) => {
-                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
-            }
-        }
+        self.component.request(Request::SelectTemplate { template_id: template_id.into() });
     }
 
     pub fn selected_template_name(&self) -> String {
@@ -411,24 +383,86 @@ impl ProjectSession {
 
     fn perform_save_custom_template(&mut self) {
         let settings = self.settings_draft_for_save();
-        match self.component.create_user_template(
-            &self.template_draft_name,
-            &self.template_draft_description,
-            &self.selected_template_id,
-            &settings,
-        ) {
-            Ok(created) => {
-                self.selected_template_id = created.template.template_id;
+        let (name, description) = (self.template_draft_name.clone(), self.template_draft_description.clone());
+        let base = self.selected_template_id.clone();
+        if let Err(error) = self.component.create_user_template(&name, &description, &base, &settings) {
+            self.status = db_error(error);
+        }
+    }
+
+    /// The replies of the registry that are there (its work runs in the background).
+    /// Returns whether one came.
+    pub fn poll(&mut self) -> bool {
+        let replies = self.component.poll();
+        let came = !replies.is_empty();
+        for reply in replies {
+            self.apply_reply(reply);
+        }
+        came
+    }
+
+    /// Whether the registry is still working on a request.
+    pub fn busy(&self) -> bool {
+        self.component.busy()
+    }
+
+    fn apply_reply(&mut self, reply: Reply) {
+        match reply {
+            Reply::Projects(Ok(state)) => self.apply_projects_state(state),
+            Reply::Templates(Ok(state)) => self.apply_templates_state(state),
+            Reply::Created(Ok((project, state))) => {
+                self.project_name.clear();
+                self.status = qnc_ui_text::fill("project.msg.opened", &[("name", &project.name)]);
+                self.apply_projects_state(state);
+            }
+            Reply::Opened(Ok(state)) => {
+                self.status = self.ready_text.clone();
+                self.apply_projects_state(state);
+            }
+            Reply::Deleted(Ok((project, state))) => {
+                self.delete_candidate = None;
+                self.status = qnc_ui_text::fill("project.msg.removed", &[("v0", &project.name)]);
+                self.apply_projects_state(state);
+            }
+            Reply::TemplateSelected(Ok(state)) => {
+                self.apply_templates_state(state);
+                self.picker_open = false;
+                self.status = qnc_ui_text::fill("project.msg.template_chosen", &[("name", &self.selected_template_name())]);
+            }
+            Reply::TemplateCreated(Ok((template, state))) => {
+                self.selected_template_id = template.template_id;
                 self.template_create_open = false;
                 self.template_draft_name.clear();
                 self.template_draft_description.clear();
                 self.export_preset_draft_name.clear();
-                self.apply_templates_state(created.templates);
+                self.apply_templates_state(state);
                 self.status = qnc_ui_text::fill("project.msg.template_chosen", &[("name", &self.selected_template_name())]);
             }
-            Err(error) => {
-                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
+            Reply::TemplateDeleted { name, result } => {
+                self.delete_template_candidate = None;
+                match result {
+                    Ok(state) => {
+                        self.apply_templates_state(state);
+                        self.status = qnc_ui_text::fill("project.msg.template_deleted", &[("v0", &name)]);
+                    }
+                    Err(error) => self.status = db_error(error),
+                }
             }
+            Reply::ProjectsRoot(Ok(projects_root)) => {
+                self.projects_root = qnc_dir_browser::display_private_path(Path::new(&projects_root));
+                self.projects_root_dirty = true;
+                self.projects_root_browser_open = false;
+                qnc_settings_path::set_string_path(&mut self.draft_settings, "storage.projects_root", self.projects_root.clone());
+                self.status = qnc_ui_text::text("project.msg.projects_root_set").to_string();
+            }
+            Reply::Projects(Err(error))
+            | Reply::Templates(Err(error))
+            | Reply::Created(Err(error))
+            | Reply::Opened(Err(error))
+            | Reply::Deleted(Err(error))
+            | Reply::TemplateSelected(Err(error))
+            | Reply::TemplateCreated(Err(error))
+            | Reply::ProjectsRoot(Err(error)) => self.status = db_error(error),
         }
     }
 
@@ -520,23 +554,7 @@ impl ProjectSession {
         if display_path.trim().is_empty() {
             return;
         }
-        match self.component.set_projects_root(path.clone()) {
-            Ok(projects_root) => {
-                self.projects_root =
-                    qnc_dir_browser::display_private_path(Path::new(&projects_root));
-                self.projects_root_dirty = true;
-                self.projects_root_browser_open = false;
-                qnc_settings_path::set_string_path(
-                    &mut self.draft_settings,
-                    "storage.projects_root",
-                    self.projects_root.clone(),
-                );
-                self.status = qnc_ui_text::text("project.msg.projects_root_set").to_string();
-            }
-            Err(error) => {
-                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
-            }
-        }
+        self.component.request(Request::SetProjectsRoot { path });
     }
 
     fn toggle_export_dir_browser(&mut self) {
@@ -682,16 +700,8 @@ impl ProjectSession {
         let Some(project) = self.projects.get(index).cloned() else {
             return;
         };
-        match self.component.open_project(&project.project_id) {
-            Ok(projects) => {
-                self.selected_project = Some(index);
-                self.status = self.ready_text.clone();
-                self.apply_projects_state(projects);
-            }
-            Err(error) => {
-                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
-            }
-        }
+        self.selected_project = Some(index);
+        self.component.request(Request::Open { project_id: project.project_id });
     }
 
     fn request_delete_project(&mut self, index: usize) {
@@ -704,16 +714,7 @@ impl ProjectSession {
     }
 
     fn perform_confirm_delete_project(&mut self, project: &ProjectRow) {
-        match self.component.delete_project(&project.project_id) {
-            Ok(deleted) => {
-                self.delete_candidate = None;
-                self.status = qnc_ui_text::fill("project.msg.removed", &[("v0", &(deleted.project.name).to_string())]);
-                self.apply_projects_state(deleted.projects);
-            }
-            Err(error) => {
-                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
-            }
-        }
+        self.component.request(Request::Delete { project_id: project.project_id.clone() });
     }
 
     fn request_delete_template(&mut self, template_id: &str) {
@@ -728,22 +729,15 @@ impl ProjectSession {
     }
 
     fn perform_confirm_delete_template(&mut self, template: &ProjectTemplateRow) {
-        match self.component.delete_user_template(&template.template_id) {
-            Ok(templates) => {
-                self.delete_template_candidate = None;
-                self.apply_templates_state(templates);
-                self.status = qnc_ui_text::fill("project.msg.template_deleted", &[("v0", &(template.name).to_string())]);
-            }
-            Err(error) => {
-                self.delete_template_candidate = None;
-                self.status = qnc_ui_text::fill("project.msg.db_error", &[("error", &error)]);
-            }
-        }
+        self.component.request(Request::DeleteTemplate { template_id: template.template_id.clone(), name: template.name.clone() });
     }
 
     fn apply_projects_state(&mut self, state: ProjectsState) {
         self.selected_project = state.selected_project;
         self.projects = state.projects;
+        if !self.projects_root_dirty {
+            self.projects_root = qnc_dir_browser::display_private_path(Path::new(&state.projects_root));
+        }
     }
 
     fn apply_templates_state(&mut self, state: TemplatesState) {
@@ -773,4 +767,9 @@ impl ProjectSession {
         }
         settings
     }
+}
+
+/// The status line of a registry error.
+fn db_error(error: String) -> String {
+    qnc_ui_text::fill("project.msg.db_error", &[("error", &error)])
 }

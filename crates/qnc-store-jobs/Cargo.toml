@@ -1,0 +1,7 @@
+[package]
+name = "qnc-store-jobs"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: one background thread that owns a store and runs its jobs in order, so a form never waits for a database or a folder; the replies are taken when they are there"
+
+[dependencies]

@@ -29,8 +29,9 @@ impl ProjectApp {
     }
 
     pub fn show_desktop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, frame: &mut qnc_board::Frame<'_>) {
-        if self.session.component.applications.poll() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        // The registry works in the background: its replies are taken here.
+        if self.session.component.applications.poll() | self.session.poll() || self.session.busy() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(20));
         }
         for intent in qnc_project_blocks::show(ctx, ui, frame, &self.contracts, &mut self.session) {
             self.session.dispatch(intent);
