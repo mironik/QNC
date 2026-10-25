@@ -3698,6 +3698,9 @@ dependencies = [
 [[package]]
 name = "qnc-export-launch"
 version = "0.1.0"
+dependencies = [
+ "qnc-plugin-process",
+]
 
 [[package]]
 name = "qnc-export-preset"
@@ -3885,7 +3888,9 @@ name = "qnc-ingest"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-dev-diagnostics",
  "qnc-ingest-desktop",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -4940,6 +4945,7 @@ dependencies = [
  "qnc-content-store",
  "qnc-dev-diagnostics",
  "qnc-playback-activity",
+ "qnc-plugin-process",
  "qnc-ui-text",
 ]
 
@@ -5113,6 +5119,7 @@ name = "qnc-project"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-dev-diagnostics",
  "qnc-project-desktop",
  "qnc-ui-text",
 ]
@@ -5958,6 +5965,7 @@ dependencies = [
  "qnc-active-project-read",
  "qnc-content-store",
  "qnc-playback-activity",
+ "qnc-plugin-process",
  "qnc-ui-text",
 ]
 

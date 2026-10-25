@@ -5,7 +5,7 @@
 //! no form, no database and no format.
 
 use std::{
-    process::{Command, Stdio},
+    process::Stdio,
     sync::{Arc, Mutex},
 };
 
@@ -61,19 +61,9 @@ impl ExportRun {
 }
 
 fn run(args: &[String]) -> Outcome {
-    let name = format!("{EXECUTABLE}{}", std::env::consts::EXE_SUFFIX);
-    let executable = std::env::current_exe().map_err(|e| e.to_string())?.with_file_name(&name);
-    if !executable.is_file() {
-        return Err(format!("{name} is not beside the application"));
-    }
-    let mut command = Command::new(executable);
+    let executable = qnc_plugin_process::beside_application(EXECUTABLE)?;
+    let mut command = qnc_plugin_process::background_command(&executable);
     command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        // No console window for a background process.
-        command.creation_flags(0x0800_0000);
-    }
     let output = command.output().map_err(|e| e.to_string())?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let last = stdout.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or_default().trim().to_string();

@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public block: wakes the background worker of the active project unless its lease is alive"
 
 [dependencies]
+qnc-plugin-process = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-active-project-read = { workspace = true }
 qnc-content-store = { workspace = true }

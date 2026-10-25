@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf, process};
+use std::{path::PathBuf, process};
 
 use eframe::egui;
 
@@ -47,69 +47,7 @@ fn main() -> eframe::Result<()> {
     )
 }
 
+/// The QNC root (`qnc-dev-diagnostics` holds the one rule).
 fn resolve_qnc_root() -> Result<PathBuf, String> {
-    let mut starts = Vec::new();
-    if let Ok(path) = env::current_exe() {
-        if let Some(parent) = path.parent() {
-            starts.push(parent.to_path_buf());
-        }
-    }
-    if let Ok(path) = env::current_dir() {
-        starts.push(path);
-    }
-
-    for start in starts {
-        for candidate in start.ancestors() {
-            if is_qnc_root(candidate) {
-                return Ok(candidate.to_path_buf());
-            }
-        }
-    }
-
-    Err(qnc_ui_text::text("project.root_not_found").to_string())
-}
-
-fn is_qnc_root(path: &std::path::Path) -> bool {
-    path.join("AGENTS.md").is_file()
-        && path.join("seed").join("system_seed.json").is_file()
-        && path
-            .join("contracts")
-            .join("ui")
-            .join("project.layout.json")
-            .is_file()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::{fs, time::SystemTime};
-
-    #[test]
-    fn qnc_root_requires_agents_seed_and_project_layout() {
-        let root = env::temp_dir().join(format!(
-            "qnc_root_resolver_{}_{}",
-            process::id(),
-            SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or(0)
-        ));
-        fs::create_dir_all(root.join("seed")).expect("seed dir");
-        fs::create_dir_all(root.join("contracts").join("ui")).expect("ui dir");
-        fs::write(root.join("AGENTS.md"), "").expect("agents");
-        fs::write(root.join("seed").join("system_seed.json"), "{}").expect("seed");
-        fs::write(
-            root.join("contracts")
-                .join("ui")
-                .join("project.layout.json"),
-            "{}",
-        )
-        .expect("layout");
-
-        assert!(is_qnc_root(&root));
-
-        fs::remove_file(root.join("AGENTS.md")).expect("remove agents");
-        assert!(!is_qnc_root(&root));
-        let _ = fs::remove_dir_all(root);
-    }
+    qnc_dev_diagnostics::resolve_qnc_root().ok_or_else(|| qnc_ui_text::text("project.root_not_found").to_string())
 }

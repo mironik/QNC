@@ -539,46 +539,9 @@ fn rgb(value: [u8; 3]) -> Color32 {
     Color32::from_rgb(value[0], value[1], value[2])
 }
 
+/// The QNC root of the shell (`qnc-dev-diagnostics` holds the one rule).
 pub fn resolve_qnc_root() -> Result<PathBuf, String> {
-    // A root named by QNC_ROOT (an isolated copy for tests and measurements) is the one;
-    // one that is not a QNC root is an error, never a quiet fall back to the working
-    // directory, which may be the real projects' root (2026-10-15).
-    if let Some(root) = env::var_os("QNC_ROOT").map(PathBuf::from) {
-        return if is_qnc_root(&root) {
-            Ok(root)
-        } else {
-            Err(qnc_ui_text::text("shell.root_not_found").to_string())
-        };
-    }
-    let mut starts = Vec::new();
-    if let Ok(path) = env::current_exe() {
-        if let Some(parent) = path.parent() {
-            starts.push(parent.to_path_buf());
-        }
-    }
-    if let Ok(path) = env::current_dir() {
-        starts.push(path);
-    }
-
-    for start in starts {
-        for candidate in start.ancestors() {
-            if is_qnc_root(candidate) {
-                return Ok(candidate.to_path_buf());
-            }
-        }
-    }
-
-    Err(qnc_ui_text::text("shell.root_not_found").to_string())
-}
-
-fn is_qnc_root(path: &Path) -> bool {
-    path.join("AGENTS.md").is_file()
-        && path.join("seed").join("system_seed.json").is_file()
-        && path
-            .join("contracts")
-            .join("ui")
-            .join("shell.layout.json")
-            .is_file()
+    qnc_dev_diagnostics::resolve_qnc_root().ok_or_else(|| qnc_ui_text::text("shell.root_not_found").to_string())
 }
 
 #[cfg(test)]
@@ -594,33 +557,6 @@ mod tests {
             layout.application_tabs,
             ["project", "ingest", "media_assist", "storyboard"]
         );
-    }
-
-    #[test]
-    fn qnc_root_requires_agents_seed_and_shell_layout() {
-        let root = env::temp_dir().join(format!(
-            "qnc_shell_root_{}_{}",
-            process::id(),
-            SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or(0)
-        ));
-        fs::create_dir_all(root.join("seed")).expect("seed dir");
-        fs::create_dir_all(root.join("contracts").join("ui")).expect("ui dir");
-        fs::write(root.join("AGENTS.md"), "").expect("agents");
-        fs::write(root.join("seed").join("system_seed.json"), "{}").expect("seed");
-        fs::write(
-            root.join("contracts").join("ui").join("shell.layout.json"),
-            "{}",
-        )
-        .expect("shell");
-
-        assert!(is_qnc_root(&root));
-
-        fs::remove_file(root.join("AGENTS.md")).expect("remove agents");
-        assert!(!is_qnc_root(&root));
-        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

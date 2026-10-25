@@ -637,6 +637,8 @@ pub fn clear_cache() {
     }
 }
 
+/// The QNC root for diagnostics and settings files: a QNC_ROOT that is not a full root (an
+/// isolated copy of only the projects) falls back to the root the program runs from.
 pub fn locate_qnc_root() -> Option<PathBuf> {
     if let Ok(root) = env::var("QNC_ROOT") {
         let root = PathBuf::from(root);
@@ -644,7 +646,22 @@ pub fn locate_qnc_root() -> Option<PathBuf> {
             return Some(root);
         }
     }
+    root_around_program()
+}
 
+/// The QNC root an application works in (audit 2026-10-25: one rule for the shell and every
+/// standalone application, which had their own copies and did not honour QNC_ROOT). A
+/// QNC_ROOT that is not a QNC root is no root at all: never a quiet fall back to the root of
+/// the real projects.
+pub fn resolve_qnc_root() -> Option<PathBuf> {
+    match env::var_os("QNC_ROOT").map(PathBuf::from) {
+        Some(root) => is_qnc_root(&root).then_some(root),
+        None => root_around_program(),
+    }
+}
+
+/// The nearest QNC root above the running program, else above the working directory.
+fn root_around_program() -> Option<PathBuf> {
     let mut starts = Vec::new();
     if let Ok(exe) = env::current_exe() {
         starts.push(exe);
@@ -699,7 +716,8 @@ fn validate(settings: &DiagnosticsSettings) -> Result<(), String> {
     Ok(())
 }
 
-fn is_qnc_root(path: &Path) -> bool {
+/// Whether `path` is a QNC root (the law, the workspace and the contracts).
+pub fn is_qnc_root(path: &Path) -> bool {
     path.join("AGENTS.md").is_file()
         && path.join("Cargo.toml").is_file()
         && path.join("contracts").is_dir()

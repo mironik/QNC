@@ -5,7 +5,7 @@
 //! process start. It knows no form and no application.
 
 use std::{
-    process::{Command, Stdio},
+    process::Stdio,
     time::{Duration, Instant},
 };
 
@@ -54,19 +54,10 @@ fn start(target: &ContentTarget) -> Result<(), String> {
     if qnc_playback_activity::is_fresh(target, LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS) {
         return Ok(());
     }
-    let name = format!("{EXECUTABLE}{}", std::env::consts::EXE_SUFFIX);
-    let executable = std::env::current_exe().map_err(|e| e.to_string())?.with_file_name(&name);
-    if !executable.is_file() {
-        return Err(qnc_ui_text::fill("app.helper_missing_short", &[("name", &name.to_string())]));
-    }
-    let mut command = Command::new(executable);
+    let executable = qnc_plugin_process::beside_application(EXECUTABLE)
+        .map_err(|_| qnc_ui_text::fill("app.helper_missing_short", &[("name", EXECUTABLE)]))?;
+    let mut command = qnc_plugin_process::background_command(&executable);
     command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        // No console window for a background process.
-        command.creation_flags(0x0800_0000);
-    }
     let mut child = command.spawn().map_err(|e| e.to_string())?;
     let _ = child.wait();
     Ok(())

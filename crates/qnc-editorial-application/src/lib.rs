@@ -30,7 +30,7 @@ pub use view::{
 };
 
 /// Finds the QNC root: the one finder of the diagnostics block, never a copy of it.
-pub use qnc_dev_diagnostics::locate_qnc_root;
+pub use qnc_dev_diagnostics::resolve_qnc_root as locate_qnc_root;
 
 struct Loaded {
     settings: WorkSettings,

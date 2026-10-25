@@ -101,6 +101,19 @@ pub fn beside_application(name: &str) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("the plug-in program '{file}' is not beside the application"))
 }
 
+/// A command for a program of QNC that runs in the background: no console window on
+/// Windows (audit 2026-10-25: written the same way in several pieces).
+pub fn background_command(executable: &Path) -> Command {
+    #[allow(unused_mut)]
+    let mut command = Command::new(executable);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000); // no console window
+    }
+    command
+}
+
 struct Running {
     child: Child,
     stdin: ChildStdin,
@@ -242,13 +255,8 @@ impl Plugin {
 }
 
 fn start(spec: &PluginSpec) -> Result<Running, String> {
-    let mut command = Command::new(&spec.executable);
+    let mut command = background_command(&spec.executable);
     command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000); // no console window
-    }
     let mut child = command.spawn().map_err(|e| format!("plug-in {} does not start: {e}", spec.executable.display()))?;
     let mut stdin = child.stdin.take().ok_or("plug-in has no stdin")?;
     let stdout = child.stdout.take().ok_or("plug-in has no stdout")?;

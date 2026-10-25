@@ -5,3 +5,4 @@ edition = "2021"
 description = "QNC public block: starts the export of the story (the qnc-export executable beside the application) on a thread of its own and gives its outcome; a form never waits for it"
 
 [dependencies]
+qnc-plugin-process = { workspace = true }

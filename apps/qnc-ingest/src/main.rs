@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::env;
 
 fn main() -> eframe::Result<()> {
     if env::args().any(|arg| arg == "--check-contracts") {
@@ -14,8 +14,11 @@ fn main() -> eframe::Result<()> {
         }
     }
 
-    let qnc_root = locate_qnc_root()
-        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    // The one root rule (`qnc-dev-diagnostics`): never the working directory by default.
+    let qnc_root = qnc_dev_diagnostics::resolve_qnc_root().unwrap_or_else(|| {
+        eprintln!("{}", qnc_ui_text::text("shell.root_not_found"));
+        std::process::exit(2);
+    });
     let app = qnc_ingest_desktop::create_ingest_app(qnc_root)
         .unwrap_or_else(|error| panic!("failed to create Ingest app: {error}"));
     let options = eframe::NativeOptions {
@@ -29,48 +32,4 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native("QNC Ingest", options, Box::new(|_| Ok(Box::new(app))))
-}
-
-fn locate_qnc_root() -> Option<PathBuf> {
-    let mut starts = Vec::new();
-    if let Ok(exe) = env::current_exe() {
-        starts.push(exe);
-    }
-    if let Ok(cwd) = env::current_dir() {
-        starts.push(cwd);
-    }
-
-    for start in starts {
-        let mut current = if start.is_file() {
-            start.parent().map(PathBuf::from)
-        } else {
-            Some(start)
-        };
-        while let Some(dir) = current {
-            if is_qnc_root(&dir) {
-                return Some(dir);
-            }
-            current = dir.parent().map(PathBuf::from);
-        }
-    }
-
-    None
-}
-
-fn is_qnc_root(dir: &std::path::Path) -> bool {
-    dir.join("AGENTS.md").is_file()
-        && dir
-            .join("contracts")
-            .join("ui")
-            .join("ingest.layout.json")
-            .is_file()
-        && dir
-            .join("contracts")
-            .join("applications")
-            .join("ingest.application.json")
-            .is_file()
-        && dir
-            .join("contracts")
-            .join("qnc-keyboard-shortcuts.json")
-            .is_file()
 }
