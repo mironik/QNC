@@ -256,9 +256,7 @@ impl Queue {
         if samples.is_empty()
             || !samples.len().is_multiple_of(channels)
             || first_frame != self.next
-            || samples
-                .iter()
-                .any(|s| !s.is_finite() || !(-1.0..=1.0).contains(s))
+            || samples.iter().any(|s| !s.is_finite())
         {
             return Err(Error::new(
                 Code::Contract,
@@ -269,10 +267,12 @@ impl Queue {
             .producer
             .write_chunk(samples.len())
             .map_err(|_| Error::new(Code::Full, "audio queue full"))?;
+        // A loud mix (levels, crossfades, normalising; audit 2026-10-25) is clipped at full
+        // scale, never refused: a sample over it cost the whole session.
         let (a, b) = chunk.as_mut_slices();
-        let split = a.len();
-        a.copy_from_slice(&samples[..split]);
-        b.copy_from_slice(&samples[split..]);
+        for (out, sample) in a.iter_mut().chain(b.iter_mut()).zip(samples) {
+            *out = sample.clamp(-1.0, 1.0);
+        }
         chunk.commit_all();
         self.next = next;
         Ok(())
@@ -424,6 +424,14 @@ impl Queue {
     }
 }
 
+/// The one limit of what reaches the device: full scale (levels, a part's gain and the bed
+/// can lift a sample over it; audit 2026-10-25).
+fn clip(output: &mut [f32]) {
+    for sample in output {
+        *sample = sample.clamp(-1.0, 1.0);
+    }
+}
+
 fn samples_to_ns(samples: u64, rate: u32) -> u64 {
     (u128::from(samples) * 1_000_000_000 / u128::from(rate)).min(u128::from(u64::MAX)) as u64
 }
@@ -542,6 +550,7 @@ impl Callback {
                 chunk.commit_all();
             }
             self.apply_gains(output);
+            clip(output);
             self.note_peaks(output);
             return;
         }
@@ -589,6 +598,7 @@ impl Callback {
         // is in its samples).
         let channels = self.channels;
         self.bed.mix(&self.shared, &mut output[..needed * channels], channels, self.anchor + self.submitted);
+        clip(output);
         self.note_peaks(output);
         if needed > 0 {
             self.shared.timing_revision.fetch_add(1, Ordering::SeqCst);

@@ -62,8 +62,10 @@ impl ExportRun {
 
 fn run(args: &[String]) -> Outcome {
     let executable = qnc_plugin_process::beside_application(EXECUTABLE)?;
+    // The root of this application, given explicitly: the export uses no other.
+    let root = qnc_dev_diagnostics::resolve_qnc_root().ok_or("QNC root missing (QNC_ROOT or beside the application)")?;
     let mut command = qnc_plugin_process::background_command(&executable);
-    command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+    command.arg("--root").arg(root).args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
     let output = command.output().map_err(|e| e.to_string())?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let last = stdout.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or_default().trim().to_string();
@@ -77,17 +79,24 @@ fn run(args: &[String]) -> Outcome {
 mod tests {
     use super::*;
 
+    /// Audit 2026-10-25: this test started the real export on the real active project. It
+    /// gives an empty root of its own (the last `--root` counts), so whatever runs writes
+    /// nothing, and the outcome is an error, never a hang.
     #[test]
-    fn a_missing_executable_is_an_outcome_not_a_hang() {
+    fn an_export_that_cannot_run_is_an_error_outcome_not_a_hang() {
+        let empty = std::env::temp_dir().join(format!("qnc-export-launch-test-{}", std::process::id()));
+        std::fs::create_dir_all(&empty).unwrap();
         let mut run = ExportRun::default();
-        assert!(run.start(&["--xml"]));
+        assert!(run.start(&["--xml", "--root", empty.to_str().unwrap()]));
         let outcome = loop {
             if let Some(outcome) = run.take() {
                 break outcome;
             }
             std::thread::yield_now();
         };
-        assert!(outcome.is_err() || outcome.is_ok());
+        assert!(outcome.is_err(), "{outcome:?}");
         assert!(!run.running());
+        assert_eq!(std::fs::read_dir(&empty).unwrap().count(), 0, "nothing written");
+        std::fs::remove_dir_all(&empty).unwrap();
     }
 }

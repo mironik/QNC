@@ -6,3 +6,4 @@ description = "QNC public block: starts the export of the story (the qnc-export 
 
 [dependencies]
 qnc-plugin-process = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }

@@ -30,11 +30,13 @@ pub(crate) fn make(
     let name = format!("{}.mov", stem.rsplit_once('.').map_or(stem.as_str(), |(stem, _)| stem));
     let directory = project_dir.join(FOLDER);
     let file = directory.join(&name);
-    let partial = directory.join(format!("{name}.partial"));
     inside_project(project_dir, &file)?;
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    optimizer()?.make(&source, &partial, cancel)?;
-    fs::rename(&partial, &file).map_err(|e| e.to_string())?;
+    // Straight under its name: the protected project folder allows no rename (audit
+    // 2026-10-25: a `.partial` renamed was "Access is denied" on every project). A copy cut
+    // short is never recorded (the check below needs every frame) and the next import
+    // writes over it.
+    optimizer()?.make(&source, &file, cancel)?;
     let uri = qnc_source_reader::SourceReference::new(
         &plan.settings.project_media_source_uri().map_err(|e| e.to_string())?,
         &format!("{FOLDER}/{name}"),

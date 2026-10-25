@@ -126,6 +126,22 @@ fn pause_discards_old_generation_and_requires_fresh_preparation() {
     assert_eq!(q.telemetry().submitted_frames, 2);
 }
 
+/// Audit 2026-10-25: a loud mix (a cover at +6 dB, a crossfade near full scale) was refused
+/// as a broken block and ended the session; it is clipped at full scale instead, and so is a
+/// gain on the way to the device.
+#[test]
+fn samples_over_full_scale_are_clipped_not_refused() {
+    let (mut q, mut c, g) = prepared(1);
+    q.push(g, 10, &[1.5, -2.0, 0.5]).unwrap();
+    q.finish(g).unwrap();
+    q.commit(g).unwrap();
+    q.start(g).unwrap();
+    q.shared.set_gains(&[4.0]);
+    let mut out = [0.0; 3];
+    c.render(&mut out, 0, None);
+    assert_eq!(out, [1.0, -1.0, 1.0]);
+}
+
 #[test]
 fn overflow_rejects_entire_block_and_preserves_next_position() {
     let (mut q, mut c, g) = prepared(1);
@@ -143,13 +159,12 @@ fn overflow_rejects_entire_block_and_preserves_next_position() {
 }
 
 #[test]
-fn queue_never_accepts_partial_channels_nonfinite_clipped_or_discontinuous_data() {
+fn queue_never_accepts_partial_channels_nonfinite_or_discontinuous_data() {
     let (mut q2, callback, g2) = prepared(2);
     for data in [
         &[0.1][..],
         &[0.1, f32::NAN],
         &[f32::INFINITY, 0.0],
-        &[1.01, 0.0],
         &[],
     ] {
         assert_eq!(q2.push(g2, 10, data).unwrap_err().code, Code::Contract);

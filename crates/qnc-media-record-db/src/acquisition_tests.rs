@@ -133,6 +133,34 @@ fn failure_and_uncertainty_never_reopen_acquisition() {
     }
 }
 
+/// Audit 2026-10-25: an attempt whose finish was never written (worker killed, laptop
+/// asleep) stayed running for good and its clip never got a final record.
+#[test]
+fn an_attempt_abandoned_long_ago_gives_way_but_a_running_one_does_not() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("media.sqlite");
+    let mut db = local(&path, true, Access::ReadWrite);
+    db.write(input("A")).unwrap();
+    assert!(db.begin_acquisition(begin()).unwrap().granted);
+    let again = BeginAcquisition {
+        attempt_id: "attempt-2".into(),
+        document_uri: "qnc://local/artifact/probe-2".into(),
+        ..begin()
+    };
+    assert!(!db.begin_acquisition(again.clone()).unwrap().granted, "a running attempt is not taken over");
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
+    let old = now - crate::acquisition::ABANDONED_AFTER_MS - 1_000;
+    conn.execute(
+        "UPDATE media_acquisitions SET acquisition_json = json_set(acquisition_json, '$.started_at_unix_ms', ?1)",
+        [old as i64],
+    )
+    .unwrap();
+    let claim = db.begin_acquisition(again.clone()).unwrap();
+    assert!(claim.granted, "an abandoned attempt gives way");
+    assert_eq!(claim.acquisition.request, again);
+}
+
 #[test]
 fn an_interrupted_attempt_gives_way_to_a_new_one() {
     let dir = tempfile::tempdir().unwrap();

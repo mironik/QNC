@@ -3712,6 +3712,7 @@ dependencies = [
 name = "qnc-export-launch"
 version = "0.1.0"
 dependencies = [
+ "qnc-dev-diagnostics",
  "qnc-plugin-process",
 ]
 

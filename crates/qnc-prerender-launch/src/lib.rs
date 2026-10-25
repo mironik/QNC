@@ -56,8 +56,10 @@ fn start(target: &ContentTarget) -> Result<(), String> {
     }
     let executable = qnc_plugin_process::beside_application(EXECUTABLE)
         .map_err(|_| qnc_ui_text::fill("app.helper_missing_short", &[("name", EXECUTABLE)]))?;
+    // The root of this application, given explicitly: the prerender uses no other.
+    let root = qnc_dev_diagnostics::resolve_qnc_root().ok_or("QNC root missing (QNC_ROOT or beside the application)")?;
     let mut command = qnc_plugin_process::background_command(&executable);
-    command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    command.arg("--root").arg(root).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
     let mut child = command.spawn().map_err(|e| e.to_string())?;
     let _ = child.wait();
     Ok(())

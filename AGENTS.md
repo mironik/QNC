@@ -6127,3 +6127,18 @@ brisati, sama mapa `exports` i ostatak projekta ostaju zasticeni. Postojeci proj
 spremiste (provjera bez masovnog ACL posla). Export direktorij izvan `exports` (apsolutni ili drugi relativni) nije
 pokriven. Test `the_files_of_the_prerender_cache_may_be_deleted_the_rest_stays_protected` (i export), 42 testa. Project je
 ponovno zamrznut.
+Otkljucano i izvedeno 2026-10-25 (audit, korisnik "otkljucaj i kreni s 1 do 5"): (1) Glasan miks vise ne gasi player:
+zvucni red je uzorak izvan [-1, 1] odbijao kao neispravan blok (`Contract`), sesija je stala do ponovnog otvaranja
+(pokrivalica +6 dB na glasnom ambijentu, crossfade blizu punog nivoa). `qnc-audio-output`: uzorci se pri upisu u red
+rezu na puni nivo, a izlaz uredaja nakon razina, razine dijela i podloge Synca jos jednom (`clip`); nekonacan uzorak i
+dalje je greska. Test `samples_over_full_scale_are_clipped_not_refused`. (2) Probe ciji ishod nikad nije upisan
+(radnik ubijen, laptop zaspao) drzao je klip zauvijek bez konacnog zapisa: `qnc-media-record-db` pokusaj bez ishoda
+stariji od 2 min (`ABANDONED_AFTER_MS`, probe traje najvise 40 s) ustupa novom; pokusaj koji jos moze trajati i dalje
+se ne preuzima. Test. (3) Uvoz "Optimizirani" pisao je `.partial` pa preimenovao, sto zastita projekta ne dopusta:
+`qnc-ingest-import-worker` pise odmah pod konacnim imenom. (4) Test `qnc-export-launch` pokretao je pravi export nad
+aktivnim projektom: `qnc-export` i `qnc-prerender` rade samo uz `--root` ili `QNC_ROOT` (bez trazenja korijena uz
+program); `qnc-export-launch` i `qnc-prerender-launch` predaju korijen aplikacije (`resolve_qnc_root`); test daje
+prazan korijen i trazi gresku i da nista nije zapisano. (5) Original export i XML uzimali su velicinu slike iz
+reprezentacije koju projekt pusta (proxy): `tools/qnc-export` (`original_picture`) cita je iz spremljenog originala.
+Testovi `qnc-audio-output` (23), `qnc-media-record-db` (30), `qnc-ingest-import-worker` (22), `qnc-export-launch`,
+`qnc-prerender-launch`; XML na izoliranoj kopiji. Sve ostalo ostaje zamrznuto.

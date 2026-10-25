@@ -51,7 +51,9 @@ fn run() -> Result<PathBuf> {
         }
     }
     let what = what.ok_or("--xml, --express or --render <id>")?;
-    let root = root.or_else(qnc_dev_diagnostics::locate_qnc_root).ok_or("QNC root missing (--root, QNC_ROOT or beside the executable)")?;
+    // Only the root it is given (audit 2026-10-25: found beside the executable, a test that
+    // started it wrote into the real active project).
+    let root = root.ok_or("QNC root missing (--root or QNC_ROOT)")?;
     let reader = SettingsReader::from_root(&root).map_err(|e| e.to_string())?;
     let settings = reader.read().map_err(|e| e.to_string())?;
     let project_dir = reader.local_workspace_dir(&settings).map_err(|e| e.to_string())?.ok_or("The project has no local folder.")?;
@@ -75,7 +77,7 @@ fn run() -> Result<PathBuf> {
         return deliver(&settings, &program, delivery, "express", content.as_ref(), &target, &project_dir, &folder, roots);
     }
     if let Some(id) = what.strip_prefix("--render=") {
-        let values = qnc_export_choice::delivery_values(id, &settings.export, story_format(&program))?;
+        let values = qnc_export_choice::delivery_values(id, &settings.export, story_format(&program)?)?;
         let delivery = qnc_program_render::Delivery::from_export(&values)?;
         // From the camera originals, never the prerender (user 2026-10-24).
         return deliver(&settings, &program, delivery, &file_name(id), None, &target, &project_dir, &folder, roots);
@@ -91,7 +93,7 @@ fn run() -> Result<PathBuf> {
             .map(|source| source.media.media_uri.clone())
             .unwrap_or_else(|| input.snapshot.binding.original_uri.clone());
         let path = local_path(&roots, &uri)?;
-        let video = sources.iter().find_map(|source| source.source_video_format);
+        let video = original_picture(clip_id, input)?;
         files.insert(
             clip_id.clone(),
             qnc_fcp7_xml::ClipFile {
@@ -117,16 +119,37 @@ fn run() -> Result<PathBuf> {
 
 /// The picture and sound of the story itself: the frame size of its first picture, its rate,
 /// its sound outputs.
-fn story_format(program: &qnc_player_input::ProgramInput) -> qnc_export_choice::StoryFormat {
-    let picture = program.playlist.items.iter().flat_map(|item| &item.sources).find_map(|source| source.source_video_format);
+fn story_format(program: &qnc_player_input::ProgramInput) -> Result<qnc_export_choice::StoryFormat> {
+    // The first picture of the story, its size as the original has it (the playlist's is
+    // the proxy's when the project plays proxies; audit 2026-10-25).
+    let first = program.playlist.items.iter().flat_map(|item| &item.sources).find(|source| source.video_layer.is_some());
+    let picture = match first {
+        Some(source) => original_picture(&source.clip_id, program.clips.get(&source.clip_id).ok_or("no input of the first clip")?)?,
+        None => None,
+    };
     let rate = program.playlist.program_timebase;
-    qnc_export_choice::StoryFormat {
+    Ok(qnc_export_choice::StoryFormat {
         width: picture.map_or(0, |format| format.width),
         height: picture.map_or(0, |format| format.height),
         fps: rate.fps_num as f64 / rate.fps_den.max(1) as f64,
         audio_channels: program.playlist.audio_layout.channel_count,
         audio_sample_rate: program.project_audio.sample_rate_hz,
-    }
+    })
+}
+
+/// The picture of a clip as its original has it (size and scan from the saved record), not
+/// the representation the project plays.
+fn original_picture(clip_id: &str, input: &qnc_player_input::PreparedInput) -> Result<Option<Size>> {
+    let original = input.clone().with_original_picture().map_err(|e| e.to_string())?;
+    let media = qnc_program_input::resolved_media(clip_id, &original.snapshot.metadata.original, original.audio_media(), &original.layout)?;
+    Ok(media.video_format.map(|format| Size { width: format.width, height: format.height }))
+}
+
+/// A picture size.
+#[derive(Clone, Copy)]
+struct Size {
+    width: u32,
+    height: u32,
 }
 
 /// The story's units in `delivery` put together: with `from_prerender` (Express) from the
@@ -149,7 +172,8 @@ fn deliver(
     let units = qnc_broadcast_engine::ProgramPlan::for_render(program).and_then(|plan| plan.render_units()).map_err(|e| e.to_string())?;
     let ffmpeg = qnc_decoder_catalog::installed_deployment().map_err(|e| e.to_string())?.executable;
     let delivery = delivery.on(&ffmpeg);
-    let story_fps = story_format(program).fps;
+    let rate = program.playlist.program_timebase;
+    let story_fps = rate.fps_num as f64 / rate.fps_den.max(1) as f64;
     let picture = match delivery.interlaced {
         true => delivery.interlaced_encode(&ffmpeg, story_fps)?,
         false => Vec::new(),

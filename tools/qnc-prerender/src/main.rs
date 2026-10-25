@@ -58,7 +58,8 @@ fn run() -> Result<()> {
             other => return Err(format!("unknown argument {other}")),
         }
     }
-    let root = root.or_else(qnc_dev_diagnostics::locate_qnc_root).ok_or("QNC root missing (--root, QNC_ROOT or beside the executable)")?;
+    // Only the root it is given (audit 2026-10-25), never one found beside the executable.
+    let root = root.ok_or("QNC root missing (--root or QNC_ROOT)")?;
     let reader = SettingsReader::from_root(&root).map_err(|e| e.to_string())?;
     let settings = reader.read().map_err(|e| e.to_string())?;
     let project_dir = reader

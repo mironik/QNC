@@ -6,6 +6,10 @@ use crate::{
 use rusqlite::{params, Connection, OptionalExtension};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// How long after its start an attempt with no outcome is taken for abandoned: well past the
+/// longest probe (`qnc-media-probe` gives a medium 40 s).
+pub(crate) const ABANDONED_AFTER_MS: u64 = 120_000;
+
 impl Store {
     pub(crate) fn begin_acquisition(
         &mut self,
@@ -19,9 +23,14 @@ impl Store {
             // An attempt of another clip at the same place is of the file that was there
             // before: a new clip at that place comes only from a new source record (the
             // file was replaced under its name), so it is another medium and gets its probe.
-            // A running attempt is never taken over.
+            // A running attempt is not taken over while it may still run; one with no outcome
+            // long after any probe ends was abandoned (the worker killed, the laptop asleep,
+            // its finish never written; audit 2026-10-25: the clip stayed unfinished for good)
+            // and gives way like an interrupted one.
             let earlier_file = existing.request.clip_id != begin.clip_id && existing.outcome.is_some();
-            if !earlier_file && !matches!(existing.outcome, Some(AcquisitionOutcome::Interrupted { .. })) {
+            let abandoned = existing.outcome.is_none()
+                && now()?.saturating_sub(existing.started_at_unix_ms) > ABANDONED_AFTER_MS;
+            if !earlier_file && !abandoned && !matches!(existing.outcome, Some(AcquisitionOutcome::Interrupted { .. })) {
                 return Ok(AcquisitionClaim {
                     granted: false,
                     acquisition: existing,
