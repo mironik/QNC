@@ -5,6 +5,7 @@
 //! content write adapter. It does not scan, probe, own UI, own timeline state
 //! or choose a hardcoded decoder.
 
+use qnc_background_jobs::{Jobs, Preferred};
 use qnc_media_decode::{DecodeRequest, DecoderConfig};
 use qnc_media_metadata::{MediaRepresentation, StreamDetails};
 use qnc_media_records::Snapshot;
@@ -12,15 +13,13 @@ use qnc_media_stream::{LocalSource, MediaStream, SourceReference};
 use qnc_transport_resolver::ResolverConfig;
 use qnc_wave::{StreamPeakCollector, WaveArtifactRecord, WaveLane, WavePlan};
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet},
     fmt,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver, SyncSender, TryRecvError},
         Arc,
     },
-    thread::JoinHandle,
     time::Instant,
 };
 
@@ -197,12 +196,6 @@ pub struct WaveRequest {
     pub clip_id: String,
 }
 
-impl WaveRequest {
-    fn key(&self) -> String {
-        wave_cache_key(&self.project_id, &self.clip_id)
-    }
-}
-
 #[derive(Debug)]
 pub struct WavePoll {
     pub changed: bool,
@@ -219,12 +212,6 @@ impl WavePoll {
 }
 
 #[derive(Debug)]
-struct WaveOutcome {
-    request: WaveRequest,
-    result: Result<GeneratedWave, String>,
-}
-
-#[derive(Debug)]
 struct GeneratedWave {
     artifact: WaveArtifactRecord,
     ready_before: bool,
@@ -233,62 +220,51 @@ struct GeneratedWave {
     coarse: bool,
 }
 
-#[derive(Debug)]
-struct ActiveWaveWorker {
-    request: WaveRequest,
-    result: Receiver<WaveOutcome>,
-    cancel: Arc<AtomicBool>,
-    thread: JoinHandle<()>,
-}
-
-#[derive(Default)]
+/// The waves of the active project: which clips wait, run and are done is the public
+/// scheduler's (`qnc-background-jobs`); this service reads the database, makes a clip's wave
+/// and hands it to the write transport.
 pub struct TimelineWaveService {
     context: Option<WaveContext>,
-    ready: BTreeSet<String>,
-    queue: VecDeque<WaveRequest>,
-    queued: BTreeSet<String>,
-    workers: Vec<ActiveWaveWorker>,
-    /// Coarse waves on their way to the database: their clips are not ready.
+    /// The open clip's pass reads the card alone (user 2026-10-18: two long passes side by
+    /// side on one card took 45-55 s each, its filmstrip waited for it).
+    jobs: Jobs<GeneratedWave>,
+    /// Clips whose coarse wave is on its way to the database: they are not ready.
     coarse: BTreeSet<String>,
     publisher: Option<Box<dyn WaveContentWrite>>,
-    playback_priority: bool,
-    /// At most this many readers (user 2026-10-20: two while the user edits).
-    cap: Option<usize>,
-    /// The clip open in a preview: its pass reads the card alone (user 2026-10-18: two long
-    /// passes side by side on one card took 45-55 s each, its filmstrip waited for it).
-    preferred: Option<String>,
     /// How many passes read at once, found by one short test of the medium (user 2026-10-18).
     readers: Readers,
+}
+
+impl Default for TimelineWaveService {
+    fn default() -> Self {
+        Self {
+            context: None,
+            jobs: Jobs::new("qnc-wave-worker", Preferred::Alone),
+            coarse: BTreeSet::new(),
+            publisher: None,
+            readers: Readers::default(),
+        }
+    }
 }
 
 impl fmt::Debug for TimelineWaveService {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimelineWaveService")
             .field("context", &self.context)
-            .field("ready", &self.ready.len())
-            .field("queue", &self.queue.len())
-            .field("queued", &self.queued.len())
-            .field("workers", &self.workers.len())
+            .field("busy", &self.jobs.is_busy())
             .field(
                 "publisher_pending",
                 &self.publisher.as_ref().map(|p| p.has_pending()),
             )
-            .field("playback_priority", &self.playback_priority)
+            .field("playback_priority", &self.jobs.playback_priority())
             .finish()
     }
 }
 
 impl TimelineWaveService {
     pub fn configure(&mut self, context: WaveContext) {
-        let project_changed = self
-            .context
-            .as_ref()
-            .is_some_and(|old| old.project_id() != context.project_id());
-        if project_changed {
-            self.cancel_and_join_workers();
-            self.ready.clear();
-            self.queue.clear();
-            self.queued.clear();
+        if self.jobs.set_project(context.project_id()) {
+            self.coarse.clear();
             self.publisher = None;
             self.readers = Readers::default();
         }
@@ -298,34 +274,23 @@ impl TimelineWaveService {
     }
 
     pub fn reset(&mut self) {
-        self.cancel_and_join_workers();
+        self.jobs.clear();
         self.context = None;
-        self.ready.clear();
-        self.queue.clear();
-        self.queued.clear();
+        self.coarse.clear();
         self.publisher = None;
     }
 
     /// While a player plays only the preferred clip's wave is made, alone (user
     /// 2026-10-20); everything else waits.
     pub fn set_playback_priority(&mut self, active: bool) {
-        if self.playback_priority == active {
-            return;
-        }
-        self.playback_priority = active;
-        if active {
-            for worker in self.workers.iter().filter(|worker| Some(worker.request.clip_id.as_str()) != self.preferred.as_deref()) {
-                worker.cancel.store(true, Ordering::Release);
-            }
-        } else {
+        if self.jobs.set_playback_priority(active) && !active {
             self.start_next();
         }
     }
 
     /// At most `cap` readers (`None`: as many as the medium test chose).
     pub fn set_cap(&mut self, cap: Option<usize>) {
-        if self.cap != cap {
-            self.cap = cap;
+        if self.jobs.set_cap(cap) {
             self.start_next();
         }
     }
@@ -334,7 +299,6 @@ impl TimelineWaveService {
         let Some(context) = self.context.clone() else {
             return Ok(());
         };
-        let project_id = context.project_id().to_string();
         let mut after = None;
         loop {
             let page = context.content_reader.list_clips(after.clone())?;
@@ -351,22 +315,17 @@ impl TimelineWaveService {
                 if clip.snapshot.phase != qnc_media_records::Phase::Final {
                     continue;
                 }
-                let request = WaveRequest {
-                    project_id: project_id.clone(),
-                    clip_id: clip.clip_id,
-                };
-                let key = request.key();
-                if self.ready.contains(&key) {
+                if self.jobs.is_ready(&clip.clip_id) {
                     continue;
                 }
-                match context.content_reader.read_wave(&request.clip_id)? {
+                match context.content_reader.read_wave(&clip.clip_id)? {
                     Some(record) if wave_artifact_ready(&record) => {
-                        self.ready.insert(key);
+                        self.jobs.mark_ready(&clip.clip_id);
                         continue;
                     }
                     Some(_) | None => {}
                 }
-                self.enqueue(request, clip.priority);
+                self.jobs.enqueue(&clip.clip_id, clip.priority);
             }
             if after.as_deref() == Some(next_after.as_str()) {
                 return Err(qnc_ui_text::text("wave.wave_content_paging_did_move").into());
@@ -378,97 +337,60 @@ impl TimelineWaveService {
     }
 
     pub fn remove_clips(&mut self, clip_ids: &[String]) {
-        let ids = clip_ids.iter().collect::<BTreeSet<_>>();
-        let project_id = self
-            .context
-            .as_ref()
-            .map(|ctx| ctx.project_id().to_string());
-        self.queue.retain(|request| !ids.contains(&request.clip_id));
-        self.queued.retain(|key| {
-            project_id.as_ref().is_none_or(|project| {
-                !clip_ids
-                    .iter()
-                    .any(|clip_id| key == &wave_cache_key(project, clip_id))
-            })
-        });
-        if let Some(project) = project_id {
-            for clip_id in clip_ids {
-                self.ready.remove(&wave_cache_key(&project, clip_id));
-            }
-        }
+        self.jobs.forget(clip_ids);
     }
 
     pub fn poll(&mut self, active_clip_id: Option<&str>) -> WavePoll {
         let mut poll = WavePoll::empty();
-        let current_project = self.context.as_ref().map(WaveContext::project_id);
-        {
-            if let Some(publisher) = &mut self.publisher {
-                for completion in publisher.poll() {
-                    poll.changed = true;
-                    match completion.result {
-                        Ok(_) => {
-                            wave_log(|| {
-                                format!(
-                                    "qnc-wave-worker-publish: key={} status=ready",
-                                    completion.key
-                                )
-                            });
-                            // A coarse wave stored: its clip waits for the wave of every frame.
-                            if !self.coarse.remove(&completion.key) {
-                                self.ready.insert(completion.key);
+        let current_project = self.context.as_ref().map(|context| context.project_id().to_string());
+        if let Some(publisher) = &mut self.publisher {
+            for completion in publisher.poll() {
+                poll.changed = true;
+                let clip_id = current_project
+                    .as_deref()
+                    .and_then(|project| completion.key.strip_prefix(&format!("{project}::")));
+                match completion.result {
+                    Ok(_) => {
+                        wave_log(|| {
+                            format!(
+                                "qnc-wave-worker-publish: key={} status=ready",
+                                completion.key
+                            )
+                        });
+                        // A coarse wave stored: its clip waits for the wave of every frame.
+                        if let Some(clip_id) = clip_id {
+                            if !self.coarse.remove(clip_id) {
+                                self.jobs.mark_ready(clip_id);
                             }
                         }
-                        Err(error) => {
-                            let matches_active = current_project.is_some_and(|project| {
-                                completion.key.starts_with(&format!("{project}::"))
-                            }) && active_clip_id.is_some_and(|clip_id| {
-                                completion.key.ends_with(&format!("::{clip_id}"))
-                            });
-                            wave_log(|| {
-                                format!(
-                                    "qnc-wave-worker-error: key={} stage=publish error={}",
-                                    completion.key, error
-                                )
-                            });
-                            if matches_active {
-                                poll.active_error = Some(error);
-                            }
+                    }
+                    Err(error) => {
+                        wave_log(|| {
+                            format!(
+                                "qnc-wave-worker-error: key={} stage=publish error={}",
+                                completion.key, error
+                            )
+                        });
+                        if clip_id.is_some() && clip_id == active_clip_id {
+                            poll.active_error = Some(error);
                         }
                     }
                 }
             }
         }
-        let mut index = 0;
-        while index < self.workers.len() {
-            let outcome = match self.workers[index].result.try_recv() {
-                Ok(outcome) => Some(outcome),
-                Err(TryRecvError::Empty) => {
-                    index += 1;
-                    None
-                }
-                Err(TryRecvError::Disconnected) => Some(WaveOutcome {
-                    request: self.workers[index].request.clone(),
-                    result: Err(qnc_ui_text::text("wave.wave_worker_interrupted").into()),
-                }),
-            };
-            let Some(outcome) = outcome else {
-                continue;
-            };
-            let worker = self.workers.swap_remove(index);
-            let _ = worker.thread.join();
-            poll.changed = true;
-            let current_project = self.context.as_ref().map(WaveContext::project_id);
-            let matches_active = current_project == Some(outcome.request.project_id.as_str())
-                && active_clip_id == Some(outcome.request.clip_id.as_str());
-            if self.playback_priority && Some(outcome.request.clip_id.as_str()) != self.preferred.as_deref() {
-                if current_project == Some(outcome.request.project_id.as_str()) {
-                    self.enqueue(outcome.request, true);
-                }
-                continue;
-            }
-            match outcome.result {
-                Ok(generated) if current_project == Some(outcome.request.project_id.as_str()) => {
-                    let key = outcome.request.key();
+        let (any, finished) = self.jobs.finished();
+        poll.changed |= any;
+        for done in finished {
+            let matches_active = active_clip_id == Some(done.clip_id.as_str());
+            let result = done
+                .result
+                .unwrap_or_else(|| Err(qnc_ui_text::text("wave.wave_worker_interrupted").into()));
+            match result {
+                Ok(generated) => {
+                    let Some(project) = current_project.as_deref() else {
+                        continue;
+                    };
+                    let key = wave_cache_key(project, &done.clip_id);
                     let ready_before = generated.ready_before;
                     let total_ms = generated.total_ms;
                     let peak_count = generated.artifact.peak_count;
@@ -480,23 +402,23 @@ impl TimelineWaveService {
                     let publish_state = if ready_before { "ready" } else { "queued" };
                     let coarse = generated.coarse;
                     if generated.ready_before {
-                        self.ready.insert(key);
+                        self.jobs.mark_ready(&done.clip_id);
                     } else {
                         if coarse {
-                            self.coarse.insert(key.clone());
+                            self.coarse.insert(done.clip_id.clone());
                         }
                         self.queue_publish(key, generated.artifact, matches_active, &mut poll);
                     }
                     if coarse {
                         // The wave of every frame comes after every clip's coarse one; the
                         // open clip's comes first.
-                        let first = self.preferred.as_deref() == Some(outcome.request.clip_id.as_str());
-                        self.enqueue(outcome.request.clone(), first);
+                        let first = self.jobs.preferred() == Some(done.clip_id.as_str());
+                        self.jobs.enqueue(&done.clip_id, first);
                     }
                     wave_log(|| {
                         format!(
                             "qnc-wave-worker: clip={} source={} coarse={coarse} ready_before={} peaks={} a1={} a2={} a3={} a4={} total_ms={} publish={}",
-                            outcome.request.clip_id,
+                            done.clip_id,
                             source_uri,
                             ready_before,
                             peak_count,
@@ -509,35 +431,29 @@ impl TimelineWaveService {
                         )
                     });
                 }
-                Ok(_) => {}
                 Err(error) if error == wave_paused_for_playback() => {
                     wave_log(|| {
                         format!(
                             "qnc-wave-worker-paused: clip={} reason=playback_priority",
-                            outcome.request.clip_id
+                            done.clip_id
                         )
                     });
-                    if current_project == Some(outcome.request.project_id.as_str()) {
-                        self.enqueue(outcome.request, true);
-                    }
+                    self.jobs.enqueue(&done.clip_id, true);
                 }
                 Err(error) => {
                     wave_log(|| {
                         format!(
                             "qnc-wave-worker-error: clip={} stage=generate active={} error={}",
-                            outcome.request.clip_id, matches_active, error
+                            done.clip_id, matches_active, error
                         )
                     });
-                    // A clip whose wave cannot be made holds back no filmstrip.
                     if matches_active {
                         poll.active_error = Some(error);
                     }
                 }
             }
         }
-        if !self.playback_priority {
-            self.start_next();
-        }
+        self.start_next();
         poll
     }
 
@@ -546,139 +462,37 @@ impl TimelineWaveService {
     /// Its pass reads the card alone: the other passes give way (they are cancelled and
     /// queued again, as for a player) and wait until it is done.
     pub fn prefer(&mut self, clip_id: &str) {
-        self.preferred = Some(clip_id.to_string());
-        if let Some(index) = self.queue.iter().position(|queued| queued.clip_id == clip_id) {
-            let request = self.queue.remove(index).expect("index exists");
-            self.queue.push_front(request);
-            for worker in self.workers.iter().filter(|worker| worker.request.clip_id != clip_id) {
-                worker.cancel.store(true, Ordering::Release);
-            }
-        }
-    }
-
-    /// Whether the preferred clip waits in the queue or runs: then nothing else starts.
-    fn preferred_alone(&mut self) -> Option<bool> {
-        let preferred = self.preferred.as_deref()?;
-        if self.workers.iter().any(|worker| worker.request.clip_id == preferred) {
-            return Some(true); // it runs: the card is its own
-        }
-        let index = self.queue.iter().position(|queued| queued.clip_id == preferred)?;
-        let request = self.queue.remove(index).expect("index exists");
-        self.queue.push_front(request);
-        Some(!self.workers.is_empty()) // the others still stop: it starts once they have
+        self.jobs.prefer(clip_id);
     }
 
     pub fn has_pending_work(&self) -> bool {
-        !self.workers.is_empty()
-            || !self.queue.is_empty()
+        self.jobs.is_busy()
             || self
                 .publisher
                 .as_ref()
                 .is_some_and(|publisher| publisher.has_pending())
     }
 
-    fn enqueue(&mut self, request: WaveRequest, front: bool) {
-        let key = request.key();
-        if self.ready.contains(&key) || self.workers.iter().any(|worker| worker.request == request)
-        {
-            return;
-        }
-        if !self.queued.insert(key.clone()) {
-            if front {
-                if let Some(index) = self.queue.iter().position(|queued| queued == &request) {
-                    let queued = self.queue.remove(index).expect("index exists");
-                    self.queue.push_front(queued);
-                }
-            }
-            return;
-        }
-        if front {
-            self.queue.push_front(request);
-        } else {
-            self.queue.push_back(request);
-        }
-    }
-
     fn start_next(&mut self) {
         let Some(context) = self.context.clone() else {
             return;
         };
-        if self.playback_priority {
-            // A player plays: only the preferred clip's wave, alone.
-            if self.preferred_alone() == Some(false) && self.workers.is_empty() {
-                self.start_one(&context);
-            }
-            return;
-        }
-        match self.preferred_alone() {
-            Some(true) => return,
-            // The preferred clip is first in the queue and starts alone.
-            Some(false) => {
-                self.start_one(&context);
-                return;
-            }
-            None => {}
-        }
         // Until the medium is tested one pass runs (it tests first).
         let readers = self.readers.try_lock().ok().and_then(|readers| *readers).unwrap_or(1);
-        let readers = readers.min(self.cap.unwrap_or(usize::MAX));
-        while self.workers.len() < readers {
-            if !self.start_one(&context) {
-                return;
-            }
-        }
-    }
-
-    /// Starts the first request of the queue that still needs a wave; false when none.
-    fn start_one(&mut self, context: &WaveContext) -> bool {
-        loop {
-            let Some(request) = self.queue.pop_front() else {
-                return false;
-            };
-            self.queued.remove(&request.key());
-            if request.project_id != context.project_id() || self.ready.contains(&request.key()) {
-                continue;
-            }
-            let (send, receive) = mpsc::sync_channel(1);
-            let worker_request = request.clone();
-            let cancel = Arc::new(AtomicBool::new(false));
-            let worker_cancel = cancel.clone();
-            let readers = self.readers.clone();
+        let shared_readers = self.readers.clone();
+        let coarse = &self.coarse;
+        self.jobs.start(readers, |clip_id| {
+            let request = WaveRequest { project_id: context.project_id().to_string(), clip_id: clip_id.to_string() };
+            let context = context.clone();
+            let readers = shared_readers.clone();
             // Its coarse wave is made (maybe still on its way to the database): the wave of
             // every frame now (live 2026-10-19: the open clip's coarse wave was made 95 times
             // over, read again before its own write had landed).
-            let coarse_made = self.coarse.contains(&request.key());
-            match std::thread::Builder::new()
-                .name("qnc-wave-worker".into())
-                .spawn({
-                    let context = context.clone();
-                    move || run_wave_worker(worker_request, context, readers, coarse_made, worker_cancel, send)
-                }) {
-                Ok(thread) => self.workers.push(ActiveWaveWorker {
-                    request,
-                    result: receive,
-                    cancel,
-                    thread,
-                }),
-                Err(error) => {
-                    wave_log(|| format!("qnc-wave-worker-error: stage=start error={error}"))
-                }
-            }
-            return true;
-        }
-    }
-
-    fn cancel_active_workers(&self) {
-        for worker in &self.workers {
-            worker.cancel.store(true, Ordering::Release);
-        }
-    }
-
-    fn cancel_and_join_workers(&mut self) {
-        self.cancel_active_workers();
-        for worker in self.workers.drain(..) {
-            let _ = worker.thread.join();
-        }
+            let coarse_made = coarse.contains(clip_id);
+            Some(Box::new(move |cancel: Arc<AtomicBool>| {
+                build_timeline_wave(&request, &context, &readers, coarse_made, &cancel)
+            }))
+        });
     }
 
     fn ensure_publisher(&mut self) {
@@ -721,26 +535,8 @@ impl TimelineWaveService {
     }
 }
 
-impl Drop for TimelineWaveService {
-    fn drop(&mut self) {
-        self.cancel_and_join_workers();
-    }
-}
-
 pub fn wave_cache_key(project_id: &str, clip_id: &str) -> String {
     format!("{project_id}::{clip_id}")
-}
-
-fn run_wave_worker(
-    request: WaveRequest,
-    context: WaveContext,
-    readers: Readers,
-    coarse_made: bool,
-    cancel: Arc<AtomicBool>,
-    send: SyncSender<WaveOutcome>,
-) {
-    let result = build_timeline_wave(&request, &context, &readers, coarse_made, &cancel);
-    let _ = send.send(WaveOutcome { request, result });
 }
 
 fn build_timeline_wave(
@@ -1259,67 +1055,5 @@ mod tests {
         service.sync_content_db().unwrap();
 
         assert!(!service.has_pending_work());
-    }
-
-    #[test]
-    fn playback_priority_holds_wave_queue() {
-        let mut service = TimelineWaveService::default();
-        service.set_playback_priority(true);
-        service.enqueue(
-            WaveRequest {
-                project_id: "project-a".into(),
-                clip_id: "clip-a".into(),
-            },
-            false,
-        );
-
-        service.start_next();
-
-        assert_eq!(service.queue.len(), 1);
-        assert!(service.workers.is_empty());
-    }
-
-    #[test]
-    fn the_preferred_clip_reads_the_card_alone() {
-        let request = |clip: &str| WaveRequest { project_id: "project-a".into(), clip_id: clip.into() };
-        let mut service = TimelineWaveService::default();
-        let (_send, receive) = mpsc::sync_channel(1);
-        let cancel = Arc::new(AtomicBool::new(false));
-        service.workers.push(ActiveWaveWorker {
-            request: request("long"),
-            result: receive,
-            cancel: cancel.clone(),
-            thread: std::thread::spawn(|| {}),
-        });
-        service.enqueue(request("other"), false);
-        service.enqueue(request("open"), false);
-        service.prefer("open");
-        assert!(cancel.load(Ordering::Acquire), "the other pass gives way");
-        assert_eq!(service.queue.front().map(|queued| queued.clip_id.as_str()), Some("open"));
-        assert_eq!(service.preferred_alone(), Some(true), "nothing starts while the other one stops");
-        // Once it has stopped, the preferred clip starts first and alone.
-        service.workers.clear();
-        assert_eq!(service.preferred_alone(), Some(false));
-        assert_eq!(service.queue.front().map(|queued| queued.clip_id.as_str()), Some("open"));
-    }
-
-    #[test]
-    fn playback_priority_cancels_active_wave_workers() {
-        let mut service = TimelineWaveService::default();
-        let (_send, receive) = mpsc::sync_channel(1);
-        let cancel = Arc::new(AtomicBool::new(false));
-        service.workers.push(ActiveWaveWorker {
-            request: WaveRequest {
-                project_id: "project-a".into(),
-                clip_id: "clip-a".into(),
-            },
-            result: receive,
-            cancel: cancel.clone(),
-            thread: std::thread::spawn(|| {}),
-        });
-
-        service.set_playback_priority(true);
-
-        assert!(cancel.load(Ordering::Acquire));
     }
 }

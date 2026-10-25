@@ -1,0 +1,46 @@
+{
+  "module_id": "qnc.module.background-jobs",
+  "module_name": "Background jobs",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "jobs.queue.per_clip",
+    "jobs.preferred_clip_first",
+    "jobs.playback_priority",
+    "jobs.cap"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "source.scan.roles",
+    "business.workflow",
+    "player.command",
+    "ui.paint",
+    "database.read",
+    "database.write"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.scanner",
+    "qnc.module.source-preview",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-background-jobs",
+  "input": "The project, the clips to work on (in order, the open clip first), whether a player plays, the most workers, and the work of one clip given by its owner.",
+  "output": "The clips whose work ended and its result. It runs the threads; it reads and writes nothing, the owner of the job does.",
+  "specification": "User 2026-10-26: one scheduler for every kind of background job over the clips of a project (filmstrip and wave now; transcripts, scenes and image vectors later), instead of a mirrored copy in each worker. The clip open in a preview goes first: beside the others (work of the processor) or alone (work of the medium). While a player plays only that clip runs, alone; the others are cancelled and queued again. Another project ends every worker and forgets what was done."
+}

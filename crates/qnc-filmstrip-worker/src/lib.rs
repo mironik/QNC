@@ -8,6 +8,7 @@ use qnc_filmstrip::{
     file_ready, FilmstripArtifactRecord, FilmstripExtractionMode, FilmstripFrameRecord,
     FilmstripFrameRequest, FilmstripPlan, LocalFilmstripArtifacts,
 };
+use qnc_background_jobs::{Jobs, Preferred};
 use qnc_frame_timebase::FrameTimebase;
 use qnc_media_decode::{DecodeRequest, DecodedFormat, Decoder, DecoderConfig};
 use qnc_media_metadata::{MediaRepresentation, Rational, StreamDetails, VideoMetadata};
@@ -16,13 +17,13 @@ use qnc_media_stream::{CodecEndpoint, LocalSource, MediaStream, SourceReference}
 use qnc_pixel_convert::{ConversionSpec, Converter, RasterConverter};
 use qnc_transport_resolver::ResolverConfig;
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet},
     fmt, fs,
     io::Write,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver, SyncSender, TryRecvError},
+        mpsc::{self, SyncSender},
         Arc,
     },
     thread::JoinHandle,
@@ -207,12 +208,6 @@ pub struct FilmstripRequest {
     pub clip_id: String,
 }
 
-impl FilmstripRequest {
-    fn key(&self) -> String {
-        filmstrip_cache_key(&self.project_id, &self.clip_id)
-    }
-}
-
 #[derive(Debug)]
 pub struct FilmstripPoll {
     pub changed: bool,
@@ -229,12 +224,6 @@ impl FilmstripPoll {
 }
 
 #[derive(Debug)]
-struct FilmstripOutcome {
-    request: FilmstripRequest,
-    result: Result<GeneratedFilmstrip, String>,
-}
-
-#[derive(Debug)]
 struct GeneratedFilmstrip {
     artifact: FilmstripArtifactRecord,
     source_kind: qnc_filmstrip::FilmstripSourceKind,
@@ -244,43 +233,24 @@ struct GeneratedFilmstrip {
     total_ms: u128,
 }
 
-#[derive(Debug)]
-struct ActiveFilmstripWorker {
-    request: FilmstripRequest,
-    result: Receiver<FilmstripOutcome>,
-    cancel: Arc<AtomicBool>,
-    thread: JoinHandle<()>,
-}
-
+/// The filmstrips of the active project: which clips wait, run and are done is the public
+/// scheduler's (`qnc-background-jobs`); this service reads the database, makes a clip's
+/// filmstrip and hands it to the write transport.
 pub struct TimelineFilmstripService {
     context: Option<FilmstripContext>,
-    ready: BTreeSet<String>,
+    jobs: Jobs<GeneratedFilmstrip>,
     db_complete: bool,
-    queue: VecDeque<FilmstripRequest>,
-    queued: BTreeSet<String>,
-    workers: Vec<ActiveFilmstripWorker>,
     publisher: Option<Box<dyn FilmstripContentWrite>>,
-    playback_priority: bool,
-    /// At most this many workers (user 2026-10-20: while the user edits two; measured:
-    /// beside a playing player one core of background work costs nothing, two cost stutters).
-    cap: Option<usize>,
-    /// The clip open in a preview.
-    preferred: Option<FilmstripRequest>,
 }
 
 impl Default for TimelineFilmstripService {
     fn default() -> Self {
         Self {
             context: None,
-            ready: BTreeSet::new(),
+            // The work is the processor's: the open clip runs beside the others.
+            jobs: Jobs::new("qnc-filmstrip-worker", Preferred::Beside),
             db_complete: true,
-            queue: VecDeque::new(),
-            queued: BTreeSet::new(),
-            workers: Vec::new(),
             publisher: None,
-            playback_priority: false,
-            cap: None,
-            preferred: None,
         }
     }
 }
@@ -289,30 +259,21 @@ impl fmt::Debug for TimelineFilmstripService {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimelineFilmstripService")
             .field("context", &self.context)
-            .field("ready", &self.ready.len())
             .field("db_complete", &self.db_complete)
-            .field("queue", &self.queue.len())
-            .field("queued", &self.queued.len())
-            .field("workers", &self.workers.len())
+            .field("busy", &self.jobs.is_busy())
             .field(
                 "publisher_pending",
                 &self.publisher.as_ref().map(|p| p.has_pending()),
             )
-            .field("playback_priority", &self.playback_priority)
+            .field("playback_priority", &self.jobs.playback_priority())
             .finish()
     }
 }
 
 impl TimelineFilmstripService {
     pub fn configure(&mut self, context: FilmstripContext) {
-        let project_changed =
-            self.context.as_ref().map(FilmstripContext::project_id) != Some(context.project_id());
-        if project_changed {
-            self.cancel_and_join_workers();
-            self.ready.clear();
+        if self.jobs.set_project(context.project_id()) {
             self.db_complete = false;
-            self.queue.clear();
-            self.queued.clear();
             self.publisher = None;
         }
         self.context = Some(context);
@@ -321,36 +282,23 @@ impl TimelineFilmstripService {
     }
 
     pub fn reset(&mut self) {
-        self.cancel_and_join_workers();
+        self.jobs.clear();
         self.context = None;
-        self.ready.clear();
         self.db_complete = false;
-        self.queue.clear();
-        self.queued.clear();
         self.publisher = None;
     }
 
     /// While a player plays only the preferred clip (the one a preview has open) is made,
     /// alone; everything else waits (user 2026-10-20).
     pub fn set_playback_priority(&mut self, active: bool) {
-        if self.playback_priority == active {
-            return;
-        }
-        self.playback_priority = active;
-        if active {
-            let preferred = self.preferred.clone();
-            for worker in self.workers.iter().filter(|worker| Some(&worker.request) != preferred.as_ref()) {
-                worker.cancel.store(true, Ordering::Release);
-            }
-        } else {
+        if self.jobs.set_playback_priority(active) && !active {
             self.start_next();
         }
     }
 
     /// At most `cap` workers (`None`: as many as the machine gives).
     pub fn set_cap(&mut self, cap: Option<usize>) {
-        if self.cap != cap {
-            self.cap = cap;
+        if self.jobs.set_cap(cap) {
             self.start_next();
         }
     }
@@ -360,7 +308,6 @@ impl TimelineFilmstripService {
             self.db_complete = true;
             return Ok(());
         };
-        let project_id = context.project_id().to_string();
         let mut all_ready = true;
         let mut after = None;
         loop {
@@ -373,24 +320,17 @@ impl TimelineFilmstripService {
                 .map(|clip| clip.clip_id.clone())
                 .ok_or_else(|| qnc_ui_text::text("filmstrip.filmstrip_content_page_empty").to_string())?;
             for clip in page {
-                let key = filmstrip_cache_key(&project_id, &clip.clip_id);
-                if self.ready.contains(&key) {
+                if self.jobs.is_ready(&clip.clip_id) {
                     continue;
                 }
                 if let Some(record) = context.content_reader.read_filmstrip(&clip.clip_id)? {
                     if filmstrip_artifact_ready(&context, &record) {
-                        self.ready.insert(key);
+                        self.jobs.mark_ready(&clip.clip_id);
                         continue;
                     }
                 }
                 all_ready = false;
-                self.enqueue(
-                    FilmstripRequest {
-                        project_id: project_id.clone(),
-                        clip_id: clip.clip_id,
-                    },
-                    clip.priority,
-                );
+                self.enqueue(&clip.clip_id, clip.priority);
             }
             if after.as_deref() == Some(next_after.as_str()) {
                 return Err(qnc_ui_text::text("filmstrip.filmstrip_content_paging_did_move").into());
@@ -403,92 +343,54 @@ impl TimelineFilmstripService {
     }
 
     pub fn remove_clips(&mut self, clip_ids: &[String]) {
-        let ids = clip_ids.iter().collect::<BTreeSet<_>>();
-        let project_id = self
-            .context
-            .as_ref()
-            .map(|ctx| ctx.project_id().to_string());
-        self.queue.retain(|request| !ids.contains(&request.clip_id));
-        self.queued.retain(|key| {
-            project_id.as_ref().is_none_or(|project| {
-                !clip_ids
-                    .iter()
-                    .any(|clip_id| key == &filmstrip_cache_key(project, clip_id))
-            })
-        });
-        if let Some(project) = project_id {
-            for clip_id in clip_ids {
-                self.ready.remove(&filmstrip_cache_key(&project, clip_id));
-            }
-        }
+        self.jobs.forget(clip_ids);
         self.db_complete = false;
     }
 
     pub fn poll(&mut self, active_clip_id: Option<&str>) -> FilmstripPoll {
         let mut poll = FilmstripPoll::empty();
-        let current_project = self.context.as_ref().map(FilmstripContext::project_id);
-        {
-            if let Some(publisher) = &mut self.publisher {
-                for completion in publisher.poll() {
-                    poll.changed = true;
-                    match completion.result {
-                        Ok(_) => {
-                            self.ready.insert(completion.key);
-                            self.db_complete = false;
+        let current_project = self.context.as_ref().map(|context| context.project_id().to_string());
+        if let Some(publisher) = &mut self.publisher {
+            for completion in publisher.poll() {
+                poll.changed = true;
+                let clip_id = current_project
+                    .as_deref()
+                    .and_then(|project| completion.key.strip_prefix(&format!("{project}::")));
+                match completion.result {
+                    Ok(_) => {
+                        if let Some(clip_id) = clip_id {
+                            self.jobs.mark_ready(clip_id);
                         }
-                        Err(error) => {
-                            self.db_complete = false;
-                            eprintln!("Filmstrip content transport: {error}");
-                            let matches_active = current_project.is_some_and(|project| {
-                                completion.key.starts_with(&format!("{project}::"))
-                            }) && active_clip_id.is_some_and(|clip_id| {
-                                completion.key.ends_with(&format!("::{clip_id}"))
-                            });
-                            if matches_active {
-                                poll.active_error = Some(error);
-                            }
+                        self.db_complete = false;
+                    }
+                    Err(error) => {
+                        self.db_complete = false;
+                        eprintln!("Filmstrip content transport: {error}");
+                        if clip_id.is_some() && clip_id == active_clip_id {
+                            poll.active_error = Some(error);
                         }
                     }
                 }
             }
         }
-        let mut index = 0;
-        while index < self.workers.len() {
-            let outcome = match self.workers[index].result.try_recv() {
-                Ok(outcome) => Some(outcome),
-                Err(TryRecvError::Empty) => {
-                    index += 1;
-                    None
-                }
-                Err(TryRecvError::Disconnected) => Some(FilmstripOutcome {
-                    request: self.workers[index].request.clone(),
-                    result: Err(qnc_ui_text::text("filmstrip.filmstrip_worker_interrupted").into()),
-                }),
-            };
-            let Some(outcome) = outcome else {
-                continue;
-            };
-            let worker = self.workers.swap_remove(index);
-            let _ = worker.thread.join();
-            poll.changed = true;
-            let held = self.playback_priority && Some(&outcome.request) != self.preferred.as_ref();
-            let current_project = self.context.as_ref().map(FilmstripContext::project_id);
-            let matches_active = current_project == Some(outcome.request.project_id.as_str())
-                && active_clip_id == Some(outcome.request.clip_id.as_str());
-            if held {
-                if current_project == Some(outcome.request.project_id.as_str()) {
-                    self.enqueue(outcome.request, true);
-                }
-                continue;
-            }
-            match outcome.result {
-                Ok(generated) if current_project == Some(outcome.request.project_id.as_str()) => {
-                    let key = outcome.request.key();
+        let (any, finished) = self.jobs.finished();
+        poll.changed |= any;
+        for done in finished {
+            let matches_active = active_clip_id == Some(done.clip_id.as_str());
+            let result = done
+                .result
+                .unwrap_or_else(|| Err(qnc_ui_text::text("filmstrip.filmstrip_worker_interrupted").into()));
+            match result {
+                Ok(generated) => {
+                    let Some(project) = current_project.as_deref() else {
+                        continue;
+                    };
+                    let key = filmstrip_cache_key(project, &done.clip_id);
                     self.queue_publish(key, generated.artifact, matches_active, &mut poll);
                     filmstrip_log(|| {
                         format!(
                             "qnc-filmstrip-worker-total: clip={} source={:?} mode={:?} ready_before={} extract_ms={} publish=queued total_ms={}",
-                            outcome.request.clip_id,
+                            done.clip_id,
                             generated.source_kind,
                             generated.extraction_mode,
                             generated.ready_before,
@@ -497,11 +399,8 @@ impl TimelineFilmstripService {
                         )
                     });
                 }
-                Ok(_) => {}
                 Err(error) if error == filmstrip_paused_for_playback() => {
-                    if current_project == Some(outcome.request.project_id.as_str()) {
-                        self.enqueue(outcome.request, true);
-                    }
+                    self.enqueue(&done.clip_id, true);
                 }
                 Err(error) if matches_active => {
                     self.db_complete = false;
@@ -511,12 +410,10 @@ impl TimelineFilmstripService {
             }
         }
         self.start_next();
-        if !self.playback_priority {
-            if self.should_resync_content_db() {
-                match self.sync_content_db() {
-                    Ok(()) => poll.changed = true,
-                    Err(error) => poll.active_error = Some(error),
-                }
+        if !self.jobs.playback_priority() && self.should_resync_content_db() {
+            match self.sync_content_db() {
+                Ok(()) => poll.changed = true,
+                Err(error) => poll.active_error = Some(error),
             }
         }
         poll
@@ -524,8 +421,7 @@ impl TimelineFilmstripService {
 
     pub fn has_pending_work(&self) -> bool {
         !self.db_complete
-            || !self.workers.is_empty()
-            || !self.queue.is_empty()
+            || self.jobs.is_busy()
             || self
                 .publisher
                 .as_ref()
@@ -534,49 +430,26 @@ impl TimelineFilmstripService {
 
     fn should_resync_content_db(&self) -> bool {
         !self.db_complete
-            && self.workers.is_empty()
-            && self.queue.is_empty()
+            && !self.jobs.is_busy()
             && self
                 .publisher
                 .as_ref()
                 .is_none_or(|publisher| !publisher.has_pending())
     }
 
-    fn enqueue(&mut self, request: FilmstripRequest, front: bool) {
-        let key = request.key();
-        if self.ready.contains(&key) || self.workers.iter().any(|worker| worker.request == request)
-        {
-            return;
-        }
-        self.db_complete = false;
-        if !self.queued.insert(key.clone()) {
-            if front {
-                if let Some(index) = self.queue.iter().position(|queued| queued == &request) {
-                    let queued = self.queue.remove(index).expect("index exists");
-                    self.queue.push_front(queued);
-                }
-            }
-            return;
-        }
-        if front {
-            self.queue.push_front(request);
-        } else {
-            self.queue.push_back(request);
+    fn enqueue(&mut self, clip_id: &str, front: bool) {
+        if self.jobs.enqueue(clip_id, front) {
+            self.db_complete = false;
         }
     }
 
     /// The clip open in a preview gets its filmstrip first (user 2026-10-19: "priority of
     /// the clicked clip"): first in the queue, started at once beside the running ones.
     pub fn prefer(&mut self, clip_id: &str) {
-        let Some(context) = self.context.as_ref() else {
-            return;
-        };
-        let request = FilmstripRequest { project_id: context.project_id().to_string(), clip_id: clip_id.to_string() };
-        if self.ready.contains(&request.key()) || self.workers.iter().any(|worker| worker.request == request) {
+        if self.context.is_none() {
             return;
         }
-        self.preferred = Some(request.clone());
-        self.enqueue(request, true);
+        self.jobs.prefer(clip_id);
         self.start_next();
     }
 
@@ -584,54 +457,11 @@ impl TimelineFilmstripService {
         let Some(context) = self.context.clone() else {
             return;
         };
-        // The preferred clip does not wait for a free worker: one more runs for it.
-        let preferred_first = self.preferred.as_ref().is_some_and(|preferred| self.queue.front() == Some(preferred));
-        let most = match self.playback_priority {
-            // A player plays: only the preferred clip, alone.
-            true if preferred_first && self.workers.is_empty() => 1,
-            true => return,
-            false => filmstrip_workers().min(self.cap.unwrap_or(usize::MAX)) + usize::from(preferred_first),
-        };
-        while self.workers.len() < most {
-            let Some(request) = self.queue.pop_front() else {
-                return;
-            };
-            self.queued.remove(&request.key());
-            if request.project_id != context.project_id() || self.ready.contains(&request.key()) {
-                continue;
-            }
-            let (send, receive) = mpsc::sync_channel(1);
-            let worker_request = request.clone();
-            let cancel = Arc::new(AtomicBool::new(false));
-            let worker_cancel = cancel.clone();
-            match std::thread::Builder::new()
-                .name("qnc-filmstrip-worker".into())
-                .spawn({
-                    let context = context.clone();
-                    move || run_filmstrip_worker(worker_request, context, worker_cancel, send)
-                }) {
-                Ok(thread) => self.workers.push(ActiveFilmstripWorker {
-                    request,
-                    result: receive,
-                    cancel,
-                    thread,
-                }),
-                Err(error) => eprintln!("Filmstrip worker start: {error}"),
-            }
-        }
-    }
-
-    fn cancel_active_workers(&self) {
-        for worker in &self.workers {
-            worker.cancel.store(true, Ordering::Release);
-        }
-    }
-
-    fn cancel_and_join_workers(&mut self) {
-        self.cancel_active_workers();
-        for worker in self.workers.drain(..) {
-            let _ = worker.thread.join();
-        }
+        self.jobs.start(filmstrip_workers(), |clip_id| {
+            let request = FilmstripRequest { project_id: context.project_id().to_string(), clip_id: clip_id.to_string() };
+            let context = context.clone();
+            Some(Box::new(move |cancel: Arc<AtomicBool>| build_timeline_background(&request, &context, &cancel)))
+        });
     }
 
     fn ensure_publisher(&mut self) {
@@ -669,12 +499,6 @@ impl TimelineFilmstripService {
                 poll.active_error = Some(error);
             }
         }
-    }
-}
-
-impl Drop for TimelineFilmstripService {
-    fn drop(&mut self) {
-        self.cancel_and_join_workers();
     }
 }
 
@@ -735,16 +559,6 @@ fn sanitize_scratch_part(value: &str) -> String {
     } else {
         sanitized
     }
-}
-
-fn run_filmstrip_worker(
-    request: FilmstripRequest,
-    context: FilmstripContext,
-    cancel: Arc<AtomicBool>,
-    send: SyncSender<FilmstripOutcome>,
-) {
-    let result = build_timeline_background(&request, &context, &cancel);
-    let _ = send.send(FilmstripOutcome { request, result });
 }
 
 fn build_timeline_background(
@@ -1553,43 +1367,5 @@ mod tests {
     #[test]
     fn filmstrip_diagnostics_query_is_shared_module_backed() {
         let _ = filmstrip_diagnostics_enabled();
-    }
-
-    #[test]
-    fn playback_priority_holds_filmstrip_queue() {
-        let mut service = TimelineFilmstripService::default();
-        service.set_playback_priority(true);
-        service.enqueue(
-            FilmstripRequest {
-                project_id: "project-a".into(),
-                clip_id: "clip-a".into(),
-            },
-            false,
-        );
-
-        service.start_next();
-
-        assert_eq!(service.queue.len(), 1);
-        assert!(service.workers.is_empty());
-    }
-
-    #[test]
-    fn playback_priority_cancels_active_filmstrip_workers() {
-        let mut service = TimelineFilmstripService::default();
-        let (_send, receive) = mpsc::sync_channel(1);
-        let cancel = Arc::new(AtomicBool::new(false));
-        service.workers.push(ActiveFilmstripWorker {
-            request: FilmstripRequest {
-                project_id: "project-a".into(),
-                clip_id: "clip-a".into(),
-            },
-            result: receive,
-            cancel: cancel.clone(),
-            thread: std::thread::spawn(|| {}),
-        });
-
-        service.set_playback_priority(true);
-
-        assert!(cancel.load(Ordering::Acquire));
     }
 }

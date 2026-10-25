@@ -6,6 +6,7 @@ description = "Background filmstrip JPEG generator for QNC"
 
 [dependencies]
 qnc-ui-text = { workspace = true }
+qnc-background-jobs = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 qnc-decoder-catalog = { workspace = true }
 qnc-dir-browser = { workspace = true }

@@ -1,0 +1,7 @@
+[package]
+name = "qnc-background-jobs"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the queue and the workers of one kind of background job over the clips of one project (the open clip first, the player's priority, a cap); it only schedules"
+
+[dependencies]

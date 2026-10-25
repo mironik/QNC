@@ -3124,6 +3124,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-background-jobs"
+version = "0.1.0"
+
+[[package]]
 name = "qnc-board"
 version = "0.1.0"
 dependencies = [
@@ -3774,6 +3778,7 @@ name = "qnc-filmstrip-worker"
 version = "0.1.0"
 dependencies = [
  "image",
+ "qnc-background-jobs",
  "qnc-contracts",
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
@@ -5964,6 +5969,7 @@ dependencies = [
 name = "qnc-wave-worker"
 version = "0.1.0"
 dependencies = [
+ "qnc-background-jobs",
  "qnc-contracts",
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",

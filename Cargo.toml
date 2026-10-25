@@ -140,6 +140,7 @@ members = [
     "crates/qnc-program-waveform",
     "crates/qnc-program-filmstrip",
     "crates/qnc-read-pace",
+    "crates/qnc-background-jobs",
     "crates/qnc-mxf-index",
     "crates/qnc-mp4-sound",
     "crates/qnc-level-meter",
@@ -376,6 +377,7 @@ qnc-sync-cover = { path = "crates/qnc-sync-cover" }
 qnc-program-waveform = { path = "crates/qnc-program-waveform" }
 qnc-program-filmstrip = { path = "crates/qnc-program-filmstrip" }
 qnc-read-pace = { path = "crates/qnc-read-pace" }
+qnc-background-jobs = { path = "crates/qnc-background-jobs" }
 qnc-mxf-index = { path = "crates/qnc-mxf-index" }
 qnc-mp4-sound = { path = "crates/qnc-mp4-sound" }
 qnc-level-meter = { path = "crates/qnc-level-meter" }

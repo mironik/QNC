@@ -6193,3 +6193,15 @@ Popravak 2026-10-25 (korisnik: "na ingestu Cancel i Select su pomaknuti na dolje
 preglednika lokacija bila je visoka tocno kao gumb, a unutra se jos oduzimao rub, pa su Cancel i Select izlazili prema dolje
 i bili odrezani. `qnc-dir-browser-panel` `show_with_confirm`: traka je visoka kao gumb plus rub gore i dolje, gumbi su
 okomito u sredini. Testovi, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-26 (korisnik: "kreni s korakom 1" plana sredivanja arhitekture prije AI modula; korak 1a): radnici
+filmstripa i vala imali su zrcalne kopije istog rasporedivaca (red, oznaka gotovih, niti, otkazivanje, prednost otvorenog
+klipa, prednost playera, granica broja radnika). Nova javna kocka `crates/qnc-background-jobs` (+ ugovor
+`contracts/modules/background-jobs.module.json`): red i radnici jedne vrste posla nad klipovima projekta; otvoreni klip
+ide prvi uz ostale (`Preferred::Beside`, filmstrip, posao procesora) ili sam (`Preferred::Alone`, val, posao medija);
+dok player svira radi samo otvoreni klip, ostali se otkazuju i vracaju u red; drugi projekt gasi radnike i zaboravlja
+gotove. Sama nista ne cita ni ne pise. `qnc-filmstrip-worker` i `qnc-wave-worker` (otkljucani uz korak 1) zadrzavaju
+samo svoj posao, citanje baze i predaju piscu; ponasanje isto, osim sto i filmstrip dok player svira premjesta
+otvoreni klip na pocetak reda i val i dok player svira pokrene otvoreni klip iz `poll` (kao filmstrip). Testovi
+rasporedivaca presli su u kocku (10, ukljucujuci prednost playera, otvoreni klip sam i uz ostale, granicu), testovi
+`qnc-filmstrip-worker`, `qnc-wave-worker`, `qnc-timeline-artifacts`, `qnc-content-artifacts`, conformance. Uzivo nije
+provjereno. Prepis, scene i vektori slika (AI) bit ce novi poslovi iste kocke.
