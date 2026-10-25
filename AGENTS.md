@@ -6170,3 +6170,14 @@ brisu se sa svojim slotovima, a markeri na istoj slici spajaju (kraci lead-out v
 `a_shorter_lead_out_takes_the_markers_past_the_new_end_with_it`. Testovi `qnc-program-db` (46), `qnc-program-segments`
 (60), `qnc-mp4-sound`, `qnc-mxf-index`, `qnc-mxf-sound`, `qnc-media-readahead`, `qnc-ingest-worker`, conformance. Uzivo
 nije provjereno.
+Izvedeno 2026-10-25 (audit, korisnik "nastavi dalje"): (1) "Slot pod playheadom" bio je napisan tri puta i na kraju
+price se nije slagao (Ctrl+S je nalazio zadnji slot, B i Overwrite ne): svi koriste `qnc-program-view::slot_at`
+(zadnji slot vrijedi i na svom kraju). (2) Baza price sama provjerava da pomak M markera ostaje strogo izmedu njegovih
+susjeda (`qnc-program-db` `move_marker`; prije je to cuvao samo upravljac, pa je drugi pisac mogao preskociti susjeda i
+premjestiti pokrivalicu u drugi raspon); poruka `story.marker_between_neighbours`. (3) `tools/qnc-prerender` postavke
+exporta i zvuka citao je jednom pri pokretanju; sada zavrsava kad se promijene (sljedece budenje krece s novima).
+(4) Hrvatski tekstovi izvan rjecnika: status ljuske (`shell.app_active`, `shell.app_no_entry`), greska programskog
+izlaza (`output.cannot_start`), poruke baze price (`story.purge_only_excluded`, `story.slot_moves_to_neighbour`,
+`story.last_slot_ends_with_story`) i nazivi slika prozora reza (`story.still.slot_first`, `story.still.slot_last`).
+Testovi `qnc-program-db` (46), `qnc-program-view`, `qnc-program-segments` (60), `qnc-desktop`, `qnc-program-output`,
+`qnc-ui-text`, conformance. Uzivo nije provjereno.

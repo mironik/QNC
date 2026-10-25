@@ -465,7 +465,7 @@ impl Store {
             )
             .map_err(err)?;
         if removed == 0 {
-            return Err("Brise se samo iskljuceni segment.".into());
+            return Err(qnc_ui_text::text("story.purge_only_excluded").into());
         }
         renumber_segments(&tx)?;
         tx.commit().map_err(err)?;

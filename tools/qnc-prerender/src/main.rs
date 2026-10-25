@@ -128,8 +128,16 @@ fn run() -> Result<()> {
             say("another prerender took the lease: prerender ends".into());
             return Ok(());
         }
-        if reader.read().map(|now| now.project_id).ok() != Some(settings.project_id.clone()) {
+        let now = reader.read().ok();
+        if now.as_ref().map(|now| &now.project_id) != Some(&settings.project_id) {
             say("the active project changed: prerender ends".into());
+            return Ok(());
+        }
+        // The delivery and the sound rules the units are made in (audit 2026-10-25: they were
+        // read once, and a changed export kept rendering units no export asks for). The next
+        // wake starts with the new ones.
+        if now.as_ref().is_some_and(|now| now.export != settings.export || now.audio != settings.audio) {
+            say("the project's export or sound settings changed: prerender ends".into());
             return Ok(());
         }
         // The player first; back to work only once it has been quiet a while (a story is

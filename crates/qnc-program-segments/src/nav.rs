@@ -9,12 +9,9 @@ use crate::{ProgramSegments, SegmentCommand};
 impl ProgramSegments {
     /// Ctrl+S: the M-M slot under the Wrap playhead (the last slot also takes its end).
     pub(crate) fn select_slot_at_playhead(&mut self) {
-        let frame = self.playhead.unwrap_or(0);
-        let count = self.view.slots.len();
-        let found = self.view.slots.iter().enumerate().find(|(index, slot)| {
-            frame >= slot.start_frame && (frame < slot.end_frame || (index + 1 == count && frame == slot.end_frame))
-        });
-        match found.map(|(_, slot)| slot.slot_id.clone()) {
+        // The one rule of the slot at a frame (audit 2026-10-25: three copies disagreed).
+        let found = qnc_program_view::slot_at(&self.view.slots, self.playhead.unwrap_or(0));
+        match found.map(|slot| slot.slot_id.clone()) {
             Some(slot_id) => {
                 self.take_slot(&slot_id);
                 self.take_slot_move(&slot_id);

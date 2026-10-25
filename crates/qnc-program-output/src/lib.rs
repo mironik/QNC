@@ -187,7 +187,7 @@ fn start(screen: Screen) -> Result<Host, String> {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x0800_0000); // no console window
     }
-    let mut child = command.spawn().map_err(|error| format!("Program izlaz: {error}"))?;
+    let mut child = command.spawn().map_err(|error| qnc_ui_text::fill("output.cannot_start", &[("error", &error.to_string())]))?;
     let stdin = child.stdin.take().ok_or(qnc_ui_text::text("output.program_output_process_input"))?;
     Ok(Host { child, stdin, screen, sent: None, offered_at: None })
 }

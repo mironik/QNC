@@ -186,10 +186,10 @@ fn a_slot_moves_with_both_its_markers_up_to_its_neighbours() {
     move_to(&mut store, &slot, 12).unwrap();
     assert_eq!(markers(&mut store), vec![12, 18, 25], "both markers moved, the length stays");
     assert_eq!(slot_of(&first), slot, "the same slot: its marker pair");
-    assert!(move_to(&mut store, &slot, 20).unwrap_err().contains("susjednog"), "its end would pass 25");
+    assert!(move_to(&mut store, &slot, 20).unwrap_err().contains(qnc_ui_text::text("story.slot_moves_to_neighbour")), "its end would pass 25");
     move_to(&mut store, &slot, 1).unwrap();
     assert_eq!(markers(&mut store), vec![1, 7, 25]);
-    assert!(move_to(&mut store, &slot, 0).unwrap_err().contains("susjednog"), "the locked start");
+    assert!(move_to(&mut store, &slot, 0).unwrap_err().contains(qnc_ui_text::text("story.slot_moves_to_neighbour")), "the locked start");
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn a_slot_trimmed_at_an_edge_moves_the_covered_slots_after_it_up_to_an_empty_one
     let last = slot_of(&markers_id(&path, 26));
     assert!(run(&mut store, Operation::TrimSlot { slot_id: last, start: false, frames: 1 })
         .unwrap_err()
-        .contains("pocetni M marker"));
+        .contains(qnc_ui_text::text("story.last_slot_ends_with_story")));
 }
 
 #[test]

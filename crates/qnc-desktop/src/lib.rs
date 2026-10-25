@@ -158,13 +158,10 @@ impl QncShell {
                 if let Some(component) = self.embedded_apps.get_mut(tab_id) {
                     component.on_activated();
                 }
-                self.status = format!("{} aktivan.", app.label);
+                self.status = qnc_ui_text::fill("shell.app_active", &[("app", &app.label)]);
             }
         } else {
-            self.status = format!(
-                "{} nema aktivan shell desktop ulaz ({})",
-                app.label, app.application_id
-            );
+            self.status = qnc_ui_text::fill("shell.app_no_entry", &[("app", &app.label), ("id", &app.application_id)]);
         }
     }
 

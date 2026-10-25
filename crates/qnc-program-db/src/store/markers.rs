@@ -88,20 +88,23 @@ impl Store {
         }
         let tx = self.conn.savepoint().map_err(err)?;
         locked_check(&tx, marker_id, duration)?;
-        let taken: bool = tx
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM story_markers
-                 WHERE marker_id != ?1 AND timeline_frame = ?2)",
-                params![marker_id, frame],
-                |row| row.get(0),
-            )
-            .map_err(err)?;
-        if taken {
-            return Err(format!("marker already exists at timeline_frame={frame}"));
-        }
         let old: i64 = tx
             .query_row("SELECT timeline_frame FROM story_markers WHERE marker_id = ?1", [marker_id], |row| row.get(0))
             .map_err(err)?;
+        // Strictly between its neighbours, whoever writes (audit 2026-10-25: the order of the
+        // markers was only kept by the controller; a marker past its neighbour moved a cover
+        // to another span).
+        let (before, after): (Option<i64>, Option<i64>) = tx
+            .query_row(
+                "SELECT (SELECT MAX(timeline_frame) FROM story_markers WHERE marker_id != ?1 AND timeline_frame <= ?2),
+                        (SELECT MIN(timeline_frame) FROM story_markers WHERE marker_id != ?1 AND timeline_frame >= ?2)",
+                params![marker_id, old],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(err)?;
+        if before.is_some_and(|before| frame <= before) || after.is_some_and(|after| frame >= after) {
+            return Err(qnc_ui_text::text("story.marker_between_neighbours").into());
+        }
         roll_cover(&tx, marker_id, frame - old)?;
         tx.execute(
             "UPDATE story_markers SET timeline_frame = ?1, timeline_sec = ?2, tc = ?3,
@@ -157,7 +160,7 @@ impl Store {
             )
             .map_err(err)?;
         if blocked || new_start <= 0 || new_end >= duration {
-            return Err("Slot se pomice samo do susjednog M markera.".into());
+            return Err(qnc_ui_text::text("story.slot_moves_to_neighbour").into());
         }
         // The slot keeps its cover as it is; the slot after it starts elsewhere (roll).
         roll_cover(&tx, &end_id, new_start - start)?;
@@ -195,7 +198,7 @@ impl Store {
             .map_err(err)?
             .ok_or_else(|| format!("slot not found: {slot_id}"))?;
         if slot_end >= duration {
-            return Err("Zadnji slot zavrsava s pricom: pomakni njegov pocetni M marker.".into());
+            return Err(qnc_ui_text::text("story.last_slot_ends_with_story").into());
         }
         if frames == 0 {
             return Ok(Data::Changed);

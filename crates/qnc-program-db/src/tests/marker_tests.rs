@@ -91,9 +91,9 @@ fn moving_and_deleting_markers_keep_the_start_and_the_end_locked() {
             },
         )
     };
-    assert!(move_to(&mut store, &id, 25)
-        .unwrap_err()
-        .contains("already exists"));
+    let between = qnc_ui_text::text("story.marker_between_neighbours");
+    assert_eq!(move_to(&mut store, &id, 25).unwrap_err(), between, "onto the neighbour");
+    assert_eq!(move_to(&mut store, &id, 28).unwrap_err(), between, "past the neighbour (audit 2026-10-25)");
     assert!(move_to(&mut store, &id, 31)
         .unwrap_err()
         .contains("length of the story"));

@@ -30,7 +30,7 @@ pub struct EditStill {
     pub image: Option<Arc<qnc_image_assets::RgbaImage>>,
     /// Texture identity of the picture.
     pub id: String,
-    /// What the picture is, e.g. "Slot - prva" (shown under it).
+    /// What the picture is, e.g. "Slot - first" (shown under it).
     pub label: String,
     /// The picture at the cut being moved (user 2026-10-13: marked red in the zoom).
     pub cut: bool,
@@ -78,7 +78,7 @@ pub fn edit_stills(view: &SegmentsView, slots: &[Slot], moves: &[(u64, u64)]) ->
     let moved = |frame: u64| moves.iter().find(|(old, _)| *old == frame).map_or(frame, |(_, new)| *new);
     // A slot moves two markers: the slot before, the slot itself, the slot after.
     let labels: &[[&str; 2]] = if moves.len() == 2 {
-        &[[qnc_ui_text::text("story.still.previous_slot_last"), "Slot - prva"], ["Slot - zadnja", qnc_ui_text::text("story.still.next_slot_first")]]
+        &[[qnc_ui_text::text("story.still.previous_slot_last"), qnc_ui_text::text("story.still.slot_first")], [qnc_ui_text::text("story.still.slot_last"), qnc_ui_text::text("story.still.next_slot_first")]]
     } else {
         &[[qnc_ui_text::text("story.still.before_marker_last"), qnc_ui_text::text("story.still.after_marker_first")]]
     };

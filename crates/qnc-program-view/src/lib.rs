@@ -307,8 +307,7 @@ impl SegmentsView {
     /// meant). An empty slot has no colour strip to click (user 2026-10-17), so B and
     /// Overwrite take the slot under the playhead when none is chosen.
     pub fn slot_at_playhead(&self) -> Option<&Slot> {
-        let frame = self.playhead?;
-        self.slots.iter().find(|slot| (slot.start_frame..slot.end_frame).contains(&frame))
+        slot_at(&self.slots, self.playhead?)
     }
 
     /// v5 `overwrite_cover_target`: the selected slot, else the selected cover's slot.

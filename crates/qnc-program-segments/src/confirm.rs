@@ -103,17 +103,7 @@ impl ProgramSegments {
             Command::TakeMarker(id) => Some(Take::Marker(id.clone())),
             Command::TakeSlot(id) => Some(Take::Slot(id.clone())),
             Command::TakeCover { cover_id, .. } => Some(Take::Cover(cover_id.clone())),
-            Command::SelectSlotAtPlayhead => {
-                let count = self.view.slots.len();
-                self.view
-                    .slots
-                    .iter()
-                    .enumerate()
-                    .find(|(index, slot)| {
-                        playhead >= slot.start_frame && (playhead < slot.end_frame || (index + 1 == count && playhead == slot.end_frame))
-                    })
-                    .map(|(_, slot)| Take::Slot(slot.slot_id.clone()))
-            }
+            Command::SelectSlotAtPlayhead => qnc_program_view::slot_at(&self.view.slots, playhead).map(|slot| Take::Slot(slot.slot_id.clone())),
             _ => None,
         }
     }
