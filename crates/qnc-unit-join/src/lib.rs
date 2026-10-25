@@ -7,9 +7,10 @@
 //! stays at the limit). The file is MXF OP1a (user 2026-10-24: TV houses prefer it), the
 //! pictures copied, every sound output its own mono PCM 24-bit track (as the cameras write
 //! them; an output without gain is copied sample for sample). Every other output is kept
-//! as it is. It reads the unit files only and writes one file, `out`, under its final name (a
-//! project folder allows no rename); the list of the units waits in the system's temporary
-//! folder. It reads no database and decodes no picture.
+//! as it is. It reads the unit files only and writes one file, `out`: into a working file
+//! beside it that takes the name `out` only when it is whole, and is removed when the join
+//! fails; the list of the units waits in the system's temporary folder. It reads no database
+//! and decodes no picture.
 
 use std::{
     io::Read,
@@ -144,18 +145,33 @@ fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Pat
         true => command.args(["-c:v", "copy"]),
         false => command.args(picture),
     };
+    // A working file beside `out` that becomes `out` only when it is whole (audit 2026-10-25:
+    // a failed join left a broken file under the final name, over a good export of the same
+    // revision). The export folder of a project allows its files to be deleted and renamed.
+    let working = working_file(out);
     let output = command
         .args(["-c:a", "pcm_s24le", "-timecode", start_timecode, "-f", "mxf"])
-        .arg(out)
+        .arg(&working)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .output()
-        .map_err(|e| format!("The units cannot be put together: {e}"))?;
-    if !output.status.success() {
-        return Err(format!("Putting the units together: {}", String::from_utf8_lossy(&output.stderr).trim()));
+        .map_err(|e| format!("The units cannot be put together: {e}"));
+    let made = output.and_then(|output| match output.status.success() {
+        true => Ok(()),
+        false => Err(format!("Putting the units together: {}", String::from_utf8_lossy(&output.stderr).trim())),
+    });
+    let done = made.and_then(|()| std::fs::rename(&working, out).map_err(|e| format!("{}: {e}", out.display())));
+    if done.is_err() {
+        let _ = std::fs::remove_file(&working);
     }
-    Ok(())
+    done
+}
+
+/// `name.joining-<process>-<time>.mxf` beside `out`, its own for this join.
+fn working_file(out: &Path) -> PathBuf {
+    let stem = out.file_stem().map(|stem| stem.to_string_lossy().into_owned()).unwrap_or_default();
+    out.with_file_name(format!("{stem}.joining-{}-{}.mxf", std::process::id(), nanos()))
 }
 
 /// Every output its own mono track `[aN]`; A1 and A2 at their gains, an output without gain

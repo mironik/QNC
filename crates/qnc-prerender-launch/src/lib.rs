@@ -13,6 +13,9 @@ use qnc_content_store::ContentTarget;
 
 /// The lease of the one prerender of a project in its database.
 pub const LEASE: &str = "prerender_lease";
+/// Held by an export while it puts prerendered units together: the prerender deletes no old
+/// unit while it is fresh (audit 2026-10-25: Express failed on a unit pruned under it).
+pub const EXPORT_LEASE: &str = "export_lease";
 /// The executable of the prerender, beside the running application.
 pub const EXECUTABLE: &str = "qnc-prerender";
 /// Wakes closer together than this are one wake.

@@ -6142,3 +6142,16 @@ prazan korijen i trazi gresku i da nista nije zapisano. (5) Original export i XM
 reprezentacije koju projekt pusta (proxy): `tools/qnc-export` (`original_picture`) cita je iz spremljenog originala.
 Testovi `qnc-audio-output` (23), `qnc-media-record-db` (30), `qnc-ingest-import-worker` (22), `qnc-export-launch`,
 `qnc-prerender-launch`; XML na izoliranoj kopiji. Sve ostalo ostaje zamrznuto.
+Izvedeno 2026-10-25 (audit, korisnik "nastavi" na sljedece tocke 6-9): (6) Express je mogao pasti usred spajanja kad
+prerender za vrijeme exporta obrise dio koji prica vise nema: export dok spaja dijelove prerendera drzi najam
+`export_lease` (`qnc-prerender-launch` `EXPORT_LEASE`, `tools/qnc-export`), a `tools/qnc-prerender` dok je on svjez ne
+brise stare dijelove (proba kasnije). (7) Neuspjeli export ostavljao je nepotpun MXF pod konacnim imenom, preko dobrog
+exporta iste revizije: `qnc-unit-join` pise u radnu datoteku uz izlaz (`<ime>.joining-<proces>-<vrijeme>.mxf`) koja tek
+cijela dobiva konacno ime, a pri gresci se brise. (8) Prozor exporta nudio je sto render odbija: Express je dostupan samo za
+progresivnu predaju koju render radi u stopi price, a svaka postavka trazi barem onoliko izlaza zvuka koliko ih prica ima
+(projektni `audio.channels`; `qnc-export-choice` `renders`, `express_made`, `from_settings(.., outputs)`;
+`qnc-source-preview` `story_outputs`, `qnc-program-segments` `open_export`, `qnc-panel-focus`); Original bez stope price ide u
+tab stope predaje projekta (prije izmisljenih 50). (9) Pojacanje pokrivalice zaokruzuje se nanize (`qnc-program-loudness`
+`cover_gain`), pa vrh nikad ne prelazi granicu. Testovi `qnc-export-choice` (5), `qnc-program-loudness`, `qnc-unit-join`,
+`qnc-program-segments` (60), `qnc-panel-focus`, `qnc-source-preview`, conformance; Express na izoliranoj kopiji (12
+dijelova, bez zaostale radne datoteke). Uzivo kroz sucelje nije provjereno.

@@ -156,7 +156,9 @@ fn run() -> Result<()> {
             .find(|(_, fingerprint)| !rendered.contains(*fingerprint) && !failed.contains(*fingerprint));
         let Some((unit, fingerprint)) = next else {
             // Every unit of the story is there: the units it no longer has go (once per story).
-            if pruned.as_ref() != Some(&fingerprints) {
+            // Not while an export puts units together: it may still read one the story left.
+            let exporting = qnc_playback_activity::is_fresh(&content, EXPORT_LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS);
+            if pruned.as_ref() != Some(&fingerprints) && !exporting {
                 if lease.confirm() {
                     prune(&writer, &mut PrerenderReader::open(&target)?, &out_dir, &fingerprints);
                 }
@@ -322,7 +324,7 @@ fn partial_name(fingerprint: &str) -> String {
 }
 
 /// The lease of the one prerender of a project in its database (the waker reads it).
-use qnc_prerender_launch::LEASE;
+use qnc_prerender_launch::{EXPORT_LEASE, LEASE};
 /// After a player stops, the prerender waits this long before it works again.
 const SETTLE: Duration = Duration::from_secs(2);
 /// With nothing to render this long the prerender ends (the story wakes it again).

@@ -21,7 +21,7 @@ impl PanelFocus {
         // while it is open its keys are its own.
         if action_id == "export_open" {
             if let Some(export) = pieces.0.export_settings() {
-                pieces.2.open_export(&export);
+                pieces.2.open_export(&export, pieces.0.story_outputs());
             }
             return Some(true);
         }

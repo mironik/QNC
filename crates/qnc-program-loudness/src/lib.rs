@@ -130,7 +130,9 @@ pub fn cover_gain<'a>(
         return None;
     }
     let gain = qnc_loudness::export_gain(Some(lufs), peak, rule.target_lufs, rule.tolerance_lu, rule.limit_dbtp);
-    Some(gain.min(COVER_GAIN_MAX_DB).round().clamp(-60.0, COVER_GAIN_MAX_DB) as i8)
+    // Whole dB down, never up: a gain rounded up could take the peak over the limit the rule
+    // already held it under (audit 2026-10-25: 2.6 dB of headroom became 3 dB).
+    Some(gain.min(COVER_GAIN_MAX_DB).floor().clamp(-60.0, COVER_GAIN_MAX_DB) as i8)
 }
 
 #[cfg(test)]

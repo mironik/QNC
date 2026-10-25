@@ -410,9 +410,9 @@ impl ProgramSegments {
 
     /// The Export button (user 2026-10-24): the box with Export to XML and every export setting
     /// of the project, `export` as the project saved it.
-    pub fn open_export(&mut self, export: &serde_json::Value) {
+    pub fn open_export(&mut self, export: &serde_json::Value, outputs: Option<u16>) {
         let story_fps = self.story_rate.filter(|rate| rate.0 > 0).map(|(num, den)| f64::from(num) / f64::from(den.max(1)));
-        self.export = Some(qnc_export_choice::ExportChoice::from_settings(export, story_fps));
+        self.export = Some(qnc_export_choice::ExportChoice::from_settings(export, story_fps, outputs));
     }
 
     /// The PAL (`false`) or NTSC (`true`) tab of the open export box.

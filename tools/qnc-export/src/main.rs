@@ -184,6 +184,11 @@ fn deliver(
     let (prerender, _) = settings.prerender_location(project_dir).map_err(|e| e.to_string())?;
     let fingerprints: Vec<String> = units.iter().map(|unit| delivery.fingerprint(unit)).collect();
     let started = std::time::Instant::now();
+    // Held until the units are put together: the prerender prunes no unit under it.
+    let _in_use = match from_prerender {
+        Some(content) => qnc_playback_activity::Lease::claim(content.clone(), qnc_prerender_launch::EXPORT_LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS)?,
+        None => None,
+    };
     let made: std::collections::HashSet<String> = match from_prerender {
         Some(content) => prerendered_units(target, content, &fingerprints)?,
         None => Default::default(),

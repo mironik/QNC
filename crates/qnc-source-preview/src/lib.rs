@@ -968,6 +968,11 @@ impl SourcePreview {
         self.context.as_ref().map(|context| context.settings.export.clone())
     }
 
+    /// The story's sound outputs (the project's `audio.channels`), for what can be exported.
+    pub fn story_outputs(&self) -> Option<u16> {
+        self.context.as_ref().and_then(|context| context.settings.audio_channels().ok())
+    }
+
     /// The program's A1 brought to the project's loudness target from its measured loudness,
     /// and every cover's A2 on its own into the rule (user 2026-10-24: no cover stands out),
     /// `None`: as edited; A1 not measured keeps its level. A1 is heard at once; the covers open

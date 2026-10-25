@@ -98,8 +98,10 @@ fn group_of(codec: &str) -> String {
 
 /// Whether a story at `story_fps` is exported in these values: the codecs the render makes
 /// (H.264, XDCAM HD422), progressive at the story's rate, interlaced (XDCAM only) at the
-/// story's rate or half of it. An unknown story rate leaves the rate to the render.
-fn renders(values: &Value, story_fps: Option<f64>) -> bool {
+/// story's rate or half of it, with at least the story's sound outputs (the render refuses a
+/// delivery with fewer; audit 2026-10-25). An unknown story rate or output count leaves them
+/// to the render.
+fn renders(values: &Value, story_fps: Option<f64>, outputs: Option<u16>) -> bool {
     let codec = values.get("video_codec").and_then(Value::as_str).unwrap_or_default();
     let fps = values.get("fps").and_then(Value::as_f64).unwrap_or_default();
     let interlaced = values.get("field_order").and_then(Value::as_str).is_some_and(|order| order != "progressive");
@@ -110,13 +112,23 @@ fn renders(values: &Value, story_fps: Option<f64>) -> bool {
     };
     let near = |a: f64, b: f64| (a - b).abs() < 0.01;
     let rate_made = story_fps.is_none_or(|story| near(story, fps) || (interlaced && near(story, 2.0 * fps)));
-    codec_made && rate_made
+    let channels = values.get("audio_channels").and_then(Value::as_u64).unwrap_or_default();
+    let sound_made = outputs.is_none_or(|outputs| channels >= u64::from(outputs));
+    codec_made && rate_made && sound_made
+}
+
+/// Whether Express is made: the prerender renders progressive units at the story's own rate
+/// in the project's delivery, so it is the same rule for progressive values only.
+fn express_made(export: &Value, story_fps: Option<f64>, outputs: Option<u16>) -> bool {
+    let progressive = export.get("field_order").and_then(Value::as_str) == Some("progressive");
+    progressive && renders(export, story_fps, outputs)
 }
 
 impl ExportChoice {
     /// The choice for a project whose export settings are `export` (as saved), for a story
-    /// at `story_fps` (unknown while it has no segment).
-    pub fn from_settings(export: &Value, story_fps: Option<f64>) -> Self {
+    /// at `story_fps` (unknown while it has no segment) with `outputs` sound outputs (the
+    /// project's `audio.channels`).
+    pub fn from_settings(export: &Value, story_fps: Option<f64>, outputs: Option<u16>) -> Self {
         let settings = serde_json::json!({ "export": export });
         let current = export.get("preset").and_then(Value::as_str).unwrap_or_default();
         let presets = qnc_export_preset::presets(&settings);
@@ -127,18 +139,20 @@ impl ExportChoice {
             default,
             standard: Some(Standard::of_rate(values.get("fps").and_then(Value::as_f64).unwrap_or_default())),
             group: group_of(values.get("video_codec").and_then(Value::as_str).unwrap_or_default()),
-            available: renders(values, story_fps),
+            available: renders(values, story_fps, outputs),
         };
-        let top = |kind, id: &str, label: String| ExportOption { kind, id: id.into(), label, default: false, standard: None, group: String::new(), available: true };
+        let top = |kind, id: &str, label: String, available| ExportOption { kind, id: id.into(), label, default: false, standard: None, group: String::new(), available };
+        let export_fps = export.get("fps").and_then(Value::as_f64).unwrap_or_default();
         let mut options = vec![
-            top(Kind::Xml, "xml", qnc_ui_text::text("export.to_xml").into()),
-            top(Kind::Express, "express", qnc_ui_text::fill("export.express", &[("format", &prerender_format(export))])),
+            top(Kind::Xml, "xml", qnc_ui_text::text("export.to_xml").into(), true),
+            top(Kind::Express, "express", qnc_ui_text::fill("export.express", &[("format", &prerender_format(export))]), express_made(export, story_fps, outputs)),
             ExportOption {
                 kind: Kind::Original,
                 id: "original".into(),
                 label: qnc_ui_text::text("export.original").into(),
                 default: false,
-                standard: Some(Standard::of_rate(story_fps.unwrap_or(50.0))),
+                // The tab of the story's rate; before the story has one, of the project's delivery.
+                standard: Some(Standard::of_rate(story_fps.unwrap_or(export_fps))),
                 group: qnc_ui_text::text("export.group.original").into(),
                 available: true,
             },
@@ -282,7 +296,7 @@ mod tests {
 
     #[test]
     fn xml_express_original_then_the_default_chosen_then_the_others() {
-        let choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "xdcam_hd422_50i", "format": "HD 1080p50", "video_codec": "h264" }), Some(50.0));
+        let choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "xdcam_hd422_50i", "format": "HD 1080p50", "video_codec": "h264" }), Some(50.0), None);
         let kinds: Vec<Kind> = choice.options.iter().take(4).map(|option| option.kind).collect();
         assert_eq!(kinds, [Kind::Xml, Kind::Express, Kind::Original, Kind::Setting]);
         assert!(choice.options[1].label.contains("HD 1080p50 4:2:0"), "{}", choice.options[1].label);
@@ -308,7 +322,7 @@ mod tests {
 
     #[test]
     fn values_of_no_preset_are_offered_as_the_project_settings() {
-        let mut choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "manual", "format": "HD 1080i50", "video_codec": "mpeg2_422_50mbit", "fps": 25.0, "field_order": "upper_first" }), Some(50.0));
+        let mut choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "manual", "format": "HD 1080i50", "video_codec": "mpeg2_422_50mbit", "fps": 25.0, "field_order": "upper_first" }), Some(50.0), None);
         assert!(choice.options[1].label.contains("4:2:2"));
         assert_eq!((choice.options[3].id.as_str(), choice.options[3].default), (PROJECT_SETTINGS, true));
         for _ in 0..5 {
@@ -320,7 +334,7 @@ mod tests {
     #[test]
     fn pal_and_ntsc_tabs_in_groups_and_what_this_story_cannot_be_exported_in_is_greyed() {
         // User 2026-10-25: XML and Express above the tabs, the settings by group, not made greyed.
-        let mut choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "h264_1080p50", "video_codec": "h264", "fps": 50.0, "field_order": "progressive" }), Some(50.0));
+        let mut choice = ExportChoice::from_settings(&serde_json::json!({ "preset": "h264_1080p50", "video_codec": "h264", "fps": 50.0, "field_order": "progressive" }), Some(50.0), None);
         assert_eq!(choice.tab, Standard::Pal);
         let shown: Vec<&str> = choice.shown().into_iter().map(|index| choice.options[index].id.as_str()).collect();
         assert_eq!(&shown[..3], ["xml", "express", "original"]);
@@ -349,5 +363,23 @@ mod tests {
             choice.step(false);
         }
         assert!(choice.options[choice.chosen].available);
+    }
+
+    /// Audit 2026-10-25: the box offered what the render then refused.
+    #[test]
+    fn express_and_settings_with_fewer_outputs_than_the_story_are_greyed() {
+        let export = serde_json::json!({ "preset": "h264_1080p50", "video_codec": "h264", "fps": 50.0, "field_order": "progressive", "audio_channels": 2 });
+        let option = |choice: &ExportChoice, id: &str| choice.options.iter().find(|option| option.id == id).unwrap().available;
+        let stereo = ExportChoice::from_settings(&export, Some(50.0), Some(2));
+        assert!(option(&stereo, "express") && option(&stereo, "h264_1080p50"));
+        let four = ExportChoice::from_settings(&export, Some(50.0), Some(4));
+        assert!(!option(&four, "express"), "the delivery has 2 outputs, the story 4");
+        assert!(!option(&four, "h264_1080p50") && option(&four, "original"));
+        let interlaced = serde_json::json!({ "preset": "xdcam_hd422_50i", "video_codec": "mpeg2_422_50mbit", "fps": 25.0, "field_order": "upper_first", "audio_channels": 2 });
+        let interlaced = ExportChoice::from_settings(&interlaced, Some(50.0), Some(2));
+        assert!(!option(&interlaced, "express"), "the prerender makes no interlaced delivery");
+        assert!(option(&interlaced, "xdcam_hd422_50i"), "the render from the originals does");
+        let dnxhd = ExportChoice::from_settings(&serde_json::json!({ "preset": "dnxhd_hq", "video_codec": "dnxhd_hq", "fps": 25.0, "field_order": "upper_first" }), Some(25.0), None);
+        assert!(!option(&dnxhd, "express"));
     }
 }

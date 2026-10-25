@@ -918,7 +918,7 @@ fn n_turns_normalising_the_loudness_on_and_off() {
 fn the_export_box_opens_with_the_project_setting_chosen_and_says_what_is_exported() {
     // User 2026-10-24: Export opens a box of the project's export settings, its own as default.
     let mut segments = component();
-    segments.open_export(&serde_json::json!({ "preset": "h264_1080p50" }));
+    segments.open_export(&serde_json::json!({ "preset": "h264_1080p50" }), None);
     assert!(segments.export_open());
     segments.export_step(true);
     segments.apply(SegmentCommand::ExportChoose(0));
