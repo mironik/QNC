@@ -146,8 +146,11 @@ pub fn show_with_confirm(
     labels: &BrowserLabels<'_>,
     bar: &ConfirmBar<'_>,
 ) -> Option<BrowserAnswer> {
-    let bar_top = (rect.bottom() - theme.chrome_control_height - pad).max(rect.top());
-    let bar_rect = egui::Rect::from_min_size(egui::pos2(rect.left(), bar_top), Vec2::new(rect.width(), theme.chrome_control_height));
+    // The bar holds the buttons with the pad above and below them (user 2026-10-25: Cancel and
+    // Select stood too low, cut off at the bottom of the panel).
+    let bar_height = theme.chrome_control_height + 2.0 * pad;
+    let bar_top = (rect.bottom() - bar_height).max(rect.top());
+    let bar_rect = egui::Rect::from_min_size(egui::pos2(rect.left(), bar_top), Vec2::new(rect.width(), bar_height));
     let browser_rect = egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.right(), (bar_rect.top() - 8.0).max(rect.top())));
     let style = BrowserStyle::from_theme(theme);
     let asked = ui

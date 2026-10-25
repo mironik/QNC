@@ -6189,3 +6189,7 @@ otvaranje ostavljalo ~64 MB u TEMP-u. (3) `tools/qnc-export`: Express ne ceka pr
 dio (stoji iza playera ili radi dijelove koje export ne trazi); preostale dijelove renderira sam. Nije izvedeno (trazi
 odluku): pomak pokrivalice kod omjera 2:1 i dalje ovisi o broju Entera (pola slike izvora pri neparnom pomaku).
 Testovi `qnc-player-client` (18), gradnja `qnc-prerender`, `qnc-export`, conformance. Uzivo nije provjereno.
+Popravak 2026-10-25 (korisnik: "na ingestu Cancel i Select su pomaknuti na dolje, podigni ih na sredinu"): traka potvrde
+preglednika lokacija bila je visoka tocno kao gumb, a unutra se jos oduzimao rub, pa su Cancel i Select izlazili prema dolje
+i bili odrezani. `qnc-dir-browser-panel` `show_with_confirm`: traka je visoka kao gumb plus rub gore i dolje, gumbi su
+okomito u sredini. Testovi, conformance. Uzivo nije provjereno.
