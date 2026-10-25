@@ -3562,6 +3562,7 @@ dependencies = [
  "qnc-prerender-launch",
  "qnc-program-segments",
  "qnc-program-waveform",
+ "qnc-short-save",
  "qnc-shot-stills",
  "qnc-source-bindings",
  "qnc-source-preview",
@@ -5387,6 +5388,16 @@ dependencies = [
  "eframe",
  "qnc-status-line",
  "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-short-save"
+version = "0.1.0"
+dependencies = [
+ "qnc-clip-row",
+ "qnc-db-broker",
+ "qnc-ui-text",
+ "qnc-virtual-shots",
 ]
 
 [[package]]

@@ -1,0 +1,11 @@
+[package]
+name = "qnc-short-save"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: saving a SubClip (a short) from the IN/OUT the source timeline shows, checked and written in the background through the virtual shots module, never on the form thread"
+
+[dependencies]
+qnc-clip-row = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-ui-text = { workspace = true }
+qnc-virtual-shots = { workspace = true }

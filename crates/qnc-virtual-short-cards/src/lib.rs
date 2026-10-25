@@ -67,6 +67,25 @@ pub fn build_card(
     }
 }
 
+/// The cards of the rows read from the database, each with its parent clip of the pool, the
+/// posters already loaded kept (audit 2026-10-25: this was in the Story application).
+pub fn cards(rows: Vec<qnc_virtual_shots::ShortClip>, clips: &[qnc_clip_row::ClipRow], previous: &[VirtualShortCard]) -> Vec<VirtualShortCard> {
+    let mut cards: Vec<VirtualShortCard> = rows
+        .into_iter()
+        .map(|row| {
+            let parent = clips.iter().find(|clip| clip.clip_id == row.clip_id).map(|clip| ParentClip {
+                duration_seconds: clip.duration_seconds,
+                duration_frames: clip.duration_frames,
+                import_status: clip.import_status.clone(),
+                imported_media_uri: clip.imported_media_uri.clone(),
+            });
+            build_card(row, parent)
+        })
+        .collect();
+    preserve_loaded_posters(&mut cards, previous);
+    cards
+}
+
 pub fn preserve_loaded_posters(cards: &mut [VirtualShortCard], previous: &[VirtualShortCard]) {
     for card in cards {
         card.poster_image = previous

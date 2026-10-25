@@ -31,8 +31,8 @@ fn virtual_tab_is_a_separate_list_and_a_short_duration_is_seconds_and_frames() {
     app.dispatch(EditorialIntent::action("editorial_tab_virtual"));
     assert_eq!(app.view().library_tab, LibraryTab::Virtual);
     assert!(app.view().shorts.is_empty());
-    let label = qnc_virtual_short_cards::build_card(
-        qnc_virtual_shots::ShortClip {
+    let label = qnc_virtual_short_cards::cards(
+        vec![qnc_virtual_shots::ShortClip {
             shot_id: "shot-a".into(),
             clip_id: "clip-a".into(),
             in_frame: 0,
@@ -42,10 +42,12 @@ fn virtual_tab_is_a_separate_list_and_a_short_duration_is_seconds_and_frames() {
             out_still_uri: None,
             still_status: "pending".into(),
             b_roll: false,
-        },
-        Some(parent_clip(&clip("clip-a", "Mironik"))),
-    )
-    .duration_label;
+        }],
+        &[clip("clip-a", "Mironik")],
+        &[],
+    )[0]
+    .duration_label
+    .clone();
     assert_eq!(label, "2:07");
 }
 

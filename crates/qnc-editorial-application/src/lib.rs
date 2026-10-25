@@ -21,7 +21,6 @@ pub use qnc_panel_focus::{FocusLayout, Panel, PanelFocus};
 use qnc_program_segments::SourcePick;
 use qnc_source_bindings::TransportBindings;
 use qnc_source_preview::{PreviewContext, SourcePreview};
-use qnc_virtual_short_cards::ParentClip;
 use qnc_work_settings::WorkSettings;
 
 pub use view::{
@@ -65,6 +64,7 @@ pub struct EditorialApplication {
     trim_stills: qnc_trim_stills::TrimStills,
     short_stills: qnc_shot_stills::ShotStills,
     pool_shots: qnc_virtual_shots::PoolShotsReader,
+    short_save: qnc_short_save::ShortSave,
     segments: qnc_program_segments::ProgramSegments,
     wrap: qnc_wrap_session::WrapSession,
     focus: PanelFocus,
@@ -88,6 +88,7 @@ impl Default for EditorialApplication {
             trim_stills: qnc_trim_stills::TrimStills::new(),
             short_stills: Default::default(),
             pool_shots: Default::default(),
+            short_save: Default::default(),
             segments: qnc_program_segments::ProgramSegments::new(),
             wrap: qnc_wrap_session::WrapSession::new(),
             focus: PanelFocus::new(),
@@ -192,6 +193,7 @@ impl EditorialApplication {
         }
         if self.short_stills.take_published() { self.reload_shorts() } // a poster was written
         changed |= self.pool_shots.take().map(|rows| self.apply_shorts(rows)).is_some();
+        changed |= self.short_save.poll().map(|saved| self.short_saved(saved)).is_some();
         self.sync_preview_view();
         changed
     }
@@ -371,56 +373,29 @@ impl EditorialApplication {
                 true
             }
             action_ids::SAVE_VIRTUAL_SHOT if self.segments.sync_holds_enter() || self.segments.marks_used_by_cover(self.view.preview.clip_id.as_deref(), self.view.preview.timeline.source_in_frame) => true,
-            action_ids::SAVE_VIRTUAL_SHOT => self.save_virtual_shot(),
+            action_ids::SAVE_VIRTUAL_SHOT => {
+                let target = self.content_target.as_ref().map(|targets| &targets.1);
+                let marks = self.view.preview.timeline.visible_source_marks();
+                if let Err(message) = self.short_save.start(self.view.chosen_clip_id(), &self.view.clips, marks, target, self.shown_project.as_deref()) {
+                    self.view.message = message;
+                }
+                true
+            }
             _ => false,
         }
     }
 
-    /// Writes one short from the IN/OUT the source timeline is showing.
-    fn save_virtual_shot(&mut self) -> bool {
-        let Some(clip_id) = self.view.chosen_clip_id().map(str::to_string) else {
-            self.view.message = qnc_ui_text::text("story.msg.pick_clip").into();
-            return true;
+    /// A short is saved (piece `qnc-short-save`): its stills, the SubClip tab shows it.
+    fn short_saved(&mut self, saved: Result<qnc_short_save::Saved, String>) {
+        let saved = match saved {
+            Ok(saved) => saved,
+            Err(error) => return self.view.message = error,
         };
-        let Some(clip) = self.view.clips.iter().find(|clip| clip.clip_id == clip_id) else {
-            self.view.message = qnc_ui_text::text("ingest.msg.clip_not_found").into();
-            return true;
-        };
-        if !clip.imported {
-            self.view.message = qnc_ui_text::fill("story.msg.clip_not_imported", &[("clip", &clip_id)]);
-            return true;
-        }
-        let Some((in_frame, out_frame)) = self.view.preview.timeline.visible_source_marks() else {
-            self.view.message = qnc_ui_text::text("story.msg.marks_not_confirmed").into();
-            return true;
-        };
-        let Some((_, target)) = self.content_target.clone() else {
-            self.view.message = qnc_ui_text::text("story.msg.db_not_writable").into();
-            return true;
-        };
-        let Some(project_id) = self.shown_project.clone() else {
-            self.view.message = qnc_ui_text::text("story.msg.no_active_project").into();
-            return true;
-        };
-        let name = clip.name.clone();
-        match qnc_virtual_shots::save_short_now(
-            &target,
-            &project_id,
-            &clip_id,
-            &name,
-            in_frame,
-            out_frame,
-        ) {
-            Ok(shot) => {
-                self.store_short_stills(Some((&shot.shot_id, &clip_id, (in_frame, out_frame))));
-                self.reload_shorts();
-                self.view.library_tab = LibraryTab::Virtual;
-                self.view.chosen_shot_id = Some(shot.shot_id.clone());
-                self.view.message = qnc_ui_text::fill("story.msg.subclip_saved", &[("shot", &shot.shot_id)]);
-            }
-            Err(error) => self.view.message = error,
-        }
-        true
+        self.store_short_stills(Some((&saved.shot_id, &saved.clip_id, saved.marks)));
+        self.reload_shorts();
+        self.view.library_tab = LibraryTab::Virtual;
+        self.view.message = qnc_ui_text::fill("story.msg.subclip_saved", &[("shot", &saved.shot_id)]);
+        self.view.chosen_shot_id = Some(saved.shot_id);
     }
 
     /// The stills of a saved short (`Some`) or the posters of the covers just saved.
@@ -474,31 +449,11 @@ impl EditorialApplication {
     fn apply_shorts(&mut self, rows: Result<Vec<qnc_virtual_shots::ShortClip>, String>) {
         match rows {
             Ok(rows) => {
-                let mut shorts: Vec<EditorialShort> = rows.into_iter().map(|row| self.short_card(row)).collect();
-                qnc_virtual_short_cards::preserve_loaded_posters(&mut shorts, &self.view.shorts);
-                self.view.shorts = shorts;
+                self.view.shorts = qnc_virtual_short_cards::cards(rows, &self.view.clips, &self.view.shorts);
                 self.request_posters();
             }
             Err(error) => { self.view.shorts.clear(); self.view.message = error }
         }
-    }
-
-    fn short_card(&self, row: qnc_virtual_shots::ShortClip) -> EditorialShort {
-        let parent = self
-            .view
-            .clips
-            .iter()
-            .find(|clip| clip.clip_id == row.clip_id);
-        qnc_virtual_short_cards::build_card(row, parent.map(parent_clip))
-    }
-}
-
-fn parent_clip(clip: &EditorialClip) -> ParentClip {
-    ParentClip {
-        duration_seconds: clip.duration_seconds,
-        duration_frames: clip.duration_frames,
-        import_status: clip.import_status.clone(),
-        imported_media_uri: clip.imported_media_uri.clone(),
     }
 }
 
