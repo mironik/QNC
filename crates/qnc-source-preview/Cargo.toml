@@ -33,3 +33,6 @@ qnc-timeline = { workspace = true }
 qnc-timeline-assets = { workspace = true }
 qnc-wave = { workspace = true }
 qnc-work-settings = { workspace = true }
+
+[dev-dependencies]
+qnc-player-contract = { workspace = true }

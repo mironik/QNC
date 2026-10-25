@@ -1106,7 +1106,7 @@ impl SourcePreview {
         self.read_missing_assets();
         if let Some(player) = &self.player {
             let playback = player.view();
-            if playback != self.player_view {
+            if !same_player_state(&playback, &self.player_view) {
                 if let Some(error) = &playback.error {
                     if !self.waits_for_record() && !qnc_player_input::is_incomplete_media(error) {
                         self.view.message = error.clone();
@@ -1189,6 +1189,23 @@ impl Drop for SourcePreview {
 
 #[cfg(test)]
 mod tests {
+    /// A newer reply of a player standing still differs only in its sequence: no change.
+    #[test]
+    fn a_reply_with_only_a_new_sequence_is_the_same_player_state() {
+        let reply = |sequence| qnc_player_contract::envelope::EventEnvelope {
+            contract_version: "1".into(),
+            session_id: "s".into(),
+            source_generation: 1,
+            sequence,
+            events: Vec::new(),
+        };
+        let view = |sequence| super::PlayerView { reply: Some(reply(sequence)), ..Default::default() };
+        assert!(super::same_player_state(&view(1), &view(2)));
+        let mut other = view(2);
+        other.preparing = true;
+        assert!(!super::same_player_state(&view(1), &other));
+    }
+
     /// Normalising multiplies the program's output level by the gain to the target (user
     /// 2026-10-24), within what the output holds.
     #[test]
@@ -1341,4 +1358,16 @@ fn transport_bindings(context: &PreviewContext) -> Result<Vec<SourceTransportBin
 /// as soon as the clip is ready).
 fn record_wait_text() -> &'static str {
     qnc_ui_text::text("player.player_getting_ready")
+}
+
+/// The same player state: a newer reply that only carries a new sequence says nothing new.
+/// A player standing Ready answers every state request with one; counting it as a change
+/// painted an idle Story 61 times a second (live 2026-10-25).
+fn same_player_state(a: &PlayerView, b: &PlayerView) -> bool {
+    let reply = match (&a.reply, &b.reply) {
+        (Some(a), Some(b)) => a.session_id == b.session_id && a.source_generation == b.source_generation && a.events == b.events,
+        (None, None) => true,
+        _ => false,
+    };
+    reply && a.preparing == b.preparing && a.video_visible == b.video_visible && a.picture == b.picture && a.error == b.error
 }

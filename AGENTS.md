@@ -6032,3 +6032,10 @@ baza aktivnog projekta (samo citanje) pokazali su da je Enter spremio izmjenu (I
 "Segment edit: ... Enter saves, Esc cancels", pa je izgledalo da je izmjena jos otvorena. Nakon spremanja status kaze
 "Segment saved; back to normal work." (`qnc-program-segments` `commit_edit`, rjecnik `story.msg.segment_edit_saved`).
 Postupak je isti: Enter sprema, Esc odustaje; oba zavrsavaju uredivanje segmenta.
+Popravak 2026-10-25 (korisnik: "pogledaj log"; log: nakon Edit segmenta Story na mirovanju crta 61 put u sekundi,
+0,45-0,9 s procesora u sekundi, 235 `ui-frame-slow` 25-112 ms): player u stanju Ready (ne Paused) na svaki upit stanja
+odgovara istim stanjem s novim rednim brojem odgovora, a `qnc-source-preview` je cijeli pogled playera usporedjivao
+zajedno s rednim brojem, pa je svaki poll bio "promjena", ona je trazila novo crtanje, a novo crtanje novi poll. Sada je
+isto stanje ono s istom sesijom, generacijom, dogadajima, pripremom, slikom i greskom (`same_player_state`, kao
+`same_state` klijenta). Test `a_reply_with_only_a_new_sequence_is_the_same_player_state`, conformance, release build;
+uzivo: Story na mirovanju 3-4 crtanja u sekundi.

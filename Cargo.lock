@@ -5588,6 +5588,7 @@ dependencies = [
  "qnc-playback-activity",
  "qnc-player-client",
  "qnc-player-clip-content",
+ "qnc-player-contract",
  "qnc-player-input",
  "qnc-player-launcher",
  "qnc-player-timeline",
