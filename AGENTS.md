@@ -6099,3 +6099,8 @@ ne primjenjuje; razina ostaje u prici, playeru i MXF exportima, u XML-u se ne pr
 (`<layout>mono</layout>`, `<channellabel>discrete</channellabel>`), pokusaj da Resolve uzme izabrani kanal kamere
 umjesto prvog na oba izlaza. Provjereno na izoliranoj kopiji: XML ispravan, bez filtra razine. U Resolveu i Ediusu nije
 provjereno.
+Zapis 2026-10-25 (Resolve i kanal kamere; korisnik: "nije sada bitno, glavno da radi u ediusu za sada"): Resolve 21 iz
+FCP7 XML-a ne preuzima kanal kamere po klipu ni kad uveze XML koji je sam izvezao (oznaka `trackindex` po klipu i opis
+datoteke s 4 ili 16 kanala, s vezama ili bez njih: A2 bez kanala, cuje se kanal 1). Resolveov AAF kanal zapisuje po klipu
+(SourceClip na slot kanala izvora), ali uvoz u Resolve nije dovrsen. Export to XML ostaje FCP7 kakav jest (Edius svira
+sve pokrivalice); AAF za Resolve je odgoden.
