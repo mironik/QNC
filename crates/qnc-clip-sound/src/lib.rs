@@ -13,7 +13,7 @@ mod store;
 
 use std::sync::{mpsc, Arc};
 
-use qnc_db_broker::{Access, ProjectDbTarget, ProjectDbWriter, TableModule, TableModuleFactory};
+use qnc_db_broker::{Access, ProjectDbTarget, ProjectDbWriter, TableModuleFactory};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -66,32 +66,7 @@ pub struct ClipSoundModule;
 
 impl ClipSoundModule {
     pub fn factory() -> Arc<dyn TableModuleFactory> {
-        Arc::new(Self)
-    }
-}
-
-impl TableModuleFactory for ClipSoundModule {
-    fn id(&self) -> &'static str {
-        MODULE_ID
-    }
-    fn is_write(&self, payload: &Value) -> bool {
-        serde_json::from_value::<Operation>(payload.clone()).is_ok_and(|o| o.is_write())
-    }
-    fn attach(&self, connection: rusqlite::Connection, access: Access) -> Result<Box<dyn TableModule>> {
-        Ok(Box::new(Attached(store::Store::attach(connection, access)?)))
-    }
-}
-
-struct Attached(store::Store);
-
-impl TableModule for Attached {
-    fn execute(&mut self, payload: Value) -> Result<Value> {
-        let operation: Operation = serde_json::from_value(payload).map_err(|e| e.to_string())?;
-        let data = self.0.execute(&operation)?;
-        serde_json::to_value(data).map_err(|e| e.to_string())
-    }
-    fn connection(&self) -> &rusqlite::Connection {
-        self.0.connection()
+        qnc_db_broker::owned_tables::<store::Store>()
     }
 }
 

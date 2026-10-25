@@ -10,6 +10,9 @@ mod schema;
 pub(crate) use rows::*;
 use schema::*;
 
+/// The tables this module owns; it writes no other.
+const OWNED: [&str; 2] = ["virtual_shots", "virtual_shot_numbers"];
+
 pub(crate) struct Store {
     conn: Connection,
     schema_ready: bool,
@@ -30,25 +33,7 @@ impl Store {
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
-        conn.authorizer(Some(move |ctx: rusqlite::hooks::AuthContext<'_>| {
-            use rusqlite::hooks::{AuthAction as A, Authorization as R};
-            match ctx.action {
-                A::Insert { table_name }
-                | A::Delete { table_name }
-                | A::Update { table_name, .. }
-                    if access == Access::ReadWrite && (table_name == "virtual_shots" || table_name == "virtual_shot_numbers") =>
-                {
-                    R::Allow
-                }
-                A::Read { .. }
-                | A::Select
-                | A::Transaction { .. }
-                | A::Savepoint { .. }
-                | A::Function { .. }
-                | A::Recursive => R::Allow,
-                _ => R::Deny,
-            }
-        }));
+        qnc_db_broker::write_only_own_tables(&conn, access, &OWNED);
         Ok(Self { conn, schema_ready })
     }
 
@@ -387,5 +372,23 @@ impl Store {
     /// The connection the intermediary opens a leased write's transaction on.
     pub(crate) fn connection(&self) -> &Connection {
         &self.conn
+    }
+}
+
+impl qnc_db_broker::OwnedTables for Store {
+    const ID: &'static str = MODULE_ID;
+    type Operation = Operation;
+    type Data = Data;
+    fn is_write(operation: &Operation) -> bool {
+        operation.is_write()
+    }
+    fn attach(connection: Connection, access: Access) -> Result<Self> {
+        Store::attach(connection, access)
+    }
+    fn execute(&mut self, operation: &Operation) -> Result<Data> {
+        Store::execute(self, operation)
+    }
+    fn connection(&self) -> &Connection {
+        Store::connection(self)
     }
 }

@@ -26,20 +26,7 @@ impl Store {
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
-        conn.authorizer(Some(move |ctx: rusqlite::hooks::AuthContext<'_>| {
-            use rusqlite::hooks::{AuthAction as A, Authorization as R};
-            match ctx.action {
-                A::Insert { table_name } | A::Delete { table_name } | A::Update { table_name, .. }
-                    if access == Access::ReadWrite && OWNED.contains(&table_name) =>
-                {
-                    R::Allow
-                }
-                A::Read { .. } | A::Select | A::Transaction { .. } | A::Savepoint { .. } | A::Function { .. } | A::Recursive => {
-                    R::Allow
-                }
-                _ => R::Deny,
-            }
-        }));
+        qnc_db_broker::write_only_own_tables(&conn, access, &OWNED);
         Ok(Self { conn, schema_ready })
     }
 
@@ -146,4 +133,22 @@ fn object_exists(conn: &Connection, kind: &str, name: &str) -> Result<bool> {
 
 pub(crate) fn err(error: impl std::fmt::Display) -> String {
     error.to_string()
+}
+
+impl qnc_db_broker::OwnedTables for Store {
+    const ID: &'static str = MODULE_ID;
+    type Operation = Operation;
+    type Data = Data;
+    fn is_write(operation: &Operation) -> bool {
+        operation.is_write()
+    }
+    fn attach(connection: Connection, access: Access) -> Result<Self> {
+        Store::attach(connection, access)
+    }
+    fn execute(&mut self, operation: &Operation) -> Result<Data> {
+        Store::execute(self, operation)
+    }
+    fn connection(&self) -> &Connection {
+        Store::connection(self)
+    }
 }

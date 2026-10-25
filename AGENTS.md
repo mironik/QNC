@@ -6205,3 +6205,11 @@ otvoreni klip na pocetak reda i val i dok player svira pokrene otvoreni klip iz 
 rasporedivaca presli su u kocku (10, ukljucujuci prednost playera, otvoreni klip sam i uz ostale, granicu), testovi
 `qnc-filmstrip-worker`, `qnc-wave-worker`, `qnc-timeline-artifacts`, `qnc-content-artifacts`, conformance. Uzivo nije
 provjereno. Prepis, scene i vektori slika (AI) bit ce novi poslovi iste kocke.
+Izvedeno 2026-10-26 (isti korak 1, dio 1b): pet modula tablica posrednika (`qnc-program-db`, `qnc-virtual-shots`,
+`qnc-artifact-db`, `qnc-prerender-db`, `qnc-clip-sound`) imalo je istu kopiju spajanja na posrednika (tvornica,
+omotac, pretvorba zahtjeva i odgovora) i istog autorizatora (pise samo svoje tablice, cita sve). Sada je to jednom u
+`qnc-db-broker` (`owned.rs`: svojstvo `OwnedTables`, `owned_tables::<M>()`, `write_only_own_tables`); modul daje samo svoj
+id, vrste zahtjeva, spajanje (shema) i izvodenje. `qnc-virtual-shots` dobio je popis svojih tablica `OWNED`. Ponasanje
+isto. `qnc-media-record-db` i `qnc-source-index-db` imaju drukciji oblik (spajanje kroz `project.rs`) i nisu dirani.
+Testovi: dva nova u posredniku (pisanje samo u svoje tablice, modul samo za citanje ne pise ni u svoje), testovi pet
+modula, `qnc-program-segments`, `qnc-content-artifacts`, conformance. Uzivo nije provjereno.
