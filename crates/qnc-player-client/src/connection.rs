@@ -475,6 +475,13 @@ impl HostProcess {
                 return Err(format!("Player startup failed: {}", String::from_utf8_lossy(&self.errors.lock().unwrap())));
             }
             let said: serde_json::Value = serde_json::from_slice(&line).map_err(|e| e.to_string())?;
+            if let Some(why) = said.get("session_refused") {
+                return Err(format!("Player startup failed: {}", why.as_str().unwrap_or_default()));
+            }
+            if said["session_ended"] == session {
+                // This session ended before it said hello.
+                return Err(format!("Player startup failed: {}", String::from_utf8_lossy(&self.errors.lock().unwrap())));
+            }
             if said.get("session_ended").is_some() {
                 continue; // the end of an earlier session
             }

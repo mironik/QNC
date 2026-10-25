@@ -524,7 +524,10 @@ fn host_sessions() -> Result<()> {
         let boot = match Boot::from_bytes(line.trim_ascii()) {
             Ok(boot) => boot,
             Err(error) => {
+                // Said at once, so the client does not wait for a hello that never comes.
                 eprintln!("player host: {error}");
+                println!("{}", serde_json::json!({ "session_refused": error.to_string() }));
+                io::stdout().flush()?;
                 continue;
             }
         };

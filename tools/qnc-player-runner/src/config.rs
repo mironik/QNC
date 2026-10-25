@@ -195,7 +195,7 @@ impl Boot {
     pub fn plan(&self) -> crate::Result<Plan> {
         match (&self.input, &self.program) {
             (Some(input), None)
-                if self.media_binding.is_some() && self.program_bindings.is_empty() == self.sync_bed.is_none() =>
+                if clip_bindings_fit(self.media_binding.is_some(), self.sync_bed.is_some(), self.program_bindings.len()) =>
             {
                 Ok(Plan::Clip(InputPlan::new(
                     input,
@@ -241,6 +241,26 @@ impl Boot {
             return program_opener(bindings);
         }
         program_opener(std::mem::take(&mut self.program_bindings))
+    }
+}
+
+/// The bindings of a clip session: the clip's own, and program bindings only for its Sync bed.
+/// A bed may read no media at all (a lead or an A1 that is off: silence), so it may come
+/// without them (live 2026-10-25: a bed of the lead-out was refused and the player hung).
+fn clip_bindings_fit(media_binding: bool, sync_bed: bool, program_bindings: usize) -> bool {
+    media_binding && (sync_bed || program_bindings == 0)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_sync_bed_of_silence_needs_no_bindings_and_a_clip_without_a_bed_has_none() {
+        use super::clip_bindings_fit as fit;
+        assert!(fit(true, false, 0));
+        assert!(fit(true, true, 2));
+        assert!(fit(true, true, 0), "a silent bed reads no media");
+        assert!(!fit(true, false, 1), "bindings without a bed");
+        assert!(!fit(false, true, 1), "a clip needs its own binding");
     }
 }
 

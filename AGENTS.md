@@ -6061,3 +6061,12 @@ koji pocne pod prethodnim rezu se na pocetku sljedeceg, a preklapanje je Cross F
 `sourcechannel` i frekvencijom iz spremljenog zapisa, `ClipFile.audio_sample_rate`); sekvenca ima `samplecharacteristics`
 (24-bit, frekvencija projekta) i dva izlaza. `tools/qnc-export` predaje frekvencije. Provjereno na izoliranoj kopiji: XML
 ispravan (parser), A2 12 klipova i 10 prijelaza, bez preklapanja. Test. U Resolveu i Ediusu nije provjereno.
+Otkljucano i izvedeno 2026-10-25 (korisnik: "zablokirao se source player"; "da, otkljucaj i popravi, obrisi i debug cache";
+otkljucani `tools/qnc-player-runner` i `crates/qnc-player-client`): log: nakon Entera Synca preview je klip otvarao s A1
+sljedeceg Sync prozora, a to je bio lead-out (A1 iskljucen), koji ne cita nijednu datoteku i nema vezu izvora; player je
+takvo pokretanje odbijao ("player bootstrap needs one clip with its binding") i nista nije javio, pa je klijent svaki put
+cekao 10 s i source player nije radio. Sada player prima A1 Synca bez veza izvora (tisina; `config.rs`
+`clip_bindings_fit`, test), a odbijeno pokretanje odmah javlja (`session_refused`; i sesija koja zavrsi prije pozdrava),
+pa klijent javlja gresku umjesto cekanja (`qnc-player-client` `open_session`). Uz to disk C: je bio pun (454 MB slobodno,
+prerender nije mogao pisati): obrisan debug cache (`cargo clean --profile dev`, 40,7 GiB) uz dozvolu korisnika. Testovi,
+conformance, release build. Uzivo nije provjereno.
