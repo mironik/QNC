@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: the flat program playlist of an edited story (v5 qnc-program-playlist), frame based and without I/O"
 
 [dependencies]
+qnc-gain = { workspace = true }
 qnc-frame-timebase = { workspace = true }
 serde = { workspace = true }
 

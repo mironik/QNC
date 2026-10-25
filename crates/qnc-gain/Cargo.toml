@@ -1,0 +1,7 @@
+[package]
+name = "qnc-gain"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: a sound level in dB as a linear gain, one rule for the player, render, export, loudness and every wave drawn; pure arithmetic"
+
+[dependencies]

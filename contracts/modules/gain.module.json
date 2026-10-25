@@ -1,0 +1,20 @@
+{
+  "module_id": "qnc.module.gain",
+  "module_name": "Sound level gain",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["audio.level.gain"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": ["ffprobe", "database.write", "player.command"],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-gain",
+  "input": "A level in dB (and whether the lane or part is off).",
+  "output": "Its linear gain: 10^(dB/20), 0 when off.",
+  "specification": "Audit 2026-10-25: one rule for the player, render, export, loudness and the waves drawn instead of 13 copies."
+}

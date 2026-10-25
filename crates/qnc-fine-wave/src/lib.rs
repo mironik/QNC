@@ -130,7 +130,7 @@ impl FineWave {
                 self.ask(locator, &piece.clip_id, piece.channel, first, last);
                 continue;
             };
-            let gain = 10f32.powf(f32::from(piece.level_db) / 20.0);
+            let gain = qnc_gain::level_gain(piece.level_db, false);
             let span = (to - from) as f64 / columns as f64;
             for (column, peak) in peaks.iter_mut().enumerate() {
                 let (c0, c1) = (from as f64 + column as f64 * span, from as f64 + (column + 1) as f64 * span);

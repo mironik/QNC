@@ -163,7 +163,7 @@ impl Biquad {
     fn shelf(rate: f64) -> Self {
         let (f0, gain_db, q) = (1681.974_450_955_533, 3.999_843_853_973_347, 0.707_175_236_955_419_6);
         let k = (std::f64::consts::PI * f0 / rate).tan();
-        let vh = 10f64.powf(gain_db / 20.0);
+        let vh = qnc_gain::db_to_gain(gain_db);
         let vb = vh.powf(0.499_666_774_154_541_6);
         let a0 = 1.0 + k / q + k * k;
         Self::new(

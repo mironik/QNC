@@ -5,5 +5,6 @@ edition = "2021"
 description = "QNC public block: the integrated loudness and true peak of a story's A1 and A2, from the 100 ms loudness segments measured with each clip's wave, at each part's level"
 
 [dependencies]
+qnc-gain = { workspace = true }
 qnc-loudness = { workspace = true }
 qnc-program-waveform = { workspace = true }

@@ -3141,6 +3141,7 @@ dependencies = [
  "qnc-broadcast-player",
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
+ "qnc-gain",
  "qnc-gpu-raster",
  "qnc-media-decode",
  "qnc-media-metadata",
@@ -3261,6 +3262,7 @@ name = "qnc-channel-picker"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-gain",
 ]
 
 [[package]]
@@ -3710,6 +3712,7 @@ dependencies = [
 name = "qnc-fcp7-xml"
 version = "0.1.0"
 dependencies = [
+ "qnc-gain",
  "qnc-program-playlist",
 ]
 
@@ -3776,6 +3779,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
+ "qnc-gain",
  "qnc-media-decode",
  "qnc-media-metadata",
  "qnc-media-stream",
@@ -3834,6 +3838,10 @@ version = "0.1.0"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "qnc-gain"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-gesture-steps"
@@ -4329,6 +4337,9 @@ dependencies = [
 [[package]]
 name = "qnc-lane-choice"
 version = "0.1.0"
+dependencies = [
+ "qnc-gain",
+]
 
 [[package]]
 name = "qnc-level-meter"
@@ -4353,6 +4364,7 @@ dependencies = [
 name = "qnc-loudness"
 version = "0.1.0"
 dependencies = [
+ "qnc-gain",
  "serde",
 ]
 
@@ -4989,6 +5001,7 @@ dependencies = [
 name = "qnc-program-loudness"
 version = "0.1.0"
 dependencies = [
+ "qnc-gain",
  "qnc-loudness",
  "qnc-program-waveform",
 ]
@@ -5021,6 +5034,7 @@ name = "qnc-program-playlist"
 version = "0.1.0"
 dependencies = [
  "qnc-frame-timebase",
+ "qnc-gain",
  "serde",
  "serde_json",
 ]
@@ -5088,6 +5102,7 @@ dependencies = [
 name = "qnc-program-waveform"
 version = "0.1.0"
 dependencies = [
+ "qnc-gain",
  "qnc-loudness",
  "qnc-timeline-assets",
  "qnc-wave",
@@ -5266,6 +5281,7 @@ dependencies = [
 name = "qnc-render-unit"
 version = "0.1.0"
 dependencies = [
+ "qnc-gain",
  "qnc-media-metadata",
  "serde",
  "serde_json",
@@ -5530,6 +5546,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-filmstrip",
+ "qnc-gain",
  "qnc-media-metadata",
  "qnc-media-records",
  "qnc-media-stream",
@@ -5808,6 +5825,7 @@ dependencies = [
 name = "qnc-unit-join"
 version = "0.1.0"
 dependencies = [
+ "qnc-gain",
  "qnc-loudness",
 ]
 
@@ -5882,6 +5900,7 @@ name = "qnc-wave-view"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-gain",
 ]
 
 [[package]]

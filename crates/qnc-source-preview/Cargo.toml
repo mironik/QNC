@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: source preview session for one clip (Broadcast Player, monitor picture, timeline projection and published timeline artifacts); no form, no application, read-only"
 
 [dependencies]
+qnc-gain = { workspace = true }
 qnc-player-clip-content = { workspace = true }
 serde_json = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }

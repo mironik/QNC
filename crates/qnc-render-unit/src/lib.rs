@@ -81,7 +81,7 @@ fn is_zero(level_db: &i8) -> bool {
 impl AudioPart {
     /// The factor the decoded samples are multiplied by.
     pub fn gain(&self) -> f32 {
-        10f32.powf(f32::from(self.level_db) / 20.0)
+        qnc_gain::level_gain(self.level_db, false)
     }
 
     /// The unit samples `[from, to)` the part sounds in a unit of `samples`.

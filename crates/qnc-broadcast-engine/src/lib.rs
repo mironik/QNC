@@ -511,7 +511,7 @@ impl Runtime {
         };
         let part = match part {
             Some((output, from, to, gain_db, off)) => {
-                let gain = if off { 0.0 } else { 10f32.powf(f32::from(gain_db) / 20.0) };
+                let gain = if off { 0.0 } else { qnc_gain::db_to_gain(f64::from(gain_db)) as f32 };
                 Some((output, sample_boundary(from, timebase, rate)?, sample_boundary(to, timebase, rate)?, gain))
             }
             None => None,

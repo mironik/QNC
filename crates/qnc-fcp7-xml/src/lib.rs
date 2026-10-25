@@ -142,7 +142,7 @@ fn clip_item(
     if audio.is_some() {
         writeln!(w, "<sourcetrack><mediatype>audio</mediatype><trackindex>{}</trackindex></sourcetrack>", piece.channel + 1).ok();
         if piece.level_db != 0 {
-            let gain = 10f64.powf(f64::from(piece.level_db) / 20.0);
+            let gain = qnc_gain::db_to_gain(f64::from(piece.level_db));
             writeln!(
                 w,
                 "<filter><effect><name>Audio Levels</name><effectid>audiolevels</effectid><effectcategory>audiolevels</effectcategory><effecttype>audiolevels</effecttype><mediatype>audio</mediatype><parameter><parameterid>level</parameterid><name>Level</name><valuemin>0</valuemin><valuemax>3.98109</valuemax><value>{gain:.5}</value></parameter></effect></filter>"

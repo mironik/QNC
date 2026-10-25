@@ -165,7 +165,7 @@ fn mono_tracks(channels: u16, gains_db: [f64; 2]) -> String {
     let mut text = format!("[0:a:0]asplit={channels}{split}");
     for channel in 0..usize::from(channels) {
         let gain = match gains_db.get(channel) {
-            Some(db) if *db != 0.0 => format!("{:.6}*", 10f64.powf(db / 20.0)),
+            Some(db) if *db != 0.0 => format!("{:.6}*", qnc_gain::db_to_gain(*db)),
             _ => String::new(),
         };
         text.push_str(&format!(";[s{channel}]pan=mono|c0={gain}c{channel}[a{channel}]"));

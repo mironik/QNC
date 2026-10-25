@@ -959,7 +959,7 @@ impl SourcePreview {
     /// `levels` with the normalising gains on them, within what the output holds.
     fn normalized(&self, levels: [u16; 2]) -> [u16; 2] {
         let gains = self.normalize.unwrap_or_default();
-        let level = |percent: u16, db: f64| (f64::from(percent) * 10f64.powf(db / 20.0)).round().clamp(0.0, 400.0) as u16;
+        let level = |percent: u16, db: f64| (f64::from(percent) * qnc_gain::db_to_gain(db)).round().clamp(0.0, 400.0) as u16;
         [level(levels[0], gains[0]), level(levels[1], gains[1])]
     }
 

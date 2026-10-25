@@ -33,7 +33,7 @@ impl ChannelChoice {
 
     /// The lane's level as a factor of the recorded sound (0 when it is off).
     pub fn gain(&self) -> f32 {
-        if self.off { 0.0 } else { 10f32.powf(f32::from(self.level_db) / 20.0) }
+        qnc_gain::level_gain(self.level_db, self.off)
     }
 }
 

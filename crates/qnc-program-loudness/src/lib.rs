@@ -82,7 +82,7 @@ fn lane_loudness<'a>(
             complete = false;
             continue;
         };
-        let gain = 10f64.powf(f64::from(at.level_db) / 20.0);
+        let gain = qnc_gain::db_to_gain(f64::from(at.level_db));
         let segments = channel.energies.len() as u64;
         let (length, source) = (at.program_end - at.program_start, at.source_out.saturating_sub(at.source_in));
         for frame in at.program_start..at.program_end.min(total_frames) {

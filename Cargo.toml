@@ -26,6 +26,7 @@ members = [
     "crates/qnc-editorial-desktop",
     "crates/qnc-editorial-shell",
     "crates/qnc-frame-timebase",
+    "crates/qnc-gain",
     "crates/qnc-player-contract",
     "crates/qnc-player-frame-transport",
     "crates/qnc-player-input",
@@ -261,6 +262,7 @@ qnc-editorial-application = { path = "crates/qnc-editorial-application" }
 qnc-editorial-desktop = { path = "crates/qnc-editorial-desktop" }
 qnc-editorial-shell = { path = "crates/qnc-editorial-shell" }
 qnc-frame-timebase = { path = "crates/qnc-frame-timebase" }
+qnc-gain = { path = "crates/qnc-gain" }
 qnc-player-contract = { path = "crates/qnc-player-contract" }
 qnc-player-frame-transport = { path = "crates/qnc-player-frame-transport" }
 qnc-player-input = { path = "crates/qnc-player-input" }

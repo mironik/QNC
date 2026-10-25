@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC public component: passive program waveform (A1 segments, A2 covers) composed from the stored clip waves, and its slice for one Wrap row"
 
 [dependencies]
+qnc-gain = { workspace = true }
 qnc-timeline-assets = { workspace = true }
 qnc-loudness = { workspace = true }
 qnc-wave = { workspace = true }

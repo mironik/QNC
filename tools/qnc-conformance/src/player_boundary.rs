@@ -331,6 +331,8 @@ fn forbidden_dependency(owner: &str, dependency: &str) -> bool {
                 dependency,
                 "qnc-player-input"
                     | "qnc-program-playlist"
+                    // dB as a gain: pure arithmetic (audit 2026-10-25).
+                    | "qnc-gain"
                     | "qnc-ingest-store"
                     | "qnc-wave"
                     | "qnc-work-settings"

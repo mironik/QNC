@@ -5,4 +5,5 @@ edition = "2021"
 description = "QNC public block: rendered units of a story put together into one file (pictures and sound copied), A1/A2 brought to the project's loudness rule only when outside it"
 
 [dependencies]
+qnc-gain = { workspace = true }
 qnc-loudness = { workspace = true }

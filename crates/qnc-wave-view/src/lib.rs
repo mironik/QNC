@@ -19,7 +19,7 @@ pub fn paint_level_marks(painter: &egui::Painter, rect: Rect, gain: f32, colors:
     let mid = rect.center().y;
     let half = rect.height() * 0.48;
     for (dbfs, color) in LEVEL_MARKS_DBFS.into_iter().zip(colors) {
-        let amp = 10f32.powf(dbfs / 20.0) * gain;
+        let amp = qnc_gain::db_to_gain(f64::from(dbfs)) as f32 * gain;
         if amp > 1.0 {
             continue;
         }

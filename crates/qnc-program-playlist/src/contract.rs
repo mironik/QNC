@@ -186,7 +186,7 @@ pub struct ProgramAudioRoute {
 impl ProgramAudioRoute {
     /// The factor the source samples are multiplied by.
     pub fn gain(&self) -> f32 {
-        10f32.powf(f32::from(self.level_db) / 20.0)
+        qnc_gain::level_gain(self.level_db, false)
     }
 
     /// The fade factor at program position `frame` (a fractional frame: a sample inside it),

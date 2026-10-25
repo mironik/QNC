@@ -45,7 +45,7 @@ struct Bus {
 
 impl Bus {
     fn gain(&self) -> f32 {
-        10f32.powf(f32::from(self.level_db) / 20.0)
+        qnc_gain::level_gain(self.level_db, false)
     }
 
     /// The fade factor at program position `frame` (fractional: a sample inside it).

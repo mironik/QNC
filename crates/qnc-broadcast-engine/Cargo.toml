@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+qnc-gain = { workspace = true }
 qnc-broadcast-player.workspace = true
 qnc-dev-diagnostics.workspace = true
 qnc-player-input.workspace = true
