@@ -5913,3 +5913,10 @@ prerendera ziv ceka njegove dijelove (najvise 10 min, `prerendered_units`) umjes
 pise u player log broj dijelova, koliko je iz prerendera, trajanje i glasnocu (`export ...`). Izmjereno na izoliranoj kopiji
 (kartica samo citana): prerender cijele price 2 min 4 s (29 dijelova, iz originala s kartice), Express zatim 3,3 s (29 od 29
 iz prerendera; prije 60-87 s). Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-25 (korisnik: "gdje vidim da li je normalizacija ukljucena, gdje je ukljucujem ili iskljucujem"; "da, dodaj
+dugme NORM i zapis u log"): u traci panela Segmenti desno od pokazivaca razine dugme NORM (`qnc-segment-panel` `bar.rs`),
+osvijetljeno dok je normalizacija ukljucena; klik je isto sto tipka N (`toggle_loudness_normalize`), savjet pod misem u
+rjecniku (`story.ui.normalize_hint`). Player log: `story-normalize on|off` s izmjerenim A1/A2 pri svakoj promjeni i
+`story-normalize on|off (project opened)` pri otvaranju projekta (`qnc-program-segments`). Popravak: otvaranje projekta
+vracalo je panel na zadano stanje i iskljucivalo normalizaciju (N je zato bio iskljucen iako je od 25. 10. ukljucen pri
+pokretanju); sada izbor korisnika ostaje (test). Testovi, conformance. Uzivo nije provjereno.

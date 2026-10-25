@@ -135,6 +135,11 @@ impl ProgramSegments {
                 self.normalize = !self.normalize;
                 let measured = self.loudness.as_ref().map(|(_, measured)| *measured).unwrap_or_default();
                 let lufs = |value: Option<f64>| value.map_or("--".to_string(), |lufs| format!("{lufs:.1}"));
+                let state = if self.normalize { "on" } else { "off" };
+                qnc_dev_diagnostics::log_line(
+                    qnc_dev_diagnostics::DiagnosticsStream::Player,
+                    format!("story-normalize {state} a1_lufs={:?} a2_lufs={:?}", measured.a1_lufs, measured.a2_lufs),
+                );
                 let message = match self.normalize {
                     true => qnc_ui_text::fill("story.msg.normalize_on", &[("a1", &lufs(measured.a1_lufs)), ("a2", &lufs(measured.a2_lufs))]),
                     false => qnc_ui_text::text("story.msg.normalize_off").to_string(),

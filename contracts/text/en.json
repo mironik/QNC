@@ -769,6 +769,7 @@
     "story.msg.normalize_on": "Loudness normalised in the preview: A1 {a1} LUFS and A2 {a2} LUFS to the project's targets (N turns it off)",
     "story.msg.normalize_off": "Loudness as edited (N normalises A1 and A2 to the project's targets)",
     "story.ui.normalized": "NORM",
+    "story.ui.normalize_hint": "Loudness of A1 and every cover's A2 to the project's targets (EBU R 128), as the export gives it; lit: on (N)",
     "story.msg.lane_taken": "{lane}: up/down channel, left off, right on, Ctrl+left/right level, Enter keeps, Esc cancels",
     "wave.wave_needs_stored_container": "The wave needs the stored container of the source clip.",
     "story.msg.lane_off": "{lane}: off (level 0), right turns it on",

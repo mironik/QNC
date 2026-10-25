@@ -301,7 +301,13 @@ impl ProgramSegments {
     ) {
         let same = self.target.as_ref().map(ProjectDbTarget::uri) == Some(story.uri());
         if !same {
-            *self = Self::default();
+            // Another project starts afresh; normalising stays as the user has it (on at start).
+            let normalize = self.normalize;
+            *self = Self { normalize, ..Self::default() };
+            qnc_dev_diagnostics::log_line(
+                qnc_dev_diagnostics::DiagnosticsStream::Player,
+                format!("story-normalize {} (project opened)", if normalize { "on" } else { "off" }),
+            );
             self.filmstrips.set_reader(waves.clone());
             self.waves.set_reader(waves);
         }

@@ -23,6 +23,8 @@ const FONT_UI: f32 = 14.0;
 /// The middle buttons (previous/next segment, slot, marker, program start) are hidden: a
 /// level meter is in their place (user 2026-10-16: hidden, not deleted).
 const SHOW_NAVIGATION: bool = false;
+/// The width of the NORM button beside the level meter.
+const NORM_W: f32 = 52.0;
 
 pub(crate) fn show(
     ui: &mut egui::Ui,
@@ -44,9 +46,20 @@ pub(crate) fn show(
         Vec2::new(TRANSPORT_CONTROLS_W, COMPACT_CTRL_H),
     );
     if !SHOW_NAVIGATION {
+        // NORM right of the meter (user 2026-10-25): lit while the preview normalises the
+        // loudness; a click is the N key.
+        let norm = Rect::from_min_max(Pos2::new(transport.max.x - NORM_W, transport.min.y), transport.max);
+        let meter = Rect::from_min_max(transport.min, Pos2::new(norm.min.x - EDIT_ACTION_GAP, transport.max.y));
         let style = qnc_level_meter::MeterStyle { background: theme.background, border: theme.border, text: theme.muted };
         let lanes = [("A1", levels[0]), ("A2", levels[1])];
-        qnc_level_meter::show(ui, ui.make_persistent_id("qnc_segment_level_meter"), transport.shrink2(Vec2::new(0.0, 1.0)), &lanes, style);
+        qnc_level_meter::show(ui, ui.make_persistent_id("qnc_segment_level_meter"), meter.shrink2(Vec2::new(0.0, 1.0)), &lanes, style);
+        in_rect(ui, norm, egui::Layout::left_to_right(egui::Align::Center), |ui| {
+            ui.spacing_mut().button_padding = Vec2::new(6.0, 1.0);
+            let button = flash_button(ui, qnc_ui_text::text("story.ui.normalized"), true, segments.normalize, theme);
+            if clicked(button.on_hover_text(qnc_ui_text::text("story.ui.normalize_hint"))) {
+                command = Some("toggle_loudness_normalize"); // the N key
+            }
+        });
     }
     in_rect(
         ui,

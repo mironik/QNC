@@ -464,3 +464,21 @@ fn a_written_cover_confirms_its_b_roll_shot() {
     }
     panic!("the B-roll shot of the written cover was not confirmed");
 }
+
+#[test]
+fn normalising_is_on_at_start_and_opening_a_project_keeps_what_the_user_chose() {
+    // User 2026-10-25: the preview normalises as the export does, on when the application
+    // starts; opening a project must not turn it off, nor on again once the user turned it off.
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("project.db");
+    store_with_story(&file);
+    let mut segments = ProgramSegments::new();
+    configure(&mut segments, &file);
+    assert!(segments.normalization().is_some(), "on after a project opened");
+    segments.apply_action("toggle_loudness_normalize");
+    let other = dir.path().join("other").join("project.db");
+    std::fs::create_dir_all(other.parent().unwrap()).unwrap();
+    store_with_story(&other);
+    segments.configure(ProjectDbTarget::from_owner_binding(&other, "qnc://local/db/project_db/p2").unwrap(), "p2", None, None);
+    assert_eq!(segments.normalization(), None, "off as the user turned it");
+}
