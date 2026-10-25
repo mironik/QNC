@@ -51,12 +51,16 @@ const PRODUCT_DIRECTORY_FIELDS: &[(&str, &str)] = &[
 /// files may be deleted and replaced (old prerender units go with their name); the
 /// folder itself stays protected.
 const CACHE_PRODUCT_FIELDS: &[&str] = &["prerender"];
+/// The exports of the project (user 2026-10-25: "the export folder may be cleaned"): what is
+/// in it may be deleted, the folder itself stays protected.
+const EXPORTS_FOLDER: &str = "exports";
 
 fn cache_product_folders() -> impl Iterator<Item = &'static str> {
     PRODUCT_DIRECTORY_FIELDS
         .iter()
         .filter(|(field, _)| CACHE_PRODUCT_FIELDS.contains(field))
         .map(|(_, folder)| *folder)
+        .chain([EXPORTS_FOLDER])
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2879,6 +2883,11 @@ mod tests {
         assert!(std::fs::remove_file(&unit).is_ok(), "a cache file goes with its name");
         assert!(std::fs::remove_file(&other).is_err(), "the rest of the project stays protected");
         assert!(std::fs::remove_dir(project_dir.join("products/prerender")).is_err(), "the cache folder itself stays");
+        // The exports may be cleaned too (user 2026-10-25), the exports folder stays.
+        let export = project_dir.join(DEFAULT_EXPORT_DIRECTORY).join("story_1.xml");
+        std::fs::write(&export, b"xml").unwrap();
+        assert!(std::fs::remove_file(&export).is_ok(), "an export goes with its name");
+        assert!(std::fs::remove_dir(project_dir.join(EXPORTS_FOLDER)).is_err(), "the exports folder itself stays");
         unlock_project_dir(&project_dir).expect("unlock cleanup");
         cleanup_temp_root(&root);
     }

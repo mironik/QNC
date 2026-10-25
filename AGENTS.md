@@ -6120,3 +6120,10 @@ crta se bojama i dijelovima teme aplikacije (`qnc-desktop-theme`): okvir kao inf
 NTSC kao tabovi poola (`qnc-media-pool-head::tab`), Export kao jaki gumb (`strong_button`), Cancel kao chrome gumb,
 font teme; vlastite boje (`ExportBoxStyle`) i zaobljeni okviri redaka uklonjeni. `qnc-segment-panel::show` prima temu
 aplikacije umjesto teme timelinea.
+Zatvoreno ograniceno odobrenje 2026-10-25 (korisnik: "otkljucaj Project da se mapa exporta smije cistiti"): otkljucan
+samo `crates/qnc-project-store`. Mapa `exports` projekta dobiva istu dozvolu kao mapa prerendera
+(`(OI)(CI)(IO)(DE)` za trenutnog korisnika): sve u njoj (exporti, podmapa `exports/projekti` i datoteke u njoj) smije se
+brisati, sama mapa `exports` i ostatak projekta ostaju zasticeni. Postojeci projekti dobivaju dozvolu kad Project otvori
+spremiste (provjera bez masovnog ACL posla). Export direktorij izvan `exports` (apsolutni ili drugi relativni) nije
+pokriven. Test `the_files_of_the_prerender_cache_may_be_deleted_the_rest_stays_protected` (i export), 42 testa. Project je
+ponovno zamrznut.
