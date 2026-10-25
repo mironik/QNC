@@ -19,11 +19,23 @@ pub(crate) fn story_kind(kind: &str) -> Result<&'static str> {
 }
 
 pub(crate) fn new_marker_id() -> String {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
-    format!("marker_{nanos:x}")
+    format!("marker_{:x}", unique_stamp())
+}
+
+/// The time in nanoseconds, never the same twice in this process (audit 2026-10-25: two
+/// ids made in one write could take the same clock tick and fail on the key).
+pub(crate) fn unique_stamp() -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static LAST: AtomicU64 = AtomicU64::new(0);
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|duration| duration.as_nanos() as u64).unwrap_or(0);
+    let mut last = LAST.load(Ordering::Relaxed);
+    loop {
+        let next = now.max(last + 1);
+        match LAST.compare_exchange_weak(last, next, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => return next,
+            Err(seen) => last = seen,
+        }
+    }
 }
 
 /// v5 `require_current_story_program_source_fps`: the rate of the story; markers and

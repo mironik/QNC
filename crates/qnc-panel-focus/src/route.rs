@@ -319,7 +319,7 @@ impl PanelFocus {
             }
             "clear_focus" if self.taken(timeline) => return self.source.route(action_id, preview, timeline),
             // Escape gives up what is not saved (user 2026-10-21): after a taken mark, a Sync draft.
-            "clear_focus" if segments.sync_drafting() => segments.discard_sync(),
+            "clear_focus" if segments.sync_drafting() || segments.sync_waiting() => segments.discard_sync(),
             // Escape drops the edit of a segment wherever the keyboard is.
             "clear_focus" if on_source && segments.view().editing.is_some() => {
                 segments.apply_action(action_id)

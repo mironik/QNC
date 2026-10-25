@@ -51,10 +51,7 @@ impl Store {
                 |row| row.get(0),
             )
             .map_err(err)?;
-        let created = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
+        let created = unique_stamp();
         let segment_id = format!("part_{created:x}");
         let now = story_now();
         // A last slot with a cover keeps its length (user 2026-10-18: a new segment was
@@ -368,6 +365,10 @@ impl Store {
             ],
         )
         .map_err(err)?;
+        // The boundary markers first take their new place, then two markers left on one frame
+        // become one (audit 2026-10-25), and the slots follow.
+        finalize_story(&tx)?;
+        merge_coincident_markers(&tx)?;
         finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
@@ -410,12 +411,14 @@ impl Store {
                 moved.push((marker_id, frame + start + length - end));
                 continue;
             }
-            // The picture under the marker, in source frames, stays under it.
-            let source = old_in + (frame - start) * den / num;
-            if source <= in_frame || source >= out_frame {
+            // The picture under the marker stays under it, counted in story frames (audit
+            // 2026-10-25: through source frames a 25p source in a 50p story lost the odd
+            // frame and could cut markers that stay inside the segment).
+            let moved_to = frame + (old_in - in_frame) * num / den;
+            if moved_to <= start || moved_to >= start + length {
                 cut.push(marker_id);
             } else {
-                moved.push((marker_id, start + (source - in_frame) * num / den));
+                moved.push((marker_id, moved_to));
             }
         }
         delete_markers_with_slots(&tx, &cut)?;
@@ -442,6 +445,10 @@ impl Store {
             ],
         )
         .map_err(err)?;
+        // The boundary markers first take their new place, then two markers left on one frame
+        // become one (audit 2026-10-25), and the slots follow.
+        finalize_story(&tx)?;
+        merge_coincident_markers(&tx)?;
         finalize_story(&tx)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)

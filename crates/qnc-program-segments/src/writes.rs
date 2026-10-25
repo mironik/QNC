@@ -67,6 +67,13 @@ impl ProgramSegments {
 
     /// Applies finished writes and rereads the program. Returns whether it changed.
     pub fn poll(&mut self) -> bool {
+        // A write that waits for its outcome holds Enter; with no write left nothing waits
+        // (audit 2026-10-25: a Sync cover or a marker cut that never got written held Enter,
+        // every other take was refused).
+        if !self.has_pending_work() {
+            self.sync.landed();
+            self.marker_committing = false;
+        }
         // The outcome of an export (user 2026-10-24).
         let exported = self.export_run.take().map(|outcome| match outcome {
             Ok(path) => {

@@ -5986,3 +5986,15 @@ stajala dulje od zalihe, dio zvuka se cuje ponovno). Dva testa koja su zakljucav
 prilagodena. Provjereno: testovi `qnc-broadcast-player` (80), `qnc-broadcast-engine`, `qnc-audio-output`, conformance;
 `qnc-player-acceptance` na izoliranoj kopiji: prica od 0 i od 600 100 % slika (jednom trzaj 85 ms), A/V -0,2 slike; klip 3396
 1-3 trzaja oko slike 470 jednako kao stari kod (izmjereno istim alatom prije izmjene: 1-4 trzaja). Uzivo nije provjereno.
+Izvedeno 2026-10-25 (audit, korak 2, greske montaze price): (1) Skracivanje segmenta (`TrimSegment`) racunalo je markere
+kroz slike izvora, pa je izvor upola manje stope (25p u 50p prici) gubio neparnu sliku i mogao obrisati markere koji ostaju u
+segmentu; sada u slikama price (`qnc-program-db` `trim_segment`, test). (2) Zamjena i skracivanje segmenta mogli su ostaviti
+dva markera na istoj slici; nakon izmjene granicni markeri dobiju novo mjesto, markeri na istoj slici postaju jedan
+(`merge_coincident_markers`), slotovi se slazu iznova. (3) Sync ili rez markera koji se nikad nisu upisali (upis nije krenuo
+ili je pao) drzali su Enter i odbijali svako drugo uzimanje: bez upisa u tijeku nista ne ceka (`qnc-program-segments` `poll`),
+novi IN i Delete pustaju Sync, Esc odbacuje i zatvoreni Sync slot koji nije upisan (`qnc-sync-cover` `waits`,
+`qnc-panel-focus`). (4) Undo/Redo puste sve uzeto (slot, rub, J/L, zvuk, pokrivalica, marker; test), brisanje i premjestanje
+segmenta zatvaraju otvoreni edit. (5) Oznake markera, segmenata i pokrivalica ne mogu se ponoviti u istom procesu
+(`unique_stamp`). Testovi `qnc-program-db` (45), `qnc-program-segments` (60), zlatna tablica tipki, conformance. Nije
+izvedeno iz audita (niska vaznost): razlika jedne slike izvora izmedu nacrta i upisa rolla pri 2:1, rez pokrivalice na
+neparnoj slici pri 2:1, provjera susjeda u bazi pri pomaku markera. Uzivo nije provjereno.

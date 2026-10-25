@@ -329,3 +329,23 @@ fn a_source_of_half_or_twice_the_story_rate_joins_with_its_length_in_story_frame
     assert_eq!(program_length(&mut store), 15);
     assert!(create_segment(&mut store, "offovi", (0, 1), (50, 1)).is_err(), "shorter than a story frame");
 }
+
+#[test]
+fn trimming_the_out_of_a_half_rate_segment_keeps_its_markers_on_their_frames() {
+    // A 50p story, a 25p segment of two story frames per source frame (audit 2026-10-25:
+    // the markers went through source frames, lost the odd frame or were cut).
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    create_segment(&mut store, "tonovi", (0, 10), (50, 1)).unwrap();
+    set_clip_timing(&path, 100_000, (25, 1));
+    create_segment(&mut store, "offovi", (100, 110), (25, 1)).unwrap();
+    let second = segments(&mut store)[1].segment_id.clone();
+    for local in [1, 3] {
+        run(&mut store, Operation::CreateMarker { part_id: second.clone(), local_frame: local }).unwrap();
+    }
+    assert!(markers(&mut store).contains(&11) && markers(&mut store).contains(&13), "{:?}", markers(&mut store));
+    run(&mut store, Operation::TrimSegment { segment_id: second, in_frame: 100, out_frame: 108 }).unwrap();
+    let after = markers(&mut store);
+    assert!(after.contains(&11) && after.contains(&13), "the markers stay on their pictures: {after:?}");
+}

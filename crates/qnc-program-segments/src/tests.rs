@@ -946,3 +946,14 @@ fn a_taken_in_or_out_shows_the_pictures_around_its_cut_and_a_second_of_sound_eac
     segments.set_source(pick(Some(false)));
     assert_eq!(frames(&segments), vec![(Some(449), true), (Some(450), false)], "OUT last, after OUT");
 }
+
+#[test]
+fn undo_lets_go_of_a_taken_slot_whose_frames_belong_to_the_story_before_it() {
+    let mut segments = component();
+    segments.set_playhead(Some(20));
+    segments.apply(SegmentCommand::SelectSlotAtPlayhead);
+    segments.apply_action("step_forward_frame");
+    assert!(segments.handles("step_forward_frame"), "the slot is taken");
+    segments.apply(SegmentCommand::Undo);
+    assert!(!segments.handles("step_forward_frame"), "Undo let it go: the arrows go back to the playhead");
+}

@@ -182,6 +182,11 @@ impl ProgramSegments {
         self.sync.is_active()
     }
 
+    /// A Sync slot closed but not written (its marker or cover failed): Escape drops it.
+    pub fn sync_waiting(&self) -> bool {
+        self.sync.waits()
+    }
+
     /// An arrow on a stopped Sync moves its end a frame.
     pub fn sync_nudge(&mut self, frames: i64) -> bool {
         if !self.sync.nudge(frames) {

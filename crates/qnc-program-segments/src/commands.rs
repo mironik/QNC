@@ -92,6 +92,8 @@ impl ProgramSegments {
                 | SegmentCommand::AddSegment(_)
                 | SegmentCommand::Undo
                 | SegmentCommand::Redo
+                | SegmentCommand::DeleteSelected
+                | SegmentCommand::Move { .. }
         ) {
             self.end_edit();
         }
@@ -153,8 +155,9 @@ impl ProgramSegments {
                 self.refresh_view(String::new());
             }
             SegmentCommand::Undo | SegmentCommand::Redo => {
-                self.marker_edit = None;
-                self.slot_trim = None;
+                // Everything taken goes: its frames belong to the story before the undo (audit
+                // 2026-10-25: a taken slot moved with stale frames after Undo).
+                self.let_go_edits(false);
                 self.adopt_selection = true;
                 self.write(if matches!(command, SegmentCommand::Undo) {
                     Operation::UndoStory

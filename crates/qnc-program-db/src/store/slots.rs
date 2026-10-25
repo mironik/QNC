@@ -252,7 +252,7 @@ pub(crate) fn split_cover_at(conn: &Connection, marker_id: &str, frame: i64) -> 
     let (num, den) = story_per_source(rate, (fps_num, fps_den))?;
     let split = source_in + (frame - start) * den / num;
     let fps = f64::from(fps_num) / f64::from(fps_den);
-    let created = SystemTime::now().duration_since(UNIX_EPOCH).map(|duration| duration.as_nanos()).unwrap_or(0);
+    let created = unique_stamp();
     let now = story_now();
     conn.execute(
         "INSERT INTO story_covers (

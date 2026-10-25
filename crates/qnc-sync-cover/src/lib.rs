@@ -122,6 +122,7 @@ impl SyncCover {
             self.armed = Some(source);
             self.pending = None;
             self.ready = None;
+            self.committing = false;
         }
     }
 
@@ -332,6 +333,7 @@ impl SyncCover {
     pub fn discard(&mut self) -> bool {
         let had = self.active.take().is_some() | self.pending.take().is_some() | self.ready.take().is_some();
         self.source_frame = None;
+        self.committing = false;
         had
     }
 
@@ -391,6 +393,11 @@ impl SyncCover {
         let ready = self.ready.take()?;
         self.committing = true;
         Some(ready)
+    }
+
+    /// A closed slot waits for Enter (not written yet): Escape drops it.
+    pub fn waits(&self) -> bool {
+        self.pending.is_some() || self.ready.is_some()
     }
 
     /// The cover write landed (or failed).

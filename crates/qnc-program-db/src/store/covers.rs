@@ -114,10 +114,7 @@ impl Store {
         let Some((start, end, start_sec, end_sec, signature, slot_index)) = slot else {
             return Err(format!("slot not found: {slot_id}"));
         };
-        let created = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
+        let created = unique_stamp();
         tx.execute("DELETE FROM story_covers WHERE slot_id = ?1", [slot_id])
             .map_err(err)?;
         let cover_id = format!("cover_{created:x}");
