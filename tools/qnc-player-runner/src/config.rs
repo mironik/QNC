@@ -76,7 +76,7 @@ impl Binding {
                 Ok((
                     Some(bound),
                     Box::new(move |uri| {
-                        let media = MediaStream::local(&source, uri)?;
+                        let media = open_card_media(|| MediaStream::local(&source, uri), CARD_RETRY)?;
                         let storage_stamp = media.info().storage_stamp.clone();
                         let path = local_codec_path(&source_uri, &root, uri)?;
                         Ok(DecodeMediaAccess::Endpoint {
@@ -111,6 +111,50 @@ impl Binding {
             }
         }
     }
+}
+
+/// How long a card that is gone for a moment is waited for (live 2026-10-25: the card reader
+/// dropped the card for about two seconds and the story stopped on "Source transport
+/// unavailable" until the next click).
+const CARD_RETRY: std::time::Duration = std::time::Duration::from_secs(4);
+
+/// Opens a medium of a card, again while the card is unavailable (gone for a moment), for
+/// at most `within`. A medium that is not there, not allowed or not a file is not waited for.
+fn open_card_media<T>(mut open: impl FnMut() -> io::Result<T>, within: std::time::Duration) -> io::Result<T> {
+    let until = std::time::Instant::now() + within;
+    let mut tries = 0u32;
+    loop {
+        match open() {
+            Err(error) if card_away(&error) && std::time::Instant::now() < until => {
+                tries += 1;
+                if tries == 1 && qnc_dev_diagnostics::player_diagnostics_enabled() {
+                    qnc_dev_diagnostics::log_line(
+                        qnc_dev_diagnostics::DiagnosticsStream::Player,
+                        format!("card-retry open waits: {error}"),
+                    );
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+            result => {
+                if tries > 0 && qnc_dev_diagnostics::player_diagnostics_enabled() {
+                    qnc_dev_diagnostics::log_line(
+                        qnc_dev_diagnostics::DiagnosticsStream::Player,
+                        format!("card-retry tries={tries} ok={}", result.is_ok()),
+                    );
+                }
+                return result;
+            }
+        }
+    }
+}
+
+/// The card's transport is unavailable (as the source reader says it), not a missing or
+/// forbidden medium.
+fn card_away(error: &io::Error) -> bool {
+    error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<qnc_source_reader::ReadError>())
+        .is_some_and(|read| matches!(read, qnc_source_reader::ReadError::Unavailable))
 }
 
 /// One opener for the media of a program: each URI goes to the binding of its
@@ -261,6 +305,33 @@ mod tests {
         assert!(fit(true, true, 0), "a silent bed reads no media");
         assert!(!fit(true, false, 1), "bindings without a bed");
         assert!(!fit(false, true, 1), "a clip needs its own binding");
+    }
+
+    #[test]
+    fn a_card_gone_for_a_moment_is_opened_again_a_missing_medium_is_not() {
+        use std::io;
+        let gone = || io::Error::new(io::ErrorKind::Other, qnc_source_reader::ReadError::Unavailable);
+        let mut calls = 0;
+        let opened = super::open_card_media(
+            || {
+                calls += 1;
+                if calls < 3 { Err(gone()) } else { Ok(calls) }
+            },
+            std::time::Duration::from_secs(4),
+        );
+        assert_eq!(opened.unwrap(), 3, "opened once the card is back");
+        let mut calls = 0;
+        let missing = super::open_card_media::<()>(
+            || {
+                calls += 1;
+                Err(io::Error::new(io::ErrorKind::NotFound, qnc_source_reader::ReadError::NotFound))
+            },
+            std::time::Duration::from_secs(4),
+        );
+        assert!(missing.is_err());
+        assert_eq!(calls, 1, "a missing medium is not waited for");
+        let gave_up = super::open_card_media::<()>(|| Err(gone()), std::time::Duration::from_millis(300));
+        assert!(gave_up.is_err(), "a card that stays away is an error after the wait");
     }
 }
 

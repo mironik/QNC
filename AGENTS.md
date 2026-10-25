@@ -6070,3 +6070,11 @@ cekao 10 s i source player nije radio. Sada player prima A1 Synca bez veza izvor
 pa klijent javlja gresku umjesto cekanja (`qnc-player-client` `open_session`). Uz to disk C: je bio pun (454 MB slobodno,
 prerender nije mogao pisati): obrisan debug cache (`cargo clean --profile dev`, 40,7 GiB) uz dozvolu korisnika. Testovi,
 conformance, release build. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-25 (korisnik: "da, dodaj ponovno otvaranje kad kartica nestane"; log 15:41: kartica D: je na
+oko 2 s nestala, player price javio "Source transport unavailable" i stao do sljedeceg klika): `tools/qnc-player-runner`
+(`open_card_media`, `card_away`): lokalni opener playera (klip, zvuk, A1 Synca, prica) otvara medij kartice ponovno svakih
+200 ms dok izvor javlja da je nedostupan (`qnc_source_reader::ReadError::Unavailable`), najvise 4 s; medij koji ne postoji,
+nije dopusten ili nije datoteka ne ceka se. Pokusaji idu u player log (`card-retry`). Ovisnost `qnc-source-reader` u
+programu playera. Otvaranje price ide u pozadinskoj niti dekodera, pa cekanje ne zaustavlja sat; priprema klipa ceka
+najvise toliko. Test `a_card_gone_for_a_moment_is_opened_again_a_missing_medium_is_not`, conformance, release build.
+Uzivo nije provjereno (kartica nije namjerno vadena).

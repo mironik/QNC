@@ -14,6 +14,7 @@ qnc-player-input.workspace = true
 qnc-broadcast-engine.workspace = true
 qnc-dev-diagnostics.workspace = true
 qnc-media-stream.workspace = true
+qnc-source-reader.workspace = true
 qnc-media-decode.workspace = true
 qnc-decoder-catalog.workspace = true
 qnc-video-output.workspace = true

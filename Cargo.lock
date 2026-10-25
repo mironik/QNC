@@ -4851,6 +4851,7 @@ dependencies = [
  "qnc-player-contract",
  "qnc-player-frame-transport",
  "qnc-player-input",
+ "qnc-source-reader",
  "qnc-transport-resolver",
  "qnc-video-output",
  "qnc-work-settings",
