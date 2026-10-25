@@ -220,6 +220,8 @@ impl ProgramSegments {
             self.wrap_return = Some(edge.wrap_frame(out_frame.saturating_sub(in_frame)));
         }
         self.write(Operation::TrimSegment { segment_id, in_frame, out_frame });
+        // The edit is over: say so (live 2026-10-25: the edit hint stayed and it looked open).
+        self.refresh_view(qnc_ui_text::text("story.msg.segment_edit_saved").into());
         true
     }
 }

@@ -6027,3 +6027,8 @@ lokacija (`qnc-dir-browser`) i dalje lista mape na niti sucelja. Provjereno: tes
 (odgovori redom iz pozadinske niti na privremenom korijenu), `qnc-project-store`, `qnc-desktop`, conformance, release build;
 pokretanje aplikacije bez ijednog sporog framea u logu. Uzivo kroz sucelje (kreiranje, otvaranje, brisanje) nije provjereno.
 Project je ponovno zamrznut.
+Dopuna 2026-10-25 (korisnik: "kada segment editiram u source timeline i kada zavrsim, kako se vracam na normalni rad"): log i
+baza aktivnog projekta (samo citanje) pokazali su da je Enter spremio izmjenu (IN 851 -> 848), ali je poruka i dalje glasila
+"Segment edit: ... Enter saves, Esc cancels", pa je izgledalo da je izmjena jos otvorena. Nakon spremanja status kaze
+"Segment saved; back to normal work." (`qnc-program-segments` `commit_edit`, rjecnik `story.msg.segment_edit_saved`).
+Postupak je isti: Enter sprema, Esc odustaje; oba zavrsavaju uredivanje segmenta.

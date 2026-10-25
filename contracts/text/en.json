@@ -146,6 +146,7 @@
     "story.still.segment_new_first": "Segment - new first",
     "story.still.segment_new_last": "Segment - new last",
     "story.still.after_segment_first": "After the segment - first",
+    "story.msg.segment_edit_saved": "Segment saved; back to normal work.",
     "story.msg.segment_edit_cancelled": "Segment edit cancelled.",
     "story.msg.segment_edit_own_clip": "The segment is edited on its own clip; go back to it or press Esc.",
     "story.msg.no_audio_channels": "The clip has no known audio channels.",
