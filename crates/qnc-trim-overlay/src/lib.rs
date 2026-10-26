@@ -23,6 +23,8 @@ const LABEL_HEIGHT: f32 = 22.0;
 /// One lane of the zoom's sound and the gap above the lanes.
 const LANE_HEIGHT: f32 = 64.0;
 const LANES_GAP: f32 = 8.0;
+/// The row of the words said on A1, under its wave (user 2026-10-26).
+const WORDS_HEIGHT: f32 = 22.0;
 /// The thin line through the cut.
 const CUT_LINE: Color32 = Color32::from_rgb(230, 30, 30);
 /// The share of the screen width the window may take.
@@ -40,7 +42,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) {
     let width = ((screen.width() * SCREEN_SHARE - 2.0 * MARGIN - GAP * (count - 1.0)) / count).min(MAX_PICTURE.x);
     let picture = Vec2::new(width.max(16.0), width.max(16.0) * 9.0 / 16.0);
     let sound = segments.zoom_sound.as_ref().filter(|sound| sound.to > sound.from);
-    let lanes = if sound.is_some() { LANES_GAP + 2.0 * LANE_HEIGHT + GAP / 2.0 } else { 0.0 };
+    let lanes = if sound.is_some() { LANES_GAP + 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT } else { 0.0 };
     let size = Vec2::new(count * picture.x + GAP * (count - 1.0), picture.y + LABEL_HEIGHT + lanes) + Vec2::splat(2.0 * MARGIN);
     egui::Area::new(egui::Id::new("qnc_trim_overlay"))
         .order(egui::Order::Foreground)
@@ -67,7 +69,7 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) {
                 }
             }
             if let Some(sound) = sound {
-                let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0));
+                let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
                 paint_sound(ui, area, sound, gap_at, top.y, &visuals);
             }
         });
@@ -90,8 +92,12 @@ fn shown_height(peak: u16) -> f32 {
 fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, visuals: &egui::Visuals) {
     let span = (sound.to - sound.from) as f32;
     let cut_x = area.left() + area.width() * (sound.cut.saturating_sub(sound.from)) as f32 / span;
+    let x_of = |frame: u64| area.left() + area.width() * (frame.saturating_sub(sound.from)) as f32 / span;
     for lane in 0..2 {
-        let top = area.top() + lane as f32 * (LANE_HEIGHT + GAP / 2.0);
+        let top = area.top() + lane as f32 * (LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT);
+        if lane == 1 {
+            paint_words(ui, Rect::from_min_size(egui::pos2(area.left(), top - WORDS_HEIGHT - GAP / 4.0), Vec2::new(area.width(), WORDS_HEIGHT)), sound, &x_of, visuals);
+        }
         let band = Rect::from_min_size(egui::pos2(area.left(), top), Vec2::new(area.width(), LANE_HEIGHT));
         ui.painter().rect_filled(band, 2.0, Color32::from_rgb(17, 103, 88));
         let peaks = &sound.peaks[lane];
@@ -113,6 +119,22 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
         _ => area.top(),
     };
     ui.painter().line_segment([egui::pos2(cut_x, from_top), egui::pos2(cut_x, area.bottom())], Stroke::new(1.5, CUT_LINE));
+}
+
+/// The words said on A1 in the window, each from where it is said, cut where the next one
+/// starts; a short tick marks a word's start, so a pause between words is seen.
+fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u64) -> f32, visuals: &egui::Visuals) {
+    let font = FontId::proportional(13.0);
+    for (index, word) in sound.words.iter().enumerate() {
+        let left = x_of(word.from).max(row.left());
+        let right = sound.words.get(index + 1).map_or(row.right(), |next| x_of(next.from)).min(row.right()).max(left);
+        let end = x_of(word.to).clamp(left, right);
+        let said = Rect::from_min_max(egui::pos2(left, row.top() + 2.0), egui::pos2(end.max(left + 1.0), row.bottom() - 2.0));
+        ui.painter().rect_filled(said, 2.0, visuals.faint_bg_color);
+        ui.painter().line_segment([egui::pos2(left, row.top()), egui::pos2(left, row.bottom())], Stroke::new(1.0, visuals.weak_text_color()));
+        let cell = Rect::from_min_max(egui::pos2(left + 3.0, row.top()), egui::pos2(right, row.bottom()));
+        ui.painter().with_clip_rect(cell).text(egui::pos2(cell.left(), row.center().y), Align2::LEFT_CENTER, word.text.trim(), font.clone(), visuals.text_color());
+    }
 }
 
 fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, visuals: &egui::Visuals) {

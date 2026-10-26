@@ -136,6 +136,7 @@ members = [
     "crates/qnc-transcript",
     "crates/qnc-transcript-panel",
     "crates/qnc-right-panel",
+    "crates/qnc-zoom-words",
     "tools/qnc-transcribe-whisper",
     "tools/qnc-decoder-acceptance",
     "crates/qnc-installed-versions",
@@ -384,6 +385,7 @@ qnc-transcribe-run = { path = "crates/qnc-transcribe-run" }
 qnc-transcript = { path = "crates/qnc-transcript" }
 qnc-transcript-panel = { path = "crates/qnc-transcript-panel" }
 qnc-right-panel = { path = "crates/qnc-right-panel" }
+qnc-zoom-words = { path = "crates/qnc-zoom-words" }
 qnc-installed-versions = { path = "crates/qnc-installed-versions" }
 qnc-choice-box = { path = "crates/qnc-choice-box" }
 qnc-keyframe-nav = { path = "crates/qnc-keyframe-nav" }

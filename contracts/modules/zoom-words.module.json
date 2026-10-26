@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.zoom-words",
+  "module_name": "Zoom Words",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.trim_zoom.words", "speech.transcribe.clip_range", "db.transcripts.read"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "playback.clock", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-zoom-words",
+  "input": "The sound of the trim zoom (its window, the pieces A1 plays there with their clip frames) and the locator of the project the preview works in.",
+  "output": "The words said on A1 in the window on the zoom's axis, from the transcripts kept in the project database; a part no transcript covers is transcribed once (five seconds on each side) off the form thread and kept through qnc-transcript-db.",
+  "specification": "User 2026-10-26: words in the trim zoom to find the start or end of a statement (AGENTS.md)."
+}

@@ -1,0 +1,13 @@
+[package]
+name = "qnc-zoom-words"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the words A1 says around the cut of the trim zoom, from the transcripts kept in the project database, a part no transcript covers transcribed once with five seconds on each side, off the form thread; it paints nothing and knows no form"
+
+[dependencies]
+qnc-db-broker = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-program-view = { workspace = true }
+qnc-still-locator = { workspace = true }
+qnc-transcribe-run = { workspace = true }
+qnc-transcript-db = { workspace = true }

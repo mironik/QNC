@@ -100,6 +100,11 @@ impl StillLocator {
         &self.settings.project_id
     }
 
+    /// The reader of that project's settings (its database binding on this machine).
+    pub fn reader(&self) -> &SettingsReader {
+        &self.reader
+    }
+
     /// The work settings of that project, as read from its database.
     pub fn settings(&self) -> &WorkSettings {
         &self.settings

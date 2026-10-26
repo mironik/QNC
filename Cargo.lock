@@ -5990,6 +5990,7 @@ dependencies = [
  "qnc-source-preview",
  "qnc-still-locator",
  "qnc-ui-text",
+ "qnc-zoom-words",
 ]
 
 [[package]]
@@ -6178,6 +6179,18 @@ dependencies = [
  "qnc-ui-text",
  "rusqlite",
  "serde",
+]
+
+[[package]]
+name = "qnc-zoom-words"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-dev-diagnostics",
+ "qnc-program-view",
+ "qnc-still-locator",
+ "qnc-transcribe-run",
+ "qnc-transcript-db",
 ]
 
 [[package]]

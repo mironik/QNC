@@ -100,6 +100,17 @@ pub struct ZoomSound {
     pub cut: u64,
     pub lanes: [Vec<qnc_program_waveform::Placement>; 2],
     pub peaks: [Vec<u16>; 2],
+    /// The words said on A1 in the window (user 2026-10-26: the start or end of a statement
+    /// found in the zoom), on its axis; empty until transcribed.
+    pub words: Vec<ZoomWord>,
+}
+
+/// A word of the zoom's window: its frames on the zoom's axis and what was said.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ZoomWord {
+    pub from: u64,
+    pub to: u64,
+    pub text: String,
 }
 
 /// What a form shows: the program in order, its markers and slots, timebase,

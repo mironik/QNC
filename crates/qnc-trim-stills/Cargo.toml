@@ -17,3 +17,4 @@ qnc-media-stream = { workspace = true }
 qnc-program-view = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-still-locator = { workspace = true }
+qnc-zoom-words = { workspace = true }

@@ -157,7 +157,7 @@ impl ProgramSegments {
                 level_db: lane.level_db,
                 off: lane.off,
             };
-            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], peaks: Default::default() });
+            return Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [vec![lane(&self.source.lanes[0])], vec![lane(&self.source.lanes[1])]], ..Default::default() });
         }
         let cut = cut_of(&view.edit_stills)?;
         let (num, den) = view.timebase?;
@@ -165,7 +165,7 @@ impl ProgramSegments {
         let (from, to) = (cut.saturating_sub(half), (cut + half).min(view.total_frames.max(cut + 1)));
         let (segments, covers) = view.wave_placements();
         let near = |placements: Vec<qnc_program_waveform::Placement>| placements.into_iter().filter(|at| at.program_start < to && from < at.program_end).collect();
-        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], peaks: Default::default() })
+        Some(qnc_program_view::ZoomSound { from, to, cut, lanes: [near(segments), near(covers)], ..Default::default() })
     }
 
     /// Whether a segment edge taken from the segment panel waits for Enter or Escape.

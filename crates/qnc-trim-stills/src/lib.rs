@@ -85,6 +85,8 @@ pub struct TrimStills {
     moving: HashMap<String, (StillPicture, i8)>,
     /// The fine wave of the zoom's cut (user 2026-10-25), read around it from the original.
     fine: qnc_fine_wave::FineWave,
+    /// The words A1 says there (user 2026-10-26), from the project's transcripts.
+    words: qnc_zoom_words::ZoomWords,
 }
 
 impl TrimStills {
@@ -141,6 +143,7 @@ impl TrimStills {
                 let (peaks, _) = self.fine.lane_peaks(&locator, &sound.lanes[lane], sound.from, sound.to, ZOOM_COLUMNS);
                 sound.peaks[lane] = peaks.iter().map(|peak| (peak * 1000.0).round() as u16).collect();
             }
+            self.words.fill(&locator, sound);
         }
         for still in view.edit_stills.iter_mut().chain(view.source_edit_stills.iter_mut()) {
             still.image = still.picture.as_ref().and_then(|picture| self.cache.get(picture).cloned());
@@ -252,7 +255,7 @@ impl TrimStills {
 
     /// Whether a picture is being made (the caller repaints soon).
     pub fn loading(&self) -> bool {
-        self.job.is_some() || self.fine.loading()
+        self.job.is_some() || self.fine.loading() || self.words.loading()
     }
 
     fn take_finished(&mut self) -> bool {

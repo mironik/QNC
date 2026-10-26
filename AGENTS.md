@@ -6261,3 +6261,13 @@ raspona klipa: privremeni 16 kHz WAV u praznoj privremenoj mapi, program ostaje 
 `StillLocator::settings`. Conformance: grupa e mora imati `transcript_panel`, g i l prazni; `qnc-transcript-db` na
 popisu javnih DB vlasnika. Testovi, conformance, release build. Uzivo kroz sucelje nije provjereno. Nije izvedeno
 (dio 2): rijeci u trim zoomu oko reza.
+Izvedeno 2026-10-26 (korisnik: "kreni s drugim dijelom, zoom"; korak 2b, dio 2): trim zoom (slot, marker, rub, source
+IN/OUT) ispod vala A1 pokazuje rijeci izgovorene u prozoru, svaku od mjesta gdje je izgovorena, s crticom pocetka, pa se
+vidi i stanka izmedu rijeci; crvena linija reza prolazi i kroz njih. Nova javna kocka `crates/qnc-zoom-words` (+ ugovor
+`contracts/modules/zoom-words.module.json`): za svaki dio zvuka koji A1 pusta u prozoru rijeci njegova klipa iz prijepisa
+u bazi projekta (`qnc-transcript-db`); dio koji nijedan prijepis ne pokriva prepisuje se jednom, 5 s sa svake strane, u
+pozadini (`qnc-transcribe-run`, program ostaje ucitan), zapisuje u bazu i ponovno cita odande; klip ciji prijepis nije
+uspio ne pita se ponovno u istom radu; bez ukljucenog prijepisa u projektu nema rijeci. Rijeci su iz kanala govora
+projekta. Puni je `qnc-trim-stills` uz fini val (aplikacija nije dirana), crta `qnc-trim-overlay` (`paint_words`);
+`qnc-program-view` `ZoomSound.words`, `ZoomWord`; `qnc-still-locator` `reader`. Testovi, conformance, release build.
+Uzivo nije provjereno.
