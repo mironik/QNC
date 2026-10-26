@@ -1,0 +1,39 @@
+{
+  "module_id": "qnc.module.transcribe-jobs",
+  "module_name": "Transcribe jobs",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "speech.transcribe"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "media.read",
+    "database.read",
+    "database.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-transcribe-jobs",
+  "input": "A transcription program by its name beside the application (from the AI catalog) and one job: the model, the voice activity model, the backend, the language and a 16 kHz mono WAV in an empty temporary folder of the application.",
+  "output": "The segments of speech with their words and times (seconds from the start of the WAV) as they are made, and the language, or a controlled error; the program's side of the same contract (contracts/plugins/transcribe.v1.json).",
+  "specification": "User 2026-10-26: the best offline transcription, as a block that can be replaced without building QNC. The program writes nothing; a backend the program cannot run is an error, nothing falls back."
+}

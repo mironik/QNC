@@ -1,0 +1,15 @@
+[package]
+name = "qnc-transcribe-whisper"
+version = "0.1.0"
+edition = "2021"
+description = "QNC transcription plug-in: speech to text with whisper.cpp (contract qnc.transcribe 1), as its own program; feature vulkan runs it on the graphics card"
+
+[features]
+# whisper.cpp on the processor (needs cmake and a C++ compiler to build).
+whisper = ["dep:whisper-rs"]
+# ... and on the graphics card through Vulkan (needs the Vulkan SDK to build).
+vulkan = ["whisper", "whisper-rs/vulkan"]
+
+[dependencies]
+qnc-transcribe-jobs = { workspace = true }
+whisper-rs = { version = "0.16", optional = true }

@@ -128,6 +128,9 @@ members = [
     "tools/qnc-format-sony",
     "crates/qnc-decoder-jobs",
     "tools/qnc-decoder-ffmpeg",
+    "crates/qnc-transcribe-jobs",
+    "crates/qnc-ai-catalog",
+    "tools/qnc-transcribe-whisper",
     "tools/qnc-decoder-acceptance",
     "crates/qnc-installed-versions",
     "tools/qnc-versions",
@@ -367,6 +370,8 @@ qnc-camera-profile-adapter = { path = "crates/qnc-camera-profile-adapter" }
 qnc-plugin-process = { path = "crates/qnc-plugin-process" }
 qnc-record-format-plugin = { path = "crates/qnc-record-format-plugin" }
 qnc-decoder-jobs = { path = "crates/qnc-decoder-jobs" }
+qnc-transcribe-jobs = { path = "crates/qnc-transcribe-jobs" }
+qnc-ai-catalog = { path = "crates/qnc-ai-catalog" }
 qnc-installed-versions = { path = "crates/qnc-installed-versions" }
 qnc-choice-box = { path = "crates/qnc-choice-box" }
 qnc-keyframe-nav = { path = "crates/qnc-keyframe-nav" }

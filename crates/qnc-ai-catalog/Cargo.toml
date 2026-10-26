@@ -1,0 +1,9 @@
+[package]
+name = "qnc-ai-catalog"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: the AI catalog of this host (catalogs/ai/catalog.json): which program, model and backend do each AI job here, one selected per job, nothing falls back"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

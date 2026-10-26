@@ -1,0 +1,15 @@
+[package]
+name = "qnc-transcribe-jobs"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public block: speech to text as a plug-in program (contract qnc.transcribe 1): the client the application uses, the side a transcription program serves, and the 16 kHz mono WAV the contract takes"
+
+[dependencies]
+qnc-plugin-process = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true, features = ["float_roundtrip"] }
+
+[dev-dependencies]
+qnc-ai-catalog = { workspace = true }
+qnc-decoder-catalog = { workspace = true }
+qnc-ffmpeg-decode = { workspace = true }

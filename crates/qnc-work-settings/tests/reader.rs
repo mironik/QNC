@@ -311,3 +311,24 @@ fn a_new_project_has_ebu_loudness_on_a1_and_a2_and_a_two_second_tail_and_nothing
     settings.export.as_object_mut().unwrap().remove("start_timecode");
     assert!(settings.export_start_timecode().is_err());
 }
+
+#[test]
+fn transcription_is_off_in_croatian_on_the_first_channel_until_the_project_says_other_and_nothing_is_guessed() {
+    let root = fixture();
+    let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
+    let mut settings = reader.read().unwrap();
+    assert!(!settings.transcription_enabled().unwrap());
+    assert_eq!(settings.speech_language().unwrap(), "hr");
+    assert_eq!(settings.transcribe_channel().unwrap(), 0, "CH1 is the first channel");
+    settings.ai["language"] = json!("auto");
+    settings.audio["transcribe_channel"] = json!("CH3");
+    assert_eq!(settings.speech_language().unwrap(), "auto");
+    assert_eq!(settings.transcribe_channel().unwrap(), 2);
+    // Missing or impossible values are refused, never defaulted.
+    settings.ai["language"] = json!("Hrvatski");
+    assert!(settings.speech_language().is_err());
+    settings.ai.as_object_mut().unwrap().remove("transcription");
+    assert!(settings.transcription_enabled().is_err());
+    settings.audio["transcribe_channel"] = json!("CH0");
+    assert!(settings.transcribe_channel().is_err());
+}

@@ -1,0 +1,24 @@
+{
+  "version": "1",
+  "transcribe": {
+    "selected": "whisper.large-v3-turbo.vulkan",
+    "engines": [
+      {
+        "id": "whisper.large-v3-turbo.vulkan",
+        "program": "qnc-transcribe-whisper",
+        "backend": "vulkan",
+        "model": "../../data/models/ggml-large-v3-turbo.bin",
+        "vad_model": "../../data/models/ggml-silero-v5.1.2.bin",
+        "threads": 4
+      },
+      {
+        "id": "whisper.large-v3-turbo.cpu",
+        "program": "qnc-transcribe-whisper",
+        "backend": "cpu",
+        "model": "../../data/models/ggml-large-v3-turbo.bin",
+        "vad_model": "../../data/models/ggml-silero-v5.1.2.bin",
+        "threads": 6
+      }
+    ]
+  }
+}

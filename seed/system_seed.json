@@ -120,7 +120,9 @@
         },
         "ai": {
           "enabled": false,
-          "coverage_suggestions": false
+          "coverage_suggestions": false,
+          "transcription": false,
+          "language": "hr"
         },
         "artifacts": {
           "filmstrip": "auto",
@@ -207,7 +209,9 @@
         },
         "ai": {
           "enabled": false,
-          "coverage_suggestions": true
+          "coverage_suggestions": true,
+          "transcription": false,
+          "language": "hr"
         },
         "artifacts": {
           "filmstrip": "auto",
@@ -294,7 +298,9 @@
         },
         "ai": {
           "enabled": false,
-          "coverage_suggestions": true
+          "coverage_suggestions": true,
+          "transcription": false,
+          "language": "hr"
         },
         "artifacts": {
           "filmstrip": "auto",
@@ -381,7 +387,9 @@
         },
         "ai": {
           "enabled": false,
-          "coverage_suggestions": true
+          "coverage_suggestions": true,
+          "transcription": false,
+          "language": "hr"
         },
         "artifacts": {
           "filmstrip": "auto",

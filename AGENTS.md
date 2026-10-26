@@ -6213,3 +6213,34 @@ id, vrste zahtjeva, spajanje (shema) i izvodenje. `qnc-virtual-shots` dobio je p
 isto. `qnc-media-record-db` i `qnc-source-index-db` imaju drukciji oblik (spajanje kroz `project.rs`) i nisu dirani.
 Testovi: dva nova u posredniku (pisanje samo u svoje tablice, modul samo za citanje ne pise ni u svoje), testovi pet
 modula, `qnc-program-segments`, `qnc-content-artifacts`, conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-26 (korak 2a plana AI; korisnik: "kreni s korakom 2", "ne postuj postojece rjesenje,
+predlozi najbolje", "da" na whisper.cpp s Vulkanom kao zaseban program, "da, preuzmi VAD, jezik postavka projekta",
+"obvezno da podrzava hrvatski"; Project otkljucan samo za postavku jezika): prepis govora kao dodatak. Ugovor
+`contracts/plugins/transcribe.v1.json` (`qnc.transcribe` 1: aplikacija pise 16 kHz mono WAV u praznu privremenu mapu,
+program vraca segmente s rijecima i njihovim vremenima u dijelovima, pa jezik; program nista ne pise; backend koji ne
+moze pokrenuti je greska). Nova javna kocka `crates/qnc-transcribe-jobs` (+ ugovor modula): strana aplikacije
+(`Transcriber`, jedan proces, poslovi redom jer model drzi graficku), strana programa (`serve`, `Engine`) i zvuk koji
+ugovor trazi (`to_whisper_rate`: windowed-sinc s ostrim rubom do 7,8 kHz; kratki filtar koji je gusio od ~6 kHz davao
+je "Hvala." umjesto govora, izmjereno; `write_wav`, `read_wav`). Nova javna kocka `crates/qnc-ai-catalog` (+ ugovor):
+katalog AI motora racunala `catalogs/ai/catalog.json` (program, backend vulkan|cpu, model i VAD model relativno mapi
+kataloga, niti; jedan odabran, model koji nedostaje je greska, nema zamjene). Novi program `tools/qnc-transcribe-whisper`
+(whisper-rs 0.16 / whisper.cpp; znacajka `vulkan`: Intel, AMD i NVIDIA graficka i procesor; `whisper`: samo procesor;
+bez nje javlja da nema motora): model se ucitava jednom, vremena rijeci iz DTW poravnanja za large-v3-turbo, Silero VAD,
+beam 5, whisperovi zadani pragovi i ponovni pokusaj na visoj temperaturi (bez njega govor je izlazio kao "Hvala."),
+zvuk u komadima do 240 s rezanima na najtisem mjestu, uzastopni isti segmenti se brisu (petlja na ambijentu; kao v5).
+`whisper-rs` 0.16 `set_abort_callback_safe` cita svoj closure kao krivi tip i prekida svaki posao, pa se koristi izravni
+callback. Gradnja: cmake, Vulkan SDK (`C:\VulkanSDK\1.4.363.0`), LLVM, `--features vulkan`, i kratki `CARGO_TARGET_DIR`
+(MSBuild ne prima putanju od 265 znakova u `QNC\target`); exe se kopira uz aplikaciju. Modeli (nisu u gitu):
+`data/models/ggml-large-v3-turbo.bin` (1,6 GB), `data/models/ggml-silero-v5.1.2.bin`. Project: postavka `ai.language`
+(seed svih sistemskih predlozaka `hr`, i `ai.transcription` false; `qnc-project-store` ih dopunjuje starijem projektu,
+test; Advanced sekcija "Transcription", izbor "Language of speech": hr, sr, bs, sl, mk, en, de, it, auto); Project je
+ponovno zamrznut. `qnc-work-settings`: `transcription_enabled`, `speech_language`, `transcribe_channel`
+(`audio.transcribe_channel` CH1 -> 0), strogo, test. `qnc-installed-versions`/`qnc-versions` pokazuje motor prepisa.
+Izmjereno (Mironik 2002 s kartice G:, samo citanje, kanal 1, hrvatski): Intel Iris Xe Vulkan 90 s zvuka za 58 s
+(1,55x stvarnog vremena, s ucitavanjem modela), cijeli klip 204 s za oko 136 s; procesor (6 niti) 90 s za 782 s.
+Tekst novinara dobar ("Vidite, upravo ovdje u Medugorju otvara svoj teniski centar..."), greske u imenima (Pajevic za
+Pavic, Bekera); na tihom kanalu preko ambijenta whisper izmislja kratke recenice ("Oprosti Gula.", "Hvala sto
+pratitev."). Testovi `qnc-transcribe-jobs`, `qnc-ai-catalog`, `qnc-work-settings`, `qnc-project-store`,
+`qnc-transcribe-whisper`, conformance. Nije izvedeno (2b): pozadinski posao (raspored iz koraka 1, zvuk kanala iz
+originala kroz katalog dekodera), tablica prepisa u bazi projekta s pretragom rijeci (FTS5), prikaz; prijevod na
+hrvatski (whisper prevodi samo na engleski, treba zaseban model).

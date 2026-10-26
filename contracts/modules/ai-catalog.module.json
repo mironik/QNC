@@ -1,0 +1,39 @@
+{
+  "module_id": "qnc.module.ai-catalog",
+  "module_name": "AI catalog",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "ai.catalog.read"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "ffprobe",
+    "media.decode",
+    "media.read",
+    "database.read",
+    "database.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [
+    "qnc.module.media-probe",
+    "qnc.module.content-store"
+  ],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-ai-catalog",
+  "input": "The AI catalog of this host (catalogs/ai/catalog.json beside the application, or QNC_AI_CATALOG).",
+  "output": "The engine selected for each AI job (program, backend, model files, threads), or a controlled error when it cannot run here.",
+  "specification": "User 2026-10-26: AI engines are host configuration like the decoder catalog, never project settings. One engine per job is selected; nothing falls back to another."
+}

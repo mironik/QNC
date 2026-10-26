@@ -124,7 +124,27 @@ fn plugins(root: &Path) -> Vec<PluginLine> {
             }
         }
     }
+    // The transcription engine the AI catalog selects (user 2026-10-26), with its model.
+    match qnc_ai_catalog::installed_transcriber() {
+        Ok(engine) => {
+            let role = format!("transcription {} ({}, model {})", engine.id, engine.backend, file_name(&engine.model));
+            lines.push(ask(role, &engine.program, qnc_transcribe_jobs::CONTRACT, qnc_transcribe_jobs::CONTRACT_VERSION, Duration::from_secs(10)));
+        }
+        Err(error) => lines.push(PluginLine {
+            role: "transcription".into(),
+            program: String::new(),
+            contract: qnc_transcribe_jobs::CONTRACT.into(),
+            contract_version: qnc_transcribe_jobs::CONTRACT_VERSION,
+            plugin_id: None,
+            plugin_version: None,
+            problem: Some(error),
+        }),
+    }
     lines
+}
+
+fn file_name(path: &Path) -> String {
+    path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
 /// Starts `program` beside the application and asks who it is.

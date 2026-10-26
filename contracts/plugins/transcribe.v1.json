@@ -1,0 +1,19 @@
+{
+  "contract": "qnc.transcribe",
+  "version": 1,
+  "purpose": "Speech to text for QNC as a plug-in program beside the application (user 2026-10-26: the best offline transcription, a block that can be replaced without building QNC). The AI catalog of the host (catalogs/ai/catalog.json) names the program, the model and the backend; nothing falls back to another engine.",
+  "transport": "The JSON lines of qnc.module.plugin-process: the application's hello, the plug-in's ready, then one request at a time. A job answers its segments in parts (lines with \"part\") before its answer. A request { \"id\": 0, \"op\": \"cancel\", \"body\": <id> } stops the running job; a plug-in that does not end it in 2 s is stopped.",
+  "handshake": {
+    "application": { "contract": "qnc.transcribe", "version": 1 },
+    "plugin": { "contract": "qnc.transcribe", "version": 1, "plugin_id": "a stable id", "plugin_version": "its version", "about": "{ engine, backends: [..] }" }
+  },
+  "operations": {
+    "transcribe": {
+      "body": "{ model, vad_model?, backend: vulkan | cpu, wav, language, threads }",
+      "part": "{ start, end, text, words: [{ start, end, text, p }] }: one segment, times in seconds from the start of wav",
+      "ok": "{ language }: the language the text is in"
+    }
+  },
+  "rules": "wav is a 16 kHz mono 16-bit PCM WAV file in an empty temporary folder of the application (the only file the plug-in reads besides the models); the plug-in writes nothing. language is a code (hr, en...) or auto. backend is the one the catalog chose: a plug-in that cannot run it answers an error, never another backend. Word times are the engine's alignment of each word to the sound. An error is an answer, never a different result.",
+  "acceptance": "crates/qnc-transcribe-jobs/examples/transcribe_media.rs: a medium that is only read, its sound through the decoder catalog, the time it takes and the words with their times."
+}

@@ -179,6 +179,39 @@ impl WorkSettings {
             .ok_or_else(|| ReadError::new("audio_crossfade_frames", "The database holds no valid audio.crossfade_frames."))
     }
 
+    /// Whether the speech of this project is transcribed (`ai.transcription`, user 2026-10-26);
+    /// a project without it is completed when Project opens it, a missing value is an error.
+    pub fn transcription_enabled(&self) -> Result<bool, ReadError> {
+        self.ai
+            .get("transcription")
+            .and_then(Value::as_bool)
+            .ok_or_else(|| ReadError::new("ai_transcription", "The database holds no valid ai.transcription."))
+    }
+
+    /// The language of speech of this project (`ai.language`, user 2026-10-26: a project
+    /// setting, Croatian unless it says other): a language code or `auto`.
+    pub fn speech_language(&self) -> Result<String, ReadError> {
+        self.ai
+            .get("language")
+            .and_then(Value::as_str)
+            .filter(|code| *code == "auto" || ((2..=3).contains(&code.len()) && code.bytes().all(|b| b.is_ascii_lowercase())))
+            .map(str::to_string)
+            .ok_or_else(|| ReadError::new("ai_language", "The database holds no valid ai.language."))
+    }
+
+    /// The channel of the original whose speech is transcribed (`audio.transcribe_channel`,
+    /// `CH1` is the first): its index from 0.
+    pub fn transcribe_channel(&self) -> Result<u32, ReadError> {
+        self.audio
+            .get("transcribe_channel")
+            .and_then(Value::as_str)
+            .and_then(|text| text.strip_prefix("CH"))
+            .and_then(|number| number.parse::<u32>().ok())
+            .filter(|number| (1..=64).contains(number))
+            .map(|number| number - 1)
+            .ok_or_else(|| ReadError::new("audio_transcribe_channel", "The database holds no valid audio.transcribe_channel."))
+    }
+
     /// The loudness targets of A1 and A2 (user 2026-10-24: EBU R 128 by default, changeable in
     /// the project); a missing or unlikely value is a controlled error, never a default here.
     pub fn audio_loudness(&self) -> Result<Loudness, ReadError> {
