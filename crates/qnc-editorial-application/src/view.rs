@@ -74,7 +74,7 @@ impl EditorialView {
         match action_id {
             action_ids::SAVE_VIRTUAL_SHOT
             | action_ids::ADD_TON_SEGMENT
-            | action_ids::ADD_OFF_SEGMENT => self.chosen_clip_id().is_some(),
+            | action_ids::ADD_OFF_SEGMENT | "transcribe_marks" => self.chosen_clip_id().is_some(),
             action_ids::DELETE_SEGMENT | action_ids::DELETE_PART => {
                 self.segments.selected().is_some()
             }

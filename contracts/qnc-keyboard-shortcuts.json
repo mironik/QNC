@@ -91,6 +91,12 @@
     "step_next_segment": {
       "label": "Sljedeći OFF segment"
     },
+    "transcribe_marks": {
+      "label": "Transkribiraj IN-OUT (bez oznaka cijeli klip)"
+    },
+    "transcript_cue_word": {
+      "label": "Playhead na rijec transkripta"
+    },
     "translate_transcript": {
       "label": "Prevedi transkript (IN–OUT ako je označen)"
     },

@@ -1,0 +1,14 @@
+[package]
+name = "qnc-right-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the right panel of an editorial board by the kind its layout contract names (segment_panel, transcript_panel, none); it paints the named public panel and gives its answer, nothing else"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-action-event = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-program-view = { workspace = true }
+qnc-segment-panel = { workspace = true }
+qnc-transcript = { workspace = true }
+qnc-transcript-panel = { workspace = true }

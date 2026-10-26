@@ -3641,6 +3641,7 @@ dependencies = [
  "qnc-monitor-panel",
  "qnc-panel-focus",
  "qnc-pool-tabs-panel",
+ "qnc-right-panel",
  "qnc-segment-panel",
  "qnc-source-timeline",
  "qnc-theme-styles",
@@ -3835,13 +3836,10 @@ dependencies = [
 name = "qnc-fine-wave"
 version = "0.1.0"
 dependencies = [
- "qnc-decoder-catalog",
  "qnc-dev-diagnostics",
  "qnc-gain",
- "qnc-media-decode",
- "qnc-media-metadata",
- "qnc-media-stream",
  "qnc-program-waveform",
+ "qnc-sound-range",
  "qnc-still-locator",
 ]
 
@@ -4739,6 +4737,7 @@ dependencies = [
  "qnc-source-timeline",
  "qnc-sync-session",
  "qnc-timeline",
+ "qnc-transcript",
  "qnc-ui-kit",
  "qnc-wheel-jog",
  "qnc-wrap-session",
@@ -5369,6 +5368,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-right-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-action-event",
+ "qnc-desktop-theme",
+ "qnc-program-view",
+ "qnc-segment-panel",
+ "qnc-transcript",
+ "qnc-transcript-panel",
+]
+
+[[package]]
 name = "qnc-scanner"
 version = "0.1.0"
 dependencies = [
@@ -5504,6 +5516,17 @@ dependencies = [
  "serde",
  "serde_json",
  "xml-rs",
+]
+
+[[package]]
+name = "qnc-sound-range"
+version = "0.1.0"
+dependencies = [
+ "qnc-decoder-catalog",
+ "qnc-media-decode",
+ "qnc-media-metadata",
+ "qnc-media-stream",
+ "qnc-still-locator",
 ]
 
 [[package]]
@@ -5867,11 +5890,59 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-transcribe-run"
+version = "0.1.0"
+dependencies = [
+ "qnc-ai-catalog",
+ "qnc-sound-range",
+ "qnc-still-locator",
+ "qnc-transcribe-jobs",
+ "qnc-transcript-db",
+ "qnc-ui-text",
+]
+
+[[package]]
 name = "qnc-transcribe-whisper"
 version = "0.1.0"
 dependencies = [
  "qnc-transcribe-jobs",
  "whisper-rs",
+]
+
+[[package]]
+name = "qnc-transcript"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-dev-diagnostics",
+ "qnc-source-preview",
+ "qnc-timeline",
+ "qnc-transcribe-run",
+ "qnc-transcript-db",
+ "qnc-ui-text",
+]
+
+[[package]]
+name = "qnc-transcript-db"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-ui-text",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-transcript-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-action-event",
+ "qnc-desktop-theme",
+ "qnc-transcript",
+ "qnc-ui-text",
 ]
 
 [[package]]

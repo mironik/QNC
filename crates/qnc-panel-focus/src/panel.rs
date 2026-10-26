@@ -74,6 +74,8 @@ pub struct FocusView {
     pub panel: Panel,
     pub button: Option<String>,
     pub pool_step: Option<(PoolStep, u64)>,
+    /// The transcript of the clip on the preview.
+    pub transcript: qnc_transcript::TranscriptView,
 }
 
 impl FocusView {

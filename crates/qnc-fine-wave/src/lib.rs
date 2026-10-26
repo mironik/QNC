@@ -13,8 +13,6 @@ use std::{
     sync::{mpsc, Arc, Mutex},
 };
 
-use qnc_media_decode::{DecodeRequest, DecodedFormat, Decoder};
-use qnc_media_metadata::Rational;
 use qnc_program_waveform::Placement;
 use qnc_still_locator::{LocatedSound, StillLocator};
 
@@ -26,32 +24,8 @@ const MARGIN_SECONDS: f64 = 1.5;
 /// Chunks of samples kept per clip channel (about 4 s mono each).
 const KEPT_CHUNKS: usize = 6;
 
-/// Samples of one camera channel of a clip from `from_seconds` (media timestamps).
-#[derive(Debug, Clone)]
-struct Chunk {
-    from_seconds: f64,
-    rate: u32,
-    samples: Vec<f32>,
-    /// The clip frames this chunk was read for: whatever the media gave there is all there
-    /// is (a clip starts or ends inside them), so it is never asked again.
-    frames: (u64, u64),
-}
-
-impl Chunk {
-    fn to_seconds(&self) -> f64 {
-        self.from_seconds + self.samples.len() as f64 / f64::from(self.rate.max(1))
-    }
-
-    fn covers(&self, from: f64, to: f64) -> bool {
-        self.from_seconds <= from && to <= self.to_seconds()
-    }
-
-    /// Whether this chunk answers clip frames `[first, last)`: its samples cover them, or it
-    /// was read for them (the media has no more sound there).
-    fn answers(&self, first: u64, last: u64, seconds: impl Fn(f64) -> f64) -> bool {
-        (self.frames.0 <= first && last <= self.frames.1) || self.covers(seconds(first as f64), seconds(last as f64))
-    }
-}
+/// Samples of one camera channel of a clip (piece `qnc-sound-range`).
+type Chunk = qnc_sound_range::SoundRange;
 
 /// A read of `(clip, camera channel)` over clip frames `[from, to)`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -241,82 +215,6 @@ impl FineWave {
     }
 }
 
-/// The samples of the asked camera channel over clip frames `[from, to)`, from the camera
-/// original through the decoder catalog.
 fn read(place: &LocatedSound, ask: &Ask) -> Result<Chunk, String> {
-    let (stream_index, inside, width, rate) = place.channel(ask.channel).ok_or_else(|| format!("no camera channel {}", ask.channel + 1))?;
-    let config = qnc_decoder_catalog::installed_config().map_err(|error| error.to_string())?;
-    // The decoder starts at the time of the first frame from the media's start (as the
-    // trim pictures and the player seek).
-    let start = (ask.from > 0).then(|| Rational { numerator: (ask.from * u64::from(place.fps.1)) as i64, denominator: i64::from(place.fps.0.max(1)) });
-    let request = DecodeRequest {
-        version: qnc_media_decode::VERSION.into(),
-        media: place.media.clone(),
-        stream_index,
-        start,
-        output_pixel_format: None,
-        progressive: false,
-        delivered_rate: None,
-    };
-    let endpoint = qnc_media_stream::CodecEndpoint::for_local_file(&place.file, &place.media.media_uri).map_err(|error| error.to_string())?;
-    let mut decoder = Decoder::open_endpoint(request, endpoint, place.stamp.clone(), config).map_err(|error| error.to_string())?;
-    let (want_from, want_to) = (place.seconds_of(ask.from as f64), place.seconds_of(ask.to as f64));
-    let mut chunk: Option<Chunk> = None;
-    loop {
-        let packet = match decoder.next_packet() {
-            Ok(Some(packet)) => packet,
-            Ok(None) => break,
-            // Past the end of the clip the decoder refuses: the sound read so far is all
-            // there is (an OUT near the clip's end).
-            Err(_) if chunk.is_some() => break,
-            Err(error) => return Err(error.to_string()),
-        };
-        let DecodedFormat::Audio { sample_rate_hz, channels, .. } = &packet.format else { continue };
-        if *channels != u32::from(width) || *sample_rate_hz != rate {
-            return Err("the decoded sound is not the stored format".into());
-        }
-        let at = packet.pts as f64 * packet.time_base.numerator as f64 / packet.time_base.denominator.max(1) as f64;
-        if at > want_to {
-            break;
-        }
-        let samples = packet
-            .bytes
-            .chunks_exact(usize::from(width) * 4)
-            .map(|frame| f32::from_le_bytes(frame[usize::from(inside) * 4..usize::from(inside) * 4 + 4].try_into().expect("sample")));
-        match &mut chunk {
-            Some(chunk) => chunk.samples.extend(samples),
-            None => chunk = Some(Chunk { from_seconds: at, rate, samples: samples.collect(), frames: (ask.from, ask.to) }),
-        }
-        if chunk.as_ref().is_some_and(|chunk| chunk.to_seconds() >= want_to) {
-            break;
-        }
-    }
-    let chunk = chunk.ok_or("no sound in the asked part")?;
-    if chunk.from_seconds > want_from + 0.05 {
-        // The decoder started after the asked part (the start of the media): still drawn.
-        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("fine-wave {} starts {:.3} s late", ask.clip_id, chunk.from_seconds - want_from));
-    }
-    Ok(chunk)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_chunk_covers_the_seconds_of_its_samples() {
-        let chunk = Chunk { from_seconds: 10.0, rate: 48_000, samples: vec![0.0; 96_000], frames: (500, 600) };
-        assert!(chunk.covers(10.5, 11.9));
-        assert!(!chunk.covers(9.9, 11.0));
-        assert!(!chunk.covers(10.0, 12.1));
-    }
-
-    #[test]
-    fn a_chunk_read_for_frames_answers_them_even_where_the_media_has_no_sound() {
-        // The end of a clip: the read stopped at the end of the media, short of the asked part.
-        let chunk = Chunk { from_seconds: 10.0, rate: 48_000, samples: vec![0.0; 48_000], frames: (500, 600) };
-        let seconds = |frame: f64| frame / 50.0;
-        assert!(chunk.answers(520, 590, seconds), "asked once, never again");
-        assert!(!chunk.answers(590, 610, seconds), "frames past the read are asked");
-    }
+    qnc_sound_range::read(place, ask.channel, ask.from, ask.to, &mut |_| true)
 }

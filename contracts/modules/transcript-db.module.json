@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.transcript-db",
+  "module_name": "Transcript Table",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["db.transcripts.read", "db.transcripts.write"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["media.decode", "media.probe.full", "file.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-transcript-db",
+  "input": "A transcript of a range of a clip (lines, words and their clip frames, language, engine), or a clip id to read.",
+  "output": "The table clip_transcripts and the view public_clip_transcripts of the project database through its one intermediary (qnc-db-broker); a range transcribed again replaces the kept one; a line or word outside its range is refused.",
+  "specification": "User 2026-10-26: transcription of a clip's IN/OUT in Media Assist Audio AI (AGENTS.md)."
+}

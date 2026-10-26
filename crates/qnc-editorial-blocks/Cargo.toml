@@ -16,6 +16,7 @@ qnc-media-pool-panel = { workspace = true }
 qnc-monitor-panel = { workspace = true }
 qnc-panel-focus = { workspace = true }
 qnc-pool-tabs-panel = { workspace = true }
+qnc-right-panel = { workspace = true }
 qnc-segment-panel = { workspace = true }
 qnc-source-timeline = { workspace = true }
 qnc-theme-styles = { workspace = true }

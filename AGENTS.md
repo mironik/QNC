@@ -6244,3 +6244,20 @@ pratitev."). Testovi `qnc-transcribe-jobs`, `qnc-ai-catalog`, `qnc-work-settings
 `qnc-transcribe-whisper`, conformance. Nije izvedeno (2b): pozadinski posao (raspored iz koraka 1, zvuk kanala iz
 originala kroz katalog dekodera), tablica prepisa u bazi projekta s pretragom rijeci (FTS5), prikaz; prijevod na
 hrvatski (whisper prevodi samo na engleski, treba zaseban model).
+Izvedeno 2026-10-26 (korisnik: "transkript bi se pozivao iz forme Media Assist Audio AI... korisnik bi odabrao klip
+i odredio IN/OUT, ili virtualni IN/OUT (pocetak i kraj klipa)"; "kreni"; korak 2b, dio 1): grupa e ima desni panel
+prepisa i dugme Transcribe u zaglavlju source timelinea (akcija kataloga `transcribe_marks`, bez tipke). Prepisuje se
+samo IN-OUT prikazanog klipa (bez oznaka cijeli klip), kanal govora i jezik iz postavki projekta (`ai.transcription`
+mora biti ukljucen u Project Advanced), program iz AI kataloga ovog racunala. Retci se pokazuju dok nastaju; gotov
+prepis zapisuje se u bazu projekta i odande se cita. Rijec izgovorena na playheadu je osvijetljena, klik na rijec
+stavlja playhead na nju (`transcript_cue_word`). Nove javne kocke (s ugovorima): `qnc-sound-range` (zvuk jednog
+kanala originala za raspon slika kroz katalog dekodera; premjesteno iz `qnc-fine-wave`, koji ga sada koristi),
+`qnc-transcript-db` (modul tablica posrednika: `clip_transcripts`, `public_clip_transcripts`; ugovor baze
+`transcripts.database.json`; isti raspon prepisan ponovno zamjenjuje stari), `qnc-transcribe-run` (jedan prepis
+raspona klipa: privremeni 16 kHz WAV u praznoj privremenoj mapi, program ostaje ucitan u procesu), `qnc-transcript`
+(stanje prepisa prikazanog klipa, citanje i rad izvan niti sucelja), `qnc-transcript-panel` (crtanje), `qnc-right-panel`
+(desni panel ploce po vrsti iz ugovora rasporeda: segment_panel, transcript_panel, none). Drzi ih `qnc-panel-focus`
+(kao source timeline); ploca Storyja/MA poziva `qnc-right-panel` umjesto segment panela, bez rasta (C10 101).
+`StillLocator::settings`. Conformance: grupa e mora imati `transcript_panel`, g i l prazni; `qnc-transcript-db` na
+popisu javnih DB vlasnika. Testovi, conformance, release build. Uzivo kroz sucelje nije provjereno. Nije izvedeno
+(dio 2): rijeci u trim zoomu oko reza.

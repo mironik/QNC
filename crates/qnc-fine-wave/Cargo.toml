@@ -6,10 +6,7 @@ description = "QNC public piece: the fine wave of a cut for the trim zoom, read 
 
 [dependencies]
 qnc-gain = { workspace = true }
-qnc-decoder-catalog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
-qnc-media-decode = { workspace = true }
-qnc-media-metadata = { workspace = true }
-qnc-media-stream = { workspace = true }
+qnc-sound-range = { workspace = true }
 qnc-program-waveform = { workspace = true }
 qnc-still-locator = { workspace = true }

@@ -128,7 +128,7 @@
         "show_export_hires": false,
         "show_quick_cover": false
       },
-      "right_panel": "none",
+      "right_panel": "transcript_panel",
       "tab_order": [
         "pool_tabs",
         "pool",
@@ -147,6 +147,10 @@
           {
             "label": "@story.add_subclip",
             "action_id": "save_virtual_shot"
+          },
+          {
+            "label": "@ma.transcribe",
+            "action_id": "transcribe_marks"
           }
         ]
       },

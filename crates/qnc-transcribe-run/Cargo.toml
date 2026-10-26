@@ -1,0 +1,13 @@
+[package]
+name = "qnc-transcribe-run"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: one transcription of a range of a clip, from the project's settings (on, channel, language) and the host's AI catalog to the words as clip frames; reads the camera original's sound on this machine, writes only a temporary WAV"
+
+[dependencies]
+qnc-ai-catalog = { workspace = true }
+qnc-sound-range = { workspace = true }
+qnc-still-locator = { workspace = true }
+qnc-transcribe-jobs = { workspace = true }
+qnc-transcript-db = { workspace = true }
+qnc-ui-text = { workspace = true }

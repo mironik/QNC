@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.transcribe-run",
+  "module_name": "Transcribe Run",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["speech.transcribe.clip_range"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "database.write", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-transcribe-run",
+  "input": "A clip and a range of its frames, the project's work settings (transcription on, speech language, channel) and this host's AI catalog engine.",
+  "output": "The transcript of that range as clip frames, every line as it is heard; only a temporary 16 kHz WAV in an empty temporary folder is written and removed.",
+  "specification": "User 2026-10-26: transcription of a clip's IN/OUT in Media Assist Audio AI (AGENTS.md)."
+}

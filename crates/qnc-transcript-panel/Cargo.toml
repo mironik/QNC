@@ -1,0 +1,12 @@
+[package]
+name = "qnc-transcript-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive panel: the transcript of the clip on the preview, line by line with every word; the word said at the playhead lit, a click on a word asks the playhead there; it paints only"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-action-event = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-transcript = { workspace = true }
+qnc-ui-text = { workspace = true }

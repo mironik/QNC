@@ -69,6 +69,8 @@ pub struct PanelFocus {
     /// The catalog action a key on the pool tabs or a dock button stands for; the
     /// caller runs it as its own action (`take_pick`).
     pick: Option<String>,
+    /// The transcript of the clip on the preview (piece `qnc-transcript`, Media Assist Audio AI).
+    transcript: qnc_transcript::Transcript,
 }
 
 /// The walk of a layout: its panels, the pool tabs row and the source dock buttons row.
@@ -146,12 +148,13 @@ impl PanelFocus {
             }
         }
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
-        FocusView { panel: self.panel, button, pool_step: self.walk.last_step() }
+        self.transcript.poll(preview);
+        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: self.transcript.view().clone() }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).
     pub fn busy(&self) -> bool {
-        self.keyframes.busy()
+        self.keyframes.busy() || self.transcript.busy()
     }
 
     /// A clip chosen in the media pool: the Source view; the keyboard stays on the pool

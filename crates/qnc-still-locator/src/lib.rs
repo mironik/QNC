@@ -100,6 +100,11 @@ impl StillLocator {
         &self.settings.project_id
     }
 
+    /// The work settings of that project, as read from its database.
+    pub fn settings(&self) -> &WorkSettings {
+        &self.settings
+    }
+
     pub fn locate(&self, clip_id: &str) -> Result<LocatedPicture, String> {
         let input = InputReader::with_content_reader(self.reader.clone(), self.content.clone())
             .load(&self.settings.workspace_db_uri, clip_id)

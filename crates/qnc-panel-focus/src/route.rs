@@ -17,6 +17,10 @@ impl PanelFocus {
         let event = event.into();
         let action_id = event.action_id.as_str();
         let panel = self.panel;
+        // The transcript's own actions (Media Assist Audio AI, user 2026-10-26).
+        if let Some(done) = self.transcript.act(action_id, event.value, pieces.0, pieces.3) {
+            return Some(done);
+        }
         // The Export button opens the box of the project's export settings (user 2026-10-24);
         // while it is open its keys are its own.
         if action_id == "export_open" {

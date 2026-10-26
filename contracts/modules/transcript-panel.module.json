@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.transcript-panel",
+  "module_name": "Transcript Panel",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.transcript.paint"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-transcript-panel",
+  "input": "The transcript view and the desktop theme.",
+  "output": "The transcript painted line by line with its words, the word said at the playhead lit; a click on a word as the action transcript_cue_word with its first frame.",
+  "specification": "User 2026-10-26: transcription of a clip's IN/OUT in Media Assist Audio AI (AGENTS.md)."
+}

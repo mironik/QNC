@@ -331,12 +331,15 @@ fn validate_editorial_layout_composition(root: &Path) -> CheckResult {
             ));
         }
     }
-    for group in ["e", "g", "l"] {
+    for group in ["g", "l"] {
         if editorial["groups"][group]["right_panel"] != "none" {
             report.error(format!(
                 "editorial.layout.json: group '{group}' must keep the right panel empty (none)"
             ));
         }
+    }
+    if editorial["groups"]["e"]["right_panel"] != "transcript_panel" {
+        report.error("editorial.layout.json: group 'e' (Audio AI) must use transcript_panel".to_string());
     }
     if editorial["groups"]["o"]["right_panel"] != "segment_panel" {
         report.error("editorial.layout.json: group 'o' (Story) must use segment_panel".to_string());
@@ -1910,6 +1913,7 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-artifact-db/",
         "crates/qnc-prerender-db/",
         "crates/qnc-clip-sound/",
+        "crates/qnc-transcript-db/",
         "crates/qnc-project-store/",
         "crates/qnc-project-close/",
         "crates/qnc-camera-patterns/",

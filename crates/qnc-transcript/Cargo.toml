@@ -1,0 +1,14 @@
+[package]
+name = "qnc-transcript"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the transcript of the clip on the preview - the transcripts kept in the project database, a new one of the source timeline's IN/OUT asked off the form thread, a click on a word takes the playhead there; it knows no form"
+
+[dependencies]
+qnc-db-broker = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-transcribe-run = { workspace = true }
+qnc-transcript-db = { workspace = true }
+qnc-ui-text = { workspace = true }

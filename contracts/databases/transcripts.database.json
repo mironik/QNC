@@ -1,0 +1,23 @@
+{
+  "database_id": "qnc.db.transcripts",
+  "database_owner": "project",
+  "owner_application": "qnc.module.transcript-db",
+  "ownership_rule": "The project owns this database; no application owns it or its table. A transcript reaches it only through the one intermediary of the project database (qnc.module.db-broker), whose table module qnc.module.transcript-db owns it.",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/project_db",
+  "tables": [
+    "clip_transcripts"
+  ],
+  "public_read_views": [
+    "public_clip_transcripts"
+  ],
+  "write_owner": "qnc.module.transcript-db",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "range": "A row is what was said in clip frames [from_frame, to_frame) of a clip: its lines and words as clip frames, the language and the engine that heard it.",
+    "replace": "A range transcribed again replaces the row of the same clip and range; other ranges stay."
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-10-26T00:00:00Z",
+  "updated_at": "2026-10-26T00:00:00Z"
+}

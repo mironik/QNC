@@ -130,6 +130,12 @@ members = [
     "tools/qnc-decoder-ffmpeg",
     "crates/qnc-transcribe-jobs",
     "crates/qnc-ai-catalog",
+    "crates/qnc-sound-range",
+    "crates/qnc-transcript-db",
+    "crates/qnc-transcribe-run",
+    "crates/qnc-transcript",
+    "crates/qnc-transcript-panel",
+    "crates/qnc-right-panel",
     "tools/qnc-transcribe-whisper",
     "tools/qnc-decoder-acceptance",
     "crates/qnc-installed-versions",
@@ -372,6 +378,12 @@ qnc-record-format-plugin = { path = "crates/qnc-record-format-plugin" }
 qnc-decoder-jobs = { path = "crates/qnc-decoder-jobs" }
 qnc-transcribe-jobs = { path = "crates/qnc-transcribe-jobs" }
 qnc-ai-catalog = { path = "crates/qnc-ai-catalog" }
+qnc-sound-range = { path = "crates/qnc-sound-range" }
+qnc-transcript-db = { path = "crates/qnc-transcript-db" }
+qnc-transcribe-run = { path = "crates/qnc-transcribe-run" }
+qnc-transcript = { path = "crates/qnc-transcript" }
+qnc-transcript-panel = { path = "crates/qnc-transcript-panel" }
+qnc-right-panel = { path = "crates/qnc-right-panel" }
 qnc-installed-versions = { path = "crates/qnc-installed-versions" }
 qnc-choice-box = { path = "crates/qnc-choice-box" }
 qnc-keyframe-nav = { path = "crates/qnc-keyframe-nav" }

@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.sound-range",
+  "module_name": "Sound Range",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["media.sound.read_range"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "file.write", "database.write", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-sound-range",
+  "input": "A clip's located camera original on this machine (qnc-still-locator), one camera channel and a range of clip frames.",
+  "output": "The samples of that channel over the range, mono, at the saved rate, read through the decoder catalog; no probe, nothing written.",
+  "specification": "User 2026-10-26: transcription of a clip's IN/OUT in Media Assist Audio AI (AGENTS.md)."
+}

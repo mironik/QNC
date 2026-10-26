@@ -31,12 +31,12 @@ pub fn render_desktop(
         "pool-head" => framed(pool_tabs(ui, rect, contracts, theme, view), ui, rect, &[Panel::PoolTabs]),
         "transport" => qnc_transport_panel::show(ui, rect, theme, contracts.tab_gap()).map(|action| EditorialIntent::action(&action)),
         "clip-cards" => framed(pool(ui, contracts, theme, view), ui, rect, &[Panel::Pool]),
-        "right-panel" if contracts.composition().right_panel == "segment_panel" => {
-            let shown = qnc_segment_panel::show(ui, &view.segments, theme, &contracts.editorial.cover_lengths, view.preview.output_levels);
-            framed(shown.map(EditorialIntent::Action), ui, rect, &[Panel::Segments])
+        // The group's right panel by its layout contract (Segmenti for Story, the transcript for Audio AI).
+        "right-panel" => {
+            let (answer, segments) = qnc_right_panel::show(ui, &contracts.composition().right_panel, theme, &qnc_right_panel::Shown { segments: &view.segments, cover_lengths: &contracts.editorial.cover_lengths, levels: view.preview.output_levels, transcript: &view.focus.transcript });
+            framed(answer.map(EditorialIntent::Action), ui, rect, if segments { &[Panel::Segments] } else { &[] })
         }
         "source-dock" => framed(source_dock(ui, contracts, theme, view), ui, rect, if view.segments.zoom.is_some() { &[Panel::Segments, Panel::SourceButtons] } else { &[Panel::SourceTimeline, Panel::SourceButtons] }),
-        // Right panel of the other groups: empty, reserved for their functions.
         _ => None,
     }))
 }

@@ -21,3 +21,4 @@ qnc-source-mark-focus = { workspace = true }
 qnc-keyframe-nav = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-wrap-session = { workspace = true }
+qnc-transcript = { workspace = true }

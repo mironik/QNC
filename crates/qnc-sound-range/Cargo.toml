@@ -1,0 +1,12 @@
+[package]
+name = "qnc-sound-range"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the sound of one camera channel of a clip over a range of its frames, from the camera original on this machine through the decoder catalog; no probe, no database"
+
+[dependencies]
+qnc-decoder-catalog = { workspace = true }
+qnc-media-decode = { workspace = true }
+qnc-media-metadata = { workspace = true }
+qnc-media-stream = { workspace = true }
+qnc-still-locator = { workspace = true }

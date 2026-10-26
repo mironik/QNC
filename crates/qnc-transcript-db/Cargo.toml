@@ -1,0 +1,15 @@
+[package]
+name = "qnc-transcript-db"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: the transcripts of a project (what was said in a range of a clip, line by line with every word and its frames, the language and engine) as a table module of the project database intermediary; it knows no form, worker or application"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+qnc-db-broker = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
