@@ -9,11 +9,13 @@ use eframe::egui::{self, RichText};
 
 pub const MODULE_ID: &str = "qnc.module.text-source-editor";
 
-/// A button under the text: its label, the catalog action it stands for and whether it can be
+/// A button under the text: its label, the catalog action it stands for, what it names (empty:
+/// nothing; for example the kind of block the text goes in as) and whether it can be
 /// pressed now.
 pub struct EditorButton<'a> {
     pub label: &'a str,
     pub action_id: &'a str,
+    pub target: &'a str,
     pub enabled: bool,
 }
 
@@ -35,8 +37,8 @@ pub struct Editor<'a> {
 pub enum Answer {
     /// Typing changed the text; the whole new text.
     Text(String),
-    /// A button was pressed; its action.
-    Button(String),
+    /// A button was pressed; its action and what it names.
+    Button(String, Option<String>),
 }
 
 /// Paints the editor over the whole of `ui` (the text takes what the title, info and buttons
@@ -49,7 +51,7 @@ pub fn show(ui: &mut egui::Ui, editor: &Editor<'_>, theme: &qnc_desktop_theme::T
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             for button in editor.buttons.iter().rev() {
                 if qnc_ui_kit::chrome_button(ui, button.label, button.enabled, false, style).clicked() {
-                    answer = Some(Answer::Button(button.action_id.to_string()));
+                    answer = Some(Answer::Button(button.action_id.to_string(), (!button.target.is_empty()).then(|| button.target.to_string())));
                 }
             }
         });

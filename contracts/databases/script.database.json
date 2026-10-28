@@ -6,17 +6,20 @@
   "schema_version": "0.1.0",
   "qnc_uri": "qnc://local/db/project_db",
   "tables": [
-    "script_blocks"
+    "script_blocks",
+    "script_profile"
   ],
   "public_read_views": [
-    "public_script_blocks"
+    "public_script_blocks",
+    "public_script_profile"
   ],
   "write_owner": "qnc.module.script-db",
   "public_read_policy": "public_read_views",
   "rules": {
     "order": "The blocks are read in the order of position, 0, 1, 2...; a block is added after a chosen one or at the end, moves one place up or down, and leaves without a gap.",
-    "off": "An OFF block is the text the journalist writes and records; it is never empty. Its length comes from its words and the project's audio.reading_words_per_second.",
-    "sot": "A statement is a clip's frames [from_frame, to_frame) with its timecodes, length and seconds as shown when it was added, and the words said there (which may be corrected); it needs a clip and an IN before its OUT."
+    "profile": "The script is written with one script profile (script_profile, one row: its code and the whole profile as it was when chosen, user 2026-10-28: the form of the script is programmable). A block's kind is a code of that profile; a block of a kind it does not have is refused, and a profile without a kind the blocks have is refused. A project read on another computer keeps the profile it was written with.",
+    "text": "A block of a text kind (spoken, anchor, note) is never empty; its length comes from its words and the project's audio.reading_words_per_second, or from its recording when its kind is recorded (only a recorded kind takes one).",
+    "clip": "A block of a clip kind (a statement, a stand-up...) is a clip's frames [from_frame, to_frame) with its timecodes, length and seconds as shown when it was added, and the words said there (which may be corrected); it needs a clip and an IN before its OUT."
   },
   "migration_policy": "owner_application_only",
   "created_at": "2026-10-28T00:00:00Z",

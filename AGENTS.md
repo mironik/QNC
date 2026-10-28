@@ -6700,3 +6700,19 @@ dvaput, snima se a nije spoken, note s trajanjem, polje s nepostojecim izborima)
 `sot`, `intro`, `outro` postojecih blokova su vrste profila koji ih imaju. Testovi `qnc-script-profile` (3). Conformance
 NE prolazi dok tocka 2 ne spoji profil u scenarij: C5 "javna kocka bez korisnika" (`qnc-script-profile` jos nitko ne koristi).
 Nije izvedeno (tocke 2-5): baza i panel na vrstama iz profila, polja uz vrstu, izvoz kroz predloske, uredivanje profila.
+Izvedeno 2026-10-28 (korisnik: "da, kreni s tockom 2"): baza i panel scenarija rade s vrstama iz profila, a projekt pamti
+profil s kojim je napisan. `qnc-script-db`: vrsta bloka je sifra profila (`Block.kind: String`, tablica vise ne nabraja
+vrste; stare tablice s `kind IN (...)` prepisuju se uz zadrzane blokove i snimke); nova tablica `script_profile` (jedan red:
+sifra i cijeli profil kakav je bio kad je izabran) i pogled `public_script_profile`; operacije `ReadProfile`,
+`SetProfile` (odbija profil bez vrste koju blokovi imaju); upis bloka vrste koje profil nema, prazan tekst tekstualne
+vrste, klip blok bez raspona i snimka vrste koja se ne snima se odbijaju; bez profila se ne pise. `qnc-script`: projekt bez
+profila pri prvom citanju dobiva profil izabran na racunalu (`qnc-script-profile` `DEFAULT_PROFILE` = general_tv kad nista
+nije izabrano), oznaka bloka je numerirani cue vrste (`OFF 2`, `Take SOT 1`) ili kratka oznaka, trajanje po ulozi (klip
+svoj raspon, snimka svoje, note nista, tekst po rijecima), zbroj priloga i spikera po `counts`, Rec samo na vrsti koja se
+snima, naslov kartice snimke je oznaka bloka; akcije `script_add_text` i `script_add_clip` (target: sifra vrste),
+`script_replace_text` (umjesto `script_add_off`/`_intro`/`_outro`, `script_add_sot`, `script_replace_off`).
+`qnc-script-panel`: gumb `+ <oznaka> (IN-OUT)` za svaku klip vrstu, gumb `+ <oznaka>` u editoru za svaku tekstualnu
+vrstu, naziv profila uz naslov. `qnc-text-source-editor` `EditorButton.target`. Ugovori `script.database.json`,
+`script-db.module.json`, rjecnik, katalog akcija. Testovi `qnc-script-db` (7), `qnc-script` (3), `qnc-script-profile` (3),
+conformance prolazi (C5 rijesen), release build. Uzivo nije provjereno. Nije izvedeno (tocke 3-5): polja uz vrstu, izvoz
+kroz predloske, uredivanje profila (i promjena profila projekta).

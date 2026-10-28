@@ -15,7 +15,7 @@
   "state_policy": "session_local",
   "database_write_policy": "public_db_owner_write_adapter_only",
   "runtime_crate": "qnc-script-db",
-  "input": "A block of the script (OFF text, or a statement: clip, IN/OUT frames, timecodes, length, seconds, words), its place, a new text, a move or a removal.",
-  "output": "The table script_blocks and the view public_script_blocks of the project database through its one intermediary (qnc-db-broker): the blocks in reading order; an empty OFF or a statement without a range is refused.",
+  "input": "The script profile of the project; a block of the script (text of a text kind, or a range of a clip of a clip kind: clip, IN/OUT frames, timecodes, length, seconds, words), its place, a new text, a move or a removal.",
+  "output": "The tables script_blocks and script_profile and the views public_script_blocks and public_script_profile of the project database through its one intermediary (qnc-db-broker): the blocks in reading order; a kind the profile does not have, empty text or a clip block without a range is refused.",
   "specification": "User 2026-10-28: writing the offs and putting the story together as text in Media Assist Audio (AGENTS.md)."
 }

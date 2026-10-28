@@ -1,17 +1,21 @@
 //! The script of a project's story (user 2026-10-28: Media Assist Audio, writing the offs and
-//! putting the story together as text): its blocks in the order they are read. An OFF block
-//! is the text the journalist writes and later records; a statement (SOT) is a range of a
-//! clip with its timecodes, length and the words said there. Kept in the project database,
-//! so Story builds the story from it and another computer reads it.
+//! putting the story together as text): its blocks in the order they are read, and the script
+//! profile the project is written with (user 2026-10-28: the form of the script is
+//! programmable, not fixed). A block's kind is a code of that profile (OFF, SOT, lead-in, or a
+//! kind QNC does not foresee); the profile says what a kind is: text read by the reporter or the
+//! anchor, a range of a clip with its timecodes, length and the words said there, or a note.
+//! Kept in the project database, so Story builds the story from it and another computer reads
+//! it as it was written, without that computer's profiles.
 //!
 //! A table module of the project database intermediary (`qnc-db-broker`): it owns only its
-//! table, is written only through that intermediary and knows no form or application.
+//! tables, is written only through that intermediary and knows no form or application.
 
 mod store;
 
 use std::sync::Arc;
 
 use qnc_db_broker::{Access, ProjectDbTarget, TableModuleFactory};
+pub use qnc_script_profile::{Counts, KindSpec, Role, ScriptProfile};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -19,36 +23,22 @@ pub const MODULE_ID: &str = "qnc.module.script-db";
 
 pub type Result<T> = std::result::Result<T, String>;
 
-/// What a block of the script is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum BlockKind {
-    /// Text the journalist writes and records (voice-over).
-    Off,
-    /// A statement: a range of a clip and what is said in it.
-    Sot,
-    /// The anchor's lead-in, read in the studio before the story (user 2026-10-28: "najava";
-    /// not recorded, not in the length of the story).
-    Intro,
-    /// The anchor's tag after the story ("odjava"; not recorded, not in its length).
-    Outro,
-}
-
-/// One block of the script. `id` is given by the table; the timecodes and length of a
-/// statement are written as shown when it was added.
+/// One block of the script. `id` is given by the table; `kind` is a code of the project's
+/// script profile; the timecodes and length of a clip block are written as shown when it was
+/// added.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Block {
     #[serde(default)]
     pub id: i64,
-    pub kind: BlockKind,
+    pub kind: String,
     pub text: String,
-    /// The clip of a statement (empty for an OFF block).
+    /// The clip of a clip block (empty for text).
     #[serde(default)]
     pub clip_id: String,
     #[serde(default)]
     pub clip_name: String,
-    /// Clip frames `[from, to)` of a statement.
+    /// Clip frames `[from, to)` of a clip block.
     #[serde(default)]
     pub from_frame: u64,
     #[serde(default)]
@@ -59,10 +49,11 @@ pub struct Block {
     pub end_tc: String,
     #[serde(default)]
     pub length: String,
-    /// Seconds of a statement (an OFF block's length comes from its words).
+    /// Seconds of a clip block (a text block's length comes from its words).
     #[serde(default)]
     pub seconds: f64,
-    /// The recording of an OFF block (its media URI in the project; empty until recorded).
+    /// The recording of a block of a recorded kind (its media URI in the project; empty until
+    /// recorded).
     #[serde(default)]
     pub voice_uri: String,
     /// Seconds of the recording.
@@ -74,19 +65,9 @@ pub struct Block {
 }
 
 impl Block {
-    /// Whether the block is text read by someone (OFF, lead-in, tag), not a clip.
-    pub fn is_text(&self) -> bool {
-        self.kind != BlockKind::Sot
-    }
-
-    /// A text block of `kind` (OFF, lead-in or tag).
-    pub fn written(kind: BlockKind, text: impl Into<String>) -> Self {
-        Self { kind, ..Self::off(text) }
-    }
-
-    /// An OFF block of `text`.
-    pub fn off(text: impl Into<String>) -> Self {
-        Self { id: 0, kind: BlockKind::Off, text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new() }
+    /// A text block of kind `kind`.
+    pub fn written(kind: impl Into<String>, text: impl Into<String>) -> Self {
+        Self { id: 0, kind: kind.into(), text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new() }
     }
 }
 
@@ -95,6 +76,12 @@ impl Block {
 pub enum Operation {
     /// The blocks in reading order.
     Read,
+    /// The profile the project's script is written with (none yet: the script was never
+    /// written, or was written before profiles).
+    ReadProfile,
+    /// The project's script is written with `profile` from now on; refused when it cannot be
+    /// used or lacks a kind a block of the script has.
+    SetProfile { profile: ScriptProfile },
     /// A block is added after block `after` (at the end without it, or first).
     Add { after: Option<i64>, #[serde(default)] first: bool, block: Block },
     /// The text of a block changes.
@@ -103,13 +90,13 @@ pub enum Operation {
     Move { id: i64, up: bool },
     /// A block leaves the script.
     Remove { id: i64 },
-    /// An OFF block got its recording (an empty URI takes it away).
+    /// A block of a recorded kind got its recording (an empty URI takes it away).
     SetVoice { id: i64, uri: String, seconds: f64, tc: String },
 }
 
 impl Operation {
     pub fn is_write(&self) -> bool {
-        !matches!(self, Self::Read)
+        !matches!(self, Self::Read | Self::ReadProfile)
     }
 }
 
@@ -117,11 +104,12 @@ impl Operation {
 #[serde(tag = "kind", content = "data", rename_all = "snake_case")]
 pub enum Data {
     Blocks(Vec<Block>),
+    Profile(Option<ScriptProfile>),
     Added(i64),
     Changed,
 }
 
-/// Joins the script table to a project database.
+/// Joins the script tables to a project database.
 pub struct ScriptModule;
 
 impl ScriptModule {
@@ -138,14 +126,31 @@ fn reply() -> String {
     qnc_ui_text::text("db.script_reply").into()
 }
 
+fn read_only(target: &ProjectDbTarget, operation: &Operation) -> Result<Data> {
+    let mut client = target.open(Access::ReadOnly, vec![ScriptModule::factory()])?;
+    let answer = client.execute(MODULE_ID, encode(operation)?)?;
+    serde_json::from_value(answer).map_err(|e| e.to_string())
+}
+
 /// The script of the project behind `target`, in reading order.
 pub fn read(target: &ProjectDbTarget) -> Result<Vec<Block>> {
-    let mut client = target.open(Access::ReadOnly, vec![ScriptModule::factory()])?;
-    let answer = client.execute(MODULE_ID, encode(&Operation::Read)?)?;
-    match serde_json::from_value(answer).map_err(|e| e.to_string())? {
+    match read_only(target, &Operation::Read)? {
         Data::Blocks(blocks) => Ok(blocks),
         _ => Err(reply()),
     }
+}
+
+/// The profile the project's script is written with.
+pub fn read_profile(target: &ProjectDbTarget) -> Result<Option<ScriptProfile>> {
+    match read_only(target, &Operation::ReadProfile)? {
+        Data::Profile(profile) => Ok(profile),
+        _ => Err(reply()),
+    }
+}
+
+/// The project's script is written with `profile` from now on.
+pub fn set_profile(target: &ProjectDbTarget, profile: ScriptProfile) -> Result<()> {
+    write(target, Operation::SetProfile { profile }).map(drop)
 }
 
 /// Adds `block` after block `after` (at the end without it); the id it was given.
@@ -184,7 +189,7 @@ pub fn move_block(target: &ProjectDbTarget, id: i64, up: bool) -> Result<()> {
     write(target, Operation::Move { id, up }).map(drop)
 }
 
-/// OFF block `id` got the recording at `uri`, `seconds` long, starting at timecode `tc`.
+/// Block `id` of a recorded kind got the recording at `uri`, `seconds` long, starting at `tc`.
 pub fn set_voice(target: &ProjectDbTarget, id: i64, uri: String, seconds: f64, tc: String) -> Result<()> {
     write(target, Operation::SetVoice { id, uri, seconds, tc }).map(drop)
 }

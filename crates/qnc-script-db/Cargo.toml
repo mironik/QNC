@@ -6,6 +6,7 @@ description = "QNC public module: the script of a project's story (its blocks in
 
 [dependencies]
 qnc-ui-text = { workspace = true }
+qnc-script-profile = { workspace = true }
 qnc-db-broker = { workspace = true }
 rusqlite = { workspace = true, features = ["hooks"] }
 serde = { workspace = true }

@@ -21,6 +21,7 @@ fn every_prepared_profile_is_read_and_can_be_used() {
     let ids: Vec<&str> = profiles.list.iter().map(|(p, _)| p.profile_id.as_str()).collect();
     assert_eq!(ids, ["agency_online", "general_tv", "inews_mos", "radio"]);
     let general = &profiles.list[1].0;
+    assert_eq!(profiles.current().unwrap().profile_id, "general_tv", "chosen where none was chosen");
     // The blocks written before profiles (off, sot, intro, outro) are kinds of every profile
     // that has them, under the same codes.
     for code in ["intro", "off", "sot", "outro"] {

@@ -1,10 +1,10 @@
-//! The script table of a project database and its requests.
+//! The script tables of a project database and their requests.
 
 use crate::*;
 use rusqlite::{params, Connection, OptionalExtension};
 
-/// The table this module owns; it writes no other.
-const OWNED: [&str; 1] = ["script_blocks"];
+/// The tables this module owns; it writes no other.
+const OWNED: [&str; 2] = ["script_blocks", "script_profile"];
 
 pub(crate) struct Store {
     conn: Connection,
@@ -15,22 +15,20 @@ pub(crate) struct Store {
 }
 
 impl Store {
-    /// Creates the table if missing (read-write) and serves it; a read-only connection of a
-    /// project without it reads an empty script.
+    /// Creates the tables if missing (read-write) and serves them; a read-only connection of a
+    /// project without them reads an empty script and no profile.
     pub(crate) fn attach(mut conn: Connection, access: Access) -> Result<Self> {
         if access == Access::ReadWrite {
             let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(err)?;
             ensure_schema(&tx)?;
             tx.commit().map_err(err)?;
         }
-        let ready: bool = conn
-            .query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='view' AND name='public_script_blocks')", [], |r| r.get(0))
-            .map_err(err)?;
+        let ready = view_exists(&conn, "public_script_blocks")?;
         if access == Access::ReadOnly {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
         qnc_db_broker::write_only_own_tables(&conn, access, &OWNED);
-        let legacy = ready && !current(&conn)?;
+        let legacy = ready && !has_voice(&conn)?;
         Ok(Self { conn, ready, legacy })
     }
 
@@ -38,6 +36,8 @@ impl Store {
         match operation {
             Operation::Read if !self.ready => Ok(Data::Blocks(Vec::new())),
             Operation::Read => self.read().map(Data::Blocks),
+            Operation::ReadProfile => profile(&self.conn).map(Data::Profile),
+            Operation::SetProfile { profile } => self.set_profile(profile),
             Operation::Add { after, first, block } => self.add(*after, *first, block),
             Operation::SetText { id, text } => self.set_text(*id, text),
             Operation::Move { id, up } => self.move_block(*id, *up),
@@ -59,7 +59,7 @@ impl Store {
             .query_map([], |r| {
                 Ok(Block {
                     id: r.get(0)?,
-                    kind: kind_of(&r.get::<_, String>(1)?),
+                    kind: r.get(1)?,
                     text: r.get(2)?,
                     clip_id: r.get(3)?,
                     clip_name: r.get(4)?,
@@ -78,13 +78,43 @@ impl Store {
         rows.collect::<std::result::Result<Vec<_>, _>>().map_err(err)
     }
 
-    fn add(&mut self, after: Option<i64>, first: bool, block: &Block) -> Result<Data> {
-        let sot = block.kind == BlockKind::Sot;
-        if sot && (block.clip_id.is_empty() || block.to_frame <= block.from_frame) {
-            return Err(qnc_ui_text::text("db.script_sot_range").into());
+    /// The project's script is written with `profile`; every kind its blocks have must be one
+    /// of it.
+    fn set_profile(&mut self, new: &ScriptProfile) -> Result<Data> {
+        new.check()?;
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+        let used: Vec<String> = {
+            let mut statement = tx.prepare("SELECT DISTINCT kind FROM script_blocks ORDER BY kind").map_err(err)?;
+            let rows = statement.query_map([], |r| r.get(0)).map_err(err)?;
+            rows.collect::<std::result::Result<Vec<_>, _>>().map_err(err)?
+        };
+        if let Some(missing) = used.iter().find(|kind| new.kind(kind).is_none()) {
+            return Err(qnc_ui_text::fill("db.script_profile_lacks", &[("kind", missing), ("profile", &new.name)]));
         }
-        if !sot && block.text.trim().is_empty() {
-            return Err(qnc_ui_text::text("db.script_off_empty").into());
+        let json = serde_json::to_string(new).map_err(err)?;
+        tx.execute(
+            "INSERT INTO script_profile (singleton, profile_id, profile_json, updated_at_utc) VALUES (1, ?1, ?2, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+             ON CONFLICT(singleton) DO UPDATE SET profile_id = excluded.profile_id, profile_json = excluded.profile_json, updated_at_utc = excluded.updated_at_utc",
+            params![new.profile_id, json],
+        )
+        .map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    /// The kind `code` of the project's profile (a write needs both).
+    fn kind_spec(&self, code: &str) -> Result<KindSpec> {
+        let profile = profile(&self.conn)?.ok_or_else(|| qnc_ui_text::text("db.script_no_profile").to_string())?;
+        profile.kind(code).cloned().ok_or_else(|| qnc_ui_text::fill("db.script_unknown_kind", &[("kind", code), ("profile", &profile.name)]))
+    }
+
+    fn add(&mut self, after: Option<i64>, first: bool, block: &Block) -> Result<Data> {
+        let kind = self.kind_spec(&block.kind)?;
+        if kind.role == Role::Clip && (block.clip_id.is_empty() || block.to_frame <= block.from_frame) {
+            return Err(qnc_ui_text::fill("db.script_clip_range", &[("kind", &kind.label)]));
+        }
+        if kind.role != Role::Clip && block.text.trim().is_empty() {
+            return Err(qnc_ui_text::fill("db.script_text_empty", &[("kind", &kind.label)]));
         }
         let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
         let at: i64 = match after {
@@ -104,7 +134,7 @@ impl Store {
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
             params![
                 at,
-                kind_name(block.kind),
+                block.kind,
                 block.text,
                 block.clip_id,
                 block.clip_name,
@@ -123,14 +153,21 @@ impl Store {
         Ok(Data::Added(id))
     }
 
+    /// The kind code of block `id`.
+    fn kind_of_block(&self, id: i64) -> Result<String> {
+        self.conn
+            .query_row("SELECT kind FROM script_blocks WHERE block_id = ?1", params![id], |r| r.get(0))
+            .optional()
+            .map_err(err)?
+            .ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())
+    }
+
     fn set_text(&mut self, id: i64, text: &str) -> Result<Data> {
-        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
-        let kind: Option<String> = tx.query_row("SELECT kind FROM script_blocks WHERE block_id = ?1", params![id], |r| r.get(0)).optional().map_err(err)?;
-        match kind.as_deref() {
-            None => return Err(qnc_ui_text::text("db.script_no_block").into()),
-            Some(kind) if kind != "sot" && text.trim().is_empty() => return Err(qnc_ui_text::text("db.script_off_empty").into()),
-            _ => {}
+        let kind = self.kind_spec(&self.kind_of_block(id)?)?;
+        if kind.role != Role::Clip && text.trim().is_empty() {
+            return Err(qnc_ui_text::fill("db.script_text_empty", &[("kind", &kind.label)]));
         }
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
         tx.execute("UPDATE script_blocks SET text = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, text]).map_err(err)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
@@ -154,13 +191,11 @@ impl Store {
     }
 
     fn set_voice(&mut self, id: i64, uri: &str, seconds: f64, tc: &str) -> Result<Data> {
-        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
-        let kind: Option<String> = tx.query_row("SELECT kind FROM script_blocks WHERE block_id = ?1", params![id], |r| r.get(0)).optional().map_err(err)?;
-        match kind.as_deref() {
-            None => return Err(qnc_ui_text::text("db.script_no_block").into()),
-            Some("off") => {}
-            Some(_) => return Err(qnc_ui_text::text("db.script_voice_off_only").into()),
+        let kind = self.kind_spec(&self.kind_of_block(id)?)?;
+        if !kind.recorded {
+            return Err(qnc_ui_text::fill("db.script_not_recorded", &[("kind", &kind.label)]));
         }
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
         let seconds = if uri.is_empty() { 0.0 } else { seconds.max(0.0) };
         tx.execute(
             "UPDATE script_blocks SET voice_uri = ?2, voice_seconds = ?3, voice_tc = ?4, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1",
@@ -184,6 +219,19 @@ impl Store {
     }
 }
 
+/// The profile the project keeps (none in a project without the table or the row).
+fn profile(conn: &Connection) -> Result<Option<ScriptProfile>> {
+    if !view_exists(conn, "public_script_profile")? {
+        return Ok(None);
+    }
+    let json: Option<String> = conn.query_row("SELECT profile_json FROM public_script_profile", [], |r| r.get(0)).optional().map_err(err)?;
+    json.map(|json| serde_json::from_str(&json).map_err(err)).transpose()
+}
+
+fn view_exists(conn: &Connection, name: &str) -> Result<bool> {
+    conn.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='view' AND name=?1)", params![name], |r| r.get(0)).map_err(err)
+}
+
 /// Positions 0, 1, 2... in reading order.
 fn renumber(conn: &Connection) -> Result<()> {
     let ids: Vec<i64> = {
@@ -197,10 +245,11 @@ fn renumber(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-/// The columns of a script block as the table keeps them (in this order).
+/// The columns of a script block as the table keeps them (in this order). The kind is a code
+/// of the project's profile, so the table names no kinds.
 const COLUMNS: &str = "block_id INTEGER PRIMARY KEY AUTOINCREMENT,
             position INTEGER NOT NULL,
-            kind TEXT NOT NULL CHECK (kind IN ('off', 'sot', 'intro', 'outro')),
+            kind TEXT NOT NULL CHECK (length(kind) > 0),
             text TEXT NOT NULL,
             clip_id TEXT NOT NULL,
             clip_name TEXT NOT NULL,
@@ -215,40 +264,30 @@ const COLUMNS: &str = "block_id INTEGER PRIMARY KEY AUTOINCREMENT,
             voice_tc TEXT NOT NULL DEFAULT '',
             updated_at_utc TEXT NOT NULL";
 
-/// The kind as the table keeps it.
-pub(crate) fn kind_name(kind: BlockKind) -> &'static str {
-    match kind {
-        BlockKind::Off => "off",
-        BlockKind::Sot => "sot",
-        BlockKind::Intro => "intro",
-        BlockKind::Outro => "outro",
-    }
+fn table_sql(conn: &Connection) -> Result<Option<String>> {
+    conn.query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='script_blocks'", [], |r| r.get(0)).optional().map_err(err)
 }
 
-pub(crate) fn kind_of(name: &str) -> BlockKind {
-    match name {
-        "sot" => BlockKind::Sot,
-        "intro" => BlockKind::Intro,
-        "outro" => BlockKind::Outro,
-        _ => BlockKind::Off,
-    }
+/// Whether the table keeps recordings (one made on the first day of the script did not).
+fn has_voice(conn: &Connection) -> Result<bool> {
+    Ok(table_sql(conn)?.is_none_or(|sql| sql.contains("voice_uri")))
 }
 
-/// Whether the table of a project keeps the recordings and the lead-in and tag (one made on the
-/// first day of the script did not).
+/// Whether the table is as this module makes it (the ones of the days before profiles named
+/// their kinds).
 fn current(conn: &Connection) -> Result<bool> {
-    let sql: Option<String> = conn.query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='script_blocks'", [], |r| r.get(0)).optional().map_err(err)?;
-    Ok(sql.is_none_or(|sql| sql.contains("voice_uri") && sql.contains("'intro'")))
+    Ok(table_sql(conn)?.is_none_or(|sql| sql.contains("voice_uri") && !sql.contains("kind IN")))
 }
 
 fn ensure_schema(conn: &Connection) -> Result<()> {
     if !current(conn)? {
-        // The blocks written on the first day stay; the table gets its new columns and kinds.
+        // The blocks written before stay, with their recordings when the table had them.
+        let voice = if has_voice(conn)? { ", voice_uri, voice_seconds, voice_tc" } else { "" };
         conn.execute_batch(&format!(
             "DROP VIEW IF EXISTS public_script_blocks;
              CREATE TABLE script_blocks_next ({COLUMNS});
-             INSERT INTO script_blocks_next (block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, updated_at_utc)
-                 SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, updated_at_utc FROM script_blocks;
+             INSERT INTO script_blocks_next (block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, updated_at_utc{voice})
+                 SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, updated_at_utc{voice} FROM script_blocks;
              DROP TABLE script_blocks;
              ALTER TABLE script_blocks_next RENAME TO script_blocks;"
         ))
@@ -258,7 +297,14 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
         "CREATE TABLE IF NOT EXISTS script_blocks ({COLUMNS});
         CREATE VIEW IF NOT EXISTS public_script_blocks AS
             SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, voice_uri, voice_seconds, voice_tc, updated_at_utc
-            FROM script_blocks;"
+            FROM script_blocks;
+        CREATE TABLE IF NOT EXISTS script_profile (
+            singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+            profile_id TEXT NOT NULL,
+            profile_json TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL);
+        CREATE VIEW IF NOT EXISTS public_script_profile AS
+            SELECT profile_id, profile_json, updated_at_utc FROM script_profile;"
     ))
     .map_err(err)
 }

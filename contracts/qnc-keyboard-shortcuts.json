@@ -125,19 +125,19 @@
       "label": "Ukloni izjavu s popisa"
     },
     "script_editor_text": {
-      "label": "Tekst OFF editora scenarija"
+      "label": "Tekst editora scenarija"
     },
-    "script_add_off": {
-      "label": "Dodaj OFF iz editora u scenarij"
+    "script_add_text": {
+      "label": "Dodaj tekst iz editora kao blok izabrane vrste profila"
     },
-    "script_replace_off": {
-      "label": "Zamijeni tekst izabranog OFF-a"
+    "script_replace_text": {
+      "label": "Zamijeni tekst izabranog bloka"
     },
     "script_editor_clear": {
-      "label": "Isprazni OFF editor"
+      "label": "Isprazni editor scenarija"
     },
-    "script_add_sot": {
-      "label": "Dodaj izjavu (IN-OUT) u scenarij"
+    "script_add_clip": {
+      "label": "Dodaj IN-OUT klipa kao blok izabrane vrste profila"
     },
     "script_add_quote": {
       "label": "Dodaj izjavu s popisa u scenarij"
@@ -156,12 +156,6 @@
     },
     "script_open": {
       "label": "Otvori klip izjave scenarija"
-    },
-    "script_add_intro": {
-      "label": "Dodaj najavu (spiker) iz editora"
-    },
-    "script_add_outro": {
-      "label": "Dodaj odjavu (spiker) iz editora"
     },
     "transcribe_fast": {
       "label": "Transkribiraj brzo (procesor)"

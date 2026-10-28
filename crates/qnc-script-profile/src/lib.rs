@@ -9,7 +9,7 @@
 //! the ones a newsroom made on this computer are beside its other settings
 //! (`data/script-profiles`), and the one chosen in `data/script-profile.json`. A prepared
 //! profile is never written over: a copy gets its own code. It knows no form or database;
-//! a project keeps the profile it was written with (later step).
+//! a project keeps the profile it was written with in its database (`qnc-script-db`).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,6 +19,10 @@ use qnc_settings_form::{FieldSpec, OptionSets};
 use serde::{Deserialize, Serialize};
 
 pub const MODULE_ID: &str = "qnc.module.script-profile";
+
+/// The profile chosen on a computer where none was chosen (the general TV one QNC brings; any
+/// prepared one when it is not there).
+pub const DEFAULT_PROFILE: &str = "general_tv";
 
 /// What a kind of block is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -170,7 +174,8 @@ impl Profiles {
             }
         }
         let selected = fs::read_to_string(chosen_file(root)).ok().and_then(|text| serde_json::from_str::<Chosen>(&text).ok()).map(|chosen| chosen.selected);
-        let chosen = selected.and_then(|id| list.iter().position(|(profile, _)| profile.profile_id == id)).unwrap_or(0);
+        let at = |id: &str| list.iter().position(|(profile, _)| profile.profile_id == id);
+        let chosen = selected.and_then(|id| at(&id)).or_else(|| at(DEFAULT_PROFILE)).unwrap_or(0);
         (Self { root: root.to_path_buf(), list, chosen }, errors)
     }
 
