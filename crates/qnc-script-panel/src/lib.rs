@@ -9,7 +9,7 @@
 
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, Role, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT};
+use qnc_script::{seconds_label, FieldEdit, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT};
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
 
@@ -118,9 +118,10 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
     let block = &row.block;
     let id = block.id.to_string();
     let chosen = view.selected == Some(block.id);
+    let mut picked = false;
     let stroke = if chosen { egui::Stroke::new(1.5, theme.focus) } else { egui::Stroke::new(1.0, theme.border) };
     let fill = if row.is_clip() { theme.surface_alt } else { theme.bg };
-    let frame = egui::Frame::new().fill(fill).stroke(stroke).inner_margin(egui::Margin::symmetric(6, 4)).show(ui, |ui| {
+    egui::Frame::new().fill(fill).stroke(stroke).inner_margin(egui::Margin::symmetric(6, 4)).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             let color = match row.role {
@@ -129,7 +130,9 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
                 Some(Role::Anchor | Role::Note) => theme.text_muted,
                 None => theme.danger,
             };
-            ui.label(RichText::new(&row.mark).color(color).strong().size(theme.font_ui));
+            if ui.add(egui::Label::new(RichText::new(&row.mark).color(color).strong().size(theme.font_ui)).sense(Sense::click())).clicked() {
+                picked = true;
+            }
             let detail = if row.is_clip() {
                 format!("{}  {} - {}  {}", block.clip_name, block.start_tc, block.end_tc, block.length)
             } else if !block.voice_uri.is_empty() {
@@ -175,14 +178,63 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
         }
         let text = if block.text.is_empty() { qnc_ui_text::text("script.no_words").to_string() } else { block.text.clone() };
         let color = if block.text.is_empty() { theme.text_muted } else { theme.text };
-        ui.add(egui::Label::new(RichText::new(text).color(color).size(theme.font_ui + 1.0)).wrap());
+        if ui.add(egui::Label::new(RichText::new(text).color(color).size(theme.font_ui + 1.0)).wrap().sense(Sense::click())).clicked() {
+            picked = true;
+        }
+        if let Some(event) = paint_fields(ui, row, view, theme) {
+            asked = Some(event);
+        }
     });
-    let response = ui.interact(frame.response.rect, egui::Id::new(("qnc_script_block", block.id)), Sense::click());
-    if response.clicked() && asked.is_none() {
+    // The mark and the text choose the block (the whole frame would take the clicks of its
+    // buttons and fields).
+    if picked && asked.is_none() {
         asked = Some(ActionEvent::key(SELECT).with_target(id).at(PANEL));
     }
     asked
 }
+
+/// The fields of a block's kind (the caption of a statement, the template and lines of a
+/// graphic), one row each: typed text goes into the script when the field is left or Enter is
+/// pressed, a choice at once.
+fn paint_fields(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView, theme: &qnc_desktop_theme::Theme) -> Option<ActionEvent> {
+    let profile = view.profile.as_ref()?;
+    let kind = profile.kind(&row.block.kind)?;
+    let mut asked = None;
+    let id = row.block.id;
+    for field in &kind.fields {
+        ui.horizontal(|ui| {
+            ui.add_sized([LABEL_WIDTH, theme.chrome_control_height], egui::Label::new(RichText::new(&field.label).color(theme.text_muted).size(theme.font_ui)));
+            let stored = view.field_value(id, &field.path);
+            let choices = field.options.as_ref().and_then(|set| profile.options.get(set));
+            match choices.filter(|_| field.kind == qnc_settings_form::FieldKind::Choice) {
+                Some(choices) => {
+                    let value = if stored.is_empty() { field.default.clone() } else { stored };
+                    let shown = choices.iter().find(|(choice, _)| *choice == value).map_or(value.clone(), |(_, name)| name.clone());
+                    egui::ComboBox::from_id_salt(("qnc_script_field", id, &field.path)).selected_text(shown).show_ui(ui, |ui| {
+                        for (choice, name) in choices {
+                            if ui.selectable_label(*choice == value, name).clicked() {
+                                asked = Some(ActionEvent::key(FIELD_SET).with_target(FieldEdit::target(id, &field.path, choice)).at(PANEL));
+                            }
+                        }
+                    });
+                }
+                None => {
+                    let mut text = stored;
+                    let edit = ui.add(egui::TextEdit::singleline(&mut text).hint_text(&field.hint).desired_width(ui.available_width()));
+                    if edit.changed() {
+                        asked = Some(ActionEvent::key(FIELD_TEXT).with_target(FieldEdit::target(id, &field.path, &text)).at(PANEL));
+                    } else if edit.lost_focus() {
+                        asked = Some(ActionEvent::key(FIELD_COMMIT).with_target(id.to_string()).at(PANEL));
+                    }
+                }
+            }
+        });
+    }
+    asked
+}
+
+/// The width of a field's name in front of it.
+const LABEL_WIDTH: f32 = 120.0;
 
 /// The TextSourceEditor at the bottom: text is written here; a kind's button puts it after the
 /// chosen block as that kind, Replace puts it back into the block it was taken from.

@@ -16,7 +16,7 @@
 //! on the screen until it is added or replaced.
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     sync::mpsc,
     time::{Duration, Instant},
 };
@@ -56,6 +56,13 @@ pub const OPEN: &str = "script_open";
 /// A block of a recorded kind is recorded from the microphone, or its recording stops (target:
 /// its id; without one the chosen block). The catalog names it `record_toggle` (v4).
 pub const RECORD: &str = "record_toggle";
+/// A field of a block is being typed (target: `{"block":id,"field":code,"value":text}`); the text is a
+/// draft on the screen until it is committed.
+pub const FIELD_TEXT: &str = "script_field_text";
+/// The drafts of a block's fields go into the script (target: the block id).
+pub const FIELD_COMMIT: &str = "script_field_commit";
+/// A field is set and goes into the script at once (a choice; target as `FIELD_TEXT`).
+pub const FIELD_SET: &str = "script_field_set";
 
 /// How often the script is read again (another process may change it).
 const READ_EVERY: Duration = Duration::from_secs(2);
@@ -107,6 +114,8 @@ pub struct ScriptView {
     pub recording: Option<(i64, f64, f32)>,
     /// A recording is being started or finished.
     pub record_busy: bool,
+    /// Field values typed and not yet in the script, by block and field code.
+    pub field_drafts: BTreeMap<(i64, String), String>,
     pub message: String,
 }
 
@@ -131,6 +140,25 @@ impl ScriptView {
         self.profile.as_ref()?.kind(&block.block.kind)
     }
 
+    /// The value of field `code` of block `id` as shown: the draft while it is typed, else the
+    /// value in the script.
+    pub fn field_value(&self, id: i64, code: &str) -> String {
+        if let Some(draft) = self.field_drafts.get(&(id, code.to_string())) {
+            return draft.clone();
+        }
+        self.blocks.iter().find(|row| row.block.id == id).and_then(|row| row.block.fields.get(code).cloned()).unwrap_or_default()
+    }
+
+    /// The fields of a block as lines of the pasted script (`Caption: name: Ivan Horvat`).
+    fn fields_text(&self, row: &BlockRow) -> String {
+        let Some(kind) = self.profile.as_ref().and_then(|profile| profile.kind(&row.block.kind)) else { return String::new() };
+        kind.fields
+            .iter()
+            .filter_map(|field| row.block.fields.get(&field.path).map(|value| format!("
+{}: {}", field.label, value)))
+            .collect()
+    }
+
     /// The script as text to paste: each block in reading order with its mark, a clip block
     /// with its clip and timecodes.
     pub fn text(&self) -> String {
@@ -138,9 +166,9 @@ impl ScriptView {
             .iter()
             .map(|row| {
                 if row.is_clip() {
-                    format!("{} {} {} - {} ({})\n{}", row.mark, row.block.clip_name, row.block.start_tc, row.block.end_tc, row.block.length, row.block.text)
+                    format!("{} {} {} - {} ({})\n{}{}", row.mark, row.block.clip_name, row.block.start_tc, row.block.end_tc, row.block.length, row.block.text, self.fields_text(row))
                 } else {
-                    format!("{} ({})\n{}", row.mark, seconds_label(row.seconds), row.block.text)
+                    format!("{} ({})\n{}{}", row.mark, seconds_label(row.seconds), row.block.text, self.fields_text(row))
                 }
             })
             .collect::<Vec<_>>()
@@ -186,7 +214,7 @@ pub fn rows(blocks: &[Block], profile: Option<&ScriptProfile>, words_per_second:
             let kind = profile.and_then(|profile| profile.kind(&block.kind));
             let number = numbers.entry(block.kind.as_str()).or_insert(0);
             *number += 1;
-            let cue = profile.map(|profile| profile.cue_label(&block.kind, *number)).unwrap_or_default();
+            let cue = profile.map(|profile| profile.cue_label_with(&block.kind, *number, &block.fields)).unwrap_or_default();
             let mark = if !cue.is_empty() {
                 cue
             } else {
@@ -197,7 +225,21 @@ pub fn rows(blocks: &[Block], profile: Option<&ScriptProfile>, words_per_second:
         .collect()
 }
 
-type Read = Result<(Vec<Block>, Option<ScriptProfile>, Option<f64>), String>;
+/// The target of `FIELD_TEXT` and `FIELD_SET`.
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct FieldEdit {
+    pub block: i64,
+    pub field: String,
+    pub value: String,
+}
+
+impl FieldEdit {
+    pub fn target(block: i64, field: &str, value: &str) -> String {
+        serde_json::to_string(&Self { block, field: field.into(), value: value.into() }).unwrap_or_default()
+    }
+}
+
+type Read =Result<(Vec<Block>, Option<ScriptProfile>, Option<f64>), String>;
 
 /// Where a take goes and what its clip is: the voice-over folder of the project, its name
 /// without extension and the project picture.
@@ -362,6 +404,19 @@ impl Script {
                 let block = id().or(self.view.selected);
                 self.record(preview, block)
             }
+            FIELD_TEXT | FIELD_SET => {
+                let Some(edit) = target.and_then(|target| serde_json::from_str::<FieldEdit>(target).ok()) else { return Some(false) };
+                let block = edit.block;
+                self.view.field_drafts.insert((edit.block, edit.field), edit.value);
+                if action_id == FIELD_SET {
+                    return Some(self.commit_fields(preview, block));
+                }
+                true
+            }
+            FIELD_COMMIT => {
+                let Some(block) = id() else { return Some(false) };
+                self.commit_fields(preview, block)
+            }
             OPEN => match id().and_then(|id| self.view.blocks.iter().find(|row| row.block.id == id && row.is_clip())) {
                 Some(row) => {
                     self.source_request = Some((row.block.clip_id.clone(), row.block.from_frame, row.block.to_frame));
@@ -468,6 +523,27 @@ impl Script {
             let uri = format!("{}/{}.mxf", take.base, take.stem);
             qnc_script_db::set_voice(target, id, uri, recording.seconds, recording.timecode).map(|_| None)
         })
+    }
+
+    /// The drafts of block `block`'s fields go into the script (nothing is written when they
+    /// change nothing). The block shows them at once; the script read after the write is the truth.
+    fn commit_fields(&mut self, preview: &SourcePreview, block: i64) -> bool {
+        let drafts: Vec<(String, String)> = self.view.field_drafts.iter().filter(|((id, _), _)| *id == block).map(|((_, code), value)| (code.clone(), value.clone())).collect();
+        self.view.field_drafts.retain(|(id, _), _| *id != block);
+        let Some(stored) = self.blocks.iter_mut().find(|b| b.id == block) else { return false };
+        let mut fields = stored.fields.clone();
+        for (code, value) in drafts {
+            if value.trim().is_empty() {
+                fields.remove(&code);
+            } else {
+                fields.insert(code, value.trim().to_string());
+            }
+        }
+        if fields == stored.fields {
+            return true;
+        }
+        stored.fields = fields.clone();
+        self.write(preview, move |target| qnc_script_db::set_fields(target, block, fields).map(|_| None))
     }
 
     /// Seconds of `frames` of `clip_id` (0 when its rate is not known).
@@ -641,5 +717,19 @@ mod tests {
         assert_eq!(view.text(), "OFF 1 (0:01)\nUvod u prilog.\n\nSOT 1 Mironik 2002 10:00:02:00 - 10:00:06:49 (5:00)\nRekao je.");
         assert_eq!(view.text_kinds().iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["intro", "off", "outro"]);
         assert_eq!(view.clip_kinds().iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["sot", "standup", "nat"]);
+    }
+
+    #[test]
+    fn the_fields_of_a_block_are_in_the_pasted_script_and_a_draft_is_shown_until_committed() {
+        let profile = general_tv();
+        let mut statement = sot("Rekao je.");
+        statement.id = 4;
+        statement.fields.insert("caption_name".into(), "Ivan Horvat".into());
+        let name = profile.kind("sot").unwrap().fields[0].label.clone();
+        let mut view = ScriptView { blocks: rows(&[statement], Some(&profile), 2.5), profile: Some(profile), ..ScriptView::default() };
+        assert!(view.text().ends_with(&format!("Rekao je.\n{name}: Ivan Horvat")));
+        view.field_drafts.insert((4, "caption_name".into()), "Ivan Horvat Mlađi".into());
+        assert_eq!(view.field_value(4, "caption_name"), "Ivan Horvat Mlađi");
+        assert_eq!(view.field_value(4, "caption_role"), "");
     }
 }

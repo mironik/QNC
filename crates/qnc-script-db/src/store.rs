@@ -12,6 +12,8 @@ pub(crate) struct Store {
     /// A table made on the first day of the script (read only until the owner brings it up):
     /// its blocks are read without recordings.
     legacy: bool,
+    /// A table made before block fields: its blocks are read without them.
+    no_fields: bool,
 }
 
 impl Store {
@@ -29,7 +31,8 @@ impl Store {
         }
         qnc_db_broker::write_only_own_tables(&conn, access, &OWNED);
         let legacy = ready && !has_voice(&conn)?;
-        Ok(Self { conn, ready, legacy })
+        let no_fields = ready && !has_column(&conn, "fields_json")?;
+        Ok(Self { conn, ready, legacy, no_fields })
     }
 
     pub(crate) fn execute(&mut self, operation: &Operation) -> Result<Data> {
@@ -43,15 +46,17 @@ impl Store {
             Operation::Move { id, up } => self.move_block(*id, *up),
             Operation::Remove { id } => self.remove(*id),
             Operation::SetVoice { id, uri, seconds, tc } => self.set_voice(*id, uri, *seconds, tc),
+            Operation::SetFields { id, fields } => self.set_fields(*id, fields),
         }
     }
 
     fn read(&self) -> Result<Vec<Block>> {
         let voice = if self.legacy { "'', 0.0, ''" } else { "voice_uri, voice_seconds, voice_tc" };
+        let fields = if self.no_fields { "'{}'" } else { "fields_json" };
         let mut statement = self
             .conn
             .prepare(&format!(
-                "SELECT block_id, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, {voice}
+                "SELECT block_id, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, {voice}, {fields}
                  FROM public_script_blocks ORDER BY position"
             ))
             .map_err(err)?;
@@ -72,6 +77,7 @@ impl Store {
                     voice_uri: r.get(11)?,
                     voice_seconds: r.get(12)?,
                     voice_tc: r.get(13)?,
+                    fields: serde_json::from_str(&r.get::<_, String>(14)?).unwrap_or_default(),
                 })
             })
             .map_err(err)?;
@@ -116,6 +122,7 @@ impl Store {
         if kind.role != Role::Clip && block.text.trim().is_empty() {
             return Err(qnc_ui_text::fill("db.script_text_empty", &[("kind", &kind.label)]));
         }
+        let fields = self.fields_json(&kind, &block.fields)?;
         let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
         let at: i64 = match after {
             Some(after) => {
@@ -130,8 +137,8 @@ impl Store {
         };
         tx.execute("UPDATE script_blocks SET position = position + 1 WHERE position >= ?1", params![at]).map_err(err)?;
         tx.execute(
-            "INSERT INTO script_blocks (position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, updated_at_utc)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+            "INSERT INTO script_blocks (position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, fields_json, updated_at_utc)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
             params![
                 at,
                 block.kind,
@@ -143,7 +150,8 @@ impl Store {
                 block.start_tc,
                 block.end_tc,
                 block.length,
-                block.seconds
+                block.seconds,
+                fields
             ],
         )
         .map_err(err)?;
@@ -206,6 +214,38 @@ impl Store {
         Ok(Data::Changed)
     }
 
+    /// The fields of `kind` as the table keeps them: only fields the kind has, a choice only one
+    /// of its choices, an empty value left out.
+    fn fields_json(&self, kind: &KindSpec, fields: &std::collections::BTreeMap<String, String>) -> Result<String> {
+        let options = profile(&self.conn)?.map(|profile| profile.options).unwrap_or_default();
+        let mut kept = std::collections::BTreeMap::new();
+        for (code, value) in fields {
+            let value = value.trim();
+            if value.is_empty() {
+                continue;
+            }
+            let Some(spec) = kind.fields.iter().find(|field| field.path == *code) else {
+                return Err(qnc_ui_text::fill("db.script_unknown_field", &[("field", code), ("kind", &kind.label)]));
+            };
+            if let Some(set) = &spec.options {
+                if spec.kind == qnc_settings_form::FieldKind::Choice && !options.get(set).is_some_and(|choices| choices.iter().any(|(id, _)| id == value)) {
+                    return Err(qnc_ui_text::fill("db.script_bad_choice", &[("field", &spec.label), ("value", value)]));
+                }
+            }
+            kept.insert(code.clone(), value.to_string());
+        }
+        serde_json::to_string(&kept).map_err(err)
+    }
+
+    fn set_fields(&mut self, id: i64, fields: &std::collections::BTreeMap<String, String>) -> Result<Data> {
+        let kind = self.kind_spec(&self.kind_of_block(id)?)?;
+        let json = self.fields_json(&kind, fields)?;
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+        tx.execute("UPDATE script_blocks SET fields_json = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, json]).map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
     fn remove(&mut self, id: i64) -> Result<Data> {
         let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
         tx.execute("DELETE FROM script_blocks WHERE block_id = ?1", params![id]).map_err(err)?;
@@ -262,10 +302,16 @@ const COLUMNS: &str = "block_id INTEGER PRIMARY KEY AUTOINCREMENT,
             voice_uri TEXT NOT NULL DEFAULT '',
             voice_seconds REAL NOT NULL DEFAULT 0 CHECK (voice_seconds >= 0),
             voice_tc TEXT NOT NULL DEFAULT '',
+            fields_json TEXT NOT NULL DEFAULT '{}',
             updated_at_utc TEXT NOT NULL";
 
 fn table_sql(conn: &Connection) -> Result<Option<String>> {
     conn.query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='script_blocks'", [], |r| r.get(0)).optional().map_err(err)
+}
+
+/// Whether the table has column `name` (a table made before block fields has no `fields_json`).
+fn has_column(conn: &Connection, name: &str) -> Result<bool> {
+    Ok(table_sql(conn)?.is_none_or(|sql| sql.contains(name)))
 }
 
 /// Whether the table keeps recordings (one made on the first day of the script did not).
@@ -276,13 +322,14 @@ fn has_voice(conn: &Connection) -> Result<bool> {
 /// Whether the table is as this module makes it (the ones of the days before profiles named
 /// their kinds).
 fn current(conn: &Connection) -> Result<bool> {
-    Ok(table_sql(conn)?.is_none_or(|sql| sql.contains("voice_uri") && !sql.contains("kind IN")))
+    Ok(table_sql(conn)?.is_none_or(|sql| sql.contains("voice_uri") && sql.contains("fields_json") && !sql.contains("kind IN")))
 }
 
 fn ensure_schema(conn: &Connection) -> Result<()> {
     if !current(conn)? {
         // The blocks written before stay, with their recordings when the table had them.
         let voice = if has_voice(conn)? { ", voice_uri, voice_seconds, voice_tc" } else { "" };
+        let voice = if has_column(conn, "fields_json")? { format!("{voice}, fields_json") } else { voice.to_string() };
         conn.execute_batch(&format!(
             "DROP VIEW IF EXISTS public_script_blocks;
              CREATE TABLE script_blocks_next ({COLUMNS});
@@ -296,7 +343,7 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(&format!(
         "CREATE TABLE IF NOT EXISTS script_blocks ({COLUMNS});
         CREATE VIEW IF NOT EXISTS public_script_blocks AS
-            SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, voice_uri, voice_seconds, voice_tc, updated_at_utc
+            SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, voice_uri, voice_seconds, voice_tc, fields_json, updated_at_utc
             FROM script_blocks;
         CREATE TABLE IF NOT EXISTS script_profile (
             singleton INTEGER PRIMARY KEY CHECK (singleton = 1),

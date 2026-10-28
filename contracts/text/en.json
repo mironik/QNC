@@ -615,6 +615,8 @@
     "db.script_text_empty": "A {kind} block needs text.",
     "db.script_no_block": "That block is not in the script any more.",
     "db.script_not_recorded": "A {kind} block is not recorded.",
+    "db.script_unknown_field": "A {kind} block has no field {field}.",
+    "db.script_bad_choice": "{value} is not one of the choices of {field}.",
     "db.script_no_profile": "This project's script has no script profile yet.",
     "db.script_unknown_kind": "The script profile {profile} has no kind {kind}.",
     "db.script_profile_lacks": "The script profile {profile} has no kind {kind}, which blocks of this script have.",

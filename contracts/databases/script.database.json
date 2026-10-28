@@ -19,6 +19,7 @@
     "order": "The blocks are read in the order of position, 0, 1, 2...; a block is added after a chosen one or at the end, moves one place up or down, and leaves without a gap.",
     "profile": "The script is written with one script profile (script_profile, one row: its code and the whole profile as it was when chosen, user 2026-10-28: the form of the script is programmable). A block's kind is a code of that profile; a block of a kind it does not have is refused, and a profile without a kind the blocks have is refused. A project read on another computer keeps the profile it was written with.",
     "text": "A block of a text kind (spoken, anchor, note) is never empty; its length comes from its words and the project's audio.reading_words_per_second, or from its recording when its kind is recorded (only a recorded kind takes one).",
+    "fields": "A block keeps the values of its kind's fields (fields_json, by field code; for example the caption of a statement or the template and lines of a graphic). A field the kind does not have, or a choice not among its choices, is refused; an empty value is none. The cue label of a kind may name a field (`{code}`).",
     "clip": "A block of a clip kind (a statement, a stand-up...) is a clip's frames [from_frame, to_frame) with its timecodes, length and seconds as shown when it was added, and the words said there (which may be corrected); it needs a clip and an IN before its OUT."
   },
   "migration_policy": "owner_application_only",

@@ -154,6 +154,15 @@
     "script_remove": {
       "label": "Ukloni blok iz scenarija"
     },
+    "script_field_text": {
+      "label": "Tekst polja bloka scenarija"
+    },
+    "script_field_commit": {
+      "label": "Spremi polja bloka scenarija"
+    },
+    "script_field_set": {
+      "label": "Izaberi vrijednost polja bloka scenarija"
+    },
     "script_open": {
       "label": "Otvori klip izjave scenarija"
     },

@@ -96,7 +96,25 @@ impl ScriptProfile {
 
     /// The label of the cue of the `number`-th block of kind `id` (empty when not numbered).
     pub fn cue_label(&self, id: &str, number: usize) -> String {
-        self.kind(id).map_or_else(String::new, |kind| kind.cue.replace("{n}", &number.to_string()))
+        self.cue_label_with(id, number, &std::collections::BTreeMap::new())
+    }
+
+    /// The cue label with the block's field values in it: `{code}` of a field becomes the name
+    /// of its choice or its value (for example `*CG {cg_template}` becomes `*CG 2line`).
+    pub fn cue_label_with(&self, id: &str, number: usize, fields: &std::collections::BTreeMap<String, String>) -> String {
+        let Some(kind) = self.kind(id) else { return String::new() };
+        let mut label = kind.cue.replace("{n}", &number.to_string());
+        for field in &kind.fields {
+            let value = fields.get(&field.path).cloned().unwrap_or_else(|| field.default.clone());
+            let shown = field
+                .options
+                .as_ref()
+                .and_then(|set| self.options.get(set))
+                .and_then(|choices| choices.iter().find(|(choice, _)| *choice == value))
+                .map_or(value.clone(), |(_, name)| name.clone());
+            label = label.replace(&format!("{{{}}}", field.path), &shown);
+        }
+        label
     }
 
     /// Why the profile cannot be used, if it cannot.

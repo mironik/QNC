@@ -6723,3 +6723,14 @@ klipova istodobno citali karticu D: i trosili procesor; "da, otkljucaj i popravi
 filmstrip rade kao dok player svira (samo klip otvoren u previewu, najvise jedan radnik); ostali cekaju dok red ne zavrsi.
 Najam se cita najvise dvaput u sekundi. `qnc-timeline-artifacts` nije trebalo mijenjati. Debug cache obrisan
 (`cargo clean --profile dev`, 36,3 GiB) uz dozvolu korisnika. Conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-28 (korisnik: "nastavi s tockom 3 i pokreni za test"): tocka 3, polja uz vrstu bloka. `qnc-script-db`:
+blok cuva vrijednosti polja svoje vrste (`Block.fields`, stupac `fields_json`, starija tablica se prepisuje uz zadrzane
+blokove i snimke), operacija `SetFields` (polje koje vrsta nema i izbor izvan izbora profila se odbijaju, prazna vrijednost
+je nista; test). `qnc-script-profile` `cue_label_with`: oznaka cuea moze imenovati polje (`{code}` postaje naziv izbora ili
+vrijednost; `inews_mos` CG je `*CG {cg_template}`). `qnc-script`: akcije `script_field_text` (nacrt dok se tipka),
+`script_field_commit` (nacrti bloka u bazu kad se polje napusti ili Enter), `script_field_set` (izbor odmah); oznaka bloka
+uzima polja, Copy daje polja ispod teksta (`Naziv polja: vrijednost`). `qnc-script-panel`: ispod teksta bloka redak po
+polju (tekst ili izbor); blok se bira klikom na oznaku ili tekst (okvir bloka vise ne uzima klikove gumba i polja).
+Katalog akcija (bez tipki), rjecnik, ugovor `script.database.json` (`fields`). Testovi `qnc-script-db` (8), `qnc-script`
+(4), `qnc-script-profile` (3), conformance, release build. Uzivo nije provjereno. Nije izvedeno (tocke 4-5): izvoz kroz
+predloske (MOS, dva stupca, tekst), uredivanje profila i promjena profila projekta.

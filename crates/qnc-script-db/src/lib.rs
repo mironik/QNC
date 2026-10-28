@@ -12,7 +12,7 @@
 
 mod store;
 
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use qnc_db_broker::{Access, ProjectDbTarget, TableModuleFactory};
 pub use qnc_script_profile::{Counts, KindSpec, Role, ScriptProfile};
@@ -62,12 +62,16 @@ pub struct Block {
     /// The timecode the recording starts at (the time of day it was recorded).
     #[serde(default)]
     pub voice_tc: String,
+    /// The values of its kind's fields, by field code (for example the caption of a statement or
+    /// the lines of a graphic); a field without a value is not kept.
+    #[serde(default)]
+    pub fields: BTreeMap<String, String>,
 }
 
 impl Block {
     /// A text block of kind `kind`.
     pub fn written(kind: impl Into<String>, text: impl Into<String>) -> Self {
-        Self { id: 0, kind: kind.into(), text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new() }
+        Self { id: 0, kind: kind.into(), text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new(), fields: BTreeMap::new() }
     }
 }
 
@@ -92,6 +96,8 @@ pub enum Operation {
     Remove { id: i64 },
     /// A block of a recorded kind got its recording (an empty URI takes it away).
     SetVoice { id: i64, uri: String, seconds: f64, tc: String },
+    /// The values of a block's fields (each one a field of its kind; an empty value is none).
+    SetFields { id: i64, fields: BTreeMap<String, String> },
 }
 
 impl Operation {
@@ -192,6 +198,11 @@ pub fn move_block(target: &ProjectDbTarget, id: i64, up: bool) -> Result<()> {
 /// Block `id` of a recorded kind got the recording at `uri`, `seconds` long, starting at `tc`.
 pub fn set_voice(target: &ProjectDbTarget, id: i64, uri: String, seconds: f64, tc: String) -> Result<()> {
     write(target, Operation::SetVoice { id, uri, seconds, tc }).map(drop)
+}
+
+/// The fields of block `id` become `fields`.
+pub fn set_fields(target: &ProjectDbTarget, id: i64, fields: BTreeMap<String, String>) -> Result<()> {
+    write(target, Operation::SetFields { id, fields }).map(drop)
 }
 
 /// Block `id` leaves the script.

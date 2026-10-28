@@ -18,4 +18,5 @@ qnc-ui-text = { workspace = true }
 qnc-voice-record = { workspace = true }
 qnc-voice-clip = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }

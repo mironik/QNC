@@ -1,5 +1,6 @@
 use super::*;
 use rusqlite::Connection;
+use std::collections::BTreeMap;
 
 const PROJECT_DB: &str = "qnc://local/db/project_db/p1";
 
@@ -168,4 +169,23 @@ fn a_script_of_the_first_day_keeps_its_blocks_when_its_table_is_brought_up() {
     set_profile(&target, prepared("general_tv")).unwrap();
     add(&target, None, Block::written("intro", "najava")).unwrap();
     assert_eq!(texts(&target), ["stari off", "najava"]);
+}
+
+#[test]
+fn a_block_keeps_only_the_fields_of_its_kind_and_a_choice_only_one_of_its_choices() {
+    let (_dir, target) = project();
+    set_profile(&target, prepared("inews_mos")).unwrap();
+    let id = add(&target, None, sot("2002")).unwrap();
+    let mut fields = BTreeMap::from([("caption_name".to_string(), "Ivan Horvat".to_string()), ("caption_role".to_string(), "  ".to_string())]);
+    set_fields(&target, id, fields.clone()).unwrap();
+    assert_eq!(read(&target).unwrap()[0].fields, BTreeMap::from([("caption_name".to_string(), "Ivan Horvat".to_string())]), "an empty value is none");
+    fields.insert("line1".into(), "x".into());
+    assert!(set_fields(&target, id, fields).is_err(), "a SOT has no line1");
+    let cg = add(&target, None, Block::written("cg", "Potpis")).unwrap();
+    assert!(set_fields(&target, cg, BTreeMap::from([("cg_template".to_string(), "4line".to_string())])).is_err());
+    set_fields(&target, cg, BTreeMap::from([("cg_template".to_string(), "locator".to_string()), ("line1".to_string(), "Zagreb".to_string())])).unwrap();
+    let blocks = read(&target).unwrap();
+    assert_eq!(blocks[1].fields.get("line1").map(String::as_str), Some("Zagreb"));
+    let profile = read_profile(&target).unwrap().unwrap();
+    assert_eq!(profile.cue_label_with("cg", 1, &blocks[1].fields), "*CG locator");
 }

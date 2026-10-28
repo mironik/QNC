@@ -9,6 +9,7 @@ eframe = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-script = { workspace = true }
+qnc-settings-form = { workspace = true }
 qnc-text-source-editor = { workspace = true }
 qnc-transcript = { workspace = true }
 qnc-ui-kit = { workspace = true }
