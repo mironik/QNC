@@ -6697,5 +6697,6 @@ potpisom ime/funkcija, stand-up, prirodni ton, odjava), `inews_mos` (On Camera, 
 retcima, TAG), `radio`, `agency_online`; profili racunala u `data/script-profiles`, izbor u `data/script-profile.json`;
 pripremljeni se nikad ne prepisuje (kopija dobiva svoju sifru), profil koji se ne moze koristiti (krive sifre, sifra
 dvaput, snima se a nije spoken, note s trajanjem, polje s nepostojecim izborima) izostavlja se uz razlog. Sifre `off`,
-`sot`, `intro`, `outro` postojecih blokova su vrste profila koji ih imaju. Testovi `qnc-script-profile` (3), conformance.
+`sot`, `intro`, `outro` postojecih blokova su vrste profila koji ih imaju. Testovi `qnc-script-profile` (3). Conformance
+NE prolazi dok tocka 2 ne spoji profil u scenarij: C5 "javna kocka bez korisnika" (`qnc-script-profile` jos nitko ne koristi).
 Nije izvedeno (tocke 2-5): baza i panel na vrstama iz profila, polja uz vrstu, izvoz kroz predloske, uredivanje profila.
