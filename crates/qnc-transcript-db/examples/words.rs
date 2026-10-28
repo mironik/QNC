@@ -1,18 +1,16 @@
-//! Reads (only) the words of one clip's transcripts between two frames.
-//! Usage: words PROJECT_DB PROJECT_ID CLIP_NAME_PART FROM TO
-use qnc_db_broker::ProjectDbTarget;
-
+//! Reads (only) the words of one clip's transcripts between two frames, in the active project
+//! of a QNC root. Usage: words QNC_ROOT CLIP_ID FROM TO
 fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let [file, id, clip, from, to] = args.as_slice() else { return Err("usage: words PROJECT_DB PROJECT_ID CLIP FROM TO".into()) };
+    let [root, clip, from, to] = args.as_slice() else { return Err("usage: words QNC_ROOT CLIP_ID FROM TO".into()) };
     let (from, to): (u64, u64) = (from.parse().map_err(|_| "FROM")?, to.parse().map_err(|_| "TO")?);
-    let target = ProjectDbTarget::from_owner_binding(std::path::Path::new(file), &format!("qnc://local/db/project_db/{id}")).map_err(|e| e.to_string())?;
-    for queued in qnc_transcript_db::read_queue(&target)? {
-        if !queued.clip_id.contains(clip.as_str()) { continue; }
-        for transcript in qnc_transcript_db::read_clip(&target, &queued.clip_id)? {
-            for word in transcript.lines.iter().flat_map(|l| l.words.iter()).filter(|w| w.to >= from && w.from <= to) {
-                println!("{:6}-{:6} {}", word.from, word.to, word.text);
-            }
+    let reader = qnc_active_project_read::ActiveProjectReader::from_root(std::path::Path::new(root)).map_err(|e| e.to_string())?;
+    let snapshot = reader.read().map_err(|e| e.to_string())?;
+    let target = qnc_db_broker::ProjectDbTarget::for_project(reader.settings_reader(), &snapshot.settings)?;
+    for transcript in qnc_transcript_db::read_clip(&target, clip)? {
+        println!("[{}..{}] {} {}", transcript.from_frame, transcript.to_frame, transcript.engine, transcript.language);
+        for word in transcript.lines.iter().flat_map(|l| l.words.iter()).filter(|w| w.to >= from && w.from <= to) {
+            println!("{:6}-{:6} {}", word.from, word.to, word.text);
         }
     }
     Ok(())

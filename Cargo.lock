@@ -6154,6 +6154,7 @@ dependencies = [
 name = "qnc-transcript-db"
 version = "0.1.0"
 dependencies = [
+ "qnc-active-project-read",
  "qnc-db-broker",
  "qnc-ui-text",
  "rusqlite",
