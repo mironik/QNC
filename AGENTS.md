@@ -6775,3 +6775,18 @@ ugovorima), prikaz u `view.rs`, citanje u `read.rs`, testovi u `tests.rs`. (4) P
 brzine citanja kaze razlog u panelu umjesto tihog 0:00. Testovi dotaknutih kocki, conformance, release build. Uzivo nije
 provjereno. Ostaje iz audita (5-8): MOS oznake su u kodu, kopije provjere mape projekta i mjeraca razine, polja bloka
 mimo `qnc-settings-form`, provjera raspona klip bloka prema katalogu, program obrasca pise u bazu na niti sucelja.
+Izvedeno 2026-10-28 (korisnik: usporedba s obrascem `broadcast_obrazac_tv_prilog.pdf`, "da, slozi profil i doradi izvoz";
+zatim "ti profili trebaju biti json ne kodirani dio aplikacije kako bi se mogao prilagodavati"): novi pripremljeni profil
+`catalogs/script-profiles/tv_package.json` (TV prilog po obrascu: studio s kamerom i grafikom, VO s B-rollom i prirodnim tonom,
+SOT s potpisom, stand-up s kadrom i lokacijom, NAT, odjava novinara s B-rollom i potpisima, odjava voditelja). Sve rijeci
+izvoza dolaze iz JSON-a profila, ne iz koda: vrsta bloka ima `speaker` (tko se cuje, s `{polje}`; prazno kad polje koje
+imenuje nema vrijednost) i `picture` (redak slike: `{mark}`, `{clip}`, `{start}`, `{end}` i polja; bez njega samo oznaka),
+profil ima `labels` (stupci VIDEO/AUDIO/DUR, IN-CUE, OUT-CUE, TRT, ANCHOR, redak snimke `{tc}`, redak cueova `{in}`/`{out}`,
+smjer prijelaza na prilog nakon teksta voditelja; profil bez `labels` dobiva zadane engleske rijeci, bez smjera prijelaza).
+`qnc-script-profile` (`KindSpec.speaker`, `picture`, `Labels`, `speaker_with`, `picture_with`), `qnc-script-profile-editor`
+(retci "tko se cuje" i "redak slike"), `qnc-script-export` (bez ijedne ugradene rijeci; tekuce vrijeme priloga od prvog bloka u
+trajanju, smjer prijelaza na prvom bloku priloga nakon voditelja, govornik iznad teksta, polja velikim imenom i vrijednoscu
+kako je napisana), `qnc-script` `export_story`. Svi pripremljeni profili dobili su `picture` iste kao dosadasnji izlaz
+(`{mark} (ON CAM)`, `{mark} (B-ROLL)`, `{mark}: {clip} {start} - {end}`). Labels se zasad mijenjaju samo u JSON-u (urednik
+profila ih ne prikazuje). Testovi `qnc-script-export` (5, novi: svaka rijec iz profila), `qnc-script-profile`, `qnc-script`,
+`qnc-script-profile-editor`, conformance, release build. Uzivo nije provjereno.

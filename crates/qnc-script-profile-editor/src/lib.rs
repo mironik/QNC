@@ -208,6 +208,10 @@ fn kind_rows(ui: &mut egui::Ui, kind: &mut KindSpec, theme: &Theme) {
     });
     ui.horizontal(|ui| {
         ui.add(row_box(&mut kind.cue, width * 0.45).hint_text(qnc_ui_text::text("sp.cue_hint")));
+        ui.add(row_box(&mut kind.speaker, width * 0.45).hint_text(qnc_ui_text::text("sp.speaker_hint")));
+    });
+    ui.horizontal(|ui| {
+        ui.add(row_box(&mut kind.picture, width * 0.9).hint_text(qnc_ui_text::text("sp.picture_hint")));
     });
 }
 
@@ -217,7 +221,7 @@ pub fn new_kind(profile: &ScriptProfile, label: &str) -> KindSpec {
     let taken = |code: &str| profile.kinds.iter().any(|kind| kind.id == code);
     let id = if taken(&base) { (2..).map(|n| format!("{base}_{n}")).find(|code| !taken(code)).unwrap_or_default() } else { base };
     let short = label.trim().to_uppercase();
-    KindSpec { id, label: label.trim().to_string(), short, role: Role::Spoken, counts: Counts::Story, recorded: false, cues: false, cue: String::new(), fields: Vec::new() }
+    KindSpec { id, label: label.trim().to_string(), short, role: Role::Spoken, counts: Counts::Story, recorded: false, cues: false, cue: String::new(), speaker: String::new(), picture: String::new(), fields: Vec::new() }
 }
 
 #[cfg(test)]
@@ -226,7 +230,7 @@ mod tests {
 
     #[test]
     fn a_new_kind_gets_a_free_code_and_can_be_used() {
-        let mut profile = ScriptProfile { profile_id: "test".into(), name: "Test".into(), locked: false, kinds: Vec::new(), options: Default::default() };
+        let mut profile = ScriptProfile { profile_id: "test".into(), name: "Test".into(), locked: false, kinds: Vec::new(), options: Default::default(), labels: Default::default() };
         profile.kinds.push(new_kind(&profile, "Voditelj uživo"));
         profile.kinds.push(new_kind(&profile, "Voditelj uživo"));
         assert_eq!(profile.kinds[0].id, "voditelj_uzivo");

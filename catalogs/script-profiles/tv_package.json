@@ -1,0 +1,38 @@
+{
+  "profile_id": "tv_package",
+  "name": "@sp.tv_package",
+  "labels": { "video": "VIDEO", "audio": "AUDIO", "duration": "DUR", "in_cue": "IN-CUE", "out_cue": "OUT-CUE", "trt": "TRT",
+    "anchor": "ANCHOR", "recorded": "VO TC {tc}", "cues": "IN: {in}   OUT: {out}", "cut_to_package": "[CUT TO PACKAGE]" },
+  "kinds": [
+    { "id": "intro", "label": "@sp.k.studio", "short": "@sp.s.studio", "role": "anchor", "picture": "{mark} (ON CAM)", "counts": "anchor", "speaker": "@sp.sp.anchor",
+      "fields": [
+        { "kind": "text", "label": "@sp.f.camera", "id": "camera", "path": "camera", "hint": "@sp.h.camera" },
+        { "kind": "text", "label": "@sp.f.graphics", "id": "graphics", "path": "graphics", "hint": "@sp.h.graphics" }
+      ] },
+    { "id": "off", "label": "@sp.k.vo", "short": "VO", "role": "spoken", "picture": "{mark} (B-ROLL)", "counts": "story", "recorded": true, "cue": "VO {n}", "speaker": "@sp.sp.vo",
+      "fields": [
+        { "kind": "text", "label": "@sp.f.broll", "id": "broll", "path": "broll", "hint": "@sp.h.broll" },
+        { "kind": "text", "label": "@sp.f.nat", "id": "nat", "path": "nat", "hint": "@sp.h.nat" }
+      ] },
+    { "id": "sot", "label": "@sp.k.sot", "short": "SOT", "role": "clip", "picture": "{mark}: {clip} {start} - {end}", "counts": "story", "cues": true, "cue": "SOT {n}", "speaker": "{caption_name} (SOT)",
+      "fields": [
+        { "kind": "text", "label": "@sp.f.name", "id": "caption_name", "path": "caption_name" },
+        { "kind": "text", "label": "@sp.f.role", "id": "caption_role", "path": "caption_role" }
+      ] },
+    { "id": "standup", "label": "@sp.k.standup", "short": "STAND-UP", "role": "clip", "picture": "{mark}: {clip} {start} - {end}", "counts": "story", "cues": true, "cue": "STAND-UP", "speaker": "@sp.sp.standup",
+      "fields": [
+        { "kind": "text", "label": "@sp.f.shot", "id": "shot", "path": "shot", "hint": "@sp.h.shot" },
+        { "kind": "text", "label": "@sp.f.location", "id": "location", "path": "location", "hint": "@sp.h.location" }
+      ] },
+    { "id": "nat", "label": "@sp.k.nat", "short": "NAT", "role": "clip", "picture": "{mark}: {clip} {start} - {end}", "counts": "story", "speaker": "@sp.sp.nat",
+      "fields": [
+        { "kind": "text", "label": "@sp.f.direction", "id": "direction", "path": "direction", "hint": "@sp.h.nat" }
+      ] },
+    { "id": "signoff", "label": "@sp.k.signoff", "short": "@sp.s.signoff", "role": "spoken", "picture": "{mark} (B-ROLL)", "counts": "story", "recorded": true, "speaker": "@sp.sp.vo",
+      "fields": [
+        { "kind": "text", "label": "@sp.f.broll", "id": "broll", "path": "broll", "hint": "@sp.h.broll" },
+        { "kind": "text", "label": "@sp.f.credits", "id": "credits", "path": "credits", "hint": "@sp.h.credits" }
+      ] },
+    { "id": "outro", "label": "@sp.k.outro", "short": "@sp.s.outro", "role": "anchor", "picture": "{mark} (ON CAM)", "counts": "anchor", "speaker": "@sp.sp.anchor" }
+  ]
+}

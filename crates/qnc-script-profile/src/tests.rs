@@ -19,7 +19,7 @@ fn every_prepared_profile_is_read_and_can_be_used() {
     let (profiles, errors) = Profiles::load(dir.path());
     assert!(errors.is_empty(), "{errors:?}");
     let ids: Vec<&str> = profiles.list.iter().map(|(p, _)| p.profile_id.as_str()).collect();
-    assert_eq!(ids, ["agency_online", "general_tv", "inews_mos", "radio"]);
+    assert_eq!(ids, ["agency_online", "general_tv", "inews_mos", "radio", "tv_package"]);
     let general = &profiles.list[1].0;
     assert_eq!(profiles.current().unwrap().profile_id, "general_tv", "chosen where none was chosen");
     // The blocks written before profiles (off, sot, intro, outro) are kinds of every profile
@@ -39,7 +39,7 @@ fn a_profile_of_this_computer_is_kept_chosen_and_a_prepared_one_is_never_written
     let (mut profiles, _) = Profiles::load(dir.path());
     let mut own = profiles.list[1].0.clone();
     own.name = "Naša redakcija".into();
-    own.kinds.push(KindSpec { id: "voditelj_uzivo".into(), label: "Voditelj uživo".into(), short: "LIVE".into(), role: Role::Anchor, counts: Counts::Anchor, recorded: false, cues: false, cue: String::new(), fields: Vec::new() });
+    own.kinds.push(KindSpec { id: "voditelj_uzivo".into(), label: "Voditelj uživo".into(), short: "LIVE".into(), role: Role::Anchor, counts: Counts::Anchor, recorded: false, cues: false, cue: String::new(), speaker: String::new(), picture: String::new(), fields: Vec::new() });
     profiles.keep(own).unwrap();
     let (again, errors) = Profiles::load(dir.path());
     assert!(errors.is_empty(), "{errors:?}");
@@ -63,4 +63,20 @@ fn a_profile_that_cannot_be_used_is_refused_with_why() {
     fs::write(dir.path().join("data").join("script-profiles").join("x.json"), "{ not json").ok();
     let (_, errors) = Profiles::load(dir.path());
     assert!(errors.is_empty() || errors.iter().all(|e| e.contains("x.json")));
+}
+
+#[test]
+fn the_tv_package_profile_names_who_is_heard_and_the_picture_of_each_block() {
+    let dir = root();
+    let (profiles, _) = Profiles::load(dir.path());
+    let package = &profiles.list.iter().find(|(p, _)| p.profile_id == "tv_package").unwrap().0;
+    let mut fields = std::collections::BTreeMap::new();
+    assert_eq!(package.speaker_with("sot", &fields), "", "nobody named until the caption has a name");
+    fields.insert("caption_name".to_string(), "Ivan Marić".to_string());
+    assert_eq!(package.speaker_with("sot", &fields), "Ivan Marić (SOT)");
+    assert_eq!(package.speaker_with("off", &fields), "REPORTER (VO)");
+    assert_eq!(package.cue_label("off", 2), "VO 2");
+    assert!(package.kind("off").unwrap().fields.iter().any(|field| field.path == "broll"));
+    assert!(package.kind("intro").unwrap().fields.iter().any(|field| field.path == "camera"));
+    assert!(package.kind("signoff").unwrap().recorded);
 }

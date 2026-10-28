@@ -212,11 +212,13 @@ pub fn export_story(view: &ScriptView) -> qnc_script_export::Story {
                 .map(|kind| kind.fields.iter().filter_map(|field| block.fields.get(&field.path).map(|value| (field.label.clone(), value.clone()))).collect())
                 .unwrap_or_default();
             qnc_script_export::Item {
-                mark: row.mark.clone(),
+                heading: view.profile.as_ref().map_or_else(|| row.mark.clone(), |profile| profile.picture_with(&block.kind, &row.mark, row.is_clip().then(|| (block.clip_name.as_str(), block.start_tc.as_str(), block.end_tc.as_str())), &block.fields)),
                 role: row.role,
                 text: block.text.clone(),
-                clip: row.is_clip().then(|| (block.clip_name.clone(), block.start_tc.clone(), block.end_tc.clone())),
+                speaker: view.profile.as_ref().map(|profile| profile.speaker_with(&block.kind, &block.fields)).unwrap_or_default(),
                 length: if row.role == Some(Role::Note) { String::new() } else if row.is_clip() { block.length.clone() } else { seconds_label(row.seconds) },
+                seconds: row.seconds,
+                in_story: row.in_story,
                 fields,
                 cues: (row.cues && !block.text.trim().is_empty()).then(|| (in_cue(&block.text), out_cue(&block.text))),
                 recorded_tc: (!block.voice_uri.is_empty()).then(|| block.voice_tc.clone()),
@@ -231,6 +233,7 @@ pub fn export_story(view: &ScriptView) -> qnc_script_export::Story {
         total: seconds_label(view.total_seconds()),
         target: view.target_seconds.map(seconds_label),
         anchor: seconds_label(view.anchor_seconds),
+        labels: view.profile.as_ref().map(|profile| profile.labels.clone()).unwrap_or_default(),
         items,
     }
 }

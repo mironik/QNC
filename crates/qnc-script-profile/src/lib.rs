@@ -70,6 +70,15 @@ pub struct KindSpec {
     /// not numbered), for example `OFF {n}` or `Take SOT {n}`.
     #[serde(default)]
     pub cue: String,
+    /// Who is heard, written above the words in the A/V script (empty: nobody named), with the
+    /// block's fields as in the cue label, for example `REPORTER (VO)` or `{caption_name} (SOT)`.
+    #[serde(default)]
+    pub speaker: String,
+    /// Its line on the picture side of the A/V script (empty: its mark alone), with `{mark}`,
+    /// the clip of a clip block as `{clip}`, `{start}`, `{end}` and the block's fields, for
+    /// example `{mark} (ON CAM)` or `{mark}: {clip} {start} - {end}`.
+    #[serde(default)]
+    pub picture: String,
     /// The fields that go with a block of this kind (for example the caption of a statement).
     #[serde(default)]
     pub fields: Vec<FieldSpec>,
@@ -87,9 +96,62 @@ pub struct ScriptProfile {
     pub kinds: Vec<KindSpec>,
     #[serde(default)]
     pub options: OptionSets,
+    /// The words of the written-out script (headings, directions, the column names), as the
+    /// newsroom writes them.
+    #[serde(default)]
+    pub labels: Labels,
+}
+
+/// The words of the written-out script (user 2026-10-28: the profile is a file the newsroom
+/// changes, not part of the application). `{tc}`, `{in}` and `{out}` are filled in.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Labels {
+    pub video: String,
+    pub audio: String,
+    pub duration: String,
+    pub in_cue: String,
+    pub out_cue: String,
+    /// The length of the story against its target.
+    pub trt: String,
+    /// The anchor's time in the studio.
+    pub anchor: String,
+    /// Under a recorded block: its timecode as `{tc}`.
+    pub recorded: String,
+    /// Under a block whose kind shows its cues: `{in}` and `{out}`.
+    pub cues: String,
+    /// Where the anchor's text ends and the package starts (empty: nothing is written).
+    pub cut_to_package: String,
+}
+
+impl Default for Labels {
+    /// The words of a profile file that names none (a profile kept before it could).
+    fn default() -> Self {
+        Self {
+            video: "VIDEO".into(),
+            audio: "AUDIO".into(),
+            duration: "DUR".into(),
+            in_cue: "IN-CUE".into(),
+            out_cue: "OUT-CUE".into(),
+            trt: "TRT".into(),
+            anchor: "ANCHOR".into(),
+            recorded: "VO TC {tc}".into(),
+            cues: "IN: {in}   OUT: {out}".into(),
+            cut_to_package: String::new(),
+        }
+    }
 }
 
 impl ScriptProfile {
+    /// The picture line of a block of kind `id`: its mark, its clip (name, start, end) and its
+    /// fields in the kind's template (its mark alone when the kind has none).
+    pub fn picture_with(&self, id: &str, mark: &str, clip: Option<(&str, &str, &str)>, fields: &std::collections::BTreeMap<String, String>) -> String {
+        let Some(kind) = self.kind(id).filter(|kind| !kind.picture.trim().is_empty()) else { return mark.to_string() };
+        let (name, start, end) = clip.unwrap_or_default();
+        let line = kind.picture.replace("{mark}", mark).replace("{clip}", name).replace("{start}", start).replace("{end}", end);
+        self.fill(kind, &line, fields).trim().to_string()
+    }
+
     pub fn kind(&self, id: &str) -> Option<&KindSpec> {
         self.kinds.iter().find(|kind| kind.id == id)
     }
@@ -103,7 +165,20 @@ impl ScriptProfile {
     /// of its choice or its value (for example `*CG {cg_template}` becomes `*CG 2line`).
     pub fn cue_label_with(&self, id: &str, number: usize, fields: &std::collections::BTreeMap<String, String>) -> String {
         let Some(kind) = self.kind(id) else { return String::new() };
-        let mut label = kind.cue.replace("{n}", &number.to_string());
+        self.fill(kind, &kind.cue.replace("{n}", &number.to_string()), fields)
+    }
+
+    /// Who is heard in a block of kind `id`, with the block's field values in it (empty when the
+    /// kind names nobody, or a field it names has no value).
+    pub fn speaker_with(&self, id: &str, fields: &std::collections::BTreeMap<String, String>) -> String {
+        let Some(kind) = self.kind(id) else { return String::new() };
+        let named = kind.fields.iter().filter(|field| kind.speaker.contains(&format!("{{{}}}", field.path))).all(|field| fields.get(&field.path).is_some_and(|value| !value.trim().is_empty()) || !field.default.is_empty());
+        if named { self.fill(kind, &kind.speaker, fields).trim().to_string() } else { String::new() }
+    }
+
+    /// `template` with `{code}` of each field of `kind` as the name of its choice or its value.
+    fn fill(&self, kind: &KindSpec, template: &str, fields: &std::collections::BTreeMap<String, String>) -> String {
+        let mut label = template.to_string();
         for field in &kind.fields {
             let value = fields.get(&field.path).cloned().unwrap_or_else(|| field.default.clone());
             let shown = field
