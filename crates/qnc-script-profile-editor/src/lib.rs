@@ -11,7 +11,7 @@ use std::path::Path;
 use eframe::egui::{self, RichText};
 use qnc_desktop_theme::Theme;
 use qnc_newsroom_sheet::{button, code_of, label, row_box, ROW_GAP, ROW_HEIGHT};
-use qnc_script_profile::{Counts, KindSpec, Profiles, Role, ScriptProfile};
+use qnc_script_profile::{Counts, KindSpec, Labels, Profiles, Role, ScriptProfile};
 
 pub const MODULE_ID: &str = "qnc.module.script-profile-editor";
 
@@ -153,6 +153,8 @@ fn change(ui: &mut egui::Ui, editor: &mut ProfileEditor, theme: &Theme) {
         });
     });
     ui.add_space(ROW_GAP);
+    ui.add_enabled_ui(!locked, |ui| labels_rows(ui, &mut profile.labels, theme, width));
+    ui.add_space(ROW_GAP);
     ui.horizontal(|ui| {
         if button(ui, qnc_ui_text::text("sp.save"), true, theme) {
             if let Some(profile) = editor.editing.take() {
@@ -212,6 +214,32 @@ fn kind_rows(ui: &mut egui::Ui, kind: &mut KindSpec, theme: &Theme) {
     });
     ui.horizontal(|ui| {
         ui.add(row_box(&mut kind.picture, width * 0.9).hint_text(qnc_ui_text::text("sp.picture_hint")));
+    });
+}
+
+/// The words of the written-out script: one row per word, its name from the dictionary.
+fn labels_rows(ui: &mut egui::Ui, labels: &mut Labels, theme: &Theme, width: f32) {
+    egui::Frame::new().stroke(egui::Stroke::new(1.0, theme.border)).inner_margin(8).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.label(RichText::new(qnc_ui_text::text("sp.labels")).color(theme.text).size(theme.font_ui));
+        let rows: [(&str, &mut String); 10] = [
+            ("sp.l.video", &mut labels.video),
+            ("sp.l.audio", &mut labels.audio),
+            ("sp.l.duration", &mut labels.duration),
+            ("sp.l.in_cue", &mut labels.in_cue),
+            ("sp.l.out_cue", &mut labels.out_cue),
+            ("sp.l.trt", &mut labels.trt),
+            ("sp.l.anchor", &mut labels.anchor),
+            ("sp.l.recorded", &mut labels.recorded),
+            ("sp.l.cues", &mut labels.cues),
+            ("sp.l.cut_to_package", &mut labels.cut_to_package),
+        ];
+        for (code, value) in rows {
+            ui.horizontal(|ui| {
+                label(ui, theme, qnc_ui_text::text(code));
+                ui.add(row_box(value, width * 0.45));
+            });
+        }
     });
 }
 

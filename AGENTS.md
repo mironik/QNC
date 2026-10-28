@@ -6790,3 +6790,10 @@ kako je napisana), `qnc-script` `export_story`. Svi pripremljeni profili dobili 
 (`{mark} (ON CAM)`, `{mark} (B-ROLL)`, `{mark}: {clip} {start} - {end}`). Labels se zasad mijenjaju samo u JSON-u (urednik
 profila ih ne prikazuje). Testovi `qnc-script-export` (5, novi: svaka rijec iz profila), `qnc-script-profile`, `qnc-script`,
 `qnc-script-profile-editor`, conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-29 (korisnik: "dodaj labels u urednik profila i ispravi radio profil"): urednik profila scenarija
+(`qnc-script-profile-editor`) ima okvir "Words of the written-out script" s retkom za svaku rijec izvoza (`labels`: stupci,
+in/out-cue, TRT, vrijeme voditelja, redak snimke `{tc}`, redak cueova `{in}`/`{out}`, prijelaz na prilog; prazno = nema
+retka), zakljucan kao i ostatak profila. Radio profil vise nema TV rijeci: stupci CUE / TEXT, PRESENTER, `REC TC {tc}`,
+`[PLAY PACKAGE]`, najava i odjava `{mark} (STUDIO)` s govornikom PRESENTER, tekst novinara samo oznaka s govornikom
+REPORTER. Rjecnik `sp.labels`, `sp.l.*`, `sp.sp.presenter`, `sp.sp.reporter`. Testovi `qnc-script-profile-editor`,
+`qnc-script-profile`, `qnc-script-export`, `qnc-script`, conformance, release build. Uzivo nije provjereno.
