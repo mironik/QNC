@@ -10,6 +10,7 @@ qnc-clip-row = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-source-timeline = { workspace = true }
+qnc-source-panel = { workspace = true }
 qnc-wheel-jog = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 eframe = { workspace = true }

@@ -6613,3 +6613,9 @@ drugog razloga). `qnc-transcribe-queue`: kad u redu nema vise posla, izvrsitelj 
 radnika projekta (`qnc-worker-wake`; radnik koji vec radi i ceka najam krene odmah), ishod ide u player log. Izmjereno
 (Parakeet, 120 s govora Mironik 2002 iz WAV-a, samo citanje): 1 nit 0,86 jezgre, 4,2x stvarnog vremena; 2 niti (katalog
 racunala) 1,9 jezgre, vrh 2,6, 8,1x; 4 niti 3,6 jezgre, 8,6x. Conformance. Uzivo nije provjereno.
+Dopuna 2026-10-28 (korisnik: "kada se kreira SubClip, njegov play krece od IN do OUT i tu staje, korisnik ga moze editirati
+ili novim Space nastaviti play; trebamo akciju koja ce ga vratiti na pocetak SubClipa"): nova akcija kataloga `go_to_mark_in`
+(Alt+I, QNC preset, opsezi `source_timeline`, `storyboard`, `ingest`; grupa pomoci "Reprodukcija i playhead"): playhead na IN
+prikazanog klipa (korisnikov IN, bez njega pocetak klipa), pa Space ponovno pusta SubClip. Uzeta oznaka ostaje uzeta.
+`qnc-source-panel` (`go_to_mark_in`, `in_frame`, test), `qnc-panel-focus` (s bilo kojeg panela: pogled izvora, tipkovnica na
+source timeline). Testovi, conformance. Uzivo nije provjereno.

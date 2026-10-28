@@ -4850,6 +4850,7 @@ dependencies = [
  "qnc-program-segments",
  "qnc-segments-keys",
  "qnc-source-mark-focus",
+ "qnc-source-panel",
  "qnc-source-preview",
  "qnc-source-timeline",
  "qnc-sync-session",

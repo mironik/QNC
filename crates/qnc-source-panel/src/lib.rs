@@ -25,6 +25,7 @@ pub const ACTIONS: &[&str] = &[
     "navigate_prev_object",
     "navigate_next_object",
     "playlist_input_start",
+    "go_to_mark_in",
     "clear_focus",
     "monitor_auto",
     "monitor_on",
@@ -89,6 +90,12 @@ impl SourcePanel {
                 mark_cue(preview, key)
             }
             "playlist_input_start" => preview.cue(timeline.range_start_frame),
+            // Alt+I: the playhead back to IN, the start of the SubClip (without a mark the start
+            // of the clip), so Space plays it again (user 2026-10-28).
+            "go_to_mark_in" => match in_frame(timeline) {
+                Some(frame) => preview.cue(frame),
+                None => false,
+            },
             // The monitor's Auto | On switch (`qnc-monitor`), the same in every form.
             "monitor_auto" | "monitor_on" => preview.set_monitor_mode(action_id),
             "clear_focus" if self.mark_taken(timeline) => {
@@ -98,6 +105,11 @@ impl SourcePanel {
             _ => return None,
         })
     }
+}
+
+/// The source frame of IN the timeline shows (the user's, else the start of the clip).
+pub fn in_frame(timeline: &TimelineProjection) -> Option<u64> {
+    timeline.visible_source_marks().map(|(in_frame, _)| timeline.range_start_frame + in_frame)
 }
 
 /// A taken or moved mark: the playhead goes to it.
@@ -127,6 +139,12 @@ mod tests {
         assert_eq!(panel.route("clear_focus", &mut preview, &mut timeline), Some(true));
         assert!(!panel.mark_taken(&timeline));
         assert_eq!(panel.route("clear_focus", &mut preview, &mut timeline), None, "nothing taken: the form's Escape");
+    }
+
+    #[test]
+    fn go_to_mark_in_is_the_users_in_or_the_start_of_the_clip() {
+        assert_eq!(in_frame(&marked()), Some(10));
+        assert_eq!(in_frame(&TimelineProjection::new(0, 100).with_playhead(25)), Some(0));
     }
 
     #[test]

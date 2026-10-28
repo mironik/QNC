@@ -486,6 +486,9 @@
     },
     "playlist_input_start": {
       "label": "Početak playlist inputa"
+    },
+    "go_to_mark_in": {
+      "label": "Playhead na IN (početak SubClipa)"
     }
   },
   "help": {
@@ -509,7 +512,7 @@
       { "keys": "Tab / klik", "meaning": "Tipke djeluju samo na panel u fokusu; Tab ili klik mijenja panel." }
     ],
     "groups": [
-      { "title": "Reprodukcija i playhead", "actions": ["play_pause", "step_back_frame", "step_forward_frame", "playlist_input_start"] },
+      { "title": "Reprodukcija i playhead", "actions": ["play_pause", "step_back_frame", "step_forward_frame", "playlist_input_start", "go_to_mark_in"] },
       { "title": "IN / OUT", "actions": ["mark_in", "mark_out", "select_mark_in", "select_mark_out", "mark_in_fit_duration", "save_virtual_shot"] },
       { "title": "Audio A1 / A2", "actions": ["select_audio_a1", "select_audio_a2", "lane_level_down", "lane_level_up"] },
       { "title": "Segmenti", "actions": ["add_ton_segment", "add_off_segment", "step_prev_part", "step_next_part", "select_segment_start", "select_segment_end", "delete_part"] },
@@ -626,6 +629,9 @@
         "ingest_set_clip_filter": [
           { "code": "KeyN", "alt": true }
         ],
+        "go_to_mark_in": [
+          { "code": "KeyI", "alt": true }
+        ],
         "step_forward_frame": [ { "code": "ArrowRight", "key": "ArrowRight" } ]
       },
       "source_timeline": {
@@ -639,6 +645,7 @@
         "navigate_prev_object": [{ "code": "ArrowLeft", "alt": true }],
         "navigate_next_object": [{ "code": "ArrowRight", "alt": true }],
         "playlist_input_start": [{ "key": "Home", "code": "Home" }],
+        "go_to_mark_in": [{ "code": "KeyI", "alt": true }],
         "clear_focus": [{ "key": "Escape" }],
         "activate_focused_item": [{ "key": "Enter" }],
         "step_prev_part": [{ "key": "ArrowUp" }],
@@ -766,6 +773,12 @@
         "editorial_tab_transcript": [
           {
             "code": "KeyT",
+            "alt": true
+          }
+        ],
+        "go_to_mark_in": [
+          {
+            "code": "KeyI",
             "alt": true
           }
         ],

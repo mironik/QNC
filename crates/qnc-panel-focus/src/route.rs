@@ -296,6 +296,13 @@ impl PanelFocus {
             }
             // Home on the source timeline: the start of the clip (the V label does the same).
             "playlist_input_start" if on_source => return Some(preview.cue(timeline.range_start_frame)),
+            // Alt+I from any panel: the source view, the playhead on IN of the shown clip (the
+            // start of the SubClip), the keyboard on the source timeline (user 2026-10-28).
+            "go_to_mark_in" => {
+                let Some(frame) = qnc_source_panel::in_frame(timeline) else { return Some(false) };
+                self.to_source(wrap);
+                return Some(self.source.cue(&TimelineIntent::CueFrame(frame), preview));
+            }
             "focus_next" | "focus_prev" => {
                 let next = cycle(panel, action_id == "focus_next", &self.walk());
                 return Some(self.enter(next, preview, wrap, segments));
