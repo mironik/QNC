@@ -15,15 +15,15 @@ use qnc_desktop_theme::Theme;
 use qnc_settings_form::{FieldKind, GridStyle};
 use serde_json::Value;
 
-pub use sheets::{code_of, new_field, valid_code, Origin, SheetSpec, Sheets};
+pub use sheets::{code_of, new_field, new_field_in, valid_code, Origin, SheetSpec, Sheets};
 
 pub const MODULE_ID: &str = "qnc.module.newsroom-sheet";
 
 const WIDTH: f32 = 760.0;
-const LABEL_WIDTH: f32 = 200.0;
+pub const LABEL_WIDTH: f32 = 200.0;
 /// As tall as the template picker row of the Project panel (user 2026-10-28).
-const ROW_HEIGHT: f32 = 32.0;
-const ROW_GAP: f32 = 12.0;
+pub const ROW_HEIGHT: f32 = 32.0;
+pub const ROW_GAP: f32 = 12.0;
 
 /// What the user did with the overlay.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,18 +161,18 @@ fn style(theme: &Theme) -> GridStyle {
 }
 
 /// A text box as tall as a row, its text in the middle.
-fn row_box(text: &mut String, width: f32) -> egui::TextEdit<'_> {
+pub fn row_box(text: &mut String, width: f32) -> egui::TextEdit<'_> {
     egui::TextEdit::singleline(text).desired_width(width).min_size(Vec2::new(0.0, ROW_HEIGHT)).vertical_align(egui::Align::Center)
 }
 
 /// A row's label on the left, as wide as the labels of the fields and as tall as the row.
-fn label(ui: &mut egui::Ui, theme: &Theme, text: &str) {
+pub fn label(ui: &mut egui::Ui, theme: &Theme, text: &str) {
     let text = RichText::new(text).size(theme.font_ui).color(theme.text_muted);
     ui.add_sized(Vec2::new(LABEL_WIDTH, ROW_HEIGHT), egui::Label::new(text));
     ui.add_space(ROW_GAP);
 }
 
-fn button(ui: &mut egui::Ui, label: &str, enabled: bool, theme: &Theme) -> bool {
+pub fn button(ui: &mut egui::Ui, label: &str, enabled: bool, theme: &Theme) -> bool {
     qnc_ui_kit::chrome_button(ui, label, enabled, false, qnc_theme_styles::button(theme)).clicked()
 }
 
@@ -250,7 +250,6 @@ fn editor(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme) {
     let width = ui.available_width();
     ui.spacing_mut().interact_size.y = ROW_HEIGHT;
     ui.spacing_mut().item_spacing.y = ROW_GAP / 2.0;
-    let field_label_w = width * 0.4;
     let Some(sheet) = overlay.editing.as_mut() else { return };
     ui.horizontal(|ui| {
         label(ui, theme, qnc_ui_text::text("sheet.name"));
@@ -258,14 +257,34 @@ fn editor(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme) {
     });
     ui.checkbox(&mut sheet.locked, qnc_ui_text::text("sheet.locked"));
     ui.add_space(ROW_GAP);
+    fields_editor(ui, "qnc_story_sheet", &mut sheet.fields, &mut sheet.options, &mut overlay.new_label, sheet.locked, theme);
+    if !overlay.message.is_empty() {
+        ui.label(RichText::new(&overlay.message).color(theme.danger));
+    }
+}
+
+/// The editor of a list of fields (user 2026-10-28: the same for a story sheet and for the fields
+/// of a kind of script block): each field's name, kind, choices, order and removal, and a new
+/// field whose code comes from its name. Nothing changes while `locked`.
+pub fn fields_editor(
+    ui: &mut egui::Ui,
+    salt: &str,
+    fields: &mut Vec<qnc_settings_form::FieldSpec>,
+    options: &mut qnc_settings_form::OptionSets,
+    new_label: &mut String,
+    locked: bool,
+    theme: &Theme,
+) {
+    let width = ui.available_width();
+    let field_label_w = width * 0.4;
     let (mut up, mut down, mut gone) = (None, None, None);
-    let count = sheet.fields.len();
-    for (index, field) in sheet.fields.iter_mut().enumerate() {
-        ui.add_enabled_ui(!sheet.locked, |ui| {
+    let count = fields.len();
+    for (index, field) in fields.iter_mut().enumerate() {
+        ui.add_enabled_ui(!locked, |ui| {
             ui.horizontal(|ui| {
                 ui.add(row_box(&mut field.label, field_label_w));
                 let kind = KINDS.iter().find(|(kind, _)| *kind == field.kind).map_or("", |(_, code)| qnc_ui_text::text(code));
-                egui::ComboBox::from_id_salt(("qnc_story_sheet_kind", index)).selected_text(kind).width(110.0).show_ui(ui, |ui| {
+                egui::ComboBox::from_id_salt((salt, "kind", index)).selected_text(kind).width(110.0).show_ui(ui, |ui| {
                     for (kind, code) in KINDS {
                         ui.selectable_value(&mut field.kind, kind, qnc_ui_text::text(code));
                     }
@@ -275,33 +294,29 @@ fn editor(ui: &mut egui::Ui, overlay: &mut SheetOverlay, theme: &Theme) {
                 gone = gone.or((button(ui, qnc_ui_text::text("sheet.remove"), true, theme)).then_some(index));
             });
             if field.kind == FieldKind::Choice {
-                choices_row(ui, field, &mut sheet.options, width);
+                choices_row(ui, field, options, width);
             }
         });
     }
     if let Some(index) = up {
-        sheet.fields.swap(index, index - 1);
+        fields.swap(index, index - 1);
     }
     if let Some(index) = down {
-        sheet.fields.swap(index, index + 1);
+        fields.swap(index, index + 1);
     }
     if let Some(index) = gone {
-        sheet.fields.remove(index);
+        fields.remove(index);
     }
-    ui.add_space(ROW_GAP);
-    ui.add_enabled_ui(!sheet.locked, |ui| {
+    ui.add_enabled_ui(!locked, |ui| {
         ui.horizontal(|ui| {
-            ui.add(row_box(&mut overlay.new_label, field_label_w).hint_text(qnc_ui_text::text("sheet.new_field_hint")));
-            if button(ui, qnc_ui_text::text("sheet.add_field"), !overlay.new_label.trim().is_empty(), theme) {
-                let field = new_field(sheet, &overlay.new_label);
-                sheet.fields.push(field);
-                overlay.new_label.clear();
+            ui.add(row_box(new_label, field_label_w).hint_text(qnc_ui_text::text("sheet.new_field_hint")));
+            if button(ui, qnc_ui_text::text("sheet.add_field"), !new_label.trim().is_empty(), theme) {
+                let field = new_field_in(fields, new_label);
+                fields.push(field);
+                new_label.clear();
             }
         });
     });
-    if !overlay.message.is_empty() {
-        ui.label(RichText::new(&overlay.message).color(theme.danger));
-    }
 }
 
 /// Save sheet (rightmost) and Back of the editor; the overlay stays open either way.

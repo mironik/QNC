@@ -13,13 +13,23 @@ use qnc_newsroom_sheet::{Answer, SheetOverlay, SheetSpec};
 use qnc_newsroom_sheet_db::StorySheet;
 use serde_json::Value;
 
-/// The project the sheet belongs to, when one is active.
+/// The project the sheet belongs to, when one is active, and the script profile it is written with.
 struct Project {
     target: ProjectDbTarget,
+    profile: Option<String>,
+}
+
+/// What the window shows.
+#[derive(PartialEq)]
+enum Tab {
+    Sheet,
+    Profile,
 }
 
 struct App {
     overlay: SheetOverlay,
+    profiles: qnc_script_profile_editor::ProfileEditor,
+    tab: Tab,
     project: Option<Project>,
     theme: Theme,
     shortcuts: ShortcutCatalog,
@@ -33,9 +43,10 @@ fn main() -> eframe::Result<()> {
         .and_then(|text| ShortcutCatalog::from_json_str(&text))
         .unwrap_or_else(|error| fail(&error));
     let (overlay, project) = open(&root);
-    let app = App { overlay, project, theme, shortcuts };
+    let profiles = qnc_script_profile_editor::ProfileEditor::new(&root);
+    let app = App { overlay, profiles, tab: Tab::Sheet, project, theme, shortcuts };
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_title(qnc_ui_text::text("sheet.title")).with_inner_size([640.0, 720.0]),
+        viewport: egui::ViewportBuilder::default().with_title(qnc_ui_text::text("sheet.title")).with_inner_size([820.0, 820.0]),
         ..Default::default()
     };
     eframe::run_native("QNC Story sheet", options, Box::new(|_| Ok(Box::new(app))))
@@ -71,7 +82,8 @@ fn open(root: &Path) -> (SheetOverlay, Option<Project>) {
         Ok((name, target, kept)) => {
             let sheet = serde_json::from_value::<SheetSpec>(kept.sheet).ok();
             let values = Value::Object(kept.values.into_iter().collect());
-            (SheetOverlay::new(root, name, false, values, sheet, save), Some(Project { target }))
+            let profile = qnc_script_db::read_profile(&target).ok().flatten().map(|profile| profile.name);
+            (SheetOverlay::new(root, name, false, values, sheet, save), Some(Project { target, profile }))
         }
         Err(error) => {
             let mut overlay = SheetOverlay::new(root, String::new(), false, Value::Null, None, save);
@@ -84,7 +96,36 @@ fn open(root: &Path) -> (SheetOverlay, Option<Project>) {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         qnc_desktop_theme::apply_settings_look(ctx, &self.theme);
-        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(self.theme.surface)).show(ctx, |_| {});
+        egui::TopBottomPanel::top("qnc_sheet_tabs").frame(egui::Frame::NONE.fill(self.theme.surface_alt).inner_margin(8)).show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut self.tab, Tab::Sheet, qnc_ui_text::text("sheet.tab_sheet"));
+                ui.selectable_value(&mut self.tab, Tab::Profile, qnc_ui_text::text("sheet.tab_profile"));
+            });
+        });
+        let mut asked = None;
+        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(self.theme.surface).inner_margin(24)).show(ctx, |ui| {
+            if self.tab == Tab::Profile {
+                let project = self.project.as_ref().map(|project| project.profile.clone().unwrap_or_else(|| "—".into()));
+                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                    asked = qnc_script_profile_editor::show(ui, &mut self.profiles, &self.theme, project.as_deref());
+                });
+            }
+        });
+        if let Some(qnc_script_profile_editor::Answer::UseForProject(profile)) = asked {
+            self.profiles.message = match self.project.as_mut() {
+                Some(project) => match qnc_script_db::set_profile(&project.target, profile.clone()) {
+                    Ok(()) => {
+                        project.profile = Some(profile.name);
+                        qnc_ui_text::text("sp.used").to_string()
+                    }
+                    Err(error) => error,
+                },
+                None => qnc_ui_text::text("sp.no_project").to_string(),
+            };
+        }
+        if self.tab == Tab::Profile {
+            return;
+        }
         let next_field = ctx.wants_keyboard_input()
             && qnc_keyboard_shortcut::egui_shortcut_events(ctx)
                 .iter()

@@ -4824,6 +4824,8 @@ dependencies = [
  "qnc-keyboard-shortcut",
  "qnc-newsroom-sheet",
  "qnc-newsroom-sheet-db",
+ "qnc-script-db",
+ "qnc-script-profile-editor",
  "qnc-ui-text",
  "serde_json",
 ]
@@ -5608,6 +5610,17 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-script-profile-editor"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-desktop-theme",
+ "qnc-newsroom-sheet",
+ "qnc-script-profile",
+ "qnc-ui-text",
 ]
 
 [[package]]

@@ -6748,3 +6748,13 @@ mapa exporta `qnc-work-settings` `WorkSettings::export_folder` i ime datoteke `e
 ih sada koristi); `qnc-newsroom-sheet-db` `StorySheet::shown` (obrazac kako se cita: naziv polja, izbor po nazivu, trajanje
 m:ss). Katalog akcija (bez tipki), rjecnik. Testovi `qnc-script-export` (3), `qnc-script` (5), conformance. Uzivo nije
 provjereno. Nije izvedeno: status priloga i povijest verzija, provjera po formatu (VTR/VO/SOT), tocka 5.
+Izvedeno 2026-10-28 (tocka 5 plana profila scenarija; korisnik: "zavrsi prije planirane radnje"): uredivanje profila scenarija.
+Nova kocka `crates/qnc-script-profile-editor` (+ ugovor `contracts/modules/script-profile-editor.module.json`): izbor profila
+racunala, promjena naziva, prekidac Locked, vrste blokova (naziv, oznaka, uloga, u koju duljinu se broji, snima li se (samo
+spoken), in/out cue, oznaka cuea, polja uz vrstu), dodavanje, uklanjanje i redoslijed vrsta; Save cuva kroz
+`qnc-script-profile` (pripremljeni profil kopija pod svojom sifrom), "Use for project" daje profil aktivnom projektu.
+Uredivac polja premjesten iz uredivaca obrasca u `qnc-newsroom-sheet::fields_editor` (koriste ga obrazac i profil).
+Samostalni program `tools/qnc-newsroom-sheet` ima tabove Story sheet | Script profile; uz aktivni projekt pokazuje njegov
+profil i upisuje izabrani kroz `qnc-script-db::set_profile` (vlasnik tablice). Rjecnik `sp.*`, `sheet.tab_*`. Testovi
+`qnc-script-profile-editor` (1), `qnc-newsroom-sheet`, `qnc-script`, `qnc-script-db`, conformance, release build. Uzivo
+nije provjereno.

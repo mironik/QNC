@@ -171,8 +171,13 @@ fn free_id(list: &[(SheetSpec, Origin)], base: &str) -> String {
 
 /// A new typed field of a sheet, its code made of its name and free in the sheet.
 pub fn new_field(sheet: &SheetSpec, label: &str) -> FieldSpec {
+    new_field_in(&sheet.fields, label)
+}
+
+/// A new text field named `label` among `fields`, its code free among them.
+pub fn new_field_in(fields: &[FieldSpec], label: &str) -> FieldSpec {
     let base = code_of(label);
-    let taken = |code: &str| sheet.fields.iter().any(|field| field.path == code);
+    let taken = |code: &str| fields.iter().any(|field| field.path == code);
     let code = if taken(&base) { (2..).map(|n| format!("{base}_{n}")).find(|code| !taken(code)).unwrap_or_default() } else { base };
     FieldSpec { kind: FieldKind::Text, label: label.trim().to_string(), id: code.clone(), path: code, options: None, default: String::new(), hint: String::new() }
 }
