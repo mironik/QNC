@@ -6716,3 +6716,10 @@ vrstu, naziv profila uz naslov. `qnc-text-source-editor` `EditorButton.target`. 
 `script-db.module.json`, rjecnik, katalog akcija. Testovi `qnc-script-db` (7), `qnc-script` (3), `qnc-script-profile` (3),
 conformance prolazi (C5 rijesen), release build. Uzivo nije provjereno. Nije izvedeno (tocke 3-5): polja uz vrstu, izvoz
 kroz predloske, uredivanje profila (i promjena profila projekta).
+Otkljucano i izvedeno 2026-10-28 (korisnik: "pokvario si transcribe"; nalaz u logu: prijepis radi, ali je nakon Uvezi
+novog projekta citanje trajalo 157 s i motor 156 s za 254 s zvuka (ranije 44 s i 33 s), jer su valovi i filmstrip svih
+klipova istodobno citali karticu D: i trosili procesor; "da, otkljucaj i popravi, obrisi debug cache"): `tools/qnc-ingest-worker`
+(`run_artifacts`, `transcription_running`): dok je najam reda prijepisa (`qnc-transcribe-queue::LEASE`) ziv, valovi i
+filmstrip rade kao dok player svira (samo klip otvoren u previewu, najvise jedan radnik); ostali cekaju dok red ne zavrsi.
+Najam se cita najvise dvaput u sekundi. `qnc-timeline-artifacts` nije trebalo mijenjati. Debug cache obrisan
+(`cargo clean --profile dev`, 36,3 GiB) uz dozvolu korisnika. Conformance, release build. Uzivo nije provjereno.

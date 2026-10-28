@@ -283,13 +283,18 @@ fn run_artifacts(
     // While the user edits two workers, while the player plays only the open clip's (user
     // 2026-10-20: measured, one core beside a playing player costs nothing).
     let level = qnc_playback_activity::playback_level(target.clone());
-    let player_works = || level() == qnc_playback_activity::PlaybackLevel::Playing;
+    // A transcription the user asked for counts as playing (user 2026-10-28: it crawled behind
+    // the waves and filmstrips of a fresh import, read 157 s and engine 156 s for 254 s of
+    // sound): only the open clip's artifacts go on beside it, the rest wait until it is done.
+    let transcribing = transcription_running(target.clone());
+    let player_works = || level() == qnc_playback_activity::PlaybackLevel::Playing || transcribing();
+    let cap = || if transcribing() { qnc_playback_activity::PlaybackLevel::Playing.background_cap() } else { level().background_cap() };
     let mut artifacts = qnc_content_artifacts::ProjectArtifacts::new();
     artifacts.set_host_root(root);
     // Published under the lease, checked by the database owner in the same transaction.
     artifacts.set_write_lease(lease.write_lease());
     artifacts.set_playback_priority(player_works());
-    artifacts.set_cap(level().background_cap());
+    artifacts.set_cap(cap());
     artifacts.sync(&reader, &settings, target.clone(), false)?;
     let deadline = std::time::Instant::now() + Duration::from_secs(60 * 60);
     let mut shown_checked = std::time::Instant::now() - Duration::from_secs(1);
@@ -316,7 +321,7 @@ fn run_artifacts(
             }
         }
         artifacts.set_playback_priority(player_works());
-        artifacts.set_cap(level().background_cap());
+        artifacts.set_cap(cap());
         let polled = artifacts.poll(None);
         if let Some(error) = polled.error {
             return Err(error);
@@ -379,5 +384,20 @@ fn make_shots(
             eprintln!("analiza kadrova nije uspjela: {error}");
             qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("shot-analysis failed error={error}"));
         }
+    }
+}
+
+/// Whether a transcription the user asked for runs (its lease is fresh), read at most twice a second.
+fn transcription_running(target: qnc_content_store::ContentTarget) -> impl Fn() -> bool {
+    let last = std::cell::Cell::new(None::<(std::time::Instant, bool)>);
+    move || {
+        if let Some((at, value)) = last.get() {
+            if at.elapsed() < Duration::from_millis(500) {
+                return value;
+            }
+        }
+        let value = qnc_playback_activity::is_fresh(&target, qnc_transcribe_queue::LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS);
+        last.set(Some((std::time::Instant::now(), value)));
+        value
     }
 }
