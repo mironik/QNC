@@ -179,6 +179,17 @@ impl WorkSettings {
             .ok_or_else(|| ReadError::new("audio_crossfade_frames", "The database holds no valid audio.crossfade_frames."))
     }
 
+    /// Words a second the voice-over is read at (`audio.reading_words_per_second`, user
+    /// 2026-10-28): the length of an OFF block of the script before it is recorded. A project
+    /// without it is completed when Project opens it, a missing value is a controlled error.
+    pub fn reading_words_per_second(&self) -> Result<f64, ReadError> {
+        self.audio
+            .get("reading_words_per_second")
+            .and_then(Value::as_f64)
+            .filter(|value| (0.5..=10.0).contains(value))
+            .ok_or_else(|| ReadError::new("audio_reading_words_per_second", "The database holds no valid audio.reading_words_per_second."))
+    }
+
     /// Whether the speech of this project is transcribed (`ai.transcription`, user 2026-10-26);
     /// a project without it is completed when Project opens it, a missing value is an error.
     pub fn transcription_enabled(&self) -> Result<bool, ReadError> {

@@ -178,6 +178,10 @@ members = [
     "crates/qnc-location-field",
     "crates/qnc-settings-rows",
     "crates/qnc-newsroom-sheet-db",
+    "crates/qnc-script-db",
+    "crates/qnc-script",
+    "crates/qnc-script-panel",
+    "crates/qnc-text-source-editor",
     "crates/qnc-newsroom-sheet",
     "tools/qnc-newsroom-sheet",
     "crates/qnc-still-locator",
@@ -436,6 +440,10 @@ qnc-dir-browser-panel = { path = "crates/qnc-dir-browser-panel" }
 qnc-location-field = { path = "crates/qnc-location-field" }
 qnc-settings-rows = { path = "crates/qnc-settings-rows" }
 qnc-newsroom-sheet-db = { path = "crates/qnc-newsroom-sheet-db" }
+qnc-script-db = { path = "crates/qnc-script-db" }
+qnc-script = { path = "crates/qnc-script" }
+qnc-script-panel = { path = "crates/qnc-script-panel" }
+qnc-text-source-editor = { path = "crates/qnc-text-source-editor" }
 qnc-newsroom-sheet = { path = "crates/qnc-newsroom-sheet" }
 qnc-still-locator = { path = "crates/qnc-still-locator" }
 qnc-clip-row = { path = "crates/qnc-clip-row" }

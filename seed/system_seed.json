@@ -108,6 +108,7 @@
         "audio": {
           "sample_rate": 48000,
           "crossfade_frames": 4,
+          "reading_words_per_second": 2.5,
           "loudness": {
             "a1_lufs": -23,
             "a2_lufs": -23,
@@ -197,6 +198,7 @@
         "audio": {
           "sample_rate": 48000,
           "crossfade_frames": 4,
+          "reading_words_per_second": 2.5,
           "loudness": {
             "a1_lufs": -23,
             "a2_lufs": -23,
@@ -286,6 +288,7 @@
         "audio": {
           "sample_rate": 48000,
           "crossfade_frames": 4,
+          "reading_words_per_second": 2.5,
           "loudness": {
             "a1_lufs": -23,
             "a2_lufs": -23,
@@ -375,6 +378,7 @@
         "audio": {
           "sample_rate": 48000,
           "crossfade_frames": 4,
+          "reading_words_per_second": 2.5,
           "loudness": {
             "a1_lufs": -23,
             "a2_lufs": -23,

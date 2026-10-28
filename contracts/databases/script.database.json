@@ -1,0 +1,24 @@
+{
+  "database_id": "qnc.db.script",
+  "database_owner": "project",
+  "owner_application": "qnc.module.script-db",
+  "ownership_rule": "The project owns this database; no application owns it or its tables. The script of a project reaches it only through the one intermediary of the project database (qnc.module.db-broker), whose table module qnc.module.script-db owns it.",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/project_db",
+  "tables": [
+    "script_blocks"
+  ],
+  "public_read_views": [
+    "public_script_blocks"
+  ],
+  "write_owner": "qnc.module.script-db",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "order": "The blocks are read in the order of position, 0, 1, 2...; a block is added after a chosen one or at the end, moves one place up or down, and leaves without a gap.",
+    "off": "An OFF block is the text the journalist writes and records; it is never empty. Its length comes from its words and the project's audio.reading_words_per_second.",
+    "sot": "A statement is a clip's frames [from_frame, to_frame) with its timecodes, length and seconds as shown when it was added, and the words said there (which may be corrected); it needs a clip and an IN before its OUT."
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-10-28T00:00:00Z",
+  "updated_at": "2026-10-28T00:00:00Z"
+}

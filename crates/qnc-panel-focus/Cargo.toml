@@ -25,3 +25,4 @@ qnc-timeline = { workspace = true }
 qnc-wrap-session = { workspace = true }
 qnc-transcript = { workspace = true }
 qnc-clip-shots = { workspace = true }
+qnc-script = { workspace = true }

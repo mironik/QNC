@@ -78,6 +78,8 @@ pub struct FocusView {
     pub transcript: qnc_transcript::TranscriptView,
     /// The shots of the clip on the preview (Video AI).
     pub shots: qnc_clip_shots::ShotsView,
+    /// The script of the story (Media Assist Audio).
+    pub script: qnc_script::ScriptView,
 }
 
 impl FocusView {

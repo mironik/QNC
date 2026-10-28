@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.script-db",
+  "module_name": "Script Table",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["db.script.read", "db.script.write"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["media.decode", "media.probe.full", "file.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.broadcast-player-core"],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-script-db",
+  "input": "A block of the script (OFF text, or a statement: clip, IN/OUT frames, timecodes, length, seconds, words), its place, a new text, a move or a removal.",
+  "output": "The table script_blocks and the view public_script_blocks of the project database through its one intermediary (qnc-db-broker): the blocks in reading order; an empty OFF or a statement without a range is refused.",
+  "specification": "User 2026-10-28: writing the offs and putting the story together as text in Media Assist Audio (AGENTS.md)."
+}

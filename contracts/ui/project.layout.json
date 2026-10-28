@@ -317,6 +317,7 @@
       "lufs_a2": [["-20", "-20"], ["-23", "-23 (EBU R 128)"], ["-26", "-26"], ["-28", "-28"], ["-30", "-30"]],
       "true_peak": [["-1", "-1 (EBU R 128)"], ["-2", "-2"], ["-3", "-3"]],
       "loudness_tolerance": [["0.5", "0.5"], ["1", "1"]],
+      "reading_speeds": [["2", "2"], ["2.5", "2.5"], ["3", "3"], ["3.5", "3.5"]],
       "video_bitrates": [["25", "25"], ["35", "35"], ["50", "50"]],
       "transcription_languages": [["hr", "Croatian (hr)"], ["sr", "Serbian (sr)"], ["bs", "Bosnian (bs)"], ["sl", "Slovenian (sl)"], ["mk", "Macedonian (mk)"], ["en", "English (en)"], ["de", "German (de)"], ["it", "Italian (it)"], ["auto", "Detect (auto)"]],
       "start_timecodes": [["10:00:00:00", "10:00:00:00"], ["01:00:00:00", "01:00:00:00"], ["00:00:00:00", "00:00:00:00"]],
@@ -471,6 +472,13 @@
             "id": "pts_audio_crossfade",
             "path": "audio.crossfade_frames",
             "options": "crossfade_frames"
+          },
+          {
+            "kind": "number",
+            "label": "@project.reading_words_per_second",
+            "id": "pts_reading_speed",
+            "path": "audio.reading_words_per_second",
+            "options": "reading_speeds"
           }
         ]
       },

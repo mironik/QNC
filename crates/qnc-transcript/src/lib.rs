@@ -113,6 +113,12 @@ impl TranscriptView {
         clips.iter().filter(|clip| !transcript_tab || self.transcribed.contains(&clip.clip_id)).collect()
     }
 
+    /// The words of the shown clip said between clip frames `from` and `to` (empty when none
+    /// were heard there); the script takes them for a statement.
+    pub fn said(&self, from: u64, to: u64) -> String {
+        said_between(&self.lines, from, to)
+    }
+
     /// Whether the switch `action_id` (Fast or Quality) is the one chosen.
     pub fn selected(&self, action_id: &str) -> bool {
         (action_id == FAST && self.fast) || (action_id == BEST && !self.fast)

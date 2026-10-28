@@ -73,6 +73,8 @@ pub struct PanelFocus {
     transcript: qnc_transcript::Transcript,
     /// The shots of the clip on the preview (piece `qnc-clip-shots`, Video AI).
     shots: qnc_clip_shots::ClipShots,
+    /// The script of the story (piece `qnc-script`, Media Assist Audio).
+    script: qnc_script::Script,
 }
 
 /// The walk of a layout: its panels, the pool tabs row and the source dock buttons row.
@@ -111,7 +113,7 @@ impl PanelFocus {
     /// A clip and IN/OUT a chosen statement of the transcript or a usable part of the shot
     /// analysis opens (once).
     pub fn take_source_request(&mut self) -> Option<(String, u64, u64)> {
-        self.transcript.take_source_request().or_else(|| self.shots.take_source_request())
+        self.transcript.take_source_request().or_else(|| self.shots.take_source_request()).or_else(|| self.script.take_source_request())
     }
 
     pub fn source_timeline_mut(&mut self) -> &mut qnc_source_timeline::SourceTimeline {
@@ -158,12 +160,13 @@ impl PanelFocus {
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
         self.transcript.poll(preview, timeline, clips); // the pool's ticks are the transcript's
         self.shots.poll(preview);
-        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: self.transcript.view().clone(), shots: self.shots.view().clone() }
+        self.script.poll(preview, timeline, clips);
+        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: self.transcript.view().clone(), shots: self.shots.view().clone(), script: self.script.view().clone() }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).
     pub fn busy(&self) -> bool {
-        self.keyframes.busy() || self.transcript.busy()
+        self.keyframes.busy() || self.transcript.busy() || self.script.busy()
     }
 
     /// Whether a transcription of this process runs in the background (the caller repaints

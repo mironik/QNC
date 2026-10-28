@@ -1,0 +1,15 @@
+[package]
+name = "qnc-script-db"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: the script of a project's story (its blocks in reading order: OFF text the journalist writes, statements of clips with their IN/OUT, timecodes and words) as a table module of the project database intermediary; it knows no form or application"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+qnc-db-broker = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

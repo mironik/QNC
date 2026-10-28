@@ -124,6 +124,39 @@
     "transcript_delete_quote": {
       "label": "Ukloni izjavu s popisa"
     },
+    "script_editor_text": {
+      "label": "Tekst OFF editora scenarija"
+    },
+    "script_add_off": {
+      "label": "Dodaj OFF iz editora u scenarij"
+    },
+    "script_replace_off": {
+      "label": "Zamijeni tekst izabranog OFF-a"
+    },
+    "script_editor_clear": {
+      "label": "Isprazni OFF editor"
+    },
+    "script_add_sot": {
+      "label": "Dodaj izjavu (IN-OUT) u scenarij"
+    },
+    "script_add_quote": {
+      "label": "Dodaj izjavu s popisa u scenarij"
+    },
+    "script_select": {
+      "label": "Izaberi blok scenarija"
+    },
+    "script_move_up": {
+      "label": "Blok scenarija gore"
+    },
+    "script_move_down": {
+      "label": "Blok scenarija dolje"
+    },
+    "script_remove": {
+      "label": "Ukloni blok iz scenarija"
+    },
+    "script_open": {
+      "label": "Otvori klip izjave scenarija"
+    },
     "transcribe_fast": {
       "label": "Transkribiraj brzo (procesor)"
     },

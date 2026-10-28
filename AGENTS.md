@@ -6630,3 +6630,25 @@ rijeci dao 3-10 slika ranije. Pravilo iznad (sljedeca rijec ostaje gdje ju je mo
 Sada `qnc-word-align` `assign` rijeci ne dopusta da ostane na mjestu motora koje je tisina (`keepable`): takva rijec uzima
 pocetak glasa, a ostale se slazu redom. Mironik 3452 (pravi vrhovi s kartice): A 2418, ono 2431, sto 2444, nas 2449, sve 2462,
 zanima 2469; test Mironik 2680 i dalje prolazi. Testovi, conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-28 (korisnik: "sada bi se posvetio MA Audio: pisanje i snimanje offova i tekstualno slaganje
+price"; v5 i v4 to nemaju, u katalogu su samo nazivi `record_toggle`/`save_off`; plan u tri koraka: scenarij, snimanje
+OFF-a, slaganje price u Story; "da, otkljucaj Project i kreni s korakom 1"; "za pisanje offova na dnu mali editor u
+kojem korisnik pise i ispravlja, dugmetom Dodaj off tekst ide u tablicu iznad"; "taj editor moze biti TextSourceEditor"):
+korak 1. Project: postavka `audio.reading_words_per_second` (seed svih sistemskih predlozaka 2,5; `qnc-project-store` je
+dopunjuje starijem projektu pri otvaranju, test; Advanced "Audio editing" izbor 2/2,5/3/3,5; rjecnik;
+`qnc-work-settings` `reading_words_per_second` strogo). Project je ponovno zamrznut. Nove kocke (s ugovorima modula):
+`qnc-script-db` (modul tablica posrednika, `script_blocks` / `public_script_blocks`, ugovor baze `script.database.json`:
+blokovi redom citanja, OFF tekst ili izjava s klipom, IN/OUT, timecodeovima, duljinom i rijecima; dodaj iza izabranog,
+gore/dolje, ukloni, prazan OFF i izjava bez raspona se odbijaju; conformance: na popisu javnih DB vlasnika),
+`qnc-script` (stanje scenarija: citanje i pisanje izvan niti sucelja, ponovno citanje svake 2 s; duljina OFF-a iz rijeci i
+brzine citanja projekta, izjave iz klipa; ukupno prema zadanom trajanju iz obrasca priloga, prvo polje vrste duration),
+`qnc-text-source-editor` (TextSourceEditor: mali editor teksta s retkom informacija i gumbima pozivatelja; ne drzi tekst),
+`qnc-script-panel` (panel Scenarij: duljine OFF/SOT/ukupno i cilj (crveno kad je preko), blokovi s duljinom, Open, gore,
+dolje, X; izjave iz AI Media Assista s "+"; na dnu TextSourceEditor: Add OFF stavlja tekst iza izabranog bloka, klik na OFF
+vraca njegov tekst u editor, Replace ga sprema natrag, Clear prazni; Add SOT (IN-OUT) uzima IN/OUT prikazanog klipa s
+rijecima izgovorenim tamo; Copy daje scenarij kao tekst). Grupa g (Media Assist Audio) ima desni panel `script_panel`
+(`contracts/ui/editorial.layout.json`; conformance: g mora imati script_panel). `qnc-right-panel` ga crta, `qnc-panel-focus`
+drzi scenarij i salje mu radnje (`script_*`, katalog bez tipki), `qnc-transcript` `TranscriptView::said`. Tipke kataloga
+ne rade dok se pise u editoru (polje teksta drzi tipkovnicu, postojece pravilo). Testovi `qnc-script-db` (3), `qnc-script`
+(2), `qnc-project-store`, `qnc-panel-focus`, conformance, release build. Uzivo nije provjereno. Nije izvedeno: korak 2
+(snimanje OFF-a, mapa `products/voice`), korak 3 (slaganje price u Story iz scenarija).

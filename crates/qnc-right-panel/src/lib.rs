@@ -15,6 +15,8 @@ pub const SEGMENT_PANEL: &str = "segment_panel";
 pub const TRANSCRIPT_PANEL: &str = "transcript_panel";
 /// The Video AI panel: the shots of the clip on the preview.
 pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
+/// The script of the story (Media Assist Audio, user 2026-10-28).
+pub const SCRIPT_PANEL: &str = "script_panel";
 
 /// What the right panels show.
 pub struct Shown<'a> {
@@ -24,6 +26,8 @@ pub struct Shown<'a> {
     pub transcript: &'a qnc_transcript::TranscriptView,
     /// The shots of the clip on the preview (Video AI).
     pub shots: &'a qnc_clip_shots::ShotsView,
+    /// The script of the story (Media Assist Audio).
+    pub script: &'a qnc_script::ScriptView,
     /// The shown clip's source timecode.
     pub timecode: Option<&'a qnc_source_timecode::SourceTimecode>,
 }
@@ -53,6 +57,7 @@ pub fn show(ui: &mut egui::Ui, kind: &str, theme: &qnc_desktop_theme::Theme, sho
         SEGMENT_PANEL => (qnc_segment_panel::show(ui, shown.segments, theme, shown.cover_lengths, shown.levels), true),
         TRANSCRIPT_PANEL => (qnc_transcript_panel::show(ui, shown.transcript, theme, shown.timecode), false),
         VIDEO_AI_PANEL => (qnc_shot_panel::show(ui, shown.shots, theme, shown.timecode, shown.cover_lengths), false),
+        SCRIPT_PANEL => (qnc_script_panel::show(ui, shown.script, shown.transcript, theme), false),
         _ => (None, false),
     }
 }

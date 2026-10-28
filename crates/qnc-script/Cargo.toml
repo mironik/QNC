@@ -1,0 +1,17 @@
+[package]
+name = "qnc-script"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the script of a project's story (user 2026-10-28, Media Assist Audio) - OFF text written in the editor and statements of clips put in reading order, kept in the project database, with the length of each block, the whole and the target of the story sheet; it knows no form"
+
+[dependencies]
+qnc-clip-row = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-newsroom-sheet-db = { workspace = true }
+qnc-script-db = { workspace = true }
+qnc-source-preview = { workspace = true }
+qnc-source-timecode = { workspace = true }
+qnc-timeline = { workspace = true }
+qnc-transcript = { workspace = true }
+qnc-ui-text = { workspace = true }
+serde_json = { workspace = true }

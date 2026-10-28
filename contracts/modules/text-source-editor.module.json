@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.text-source-editor",
+  "module_name": "TextSourceEditor",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.text.edit"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-text-source-editor",
+  "input": "The text to show, a title, an info line, a hint and the caller buttons (label, action id, enabled).",
+  "output": "The whole new text when typing changed it, or the action of a pressed button.",
+  "specification": "User 2026-10-28: the small editor at the bottom where OFF text is written and corrected (AGENTS.md)."
+}

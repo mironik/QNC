@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.script-panel",
+  "module_name": "Script Panel",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.script.paint", "ui.clipboard.copy_text"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-script-panel",
+  "input": "The script view, the statements of the transcript view and the desktop theme.",
+  "output": "The script painted (lengths against the target, blocks, statements to add) with the TextSourceEditor at the bottom; clicks and typing as script catalog actions.",
+  "specification": "User 2026-10-28: Media Assist Audio script (AGENTS.md)."
+}

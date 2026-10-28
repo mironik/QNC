@@ -1796,6 +1796,9 @@ fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
     // The audio crossfade on every A2 cut (user 2026-10-21: news practice, a few frames).
     if let Some(audio) = root.get_mut("audio").and_then(Value::as_object_mut) {
         audio.entry("crossfade_frames".to_string()).or_insert_with(|| json!(DEFAULT_CROSSFADE_FRAMES));
+        // The reading speed of the voice-over, for the length of an OFF block of the script
+        // (user 2026-10-28: a project setting, about 2.5 words a second for Croatian).
+        audio.entry("reading_words_per_second".to_string()).or_insert_with(|| json!(DEFAULT_READING_WORDS_PER_SECOND));
         // The loudness of A1 and A2 (user 2026-10-24: EBU R 128 by default, each changeable).
         audio.entry("loudness".to_string()).or_insert_with(default_loudness);
     }
@@ -1843,6 +1846,8 @@ fn default_loudness() -> Value {
 
 /// The audio crossfade of a project whose template does not say it (the system templates do).
 const DEFAULT_CROSSFADE_FRAMES: u64 = 4;
+/// The reading speed of a project whose template does not say it (the system templates do).
+const DEFAULT_READING_WORDS_PER_SECOND: f64 = 2.5;
 
 /// The settings of a project created before a field existed are completed when it is opened
 /// (one short write, only when something is missing; nothing else of the project is touched).
@@ -3026,6 +3031,7 @@ mod tests {
             serde_json::from_str::<Value>(&raw).expect("json")
         };
         assert_eq!(read()["audio"]["crossfade_frames"], json!(4), "a new project has it from its template");
+        assert_eq!(read()["audio"]["reading_words_per_second"], json!(2.5), "a new project has it from its template");
         assert_eq!(read()["audio"]["loudness"]["a1_lufs"], json!(-23), "EBU R 128 from its template");
         assert_eq!(read()["export"]["tail_seconds"], json!(2));
         assert_eq!(read()["export"]["lead_in_seconds"], json!(2));
@@ -3035,6 +3041,7 @@ mod tests {
         assert_eq!(read()["ai"]["transcription"], json!(false));
         let mut older = read();
         older["audio"].as_object_mut().unwrap().remove("crossfade_frames");
+        older["audio"].as_object_mut().unwrap().remove("reading_words_per_second");
         older["audio"].as_object_mut().unwrap().remove("loudness");
         older["export"].as_object_mut().unwrap().remove("tail_seconds");
         older["export"].as_object_mut().unwrap().remove("lead_in_seconds");
@@ -3049,6 +3056,7 @@ mod tests {
         store.open_project(&row.project_id).expect("open");
         let completed = read();
         assert_eq!(completed["audio"]["crossfade_frames"], json!(4));
+        assert_eq!(completed["audio"]["reading_words_per_second"], json!(2.5));
         assert_eq!(completed["audio"]["loudness"], json!({ "a1_lufs": -23, "a2_lufs": -23, "true_peak_dbtp": -1, "tolerance_lu": 0.5 }));
         assert_eq!(completed["export"]["tail_seconds"], json!(2));
         assert_eq!(completed["export"]["lead_in_seconds"], json!(2));

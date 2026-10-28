@@ -1,0 +1,10 @@
+[package]
+name = "qnc-text-source-editor"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive piece: TextSourceEditor, a small editor box where text is written and corrected (user 2026-10-28: the OFF text of the script), with a line of what the text is and the caller's buttons; it paints and gives the changed text or the pressed button, it holds no text and knows no form"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-ui-kit = { workspace = true }

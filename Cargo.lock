@@ -4848,6 +4848,7 @@ dependencies = [
  "qnc-key-list",
  "qnc-keyframe-nav",
  "qnc-program-segments",
+ "qnc-script",
  "qnc-segments-keys",
  "qnc-source-mark-focus",
  "qnc-source-panel",
@@ -5507,6 +5508,8 @@ dependencies = [
  "qnc-editorial-layout",
  "qnc-pool-tabs-panel",
  "qnc-program-view",
+ "qnc-script",
+ "qnc-script-panel",
  "qnc-segment-panel",
  "qnc-shot-panel",
  "qnc-source-timecode",
@@ -5530,6 +5533,48 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tiny_http",
+]
+
+[[package]]
+name = "qnc-script"
+version = "0.1.0"
+dependencies = [
+ "qnc-clip-row",
+ "qnc-db-broker",
+ "qnc-newsroom-sheet-db",
+ "qnc-script-db",
+ "qnc-source-preview",
+ "qnc-source-timecode",
+ "qnc-timeline",
+ "qnc-transcript",
+ "qnc-ui-text",
+ "serde_json",
+]
+
+[[package]]
+name = "qnc-script-db"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-ui-text",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-script-panel"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-action-event",
+ "qnc-desktop-theme",
+ "qnc-script",
+ "qnc-text-source-editor",
+ "qnc-transcript",
+ "qnc-ui-kit",
+ "qnc-ui-text",
 ]
 
 [[package]]
@@ -6001,6 +6046,15 @@ dependencies = [
  "qnc-program-segments",
  "qnc-source-preview",
  "qnc-wrap-session",
+]
+
+[[package]]
+name = "qnc-text-source-editor"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "qnc-desktop-theme",
+ "qnc-ui-kit",
 ]
 
 [[package]]

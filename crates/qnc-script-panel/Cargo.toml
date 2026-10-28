@@ -1,0 +1,15 @@
+[package]
+name = "qnc-script-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public passive panel: the script of the story (user 2026-10-28, Media Assist Audio) - its blocks in reading order with their lengths, the whole against the target, the statements to put in, and the TextSourceEditor at the bottom where OFF text is written; it paints only and gives catalog actions"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-action-event = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-script = { workspace = true }
+qnc-text-source-editor = { workspace = true }
+qnc-transcript = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-ui-text = { workspace = true }
