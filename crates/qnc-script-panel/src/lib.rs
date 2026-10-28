@@ -7,7 +7,7 @@
 
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, BlockKind, ScriptView, ADD_OFF, ADD_QUOTE, ADD_SOT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, REMOVE, REPLACE_OFF, SELECT};
+use qnc_script::{seconds_label, BlockKind, ScriptView, ADD_INTRO, ADD_OFF, ADD_OUTRO, ADD_QUOTE, ADD_SOT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_OFF, SELECT};
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
 
@@ -58,7 +58,7 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
     });
     // The length of the script against the target of the story sheet (red when over).
     let total = view.total_seconds();
-    let lengths = qnc_ui_text::fill("script.lengths", &[("off", &seconds_label(view.off_seconds)), ("sot", &seconds_label(view.sot_seconds)), ("total", &seconds_label(total))]);
+    let lengths = qnc_ui_text::fill("script.lengths", &[("off", &seconds_label(view.off_seconds)), ("sot", &seconds_label(view.sot_seconds)), ("total", &seconds_label(total)), ("anchor", &seconds_label(view.anchor_seconds))]);
     ui.horizontal(|ui| {
         ui.label(muted(&lengths));
         if let Some(target) = view.target_seconds {
@@ -116,10 +116,13 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
             let (badge, color) = match block.kind {
                 BlockKind::Off => (qnc_ui_text::text("script.off"), theme.focus),
                 BlockKind::Sot => (qnc_ui_text::text("script.sot"), theme.text),
+                BlockKind::Intro => (qnc_ui_text::text("script.intro"), theme.text_muted),
+                BlockKind::Outro => (qnc_ui_text::text("script.outro"), theme.text_muted),
             };
             ui.label(RichText::new(badge).color(color).strong().size(theme.font_ui));
             let detail = match block.kind {
-                BlockKind::Off => seconds_label(row.seconds),
+                BlockKind::Off if !block.voice_uri.is_empty() => qnc_ui_text::fill("script.recorded", &[("length", &seconds_label(row.seconds)), ("tc", &block.voice_tc)]),
+                BlockKind::Off | BlockKind::Intro | BlockKind::Outro => seconds_label(row.seconds),
                 BlockKind::Sot => format!("{}  {} - {}  {}", block.clip_name, block.start_tc, block.end_tc, block.length),
             };
             ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
@@ -132,8 +135,30 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
                 if block.kind == BlockKind::Sot && qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.open"), true, false, style).clicked() {
                     asked = Some(ActionEvent::key(OPEN).with_target(id.clone()).at(PANEL));
                 }
+                // Rec on an OFF block; while it records, Stop (user 2026-10-28).
+                if block.kind == BlockKind::Off {
+                    let this = view.recording.is_some_and(|(recording, _, _)| recording == block.id);
+                    let other = view.recording.is_some() && !this;
+                    let label = if this { qnc_ui_text::text("script.stop") } else { qnc_ui_text::text("script.record") };
+                    let red = qnc_ui_kit::ChromeButtonStyle { text: theme.danger, border: theme.danger, focus: theme.danger, ..style };
+                    if qnc_ui_kit::chrome_button(ui, label, !other && !view.record_busy, this, red).on_hover_text(qnc_ui_text::text("script.record_hint")).clicked() {
+                        asked = Some(ActionEvent::key(RECORD).with_target(id.clone()).at(PANEL));
+                    }
+                }
             });
         });
+        // The take being recorded: its time and the microphone's level.
+        if let Some((_, seconds, peak)) = view.recording.filter(|(recording, _, _)| *recording == block.id) {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(format!("● {}", seconds_label(seconds))).color(theme.danger).strong().size(theme.font_ui));
+                let (bar, _) = ui.allocate_exact_size(egui::vec2(ui.available_width().min(240.0), 8.0), Sense::hover());
+                ui.painter().rect_filled(bar, 2.0, theme.surface_alt);
+                let level = if peak > 0.0 { ((20.0 * peak.log10() + 48.0) / 48.0).clamp(0.0, 1.0) } else { 0.0 };
+                let mut lit = bar;
+                lit.set_width(bar.width() * level);
+                ui.painter().rect_filled(lit, 2.0, if peak > 0.7 { theme.danger } else { theme.focus });
+            });
+        }
         let text = if block.text.is_empty() { qnc_ui_text::text("script.no_words").to_string() } else { block.text.clone() };
         let color = if block.text.is_empty() { theme.text_muted } else { theme.text };
         ui.add(egui::Label::new(RichText::new(text).color(color).size(theme.font_ui + 1.0)).wrap());
@@ -152,6 +177,8 @@ fn paint_editor(ui: &mut egui::Ui, view: &ScriptView, theme: &qnc_desktop_theme:
     let buttons = [
         EditorButton { label: qnc_ui_text::text("script.clear"), action_id: CLEAR_EDITOR, enabled: written || view.editing.is_some() },
         EditorButton { label: qnc_ui_text::text("script.replace"), action_id: REPLACE_OFF, enabled: written && view.editing.is_some() },
+        EditorButton { label: qnc_ui_text::text("script.add_intro"), action_id: ADD_INTRO, enabled: written },
+        EditorButton { label: qnc_ui_text::text("script.add_outro"), action_id: ADD_OUTRO, enabled: written },
         EditorButton { label: qnc_ui_text::text("script.add_off"), action_id: ADD_OFF, enabled: written },
     ];
     let info = qnc_ui_text::fill("script.editor_info", &[("words", &view.editor.split_whitespace().count().to_string()), ("length", &seconds_label(view.editor_seconds))]);

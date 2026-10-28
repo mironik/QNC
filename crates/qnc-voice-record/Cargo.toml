@@ -1,0 +1,14 @@
+[package]
+name = "qnc-voice-record"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: records the voice-over from this computer's microphone (user 2026-10-28, Media Assist Audio) into a WAV file inside the project folder at the project's sample rate, with the time of day it started as its timecode; it knows no form, script or database"
+
+[dependencies]
+cpal = "=0.17.1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+qnc-ui-text = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

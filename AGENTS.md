@@ -6652,3 +6652,24 @@ drzi scenarij i salje mu radnje (`script_*`, katalog bez tipki), `qnc-transcript
 ne rade dok se pise u editoru (polje teksta drzi tipkovnicu, postojece pravilo). Testovi `qnc-script-db` (3), `qnc-script`
 (2), `qnc-project-store`, `qnc-panel-focus`, conformance, release build. Uzivo nije provjereno. Nije izvedeno: korak 2
 (snimanje OFF-a, mapa `products/voice`), korak 3 (slaganje price u Story iz scenarija).
+Otkljucano i izvedeno 2026-10-28 (korisnik: "da, otkljucaj Project i kreni s korakom 2"; u scenariju je napisao da je
+prvo najava koju cita spiker, pa prvi off; odabrao dijelove "Najava i odjava" i preslusavanje kroz Broadcast Player;
+"ton koji snimamo neka u QNC dobije timecode i moguce video title teksta; treba omoguciti i ucitavanje tona snimljenog na
+drugi nacin (kamera na terenu), kasnije preko mreze"; "koristi kocke"): korak 2, prvi dio. Scenarij: vrste blokova
+Najava (`intro`, spiker prije priloga) i Odjava (`outro`, spiker poslije), ne snimaju se i ne broje u trajanje priloga
+(zasebno "Anchor"); editor ima gumbe Lead-in i Tag; najava bez izabranog bloka ide na pocetak. `qnc-script-db`: vrste i
+polja snimke (`voice_uri`, `voice_seconds`, `voice_tc`), operacija `SetVoice` (samo OFF), `Place::First`; tablica prvog
+dana (bez tih stupaca) prepisuje se u novu pri prvom upisu, blokovi ostaju, a do tada se cita bez snimki (test). Project:
+mapa proizvoda `products/voice` (popis mapa proizvoda je jedan korijen `products` i nazivi polja, iste vrijednosti kao
+prije; C13 Projecta 6 -> 0, baseline spusten); `qnc-work-settings` `ProductLocations.voice` (neobavezno, projekt bez nje
+dobiva kontroliranu gresku samo za snimanje) i `voice_location` (mapa i URI pod mapom projekta kao izvorom medija).
+Project je ponovno zamrznut. Nova kocka `qnc-voice-record` (+ ugovor): mikrofon racunala (zadani ulaz ili naziv iz
+postavke racunala `voice-input.json` uz ostale postavke) snima prvi kanal na frekvenciji projekta u mono 24-bit WAV u mapi
+projekta (provjera da je put u projektu; datoteka odmah pod konacnim imenom), mikrofon koji ne radi na toj frekvenciji je
+jasna greska; timecode je doba dana pocetka snimke u stopi projekta. `qnc-script`: radnja `record_toggle` na OFF bloku
+(Rec/Stop, otvaranje mikrofona izvan niti sucelja), snimka se upisuje uz blok (`off_<id>_<vrijeme>.wav`), novi take
+zamjenjuje zapis; duljina snimljenog OFF-a je duljina snimke. Panel: Rec/Stop na OFF bloku, vrijeme i razina mikrofona dok
+snima, "recorded m:ss TC ..." uz snimljeni OFF. Proba kocke na scratchpadu: 2,0 s, 48 kHz, 24-bit mono. Testovi
+`qnc-script-db` (5), `qnc-voice-record` (3), `qnc-script` (2), `qnc-project-store` (43), zlatna tablica tipki,
+conformance, release build. Uzivo kroz sucelje nije provjereno. Nije izvedeno: preslusavanje kroz Broadcast Player (snimka
+kao klip projekta sa slikom naslova teksta i timecodeom), ucitavanje tona snimljenog drugdje, slaganje price u Story.

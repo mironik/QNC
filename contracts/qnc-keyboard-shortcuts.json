@@ -157,6 +157,12 @@
     "script_open": {
       "label": "Otvori klip izjave scenarija"
     },
+    "script_add_intro": {
+      "label": "Dodaj najavu (spiker) iz editora"
+    },
+    "script_add_outro": {
+      "label": "Dodaj odjavu (spiker) iz editora"
+    },
     "transcribe_fast": {
       "label": "Transkribiraj brzo (procesor)"
     },

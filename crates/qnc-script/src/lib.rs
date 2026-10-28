@@ -30,7 +30,10 @@ pub const PANEL: &str = "script";
 pub const EDITOR_TEXT: &str = "script_editor_text";
 /// The editor's text goes into the script as an OFF block after the chosen one.
 pub const ADD_OFF: &str = "script_add_off";
-/// The editor's text replaces the OFF block it was taken from.
+/// The editor's text goes into the script as the anchor's lead-in or tag (user 2026-10-28).
+pub const ADD_INTRO: &str = "script_add_intro";
+pub const ADD_OUTRO: &str = "script_add_outro";
+/// The editor's text replaces the text block it was taken from.
 pub const REPLACE_OFF: &str = "script_replace_off";
 /// The editor is emptied (and no longer holds a block's text).
 pub const CLEAR_EDITOR: &str = "script_editor_clear";
@@ -46,6 +49,9 @@ pub const MOVE_DOWN: &str = "script_move_down";
 pub const REMOVE: &str = "script_remove";
 /// A statement opens its clip with its IN/OUT (target: its id).
 pub const OPEN: &str = "script_open";
+/// An OFF block is recorded from the microphone, or its recording stops (target: its id;
+/// without one the chosen OFF block). The catalog names it `record_toggle` (v4).
+pub const RECORD: &str = "record_toggle";
 
 /// How often the script is read again (another process may change it).
 const READ_EVERY: Duration = Duration::from_secs(2);
@@ -72,10 +78,16 @@ pub struct ScriptView {
     pub editor_seconds: f64,
     pub off_seconds: f64,
     pub sot_seconds: f64,
+    /// The anchor's lead-in and tag (read in the studio, not in the length of the story).
+    pub anchor_seconds: f64,
     /// The target length of the story (the story sheet's first length field).
     pub target_seconds: Option<f64>,
     /// Whether the shown clip has an IN/OUT (Add SOT can take it).
     pub marks: bool,
+    /// The OFF block being recorded now, the seconds recorded and the level of the microphone.
+    pub recording: Option<(i64, f64, f32)>,
+    /// A recording is being started or finished.
+    pub record_busy: bool,
     pub message: String,
 }
 
@@ -91,6 +103,8 @@ impl ScriptView {
             .iter()
             .map(|row| match row.block.kind {
                 BlockKind::Off => format!("OFF ({})\n{}", seconds_label(row.seconds), row.block.text),
+                BlockKind::Intro => format!("{} ({})\n{}", qnc_ui_text::text("script.intro_heading"), seconds_label(row.seconds), row.block.text),
+                BlockKind::Outro => format!("{} ({})\n{}", qnc_ui_text::text("script.outro_heading"), seconds_label(row.seconds), row.block.text),
                 BlockKind::Sot => format!("SOT {} {} - {} ({})\n{}", row.block.clip_name, row.block.start_tc, row.block.end_tc, row.block.length, row.block.text),
             })
             .collect::<Vec<_>>()
@@ -102,6 +116,16 @@ impl ScriptView {
 pub fn seconds_label(seconds: f64) -> String {
     let whole = seconds.max(0.0).round() as u64;
     format!("{}:{:02}", whole / 60, whole % 60)
+}
+
+/// Seconds a block lasts: a statement its own, a recorded OFF its recording, other text the
+/// time its words take to read.
+pub fn block_seconds(block: &Block, words_per_second: f64) -> f64 {
+    match block.kind {
+        BlockKind::Sot => block.seconds,
+        BlockKind::Off if !block.voice_uri.is_empty() => block.voice_seconds,
+        _ => reading_seconds(&block.text, words_per_second),
+    }
 }
 
 /// Seconds `text` takes to read at `words_per_second`.
@@ -126,11 +150,16 @@ pub struct Script {
     /// Name, frames and seconds of each clip of the pool.
     names: HashMap<String, (String, u64, f64)>,
     words_per_second: f64,
+    /// The recording that runs, of which block.
+    recorder: Option<(i64, qnc_voice_record::Recorder)>,
+    /// A recording on its way to start, or a stopped one on its way into the script.
+    starting: Option<(i64, mpsc::Receiver<Result<(qnc_voice_record::Recorder, String), String>>)>,
+    voice_base: Option<String>,
 }
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: 0.0 }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: 0.0, recorder: None, starting: None, voice_base: None }
     }
 }
 
@@ -151,7 +180,7 @@ impl Script {
 
     /// Whether a read or a write of this process runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.reading.is_some() || self.writing.is_some()
+        self.reading.is_some() || self.writing.is_some() || self.recorder.is_some() || self.starting.is_some()
     }
 
     /// A clip and IN/OUT a chosen statement opens on the source timeline, once.
@@ -174,14 +203,25 @@ impl Script {
                 self.refresh_editor();
                 true
             }
-            ADD_OFF => {
+            ADD_OFF | ADD_INTRO | ADD_OUTRO => {
                 let text = self.view.editor.trim().to_string();
                 if text.is_empty() {
                     self.view.message = qnc_ui_text::text("script.write_first").into();
                     return Some(true);
                 }
-                let after = self.view.selected;
-                self.write(preview, move |target| qnc_script_db::add(target, after, Block::off(text)).map(Some))
+                let kind = match action_id {
+                    ADD_INTRO => BlockKind::Intro,
+                    ADD_OUTRO => BlockKind::Outro,
+                    _ => BlockKind::Off,
+                };
+                // A block goes after the chosen one; without one the lead-in opens the script and
+                // the rest goes at its end.
+                let place = match (kind, self.view.selected) {
+                    (_, Some(chosen)) => qnc_script_db::Place::After(chosen),
+                    (BlockKind::Intro, None) => qnc_script_db::Place::First,
+                    _ => qnc_script_db::Place::Last,
+                };
+                self.write(preview, move |target| qnc_script_db::add_at(target, place, Block::written(kind, text)).map(Some))
             }
             REPLACE_OFF => {
                 let (Some(block), text) = (self.view.editing, self.view.editor.trim().to_string()) else {
@@ -214,7 +254,7 @@ impl Script {
                 let Some(id) = id() else { return Some(false) };
                 self.view.selected = Some(id);
                 if let Some(block) = self.blocks.iter().find(|b| b.id == id) {
-                    if block.kind == BlockKind::Off {
+                    if block.is_text() {
                         self.view.editor = block.text.clone();
                         self.view.editing = Some(id);
                         self.refresh_editor();
@@ -236,6 +276,13 @@ impl Script {
                     self.view.selected = None;
                 }
                 self.write(preview, move |target| qnc_script_db::remove(target, id).map(|_| None))
+            }
+            // The key of a form that has no script (nothing chosen, nothing recording) is not the
+            // script's.
+            RECORD if target.is_none() && self.view.selected.is_none() && self.recorder.is_none() => return None,
+            RECORD => {
+                let block = id().or(self.view.selected);
+                self.record(preview, block)
             }
             OPEN => match id().and_then(|id| self.blocks.iter().find(|b| b.id == id && b.kind == BlockKind::Sot)) {
                 Some(block) => {
@@ -273,9 +320,61 @@ impl Script {
             // The OUT is past the last frame: the end shown is the last frame of the statement.
             end_tc: at(to.saturating_sub(1).max(from)),
             length: timecode.map_or_else(|| (to - from).to_string(), |tc| tc.duration_label(to - from)),
+            ..Block::off(String::new())
         };
         let after = self.view.selected;
         self.write(preview, move |target| qnc_script_db::add(target, after, block).map(Some))
+    }
+
+    /// Starts recording OFF block `block`, or stops the recording that runs (whichever block
+    /// the press names). The microphone is opened off the form thread.
+    fn record(&mut self, preview: &SourcePreview, block: Option<i64>) -> bool {
+        if let Some((id, recorder)) = self.recorder.take() {
+            return self.finish(preview, id, recorder);
+        }
+        if self.starting.is_some() {
+            return true;
+        }
+        let Some(id) = block.filter(|id| self.blocks.iter().any(|b| b.id == *id && b.kind == BlockKind::Off)) else {
+            self.view.message = qnc_ui_text::text("script.choose_off_to_record").into();
+            return true;
+        };
+        let Some(locator) = preview.still_locator() else {
+            self.view.message = qnc_ui_text::text("script.no_project").into();
+            return true;
+        };
+        let Some(setting) = qnc_dev_diagnostics::resolve_qnc_root().map(|root| qnc_dev_diagnostics::config_path(&root).with_file_name(qnc_voice_record::INPUT_SETTING)) else {
+            self.view.message = qnc_ui_text::text("script.no_project").into();
+            return true;
+        };
+        let (send, started) = mpsc::channel();
+        let spawned = std::thread::Builder::new().name("qnc-script-record".into()).spawn(move || {
+            let start = || -> Result<(qnc_voice_record::Recorder, String), String> {
+                let settings = locator.settings();
+                let project_dir = locator.reader().local_workspace_dir(settings).map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("script.voice_local_only").to_string())?;
+                let (folder, base) = settings.voice_location(&project_dir).map_err(|e| e.to_string())?;
+                std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+                let rate = settings.audio.get("sample_rate").and_then(serde_json::Value::as_u64).unwrap_or(0) as u32;
+                let fps = settings.video.get("fps").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+                let name = format!("off_{id}_{}.wav", qnc_voice_record::file_stamp());
+                Ok((qnc_voice_record::Recorder::start(folder.join(&name), &project_dir, rate, fps, &setting)?, format!("{base}/{name}")))
+            };
+            let _ = send.send(start());
+        });
+        if spawned.is_ok() {
+            self.starting = Some((id, started));
+            self.view.message = qnc_ui_text::text("script.record_starting").into();
+        }
+        true
+    }
+
+    /// Stops the recording of block `id` and puts it into the script.
+    fn finish(&mut self, preview: &SourcePreview, id: i64, recorder: qnc_voice_record::Recorder) -> bool {
+        let uri = self.voice_base.take().unwrap_or_default();
+        self.write(preview, move |target| {
+            let recording = recorder.stop()?;
+            qnc_script_db::set_voice(target, id, uri, recording.seconds, recording.timecode).map(|_| None)
+        })
     }
 
     /// Seconds of `frames` of `clip_id` (0 when its rate is not known).
@@ -312,6 +411,21 @@ impl Script {
             *self = Self { project: key, ..Self::default() };
         }
         self.words_per_second = preview.still_locator().and_then(|locator| locator.settings().reading_words_per_second().ok()).unwrap_or(0.0);
+        if let Some((id, started)) = &self.starting {
+            if let Ok(result) = started.try_recv() {
+                match result {
+                    Ok((recorder, uri)) => {
+                        self.voice_base = Some(uri);
+                        self.recorder = Some((*id, recorder));
+                        self.view.message = qnc_ui_text::text("script.recording").into();
+                    }
+                    Err(error) => self.view.message = error,
+                }
+                self.starting = None;
+            }
+        }
+        self.view.recording = self.recorder.as_ref().map(|(id, recorder)| (*id, recorder.seconds(), recorder.take_peak()));
+        self.view.record_busy = self.starting.is_some();
         if let Some(done) = &self.writing {
             if let Ok(result) = done.try_recv() {
                 match result {
@@ -357,10 +471,11 @@ impl Script {
         self.view.blocks = self
             .blocks
             .iter()
-            .map(|block| BlockRow { seconds: if block.kind == BlockKind::Off { reading_seconds(&block.text, wps) } else { block.seconds }, block: block.clone() })
+            .map(|block| BlockRow { seconds: block_seconds(block, wps), block: block.clone() })
             .collect();
-        self.view.off_seconds = self.view.blocks.iter().filter(|row| row.block.kind == BlockKind::Off).map(|row| row.seconds).sum();
-        self.view.sot_seconds = self.view.blocks.iter().filter(|row| row.block.kind == BlockKind::Sot).map(|row| row.seconds).sum();
+        let sum = |kinds: &[BlockKind]| self.view.blocks.iter().filter(|row| kinds.contains(&row.block.kind)).map(|row| row.seconds).sum::<f64>();
+        let (off, sot, anchor) = (sum(&[BlockKind::Off]), sum(&[BlockKind::Sot]), sum(&[BlockKind::Intro, BlockKind::Outro]));
+        (self.view.off_seconds, self.view.sot_seconds, self.view.anchor_seconds) = (off, sot, anchor);
         self.refresh_editor();
         self.view != before
     }

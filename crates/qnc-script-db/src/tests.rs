@@ -76,3 +76,34 @@ fn an_empty_off_or_a_statement_without_a_range_is_refused() {
     assert!(set_text(&target, id, String::new()).is_err());
     assert_eq!(texts(&target), ["x"]);
 }
+
+#[test]
+fn the_lead_in_and_tag_are_text_blocks_and_only_an_off_takes_a_recording() {
+    let (_dir, target) = project();
+    let intro = add(&target, None, Block::written(BlockKind::Intro, "Najava spikera.")).unwrap();
+    let off = add(&target, None, Block::off("Prvi off.")).unwrap();
+    add(&target, None, Block::written(BlockKind::Outro, "Odjava.")).unwrap();
+    assert!(set_voice(&target, intro, "qnc://x".into(), 3.0, "18:00:00:00".into()).is_err());
+    set_voice(&target, off, "qnc://local/source/project-p1/file/products/voice/off.mxf".into(), 4.5, "18:01:02:03".into()).unwrap();
+    let blocks = read(&target).unwrap();
+    assert_eq!(blocks.iter().map(|b| b.kind).collect::<Vec<_>>(), [BlockKind::Intro, BlockKind::Off, BlockKind::Outro]);
+    assert_eq!((blocks[1].voice_seconds, blocks[1].voice_tc.as_str()), (4.5, "18:01:02:03"));
+}
+
+#[test]
+fn a_script_of_the_first_day_keeps_its_blocks_when_its_table_is_brought_up() {
+    let (dir, target) = project();
+    Connection::open(dir.path().join("project.db"))
+        .unwrap()
+        .execute_batch(
+            "CREATE TABLE script_blocks (block_id INTEGER PRIMARY KEY AUTOINCREMENT, position INTEGER NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('off', 'sot')),
+                text TEXT NOT NULL, clip_id TEXT NOT NULL, clip_name TEXT NOT NULL, from_frame INTEGER NOT NULL, to_frame INTEGER NOT NULL, start_tc TEXT NOT NULL,
+                end_tc TEXT NOT NULL, length TEXT NOT NULL, seconds REAL NOT NULL, updated_at_utc TEXT NOT NULL);
+             CREATE VIEW public_script_blocks AS SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, updated_at_utc FROM script_blocks;
+             INSERT INTO script_blocks VALUES (1, 0, 'off', 'stari off', '', '', 0, 0, '', '', '', 0, 'x');",
+        )
+        .unwrap();
+    assert_eq!(texts(&target), ["stari off"], "read before the owner brings it up");
+    add(&target, None, Block::written(BlockKind::Intro, "najava")).unwrap();
+    assert_eq!(texts(&target), ["stari off", "najava"]);
+}

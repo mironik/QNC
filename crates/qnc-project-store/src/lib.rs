@@ -37,16 +37,30 @@ const PROJECT_DIRECTORIES: &[&str] = &[
     "incoming/card",
     "incoming/ftp",
 ];
-const PRODUCT_DIRECTORY_FIELDS: &[(&str, &str)] = &[
-    ("root", "products"),
-    ("thumbnails", "products/thumbnails"),
-    ("filmstrip", "products/filmstrip"),
-    ("virtual_shorts", "products/virtual_shorts"),
-    ("virtual_segments", "products/virtual_segments"),
-    ("b_roll_virtual_clips", "products/b_roll_virtual_clips"),
+/// The folder all products of a project are in.
+const PRODUCT_ROOT: &str = "products";
+/// The product folders the settings name, each `products/<field>` (one root, one list).
+const PRODUCT_DIRECTORY_FIELDS: &[&str] = &[
+    "thumbnails",
+    "filmstrip",
+    "virtual_shorts",
+    "virtual_segments",
+    "b_roll_virtual_clips",
     // The prerender of the story in the delivery format (user 2026-10-12).
-    ("prerender", "products/prerender"),
+    "prerender",
+    // The recorded voice-overs of the script (user 2026-10-28).
+    "voice",
 ];
+
+/// The folder of product `field` inside the project.
+fn product_folder(field: &str) -> String {
+    format!("{PRODUCT_ROOT}/{field}")
+}
+
+/// Every product field and its folder, with the root itself (`root`).
+fn product_folders() -> impl Iterator<Item = (&'static str, String)> {
+    std::iter::once(("root", PRODUCT_ROOT.to_string())).chain(PRODUCT_DIRECTORY_FIELDS.iter().map(|field| (*field, product_folder(field))))
+}
 /// Product folders that are caches (user 2026-10-13): inside the protected project their
 /// files may be deleted and replaced (old prerender units go with their name); the
 /// folder itself stays protected.
@@ -55,12 +69,8 @@ const CACHE_PRODUCT_FIELDS: &[&str] = &["prerender"];
 /// in it may be deleted, the folder itself stays protected.
 const EXPORTS_FOLDER: &str = "exports";
 
-fn cache_product_folders() -> impl Iterator<Item = &'static str> {
-    PRODUCT_DIRECTORY_FIELDS
-        .iter()
-        .filter(|(field, _)| CACHE_PRODUCT_FIELDS.contains(field))
-        .map(|(_, folder)| *folder)
-        .chain([EXPORTS_FOLDER])
+fn cache_product_folders() -> impl Iterator<Item = String> {
+    CACHE_PRODUCT_FIELDS.iter().map(|field| product_folder(field)).chain([EXPORTS_FOLDER.to_string()])
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -803,18 +813,15 @@ impl ProjectStore {
 fn ensure_project_dirs_at(base: &Path) -> Result<(), String> {
     fs::create_dir_all(base).map_err(|error| error.to_string())?;
     for subdir in project_directories() {
-        fs::create_dir_all(base.join(subdir)).map_err(|error| error.to_string())?;
+        fs::create_dir_all(base.join(&subdir)).map_err(|error| error.to_string())?;
     }
     Ok(())
 }
 
 /// The folders of a new project: the media folders and the product folders the settings
 /// name (one list of product folders, `PRODUCT_DIRECTORY_FIELDS`).
-fn project_directories() -> impl Iterator<Item = &'static str> {
-    PROJECT_DIRECTORIES
-        .iter()
-        .copied()
-        .chain(PRODUCT_DIRECTORY_FIELDS.iter().map(|(_, folder)| *folder))
+fn project_directories() -> impl Iterator<Item = String> {
+    PROJECT_DIRECTORIES.iter().map(|folder| folder.to_string()).chain(product_folders().map(|(_, folder)| folder))
 }
 
 fn project_export_directory(
@@ -1778,10 +1785,8 @@ fn complete_project_settings(settings: &mut Value) -> Result<(), String> {
     let products = products
         .as_object_mut()
         .ok_or(qnc_ui_text::text("project.store.products_object"))?;
-    for (field, value) in PRODUCT_DIRECTORY_FIELDS {
-        products
-            .entry((*field).to_string())
-            .or_insert_with(|| json!(value));
+    for (field, value) in product_folders() {
+        products.entry(field.to_string()).or_insert_with(|| json!(value));
     }
     // Timeline artifacts (user rule 2026-09-30): made in the background unless the
     // template says `off`.
@@ -2369,7 +2374,7 @@ mod tests {
         let project_dir = root.join("projects").join(safe_dir_name(&row.project_id));
         for subdir in project_directories() {
             assert!(
-                project_dir.join(subdir).is_dir(),
+                project_dir.join(&subdir).is_dir(),
                 "missing project directory {subdir}"
             );
         }
@@ -2435,6 +2440,7 @@ mod tests {
         assert_eq!(saved["products"]["thumbnails"], "products/thumbnails");
         assert_eq!(saved["products"]["filmstrip"], "products/filmstrip");
         assert_eq!(saved["products"]["prerender"], "products/prerender");
+        assert_eq!(saved["products"]["voice"], "products/voice");
         assert_eq!(
             saved["products"]["virtual_shorts"],
             "products/virtual_shorts"

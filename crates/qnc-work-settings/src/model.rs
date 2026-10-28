@@ -109,6 +109,9 @@ pub struct ProductLocations {
     /// The prerender of the story (user 2026-10-12); a project made before it has none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prerender: Option<String>,
+    /// The recorded voice-overs of the script (user 2026-10-28); a project made before it has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voice: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -321,6 +324,11 @@ impl WorkSettings {
                     .and_then(|products| products.get("prerender"))
                     .map(|_| required_text(saved.get("products").ok_or_else(incomplete)?, "prerender"))
                     .transpose()?,
+                voice: saved
+                    .get("products")
+                    .and_then(|products| products.get("voice"))
+                    .map(|_| required_text(saved.get("products").ok_or_else(incomplete)?, "voice"))
+                    .transpose()?,
             },
             input: object(&saved, "input")?,
             playback: object(&saved, "playback")?,
@@ -368,6 +376,9 @@ impl WorkSettings {
         }
         for value in self.products.all_relative_paths() {
             validate_relative_product_path(value)?;
+        }
+        if let Some(voice) = &self.products.voice {
+            validate_relative_product_path(voice)?;
         }
         if let Some(prerender) = &self.products.prerender {
             validate_relative_product_path(prerender)?;
@@ -429,6 +440,16 @@ impl WorkSettings {
             project_dir.join(relative),
             format!("{}/{}", self.output_root_uri.trim_end_matches('/'), relative.trim_matches('/')),
         ))
+    }
+
+    /// Where the recorded voice-overs of the script are written in the project folder, and
+    /// their URI under the project folder as a media source; a project made before them has
+    /// none (a controlled error, no default).
+    pub fn voice_location(&self, project_dir: &Path) -> Result<(PathBuf, String), ReadError> {
+        let relative = self.products.voice.as_deref().ok_or_else(|| {
+            ReadError::new("products_voice", "The project has no voice-over folder (products.voice).")
+        })?;
+        Ok((project_dir.join(relative), format!("{}/file/{}", self.project_media_source_uri()?, relative.trim_matches('/'))))
     }
 
     /// The project folder as a media source: media copied into the project (an imported

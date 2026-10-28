@@ -27,6 +27,11 @@ pub enum BlockKind {
     Off,
     /// A statement: a range of a clip and what is said in it.
     Sot,
+    /// The anchor's lead-in, read in the studio before the story (user 2026-10-28: "najava";
+    /// not recorded, not in the length of the story).
+    Intro,
+    /// The anchor's tag after the story ("odjava"; not recorded, not in its length).
+    Outro,
 }
 
 /// One block of the script. `id` is given by the table; the timecodes and length of a
@@ -57,12 +62,31 @@ pub struct Block {
     /// Seconds of a statement (an OFF block's length comes from its words).
     #[serde(default)]
     pub seconds: f64,
+    /// The recording of an OFF block (its media URI in the project; empty until recorded).
+    #[serde(default)]
+    pub voice_uri: String,
+    /// Seconds of the recording.
+    #[serde(default)]
+    pub voice_seconds: f64,
+    /// The timecode the recording starts at (the time of day it was recorded).
+    #[serde(default)]
+    pub voice_tc: String,
 }
 
 impl Block {
+    /// Whether the block is text read by someone (OFF, lead-in, tag), not a clip.
+    pub fn is_text(&self) -> bool {
+        self.kind != BlockKind::Sot
+    }
+
+    /// A text block of `kind` (OFF, lead-in or tag).
+    pub fn written(kind: BlockKind, text: impl Into<String>) -> Self {
+        Self { kind, ..Self::off(text) }
+    }
+
     /// An OFF block of `text`.
     pub fn off(text: impl Into<String>) -> Self {
-        Self { id: 0, kind: BlockKind::Off, text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0 }
+        Self { id: 0, kind: BlockKind::Off, text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new() }
     }
 }
 
@@ -71,14 +95,16 @@ impl Block {
 pub enum Operation {
     /// The blocks in reading order.
     Read,
-    /// A block is added after block `after` (at the end without it).
-    Add { after: Option<i64>, block: Block },
+    /// A block is added after block `after` (at the end without it, or first).
+    Add { after: Option<i64>, #[serde(default)] first: bool, block: Block },
     /// The text of a block changes.
     SetText { id: i64, text: String },
     /// A block goes one place up or down.
     Move { id: i64, up: bool },
     /// A block leaves the script.
     Remove { id: i64 },
+    /// An OFF block got its recording (an empty URI takes it away).
+    SetVoice { id: i64, uri: String, seconds: f64, tc: String },
 }
 
 impl Operation {
@@ -124,7 +150,25 @@ pub fn read(target: &ProjectDbTarget) -> Result<Vec<Block>> {
 
 /// Adds `block` after block `after` (at the end without it); the id it was given.
 pub fn add(target: &ProjectDbTarget, after: Option<i64>, block: Block) -> Result<i64> {
-    match write(target, Operation::Add { after, block })? {
+    add_at(target, after.map_or(Place::Last, Place::After), block)
+}
+
+/// Where a new block goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Place {
+    First,
+    Last,
+    After(i64),
+}
+
+/// Adds `block` at `place`; the id it was given.
+pub fn add_at(target: &ProjectDbTarget, place: Place, block: Block) -> Result<i64> {
+    let (after, first) = match place {
+        Place::First => (None, true),
+        Place::Last => (None, false),
+        Place::After(id) => (Some(id), false),
+    };
+    match write(target, Operation::Add { after, first, block })? {
         Data::Added(id) => Ok(id),
         _ => Err(reply()),
     }
@@ -138,6 +182,11 @@ pub fn set_text(target: &ProjectDbTarget, id: i64, text: String) -> Result<()> {
 /// Block `id` goes one place up (or down).
 pub fn move_block(target: &ProjectDbTarget, id: i64, up: bool) -> Result<()> {
     write(target, Operation::Move { id, up }).map(drop)
+}
+
+/// OFF block `id` got the recording at `uri`, `seconds` long, starting at timecode `tc`.
+pub fn set_voice(target: &ProjectDbTarget, id: i64, uri: String, seconds: f64, tc: String) -> Result<()> {
+    write(target, Operation::SetVoice { id, uri, seconds, tc }).map(drop)
 }
 
 /// Block `id` leaves the script.

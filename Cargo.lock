@@ -5541,6 +5541,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-clip-row",
  "qnc-db-broker",
+ "qnc-dev-diagnostics",
  "qnc-newsroom-sheet-db",
  "qnc-script-db",
  "qnc-source-preview",
@@ -5548,6 +5549,7 @@ dependencies = [
  "qnc-timeline",
  "qnc-transcript",
  "qnc-ui-text",
+ "qnc-voice-record",
  "serde_json",
 ]
 
@@ -5555,7 +5557,9 @@ dependencies = [
 name = "qnc-script-db"
 version = "0.1.0"
 dependencies = [
+ "qnc-active-project-read",
  "qnc-db-broker",
+ "qnc-newsroom-sheet-db",
  "qnc-ui-text",
  "rusqlite",
  "serde",
@@ -6360,6 +6364,17 @@ dependencies = [
  "qnc-ui-text",
  "rusqlite",
  "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-voice-record"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cpal",
+ "qnc-ui-text",
  "serde_json",
  "tempfile",
 ]

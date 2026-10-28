@@ -9,6 +9,9 @@ const OWNED: [&str; 1] = ["script_blocks"];
 pub(crate) struct Store {
     conn: Connection,
     ready: bool,
+    /// A table made on the first day of the script (read only until the owner brings it up):
+    /// its blocks are read without recordings.
+    legacy: bool,
 }
 
 impl Store {
@@ -27,33 +30,36 @@ impl Store {
             conn.pragma_update(None, "query_only", true).map_err(err)?;
         }
         qnc_db_broker::write_only_own_tables(&conn, access, &OWNED);
-        Ok(Self { conn, ready })
+        let legacy = ready && !current(&conn)?;
+        Ok(Self { conn, ready, legacy })
     }
 
     pub(crate) fn execute(&mut self, operation: &Operation) -> Result<Data> {
         match operation {
             Operation::Read if !self.ready => Ok(Data::Blocks(Vec::new())),
             Operation::Read => self.read().map(Data::Blocks),
-            Operation::Add { after, block } => self.add(*after, block),
+            Operation::Add { after, first, block } => self.add(*after, *first, block),
             Operation::SetText { id, text } => self.set_text(*id, text),
             Operation::Move { id, up } => self.move_block(*id, *up),
             Operation::Remove { id } => self.remove(*id),
+            Operation::SetVoice { id, uri, seconds, tc } => self.set_voice(*id, uri, *seconds, tc),
         }
     }
 
     fn read(&self) -> Result<Vec<Block>> {
+        let voice = if self.legacy { "'', 0.0, ''" } else { "voice_uri, voice_seconds, voice_tc" };
         let mut statement = self
             .conn
-            .prepare(
-                "SELECT block_id, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds
-                 FROM public_script_blocks ORDER BY position",
-            )
+            .prepare(&format!(
+                "SELECT block_id, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, {voice}
+                 FROM public_script_blocks ORDER BY position"
+            ))
             .map_err(err)?;
         let rows = statement
             .query_map([], |r| {
                 Ok(Block {
                     id: r.get(0)?,
-                    kind: if r.get::<_, String>(1)? == "sot" { BlockKind::Sot } else { BlockKind::Off },
+                    kind: kind_of(&r.get::<_, String>(1)?),
                     text: r.get(2)?,
                     clip_id: r.get(3)?,
                     clip_name: r.get(4)?,
@@ -63,13 +69,16 @@ impl Store {
                     end_tc: r.get(8)?,
                     length: r.get(9)?,
                     seconds: r.get(10)?,
+                    voice_uri: r.get(11)?,
+                    voice_seconds: r.get(12)?,
+                    voice_tc: r.get(13)?,
                 })
             })
             .map_err(err)?;
         rows.collect::<std::result::Result<Vec<_>, _>>().map_err(err)
     }
 
-    fn add(&mut self, after: Option<i64>, block: &Block) -> Result<Data> {
+    fn add(&mut self, after: Option<i64>, first: bool, block: &Block) -> Result<Data> {
         let sot = block.kind == BlockKind::Sot;
         if sot && (block.clip_id.is_empty() || block.to_frame <= block.from_frame) {
             return Err(qnc_ui_text::text("db.script_sot_range").into());
@@ -86,6 +95,7 @@ impl Store {
                     .ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?
                     + 1
             }
+            None if first => 0,
             None => tx.query_row("SELECT COALESCE(MAX(position), -1) + 1 FROM script_blocks", [], |r| r.get(0)).map_err(err)?,
         };
         tx.execute("UPDATE script_blocks SET position = position + 1 WHERE position >= ?1", params![at]).map_err(err)?;
@@ -94,7 +104,7 @@ impl Store {
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
             params![
                 at,
-                if sot { "sot" } else { "off" },
+                kind_name(block.kind),
                 block.text,
                 block.clip_id,
                 block.clip_name,
@@ -118,7 +128,7 @@ impl Store {
         let kind: Option<String> = tx.query_row("SELECT kind FROM script_blocks WHERE block_id = ?1", params![id], |r| r.get(0)).optional().map_err(err)?;
         match kind.as_deref() {
             None => return Err(qnc_ui_text::text("db.script_no_block").into()),
-            Some("off") if text.trim().is_empty() => return Err(qnc_ui_text::text("db.script_off_empty").into()),
+            Some(kind) if kind != "sot" && text.trim().is_empty() => return Err(qnc_ui_text::text("db.script_off_empty").into()),
             _ => {}
         }
         tx.execute("UPDATE script_blocks SET text = ?2, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1", params![id, text]).map_err(err)?;
@@ -139,6 +149,24 @@ impl Store {
             tx.execute("UPDATE script_blocks SET position = ?2 WHERE block_id = ?1", params![neighbour, at]).map_err(err)?;
             tx.execute("UPDATE script_blocks SET position = ?2 WHERE block_id = ?1", params![id, other]).map_err(err)?;
         }
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
+    }
+
+    fn set_voice(&mut self, id: i64, uri: &str, seconds: f64, tc: &str) -> Result<Data> {
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+        let kind: Option<String> = tx.query_row("SELECT kind FROM script_blocks WHERE block_id = ?1", params![id], |r| r.get(0)).optional().map_err(err)?;
+        match kind.as_deref() {
+            None => return Err(qnc_ui_text::text("db.script_no_block").into()),
+            Some("off") => {}
+            Some(_) => return Err(qnc_ui_text::text("db.script_voice_off_only").into()),
+        }
+        let seconds = if uri.is_empty() { 0.0 } else { seconds.max(0.0) };
+        tx.execute(
+            "UPDATE script_blocks SET voice_uri = ?2, voice_seconds = ?3, voice_tc = ?4, updated_at_utc = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE block_id = ?1",
+            params![id, uri, seconds, tc],
+        )
+        .map_err(err)?;
         tx.commit().map_err(err)?;
         Ok(Data::Changed)
     }
@@ -169,12 +197,10 @@ fn renumber(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn ensure_schema(conn: &Connection) -> Result<()> {
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS script_blocks (
-            block_id INTEGER PRIMARY KEY AUTOINCREMENT,
+/// The columns of a script block as the table keeps them (in this order).
+const COLUMNS: &str = "block_id INTEGER PRIMARY KEY AUTOINCREMENT,
             position INTEGER NOT NULL,
-            kind TEXT NOT NULL CHECK (kind IN ('off', 'sot')),
+            kind TEXT NOT NULL CHECK (kind IN ('off', 'sot', 'intro', 'outro')),
             text TEXT NOT NULL,
             clip_id TEXT NOT NULL,
             clip_name TEXT NOT NULL,
@@ -184,12 +210,56 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
             end_tc TEXT NOT NULL,
             length TEXT NOT NULL,
             seconds REAL NOT NULL CHECK (seconds >= 0),
-            updated_at_utc TEXT NOT NULL
-        );
+            voice_uri TEXT NOT NULL DEFAULT '',
+            voice_seconds REAL NOT NULL DEFAULT 0 CHECK (voice_seconds >= 0),
+            voice_tc TEXT NOT NULL DEFAULT '',
+            updated_at_utc TEXT NOT NULL";
+
+/// The kind as the table keeps it.
+pub(crate) fn kind_name(kind: BlockKind) -> &'static str {
+    match kind {
+        BlockKind::Off => "off",
+        BlockKind::Sot => "sot",
+        BlockKind::Intro => "intro",
+        BlockKind::Outro => "outro",
+    }
+}
+
+pub(crate) fn kind_of(name: &str) -> BlockKind {
+    match name {
+        "sot" => BlockKind::Sot,
+        "intro" => BlockKind::Intro,
+        "outro" => BlockKind::Outro,
+        _ => BlockKind::Off,
+    }
+}
+
+/// Whether the table of a project keeps the recordings and the lead-in and tag (one made on the
+/// first day of the script did not).
+fn current(conn: &Connection) -> Result<bool> {
+    let sql: Option<String> = conn.query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='script_blocks'", [], |r| r.get(0)).optional().map_err(err)?;
+    Ok(sql.is_none_or(|sql| sql.contains("voice_uri") && sql.contains("'intro'")))
+}
+
+fn ensure_schema(conn: &Connection) -> Result<()> {
+    if !current(conn)? {
+        // The blocks written on the first day stay; the table gets its new columns and kinds.
+        conn.execute_batch(&format!(
+            "DROP VIEW IF EXISTS public_script_blocks;
+             CREATE TABLE script_blocks_next ({COLUMNS});
+             INSERT INTO script_blocks_next (block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, updated_at_utc)
+                 SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, updated_at_utc FROM script_blocks;
+             DROP TABLE script_blocks;
+             ALTER TABLE script_blocks_next RENAME TO script_blocks;"
+        ))
+        .map_err(err)?;
+    }
+    conn.execute_batch(&format!(
+        "CREATE TABLE IF NOT EXISTS script_blocks ({COLUMNS});
         CREATE VIEW IF NOT EXISTS public_script_blocks AS
-            SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, updated_at_utc
-            FROM script_blocks;",
-    )
+            SELECT block_id, position, kind, text, clip_id, clip_name, from_frame, to_frame, start_tc, end_tc, length, seconds, voice_uri, voice_seconds, voice_tc, updated_at_utc
+            FROM script_blocks;"
+    ))
     .map_err(err)
 }
 
