@@ -5549,6 +5549,7 @@ dependencies = [
  "qnc-timeline",
  "qnc-transcript",
  "qnc-ui-text",
+ "qnc-voice-clip",
  "qnc-voice-record",
  "serde_json",
 ]
@@ -6115,6 +6116,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-title-card"
+version = "0.1.0"
+dependencies = [
+ "ab_glyph",
+ "epaint_default_fonts",
+ "image",
+]
+
+[[package]]
 name = "qnc-touch-gestures"
 version = "0.1.0"
 dependencies = [
@@ -6365,6 +6375,16 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "qnc-voice-clip"
+version = "0.1.0"
+dependencies = [
+ "qnc-decoder-catalog",
+ "qnc-title-card",
+ "qnc-ui-text",
  "tempfile",
 ]
 

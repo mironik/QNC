@@ -6673,3 +6673,15 @@ snima, "recorded m:ss TC ..." uz snimljeni OFF. Proba kocke na scratchpadu: 2,0 
 `qnc-script-db` (5), `qnc-voice-record` (3), `qnc-script` (2), `qnc-project-store` (43), zlatna tablica tipki,
 conformance, release build. Uzivo kroz sucelje nije provjereno. Nije izvedeno: preslusavanje kroz Broadcast Player (snimka
 kao klip projekta sa slikom naslova teksta i timecodeom), ucitavanje tona snimljenog drugdje, slaganje price u Story.
+Izvedeno 2026-10-28 (korisnik: "da, kreni s klipom snimke za Broadcast Player"): korak 2, drugi dio. Nove kocke (s
+ugovorima modula): `qnc-title-card` (naslovna slika: bijeli tekst na crnom u velicini slike projekta, font sucelja QNC-a
+Ubuntu-Light iz `epaint_default_fonts` preko `ab_glyph`, rijeci prelomljene i smanjene dok ne stanu, mala linija iznad;
+ista na svakom racunalu) i `qnc-voice-clip` (snimka kao klip: slika je naslovna slika teksta, zvuk snimka kakva jest
+(24-bit PCM, njezina frekvencija), timecode doba dana snimanja; MXF OP1a s XDCAM HD422 slikom (MPEG-2 4:2:2, 50 Mbit CBR,
+GOP 12) u stopi i velicini projekta, ffmpegom kataloga dekodera, odmah pod konacnim imenom u mapi projekta; slika ide
+kroz privremenu mapu sustava). `qnc-script`: Stop snimanja odmah pravi klip `products/voice/off_<id>_<vrijeme>.mxf` uz WAV
+i upisuje njegov URI uz OFF blok (naslov "OFF n"). Proba na scratchpadu (samo citanje izvora): klip 1920x1080p50
+mpeg2video 4:2:2, pcm_s24le 48 kHz mono, 2,0 s, timecode 19:14:48:00; naslovna slika provjerena (i dijakritici).
+Testovi `qnc-title-card` (2), `qnc-voice-clip` (2), `qnc-script`, conformance, release build. Uzivo kroz sucelje nije
+provjereno. Nije izvedeno: klip jos nije u katalogu projekta (player pusta samo klipove iz kataloga; ulazak ceka odluku
+korisnika jer Ingest Select i probe smije pokretati samo Ingest), ucitavanje tona snimljenog drugdje.

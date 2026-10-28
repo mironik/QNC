@@ -138,6 +138,18 @@ pub fn reading_seconds(text: &str, words_per_second: f64) -> f64 {
 
 type Read = Result<(Vec<Block>, Option<f64>), String>;
 
+/// Where a take goes and what its clip is: the voice-over folder of the project, its name
+/// without extension and the project picture.
+struct Take {
+    folder: std::path::PathBuf,
+    base: String,
+    stem: String,
+    project_dir: std::path::PathBuf,
+    width: u32,
+    height: u32,
+    fps: f64,
+}
+
 pub struct Script {
     view: ScriptView,
     blocks: Vec<Block>,
@@ -153,13 +165,13 @@ pub struct Script {
     /// The recording that runs, of which block.
     recorder: Option<(i64, qnc_voice_record::Recorder)>,
     /// A recording on its way to start, or a stopped one on its way into the script.
-    starting: Option<(i64, mpsc::Receiver<Result<(qnc_voice_record::Recorder, String), String>>)>,
-    voice_base: Option<String>,
+    starting: Option<(i64, mpsc::Receiver<Result<(qnc_voice_record::Recorder, Take), String>>)>,
+    take: Option<Take>,
 }
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: 0.0, recorder: None, starting: None, voice_base: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: 0.0, recorder: None, starting: None, take: None }
     }
 }
 
@@ -349,15 +361,16 @@ impl Script {
         };
         let (send, started) = mpsc::channel();
         let spawned = std::thread::Builder::new().name("qnc-script-record".into()).spawn(move || {
-            let start = || -> Result<(qnc_voice_record::Recorder, String), String> {
+            let start = || -> Result<(qnc_voice_record::Recorder, Take), String> {
                 let settings = locator.settings();
                 let project_dir = locator.reader().local_workspace_dir(settings).map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("script.voice_local_only").to_string())?;
                 let (folder, base) = settings.voice_location(&project_dir).map_err(|e| e.to_string())?;
                 std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+                let number = |key: &str| settings.video.get(key).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
                 let rate = settings.audio.get("sample_rate").and_then(serde_json::Value::as_u64).unwrap_or(0) as u32;
-                let fps = settings.video.get("fps").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
-                let name = format!("off_{id}_{}.wav", qnc_voice_record::file_stamp());
-                Ok((qnc_voice_record::Recorder::start(folder.join(&name), &project_dir, rate, fps, &setting)?, format!("{base}/{name}")))
+                let take = Take { stem: format!("off_{id}_{}", qnc_voice_record::file_stamp()), folder, base, project_dir, width: number("width") as u32, height: number("height") as u32, fps: number("fps") };
+                let recorder = qnc_voice_record::Recorder::start(take.folder.join(format!("{}.wav", take.stem)), &take.project_dir, rate, take.fps, &setting)?;
+                Ok((recorder, take))
             };
             let _ = send.send(start());
         });
@@ -369,10 +382,20 @@ impl Script {
     }
 
     /// Stops the recording of block `id` and puts it into the script.
+    /// The recording becomes a clip of the project at once (user 2026-10-28): the title card of
+    /// the OFF's text as its picture, the time it was recorded as its timecode.
     fn finish(&mut self, preview: &SourcePreview, id: i64, recorder: qnc_voice_record::Recorder) -> bool {
-        let uri = self.voice_base.take().unwrap_or_default();
+        let Some(take) = self.take.take() else { return false };
+        let text = self.blocks.iter().find(|b| b.id == id).map(|b| b.text.clone()).unwrap_or_default();
+        let number = self.blocks.iter().filter(|b| b.kind == BlockKind::Off).position(|b| b.id == id).map_or(0, |at| at + 1);
+        let heading = qnc_ui_text::fill("script.card_heading", &[("number", &number.to_string())]);
+        self.view.message = qnc_ui_text::text("script.making_clip").into();
         self.write(preview, move |target| {
             let recording = recorder.stop()?;
+            let out = take.folder.join(format!("{}.mxf", take.stem));
+            let clip = qnc_voice_clip::VoiceClip { sound: &recording.path, text: &text, heading: &heading, width: take.width, height: take.height, fps: take.fps, timecode: &recording.timecode, out: &out, project_dir: &take.project_dir };
+            qnc_voice_clip::make(&clip)?;
+            let uri = format!("{}/{}.mxf", take.base, take.stem);
             qnc_script_db::set_voice(target, id, uri, recording.seconds, recording.timecode).map(|_| None)
         })
     }
@@ -414,8 +437,8 @@ impl Script {
         if let Some((id, started)) = &self.starting {
             if let Ok(result) = started.try_recv() {
                 match result {
-                    Ok((recorder, uri)) => {
-                        self.voice_base = Some(uri);
+                    Ok((recorder, take)) => {
+                        self.take = Some(take);
                         self.recorder = Some((*id, recorder));
                         self.view.message = qnc_ui_text::text("script.recording").into();
                     }

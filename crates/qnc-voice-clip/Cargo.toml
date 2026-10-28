@@ -1,0 +1,13 @@
+[package]
+name = "qnc-voice-clip"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: a recorded voice-over (or sound brought from elsewhere) made into a clip of the project (user 2026-10-28) - the title card of its text as the picture, its sound, the time it was recorded as timecode - written by the ffmpeg of the decoder catalog into the project folder, so the Broadcast Player plays it like any clip; it knows no form, script or database"
+
+[dependencies]
+qnc-decoder-catalog = { workspace = true }
+qnc-title-card = { workspace = true }
+qnc-ui-text = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
