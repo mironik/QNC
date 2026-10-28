@@ -72,6 +72,20 @@ fn queued_clips_are_read_in_order_and_asking_a_clip_again_waits_it_again() {
 }
 
 #[test]
+fn transcribed_clips_are_listed_and_done_entries_leave_the_queue_failed_ones_stay() {
+    let (_dir, target) = project();
+    assert!(read_transcribed(&target).unwrap().is_empty(), "a project without transcripts lists none");
+    save(&target, transcript(0, 50, "Vidite")).unwrap();
+    save(&target, transcript(100, 200, "Dobar")).unwrap();
+    assert_eq!(read_transcribed(&target).unwrap(), ["c1"], "a clip once, however many ranges");
+    enqueue(&target, vec![asked("a", QueueQuality::Fast), asked("b", QueueQuality::Fast)]).unwrap();
+    set_queued(&target, "a", QueueState::Done, "", 100).unwrap();
+    set_queued(&target, "b", QueueState::Failed, "no sound", 0).unwrap();
+    clear_done(&target).unwrap();
+    assert_eq!(read_queue(&target).unwrap().iter().map(|q| q.clip_id.as_str()).collect::<Vec<_>>(), ["b"]);
+}
+
+#[test]
 fn a_newer_transcript_is_what_was_said_over_its_range() {
     let (_dir, target) = project();
     let mut whole = transcript(0, 1000, "staro");

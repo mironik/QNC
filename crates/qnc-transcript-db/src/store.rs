@@ -50,7 +50,23 @@ impl Store {
             Operation::ReadQuotes => self.read_quotes(),
             Operation::AddQuote(quote) => self.add_quote(quote),
             Operation::DeleteQuote { id } => self.delete_quote(*id),
+            Operation::ReadTranscribed if !self.schema_ready => Ok(Data::Clips(Vec::new())),
+            Operation::ReadTranscribed => self.read_transcribed(),
+            Operation::ClearDone => self.clear_done(),
         }
+    }
+
+    fn read_transcribed(&mut self) -> Result<Data> {
+        let mut statement = self.conn.prepare("SELECT DISTINCT clip_id FROM public_clip_transcripts ORDER BY clip_id").map_err(err)?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(0)).map_err(err)?;
+        Ok(Data::Clips(rows.collect::<std::result::Result<_, _>>().map_err(err)?))
+    }
+
+    fn clear_done(&mut self) -> Result<Data> {
+        let tx = qnc_db_broker::begin_write(&mut self.conn).map_err(err)?;
+        tx.execute("DELETE FROM transcript_queue WHERE state = 'done'", []).map_err(err)?;
+        tx.commit().map_err(err)?;
+        Ok(Data::Changed)
     }
 
     fn enqueue(&mut self, ranges: &[Queued]) -> Result<Data> {

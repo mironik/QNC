@@ -3652,6 +3652,7 @@ dependencies = [
  "qnc-media-thumbnail",
  "qnc-panel-focus",
  "qnc-pending-marks",
+ "qnc-pool-tabs",
  "qnc-prerender-launch",
  "qnc-program-segments",
  "qnc-program-waveform",
@@ -3727,6 +3728,7 @@ dependencies = [
  "qnc-desktop-theme",
  "qnc-keyboard-shortcut",
  "qnc-media-pool-head",
+ "qnc-pool-tabs",
  "qnc-segment-panel",
  "qnc-source-dock",
  "qnc-timeline",
@@ -5056,6 +5058,10 @@ version = "0.1.0"
 dependencies = [
  "eframe",
 ]
+
+[[package]]
+name = "qnc-pool-tabs"
+version = "0.1.0"
 
 [[package]]
 name = "qnc-pool-tabs-panel"

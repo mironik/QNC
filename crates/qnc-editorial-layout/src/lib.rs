@@ -306,7 +306,24 @@ pub struct EditorialMediaCard {
     pub empty_message: String,
     pub broll_empty_message: String,
     pub virtual_empty_message: String,
+    pub transcript_empty_message: String,
     pub loading_message: String,
+}
+
+impl EditorialMediaCard {
+    /// What an empty pool says on `tab`: reading, the tab's own text, the catalog's message, or
+    /// that there are no clips.
+    pub fn empty_message<'a>(&'a self, tab: qnc_pool_tabs::LibraryTab, loading: bool, catalog: &'a str) -> &'a str {
+        use qnc_pool_tabs::LibraryTab;
+        match tab {
+            _ if loading => &self.loading_message,
+            LibraryTab::Virtual => &self.virtual_empty_message,
+            LibraryTab::Broll => &self.broll_empty_message,
+            LibraryTab::Transcript => &self.transcript_empty_message,
+            _ if !catalog.is_empty() => catalog,
+            _ => &self.empty_message,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

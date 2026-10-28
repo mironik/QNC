@@ -46,6 +46,7 @@
     "empty_message": "@story.pool.empty",
     "broll_empty_message": "@story.pool.broll_empty",
     "virtual_empty_message": "@story.pool.subclip_empty",
+    "transcript_empty_message": "@story.pool.transcript_empty",
     "loading_message": "@story.pool.loading"
   },
   "pool_head": {
@@ -126,7 +127,21 @@
         "show_segment_tab": false,
         "show_cover_tab": true,
         "show_export_hires": false,
-        "show_quick_cover": false
+        "show_quick_cover": false,
+        "tabs_left": [
+          {
+            "label": "@pool.tab.all",
+            "action_id": "editorial_tab_all"
+          },
+          {
+            "label": "@pool.tab.subclip",
+            "action_id": "editorial_tab_virtual"
+          },
+          {
+            "label": "@pool.tab.transcript",
+            "action_id": "editorial_tab_transcript"
+          }
+        ]
       },
       "right_panel": "transcript_panel",
       "right_panel_tabs": [

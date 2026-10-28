@@ -101,9 +101,18 @@ pub struct TranscriptView {
     pub marks: Option<(u64, u64)>,
     /// The statements chosen (user 2026-10-26), in the order they were added.
     pub quotes: Vec<Quote>,
+    /// The clips that have a kept transcript (the pool's Transcript tab, user 2026-10-28).
+    pub transcribed: Arc<BTreeSet<String>>,
+    /// True on the poll the whole queue asked was transcribed: the Transcript tab opens.
+    pub all_done: bool,
 }
 
 impl TranscriptView {
+    /// The clips the pool shows: on the Transcript tab those with a kept transcript, else all.
+    pub fn pool_clips<'a>(&self, transcript_tab: bool, clips: &'a [ClipRow]) -> Vec<&'a ClipRow> {
+        clips.iter().filter(|clip| !transcript_tab || self.transcribed.contains(&clip.clip_id)).collect()
+    }
+
     /// Whether the switch `action_id` (Fast or Quality) is the one chosen.
     pub fn selected(&self, action_id: &str) -> bool {
         (action_id == FAST && self.fast) || (action_id == BEST && !self.fast)
@@ -138,6 +147,13 @@ fn said_between(lines: &[Line], from: u64, to: u64) -> String {
 }
 
 type Kept = Result<Vec<ClipTranscript>, String>;
+/// The queue, the statements and the transcribed clips, read together.
+type QueueRead = (Vec<Queued>, Vec<Quote>, Vec<String>);
+
+/// Whether something of the queue still waits or runs.
+fn pending(queue: &[Queued]) -> bool {
+    queue.iter().any(|q| matches!(q.state, QueueState::Waiting | QueueState::Running))
+}
 
 /// The clip being transcribed now and its lines heard so far.
 struct Running {
@@ -158,7 +174,7 @@ pub struct Transcript {
     runner: QueueRunner,
     running: Option<Running>,
     queue: Vec<Queued>,
-    queue_read: Option<mpsc::Receiver<Result<(Vec<Queued>, Vec<Quote>), String>>>,
+    queue_read: Option<mpsc::Receiver<Result<QueueRead, String>>>,
     /// A clip and IN/OUT to open on the source timeline (a statement chosen).
     source_request: Option<(String, u64, u64)>,
     queue_at: Option<Instant>,
@@ -329,6 +345,7 @@ impl Transcript {
     /// they changed. Returns whether the view changed.
     pub fn poll(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, clips: &mut [ClipRow]) -> bool {
         let before = self.view.clone();
+        self.view.all_done = false;
         self.names = clips.iter().map(|clip| (clip.clip_id.clone(), (clip.name.clone(), clip.duration_frames, clip.duration_seconds))).collect();
         self.ticks.retain(|clip| self.names.contains_key(clip));
         for clip in clips.iter_mut() {
@@ -347,8 +364,8 @@ impl Transcript {
             }
         }
         if let (Some(project), Some(locator)) = (project.as_ref(), preview.still_locator()) {
-            self.read_queue(project);
-            if self.queue.iter().any(|q| matches!(q.state, QueueState::Waiting | QueueState::Running)) {
+            self.read_queue(project, preview);
+            if pending(&self.queue) {
                 self.runner.ensure(&locator, project);
             }
         } else {
@@ -446,21 +463,30 @@ impl Transcript {
         }
     }
 
-    fn read_queue(&mut self, project: &ProjectDbTarget) {
-        if let Some(done) = &self.queue_read {
+    fn read_queue(&mut self, project: &ProjectDbTarget, preview: &SourcePreview) {
+        if let Some(done) = self.queue_read.take() {
             match done.try_recv() {
                 Ok(read) => {
                     match read {
-                        Ok((queue, quotes)) => {
+                        Ok((queue, quotes, transcribed)) => {
+                            // All that was asked is transcribed (user 2026-10-28): its list goes
+                            // and the Transcript tab opens; failed entries stay, with why.
+                            let finished = pending(&self.queue) && !pending(&queue) && queue.iter().any(|q| q.state == QueueState::Done);
                             self.queue = queue;
                             self.view.quotes = quotes;
+                            if self.view.transcribed.len() != transcribed.len() || !transcribed.iter().all(|c| self.view.transcribed.contains(c)) {
+                                self.view.transcribed = Arc::new(transcribed.into_iter().collect());
+                            }
+                            if finished {
+                                self.view.all_done = true;
+                                self.write(preview, qnc_transcript_db::clear_done);
+                            }
                         }
                         Err(error) => self.view.message = error,
                     }
-                    self.queue_read = None;
                 }
-                Err(mpsc::TryRecvError::Disconnected) => self.queue_read = None,
-                Err(mpsc::TryRecvError::Empty) => return,
+                Err(mpsc::TryRecvError::Disconnected) => {}
+                Err(mpsc::TryRecvError::Empty) => return self.queue_read = Some(done),
             }
         }
         if self.queue_at.is_some_and(|at| at.elapsed() < QUEUE_EVERY) {
@@ -468,7 +494,7 @@ impl Transcript {
         }
         let (send, done) = mpsc::channel();
         let target = project.clone();
-        if std::thread::Builder::new().name("qnc-transcript-queue-read".into()).spawn(move || _ = send.send(qnc_transcript_db::read_queue(&target).and_then(|queue| Ok((queue, qnc_transcript_db::read_quotes(&target)?))))).is_ok() {
+        if std::thread::Builder::new().name("qnc-transcript-queue-read".into()).spawn(move || _ = send.send(qnc_transcript_db::read_queue(&target).and_then(|queue| Ok((queue, qnc_transcript_db::read_quotes(&target)?, qnc_transcript_db::read_transcribed(&target)?))))).is_ok() {
             self.queue_read = Some(done);
             self.queue_at = Some(Instant::now());
         }
@@ -583,6 +609,23 @@ mod tests {
         let shown = lines(&kept, Some(((150, 350), &heard)));
         assert_eq!(shown.iter().map(|l| l.text.as_str()).collect::<Vec<_>>(), ["prva", "nova druga", "treca"]);
         assert_eq!(lines(&kept, None).len(), 3);
+    }
+
+    #[test]
+    fn the_transcript_tab_shows_only_the_transcribed_clips() {
+        let clips: Vec<ClipRow> = ["a", "b", "c"].iter().map(|id| ClipRow { clip_id: (*id).into(), ..ClipRow::default() }).collect();
+        let view = TranscriptView { transcribed: Arc::new(["b".to_string(), "c".to_string()].into_iter().collect()), ..TranscriptView::default() };
+        let ids = |shown: Vec<&ClipRow>| shown.iter().map(|c| c.clip_id.clone()).collect::<Vec<_>>();
+        assert_eq!(ids(view.pool_clips(true, &clips)), ["b", "c"]);
+        assert_eq!(ids(view.pool_clips(false, &clips)), ["a", "b", "c"], "the other tabs show all");
+    }
+
+    #[test]
+    fn the_whole_queue_is_done_only_when_nothing_waits_or_runs() {
+        let q = |state| Queued { clip_id: "a".into(), from_frame: 0, to_frame: 10, quality: QueueQuality::Fast, state, error: String::new(), took_ms: 0 };
+        assert!(pending(&[q(QueueState::Done), q(QueueState::Running)]));
+        assert!(pending(&[q(QueueState::Waiting)]));
+        assert!(!pending(&[q(QueueState::Done), q(QueueState::Failed)]));
     }
 
     #[test]

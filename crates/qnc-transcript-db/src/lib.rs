@@ -127,11 +127,16 @@ pub enum Operation {
     DeleteQuote { id: i64 },
     /// The statements, in the order they were added.
     ReadQuotes,
+    /// The clips that have a kept transcript (user 2026-10-28: the pool's Transcript tab).
+    ReadTranscribed,
+    /// The entries that are done leave the queue (user 2026-10-28: once all asked are
+    /// transcribed, their list goes); failed ones stay, with why.
+    ClearDone,
 }
 
 impl Operation {
     pub fn is_write(&self) -> bool {
-        matches!(self, Self::Save(_) | Self::Enqueue(_) | Self::SetQueued { .. } | Self::AddQuote(_) | Self::DeleteQuote { .. })
+        matches!(self, Self::Save(_) | Self::Enqueue(_) | Self::SetQueued { .. } | Self::AddQuote(_) | Self::DeleteQuote { .. } | Self::ClearDone)
     }
 }
 
@@ -141,6 +146,7 @@ pub enum Data {
     Transcripts(Vec<ClipTranscript>),
     Queue(Vec<Queued>),
     Quotes(Vec<Quote>),
+    Clips(Vec<String>),
     Changed,
 }
 
@@ -205,6 +211,21 @@ pub fn read_quotes(target: &ProjectDbTarget) -> Result<Vec<Quote>> {
 /// Adds `quote` to the statements of the project behind `target`.
 pub fn add_quote(target: &ProjectDbTarget, quote: Quote) -> Result<()> {
     write(target, Operation::AddQuote(quote))
+}
+
+/// The clips of the project behind `target` that have a kept transcript, by their id.
+pub fn read_transcribed(target: &ProjectDbTarget) -> Result<Vec<String>> {
+    let mut client = target.open(Access::ReadOnly, vec![TranscriptModule::factory()])?;
+    let answer = client.execute(MODULE_ID, encode(&Operation::ReadTranscribed)?)?;
+    match serde_json::from_value(answer).map_err(|e| e.to_string())? {
+        Data::Clips(clips) => Ok(clips),
+        _ => Err(qnc_ui_text::text("db.transcript_reply").into()),
+    }
+}
+
+/// The entries of the queue that are done leave it; failed ones stay.
+pub fn clear_done(target: &ProjectDbTarget) -> Result<()> {
+    write(target, Operation::ClearDone)
 }
 
 /// Takes statement `id` off the list.

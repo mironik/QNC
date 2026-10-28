@@ -1,0 +1,37 @@
+{
+  "module_id": "qnc.module.pool-tabs",
+  "module_name": "Pool tabs",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": [
+    "ui.pool.tabs"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-pool-tabs",
+  "input": "A catalog action of a pool tab.",
+  "output": "The pool tab it names (All, SubClip, B-roll, Segment, Transcript) and whether it lists shots.",
+  "specification": "User 2026-10-28: Media Assist Audio AI gets a Transcript tab of the transcribed clips; the tab model leaves the editorial application layer."
+}

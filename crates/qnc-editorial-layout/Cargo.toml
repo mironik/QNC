@@ -6,6 +6,7 @@ description = "QNC public component: validated model of the editorial layout con
 
 [dependencies]
 qnc-media-pool-head = { workspace = true }
+qnc-pool-tabs = { workspace = true }
 qnc-ui-text = { workspace = true }
 eframe = { workspace = true }
 qnc-board = { workspace = true }

@@ -95,25 +95,19 @@ fn pool(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &Edito
         save_failed: "",
     };
     // Virtual lists the shorts, B-roll the shots of the covers (v5 pool tabs).
-    let shot_tab = matches!(view.library_tab, LibraryTab::Virtual | LibraryTab::Broll);
+    let shot_tab = view.library_tab.lists_shots();
     let now = qnc_media_pool_panel::PoolNow {
         chosen_id: if shot_tab { view.chosen_shot_id.as_deref().unwrap_or("") } else { view.chosen_clip_id().unwrap_or("") },
         panel_focused: view.focus.panel == Panel::Pool,
         step: view.focus.pool_step,
-        empty_message: match view.library_tab {
-            _ if view.loading => &cards.loading_message,
-            LibraryTab::Virtual => &cards.virtual_empty_message,
-            LibraryTab::Broll => &cards.broll_empty_message,
-            _ if !view.message.is_empty() => &view.message,
-            _ => &cards.empty_message,
-        },
+        empty_message: cards.empty_message(view.library_tab, view.loading, &view.message),
         id_salt: "editorial_clip_grid",
     };
     let clicked = if shot_tab {
         let shots: Vec<_> = view.shorts.iter().filter(|shot| shot.b_roll == (view.library_tab == LibraryTab::Broll)).collect();
         qnc_media_pool_panel::show(ui, theme, &spec, &now, &shots)
     } else {
-        qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.clips.iter().collect::<Vec<_>>())
+        qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.focus.transcript.pool_clips(view.library_tab == LibraryTab::Transcript, &view.clips))
     };
     Some(match clicked? { CardGridAction::ToggleSelection(id) if composition.ticks_several && !shot_tab => EditorialIntent::Action(qnc_action_event::ActionEvent::key(qnc_transcript::MARK).with_target(id)), CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id) => if shot_tab { EditorialIntent::PreviewShort(id) } else { EditorialIntent::PreviewClip(id) } })
 }

@@ -4,28 +4,8 @@
 pub use qnc_source_preview::{MonitorFrame, PreviewView};
 pub use qnc_virtual_short_cards::VirtualShortCard as EditorialShort;
 
-/// Pool tab, as in v5: Virtual lists short shots only, B-roll the cover shots and
-/// Segment the program segments.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum LibraryTab {
-    #[default]
-    All,
-    Virtual,
-    Broll,
-    Segment,
-}
-
-impl LibraryTab {
-    pub fn from_action(action_id: &str) -> Option<Self> {
-        match action_id {
-            action_ids::EDITORIAL_TAB_ALL => Some(Self::All),
-            action_ids::EDITORIAL_TAB_VIRTUAL => Some(Self::Virtual),
-            action_ids::EDITORIAL_TAB_BROLL => Some(Self::Broll),
-            action_ids::EDITORIAL_TAB_SEGMENT => Some(Self::Segment),
-            _ => None,
-        }
-    }
-}
+/// The pool tab (piece `qnc-pool-tabs`).
+pub use qnc_pool_tabs::LibraryTab;
 
 /// One row of the clip list: the clip row every form shows (piece `qnc-clip-row`).
 pub use qnc_clip_row::ClipRow as EditorialClip;
@@ -109,10 +89,7 @@ impl EditorialIntent {
 }
 
 pub mod action_ids {
-    pub const EDITORIAL_TAB_ALL: &str = "editorial_tab_all";
-    pub const EDITORIAL_TAB_VIRTUAL: &str = "editorial_tab_virtual";
-    pub const EDITORIAL_TAB_BROLL: &str = "editorial_tab_broll";
-    pub const EDITORIAL_TAB_SEGMENT: &str = "editorial_tab_segment";
+    pub use qnc_pool_tabs::{ALL as EDITORIAL_TAB_ALL, BROLL as EDITORIAL_TAB_BROLL, SEGMENT as EDITORIAL_TAB_SEGMENT, VIRTUAL as EDITORIAL_TAB_VIRTUAL};
     pub const STEP_PREV_PART: &str = "step_prev_part";
     pub const STEP_NEXT_PART: &str = "step_next_part";
     pub const DELETE_PART: &str = "delete_part";

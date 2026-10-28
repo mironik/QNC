@@ -1,0 +1,7 @@
+[package]
+name = "qnc-pool-tabs"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public component: the editorial pool tabs (All, SubClip, B-roll, Segment, Transcript) and their catalog actions"
+
+[dependencies]

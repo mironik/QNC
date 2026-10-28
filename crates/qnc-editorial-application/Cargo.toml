@@ -24,6 +24,7 @@ qnc-content-artifacts = { workspace = true }
 qnc-prerender-launch = { workspace = true }
 qnc-wrap-session = { workspace = true }
 qnc-panel-focus = { workspace = true }
+qnc-pool-tabs = { workspace = true }
 qnc-source-timeline = { workspace = true }
 qnc-pending-marks = { workspace = true }
 qnc-trim-stills = { workspace = true }

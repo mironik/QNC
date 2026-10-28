@@ -6580,3 +6580,18 @@ pocetku `main` svih sedam aplikacija (`apps/*`) i programa `qnc-ingest-worker`, 
 `qnc-decoder-ffmpeg`, `qnc-format-sony`. Test `a_panic_line_names_the_program_thread_place_and_message`, conformance,
 release build (player i prerender s `libav`). Gradnja whispera s Vulkanom nije uspjela (build skripta `whisper-rs-sys`),
 pa uz aplikaciju ostaje njegova verzija od 26. 10. bez zapisa panica.
+Izvedeno 2026-10-28 (korisnik: "u AI MA u media poolu treba dodati tab Transcript u kojemu ce biti klipovi koji su
+transkriptirani... kad se zavrsi transkripcija svih automatski se otvara taj tab... briše se popis fajlova u desnom panelu";
+"korisnik manualno ako zeli moze to napraviti kad god pozeli"): grupa e (AI Media Assist) ima u poolu tabove All, SubClip i
+Transcript (`contracts/ui/editorial.layout.json` `tabs_left` grupe e). Transcript pokazuje uvezene klipove koji imaju
+spremljeni prijepis u bazi projekta (`qnc-transcript-db` `ReadTranscribed`, cita se uz red svake sekunde;
+`qnc-transcript` `TranscriptView.transcribed`, `pool_clips`). Kad red prijepisa koji je cekao ili radio vise nema nicega
+sto ceka ili radi, a nesto je gotovo, aplikacija sama otvara tab Transcript (`TranscriptView.all_done`, jednom) i gotovi
+klipovi izlaze iz reda (`qnc-transcript-db` `ClearDone`; neuspjeli ostaju s razlogom). Korisnik tab otvara i sam: klik
+ili Alt+T (nova akcija kataloga `editorial_tab_transcript`, QNC preset). Klik na klip u tabu otvara ga na previewu i
+njegov prijepis u desnom panelu; rez (dvoklik na rijec, I/O, srednja tipka) i Add SubClip / Shift+S rade kao i do sada.
+Nova kocka `crates/qnc-pool-tabs` (+ ugovor `contracts/modules/pool-tabs.module.json`): model tabova poola premjesten iz
+`qnc-editorial-application` (`LibraryTab`, s novim `Transcript`, `lists_shots`); prazna poruka po tabu u
+`qnc-editorial-layout` (`EditorialMediaCard::empty_message`, `transcript_empty_message`). C10 spusteno: Story/MA
+aplikacija 524 -> 504, ploca 100 -> 94. Testovi `qnc-pool-tabs`, `qnc-transcript-db` (popis prepisanih, brisanje gotovih),
+`qnc-transcript` (tab, kraj reda), `qnc-editorial-application`, `qnc-panel-focus`, conformance. Uzivo nije provjereno.

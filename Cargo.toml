@@ -185,6 +185,7 @@ members = [
     "crates/qnc-theme-styles",
     "crates/qnc-media-pool-panel",
     "crates/qnc-pool-tabs-panel",
+    "crates/qnc-pool-tabs",
     "crates/qnc-ingest-import-bar",
     "crates/qnc-form-host",
     "crates/qnc-pool-pointer",
@@ -441,6 +442,7 @@ qnc-clip-row = { path = "crates/qnc-clip-row" }
 qnc-theme-styles = { path = "crates/qnc-theme-styles" }
 qnc-media-pool-panel = { path = "crates/qnc-media-pool-panel" }
 qnc-pool-tabs-panel = { path = "crates/qnc-pool-tabs-panel" }
+qnc-pool-tabs = { path = "crates/qnc-pool-tabs" }
 qnc-ingest-import-bar = { path = "crates/qnc-ingest-import-bar" }
 qnc-form-host = { path = "crates/qnc-form-host" }
 qnc-pool-pointer = { path = "crates/qnc-pool-pointer" }
