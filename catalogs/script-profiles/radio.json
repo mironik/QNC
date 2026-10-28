@@ -1,0 +1,10 @@
+{
+  "profile_id": "radio",
+  "name": "@sp.radio",
+  "kinds": [
+    { "id": "intro", "label": "@sp.k.intro", "short": "@sp.s.intro", "role": "anchor", "counts": "anchor" },
+    { "id": "off", "label": "@sp.k.reporter_text", "short": "@sp.s.text", "role": "spoken", "counts": "story", "recorded": true },
+    { "id": "sot", "label": "@sp.k.insert", "short": "@sp.s.insert", "role": "clip", "counts": "story", "cues": true, "cue": "INS {n}" },
+    { "id": "outro", "label": "@sp.k.outro", "short": "@sp.s.outro", "role": "anchor", "counts": "anchor" }
+  ]
+}

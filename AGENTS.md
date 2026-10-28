@@ -6685,3 +6685,17 @@ mpeg2video 4:2:2, pcm_s24le 48 kHz mono, 2,0 s, timecode 19:14:48:00; naslovna s
 Testovi `qnc-title-card` (2), `qnc-voice-clip` (2), `qnc-script`, conformance, release build. Uzivo kroz sucelje nije
 provjereno. Nije izvedeno: klip jos nije u katalogu projekta (player pusta samo klipove iz kataloga; ulazak ceka odluku
 korisnika jer Ingest Select i probe smije pokretati samo Ingest), ucitavanje tona snimljenog drugdje.
+Izvedeno 2026-10-28 (korisnik: "aplikacija je zamisljena za opcu namjenu, taj dio treba biti programibilan, ne fiksiran";
+pregled: iNEWS nema propisan obrazac, prilog je story form (polja po redakciji) + tijelo + numerirani production cueovi i
+`*CG` upute, razmjena MOS protokolom `roStorySend`; plan u 5 tocaka: profil, vrste blokova iz profila, polja uz vrstu,
+izvoz kroz predloske, uredivanje profila; "da, kreni s tockom 1"): tocka 1. Nova kocka `crates/qnc-script-profile`
+(+ ugovor `contracts/modules/script-profile.module.json`): profil scenarija je podatak, ne kod. Profil ima vrste blokova
+(sifra koju baza cuva, naziv, kratka oznaka, uloga spoken/anchor/clip/note, trajanje story/anchor/none, snima li se,
+incue/outcue, oznaka numeriranog cuea s `{n}` kao iNEWS production cue, polja uz vrstu kao u obrascu priloga) i izbore
+polja. Pripremljeni profili u `catalogs/script-profiles` (nazivi su sifre rjecnika): `general_tv` (najava, OFF, SOT s
+potpisom ime/funkcija, stand-up, prirodni ton, odjava), `inews_mos` (On Camera, Take VO n, Take SOT n, `*CG` s predloskom i
+retcima, TAG), `radio`, `agency_online`; profili racunala u `data/script-profiles`, izbor u `data/script-profile.json`;
+pripremljeni se nikad ne prepisuje (kopija dobiva svoju sifru), profil koji se ne moze koristiti (krive sifre, sifra
+dvaput, snima se a nije spoken, note s trajanjem, polje s nepostojecim izborima) izostavlja se uz razlog. Sifre `off`,
+`sot`, `intro`, `outro` postojecih blokova su vrste profila koji ih imaju. Testovi `qnc-script-profile` (3), conformance.
+Nije izvedeno (tocke 2-5): baza i panel na vrstama iz profila, polja uz vrstu, izvoz kroz predloske, uredivanje profila.

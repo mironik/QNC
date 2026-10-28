@@ -1,0 +1,16 @@
+{
+  "profile_id": "general_tv",
+  "name": "@sp.general_tv",
+  "kinds": [
+    { "id": "intro", "label": "@sp.k.intro", "short": "@sp.s.intro", "role": "anchor", "counts": "anchor" },
+    { "id": "off", "label": "@sp.k.off", "short": "OFF", "role": "spoken", "counts": "story", "recorded": true, "cue": "OFF {n}" },
+    { "id": "sot", "label": "@sp.k.sot", "short": "SOT", "role": "clip", "counts": "story", "cues": true, "cue": "SOT {n}",
+      "fields": [
+        { "kind": "text", "label": "@sp.f.name", "id": "caption_name", "path": "caption_name" },
+        { "kind": "text", "label": "@sp.f.role", "id": "caption_role", "path": "caption_role" }
+      ] },
+    { "id": "standup", "label": "@sp.k.standup", "short": "SU", "role": "clip", "counts": "story", "cues": true, "cue": "SU {n}" },
+    { "id": "nat", "label": "@sp.k.nat", "short": "NAT", "role": "clip", "counts": "story" },
+    { "id": "outro", "label": "@sp.k.outro", "short": "@sp.s.outro", "role": "anchor", "counts": "anchor" }
+  ]
+}

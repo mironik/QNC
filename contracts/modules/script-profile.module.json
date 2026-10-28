@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.script-profile",
+  "module_name": "Script Profile",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["script.profile.read", "script.profile.write_computer"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.decode", "media.probe.full", "database.read", "database.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.broadcast-player-core"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-script-profile",
+  "input": "The QNC root: the profiles QNC brings (catalogs/script-profiles), the ones of this computer (data/script-profiles) and the one chosen (data/script-profile.json); a profile to keep.",
+  "output": "The script profiles that can be used (kinds of blocks with role, length rule, recording, incue/outcue, cue label and fields), the chosen one; a profile kept on this computer (a prepared one is never written over); a profile that cannot be used is named with why.",
+  "specification": "User 2026-10-28: the form of the script is programmable, not fixed (AGENTS.md)."
+}

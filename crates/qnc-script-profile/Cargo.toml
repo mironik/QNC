@@ -1,0 +1,16 @@
+[package]
+name = "qnc-script-profile"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: the script profiles (user 2026-10-28: the form of the script is programmable, not fixed) - the kinds of blocks a newsroom writes, their rules (read and recorded, in the length of the story or the anchor's, a clip with incue and outcue, a note), their cue labels and fields; the ones QNC brings and the ones made on this computer, and which one is chosen; it knows no form or database"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-newsroom-sheet = { workspace = true }
+qnc-settings-form = { workspace = true }
+qnc-ui-text = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

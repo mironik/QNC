@@ -5583,6 +5583,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-script-profile"
+version = "0.1.0"
+dependencies = [
+ "qnc-dev-diagnostics",
+ "qnc-newsroom-sheet",
+ "qnc-settings-form",
+ "qnc-ui-text",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "qnc-segment-panel"
 version = "0.1.0"
 dependencies = [

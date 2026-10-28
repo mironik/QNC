@@ -1,0 +1,21 @@
+{
+  "profile_id": "inews_mos",
+  "name": "@sp.inews_mos",
+  "kinds": [
+    { "id": "intro", "label": "@sp.k.intro", "short": "ON CAM", "role": "anchor", "counts": "anchor", "cue": "On Camera" },
+    { "id": "off", "label": "@sp.k.off", "short": "VO", "role": "spoken", "counts": "story", "recorded": true, "cue": "Take VO {n}" },
+    { "id": "sot", "label": "@sp.k.sot", "short": "SOT", "role": "clip", "counts": "story", "cues": true, "cue": "Take SOT {n}",
+      "fields": [
+        { "kind": "text", "label": "@sp.f.name", "id": "caption_name", "path": "caption_name" },
+        { "kind": "text", "label": "@sp.f.role", "id": "caption_role", "path": "caption_role" }
+      ] },
+    { "id": "cg", "label": "@sp.k.cg", "short": "CG", "role": "note", "counts": "none", "cue": "*CG {template}",
+      "fields": [
+        { "kind": "choice", "label": "@sp.f.template", "id": "cg_template", "path": "cg_template", "options": "cg_templates", "default": "2line" },
+        { "kind": "text", "label": "@sp.f.line1", "id": "line1", "path": "line1" },
+        { "kind": "text", "label": "@sp.f.line2", "id": "line2", "path": "line2" }
+      ] },
+    { "id": "outro", "label": "@sp.k.outro", "short": "TAG", "role": "anchor", "counts": "anchor", "cue": "On Camera" }
+  ],
+  "options": { "cg_templates": [["1line", "1line"], ["2line", "2line"], ["locator", "locator"]] }
+}

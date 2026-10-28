@@ -1,0 +1,14 @@
+{
+  "profile_id": "agency_online",
+  "name": "@sp.agency_online",
+  "kinds": [
+    { "id": "intro", "label": "@sp.k.lead", "short": "LEAD", "role": "anchor", "counts": "none" },
+    { "id": "off", "label": "@sp.k.off", "short": "VO", "role": "spoken", "counts": "story", "recorded": true },
+    { "id": "sot", "label": "@sp.k.sot", "short": "SOT", "role": "clip", "counts": "story", "cues": true,
+      "fields": [
+        { "kind": "text", "label": "@sp.f.name", "id": "caption_name", "path": "caption_name" },
+        { "kind": "text", "label": "@sp.f.role", "id": "caption_role", "path": "caption_role" }
+      ] },
+    { "id": "nat", "label": "@sp.k.nat", "short": "NAT", "role": "clip", "counts": "story" }
+  ]
+}
