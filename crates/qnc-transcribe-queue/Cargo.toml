@@ -12,3 +12,4 @@ qnc-playback-activity = { workspace = true }
 qnc-still-locator = { workspace = true }
 qnc-transcribe-run = { workspace = true }
 qnc-transcript-db = { workspace = true }
+qnc-worker-wake = { workspace = true }

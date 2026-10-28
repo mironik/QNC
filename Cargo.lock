@@ -6108,6 +6108,7 @@ dependencies = [
  "qnc-still-locator",
  "qnc-transcribe-run",
  "qnc-transcript-db",
+ "qnc-worker-wake",
 ]
 
 [[package]]

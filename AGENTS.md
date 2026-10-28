@@ -6607,3 +6607,9 @@ drzi uzetu oznaku. Sada SubClip ceka samo Sync/B-roll koji radi ili ceka Enter (
 `qnc-short-save` u player log pise zasto SubClip nije spremljen i sto je spremljeno. Primjer
 `qnc-virtual-shots/examples/shorts.rs` (samo citanje) ispisuje SubClipove aktivnog projekta. Testovi (`qnc-pool-tabs`,
 test Virtual taba prilagoden novom pravilu), conformance. Uzivo nije provjereno.
+Popravak 2026-10-28 (korisnik: "neka Video AI krene cim prijepis zavrsi"): log: zadnji prijepis gotov u 12:27:32, analiza
+kadrova krenula tek u 12:34:10, jer pozadinskog radnika nitko nije probudio (analiza je krenula tek kad se radnik pokrenuo iz
+drugog razloga). `qnc-transcribe-queue`: kad u redu nema vise posla, izvrsitelj pusti najam `transcribe_lease` i probudi
+radnika projekta (`qnc-worker-wake`; radnik koji vec radi i ceka najam krene odmah), ishod ide u player log. Izmjereno
+(Parakeet, 120 s govora Mironik 2002 iz WAV-a, samo citanje): 1 nit 0,86 jezgre, 4,2x stvarnog vremena; 2 niti (katalog
+racunala) 1,9 jezgre, vrh 2,6, 8,1x; 4 niti 3,6 jezgre, 8,6x. Conformance. Uzivo nije provjereno.

@@ -116,7 +116,12 @@ fn run(locator: &StillLocator, db: &ProjectDbTarget, cancel: &AtomicBool, send: 
             Err(error) => return log(&format!("transcribe-queue read: {error}")),
         };
         // A clip left running by a run that died waits again; this runner holds the lease.
-        let Some(next) = queue.into_iter().find(|q| matches!(q.state, QueueState::Waiting | QueueState::Running)) else { return };
+        let Some(next) = queue.into_iter().find(|q| matches!(q.state, QueueState::Waiting | QueueState::Running)) else {
+            // The queue is done: the lease goes now and the background worker is woken, so the
+            // shot analysis that waited for the card starts at once (user 2026-10-28).
+            drop(lease);
+            return wake_worker(locator);
+        };
         if let Err(error) = qnc_transcript_db::set_queued(db, &next.clip_id, QueueState::Running, "", 0) {
             return log(&format!("transcribe-queue mark {}: {error}", next.clip_id));
         }
@@ -156,6 +161,20 @@ fn run(locator: &StillLocator, db: &ProjectDbTarget, cancel: &AtomicBool, send: 
         log(&format!("transcribe-queue {} {}..{} {:?} {:?} ms={} {error}", next.clip_id, next.from_frame, next.to_frame, next.quality, state, started.elapsed().as_millis()));
         let _ = qnc_transcript_db::set_queued(db, &next.clip_id, state, &error, started.elapsed().as_millis() as u64);
         let _ = send.send(Heard::Finished { clip_id: next.clip_id, result: kept });
+    }
+}
+
+/// Wakes the background worker of this project (piece `qnc-worker-wake`).
+fn wake_worker(locator: &StillLocator) {
+    let Some(root) = qnc_dev_diagnostics::resolve_qnc_root() else {
+        return log("transcribe-queue done; no QNC root to wake the worker from");
+    };
+    let woken = qnc_content_store::ContentTarget::for_project(locator.reader(), locator.settings())
+        .map_err(|e| e.to_string())
+        .and_then(|target| qnc_worker_wake::wake(&root, &target));
+    match woken {
+        Ok(()) => log("transcribe-queue done; background worker woken"),
+        Err(error) => log(&format!("transcribe-queue done; background worker not woken: {error}")),
     }
 }
 
