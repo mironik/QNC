@@ -427,6 +427,7 @@ impl ApplicationHandler for NativeHost {
     }
 }
 fn main() -> Result<()> {
+    qnc_dev_diagnostics::log_panics("qnc-player-runner");
     let process_start = Instant::now();
     // Playback before the desktop: when the processor is full the desktop may skip a paint,
     // sound and pictures may not wait (live 2026-10-08: the Story desktop took more than a

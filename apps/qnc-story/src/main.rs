@@ -1,6 +1,7 @@
 const GROUP: &str = "o";
 
 fn main() -> eframe::Result<()> {
+    qnc_dev_diagnostics::log_panics("qnc-story");
     if std::env::args().any(|arg| arg == "--check-contracts") {
         match qnc_editorial_desktop::check_contracts_message(GROUP) {
             Ok(message) => {

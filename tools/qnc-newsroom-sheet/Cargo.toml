@@ -1,0 +1,21 @@
+[package]
+name = "qnc-newsroom-sheet-tool"
+version = "0.1.0"
+edition = "2021"
+description = "QNC standalone story sheet: an administrator chooses, changes or makes the story sheet of this computer; with an active project it fills that project's sheet and keeps it in the project database"
+
+[[bin]]
+name = "qnc-newsroom-sheet"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-active-project-read = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-keyboard-shortcut = { workspace = true }
+qnc-newsroom-sheet = { workspace = true }
+qnc-newsroom-sheet-db = { workspace = true }
+qnc-ui-text = { workspace = true }
+serde_json = { workspace = true }

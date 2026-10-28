@@ -27,6 +27,7 @@ use qnc_work_settings::SettingsReader;
 type Result<T> = std::result::Result<T, String>;
 
 fn main() {
+    qnc_dev_diagnostics::log_panics("qnc-export");
     match run() {
         Ok(path) => println!("{}", path.display()),
         Err(error) => {
@@ -226,7 +227,9 @@ fn deliver(
         let joined = qnc_unit_join::join(&files, sound, rule, &ffmpeg, &out, &picture, &start_timecode)?;
         let lane = |name: &str, lane: &qnc_unit_join::LaneOutcome| {
             let measured = lane.measured_lufs.map_or("silence".into(), |lufs| format!("{lufs:.1} LUFS"));
-            format!("{name} {measured}, {:.1} dBTP, gain {:+.1} dB", lane.true_peak_dbtp, lane.gain_db)
+            let written = lane.written_lufs.map_or("silence".into(), |lufs| format!("{lufs:.1} LUFS"));
+            let limiter = if lane.limited { ", limited" } else { "" };
+            format!("{name} {measured}, {:.1} dBTP, gain {:+.1} dB{limiter} -> {written}, {:.1} dBTP", lane.true_peak_dbtp, lane.gain_db, lane.written_dbtp)
         };
         let line = format!(
             "{suffix}: {} units ({} from the prerender), {:.1} s, {}; {}",

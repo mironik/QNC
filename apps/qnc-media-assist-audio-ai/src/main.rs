@@ -1,6 +1,7 @@
 const GROUP: &str = "e";
 
 fn main() -> eframe::Result<()> {
+    qnc_dev_diagnostics::log_panics("qnc-media-assist-audio-ai");
     if std::env::args().any(|arg| arg == "--check-contracts") {
         match qnc_editorial_desktop::check_contracts_message(GROUP) {
             Ok(message) => {
@@ -17,11 +18,11 @@ fn main() -> eframe::Result<()> {
     let root = qnc_editorial_desktop::locate_qnc_root()
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
     let app = qnc_editorial_desktop::EditorialApp::new(GROUP, root)
-        .unwrap_or_else(|error| panic!("failed to create QNC Media Assist Audio AI: {error}"));
+        .unwrap_or_else(|error| panic!("failed to create QNC AI Media Assist: {error}"));
     let options = eframe::NativeOptions {
         renderer: eframe::Renderer::Wgpu,
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_title("QNC Media Assist Audio AI")
+            .with_title("QNC AI Media Assist")
             .with_inner_size([1280.0, 760.0])
             .with_min_inner_size([1100.0, 700.0])
             .with_maximized(true),
@@ -29,7 +30,7 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "QNC Media Assist Audio AI",
+        "QNC AI Media Assist",
         options,
         Box::new(|_| Ok(Box::new(app))),
     )

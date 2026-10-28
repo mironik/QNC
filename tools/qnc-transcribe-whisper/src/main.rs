@@ -10,6 +10,7 @@ use qnc_transcribe_jobs::Backend;
 mod engine;
 
 fn main() {
+    qnc_dev_diagnostics::log_panics("qnc-transcribe-whisper");
     #[cfg(feature = "whisper")]
     let result = {
         let mut engine = engine::Whisper::default();

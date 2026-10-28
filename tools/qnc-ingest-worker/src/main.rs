@@ -12,6 +12,7 @@ use std::{
 };
 
 fn main() -> ExitCode {
+    qnc_dev_diagnostics::log_panics("qnc-ingest-worker");
     let Some(root) = root_argument() else {
         eprintln!("Upotreba: qnc-ingest-worker --root <QNC korijen>");
         return ExitCode::from(2);
@@ -224,6 +225,9 @@ fn run_once(root: &Path) -> Result<bool, String> {
         // get its poster at Uvezi (user 2026-10-18).
         if !closed.load(std::sync::atomic::Ordering::Relaxed) {
             make_posters(root, &config, &lease, &cancel);
+            // The shots after the filmstrips and waves (user 2026-10-27: Video AI, a job of
+            // its own, lower than the player).
+            make_shots(root, &config, &lease, &cancel);
         }
         artifacts.and(import).map(|()| true)
     })
@@ -339,4 +343,41 @@ fn root_argument() -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Shot analysis of the clips not analysed yet, by its block (`qnc-shot-analysis`); it waits
+/// while the player plays and takes the clip a preview has open first.
+fn make_shots(
+    root: &Path,
+    config: &qnc_ingest_select::selection_config::SelectionConfig,
+    lease: &qnc_playback_activity::Lease,
+    cancel: &std::sync::atomic::AtomicBool,
+) {
+    let local_media = |uri: &str| {
+        let reference = qnc_source_reader::SourceReference::from_uri(uri).ok()?;
+        let source = config.sources.iter().find(|source| source.location.uri == reference.source_uri())?;
+        source.local_media_path(uri).ok().flatten()
+    };
+    let result = (|| {
+        let project = qnc_shot_analysis::ShotProject::active(root)?;
+        let active = qnc_active_project_read::ActiveProjectReader::from_root(root).map_err(|e| e.to_string())?;
+        let snapshot = active.read().map_err(|e| e.to_string())?;
+        let target = qnc_content_store::ContentTarget::for_project(active.settings_reader(), &snapshot.settings)?;
+        let level = qnc_playback_activity::playback_level(target.clone());
+        // It also waits while a transcription the user asked for runs: both read the same card
+        // (live 2026-10-27: the transcription read crawled behind the shot analysis).
+        let transcribing = || qnc_playback_activity::is_fresh(&target, qnc_transcribe_queue::LEASE, qnc_playback_activity::WORKER_FRESH_SECONDS);
+        let player_plays = || level() == qnc_playback_activity::PlaybackLevel::Playing || transcribing();
+        let wanted = || qnc_playback_activity::read(&target, qnc_playback_activity::PLAYBACK_CLIP);
+        let pace = qnc_shot_analysis::Pace { player_plays: &player_plays, wanted: &wanted, cancel };
+        qnc_shot_analysis::analyse_missing(&project, &local_media, Some(lease.write_lease()), &pace)
+    })();
+    match result {
+        Ok(0) => {}
+        Ok(made) => eprintln!("kadrovi analizirani: {made}"),
+        Err(error) => {
+            eprintln!("analiza kadrova nije uspjela: {error}");
+            qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("shot-analysis failed error={error}"));
+        }
+    }
 }

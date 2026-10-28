@@ -3,6 +3,7 @@ use std::{path::PathBuf, process};
 use eframe::egui;
 
 fn main() -> eframe::Result<()> {
+    qnc_dev_diagnostics::log_panics("qnc-project");
     if std::env::args().any(|arg| arg == "--check-contracts") {
         let message = qnc_project_desktop::check_contracts_message().unwrap_or_else(|error| {
             eprintln!("qnc-project contract error: {error}");

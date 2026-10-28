@@ -43,6 +43,7 @@ impl DecoderJobs for Ffmpeg {
 }
 
 fn main() {
+    qnc_dev_diagnostics::log_panics("qnc-decoder-ffmpeg");
     if let Err(error) = qnc_decoder_jobs::serve(&Ffmpeg, "qnc.decoder.ffmpeg", env!("CARGO_PKG_VERSION")) {
         eprintln!("{error}");
         std::process::exit(1);

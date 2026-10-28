@@ -586,6 +586,33 @@ pub fn log_line(stream: DiagnosticsStream, message: impl AsRef<str>) {
     let _ = file.write_all(line.as_bytes());
 }
 
+/// Writes every panic of this process into the player log (program, thread, place, message and
+/// backtrace) before the usual report on stderr, whether diagnostics are on or not: a program
+/// started from a window has no stderr, so a panic left no trace (live 2026-10-28).
+pub fn log_panics(program: &'static str) {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        log_line(DiagnosticsStream::Player, panic_line(program, info, &std::backtrace::Backtrace::force_capture()));
+        previous(info);
+    }));
+}
+
+fn panic_line(program: &str, info: &std::panic::PanicHookInfo<'_>, backtrace: &std::backtrace::Backtrace) -> String {
+    let thread = std::thread::current();
+    let message = info
+        .payload()
+        .downcast_ref::<&str>()
+        .map(|text| text.to_string())
+        .or_else(|| info.payload().downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "(no message)".into());
+    let place = info.location().map(|at| format!("{}:{}:{}", at.file(), at.line(), at.column())).unwrap_or_default();
+    format!(
+        "panic program={program} pid={} thread={} at={place} message={message}\n{backtrace}",
+        std::process::id(),
+        thread.name().unwrap_or("unnamed"),
+    )
+}
+
 pub fn recent_lines_from_root(
     root: &Path,
     stream: DiagnosticsStream,
@@ -746,6 +773,27 @@ pub use block_time::timed_block;
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn a_panic_line_names_the_program_thread_place_and_message() {
+        let caught = std::sync::Arc::new(Mutex::new(None));
+        let into = caught.clone();
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            *into.lock().unwrap() = Some(panic_line("qnc-test", info, &std::backtrace::Backtrace::disabled()));
+        }));
+        let _ = std::thread::Builder::new()
+            .name("probe".into())
+            .spawn(|| panic!("broke at frame {}", 42))
+            .unwrap()
+            .join();
+        std::panic::set_hook(previous);
+        let line = caught.lock().unwrap().clone().expect("the hook saw the panic");
+        assert!(line.starts_with("panic program=qnc-test pid="), "{line}");
+        assert!(line.contains("thread=probe"), "{line}");
+        assert!(line.contains("at=crates") && line.contains("lib.rs:"), "{line}");
+        assert!(line.contains("message=broke at frame 42"), "{line}");
+    }
 
     #[test]
     fn diagnostic_checks_have_unique_ids() {

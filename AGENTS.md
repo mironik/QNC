@@ -6570,3 +6570,13 @@ komade reda za WAV. Na zvuku kartice (samo citanje): komad sada pocinje na 2:30,
 osmisljen je poprilicno ambiciozno...". Prazno 0:00-0:18 i 1:26-2:33 nije greska: tamo nema govora (korisnik: live
 javljanje, novinar je sutio dok je iz studija isla izjava). Test
 `a_piece_whose_last_seconds_are_all_speech_ends_at_the_pause_before_them`, conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-28 (korisnik: "da, dodaj zapis panica u log"; aplikacija se ugasila u 10:56:16 bez traga u
+logu; uzrok je bilo azuriranje aplikacije Claude, koja je ugasila QNC pokrenut iz njezine sesije, ne pad): otkljucani
+`crates/qnc-dev-diagnostics` i ulazi programa. `qnc-dev-diagnostics` `log_panics(program)`: svaki panic procesa upisuje
+se u `player.log` (program, pid, nit, mjesto u kodu, poruka, backtrace) prije uobicajenog ispisa na stderr, i kad je
+dijagnostika iskljucena; program pokrenut iz prozora nema stderr, pa panic prije nije ostavljao trag. Poziva se na
+pocetku `main` svih sedam aplikacija (`apps/*`) i programa `qnc-ingest-worker`, `qnc-prerender`, `qnc-export`,
+`qnc-player-runner`, `qnc-program-output-host`, `qnc-transcribe-parakeet`, `qnc-transcribe-whisper`,
+`qnc-decoder-ffmpeg`, `qnc-format-sony`. Test `a_panic_line_names_the_program_thread_place_and_message`, conformance,
+release build (player i prerender s `libav`). Gradnja whispera s Vulkanom nije uspjela (build skripta `whisper-rs-sys`),
+pa uz aplikaciju ostaje njegova verzija od 26. 10. bez zapisa panica.

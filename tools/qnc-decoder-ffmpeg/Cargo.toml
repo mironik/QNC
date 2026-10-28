@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC decoder plug-in: the decoder jobs besides playback (contract qnc.decoder-jobs 1) done by the ffmpeg executable the decoder catalog registers, as its own program"
 
 [dependencies]
+qnc-dev-diagnostics = { workspace = true }
 qnc-decoder-jobs = { workspace = true }
 qnc-ffmpeg-decode = { workspace = true }
 qnc-frame-timebase = { workspace = true }

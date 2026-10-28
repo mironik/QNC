@@ -36,6 +36,7 @@ type Result<T> = std::result::Result<T, String>;
 use qnc_player_clip_content::PlayerClipContent as PlayerContent;
 
 fn main() {
+    qnc_dev_diagnostics::log_panics("qnc-prerender");
     if let Err(error) = run() {
         eprintln!("qnc-prerender: {error}");
         // Woken in the background its output goes nowhere: the stop is in the diagnostics.

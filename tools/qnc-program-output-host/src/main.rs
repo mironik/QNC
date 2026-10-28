@@ -355,6 +355,7 @@ impl ApplicationHandler for Host {
 }
 
 fn main() -> Result<(), String> {
+    qnc_dev_diagnostics::log_panics("qnc-program-output-host");
     let screen = args()?;
     let asked = Arc::new(Mutex::new(Asked::default()));
     // The desktop's lines; the end of stdin is the end of the desktop.

@@ -7,6 +7,7 @@ use eframe::egui;
 use qnc_shell_desktop_api::EmbeddedAppFactory;
 
 fn main() -> eframe::Result<()> {
+    qnc_dev_diagnostics::log_panics("qnc-app");
     let layout = qnc_desktop::ShellLayoutContract::load_embedded().unwrap_or_else(|error| {
         eprintln!("qnc-app shell contract error: {error}");
         process::exit(1);

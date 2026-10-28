@@ -1,6 +1,7 @@
 use std::env;
 
 fn main() -> eframe::Result<()> {
+    qnc_dev_diagnostics::log_panics("qnc-ingest");
     if env::args().any(|arg| arg == "--check-contracts") {
         match qnc_ingest_desktop::check_contracts_message() {
             Ok(message) => {

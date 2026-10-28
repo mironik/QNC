@@ -22,3 +22,5 @@ qnc-record-completion = { workspace = true }
 qnc-ingest-select = { workspace = true }
 qnc-source-reader = { workspace = true }
 qnc-work-settings = { workspace = true }
+qnc-shot-analysis = { workspace = true }
+qnc-transcribe-queue = { workspace = true }

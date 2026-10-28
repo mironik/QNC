@@ -401,14 +401,9 @@ fn validate_project_layout_reference(root: &Path) -> CheckResult {
             if layout["board"]["left_ratio"] != 0.31 {
                 report.error("contracts/ui/project.layout.json: board.left_ratio must be 0.31 (qnc_v4 reference)".to_string());
             }
-            let expected = [
-                "TemplatePicker",
-                "ProjectCreate",
-                "AiSettings",
-                "ProjectsRoot",
-                "ExportDirectory",
-                "TemplateActions",
-            ];
+            // User 2026-10-27: the template, then New project (the story sheet over the form
+            // takes the name and story data); the technical slots show only under Advanced.
+            let expected = ["TemplatePicker", "ProjectCreate"];
             let actual = layout["pts_slots"]["fixed_order"].as_array().map(|order| {
                 order
                     .iter()
@@ -1914,6 +1909,8 @@ fn is_public_db_owner_path(relative: &str) -> bool {
         "crates/qnc-prerender-db/",
         "crates/qnc-clip-sound/",
         "crates/qnc-transcript-db/",
+        "crates/qnc-newsroom-sheet-db/",
+        "crates/qnc-shot-db/",
         "crates/qnc-project-store/",
         "crates/qnc-project-close/",
         "crates/qnc-camera-patterns/",
@@ -2195,6 +2192,7 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
     collect_rs_files(&project_store_root.join("src"), &mut files);
     collect_rs_files(&root.join("crates").join("qnc-project-blocks").join("src"), &mut files);
     collect_rs_files(&root.join("crates").join("qnc-project-session").join("src"), &mut files);
+    collect_rs_files(&root.join("crates").join("qnc-location-field").join("src"), &mut files);
     collect_rs_files(
         &root
             .join("crates")
@@ -2224,36 +2222,20 @@ fn scan_project_app_boundary(root: &Path) -> CheckResult {
         if relative == "crates/qnc-project-application/src/project_component.rs" {
             has_project_component = true;
         }
-        if relative == "crates/qnc-project-blocks/src/location_browser.rs"
-            && contents.contains("LocationBrowserInput")
-            && contents.contains("LocationSourceKind")
-            && contents.contains("BrowserState")
-        {
+        // Audit 2026-10-27: the location fields of the Project form are the public piece
+        // `qnc-location-field` (its browser with Computer/LAN/Internet and Select/Cancel).
+        if relative == "crates/qnc-project-blocks/src/settings.rs" && contents.contains("qnc_location_field::show_browser") {
             has_project_location_browser = true;
         }
-        if relative == "crates/qnc-project-session/src/lib.rs"
+        if relative == "crates/qnc-location-field/src/lib.rs"
             && contents.contains("source.computer")
             && contents.contains("LAN")
             && contents.contains("Internet")
         {
             has_project_location_kinds = true;
         }
-        if relative == "crates/qnc-project-blocks/src/location_browser.rs" {
-            for forbidden in ["confirm_label", "\"Odustani\"", "\"U redu\""] {
-                if contents.contains(forbidden) {
-                    report.error(format!(
-                        "crates/qnc-project-blocks/src/location_browser.rs: confirm/cancel action bar must stay outside browser component, found '{forbidden}'"
-                    ));
-                }
-            }
-        }
-        if relative == "crates/qnc-project-blocks/src/location_browser.rs"
-            && contents.contains("clean_location_path")
-        {
-            report.error(
-                "crates/qnc-project-blocks/src/location_browser.rs: Project UI must use qnc-dir-browser display state instead of private path cleanup"
-                    .to_string(),
-            );
+        if relative.starts_with("crates/qnc-project-blocks/") && contents.contains("clean_location_path") {
+            report.error(format!("{relative}: Project UI must use qnc-dir-browser display state instead of private path cleanup"));
         }
         if relative == "crates/qnc-project-application/src/project_component.rs" {
             for forbidden in [

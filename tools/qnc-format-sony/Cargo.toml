@@ -5,6 +5,7 @@ edition = "2021"
 description = "QNC record-format plug-in: the Sony MediaProfile record format (MEDIAPRO.XML index with NonRealTimeMeta sidecars) as its own program"
 
 [dependencies]
+qnc-dev-diagnostics = { workspace = true }
 qnc-record-format-plugin = { workspace = true }
 qnc-sony-metadata = { workspace = true }
 

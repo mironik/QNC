@@ -9,6 +9,7 @@ name = "qnc-app"
 path = "src/main.rs"
 
 [dependencies]
+qnc-dev-diagnostics = { workspace = true }
 qnc-decoder-catalog = { workspace = true }
 eframe = { workspace = true }
 qnc-app-registry = { workspace = true }

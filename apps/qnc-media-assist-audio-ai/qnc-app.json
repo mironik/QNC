@@ -1,7 +1,7 @@
 {
   "application_id": "qnc.media-assist-audio-ai",
   "tab_id": "media_assist_audio_ai",
-  "label": "MA Audio AI",
+  "label": "AI Media Assist",
   "enabled": true,
   "system": true,
   "removable": false,

@@ -1,0 +1,13 @@
+[package]
+name = "qnc-transcribe-parakeet"
+version = "0.1.0"
+edition = "2021"
+description = "QNC transcription plug-in: speech to text with NVIDIA Parakeet TDT through sherpa-onnx on the processor (contract qnc.transcribe 1), as its own program; the sherpa-onnx library is loaded from beside the program"
+
+[dependencies]
+qnc-dev-diagnostics = { workspace = true }
+qnc-transcribe-jobs = { workspace = true }
+libloading = "0.8"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }

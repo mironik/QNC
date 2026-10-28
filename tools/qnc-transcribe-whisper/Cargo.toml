@@ -11,5 +11,6 @@ whisper = ["dep:whisper-rs"]
 vulkan = ["whisper", "whisper-rs/vulkan"]
 
 [dependencies]
+qnc-dev-diagnostics = { workspace = true }
 qnc-transcribe-jobs = { workspace = true }
 whisper-rs = { version = "0.16", optional = true }

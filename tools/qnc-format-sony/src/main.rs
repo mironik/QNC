@@ -2,6 +2,7 @@
 //! The application starts it, gives it texts and references, and reads its answers on stdout.
 
 fn main() {
+    qnc_dev_diagnostics::log_panics("qnc-format-sony");
     let served = qnc_record_format_plugin::serve(&qnc_sony_metadata::SonyMediaProfile, "qnc.format.sony-mediaprofile", env!("CARGO_PKG_VERSION"));
     if let Err(error) = served {
         eprintln!("{error}");
