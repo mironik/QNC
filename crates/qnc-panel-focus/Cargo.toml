@@ -24,5 +24,6 @@ qnc-keyframe-nav = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-wrap-session = { workspace = true }
 qnc-transcript = { workspace = true }
+qnc-side-pieces = { workspace = true }
 qnc-clip-shots = { workspace = true }
 qnc-script = { workspace = true }

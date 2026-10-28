@@ -4,50 +4,14 @@
 //! this piece draws them in a grid and writes what changed into the settings draft. It
 //! knows no application and no meaning of a field; the owner writes the draft.
 
-use std::collections::BTreeMap;
 
 use eframe::egui::{self, Color32, RichText, Vec2};
 use qnc_settings_path::{number_string, path_string, set_path, set_string_path};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Number, Value};
 
-/// Named choices of the schema: `(stored value, shown label)`.
-pub type OptionSets = BTreeMap<String, Vec<(String, String)>>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum FieldKind {
-    /// One of the named choices; stored as text.
-    Choice,
-    /// A decimal number, typed or one of the named choices.
-    Number,
-    /// A whole number, typed or one of the named choices.
-    Integer,
-    /// Typed text, stored as it is typed.
-    Text,
-    /// A length typed as `m:ss` (or whole seconds), stored as whole seconds; 0 is none.
-    Duration,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FieldSpec {
-    pub kind: FieldKind,
-    pub label: String,
-    /// The widget id (unique on the page).
-    pub id: String,
-    /// Dotted path in the settings, e.g. `input.mode`.
-    pub path: String,
-    /// The named choices (none for a typed number).
-    #[serde(default)]
-    pub options: Option<String>,
-    /// The value shown when the settings have none.
-    #[serde(default)]
-    pub default: String,
-    /// Grey text in an empty typed field.
-    #[serde(default)]
-    pub hint: String,
-}
+/// What a field is lives in the data piece `qnc-field-spec` (this piece only draws it).
+pub use qnc_field_spec::{FieldKind, FieldSpec, OptionSets};
 
 /// A titled group of fields with its own named choices, read from a layout contract.
 #[derive(Debug, Clone, Deserialize)]

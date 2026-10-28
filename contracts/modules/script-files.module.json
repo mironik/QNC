@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.script-files",
+  "module_name": "Script Files",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["script.export.files"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.decode", "database.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.broadcast-player-core"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-script-files",
+  "input": "The script as qnc-script-export takes it, the project's settings on this computer and its story sheet.",
+  "output": "The three forms of the script (clean text, A/V HTML, MOS roStorySend) in the export folder of the project; the file of the A/V script.",
+  "specification": "Audit 2026-10-28 of the script pieces (AGENTS.md)."
+}

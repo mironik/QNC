@@ -46,19 +46,22 @@ pub struct FocusLayout {
     pub order: Vec<Panel>,
     pub tabs: Vec<String>,
     pub buttons: Vec<String>,
+    /// The kinds of the right panels the form has (its panel and its tabs): only their pieces
+    /// are made.
+    pub right_panels: Vec<String>,
 }
 
 impl FocusLayout {
-    pub fn new((order, tabs, buttons): (Vec<&str>, Vec<&str>, Vec<&str>)) -> Self {
+    pub fn new((order, tabs, buttons, right_panels): (Vec<&str>, Vec<&str>, Vec<&str>, Vec<&str>)) -> Self {
         let owned = |names: Vec<&str>| names.into_iter().map(str::to_string).collect();
-        Self { order: order.into_iter().filter_map(Panel::from_name).collect(), tabs: owned(tabs), buttons: owned(buttons) }
+        Self { order: order.into_iter().filter_map(Panel::from_name).collect(), tabs: owned(tabs), buttons: owned(buttons), right_panels: owned(right_panels) }
     }
 }
 
 impl Default for FocusLayout {
     /// The walk without a layout: pool, source timeline, segments.
     fn default() -> Self {
-        Self { order: vec![Panel::Pool, Panel::SourceTimeline, Panel::Segments], tabs: Vec::new(), buttons: Vec::new() }
+        Self { order: vec![Panel::Pool, Panel::SourceTimeline, Panel::Segments], tabs: Vec::new(), buttons: Vec::new(), right_panels: Vec::new() }
     }
 }
 
@@ -75,11 +78,11 @@ pub struct FocusView {
     pub button: Option<String>,
     pub pool_step: Option<(PoolStep, u64)>,
     /// The transcript of the clip on the preview.
-    pub transcript: qnc_transcript::TranscriptView,
+    pub transcript: std::sync::Arc<qnc_transcript::TranscriptView>,
     /// The shots of the clip on the preview (Video AI).
-    pub shots: qnc_clip_shots::ShotsView,
+    pub shots: std::sync::Arc<qnc_clip_shots::ShotsView>,
     /// The script of the story (Media Assist Audio).
-    pub script: qnc_script::ScriptView,
+    pub script: std::sync::Arc<qnc_script::ScriptView>,
 }
 
 impl FocusView {

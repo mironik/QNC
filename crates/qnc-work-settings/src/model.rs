@@ -171,6 +171,28 @@ impl WorkSettings {
             })
     }
 
+    /// The sample rate of the project's sound (`audio.sample_rate`); a missing or unusable
+    /// value is a controlled error, never a guess.
+    pub fn audio_sample_rate(&self) -> Result<u32, ReadError> {
+        self.audio
+            .get("sample_rate")
+            .and_then(Value::as_u64)
+            .and_then(|value| u32::try_from(value).ok())
+            .filter(|value| (8_000..=192_000).contains(value))
+            .ok_or_else(|| ReadError::new("audio_sample_rate", "The database holds no valid audio.sample_rate."))
+    }
+
+    /// The project's picture (`video.width`, `video.height`, `video.fps`); a missing or unusable
+    /// value is a controlled error, never a guess.
+    pub fn video_picture(&self) -> Result<(u32, u32, f64), ReadError> {
+        let whole = |key: &str| self.video.get(key).and_then(Value::as_u64).and_then(|value| u32::try_from(value).ok()).filter(|value| (16..=16_384).contains(value));
+        let fps = self.video.get("fps").and_then(Value::as_f64).filter(|fps| (1.0..=300.0).contains(fps));
+        match (whole("width"), whole("height"), fps) {
+            (Some(width), Some(height), Some(fps)) => Ok((width, height, fps)),
+            _ => Err(ReadError::new("video_picture", "The database holds no valid video.width, video.height and video.fps.")),
+        }
+    }
+
     /// Frames of the crossfade on every A2 cut (user 2026-10-21); a project without it is
     /// completed when Project opens it, a missing value is a controlled error.
     pub fn audio_crossfade_frames(&self) -> Result<u16, ReadError> {

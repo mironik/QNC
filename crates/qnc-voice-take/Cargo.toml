@@ -1,0 +1,11 @@
+[package]
+name = "qnc-voice-take"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: one take of a script block from the microphone of this computer, from start to a clip of the project (the recording at the project's sample rate into the voice folder of the project, then a clip with the title card of the block's text and the timecode of the recording); it writes no database"
+
+[dependencies]
+qnc-still-locator = { workspace = true }
+qnc-ui-text = { workspace = true }
+qnc-voice-clip = { workspace = true }
+qnc-voice-record = { workspace = true }

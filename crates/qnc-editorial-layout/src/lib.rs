@@ -91,12 +91,15 @@ impl EditorialContracts {
 
     /// The Tab walk of this group (user 2026-10-13: it belongs to the form): its panels in
     /// order, the action ids of its pool tabs, the action ids of its source dock buttons
-    /// left to right as they are drawn.
-    pub fn focus_names(&self) -> (Vec<&str>, Vec<&str>, Vec<&str>) {
-        let order = self.composition().tab_order.iter().map(String::as_str).collect();
+    /// left to right as they are drawn, and the kinds of its right panels (the panel and its
+    /// tabs: only their pieces are made).
+    pub fn focus_names(&self) -> (Vec<&str>, Vec<&str>, Vec<&str>, Vec<&str>) {
+        let composition = self.composition();
+        let order = composition.tab_order.iter().map(String::as_str).collect();
         let tabs = self.pool_tabs().iter().filter_map(TransportCommand::action_id).collect();
-        let buttons = self.composition().source_dock.actions_rtl.iter().rev().filter_map(TransportCommand::action_id).collect();
-        (order, tabs, buttons)
+        let buttons = composition.source_dock.actions_rtl.iter().rev().filter_map(TransportCommand::action_id).collect();
+        let right = std::iter::once(composition.right_panel.as_str()).chain(composition.right_panel_tabs.iter().map(|tab| tab.panel.as_str())).collect();
+        (order, tabs, buttons, right)
     }
 
     /// The gap between the pool tabs.

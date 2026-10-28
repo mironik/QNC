@@ -11,12 +11,8 @@ use qnc_action_event::ActionEvent;
 use qnc_editorial_layout::RightPanelTab;
 
 pub const MODULE_ID: &str = "qnc.module.right-panel";
-pub const SEGMENT_PANEL: &str = "segment_panel";
-pub const TRANSCRIPT_PANEL: &str = "transcript_panel";
-/// The Video AI panel: the shots of the clip on the preview.
-pub const VIDEO_AI_PANEL: &str = "video_ai_panel";
-/// The script of the story (Media Assist Audio, user 2026-10-28).
-pub const SCRIPT_PANEL: &str = "script_panel";
+/// The kinds of right panels are the side pieces' (`qnc-side-pieces`): their pieces are made per kind.
+pub use qnc_side_pieces::{SCRIPT_PANEL, SEGMENT_PANEL, TRANSCRIPT_PANEL, VIDEO_AI_PANEL};
 
 /// What the right panels show.
 pub struct Shown<'a> {

@@ -69,12 +69,9 @@ pub struct PanelFocus {
     /// The catalog action a key on the pool tabs or a dock button stands for; the
     /// caller runs it as its own action (`take_pick`).
     pick: Option<String>,
-    /// The transcript of the clip on the preview (piece `qnc-transcript`, Media Assist Audio AI).
-    transcript: qnc_transcript::Transcript,
-    /// The shots of the clip on the preview (piece `qnc-clip-shots`, Video AI).
-    shots: qnc_clip_shots::ClipShots,
-    /// The script of the story (piece `qnc-script`, Media Assist Audio).
-    script: qnc_script::Script,
+    /// The pieces of the right panels this form has (module `qnc-side-pieces`): the transcript,
+    /// the Video AI shots, the script; none for a form without them.
+    side: qnc_side_pieces::SidePieces,
 }
 
 /// The walk of a layout: its panels, the pool tabs row and the source dock buttons row.
@@ -92,7 +89,7 @@ impl PanelFocus {
     /// The focus of a form with its Tab walk; it starts on the first panel of the walk.
     pub fn with_layout(layout: FocusLayout) -> Self {
         let panel = layout.order.first().copied().unwrap_or_default();
-        Self { panel, walk: walk_of(&layout), ..Self::default() }
+        Self { panel, walk: walk_of(&layout), side: qnc_side_pieces::SidePieces::for_panels(layout.right_panels.iter().map(String::as_str)), ..Self::default() }
     }
 
     /// The action a key on the pool tabs or a dock button stood for, once.
@@ -113,7 +110,7 @@ impl PanelFocus {
     /// A clip and IN/OUT a chosen statement of the transcript or a usable part of the shot
     /// analysis opens (once).
     pub fn take_source_request(&mut self) -> Option<(String, u64, u64)> {
-        self.transcript.take_source_request().or_else(|| self.shots.take_source_request()).or_else(|| self.script.take_source_request())
+        self.side.take_source_request()
     }
 
     pub fn source_timeline_mut(&mut self) -> &mut qnc_source_timeline::SourceTimeline {
@@ -158,21 +155,20 @@ impl PanelFocus {
             }
         }
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
-        self.transcript.poll(preview, timeline, clips); // the pool's ticks are the transcript's
-        self.shots.poll(preview);
-        self.script.poll(preview, timeline, clips);
-        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: self.transcript.view().clone(), shots: self.shots.view().clone(), script: self.script.view().clone() }
+        self.side.poll(preview, timeline, clips);
+        let side = self.side.views().clone();
+        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: side.transcript, shots: side.shots, script: side.script }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).
     pub fn busy(&self) -> bool {
-        self.keyframes.busy() || self.transcript.busy() || self.script.busy()
+        self.keyframes.busy() || self.side.busy()
     }
 
     /// Whether a transcription of this process runs in the background (the caller repaints
     /// now and then for its progress).
     pub fn working(&self) -> bool {
-        self.transcript.working()
+        self.side.working()
     }
 
     /// A clip chosen in the media pool: the Source view; the keyboard stays on the pool

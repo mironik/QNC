@@ -16,6 +16,7 @@ fn layout() -> FocusLayout {
         vec!["pool_tabs", "pool", "source_timeline", "source_buttons", "segments"],
         vec!["editorial_tab_all", "editorial_tab_virtual", "editorial_tab_broll"],
         vec!["save_virtual_shot", "add_ton_segment", "add_off_segment"],
+        vec!["segment_panel"],
     ))
 }
 

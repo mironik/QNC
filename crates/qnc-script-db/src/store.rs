@@ -228,7 +228,7 @@ impl Store {
                 return Err(qnc_ui_text::fill("db.script_unknown_field", &[("field", code), ("kind", &kind.label)]));
             };
             if let Some(set) = &spec.options {
-                if spec.kind == qnc_settings_form::FieldKind::Choice && !options.get(set).is_some_and(|choices| choices.iter().any(|(id, _)| id == value)) {
+                if spec.kind == qnc_field_spec::FieldKind::Choice && !options.get(set).is_some_and(|choices| choices.iter().any(|(id, _)| id == value)) {
                     return Err(qnc_ui_text::fill("db.script_bad_choice", &[("field", &spec.label), ("value", value)]));
                 }
             }

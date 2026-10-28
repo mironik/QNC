@@ -332,3 +332,17 @@ fn transcription_is_off_in_croatian_on_the_first_channel_until_the_project_says_
     settings.audio["transcribe_channel"] = json!("CH0");
     assert!(settings.transcribe_channel().is_err());
 }
+
+#[test]
+fn the_sound_and_picture_of_the_project_are_read_as_saved_and_nothing_is_guessed() {
+    let root = fixture();
+    let reader = SettingsReader::local(root.path().join("data/qnc-projects.db"));
+    let mut settings = reader.read().unwrap();
+    assert_eq!(settings.audio_sample_rate().unwrap(), 48_000);
+    let (width, height, _) = settings.video_picture().unwrap();
+    assert_eq!((width, height), (1920, 1080));
+    settings.audio.as_object_mut().unwrap().remove("sample_rate");
+    assert!(settings.audio_sample_rate().is_err());
+    settings.video["fps"] = json!(0);
+    assert!(settings.video_picture().is_err());
+}

@@ -21,6 +21,7 @@ fn tab_walks_the_panels_of_the_form_and_keys_on_tabs_and_buttons_become_their_ac
         vec!["pool_tabs", "pool", "source_timeline", "source_buttons", "segments"],
         vec!["editorial_tab_all", "editorial_tab_virtual"],
         vec!["save_virtual_shot", "add_ton_segment"],
+        vec!["segment_panel"],
     ));
     let mut focus = PanelFocus::with_layout(layout);
     let (mut preview, mut wrap, mut segments) = (SourcePreview::default(), WrapSession::new(), ProgramSegments::new());

@@ -6,6 +6,7 @@ description = "QNC public piece: settings fields drawn from a schema (a layout c
 
 [dependencies]
 eframe = { workspace = true }
+qnc-field-spec = { workspace = true }
 qnc-settings-path = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

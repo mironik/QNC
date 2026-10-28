@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.side-pieces",
+  "module_name": "Side Pieces",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["side.transcript", "side.shots", "side.script"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner", "qnc.module.broadcast-player-core"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-side-pieces",
+  "input": "The kinds of right panels a form's layout has, the preview, the source timeline and the pool's clips.",
+  "output": "Only the pieces of those panels (transcript, Video AI shots, script), their polls, actions and views as shared snapshots renewed when a poll changed them; a form without those panels reads and writes nothing for them.",
+  "specification": "Audit 2026-10-28 of the script pieces (AGENTS.md)."
+}

@@ -18,5 +18,6 @@ qnc-pool-tabs-panel = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-clip-shots = { workspace = true }
 qnc-shot-panel = { workspace = true }
+qnc-side-pieces = { workspace = true }
 qnc-script = { workspace = true }
 qnc-script-panel = { workspace = true }

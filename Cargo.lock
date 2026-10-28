@@ -3848,6 +3848,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "qnc-field-spec"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "qnc-filmstrip"
 version = "0.1.0"
 dependencies = [
@@ -4791,6 +4798,7 @@ dependencies = [
  "eframe",
  "qnc-desktop-theme",
  "qnc-dev-diagnostics",
+ "qnc-field-spec",
  "qnc-settings-form",
  "qnc-theme-styles",
  "qnc-ui-kit",
@@ -4852,6 +4860,7 @@ dependencies = [
  "qnc-program-segments",
  "qnc-script",
  "qnc-segments-keys",
+ "qnc-side-pieces",
  "qnc-source-mark-focus",
  "qnc-source-panel",
  "qnc-source-preview",
@@ -5514,6 +5523,7 @@ dependencies = [
  "qnc-script-panel",
  "qnc-segment-panel",
  "qnc-shot-panel",
+ "qnc-side-pieces",
  "qnc-source-timecode",
  "qnc-transcript",
  "qnc-transcript-panel",
@@ -5547,6 +5557,7 @@ dependencies = [
  "qnc-newsroom-sheet-db",
  "qnc-script-db",
  "qnc-script-export",
+ "qnc-script-files",
  "qnc-script-profile",
  "qnc-source-preview",
  "qnc-source-timecode",
@@ -5554,9 +5565,8 @@ dependencies = [
  "qnc-timeline",
  "qnc-transcript",
  "qnc-ui-text",
- "qnc-voice-clip",
  "qnc-voice-record",
- "qnc-work-settings",
+ "qnc-voice-take",
  "serde",
  "serde_json",
 ]
@@ -5567,9 +5577,9 @@ version = "0.1.0"
 dependencies = [
  "qnc-active-project-read",
  "qnc-db-broker",
+ "qnc-field-spec",
  "qnc-newsroom-sheet-db",
  "qnc-script-profile",
- "qnc-settings-form",
  "qnc-ui-text",
  "rusqlite",
  "serde",
@@ -5582,6 +5592,18 @@ name = "qnc-script-export"
 version = "0.1.0"
 dependencies = [
  "qnc-script-profile",
+]
+
+[[package]]
+name = "qnc-script-files"
+version = "0.1.0"
+dependencies = [
+ "qnc-db-broker",
+ "qnc-newsroom-sheet-db",
+ "qnc-script-export",
+ "qnc-still-locator",
+ "qnc-ui-text",
+ "qnc-work-settings",
 ]
 
 [[package]]
@@ -5604,8 +5626,7 @@ name = "qnc-script-profile"
 version = "0.1.0"
 dependencies = [
  "qnc-dev-diagnostics",
- "qnc-newsroom-sheet",
- "qnc-settings-form",
+ "qnc-field-spec",
  "qnc-ui-text",
  "serde",
  "serde_json",
@@ -5662,6 +5683,7 @@ name = "qnc-settings-form"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "qnc-field-spec",
  "qnc-settings-path",
  "serde",
  "serde_json",
@@ -5789,6 +5811,19 @@ dependencies = [
  "qnc-virtual-shots",
  "qnc-work-settings",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-side-pieces"
+version = "0.1.0"
+dependencies = [
+ "qnc-clip-row",
+ "qnc-clip-shots",
+ "qnc-script",
+ "qnc-source-preview",
+ "qnc-source-timecode",
+ "qnc-timeline",
+ "qnc-transcript",
 ]
 
 [[package]]
@@ -6438,6 +6473,16 @@ dependencies = [
  "qnc-ui-text",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-voice-take"
+version = "0.1.0"
+dependencies = [
+ "qnc-still-locator",
+ "qnc-ui-text",
+ "qnc-voice-clip",
+ "qnc-voice-record",
 ]
 
 [[package]]

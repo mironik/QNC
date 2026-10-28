@@ -5,7 +5,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use qnc_settings_form::{FieldKind, FieldSpec, OptionSets};
+use qnc_settings_form::{FieldSpec, OptionSets};
 use serde::{Deserialize, Serialize};
 
 /// One sheet: its fields in order, their choices, and whether it may be changed.
@@ -130,36 +130,8 @@ fn chosen_file(root: &Path) -> PathBuf {
     qnc_dev_diagnostics::config_path(root).with_file_name("story-sheet.json")
 }
 
-/// A field or sheet code: lower-case letters, digits and `_`, starting with a letter.
-pub fn valid_code(code: &str) -> bool {
-    code.chars().next().is_some_and(|first| first.is_ascii_lowercase())
-        && code.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-}
-
-/// A code made of a typed name: letters and digits kept (accents dropped), the rest `_`.
-pub fn code_of(name: &str) -> String {
-    let mut code = String::new();
-    for c in name.trim().to_lowercase().chars() {
-        let plain = match c {
-            'č' | 'ć' => 'c',
-            'đ' => 'd',
-            'š' => 's',
-            'ž' => 'z',
-            c => c,
-        };
-        if plain.is_ascii_alphanumeric() {
-            code.push(plain);
-        } else if !code.ends_with('_') && !code.is_empty() {
-            code.push('_');
-        }
-    }
-    let code = code.trim_end_matches('_').to_string();
-    if code.chars().next().is_some_and(|first| first.is_ascii_lowercase()) {
-        code
-    } else {
-        format!("f_{code}")
-    }
-}
+/// The codes of fields and sheets are the data piece's (`qnc-field-spec`).
+pub use qnc_field_spec::{code_of, new_field_in, valid_code};
 
 fn free_id(list: &[(SheetSpec, Origin)], base: &str) -> String {
     let taken = |id: &str| list.iter().any(|(sheet, _)| sheet.sheet_id == id);
@@ -172,12 +144,4 @@ fn free_id(list: &[(SheetSpec, Origin)], base: &str) -> String {
 /// A new typed field of a sheet, its code made of its name and free in the sheet.
 pub fn new_field(sheet: &SheetSpec, label: &str) -> FieldSpec {
     new_field_in(&sheet.fields, label)
-}
-
-/// A new text field named `label` among `fields`, its code free among them.
-pub fn new_field_in(fields: &[FieldSpec], label: &str) -> FieldSpec {
-    let base = code_of(label);
-    let taken = |code: &str| fields.iter().any(|field| field.path == code);
-    let code = if taken(&base) { (2..).map(|n| format!("{base}_{n}")).find(|code| !taken(code)).unwrap_or_default() } else { base };
-    FieldSpec { kind: FieldKind::Text, label: label.trim().to_string(), id: code.clone(), path: code, options: None, default: String::new(), hint: String::new() }
 }

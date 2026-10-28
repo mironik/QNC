@@ -17,22 +17,9 @@ impl PanelFocus {
         let event = event.into();
         let action_id = event.action_id.as_str();
         let panel = self.panel;
-        // The transcript's own actions (Media Assist Audio AI, user 2026-10-26).
-        if let Some(done) = self.transcript.act(action_id, event.value, event.target.as_deref(), pieces.0, pieces.3, self.source.view().timecode.as_ref()) {
+        // The own actions of the right panel pieces this form has (transcript, script, shots).
+        if let Some(done) = self.side.act(action_id, event.value, event.target.as_deref(), pieces.0, pieces.3, self.source.view().timecode.as_ref()) {
             return Some(done);
-        }
-        // The script's own actions (Media Assist Audio, user 2026-10-28).
-        if let Some(done) = self.script.act(action_id, event.target.as_deref(), (pieces.0, pieces.3, self.source.view().timecode.as_ref(), self.transcript.view())) {
-            return Some(done);
-        }
-        // A click on a shot of the Video AI panel puts the playhead on its start (user 2026-10-27).
-        if action_id == qnc_clip_shots::CUE_SHOT {
-            let frame = event.target.as_deref().and_then(|frame| frame.parse::<u64>().ok());
-            return Some(frame.is_some_and(|frame| pieces.0.cue(frame)));
-        }
-        // A click on a usable part opens it with its IN/OUT, for Add SubClip (user 2026-10-27).
-        if action_id == qnc_clip_shots::OPEN_PART {
-            return Some(self.shots.open_part(event.target.as_deref()));
         }
         // A double click on a word is a cut (user 2026-10-26): IN at its start, OUT at the end
         // of a word after the first cut; the source timeline keeps the pair as for scissors.

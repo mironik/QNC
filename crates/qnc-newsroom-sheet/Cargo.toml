@@ -9,6 +9,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 eframe = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
+qnc-field-spec = { workspace = true }
 qnc-settings-form = { workspace = true }
 qnc-theme-styles = { workspace = true }
 qnc-ui-kit = { workspace = true }

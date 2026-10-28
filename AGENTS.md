@@ -6758,3 +6758,20 @@ Samostalni program `tools/qnc-newsroom-sheet` ima tabove Story sheet | Script pr
 profil i upisuje izabrani kroz `qnc-script-db::set_profile` (vlasnik tablice). Rjecnik `sp.*`, `sheet.tab_*`. Testovi
 `qnc-script-profile-editor` (1), `qnc-newsroom-sheet`, `qnc-script`, `qnc-script-db`, conformance, release build. Uzivo
 nije provjereno.
+Otkljucano i izvedeno 2026-10-28 (dubinski audit kocki scenarija; korisnik: "provjeri je li sve u kockama"; "da, otkljucaj i
+kreni s 1-4"): (1) Desni panel: transkript, Video AI i scenarij drzao je `qnc-panel-focus` u svakoj formi, pa su Story i MA
+forme bez tih panela citale bazu za njih i pri prvom citanju upisivale profil scenarija u projekt. Nova kocka
+`crates/qnc-side-pieces` (+ ugovor): pravi samo dijelove panela koje raspored forme ima (`right_panel` i
+`right_panel_tabs`; scenarij donosi i transkript zbog izjava), njihove pollove, radnje i prikaze kao dijeljene snimke
+(`Arc`, obnovljene samo kad se poll promijenio); konstante vrsta panela su njezine (`qnc-right-panel` ih ponovno izvozi).
+`qnc-panel-focus` drzi samo `side` umjesto tri dijela (`FocusLayout.right_panels`, `qnc-editorial-layout::focus_names`
+daje i vrste desnih panela; zlatna tablica tipki nepromijenjena). (2) Opis polja i sifre izasli su iz UI kocki u novu
+podatkovnu kocku `crates/qnc-field-spec` (+ ugovor; `FieldSpec`, `FieldKind`, `OptionSets`, `valid_code`, `code_of`,
+`new_field_in`); `qnc-settings-form` i `qnc-newsroom-sheet` ih ponovno izvoze, a `qnc-script-db` i `qnc-script-profile`
+vise ne ovise o eframe/egui. (3) `qnc-script` (899 redaka u jednoj datoteci) podijeljen: snimanje (mikrofon, take, klip
+snimke) je nova kocka `crates/qnc-voice-take`, pisanje izvoza u mapu exporta nova kocka `crates/qnc-script-files` (obje s
+ugovorima), prikaz u `view.rs`, citanje u `read.rs`, testovi u `tests.rs`. (4) Postavke se citaju strogo:
+`qnc-work-settings` `audio_sample_rate`, `video_picture` (test); take bez njih je kontrolirana greska, a projekt bez
+brzine citanja kaze razlog u panelu umjesto tihog 0:00. Testovi dotaknutih kocki, conformance, release build. Uzivo nije
+provjereno. Ostaje iz audita (5-8): MOS oznake su u kodu, kopije provjere mape projekta i mjeraca razine, polja bloka
+mimo `qnc-settings-form`, provjera raspona klip bloka prema katalogu, program obrasca pise u bazu na niti sucelja.

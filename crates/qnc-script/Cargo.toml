@@ -12,14 +12,14 @@ qnc-script-db = { workspace = true }
 qnc-script-profile = { workspace = true }
 qnc-script-export = { workspace = true }
 qnc-status-line = { workspace = true }
-qnc-work-settings = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-transcript = { workspace = true }
 qnc-ui-text = { workspace = true }
 qnc-voice-record = { workspace = true }
-qnc-voice-clip = { workspace = true }
+qnc-voice-take = { workspace = true }
+qnc-script-files = { workspace = true }
 qnc-dev-diagnostics = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

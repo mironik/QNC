@@ -1,0 +1,13 @@
+[package]
+name = "qnc-script-files"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: the script of a story written out into the export folder of the project on this computer, in the three forms of qnc-script-export (clean text, the two-column A/V script, a MOS story), with the project's name and its story sheet"
+
+[dependencies]
+qnc-db-broker = { workspace = true }
+qnc-newsroom-sheet-db = { workspace = true }
+qnc-script-export = { workspace = true }
+qnc-still-locator = { workspace = true }
+qnc-ui-text = { workspace = true }
+qnc-work-settings = { workspace = true }

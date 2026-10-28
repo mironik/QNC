@@ -13,21 +13,27 @@
 //! when its script is first read.
 //!
 //! The script is the project database's (`qnc-script-db`); the editor's text is only a draft
-//! on the screen until it is added or replaced.
+//! on the screen until it is added or replaced. A take is the piece `qnc-voice-take`'s, writing
+//! the script out the piece `qnc-script-files`'; what the panel shows is `view`.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     sync::mpsc,
     time::{Duration, Instant},
 };
 
 use qnc_clip_row::ClipRow;
 use qnc_db_broker::ProjectDbTarget;
-pub use qnc_script_db::{Block, Counts, KindSpec, Role, ScriptProfile};
 use qnc_source_preview::SourcePreview;
 use qnc_source_timecode::SourceTimecode;
 use qnc_timeline::TimelineProjection;
 use qnc_transcript::TranscriptView;
+use qnc_voice_take::{Recorded, Take};
+
+mod read;
+mod view;
+
+pub use view::*;
 
 pub const MODULE_ID: &str = "qnc.module.script";
 /// The panel the script is shown on.
@@ -72,289 +78,36 @@ pub const OPEN_EXPORT: &str = "script_open_export";
 /// How often the script is read again (another process may change it).
 const READ_EVERY: Duration = Duration::from_secs(2);
 
-/// One block as the panel shows it.
-#[derive(Debug, Clone, PartialEq)]
-pub struct BlockRow {
-    pub block: Block,
-    /// Its length in seconds: a clip's own, a recording's own, text's from its words.
-    pub seconds: f64,
-    /// Its mark: the numbered cue of its kind (`OFF 2`, `Take SOT 1`), else the kind's short mark.
-    pub mark: String,
-    /// What its kind is (none when the project's profile does not have it).
-    pub role: Option<Role>,
-    /// Whether its kind is recorded from the microphone.
-    pub recorded: bool,
-    /// Whether its kind shows its first and last words (in-cue, out-cue).
-    pub cues: bool,
-    /// Whether it is in the length of the story.
-    pub in_story: bool,
-}
-
-impl BlockRow {
-    pub fn is_clip(&self) -> bool {
-        self.role == Some(Role::Clip)
-    }
-}
-
-/// What the script panel shows.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ScriptView {
-    pub blocks: Vec<BlockRow>,
-    /// The script profile of the project (none until it is read).
-    pub profile: Option<ScriptProfile>,
-    /// The chosen block: new blocks go after it.
-    pub selected: Option<i64>,
-    /// The editor's text.
-    pub editor: String,
-    /// The text block the editor's text was taken from (Replace puts it back there).
-    pub editing: Option<i64>,
-    /// Seconds the editor's text takes to read.
-    pub editor_seconds: f64,
-    /// Text and clips in the length of the story.
-    pub read_seconds: f64,
-    pub clip_seconds: f64,
-    /// Text the anchor reads in the studio (not in the length of the story).
-    pub anchor_seconds: f64,
-    /// The target length of the story (the story sheet's first length field).
-    pub target_seconds: Option<f64>,
-    /// The first words of the story and its last words (the director's cue that it ends).
-    pub in_cue: String,
-    pub out_cue: String,
-    /// Whether the shown clip has an IN/OUT (a clip block can take it).
-    pub marks: bool,
-    /// The block being recorded now, the seconds recorded and the level of the microphone.
-    pub recording: Option<(i64, f64, f32)>,
-    /// A recording is being started or finished.
-    pub record_busy: bool,
-    /// Field values typed and not yet in the script, by block and field code.
-    pub field_drafts: BTreeMap<(i64, String), String>,
-    /// The A/V script written last (its file), shown as a link.
-    pub exported: Option<String>,
-    /// An export is being written.
-    pub exporting: bool,
-    pub message: String,
-}
-
-impl ScriptView {
-    pub fn total_seconds(&self) -> f64 {
-        self.read_seconds + self.clip_seconds
-    }
-
-    /// The kinds of the profile that are text written in the editor, in its order.
-    pub fn text_kinds(&self) -> Vec<&KindSpec> {
-        self.profile.iter().flat_map(|profile| &profile.kinds).filter(|kind| kind.role != Role::Clip).collect()
-    }
-
-    /// The kinds of the profile that are ranges of a clip, in its order.
-    pub fn clip_kinds(&self) -> Vec<&KindSpec> {
-        self.profile.iter().flat_map(|profile| &profile.kinds).filter(|kind| kind.role == Role::Clip).collect()
-    }
-
-    /// The kind of block `id`, if the profile has it.
-    pub fn kind_of(&self, id: i64) -> Option<&KindSpec> {
-        let block = self.blocks.iter().find(|row| row.block.id == id)?;
-        self.profile.as_ref()?.kind(&block.block.kind)
-    }
-
-    /// The value of field `code` of block `id` as shown: the draft while it is typed, else the
-    /// value in the script.
-    pub fn field_value(&self, id: i64, code: &str) -> String {
-        if let Some(draft) = self.field_drafts.get(&(id, code.to_string())) {
-            return draft.clone();
-        }
-        self.blocks.iter().find(|row| row.block.id == id).and_then(|row| row.block.fields.get(code).cloned()).unwrap_or_default()
-    }
-
-    /// The fields of a block as lines of the pasted script (`Caption: name: Ivan Horvat`).
-    fn fields_text(&self, row: &BlockRow) -> String {
-        let Some(kind) = self.profile.as_ref().and_then(|profile| profile.kind(&row.block.kind)) else { return String::new() };
-        kind.fields
-            .iter()
-            .filter_map(|field| row.block.fields.get(&field.path).map(|value| format!("
-{}: {}", field.label, value)))
-            .collect()
-    }
-
-    /// The script as text to paste: each block in reading order with its mark, a clip block
-    /// with its clip and timecodes.
-    pub fn text(&self) -> String {
-        self.blocks
-            .iter()
-            .map(|row| {
-                if row.is_clip() {
-                    format!("{} {} {} - {} ({})\n{}{}", row.mark, row.block.clip_name, row.block.start_tc, row.block.end_tc, row.block.length, row.block.text, self.fields_text(row))
-                } else {
-                    format!("{} ({})\n{}{}", row.mark, seconds_label(row.seconds), row.block.text, self.fields_text(row))
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n")
-    }
-}
-
-/// Seconds as `m:ss`.
-pub fn seconds_label(seconds: f64) -> String {
-    let whole = seconds.max(0.0).round() as u64;
-    format!("{}:{:02}", whole / 60, whole % 60)
-}
-
-/// Seconds a block of kind `kind` lasts: a clip its own, a recording its own, a note none,
-/// other text the time its words take to read.
-pub fn block_seconds(block: &Block, kind: Option<&KindSpec>, words_per_second: f64) -> f64 {
-    match kind.map(|kind| kind.role) {
-        Some(Role::Clip) => block.seconds,
-        Some(Role::Note) => 0.0,
-        _ if !block.voice_uri.is_empty() => block.voice_seconds,
-        Some(_) => reading_seconds(&block.text, words_per_second),
-        // A kind the profile does not have: a clip by its range, text by its words.
-        None if !block.clip_id.is_empty() => block.seconds,
-        None => reading_seconds(&block.text, words_per_second),
-    }
-}
-
-/// Words at the start of a text the director takes as its in-cue.
-pub const IN_CUE_WORDS: usize = 3;
-/// Words at the end of a text the director takes as its out-cue.
-pub const OUT_CUE_WORDS: usize = 4;
-
-/// The first `IN_CUE_WORDS` words of `text` (`...` after them when more follow).
-pub fn in_cue(text: &str) -> String {
-    let words: Vec<&str> = text.split_whitespace().collect();
-    let cue = words.iter().take(IN_CUE_WORDS).copied().collect::<Vec<_>>().join(" ");
-    if words.len() > IN_CUE_WORDS { format!("{cue}...") } else { cue }
-}
-
-/// The last `OUT_CUE_WORDS` words of `text` (`...` before them when more come first).
-pub fn out_cue(text: &str) -> String {
-    let words: Vec<&str> = text.split_whitespace().collect();
-    let cue = words[words.len().saturating_sub(OUT_CUE_WORDS)..].join(" ");
-    if words.len() > OUT_CUE_WORDS { format!("...{cue}") } else { cue }
-}
-
-/// The in-cue and out-cue of the story: the first words of its first block in the length of the
-/// story that has words, the last words of its last one.
-pub fn story_cues(rows: &[BlockRow]) -> (String, String) {
-    let spoken = || rows.iter().filter(|row| row.in_story && !row.block.text.trim().is_empty());
-    (spoken().next().map(|row| in_cue(&row.block.text)).unwrap_or_default(), spoken().last().map(|row| out_cue(&row.block.text)).unwrap_or_default())
-}
-
-/// Seconds `text` takes to read at `words_per_second`.
-pub fn reading_seconds(text: &str, words_per_second: f64) -> f64 {
-    if words_per_second <= 0.0 {
-        return 0.0;
-    }
-    text.split_whitespace().count() as f64 / words_per_second
-}
-
-/// The rows of `blocks`: their lengths, marks (numbered among the blocks of their kind) and
-/// what their kinds are.
-pub fn rows(blocks: &[Block], profile: Option<&ScriptProfile>, words_per_second: f64) -> Vec<BlockRow> {
-    let mut numbers: HashMap<&str, usize> = HashMap::new();
-    blocks
-        .iter()
-        .map(|block| {
-            let kind = profile.and_then(|profile| profile.kind(&block.kind));
-            let number = numbers.entry(block.kind.as_str()).or_insert(0);
-            *number += 1;
-            let cue = profile.map(|profile| profile.cue_label_with(&block.kind, *number, &block.fields)).unwrap_or_default();
-            let mark = if !cue.is_empty() {
-                cue
-            } else {
-                kind.map_or_else(|| block.kind.to_uppercase(), |kind| kind.short.clone())
-            };
-            BlockRow { seconds: block_seconds(block, kind, words_per_second), mark, role: kind.map(|kind| kind.role), recorded: kind.is_some_and(|kind| kind.recorded), cues: kind.is_some_and(|kind| kind.cues), in_story: kind.is_some_and(|kind| kind.counts == Counts::Story), block: block.clone() }
-        })
-        .collect()
-}
-
-/// The script as `qnc-script-export` writes it out (its title and sheet are the project's,
-/// filled in when it is written).
-pub fn export_story(view: &ScriptView) -> qnc_script_export::Story {
-    let items = view
-        .blocks
-        .iter()
-        .map(|row| {
-            let block = &row.block;
-            let kind = view.profile.as_ref().and_then(|profile| profile.kind(&block.kind));
-            let fields = kind
-                .map(|kind| kind.fields.iter().filter_map(|field| block.fields.get(&field.path).map(|value| (field.label.clone(), value.clone()))).collect())
-                .unwrap_or_default();
-            qnc_script_export::Item {
-                mark: row.mark.clone(),
-                role: row.role,
-                text: block.text.clone(),
-                clip: row.is_clip().then(|| (block.clip_name.clone(), block.start_tc.clone(), block.end_tc.clone())),
-                length: if row.role == Some(Role::Note) { String::new() } else if row.is_clip() { block.length.clone() } else { seconds_label(row.seconds) },
-                fields,
-                cues: (row.cues && !block.text.trim().is_empty()).then(|| (in_cue(&block.text), out_cue(&block.text))),
-                recorded_tc: (!block.voice_uri.is_empty()).then(|| block.voice_tc.clone()),
-            }
-        })
-        .collect();
-    qnc_script_export::Story {
-        title: String::new(),
-        header: Vec::new(),
-        in_cue: view.in_cue.clone(),
-        out_cue: view.out_cue.clone(),
-        total: seconds_label(view.total_seconds()),
-        target: view.target_seconds.map(seconds_label),
-        anchor: seconds_label(view.anchor_seconds),
-        items,
-    }
-}
-
-/// The target of `FIELD_TEXT` and `FIELD_SET`.
-#[derive(serde::Deserialize, serde::Serialize)]
-pub struct FieldEdit {
-    pub block: i64,
-    pub field: String,
-    pub value: String,
-}
-
-impl FieldEdit {
-    pub fn target(block: i64, field: &str, value: &str) -> String {
-        serde_json::to_string(&Self { block, field: field.into(), value: value.into() }).unwrap_or_default()
-    }
-}
-
-type Read =Result<(Vec<Block>, Option<ScriptProfile>, Option<f64>), String>;
-
-/// Where a take goes and what its clip is: the voice-over folder of the project, its name
-/// without extension and the project picture.
-struct Take {
-    folder: std::path::PathBuf,
-    base: String,
-    stem: String,
-    project_dir: std::path::PathBuf,
-    width: u32,
-    height: u32,
-    fps: f64,
+/// What a take gives back: the take that started, or the finished one as its block keeps it.
+enum TakeAnswer {
+    Started(Take),
+    Finished(Result<Recorded, String>),
 }
 
 pub struct Script {
     view: ScriptView,
     blocks: Vec<Block>,
     project: Option<String>,
-    reading: Option<mpsc::Receiver<Read>>,
+    reading: Option<mpsc::Receiver<read::Read>>,
     read_at: Option<Instant>,
     /// A write on its way to the database; its answer is the id of an added block.
     writing: Option<mpsc::Receiver<Result<Option<i64>, String>>>,
     source_request: Option<(String, u64, u64)>,
     /// Name, frames and seconds of each clip of the pool.
     names: HashMap<String, (String, u64, f64)>,
-    words_per_second: f64,
-    /// The recording that runs, of which block.
-    recorder: Option<(i64, qnc_voice_record::Recorder)>,
-    /// A recording on its way to start, or a stopped one on its way into the script.
-    starting: Option<(i64, mpsc::Receiver<Result<(qnc_voice_record::Recorder, Take), String>>)>,
-    take: Option<Take>,
-    /// An export on its way to the export folder; its answer is the A/V script's file.
+    /// The project's reading speed (the reason when it has none).
+    words_per_second: Result<f64, String>,
+    /// The take that records, of which block (piece `qnc-voice-take`).
+    take: Option<(i64, Take)>,
+    /// A take on its way to start, or a stopped one on its way to its clip.
+    taking: Option<(i64, mpsc::Receiver<TakeAnswer>)>,
+    /// An export on its way to the export folder (piece `qnc-script-files`).
     exporting: Option<mpsc::Receiver<Result<String, String>>>,
 }
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: 0.0, recorder: None, starting: None, take: None, exporting: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None }
     }
 }
 
@@ -375,7 +128,7 @@ impl Script {
 
     /// Whether a read or a write of this process runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.reading.is_some() || self.writing.is_some() || self.recorder.is_some() || self.starting.is_some() || self.exporting.is_some()
+        self.reading.is_some() || self.writing.is_some() || self.take.is_some() || self.taking.is_some() || self.exporting.is_some()
     }
 
     /// A clip and IN/OUT a chosen clip block opens on the source timeline, once.
@@ -479,7 +232,7 @@ impl Script {
             }
             // The key of a form that has no script (nothing chosen, nothing recording) is not the
             // script's.
-            RECORD if target.is_none() && self.view.selected.is_none() && self.recorder.is_none() => return None,
+            RECORD if target.is_none() && self.view.selected.is_none() && self.take.is_none() => return None,
             RECORD => {
                 let block = id().or(self.view.selected);
                 self.record(preview, block)
@@ -553,69 +306,43 @@ impl Script {
         self.write(preview, move |target| qnc_script_db::add(target, after, block).map(Some))
     }
 
-    /// Starts recording block `block` (of a recorded kind), or stops the recording that runs
-    /// (whichever block the press names). The microphone is opened off the form thread.
+    /// Starts the take of block `block` (of a recorded kind), or stops the take that records
+    /// (whichever block the press names). The take (piece `qnc-voice-take`) opens the
+    /// microphone and makes its clip off the form thread; a finished take goes into its block.
     fn record(&mut self, preview: &SourcePreview, block: Option<i64>) -> bool {
-        if let Some((id, recorder)) = self.recorder.take() {
-            return self.finish(preview, id, recorder);
-        }
-        if self.starting.is_some() {
+        if self.taking.is_some() {
             return true;
+        }
+        if let Some((id, take)) = self.take.take() {
+            let (text, heading) = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| (row.block.text.clone(), row.mark.clone())).unwrap_or_default();
+            self.view.message = qnc_ui_text::text("script.making_clip").into();
+            return self.spawn_take(id, move || TakeAnswer::Finished(take.finish(&text, &heading)));
         }
         let Some(id) = block.filter(|id| self.view.blocks.iter().any(|row| row.block.id == *id && row.recorded)) else {
             self.view.message = qnc_ui_text::text("script.choose_to_record").into();
             return true;
         };
-        let Some(locator) = preview.still_locator() else {
+        let setting = qnc_dev_diagnostics::resolve_qnc_root().map(|root| qnc_dev_diagnostics::config_path(&root).with_file_name(qnc_voice_record::INPUT_SETTING));
+        let (Some(locator), Some(setting)) = (preview.still_locator(), setting) else {
             self.view.message = qnc_ui_text::text("script.no_project").into();
             return true;
         };
-        let Some(setting) = qnc_dev_diagnostics::resolve_qnc_root().map(|root| qnc_dev_diagnostics::config_path(&root).with_file_name(qnc_voice_record::INPUT_SETTING)) else {
-            self.view.message = qnc_ui_text::text("script.no_project").into();
-            return true;
-        };
-        let (send, started) = mpsc::channel();
-        let spawned = std::thread::Builder::new().name("qnc-script-record".into()).spawn(move || {
-            let start = || -> Result<(qnc_voice_record::Recorder, Take), String> {
-                let settings = locator.settings();
-                let project_dir = locator.reader().local_workspace_dir(settings).map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("script.voice_local_only").to_string())?;
-                let (folder, base) = settings.voice_location(&project_dir).map_err(|e| e.to_string())?;
-                std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-                let number = |key: &str| settings.video.get(key).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
-                let rate = settings.audio.get("sample_rate").and_then(serde_json::Value::as_u64).unwrap_or(0) as u32;
-                let take = Take { stem: format!("off_{id}_{}", qnc_voice_record::file_stamp()), folder, base, project_dir, width: number("width") as u32, height: number("height") as u32, fps: number("fps") };
-                let recorder = qnc_voice_record::Recorder::start(take.folder.join(format!("{}.wav", take.stem)), &take.project_dir, rate, take.fps, &setting)?;
-                Ok((recorder, take))
-            };
-            let _ = send.send(start());
-        });
-        if spawned.is_ok() {
-            self.starting = Some((id, started));
-            self.view.message = qnc_ui_text::text("script.record_starting").into();
+        self.view.message = qnc_ui_text::text("script.record_starting").into();
+        self.spawn_take(id, move || match Take::start(&locator, id, &setting) {
+            Ok(take) => TakeAnswer::Started(take),
+            Err(error) => TakeAnswer::Finished(Err(error)),
+        })
+    }
+
+    fn spawn_take(&mut self, id: i64, work: impl FnOnce() -> TakeAnswer + Send + 'static) -> bool {
+        let (send, answer) = mpsc::channel();
+        if std::thread::Builder::new().name("qnc-script-take".into()).spawn(move || _ = send.send(work())).is_ok() {
+            self.taking = Some((id, answer));
         }
         true
     }
 
-    /// Stops the recording of block `id` and puts it into the script.
-    /// The recording becomes a clip of the project at once (user 2026-10-28): the title card of
-    /// the block's text as its picture (its mark above it), the time it was recorded as its
-    /// timecode.
-    fn finish(&mut self, preview: &SourcePreview, id: i64, recorder: qnc_voice_record::Recorder) -> bool {
-        let Some(take) = self.take.take() else { return false };
-        let (text, heading) = self.view.blocks.iter().find(|row| row.block.id == id).map(|row| (row.block.text.clone(), row.mark.clone())).unwrap_or_default();
-        self.view.message = qnc_ui_text::text("script.making_clip").into();
-        self.write(preview, move |target| {
-            let recording = recorder.stop()?;
-            let out = take.folder.join(format!("{}.mxf", take.stem));
-            let clip = qnc_voice_clip::VoiceClip { sound: &recording.path, text: &text, heading: &heading, width: take.width, height: take.height, fps: take.fps, timecode: &recording.timecode, out: &out, project_dir: &take.project_dir };
-            qnc_voice_clip::make(&clip)?;
-            let uri = format!("{}/{}.mxf", take.base, take.stem);
-            qnc_script_db::set_voice(target, id, uri, recording.seconds, recording.timecode).map(|_| None)
-        })
-    }
-
-    /// Writes the script out off the form thread: the story sheet read from the project, the
-    /// three forms into the export folder of the project on this computer (`<project>_script`).
+    /// Writes the script out off the form thread (piece `qnc-script-files`).
     fn export(&mut self, preview: &SourcePreview) -> bool {
         if self.exporting.is_some() {
             return true;
@@ -624,36 +351,9 @@ impl Script {
             self.view.message = qnc_ui_text::text("script.no_project").into();
             return true;
         };
-        let mut story = export_story(&self.view);
+        let story = export_story(&self.view);
         let (send, done) = mpsc::channel();
-        let spawned = std::thread::Builder::new().name("qnc-script-export".into()).spawn(move || {
-            let mut write = || -> Result<String, String> {
-                let settings = locator.settings();
-                let project_dir = locator.reader().local_workspace_dir(settings).map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("script.voice_local_only").to_string())?;
-                let folder = settings.export_folder(&project_dir).map_err(|e| e.message)?;
-                story.title = settings.project_name.clone();
-                story.header = qnc_newsroom_sheet_db::read(&target).map(|sheet| sheet.shown()).unwrap_or_default();
-                let base = format!("{}_script", qnc_work_settings::export_file_name(&settings.project_name));
-                let ids = qnc_script_export::MosIds {
-                    mos_id: "qnc.mos".into(),
-                    ncs_id: "qnc.newsroom".into(),
-                    ro_id: settings.project_id.clone(),
-                    story_id: format!("{}-script", settings.project_id),
-                    message_id: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()),
-                };
-                let av = folder.join(format!("{base}.html"));
-                for (file, text) in [
-                    (folder.join(format!("{base}.txt")), qnc_script_export::text(&story)),
-                    (av.clone(), qnc_script_export::av_html(&story)),
-                    (folder.join(format!("{base}.mos.xml")), qnc_script_export::mos_xml(&story, &ids)),
-                ] {
-                    std::fs::write(&file, text).map_err(|e| format!("{}: {e}", file.display()))?;
-                }
-                Ok(av.display().to_string())
-            };
-            let _ = send.send(write());
-        });
-        if spawned.is_ok() {
+        if std::thread::Builder::new().name("qnc-script-export".into()).spawn(move || _ = send.send(qnc_script_files::write(&locator, &target, story))).is_ok() {
             self.exporting = Some(done);
             self.view.message = qnc_ui_text::text("script.exporting").into();
         }
@@ -699,37 +399,81 @@ impl Script {
         true
     }
 
-    fn refresh_editor(&mut self) {
-        self.view.editor_seconds = reading_seconds(&self.view.editor, self.words_per_second);
+    fn reading_speed(&self) -> f64 {
+        self.words_per_second.as_ref().copied().unwrap_or(0.0)
     }
 
-    /// Takes the answers of writes and reads, reads the script again now and then. Returns
-    /// whether the view changed.
+    fn refresh_editor(&mut self) {
+        self.view.editor_seconds = reading_seconds(&self.view.editor, self.reading_speed());
+    }
+
+    /// Takes the answers of takes, exports, writes and reads, reads the script again now and
+    /// then. Returns whether the view changed.
     pub fn poll(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, clips: &[ClipRow]) -> bool {
         let before = self.view.clone();
-        self.names = clips.iter().map(|clip| (clip.clip_id.clone(), (clip.name.clone(), clip.duration_frames, clip.duration_seconds))).collect();
+        if self.names.len() != clips.len() || clips.iter().any(|clip| !self.names.contains_key(&clip.clip_id)) {
+            self.names = clips.iter().map(|clip| (clip.clip_id.clone(), (clip.name.clone(), clip.duration_frames, clip.duration_seconds))).collect();
+        }
         self.view.marks = preview.view().clip_id.is_some() && timeline.visible_source_marks().is_some_and(|(from, to)| to > from);
         let project = preview.project_target().cloned();
         let key = project.as_ref().map(|target| target.uri().to_string());
         if key != self.project {
             *self = Self { project: key, ..Self::default() };
         }
-        self.words_per_second = preview.still_locator().and_then(|locator| locator.settings().reading_words_per_second().ok()).unwrap_or(0.0);
-        if let Some((id, started)) = &self.starting {
-            if let Ok(result) = started.try_recv() {
-                match result {
-                    Ok((recorder, take)) => {
-                        self.take = Some(take);
-                        self.recorder = Some((*id, recorder));
-                        self.view.message = qnc_ui_text::text("script.recording").into();
-                    }
-                    Err(error) => self.view.message = error,
-                }
-                self.starting = None;
+        // The reading speed is the project's; without it a text has no length and the panel says why.
+        self.words_per_second = match preview.still_locator() {
+            Some(locator) => locator.settings().reading_words_per_second().map_err(|e| e.message),
+            None => Ok(0.0),
+        };
+        self.take_answers(preview);
+        if let Some(project) = project.filter(|_| self.reading.is_none() && self.writing.is_none() && self.read_at.is_none_or(|at| at.elapsed() >= READ_EVERY)) {
+            self.read_at = Some(Instant::now());
+            let (send, read) = mpsc::channel();
+            if std::thread::Builder::new().name("qnc-script-read".into()).spawn(move || _ = send.send(read::read_script(&project))).is_ok() {
+                self.reading = Some(read);
             }
         }
-        self.view.recording = self.recorder.as_ref().map(|(id, recorder)| (*id, recorder.seconds(), recorder.take_peak()));
-        self.view.record_busy = self.starting.is_some();
+        if self.view.selected.is_some_and(|id| !self.blocks.iter().any(|b| b.id == id)) && self.writing.is_none() && self.reading.is_none() && !self.blocks.is_empty() {
+            self.view.selected = None;
+        }
+        if let Err(reason) = &self.words_per_second {
+            if self.view.message.is_empty() {
+                self.view.message = reason.clone();
+            }
+        }
+        self.view.blocks = rows(&self.blocks, self.view.profile.as_ref(), self.reading_speed());
+        let profile = self.view.profile.as_ref();
+        let counts = |row: &BlockRow| profile.and_then(|profile| profile.kind(&row.block.kind)).map(|kind| kind.counts);
+        let sum = |keep: &dyn Fn(&BlockRow) -> bool| self.view.blocks.iter().filter(|row| keep(row)).map(|row| row.seconds).sum::<f64>();
+        self.view.read_seconds = sum(&|row| counts(row) == Some(Counts::Story) && !row.is_clip());
+        self.view.clip_seconds = sum(&|row| counts(row) == Some(Counts::Story) && row.is_clip());
+        self.view.anchor_seconds = sum(&|row| counts(row) == Some(Counts::Anchor));
+        (self.view.in_cue, self.view.out_cue) = story_cues(&self.view.blocks);
+        self.refresh_editor();
+        self.view != before
+    }
+
+    /// The answers of takes, exports, writes and reads that came.
+    fn take_answers(&mut self, preview: &SourcePreview) {
+        if let Some((id, answer)) = &self.taking {
+            if let Ok(answer) = answer.try_recv() {
+                let id = *id;
+                self.taking = None;
+                match answer {
+                    TakeAnswer::Started(take) => {
+                        self.take = Some((id, take));
+                        self.view.message = qnc_ui_text::text("script.recording").into();
+                    }
+                    // A finished take goes into its block: its clip, length and timecode.
+                    TakeAnswer::Finished(Ok(Recorded { uri, seconds, timecode })) => {
+                        self.write(preview, move |target| qnc_script_db::set_voice(target, id, uri, seconds, timecode).map(|_| None));
+                    }
+                    TakeAnswer::Finished(Err(error)) => self.view.message = error,
+                }
+            }
+        }
+        self.view.recording = self.take.as_ref().map(|(id, take)| (*id, take.seconds(), take.take_peak()));
+        self.view.record_busy = self.taking.is_some();
         if let Some(done) = &self.exporting {
             if let Ok(result) = done.try_recv() {
                 match result {
@@ -775,125 +519,8 @@ impl Script {
                 self.reading = None;
             }
         }
-        if let Some(project) = project.filter(|_| self.reading.is_none() && self.writing.is_none() && self.read_at.is_none_or(|at| at.elapsed() >= READ_EVERY)) {
-            self.read_at = Some(Instant::now());
-            let (send, read) = mpsc::channel();
-            if std::thread::Builder::new().name("qnc-script-read".into()).spawn(move || _ = send.send(read_script(&project))).is_ok() {
-                self.reading = Some(read);
-            }
-        }
-        if self.view.selected.is_some_and(|id| !self.blocks.iter().any(|b| b.id == id)) && self.writing.is_none() && self.reading.is_none() && !self.blocks.is_empty() {
-            self.view.selected = None;
-        }
-        self.view.blocks = rows(&self.blocks, self.view.profile.as_ref(), self.words_per_second);
-        let profile = self.view.profile.as_ref();
-        let counts = |row: &BlockRow| profile.and_then(|profile| profile.kind(&row.block.kind)).map(|kind| kind.counts);
-        let sum = |keep: &dyn Fn(&BlockRow) -> bool| self.view.blocks.iter().filter(|row| keep(row)).map(|row| row.seconds).sum::<f64>();
-        self.view.read_seconds = sum(&|row| counts(row) == Some(Counts::Story) && !row.is_clip());
-        self.view.clip_seconds = sum(&|row| counts(row) == Some(Counts::Story) && row.is_clip());
-        self.view.anchor_seconds = sum(&|row| counts(row) == Some(Counts::Anchor));
-        (self.view.in_cue, self.view.out_cue) = story_cues(&self.view.blocks);
-        self.refresh_editor();
-        self.view != before
     }
-}
-
-/// The script, the profile it is written with and the target length of the story sheet (its
-/// first length field's value). A project without a profile gets the one chosen on this
-/// computer.
-fn read_script(target: &ProjectDbTarget) -> Read {
-    let blocks = qnc_script_db::read(target)?;
-    let profile = match qnc_script_db::read_profile(target)? {
-        Some(profile) => Some(profile),
-        None => {
-            let root = qnc_dev_diagnostics::resolve_qnc_root().ok_or_else(|| qnc_ui_text::text("script.no_profile").to_string())?;
-            let (profiles, errors) = qnc_script_profile::Profiles::load(&root);
-            for error in errors {
-                qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, format!("script-profile refused {error}"));
-            }
-            let chosen = profiles.current().cloned().ok_or_else(|| qnc_ui_text::text("script.no_profile").to_string())?;
-            qnc_script_db::set_profile(target, chosen)?;
-            qnc_script_db::read_profile(target)?
-        }
-    };
-    let sheet = qnc_newsroom_sheet_db::read(target).ok();
-    let length = sheet.and_then(|sheet| {
-        let field = sheet.sheet.get("fields")?.as_array()?.iter().find(|field| field.get("kind").and_then(serde_json::Value::as_str) == Some("duration"))?;
-        let code = field.get("id")?.as_str()?;
-        sheet.values.get(code)?.as_f64().filter(|seconds| *seconds > 0.0)
-    });
-    Ok((blocks, profile, length))
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn general_tv() -> ScriptProfile {
-        let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../catalogs/script-profiles/general_tv.json");
-        serde_json::from_value(qnc_ui_text::resolve_contract(&std::fs::read_to_string(file).unwrap()).unwrap()).unwrap()
-    }
-
-    fn sot(text: &str) -> Block {
-        Block { clip_id: "c".into(), clip_name: "Mironik 2002".into(), start_tc: "10:00:02:00".into(), end_tc: "10:00:06:49".into(), length: "5:00".into(), seconds: 5.0, ..Block::written("sot", text) }
-    }
-
-    #[test]
-    fn a_text_block_lasts_as_long_as_its_words_take_to_read() {
-        assert_eq!(reading_seconds("jedan dva tri  cetiri pet", 2.5), 2.0);
-        assert_eq!(reading_seconds("   ", 2.5), 0.0);
-        assert_eq!(seconds_label(83.6), "1:24");
-    }
-
-    #[test]
-    fn marks_are_the_numbered_cues_of_the_profile_and_lengths_its_rules() {
-        let profile = general_tv();
-        let mut recorded = Block::written("off", "Drugi off koji je snimljen.");
-        (recorded.voice_uri, recorded.voice_seconds) = ("qnc://v.mxf".into(), 7.0);
-        let blocks = [Block::written("intro", "Najava."), Block::written("off", "Uvod u prilog."), sot("Rekao je."), recorded, Block::written("nat", "")];
-        let rows = rows(&blocks, Some(&profile), 2.5);
-        let marks: Vec<&str> = rows.iter().map(|row| row.mark.as_str()).collect();
-        assert_eq!(marks, [profile.kind("intro").unwrap().short.as_str(), "OFF 1", "SOT 1", "OFF 2", "NAT"]);
-        assert_eq!(rows.iter().map(|row| row.seconds).collect::<Vec<_>>(), [0.4, 1.2, 5.0, 7.0, 0.0]);
-        assert!(rows[1].recorded && !rows[0].recorded && rows[2].is_clip());
-    }
-
-    #[test]
-    fn the_script_as_text_has_every_block_in_reading_order_with_its_mark() {
-        let profile = general_tv();
-        let blocks = [Block::written("off", "Uvod u prilog."), sot("Rekao je.")];
-        let view = ScriptView { blocks: rows(&blocks, Some(&profile), 2.5), profile: Some(profile), ..ScriptView::default() };
-        assert_eq!(view.text(), "OFF 1 (0:01)\nUvod u prilog.\n\nSOT 1 Mironik 2002 10:00:02:00 - 10:00:06:49 (5:00)\nRekao je.");
-        assert_eq!(view.text_kinds().iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["intro", "off", "outro"]);
-        assert_eq!(view.clip_kinds().iter().map(|k| k.id.as_str()).collect::<Vec<_>>(), ["sot", "standup", "nat"]);
-    }
-
-    #[test]
-    fn the_fields_of_a_block_are_in_the_pasted_script_and_a_draft_is_shown_until_committed() {
-        let profile = general_tv();
-        let mut statement = sot("Rekao je.");
-        statement.id = 4;
-        statement.fields.insert("caption_name".into(), "Ivan Horvat".into());
-        let name = profile.kind("sot").unwrap().fields[0].label.clone();
-        let mut view = ScriptView { blocks: rows(&[statement], Some(&profile), 2.5), profile: Some(profile), ..ScriptView::default() };
-        assert!(view.text().ends_with(&format!("Rekao je.\n{name}: Ivan Horvat")));
-        view.field_drafts.insert((4, "caption_name".into()), "Ivan Horvat Mlađi".into());
-        assert_eq!(view.field_value(4, "caption_name"), "Ivan Horvat Mlađi");
-        assert_eq!(view.field_value(4, "caption_role"), "");
-    }
-
-    #[test]
-    fn the_story_has_the_first_and_last_words_of_its_blocks_in_its_length() {
-        assert_eq!(in_cue("Unatoč lošem vremenu, više od petsto"), "Unatoč lošem vremenu,...");
-        assert_eq!(out_cue("Ana Anić, Vijesti, Zagreb."), "Ana Anić, Vijesti, Zagreb.");
-        assert_eq!(out_cue("Novi sastanak sutra u devet sati."), "...sutra u devet sati.");
-        let profile = general_tv();
-        let blocks = [Block::written("intro", "Najava spikera ne ulazi."), Block::written("off", "Prvi off priloga ovdje."), sot("Ne odustajemo od naših zahtjeva.")];
-        let rows = rows(&blocks, Some(&profile), 2.5);
-        assert_eq!(story_cues(&rows), ("Prvi off priloga...".to_string(), "...odustajemo od naših zahtjeva.".to_string()));
-        let view = ScriptView { blocks: rows, profile: Some(profile), ..ScriptView::default() };
-        let story = export_story(&view);
-        assert_eq!(story.items[2].cues, Some(("Ne odustajemo od...".to_string(), "...odustajemo od naših zahtjeva.".to_string())), "a SOT shows its cues");
-        assert_eq!(story.items[1].cues, None);
-    }
-}
+mod tests;

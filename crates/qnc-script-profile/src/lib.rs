@@ -14,8 +14,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use qnc_newsroom_sheet::{code_of, valid_code};
-use qnc_settings_form::{FieldSpec, OptionSets};
+use qnc_field_spec::{code_of, valid_code};
+use qnc_field_spec::{FieldSpec, OptionSets};
 use serde::{Deserialize, Serialize};
 
 pub const MODULE_ID: &str = "qnc.module.script-profile";

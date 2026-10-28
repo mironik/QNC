@@ -1,0 +1,8 @@
+[package]
+name = "qnc-field-spec"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: what a field of a sheet or a profile is (its kind, name, code, choices, default, hint) and the codes fields and sheets are kept by; data only, no screen and no storage"
+
+[dependencies]
+serde = { workspace = true }
