@@ -63,6 +63,11 @@ pub const FIELD_TEXT: &str = "script_field_text";
 pub const FIELD_COMMIT: &str = "script_field_commit";
 /// A field is set and goes into the script at once (a choice; target as `FIELD_TEXT`).
 pub const FIELD_SET: &str = "script_field_set";
+/// The script is written out to the project's export folder: clean text, the two-column A/V script
+/// and a MOS story (user 2026-10-28: the field crew sends it to the editor and the proofreader).
+pub const EXPORT: &str = "script_export";
+/// The exported A/V script is shown in the file browser of this OS.
+pub const OPEN_EXPORT: &str = "script_open_export";
 
 /// How often the script is read again (another process may change it).
 const READ_EVERY: Duration = Duration::from_secs(2);
@@ -79,6 +84,10 @@ pub struct BlockRow {
     pub role: Option<Role>,
     /// Whether its kind is recorded from the microphone.
     pub recorded: bool,
+    /// Whether its kind shows its first and last words (in-cue, out-cue).
+    pub cues: bool,
+    /// Whether it is in the length of the story.
+    pub in_story: bool,
 }
 
 impl BlockRow {
@@ -108,6 +117,9 @@ pub struct ScriptView {
     pub anchor_seconds: f64,
     /// The target length of the story (the story sheet's first length field).
     pub target_seconds: Option<f64>,
+    /// The first words of the story and its last words (the director's cue that it ends).
+    pub in_cue: String,
+    pub out_cue: String,
     /// Whether the shown clip has an IN/OUT (a clip block can take it).
     pub marks: bool,
     /// The block being recorded now, the seconds recorded and the level of the microphone.
@@ -116,6 +128,10 @@ pub struct ScriptView {
     pub record_busy: bool,
     /// Field values typed and not yet in the script, by block and field code.
     pub field_drafts: BTreeMap<(i64, String), String>,
+    /// The A/V script written last (its file), shown as a link.
+    pub exported: Option<String>,
+    /// An export is being written.
+    pub exporting: bool,
     pub message: String,
 }
 
@@ -196,6 +212,32 @@ pub fn block_seconds(block: &Block, kind: Option<&KindSpec>, words_per_second: f
     }
 }
 
+/// Words at the start of a text the director takes as its in-cue.
+pub const IN_CUE_WORDS: usize = 3;
+/// Words at the end of a text the director takes as its out-cue.
+pub const OUT_CUE_WORDS: usize = 4;
+
+/// The first `IN_CUE_WORDS` words of `text` (`...` after them when more follow).
+pub fn in_cue(text: &str) -> String {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let cue = words.iter().take(IN_CUE_WORDS).copied().collect::<Vec<_>>().join(" ");
+    if words.len() > IN_CUE_WORDS { format!("{cue}...") } else { cue }
+}
+
+/// The last `OUT_CUE_WORDS` words of `text` (`...` before them when more come first).
+pub fn out_cue(text: &str) -> String {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let cue = words[words.len().saturating_sub(OUT_CUE_WORDS)..].join(" ");
+    if words.len() > OUT_CUE_WORDS { format!("...{cue}") } else { cue }
+}
+
+/// The in-cue and out-cue of the story: the first words of its first block in the length of the
+/// story that has words, the last words of its last one.
+pub fn story_cues(rows: &[BlockRow]) -> (String, String) {
+    let spoken = || rows.iter().filter(|row| row.in_story && !row.block.text.trim().is_empty());
+    (spoken().next().map(|row| in_cue(&row.block.text)).unwrap_or_default(), spoken().last().map(|row| out_cue(&row.block.text)).unwrap_or_default())
+}
+
 /// Seconds `text` takes to read at `words_per_second`.
 pub fn reading_seconds(text: &str, words_per_second: f64) -> f64 {
     if words_per_second <= 0.0 {
@@ -220,9 +262,45 @@ pub fn rows(blocks: &[Block], profile: Option<&ScriptProfile>, words_per_second:
             } else {
                 kind.map_or_else(|| block.kind.to_uppercase(), |kind| kind.short.clone())
             };
-            BlockRow { seconds: block_seconds(block, kind, words_per_second), mark, role: kind.map(|kind| kind.role), recorded: kind.is_some_and(|kind| kind.recorded), block: block.clone() }
+            BlockRow { seconds: block_seconds(block, kind, words_per_second), mark, role: kind.map(|kind| kind.role), recorded: kind.is_some_and(|kind| kind.recorded), cues: kind.is_some_and(|kind| kind.cues), in_story: kind.is_some_and(|kind| kind.counts == Counts::Story), block: block.clone() }
         })
         .collect()
+}
+
+/// The script as `qnc-script-export` writes it out (its title and sheet are the project's,
+/// filled in when it is written).
+pub fn export_story(view: &ScriptView) -> qnc_script_export::Story {
+    let items = view
+        .blocks
+        .iter()
+        .map(|row| {
+            let block = &row.block;
+            let kind = view.profile.as_ref().and_then(|profile| profile.kind(&block.kind));
+            let fields = kind
+                .map(|kind| kind.fields.iter().filter_map(|field| block.fields.get(&field.path).map(|value| (field.label.clone(), value.clone()))).collect())
+                .unwrap_or_default();
+            qnc_script_export::Item {
+                mark: row.mark.clone(),
+                role: row.role,
+                text: block.text.clone(),
+                clip: row.is_clip().then(|| (block.clip_name.clone(), block.start_tc.clone(), block.end_tc.clone())),
+                length: if row.role == Some(Role::Note) { String::new() } else if row.is_clip() { block.length.clone() } else { seconds_label(row.seconds) },
+                fields,
+                cues: (row.cues && !block.text.trim().is_empty()).then(|| (in_cue(&block.text), out_cue(&block.text))),
+                recorded_tc: (!block.voice_uri.is_empty()).then(|| block.voice_tc.clone()),
+            }
+        })
+        .collect();
+    qnc_script_export::Story {
+        title: String::new(),
+        header: Vec::new(),
+        in_cue: view.in_cue.clone(),
+        out_cue: view.out_cue.clone(),
+        total: seconds_label(view.total_seconds()),
+        target: view.target_seconds.map(seconds_label),
+        anchor: seconds_label(view.anchor_seconds),
+        items,
+    }
 }
 
 /// The target of `FIELD_TEXT` and `FIELD_SET`.
@@ -270,11 +348,13 @@ pub struct Script {
     /// A recording on its way to start, or a stopped one on its way into the script.
     starting: Option<(i64, mpsc::Receiver<Result<(qnc_voice_record::Recorder, Take), String>>)>,
     take: Option<Take>,
+    /// An export on its way to the export folder; its answer is the A/V script's file.
+    exporting: Option<mpsc::Receiver<Result<String, String>>>,
 }
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: 0.0, recorder: None, starting: None, take: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: 0.0, recorder: None, starting: None, take: None, exporting: None }
     }
 }
 
@@ -295,7 +375,7 @@ impl Script {
 
     /// Whether a read or a write of this process runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.reading.is_some() || self.writing.is_some() || self.recorder.is_some() || self.starting.is_some()
+        self.reading.is_some() || self.writing.is_some() || self.recorder.is_some() || self.starting.is_some() || self.exporting.is_some()
     }
 
     /// A clip and IN/OUT a chosen clip block opens on the source timeline, once.
@@ -413,6 +493,15 @@ impl Script {
                 }
                 true
             }
+            EXPORT => self.export(preview),
+            OPEN_EXPORT => {
+                if let Some(file) = &self.view.exported {
+                    if let Err(error) = qnc_status_line::open(file) {
+                        self.view.message = error;
+                    }
+                }
+                true
+            }
             FIELD_COMMIT => {
                 let Some(block) = id() else { return Some(false) };
                 self.commit_fields(preview, block)
@@ -525,6 +614,52 @@ impl Script {
         })
     }
 
+    /// Writes the script out off the form thread: the story sheet read from the project, the
+    /// three forms into the export folder of the project on this computer (`<project>_script`).
+    fn export(&mut self, preview: &SourcePreview) -> bool {
+        if self.exporting.is_some() {
+            return true;
+        }
+        let (Some(locator), Some(target)) = (preview.still_locator(), preview.project_target().cloned()) else {
+            self.view.message = qnc_ui_text::text("script.no_project").into();
+            return true;
+        };
+        let mut story = export_story(&self.view);
+        let (send, done) = mpsc::channel();
+        let spawned = std::thread::Builder::new().name("qnc-script-export".into()).spawn(move || {
+            let mut write = || -> Result<String, String> {
+                let settings = locator.settings();
+                let project_dir = locator.reader().local_workspace_dir(settings).map_err(|e| e.to_string())?.ok_or_else(|| qnc_ui_text::text("script.voice_local_only").to_string())?;
+                let folder = settings.export_folder(&project_dir).map_err(|e| e.message)?;
+                story.title = settings.project_name.clone();
+                story.header = qnc_newsroom_sheet_db::read(&target).map(|sheet| sheet.shown()).unwrap_or_default();
+                let base = format!("{}_script", qnc_work_settings::export_file_name(&settings.project_name));
+                let ids = qnc_script_export::MosIds {
+                    mos_id: "qnc.mos".into(),
+                    ncs_id: "qnc.newsroom".into(),
+                    ro_id: settings.project_id.clone(),
+                    story_id: format!("{}-script", settings.project_id),
+                    message_id: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()),
+                };
+                let av = folder.join(format!("{base}.html"));
+                for (file, text) in [
+                    (folder.join(format!("{base}.txt")), qnc_script_export::text(&story)),
+                    (av.clone(), qnc_script_export::av_html(&story)),
+                    (folder.join(format!("{base}.mos.xml")), qnc_script_export::mos_xml(&story, &ids)),
+                ] {
+                    std::fs::write(&file, text).map_err(|e| format!("{}: {e}", file.display()))?;
+                }
+                Ok(av.display().to_string())
+            };
+            let _ = send.send(write());
+        });
+        if spawned.is_ok() {
+            self.exporting = Some(done);
+            self.view.message = qnc_ui_text::text("script.exporting").into();
+        }
+        true
+    }
+
     /// The drafts of block `block`'s fields go into the script (nothing is written when they
     /// change nothing). The block shows them at once; the script read after the write is the truth.
     fn commit_fields(&mut self, preview: &SourcePreview, block: i64) -> bool {
@@ -595,6 +730,19 @@ impl Script {
         }
         self.view.recording = self.recorder.as_ref().map(|(id, recorder)| (*id, recorder.seconds(), recorder.take_peak()));
         self.view.record_busy = self.starting.is_some();
+        if let Some(done) = &self.exporting {
+            if let Ok(result) = done.try_recv() {
+                match result {
+                    Ok(file) => {
+                        self.view.message.clear();
+                        self.view.exported = Some(file);
+                    }
+                    Err(error) => self.view.message = error,
+                }
+                self.exporting = None;
+            }
+        }
+        self.view.exporting = self.exporting.is_some();
         if let Some(done) = &self.writing {
             if let Ok(result) = done.try_recv() {
                 match result {
@@ -644,6 +792,7 @@ impl Script {
         self.view.read_seconds = sum(&|row| counts(row) == Some(Counts::Story) && !row.is_clip());
         self.view.clip_seconds = sum(&|row| counts(row) == Some(Counts::Story) && row.is_clip());
         self.view.anchor_seconds = sum(&|row| counts(row) == Some(Counts::Anchor));
+        (self.view.in_cue, self.view.out_cue) = story_cues(&self.view.blocks);
         self.refresh_editor();
         self.view != before
     }
@@ -731,5 +880,20 @@ mod tests {
         view.field_drafts.insert((4, "caption_name".into()), "Ivan Horvat Mlađi".into());
         assert_eq!(view.field_value(4, "caption_name"), "Ivan Horvat Mlađi");
         assert_eq!(view.field_value(4, "caption_role"), "");
+    }
+
+    #[test]
+    fn the_story_has_the_first_and_last_words_of_its_blocks_in_its_length() {
+        assert_eq!(in_cue("Unatoč lošem vremenu, više od petsto"), "Unatoč lošem vremenu,...");
+        assert_eq!(out_cue("Ana Anić, Vijesti, Zagreb."), "Ana Anić, Vijesti, Zagreb.");
+        assert_eq!(out_cue("Novi sastanak sutra u devet sati."), "...sutra u devet sati.");
+        let profile = general_tv();
+        let blocks = [Block::written("intro", "Najava spikera ne ulazi."), Block::written("off", "Prvi off priloga ovdje."), sot("Ne odustajemo od naših zahtjeva.")];
+        let rows = rows(&blocks, Some(&profile), 2.5);
+        assert_eq!(story_cues(&rows), ("Prvi off priloga...".to_string(), "...odustajemo od naših zahtjeva.".to_string()));
+        let view = ScriptView { blocks: rows, profile: Some(profile), ..ScriptView::default() };
+        let story = export_story(&view);
+        assert_eq!(story.items[2].cues, Some(("Ne odustajemo od...".to_string(), "...odustajemo od naših zahtjeva.".to_string())), "a SOT shows its cues");
+        assert_eq!(story.items[1].cues, None);
     }
 }

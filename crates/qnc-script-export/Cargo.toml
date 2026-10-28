@@ -1,0 +1,8 @@
+[package]
+name = "qnc-script-export"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: the script of a story written out for the people after the field crew (user 2026-10-28): clean text to send by mail or message, the two-column A/V script (picture left, sound right) and a MOS roStorySend story for a newsroom system; directions and graphics in capitals, the text read aloud as written; it reads and writes nothing"
+
+[dependencies]
+qnc-script-profile = { workspace = true }

@@ -6734,3 +6734,17 @@ polju (tekst ili izbor); blok se bira klikom na oznaku ili tekst (okvir bloka vi
 Katalog akcija (bez tipki), rjecnik, ugovor `script.database.json` (`fields`). Testovi `qnc-script-db` (8), `qnc-script`
 (4), `qnc-script-profile` (3), conformance, release build. Uzivo nije provjereno. Nije izvedeno (tocke 4-5): izvoz kroz
 predloske (MOS, dva stupca, tekst), uredivanje profila i promjena profila projekta.
+Izvedeno 2026-10-28 (korisnik: tocka 4 prosirena prijedlozima iz Gemini razgovora, in-cue/out-cue i pravila zapisa;
+"zavrsi prije planirane radnje, a na kraju mozemo testirati nove mogucnosti"): izvoz scenarija. Nova javna kocka
+`crates/qnc-script-export` (+ ugovor `contracts/modules/script-export.module.json`; cista, nista ne cita ni pise): cisti tekst
+(za e-mail ili poruku), dvostupacni A/V scenarij kao HTML (slika i upute lijevo, ton i tekst desno, trajanje uz rub; ispis na
+A4) i MOS 2.8 `roStorySend` (izgovoreni tekst kao `<p>`, oznake, upute, potpisi i cue kao `<pi>`, obrazac priloga i trajanja
+kao `mosExternalMetadata`); upute rezije, oznake i grafika VELIKIM slovima, izgovoreni tekst kako je napisan. `qnc-script`:
+in-cue (prve 3 rijeci) i out-cue (zadnje 4) priloga iz prvog i zadnjeg bloka koji ulazi u trajanje priloga, i svakog bloka
+cija vrsta ima `cues` (SOT); akcija `script_export` pise `<projekt>_script.txt`, `.html` i `.mos.xml` u mapu exporta projekta
+(izvan niti sucelja), `script_open_export` otvara A/V scenarij u pregledniku datoteka. Panel: gumb Export, In-cue/Out-cue
+priloga ispod trajanja, IN/OUT ispod SOT-a, link "Exported: ..." na izvezenu datoteku. Premjesteno (ne kopirano):
+mapa exporta `qnc-work-settings` `WorkSettings::export_folder` i ime datoteke `export_file_name` (iz `tools/qnc-export`, koji
+ih sada koristi); `qnc-newsroom-sheet-db` `StorySheet::shown` (obrazac kako se cita: naziv polja, izbor po nazivu, trajanje
+m:ss). Katalog akcija (bez tipki), rjecnik. Testovi `qnc-script-export` (3), `qnc-script` (5), conformance. Uzivo nije
+provjereno. Nije izvedeno: status priloga i povijest verzija, provjera po formatu (VTR/VO/SOT), tocka 5.

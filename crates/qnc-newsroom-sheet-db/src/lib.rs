@@ -47,6 +47,40 @@ pub enum Data {
 }
 
 impl StorySheet {
+    /// The sheet as people read it, in its order: the name of each field with a value and the
+    /// value (a choice by its name, a length as `m:ss`).
+    pub fn shown(&self) -> Vec<(String, String)> {
+        let options = self.sheet.get("options");
+        let Some(fields) = self.sheet.get("fields").and_then(Value::as_array) else { return Vec::new() };
+        fields
+            .iter()
+            .filter_map(|field| {
+                let id = field.get("id")?.as_str()?;
+                let label = field.get("label").and_then(Value::as_str).unwrap_or(id);
+                let label = label.strip_prefix('@').and_then(|code| qnc_ui_text::host().ok()?.get(code).ok()).map_or_else(|| label.to_string(), str::to_string);
+                let value = self.values.get(id)?;
+                let text = match (field.get("kind").and_then(Value::as_str), value) {
+                    (Some("duration"), Value::Number(seconds)) => {
+                        let seconds = seconds.as_f64()?.round() as u64;
+                        (seconds > 0).then(|| format!("{}:{:02}", seconds / 60, seconds % 60))?
+                    }
+                    (_, Value::String(text)) => text.trim().to_string(),
+                    (_, Value::Number(number)) => number.to_string(),
+                    _ => return None,
+                };
+                if text.is_empty() {
+                    return None;
+                }
+                let set = field.get("options").and_then(Value::as_str);
+                let named = set.and_then(|set| options?.get(set)?.as_array()?.iter().find_map(|pair| {
+                    let pair = pair.as_array()?;
+                    (pair.first()?.as_str()? == text).then(|| pair.get(1)?.as_str().map(str::to_string)).flatten()
+                }));
+                Some((label, named.unwrap_or(text)))
+            })
+            .collect()
+    }
+
     /// What a search of projects finds this sheet by: every typed value, and the names of the
     /// chosen choices (the code is kept, its name is what people type).
     pub fn search_text(&self) -> String {

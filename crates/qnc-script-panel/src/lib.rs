@@ -9,7 +9,7 @@
 
 use eframe::egui::{self, RichText, Sense};
 use qnc_action_event::ActionEvent;
-use qnc_script::{seconds_label, FieldEdit, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT};
+use qnc_script::{seconds_label, FieldEdit, EXPORT, OPEN_EXPORT, Role, FIELD_COMMIT, FIELD_SET, FIELD_TEXT, ScriptView, ADD_CLIP, ADD_QUOTE, ADD_TEXT, CLEAR_EDITOR, EDITOR_TEXT, MOVE_DOWN, MOVE_UP, OPEN, PANEL, RECORD, REMOVE, REPLACE_TEXT, SELECT};
 use qnc_text_source_editor::{Answer, Editor, EditorButton};
 use qnc_transcript::TranscriptView;
 
@@ -53,6 +53,9 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
             ui.label(muted(&qnc_ui_text::fill("script.profile", &[("name", &profile.name)])));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.export"), !view.blocks.is_empty() && !view.exporting, false, style).on_hover_text(qnc_ui_text::text("script.export_hint")).clicked() {
+                asked = Some(ActionEvent::key(EXPORT).at(PANEL));
+            }
             if qnc_ui_kit::chrome_button(ui, qnc_ui_text::text("script.copy"), !view.blocks.is_empty(), false, style).clicked() {
                 ui.ctx().copy_text(view.text());
             }
@@ -77,8 +80,19 @@ fn paint_script(ui: &mut egui::Ui, view: &ScriptView, transcript: &TranscriptVie
             ui.label(RichText::new(text).color(if over { theme.danger } else { theme.text_muted }).size(theme.font_ui));
         }
     });
+    // The story's in-cue and out-cue (the director's cue that it ends).
+    if !view.in_cue.is_empty() {
+        ui.label(muted(&qnc_ui_text::fill("script.story_cues", &[("in", &view.in_cue), ("out", &view.out_cue)])));
+    }
     if !view.message.is_empty() {
         ui.label(RichText::new(&view.message).color(theme.danger).size(theme.font_ui));
+    }
+    if let Some(file) = view.exported.as_deref().filter(|_| view.message.is_empty()) {
+        let name = std::path::Path::new(file).file_name().map_or_else(|| file.to_string(), |name| name.to_string_lossy().into_owned());
+        let link = egui::Label::new(RichText::new(qnc_ui_text::fill("script.exported", &[("file", &name)])).color(theme.focus).underline().size(theme.font_ui)).sense(Sense::click());
+        if ui.add(link).on_hover_text(file).clicked() {
+            asked = Some(ActionEvent::key(OPEN_EXPORT).at(PANEL));
+        }
     }
     ui.add_space(4.0);
     let quotes_height = if transcript.quotes.is_empty() { 0.0 } else { (ui.available_height() * QUOTES_SHARE).max(60.0) };
@@ -164,6 +178,10 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
                 }
             });
         });
+        // The first and last words of a block whose kind shows them (in-cue, out-cue).
+        if row.cues && !block.text.trim().is_empty() {
+            ui.label(RichText::new(qnc_ui_text::fill("script.block_cues", &[("in", &qnc_script::in_cue(&block.text)), ("out", &qnc_script::out_cue(&block.text))])).color(theme.text_muted).size(theme.font_ui));
+        }
         // The take being recorded: its time and the microphone's level.
         if let Some((_, seconds, peak)) = view.recording.filter(|(recording, _, _)| *recording == block.id) {
             ui.horizontal(|ui| {

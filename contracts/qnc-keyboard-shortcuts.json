@@ -163,6 +163,12 @@
     "script_field_set": {
       "label": "Izaberi vrijednost polja bloka scenarija"
     },
+    "script_export": {
+      "label": "Izvezi scenarij (tekst, A/V, MOS)"
+    },
+    "script_open_export": {
+      "label": "Otvori izvezeni scenarij"
+    },
     "script_open": {
       "label": "Otvori klip izjave scenarija"
     },

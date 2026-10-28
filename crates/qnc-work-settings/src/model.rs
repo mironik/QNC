@@ -241,6 +241,23 @@ impl WorkSettings {
         Ok(Loudness { a1_lufs: target("a1_lufs")?, a2_lufs: target("a2_lufs")?, true_peak_dbtp, tolerance_lu })
     }
 
+    /// The export folder of the project on this computer (`export.directory`, relative to the
+    /// project folder or absolute), made when missing; one separator of this OS throughout (the
+    /// setting is written with `/`). A missing setting is a controlled error.
+    pub fn export_folder(&self, project_dir: &std::path::Path) -> Result<std::path::PathBuf, ReadError> {
+        let directory = self.export.get("directory").and_then(Value::as_str).map(str::trim).unwrap_or_default();
+        if directory.is_empty() {
+            return Err(ReadError::new("export_directory", "The project has no export folder (export.directory); open the project in Project."));
+        }
+        let folder = match std::path::PathBuf::from(directory) {
+            absolute if absolute.is_absolute() => absolute,
+            relative => project_dir.join(relative),
+        };
+        let folder: std::path::PathBuf = folder.components().collect();
+        std::fs::create_dir_all(&folder).map_err(|error| ReadError::new("export_directory", &format!("{}: {error}", folder.display())))?;
+        Ok(folder)
+    }
+
     /// The lead-out after the end of the story in seconds (user 2026-10-24: 2 s by default,
     /// the client may ask other); a missing value is a controlled error.
     pub fn export_tail_seconds(&self) -> Result<f64, ReadError> {
@@ -527,4 +544,11 @@ fn validate_relative_product_path(value: &str) -> Result<(), ReadError> {
         return Err(incomplete());
     }
     Ok(())
+}
+
+/// A name a file of an export may have on every OS: letters, digits, `-` and `_`, every other
+/// sign `_` ("story" for an empty name).
+pub fn export_file_name(name: &str) -> String {
+    let name: String = name.chars().map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect();
+    if name.is_empty() { "story".into() } else { name }
 }

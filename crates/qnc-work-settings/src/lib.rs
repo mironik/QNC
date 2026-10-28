@@ -3,7 +3,7 @@ mod model;
 pub mod server;
 
 pub use model::{
-    ArtifactKind, ArtifactMode, Loudness, PlaybackInput, ProductArea, ProductLocations, ReadError, StoragePolicy, WorkSettings, VERSION,
+    export_file_name, ArtifactKind, ArtifactMode, Loudness, PlaybackInput, ProductArea, ProductLocations, ReadError, StoragePolicy, WorkSettings, VERSION,
 };
 use qnc_transport_resolver::{ResolvedEndpoint, ResolverConfig};
 use serde::{Deserialize, Serialize};

@@ -58,7 +58,7 @@ fn run() -> Result<PathBuf> {
     let reader = SettingsReader::from_root(&root).map_err(|e| e.to_string())?;
     let settings = reader.read().map_err(|e| e.to_string())?;
     let project_dir = reader.local_workspace_dir(&settings).map_err(|e| e.to_string())?.ok_or("The project has no local folder.")?;
-    let folder = export_folder(&settings.export, &project_dir)?;
+    let folder = settings.export_folder(&project_dir).map_err(|e| e.message)?;
 
     let target = qnc_db_broker::ProjectDbTarget::for_project(&reader, &settings)?;
     let inputs = InputReader::with_content_reader(reader.clone(), Arc::new(PlayerClipContent { target: ContentTarget::for_project(&reader, &settings) }));
@@ -81,7 +81,7 @@ fn run() -> Result<PathBuf> {
         let values = qnc_export_choice::delivery_values(id, &settings.export, story_format(&program)?)?;
         let delivery = qnc_program_render::Delivery::from_export(&values)?;
         // From the camera originals, never the prerender (user 2026-10-24).
-        return deliver(&settings, &program, delivery, &file_name(id), None, &target, &project_dir, &folder, roots);
+        return deliver(&settings, &program, delivery, &qnc_work_settings::export_file_name(id), None, &target, &project_dir, &folder, roots);
     }
     let mut files = BTreeMap::new();
     for (clip_id, input) in &program.clips {
@@ -111,7 +111,7 @@ fn run() -> Result<PathBuf> {
     }
     let start = settings.export_start_timecode().map_err(|e| e.to_string())?;
     let rate = program.project_audio.sample_rate_hz;
-    let base = format!("{}_{}", file_name(&settings.project_name), program.playlist.revision);
+    let base = format!("{}_{}", qnc_work_settings::export_file_name(&settings.project_name), program.playlist.revision);
     let text = qnc_fcp7_xml::sequence(&settings.project_name, &program.playlist, &files, &start, rate)?;
     let path = folder.join(format!("{base}.xml"));
     std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -223,7 +223,7 @@ fn deliver(
             true_peak_dbtp: loudness.true_peak_dbtp,
             tolerance_lu: loudness.tolerance_lu,
         };
-        let out = folder.join(format!("{}_{}_{suffix}.mxf", file_name(&settings.project_name), program.playlist.revision));
+        let out = folder.join(format!("{}_{}_{suffix}.mxf", qnc_work_settings::export_file_name(&settings.project_name), program.playlist.revision));
         let joined = qnc_unit_join::join(&files, sound, rule, &ffmpeg, &out, &picture, &start_timecode)?;
         let lane = |name: &str, lane: &qnc_unit_join::LaneOutcome| {
             let measured = lane.measured_lufs.map_or("silence".into(), |lufs| format!("{lufs:.1} LUFS"));
@@ -273,21 +273,6 @@ fn prerendered_units(target: &qnc_db_broker::ProjectDbTarget, content: &ContentT
 }
 
 /// The project's export folder (`export.directory`: inside the project when relative).
-fn export_folder(export: &serde_json::Value, project_dir: &std::path::Path) -> Result<PathBuf> {
-    let directory = export.get("directory").and_then(|d| d.as_str()).map(str::trim).unwrap_or_default();
-    if directory.is_empty() {
-        return Err("The project has no export folder (export.directory); open the project in Project.".into());
-    }
-    let folder = match PathBuf::from(directory) {
-        absolute if absolute.is_absolute() => absolute,
-        relative => project_dir.join(relative),
-    };
-    // One separator of this OS throughout (the setting is written with `/`).
-    let folder: PathBuf = folder.components().collect();
-    std::fs::create_dir_all(&folder).map_err(|e| format!("{}: {e}", folder.display()))?;
-    Ok(folder)
-}
-
 /// The local file of a medium of the story: its QNC URI bound to a root of this computer (a
 /// card source or the project folder), as the player is given it.
 fn local_path(roots: &[(String, PathBuf)], uri: &str) -> Result<PathBuf> {
@@ -297,8 +282,3 @@ fn local_path(roots: &[(String, PathBuf)], uri: &str) -> Result<PathBuf> {
     path.canonicalize().map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// A name a file may have on every OS.
-fn file_name(name: &str) -> String {
-    let name: String = name.chars().map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect();
-    if name.is_empty() { "story".into() } else { name }
-}

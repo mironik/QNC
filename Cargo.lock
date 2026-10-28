@@ -5544,14 +5544,17 @@ dependencies = [
  "qnc-dev-diagnostics",
  "qnc-newsroom-sheet-db",
  "qnc-script-db",
+ "qnc-script-export",
  "qnc-script-profile",
  "qnc-source-preview",
  "qnc-source-timecode",
+ "qnc-status-line",
  "qnc-timeline",
  "qnc-transcript",
  "qnc-ui-text",
  "qnc-voice-clip",
  "qnc-voice-record",
+ "qnc-work-settings",
  "serde",
  "serde_json",
 ]
@@ -5570,6 +5573,13 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "qnc-script-export"
+version = "0.1.0"
+dependencies = [
+ "qnc-script-profile",
 ]
 
 [[package]]

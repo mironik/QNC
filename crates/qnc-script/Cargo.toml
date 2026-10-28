@@ -10,6 +10,9 @@ qnc-db-broker = { workspace = true }
 qnc-newsroom-sheet-db = { workspace = true }
 qnc-script-db = { workspace = true }
 qnc-script-profile = { workspace = true }
+qnc-script-export = { workspace = true }
+qnc-status-line = { workspace = true }
+qnc-work-settings = { workspace = true }
 qnc-source-preview = { workspace = true }
 qnc-source-timecode = { workspace = true }
 qnc-timeline = { workspace = true }
