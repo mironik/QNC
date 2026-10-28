@@ -61,7 +61,19 @@ pub fn align(from: u64, to: u64, peaks: &[u16], words: &[Span]) -> Aligned {
     // word may keep the engine's time at the cost of a full reach), so one word's nearest
     // onset is not taken from the word it belongs to.
     let given: Vec<u64> = words.iter().map(|w| w.from.clamp(from, to.saturating_sub(1))).collect();
-    let starts = assign(&given, &onsets);
+    let mut starts = assign(&given, &onsets);
+    // Two words said as one ("A ono" heard as "aono", Mironik 3452, user 2026-10-28) share one
+    // onset: the later word took it and the earlier one was left in the quiet before it. A word
+    // never starts in quiet with nothing heard until the next word: it takes that word's voice,
+    // and the next word starts where the engine put it, after it.
+    for index in 0..starts.len().saturating_sub(1) {
+        let (start, next) = (starts[index], starts[index + 1]);
+        if !loud(start) && loud(next) && (start..next).all(|frame| !loud(frame)) {
+            let limit = starts.get(index + 2).copied().unwrap_or(to).max(next + 2);
+            starts[index] = next;
+            starts[index + 1] = given[index + 1].clamp(next + 1, limit - 1);
+        }
+    }
     // Ends: a word's voice runs on through dips of a few frames, never into the next word's
     // start; the last word no further than a little past its given end.
     let mut aligned = Vec::with_capacity(words.len());
@@ -228,5 +240,20 @@ mod measured {
         let starts: Vec<u64> = aligned.words.iter().map(|w| w.from).collect();
         // "Pa" from its first sound (864, a frame before its loud vowel), "dosad" at the red cut.
         assert_eq!(starts[..3], [864, 873, 881], "{aligned:?}");
+    }
+
+    /// Peaks of each frame of Mironik 3452 channel 1, frames 2377 on (read from the card; the
+    /// zoom of IN 2427): quiet, then "A ono" said as one ("aono") from 2418, "što" 2431, "nas"
+    /// 2444 (user 2026-10-28: "where it says ono it is a, the man says aono").
+    const AONO: [u16; 100] = [59,58,37,18,25,29,32,32,26,85,152,168,201,215,205,181,159,107,10,5,7,33,36,20,10,1,2,3,5,5,6,8,7,7,5,4,4,5,4,2,18,53,93,121,121,140,188,191,180,201,171,134,46,59,191,169,140,134,132,151,99,24,44,41,5,2,7,136,195,185,142,59,154,136,146,152,155,90,23,27,27,34,61,34,9,39,83,83,81,74,41,22,25,24,39,98,163,172,173,163];
+
+    #[test]
+    fn two_words_said_as_one_do_not_leave_the_first_in_the_quiet() {
+        // The engine's words: Hrvatski, sabor, A, ono, što, nas, sve, zanima.
+        let given = [(2357, 2382), (2386, 2413), (2413, 2421), (2421, 2441), (2441, 2449), (2449, 2457), (2457, 2473), (2474, 2498)];
+        let words: Vec<Span> = given.iter().map(|&(from, to)| Span { from, to }).collect();
+        let aligned = align(2377, 2477, &AONO, &words);
+        let starts: Vec<u64> = aligned.words.iter().map(|w| w.from).collect();
+        assert_eq!(starts[2..6], [2418, 2421, 2431, 2444], "{aligned:?}");
     }
 }

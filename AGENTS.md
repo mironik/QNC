@@ -6619,3 +6619,9 @@ ili novim Space nastaviti play; trebamo akciju koja ce ga vratiti na pocetak Sub
 prikazanog klipa (korisnikov IN, bez njega pocetak klipa), pa Space ponovno pusta SubClip. Uzeta oznaka ostaje uzeta.
 `qnc-source-panel` (`go_to_mark_in`, `in_frame`, test), `qnc-panel-focus` (s bilo kojeg panela: pogled izvora, tipkovnica na
 source timeline). Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-28 (korisnik: "gdje pise ono je a, jer covjek kaze aono"): u zoomu Mironik 3452 rijec "ono" stajala je na
+2418, gdje glas "a" pocinje (izmjereno ffmpegom s kartice: tisina 2395-2416, glas od 2418), a "A" je ostalo u tisini na 2413.
+Motor je "A ono" cuo kao jedno, pa su dvije rijeci imale jedan pocetak glasa i poravnanje ga je dalo kasnijoj. `qnc-word-align`:
+rijec ne smije poceti u tisini bez ikakvog glasa do sljedece rijeci; tada uzima pocetak glasa te rijeci, a sljedeca pocinje gdje
+ju je motor stavio, iza nje. Test na stvarnim vrhovima te kartice (prozor zooma IN 2427): A 2418, ono 2421, sto 2431, nas 2444.
+Granica izmedu "a" i "ono" je vrijeme motora (2421), jer u zvuku nema stanke. Testovi, conformance. Uzivo nije provjereno.
