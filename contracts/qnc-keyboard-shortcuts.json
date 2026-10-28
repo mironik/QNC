@@ -136,6 +136,9 @@
     "script_editor_clear": {
       "label": "Isprazni editor scenarija"
     },
+    "script_subsegment": {
+      "label": "SubSegment: IN-OUT klipa kao sljedeci dio izabranog bloka izjave, ili novi blok"
+    },
     "script_add_clip": {
       "label": "Dodaj IN-OUT klipa kao blok izabrane vrste profila"
     },

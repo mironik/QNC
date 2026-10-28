@@ -6797,3 +6797,18 @@ retka), zakljucan kao i ostatak profila. Radio profil vise nema TV rijeci: stupc
 `[PLAY PACKAGE]`, najava i odjava `{mark} (STUDIO)` s govornikom PRESENTER, tekst novinara samo oznaka s govornikom
 REPORTER. Rjecnik `sp.labels`, `sp.l.*`, `sp.sp.presenter`, `sp.sp.reporter`. Testovi `qnc-script-profile-editor`,
 `qnc-script-profile`, `qnc-script-export`, `qnc-script`, conformance, release build. Uzivo nije provjereno.
+Izvedeno 2026-10-29 (korisnik: "slaganje source-segmenata se radi u obrascu za pisanje i snimanje priloga"; "dodamo novo
+dugme SubSegment umjesto Talking head u MA audio; to dugme bi dodalo transkriptirani tekst vezan za dodani SubSegment; ako
+ima vise dijelova tekst bi se slagao jedan ispod drugoga"): u MA Audio (grupa g) dugme SubSegment zamjenjuje Talking Head
+(`contracts/ui/editorial.layout.json`, akcija kataloga `script_subsegment` bez tipke, omogucena kad je klip izabran).
+Pritisak uzima IN/OUT prikazanog klipa s rijecima prijepisa izgovorenim tamo: kad je u scenariju izabran blok izjave
+(klip vrsta profila), postaje njegov sljedeci dio; inace nastaje novi blok prve klip vrste profila, izabran, pa sljedeci
+pritisak dodaje u njega. `qnc-script-db`: `Piece` i `Block.pieces` (stupac `pieces_json`, starija tablica se prepisuje uz
+zadrzane blokove), operacija `AddPiece` (blok jednog raspona zadrzava taj raspon kao prvi dio; dio bez raspona i dio
+tekstualnog bloka se odbijaju), `Block::of_pieces`/`from_pieces`: klip, IN i pocetni TC prvog dijela, zavrsni TC
+zadnjeg, duljina zbroj, tekst rijeci dijelova jedan ispod drugoga; ugovor `script.database.json` (`pieces`).
+`qnc-script` (`SUBSEGMENT`, `marked_piece` zajednicki s "+ SOT (IN-OUT)"), `qnc-script-panel` (blok od vise dijelova:
+broj dijelova i ukupno trajanje, ispod svaki dio s klipom, TC-ovima i svojim tekstom). Nije izvedeno: slaganje price u
+Storyju iz bloka od vise dijelova (Ton segment), brisanje i redoslijed pojedinog dijela, izvoz scenarija po dijelovima
+(izvoz pise blok kao jedan raspon s tekstom svih dijelova). Testovi `qnc-script-db` (novi), `qnc-script`,
+`qnc-script-panel`, `qnc-editorial-application`, conformance, release build. Uzivo nije provjereno.

@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-pub use qnc_script_db::{Block, Counts, KindSpec, Role, ScriptProfile};
+pub use qnc_script_db::{Block, Counts, KindSpec, Piece, Role, ScriptProfile};
 
 /// One block as the panel shows it.
 #[derive(Debug, Clone, PartialEq)]

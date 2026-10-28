@@ -52,7 +52,7 @@ impl EditorialView {
 
     pub fn action_enabled(&self, action_id: &str) -> bool {
         match action_id {
-            action_ids::SAVE_VIRTUAL_SHOT | action_ids::ADD_TON_SEGMENT | action_ids::ADD_OFF_SEGMENT => self.chosen_clip_id().is_some(),
+            action_ids::SAVE_VIRTUAL_SHOT | action_ids::ADD_TON_SEGMENT | action_ids::ADD_OFF_SEGMENT | "script_subsegment" => self.chosen_clip_id().is_some(),
             "transcribe_marks" => self.chosen_clip_id().is_some() || self.focus.transcript.ticked > 0,
             action_ids::DELETE_SEGMENT | action_ids::DELETE_PART => self.segments.selected().is_some(),
             tab if LibraryTab::from_action(tab).is_some() => qnc_pool_tabs::Contents { clips: self.clips.len(), shorts: self.shorts.iter().filter(|s| !s.b_roll).count(), b_roll: self.shorts.iter().filter(|s| s.b_roll).count(), segments: self.segments.parts.len(), transcribed: self.focus.transcript.pool_clips(true, &self.clips).len() }.has(tab).unwrap_or(false),

@@ -189,3 +189,26 @@ fn a_block_keeps_only_the_fields_of_its_kind_and_a_choice_only_one_of_its_choice
     let profile = read_profile(&target).unwrap().unwrap();
     assert_eq!(profile.cue_label_with("cg", 1, &blocks[1].fields), "*CG locator");
 }
+
+fn piece(clip: &str, from: u64, to: u64, text: &str) -> Piece {
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into() }
+}
+
+#[test]
+fn a_subsegment_keeps_its_parts_their_words_one_under_another() {
+    let (_dir, target) = written();
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "a drugi dio")).unwrap();
+    add_piece(&target, id, piece("2679", 10, 60, "i treci")).unwrap();
+    let block = read(&target).unwrap().remove(0);
+    assert_eq!(block.pieces.len(), 3, "the block's own range is its first part");
+    assert_eq!(block.text, "rekao je\na drugi dio\ni treci");
+    assert_eq!(block.seconds, 7.0);
+    assert_eq!((block.clip_id.as_str(), block.from_frame, block.start_tc.as_str(), block.end_tc.as_str()), ("2002", 100, "10:00:02:00", "tc60"));
+    assert!(add_piece(&target, id, piece("2002", 50, 50, "")).is_err(), "a part without a range is refused");
+    let text = add(&target, None, off("tekst")).unwrap();
+    assert!(add_piece(&target, text, piece("2002", 1, 2, "")).is_err(), "a text block takes no parts");
+    let new = add(&target, None, Block::of_pieces("sot", vec![piece("3396", 1, 51, "nova izjava")])).unwrap();
+    let block = read(&target).unwrap().into_iter().find(|b| b.id == new).unwrap();
+    assert_eq!((block.pieces.len(), block.text.as_str(), block.from_frame), (1, "nova izjava", 1));
+}

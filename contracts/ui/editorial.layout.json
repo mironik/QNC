@@ -210,7 +210,10 @@
         "actions_rtl": [
           "@story.broll",
           "@story.voice_over",
-          "@story.talking_head",
+          {
+            "label": "@script.subsegment",
+            "action_id": "script_subsegment"
+          },
           {
             "label": "@story.add_subclip",
             "action_id": "save_virtual_shot"

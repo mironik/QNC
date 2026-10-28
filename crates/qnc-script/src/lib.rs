@@ -51,6 +51,8 @@ pub const CLEAR_EDITOR: &str = "script_editor_clear";
 pub const ADD_CLIP: &str = "script_add_clip";
 /// A statement of the transcript goes into the script (target: its id).
 pub const ADD_QUOTE: &str = "script_add_quote";
+/// SubSegment: the shown IN/OUT is the next part of the chosen clip block, or a new one.
+pub const SUBSEGMENT: &str = "script_subsegment";
 /// A block is chosen (target: its id); a text block's text goes into the editor.
 pub const SELECT: &str = "script_select";
 /// A block goes one place up or down, or leaves (target: its id).
@@ -183,6 +185,7 @@ impl Script {
                 let Some(kind) = target.and_then(|code| self.kind(code)).filter(|kind| kind.role == Role::Clip).map(|kind| kind.id.clone()) else { return Some(false) };
                 self.add_clip(preview, timeline, timecode, transcript, kind)
             }
+            SUBSEGMENT => self.add_subsegment(preview, timeline, timecode, transcript),
             ADD_QUOTE => {
                 let Some(quote) = id().and_then(|id| transcript.quotes.iter().find(|q| q.id == id)).cloned() else { return Some(false) };
                 // A statement of the transcript is a block of the profile's first clip kind.
@@ -280,30 +283,52 @@ impl Script {
 
     /// The shown clip's IN/OUT as a block of clip kind `kind`, with the words said there.
     fn add_clip(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, timecode: Option<&SourceTimecode>, transcript: &TranscriptView, kind: String) -> bool {
-        let (Some(clip_id), Some((from, to))) = (preview.view().clip_id.clone(), timeline.visible_source_marks()) else {
-            self.view.message = qnc_ui_text::text("script.sot_marks").into();
+        let Some(piece) = self.marked_piece(preview, timeline, timecode, transcript) else { return true };
+        let block = Block::of_pieces(kind, vec![piece]);
+        // A block of one range keeps no parts (its range is its own).
+        let block = Block { pieces: Vec::new(), ..block };
+        let after = self.view.selected;
+        self.write(preview, move |target| qnc_script_db::add(target, after, block).map(Some))
+    }
+
+    /// SubSegment (user 2026-10-29): the shown clip's IN/OUT with the words said there is the
+    /// next part of the chosen clip block; without a chosen clip block it starts a new one of
+    /// the profile's first clip kind (chosen then, so the next press adds to it).
+    fn add_subsegment(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, timecode: Option<&SourceTimecode>, transcript: &TranscriptView) -> bool {
+        let Some(piece) = self.marked_piece(preview, timeline, timecode, transcript) else { return true };
+        if let Some(id) = self.view.selected.filter(|id| self.view.blocks.iter().any(|row| row.block.id == *id && row.is_clip())) {
+            return self.write(preview, move |target| qnc_script_db::add_piece(target, id, piece).map(|_| None));
+        }
+        let Some(kind) = self.view.clip_kinds().first().map(|kind| kind.id.clone()) else {
+            self.view.message = qnc_ui_text::text("script.no_clip_kind").into();
             return true;
         };
-        if to <= from {
+        let block = Block::of_pieces(kind, vec![piece]);
+        let after = self.view.selected;
+        self.write(preview, move |target| qnc_script_db::add(target, after, block).map(Some))
+    }
+
+    /// The shown clip's IN/OUT as a part, with the words said there (none, and the reason in
+    /// the panel, without an IN/OUT).
+    fn marked_piece(&mut self, preview: &SourcePreview, timeline: &TimelineProjection, timecode: Option<&SourceTimecode>, transcript: &TranscriptView) -> Option<Piece> {
+        let marked = preview.view().clip_id.clone().zip(timeline.visible_source_marks()).filter(|(_, (from, to))| to > from);
+        let Some((clip_id, (from, to))) = marked else {
             self.view.message = qnc_ui_text::text("script.sot_marks").into();
-            return true;
-        }
+            return None;
+        };
         let at = |frame: u64| timecode.map_or_else(|| frame.to_string(), |tc| tc.label(frame));
-        let text = if transcript.clip_id.as_deref() == Some(clip_id.as_str()) { transcript.said(from, to) } else { String::new() };
-        let block = Block {
+        Some(Piece {
             clip_name: self.names.get(&clip_id).map_or_else(|| clip_id.clone(), |(name, _, _)| name.clone()),
             seconds: self.seconds_of(&clip_id, to - from),
+            text: if transcript.clip_id.as_deref() == Some(clip_id.as_str()) { transcript.said(from, to) } else { String::new() },
             clip_id,
             from_frame: from,
             to_frame: to,
             start_tc: at(from),
-            // The OUT is past the last frame: the end shown is the last frame of the block.
+            // The OUT is past the last frame: the end shown is the last frame of the part.
             end_tc: at(to.saturating_sub(1).max(from)),
             length: timecode.map_or_else(|| (to - from).to_string(), |tc| tc.duration_label(to - from)),
-            ..Block::written(kind, text)
-        };
-        let after = self.view.selected;
-        self.write(preview, move |target| qnc_script_db::add(target, after, block).map(Some))
+        })
     }
 
     /// Starts the take of block `block` (of a recorded kind), or stops the take that records

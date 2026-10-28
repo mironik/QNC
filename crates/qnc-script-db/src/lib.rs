@@ -66,12 +66,66 @@ pub struct Block {
     /// the lines of a graphic); a field without a value is not kept.
     #[serde(default)]
     pub fields: BTreeMap<String, String>,
+    /// The parts of a clip block put together from several ranges (empty: the block is its one
+    /// range).
+    #[serde(default)]
+    pub pieces: Vec<Piece>,
 }
 
 impl Block {
     /// A text block of kind `kind`.
     pub fn written(kind: impl Into<String>, text: impl Into<String>) -> Self {
-        Self { id: 0, kind: kind.into(), text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new(), fields: BTreeMap::new() }
+        Self { id: 0, kind: kind.into(), text: text.into(), clip_id: String::new(), clip_name: String::new(), from_frame: 0, to_frame: 0, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 0.0, voice_uri: String::new(), voice_seconds: 0.0, voice_tc: String::new(), fields: BTreeMap::new(), pieces: Vec::new() }
+    }
+
+    /// A clip block of kind `kind` made of `pieces` (at least one): its clip, IN and timecodes
+    /// the first part's, its length all of them, its words theirs one under another.
+    pub fn of_pieces(kind: impl Into<String>, pieces: Vec<Piece>) -> Self {
+        let mut block = Self::written(kind, "");
+        block.pieces = pieces;
+        block.from_pieces();
+        block
+    }
+
+    /// The block's range, length and words from its parts (nothing when it has none).
+    pub fn from_pieces(&mut self) {
+        let (Some(first), Some(last)) = (self.pieces.first().cloned(), self.pieces.last().cloned()) else { return };
+        self.clip_id = first.clip_id;
+        self.clip_name = first.clip_name;
+        self.from_frame = first.from_frame;
+        self.to_frame = first.to_frame;
+        self.start_tc = first.start_tc;
+        self.end_tc = last.end_tc;
+        self.seconds = self.pieces.iter().map(|piece| piece.seconds).sum();
+        self.length = if self.pieces.len() == 1 { first.length } else { qnc_ui_text::fill("script.pieces_length", &[("n", &self.pieces.len().to_string())]).into() };
+        self.text = self.pieces.iter().map(|piece| piece.text.trim()).filter(|text| !text.is_empty()).collect::<Vec<_>>().join("\n");
+    }
+}
+
+/// One part of a clip block put together from several ranges (user 2026-10-29: a statement is
+/// cut to leave out pauses or repeats; the parts follow one another, their words one under
+/// another).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Piece {
+    pub clip_id: String,
+    pub clip_name: String,
+    /// Clip frames `[from, to)`.
+    pub from_frame: u64,
+    pub to_frame: u64,
+    pub start_tc: String,
+    pub end_tc: String,
+    pub length: String,
+    pub seconds: f64,
+    /// The words said in it.
+    #[serde(default)]
+    pub text: String,
+}
+
+impl Piece {
+    /// The block's own range as its first part (a clip block that had one range).
+    pub fn of(block: &Block) -> Self {
+        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone() }
     }
 }
 
@@ -98,6 +152,9 @@ pub enum Operation {
     SetVoice { id: i64, uri: String, seconds: f64, tc: String },
     /// The values of a block's fields (each one a field of its kind; an empty value is none).
     SetFields { id: i64, fields: BTreeMap<String, String> },
+    /// Clip block `id` gets `piece` as its next part (a block of one range keeps that range as
+    /// its first part).
+    AddPiece { id: i64, piece: Piece },
 }
 
 impl Operation {
@@ -203,6 +260,11 @@ pub fn set_voice(target: &ProjectDbTarget, id: i64, uri: String, seconds: f64, t
 /// The fields of block `id` become `fields`.
 pub fn set_fields(target: &ProjectDbTarget, id: i64, fields: BTreeMap<String, String>) -> Result<()> {
     write(target, Operation::SetFields { id, fields }).map(drop)
+}
+
+/// Clip block `id` gets `piece` as its next part.
+pub fn add_piece(target: &ProjectDbTarget, id: i64, piece: Piece) -> Result<()> {
+    write(target, Operation::AddPiece { id, piece }).map(drop)
 }
 
 /// Block `id` leaves the script.

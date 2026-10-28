@@ -147,7 +147,10 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
             if ui.add(egui::Label::new(RichText::new(&row.mark).color(color).strong().size(theme.font_ui)).sense(Sense::click())).clicked() {
                 picked = true;
             }
-            let detail = if row.is_clip() {
+            // A SubSegment of several parts: how many and how long all of them are.
+            let detail = if row.is_clip() && block.pieces.len() > 1 {
+                format!("{}  {}", block.length, seconds_label(row.seconds))
+            } else if row.is_clip() {
                 format!("{}  {} - {}  {}", block.clip_name, block.start_tc, block.end_tc, block.length)
             } else if !block.voice_uri.is_empty() {
                 qnc_ui_text::fill("script.recorded", &[("length", &seconds_label(row.seconds)), ("tc", &block.voice_tc)])
@@ -194,10 +197,22 @@ fn paint_block(ui: &mut egui::Ui, row: &qnc_script::BlockRow, view: &ScriptView,
                 ui.painter().rect_filled(lit, 2.0, if peak > 0.7 { theme.danger } else { theme.focus });
             });
         }
-        let text = if block.text.is_empty() { qnc_ui_text::text("script.no_words").to_string() } else { block.text.clone() };
-        let color = if block.text.is_empty() { theme.text_muted } else { theme.text };
-        if ui.add(egui::Label::new(RichText::new(text).color(color).size(theme.font_ui + 1.0)).wrap().sense(Sense::click())).clicked() {
-            picked = true;
+        // A SubSegment of several parts: each part's clip and timecodes, its words under it, one
+        // part under another (user 2026-10-29).
+        let parts: Vec<(Option<String>, &str)> = if block.pieces.len() > 1 {
+            block.pieces.iter().map(|piece| (Some(format!("{}  {} - {}  {}", piece.clip_name, piece.start_tc, piece.end_tc, piece.length)), piece.text.as_str())).collect()
+        } else {
+            vec![(None, block.text.as_str())]
+        };
+        for (detail, text) in parts {
+            if let Some(detail) = detail {
+                ui.label(RichText::new(detail).color(theme.text_muted).size(theme.font_ui));
+            }
+            let shown = if text.is_empty() { qnc_ui_text::text("script.no_words").to_string() } else { text.to_string() };
+            let color = if text.is_empty() { theme.text_muted } else { theme.text };
+            if ui.add(egui::Label::new(RichText::new(shown).color(color).size(theme.font_ui + 1.0)).wrap().sense(Sense::click())).clicked() {
+                picked = true;
+            }
         }
         if let Some(event) = paint_fields(ui, row, view, theme) {
             asked = Some(event);

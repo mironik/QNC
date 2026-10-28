@@ -564,6 +564,8 @@
     "script.no_project": "Open a project first.",
     "script.choose_to_record": "Choose the block to record first.",
     "script.no_clip_kind": "The script profile of this project has no clip kind.",
+    "script.subsegment": "SubSegment",
+    "script.pieces_length": "{n} parts",
     "script.no_profile": "No script profile is there on this computer (catalogs/script-profiles).",
     "script.profile": "Profile: {name}",
     "script.voice_local_only": "Recording needs the project folder on this computer.",
