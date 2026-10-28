@@ -6625,3 +6625,8 @@ Motor je "A ono" cuo kao jedno, pa su dvije rijeci imale jedan pocetak glasa i p
 rijec ne smije poceti u tisini bez ikakvog glasa do sljedece rijeci; tada uzima pocetak glasa te rijeci, a sljedeca pocinje gdje
 ju je motor stavio, iza nje. Test na stvarnim vrhovima te kartice (prozor zooma IN 2427): A 2418, ono 2421, sto 2431, nas 2444.
 Granica izmedu "a" i "ono" je vrijeme motora (2421), jer u zvuku nema stanke. Testovi, conformance. Uzivo nije provjereno.
+Ispravak isti dan (korisnik: "ne, a je jednako glasno kao i ono"): prvi val od 2418 je "a", drugi od 2431 "ono"; motor je sve
+rijeci dao 3-10 slika ranije. Pravilo iznad (sljedeca rijec ostaje gdje ju je motor stavio) dalo je "ono" na 2421, usred "a".
+Sada `qnc-word-align` `assign` rijeci ne dopusta da ostane na mjestu motora koje je tisina (`keepable`): takva rijec uzima
+pocetak glasa, a ostale se slazu redom. Mironik 3452 (pravi vrhovi s kartice): A 2418, ono 2431, sto 2444, nas 2449, sve 2462,
+zanima 2469; test Mironik 2680 i dalje prolazi. Testovi, conformance. Uzivo nije provjereno.

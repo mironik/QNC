@@ -61,7 +61,10 @@ pub fn align(from: u64, to: u64, peaks: &[u16], words: &[Span]) -> Aligned {
     // word may keep the engine's time at the cost of a full reach), so one word's nearest
     // onset is not taken from the word it belongs to.
     let given: Vec<u64> = words.iter().map(|w| w.from.clamp(from, to.saturating_sub(1))).collect();
-    let mut starts = assign(&given, &onsets);
+    // A word kept where the engine put it must be on voice: one given in the quiet takes an
+    // onset (user 2026-10-28: "a" and "ono" equally loud, the engine early on both).
+    let keepable: Vec<bool> = given.iter().map(|&frame| loud(frame)).collect();
+    let mut starts = assign(&given, &keepable, &onsets);
     // Two words said as one ("A ono" heard as "aono", Mironik 3452, user 2026-10-28) share one
     // onset: the later word took it and the earlier one was left in the quiet before it. A word
     // never starts in quiet with nothing heard until the next word: it takes that word's voice,
@@ -114,15 +117,17 @@ pub fn align(from: u64, to: u64, peaks: &[u16], words: &[Span]) -> Aligned {
 /// Each word's start: an onset (in order, each once, at most `SNAP_REACH` from where the engine
 /// put it) or its given frame, with the least moving in all; a word kept where it was given
 /// costs a full reach and more, so a near onset is taken whenever the order allows it.
-fn assign(given: &[u64], onsets: &[u64]) -> Vec<u64> {
+fn assign(given: &[u64], keepable: &[bool], onsets: &[u64]) -> Vec<u64> {
     let (n, m) = (given.len(), onsets.len());
     let keep = SNAP_REACH + 2;
+    // Kept in the quiet: only when no onset is in reach.
+    let quiet = 1000;
     // best[i][j]: the least cost of words i.. with onsets j..; choice[i][j]: the onset taken.
     let mut best = vec![vec![0u64; m + 1]; n + 1];
     let mut choice = vec![vec![None; m + 1]; n + 1];
     for i in (0..n).rev() {
         for j in (0..=m).rev() {
-            let mut cost = keep + best[i + 1][j];
+            let mut cost = if keepable[i] { keep } else { quiet } + best[i + 1][j];
             let mut taken = None;
             for k in j..m {
                 let distance = onsets[k].abs_diff(given[i]);
@@ -254,6 +259,6 @@ mod measured {
         let words: Vec<Span> = given.iter().map(|&(from, to)| Span { from, to }).collect();
         let aligned = align(2377, 2477, &AONO, &words);
         let starts: Vec<u64> = aligned.words.iter().map(|w| w.from).collect();
-        assert_eq!(starts[2..6], [2418, 2421, 2431, 2444], "{aligned:?}");
+        assert_eq!(starts[2..5], [2418, 2431, 2444], "{aligned:?}");
     }
 }
