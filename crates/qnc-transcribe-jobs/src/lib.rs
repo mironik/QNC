@@ -7,7 +7,7 @@
 
 mod audio;
 
-pub use audio::{read_wav, to_whisper_rate, write_wav, WHISPER_RATE};
+pub use audio::{loud_spans, quiet_pieces, read_wav, to_whisper_rate, write_wav, WHISPER_RATE};
 use qnc_plugin_process::{Plugin, PluginSpec, Ready};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

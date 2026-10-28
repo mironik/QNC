@@ -58,6 +58,71 @@ pub fn to_whisper_rate(samples: &[f32], rate: u32) -> Result<Vec<f32>, String> {
     Ok(out)
 }
 
+/// `samples` (at `rate`) in pieces of at most `max_seconds`, each but the last cut at the
+/// quietest tenth of a second of its last five seconds, so a word is rarely cut (user
+/// 2026-10-26: pieces cut at fixed places cut sentences in two).
+pub fn quiet_pieces(samples: &[f32], rate: usize, max_seconds: usize) -> Vec<std::ops::Range<usize>> {
+    let mut pieces = Vec::new();
+    let mut from = 0;
+    while from < samples.len() {
+        let to = piece_end(samples, from, rate, max_seconds);
+        pieces.push(from..to);
+        from = to;
+    }
+    pieces
+}
+
+/// The stretches of `samples` (at `rate`) louder than `floor_dbfs` (RMS of a tenth of a
+/// second), each widened by a third of a second and joined when less than a second apart; the
+/// rest is not given to the engine (user 2026-10-26: "sound under some level is skipped, not
+/// analysed").
+pub fn loud_spans(samples: &[f32], rate: usize, floor_dbfs: f32) -> Vec<std::ops::Range<usize>> {
+    let tenth = (rate / 10).max(1);
+    let floor = 10f32.powf(floor_dbfs / 10.0); // mean square
+    let (pad, join) = (rate / 3, rate);
+    let mut spans: Vec<std::ops::Range<usize>> = Vec::new();
+    for at in (0..samples.len()).step_by(tenth) {
+        let window = &samples[at..(at + tenth).min(samples.len())];
+        let mean_square = window.iter().map(|s| s * s).sum::<f32>() / window.len() as f32;
+        if mean_square < floor {
+            continue;
+        }
+        let span = at.saturating_sub(pad)..(at + window.len() + pad).min(samples.len());
+        match spans.last_mut() {
+            Some(last) if span.start <= last.end + join => last.end = span.end,
+            _ => spans.push(span),
+        }
+    }
+    spans
+}
+
+/// A tenth of a second quieter than this (RMS) is a pause, not a gap between two words.
+const PAUSE_DBFS: f32 = -45.0;
+
+/// The end of the piece from `from`: the quietest tenth of its last five seconds when that is a
+/// pause; when those seconds are all speech, the latest pause of its last fifteen seconds; only
+/// when there is none, the quietest tenth after all (live 2026-10-28: a cut at a gap between two
+/// words of a sentence lost the words before it, the engine writes nothing for speech cut off).
+fn piece_end(samples: &[f32], from: usize, rate: usize, max_seconds: usize) -> usize {
+    let full = from + max_seconds * rate;
+    if full >= samples.len() {
+        return samples.len();
+    }
+    let tenth = (rate / 10).max(1);
+    let energy = |at: usize| {
+        let window = &samples[at..(at + tenth).min(samples.len())];
+        window.iter().map(|s| s * s).sum::<f32>() / window.len() as f32
+    };
+    let pause = 10f32.powf(PAUSE_DBFS / 10.0);
+    let back = |seconds: usize| (full - seconds.min(max_seconds.saturating_sub(1)) * rate).max(from + tenth)..full;
+    let quietest = back(5).step_by(tenth).min_by(|&a, &b| energy(a).total_cmp(&energy(b)));
+    let at = match quietest {
+        Some(at) if energy(at) < pause => Some(at),
+        _ => back(15).step_by(tenth).filter(|&at| energy(at) < pause).last().or(quietest),
+    };
+    at.map(|at| at + tenth / 2).unwrap_or(full)
+}
+
 fn sinc(x: f64) -> f64 {
     if x.abs() < 1e-12 {
         1.0

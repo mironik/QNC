@@ -60,3 +60,41 @@ fn a_job_and_a_segment_keep_the_contract_shape() {
     .unwrap();
     assert_eq!(segment.words[0].text, "Dobar");
 }
+
+#[test]
+fn a_long_sound_is_cut_at_its_quietest_place_near_each_piece_end() {
+    let rate = 16_000;
+    let mut samples = vec![0.5f32; 40 * rate];
+    let quiet = 27 * rate;
+    samples[quiet..quiet + rate / 10].fill(0.0);
+    let pieces = quiet_pieces(&samples, rate, 30);
+    assert_eq!(pieces, vec![0..quiet + rate / 20, quiet + rate / 20..samples.len()]);
+    assert_eq!(quiet_pieces(&samples[..rate], rate, 30), vec![0..rate], "a short sound is one piece");
+}
+
+#[test]
+fn a_piece_whose_last_seconds_are_all_speech_ends_at_the_pause_before_them() {
+    let rate = 16_000;
+    let mut samples = vec![0.5f32; 40 * rate];
+    let pause = 21 * rate;
+    samples[pause..pause + rate].fill(0.0);
+    let gap = 28 * rate; // between two words: quieter, but not a pause
+    samples[gap..gap + rate / 10].fill(0.01);
+    let pieces = quiet_pieces(&samples, rate, 30);
+    assert!(pieces[0].end > pause && pieces[0].end < pause + rate, "cut in the pause, not at the gap: {pieces:?}");
+}
+
+#[test]
+fn only_sound_over_the_floor_is_given_to_the_engine() {
+    let rate = 1000;
+    // 2 s quiet, 1 s loud, 0.5 s quiet, 1 s loud, 5 s quiet.
+    let mut samples = vec![0.0001f32; 2 * rate];
+    samples.extend(vec![0.3f32; rate]);
+    samples.extend(vec![0.0001f32; rate / 2]);
+    samples.extend(vec![0.3f32; rate]);
+    samples.extend(vec![0.0001f32; 5 * rate]);
+    let spans = crate::loud_spans(&samples, rate, -42.0);
+    assert_eq!(spans.len(), 1, "a short pause joins the two loud parts");
+    assert_eq!((spans[0].start, spans[0].end), (2 * rate - rate / 3, 4500 + rate / 3));
+    assert!(crate::loud_spans(&vec![0.0001f32; 3 * rate], rate, -42.0).is_empty());
+}

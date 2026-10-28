@@ -6271,3 +6271,302 @@ uspio ne pita se ponovno u istom radu; bez ukljucenog prijepisa u projektu nema 
 projekta. Puni je `qnc-trim-stills` uz fini val (aplikacija nije dirana), crta `qnc-trim-overlay` (`paint_words`);
 `qnc-program-view` `ZoomSound.words`, `ZoomWord`; `qnc-still-locator` `reader`. Testovi, conformance, release build.
 Uzivo nije provjereno.
+Izvedeno 2026-10-26 (korisnik: "minuta traje vjecno, usporio se pojavu playholdera, neupotrebljivo"; "ljudi traze
+multitasking, podijeliti na vise jezgri i niti"; "zoom ne prekida pozadinske procese transkripcije, on u zumu radi
+transkripciju na CPU; pozadinsku treba usporiti ili pauzirati ako su potrebni resursi za potrebu koju korisnik forsira";
+"da, kreni s podjelom 1-3"): log je pokazao da whisper na istoj grafickoj (Iris Xe) kao player ne ustupa playeru (svaki
+Ctrl+I u zoomu pokretao ga je sam; dekodiranje unatrag istek 10 s, player se prestao javljati), uz istodobni uvoz novog
+projekta i prerender. Izmjereno (Mironik 2002, 16 kHz): whisper q5 na procesoru neupotrebljiv (12 s zvuka za 363 s na 6
+niti), na grafickoj 60 s za 36 s; NVIDIA Parakeet TDT 0.6B v3 int8 kroz sherpa-onnx na procesoru 12 s za 1,5 s i 60 s za
+8,8 s na 2 niti, bez izmisljanja na tisini; tekst slabiji (imena, nema velikog Đ). Podjela: (1) zoom (`qnc-zoom-words`)
+prepisuje na procesoru Parakeetom i ne dira pozadinu; (2) pozadinski prijepis (MA Transcribe) ostaje whisper na
+grafickoj, u komadima od 30 s: prije svakog ceka dok player svira ili korisnik montira (`qnc-playback-activity` razina iz
+baze projekta), a komad koji korisnik prekine radom playera zaustavlja se i ponavlja kad player miruje
+(`qnc-transcribe-run` `Purpose`, svaki program drzi svoj model, rade istodobno); (3) novi program
+`tools/qnc-transcribe-parakeet` (ugovor `qnc.transcribe` 1; sherpa-onnx C API v2 ucitan iz `sherpa-onnx-c-api.dll` uz
+program, bez nje kontrolirana greska; zvuk u prozorima do 30 s rezanima na najtisem mjestu, rijeci iz tokena, recenice po
+interpunkciji ili stanci). AI katalog (`qnc-ai-catalog`): `transcribe.zoom` imenuje motor zooma (bez njega zoom nema motor,
+nista ne pada na drugi), model smije biti mapa. Datoteke izvan gita: `data/models/parakeet-tdt-0.6b-v3-int8`,
+`data/models/ggml-large-v3-turbo-q5_0.bin` (izmjeren, nije u katalogu), DLL-ovi sherpa-onnx 2.0.0 i onnxruntime uz program
+(beta paket ih mora ukljuciti). Probni program `crates/qnc-transcribe-jobs/examples/transcribe_wav.rs`. Testovi
+(`qnc-ai-catalog`, `qnc-transcribe-parakeet`, `qnc-transcribe-run`, `qnc-zoom-words`, `qnc-transcript`), conformance.
+Uzivo nije provjereno.
+Dopuna 2026-10-26 (korisnik: "popis imena" kroz sherpa-onnx: snaga 1,5-5 ne mijenja tekst, 6-10 ga raspada, Parakeet TDT
+nije za to; "selektiram klipove koje treba transcribe, dok se to radi u pozadini ili ceka, u zoomu mogu imati pomoc za
+rezanje izjava"; motor "postavka uz gumb"): red prijepisa. Klipovi oznaceni kvacicom u poolu MA Audio AI (grupa e,
+`ticks_several` u `editorial.layout.json`; kvacice su samo izbor na ekranu do Transcribe) ili bez kvacica IN/OUT
+prikazanog klipa stavljaju se u red u bazi projekta (`qnc-transcript-db`: tablica `transcript_queue`, pogled
+`public_transcript_queue`; klip, raspon, `fast`|`best`, stanje waiting|running|done|failed, greska), s izborom Fast
+(Parakeet, procesor) ili Quality (whisper) uz gumb Transcribe (akcije kataloga `transcribe_fast`, `transcribe_best`,
+`transcribe_mark`). Nova javna kocka `crates/qnc-transcribe-queue` (+ ugovor): jedan izvrsitelj reda po projektu (najam
+`transcribe_lease` u bazi), klip po klip, svaki u komadima koji cekaju dok player svira ili korisnik montira; klip koji
+je ostao `running` od prekinutog rada ceka ponovno. `qnc-transcribe-run` (`Quality` Best|Fast, `Pace` Now|YieldToPlayer),
+`qnc-ai-catalog` (`Quality`, kljuc `fast` umjesto `zoom`), `qnc-transcript` (kvacice, red, prekidac, citanje reda svake
+sekunde, pokretanje izvrsitelja kad nesto ceka), `qnc-transcript-panel` (red s nazivom, motorom i stanjem iznad teksta),
+`qnc-panel-focus` (poll prima klipove poola), Story/MA ploca i aplikacija (C10 spusteno: aplikacija 525, ploca 100).
+Zoom (Parakeet, odmah) radi neovisno o redu. Testovi (`qnc-transcript-db` red, `qnc-ai-catalog`, `qnc-transcript`,
+zlatna tablica tipki), conformance. Uzivo nije provjereno.
+Popravak 2026-10-26 (korisnik nakon probe: "whisper je po ovom sto vidim neupotrebljiv"; "da, kreni s 1-3, Quality makni
+za sada"): log i red u bazi: Fast 185 s zvuka za 66 s, Quality jednom pao ("the plug-in ended", greska nije zapisana pa je
+klip oboren), Quality na buci i djecjem govoru izmislja i ponavlja, a rez na fiksnih 30 s sijece recenice; svaki dodir
+playera bacao je cijeli komad. Izvedeno: (1) Fast (Parakeet) je jedini motor reda; prekidac Fast | Quality uklonjen s
+rasporeda grupe e (kod i akcije kataloga ostaju). (2) Red cita zvuk klipa jednom od pocetka medija
+(`qnc-sound-range::read_from_start`): frame-wrapped MXF s nekomprimiranim mono kanalom samo kroz zvucne elemente
+(`qnc-mxf-sound::read_element_frames`; pravilo "k-ti audio stream je element k" premjesteno iz `qnc-wave-worker` u
+`qnc-mxf-sound::sound_elements`), ostalo kroz katalog dekodera; izmjereno s kartice G: cijeli zvuk Mironik 2679 (224 s,
+1,6 GB) za 25,7 s. (3) Zvuk se reze na komade do 30 s na najtisem mjestu (`qnc-transcribe-jobs::quiet_pieces`, koristi ga
+i program Parakeet); komad koji korisnik prekine radom playera ponavlja se sam, gotovi komadi ostaju; program koji se
+ugasi u komadu pokrece se ponovno jednom, greska se zapisuje u log. Zoom i dalje cita nekoliko sekundi kroz `read`.
+Probni programi `qnc-mxf-sound/examples/element_read.rs`, `qnc-transcript-db/examples/queue.rs` (samo citanje).
+Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-26 (korisnik: "praznine ne prikazuj u tekstu, umjesto njih napisi crvenim slovima audio bez teksta od
+timecode - timecode"; "za transcribe po fajlu duljina IN/OUT, progres bar, koliko vec traje, i na kraju koliko puta brze od
+realnog vremena"): panel prepisa izmedu redaka crveno pise "Audio without text <TC> – <TC>" za svaki dio prepisanog zvuka
+bez rijeci od 2 s ili dulji (timecode izvora prikazanog klipa; `qnc-transcript` `silences`, `TranscriptView.silences`;
+dok prepis radi, samo do mjesta do kojeg je stigao). Red prepisa pokazuje sve klipove: naziv, duljinu IN/OUT, Fast,
+stanje; klip koji se prepisuje traku napretka (citanje zvuka, pa udio prepisanih sekundi) i koliko vec radi; gotov koliko
+je trajao i koliko puta brze od stvarnog vremena. `qnc-transcribe-run` javlja napredak (`Progress`), `qnc-transcribe-queue`
+ga prosljeduje (`Heard::Progress`) i upisuje trajanje gotovog klipa (`qnc-transcript-db` `took_ms`, stupac dodan starijoj
+tablici reda), `qnc-right-panel` prosljeduje timecode izvora panelu. Testovi, conformance, release build. Uzivo nije provjereno.
+Popravak 2026-10-26 (korisnik: "stvarna brzina u prosjeku manja od 2x, razmak izmedu tisina ogroman, recenice izlaze iz
+panela, trebaju biti u wrap modu"; "puno toga nije transcribirano"; "da cita samo A1 kanal, da ton ispod neke razine
+preskace"): (1) Retci prijepisa su jedan tekst prelomljen na sirinu panela (`qnc-transcript-panel`, LayoutJob; klik na
+rijec i osvijetljena rijec kao prije). (2) Log: citanje zvuka klipa s kartice pocinjalo je ispocetka pri svakom dodiru
+playera (do 7 puta po klipu); sada se nastavlja od zadnje procitane slike (`qnc-mxf-sound` `read_element_frames_into`,
+`qnc-sound-range` `read_from_start_kept`). (3) Motoru ide samo zvuk kanala govora projekta (vec tako, CH1) glasniji od
+-42 dBFS (RMS desetinke sekunde, prosiren 1/3 s, spojen preko stanki krocih od 1 s; `qnc-transcribe-jobs` `loud_spans`,
+`qnc-transcribe-run` `SILENCE_FLOOR_DBFS`), log `transcribe background ... Ns of Ms over -42 dBFS`. Nalazi: motor sam
+(Parakeet, 2-6 niti) 8-10x stvarnog vremena na 120 s zvuka; Mironik 2002 i 2679 imaju ispod -42 dBFS samo 3 s tisine (ambijent
+je glasniji), pa granica tamo malo skida. Rupe u tekstu nisu tisina: na 2679 118-148 s Parakeet daje "Okay, I think it's an
+evil.", whisper na istom zvuku hrvatski govor (djeca, dijalekt, buka); Parakeet ne moze dobiti zadani jezik. Testovi,
+conformance, release build. Uzivo nije provjereno.
+Dopuna 2026-10-26 (korisnik: "neki tekst se ponavlja; radis li transkript globalno ili po projektu, kako se baza ponasa ako se
+vise puta napravi transcribe"; "dvostruki klik za IN/OUT markere; IN je manji timecode"): (1) Prijepis je po projektu
+(`clip_transcripts` u `project.db`). Isti raspon klipa ponovno prepisan zamjenjuje stari; drugi raspon koji se preklapa
+zadrzavao je stare retke, pa se tekst ponavljao (klip s prijepisom cijelog klipa i kasnijim 644..4394). Sada je najnoviji
+prijepis ono sto je receno u svom rasponu: stariji prijepis klipa gubi retke ciji je srednji frame u novom rasponu, a
+prijepis ciji je raspon unutar novog se brise, u istoj transakciji (`qnc-transcript-db` `save`, test). Postojeci dupli redovi
+nestaju kad se taj raspon ponovno prepise. (2) Dvoklik na source timelineu (sve forme) je rez na kliknutoj slici, kao
+srednja tipka: prvi je IN, drugi oznacava razmak (manji frame IN, veci OUT), treci pocinje novi par. `qnc-timeline`
+(`TimelineIntent::CutAt`, `with_first_cut_at`, `with_second_cut`), `qnc-mouse-map` (`double_click_frame`),
+`contracts/input/mouse.json` (source_timeline `double_click_frame: source_cut`), `qnc-source-timeline` (`cut` prima sliku),
+`qnc-panel-focus`. Testovi, conformance. Uzivo nije provjereno.
+Popravak 2026-10-26 (korisnik: "nisam zadovoljan odzivom playheada na source timelineu u MA AI ni nacinom transcribe; treba
+naci nacin da se ubrza"): log: dok prijepis radi u pozadini, sucelje MA AI crta 61 put u sekundi (450-570 ms procesora u
+sekundi; slaganje redaka prijepisa i kopija prikaza pri svakom crtanju), a prijepis je stajao pri svakom dodiru playera
+(citanje zvuka 5-7 puta prekinuto po klipu). Izvedeno: (1) dok radi samo pozadinski prijepis forma crta 4 puta u sekundi
+(`qnc-transcript` `working`, `qnc-panel-focus` `working`, `qnc-editorial-application` `next_repaint_delay`); retci i tisine
+prijepisa slazu se samo kad se promijene (`rev`, `Arc`). (2) Program Parakeet radi ispod normalnog prioriteta procesa
+(`tools/qnc-transcribe-parakeet`), pa player (iznad normalnog) i sucelje uvijek dobivaju procesor; zato pozadinski prijepis
+i citanje zvuka staju samo dok player svira, ne i dok korisnik montira (`qnc-transcribe-run` `while_idle`, `wait_idle`).
+Testovi, conformance, release build. Uzivo nije provjereno.
+Dopuna 2026-10-26 (korisnik: "dvoklik na tekst rijeci ne kreira marker; ako ne moze dvoklik, misem ili touchpadom, sto
+moze"; "u zoomu rade samo strelice, ne radi kotacic ni touchpad"): (1) Dvoklik na rijec u panelu prijepisa (mis ili dvostruki
+dodir touchpada) je rez na toj rijeci (akcija kataloga `transcript_cut_word`, bez tipke): prvi je IN na pocetku rijeci,
+rijec iza prvog reza OUT na svom kraju, ranija IN na svom pocetku; par drzi source timeline kao za skare
+(`qnc-source-timeline` `cut_word`, test; `qnc-transcript-panel`, `qnc-panel-focus`). Prvi klik dvoklika stavlja playhead na
+rijec kao i prije. (2) Kotacic i touchpad nad prozorom trim zooma rade isto sto nad panelom na kojem je uzeto (source
+timeline ili Wrap redovi): `qnc-trim-overlay` vraca radnju kotacica tog panela, ploca je predaje kao i druge radnje (C10
+isti). Testovi, conformance, release build. Uzivo nije provjereno.
+Ispravak 2026-10-26 (korisnik: "sto je IN, a sto OUT odreduje se na osnovi timecodea, manji broj je IN"): dvoklik na dvije
+rijeci uvijek oznacava obje cijele, bez obzira na redoslijed: IN na pocetku ranije rijeci (manji timecode), OUT na kraju kasnije
+(`qnc-source-timeline` `cut_word` pamti prvu rijec cijelu, test u oba redoslijeda). Skare (srednja tipka, dvoklik na source
+timelineu) vec su tako radile. Conformance nije pokretan za ovu izmjenu.
+Dopuna 2026-10-26 (korisnik: "tekst koji se pojavljuje u zoomu trebao bi imati mogucnost dvoklika za marker, kao i tekst u MA
+AI"): u trim zoomu source timelinea dvoklik na rijec ispod A1 (`qnc-trim-overlay` `paint_words`; prozor zooma sada prima
+klik) salje `transcript_cut_word`. Dok je u zoomu uzet IN, rijec ga pomice na svoj pocetak, uzet OUT na svoj kraj, oznaka
+ostaje uzeta (`qnc-panel-focus`, `SourceTimeline::drag`); bez uzete oznake je rez kao na tekstu prijepisa. U zoomu Wrap redova
+(slot, marker) dvoklik na rijec ne radi nista (os je program, ne klip). Testovi, conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-26 (log: Express i H.264 export dali su A1 -31,6 LUFS s pojacanjem samo +5,5 dB, jer je vrh
+-6,5 dBTP zaustavio pojacanje na granici -1 dBTP, pa je A1 izvezen na oko -26 LUFS; korisnik: "da, otkljucaj i napravi
+limiter"; otkljucani `qnc-loudness` i `qnc-unit-join`): export dovodi A1 i A2 do cilja, a vrhove koji bi presli granicu
+drzi limiter. `qnc-loudness` `limited_gain` (`Lift`: pojacanje do cilja, nista unutar tolerancije, najvise
+`EXPORT_GAIN_MAX_DB` 20 dB; `limit` kad bi vrh uz to pojacanje presao granicu); `export_gain` ostaje za pokrivalice.
+`qnc-unit-join`: traka s limiterom ide kroz ffmpeg `aresample=192000,alimiter=...:level=false:latency=true,aresample=<rate>`
+(cetiri puta brzina, kao true peak BS.1770; strop 0,5 dB ispod granice), zapisana datoteka se mjeri ponovno i, ako je vrh
+jos iznad granice, pise jos jednom sa stropom nizim za razliku; `LaneOutcome` nosi `limited`, `written_lufs`,
+`written_dbtp`, a `tools/qnc-export` ih pise u player log. Probni program `crates/qnc-unit-join/examples/join_units.rs`
+(cita samo dijelove). Provjereno na kopiji dijelova prerendera projekta `novi-ukupni_1` u scratchpadu: A1 -31,6 -> -23,0
+LUFS, -1,5 dBTP (ffmpeg ebur128 isto), A2 -23,6 -> -23,0; 833280 uzoraka = 868 slika x 960; razlika izlaza i ulaza
+najmanja bez pomaka (-55,8 dB, pomak od 1 uzorka -44,8 dB), dakle zvuk ostaje uz sliku. Testovi, conformance. Kroz
+sucelje nije provjereno.
+Otkljucano i izvedeno 2026-10-26 (korisnik: "preciznost nije najbolja.. na ovom primjeru cijela rijec"; "da, otkljucaj i
+kreni"): nalaz: rijec nije izgubljena u zoomu nego u prijepisu (Parakeet na istom zvuku tri puta: "Pa dosta njih(rača)",
+bez rijeci na rezu; vremena rijeci na korak od 80 ms, kraj rijeci cesto prekratak). Nova javna kocka
+`crates/qnc-word-align` (+ ugovor `contracts/modules/word-align.module.json`; cista, nista ne cita ni pise): rubovi rijeci
+pomaknuti na zvuk ispod njih (pocetak natrag do mjesta gdje glas naraste, najvise 6 slika i nikad prije prethodne rijeci;
+kraj dalje dok glas ne padne, nikad u sljedecu rijec; tisina na rubu se odreze do 6 slika); glas je 6 dB iznad tihe petine
+prozora, nikad ispod -42 dBFS; glas koji nijedna rijec ne pokriva (najmanje 4 slike) vraca se zasebno. `qnc-zoom-words`
+(`fill(.., fine)`) ga primjenjuje samo kad je fini val A1 cijeli procitan (`qnc-trim-stills`), `qnc-program-view`
+`ZoomSound.unheard`, `qnc-trim-overlay` crta takav glas crveno s "?" u retku rijeci. Prijepis u bazi se ne mijenja.
+Testovi `qnc-word-align` (4), `qnc-zoom-words`, `qnc-trim-overlay`, `qnc-trim-stills`, `qnc-program-view`, conformance.
+Uzivo nije provjereno.
+Ispravak isti dan (korisnik: "rijec dosad pocinje zvucno tek na mjestu crvenog reza"; "potrebno je da rijeci budu na mjestu
+tona kako bi se tekst mogao koristiti za rezanje izjava"): izmjereno na zvuku kartice (samo citanje, 2680 kanal 1, RMS po
+slici): "Pa" pocinje na 865, "dosad" na 873, "njih" na 881, a Parakeet ih daje na 856, 868, 884 (5-9 slika ranije ili kasnije);
+prvo pravilo je pocetak jos pomicalo unatrag u dah. `qnc-word-align` sada: pocetak svake rijeci ide na najblizi pocetak glasa
+(porast iz tisine ili iz udubine za 9 dB, najvise 10 slika daleko, redom, bez preskakanja), kraj gdje njezin glas padne (kroz
+udubine do 5 slika, nikad u sljedecu rijec); glas je i najvise 18 dB ispod glasnog dijela prozora, pa dah i prostorija
+izmedu rijeci nisu glas. Test na izmjerenim vrijednostima tog mjesta. Uzivo nije provjereno.
+Ispravak isti dan (korisnik: "i dalje krivo... gdje pise dosad tu je Pa, dosad je desno na mjestu crvenog playheada"; "ili
+ti je pomaknut wave prikaz"): wave nije pomaknut (vrhovi slika procitani s kartice ffmpegom: glas "Pa" od 864, "dosad" od
+873, isto mjesto kao val zooma); najblize mjesto po rijeci (pohlepno) dalo je "dosad" pocetak "Pa" (865), a "Pa" dahu.
+`qnc-word-align`: pocetak glasa mora trajati (3 od 4 slike glasne), porasti 2 slike blizu su jedan pocetak; rijeci se na
+pocetke slazu redom s najmanje ukupnog pomicanja (`assign`, rijec bez pocetka zadrzava vrijeme motora uz kaznu vecu od
+dosega), pa jedna rijec ne uzima pocetak koji pripada drugoj. Test na izmjerenim vrhovima 2680 (slike 820-930): 864, 873,
+881. Uzivo nije provjereno.
+Popravak 2026-10-26 (korisnik: "odabrao sam tri klipa za transkript, pogledaj log"): sva tri su odmah pala (ms=0) jer je u
+projektu prijepis iskljucen (`ai.transcription` false), a log nije rekao zasto. `qnc-transcript` (`start`): Transcribe s
+iskljucenim prijepisom odmah pise `transcribe.off_in_project` i nista ne stavlja u red; `qnc-transcribe-queue` u logu uz
+ishod pise i gresku. Testovi `qnc-transcript`, `qnc-transcribe-queue`.
+Otkljucano i izvedeno 2026-10-27 (korisnik: "pojava playheada je u source timelineu spora"; "trebamo urediti MA AI transcribe
+panel ... popisu transkribiranih klipova dodati link ... oznaceni IN/OUT teksta kopira se u listu odabranog teksta s pocetnim
+i zavrsnim timecodeom i duljinom ... baza koju bi novinar mogao koristiti za kopiranje u skript"; "da, otkljucaj i kreni s
+oba"): (1) Player (otkljucan `qnc-broadcast-engine`): log je pokazao da sesija pada oko 3 s nakon "spreman": u pauzi player
+ponovno otvara dekoder slike (ffmpeg na kartici koja se budi) na svojoj niti, ne odgovara dulje od 2 s, klijent javlja
+"control read header timed out" i sljedeci klik trazi novu sesiju (0,9-1,4 s do spremnosti; 7 puta 26. 10., i 25. 10.). Sada
+klip kojem otvoreni dekoder ne moze skociti otvara novi u pozadinskoj niti (`Opening`, kao kod price); dok se otvara player
+odgovara, slika ceka kao kod dekodiranja. Testovi `qnc-broadcast-engine`. Uzivo nije provjereno. (2) Panel prijepisa:
+transkribirani klip u popisu je link (`transcript_open_clip`): otvara klip na previewu i njegov tekst; rijeci izmedu IN i OUT
+podcrtane; "Statements": "Add IN-OUT" (`transcript_add_quote`) sprema rijeci izmedu IN i OUT prikazanog klipa s pocetnim i
+zavrsnim timecodeom i duljinom (kako se prikazuju) u novu tablicu `transcript_quotes` baze projekta (`qnc-transcript-db`:
+`AddQuote`, `DeleteQuote`, `ReadQuotes`, pogled `public_transcript_quotes`; ugovor baze `transcripts.database.json`); tablica
+Start | End | Duration | Clip | Text, klik na red otvara klip s IN/OUT izjave (`transcript_open_quote`, kroz isti put kao Edit
+segmenta), X brise (`transcript_delete_quote`), "Copy" stavlja tablicu u medjuspremnik (red po izjavi, stupci odvojeni
+tabom). `qnc-transcript`, `qnc-transcript-panel` (`quotes.rs`), `qnc-panel-focus`, `qnc-editorial-application` (jedan redak
+izmijenjen, C10 isti), rjecnik, katalog akcija (bez tipki). Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-27 (korisnik: "copy prozor treba biti sirok kao i transcribe"): svaka izjava u Statements je red preko cijele
+sirine panela: gore timecodeovi, duljina, klip i X, ispod tekst prelomljen kao u prijepisu (`qnc-transcript-panel` `quotes.rs`).
+Otkljucano i izvedeno 2026-10-27 (korisnik: "na vrhu desnog panela dva taba Audio AI i Video AI"; "slazem se za naziv, moze i
+AI Media Assist"; analiza kadrova kao zaseban pozadinski posao nakon filmstripa, ne u istom citanju): grupa e zove se
+"AI Media Assist" (`apps/qnc-media-assist-audio-ai/qnc-app.json`, ugovor aplikacije, naslov prozora; id-evi isti; katalog
+aplikacija osvjezen alatom `qnc-app-catalog refresh`). Desni panel grupe smije imati tabove na vrhu (`right_panel_tabs` u
+`contracts/ui/editorial.layout.json`: naziv, akcija kataloga bez tipke, vrsta panela; `qnc-editorial-layout` `RightPanelTab`);
+crta ih `qnc-right-panel` `show_tabbed` istim izgledom kao tabove poola (`qnc-pool-tabs-panel`), a otvoreni tab je izbor
+prikaza ovog procesa (memorija sucelja, nista se ne pise). Grupa e: Audio AI (prijepis) i Video AI (`video_ai_panel`, zasad
+poruka `ai.video_none`). Akcije `ai_tab_audio`, `ai_tab_video` u katalogu bez tipke; tipke za tabove i krug fokusa nisu
+izvedeni. Forma nije narasla (C10 ploce isti). Testovi, conformance. Uzivo nije provjereno.
+Izvedeno 2026-10-27 (korisnik: "da, otkljucaj Project i kreni s analizom kadrova"): Project nije trebalo otkljucati: postavka
+postoji, Advanced kvacica "AI shot analysis and SubClips" (`ai.enabled`, seed false, `qnc-work-settings` `ai_enabled`), pa je
+ona prekidac analize. Analiza kadrova je zaseban pozadinski posao poslije filmstripa i vala: `tools/qnc-ingest-worker`
+(`make_shots`) je pokrece na kraju svog rada (otvaranje projekta, Select, Uvezi), ceka dok player svira, klip otvoren u
+previewu ide prvi. Nove kocke (s ugovorima modula): `qnc-shot-detect` (cisto: male sive slike -> kadrovi; promjena scene je
+skok histograma svjetline daleko iznad okolnih, kadar kraci od 2 slike je bljesak i spaja se; izgled black, soft, moving,
+still i najostrija slika kadra), `qnc-shot-db` (modul tablica posrednika, `clip_shots` / `public_clip_shots`, ugovor baze
+`shots.database.json`; rupa izmedju kadrova ili greska uz kadrove se odbija), `qnc-shot-analysis` (uvezeni klipovi bez
+analize: jedna intra slika originala oko svake sekunde kroz indeks MXF-a, kartica samo citana, dekodirane 160x90 kroz katalog
+dekodera po 16, upis pod najmom radnika; original koji nije na racunalu ceka sljedeci rad, original bez indeksa ili drugog
+kodeka zapisuje se s razlogom), `qnc-clip-shots` (analiza klipa na previewu citana izvan niti sucelja, ponovno svake 3 s dok je
+nema), `qnc-shot-panel` (Video AI tab: kadrovi s TC-om i izgledom, kadar pod playheadom osvijetljen, klik = `shot_cue`,
+playhead na pocetak kadra). Drzi ih `qnc-panel-focus`, crta `qnc-right-panel`; ploca isti broj redaka. Izmjereno na kartici G:
+(samo citanje, probni program `qnc-shot-analysis/examples/analyse_file.rs`): Mironik 2002 (3:24) 204 slike za 21,9 s, 1 kadar;
+2679 (3:44) 224 slike za 20,8 s, 3 kadra (rez na 6601 provjeren slikom: razgovor -> tribina); 1506 158 slika za 12,7 s,
+1 kadar. Granice (black, soft, moving, still) su prva procjena i trebaju zivu provjeru. Nije izvedeno: MP4 i ostali formati
+bez indeksa MXF-a, kadar u Wrapu/Storyju, trazenje po slici. Testovi, conformance. Uzivo nije provjereno.
+Izmjena 2026-10-27 (korisnik nakon probe: "to nije analiza i ne vidi neke subklipove"; log: svi uvezeni klipovi analizirani
+bez greske, ali skoro svaki 1 kadar, jer klip kamere je jedno snimanje bez rezova; "da, kreni s 1, pa nastavi do 5"):
+analiza daje upotrebljive dijelove snimanja. (1) `qnc-shot-analysis` cita svaku intra sliku originala (najvise 4 u sekundi;
+long GOP kamere oko 2 u sekundi, prije 1 u sekundi). (2) `qnc-shot-detect` `parts.rs`: pokret kamere izmedu susjednih slika
+je pomak cijele slike (`camera_move`: trazenje na pola velicine, pa piksel na punoj); mirno do 0,04 sirine slike u sekundi,
+jednoliki svenk do 0,5 i susjedni pomaci slicni, brze je trzaj ili brzi svenk. (3) Dio je niz mirnih ili jednolikih parova
+unutar jednog kadra, ostar i nije crn, najmanje 3 s (`PART_LEAST_SECONDS`), s najostrijom slikom. (4) `qnc-shot-db`:
+`PartRecord` (from, to, camera steady|pan, key_frame), stupci `parts_json` i `version` (`ANALYSIS_VERSION` 2); tablica
+ranijeg oblika bez dijelova se brise pa se klipovi analiziraju ponovno, red druge verzije se ne cita. (5) Video AI panel
+(`qnc-shot-panel`) prvo pokazuje dijelove (TC, mirna kamera / jednoliki svenk), ispod kadrove; klik na dio
+(`shot_open_part`, akcija kataloga bez tipke) otvara klip s IN/OUT dijela na source timelineu (`qnc-clip-shots`
+`open_part`, `take_source_request`, isti put kao izjava prijepisa), pa ga Add SubClip / Shift+S sprema kao SubClip s
+posterom. SubClipovi se ne prave sami. Izmjereno na kartici G: (samo citanje): 2679 466 slika 48 s, 11 dijelova; 2002 425
+slika 62 s, 8 dijelova (stand-up 0-1681 miran, odlazak novinara izbacen, svenkovi po tribini 2065-2257 i 2617-2881,
+provjereno slikama); 1506 328 slika 54 s, 3 dijela. Analiza je oko 2 puta sporija nego s jednom slikom u sekundi. Testovi
+`qnc-shot-detect` (pomak, dio miran, jednoliki svenk, trzaj), `qnc-shot-db` (dijelovi, stara tablica), conformance. Uzivo nije
+provjereno.
+Dopuna 2026-10-27 (korisnik: "analiziranim dijelovima dodamo boju okvira kao sto imamo za duzinu trajanja pokrivalica u
+Storyju"): svaki upotrebljivi dio u Video AI panelu ima okvir u boji svoje duljine i duljinu `sekunde:slike`, istim
+pravilom i granicama kao pokrivalica u Storyju (`qnc-segment-panel` `cover_fill`, `cover_lengths` iz
+`contracts/ui/editorial.layout.json`); stopa iz timecodea klipa. `qnc-shot-panel` (ovisi o `qnc-segment-panel` i
+`qnc-program-view`, bez kopije pravila), `qnc-right-panel` predaje granice. Conformance. Uzivo nije provjereno.
+Popravak 2026-10-27 (korisnik: "zasto se ceka pocetak transcripta na klipu od 3,29 skoro 40 sekundi"; "da, otkljucaj i
+napravi"; otkljucani `qnc-transcribe-run`, `qnc-transcribe-queue`, uz njih nuzno `qnc-sound-range` i `qnc-mxf-sound`):
+log (Mironik 2002, 203,9 s): citanje cijelog zvuka s kartice 35 s, motor 23,6 s; prvi tekst je cekao kraj citanja, a karticu
+je istodobno citao i radnik vala za isti klip. Sada red prepisa cita zvuk u jednoj niti i daje ga motoru dok se cita:
+komad cim je procitano 35 s zvuka iza njega (rez na najtisem mjestu zadnjih 5 s, najvise 30 s), ostatak kad je citanje gotovo;
+citanje i prepis i dalje stoje dok player svira, prekinuto citanje nastavlja od procitanih slika (`qnc-transcribe-run`
+`read_sound`, `hear_while_read`, `hear`). `qnc-sound-range` `stream_from_start` (MXF zvuk okvir po okvir, ostali mediji kroz
+katalog dekodera odjednom) zamjenjuje `read_from_start` i `read_from_start_kept`; `qnc-mxf-sound` `read_element_frames_each`.
+`qnc-transcribe-queue` nije trebalo mijenjati. Testovi, conformance. Uzivo nije provjereno. Nije izvedeno: radnik vala i
+prepis i dalje mogu istodobno citati isti klip s kartice.
+Popravak 2026-10-27 (korisnik: "kadrovi koje napravi, kad se na njih klikne, trebali bi playholder prebaciti na IN tog kadra"):
+klik na upotrebljivi dio u Video AI panelu (i na izjavu prijepisa, Edit segmenta) otvara klip s IN/OUT; kad je taj klip vec na
+previewu, preview ga ne otvara ponovno pa je playhead ostajao gdje je bio. Sada playhead tada ide na IN (`qnc-editorial-application`
+`open_marked`: `open_at` ili `cue`). C10 Story aplikacija 525 -> 524. Testovi, conformance. Uzivo nije provjereno.
+Popravak i izmjena 2026-10-27 (korisnik: "pogledaj log... zasto je kompletan tekst u copy prozoru, treba dodati brisanje odabranog i da prikazuje samo odabrano s timecodeom: timecode, ispod tekst, ispod end timecode"): (1) Log: sedam klipova
+reda prijepisa palo je s `db.transcript_invalid`: u njima nema zvuka iznad -42 dBFS, motor nije nista cuo pa jezik nije bio
+zadan. Prijepis bez cutog zvuka dobiva jezik iz projekta (`qnc-transcribe-run`). (2) Izjava u panelu prijepisa: klip i trajanje
+s dugmetom Delete (prije znak koji font nema), ispod pocetni timecode, izgovoreni tekst, zavrsni timecode
+(`qnc-transcript-panel`, rjecnik `transcript.quote_remove`); Copy daje isto: pocetni TC, tekst, zavrsni TC, prazan red
+izmedu izjava (`qnc-transcript` `quotes_text`, test). Izjava bez OUT-a ide do kraja klipa (pravilo 17. 10.). Testovi, conformance.
+Popravak 2026-10-27 (korisnik: "brzina transkode je pokvarena"): uzrok nije izmjena prijepisa nego kartica: pozadinski radnik je radio
+analizu kadrova (Video AI, svaka intra slika svakog klipa, pet ffmpega) dok je red prijepisa citao zvuk s iste kartice;
+izmjereno: zvuk MXF-a od 9 s s kartice 4,5-7,3 s (iz memorije 0,01 s). Analiza kadrova sada ceka i dok radi prijepis koji je
+korisnik pokrenuo (`tools/qnc-ingest-worker`: najam `qnc-transcribe-queue::LEASE` u bazi, kao za player). Log prijepisa
+pise koliko je trajalo citanje, motor i cekanje na citanje (`qnc-transcribe-run`). Testovi, conformance. Uzivo nije provjereno.
+Otkljucano i izvedeno 2026-10-27 (korisnik: plan pisanja priloga od prijepisa do grubo slozene price; "da, otkljucavam
+Project, snimanje offa da"; "project forma ima tehnicki dio i kreativni dio"; "sve na jednom panelu: gore podaci za prilog,
+na kraju izbor tehnickog templatea; sve drugo tek kad se otvori Advanced"; "smanji projekt formu, prebaci u kocke"):
+(1) Podaci priloga: nova tablica baze projekta `project_story_info` i pogled `public_project_story_info` (slug, emisija,
+format vtr|vo|sot, emitiranje, zadano trajanje u sekundama, novinar, snimatelj, montazer; vlasnik Project,
+`qnc-project-store` `story_info.rs`, `create_project_with_story`, `story_info`, `save_story_info`; novinar bez upisa je
+korisnik racunala iz zapisa porijekla), ugovor `project-workspace.database.json`. Pozadinski poslovi `LoadStory`,
+`SaveStory`, `Create` nosi podatke (`qnc-project-jobs`). (2) Project panel: gore sekcija Story (naziv projekta i polja iz
+ugovora `story_info`, crta ih `qnc-settings-form`: nova vrsta polja `text` i `duration` m:ss, `FieldSection`), zatim
+template, zatim Create (novi projekt) ili Save i New project (otvoreni projekt; sesija drzi podatke otvorenog projekta,
+`story_draft`, `story_project`); AI, lokacije, template akcije, Advanced sekcije i vlastiti template samo pod otvorenim
+Advanced (`pts_slots`, conformance Project pravilo prilagodeno). Akcije kataloga `project_story_save`, `project_new_draft`.
+(3) Forma u kocke: nova kocka `crates/qnc-location-field` (+ ugovor; polje lokacije s preglednikom, oba polja Projecta su
+njezina dva primjerka; 14 radnji preglednika postale su `PickLocation`/`AnswerLocation` s istim id-evima kataloga), nova
+kocka `crates/qnc-settings-rows` (+ ugovor; redovi i gumbi panela postavki, prije `widgets.rs`), izgled forme
+`qnc-desktop-theme::apply_settings_look` (prije kopija u `theme.rs`), Advanced radi s jednom temom. C10 `qnc-project-blocks`
+1714 -> 1178, `qnc-project-session` 788 -> 568 redaka. Testovi (`qnc-project-store` 45, `qnc-location-field`,
+`qnc-settings-rows`, `qnc-settings-form`), conformance, release build. Uzivo nije provjereno. Project je ponovno zamrznut.
+Izmjena 2026-10-27 (korisnik: "Template nema skrol"; "Stori obrazac vertikalno, Enterom u novi red"; "polja baze pod sifrom kako bi naziv
+polja mogao biti proizvoljan"; "vise pripremljenih templatea"; "owerlaj ... samostalni obrazac kojega moze kreirati administrator sustava,
+ako mu ni jedan od ponudenih ne odgovara; u njemu se pise i naziv projekta, forma preuzima naziv"; "ne ogranicavati opcije, dati opciju
+zakljucavanja" - "samo prekidac"): zamjenjuje sekciju Story iz prethodnog zapisa. Obrazac priloga je list polja po sifri. Nova kocka
+`crates/qnc-newsroom-sheet` (+ ugovor; naziv neutralan jer `qnc-story-*` pripada obitelji aplikacije Story): pripremljeni listovi
+`catalogs/story-sheets` (dnevne vijesti, javni servis, komercijalna TV, lokalna TV, agencija/online, minimalni; nazivi su sifre rjecnika
+`sheet.*`), listovi ovog racunala `data/story-sheets` i izabrani `data/story-sheet.json`; overlay u sredini ekrana: izbor lista, naziv
+projekta, polja jedno ispod drugog (Enter `form_next_field` ide dalje), Create/Save i Cancel; uredivac lista (naziv, prekidac Locked,
+polja: naziv, vrsta tekst/izbor/trajanje/broj, izbori odvojeni zarezom, redoslijed, uklanjanje, novo polje sa sifrom iz naziva). Pripremljeni
+list se nikad ne prepisuje, njegova kopija dobiva svoju sifru. Nova kocka `crates/qnc-newsroom-sheet-db` (+ ugovori modula i baze
+`newsroom-sheet.database.json`; modul tablica posrednika): `project_story_sheet` (opis lista kakav je bio kad je popunjen) i
+`project_story_values` (vrijednost po sifri), javni pogledi; conformance: na popisu javnih DB vlasnika. Project: panel ima template i
+New project (otvara overlay, naziv se pise u njemu) te Story sheet za otvoreni projekt; `qnc-project-store` vise nema `StoryInfo` (tablica
+`project_story_info` uklonjena iz ugovora), daje `project_db_binding`; `qnc-project-jobs` poslije kreiranja upisuje list u bazu novog
+projekta kroz posrednika (projekt bez upisanog lista ostaje i kaze to), `LoadStory`/`SaveStory` citaju i pisu kroz kocku. Akcije kataloga
+`project_story_open`, `project_story_confirm`, `project_story_cancel` (umjesto `project_story_save`, `project_new_draft`). Samostalni
+program `tools/qnc-newsroom-sheet` (exe `qnc-newsroom-sheet`): administrator bira, mijenja ili pravi list racunala; uz aktivni projekt
+popunjava njegov list (naziv iz projekta) i sprema ga u njegovu bazu. C10 `qnc-project-blocks` 1170 -> 1146. Testovi
+(`qnc-newsroom-sheet` 4, `qnc-newsroom-sheet-db` 2, `qnc-project-jobs` 2: novi projekt cuva list u svojoj bazi, `qnc-project-store` 43),
+conformance, release build (s `libav`). Uzivo nije provjereno. Project je ponovno zamrznut.
+Dopuna 2026-10-28 (korisnik: "prezbijeno je.. visina svakog redka kao visina template izbornika, vece margine, prosiri obrazac";
+"project name s ponudenim datumom y/m/d"; "projekti bi se trebali moci pretrazivati po novinaru, snimatelju, montazeru,
+producentu i drugim"): obrazac priloga (`qnc-newsroom-sheet`) sirok 760, margine 24, redovi 32 (kao red izbora templatea),
+razmak 12; polja uz oznaku visoka kao red (`qnc-settings-form` `text_box`); naslov u traci, gumbi desno dolje; novi projekt
+pocinje danasnjim datumom `yyyy/mm/dd ` (`today`, crate `chrono` samo u toj kocki). Pretraga projekata: Project registry
+dobio je tablicu `project_search` (ugovor `project-registry.database.json`; `qnc-project-store` `set_project_search`,
+`ProjectRow.search_text`, `matches`: svaka rijec u nazivu, datumu ili vrijednostima obrasca), `qnc-project-jobs` je pise
+kad god sprema obrazac (`qnc-newsroom-sheet-db` `StorySheet::search_text`: vrijednosti i nazivi izabranih izbora), polje
+pretrage desno od naslova popisa projekata (`qnc-settings-rows` `title_with_search`), popis filtrira sesija
+(`shown_projects`). C10 `qnc-project-blocks` 1146 -> 1142. Testovi (`qnc-project-jobs`: projekt se nalazi po obrascu),
+conformance. Uzivo nije provjereno.
+Popravak 2026-10-28 (korisnik: "ton se nastavlja u 2:30, a prepis tek od 2:33"; "da, otkljucaj i popravi"; otkljucan
+`qnc-transcribe-jobs`): Mironik 2002: govor pocinje na 2:31,0, a red prijepisa je presjekao komad na 2:32,8, na kratkoj
+stanci izmedu dvije rijeci (najtise mjesto zadnjih 5 s, a tih 5 s bio je sav govor); Parakeet za govor odrezan na kraju
+komada ne napise nista (provjereno: 2:29-2:32,8 i 2:20-2:32,8 daju 0 redaka), pa su rijeci prije "poprilicno
+ambiciozno" izgubljene. `qnc-transcribe-jobs` `piece_end` (koriste ga red prijepisa i program Parakeeta): rez je
+najtise mjesto zadnjih 5 s samo kad je to stanka (ispod -45 dBFS RMS desetinke sekunde), inace zadnja stanka zadnjih
+15 s, a tek bez nje najtise mjesto kao prije. Primjer `qnc-transcribe-jobs/examples/pieces.rs` (samo citanje) ispisuje
+komade reda za WAV. Na zvuku kartice (samo citanje): komad sada pocinje na 2:30,90 i Parakeet daje "...teniski centar
+osmisljen je poprilicno ambiciozno...". Prazno 0:00-0:18 i 1:26-2:33 nije greska: tamo nema govora (korisnik: live
+javljanje, novinar je sutio dok je iz studija isla izjava). Test
+`a_piece_whose_last_seconds_are_all_speech_ends_at_the_pause_before_them`, conformance. Uzivo nije provjereno.
