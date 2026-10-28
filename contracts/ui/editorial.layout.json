@@ -134,12 +134,12 @@
             "action_id": "editorial_tab_all"
           },
           {
-            "label": "@pool.tab.subclip",
-            "action_id": "editorial_tab_virtual"
-          },
-          {
             "label": "@pool.tab.transcript",
             "action_id": "editorial_tab_transcript"
+          },
+          {
+            "label": "@pool.tab.subclip",
+            "action_id": "editorial_tab_virtual"
           }
         ]
       },

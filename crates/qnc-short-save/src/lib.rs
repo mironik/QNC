@@ -41,6 +41,23 @@ impl ShortSave {
         target: Option<&ProjectDbTarget>,
         project_id: Option<&str>,
     ) -> Result<(), String> {
+        // Why a SubClip was not saved goes to the log too (live 2026-10-28: none was saved and
+        // the log did not say why).
+        let started = self.check_and_write(chosen, clips, marks, target, project_id);
+        if let Err(error) = &started {
+            log(&format!("short-save refused clip={chosen:?} marks={marks:?}: {error}"));
+        }
+        started
+    }
+
+    fn check_and_write(
+        &mut self,
+        chosen: Option<&str>,
+        clips: &[ClipRow],
+        marks: Option<(u64, u64)>,
+        target: Option<&ProjectDbTarget>,
+        project_id: Option<&str>,
+    ) -> Result<(), String> {
         let clip_id = chosen.ok_or_else(|| text("story.msg.pick_clip"))?;
         let clip = clips.iter().find(|clip| clip.clip_id == clip_id).ok_or_else(|| text("ingest.msg.clip_not_found"))?;
         if !clip.imported {
@@ -71,7 +88,17 @@ impl ShortSave {
             Err(TryRecvError::Disconnected) => Err(text("story.msg.db_not_writable")),
         };
         self.pending = None;
+        match &outcome {
+            Ok(saved) => log(&format!("short-save saved {} clip={} marks={:?}", saved.shot_id, saved.clip_id, saved.marks)),
+            Err(error) => log(&format!("short-save failed: {error}")),
+        }
         Some(outcome)
+    }
+}
+
+fn log(line: &str) {
+    if qnc_dev_diagnostics::player_diagnostics_enabled() {
+        qnc_dev_diagnostics::log_line(qnc_dev_diagnostics::DiagnosticsStream::Player, line.to_string());
     }
 }
 

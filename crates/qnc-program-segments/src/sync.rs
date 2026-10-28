@@ -237,6 +237,13 @@ impl ProgramSegments {
     }
 
     /// Enter is taken by a running Sync play, a closed Sync slot or its cover write.
+    /// Whether a SubClip must not be saved now: a Sync/B-roll runs or waits for its Enter (its
+    /// IN/OUT is the cover's). A taken IN or OUT on the source timeline does not stop it (live
+    /// 2026-10-28: Add SubClip after a double click on a word saved nothing and said nothing).
+    pub fn subclip_waits(&self) -> bool {
+        self.sync.is_active() || self.sync.holds_enter()
+    }
+
     pub fn sync_holds_enter(&self) -> bool {
         self.sync.is_active()
             || self.sync.holds_enter()

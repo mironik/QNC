@@ -16,4 +16,5 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 qnc-content-store = { workspace = true }
+qnc-active-project-read = { workspace = true }
 tempfile = "3"

@@ -6595,3 +6595,15 @@ Nova kocka `crates/qnc-pool-tabs` (+ ugovor `contracts/modules/pool-tabs.module.
 `qnc-editorial-layout` (`EditorialMediaCard::empty_message`, `transcript_empty_message`). C10 spusteno: Story/MA
 aplikacija 524 -> 504, ploca 100 -> 94. Testovi `qnc-pool-tabs`, `qnc-transcript-db` (popis prepisanih, brisanje gotovih),
 `qnc-transcript` (tab, kraj reda), `qnc-editorial-application`, `qnc-panel-focus`, conformance. Uzivo nije provjereno.
+Dopuna i popravak 2026-10-28 (korisnik: "Transkript tab treba biti prije SubClip"; "svi tabovi u kojima nema nista trebaju
+biti zasivljeni i nedostupni.. to se odnosi na sve forme"; "odabrani dio teksta i klipa s ADD SubClip dodaje se u SubClip
+tab"): (1) Grupa e: tabovi All, Transcript, SubClip. (2) Tab poola bez sadrzaja je siv i ne moze se izabrati (klik, tipka,
+strelice pa Enter): `qnc-pool-tabs` `Contents::has` (klipovi, SubClipovi, B-roll, segmenti, prepisani klipovi);
+Story/MA `EditorialView::action_enabled`, a aplikacija tab bez sadrzaja ne bira; Ingest tab All siv kad pool nema
+klipova (`IngestViewModel::action_enabled`). Tabovi desnog panela (Audio AI / Video AI) nisu dirani. (3) Log: Add SubClip
+nakon dvoklika na rijec nije nista spremio i nista nije rekao (u bazi aktivnog projekta nema nijednog SubClipa): zastita
+"Enter je zauzet" (`sync_holds_enter`) iz vremena kad je Enter spremao SubClip odbijala je spremanje dok source timeline
+drzi uzetu oznaku. Sada SubClip ceka samo Sync/B-roll koji radi ili ceka Enter (`qnc-program-segments` `subclip_waits`);
+`qnc-short-save` u player log pise zasto SubClip nije spremljen i sto je spremljeno. Primjer
+`qnc-virtual-shots/examples/shorts.rs` (samo citanje) ispisuje SubClipove aktivnog projekta. Testovi (`qnc-pool-tabs`,
+test Virtual taba prilagoden novom pravilu), conformance. Uzivo nije provjereno.

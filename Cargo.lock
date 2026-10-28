@@ -5628,6 +5628,7 @@ version = "0.1.0"
 dependencies = [
  "qnc-clip-row",
  "qnc-db-broker",
+ "qnc-dev-diagnostics",
  "qnc-ui-text",
  "qnc-virtual-shots",
 ]
@@ -6293,6 +6294,7 @@ dependencies = [
 name = "qnc-virtual-shots"
 version = "0.1.0"
 dependencies = [
+ "qnc-active-project-read",
  "qnc-content-read",
  "qnc-content-store",
  "qnc-contracts",

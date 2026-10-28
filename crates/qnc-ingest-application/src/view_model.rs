@@ -76,7 +76,7 @@ impl IngestViewModel {
         match action_id {
             action_ids::INGEST_IMPORT_SELECTED => self.selected_count() > 0 && !self.command_busy,
             action_ids::INGEST_CLEAR_SELECTION => self.visible_clips().any(|clip| clip.selected),
-            action_ids::INGEST_SELECT_ALL => self.visible_clips().next().is_some(),
+            action_ids::INGEST_SELECT_ALL | action_ids::INGEST_TAB_ALL => self.visible_clips().next().is_some(), // a tab with nothing is grey (user 2026-10-28)
             _ => !self.command_busy,
         }
     }

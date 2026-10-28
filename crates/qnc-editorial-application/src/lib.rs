@@ -369,11 +369,11 @@ impl EditorialApplication {
         let picked = self.focus.take_pick(); // an arrow on the pool tabs, Enter on a dock button
         let action_id = picked.as_deref().unwrap_or(action_id);
         match action_id {
-            tab if LibraryTab::from_action(tab).is_some() => {
+            tab if LibraryTab::from_action(tab).is_some() && self.view.action_enabled(tab) => {
                 self.view.library_tab = LibraryTab::from_action(tab).unwrap_or_default();
                 true
             }
-            action_ids::SAVE_VIRTUAL_SHOT if self.segments.sync_holds_enter() || self.segments.marks_used_by_cover(self.view.preview.clip_id.as_deref(), self.view.preview.timeline.source_in_frame) => true,
+            action_ids::SAVE_VIRTUAL_SHOT if self.segments.subclip_waits() || self.segments.marks_used_by_cover(self.view.preview.clip_id.as_deref(), self.view.preview.timeline.source_in_frame) => true,
             action_ids::SAVE_VIRTUAL_SHOT => {
                 let target = self.content_target.as_ref().map(|targets| &targets.1);
                 let marks = self.view.preview.timeline.visible_source_marks();

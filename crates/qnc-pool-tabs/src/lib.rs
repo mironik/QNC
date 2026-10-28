@@ -10,6 +10,34 @@ pub const SEGMENT: &str = "editorial_tab_segment";
 /// The clips that have a kept transcript (user 2026-10-28, Media Assist Audio AI).
 pub const TRANSCRIPT: &str = "editorial_tab_transcript";
 
+/// Ingest's one tab of the pool: its clips.
+pub const INGEST_ALL: &str = "ingest_tab_all";
+
+/// How much each tab of a pool would show. A tab with nothing in it is grey and cannot be
+/// chosen, in every form (user 2026-10-28).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Contents {
+    pub clips: usize,
+    pub shorts: usize,
+    pub b_roll: usize,
+    pub segments: usize,
+    pub transcribed: usize,
+}
+
+impl Contents {
+    /// Whether the tab of `action_id` has something to show; `None` when it is not a tab.
+    pub fn has(&self, action_id: &str) -> Option<bool> {
+        let count = match LibraryTab::from_action(action_id)? {
+            LibraryTab::All => self.clips,
+            LibraryTab::Virtual => self.shorts,
+            LibraryTab::Broll => self.b_roll,
+            LibraryTab::Segment => self.segments,
+            LibraryTab::Transcript => self.transcribed,
+        };
+        Some(count > 0)
+    }
+}
+
 /// Pool tab, as in v5: Virtual lists short shots only, B-roll the cover shots, Segment the
 /// program segments; Transcript the clips already transcribed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -25,7 +53,7 @@ pub enum LibraryTab {
 impl LibraryTab {
     pub fn from_action(action_id: &str) -> Option<Self> {
         match action_id {
-            ALL => Some(Self::All),
+            ALL | INGEST_ALL => Some(Self::All),
             VIRTUAL => Some(Self::Virtual),
             BROLL => Some(Self::Broll),
             SEGMENT => Some(Self::Segment),
@@ -52,5 +80,17 @@ mod tests {
         assert_eq!(LibraryTab::from_action("play_pause"), None);
         assert!(LibraryTab::Virtual.lists_shots() && LibraryTab::Broll.lists_shots());
         assert!(!LibraryTab::Transcript.lists_shots() && !LibraryTab::All.lists_shots());
+    }
+
+    #[test]
+    fn a_tab_with_nothing_in_it_cannot_be_chosen() {
+        let contents = Contents { clips: 3, transcribed: 1, ..Contents::default() };
+        assert_eq!(contents.has(ALL), Some(true));
+        assert_eq!(contents.has(INGEST_ALL), Some(true));
+        assert_eq!(contents.has(TRANSCRIPT), Some(true));
+        assert_eq!(contents.has(VIRTUAL), Some(false));
+        assert_eq!(contents.has(BROLL), Some(false));
+        assert_eq!(contents.has(SEGMENT), Some(false));
+        assert_eq!(contents.has("play_pause"), None);
     }
 }
