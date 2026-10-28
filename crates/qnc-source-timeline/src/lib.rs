@@ -77,6 +77,8 @@ pub struct SourceTimeline {
     view: SourceTimelineView,
     /// The first cut of a pair (its frame), until the second.
     first_cut: Option<u64>,
+    /// The first double clicked word of a pair (its frames), until the second.
+    first_word: Option<(u64, u64)>,
 }
 
 impl SourceTimeline {
@@ -91,6 +93,7 @@ impl SourceTimeline {
         if self.clip.as_deref() != clip_id {
             self.clip = clip_id.map(str::to_string);
             self.first_cut = None; // a pair of cuts belongs to its clip
+            self.first_word = None;
             self.lanes.new_clip();
             self.sound_known = false;
             self.message.clear();
@@ -149,7 +152,7 @@ impl SourceTimeline {
     /// Enter (or a left click) while IN or OUT is taken keeps the edit and lets the mark go.
     pub fn route_input(&mut self, action_id: &str, value: Option<i64>, preview: &mut SourcePreview, timeline: &mut TimelineProjection) -> Option<bool> {
         if action_id == CUT {
-            return Some(self.cut(timeline));
+            return Some(self.cut(timeline, value.and_then(|frame| u64::try_from(frame).ok())));
         }
         if let (DRAG_IN | DRAG_OUT, Some(frame)) = (action_id, value.and_then(|frame| u64::try_from(frame).ok())) {
             return Some(self.drag(action_id == DRAG_IN, frame, preview, timeline));
@@ -179,18 +182,38 @@ impl SourceTimeline {
 
     /// A cut (scissors) at the playhead (user 2026-10-18: the distance between two cuts is
     /// what is marked, not their order): the first is IN with no OUT, the second marks the
-    /// earlier IN and the later OUT, the next starts a new pair. A taken mark is let go.
-    pub fn cut(&mut self, timeline: &mut TimelineProjection) -> bool {
-        let Some(at) = timeline.playhead_frame else {
+    /// earlier IN and the later OUT, the next starts a new pair. A taken mark is let go. `at`
+    /// is the frame of a double click (user 2026-10-26), else the cut is at the playhead.
+    pub fn cut(&mut self, timeline: &mut TimelineProjection, at: Option<u64>) -> bool {
+        let Some(at) = at.or(timeline.playhead_frame) else {
             return false;
         };
         self.keys.set_mark_taken(false);
         qnc_source_mark_focus::release(timeline);
+        self.first_word = None;
         *timeline = match self.first_cut.take() {
-            Some(first) if first != at => timeline.clone().with_second_cut_at_confirmed(first),
+            Some(first) if first != at => timeline.clone().with_second_cut(first, at),
             _ => {
                 self.first_cut = Some(at);
-                timeline.clone().with_first_cut_at_confirmed()
+                timeline.clone().with_first_cut_at(at)
+            }
+        };
+        true
+    }
+
+    /// A cut at a word said over clip frames `[from, to)` (user 2026-10-26: a double click on
+    /// a word of the transcript): the first is IN at its start; the second marks both words
+    /// whole, whatever their order: IN at the smaller timecode (the earlier word's start), OUT
+    /// at the larger (the later word's end; user 2026-10-26). The next starts a new pair.
+    pub fn cut_word(&mut self, timeline: &mut TimelineProjection, from: u64, to: u64) -> bool {
+        self.keys.set_mark_taken(false);
+        qnc_source_mark_focus::release(timeline);
+        self.first_cut = None;
+        *timeline = match self.first_word.take() {
+            Some((first_from, first_to)) => timeline.clone().with_second_cut(first_from.min(from), first_to.max(to)),
+            None => {
+                self.first_word = Some((from, to));
+                timeline.clone().with_first_cut_at(from)
             }
         };
         true
@@ -527,14 +550,24 @@ mod tests {
         // Scissors: two cuts mark the distance, whatever their order; the third starts again.
         let mut source = SourceTimeline::new();
         let mut marks = TimelineProjection::new(0, 100).with_playhead(50);
-        assert!(source.cut(&mut marks));
+        assert!(source.cut(&mut marks, None));
         assert_eq!((marks.source_in_frame, marks.source_out_frame), (Some(50), None));
         marks = marks.with_playhead(20);
-        source.cut(&mut marks);
+        source.cut(&mut marks, None);
         assert_eq!((marks.source_in_frame, marks.source_out_frame), (Some(20), Some(50)), "the earlier is IN");
         marks = marks.with_playhead(70);
-        source.cut(&mut marks);
+        source.cut(&mut marks, None);
         assert_eq!((marks.source_in_frame, marks.source_out_frame), (Some(70), None), "a new pair");
+        // Two double clicked words: IN at the start of the first, OUT at the end of the later.
+        let mut words = SourceTimeline::new();
+        let mut marked = TimelineProjection::new(0, 100);
+        words.cut_word(&mut marked, 10, 15);
+        words.cut_word(&mut marked, 40, 48);
+        assert_eq!((marked.source_in_frame, marked.source_out_frame), (Some(10), Some(48)));
+        // The later word first: IN is still the smaller timecode, both words whole.
+        words.cut_word(&mut marked, 40, 48);
+        words.cut_word(&mut marked, 10, 15);
+        assert_eq!((marked.source_in_frame, marked.source_out_frame), (Some(10), Some(48)));
         let (mut source, mut preview) = (SourceTimeline::new(), SourcePreview::default());
         let mut timeline = TimelineProjection::new(0, 100).with_playhead(10).with_source_in_at_confirmed().with_playhead(40).with_source_out_at_confirmed();
         source.route("select_mark_in", &mut preview, &mut timeline);

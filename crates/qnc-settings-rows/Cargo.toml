@@ -1,0 +1,12 @@
+[package]
+name = "qnc-settings-rows"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the rows of a settings panel (title row, section, labelled row, row of buttons, buttons) in the look of the one desktop theme"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-ui-text = { workspace = true }
+serde = { workspace = true }

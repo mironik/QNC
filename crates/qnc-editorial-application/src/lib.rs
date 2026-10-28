@@ -148,7 +148,7 @@ impl EditorialApplication {
         let busy = self.load_result.is_some() || self.posters.has_pending_work() || self.trim_stills.loading();
         let busy = busy || self.segments.has_pending_work() || self.segments.reading() || self.focus.busy();
         // A written story or an edit picture shows within a frame or two.
-        self.preview.next_repaint_delay().or_else(|| busy.then(|| Duration::from_millis(15)))
+        self.preview.next_repaint_delay().or_else(|| busy.then(|| Duration::from_millis(15))).or_else(|| self.focus.working().then(|| Duration::from_millis(250)))
     }
 
     fn fail(&mut self, error: String) {
@@ -212,8 +212,8 @@ impl EditorialApplication {
         } else {
             self.short_stills.clear_if_clip_changed(self.view.preview.clip_id.as_deref());
         }
-        if let Some((clip_id, in_frame, out_frame, edge)) = self.segments.take_source_request() {
-            self.open_marked(&clip_id, (in_frame, out_frame), edge); // Edit of a segment, or its edge
+        if let Some((clip_id, in_frame, out_frame, edge)) = self.segments.take_source_request().or_else(|| self.focus.take_source_request().map(|(c, i, o)| (c, i, o, None))) {
+            self.open_marked(&clip_id, (in_frame, out_frame), edge); // Edit of a segment or its edge, a statement
         }
         self.pending_marks.apply(self.view.preview.clip_id.as_deref(), &mut self.view.preview.timeline);
         // The still of IN and OUT is the picture the monitor shows there, however the mark got there.
@@ -244,7 +244,7 @@ impl EditorialApplication {
             None => self.wrap.follow_program(confirmed),
         }
         self.segments.set_playhead(Some(self.wrap.playhead()));
-        self.view.focus = qnc_dev_diagnostics::timed_block("poll-focus", || self.focus.poll((&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline)));
+        self.view.focus = qnc_dev_diagnostics::timed_block("poll-focus", || self.focus.poll((&mut self.preview, &mut self.wrap, &mut self.segments, &mut self.view.preview.timeline, &mut self.view.clips)));
         self.view.segments = qnc_dev_diagnostics::timed_block("poll-segments-view", || self.segments.view_with_waves(self.view.clips.iter().map(|clip| (clip.clip_id.as_str(), clip.duration_frames, clip.thumb_image.as_ref()))));
         qnc_dev_diagnostics::timed_block("poll-trim", || self.trim_stills.fill(&mut self.view.segments, self.preview.still_locator(), self.preview.shown_program_picture().and_then(|s| Some((self.segments.stored_picture_at(s.frame)?, s))))); // edit pictures, the monitor's first
     }
@@ -437,8 +437,7 @@ impl EditorialApplication {
         self.focus.to_source(&mut self.wrap);
         let at = self.pending_marks.set(clip_id, marks, edge);
         self.posters.prioritize(clip_id);
-        self.preview.open_at(clip_id, at);
-        true
+        self.preview.open_at(clip_id, at) || self.preview.cue(at) // the clip already shown: the playhead to IN
     }
 
     fn reload_shorts(&mut self) {

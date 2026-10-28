@@ -433,23 +433,36 @@ impl TimelineProjection {
     }
 
     /// The first cut of a pair at the playhead: IN there, no OUT yet (user 2026-10-18).
-    pub fn with_first_cut_at_confirmed(mut self) -> Self {
-        if let Some(frame) = self.confirmed_frame() {
-            self.source_in_frame = Some(self.local_frame(frame));
-            self.source_out_frame = None;
+    pub fn with_first_cut_at_confirmed(self) -> Self {
+        match self.confirmed_frame() {
+            Some(frame) => self.with_first_cut_at(frame),
+            None => self.normalize_source_marks(),
         }
+    }
+
+    /// The first cut at `frame` (an absolute frame): IN there, no OUT.
+    pub fn with_first_cut_at(mut self, frame: u64) -> Self {
+        self.source_in_frame = Some(self.local_frame(frame));
+        self.source_out_frame = None;
+        self.normalize_source_marks()
+    }
+
+    /// The second cut at `frame`, the first at `first` (absolute frames): the earlier is IN,
+    /// the later OUT.
+    pub fn with_second_cut(mut self, first: u64, frame: u64) -> Self {
+        let (earlier, later) = (self.local_frame(first.min(frame)), self.local_frame(first.max(frame)));
+        self.source_in_frame = Some(earlier);
+        self.source_out_frame = Some(later.max(earlier.saturating_add(1)).min(self.duration_frames()));
         self.normalize_source_marks()
     }
 
     /// The second cut at the playhead, the first at `first` (an absolute frame): the distance
     /// between them is marked, the earlier is IN, the later OUT, whatever their order.
-    pub fn with_second_cut_at_confirmed(mut self, first: u64) -> Self {
-        if let Some(frame) = self.confirmed_frame() {
-            let (earlier, later) = (self.local_frame(first.min(frame)), self.local_frame(first.max(frame)));
-            self.source_in_frame = Some(earlier);
-            self.source_out_frame = Some(later.max(earlier.saturating_add(1)).min(self.duration_frames()));
+    pub fn with_second_cut_at_confirmed(self, first: u64) -> Self {
+        match self.confirmed_frame() {
+            Some(frame) => self.with_second_cut(first, frame),
+            None => self.normalize_source_marks(),
         }
-        self.normalize_source_marks()
     }
 
     pub fn focus_source_in(mut self) -> Self {
@@ -798,6 +811,10 @@ pub enum TimelineIntent {
     /// touchpad's three-finger tap set to it, a two-finger tap on a touch screen (user
     /// 2026-10-18: two cuts mark IN and OUT, the earlier IN, the later OUT).
     Cut,
+    /// A double click on a source timeline: a cut at the frame clicked (user 2026-10-26:
+    /// "double click for IN/OUT; which is IN and which OUT the timecode decides, IN is the
+    /// smaller"), as two cuts do.
+    CutAt(u64),
 }
 
 impl Default for TimelineIntent {
@@ -1157,6 +1174,13 @@ pub fn show(ui: &mut egui::Ui, input: TimelineInput<'_>) -> TimelineIntent {
     // 2026-10-18: the cue of that press won and no cut came).
     if cut {
         return TimelineIntent::Cut;
+    }
+    // The second click of a double click on a source timeline cues where the first did; it is
+    // a cut there (a Wrap row keeps its own double clicks).
+    if !input.layers.markers && over && ui.input(|i| i.pointer.button_double_clicked(egui::PointerButton::Primary)) {
+        if let TimelineIntent::CueFrame(frame) = intent {
+            return TimelineIntent::CutAt(frame);
+        }
     }
     match (intent, wheel) {
         // Ctrl+wheel (or the wheel with the right button held) on a source timeline with

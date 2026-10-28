@@ -1,0 +1,7 @@
+[package]
+name = "qnc-word-align"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the edges of transcribed words moved to the sound under them (a start to where the voice rises, an end to where it falls), and the sound no word covers; pure, reads and writes nothing"
+
+[dependencies]

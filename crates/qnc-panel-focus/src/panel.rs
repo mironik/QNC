@@ -69,13 +69,15 @@ pub use qnc_key_list::GridStep as PoolStep;
 /// What a form draws of the focus: the panel, on the source dock buttons the action of
 /// the one the arrows are on, and the last key on the media pool with its number (the
 /// card grid applies each number once, however often the view is read).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct FocusView {
     pub panel: Panel,
     pub button: Option<String>,
     pub pool_step: Option<(PoolStep, u64)>,
     /// The transcript of the clip on the preview.
     pub transcript: qnc_transcript::TranscriptView,
+    /// The shots of the clip on the preview (Video AI).
+    pub shots: qnc_clip_shots::ShotsView,
 }
 
 impl FocusView {

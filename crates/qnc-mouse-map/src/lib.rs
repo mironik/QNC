@@ -39,6 +39,8 @@ pub enum Pointer {
     DoubleClick,
     /// A double click on the picture or A2 of a slot: the slot enlarged (user 2026-10-21).
     DoubleClickSlot,
+    /// A double click on a source timeline: a cut at the frame clicked (user 2026-10-26).
+    DoubleClickFrame,
     ClickVLabel,
     CtrlClickVLabel,
     ClickA1Label,
@@ -67,7 +69,7 @@ pub enum Pointer {
 }
 
 impl Pointer {
-    pub const ALL: [Pointer; 31] = [
+    pub const ALL: [Pointer; 32] = [
         Self::Click,
         Self::ClickHolding,
         Self::ClickStrip,
@@ -76,6 +78,7 @@ impl Pointer {
         Self::ShiftClick,
         Self::DoubleClick,
         Self::DoubleClickSlot,
+        Self::DoubleClickFrame,
         Self::ClickVLabel,
         Self::CtrlClickVLabel,
         Self::ClickA1Label,
@@ -112,6 +115,7 @@ impl Pointer {
             Self::ShiftClick => "shift_click",
             Self::DoubleClick => "double_click",
             Self::DoubleClickSlot => "double_click_slot",
+            Self::DoubleClickFrame => "double_click_frame",
             Self::ClickVLabel => "click_v_label",
             Self::CtrlClickVLabel => "ctrl_click_v_label",
             Self::ClickA1Label => "click_a1_label",

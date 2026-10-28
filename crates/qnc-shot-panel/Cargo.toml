@@ -1,0 +1,15 @@
+[package]
+name = "qnc-shot-panel"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public panel: the Video AI panel, the shots of the clip on the preview with their timecodes and looks; a click puts the playhead on a shot (catalog action shot_cue); it holds no state and reads nothing"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-action-event = { workspace = true }
+qnc-clip-shots = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-program-view = { workspace = true }
+qnc-segment-panel = { workspace = true }
+qnc-source-timecode = { workspace = true }
+qnc-ui-text = { workspace = true }

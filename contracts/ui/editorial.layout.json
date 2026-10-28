@@ -129,6 +129,18 @@
         "show_quick_cover": false
       },
       "right_panel": "transcript_panel",
+      "right_panel_tabs": [
+        {
+          "label": "@ai.tab_audio",
+          "action_id": "ai_tab_audio",
+          "panel": "transcript_panel"
+        },
+        {
+          "label": "@ai.tab_video",
+          "action_id": "ai_tab_video",
+          "panel": "video_ai_panel"
+        }
+      ],
       "tab_order": [
         "pool_tabs",
         "pool",
@@ -156,6 +168,7 @@
       },
       "media_card": {
         "selection_check": true,
+        "ticks_several": true,
         "status_dots": "pipeline"
       }
     },

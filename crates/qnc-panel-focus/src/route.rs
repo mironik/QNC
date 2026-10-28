@@ -18,8 +18,30 @@ impl PanelFocus {
         let action_id = event.action_id.as_str();
         let panel = self.panel;
         // The transcript's own actions (Media Assist Audio AI, user 2026-10-26).
-        if let Some(done) = self.transcript.act(action_id, event.value, pieces.0, pieces.3) {
+        if let Some(done) = self.transcript.act(action_id, event.value, event.target.as_deref(), pieces.0, pieces.3, self.source.view().timecode.as_ref()) {
             return Some(done);
+        }
+        // A click on a shot of the Video AI panel puts the playhead on its start (user 2026-10-27).
+        if action_id == qnc_clip_shots::CUE_SHOT {
+            let frame = event.target.as_deref().and_then(|frame| frame.parse::<u64>().ok());
+            return Some(frame.is_some_and(|frame| pieces.0.cue(frame)));
+        }
+        // A click on a usable part opens it with its IN/OUT, for Add SubClip (user 2026-10-27).
+        if action_id == qnc_clip_shots::OPEN_PART {
+            return Some(self.shots.open_part(event.target.as_deref()));
+        }
+        // A double click on a word is a cut (user 2026-10-26): IN at its start, OUT at the end
+        // of a word after the first cut; the source timeline keeps the pair as for scissors.
+        if action_id == qnc_transcript::CUT_WORD {
+            let word = event.value.and_then(|from| u64::try_from(from).ok()).zip(event.target.as_deref().and_then(|to| to.parse().ok()));
+            let Some((from, to)) = word else { return Some(false) };
+            // In the trim zoom of a taken IN or OUT the word moves that mark: IN to its start,
+            // OUT to its end; the mark stays taken.
+            if self.source.mark_taken(pieces.3) {
+                let in_mark = pieces.3.source_mark_focus == qnc_timeline::TimelineSourceMarkFocus::In;
+                return Some(self.source.drag(in_mark, if in_mark { from } else { to }, pieces.0, pieces.3));
+            }
+            return Some(self.source.cut_word(pieces.3, from, to));
         }
         // The Export button opens the box of the project's export settings (user 2026-10-24);
         // while it is open its keys are its own.
@@ -128,7 +150,7 @@ impl PanelFocus {
             qnc_source_timeline::CUT => {
                 self.panel = Panel::SourceTimeline;
                 qnc_sync_session::armed_by_in(segments, preview, wrap);
-                Some(self.source.route_input(id, None, preview, timeline))
+                Some(self.source.route_input(id, event.value, preview, timeline))
             }
             _ => {
                 self.panel = Panel::SourceTimeline;

@@ -6,6 +6,9 @@ description = "QNC public piece: one transcription of a range of a clip, from th
 
 [dependencies]
 qnc-ai-catalog = { workspace = true }
+qnc-content-store = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-playback-activity = { workspace = true }
 qnc-sound-range = { workspace = true }
 qnc-still-locator = { workspace = true }
 qnc-transcribe-jobs = { workspace = true }

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+qnc-media-metadata = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"

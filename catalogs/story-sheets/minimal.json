@@ -1,0 +1,9 @@
+{
+  "sheet_id": "minimal",
+  "name": "@sheet.minimal",
+  "fields": [
+    { "kind": "text", "label": "@sheet.f.slug", "id": "slug", "path": "slug", "hint": "@sheet.f.slug_hint" },
+    { "kind": "duration", "label": "@sheet.f.target", "id": "target_seconds", "path": "target_seconds", "hint": "@sheet.f.target_hint" },
+    { "kind": "text", "label": "@sheet.f.journalist", "id": "journalist", "path": "journalist" }
+  ]
+}

@@ -10,5 +10,11 @@ qnc-action-event = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-program-view = { workspace = true }
 qnc-segment-panel = { workspace = true }
+qnc-source-timecode = { workspace = true }
 qnc-transcript = { workspace = true }
 qnc-transcript-panel = { workspace = true }
+qnc-editorial-layout = { workspace = true }
+qnc-pool-tabs-panel = { workspace = true }
+qnc-ui-text = { workspace = true }
+qnc-clip-shots = { workspace = true }
+qnc-shot-panel = { workspace = true }

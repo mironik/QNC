@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.shot-detect",
+  "module_name": "Shot Detect",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["media.shots.detect", "media.shots.parts"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "file.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-shot-detect",
+  "input": "Small grey pictures of a clip with their frames and the clip length in frames.",
+  "output": "The shots of the clip: changes of scene, each shot black, soft, moving or still, with its sharpest frame; the usable parts of the take (camera steady or panning evenly, measured as the shift of the whole picture between neighbouring pictures, sharp, not black, at least 3 s).",
+  "specification": "User 2026-10-27: Video AI, shot analysis in AI Media Assist, a background job of its own after the filmstrip (AGENTS.md)."
+}

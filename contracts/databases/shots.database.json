@@ -1,0 +1,25 @@
+{
+  "database_id": "qnc.db.shots",
+  "database_owner": "project",
+  "owner_application": "qnc.module.shot-db",
+  "ownership_rule": "The project owns this database; no application owns it or its table. A shot analysis reaches it only through the one intermediary of the project database (qnc.module.db-broker), whose table module qnc.module.shot-db owns it.",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/project_db",
+  "tables": [
+    "clip_shots"
+  ],
+  "public_read_views": [
+    "public_clip_shots"
+  ],
+  "write_owner": "qnc.module.shot-db",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "clip": "A row is the shot analysis of one clip: its shots one after another as clip frames [from, to), each with its looks (black, soft, moving, still) and its sharpest frame, the medium the pictures came from and how many; or only why the clip could not be analysed (user 2026-10-27).",
+    "replace": "A clip analysed again replaces its row.",
+    "parts": "With the shots a row keeps the usable parts of the take: clip frames [from, to) where the camera stands or pans evenly, sharp and not black, inside one shot, at least 3 s, with how the camera holds it (steady, pan) and its sharpest frame (user 2026-10-27).",
+    "version": "A row carries the analysis version; a row of another version is analysed again, a table of the earlier form without parts is removed."
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-10-27T00:00:00Z",
+  "updated_at": "2026-10-27T00:00:00Z"
+}

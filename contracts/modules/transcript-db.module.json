@@ -3,7 +3,7 @@
   "module_name": "Transcript Table",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["db.transcripts.read", "db.transcripts.write"],
+  "capabilities": ["db.transcripts.read", "db.transcripts.write", "db.transcript_quotes.read", "db.transcript_quotes.write"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "transport_protocol_version": "0.1.0",

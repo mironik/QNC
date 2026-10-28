@@ -9,7 +9,7 @@ mod backfill;
 mod program;
 mod sync_bed;
 pub use decode_input::DecodeMediaAccess;
-use decode_input::{DecodeInput, seek_start};
+use decode_input::{DecodeInput, Opening, seek_start};
 pub use input::InputPlan;
 use input::{relative_position, sample_boundary};
 use output::{Audio, Presenter, SharedVideo, VideoSink};
@@ -350,7 +350,7 @@ impl Runtime {
             VideoPath::Clip(Video {
                 back: back.clone(),
                 plan,
-                decoder: video_decoder,
+                decoder: Opening::Ready(video_decoder),
                 input: decode_input,
                 pending_seek: None,
                 discard_before: None,
@@ -764,7 +764,10 @@ impl SourceOpenAdapter for Source {
 }
 struct Video {
     plan: InputPlan,
-    decoder: Decoder,
+    /// Open, or opening on a thread of its own after a cue the open decoder could not jump
+    /// to: the player answers meanwhile (a card waking took over 2 s and the app dropped the
+    /// session, 2026-10-26).
+    decoder: Opening,
     input: Rc<DecodeInput>,
     pending_seek: Option<u64>,
     discard_before: Option<u64>,
@@ -905,10 +908,12 @@ impl Video {
         // A decoder that stays open jumps (user 2026-10-11: no new process and no new
         // open of the media); one that cannot is replaced by a new one opened at `from`.
         let start = seek_start(&self.plan.source, from)?;
-        let jumped = self
-            .decoder
-            .seek(start.unwrap_or(qnc_media_metadata::Rational { numerator: 0, denominator: 1 }))
-            .map_err(error)?;
+        let jumped = match &mut self.decoder {
+            Opening::Ready(decoder) => decoder
+                .seek(start.unwrap_or(qnc_media_metadata::Rational { numerator: 0, denominator: 1 }))
+                .map_err(error)?,
+            Opening::Waiting(..) => false,
+        };
         if qnc_dev_diagnostics::player_diagnostics_enabled() {
             qnc_dev_diagnostics::log_line(
                 qnc_dev_diagnostics::DiagnosticsStream::Player,
@@ -916,7 +921,7 @@ impl Video {
             );
         }
         if !jumped {
-            let decoder = self.input.open(self.plan.video_index, start)?;
+            let decoder = self.input.open_in_background(self.plan.video_index, start)?;
             retire(std::mem::replace(&mut self.decoder, decoder));
         }
         self.discard_before = Some(from);
@@ -1062,7 +1067,8 @@ impl Video {
                 }
                 break;
             };
-            let packet = match self.decoder.try_next_packet().map_err(error)? {
+            let Some(decoder) = self.decoder.ready()? else { break };
+            let packet = match decoder.try_next_packet().map_err(error)? {
                 Poll::Pending => break,
                 Poll::Ready(None) => {
                     if self.next_decode_frame >= self.plan.source.duration_frames {

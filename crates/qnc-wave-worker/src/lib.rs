@@ -739,46 +739,9 @@ fn decode_wave(
     Ok(Some(by_lane.into_iter().map(|(lane, (peaks, loudness))| (lane, peaks, loudness)).collect()))
 }
 
-/// The selected decoder must declare the saved format of every stream it reads (no silent
-/// fallback): the same check a decode request makes.
-/// The sound element number of each requested stream, when the saved record is an MXF
-/// whose requested streams are all uncompressed mono of one sample size (24-bit, or 16-bit
-/// as XDCAM HD's LPCM16): the k-th audio stream of the file is sound element k (checked
-/// byte for byte against FFmpeg on a camera original), with the sample size in bytes.
-fn mxf_sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: &[u32]) -> Option<(Vec<u8>, usize)> {
-    if media.container.as_ref()?.value != "mxf" {
-        return None;
-    }
-    let mut audio = media
-        .streams
-        .iter()
-        .filter_map(|stream| match &stream.details {
-            qnc_media_metadata::StreamDetails::Audio(details) => Some((stream, details)),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    audio.sort_by_key(|(stream, _)| stream.index.as_ref().map(|index| index.value));
-    let mut size = None;
-    let elements = streams
-        .iter()
-        .map(|wanted| {
-            let position = audio
-                .iter()
-                .position(|(stream, _)| stream.index.as_ref().is_some_and(|index| index.value == *wanted))?;
-            let (stream, details) = audio[position];
-            let codec = stream.codec.as_ref().map(|codec| &codec.value);
-            let bytes = match codec {
-                Some(qnc_media_metadata::Signal::Known(name)) if name == "pcm_s24le" => 3,
-                Some(qnc_media_metadata::Signal::Known(name)) if name == "pcm_s16le" => 2,
-                _ => return None,
-            };
-            let mono = details.channels.as_ref().is_some_and(|channels| channels.value == 1);
-            let same = *size.get_or_insert(bytes) == bytes;
-            (mono && same).then(|| u8::try_from(position).ok()).flatten()
-        })
-        .collect::<Option<Vec<u8>>>()?;
-    Some((elements, size?))
-}
+// The selected decoder must declare the saved format of every stream it reads (no silent
+// fallback): the same check a decode request makes.
+use qnc_mxf_sound::sound_elements as mxf_sound_elements;
 
 /// The track of the one requested sound stream when the saved record is an MP4 or
 /// QuickTime file and that stream is AAC (the k-th stream is the file's k-th track).

@@ -1,0 +1,38 @@
+{
+  "module_id": "qnc.module.location-field",
+  "module_name": "Location field",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.field.location",
+    "ui.field.location.browser"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-location-field",
+  "input": "The path a field shows, the user's clicks on its browser (source tab, folder, Up, Disks, Select, Cancel) and the listings of the background browser (qnc-dir-browse-jobs) its owner hands back.",
+  "output": "The step its owner sends to the background browser, or the URI of the confirmed folder; the open browser drawn with the panel qnc-dir-browser-panel and a Select/Cancel bar. It writes no setting and reads no filesystem; the owner decides what a confirmed folder means.",
+  "specification": "Audit 2026-10-27 (user: make the Project form smaller, move it into blocks): the Project form had the same field and browser code twice, for the projects folder and the export folder; both are now two instances of this piece."
+}

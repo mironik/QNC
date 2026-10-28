@@ -1,0 +1,25 @@
+{
+  "database_id": "qnc.db.newsroom_sheet",
+  "database_owner": "project",
+  "owner_application": "qnc.module.newsroom-sheet-db",
+  "ownership_rule": "The project owns this database; no application owns it or its tables. The story sheet of a project reaches it only through the one intermediary of the project database (qnc.module.db-broker), whose table module qnc.module.newsroom-sheet-db owns them.",
+  "schema_version": "0.1.0",
+  "qnc_uri": "qnc://local/db/project_db",
+  "tables": [
+    "project_story_sheet",
+    "project_story_values"
+  ],
+  "public_read_views": [
+    "public_project_story_sheet",
+    "public_project_story_values"
+  ],
+  "write_owner": "qnc.module.newsroom-sheet-db",
+  "public_read_policy": "public_read_views",
+  "rules": {
+    "sheet": "The description of the fields (codes, names, kinds, choices) as it was when the sheet was filled, so the names travel with the project.",
+    "values": "One value per field code; a save replaces every value. A code is lower-case letters, digits and _, starting with a letter."
+  },
+  "migration_policy": "owner_application_only",
+  "created_at": "2026-10-27T00:00:00Z",
+  "updated_at": "2026-10-27T00:00:00Z"
+}

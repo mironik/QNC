@@ -1,0 +1,14 @@
+{
+  "sheet_id": "agency_online",
+  "name": "@sheet.agency_online",
+  "fields": [
+    { "kind": "text", "label": "@sheet.f.slug", "id": "slug", "path": "slug", "hint": "@sheet.f.slug_hint" },
+    { "kind": "text", "label": "@sheet.f.web_title", "id": "web_title", "path": "web_title" },
+    { "kind": "text", "label": "@sheet.f.keywords", "id": "keywords", "path": "keywords" },
+    { "kind": "text", "label": "@sheet.f.location", "id": "location", "path": "location" },
+    { "kind": "duration", "label": "@sheet.f.target", "id": "target_seconds", "path": "target_seconds", "hint": "@sheet.f.target_hint" },
+    { "kind": "text", "label": "@sheet.f.journalist", "id": "journalist", "path": "journalist" },
+    { "kind": "text", "label": "@sheet.f.rights", "id": "rights", "path": "rights" },
+    { "kind": "text", "label": "@sheet.f.embargo", "id": "embargo", "path": "embargo" }
+  ]
+}

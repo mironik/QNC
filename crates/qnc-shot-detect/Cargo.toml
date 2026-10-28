@@ -1,0 +1,7 @@
+[package]
+name = "qnc-shot-detect"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the shots of a clip (changes of scene, black, soft, moving, still, sharpest picture) from small grey pictures taken through it; pure, it reads no media and writes nowhere"
+
+[dependencies]

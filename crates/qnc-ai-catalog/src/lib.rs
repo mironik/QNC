@@ -23,8 +23,22 @@ struct File {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Job {
+    /// The engine of the best text (user 2026-10-26: "Quality" beside Transcribe).
     selected: String,
+    /// The fast engine on the processor (user 2026-10-26: the trim zoom's words and "Fast"
+    /// beside Transcribe; it never takes the graphics card from the player).
+    #[serde(default)]
+    fast: Option<String>,
     engines: Vec<Engine>,
+}
+
+/// Which engine transcribes: each its own, so both can run at once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Quality {
+    /// The best text (names, letters), as fast as the host allows.
+    Best,
+    /// Fast on the processor: the trim zoom, a quick pass over many clips.
+    Fast,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -33,7 +47,8 @@ struct Engine {
     id: String,
     program: String,
     backend: String,
-    /// The model file, relative to the catalog's folder.
+    /// The model, relative to the catalog's folder: a file, or the folder of a model made
+    /// of several files.
     model: String,
     #[serde(default)]
     vad_model: Option<String>,
@@ -70,25 +85,40 @@ pub fn installed_path() -> Result<PathBuf, String> {
         .ok_or_else(|| format!("the AI catalog ({CATALOG}) is not beside the application"))
 }
 
-/// The transcription engine this host's catalog selects.
+/// The best transcription engine this host's catalog selects.
 pub fn installed_transcriber() -> Result<Transcriber, String> {
     transcriber(&installed_path()?)
 }
 
-/// The transcription engine the catalog at `path` selects; its model must be there.
+/// The transcription engine this host's catalog selects for `quality`.
+pub fn installed_transcriber_for(quality: Quality) -> Result<Transcriber, String> {
+    transcriber_for(&installed_path()?, quality)
+}
+
+/// The best transcription engine the catalog at `path` selects.
 pub fn transcriber(path: &Path) -> Result<Transcriber, String> {
+    transcriber_for(path, Quality::Best)
+}
+
+/// The transcription engine the catalog at `path` selects for `quality`; its model must be
+/// there. A catalog without a fast engine gives none (nothing falls back).
+pub fn transcriber_for(path: &Path, quality: Quality) -> Result<Transcriber, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let file: File = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
     if file.version != "1" {
         return Err(format!("AI catalog version {} is not known", file.version));
     }
     let folder = path.parent().ok_or("the AI catalog has no folder")?;
+    let selected = match quality {
+        Quality::Best => file.transcribe.selected.clone(),
+        Quality::Fast => file.transcribe.fast.clone().ok_or("the AI catalog of this host has no fast transcription engine")?,
+    };
     let engine = file
         .transcribe
         .engines
         .iter()
-        .find(|engine| engine.id == file.transcribe.selected)
-        .ok_or_else(|| format!("the selected transcription engine {} is not in the AI catalog", file.transcribe.selected))?;
+        .find(|engine| engine.id == selected)
+        .ok_or_else(|| format!("the selected transcription engine {selected} is not in the AI catalog"))?;
     if !BACKENDS.contains(&engine.backend.as_str()) {
         return Err(format!("transcription engine {}: unknown backend {}", engine.id, engine.backend));
     }
@@ -97,7 +127,7 @@ pub fn transcriber(path: &Path) -> Result<Transcriber, String> {
     }
     let present = |relative: &str| -> Result<PathBuf, String> {
         let file = folder.join(relative);
-        if file.is_file() {
+        if file.exists() {
             Ok(file)
         } else {
             Err(format!("transcription engine {}: the model {} is not on this host", engine.id, file.display()))

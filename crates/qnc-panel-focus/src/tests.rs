@@ -34,9 +34,9 @@ fn tab_walks_the_panels_of_the_form_and_keys_on_tabs_and_buttons_become_their_ac
     focus.route("activate_focused_item", (&mut preview, &mut wrap, &mut segments, &mut timeline));
     assert_eq!(focus.panel(), Panel::Pool);
     focus.route("step_next_part", (&mut preview, &mut wrap, &mut segments, &mut timeline));
-    assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).pool_step, Some((PoolStep::Down, 1)));
+    assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline, &mut [])).pool_step, Some((PoolStep::Down, 1)));
     focus.route("step_prev_segment", (&mut preview, &mut wrap, &mut segments, &mut timeline));
-    assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).pool_step, Some((PoolStep::Down, 1)), "the second action of the same arrow keeps it");
+    assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline, &mut [])).pool_step, Some((PoolStep::Down, 1)), "the second action of the same arrow keeps it");
     focus.set(Panel::SourceTimeline);
     focus.route("activate_focused_item", (&mut preview, &mut wrap, &mut segments, &mut timeline));
     assert_eq!(focus.panel(), Panel::SourceButtons, "nothing to confirm on the source: on to its buttons");
@@ -46,7 +46,7 @@ fn tab_walks_the_panels_of_the_form_and_keys_on_tabs_and_buttons_become_their_ac
     assert_eq!(focus.take_pick().as_deref(), Some("editorial_tab_virtual"), "the right arrow is the next tab");
     focus.set(Panel::SourceButtons);
     focus.route("step_forward_frame", (&mut preview, &mut wrap, &mut segments, &mut timeline));
-    assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline)).button.as_deref(), Some("add_ton_segment"));
+    assert_eq!(focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline, &mut [])).button.as_deref(), Some("add_ton_segment"));
     assert_eq!(cycle(Panel::SourceTimeline, false, &[Panel::Pool, Panel::SourceTimeline]), Panel::Pool);
 }
 

@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.transcribe-queue",
+  "module_name": "Transcribe Queue",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["speech.transcribe.queue", "db.transcripts.read", "db.transcripts.write_through_owner"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "playback.clock", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-transcribe-queue",
+  "input": "The transcription queue kept in the project database (qnc-transcript-db) and the locator of the project the preview works in.",
+  "output": "One runner per project (a lease in its database): clip after clip, each with the engine it was asked with (Fast or Quality), in pieces that wait while the player plays or the user edits; the transcript kept and the clip marked done or failed through qnc-transcript-db; the lines heard handed out as they come.",
+  "specification": "User 2026-10-26: tick the clips to transcribe; they are transcribed in the background or wait there, while the trim zoom helps cut statements (AGENTS.md)."
+}

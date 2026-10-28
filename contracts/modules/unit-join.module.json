@@ -32,6 +32,6 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-unit-join",
   "input": "The rendered unit files of a story in order (MOV: one picture stream, one PCM stream), the sound rate and outputs, the project's loudness rule (audio.loudness) and the ffmpeg of the installed decoder catalog.",
-  "output": "One MXF OP1a file under its final name: pictures copied; every sound output its own mono PCM 24-bit track, copied sample for sample when A1 and A2 are within target +- tolerance and under the true peak limit, else A1/A2 at the gain that brings them to the target (limited by the true peak); the measured loudness, true peak and gain of A1 and A2.",
+  "output": "One MXF OP1a file under its final name: pictures copied; every sound output its own mono PCM 24-bit track, copied sample for sample when A1 and A2 are within target +- tolerance and under the true peak limit, else A1/A2 at the gain that brings them to the target (at most +20 dB), a lane whose true peak would go over the limit through a peak limiter at four times the rate (delay taken back), the written file measured again; the measured and written loudness, true peak, gain and whether it was limited.",
   "specification": "User 2026-10-24: Express export puts the prerender together without rendering again; the user's levels are kept when they fit the EBU rule."
 }

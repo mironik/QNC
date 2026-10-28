@@ -36,6 +36,35 @@ impl SoundRange {
     }
 }
 
+/// The samples of camera channel `channel` over clip frames `[from, to)` read from the start
+/// of the media and handed to `each` while they are read (user 2026-10-27: the transcription
+/// of a whole clip waited for the whole read before its first word): a frame-wrapped MXF whose
+/// channel is uncompressed mono through its sound elements only (user 2026-10-26: the sound is
+/// a few percent of the file), any other through the decoder catalog. For whole clips; a few
+/// seconds in a long clip read faster through [`read`]. `each` hears the samples, the clip
+/// frames they cover and the media seconds of their first sample.
+/// A frame-wrapped MXF hands one frame at a time, so a stopped read keeps whole frames and the
+/// next call goes on from `from` plus the frames already heard; any other medium is read whole
+/// through the decoder catalog and handed once. `Ok(false)` is a read stopped before its end.
+pub fn stream_from_start(place: &LocatedSound, channel: u16, from: u64, to: u64, cancel: &std::sync::atomic::AtomicBool, each: &mut dyn FnMut(&[f32], u64, f64)) -> Result<bool, String> {
+    let (stream_index, _, width, _) = place.channel(channel).ok_or_else(|| format!("no camera channel {}", channel + 1))?;
+    if let Some((elements, bytes)) = qnc_mxf_sound::sound_elements(&place.media, &[stream_index]).filter(|_| width == 1) {
+        let mut frame = from;
+        return qnc_mxf_sound::read_element_frames_each(&place.file, elements[0], bytes, from, to, cancel, &mut |samples| {
+            each(samples, 1, place.seconds_of(frame as f64));
+            frame += 1;
+        });
+    }
+    match read(place, channel, from, to, &mut |_| !cancel.load(std::sync::atomic::Ordering::Relaxed)) {
+        _ if cancel.load(std::sync::atomic::Ordering::Relaxed) => Ok(false),
+        Ok(range) => {
+            each(&range.samples, to.saturating_sub(from), range.from_seconds);
+            Ok(true)
+        }
+        Err(error) => Err(error),
+    }
+}
+
 /// The samples of camera channel `channel` of the clip `place` locates, over clip frames
 /// `[from, to)`. `on_progress` hears the seconds read so far and stops the read with `false`.
 pub fn read(place: &LocatedSound, channel: u16, from: u64, to: u64, on_progress: &mut dyn FnMut(f64) -> bool) -> Result<SoundRange, String> {

@@ -40,6 +40,7 @@ pub fn event(intent: &TimelineIntent, panel: &str, frame: &dyn Fn(u64) -> u64) -
         // IN or OUT dragged: the clip's own frame, never mapped.
         TimelineIntent::DragMark { in_mark, frame: at } => (if *in_mark { Pointer::DragIn } else { Pointer::DragOut }, Some(*at), None),
         TimelineIntent::Cut => (Pointer::MiddleClick, None, None),
+        TimelineIntent::CutAt(at) => (Pointer::DoubleClickFrame, Some(frame(*at)), None),
         TimelineIntent::Wheel(turn) => (
             match (turn.ctrl, turn.up) {
                 (false, false) => Pointer::WheelBack,
@@ -95,6 +96,7 @@ mod tests {
         assert_eq!(on(TimelineIntent::OpenVirtual { id: "s1".into(), frame: 4 }, "source_timeline"), None);
         assert_eq!(on(TimelineIntent::OpenSlot { id: "m1|m2".into(), frame: 4 }, "segments"), Some(("wrap_zoom".into(), Some(104), id("m1|m2"))), "a double click on the picture enlarges the slot");
         assert_eq!(on(TimelineIntent::Cut, "source_timeline"), Some(("source_cut".into(), None, None)));
+        assert_eq!(on(TimelineIntent::CutAt(40), "source_timeline"), Some(("source_cut".into(), Some(140), None)), "a double click is a cut where it clicked");
         assert_eq!(on(TimelineIntent::ChooseA2Channel(3), "source_timeline"), Some(("source_choose_a2_channel".into(), Some(3), None)));
         assert_eq!(on(TimelineIntent::None, "segments"), None);
     }

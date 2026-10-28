@@ -3,11 +3,10 @@
 //! own template), in the order of the layout contract (`pts_slots`).
 
 use eframe::egui::{self, RichText, Sense, Vec2};
-use qnc_project_session::{LocationSourceKind, ProjectIntent};
+use qnc_project_session::{LocationTarget, ProjectIntent};
 
 use crate::{
     layout_contract::SettingsPanelMetrics,
-    location_browser::{self, LocationBrowserAction, LocationBrowserInput},
     project_advanced,
     theme::{self, Theme},
     widgets, Blocks,
@@ -55,7 +54,6 @@ impl Blocks<'_> {
                 ui.set_clip_rect(panel);
                 ui.spacing_mut().item_spacing = Vec2::ZERO;
                 self.pts_head(ui, width, settings);
-                self.pts_fixed(ui, width, settings);
                 self.pts_scroll(ui, width, panel.bottom(), settings);
             },
         );
@@ -63,7 +61,7 @@ impl Blocks<'_> {
 
     fn pts_head(&mut self, ui: &mut egui::Ui, width: f32, settings: &SettingsPanelMetrics) {
         let t = Theme::from_contract(&self.contracts.shell.colors);
-        widgets::panel_title_row(ui, &settings.title, &self.contracts.shell);
+        widgets::panel_title_row(ui, &settings.title, &self.contracts.theme);
         egui::Frame::NONE
             .inner_margin(egui::Margin {
                 left: settings.inner_pad_x as i8,
@@ -77,33 +75,16 @@ impl Blocks<'_> {
             });
     }
 
+    /// The slots shown always, first in the scroll (user 2026-10-27: the template list
+    /// scrolls with the panel).
     fn pts_fixed(&mut self, ui: &mut egui::Ui, width: f32, settings: &SettingsPanelMetrics) {
-        egui::Frame::NONE
-            .inner_margin(egui::Margin {
-                left: settings.inner_pad_x as i8,
-                right: settings.inner_pad_x as i8,
-                top: settings.inner_pad_y as i8,
-                bottom: settings.inner_pad_y as i8,
-            })
-            .show(ui, |ui| {
-                ui.set_max_width(width);
-                ui.spacing_mut().item_spacing.y = settings.section_gap;
-                for slot in self.contracts.project.pts_slots.fixed_order.clone() {
-                    match slot.as_str() {
-                        "TemplatePicker" => self.template_picker(ui, width, settings),
-                        "ProjectCreate" => self.project_create(ui, width, settings),
-                        "AiSettings" => self.ai_settings(ui, width, settings),
-                        "ProjectsRoot" => {
-                            self.path_row(ui, width, settings, true)
-                        }
-                        "ExportDirectory" => {
-                            self.path_row(ui, width, settings, false)
-                        }
-                        "TemplateActions" => self.template_actions(ui, width, settings),
-                        _ => {}
-                    }
-                }
-            });
+        for slot in self.contracts.project.pts_slots.fixed_order.clone() {
+            match slot.as_str() {
+                "TemplatePicker" => self.template_picker(ui, width, settings),
+                "ProjectCreate" => self.project_create(ui, width, settings),
+                _ => {}
+            }
+        }
     }
 
     fn pts_scroll(
@@ -140,9 +121,19 @@ impl Blocks<'_> {
                             .show(ui, |ui| {
                                 ui.set_max_width(width);
                                 ui.spacing_mut().item_spacing.y = settings.section_gap;
-                                for slot in self.contracts.project.pts_slots.scroll_order.clone() {
+                                self.pts_fixed(ui, width, settings);
+                                // The Advanced bar; the slots of the scroll show only while it is open.
+                                project_advanced::header(ui, width, &self.contracts.project.advanced_settings, &self.contracts.theme, &mut self.session.advanced_open);
+                                let slots = if self.session.advanced_open { self.contracts.project.pts_slots.scroll_order.clone() } else { Vec::new() };
+                                for slot in slots {
                                     match slot.as_str() {
-                                        "Advanced" => self.advanced(ui, width, settings),
+                                        "AiSettings" => self.ai_settings(ui, width, settings),
+                                        "Locations" => {
+                                            self.path_row(ui, width, settings, LocationTarget::ProjectsRoot);
+                                            self.path_row(ui, width, settings, LocationTarget::ExportDir);
+                                        }
+                                        "TemplateActions" => self.template_actions(ui, width, settings),
+                                        "AdvancedSections" => self.advanced(ui, width, settings),
                                         "CustomTemplate" if self.session.template_create_open => {
                                             self.custom_template(ui, width, settings);
                                         }
@@ -275,42 +266,26 @@ impl Blocks<'_> {
         }
     }
 
-    fn project_create(
-        &mut self,
-        ui: &mut egui::Ui,
-        content_w: f32,
-        settings: &SettingsPanelMetrics,
-    ) {
-        let can_create =
-            !self.session.project_name.trim().is_empty() && !self.session.selected_template_id.trim().is_empty();
-        let shell = self.contracts.shell.clone();
-        let mut should_create = false;
-        widgets::inline_row(
-            ui,
-            content_w,
-            &self.contracts.project.texts.project_name_label,
-            settings,
-            &shell,
-            |ui, width| {
-                ui.add(
-                    egui::TextEdit::singleline(&mut self.session.project_name)
-                        .desired_width(width.max(40.0))
-                        .hint_text(&self.contracts.project.texts.project_name_hint),
-                );
-            },
-            |ui, _| {
-                if widgets::primary_btn(ui, &self.contracts.project.texts.new_project, can_create, &shell).clicked() {
-                    should_create = true;
-                }
-            },
-        );
-        if should_create {
-            self.intents.push(ProjectIntent::CreateProject);
-        }
+    /// After the template: New project opens the story sheet, where its name is typed (user
+    /// 2026-10-27); the open project's sheet opens with Story sheet.
+    fn project_create(&mut self, ui: &mut egui::Ui, content_w: f32, settings: &SettingsPanelMetrics) {
+        let (texts, shell) = (&self.contracts.project.texts, &self.contracts.theme);
+        let can_create = !self.session.selected_template_id.trim().is_empty();
+        let open = self.session.story_project.is_some();
+        let mut intent = None;
+        widgets::trailing_actions(ui, content_w, settings, |ui| {
+            if open && widgets::action_btn(ui, &texts.story_sheet, shell).clicked() {
+                intent = Some(ProjectIntent::OpenStorySheet);
+            }
+            if widgets::primary_btn(ui, &texts.new_project, can_create, shell).clicked() {
+                intent = Some(ProjectIntent::CreateProject);
+            }
+        });
+        self.intents.extend(intent);
     }
 
     fn ai_settings(&mut self, ui: &mut egui::Ui, content_w: f32, settings: &SettingsPanelMetrics) {
-        widgets::section(ui, content_w, "AI", settings, &self.contracts.shell, |ui| {
+        widgets::section(ui, content_w, "AI", settings, &self.contracts.theme, |ui| {
             ui.spacing_mut().item_spacing.y = 8.0;
             let switches = &self.contracts.project.ai_switches;
             if qnc_settings_switches::show(ui, &mut self.session.draft_settings, switches) {
@@ -319,163 +294,30 @@ impl Blocks<'_> {
         });
     }
 
-    fn path_row(
-        &mut self,
-        ui: &mut egui::Ui,
-        content_w: f32,
-        settings: &SettingsPanelMetrics,
-        project_root: bool,
-    ) {
-        let shell = self.contracts.shell.clone();
-        let texts = &self.contracts.project.texts;
-        let label = if project_root { texts.projects_root_label.clone() } else { texts.export_directory_label.clone() };
-        let mut should_pick = false;
-        let mut text_changed = false;
-        widgets::inline_row(
-            ui,
-            content_w,
-            label.as_str(),
-            settings,
-            &shell,
-            |ui, width| {
-                let draft = if project_root {
-                    &mut self.session.projects_root
-                } else {
-                    &mut self.session.export_dir
-                };
-                let response = ui.add(
-                    egui::TextEdit::singleline(draft)
-                        .desired_width(width.max(40.0))
-                        .hint_text(&self.contracts.project.texts.path_hint),
-                );
-                if response.changed() {
-                    text_changed = true;
-                }
-            },
-            |ui, _| {
-                if widgets::primary_btn(ui, &self.contracts.project.texts.choose, true, &shell).clicked() {
-                    should_pick = true;
-                }
-            },
-        );
-        if text_changed {
-            if project_root {
-                self.session.projects_root_dirty = true;
-                qnc_settings_path::set_string_path(
-                    &mut self.session.draft_settings,
-                    "storage.projects_root",
-                    self.session.projects_root.clone(),
-                );
-            } else {
-                self.session.export_dir_dirty = true;
-                qnc_settings_path::set_string_path(
-                    &mut self.session.draft_settings,
-                    "export.directory",
-                    self.session.export_dir.clone(),
-                );
-            }
-            self.session.status = self.contracts.project.texts.settings_changed.clone();
-        }
-        if should_pick {
-            let action = if project_root {
-                ProjectIntent::PickProjectsRoot
-            } else {
-                ProjectIntent::PickExportDir
-            };
-            self.intents.push(action);
-        }
-        if project_root && self.session.projects_root_browser_open {
-            self.location_browser(ui, true);
-        }
-        if !project_root && self.session.export_dir_browser_open {
-            self.location_browser(ui, false);
-        }
-    }
-
-    fn location_browser(&mut self, ui: &mut egui::Ui, project_root: bool) {
-        let shell = self.contracts.shell.clone();
-        let browser_action = {
-            let browser = if project_root {
-                &self.session.projects_root_browser
-            } else {
-                &self.session.export_dir_browser
-            };
-            ui.add_space(6.0);
-            location_browser::show(
-                ui,
-                LocationBrowserInput {
-                    id_salt: if project_root {
-                        "project_root"
-                    } else {
-                        "export_dir"
-                    },
-                    kind: browser.kind,
-                    browser: &browser.browser,
-                    error: browser.error.as_deref(),
-                    max_tree_height: Some(if project_root { 170.0 } else { 150.0 }),
-                    shell: &shell,
-                    texts: &self.contracts.project.texts,
-                },
-            )
+    /// A location field (piece `qnc-location-field`): the path, Choose, and while open its
+    /// browser with Select/Cancel.
+    fn path_row(&mut self, ui: &mut egui::Ui, content_w: f32, settings: &SettingsPanelMetrics, target: LocationTarget) {
+        let (shell, texts) = (&self.contracts.theme, &self.contracts.project.texts);
+        let projects = target == LocationTarget::ProjectsRoot;
+        let label = if projects { &texts.projects_root_label } else { &texts.export_directory_label };
+        let field = if projects { &mut self.session.projects_root } else { &mut self.session.export_dir };
+        let (mut typed, mut pick) = (false, false);
+        widgets::inline_row(ui, content_w, label, settings, shell, |ui, width| {
+            typed = ui.add(egui::TextEdit::singleline(&mut field.text).desired_width(width.max(40.0)).hint_text(&texts.path_hint)).changed();
+        }, |ui, _| pick = widgets::primary_btn(ui, &texts.choose, true, shell).clicked());
+        let labels = qnc_location_field::FieldLabels {
+            sources: &texts.sources, up: &texts.up, disks: &texts.disks, internet: &texts.internet,
+            empty_folder: &texts.empty_folder, empty_disks: &texts.empty_disks, empty_lan: &texts.empty_lan,
+            empty_internet: &texts.empty_internet, confirm: &texts.confirm, cancel: &texts.cancel,
         };
-
-        ui.add_space(8.0);
-        let can_confirm = {
-            let browser = if project_root {
-                &self.session.projects_root_browser
-            } else {
-                &self.session.export_dir_browser
-            };
-            browser.kind == LocationSourceKind::Local
-                && !browser.browser.roots
-                && browser.browser.current_uri.is_some()
-                && !browser.busy
-        };
-        let form_actions = widgets::form_action_bar(ui, &shell, &self.contracts.project.texts.confirm, can_confirm, &self.contracts.project.texts.cancel);
-
-        let mut action = match browser_action {
-            LocationBrowserAction::None => None,
-            LocationBrowserAction::SelectKind(kind) => Some(if project_root {
-                ProjectIntent::SelectProjectsRootKind { kind }
-            } else {
-                ProjectIntent::SelectExportDirKind { kind }
-            }),
-            LocationBrowserAction::OpenUri(uri) => Some(if project_root {
-                ProjectIntent::OpenProjectsRootUri { uri }
-            } else {
-                ProjectIntent::OpenExportDirUri { uri }
-            }),
-            LocationBrowserAction::OpenParent => Some(if project_root {
-                ProjectIntent::OpenProjectsRootParent
-            } else {
-                ProjectIntent::OpenExportDirParent
-            }),
-            LocationBrowserAction::OpenRoots => Some(if project_root {
-                ProjectIntent::OpenProjectsRootRoots
-            } else {
-                ProjectIntent::OpenExportDirRoots
-            }),
-        };
-
-        if action.is_none() {
-            if form_actions.cancel_clicked {
-                action = Some(if project_root {
-                    ProjectIntent::CancelProjectsRootBrowser
-                } else {
-                    ProjectIntent::CancelExportDirBrowser
-                });
-            } else if form_actions.confirm_clicked {
-                action = Some(if project_root {
-                    ProjectIntent::ConfirmProjectsRootBrowser
-                } else {
-                    ProjectIntent::ConfirmExportDirBrowser
-                });
-            }
+        let (id, height) = if projects { ("project_root", 170.0) } else { ("export_dir", 150.0) };
+        let answer = field.open.then(|| qnc_location_field::show_browser(ui, field, id, height, &labels, &self.contracts.theme)).flatten();
+        if typed {
+            self.session.location_typed(target);
+            self.session.status = texts.settings_changed.clone();
         }
-
-        if let Some(action) = action {
-            self.intents.push(action);
-        }
+        self.intents.extend(pick.then_some(ProjectIntent::PickLocation { target }));
+        self.intents.extend(answer.map(|answer| ProjectIntent::AnswerLocation { target, answer }));
     }
 
     fn template_actions(
@@ -486,11 +328,11 @@ impl Blocks<'_> {
     ) {
         widgets::trailing_actions(ui, content_w, settings, |ui| {
             if self.session.template_create_open
-                && widgets::action_btn(ui, &self.contracts.project.texts.cancel, &self.contracts.shell).clicked()
+                && widgets::action_btn(ui, &self.contracts.project.texts.cancel, &self.contracts.theme).clicked()
             {
                 self.intents.push(ProjectIntent::CancelTemplateCreate);
             }
-            if widgets::action_btn(ui, &self.contracts.project.texts.new_template, &self.contracts.shell).clicked() {
+            if widgets::action_btn(ui, &self.contracts.project.texts.new_template, &self.contracts.theme).clicked() {
                 self.intents.push(ProjectIntent::BeginTemplateCreate);
             }
         });
@@ -505,8 +347,7 @@ impl Blocks<'_> {
             content_w,
             settings,
             &self.contracts.project.advanced_settings,
-            &self.contracts.shell,
-            &mut self.session.advanced_open,
+            &self.contracts.theme,
             project_advanced::AdvancedDraft {
                 draft_settings: &mut self.session.draft_settings,
                 export_preset_draft_name: &mut self.session.export_preset_draft_name,
@@ -541,15 +382,11 @@ impl Blocks<'_> {
         let can_save =
             !self.session.template_draft_name.trim().is_empty() && !self.session.selected_template_id.is_empty();
         let mut should_save = false;
-        let shell = self.contracts.shell.clone();
+        let shell = self.contracts.theme.clone();
         let base_name = self.session.selected_template_name();
         widgets::section(ui, content_w, &self.contracts.project.texts.new_template, settings, &shell, |ui| {
-            let t = Theme::from_contract(&shell.colors);
-            ui.label(
-                RichText::new(self.contracts.project.texts.template_base.replace("{base}", &base_name))
-                    .size(12.0)
-                    .color(t.muted),
-            );
+            let base = self.contracts.project.texts.template_base.replace("{base}", &base_name);
+            ui.label(RichText::new(base).size(12.0).color(shell.text_muted));
             ui.add_space(8.0);
             widgets::inline_row(
                 ui,

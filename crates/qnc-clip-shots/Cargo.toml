@@ -1,0 +1,10 @@
+[package]
+name = "qnc-clip-shots"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the shots of the clip on the preview as the background worker kept them in the project database, read outside the UI thread and again while the clip has none; it analyses nothing"
+
+[dependencies]
+qnc-db-broker = { workspace = true }
+qnc-shot-db = { workspace = true }
+qnc-source-preview = { workspace = true }

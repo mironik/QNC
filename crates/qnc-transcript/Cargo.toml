@@ -2,13 +2,14 @@
 name = "qnc-transcript"
 version = "0.1.0"
 edition = "2021"
-description = "QNC public piece: the transcript of the clip on the preview - the transcripts kept in the project database, a new one of the source timeline's IN/OUT asked off the form thread, a click on a word takes the playhead there; it knows no form"
+description = "QNC public piece: the transcripts of a project's clips - ticked clips (or the shown clip's IN/OUT) queued in the project database with Fast or Quality and run in the background, the kept transcripts of the shown clip read from it, a click on a word takes the playhead there; it knows no form"
 
 [dependencies]
+qnc-clip-row = { workspace = true }
 qnc-db-broker = { workspace = true }
-qnc-dev-diagnostics = { workspace = true }
 qnc-source-preview = { workspace = true }
+qnc-source-timecode = { workspace = true }
 qnc-timeline = { workspace = true }
-qnc-transcribe-run = { workspace = true }
+qnc-transcribe-queue = { workspace = true }
 qnc-transcript-db = { workspace = true }
 qnc-ui-text = { workspace = true }

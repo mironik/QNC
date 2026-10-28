@@ -2,6 +2,7 @@
   "version": "1",
   "transcribe": {
     "selected": "whisper.large-v3-turbo.vulkan",
+    "fast": "parakeet.tdt-0.6b-v3.cpu",
     "engines": [
       {
         "id": "whisper.large-v3-turbo.vulkan",
@@ -18,6 +19,13 @@
         "model": "../../data/models/ggml-large-v3-turbo.bin",
         "vad_model": "../../data/models/ggml-silero-v5.1.2.bin",
         "threads": 6
+      },
+      {
+        "id": "parakeet.tdt-0.6b-v3.cpu",
+        "program": "qnc-transcribe-parakeet",
+        "backend": "cpu",
+        "model": "../../data/models/parakeet-tdt-0.6b-v3-int8",
+        "threads": 2
       }
     ]
   }

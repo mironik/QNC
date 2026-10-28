@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.shot-panel",
+  "module_name": "Shot Panel",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["ui.shots.paint"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.decode", "database.read", "database.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-shot-panel",
+  "input": "The shots view of the shown clip, its source timecode and the cover length bands of the layout contract.",
+  "output": "The Video AI panel painted: usable parts first, each framed in the colour of its length and with its length as a Story cover (cover_fill of qnc-segment-panel), then shots; a click on a part as the catalog action shot_open_part with its index, on a shot as shot_cue with its first frame.",
+  "specification": "User 2026-10-27: Video AI, shot analysis in AI Media Assist, a background job of its own after the filmstrip (AGENTS.md)."
+}

@@ -91,11 +91,47 @@
     "step_next_segment": {
       "label": "Sljedeći OFF segment"
     },
+    "ai_tab_audio": {
+      "label": "Tab Audio AI desnog panela"
+    },
+    "ai_tab_video": {
+      "label": "Tab Video AI desnog panela"
+    },
+    "shot_cue": {
+      "label": "Playhead na pocetak kadra (Video AI)"
+    },
+    "shot_open_part": {
+      "label": "Upotrebljivi dio kao IN/OUT na source timelineu (Video AI)"
+    },
     "transcribe_marks": {
       "label": "Transkribiraj IN-OUT (bez oznaka cijeli klip)"
     },
+    "transcript_cut_word": {
+      "label": "Rez na rijeci transkripta (dvoklik: IN na pocetku, OUT na kraju)"
+    },
     "transcript_cue_word": {
       "label": "Playhead na rijec transkripta"
+    },
+    "transcript_open_clip": {
+      "label": "Otvori transkribirani klip (iz popisa transkripta)"
+    },
+    "transcript_add_quote": {
+      "label": "Dodaj tekst IN-OUT u izjave"
+    },
+    "transcript_open_quote": {
+      "label": "Otvori izjavu (klip s njezinim IN-OUT)"
+    },
+    "transcript_delete_quote": {
+      "label": "Ukloni izjavu s popisa"
+    },
+    "transcribe_fast": {
+      "label": "Transkribiraj brzo (procesor)"
+    },
+    "transcribe_best": {
+      "label": "Transkribiraj kvalitetno"
+    },
+    "transcribe_mark": {
+      "label": "Oznaci klip za transkripciju"
     },
     "translate_transcript": {
       "label": "Prevedi transkript (IN–OUT ako je označen)"
@@ -208,11 +244,23 @@
     "project_open_selected": {
       "label": "Otvori odabrani projekt"
     },
+    "form_next_field": {
+      "label": "Sljedeće polje obrasca"
+    },
     "project_open_row": {
       "label": "Otvori projekt iz popisa"
     },
     "project_create": {
       "label": "Kreiraj projekt"
+    },
+    "project_story_open": {
+      "label": "Otvori obrazac priloga otvorenog projekta"
+    },
+    "project_story_confirm": {
+      "label": "Kreiraj projekt ili spremi obrazac priloga"
+    },
+    "project_story_cancel": {
+      "label": "Zatvori obrazac priloga"
     },
     "project_delete_request": {
       "label": "Zatraži uklanjanje projekta"
@@ -474,6 +522,11 @@
       "description": "QNC: I/O mark, T Talking Head, V Voice over",
       "project": {
         "project_open_selected": [
+          {
+            "key": "Enter"
+          }
+        ],
+        "form_next_field": [
           {
             "key": "Enter"
           }

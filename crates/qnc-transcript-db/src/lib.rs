@@ -52,6 +52,61 @@ pub struct ClipTranscript {
     pub lines: Vec<Line>,
 }
 
+/// Which engine a queued range is transcribed with (user 2026-10-26: Fast or Quality).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QueueQuality {
+    Fast,
+    Best,
+}
+
+/// Where a queued range is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QueueState {
+    Waiting,
+    Running,
+    Done,
+    Failed,
+}
+
+/// A range of a clip asked to be transcribed in the background (user 2026-10-26: clips
+/// ticked in the pool are queued; the queue is in the project database, so it outlives the
+/// application and another one sees it).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Queued {
+    pub clip_id: String,
+    pub from_frame: u64,
+    pub to_frame: u64,
+    pub quality: QueueQuality,
+    pub state: QueueState,
+    /// Why it failed.
+    pub error: String,
+    /// How long its transcription took, when done (milliseconds).
+    #[serde(default)]
+    pub took_ms: u64,
+}
+
+
+/// A statement chosen from a transcript (user 2026-10-26: the text between IN and OUT kept in
+/// a list, with its start and end timecode and length, for the journalist's script). The
+/// timecodes and length are written as shown when it was chosen; `id` is given by the table.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Quote {
+    #[serde(default)]
+    pub id: i64,
+    pub clip_id: String,
+    pub clip_name: String,
+    pub from_frame: u64,
+    pub to_frame: u64,
+    pub start_tc: String,
+    pub end_tc: String,
+    pub length: String,
+    pub text: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Operation {
@@ -59,11 +114,24 @@ pub enum Operation {
     Save(ClipTranscript),
     /// The transcripts of a clip, in the order of their ranges.
     ReadClip { clip_id: String },
+    /// Ranges are queued, waiting (a clip's earlier entry is replaced).
+    Enqueue(Vec<Queued>),
+    /// A queued clip is now in `state` (a running entry stays one, by its clip), with how
+    /// long it took when done.
+    SetQueued { clip_id: String, state: QueueState, error: String, #[serde(default)] took_ms: u64 },
+    /// The queue, in the order it was asked.
+    ReadQueue,
+    /// A statement is added to the list (user 2026-10-26).
+    AddQuote(Quote),
+    /// A statement leaves the list.
+    DeleteQuote { id: i64 },
+    /// The statements, in the order they were added.
+    ReadQuotes,
 }
 
 impl Operation {
     pub fn is_write(&self) -> bool {
-        matches!(self, Self::Save(_))
+        matches!(self, Self::Save(_) | Self::Enqueue(_) | Self::SetQueued { .. } | Self::AddQuote(_) | Self::DeleteQuote { .. })
     }
 }
 
@@ -71,6 +139,8 @@ impl Operation {
 #[serde(tag = "kind", content = "data", rename_all = "snake_case")]
 pub enum Data {
     Transcripts(Vec<ClipTranscript>),
+    Queue(Vec<Queued>),
+    Quotes(Vec<Quote>),
     Changed,
 }
 
@@ -93,14 +163,58 @@ pub fn read_clip(target: &ProjectDbTarget, clip_id: &str) -> Result<Vec<ClipTran
     let answer = client.execute(MODULE_ID, encode(&Operation::ReadClip { clip_id: clip_id.into() })?)?;
     match serde_json::from_value(answer).map_err(|e| e.to_string())? {
         Data::Transcripts(transcripts) => Ok(transcripts),
-        Data::Changed => Err(qnc_ui_text::text("db.transcript_reply").into()),
+        _ => Err(qnc_ui_text::text("db.transcript_reply").into()),
+    }
+}
+
+/// The transcription queue of the project behind `target`.
+pub fn read_queue(target: &ProjectDbTarget) -> Result<Vec<Queued>> {
+    let mut client = target.open(Access::ReadOnly, vec![TranscriptModule::factory()])?;
+    let answer = client.execute(MODULE_ID, encode(&Operation::ReadQueue)?)?;
+    match serde_json::from_value(answer).map_err(|e| e.to_string())? {
+        Data::Queue(queue) => Ok(queue),
+        _ => Err(qnc_ui_text::text("db.transcript_reply").into()),
     }
 }
 
 /// Keeps `transcript` in the project behind `target` through its serial writer.
 pub fn save(target: &ProjectDbTarget, transcript: ClipTranscript) -> Result<()> {
+    write(target, Operation::Save(transcript))
+}
+
+/// Queues `ranges` (waiting) in the project behind `target`.
+pub fn enqueue(target: &ProjectDbTarget, ranges: Vec<Queued>) -> Result<()> {
+    write(target, Operation::Enqueue(ranges))
+}
+
+/// Puts the queued `clip_id` in `state`; `took_ms` is how long it took when done.
+pub fn set_queued(target: &ProjectDbTarget, clip_id: &str, state: QueueState, error: &str, took_ms: u64) -> Result<()> {
+    write(target, Operation::SetQueued { clip_id: clip_id.into(), state, error: error.into(), took_ms })
+}
+
+/// The statements of the project behind `target`, in the order they were added.
+pub fn read_quotes(target: &ProjectDbTarget) -> Result<Vec<Quote>> {
+    let mut client = target.open(Access::ReadOnly, vec![TranscriptModule::factory()])?;
+    let answer = client.execute(MODULE_ID, encode(&Operation::ReadQuotes)?)?;
+    match serde_json::from_value(answer).map_err(|e| e.to_string())? {
+        Data::Quotes(quotes) => Ok(quotes),
+        _ => Err(qnc_ui_text::text("db.transcript_reply").into()),
+    }
+}
+
+/// Adds `quote` to the statements of the project behind `target`.
+pub fn add_quote(target: &ProjectDbTarget, quote: Quote) -> Result<()> {
+    write(target, Operation::AddQuote(quote))
+}
+
+/// Takes statement `id` off the list.
+pub fn delete_quote(target: &ProjectDbTarget, id: i64) -> Result<()> {
+    write(target, Operation::DeleteQuote { id })
+}
+
+fn write(target: &ProjectDbTarget, operation: Operation) -> Result<()> {
     let writer = qnc_db_broker::ProjectDbWriter::spawn(target.clone(), vec![TranscriptModule::factory()])?;
-    writer.call(MODULE_ID, encode(&Operation::Save(transcript))?).map(drop)
+    writer.call(MODULE_ID, encode(&operation)?).map(drop)
 }
 
 #[cfg(test)]

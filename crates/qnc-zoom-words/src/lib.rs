@@ -61,7 +61,9 @@ impl ZoomWords {
     }
 
     /// Puts the words A1 says in the window of `sound` on it.
-    pub fn fill(&mut self, locator: &StillLocator, sound: &mut ZoomSound) {
+    /// `fine`: A1's peaks are its whole read sound (not silence still being read), so the
+    /// words' edges are moved to it (user 2026-10-26) and voice no word covers is marked.
+    pub fn fill(&mut self, locator: &StillLocator, sound: &mut ZoomSound, fine: bool) {
         if self.project_id.as_deref() != Some(locator.project_id()) {
             self.stop();
             *self = Self { project_id: Some(locator.project_id().to_string()), ..Self::default() };
@@ -78,6 +80,15 @@ impl ZoomWords {
         sound.words = needs.iter().flat_map(|need| self.words_of(sound, need)).collect();
         sound.words.sort_by_key(|word| word.from);
         sound.words.dedup_by(|a, b| a.from == b.from && a.text == b.text);
+        sound.unheard.clear();
+        if fine && !sound.words.is_empty() {
+            let spans: Vec<qnc_word_align::Span> = sound.words.iter().map(|w| qnc_word_align::Span { from: w.from, to: w.to }).collect();
+            let aligned = qnc_word_align::align(sound.from, sound.to, &sound.peaks[0], &spans);
+            for (word, span) in sound.words.iter_mut().zip(aligned.words) {
+                (word.from, word.to) = (span.from, span.to);
+            }
+            sound.unheard = aligned.unheard.into_iter().map(|span| (span.from, span.to)).collect();
+        }
     }
 
     /// Stops a running transcription (the zoom closed or another project).
@@ -146,7 +157,7 @@ impl ZoomWords {
             let made = locator.locate_sound(&wanted.clip_id).and_then(|place| {
                 let around = AROUND_SECONDS * u64::from(place.fps.0) / u64::from(place.fps.1.max(1));
                 let ask = qnc_transcribe_run::Ask { clip_id: wanted.clip_id.clone(), from: wanted.first.saturating_sub(around), to: wanted.last + around };
-                let transcript = qnc_transcribe_run::transcribe(&locator, &ask, &stop, &mut |_| {})?;
+                let transcript = qnc_transcribe_run::transcribe(&locator, &ask, qnc_transcribe_run::Quality::Fast, qnc_transcribe_run::Pace::Now, &stop, &mut |_| {}, &mut |_| {})?;
                 let target = qnc_db_broker::ProjectDbTarget::for_project(locator.reader(), locator.settings()).map_err(|error| error.to_string())?;
                 qnc_transcript_db::save(&target, transcript)
             });

@@ -51,12 +51,8 @@ impl Blocks<'_> {
                 .max_rect(title_rect)
                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
             |ui| {
-                ui.label(
-                    RichText::new(&metrics.title)
-                        .size(self.contracts.shell.theme_metrics.font_ui)
-                        .strong()
-                        .color(t.text),
-                );
+                let title = RichText::new(&metrics.title).size(self.contracts.shell.theme_metrics.font_ui).strong().color(t.text);
+                crate::widgets::title_with_search(ui, title, &mut self.session.project_search, content_w * 0.55);
             },
         );
         ui.painter().hline(
@@ -99,12 +95,12 @@ impl Blocks<'_> {
                             );
                             return;
                         }
-                        for index in 0..self.session.projects.len() {
-                            let project = self.session.projects[index].clone();
-                            self.project_row(ui, index, &project, metrics);
-                            if index + 1 < self.session.projects.len() {
+                        for (at, index) in self.session.shown_projects().into_iter().enumerate() {
+                            if at > 0 {
                                 ui.add_space(metrics.row_gap);
                             }
+                            let project = self.session.projects[index].clone();
+                            self.project_row(ui, index, &project, metrics);
                         }
                     });
             },

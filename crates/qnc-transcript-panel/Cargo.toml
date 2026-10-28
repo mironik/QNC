@@ -8,5 +8,7 @@ description = "QNC public passive panel: the transcript of the clip on the previ
 eframe = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-desktop-theme = { workspace = true }
+qnc-source-timecode = { workspace = true }
 qnc-transcript = { workspace = true }
+qnc-ui-kit = { workspace = true }
 qnc-ui-text = { workspace = true }

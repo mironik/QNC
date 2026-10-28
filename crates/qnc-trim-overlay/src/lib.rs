@@ -10,10 +10,13 @@
 //! across both waves.
 
 use eframe::egui::{self, Align2, Color32, FontId, Rect, Sense, Stroke, StrokeKind, Vec2};
+use qnc_action_event::ActionEvent;
 use qnc_program_view::{ClipEdge, EditStill, SegmentsView, ZoomSound};
 
 pub const MODULE_ID: &str = "qnc.module.trim-overlay";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The catalog action of a cut at a word (contracts/qnc-keyboard-shortcuts.json).
+const CUT_WORD: &str = "transcript_cut_word";
 
 /// The largest picture (16:9) and the gaps of the window.
 const MAX_PICTURE: Vec2 = Vec2::new(480.0, 270.0);
@@ -27,16 +30,22 @@ const LANES_GAP: f32 = 8.0;
 const WORDS_HEIGHT: f32 = 22.0;
 /// The thin line through the cut.
 const CUT_LINE: Color32 = Color32::from_rgb(230, 30, 30);
+/// The voice no word was heard for: the cut line's red, faint.
+const UNHEARD_FILL: Color32 = Color32::from_rgba_premultiplied(70, 10, 10, 70);
 /// The share of the screen width the window may take.
 const SCREEN_SHARE: f32 = 0.92;
 
 /// Shows the trim zoom over everything while `segments` has edit pictures (the Wrap
 /// rows' or, for a segment edge, the source timeline's).
-pub fn show(ctx: &egui::Context, segments: &SegmentsView) {
-    let stills = if segments.source_edit_stills.is_empty() { &segments.edit_stills } else { &segments.source_edit_stills };
+/// The wheel and the touchpad over the window are the wheel of the panel the taken thing is
+/// on (user 2026-10-26: "in the zoom only the arrows work"), its system action.
+pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent> {
+    let source = !segments.source_edit_stills.is_empty();
+    let stills = if source { &segments.source_edit_stills } else { &segments.edit_stills };
     if stills.is_empty() {
-        return;
+        return None;
     }
+    let mut turned = None;
     let count = stills.len() as f32;
     let screen = ctx.screen_rect();
     let width = ((screen.width() * SCREEN_SHARE - 2.0 * MARGIN - GAP * (count - 1.0)) / count).min(MAX_PICTURE.x);
@@ -47,9 +56,12 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) {
     egui::Area::new(egui::Id::new("qnc_trim_overlay"))
         .order(egui::Order::Foreground)
         .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
-        .interactable(false)
+        .interactable(true)
         .show(ctx, |ui| {
             let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+            let wheel = qnc_wheel_jog::take(ui, rect, ui.id().with("wheel")).or_else(|| qnc_touchpad::take(ui, rect, ui.id().with("touchpad")));
+            let (actions, panel) = if source { (qnc_wheel_jog::SOURCE_ACTIONS, "source_timeline") } else { (qnc_wheel_jog::SEGMENTS_ACTIONS, "segments") };
+            turned = wheel.map(|wheel| ActionEvent::key(wheel.action(actions)).at(panel));
             let visuals = ui.visuals().clone();
             ui.painter().rect_filled(rect, 6.0, visuals.window_fill);
             ui.painter().rect_stroke(rect, 6.0, visuals.window_stroke, StrokeKind::Inside);
@@ -70,9 +82,13 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) {
             }
             if let Some(sound) = sound {
                 let area = Rect::from_min_size(egui::pos2(top.x, top.y + picture.y + LABEL_HEIGHT + LANES_GAP), Vec2::new(row_width, 2.0 * LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT));
-                paint_sound(ui, area, sound, gap_at, top.y, &visuals);
+                // A double clicked word on a source timeline's zoom is a cut, as on the transcript.
+                if let Some((from, to)) = paint_sound(ui, area, sound, gap_at, top.y, &visuals).filter(|_| source) {
+                    turned = Some(ActionEvent::key(CUT_WORD).with_value(from).with_target(to.to_string()).at("source_timeline"));
+                }
             }
         });
+    turned
 }
 
 /// How high a peak (per mille of full scale) is drawn, 0 to 1: on a dB scale from
@@ -89,14 +105,15 @@ fn shown_height(peak: u16) -> f32 {
 /// A1 and A2 around the cut, each a lane of its peaks mirrored about its middle, and the
 /// thin line of the cut: from between the pictures when it lies under that gap, across
 /// both lanes at the cut's place in the window.
-fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, visuals: &egui::Visuals) {
+fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<f32>, pictures_top: f32, visuals: &egui::Visuals) -> Option<(u64, u64)> {
+    let mut word = None;
     let span = (sound.to - sound.from) as f32;
     let cut_x = area.left() + area.width() * (sound.cut.saturating_sub(sound.from)) as f32 / span;
     let x_of = |frame: u64| area.left() + area.width() * (frame.saturating_sub(sound.from)) as f32 / span;
     for lane in 0..2 {
         let top = area.top() + lane as f32 * (LANE_HEIGHT + GAP / 2.0 + WORDS_HEIGHT);
         if lane == 1 {
-            paint_words(ui, Rect::from_min_size(egui::pos2(area.left(), top - WORDS_HEIGHT - GAP / 4.0), Vec2::new(area.width(), WORDS_HEIGHT)), sound, &x_of, visuals);
+            word = paint_words(ui, Rect::from_min_size(egui::pos2(area.left(), top - WORDS_HEIGHT - GAP / 4.0), Vec2::new(area.width(), WORDS_HEIGHT)), sound, &x_of, visuals);
         }
         let band = Rect::from_min_size(egui::pos2(area.left(), top), Vec2::new(area.width(), LANE_HEIGHT));
         ui.painter().rect_filled(band, 2.0, Color32::from_rgb(17, 103, 88));
@@ -119,12 +136,25 @@ fn paint_sound(ui: &mut egui::Ui, area: Rect, sound: &ZoomSound, gap_at: Option<
         _ => area.top(),
     };
     ui.painter().line_segment([egui::pos2(cut_x, from_top), egui::pos2(cut_x, area.bottom())], Stroke::new(1.5, CUT_LINE));
+    word
 }
 
 /// The words said on A1 in the window, each from where it is said, cut where the next one
 /// starts; a short tick marks a word's start, so a pause between words is seen.
-fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u64) -> f32, visuals: &egui::Visuals) {
+/// A double click on a word gives its frames (user 2026-10-26: as on the transcript, a cut).
+fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u64) -> f32, visuals: &egui::Visuals) -> Option<(u64, u64)> {
+    let mut clicked = None;
     let font = FontId::proportional(13.0);
+    // Voice no word was heard for (user 2026-10-26): red, so a word the transcript missed is seen.
+    for &(from, to) in &sound.unheard {
+        let (left, right) = (x_of(from).max(row.left()), x_of(to).min(row.right()));
+        if right > left {
+            let span = Rect::from_min_max(egui::pos2(left, row.top() + 2.0), egui::pos2(right, row.bottom() - 2.0));
+            ui.painter().rect_filled(span, 2.0, UNHEARD_FILL);
+            ui.painter().rect_stroke(span, 2.0, Stroke::new(1.0, CUT_LINE), StrokeKind::Inside);
+            ui.painter().with_clip_rect(span).text(span.center(), Align2::CENTER_CENTER, "?", font.clone(), CUT_LINE);
+        }
+    }
     for (index, word) in sound.words.iter().enumerate() {
         let left = x_of(word.from).max(row.left());
         let right = sound.words.get(index + 1).map_or(row.right(), |next| x_of(next.from)).min(row.right()).max(left);
@@ -134,7 +164,16 @@ fn paint_words(ui: &mut egui::Ui, row: Rect, sound: &ZoomSound, x_of: &dyn Fn(u6
         ui.painter().line_segment([egui::pos2(left, row.top()), egui::pos2(left, row.bottom())], Stroke::new(1.0, visuals.weak_text_color()));
         let cell = Rect::from_min_max(egui::pos2(left + 3.0, row.top()), egui::pos2(right, row.bottom()));
         ui.painter().with_clip_rect(cell).text(egui::pos2(cell.left(), row.center().y), Align2::LEFT_CENTER, word.text.trim(), font.clone(), visuals.text_color());
+        let hit = Rect::from_min_max(egui::pos2(left, row.top()), egui::pos2(right.max(left + 4.0), row.bottom()));
+        let response = ui.interact(hit, ui.id().with(("qnc_trim_word", index)), Sense::click());
+        if response.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if response.double_clicked() {
+            clicked = Some((word.from, word.to.max(word.from + 1)));
+        }
     }
+    clicked
 }
 
 fn paint_still(ui: &mut egui::Ui, pane: Rect, still: &EditStill, visuals: &egui::Visuals) {

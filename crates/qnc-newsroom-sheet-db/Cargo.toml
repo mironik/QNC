@@ -1,0 +1,15 @@
+[package]
+name = "qnc-newsroom-sheet-db"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: the story sheet of a project (the description of its fields as it was when filled, and the values by field code) as a table module of the project database intermediary; it knows no form or application"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+qnc-db-broker = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

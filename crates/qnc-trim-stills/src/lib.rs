@@ -139,11 +139,13 @@ impl TrimStills {
         }
         // The sound under the pictures: a peak per column of each lane, per mille.
         if let Some(sound) = view.zoom_sound.as_mut() {
+            let mut a1_read = false;
             for lane in 0..2 {
-                let (peaks, _) = self.fine.lane_peaks(&locator, &sound.lanes[lane], sound.from, sound.to, ZOOM_COLUMNS);
+                let (peaks, complete) = self.fine.lane_peaks(&locator, &sound.lanes[lane], sound.from, sound.to, ZOOM_COLUMNS);
                 sound.peaks[lane] = peaks.iter().map(|peak| (peak * 1000.0).round() as u16).collect();
+                a1_read |= lane == 0 && complete;
             }
-            self.words.fill(&locator, sound);
+            self.words.fill(&locator, sound, a1_read);
         }
         for still in view.edit_stills.iter_mut().chain(view.source_edit_stills.iter_mut()) {
             still.image = still.picture.as_ref().and_then(|picture| self.cache.get(picture).cloned());

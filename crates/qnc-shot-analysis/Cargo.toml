@@ -1,0 +1,21 @@
+[package]
+name = "qnc-shot-analysis"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public module: shot analysis of the imported clips of a project (an intra picture of the original about every second through its MXF index, decoded small through the decoder catalog, shots by qnc-shot-detect, kept by qnc-shot-db under the caller's lease); run by the background worker after the filmstrips"
+
+[dependencies]
+qnc-ui-text = { workspace = true }
+qnc-active-project-read = { workspace = true }
+qnc-content-read = { workspace = true }
+qnc-content-store = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-decoder-catalog = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-filmstrip = { workspace = true }
+qnc-media-records = { workspace = true }
+qnc-mxf-index = { workspace = true }
+qnc-shot-db = { workspace = true }
+qnc-shot-detect = { workspace = true }
+qnc-work-settings = { workspace = true }
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }

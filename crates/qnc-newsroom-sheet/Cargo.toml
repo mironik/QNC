@@ -1,0 +1,20 @@
+[package]
+name = "qnc-newsroom-sheet"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: the story sheet (the data of a news story as fields by code): the prepared sheets and the ones a newsroom makes, the overlay that fills one (project name first, fields one under the other) and the editor of a sheet with its lock"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+eframe = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-settings-form = { workspace = true }
+qnc-theme-styles = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-ui-text = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

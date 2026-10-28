@@ -3,7 +3,7 @@
   "module_name": "Right Panel",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["ui.right_panel.paint"],
+  "capabilities": ["ui.right_panel.paint", "ui.right_panel.tabs"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "transport_protocol_version": "0.1.0",
@@ -15,7 +15,7 @@
   "state_policy": "session_local",
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-right-panel",
-  "input": "The kind of right panel a group's layout contract names (segment_panel, transcript_panel, none) and what those panels show.",
+  "input": "The kind of right panel a group's layout contract names (segment_panel, transcript_panel, video_ai_panel, none), optional tabs on top with their panel kinds, and what those panels show.",
   "output": "The named public panel painted and its answer; an unknown kind stays empty.",
-  "specification": "User 2026-10-26: transcription of a clip's IN/OUT in Media Assist Audio AI (AGENTS.md)."
+  "specification": "User 2026-10-26: transcription in Media Assist Audio AI; user 2026-10-27: tabs Audio AI and Video AI in AI Media Assist (AGENTS.md)."
 }

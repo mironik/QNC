@@ -7,7 +7,10 @@ description = "QNC Project piece: the state of the Project application and the w
 [dependencies]
 qnc-ui-text = { workspace = true }
 qnc-dir-browser = { workspace = true }
+qnc-dir-browser-panel = { workspace = true }
+qnc-location-field = { workspace = true }
 qnc-project-application = { workspace = true }
 qnc-settings-path = { workspace = true }
+qnc-newsroom-sheet = { workspace = true }
 qnc-ui-kit = { workspace = true }
 serde_json = { workspace = true }

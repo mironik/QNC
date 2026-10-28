@@ -33,7 +33,7 @@ pub fn render_desktop(
         "clip-cards" => framed(pool(ui, contracts, theme, view), ui, rect, &[Panel::Pool]),
         // The group's right panel by its layout contract (Segmenti for Story, the transcript for Audio AI).
         "right-panel" => {
-            let (answer, segments) = qnc_right_panel::show(ui, &contracts.composition().right_panel, theme, &qnc_right_panel::Shown { segments: &view.segments, cover_lengths: &contracts.editorial.cover_lengths, levels: view.preview.output_levels, transcript: &view.focus.transcript });
+            let (answer, segments) = qnc_right_panel::show_tabbed(ui, &contracts.composition().right_panel, &contracts.composition().right_panel_tabs, theme, &qnc_right_panel::Shown { segments: &view.segments, cover_lengths: &contracts.editorial.cover_lengths, levels: view.preview.output_levels, transcript: &view.focus.transcript, shots: &view.focus.shots, timecode: view.source_timeline.timecode.as_ref() });
             framed(answer.map(EditorialIntent::Action), ui, rect, if segments { &[Panel::Segments] } else { &[] })
         }
         "source-dock" => framed(source_dock(ui, contracts, theme, view), ui, rect, if view.segments.zoom.is_some() { &[Panel::Segments, Panel::SourceButtons] } else { &[Panel::SourceTimeline, Panel::SourceButtons] }),
@@ -43,10 +43,10 @@ pub fn render_desktop(
 
 fn preview(ui: &mut Ui, rect: Rect, contracts: &EditorialContracts, theme: &Theme, view: &EditorialView) -> Option<EditorialIntent> {
     let label = view.current_clip_label().unwrap_or(contracts.editorial.preview.empty_label.as_str());
-    qnc_trim_overlay::show(ui.ctx(), &view.segments); // the trim zoom, while something is taken
+    let turned = qnc_trim_overlay::show(ui.ctx(), &view.segments); // the trim zoom, its wheel the panel's
     let shown = view.shown_clip().map(|clip| clip as &dyn qnc_clip_row::PoolItem);
     qnc_monitor_panel::show(ui, rect, egui::Id::new(("qnc-monitor", "editorial-source")), theme, &view.preview.monitor(), shown, label);
-    None // the monitor gives no intent
+    turned.map(EditorialIntent::Action) // the monitor gives no intent
 }
 
 fn pool_tabs(ui: &mut Ui, rect: Rect, contracts: &EditorialContracts, theme: &Theme, view: &EditorialView) -> Option<EditorialIntent> {
@@ -62,7 +62,7 @@ fn source_dock(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view:
     let header = |ui: &mut Ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
-            let (enabled, on) = (|id: &str| view.action_enabled(id), |id: &str| view.segments.action_selected(id));
+            let (enabled, on) = (|id: &str| view.action_enabled(id), |id: &str| view.segments.action_selected(id) || view.focus.transcript.selected(id));
             clicked = qnc_source_timeline::header_actions(ui, theme, actions, enabled, on, view.focus.button.as_deref());
         });
     };
@@ -88,7 +88,7 @@ fn pool(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &Edito
     let spec = qnc_media_pool_panel::PoolSpec {
         pad: contracts.editorial.board.block_pad,
         metrics: CardMetrics { min_card_width: cards.min_card_width, card_text_height: cards.card_text_height, grid_gap: cards.grid_gap },
-        ticks: Ticks::chosen_if(composition.selection_check),
+        ticks: if composition.ticks_several { Ticks::Selected } else { Ticks::chosen_if(composition.selection_check) },
         status_dots: StatusDotsMode::from_contract(&composition.status_dots).unwrap_or(StatusDotsMode::Off),
         imported_marker: None,
         saving: "",
@@ -115,6 +115,5 @@ fn pool(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &Edito
     } else {
         qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.clips.iter().collect::<Vec<_>>())
     };
-    let (CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id)) = clicked?;
-    Some(if shot_tab { EditorialIntent::PreviewShort(id) } else { EditorialIntent::PreviewClip(id) })
+    Some(match clicked? { CardGridAction::ToggleSelection(id) if composition.ticks_several && !shot_tab => EditorialIntent::Action(qnc_action_event::ActionEvent::key(qnc_transcript::MARK).with_target(id)), CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id) => if shot_tab { EditorialIntent::PreviewShort(id) } else { EditorialIntent::PreviewClip(id) } })
 }

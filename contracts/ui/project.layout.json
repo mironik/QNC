@@ -98,14 +98,13 @@
     ],
     "fixed_order": [
       "TemplatePicker",
-      "ProjectCreate",
-      "AiSettings",
-      "ProjectsRoot",
-      "ExportDirectory",
-      "TemplateActions"
+      "ProjectCreate"
     ],
     "scroll_order": [
-      "Advanced",
+      "AiSettings",
+      "Locations",
+      "TemplateActions",
+      "AdvancedSections",
       "CustomTemplate"
     ]
   },
@@ -690,6 +689,8 @@
     "project_name_label": "@project.project_name",
     "project_name_hint": "@project.name_new_project",
     "new_project": "@project.new_project",
+    "create_project": "@project.create_project",
+    "story_sheet": "@sheet.title",
     "settings_changed": "@project.settings_changed",
     "path_hint": "@project.path",
     "choose": "@project.choose",

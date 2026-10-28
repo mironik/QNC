@@ -267,6 +267,10 @@ pub const FOCUS_PANELS: [&str; 5] = ["pool_tabs", "pool", "source_timeline", "so
 pub struct GroupComposition {
     pub role: String,
     pub right_panel: String,
+    /// Tabs on top of the right panel, each with its panel kind (AI Media Assist: Audio AI and
+    /// Video AI, user 2026-10-27); none: the right panel is `right_panel` alone.
+    #[serde(default)]
+    pub right_panel_tabs: Vec<RightPanelTab>,
     /// The panels Tab walks in this group, in order (`FOCUS_PANELS`).
     pub tab_order: Vec<String>,
     /// Tabs and transport of this group; the shared pool head when absent.
@@ -274,6 +278,14 @@ pub struct GroupComposition {
     pub pool_head: GroupPoolHead,
     pub source_dock: GroupSourceDock,
     pub media_card: GroupMediaCard,
+}
+
+/// One tab of the right panel: its label, its catalog action and the panel kind it shows.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RightPanelTab {
+    pub label: String,
+    pub action_id: String,
+    pub panel: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -300,5 +312,9 @@ pub struct EditorialMediaCard {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GroupMediaCard {
     pub selection_check: bool,
+    /// The check marks tick several clips for an action of the group (Audio AI: the clips to
+    /// transcribe, user 2026-10-26), not the one chosen.
+    #[serde(default)]
+    pub ticks_several: bool,
     pub status_dots: String,
 }

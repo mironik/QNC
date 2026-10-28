@@ -11,3 +11,4 @@ qnc-program-view = { workspace = true }
 qnc-still-locator = { workspace = true }
 qnc-transcribe-run = { workspace = true }
 qnc-transcript-db = { workspace = true }
+qnc-word-align = { workspace = true }

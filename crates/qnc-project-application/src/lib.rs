@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 pub use project_component::{ProjectBrowserTarget, ProjectComponent};
 pub use qnc_dir_browse_jobs::BrowseStep;
-pub use qnc_project_jobs::{ProjectsState, Reply, Request, TemplatesState};
+pub use qnc_project_jobs::{ProjectsState, Reply, Request, StorySheet, TemplatesState};
 pub use qnc_project_store::{ProjectNavigationStep, ProjectRow, ProjectTemplateRow};
 
 use qnc_project_store::ProjectStore;
@@ -45,6 +45,7 @@ mod tests {
                 created_date: String::new(),
                 project_uri: "qnc://local/project/p1".into(),
                 active: true,
+                search_text: String::new(),
             },
             ProjectRow {
                 project_id: "p2".into(),
@@ -52,6 +53,7 @@ mod tests {
                 created_date: String::new(),
                 project_uri: "qnc://local/project/p2".into(),
                 active: false,
+                search_text: String::new(),
             },
         ];
         assert_eq!(selected_project_label(&rows, Some(0)), "First project");

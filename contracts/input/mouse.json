@@ -17,6 +17,7 @@
       "drag_in": "source_drag_in",
       "drag_out": "source_drag_out",
       "middle_click": "source_cut",
+      "double_click_frame": "source_cut",
       "wheel_back": "wheel_source_back",
       "wheel_forward": "wheel_source_forward",
       "ctrl_wheel_back": "wheel_source_ctrl_back",

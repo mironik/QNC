@@ -6,6 +6,7 @@ description = "QNC public component: the keyboard map acts on the editorial pane
 
 [dependencies]
 qnc-focus-walk = { workspace = true }
+qnc-clip-row = { workspace = true }
 qnc-ui-kit = { workspace = true }
 qnc-action-event = { workspace = true }
 qnc-source-timeline = { workspace = true }
@@ -22,3 +23,4 @@ qnc-keyframe-nav = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-wrap-session = { workspace = true }
 qnc-transcript = { workspace = true }
+qnc-clip-shots = { workspace = true }

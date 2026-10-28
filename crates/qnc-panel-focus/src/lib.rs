@@ -71,6 +71,8 @@ pub struct PanelFocus {
     pick: Option<String>,
     /// The transcript of the clip on the preview (piece `qnc-transcript`, Media Assist Audio AI).
     transcript: qnc_transcript::Transcript,
+    /// The shots of the clip on the preview (piece `qnc-clip-shots`, Video AI).
+    shots: qnc_clip_shots::ClipShots,
 }
 
 /// The walk of a layout: its panels, the pool tabs row and the source dock buttons row.
@@ -106,6 +108,12 @@ impl PanelFocus {
         &self.source
     }
 
+    /// A clip and IN/OUT a chosen statement of the transcript or a usable part of the shot
+    /// analysis opens (once).
+    pub fn take_source_request(&mut self) -> Option<(String, u64, u64)> {
+        self.transcript.take_source_request().or_else(|| self.shots.take_source_request())
+    }
+
     pub fn source_timeline_mut(&mut self) -> &mut qnc_source_timeline::SourceTimeline {
         &mut self.source
     }
@@ -118,7 +126,7 @@ impl PanelFocus {
     /// for (the taken source mark, or the taken slot or marker); returns the panel.
     pub fn poll(
         &mut self,
-        (preview, wrap, segments, timeline): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection),
+        (preview, wrap, segments, timeline, clips): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments, &mut TimelineProjection, &mut [qnc_clip_row::ClipRow]),
     ) -> FocusView {
         // What the segment panel took is its own: left by a click, Tab or Enter, it is dropped.
         let last = std::mem::replace(&mut self.last_panel, self.panel);
@@ -148,13 +156,20 @@ impl PanelFocus {
             }
         }
         let button = (self.panel == Panel::SourceButtons).then(|| self.walk.chosen_in(qnc_focus_walk::SOURCE_BUTTONS).map(str::to_string)).flatten();
-        self.transcript.poll(preview);
-        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: self.transcript.view().clone() }
+        self.transcript.poll(preview, timeline, clips); // the pool's ticks are the transcript's
+        self.shots.poll(preview);
+        FocusView { panel: self.panel, button, pool_step: self.walk.last_step(), transcript: self.transcript.view().clone(), shots: self.shots.view().clone() }
     }
 
     /// Whether a key picture search runs (the caller repaints soon).
     pub fn busy(&self) -> bool {
         self.keyframes.busy() || self.transcript.busy()
+    }
+
+    /// Whether a transcription of this process runs in the background (the caller repaints
+    /// now and then for its progress).
+    pub fn working(&self) -> bool {
+        self.transcript.working()
     }
 
     /// A clip chosen in the media pool: the Source view; the keyboard stays on the pool

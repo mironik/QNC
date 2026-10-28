@@ -103,6 +103,8 @@ pub struct ZoomSound {
     /// The words said on A1 in the window (user 2026-10-26: the start or end of a statement
     /// found in the zoom), on its axis; empty until transcribed.
     pub words: Vec<ZoomWord>,
+    /// Voice on A1 no word was heard for (user 2026-10-26), on the zoom's axis.
+    pub unheard: Vec<(u64, u64)>,
 }
 
 /// A word of the zoom's window: its frames on the zoom's axis and what was said.

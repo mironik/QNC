@@ -41,7 +41,7 @@ fn row(panel: Panel, name: &str, timeline: &TimelineProjection, actions: &[&str]
         let pick = focus.take_pick();
         answers.push(format!("{routed:?}/{:?}/{pick:?}", focus.panel()));
     }
-    let view = focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline));
+    let view = focus.poll((&mut preview, &mut wrap, &mut segments, &mut timeline, &mut []));
     format!(
         "{panel:?} {name} {} => {} | button={:?} pool={:?} in={:?} out={:?} playhead={:?} wrap={}",
         actions.join("+"),

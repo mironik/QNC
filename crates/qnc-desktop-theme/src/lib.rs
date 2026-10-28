@@ -113,6 +113,51 @@ pub fn apply(ctx: &egui::Context, theme: &Theme) {
     ctx.set_style(style);
 }
 
+/// The look of a settings form (the Project form had it as its own copy, audit 2026-10-27):
+/// raised controls, accent hover and selection, the text colour on every widget.
+pub fn apply_settings_look(ctx: &egui::Context, theme: &Theme) {
+    let mut style = (*ctx.style()).clone();
+    let font = |size: f32| FontId::new(size, FontFamily::Proportional);
+    style.text_styles = [
+        (TextStyle::Small, font(theme.font_ui - 1.0)),
+        (TextStyle::Body, font(theme.font_ui)),
+        (TextStyle::Button, font(theme.font_ui)),
+        (TextStyle::Heading, font(20.0)),
+        (TextStyle::Monospace, font(theme.font_ui)),
+    ]
+    .into();
+    style.spacing.button_padding = egui::vec2(10.0, 6.0);
+    style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+    let visuals = &mut style.visuals;
+    visuals.panel_fill = theme.bg;
+    visuals.window_fill = theme.surface;
+    visuals.extreme_bg_color = theme.bg;
+    visuals.faint_bg_color = theme.surface;
+    visuals.code_bg_color = theme.surface_alt;
+    visuals.override_text_color = Some(theme.text);
+    let widgets = &mut visuals.widgets;
+    widgets.noninteractive.bg_fill = theme.surface;
+    widgets.noninteractive.weak_bg_fill = theme.surface_alt;
+    widgets.noninteractive.fg_stroke = Stroke::new(1.0, theme.text_muted);
+    widgets.noninteractive.bg_stroke = Stroke::new(1.0, theme.border);
+    widgets.inactive.bg_fill = theme.surface_alt;
+    widgets.inactive.weak_bg_fill = theme.surface;
+    widgets.inactive.fg_stroke = Stroke::new(1.0, theme.text);
+    widgets.inactive.bg_stroke = Stroke::new(1.0, theme.border);
+    widgets.hovered.bg_fill = theme.surface_alt;
+    widgets.hovered.weak_bg_fill = theme.surface_alt;
+    widgets.hovered.fg_stroke = Stroke::new(1.0, theme.text);
+    widgets.hovered.bg_stroke = Stroke::new(1.0, theme.accent);
+    widgets.active.bg_fill = theme.accent;
+    widgets.active.weak_bg_fill = theme.accent;
+    widgets.active.fg_stroke = Stroke::new(1.0, Color32::WHITE);
+    widgets.active.bg_stroke = Stroke::new(1.0, theme.accent);
+    visuals.selection.bg_fill = theme.accent.linear_multiply(0.35);
+    visuals.selection.stroke = Stroke::new(1.0, theme.accent);
+    visuals.hyperlink_color = theme.accent;
+    ctx.set_style(style);
+}
+
 fn rgb(value: [u8; 3]) -> Color32 {
     Color32::from_rgb(value[0], value[1], value[2])
 }

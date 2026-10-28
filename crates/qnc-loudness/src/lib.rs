@@ -139,6 +139,28 @@ pub fn export_gain(measured_lufs: Option<f64>, true_peak_dbtp: f64, target_lufs:
     (target_lufs - measured).min(limit_dbtp - true_peak_dbtp)
 }
 
+/// Most an export lifts a lane towards its target (user 2026-10-26: with the peak limiter a
+/// near silent lane is not brought up from the noise).
+pub const EXPORT_GAIN_MAX_DB: f64 = 20.0;
+
+/// What an export gives a lane when its peaks are limited (user 2026-10-26: "make the
+/// limiter"): the gain that brings it to its target (none within `tolerance_lu`, at most
+/// [`EXPORT_GAIN_MAX_DB`]), and whether its true peak at that gain goes over `limit_dbtp`, so
+/// the peaks are limited there instead of the whole lane staying quieter.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Lift {
+    pub gain_db: f64,
+    pub limit: bool,
+}
+
+pub fn limited_gain(measured_lufs: Option<f64>, true_peak_dbtp: f64, target_lufs: f64, tolerance_lu: f64, limit_dbtp: f64) -> Lift {
+    let Some(measured) = measured_lufs else {
+        return Lift { gain_db: 0.0, limit: false };
+    };
+    let gain_db = if (measured - target_lufs).abs() <= tolerance_lu { 0.0 } else { (target_lufs - measured).min(EXPORT_GAIN_MAX_DB) };
+    Lift { gain_db, limit: true_peak_dbtp + gain_db > limit_dbtp }
+}
+
 /// dB of a linear peak (dBTP for a true peak).
 pub fn peak_db(peak: f64) -> f64 {
     if peak <= 0.0 {
@@ -241,6 +263,13 @@ mod tests {
         assert_eq!(export_gain(Some(-30.0), -3.0, -23.0, 0.5, -1.0), 2.0, "the true peak limits the gain");
         assert_eq!(export_gain(Some(-23.0), 0.5, -23.0, 0.5, -1.0), -1.5, "over the peak: lowered to the limit");
         assert_eq!(export_gain(None, f64::NEG_INFINITY, -23.0, 0.5, -1.0), 0.0, "silence: nothing");
+        use super::{limited_gain, Lift};
+        let lift = limited_gain(Some(-31.6), -6.5, -23.0, 0.5, -1.0);
+        assert!((lift.gain_db - 8.6).abs() < 1e-9 && lift.limit, "to the target, its peaks limited: {lift:?}");
+        assert_eq!(limited_gain(Some(-30.0), -10.0, -23.0, 0.5, -1.0), Lift { gain_db: 7.0, limit: false }, "room under the limit: no limiter");
+        assert_eq!(limited_gain(Some(-23.2), 0.5, -23.0, 0.5, -1.0), Lift { gain_db: 0.0, limit: true }, "within the tolerance, only its peaks limited");
+        assert_eq!(limited_gain(Some(-70.0), -40.0, -23.0, 0.5, -1.0).gain_db, 20.0, "no more than the most an export lifts");
+        assert_eq!(limited_gain(None, f64::NEG_INFINITY, -23.0, 0.5, -1.0), Lift { gain_db: 0.0, limit: false }, "silence: nothing");
     }
 
     use super::*;

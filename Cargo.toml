@@ -132,11 +132,19 @@ members = [
     "crates/qnc-ai-catalog",
     "crates/qnc-sound-range",
     "crates/qnc-transcript-db",
+    "crates/qnc-shot-detect",
+    "crates/qnc-shot-db",
+    "crates/qnc-shot-analysis",
+    "crates/qnc-clip-shots",
+    "crates/qnc-shot-panel",
     "crates/qnc-transcribe-run",
+    "crates/qnc-transcribe-queue",
     "crates/qnc-transcript",
     "crates/qnc-transcript-panel",
     "crates/qnc-right-panel",
     "crates/qnc-zoom-words",
+    "crates/qnc-word-align",
+    "tools/qnc-transcribe-parakeet",
     "tools/qnc-transcribe-whisper",
     "tools/qnc-decoder-acceptance",
     "crates/qnc-installed-versions",
@@ -167,6 +175,11 @@ members = [
     "crates/qnc-monitor-panel",
     "crates/qnc-transport-panel",
     "crates/qnc-dir-browser-panel",
+    "crates/qnc-location-field",
+    "crates/qnc-settings-rows",
+    "crates/qnc-newsroom-sheet-db",
+    "crates/qnc-newsroom-sheet",
+    "tools/qnc-newsroom-sheet",
     "crates/qnc-still-locator",
     "crates/qnc-clip-row",
     "crates/qnc-theme-styles",
@@ -381,11 +394,18 @@ qnc-transcribe-jobs = { path = "crates/qnc-transcribe-jobs" }
 qnc-ai-catalog = { path = "crates/qnc-ai-catalog" }
 qnc-sound-range = { path = "crates/qnc-sound-range" }
 qnc-transcript-db = { path = "crates/qnc-transcript-db" }
+qnc-shot-detect = { path = "crates/qnc-shot-detect" }
+qnc-shot-db = { path = "crates/qnc-shot-db" }
+qnc-shot-analysis = { path = "crates/qnc-shot-analysis" }
+qnc-clip-shots = { path = "crates/qnc-clip-shots" }
+qnc-shot-panel = { path = "crates/qnc-shot-panel" }
 qnc-transcribe-run = { path = "crates/qnc-transcribe-run" }
+qnc-transcribe-queue = { path = "crates/qnc-transcribe-queue" }
 qnc-transcript = { path = "crates/qnc-transcript" }
 qnc-transcript-panel = { path = "crates/qnc-transcript-panel" }
 qnc-right-panel = { path = "crates/qnc-right-panel" }
 qnc-zoom-words = { path = "crates/qnc-zoom-words" }
+qnc-word-align = { path = "crates/qnc-word-align" }
 qnc-installed-versions = { path = "crates/qnc-installed-versions" }
 qnc-choice-box = { path = "crates/qnc-choice-box" }
 qnc-keyframe-nav = { path = "crates/qnc-keyframe-nav" }
@@ -412,6 +432,10 @@ qnc-export-launch = { path = "crates/qnc-export-launch" }
 qnc-monitor-panel = { path = "crates/qnc-monitor-panel" }
 qnc-transport-panel = { path = "crates/qnc-transport-panel" }
 qnc-dir-browser-panel = { path = "crates/qnc-dir-browser-panel" }
+qnc-location-field = { path = "crates/qnc-location-field" }
+qnc-settings-rows = { path = "crates/qnc-settings-rows" }
+qnc-newsroom-sheet-db = { path = "crates/qnc-newsroom-sheet-db" }
+qnc-newsroom-sheet = { path = "crates/qnc-newsroom-sheet" }
 qnc-still-locator = { path = "crates/qnc-still-locator" }
 qnc-clip-row = { path = "crates/qnc-clip-row" }
 qnc-theme-styles = { path = "crates/qnc-theme-styles" }

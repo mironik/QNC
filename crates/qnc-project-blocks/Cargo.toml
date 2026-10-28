@@ -12,7 +12,8 @@ qnc-board = { workspace = true }
 qnc-confirm-dialog = { workspace = true }
 qnc-contracts = { workspace = true }
 qnc-dir-browser = { workspace = true }
-qnc-dir-browser-panel = { workspace = true }
+qnc-location-field = { workspace = true }
+qnc-settings-rows = { workspace = true }
 qnc-desktop-theme = { workspace = true }
 qnc-export-preset = { workspace = true }
 qnc-keyboard-shortcut = { workspace = true }
@@ -21,6 +22,7 @@ qnc-project-session = { workspace = true }
 qnc-settings-path = { workspace = true }
 qnc-settings-form = { workspace = true }
 qnc-settings-switches = { workspace = true }
+qnc-newsroom-sheet = { workspace = true }
 qnc-ui-kit = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

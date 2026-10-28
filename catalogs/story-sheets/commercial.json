@@ -1,0 +1,20 @@
+{
+  "sheet_id": "commercial",
+  "name": "@sheet.commercial",
+  "fields": [
+    { "kind": "text", "label": "@sheet.f.slug", "id": "slug", "path": "slug", "hint": "@sheet.f.slug_hint" },
+    { "kind": "text", "label": "@sheet.f.show", "id": "show", "path": "show", "hint": "@sheet.f.show_hint" },
+    { "kind": "choice", "label": "@sheet.f.priority", "id": "priority", "path": "priority", "options": "priorities", "default": "normal" },
+    { "kind": "choice", "label": "@sheet.f.format", "id": "format", "path": "format", "options": "formats", "default": "vtr" },
+    { "kind": "text", "label": "@sheet.f.air_at", "id": "air_at", "path": "air_at", "hint": "@sheet.f.air_at_hint" },
+    { "kind": "duration", "label": "@sheet.f.target", "id": "target_seconds", "path": "target_seconds", "hint": "@sheet.f.target_hint" },
+    { "kind": "text", "label": "@sheet.f.journalist", "id": "journalist", "path": "journalist" },
+    { "kind": "text", "label": "@sheet.f.camera", "id": "camera_operator", "path": "camera_operator" },
+    { "kind": "text", "label": "@sheet.f.editor", "id": "editor", "path": "editor" },
+    { "kind": "text", "label": "@sheet.f.producer", "id": "producer", "path": "producer" }
+  ],
+  "options": {
+    "formats": [["vtr", "@sheet.f.format_vtr"], ["vo", "@sheet.f.format_vo"], ["sot", "@sheet.f.format_sot"]],
+    "priorities": [["normal", "@sheet.f.priority_normal"], ["breaking", "@sheet.f.priority_breaking"], ["exclusive", "@sheet.f.priority_exclusive"]]
+  }
+}

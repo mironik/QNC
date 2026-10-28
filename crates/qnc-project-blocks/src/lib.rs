@@ -7,11 +7,10 @@
 
 pub mod layout_contract;
 mod list;
-pub mod location_browser;
 mod project_advanced;
 mod settings;
 pub mod theme;
-mod widgets;
+use qnc_settings_rows as widgets;
 
 use eframe::egui;
 use qnc_project_session::{ProjectIntent, ProjectSession};
@@ -34,28 +33,26 @@ pub fn show(
     contracts: &AppContracts,
     session: &mut ProjectSession,
 ) -> Vec<ProjectIntent> {
-    let intents = key_intents(ctx, contracts, session);
+    let actions: Vec<&str> = qnc_keyboard_shortcut::egui_shortcut_events(ctx)
+        .iter()
+        .flat_map(|event| contracts.shortcuts.action_ids_for_event("project", event))
+        .collect();
+    // While a field is typed in its keys move between fields; while a dialog, picker or
+    // browser is open no Project key works.
+    let typing = ctx.wants_keyboard_input();
+    let next_field = typing && actions.contains(&"form_next_field");
+    let open = !typing && !session.keys_held() && actions.contains(&"project_open_selected");
+    let intents = open.then_some(ProjectIntent::OpenSelectedProject).into_iter().collect();
     let mut blocks = Blocks { contracts, session, intents };
     blocks.board(ui, frame);
     blocks.delete_questions(ctx);
-    blocks.intents
-}
-
-/// The catalog keys of the Project scope; none while a dialog, picker or browser is open.
-fn key_intents(ctx: &egui::Context, contracts: &AppContracts, session: &ProjectSession) -> Vec<ProjectIntent> {
-    if session.keys_held() {
-        return Vec::new();
+    // The story sheet over the board (piece `qnc-newsroom-sheet`): name and story data.
+    if let Some(overlay) = blocks.session.sheet.as_mut() {
+        if let Some(answer) = qnc_newsroom_sheet::show(ctx, overlay, &contracts.theme, next_field) {
+            blocks.intents.push(ProjectIntent::AnswerStorySheet { answer });
+        }
     }
-    qnc_keyboard_shortcut::egui_shortcut_events(ctx)
-        .iter()
-        .filter(|event| {
-            contracts
-                .shortcuts
-                .action_ids_for_event("project", event)
-                .contains(&"project_open_selected")
-        })
-        .map(|_| ProjectIntent::OpenSelectedProject)
-        .collect()
+    blocks.intents
 }
 
 impl Blocks<'_> {
@@ -119,6 +116,5 @@ fn question<'a>(id: &'a str, title: &'a str, subject: &'a str) -> qnc_confirm_di
 
 /// Fonts and colours of the Project contract applied to the window.
 pub fn apply_style(ctx: &egui::Context, contracts: &AppContracts) {
-    theme::apply_app_fonts(ctx, &contracts.shell);
-    theme::apply_visuals(ctx, &contracts.shell);
+    qnc_desktop_theme::apply_settings_look(ctx, &contracts.theme);
 }

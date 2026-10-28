@@ -1,0 +1,14 @@
+[package]
+name = "qnc-transcribe-queue"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: runs the transcription queue kept in the project database - one runner per project (a lease in its database), clip after clip, each yielding to the player; the lines heard are handed out as they come; it knows no form"
+
+[dependencies]
+qnc-content-store = { workspace = true }
+qnc-db-broker = { workspace = true }
+qnc-dev-diagnostics = { workspace = true }
+qnc-playback-activity = { workspace = true }
+qnc-still-locator = { workspace = true }
+qnc-transcribe-run = { workspace = true }
+qnc-transcript-db = { workspace = true }

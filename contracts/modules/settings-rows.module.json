@@ -1,0 +1,40 @@
+{
+  "module_id": "qnc.module.settings-rows",
+  "module_name": "Settings panel rows",
+  "module_version": "0.1.0",
+  "module_kind": "ui_widget",
+  "capabilities": [
+    "ui.settings.title_row",
+    "ui.settings.section",
+    "ui.settings.inline_row",
+    "ui.settings.buttons"
+  ],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "supported_cpu": [
+    "x86_64",
+    "aarch64"
+  ],
+  "transport_protocol_version": "0.1.0",
+  "forbidden_calls": [
+    "application.start",
+    "business.db.write",
+    "database.read",
+    "workflow.run",
+    "media.process",
+    "filesystem.write",
+    "player.command"
+  ],
+  "forbidden_dependencies": [],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-settings-rows",
+  "input": "The measures of a settings panel from the form's layout contract, the one desktop theme, the labels and the contents of each row.",
+  "output": "The rows drawn (title row, section, labelled row with a button column, row of buttons) and the clicks of their buttons.",
+  "specification": "Audit 2026-10-27 (user: make the Project form smaller, move it into blocks): these rows and buttons lived in the Project form as widgets.rs."
+}

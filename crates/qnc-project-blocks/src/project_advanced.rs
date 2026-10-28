@@ -3,10 +3,10 @@ use qnc_settings_path::{path_string, set_string_path};
 use serde_json::Value;
 
 use crate::{
-    layout_contract::{AdvancedSection, AdvancedSettings, SettingsPanelMetrics, ShellLayoutContract},
-    theme::Theme,
+    layout_contract::{AdvancedSection, AdvancedSettings, SettingsPanelMetrics},
     widgets,
 };
+use qnc_desktop_theme::Theme;
 
 pub enum ApplicationSelectionAction {
     Choose {
@@ -25,48 +25,41 @@ pub struct AdvancedDraft<'a> {
     pub keyboard_default: &'a str,
 }
 
-/// The Advanced settings: its sections come from the layout contract (fields drawn by the
-/// public piece `qnc-settings-form`); this board only composes the three blocks that are
-/// more than fields (keyboard preset, export preset, workflow applications).
-#[allow(clippy::too_many_arguments)]
-pub fn show(
-    ui: &mut egui::Ui,
-    content_w: f32,
-    settings: &SettingsPanelMetrics,
-    advanced: &AdvancedSettings,
-    shell: &ShellLayoutContract,
-    open: &mut bool,
-    draft: AdvancedDraft<'_>,
-    application_action: &mut Option<ApplicationSelectionAction>,
-) -> bool {
-    let t = Theme::from_contract(&shell.colors);
+/// The Advanced bar: opens and closes everything technical of the panel (user 2026-10-27:
+/// the journalist sees the story data and the template; the rest only under Advanced).
+pub fn header(ui: &mut egui::Ui, content_w: f32, advanced: &AdvancedSettings, t: &Theme, open: &mut bool) {
     ui.set_max_width(content_w);
     let summary = egui::Frame::NONE
-        .fill(t.raised)
+        .fill(t.surface_alt)
         .stroke(egui::Stroke::new(1.0, t.border))
         .inner_margin(egui::Margin::symmetric(8, 8))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(&advanced.title).size(13.0).strong().color(t.text));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(RichText::new(if *open { "▲" } else { "▼" }).size(11.0).color(t.muted));
+                    ui.label(RichText::new(if *open { "▲" } else { "▼" }).size(11.0).color(t.text_muted));
                 });
             });
         });
     if summary.response.interact(Sense::click()).clicked() {
         *open = !*open;
     }
-    if !*open {
-        return false;
-    }
+}
+
+/// The Advanced settings: its sections come from the layout contract (fields drawn by the
+/// public piece `qnc-settings-form`); this board only composes the three blocks that are
+/// more than fields (keyboard preset, export preset, workflow applications).
+pub fn show(
+    ui: &mut egui::Ui,
+    content_w: f32,
+    settings: &SettingsPanelMetrics,
+    advanced: &AdvancedSettings,
+    shell: &Theme,
+    draft: AdvancedDraft<'_>,
+    application_action: &mut Option<ApplicationSelectionAction>,
+) -> bool {
     ui.spacing_mut().item_spacing.y = settings.section_gap;
-    let style = qnc_settings_form::GridStyle {
-        label_color: t.muted,
-        label_size: advanced.grid.label_size,
-        min_cell_width: advanced.grid.min_cell_width,
-        gap: advanced.grid.gap,
-        cell_height: advanced.grid.cell_height,
-    };
+    let style = grid_style(advanced, shell);
     let mut draft = draft;
     let mut changed = false;
     for section in &advanced.sections {
@@ -77,6 +70,13 @@ pub fn show(
     changed
 }
 
+/// The look of a field grid of the panel, from the contract.
+pub fn grid_style(advanced: &AdvancedSettings, shell: &Theme) -> qnc_settings_form::GridStyle {
+    let grid = &advanced.grid;
+    let label_color = shell.text_muted;
+    qnc_settings_form::GridStyle { label_color, label_size: grid.label_size, min_cell_width: grid.min_cell_width, gap: grid.gap, cell_height: grid.cell_height, label_beside: None }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn section_body(
     ui: &mut egui::Ui,
@@ -84,7 +84,7 @@ fn section_body(
     advanced: &AdvancedSettings,
     style: &qnc_settings_form::GridStyle,
     settings: &SettingsPanelMetrics,
-    shell: &ShellLayoutContract,
+    shell: &Theme,
     draft: &mut AdvancedDraft<'_>,
     application_action: &mut Option<ApplicationSelectionAction>,
 ) -> bool {
@@ -144,11 +144,10 @@ fn section_body(
 fn applications(
     ui: &mut egui::Ui,
     advanced: &AdvancedSettings,
-    shell: &ShellLayoutContract,
+    t: &Theme,
     draft: &AdvancedDraft<'_>,
     application_action: &mut Option<ApplicationSelectionAction>,
 ) {
-    let t = Theme::from_contract(&shell.colors);
     let applications = draft.applications;
     ui.spacing_mut().item_spacing.y = 6.0;
     let columns: Vec<_> = applications
@@ -179,7 +178,7 @@ fn applications(
         })
         .collect();
     let style = qnc_ui_kit::OptionColumnsStyle {
-        font_size: shell.theme_metrics.font_ui,
+        font_size: t.font_ui,
         text: t.text,
         min_column_width: 160.0,
         column_gap: 12.0,

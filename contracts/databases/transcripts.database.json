@@ -6,18 +6,23 @@
   "schema_version": "0.1.0",
   "qnc_uri": "qnc://local/db/project_db",
   "tables": [
-    "clip_transcripts"
+    "clip_transcripts",
+    "transcript_queue",
+    "transcript_quotes"
   ],
   "public_read_views": [
-    "public_clip_transcripts"
+    "public_clip_transcripts",
+    "public_transcript_queue",
+    "public_transcript_quotes"
   ],
   "write_owner": "qnc.module.transcript-db",
   "public_read_policy": "public_read_views",
   "rules": {
     "range": "A row is what was said in clip frames [from_frame, to_frame) of a clip: its lines and words as clip frames, the language and the engine that heard it.",
-    "replace": "A range transcribed again replaces the row of the same clip and range; other ranges stay."
+    "replace": "A range transcribed again replaces the row of the same clip and range; other ranges stay.",
+    "quotes": "A statement is the text said between a clip's IN and OUT, kept with its frames, its start and end timecode and length as shown when it was added (user 2026-10-26); rows stay in the order they were added until removed."
   },
   "migration_policy": "owner_application_only",
   "created_at": "2026-10-26T00:00:00Z",
-  "updated_at": "2026-10-26T00:00:00Z"
+  "updated_at": "2026-10-27T00:00:00Z"
 }

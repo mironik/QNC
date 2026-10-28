@@ -4,45 +4,26 @@
 //! them out through the Project component, the owner of the project registry.
 
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use qnc_dir_browser::BrowserState;
 use qnc_project_application::{
-    BrowseStep, ProjectBrowserTarget, ProjectComponent, ProjectRow, ProjectTemplateRow, ProjectsState, Reply,
-    Request, TemplatesState,
+    ProjectComponent, ProjectRow, ProjectTemplateRow, ProjectsState, Reply,
+    Request, StorySheet, TemplatesState,
 };
+use qnc_newsroom_sheet::{SheetOverlay, SheetSpec};
+pub use qnc_newsroom_sheet::Answer as SheetAnswer;
 use serde_json::Value;
 
-/// Where a location browser looks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum LocationSourceKind {
-    #[default]
-    Local,
-    Lan,
-    Internet,
-}
-
-impl LocationSourceKind {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Local => qnc_ui_text::text("source.computer"),
-            Self::Lan => "LAN",
-            Self::Internet => "Internet",
-        }
-    }
-}
+pub use qnc_location_field::{Answer as LocationAnswer, FieldStep, LocationField, SourceKind as LocationSourceKind};
+pub use qnc_project_application::ProjectBrowserTarget as LocationTarget;
 
 pub struct ProjectSession {
     pub component: ProjectComponent,
     pub project_name: String,
-    pub projects_root: String,
-    pub export_dir: String,
-    pub projects_root_dirty: bool,
-    pub export_dir_dirty: bool,
-    pub projects_root_browser_open: bool,
-    pub projects_root_browser: LocationBrowserState,
-    pub export_dir_browser_open: bool,
-    pub export_dir_browser: LocationBrowserState,
+    /// Where new projects go and where exports go (piece `qnc-location-field`).
+    pub projects_root: LocationField,
+    pub export_dir: LocationField,
     pub picker_open: bool,
     pub template_create_open: bool,
     pub advanced_open: bool,
@@ -56,6 +37,14 @@ pub struct ProjectSession {
     pub template_draft_name: String,
     pub template_draft_description: String,
     pub export_preset_draft_name: String,
+    /// The story sheet over the form (piece `qnc-newsroom-sheet`): of a new project (its name is
+    /// typed in it) or of the open one; none while it is closed.
+    pub sheet: Option<SheetOverlay>,
+    /// The open project and its story sheet as kept in its database.
+    pub story_project: Option<String>,
+    story_kept: Option<StorySheet>,
+    /// What the project list is searched by (name, date, story sheet values).
+    pub project_search: String,
     pub status: String,
     ready_text: String,
     known_actions: BTreeSet<String>,
@@ -71,7 +60,14 @@ pub enum ProjectIntent {
     OpenProjectRow {
         index: usize,
     },
+    /// Opens the story sheet of a new project (its name is typed there).
     CreateProject,
+    /// Opens the story sheet of the open project.
+    OpenStorySheet,
+    /// What the user did with the story sheet: Create or Save, or Cancel.
+    AnswerStorySheet {
+        answer: SheetAnswer,
+    },
     RequestDeleteProject {
         index: usize,
     },
@@ -88,28 +84,15 @@ pub enum ProjectIntent {
     },
     CancelDeleteTemplate,
     ConfirmDeleteTemplate,
-    PickProjectsRoot,
-    SelectProjectsRootKind {
-        kind: LocationSourceKind,
+    /// Opens or closes the browser of a location field.
+    PickLocation {
+        target: LocationTarget,
     },
-    OpenProjectsRootUri {
-        uri: String,
+    /// What the user asked of the open browser of a location field.
+    AnswerLocation {
+        target: LocationTarget,
+        answer: LocationAnswer,
     },
-    OpenProjectsRootParent,
-    OpenProjectsRootRoots,
-    ConfirmProjectsRootBrowser,
-    CancelProjectsRootBrowser,
-    PickExportDir,
-    SelectExportDirKind {
-        kind: LocationSourceKind,
-    },
-    OpenExportDirUri {
-        uri: String,
-    },
-    OpenExportDirParent,
-    OpenExportDirRoots,
-    ConfirmExportDirBrowser,
-    CancelExportDirBrowser,
 }
 
 impl ProjectIntent {
@@ -119,6 +102,9 @@ impl ProjectIntent {
             Self::OpenSelectedProject => "project_open_selected",
             Self::OpenProjectRow { .. } => "project_open_row",
             Self::CreateProject => "project_create",
+            Self::OpenStorySheet => "project_story_open",
+            Self::AnswerStorySheet { answer: SheetAnswer::Confirm } => "project_story_confirm",
+            Self::AnswerStorySheet { answer: SheetAnswer::Cancel } => "project_story_cancel",
             Self::RequestDeleteProject { .. } => "project_delete_request",
             Self::CancelDeleteProject => "project_delete_cancel",
             Self::ConfirmDeleteProject => "project_delete_confirm",
@@ -129,42 +115,13 @@ impl ProjectIntent {
             Self::RequestDeleteTemplate { .. } => "project_template_delete_request",
             Self::CancelDeleteTemplate => "project_template_delete_cancel",
             Self::ConfirmDeleteTemplate => "project_template_delete_confirm",
-            Self::PickProjectsRoot => "project_pick_projects_root",
-            Self::SelectProjectsRootKind { .. } => "project_projects_root_browser_select_source",
-            Self::OpenProjectsRootUri { .. }
-            | Self::OpenProjectsRootParent
-            | Self::OpenProjectsRootRoots => "project_projects_root_browser_open_path",
-            Self::ConfirmProjectsRootBrowser => "project_projects_root_browser_confirm",
-            Self::CancelProjectsRootBrowser => "project_projects_root_browser_cancel",
-            Self::PickExportDir => "project_pick_export_dir",
-            Self::SelectExportDirKind { .. } => "project_export_dir_browser_select_source",
-            Self::OpenExportDirUri { .. }
-            | Self::OpenExportDirParent
-            | Self::OpenExportDirRoots => "project_export_dir_browser_open_path",
-            Self::ConfirmExportDirBrowser => "project_export_dir_browser_confirm",
-            Self::CancelExportDirBrowser => "project_export_dir_browser_cancel",
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LocationBrowserState {
-    pub kind: LocationSourceKind,
-    pub browser: BrowserState,
-    pub error: Option<String>,
-    pub busy: bool,
-}
-
-impl Default for LocationBrowserState {
-    fn default() -> Self {
-        Self {
-            kind: LocationSourceKind::Local,
-            browser: BrowserState {
-                roots: true,
-                ..BrowserState::default()
-            },
-            error: None,
-            busy: false,
+            Self::PickLocation { target } => location_action(*target, "pick"),
+            Self::AnswerLocation { target, answer } => location_action(*target, match answer {
+                LocationAnswer::Browser(qnc_dir_browser_panel::BrowserAction::Kind(_)) => "browser_select_source",
+                LocationAnswer::Browser(_) => "browser_open_path",
+                LocationAnswer::Confirm => "browser_confirm",
+                LocationAnswer::Cancel => "browser_cancel",
+            }),
         }
     }
 }
@@ -174,18 +131,11 @@ impl ProjectSession {
     /// action ids of the keyboard catalog (an intent outside it is refused).
     pub fn new(component: ProjectComponent, ready_text: String, known_actions: BTreeSet<String>) -> Self {
         // Shown once the registry answers (piece `qnc-project-jobs`).
-        let projects_root = String::new();
         let mut session = Self {
             component,
             project_name: String::new(),
-            projects_root,
-            export_dir: "exports/projekti".to_string(),
-            projects_root_dirty: false,
-            export_dir_dirty: false,
-            projects_root_browser_open: false,
-            projects_root_browser: LocationBrowserState::default(),
-            export_dir_browser_open: false,
-            export_dir_browser: LocationBrowserState::default(),
+            projects_root: LocationField::new(String::new()),
+            export_dir: LocationField::new("exports/projekti"),
             picker_open: false,
             template_create_open: false,
             advanced_open: false,
@@ -199,6 +149,10 @@ impl ProjectSession {
             template_draft_name: String::new(),
             template_draft_description: String::new(),
             export_preset_draft_name: String::new(),
+            sheet: None,
+            story_project: None,
+            story_kept: None,
+            project_search: String::new(),
             status: ready_text.clone(),
             ready_text,
             known_actions,
@@ -206,6 +160,11 @@ impl ProjectSession {
         session.refresh_projects();
         session.refresh_templates();
         session
+    }
+
+    /// The rows of the project list its search finds (all without a search).
+    pub fn shown_projects(&self) -> Vec<usize> {
+        (0..self.projects.len()).filter(|&index| self.projects[index].matches(&self.project_search)).collect()
     }
 
     pub fn footer_status(&self) -> &str {
@@ -227,9 +186,10 @@ impl ProjectSession {
         self.delete_candidate.is_some()
             || self.delete_template_candidate.is_some()
             || self.picker_open
-            || self.projects_root_browser_open
-            || self.export_dir_browser_open
+            || self.projects_root.open
+            || self.export_dir.open
             || self.template_create_open
+            || self.sheet.is_some()
     }
 
     /// Carries out one intent of a Project block or key.
@@ -263,8 +223,12 @@ impl ProjectSession {
                 self.perform_open_project(index);
             }
             ProjectIntent::CreateProject => {
-                self.perform_create_project();
+                let confirm = qnc_ui_text::text("project.create_project").to_string();
+                self.sheet = Some(SheetOverlay::new(&self.component.root, self.project_name.clone(), true, Value::Null, None, confirm));
             }
+            ProjectIntent::OpenStorySheet => self.open_story_sheet(),
+            ProjectIntent::AnswerStorySheet { answer: SheetAnswer::Cancel } => self.sheet = None,
+            ProjectIntent::AnswerStorySheet { answer: SheetAnswer::Confirm } => self.confirm_story_sheet(),
             ProjectIntent::RequestDeleteProject { index } => {
                 self.request_delete_project(index);
             }
@@ -308,47 +272,14 @@ impl ProjectSession {
                     self.perform_confirm_delete_template(&template);
                 }
             }
-            ProjectIntent::PickProjectsRoot => {
-                self.toggle_projects_root_browser();
+            ProjectIntent::PickLocation { target } => {
+                let (field, other) = self.locations_mut(target);
+                let step = field.toggle(other);
+                self.location_step(target, step);
             }
-            ProjectIntent::SelectProjectsRootKind { kind } => {
-                self.select_projects_root_kind(kind);
-            }
-            ProjectIntent::OpenProjectsRootUri { uri } => {
-                self.open_projects_root_uri(&uri);
-            }
-            ProjectIntent::OpenProjectsRootParent => {
-                self.open_projects_root_parent();
-            }
-            ProjectIntent::OpenProjectsRootRoots => {
-                self.open_projects_root_roots();
-            }
-            ProjectIntent::ConfirmProjectsRootBrowser => {
-                self.confirm_projects_root_browser();
-            }
-            ProjectIntent::CancelProjectsRootBrowser => {
-                self.projects_root_browser_open = false;
-            }
-            ProjectIntent::PickExportDir => {
-                self.toggle_export_dir_browser();
-            }
-            ProjectIntent::SelectExportDirKind { kind } => {
-                self.select_export_dir_kind(kind);
-            }
-            ProjectIntent::OpenExportDirUri { uri } => {
-                self.open_export_dir_uri(&uri);
-            }
-            ProjectIntent::OpenExportDirParent => {
-                self.open_export_dir_parent();
-            }
-            ProjectIntent::OpenExportDirRoots => {
-                self.open_export_dir_roots();
-            }
-            ProjectIntent::ConfirmExportDirBrowser => {
-                self.confirm_export_dir_browser();
-            }
-            ProjectIntent::CancelExportDirBrowser => {
-                self.export_dir_browser_open = false;
+            ProjectIntent::AnswerLocation { target, answer } => {
+                let step = self.locations_mut(target).0.answer(&answer);
+                self.location_step(target, step);
             }
         }
     }
@@ -357,11 +288,45 @@ impl ProjectSession {
         self.component.request(Request::LoadProjects);
     }
 
-    fn perform_create_project(&mut self) {
+    /// The sheet of the open project as kept in it (or the sheet of this computer, empty).
+    fn open_story_sheet(&mut self) {
+        let Some(project_id) = self.story_project.clone() else { return };
+        let name = self.projects.iter().find(|project| project.project_id == project_id).map(|project| project.name.clone()).unwrap_or_default();
+        let kept = self.story_kept.clone().unwrap_or_default();
+        let sheet = serde_json::from_value::<SheetSpec>(kept.sheet).ok();
+        let values = Value::Object(kept.values.into_iter().collect());
+        let confirm = qnc_ui_text::text("sheet.save_values").to_string();
+        self.sheet = Some(SheetOverlay::new(&self.component.root, name, false, values, sheet, confirm));
+    }
+
+    /// Create (a new project with the name and sheet typed) or Save (the open project's sheet).
+    /// The overlay stays open until the registry answers.
+    fn confirm_story_sheet(&mut self) {
+        let Some(overlay) = self.sheet.as_ref() else { return };
+        let Some((sheet, values)) = overlay.filled() else { return };
+        let (new_project, name) = (overlay.name_editable, overlay.name.trim().to_string());
+        let sheet = StorySheet {
+            sheet: serde_json::to_value(sheet).unwrap_or(Value::Null),
+            values: values.as_object().cloned().unwrap_or_default().into_iter().collect(),
+        };
+        if !new_project {
+            if let Some(project_id) = self.story_project.clone() {
+                self.component.request(Request::SaveStory { project_id, sheet });
+            }
+            return;
+        }
         let settings = self.settings_draft_for_save();
-        let (name, template_id) = (self.project_name.clone(), self.selected_template_id.clone());
-        if let Err(error) = self.component.create_project(&name, &template_id, &settings) {
-            self.status = db_error(error);
+        let template_id = self.selected_template_id.clone();
+        if let Err(error) = self.component.create_project(&name, &template_id, &settings, sheet) {
+            self.sheet_message(db_error(error));
+        }
+    }
+
+    /// A message in the open sheet, or in the status line when it is closed.
+    fn sheet_message(&mut self, message: String) {
+        match self.sheet.as_mut() {
+            Some(overlay) => overlay.message = message,
+            None => self.status = message,
         }
     }
 
@@ -416,6 +381,7 @@ impl ProjectSession {
             Reply::Templates(Ok(state)) => self.apply_templates_state(state),
             Reply::Created(Ok((project, state))) => {
                 self.project_name.clear();
+                self.sheet = None;
                 self.status = qnc_ui_text::fill("project.msg.opened", &[("name", &project.name)]);
                 self.apply_projects_state(state);
             }
@@ -452,16 +418,31 @@ impl ProjectSession {
                     Err(error) => self.status = db_error(error),
                 }
             }
+            Reply::Story { project_id, saved, result } => match result {
+                Ok(sheet) if self.story_project.as_deref() == Some(project_id.as_str()) => {
+                    self.story_kept = Some(sheet);
+                    if saved {
+                        self.sheet = None;
+                        self.status = qnc_ui_text::text("project.msg.story_saved").to_string();
+                        // The list searches the new values.
+                        self.refresh_projects();
+                    }
+                }
+                Ok(_) => {}
+                Err(error) => self.sheet_message(db_error(error)),
+            },
+            Reply::Created(Err(error)) => {
+                // A project whose sheet was not kept is there all the same: the list shows it.
+                self.sheet_message(db_error(error));
+                self.refresh_projects();
+            }
             Reply::ProjectsRoot(Ok(projects_root)) => {
-                self.projects_root = qnc_dir_browser::display_private_path(Path::new(&projects_root));
-                self.projects_root_dirty = true;
-                self.projects_root_browser_open = false;
-                qnc_settings_path::set_string_path(&mut self.draft_settings, "storage.projects_root", self.projects_root.clone());
+                self.projects_root.chosen(qnc_dir_browser::display_private_path(Path::new(&projects_root)));
+                qnc_settings_path::set_string_path(&mut self.draft_settings, "storage.projects_root", self.projects_root.text.clone());
                 self.status = qnc_ui_text::text("project.msg.projects_root_set").to_string();
             }
             Reply::Projects(Err(error))
             | Reply::Templates(Err(error))
-            | Reply::Created(Err(error))
             | Reply::Opened(Err(error))
             | Reply::Deleted(Err(error))
             | Reply::TemplateSelected(Err(error))
@@ -470,185 +451,51 @@ impl ProjectSession {
         }
     }
 
-    fn browser_start_path(path: &str) -> Option<PathBuf> {
-        let trimmed = path.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-        let path = PathBuf::from(trimmed);
-        if path.is_absolute() {
-            Some(path)
-        } else {
-            None
+/// The field `target` and the other one (only one browser is open at a time).
+    fn locations_mut(&mut self, target: LocationTarget) -> (&mut LocationField, &mut LocationField) {
+        match target {
+            LocationTarget::ProjectsRoot => (&mut self.projects_root, &mut self.export_dir),
+            LocationTarget::ExportDir => (&mut self.export_dir, &mut self.projects_root),
         }
     }
 
-    fn toggle_projects_root_browser(&mut self) {
-        let opened = qnc_ui_kit::toggle_exclusive_panel(
-            &mut self.projects_root_browser_open,
-            &mut self.export_dir_browser_open,
-        );
-        if opened && self.projects_root_browser.kind == LocationSourceKind::Local {
-            let start = Self::browser_start_path(&self.projects_root);
-            self.load_projects_root_browser(start);
-        }
-    }
-
-    fn select_projects_root_kind(&mut self, kind: LocationSourceKind) {
-        self.projects_root_browser.kind = kind;
-        if kind == LocationSourceKind::Local
-            && self.projects_root_browser.browser.entries.is_empty()
-            && self
-                .projects_root_browser
-                .browser
-                .path_label
-                .trim()
-                .is_empty()
-        {
-            self.load_projects_root_browser(None);
-        }
-    }
-
-    fn open_projects_root_uri(&mut self, uri: &str) {
-        if self.projects_root_browser.kind == LocationSourceKind::Local {
-            self.browse(ProjectBrowserTarget::ProjectsRoot, BrowseStep::Uri(uri.into()));
-        }
-    }
-
-    fn open_projects_root_parent(&mut self) {
-        if self.projects_root_browser.kind == LocationSourceKind::Local {
-            self.browse(ProjectBrowserTarget::ProjectsRoot, BrowseStep::Parent);
-        }
-    }
-
-    fn open_projects_root_roots(&mut self) {
-        if self.projects_root_browser.kind == LocationSourceKind::Local {
-            self.load_projects_root_browser(None);
-        }
-    }
-
-    fn confirm_projects_root_browser(&mut self) {
-        let Some(uri) = self.projects_root_browser.browser.current_uri.clone() else {
+    /// What a location field asks: a browser step runs in the background (its listing comes
+    /// with `poll`); a confirmed folder becomes the projects root (through the registry) or
+    /// the export folder of the draft.
+    fn location_step(&mut self, target: LocationTarget, step: FieldStep) {
+        let uri = match step {
+            FieldStep::Nothing => return,
+            FieldStep::Browse(step) => return self.component.browse(target, step),
+            FieldStep::Confirm(uri) => uri,
+        };
+        let Some(path) = self.component.browser_private_path_for_uri(target, &uri) else {
+            let missing = if target == LocationTarget::ProjectsRoot { "project.msg.browser_no_project_path" } else { "project.msg.browser_no_export_path" };
+            self.status = qnc_ui_text::text(missing).to_string();
             return;
         };
-        let Some(path) = self
-            .component
-            .browser_private_path_for_uri(ProjectBrowserTarget::ProjectsRoot, &uri)
-        else {
-            self.status = qnc_ui_text::text("project.msg.browser_no_project_path").to_string();
-            return;
-        };
-        let display_path = qnc_dir_browser::display_private_path(&path);
-        if display_path.trim().is_empty() {
+        let shown = qnc_dir_browser::display_private_path(&path);
+        if shown.trim().is_empty() {
             return;
         }
-        self.component.request(Request::SetProjectsRoot { path });
-    }
-
-    fn toggle_export_dir_browser(&mut self) {
-        let opened = qnc_ui_kit::toggle_exclusive_panel(
-            &mut self.export_dir_browser_open,
-            &mut self.projects_root_browser_open,
-        );
-        if opened && self.export_dir_browser.kind == LocationSourceKind::Local {
-            let start = Self::browser_start_path(&self.export_dir);
-            self.load_export_dir_browser(start);
+        if target == LocationTarget::ProjectsRoot {
+            return self.component.request(Request::SetProjectsRoot { path });
         }
-    }
-
-    fn select_export_dir_kind(&mut self, kind: LocationSourceKind) {
-        self.export_dir_browser.kind = kind;
-        if kind == LocationSourceKind::Local
-            && self.export_dir_browser.browser.entries.is_empty()
-            && self.export_dir_browser.browser.path_label.trim().is_empty()
-        {
-            self.load_export_dir_browser(None);
-        }
-    }
-
-    fn open_export_dir_uri(&mut self, uri: &str) {
-        if self.export_dir_browser.kind == LocationSourceKind::Local {
-            self.browse(ProjectBrowserTarget::ExportDir, BrowseStep::Uri(uri.into()));
-        }
-    }
-
-    fn open_export_dir_parent(&mut self) {
-        if self.export_dir_browser.kind == LocationSourceKind::Local {
-            self.browse(ProjectBrowserTarget::ExportDir, BrowseStep::Parent);
-        }
-    }
-
-    fn open_export_dir_roots(&mut self) {
-        if self.export_dir_browser.kind == LocationSourceKind::Local {
-            self.load_export_dir_browser(None);
-        }
-    }
-
-    fn confirm_export_dir_browser(&mut self) {
-        let Some(uri) = self.export_dir_browser.browser.current_uri.clone() else {
-            return;
-        };
-        let Some(path) = self
-            .component
-            .browser_private_path_for_uri(ProjectBrowserTarget::ExportDir, &uri)
-        else {
-            self.status = qnc_ui_text::text("project.msg.browser_no_export_path").to_string();
-            return;
-        };
-        let path = qnc_dir_browser::display_private_path(&path);
-        if path.trim().is_empty() {
-            return;
-        }
-        self.export_dir = path;
-        self.export_dir_dirty = true;
-        self.export_dir_browser_open = false;
-        qnc_settings_path::set_string_path(
-            &mut self.draft_settings,
-            "export.directory",
-            self.export_dir.clone(),
-        );
+        self.export_dir.chosen(shown);
+        qnc_settings_path::set_string_path(&mut self.draft_settings, "export.directory", self.export_dir.text.clone());
         self.status = qnc_ui_text::text("project.msg.export_dir_set").to_string();
     }
 
-    fn load_projects_root_browser(&mut self, start: Option<PathBuf>) {
-        self.browse(ProjectBrowserTarget::ProjectsRoot, start.map_or(BrowseStep::Roots, BrowseStep::Path));
+    /// The path of a location field was typed: it goes into the draft of the new project.
+    pub fn location_typed(&mut self, target: LocationTarget) {
+        let (field, _) = self.locations_mut(target);
+        field.dirty = true;
+        let text = field.text.clone();
+        let path = if target == LocationTarget::ProjectsRoot { "storage.projects_root" } else { "export.directory" };
+        qnc_settings_path::set_string_path(&mut self.draft_settings, path, text);
     }
 
-    fn load_export_dir_browser(&mut self, start: Option<PathBuf>) {
-        self.browse(ProjectBrowserTarget::ExportDir, start.map_or(BrowseStep::Roots, BrowseStep::Path));
-    }
-
-    /// A browser step runs in the background; its listing is applied by `poll`.
-    fn browse(&mut self, target: ProjectBrowserTarget, step: BrowseStep) {
-        let state = self.browser_state_mut(target);
-        state.busy = true;
-        state.error = None;
-        self.component.browse(target, step);
-    }
-
-    fn browser_state_mut(&mut self, target: ProjectBrowserTarget) -> &mut LocationBrowserState {
-        match target {
-            ProjectBrowserTarget::ProjectsRoot => &mut self.projects_root_browser,
-            ProjectBrowserTarget::ExportDir => &mut self.export_dir_browser,
-        }
-    }
-
-    fn apply_browser_listing(&mut self, target: ProjectBrowserTarget, listing: Result<BrowserState, String>) {
-        let state = self.browser_state_mut(target);
-        match listing {
-            Ok(browser) => Self::apply_location_listing(state, browser),
-            Err(error) => {
-                state.error = Some(error);
-                state.browser.entries.clear();
-                state.busy = false;
-            }
-        }
-    }
-
-    fn apply_location_listing(browser_state: &mut LocationBrowserState, browser: BrowserState) {
-        browser_state.browser = browser;
-        browser_state.error = None;
-        browser_state.busy = false;
+    fn apply_browser_listing(&mut self, target: LocationTarget, listing: Result<BrowserState, String>) {
+        self.locations_mut(target).0.apply_listing(listing);
     }
 
     fn perform_open_project(&mut self, index: usize) {
@@ -690,8 +537,16 @@ impl ProjectSession {
     fn apply_projects_state(&mut self, state: ProjectsState) {
         self.selected_project = state.selected_project;
         self.projects = state.projects;
-        if !self.projects_root_dirty {
-            self.projects_root = qnc_dir_browser::display_private_path(Path::new(&state.projects_root));
+        let open = self.projects.iter().find(|project| project.active).map(|project| project.project_id.clone());
+        if open != self.story_project {
+            self.story_project = open.clone();
+            self.story_kept = None;
+            if let Some(project_id) = open {
+                self.component.request(Request::LoadStory { project_id });
+            }
+        }
+        if !self.projects_root.dirty {
+            self.projects_root.text = qnc_dir_browser::display_private_path(Path::new(&state.projects_root));
         }
     }
 
@@ -702,8 +557,8 @@ impl ProjectSession {
         self.selected_template_id = state.selected_template_id;
         self.templates = state.templates;
         self.draft_settings = state.draft_settings;
-        self.projects_root_dirty = false;
-        self.export_dir_dirty = false;
+        self.projects_root.dirty = false;
+        self.export_dir.dirty = false;
     }
 
     pub fn settings_draft_for_save(&self) -> Value {
@@ -711,13 +566,13 @@ impl ProjectSession {
         qnc_settings_path::set_string_path(
             &mut settings,
             "storage.projects_root",
-            self.projects_root.clone(),
+            self.projects_root.text.clone(),
         );
-        if self.export_dir_dirty && !self.export_dir.trim().is_empty() {
+        if self.export_dir.dirty && !self.export_dir.text.trim().is_empty() {
             qnc_settings_path::set_string_path(
                 &mut settings,
                 "export.directory",
-                self.export_dir.clone(),
+                self.export_dir.text.clone(),
             );
         }
         settings
@@ -727,4 +582,20 @@ impl ProjectSession {
 /// The status line of a registry error.
 fn db_error(error: String) -> String {
     qnc_ui_text::fill("project.msg.db_error", &[("error", &error)])
+}
+
+/// The catalog action of a location field's `what`, by the field (the ids the form had).
+fn location_action(target: LocationTarget, what: &str) -> &'static str {
+    match (target, what) {
+        (LocationTarget::ProjectsRoot, "pick") => "project_pick_projects_root",
+        (LocationTarget::ProjectsRoot, "browser_select_source") => "project_projects_root_browser_select_source",
+        (LocationTarget::ProjectsRoot, "browser_open_path") => "project_projects_root_browser_open_path",
+        (LocationTarget::ProjectsRoot, "browser_confirm") => "project_projects_root_browser_confirm",
+        (LocationTarget::ProjectsRoot, _) => "project_projects_root_browser_cancel",
+        (LocationTarget::ExportDir, "pick") => "project_pick_export_dir",
+        (LocationTarget::ExportDir, "browser_select_source") => "project_export_dir_browser_select_source",
+        (LocationTarget::ExportDir, "browser_open_path") => "project_export_dir_browser_open_path",
+        (LocationTarget::ExportDir, "browser_confirm") => "project_export_dir_browser_confirm",
+        (LocationTarget::ExportDir, _) => "project_export_dir_browser_cancel",
+    }
 }

@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.shot-db",
+  "module_name": "Shot Table",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["db.shots.read", "db.shots.write"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["media.decode", "media.probe.full", "file.write", "playback.clock"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "session_local",
+  "database_write_policy": "public_db_owner_write_adapter_only",
+  "runtime_crate": "qnc-shot-db",
+  "input": "The shot analysis of a clip, or a clip id to read.",
+  "output": "The table clip_shots and the view public_clip_shots of the project database through its one intermediary (qnc-db-broker); a gap between shots or an error beside shots is refused.",
+  "specification": "User 2026-10-27: Video AI, shot analysis in AI Media Assist, a background job of its own after the filmstrip (AGENTS.md)."
+}

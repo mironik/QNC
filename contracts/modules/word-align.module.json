@@ -1,0 +1,21 @@
+{
+  "module_id": "qnc.module.word-align",
+  "module_name": "Word Align",
+  "module_version": "0.1.0",
+  "module_kind": "library",
+  "capabilities": ["speech.words.align_to_sound"],
+  "input_contract_version": "0.1.0",
+  "output_contract_version": "0.1.0",
+  "transport_protocol_version": "0.1.0",
+  "transport_scope": ["local", "lan", "intranet"],
+  "supported_os": ["windows", "linux", "macos"],
+  "supported_cpu": ["x86_64", "aarch64"],
+  "forbidden_calls": ["ffprobe", "media.probe.full", "playback.clock", "player.command"],
+  "forbidden_dependencies": ["qnc.module.media-probe", "qnc.module.scanner"],
+  "state_policy": "stateless",
+  "database_write_policy": "no_db_writes",
+  "runtime_crate": "qnc-word-align",
+  "input": "A window of frames, the peak of each column of its sound (per mille of full scale) and the words said there (their frames).",
+  "output": "Each word's frames moved to the sound: its start to the nearest onset of voice (a rise after quiet or out of a dip, at most ten frames away, in order), its end to where its voice falls (through dips of up to five frames, never into the next word); and the runs of voice no word covers (at least four frames).",
+  "specification": "User 2026-10-26: the words must be where their sound is, to cut statements by the text; the engine gives word times several frames off (AGENTS.md)."
+}

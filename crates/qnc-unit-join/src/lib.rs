@@ -2,9 +2,10 @@
 //! the pictures and the sound are copied as they are, in the order given, by the ffmpeg of the
 //! installed decoder catalog (the prerender's toolchain). Before they are put together their
 //! sound is measured (EBU R 128 / BS.1770-4, `qnc-loudness`): A1 (output 1) and A2 (output 2)
-//! keep the user's levels when they are within the target's tolerance and under the true peak
-//! limit, otherwise each gets the gain that brings it to its target (lowered so its true peak
-//! stays at the limit). The file is MXF OP1a (user 2026-10-24: TV houses prefer it), the
+//! keep the user's levels when they are within the target's tolerance, otherwise each gets the
+//! gain that brings it to its target; a lane whose true peak would go over the limit goes
+//! through a peak limiter (user 2026-10-26) instead of staying quieter, and the written file
+//! is measured again (once more with a lower ceiling when it is still over). The file is MXF OP1a (user 2026-10-24: TV houses prefer it), the
 //! pictures copied, every sound output its own mono PCM 24-bit track (as the cameras write
 //! them; an output without gain is copied sample for sample). Every other output is kept
 //! as it is. It reads the unit files only and writes one file, `out`: into a working file
@@ -37,6 +38,11 @@ pub struct LaneOutcome {
     pub measured_lufs: Option<f64>,
     pub true_peak_dbtp: f64,
     pub gain_db: f64,
+    /// Its peaks went through the limiter.
+    pub limited: bool,
+    /// As it was written into the file.
+    pub written_lufs: Option<f64>,
+    pub written_dbtp: f64,
 }
 
 /// What was written.
@@ -68,16 +74,54 @@ pub fn join(units: &[PathBuf], sound: Sound, rule: LoudnessRule, ffmpeg: &Path, 
     let list = std::env::temp_dir().join(format!("qnc-unit-join-{}-{}.txt", std::process::id(), nanos()));
     std::fs::write(&list, list_text(units)).map_err(|e| format!("{}: {e}", list.display()))?;
     let result = measure(&list, sound, ffmpeg).and_then(|measured| {
-        let lane = |index: usize, target: f64| {
+        let lift = |index: usize, target: f64| {
             let (lufs, peak) = measured[index];
-            LaneOutcome { measured_lufs: lufs, true_peak_dbtp: peak, gain_db: qnc_loudness::export_gain(lufs, peak, target, rule.tolerance_lu, rule.true_peak_dbtp) }
+            qnc_loudness::limited_gain(lufs, peak, target, rule.tolerance_lu, rule.true_peak_dbtp)
         };
-        let (a1, a2) = (lane(0, rule.a1_lufs), lane(1, rule.a2_lufs));
-        write(&list, sound, [a1.gain_db, a2.gain_db], ffmpeg, out, picture, start_timecode)?;
-        Ok(Joined { path: out.to_path_buf(), a1, a2 })
+        let lifts = [lift(0, rule.a1_lufs), lift(1, rule.a2_lufs)];
+        // The limiter's ceiling a little under the true peak limit; when the written file still
+        // goes over it, once more with the ceiling lowered by as much (user 2026-10-26).
+        let mut ceilings = [rule.true_peak_dbtp - CEILING_MARGIN_DB; 2];
+        let mut written = Vec::new();
+        for attempt in 0..2 {
+            let lanes = [0, 1].map(|index| Lane { gain_db: lifts[index].gain_db, ceiling_dbtp: lifts[index].limit.then_some(ceilings[index]) });
+            write(&list, sound, lanes, ffmpeg, out, picture, start_timecode)?;
+            written = measure_written(out, sound, ffmpeg)?;
+            let over: Vec<usize> = (0..2).filter(|index| lifts[*index].limit && written[*index].1 > rule.true_peak_dbtp).collect();
+            if over.is_empty() || attempt == 1 {
+                break;
+            }
+            for index in over {
+                ceilings[index] -= written[index].1 - rule.true_peak_dbtp + 0.1;
+            }
+        }
+        let lane = |index: usize| LaneOutcome {
+            measured_lufs: measured[index].0,
+            true_peak_dbtp: measured[index].1,
+            gain_db: lifts[index].gain_db,
+            limited: lifts[index].limit,
+            written_lufs: written[index].0,
+            written_dbtp: written[index].1,
+        };
+        Ok(Joined { path: out.to_path_buf(), a1: lane(0), a2: lane(1) })
     });
     let _ = std::fs::remove_file(&list);
     result
+}
+
+/// How far under the true peak limit the limiter's ceiling is: it limits the samples of the
+/// sound taken to four times its rate, near what the true peak measures.
+const CEILING_MARGIN_DB: f64 = 0.5;
+
+/// The rate the limiter works at (four times 48 kHz, BS.1770's true peak oversampling).
+const LIMITER_RATE: u32 = 192_000;
+
+/// How A1 or A2 is written: its gain and, when its peaks go over the limit, the ceiling of the
+/// limiter.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Lane {
+    gain_db: f64,
+    ceiling_dbtp: Option<f64>,
 }
 
 /// The concat list: every unit once, in order (single quotes are literal in it).
@@ -90,10 +134,25 @@ fn list_text(units: &[PathBuf]) -> String {
 
 /// The integrated loudness and the true peak of each output of the joined sound.
 fn measure(list: &Path, sound: Sound, ffmpeg: &Path) -> Result<Vec<(Option<f64>, f64)>> {
-    let mut child = Command::new(ffmpeg)
-        .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-f", "concat", "-safe", "0", "-i"])
-        .arg(list)
-        .args(["-map", "0:a:0", "-vn", "-c:a", "pcm_f32le", "-f", "f32le", "-"])
+    let mut command = Command::new(ffmpeg);
+    command.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-f", "concat", "-safe", "0", "-i"]).arg(list).args(["-map", "0:a:0"]);
+    meter(command, sound)
+}
+
+/// A1 and A2 as they were written into `out` (its first two mono tracks).
+fn measure_written(out: &Path, sound: Sound, ffmpeg: &Path) -> Result<Vec<(Option<f64>, f64)>> {
+    let mut command = Command::new(ffmpeg);
+    command
+        .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i"])
+        .arg(out)
+        .args(["-filter_complex", "[0:a:0][0:a:1]amerge=inputs=2[m]", "-map", "[m]"]);
+    meter(command, Sound { channels: 2, ..sound })
+}
+
+/// Runs `command` (its input and its one mapped sound) and measures each channel.
+fn meter(mut command: Command, sound: Sound) -> Result<Vec<(Option<f64>, f64)>> {
+    let mut child = command
+        .args(["-vn", "-c:a", "pcm_f32le", "-f", "f32le", "-"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -132,12 +191,12 @@ fn measure(list: &Path, sound: Sound, ffmpeg: &Path) -> Result<Vec<(Option<f64>,
 
 /// The joined file (MXF OP1a): the pictures copied, every output a mono track, A1/A2 at
 /// their gains.
-fn write(list: &Path, sound: Sound, gains_db: [f64; 2], ffmpeg: &Path, out: &Path, picture: &[String], start_timecode: &str) -> Result<()> {
+fn write(list: &Path, sound: Sound, lanes: [Lane; 2], ffmpeg: &Path, out: &Path, picture: &[String], start_timecode: &str) -> Result<()> {
     let mut command = Command::new(ffmpeg);
     command
         .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i"])
         .arg(list)
-        .args(["-filter_complex", &mono_tracks(sound.channels, gains_db), "-map", "0:v:0"]);
+        .args(["-filter_complex", &mono_tracks(sound, lanes), "-map", "0:v:0"]);
     for channel in 0..sound.channels {
         command.args(["-map", &format!("[a{channel}]")]);
     }
@@ -175,16 +234,24 @@ fn working_file(out: &Path) -> PathBuf {
 }
 
 /// Every output its own mono track `[aN]`; A1 and A2 at their gains, an output without gain
-/// only picked out (sample for sample).
-fn mono_tracks(channels: u16, gains_db: [f64; 2]) -> String {
+/// only picked out (sample for sample). A lane with a ceiling goes through the limiter at four
+/// times the rate (peaks over the true peak limit held there, user 2026-10-26); the limiter's
+/// delay is taken back so the sound stays with the pictures.
+fn mono_tracks(sound: Sound, lanes: [Lane; 2]) -> String {
+    let channels = sound.channels;
     let split: String = (0..channels).map(|channel| format!("[s{channel}]")).collect();
     let mut text = format!("[0:a:0]asplit={channels}{split}");
     for channel in 0..usize::from(channels) {
-        let gain = match gains_db.get(channel) {
-            Some(db) if *db != 0.0 => format!("{:.6}*", qnc_gain::db_to_gain(*db)),
+        let lane = lanes.get(channel).copied().unwrap_or(Lane { gain_db: 0.0, ceiling_dbtp: None });
+        let gain = match lane.gain_db {
+            db if db != 0.0 => format!("{:.6}*", qnc_gain::db_to_gain(db)),
             _ => String::new(),
         };
-        text.push_str(&format!(";[s{channel}]pan=mono|c0={gain}c{channel}[a{channel}]"));
+        let limiter = lane.ceiling_dbtp.map_or_else(String::new, |ceiling| {
+            let limit = qnc_gain::db_to_gain(ceiling).clamp(0.0625, 1.0);
+            format!(",aresample={LIMITER_RATE},alimiter=limit={limit:.6}:attack=5:release=50:level=false:latency=true,aresample={}", sound.sample_rate)
+        });
+        text.push_str(&format!(";[s{channel}]pan=mono|c0={gain}c{channel}{limiter}[a{channel}]"));
     }
     text
 }
@@ -202,8 +269,17 @@ mod tests {
         let text = list_text(&[PathBuf::from(r"C:\a\b.mov"), PathBuf::from("/x/it's.mov")]);
         assert_eq!(text, "file 'C:/a/b.mov'\nfile '/x/it'\\''s.mov'\n");
         assert_eq!(
-            mono_tracks(3, [6.0, 0.0]),
+            mono_tracks(Sound { sample_rate: 48_000, channels: 3 }, [Lane { gain_db: 6.0, ceiling_dbtp: None }, Lane { gain_db: 0.0, ceiling_dbtp: None }]),
             "[0:a:0]asplit=3[s0][s1][s2];[s0]pan=mono|c0=1.995262*c0[a0];[s1]pan=mono|c0=c1[a1];[s2]pan=mono|c0=c2[a2]"
+        );
+    }
+
+    #[test]
+    fn a_lane_over_the_peak_limit_goes_through_the_limiter_at_four_times_the_rate() {
+        let lanes = [Lane { gain_db: 0.0, ceiling_dbtp: Some(-1.5) }, Lane { gain_db: 0.0, ceiling_dbtp: None }];
+        assert_eq!(
+            mono_tracks(Sound { sample_rate: 48_000, channels: 2 }, lanes),
+            "[0:a:0]asplit=2[s0][s1];[s0]pan=mono|c0=c0,aresample=192000,alimiter=limit=0.841395:attack=5:release=50:level=false:latency=true,aresample=48000[a0];[s1]pan=mono|c0=c1[a1]"
         );
     }
 }

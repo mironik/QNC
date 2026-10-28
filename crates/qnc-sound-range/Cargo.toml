@@ -9,4 +9,5 @@ qnc-decoder-catalog = { workspace = true }
 qnc-media-decode = { workspace = true }
 qnc-media-metadata = { workspace = true }
 qnc-media-stream = { workspace = true }
+qnc-mxf-sound = { workspace = true }
 qnc-still-locator = { workspace = true }

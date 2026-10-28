@@ -167,6 +167,96 @@ pub fn read_sound_and_pictures(
     Ok(())
 }
 
+/// The sound element number of each requested stream, when the saved record is an MXF
+/// whose requested streams are all uncompressed mono of one sample size (24-bit, or 16-bit
+/// as XDCAM HD's LPCM16): the k-th audio stream of the file is sound element k (checked
+/// byte for byte against FFmpeg on a camera original), with the sample size in bytes.
+pub fn sound_elements(media: &qnc_media_metadata::MediaRepresentation, streams: &[u32]) -> Option<(Vec<u8>, usize)> {
+    if media.container.as_ref()?.value != "mxf" {
+        return None;
+    }
+    let mut audio = media
+        .streams
+        .iter()
+        .filter_map(|stream| match &stream.details {
+            qnc_media_metadata::StreamDetails::Audio(details) => Some((stream, details)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    audio.sort_by_key(|(stream, _)| stream.index.as_ref().map(|index| index.value));
+    let mut size = None;
+    let elements = streams
+        .iter()
+        .map(|wanted| {
+            let position = audio
+                .iter()
+                .position(|(stream, _)| stream.index.as_ref().is_some_and(|index| index.value == *wanted))?;
+            let (stream, details) = audio[position];
+            let codec = stream.codec.as_ref().map(|codec| &codec.value);
+            let bytes = match codec {
+                Some(qnc_media_metadata::Signal::Known(name)) if name == "pcm_s24le" => 3,
+                Some(qnc_media_metadata::Signal::Known(name)) if name == "pcm_s16le" => 2,
+                _ => return None,
+            };
+            let mono = details.channels.as_ref().is_some_and(|channels| channels.value == 1);
+            let same = *size.get_or_insert(bytes) == bytes;
+            (mono && same).then(|| u8::try_from(position).ok()).flatten()
+        })
+        .collect::<Option<Vec<u8>>>()?;
+    Some((elements, size?))
+}
+
+/// The samples of sound element `element` (mono, `sample_bytes` a sample) for the frames
+/// `[from, to)` of a frame-wrapped MXF: one element a frame, counted from the file's start;
+/// the read stops after frame `to`. Read only.
+pub fn read_element_frames(path: &Path, element: u8, sample_bytes: usize, from: u64, to: u64, cancel: &AtomicBool) -> Result<Vec<f32>, String> {
+    let mut samples = Vec::new();
+    match read_element_frames_into(path, element, sample_bytes, from, to, cancel, &mut samples)? {
+        true => Ok(samples),
+        false => Err("mxf sound: the read was cancelled".into()),
+    }
+}
+
+/// As [`read_element_frames`], appending to `samples` frame by frame; a cancelled read keeps
+/// the whole frames read so far and answers `Ok(false)`, so the caller can go on from there
+/// (user 2026-10-26: a read the player interrupted started again from the beginning).
+pub fn read_element_frames_into(path: &Path, element: u8, sample_bytes: usize, from: u64, to: u64, cancel: &AtomicBool, samples: &mut Vec<f32>) -> Result<bool, String> {
+    read_element_frames_each(path, element, sample_bytes, from, to, cancel, &mut |frame| samples.extend_from_slice(frame))
+}
+
+/// As [`read_element_frames_into`], handing the samples of each frame to `each` as soon as it
+/// is read (user 2026-10-27: the transcription starts on the first seconds instead of waiting
+/// for the whole clip's sound).
+pub fn read_element_frames_each(path: &Path, element: u8, sample_bytes: usize, from: u64, to: u64, cancel: &AtomicBool, each: &mut dyn FnMut(&[f32])) -> Result<bool, String> {
+    const ENOUGH: &str = "mxf sound: enough";
+    let mut frame = 0u64;
+    let mut samples = Vec::new();
+    let read = read_sound_elements(path, cancel, &mut |number, value| {
+        if number != element {
+            return Ok(());
+        }
+        if frame >= to {
+            return Err(ENOUGH.into());
+        }
+        if frame >= from {
+            samples.clear();
+            if sample_bytes == 2 {
+                s16le_to_f32(value, &mut samples);
+            } else {
+                s24le_to_f32(value, &mut samples);
+            }
+            each(&samples);
+        }
+        frame += 1;
+        Ok(())
+    });
+    match read {
+        _ if cancel.load(std::sync::atomic::Ordering::Relaxed) => Ok(false),
+        Err(error) if error != ENOUGH => Err(error),
+        _ => Ok(true),
+    }
+}
+
 /// Whether an H.264 picture (Annex B, as a camera's MXF stores it) begins a group of
 /// pictures: its first NAL units carry a sequence parameter set or an IDR slice before any
 /// other slice.

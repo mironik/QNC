@@ -44,3 +44,24 @@ fn a_missing_model_or_an_unknown_choice_is_an_error_not_another_engine() {
     assert!(transcriber(&catalog(&folder, "w.none", "vulkan")).is_err());
     assert!(transcriber(&catalog(&folder, "w.gpu", "cuda")).unwrap_err().contains("unknown backend"));
 }
+
+#[test]
+fn the_fast_engine_is_its_own_and_a_catalog_without_one_gives_none() {
+    let folder = folder("fast");
+    std::fs::write(folder.join("model.bin"), b"m").unwrap();
+    std::fs::write(folder.join("vad.bin"), b"v").unwrap();
+    std::fs::create_dir_all(folder.join("parakeet")).unwrap();
+    let path = folder.join("catalog.json");
+    std::fs::write(
+        &path,
+        r#"{"version":"1","transcribe":{"selected":"w.gpu","fast":"p.cpu","engines":[
+          {"id":"w.gpu","program":"qnc-transcribe-whisper","backend":"vulkan","model":"model.bin","vad_model":"vad.bin","threads":4},
+          {"id":"p.cpu","program":"qnc-transcribe-parakeet","backend":"cpu","model":"parakeet","threads":2}]}}"#,
+    )
+    .unwrap();
+    assert_eq!(transcriber_for(&path, Quality::Best).unwrap().id, "w.gpu");
+    let fast = transcriber_for(&path, Quality::Fast).unwrap();
+    assert_eq!((fast.program.as_str(), fast.model, fast.threads), ("qnc-transcribe-parakeet", folder.join("parakeet"), 2));
+    let without = catalog(&folder, "w.gpu", "vulkan");
+    assert!(transcriber_for(&without, Quality::Fast).unwrap_err().contains("no fast"));
+}

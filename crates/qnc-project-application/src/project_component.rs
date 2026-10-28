@@ -17,6 +17,8 @@ pub enum ProjectBrowserTarget {
 /// The Project component: its work on the registry and folders runs in the background
 /// (piece `qnc-project-jobs`, audit 2026-10-25); the form takes the replies with `poll`.
 pub struct ProjectComponent {
+    /// The QNC root: where the story sheets of this computer are.
+    pub root: PathBuf,
     pub applications: ApplicationSelection,
     jobs: StoreJobs<Result<ProjectStore, String>, Answer>,
     projects_root_browser: BackgroundBrowser,
@@ -28,6 +30,7 @@ pub struct ProjectComponent {
 impl ProjectComponent {
     pub fn new(root: &Path) -> Self {
         Self {
+            root: root.to_path_buf(),
             applications: ApplicationSelection::new(root),
             jobs: qnc_project_jobs::start(root.to_path_buf()),
             projects_root_browser: BackgroundBrowser::start("qnc-project-root-browser"),
@@ -39,16 +42,14 @@ impl ProjectComponent {
 
     /// Sends a request to the background worker.
     pub fn request(&mut self, request: Request) {
-        if matches!(request, Request::Create { .. } | Request::Open { .. }) {
-            self.navigation_pending = false;
-        }
+        self.navigation_pending &= !matches!(request, Request::Create { .. } | Request::Open { .. });
         self.jobs.submit(move |store| qnc_project_jobs::run(store, request));
     }
 
     /// A new project from the template, with the applications chosen now.
-    pub fn create_project(&mut self, name: &str, template_id: &str, settings: &Value) -> Result<(), String> {
+    pub fn create_project(&mut self, name: &str, template_id: &str, settings: &Value, sheet: qnc_project_jobs::StorySheet) -> Result<(), String> {
         let selection = self.applications.snapshot()?;
-        self.request(Request::Create { name: name.into(), template_id: template_id.into(), settings: settings.clone(), selection });
+        self.request(Request::Create { name: name.into(), template_id: template_id.into(), settings: settings.clone(), selection, sheet });
         Ok(())
     }
 

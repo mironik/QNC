@@ -72,19 +72,16 @@ impl EditorialView {
 
     pub fn action_enabled(&self, action_id: &str) -> bool {
         match action_id {
-            action_ids::SAVE_VIRTUAL_SHOT
-            | action_ids::ADD_TON_SEGMENT
-            | action_ids::ADD_OFF_SEGMENT | "transcribe_marks" => self.chosen_clip_id().is_some(),
-            action_ids::DELETE_SEGMENT | action_ids::DELETE_PART => {
-                self.segments.selected().is_some()
-            }
+            action_ids::SAVE_VIRTUAL_SHOT | action_ids::ADD_TON_SEGMENT | action_ids::ADD_OFF_SEGMENT => self.chosen_clip_id().is_some(),
+            "transcribe_marks" => self.chosen_clip_id().is_some() || self.focus.transcript.ticked > 0,
+            action_ids::DELETE_SEGMENT | action_ids::DELETE_PART => self.segments.selected().is_some(),
             tab if LibraryTab::from_action(tab).is_some() => true,
             action if self.segments.handles(action) => self.segments.action_enabled(action),
             action_ids::PLAY_PAUSE
             | action_ids::STEP_BACK_FRAME
             | action_ids::STEP_FORWARD_FRAME
             | action_ids::MARK_IN
-            | action_ids::MARK_OUT => true,
+            | action_ids::MARK_OUT | "transcribe_fast" | "transcribe_best" => true,
             _ => false,
         }
     }

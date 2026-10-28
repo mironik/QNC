@@ -3,7 +3,7 @@
   "module_name": "Transcript Panel",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["ui.transcript.paint"],
+  "capabilities": ["ui.transcript.paint", "ui.transcript.statements_table", "ui.clipboard.copy_text"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "transport_protocol_version": "0.1.0",

@@ -70,6 +70,17 @@ pub struct ProjectRow {
     pub created_date: String,
     pub project_uri: String,
     pub active: bool,
+    /// The values of its story sheet (journalist, camera, editor, producer and the rest), by
+    /// which the project list is searched.
+    pub search_text: String,
+}
+
+impl ProjectRow {
+    /// Whether every word of `query` is in its name, date or story sheet (any case).
+    pub fn matches(&self, query: &str) -> bool {
+        let haystack = format!("{} {} {}", self.name, self.created_date, self.search_text).to_lowercase();
+        query.to_lowercase().split_whitespace().all(|word| haystack.contains(word))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -170,10 +181,11 @@ impl ProjectStore {
         let active_project_id = get_setting(&conn, "active_project_id", "")?;
         let mut statement = conn
             .prepare(
-                "SELECT project_id, name, project_uri,
-                    COALESCE(strftime('%d.%m.%Y.', substr(created_at, 7), 'unixepoch', 'localtime'), '')
-                 FROM projects
-                 ORDER BY created_at, name, project_id",
+                "SELECT p.project_id, p.name, p.project_uri,
+                    COALESCE(strftime('%d.%m.%Y.', substr(p.created_at, 7), 'unixepoch', 'localtime'), ''),
+                    COALESCE(s.search_text, '')
+                 FROM projects p LEFT JOIN project_search s ON s.project_id = p.project_id
+                 ORDER BY p.created_at, p.name, p.project_id",
             )
             .map_err(|error| error.to_string())?;
         let rows = statement
@@ -185,6 +197,7 @@ impl ProjectStore {
                     name: row.get(1)?,
                     project_uri: row.get(2)?,
                     created_date: row.get(3)?,
+                    search_text: row.get(4)?,
                 })
             })
             .map_err(|error| error.to_string())?;
@@ -441,6 +454,7 @@ impl ProjectStore {
                 created_date,
                 project_uri,
                 active: true,
+                search_text: String::new(),
             })
         })();
         match result {
@@ -569,6 +583,32 @@ impl ProjectStore {
         Ok(())
     }
 
+    /// Keeps `text` (the values of the project's story sheet) as what the project list searches.
+    pub fn set_project_search(&self, project_id: &str, text: &str) -> Result<(), String> {
+        let conn = self.open_registry()?;
+        init_registry_schema(&conn)?;
+        conn.execute(
+            "INSERT INTO project_search (project_id, search_text) VALUES (?1, ?2)
+             ON CONFLICT(project_id) DO UPDATE SET search_text = excluded.search_text",
+            params![project_id, text],
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(())
+    }
+
+    /// The database of a registered project as its owner binds it: its file and its QNC URI,
+    /// for the table modules that keep their own tables in it (the story sheet).
+    pub fn project_db_binding(&self, project_id: &str) -> Result<(PathBuf, String), String> {
+        let registry = self.open_registry()?;
+        init_registry_schema(&registry)?;
+        let project_dir = project_dir_from_conn(&registry, &self.projects_root, project_id)?;
+        let workspace_db = self.project_workspace_db_path(project_id, &project_dir)?;
+        if !workspace_db.is_file() {
+            return Err(qnc_ui_text::fill("project.store.folder_invalid", &[("v0", &(project_dir.display()).to_string())]));
+        }
+        Ok((workspace_db, project_workspace_db_uri(project_id)))
+    }
+
     pub fn delete_project(&self, project_id: &str) -> Result<ProjectRow, String> {
         let project_id = project_id.trim();
         if project_id.is_empty() {
@@ -591,6 +631,7 @@ impl ProjectStore {
                         name: row.get(1)?,
                         project_uri: row.get(2)?,
                         created_date: row.get(3)?,
+                        search_text: String::new(),
                     })
                 },
             )
@@ -632,6 +673,8 @@ impl ProjectStore {
             params![project_id],
         )
         .map_err(|error| error.to_string())?;
+        tx.execute("DELETE FROM project_search WHERE project_id = ?1", params![project_id])
+            .map_err(|error| error.to_string())?;
         tx.execute(
             "DELETE FROM projects WHERE project_id = ?1",
             params![project_id],
@@ -1284,6 +1327,10 @@ fn init_registry_schema(conn: &Connection) -> Result<(), String> {
         CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS project_search (
+            project_id TEXT PRIMARY KEY,
+            search_text TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
@@ -3010,6 +3057,20 @@ mod tests {
         assert_eq!(completed["ai"]["language"], json!("hr"));
         assert_eq!(completed["ai"]["transcription"], json!(false));
         assert_eq!(completed["audio"]["channels"], older["audio"]["channels"]);
+        cleanup_temp_root(&root);
+    }
+
+    #[test]
+    fn a_new_project_gives_the_binding_of_its_database() {
+        let root = temp_root("binding");
+        let store = ProjectStore::open(&root).expect("store");
+        let templates = store.list_project_templates().expect("templates");
+        let project = store
+            .create_project("Prilog", &templates[0].template_id, None, &test_selection(&["project", "ingest"]))
+            .expect("project");
+        let (file, uri) = store.project_db_binding(&project.project_id).expect("binding");
+        assert!(file.is_file() && file.ends_with("project.db"));
+        assert_eq!(uri, project_workspace_db_uri(&project.project_id));
         cleanup_temp_root(&root);
     }
 

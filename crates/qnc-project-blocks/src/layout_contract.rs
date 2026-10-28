@@ -13,6 +13,8 @@ pub struct AppContracts {
     pub project: ProjectLayoutContract,
     pub shortcuts: ShortcutCatalog,
     pub project_open_hint: Option<String>,
+    /// The one desktop theme, for the public pieces the board places.
+    pub theme: qnc_desktop_theme::Theme,
 }
 
 impl AppContracts {
@@ -31,13 +33,10 @@ impl AppContracts {
             return Err("keyboard catalog missing project_open_selected binding".to_string());
         }
         validate_metrics(&shell, &project)?;
-
-        Ok(Self {
-            shell,
-            project,
-            shortcuts,
-            project_open_hint,
-        })
+        let desktop = serde_json::from_str::<qnc_desktop_theme::ShellLayoutContract>(SHELL_LAYOUT_JSON)
+            .map_err(|error| format!("shell layout parse failed: {error}"))?;
+        let theme = qnc_desktop_theme::Theme::from_contract(&desktop);
+        Ok(Self { shell, project, shortcuts, project_open_hint, theme })
     }
 }
 
@@ -137,6 +136,9 @@ pub struct ProjectTexts {
     pub project_name_label: String,
     pub project_name_hint: String,
     pub new_project: String,
+    pub create_project: String,
+    /// Opens the story sheet of the open project (piece `qnc-newsroom-sheet`).
+    pub story_sheet: String,
     pub settings_changed: String,
     pub path_hint: String,
     pub choose: String,
@@ -238,22 +240,8 @@ pub struct ProjectListMetrics {
     pub ready_text: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct SettingsPanelMetrics {
-    pub panel_pad: f32,
-    pub title: String,
-    pub subtitle: String,
-    pub inner_pad_x: f32,
-    pub inner_pad_y: f32,
-    pub section_gap: f32,
-    pub inline_label_width: f32,
-    pub inline_button_width: f32,
-    pub inline_column_gap: f32,
-    pub field_min_width: f32,
-    pub label_font_size: f32,
-    pub group_title_font_size: f32,
-    pub row_height: f32,
-}
+/// The measures of the settings panel (drawn by the piece `qnc-settings-rows`).
+pub use qnc_settings_rows::PanelMetrics as SettingsPanelMetrics;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PtsSlots {

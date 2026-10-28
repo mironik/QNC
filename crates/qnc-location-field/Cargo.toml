@@ -1,0 +1,14 @@
+[package]
+name = "qnc-location-field"
+version = "0.1.0"
+edition = "2021"
+description = "QNC public piece: a location field with its browser (source tabs, folders, Select/Cancel), its state and the steps it asks of the background browser"
+
+[dependencies]
+eframe = { workspace = true }
+qnc-desktop-theme = { workspace = true }
+qnc-dir-browse-jobs = { workspace = true }
+qnc-dir-browser = { workspace = true }
+qnc-dir-browser-panel = { workspace = true }
+qnc-ui-kit = { workspace = true }
+qnc-ui-text = { workspace = true }

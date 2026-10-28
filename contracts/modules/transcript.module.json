@@ -3,7 +3,7 @@
   "module_name": "Transcript",
   "module_version": "0.1.0",
   "module_kind": "library",
-  "capabilities": ["ui.transcript.state", "speech.transcribe.clip_range", "db.transcripts.read"],
+  "capabilities": ["ui.transcript.state", "speech.transcribe.clip_range", "db.transcripts.read", "ui.transcript.statements"],
   "input_contract_version": "0.1.0",
   "output_contract_version": "0.1.0",
   "transport_protocol_version": "0.1.0",
