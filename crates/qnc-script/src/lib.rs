@@ -72,6 +72,12 @@ pub const SUBSEGMENT_CLOSE: &str = "subsegment_close";
 /// An edge of a part is taken for trimming (a right click on its timeline): `target` is
 /// `part:in` or `part:out`.
 pub const TAKE_EDGE: &str = "subsegment_take_edge";
+/// The camera channel a part is heard on (A1): `target` is `block:part:channel` (zero based).
+pub const PART_CHANNEL: &str = "subsegment_part_channel";
+/// A part's A1 level one dB up or down: `target` is `block:part:1` or `-1`.
+pub const PART_LEVEL: &str = "subsegment_part_level";
+/// A part's A1 off or on: `target` is `block:part`.
+pub const PART_OFF: &str = "subsegment_part_off";
 /// A block of a recorded kind is recorded from the microphone, or its recording stops (target:
 /// its id; without one the chosen block). The catalog names it `record_toggle` (v4).
 pub const RECORD: &str = "record_toggle";
@@ -207,6 +213,9 @@ impl Script {
         }
         let placements = view::subsegment_placements(&shown, &view::block_pieces(&block));
         let names = &self.names;
+        for (part, piece) in shown.parts.iter_mut().zip(view::block_pieces(&block)) {
+            part.channels = self.waves.channels(&piece.clip_id);
+        }
         shown.a1 = self.waves.peaks(shown.total_frames, &placements, &[], |clip| names.get(clip).map(|(_, frames, _)| *frames)).a1;
         shown.trim = self.trim.and_then(|trim| shown.parts.get(trim.index).map(|part| (trim.index, trim.out, if trim.out { part.end.saturating_sub(1) } else { part.start })));
         // The trim zoom of the taken edge: its pictures, fine wave and words come from the
@@ -452,6 +461,19 @@ impl Script {
                 (self.open_subsegment, self.view.subsegment) = (None, None);
                 true
             }
+            // A part's own A1 (user 2026-10-29): written at once, the SubSegment plays it again.
+            PART_CHANNEL | PART_LEVEL | PART_OFF => {
+                let mut parts = target.unwrap_or_default().split(':');
+                let (Some(id), Some(index)) = (parts.next().and_then(|id| id.parse::<i64>().ok()), parts.next().and_then(|index| index.parse::<usize>().ok())) else { return Some(false) };
+                let Some(mut piece) = self.block(Some(id)).map(view::block_pieces).and_then(|pieces| pieces.get(index).cloned()) else { return Some(false) };
+                let value = parts.next().and_then(|value| value.parse::<i64>().ok()).unwrap_or(0);
+                match action_id {
+                    PART_CHANNEL => piece.a1_channel = u16::try_from(value).ok(),
+                    PART_LEVEL => piece.a1_level_db = (i64::from(piece.a1_level_db) + value).clamp(-40, 12) as i8,
+                    _ => piece.a1_off = !piece.a1_off,
+                }
+                self.write(preview, move |target| qnc_script_db::set_piece(target, id, index, piece).map(|_| None))
+            }
             JOIN_GAP | JOIN_CUT => {
                 let mut parts = target.unwrap_or_default().split(':');
                 let (Some(id), Some(index)) = (parts.next().and_then(|id| id.parse::<i64>().ok()), parts.next().and_then(|index| index.parse::<usize>().ok())) else { return Some(false) };
@@ -530,6 +552,9 @@ impl Script {
             length: timecode.map_or_else(|| (to - from).to_string(), |tc| tc.duration_label(to - from)),
             gap_before: 0,
             cut: false,
+            a1_channel: None,
+            a1_level_db: 0,
+            a1_off: false,
         })
     }
 

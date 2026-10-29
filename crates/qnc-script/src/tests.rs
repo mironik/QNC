@@ -69,7 +69,7 @@ fn the_story_has_the_first_and_last_words_of_its_blocks_in_its_length() {
 }
 
 fn part(clip: &str, from: u64, to: u64, gap: u64) -> Piece {
-    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false }
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: String::new(), end_tc: String::new(), length: String::new(), seconds: 1.0, text: String::new(), gap_before: gap, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false }
 }
 
 #[test]

@@ -188,7 +188,16 @@
       "label": "Zatvori SubSegment, vrati source timeline"
     },
     "subsegment_take_edge": {
-      "label": "Uzmi rub dijela SubSegmenta (desni klik na spoj)"
+      "label": "Uzmi rub dijela SubSegmenta (desni klik: najblizi IN ili OUT)"
+    },
+    "subsegment_part_channel": {
+      "label": "Kanal kamere na A1 za dio SubSegmenta"
+    },
+    "subsegment_part_level": {
+      "label": "Razina A1 dijela SubSegmenta (1 dB gore ili dolje)"
+    },
+    "subsegment_part_off": {
+      "label": "A1 dijela SubSegmenta iskljucen ili ukljucen"
     },
     "transcribe_fast": {
       "label": "Transkribiraj brzo (procesor)"

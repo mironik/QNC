@@ -6855,3 +6855,15 @@ ispod A1 sekundu sa svake strane reza na osi SubSegmenta s rijecima. Kotacic nad
 ne radi rez. `qnc-script` (`subsegment_zoom`, `SubsegmentView.zoom`, `trim_stills`; slike prate nacrt), crta ga
 `qnc-subsegment-panel`. Test `the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut`, conformance.
 Uzivo nije provjereno.
+Popravak i dopuna 2026-10-29 (korisnik: "nastavi s kanalom i razinom A1 po dijelu"; "bag: OUT prvog subclipa ne
+dozvoljava editirati; provjeri mogu li se svi IN i OUT editirati kod svih subklipova desnim misem"): (1) desni klik na
+timelineu SubSegmenta uzimao je samo IN dijela iza spoja (crta je bila samo na spojevima), pa OUT dijelova i IN prvog
+dijela misem nisu bili dostupni. Sada je crta na svakom IN-u i OUT-u svakog dijela, a desni klik uzima najblizi rub po
+kliknutoj slici; na spoju bez razmaka slika prije spoja uzima OUT, slika na ili iza spoja IN (`qnc-subsegment-panel`
+`nearest_edge`, test `a_right_click_takes_every_in_and_out_of_every_part`). (2) Svaki dio ima svoj A1: kanal kamere,
+razinu (1 dB, -40..+12) i ukljuceno/iskljuceno, u retku dijela ispod timelinea (broj kanala iz spremljenog vala klipa).
+Bez izbora kanala vrijedi kanal zadrzan za klip na source timelineu. `qnc-script-db` `Piece.a1_channel`, `a1_level_db`,
+`a1_off` (zapis kroz `SetPiece`), `qnc-program-input` `PieceInput.a1`, `qnc-script` (`subsegment_part_channel`,
+`subsegment_part_level`, `subsegment_part_off`; val dijela prati kanal i razinu), katalog akcija bez tipki. Svaka promjena
+se odmah upise i SubSegment ponovno svira. Nije izvedeno: Ctrl+1 i tipke traka (kao kod pokrivalica) za zvuk dijela,
+filmstrip dijelova, povlacenje ruba misem. Testovi, conformance. Uzivo nije provjereno.

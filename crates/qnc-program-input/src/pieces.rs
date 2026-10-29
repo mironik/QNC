@@ -10,6 +10,9 @@ pub struct PieceInput {
     pub to_frame: u64,
     pub gap_before: u64,
     pub crossfade: bool,
+    /// The part's own A1: camera channel (`None`: the one kept for its clip), level in dB and
+    /// off (user 2026-10-29); `None`: the sound kept for its clip.
+    pub a1: Option<(Option<u16>, i8, bool)>,
 }
 
 /// The program of a SubSegment: its parts one after another on V1 and A1 (a pause is black
@@ -48,7 +51,12 @@ pub fn load_pieces(
         if frames <= 0 {
             return Err(qnc_ui_text::text("script.sot_marks").into());
         }
-        let sound = qnc_clip_sound::read(target, &piece.clip_id)?.map(|sound| sound.a1);
+        // The part's own A1 (user 2026-10-29), else the sound kept for its clip.
+        let kept = qnc_clip_sound::read(target, &piece.clip_id)?.map(|sound| (sound.a1.channel, sound.a1.level_db, sound.a1.off));
+        let sound = match piece.a1 {
+            Some((channel, level, off)) => Some((channel.or(kept.map(|kept| kept.0)).unwrap_or(0), level, off)),
+            None => kept,
+        };
         let record_range = ProgramFrameRange::new(start + gap, start + gap + frames).map_err(|error| error.message)?;
         if index > 0 {
             joins.push(qnc_program_playlist::A1Join { end: start, start: start + gap, frames: if piece.crossfade { crossfade } else { 0 } });
@@ -60,9 +68,9 @@ pub fn load_pieces(
             virtual_shot_id: String::new(),
             record_range,
             source_range: FrameRange { source_in, source_out: source_in + frames, timebase: program_timebase },
-            a1_source_channel: sound.map_or(0, |sound| sound.channel),
-            a1_level_db: sound.map_or(0, |sound| sound.level_db),
-            a1_off: sound.is_some_and(|sound| sound.off),
+            a1_source_channel: sound.map_or(0, |sound| sound.0),
+            a1_level_db: sound.map_or(0, |sound| sound.1),
+            a1_off: sound.is_some_and(|sound| sound.2),
             covers: Vec::new(),
             v_lead_frames: 0,
         });

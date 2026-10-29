@@ -7,7 +7,7 @@
 
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
-use qnc_script::{SubsegmentView, JOIN_CUT, JOIN_GAP, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, TAKE_EDGE};
+use qnc_script::{SubsegmentView, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_OFF, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, TAKE_EDGE};
 use qnc_timeline::{
     AudioLane, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
@@ -59,12 +59,14 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
         .zip(&ids)
         .map(|((part, label), id)| TimelineVirtualSpan { id, label, start_frame: part.start, end_frame: part.end, has_base_video: true, selected: false })
         .collect();
+    // A line on every edge (the IN and OUT of every part): a right click near one takes it.
+    let edge_ids: Vec<String> = (0..view.parts.len()).flat_map(|index| [format!("edge-{index}-in"), format!("edge-{index}-out")]).collect();
     let markers: Vec<TimelineMarkerPin<'_>> = view
         .parts
         .iter()
-        .zip(&ids)
-        .skip(1)
-        .map(|(part, id)| TimelineMarkerPin { id, frame: part.start, taken: false, locked: false, part: TimelineMarkerPart::Whole, origin: None, sound_at: None })
+        .flat_map(|part| [part.start, part.end])
+        .zip(&edge_ids)
+        .map(|(frame, id)| TimelineMarkerPin { id, frame, taken: false, locked: false, part: TimelineMarkerPart::Whole, origin: None, sound_at: None })
         .collect();
     // The edge being trimmed, as the trim playhead of a cover's edge.
     let trim_label = qnc_ui_text::text("subsegment.trimming");
@@ -112,7 +114,9 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
     let event = match intent {
         TimelineIntent::CueFrame(frame) => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
         // A right click on a join takes the IN of the part after it, as Ctrl+I.
-        TimelineIntent::TakeMarker { id, .. } => id.strip_prefix("part-").map(|index| ActionEvent::key(TAKE_EDGE).with_target(format!("{index}:in"))),
+        // A right click takes the IN or OUT nearest to where it was (user 2026-10-29: every IN
+        // and OUT of every part); at a join the side clicked on decides.
+        TimelineIntent::TakeMarker { frame, .. } => nearest_edge(view, frame).map(|(index, out)| ActionEvent::key(TAKE_EDGE).with_target(format!("{index}:{}", if out { "out" } else { "in" }))),
         // The wheel moves the playhead, or the taken edge, a frame as the arrows do.
         TimelineIntent::Wheel(wheel) if !wheel.ctrl => Some(ActionEvent::key(if wheel.up == qnc_wheel_jog::source_step_forward("wheel_source_forward").unwrap_or(true) { "step_forward_frame" } else { "step_back_frame" })),
         _ => None,
@@ -122,25 +126,81 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
     // a word is not a cut here (the source timeline is not shown).
     let zoomed = view.zoom.as_deref().and_then(|zoom| qnc_trim_overlay::show(ui.ctx(), zoom)).filter(|event| event.action_id != "transcript_cut_word");
     answer = answer.or(zoomed);
-    // The pause and join before every part after the first.
-    for (index, part) in view.parts.iter().enumerate().skip(1) {
+    // Every part: the pause and join before it (after the first) and its own A1, the camera
+    // channel, level and on/off (user 2026-10-29).
+    for (index, part) in view.parts.iter().enumerate() {
         let target = |step: Option<i64>| match step {
             Some(step) => format!("{}:{index}:{step}", view.block_id),
             None => format!("{}:{index}", view.block_id),
         };
         ui.horizontal(|ui| {
-            ui.label(RichText::new(qnc_ui_text::fill("subsegment.join", &[("n", &index.to_string()), ("frames", &part.gap_before.to_string())])).color(theme.text));
-            if ui.small_button("-").clicked() && part.gap_before > 0 {
-                answer = Some(ActionEvent::key(JOIN_GAP).with_target(target(Some(-1))));
+            ui.label(RichText::new(qnc_ui_text::fill("subsegment.part", &[("n", &(index + 1).to_string()), ("clip", &part.clip_name)])).color(theme.text));
+            if index > 0 {
+                ui.label(RichText::new(qnc_ui_text::fill("subsegment.join", &[("frames", &part.gap_before.to_string())])).color(theme.text));
+                if ui.small_button("-").clicked() && part.gap_before > 0 {
+                    answer = Some(ActionEvent::key(JOIN_GAP).with_target(target(Some(-1))));
+                }
+                if ui.small_button("+").clicked() {
+                    answer = Some(ActionEvent::key(JOIN_GAP).with_target(target(Some(1))));
+                }
+                let kind = qnc_ui_text::text(if part.cut { "subsegment.cut" } else { "subsegment.crossfade" });
+                if ui.small_button(kind).on_hover_text(qnc_ui_text::text("subsegment.join_hint")).clicked() {
+                    answer = Some(ActionEvent::key(JOIN_CUT).with_target(target(None)));
+                }
+                ui.separator();
             }
+            ui.label(RichText::new("A1").color(theme.text)).on_hover_text(qnc_ui_text::text("subsegment.channel_hint"));
+            for channel in 0..part.channels.unwrap_or(2).max(1) {
+                let chosen = part.a1_channel == Some(channel);
+                if ui.selectable_label(chosen, (channel + 1).to_string()).clicked() {
+                    answer = Some(ActionEvent::key(PART_CHANNEL).with_target(target(Some(i64::from(channel)))));
+                }
+            }
+            if ui.small_button("-").clicked() {
+                answer = Some(ActionEvent::key(PART_LEVEL).with_target(target(Some(-1))));
+            }
+            ui.label(RichText::new(format!("{:+} dB", part.a1_level_db)).color(theme.text));
             if ui.small_button("+").clicked() {
-                answer = Some(ActionEvent::key(JOIN_GAP).with_target(target(Some(1))));
+                answer = Some(ActionEvent::key(PART_LEVEL).with_target(target(Some(1))));
             }
-            let kind = qnc_ui_text::text(if part.cut { "subsegment.cut" } else { "subsegment.crossfade" });
-            if ui.small_button(kind).on_hover_text(qnc_ui_text::text("subsegment.join_hint")).clicked() {
-                answer = Some(ActionEvent::key(JOIN_CUT).with_target(target(None)));
+            let off = qnc_ui_text::text(if part.a1_off { "subsegment.a1_off" } else { "subsegment.a1_on" });
+            if ui.small_button(off).clicked() {
+                answer = Some(ActionEvent::key(PART_OFF).with_target(target(None)));
             }
         });
     }
     answer
+}
+
+/// The edge nearest to `frame`: its part and whether it is the OUT. An OUT lies past the part's
+/// last frame, an IN on its first; where an OUT and the next IN meet (a join without a pause),
+/// the frame before the join takes the OUT, the frame on or after it the IN.
+pub fn nearest_edge(view: &SubsegmentView, frame: u64) -> Option<(usize, bool)> {
+    view.parts
+        .iter()
+        .enumerate()
+        .flat_map(|(index, part)| [(index, false, part.start), (index, true, part.end)])
+        .min_by_key(|(_, out, at)| (frame.abs_diff(*at), (*out && frame >= *at) || (!*out && frame < *at)))
+        .map(|(index, out, _)| (index, out))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use qnc_script::SubsegmentPart;
+
+    fn part(start: u64, end: u64) -> SubsegmentPart {
+        SubsegmentPart { start, end, clip_name: String::new(), length: String::new(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false, channels: None }
+    }
+
+    #[test]
+    fn a_right_click_takes_every_in_and_out_of_every_part() {
+        let view = SubsegmentView { parts: vec![part(0, 50), part(50, 90), part(95, 145)], total_frames: 145, ..Default::default() };
+        assert_eq!(nearest_edge(&view, 2), Some((0, false)), "the first part's IN");
+        assert_eq!(nearest_edge(&view, 48), Some((0, true)), "the first part's OUT, before the join");
+        assert_eq!(nearest_edge(&view, 52), Some((1, false)), "the next part's IN, after the join");
+        assert_eq!(nearest_edge(&view, 91), Some((1, true)), "an OUT before a pause");
+        assert_eq!(nearest_edge(&view, 94), Some((2, false)), "an IN after a pause");
+        assert_eq!(nearest_edge(&view, 140), Some((2, true)), "the last part's OUT");
+    }
 }

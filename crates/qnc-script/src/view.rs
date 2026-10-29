@@ -264,6 +264,12 @@ pub struct SubsegmentPart {
     pub length: String,
     pub gap_before: u64,
     pub cut: bool,
+    /// Its own A1: the camera channel (`None`: the one kept for its clip), level in dB, off.
+    pub a1_channel: Option<u16>,
+    pub a1_level_db: i8,
+    pub a1_off: bool,
+    /// How many channels its clip has (from its stored wave), once read.
+    pub channels: Option<u16>,
 }
 
 /// The SubSegment open in place of the source timeline (user 2026-10-29): its parts one after
@@ -299,6 +305,8 @@ pub fn piece_inputs(block: &Block) -> Vec<qnc_source_preview::PieceInput> {
             to_frame: piece.to_frame,
             gap_before: if index == 0 { 0 } else { piece.gap_before },
             crossfade: !piece.cut,
+            // The part's own A1 once any of it is set; else its clip's kept sound.
+            a1: (piece.a1_channel.is_some() || piece.a1_level_db != 0 || piece.a1_off).then_some((piece.a1_channel, piece.a1_level_db, piece.a1_off)),
         })
         .collect()
 }
@@ -313,7 +321,7 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             let gap = if index == 0 { 0 } else { piece.gap_before };
             start += gap;
             let end = start + piece.to_frame.saturating_sub(piece.from_frame);
-            let part = SubsegmentPart { start, end, clip_name: piece.clip_name, length: piece.length, gap_before: gap, cut: piece.cut };
+            let part = SubsegmentPart { start, end, clip_name: piece.clip_name, length: piece.length, gap_before: gap, cut: piece.cut, a1_channel: piece.a1_channel, a1_level_db: piece.a1_level_db, a1_off: piece.a1_off, channels: None };
             start = end;
             part
         })
@@ -329,13 +337,13 @@ pub fn subsegment_placements(view: &SubsegmentView, pieces: &[Piece]) -> Vec<qnc
         .zip(pieces)
         .map(|(part, piece)| qnc_program_waveform::Placement {
             clip_id: piece.clip_id.clone(),
-            channel: 0,
+            channel: piece.a1_channel.unwrap_or(0),
             program_start: part.start,
             program_end: part.end,
             source_in: piece.from_frame,
             source_out: piece.to_frame,
-            level_db: 0,
-            off: false,
+            level_db: piece.a1_level_db,
+            off: piece.a1_off,
         })
         .collect()
 }

@@ -191,7 +191,7 @@ fn a_block_keeps_only_the_fields_of_its_kind_and_a_choice_only_one_of_its_choice
 }
 
 fn piece(clip: &str, from: u64, to: u64, text: &str) -> Piece {
-    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into(), gap_before: 0, cut: false }
+    Piece { clip_id: clip.into(), clip_name: clip.into(), from_frame: from, to_frame: to, start_tc: format!("tc{from}"), end_tc: format!("tc{to}"), length: "1:00".into(), seconds: 1.0, text: text.into(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false }
 }
 
 #[test]

@@ -127,12 +127,21 @@ pub struct Piece {
     /// The part's sound joins the part before with a cut, not the project's crossfade.
     #[serde(default)]
     pub cut: bool,
+    /// The camera channel heard on A1 for this part (zero based; user 2026-10-29: channel and
+    /// level per part); `None`: the channel kept for its clip on the source timeline.
+    #[serde(default)]
+    pub a1_channel: Option<u16>,
+    /// Its A1 level in dB (0 as recorded) and whether its A1 is off.
+    #[serde(default)]
+    pub a1_level_db: i8,
+    #[serde(default)]
+    pub a1_off: bool,
 }
 
 impl Piece {
     /// The block's own range as its first part (a clip block that had one range).
     pub fn of(block: &Block) -> Self {
-        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false }
+        Self { clip_id: block.clip_id.clone(), clip_name: block.clip_name.clone(), from_frame: block.from_frame, to_frame: block.to_frame, start_tc: block.start_tc.clone(), end_tc: block.end_tc.clone(), length: block.length.clone(), seconds: block.seconds, text: block.text.clone(), gap_before: 0, cut: false, a1_channel: None, a1_level_db: 0, a1_off: false }
     }
 }
 
