@@ -34,6 +34,12 @@ pub struct VirtualShortCard {
     pub b_roll: bool,
 }
 
+/// The chosen SubClip (not a B-roll shot) as `(shot, clip, (in, out))`, for its fine tuning.
+pub fn chosen<'a>(cards: &'a [VirtualShortCard], shot_id: Option<&str>) -> Option<(&'a str, &'a str, (u64, u64))> {
+    let card = cards.iter().find(|card| Some(card.shot_id.as_str()) == shot_id && !card.b_roll)?;
+    Some((card.shot_id.as_str(), card.clip_id.as_str(), (card.in_frame, card.out_frame)))
+}
+
 /// The short's card in the media pool (piece `qnc-media-card`).
 impl qnc_clip_row::PoolItem for VirtualShortCard {
     fn card_id(&self) -> &str { &self.shot_id }

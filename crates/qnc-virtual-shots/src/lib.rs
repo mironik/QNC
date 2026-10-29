@@ -82,6 +82,13 @@ pub enum Operation {
     ForgetUnconfirmedCoverShots {
         older_than_seconds: u64,
     },
+    /// A SubClip fine tuned (user 2026-10-29: its new IN/OUT were not kept and it opened on
+    /// the old cut again): its IN/OUT within its clip; its stills are made again.
+    TrimShort {
+        shot_id: String,
+        in_frame: u64,
+        out_frame: u64,
+    },
     ListShorts,
     /// The B-roll virtual shots (covers), oldest first.
     ListBroll,
@@ -248,6 +255,14 @@ pub fn save_short_now(
         out_frame,
     })? {
         Data::SavedShort(shot) => Ok(shot),
+        _ => Err(wrong()),
+    }
+}
+
+/// New IN/OUT of a SubClip (fine tuned on the source timeline), written and waited for.
+pub fn trim_short_now(target: &ProjectDbTarget, shot_id: &str, in_frame: u64, out_frame: u64) -> Result<()> {
+    match VirtualShotsWriter::start(target.clone())?.call(&Operation::TrimShort { shot_id: shot_id.into(), in_frame, out_frame })? {
+        Data::Changed => Ok(()),
         _ => Err(wrong()),
     }
 }

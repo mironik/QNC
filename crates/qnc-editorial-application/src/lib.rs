@@ -193,7 +193,7 @@ impl EditorialApplication {
         }
         if self.short_stills.take_published() { self.reload_shorts() } // a poster was written
         changed |= self.pool_shots.take().map(|rows| self.apply_shorts(rows)).is_some();
-        changed |= self.short_save.poll().map(|saved| self.short_saved(saved)).is_some();
+        changed |= self.short_save.follow(qnc_virtual_short_cards::chosen(&self.view.shorts, self.view.chosen_shot_id.as_deref()),self.view.preview.clip_id.as_deref(), self.view.preview.timeline.visible_source_marks(), self.view.preview.timeline.taken_source_mark().is_some(), self.content_target.as_ref().map(|targets| &targets.1)).map(|saved| self.short_saved(saved)).is_some();
         self.sync_preview_view();
         changed
     }
@@ -253,7 +253,7 @@ impl EditorialApplication {
 
     fn poll_catalog(&mut self) -> bool {
         let Some(receiver) = self.load_result.as_ref() else {
-            return false;
+            if self.active_project_reader.as_ref().is_some_and(|reader| reader.catalog_changed(self.shown_project.clone().zip(self.shown_signature.clone()).map(|(project_id, catalog_signature)| ShownProject { project_id, catalog_signature }).as_ref())) { self.load_catalog() } return false; // a clip imported meanwhile (user 2026-10-29)
         };
         let result = match receiver.try_recv() {
             Ok(result) => result,

@@ -6897,3 +6897,16 @@ redak poola ostao neuvezen i `qnc-short-save` je odbijao SubClip. Sada `qnc-shor
 klip uvezen provjerava baza u istoj transakciji kao upis (`qnc-virtual-shots`, vec postojeca provjera). Test
 `nothing_is_written_without_a_clip_marks_and_a_database`. Nije izvedeno: oznaka stanja klipa u poolu AI Media Assista
 ostaje stara dok se povrsina ponovno ne aktivira.
+Dopuna i popravak 2026-10-29 (korisnik: "da, dodaj povremenu provjeru kataloga"; "kreirani subklip se ne dozvoljava u
+zumu fino podesiti, stalno se vraca na originalni rez"): (1) Otvorena Story/MA forma svake 2 s usporeduje lagani potpis
+kataloga s bazom u pozadinskoj niti (`qnc-active-project-read` `catalog_changed`, `CATALOG_CHECK`; samo signature, bez
+kartice, slika i medija, §5) i katalog cita ponovno samo kad se razlikuje. (2) Log: IN otvorenog SubClipa uzet (Ctrl+I) i
+pomaknut 1909 -> 1915 pa pusten Enterom, ali nijedna operacija nije postojala za izmjenu SubClipa, pa se ponovnim otvaranjem
+vracao na 1909. Sada kad se uzeti IN ili OUT otvorenog SubClipa pusti (Enter, klik), rez razlicit od spremljenog zapisuje se
+kao njegov novi IN/OUT (`qnc-short-save` `follow`, zapis u log `short-save fine tuning`), a slike IN/OUT se rade ponovno;
+nove oznake postavljene s I i O bez uzimanja i dalje su novi SubClip (Add SubClip). `qnc-virtual-shots` operacija
+`TrimShort` (`trim_short_now`: samo klasa `short`, OUT iza IN-a, unutar klipa, uvezen klip, slike `pending`), test
+`a_fine_tuned_short_keeps_its_new_cut_and_its_stills_are_made_again`; `qnc-virtual-short-cards` `chosen`. C10 Story
+aplikacija 504 (isto). Debug cache obrisan (`cargo clean --profile dev`, 29,2 GiB; disk je imao 0 B slobodno). Testovi,
+conformance, release build. Uzivo nije provjereno. Nije izvedeno: povlacenje oznake SubClipa misem bez uzimanja ne
+mijenja SubClip.

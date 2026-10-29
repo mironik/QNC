@@ -64,6 +64,7 @@ impl Store {
             Operation::ForgetUnconfirmedCoverShots { older_than_seconds } => {
                 self.forget_unconfirmed_cover_shots(*older_than_seconds)
             }
+            Operation::TrimShort { shot_id, in_frame, out_frame } => self.trim_short(shot_id, *in_frame, *out_frame),
             Operation::ListShorts => self.list_shorts(),
             Operation::ListBroll => self.list_b_roll(),
             Operation::MarkShortStills {
@@ -257,6 +258,34 @@ impl Store {
             Ok(Data::Changed)
         }
     }
+    /// New IN/OUT of a SubClip (class `short`): OUT after IN, both within its clip as the
+    /// catalog has it; its stills are pending again (they showed the old cut).
+    fn trim_short(&mut self, shot_id: &str, in_frame: u64, out_frame: u64) -> Result<Data> {
+        if out_frame <= in_frame {
+            return Err(qnc_ui_text::text("story.out_after_in").into());
+        }
+        let clip_id: Option<String> = self
+            .conn
+            .query_row("SELECT clip_id FROM virtual_shots WHERE shot_id = ?1 AND class = 'short'", [shot_id], |row| row.get(0))
+            .optional()
+            .map_err(err)?;
+        let clip_id = clip_id.ok_or_else(|| qnc_ui_text::text("story.msg.subclip_not_found").to_string())?;
+        require_imported_clip(&self.conn, &clip_id)?;
+        if let Some((frames, _)) = qnc_content_read::clip_timing_on(&self.conn, &clip_id)? {
+            if frames > 0 && out_frame > frames {
+                return Err(qnc_ui_text::text("story.out_after_in").into());
+            }
+        }
+        self.conn
+            .execute(
+                "UPDATE virtual_shots SET in_frame = ?2, out_frame = ?3, still_status = 'pending', still_error = NULL
+                 WHERE shot_id = ?1 AND class = 'short'",
+                params![shot_id, in_frame as i64, out_frame as i64],
+            )
+            .map_err(err)?;
+        Ok(Data::Changed)
+    }
+
     fn confirm_cover_shot(&mut self, shot_id: &str) -> Result<Data> {
         self.conn
             .execute("UPDATE virtual_shots SET cover_pending = 0 WHERE shot_id = ?1 AND class = 'b_roll'", [shot_id])

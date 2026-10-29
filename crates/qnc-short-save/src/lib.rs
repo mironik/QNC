@@ -23,11 +23,53 @@ pub struct Saved {
 #[derive(Default)]
 pub struct ShortSave {
     pending: Option<Receiver<Result<Saved, String>>>,
+    /// The SubClip whose IN or OUT was taken on the source timeline: `(shot, clip)`.
+    fine_tuning: Option<(String, String)>,
+    /// The cut last written for a SubClip (its row is read again after the write).
+    written: Option<(String, (u64, u64))>,
 }
+
+/// A SubClip open on the source timeline: its id, clip and saved IN/OUT.
+pub type OpenShort<'a> = (&'a str, &'a str, (u64, u64));
 
 impl ShortSave {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Fine tuning of an open SubClip (user 2026-10-29: it went back to its old cut): while
+    /// its IN or OUT is taken on the source timeline of its clip the tuning runs; once the
+    /// mark is let go (Enter, a click) a cut other than the saved one is written as its new
+    /// IN/OUT, and the outcome is given like a save's (this is `poll` too). New marks set
+    /// with I and O without taking one stay a new SubClip (Add SubClip).
+    pub fn follow(&mut self, open: Option<OpenShort<'_>>, shown_clip: Option<&str>, marks: Option<(u64, u64)>, taken: bool, target: Option<&ProjectDbTarget>) -> Option<Result<Saved, String>> {
+        self.tune(open, shown_clip, marks, taken, target);
+        self.poll()
+    }
+
+    fn tune(&mut self, open: Option<OpenShort<'_>>, shown_clip: Option<&str>, marks: Option<(u64, u64)>, taken: bool, target: Option<&ProjectDbTarget>) {
+        let open = open.filter(|(_, clip, _)| Some(*clip) == shown_clip);
+        if taken {
+            self.fine_tuning = open.map(|(shot, clip, _)| (shot.to_string(), clip.to_string())).or(self.fine_tuning.take());
+            return;
+        }
+        let Some((shot, _)) = self.fine_tuning.take() else { return };
+        let (Some((open_shot, clip_id, saved)), Some(cut), Some(target)) = (open, marks, target) else { return };
+        let already = self.written.as_ref().is_some_and(|(id, written)| *id == shot && *written == cut);
+        if open_shot != shot || cut == saved || already || self.pending.is_some() {
+            return;
+        }
+        log(&format!("short-save fine tuning {shot} {saved:?} -> {cut:?}"));
+        self.written = Some((shot.clone(), cut));
+        let (target, clip_id) = (target.clone(), clip_id.to_string());
+        let (sender, receiver) = mpsc::channel();
+        let started = std::thread::Builder::new().name("qnc-short-trim".into()).spawn(move || {
+            let trimmed = qnc_virtual_shots::trim_short_now(&target, &shot, cut.0, cut.1).map(|_| Saved { shot_id: shot, clip_id, marks: cut });
+            let _ = sender.send(trimmed);
+        });
+        if started.is_ok() {
+            self.pending = Some(receiver);
+        }
     }
 
     /// Checks what is asked and starts the write: the chosen clip of `clips`, the marks the

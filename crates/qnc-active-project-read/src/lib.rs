@@ -68,7 +68,20 @@ impl From<ReadError> for ActiveProjectError {
 #[derive(Clone)]
 pub struct ActiveProjectReader {
     settings: SettingsReader,
+    /// The background compare of the shown catalog with the database (`catalog_changed`).
+    watch: std::sync::Arc<std::sync::Mutex<CatalogWatch>>,
 }
+
+#[derive(Default)]
+struct CatalogWatch {
+    started: Option<std::time::Instant>,
+    running: bool,
+    changed: bool,
+}
+
+/// How often an open form compares its catalog with the database (user 2026-10-29: a clip
+/// imported after the pool was read stayed shown as not imported).
+pub const CATALOG_CHECK: std::time::Duration = std::time::Duration::from_secs(2);
 
 impl std::fmt::Debug for ActiveProjectReader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -79,13 +92,37 @@ impl std::fmt::Debug for ActiveProjectReader {
 
 impl ActiveProjectReader {
     pub fn from_root(root: &Path) -> Result<Self, ActiveProjectError> {
-        Ok(Self {
-            settings: SettingsReader::from_root(root)?,
-        })
+        Ok(Self::from_settings_reader(SettingsReader::from_root(root)?))
     }
 
     pub fn from_settings_reader(settings: SettingsReader) -> Self {
-        Self { settings }
+        Self { settings, watch: Default::default() }
+    }
+
+    /// Whether the catalog shown as `shown` differs from the database: once every
+    /// `CATALOG_CHECK` the light signature is compared on a thread of its own (never the
+    /// clips, cards or media; §5), and a difference is answered once, on a later call. The
+    /// form then reads the catalog again; nothing here is kept as truth.
+    pub fn catalog_changed(&self, shown: Option<&ShownProject>) -> bool {
+        let Ok(mut watch) = self.watch.lock() else { return false };
+        if std::mem::take(&mut watch.changed) {
+            return true;
+        }
+        let now = std::time::Instant::now();
+        if watch.running || watch.started.is_some_and(|at| now.duration_since(at) < CATALOG_CHECK) {
+            return false;
+        }
+        let Some(shown) = shown.cloned() else { return false };
+        (watch.started, watch.running) = (Some(now), true);
+        let (reader, state) = (self.clone(), self.watch.clone());
+        let spawned = std::thread::Builder::new().name("qnc-catalog-watch".into()).spawn(move || {
+            let changed = !matches!(reader.compare(Some(&shown)), Ok(ActiveProjectChange::Same(..)) | Err(_));
+            if let Ok(mut watch) = state.lock() {
+                (watch.running, watch.changed) = (false, changed);
+            }
+        });
+        watch.running = spawned.is_ok();
+        false
     }
 
     /// Reads the active project from the DB now. No result from a previous call

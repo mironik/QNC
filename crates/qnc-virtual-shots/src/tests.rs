@@ -70,6 +70,18 @@ fn only_an_imported_clip_and_a_real_range_make_a_short() {
 }
 
 #[test]
+fn a_fine_tuned_short_keeps_its_new_cut_and_its_stills_are_made_again() {
+    let (_dir, target) = project();
+    let shot = save(&target, "clip-a", (10, 40)).unwrap();
+    publish_stills_now(&target, &shot.shot_id, Ok(("qnc://local/artifact/in.jpg".into(), "qnc://local/artifact/out.jpg".into()))).unwrap();
+    trim_short_now(&target, &shot.shot_id, 16, 38).unwrap();
+    let shorts = list_shorts(&target).unwrap();
+    assert_eq!((shorts[0].in_frame, shorts[0].out_frame, shorts[0].still_status.as_str()), (16, 38, "pending"));
+    assert!(trim_short_now(&target, &shot.shot_id, 20, 20).is_err(), "OUT after IN");
+    assert!(trim_short_now(&target, "clip-a_shot_009", 1, 2).is_err(), "no such SubClip");
+}
+
+#[test]
 fn stills_of_a_short_are_published_ready_or_failed() {
     let (_dir, target) = project();
     let shot = save(&target, "clip-a", (10, 40)).unwrap();
