@@ -7,7 +7,7 @@
 
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
-use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_OFF, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, TAKE_EDGE};
+use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, TAKE_EDGE};
 use qnc_timeline::{
     AudioLane, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelinePicture, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
@@ -165,6 +165,18 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
             let taken = view.sound == Some(index);
             let name = RichText::new(qnc_ui_text::fill("subsegment.part", &[("n", &(index + 1).to_string()), ("clip", &part.clip_name)]));
             ui.label(if taken { name.color(theme.lane_taken).strong() } else { name.color(theme.text) });
+            // Its place among the parts and its leaving (user 2026-10-29).
+            let last = index + 1 == view.parts.len();
+            if ui.add_enabled(index > 0, egui::Button::new(qnc_ui_text::text("subsegment.move_earlier")).small()).on_hover_text(qnc_ui_text::text("subsegment.move_hint")).clicked() {
+                answer = Some(ActionEvent::key(PART_MOVE).with_target(target(Some(-1))));
+            }
+            if ui.add_enabled(!last, egui::Button::new(qnc_ui_text::text("subsegment.move_later")).small()).on_hover_text(qnc_ui_text::text("subsegment.move_hint")).clicked() {
+                answer = Some(ActionEvent::key(PART_MOVE).with_target(target(Some(1))));
+            }
+            if ui.add_enabled(view.parts.len() > 1, egui::Button::new(qnc_ui_text::text("subsegment.remove")).small()).on_hover_text(qnc_ui_text::text("subsegment.remove_hint")).clicked() {
+                answer = Some(ActionEvent::key(PART_REMOVE).with_target(target(None)));
+            }
+            ui.separator();
             if index > 0 {
                 ui.label(RichText::new(qnc_ui_text::fill("subsegment.join", &[("frames", &part.gap_before.to_string())])).color(theme.text));
                 if ui.small_button("-").clicked() && part.gap_before > 0 {

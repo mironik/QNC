@@ -81,6 +81,10 @@ pub const PART_CHANNEL: &str = "subsegment_part_channel";
 pub const PART_LEVEL: &str = "subsegment_part_level";
 /// A part's A1 off or on: `target` is `block:part`.
 pub const PART_OFF: &str = "subsegment_part_off";
+/// A part changes places with the part before (`block:part:-1`) or after (`block:part:1`) it.
+pub const PART_MOVE: &str = "subsegment_part_move";
+/// A part leaves its SubSegment: `target` is `block:part`.
+pub const PART_REMOVE: &str = "subsegment_part_remove";
 /// A block of a recorded kind is recorded from the microphone, or its recording stops (target:
 /// its id; without one the chosen block). The catalog names it `record_toggle` (v4).
 pub const RECORD: &str = "record_toggle";
@@ -583,6 +587,18 @@ impl Script {
                     _ => piece.a1_off = !piece.a1_off,
                 }
                 self.write(preview, move |target| qnc_script_db::set_piece(target, id, index, piece).map(|_| None))
+            }
+            // A part's place and its leaving (user 2026-10-29): written at once, the SubSegment
+            // plays it again; a taken edge or sound is let go (its part may have moved).
+            PART_MOVE | PART_REMOVE => {
+                let mut parts = target.unwrap_or_default().split(':');
+                let (Some(id), Some(index)) = (parts.next().and_then(|id| id.parse::<i64>().ok()), parts.next().and_then(|index| index.parse::<usize>().ok())) else { return Some(false) };
+                (self.trim, self.sound) = (None, None);
+                if action_id == PART_REMOVE {
+                    return Some(self.write(preview, move |target| qnc_script_db::remove_piece(target, id, index).map(|_| None)));
+                }
+                let earlier = parts.next().and_then(|step| step.parse::<i64>().ok()).unwrap_or(0) < 0;
+                self.write(preview, move |target| qnc_script_db::move_piece(target, id, index, earlier).map(|_| None))
             }
             JOIN_GAP | JOIN_CUT => {
                 let mut parts = target.unwrap_or_default().split(':');

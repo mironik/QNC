@@ -53,6 +53,8 @@ impl Store {
             Operation::AddPiece { id, piece } => self.add_piece(*id, piece),
             Operation::SetJoin { id, index, gap_before, cut } => self.set_join(*id, *index, *gap_before, *cut),
             Operation::SetPiece { id, index, piece } => self.set_piece(*id, *index, piece),
+            Operation::MovePiece { id, index, earlier } => self.move_piece(*id, *index, *earlier),
+            Operation::RemovePiece { id, index } => self.remove_piece(*id, *index),
         }
     }
 
@@ -294,6 +296,39 @@ impl Store {
             return Err(qnc_ui_text::fill("db.script_clip_range", &[("kind", &block.kind)]));
         }
         *stored = Piece { gap_before: stored.gap_before, cut: stored.cut, ..piece.clone() };
+        self.store_pieces(id, block)
+    }
+
+    /// Part `index` changes places with its neighbour (user 2026-10-29); the pause and join
+    /// before each place stay with the place, the first place has none.
+    fn move_piece(&mut self, id: i64, index: usize, earlier: bool) -> Result<Data> {
+        let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
+        let other = if earlier { index.checked_sub(1) } else { index.checked_add(1) };
+        let Some(other) = other.filter(|other| index < block.pieces.len() && *other < block.pieces.len()) else {
+            return Err(qnc_ui_text::text("db.script_no_join").into());
+        };
+        let joins: Vec<(u64, bool)> = block.pieces.iter().map(|piece| (piece.gap_before, piece.cut)).collect();
+        block.pieces.swap(index, other);
+        for (piece, (gap, cut)) in block.pieces.iter_mut().zip(joins) {
+            (piece.gap_before, piece.cut) = (gap, cut);
+        }
+        self.store_pieces(id, block)
+    }
+
+    /// Part `index` leaves its block (user 2026-10-29); the part that becomes first has no
+    /// pause or join before it. A block's last part does not leave: the block is removed.
+    fn remove_piece(&mut self, id: i64, index: usize) -> Result<Data> {
+        let mut block = self.read()?.into_iter().find(|block| block.id == id).ok_or_else(|| qnc_ui_text::text("db.script_no_block").to_string())?;
+        if index >= block.pieces.len() {
+            return Err(qnc_ui_text::text("db.script_no_join").into());
+        }
+        if block.pieces.len() < 2 {
+            return Err(qnc_ui_text::text("db.script_last_piece").into());
+        }
+        block.pieces.remove(index);
+        if let Some(first) = block.pieces.first_mut() {
+            (first.gap_before, first.cut) = (0, false);
+        }
         self.store_pieces(id, block)
     }
 

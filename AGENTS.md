@@ -6941,3 +6941,11 @@ svakoj formi; razine iz previewa (`SourceTimelineView.levels`), stanje NORM-a da
 (`offer_normalize`, `qnc-panel-focus`), Ingest nema pricu pa je NORM ondje ugasen. Traka panela Segmenti vise nema metar
 ni NORM (srednja dugmad i dalje skrivena); `levels` uklonjen iz `qnc-segment-panel`, `qnc-right-panel` i Story ploce.
 Testovi, conformance, release build.
+Dopuna 2026-10-29 (korisnik: "nastavi s premjestanjem i brisanjem dijela SubSegmenta"): svaki redak dijela ispod
+SubSegment timelinea ima `<` i `>` (dio mijenja mjesto s prethodnim ili sljedecim) i Delete (dio izlazi iz SubSegmenta,
+klip ostaje u projektu). Pauze i spojevi (rez/crossfade) ostaju na svojim mjestima izmedu dijelova; dio koji postane prvi
+nema pauzu ni spoj. Zadnji dio bloka se ne brise sam (poruka `db.script_last_piece`: ukloni se cijeli blok).
+`qnc-script-db` operacije `MovePiece`, `RemovePiece` (`move_piece`, `remove_piece`, test
+`a_part_moves_past_its_neighbour_and_leaves_the_joins_stay_in_their_places`), `qnc-script` radnje `subsegment_part_move`,
+`subsegment_part_remove` (upis odmah, SubSegment svira ponovno, uzeti rub ili zvuk dijela se pusta), katalog akcija bez
+tipki, `qnc-subsegment-panel`, rjecnik. Testovi, conformance, release build. Uzivo nije provjereno.

@@ -175,6 +175,11 @@ pub enum Operation {
     SetJoin { id: i64, index: usize, gap_before: u64, cut: bool },
     /// Part `index` with a new range (its pause and join stay).
     SetPiece { id: i64, index: usize, piece: Piece },
+    /// Part `index` changes places with the part before it (`earlier`) or after it; the pauses
+    /// and joins stay where they are between the parts.
+    MovePiece { id: i64, index: usize, earlier: bool },
+    /// Part `index` leaves its block (the last part stays: the block is removed as a whole).
+    RemovePiece { id: i64, index: usize },
 }
 
 impl Operation {
@@ -305,6 +310,16 @@ fn write(target: &ProjectDbTarget, operation: Operation) -> Result<Data> {
 
 #[cfg(test)]
 mod tests;
+
+/// Part `index` of block `id` changes places with the part before it (`earlier`) or after it.
+pub fn move_piece(target: &ProjectDbTarget, id: i64, index: usize, earlier: bool) -> Result<()> {
+    write(target, Operation::MovePiece { id, index, earlier }).map(drop)
+}
+
+/// Part `index` of block `id` leaves it.
+pub fn remove_piece(target: &ProjectDbTarget, id: i64, index: usize) -> Result<()> {
+    write(target, Operation::RemovePiece { id, index }).map(drop)
+}
 
 /// Part `index` of block `id` with a new range (an edge trimmed on the SubSegment timeline).
 pub fn set_piece(target: &ProjectDbTarget, id: i64, index: usize, piece: Piece) -> Result<()> {

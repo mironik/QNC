@@ -228,6 +228,31 @@ a drugi dio", "the words stay");
 }
 
 #[test]
+fn a_part_moves_past_its_neighbour_and_leaves_the_joins_stay_in_their_places() {
+    let (_dir, target) = written();
+    let id = add(&target, None, sot("2002")).unwrap();
+    add_piece(&target, id, piece("2002", 500, 550, "drugi")).unwrap();
+    add_piece(&target, id, piece("2679", 10, 60, "treci")).unwrap();
+    set_join(&target, id, 1, 8, true).unwrap();
+    set_join(&target, id, 2, 3, false).unwrap();
+    move_piece(&target, id, 2, true).unwrap();
+    let block = read(&target).unwrap().remove(0);
+    let parts: Vec<_> = block.pieces.iter().map(|p| (p.from_frame, p.gap_before, p.cut)).collect();
+    assert_eq!(parts, [(100, 0, false), (10, 8, true), (500, 3, false)], "the pauses stay with their places");
+    assert_eq!(block.text, "rekao je\ntreci\ndrugi");
+    move_piece(&target, id, 0, false).unwrap();
+    assert_eq!(read(&target).unwrap()[0].pieces[0].from_frame, 10, "the first part is another");
+    assert!(move_piece(&target, id, 0, true).is_err(), "nothing before the first part");
+    assert!(move_piece(&target, id, 2, false).is_err(), "nothing after the last part");
+    remove_piece(&target, id, 0).unwrap();
+    let block = read(&target).unwrap().remove(0);
+    assert_eq!((block.pieces.len(), block.pieces[0].gap_before, block.pieces[0].cut, block.from_frame), (2, 0, false, 100), "the new first part has no join");
+    remove_piece(&target, id, 1).unwrap();
+    assert!(remove_piece(&target, id, 0).is_err(), "the last part stays: the block is removed instead");
+    assert!(remove_piece(&target, id, 5).is_err());
+}
+
+#[test]
 fn a_trimmed_part_keeps_its_clip_pause_and_join() {
     let (_dir, target) = written();
     let id = add(&target, None, sot("2002")).unwrap();
