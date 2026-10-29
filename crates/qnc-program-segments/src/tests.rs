@@ -908,6 +908,20 @@ fn the_j_and_the_l_of_a_cut_move_apart_and_are_written_together() {
     assert!(draft.contains(&("c0".to_string(), (0, 4))) && draft.contains(&("c1".to_string(), (3, 0))), "{draft:?}");
 }
 
+/// Log 2026-10-29: the A1/A2 buttons of the trim zoom name the taken cut and take its sound on a
+/// Wrap row too (the trim zoom is open there); a keyboard Ctrl+2 there still moves it whole.
+#[test]
+fn the_lane_buttons_of_the_trim_zoom_take_the_sound_of_the_taken_cut() {
+    let mut segments = component();
+    segments.stored_covers = vec![cover("c0", "S|m1", (0, 15)), cover("c1", "m1|m2", (15, 33))];
+    segments.refresh_view(String::new());
+    segments.apply(SegmentCommand::TakeMarker("m1".into()));
+    assert!(segments.take_cut_part(None, false, 1));
+    assert!(!segments.cut_sound_taken(), "a key on a Wrap row: the marker moves whole");
+    assert!(segments.apply(SegmentCommand::CutPart { marker_id: "m1".into(), picture: false, lane: 1 }));
+    assert!(segments.cut_sound_taken(), "the A2 button of the trim zoom takes its sound");
+}
+
 /// User 2026-10-29: every cut is a marker, the join of two clips too (the OUT of the clip
 /// before and the IN of the clip after). With it taken in the zoom Ctrl+1 takes its A1 sound:
 /// the J of the clip after and the L of the clip before move as on A2 and are drafted to their

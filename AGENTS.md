@@ -7011,3 +7011,9 @@ reza crtaju se i hvataju i na A1. Panel Segmenti predaje i reze dvaju klipova (`
 `qnc-program-playlist` (21), `qnc-program-segments` (62, novi `the_a1_sound_of_a_cut_between_two_clips_has_a_j_and_an_l`),
 conformance, release build. Uzivo nije provjereno. Nije izvedeno: J/L reza koji pada na granicu Wrap redova crta se samo na
 retku na kojem je strana (drugi redak ne pokazuje stranu iza granice).
+Popravak 2026-10-29 (korisnik: "pogledaj log, ne rade ti gumbi A1 ni A2"): log: klik na A1/A2 u zoom prozoru reza stizao je
+do price (`CutPart` s uzetim markerom), ali ga je odbijalo pravilo od 22. 10. (ton ili slika reza samo u uvecanom slotu),
+jer se zoom prozor reza vidi i dok je marker uzet na Wrap retku. Sada gumb zoom prozora koji imenuje vec uzeti rez uzima
+njegov ton i izvan uvecanog slota (`qnc-program-segments` `take_cut_part`, `from_trim_zoom`); tipke Ctrl+1/Ctrl+2 na Wrap
+retku i dalje pomicu cijeli marker. Klik na A1 uz M marker usred segmenta i dalje kaze da tamo A1 nema rez (dva klipa se ne
+spajaju). Test `the_lane_buttons_of_the_trim_zoom_take_the_sound_of_the_taken_cut`, conformance, release build.

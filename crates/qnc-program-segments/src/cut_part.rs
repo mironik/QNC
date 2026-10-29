@@ -59,7 +59,10 @@ impl ProgramSegments {
     /// (`marker_id`) that takes that cut first. False when no cut is taken.
     pub fn take_cut_part(&mut self, marker_id: Option<String>, picture: bool, lane: u8) -> bool {
         // Only in the enlarged slot (user 2026-10-22): on a Wrap row the cut moves whole.
-        if self.zoom_slot.is_none() && (marker_id.is_some() || self.marker_edit.is_some()) {
+        // The A1/A2 buttons of the trim zoom (log 2026-10-29: refused on a Wrap row) name the cut
+        // already taken: that zoom is open, so its part is taken there too.
+        let from_trim_zoom = marker_id.is_some() && marker_id.as_deref() == self.marker_edit.as_ref().map(|(id, _)| id.as_str());
+        if self.zoom_slot.is_none() && !from_trim_zoom && (marker_id.is_some() || self.marker_edit.is_some()) {
             self.refresh_view(qnc_ui_text::text("story.msg.cut_part_zoom_only").into());
             return true;
         }
