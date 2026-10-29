@@ -6867,3 +6867,15 @@ Bez izbora kanala vrijedi kanal zadrzan za klip na source timelineu. `qnc-script
 `subsegment_part_level`, `subsegment_part_off`; val dijela prati kanal i razinu), katalog akcija bez tipki. Svaka promjena
 se odmah upise i SubSegment ponovno svira. Nije izvedeno: Ctrl+1 i tipke traka (kao kod pokrivalica) za zvuk dijela,
 filmstrip dijelova, povlacenje ruba misem. Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-29 (korisnik: "nastavi s tipkama za zvuk dijela kao kod pokrivalica"; "u zoom dvije slike lijevo i desno
+od crvenog playheada koje predstavljaju OUT prethodnog klipa i IN narednog; klik na slicicu mijenja objekt edita, lijevo
+OUT, desno IN narednog klipa"): (1) A1 dijela tipkama kao traka pokrivalice (isto preslikavanje `qnc_timeline::LaneKey`):
+Ctrl+1 uzima A1 dijela pod playheadom (naziv dijela u retku oznacen kao uzeta traka), gore/dolje kanal kamere, lijevo
+iskljuci, desno ukljuci, Ctrl+strelice i Ctrl+kotacic razina za 1 dB, svaki korak odmah svira nacrt, Enter zapisuje
+(`SetPiece`), Esc odustaje; uzimanje ruba (Ctrl+I/O, desni klik) pusta uzeti zvuk i obrnuto. `qnc-script` (`sound_key`,
+`PartSound`, `SubsegmentView.sound`), `qnc-subsegment-panel`. (2) Zoom reza SubSegmenta: lijevo uvijek zadnja slika
+prethodnog dijela (i iza razmaka), desno prva slika sljedeceg; klik na lijevu sliku uzima OUT prethodnog dijela, na
+desnu IN sljedeceg (`subsegment_take_edge`); pomaknuti rub koji se napusti zapisuje se prije, a isti dio zadrzava svoj
+nacrt. `qnc-program-view` `EditStill.click` (radnja kataloga i cilj; `None` drugdje, zoom pokrivalica isti), crta i
+klika `qnc-trim-overlay`. Test zooma prosiren (klikovi, OUT prethodnog dijela iza razmaka, prvi IN i zadnji OUT bez
+klika), conformance, `cargo check --workspace`. Uzivo nije provjereno.

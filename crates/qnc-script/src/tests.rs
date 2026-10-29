@@ -85,11 +85,19 @@ fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
     let sound = zoom.zoom_sound.unwrap();
     assert_eq!((sound.from, sound.to, sound.cut), (0, 100, 50));
     assert_eq!(sound.lanes[0].len(), 3, "every part within a second of the cut is heard on A1");
-    // The IN of the third part follows a pause: before it is what lies before its own IN.
+    // A click on the left picture takes the OUT of the part before, on the right one this IN.
+    let clicks: Vec<_> = zoom.source_edit_stills.iter().map(|s| s.click.as_ref().map(|(_, target)| target.as_str())).collect();
+    assert_eq!(clicks, vec![Some("0:out"), Some("1:in")]);
+    // The IN of the third part follows a pause: on the left is still the OUT of the part before.
     let zoom = subsegment_zoom(&shown, &pieces, (2, false), 50, |_| Some(1000)).unwrap();
-    assert_eq!(zoom.source_edit_stills[0].picture.as_ref().map(|p| p.source_frame), Some(9));
+    assert_eq!(zoom.source_edit_stills[0].picture.as_ref().map(|p| (p.clip_id.as_str(), p.source_frame)), Some(("a", 339)));
     // The OUT of the first part: its last picture, marked, then the next part's first.
     let zoom = subsegment_zoom(&shown, &pieces, (0, true), 50, |_| Some(1000)).unwrap();
     let pictures: Vec<_> = zoom.source_edit_stills.iter().map(|s| (s.picture.as_ref().map(|p| p.source_frame), s.cut)).collect();
     assert_eq!(pictures, vec![(Some(149), true), (Some(300), false)]);
+    // The first part's IN has no OUT before it; the last part's OUT no IN after it.
+    let first = subsegment_zoom(&shown, &pieces, (0, false), 50, |_| Some(1000)).unwrap();
+    assert!(first.source_edit_stills[0].click.is_none());
+    let last = subsegment_zoom(&shown, &pieces, (2, true), 50, |_| Some(1000)).unwrap();
+    assert!(last.source_edit_stills[1].click.is_none());
 }

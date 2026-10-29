@@ -41,6 +41,10 @@ pub struct EditStill {
     pub clip_frames: Option<u64>,
     /// The draft asked a picture past the end of its clip (it is shown at the last one).
     pub past_end: bool,
+    /// What a click on the picture does (user 2026-10-29: in a SubSegment's zoom the left
+    /// picture takes the OUT before the cut, the right one the IN after it): a catalog action
+    /// and its target; `None`: nothing.
+    pub click: Option<(String, String)>,
 }
 
 /// Which end of its clip a picture reached.
@@ -143,7 +147,7 @@ impl EditStill {
         let id = picture
             .as_ref()
             .map_or_else(String::new, |p| format!("qnc_edit_still:{}:{}", p.clip_id, p.source_frame));
-        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false, clip_edge: None, clip_frames: None, past_end: false }
+        Self { marker_frame, after, picture, image: None, id, label: String::new(), cut: false, clip_edge: None, clip_frames: None, past_end: false, click: None }
     }
 
     /// The same picture with what it is.

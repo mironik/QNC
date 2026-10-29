@@ -287,6 +287,8 @@ pub struct SubsegmentView {
     /// The trim zoom of the taken edge (user 2026-10-29: as a cover's): the pictures either
     /// side of the cut, the fine A1 wave and the words around it.
     pub zoom: Option<Box<qnc_program_view::SegmentsView>>,
+    /// The part whose A1 is taken (Ctrl+1), as drafted.
+    pub sound: Option<usize>,
 }
 
 /// The parts of a clip block (its own range when it has no parts).
@@ -326,7 +328,7 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             part
         })
         .collect();
-    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), trim: None, zoom: None }
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), trim: None, zoom: None, sound: None }
 }
 
 /// Where the parts play on the SubSegment's axis, for its wave (channel 1 of each clip: the
@@ -364,8 +366,9 @@ pub fn subsegment_zoom(
     let picture = |piece: &Piece, frame: u64| Some(StillPicture { clip_id: piece.clip_id.clone(), source_frame: frame });
     let bounded = |still: EditStill, piece: &Piece| EditStill { clip_frames: clip_frames(&piece.clip_id), ..still };
     let (cut, before, after) = if out {
-        let next = (index + 1 < pieces.len() && view.parts[index + 1].gap_before == 0).then(|| &pieces[index + 1]);
-        // After the last part (or before a pause) the zoom shows what lies past its OUT.
+        // The next part's IN on the right, also after a pause (user 2026-10-29: left the OUT of
+        // the part before, right the IN of the next); after the last part what lies past its OUT.
+        let next = pieces.get(index + 1);
         let after = match next {
             Some(next) => bounded(EditStill::new(part.end, true, picture(next, next.from_frame)), next),
             None => bounded(EditStill::new(part.end, true, picture(piece, piece.to_frame)), piece),
@@ -373,7 +376,8 @@ pub fn subsegment_zoom(
         let before = bounded(EditStill::new(part.end, false, picture(piece, piece.to_frame.saturating_sub(1))), piece).at_cut();
         (part.end, before.labelled(qnc_ui_text::text("story.still.out_last")), after.labelled(qnc_ui_text::text("story.still.after_out")))
     } else {
-        let previous = (index > 0 && part.gap_before == 0).then(|| &pieces[index - 1]);
+        // The previous part's OUT on the left; before the first part what lies before its IN.
+        let previous = index.checked_sub(1).and_then(|i| pieces.get(i));
         let before = match previous {
             Some(previous) => bounded(EditStill::new(part.start, false, picture(previous, previous.to_frame.saturating_sub(1))), previous),
             None => bounded(EditStill::new(part.start, false, (piece.from_frame > 0).then(|| picture(piece, piece.from_frame - 1)).flatten()), piece),
@@ -381,6 +385,11 @@ pub fn subsegment_zoom(
         let after = bounded(EditStill::new(part.start, true, picture(piece, piece.from_frame)), piece).at_cut();
         (part.start, before.labelled(qnc_ui_text::text("story.still.before_in")), after.labelled(qnc_ui_text::text("story.still.in_first")))
     };
+    // A click on the left picture takes the OUT before the cut, on the right one the IN after it.
+    let edge = |index: usize, out: bool| (crate::TAKE_EDGE.to_string(), format!("{index}:{}", if out { "out" } else { "in" }));
+    let (left, right) = if out { (Some((index, true)), (index + 1 < pieces.len()).then_some((index + 1, false))) } else { (index.checked_sub(1).map(|i| (i, true)), Some((index, false))) };
+    let before = EditStill { click: left.map(|(i, out)| edge(i, out)), ..before };
+    let after = EditStill { click: right.map(|(i, out)| edge(i, out)), ..after };
     let half = rate.max(1);
     let (from, to) = (cut.saturating_sub(half), (cut + half).min(view.total_frames.max(cut + 1)));
     let lane = subsegment_placements(view, pieces).into_iter().filter(|at| at.program_start < to && from < at.program_end).collect();

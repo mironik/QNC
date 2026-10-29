@@ -72,6 +72,13 @@ pub fn show(ctx: &egui::Context, segments: &SegmentsView) -> Option<ActionEvent>
                 let left = top.x + index as f32 * (picture.x + GAP);
                 let pane = Rect::from_min_size(egui::pos2(left, top.y), picture);
                 paint_still(ui, pane, still, &visuals);
+                // A picture that switches what is edited (a SubSegment's zoom) is clicked.
+                if let Some((action, target)) = &still.click {
+                    let response = ui.interact(pane, ui.id().with(("still", index)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+                    if response.clicked() {
+                        turned = Some(ActionEvent::key(action).with_target(target.clone()));
+                    }
+                }
                 // The marker lies between the picture before it and the one after it.
                 if still.after && index > 0 && !stills[index - 1].after {
                     let x = left - GAP / 2.0;

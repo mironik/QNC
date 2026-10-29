@@ -134,6 +134,17 @@ pub struct Script {
     waves_project: Option<String>,
     /// The pictures, fine wave and words of the trim zoom.
     trim_stills: qnc_trim_stills::TrimStills,
+    /// The A1 of a part taken with Ctrl+1, as drafted.
+    sound: Option<PartSound>,
+}
+
+/// The A1 of part `index` taken (Ctrl+1) as drafted: camera channel, level, off.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PartSound {
+    index: usize,
+    channel: Option<u16>,
+    level_db: i8,
+    off: bool,
 }
 
 /// An edge of part `index` being trimmed: the OUT or the IN, and the part's range as drafted.
@@ -147,7 +158,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new() }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), sound: None }
     }
 }
 
@@ -227,6 +238,7 @@ impl Script {
             self.trim_stills.fill(&mut zoom, preview.still_locator(), None);
             Box::new(zoom)
         });
+        shown.sound = self.sound.map(|sound| sound.index);
         self.view.subsegment = Some(shown);
     }
 
@@ -238,7 +250,55 @@ impl Script {
                 (block.pieces[trim.index].from_frame, block.pieces[trim.index].to_frame) = (trim.from, trim.to);
             }
         }
+        if let Some(sound) = self.sound {
+            if let Some(piece) = block.pieces.get_mut(sound.index) {
+                (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel, sound.level_db, sound.off);
+            }
+        }
         block
+    }
+
+    /// The sound keys of a part, as a cover's lane (user 2026-10-29): Ctrl+1 takes the A1 of the
+    /// part under the playhead, up/down its camera channel, left off and right on, Ctrl+arrows
+    /// and Ctrl+wheel its level a dB, Enter keeps it, Esc gives it up. Every key plays the
+    /// draft at once. `None` for a key that is not the sound's.
+    fn sound_key(&mut self, action_id: &str, block: &Block, pieces: &[Piece], preview: &SourcePreview) -> Option<bool> {
+        let key = qnc_timeline::LaneKey::of(action_id)?;
+        let at = self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0);
+        match key {
+            qnc_timeline::LaneKey::Take(0) => {
+                let index = self.view.subsegment.as_ref().and_then(|view| view.parts.iter().position(|part| at < part.end)).unwrap_or(0);
+                let piece = pieces.get(index)?;
+                self.trim = None;
+                self.sound = Some(PartSound { index, channel: piece.a1_channel, level_db: piece.a1_level_db, off: piece.a1_off });
+                return Some(true);
+            }
+            qnc_timeline::LaneKey::Take(_) | qnc_timeline::LaneKey::Pick(_) => return None,
+            _ => {}
+        }
+        let mut sound = self.sound?;
+        let channels = self.waves.channels(&pieces.get(sound.index)?.clip_id).unwrap_or(2).max(1);
+        match key {
+            qnc_timeline::LaneKey::Channel(delta) => sound.channel = Some((i64::from(sound.channel.unwrap_or(0)) + delta).clamp(0, i64::from(channels) - 1) as u16),
+            qnc_timeline::LaneKey::Off(off) => sound.off = off,
+            qnc_timeline::LaneKey::Level(delta) => sound.level_db = (i16::from(sound.level_db) + i16::from(delta)).clamp(-40, 12) as i8,
+            qnc_timeline::LaneKey::Keep => {
+                self.sound = None;
+                let mut piece = pieces.get(sound.index)?.clone();
+                (piece.a1_channel, piece.a1_level_db, piece.a1_off) = (sound.channel, sound.level_db, sound.off);
+                let id = block.id;
+                return Some(self.write(preview, move |target| qnc_script_db::set_piece(target, id, sound.index, piece).map(|_| None)));
+            }
+            qnc_timeline::LaneKey::Drop => {
+                self.sound = None;
+                self.pieces_request = Some((view::piece_inputs(block), at));
+                return Some(true);
+            }
+            _ => return None,
+        }
+        self.sound = Some(sound);
+        self.pieces_request = Some((view::piece_inputs(&self.drafted(block.clone())), at));
+        Some(true)
     }
 
     /// The trim keys of the open SubSegment (user 2026-10-29: its parts are edited as covers
@@ -249,17 +309,36 @@ impl Script {
         let block = self.block(self.open_subsegment)?.clone();
         let pieces = view::block_pieces(&block);
         let take = |index: usize, out: bool| pieces.get(index).map(|piece| Trim { index, out, from: piece.from_frame, to: piece.to_frame });
+        if let Some(done) = self.sound_key(action_id, &block, &pieces, preview) {
+            return Some(done);
+        }
         let step = match action_id {
             "select_mark_in" | "select_mark_out" => {
                 let at = self.view.subsegment.as_ref().and_then(|view| view.playhead).unwrap_or(0);
                 let index = self.view.subsegment.as_ref().and_then(|view| view.parts.iter().position(|part| at < part.end)).unwrap_or(0);
+                self.sound = None;
                 self.trim = take(index, action_id == "select_mark_out");
                 0
             }
             TAKE_EDGE => {
                 let mut parts = target.unwrap_or_default().split(':');
                 let index = parts.next().and_then(|index| index.parse::<usize>().ok())?;
-                self.trim = take(index, parts.next() == Some("out"));
+                let out = parts.next() == Some("out");
+                // Another edge taken (a picture of the zoom clicked, user 2026-10-29): a moved
+                // edge is kept first, the same part keeps its drafted range.
+                let new = match self.trim.take() {
+                    Some(old) if old.index == index => Some(Trim { out, ..old }),
+                    Some(old) => {
+                        if pieces.get(old.index).is_some_and(|piece| (piece.from_frame, piece.to_frame) != (old.from, old.to)) {
+                            let (piece, id) = (self.trimmed_piece(&pieces[old.index], old), block.id);
+                            self.write(preview, move |target| qnc_script_db::set_piece(target, id, old.index, piece).map(|_| None));
+                        }
+                        take(index, out)
+                    }
+                    None => take(index, out),
+                };
+                self.sound = None;
+                self.trim = new;
                 0
             }
             "step_back_frame" | "step_forward_frame" if self.trim.is_some() => if action_id == "step_forward_frame" { 1 } else { -1 },

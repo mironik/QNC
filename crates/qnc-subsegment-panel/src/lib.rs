@@ -119,6 +119,8 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
         TimelineIntent::TakeMarker { frame, .. } => nearest_edge(view, frame).map(|(index, out)| ActionEvent::key(TAKE_EDGE).with_target(format!("{index}:{}", if out { "out" } else { "in" }))),
         // The wheel moves the playhead, or the taken edge, a frame as the arrows do.
         TimelineIntent::Wheel(wheel) if !wheel.ctrl => Some(ActionEvent::key(if wheel.up == qnc_wheel_jog::source_step_forward("wheel_source_forward").unwrap_or(true) { "step_forward_frame" } else { "step_back_frame" })),
+        // Ctrl+wheel: the level of the taken A1 (Ctrl+1), as on a cover's lane.
+        TimelineIntent::Wheel(wheel) => Some(ActionEvent::key(wheel.action(qnc_wheel_jog::SOURCE_ACTIONS))),
         _ => None,
     };
     answer = answer.or(event);
@@ -134,7 +136,10 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
             None => format!("{}:{index}", view.block_id),
         };
         ui.horizontal(|ui| {
-            ui.label(RichText::new(qnc_ui_text::fill("subsegment.part", &[("n", &(index + 1).to_string()), ("clip", &part.clip_name)])).color(theme.text));
+            // The part whose A1 is taken (Ctrl+1) is marked as a taken lane is.
+            let taken = view.sound == Some(index);
+            let name = RichText::new(qnc_ui_text::fill("subsegment.part", &[("n", &(index + 1).to_string()), ("clip", &part.clip_name)]));
+            ui.label(if taken { name.color(theme.lane_taken).strong() } else { name.color(theme.text) });
             if index > 0 {
                 ui.label(RichText::new(qnc_ui_text::fill("subsegment.join", &[("frames", &part.gap_before.to_string())])).color(theme.text));
                 if ui.small_button("-").clicked() && part.gap_before > 0 {
