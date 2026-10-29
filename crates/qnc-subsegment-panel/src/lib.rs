@@ -10,7 +10,7 @@ use qnc_action_event::ActionEvent;
 use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_OFF, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, TAKE_EDGE};
 use qnc_timeline::{
     AudioLane, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
-    TimelineMetrics, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
+    TimelineMetrics, TimelinePicture, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
 };
 
 pub const MODULE_ID: &str = "qnc.module.subsegment-panel";
@@ -76,6 +76,14 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
     // The edge being trimmed, as the trim playhead of a cover's edge.
     let trim_label = qnc_ui_text::text("subsegment.trimming");
     let trim: Vec<(u64, &str)> = view.trim.map(|(_, _, frame)| (frame, trim_label)).into_iter().collect();
+    // The parts' filmstrip on V1, as a Wrap row shows its segments (user 2026-10-29).
+    let pictures: Vec<TimelinePicture<'_>> = view
+        .pictures
+        .iter()
+        .filter_map(|picture| {
+            Some(TimelinePicture { start_frame: picture.program_start, end_frame: picture.program_end, frame: picture.strip.frames.get(picture.frame)?, strip: &picture.strip })
+        })
+        .collect();
     let intent = ui
         .push_id("qnc_subsegment_timeline", |ui| {
             qnc_timeline::show(
@@ -110,7 +118,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
                     wave_over_video: None,
                     trim_playheads: &trim,
                     a1_splits: &[],
-                    pictures: &[],
+                    pictures: &pictures,
                     holding: false,
                 },
             )

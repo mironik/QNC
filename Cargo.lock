@@ -5557,6 +5557,7 @@ dependencies = [
  "qnc-db-broker",
  "qnc-dev-diagnostics",
  "qnc-newsroom-sheet-db",
+ "qnc-program-filmstrip",
  "qnc-program-view",
  "qnc-program-waveform",
  "qnc-script-db",

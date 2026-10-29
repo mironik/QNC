@@ -73,6 +73,14 @@ fn part(clip: &str, from: u64, to: u64, gap: u64) -> Piece {
 }
 
 #[test]
+fn the_filmstrip_of_a_subsegment_lays_each_part_after_its_pause() {
+    let pieces = vec![part("a", 100, 150, 0), part("b", 10, 60, 5)];
+    let shown = subsegment_view(&Block::of_pieces("sot", pieces.clone()), None);
+    let at: Vec<_> = subsegment_pictures(&shown, &pieces).iter().map(|p| (p.clip_id.clone(), p.program_start, p.program_end, p.source_in, p.source_out)).collect();
+    assert_eq!(at, vec![("a".to_string(), 0, 50, 100, 150), ("b".to_string(), 55, 105, 10, 60)]);
+}
+
+#[test]
 fn the_zoom_of_a_subsegment_edge_shows_the_pictures_either_side_of_its_cut() {
     let pieces = vec![part("a", 100, 150, 0), part("a", 300, 340, 0), part("b", 10, 60, 5)];
     let block = Block::of_pieces("sot", pieces.clone());

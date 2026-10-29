@@ -6884,3 +6884,9 @@ Ctrl+I/O, klik na sliku zooma) vuce se lijevom tipkom misa, po pravilu misa samo
 (dio zadrzava barem jednu sliku i ostaje unutar svog klipa, player pokazuje sliku na rubu kao uz strelice), pustanje
 tipke ga sprema kao Enter. `qnc-subsegment-panel` (uzeti rub je `taken` marker, `drag_target`, test), `qnc-script`
 (`DRAG_EDGE`, `drag_edge`), katalog akcija `subsegment_drag_edge` (bez tipke). Testovi, conformance. Uzivo nije provjereno.
+Dopuna 2026-10-29 (korisnik: "nastavi s filmstripom dijelova u SubSegmentu"): timeline SubSegmenta na V1 pokazuje
+filmstrip svakog dijela po njegovom IN/OUT-u, iza razmaka na svom mjestu, istom kockom kao Wrap redovi
+(`qnc-program-filmstrip` `ProgramFilmstrips`, spremljeni filmstripovi kroz citac artefakata previewa, citani u pozadini;
+klip bez filmstripa nema slike dok ga radnik ne napravi). `qnc-script` (`subsegment_pictures`, `SubsegmentView.pictures`;
+nacrt ruba pomice i slike), `qnc-subsegment-panel` (`TimelinePicture`). Test
+`the_filmstrip_of_a_subsegment_lays_each_part_after_its_pause`, conformance. Uzivo nije provjereno.

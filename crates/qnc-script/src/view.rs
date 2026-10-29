@@ -282,6 +282,9 @@ pub struct SubsegmentView {
     pub playhead: Option<u64>,
     /// The A1 wave of the parts on the SubSegment's axis (peaks over the whole of it).
     pub a1: Vec<f32>,
+    /// The filmstrip of the parts on the SubSegment's axis (user 2026-10-29: as a Wrap row
+    /// shows its segments), from `qnc-program-filmstrip`.
+    pub pictures: Vec<qnc_program_filmstrip::ProgramPicture>,
     /// The edge being trimmed: its part, whether it is the OUT, and its frame on the axis.
     pub trim: Option<(usize, bool, u64)>,
     /// The trim zoom of the taken edge (user 2026-10-29: as a cover's): the pictures either
@@ -328,7 +331,7 @@ pub fn subsegment_view(block: &Block, playhead: Option<u64>) -> SubsegmentView {
             part
         })
         .collect();
-    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), trim: None, zoom: None, sound: None }
+    SubsegmentView { block_id: block.id, parts, total_frames: start, playhead, a1: Vec::new(), pictures: Vec::new(), trim: None, zoom: None, sound: None }
 }
 
 /// Where the parts play on the SubSegment's axis, for its wave (channel 1 of each clip: the
@@ -346,6 +349,21 @@ pub fn subsegment_placements(view: &SubsegmentView, pieces: &[Piece]) -> Vec<qnc
             source_out: piece.to_frame,
             level_db: piece.a1_level_db,
             off: piece.a1_off,
+        })
+        .collect()
+}
+
+/// Where the parts' pictures are on the SubSegment's axis, for its filmstrip.
+pub fn subsegment_pictures(view: &SubsegmentView, pieces: &[Piece]) -> Vec<qnc_program_filmstrip::PicturePlacement> {
+    view.parts
+        .iter()
+        .zip(pieces)
+        .map(|(part, piece)| qnc_program_filmstrip::PicturePlacement {
+            clip_id: piece.clip_id.clone(),
+            program_start: part.start,
+            program_end: part.end,
+            source_in: piece.from_frame,
+            source_out: piece.to_frame,
         })
         .collect()
 }

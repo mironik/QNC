@@ -133,6 +133,8 @@ pub struct Script {
     trim: Option<Trim>,
     /// The waves of the SubSegment's clips (read in the background).
     waves: qnc_program_waveform::ProgramWaves,
+    /// The filmstrips of the SubSegment's clips (read in the background).
+    filmstrips: qnc_program_filmstrip::ProgramFilmstrips,
     /// The project the waves read from.
     waves_project: Option<String>,
     /// The pictures, fine wave and words of the trim zoom.
@@ -161,7 +163,7 @@ struct Trim {
 
 impl Default for Script {
     fn default() -> Self {
-        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), sound: None }
+        Self { view: ScriptView::default(), blocks: Vec::new(), project: None, reading: None, read_at: None, writing: None, source_request: None, names: HashMap::new(), words_per_second: Ok(0.0), take: None, taking: None, exporting: None, open_subsegment: None, pieces_request: None, trim: None, waves: qnc_program_waveform::ProgramWaves::new(), filmstrips: qnc_program_filmstrip::ProgramFilmstrips::new(), waves_project: None, trim_stills: qnc_trim_stills::TrimStills::new(), sound: None }
     }
 }
 
@@ -182,7 +184,7 @@ impl Script {
 
     /// Whether a read or a write of this process runs (the form repaints soon).
     pub fn busy(&self) -> bool {
-        self.reading.is_some() || self.writing.is_some() || self.take.is_some() || self.taking.is_some() || self.exporting.is_some() || self.trim_stills.loading()
+        self.reading.is_some() || self.writing.is_some() || self.take.is_some() || self.taking.is_some() || self.exporting.is_some() || self.trim_stills.loading() || self.filmstrips.reading()
     }
 
     /// A clip and IN/OUT a chosen clip block opens on the source timeline, once.
@@ -223,6 +225,7 @@ impl Script {
         let mut shown = view::subsegment_view(&block, playhead);
         if self.waves_project != self.project {
             self.waves.set_reader(preview.artifact_reader());
+            self.filmstrips.set_reader(preview.artifact_reader());
             self.waves_project = self.project.clone();
         }
         let placements = view::subsegment_placements(&shown, &view::block_pieces(&block));
@@ -231,6 +234,8 @@ impl Script {
             part.channels = self.waves.channels(&piece.clip_id);
         }
         shown.a1 = self.waves.peaks(shown.total_frames, &placements, &[], |clip| names.get(clip).map(|(_, frames, _)| *frames)).a1;
+        let at = view::subsegment_pictures(&shown, &view::block_pieces(&block));
+        shown.pictures = self.filmstrips.pictures(&at, |clip| names.get(clip).map(|(_, frames, _)| *frames), |_| None);
         shown.trim = self.trim.and_then(|trim| shown.parts.get(trim.index).map(|part| (trim.index, trim.out, if trim.out { part.end.saturating_sub(1) } else { part.start })));
         // The trim zoom of the taken edge: its pictures, fine wave and words come from the
         // same pieces as a cover's (`qnc-trim-stills`).
