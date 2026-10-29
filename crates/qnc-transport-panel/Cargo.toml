@@ -6,6 +6,7 @@ description = "QNC public panel: the transport buttons a layout lists (Play, IN,
 
 [dependencies]
 qnc-desktop-theme = { workspace = true }
+qnc-level-meter = { workspace = true }
 qnc-theme-styles = { workspace = true }
 eframe = { workspace = true }
 qnc-media-pool-head = { workspace = true }

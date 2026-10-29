@@ -6346,6 +6346,7 @@ version = "0.1.0"
 dependencies = [
  "eframe",
  "qnc-desktop-theme",
+ "qnc-level-meter",
  "qnc-media-pool-head",
  "qnc-monitor",
  "qnc-source-dock",

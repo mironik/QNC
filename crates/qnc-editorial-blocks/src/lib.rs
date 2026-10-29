@@ -29,7 +29,7 @@ pub fn render_desktop(
     qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| qnc_dev_diagnostics::timed_block(block, || match block {
         "preview" => preview(ui, rect, contracts, theme, view),
         "pool-head" => framed(pool_tabs(ui, rect, contracts, theme, view), ui, rect, &[Panel::PoolTabs]),
-        "transport" => qnc_transport_panel::show(ui, rect, theme, contracts.tab_gap()).map(|action| EditorialIntent::action(&action)),
+        "transport" => qnc_transport_panel::show(ui, rect, theme, contracts.tab_gap(), view.preview.output_levels).map(|action| EditorialIntent::action(&action)),
         "clip-cards" => framed(pool(ui, contracts, theme, view), ui, rect, &[Panel::Pool]),
         // The group's right panel by its layout contract (Segmenti for Story, the transcript for Audio AI).
         "right-panel" => {

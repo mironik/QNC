@@ -45,14 +45,22 @@ pub fn controls() -> Vec<Control> {
         .collect()
 }
 
-/// The panel in `rect`; the clicked button's catalog action.
-/// The panel in `rect`, in the look of the one theme (`tab_gap` is the form's measure).
-pub fn show(ui: &mut Ui, rect: Rect, theme: &qnc_desktop_theme::Theme, tab_gap: f32) -> Option<String> {
+/// The width of the level meter left of the buttons.
+const METER_W: f32 = 84.0;
+
+/// The panel in `rect`, in the look of the one theme (`tab_gap` is the form's measure); the
+/// clicked button's catalog action. Left of the buttons the level meter of the player's
+/// output A1/A2 (user 2026-10-29: it was only in Story's Segments panel, so a form without
+/// that panel had none); `levels` are the peaks the player measured (dBFS).
+pub fn show(ui: &mut Ui, rect: Rect, theme: &qnc_desktop_theme::Theme, tab_gap: f32, levels: [Option<f32>; 2]) -> Option<String> {
     let (row, chrome) = (qnc_theme_styles::row(theme, tab_gap), qnc_theme_styles::dock(theme, 0.0));
     let controls = controls();
     let commands: Vec<_> = controls.iter().map(|control| RowCommand { label: &control.label, on: control.on }).collect();
     let mut clicked = None;
     qnc_source_dock::show_chrome_row(ui, rect, &chrome, theme.surface, true, |ui| {
+        let (meter, _) = ui.allocate_exact_size(eframe::egui::vec2(METER_W, theme.chrome_control_height), eframe::egui::Sense::hover());
+        let style = qnc_level_meter::MeterStyle { background: theme.bg, border: theme.border, text: theme.text_muted };
+        qnc_level_meter::show(ui, ui.make_persistent_id("qnc_transport_level_meter"), meter, &[("A1", levels[0]), ("A2", levels[1])], style);
         if let Some(RowClick::Command(index)) = qnc_media_pool_head::show_row(ui, &row, &[], &commands) {
             clicked = Some(controls[index].action_id.clone());
         }

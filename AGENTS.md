@@ -6910,3 +6910,10 @@ nove oznake postavljene s I i O bez uzimanja i dalje su novi SubClip (Add SubCli
 aplikacija 504 (isto). Debug cache obrisan (`cargo clean --profile dev`, 29,2 GiB; disk je imao 0 B slobodno). Testovi,
 conformance, release build. Uzivo nije provjereno. Nije izvedeno: povlacenje oznake SubClipa misem bez uzimanja ne
 mijenja SubClip.
+Popravak 2026-10-29 (korisnik: "negdje usput nestao audio vu-metar"; odabrao "panel transporta"): metar nije nestao iz
+koda, od 16. 10. bio je samo u traci panela Segmenti (Story), pa ga MA forme (log: rad u MA Audio, SubSegment) nisu imale.
+Sada ga ima i panel transporta ispod monitora u svakoj formi (Ingest, MA, Story), lijevo od Play/IN/OUT/Auto/On: razina
+izlaza A1/A2 koju player mjeri na uredaju (`qnc-transport-panel` `show(.., levels)`, `qnc-level-meter`); u Storyju ostaje i
+u Segmentima. Mjesto transporta sire je u oba ugovora rasporeda (`transport_width` 290 -> 380). Story/MA ploca predaje
+`preview.output_levels`, Ingest ploca razine iz `playback` (isti broj redaka). Testovi, conformance, release build. Uzivo
+nije provjereno.

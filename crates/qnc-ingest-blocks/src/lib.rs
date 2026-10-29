@@ -30,7 +30,7 @@ pub fn render_desktop(
     qnc_board::show_in_frame(ui, frame, &board, |name| faces.named(name), |ui, block, rect| match block {
         "preview" => panels::preview(ui, rect, contracts, theme, view),
         "pool-head" => framed(panels::pool_tabs(ui, rect, contracts, theme, view), ui, rect, &[qnc_focus_walk::POOL_TABS]),
-        "transport" => qnc_transport_panel::show(ui, rect, theme, contracts.ingest.pool_head.tab_gap).map(|action| IngestIntent::empty(&action)),
+        "transport" => qnc_transport_panel::show(ui, rect, theme, contracts.ingest.pool_head.tab_gap, [1, 2].map(|output| view.playback.output_level_dbfs(output))).map(|action| IngestIntent::empty(&action)),
         "source-browser" => framed(panels::browser(ui, rect, contracts, theme, view), ui, rect, &[qnc_focus_walk::SOURCE_KINDS, qnc_focus_walk::BROWSER, qnc_focus_walk::BROWSER_BUTTONS]),
         "clip-cards" => framed(panels::pool(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::CARDS]),
         "source-dock" => framed(panels::source_dock(ui, contracts, theme, view), ui, rect, &[qnc_focus_walk::SOURCE_TIMELINE, qnc_focus_walk::SOURCE_BUTTONS]),
