@@ -110,9 +110,12 @@ pub(crate) fn paint_program(
                 qnc_program_view::TakenPart::Whole => qnc_timeline::TimelineMarkerPart::Whole,
                 qnc_program_view::TakenPart::Picture => qnc_timeline::TimelineMarkerPart::Picture,
                 qnc_program_view::TakenPart::Sound => qnc_timeline::TimelineMarkerPart::Sound,
+                qnc_program_view::TakenPart::SoundLead => qnc_timeline::TimelineMarkerPart::SoundLead,
+                qnc_program_view::TakenPart::SoundTail => qnc_timeline::TimelineMarkerPart::SoundTail,
             },
             origin: pin.origin.filter(|frame| (start..=end).contains(frame)).map(local),
-            sound_at: pin.sound_at.filter(|frame| (start..=end).contains(frame)).map(local),
+            sound_tail: pin.sound_tail.filter(|frame| (start..=end).contains(frame)).map(local),
+            sound_lead: pin.sound_lead.filter(|frame| (start..=end).contains(frame)).map(local),
         })
         .collect::<Vec<_>>();
     // v5 `local_peaks_for_row`: this row's part of the program wave.

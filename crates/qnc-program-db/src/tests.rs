@@ -437,12 +437,39 @@ fn the_picture_or_the_sound_of_a_marker_cut_moves_alone() {
     run(&mut store, Operation::SetCutSound { marker_id: m14.clone(), offset: 3 }).unwrap();
     assert_eq!(overlaps(&mut store), vec![(0, 0, 3), (14, 0, 0)], "an L of the cover before");
     run(&mut store, Operation::MoveMarkerPicture { marker_id: m14.clone(), program_frame: 18 }).unwrap();
-    // The picture 4 later, the sound where it was: 3 after 14 is 1 before 18.
-    assert_eq!(overlaps(&mut store), vec![(0, 0, 0), (18, 1, 0)]);
+    // The picture 4 later, the sound where it was (user 2026-10-29): the cover after still
+    // starts at 14, a J of 4; the cover before ends at the new cut, it cannot end before it.
+    assert_eq!(overlaps(&mut store), vec![(0, 0, 0), (18, 4, 0)]);
     assert_eq!(markers(&mut store), vec![18]);
     run(&mut store, Operation::UndoStory).unwrap();
     assert_eq!(markers(&mut store), vec![14], "one Undo step");
     assert_eq!(overlaps(&mut store), vec![(0, 0, 3), (14, 0, 0)]);
+}
+
+/// User 2026-10-29: the J of the cover after and the L of the cover before at one cut, both at
+/// once (an overlap), one Undo step; a picture moved keeps both where they are in the story.
+#[test]
+fn a_cut_has_the_j_of_the_cover_after_and_the_l_of_the_cover_before_together() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut store = imported_store(&path);
+    three_segments(&mut store);
+    let Data::Created(m14) = marker(&mut store, 14).unwrap() else { panic!() };
+    create_cover(&mut store, &slot_at_frame(&path, 5), (1000, 1100)).unwrap();
+    create_cover(&mut store, &slot_at_frame(&path, 20), (2000, 2100)).unwrap();
+    let overlaps = |store: &mut Story| {
+        let mut rows: Vec<_> = covers(store).into_iter().map(|c| (c.program_start_frame, c.a2_lead_frames, c.a2_tail_frames)).collect();
+        rows.sort();
+        rows
+    };
+    run(&mut store, Operation::SetCutSoundEdges { marker_id: m14.clone(), tail_frames: 3, lead_frames: 5 }).unwrap();
+    assert_eq!(overlaps(&mut store), vec![(0, 0, 3), (14, 5, 0)], "the L before and the J after together");
+    // Sound from 9 (J) to 17 (L); the picture to 12: J 3, L 5.
+    run(&mut store, Operation::MoveMarkerPicture { marker_id: m14.clone(), program_frame: 12 }).unwrap();
+    assert_eq!(overlaps(&mut store), vec![(0, 0, 5), (12, 3, 0)]);
+    run(&mut store, Operation::UndoStory).unwrap();
+    run(&mut store, Operation::UndoStory).unwrap();
+    assert_eq!(overlaps(&mut store), vec![(0, 0, 0), (14, 0, 0)], "each an Undo step");
 }
 
 mod segment_tests;

@@ -70,19 +70,64 @@ impl Store {
         Ok(Data::Changed)
     }
 
-    /// The picture cut moves, its A2 sound stays: the offset grows by as much as the marker
-    /// moves back (the side that has no cover keeps what it can).
+    /// The L of the cover before the cut and the J of the cover after it, story frames; `None`
+    /// for a side with no cover.
+    pub(crate) fn cut_edges(&self, marker_id: &str) -> Result<(Option<u32>, Option<u32>)> {
+        let marker_id = marker_id.trim();
+        let side = |filter: &str, column: &str| -> Result<Option<i64>> {
+            self.conn
+                .query_row(&format!("SELECT {column} FROM story_covers WHERE {filter} LIMIT 1"), [marker_id], |row| row.get(0))
+                .optional()
+                .map_err(err)
+        };
+        let bound = |frames: i64| frames.clamp(0, i64::from(MAX_OVERLAP_FRAMES)) as u32;
+        let tail = side("substr(slot_id, -length(?1) - 1) = '|' || ?1", "a2_tail_frames")?.map(bound);
+        let lead = side("substr(slot_id, 1, length(?1) + 1) = ?1 || '|'", "a2_lead_frames")?.map(bound);
+        Ok((tail, lead))
+    }
+
+    /// Both sides of the cut's A2 sound at once (user 2026-10-29): the L of the cover before
+    /// and the J of the cover after; a side with no cover cannot take any.
+    pub(crate) fn set_cut_sound_edges(&mut self, marker_id: &str, tail: u32, lead: u32) -> Result<Data> {
+        if tail > MAX_OVERLAP_FRAMES || lead > MAX_OVERLAP_FRAMES {
+            return Err(qnc_ui_text::fill("story.overlap_too_long", &[("frames", &MAX_OVERLAP_FRAMES.to_string())]));
+        }
+        let (before, after, _) = self.cut_covers(marker_id)?;
+        if tail > 0 && before.is_none() || lead > 0 && after.is_none() {
+            return Err(qnc_ui_text::text("story.cut_sound_no_cover").into());
+        }
+        let now = story_now();
+        if let Some(cover) = before {
+            self.conn
+                .execute("UPDATE story_covers SET a2_tail_frames = ?1, updated_at = ?2 WHERE cover_id = ?3", params![tail, now, cover])
+                .map_err(err)?;
+        }
+        if let Some(cover) = after {
+            self.conn
+                .execute("UPDATE story_covers SET a2_lead_frames = ?1, updated_at = ?2 WHERE cover_id = ?3", params![lead, now, cover])
+                .map_err(err)?;
+        }
+        Ok(Data::Changed)
+    }
+
+    /// The picture cut moves, its A2 sound stays: where the sound of the cover before ends and
+    /// where the sound of the cover after starts stay in the story (user 2026-10-29: J and L
+    /// together); neither can be on the wrong side of the new picture cut, a side with no cover
+    /// takes none.
     pub(crate) fn move_marker_picture(&mut self, marker_id: &str, program_frame: u64) -> Result<Data> {
         let from: i64 = self
             .conn
             .query_row("SELECT timeline_frame FROM story_markers WHERE marker_id = ?1", [marker_id.trim()], |row| row.get(0))
             .map_err(err)?;
-        let (_, _, offset) = self.cut_covers(marker_id)?;
+        let (tail, lead) = self.cut_edges(marker_id)?;
+        let (sound_end, sound_start) = (from + i64::from(tail.unwrap_or(0)), from - i64::from(lead.unwrap_or(0)));
         self.move_marker(marker_id, program_frame)?;
-        let (before, after, _) = self.cut_covers(marker_id)?;
-        let wanted = offset - (program_frame as i64 - from);
-        let kept = if wanted > 0 && before.is_none() || wanted < 0 && after.is_none() { 0 } else { wanted };
-        self.set_cut_sound(marker_id, kept)
+        let (before, after) = self.cut_edges(marker_id)?;
+        let to = program_frame as i64;
+        let tail = before.map_or(0, |_| (sound_end - to).max(0));
+        let lead = after.map_or(0, |_| (to - sound_start).max(0));
+        let bound = |frames: i64| frames.min(i64::from(MAX_OVERLAP_FRAMES)) as u32;
+        self.set_cut_sound_edges(marker_id, bound(tail), bound(lead))
     }
 
     /// The picture J of a Ton segment, at most `MAX_OVERLAP_FRAMES`; an Off segment has no picture.

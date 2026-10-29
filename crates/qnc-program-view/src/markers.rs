@@ -17,7 +17,12 @@ pub enum TakenPart {
     #[default]
     Whole,
     Picture,
+    /// Its A2 sound, both sides at once (Ctrl+2).
     Sound,
+    /// Only the J of the cover after (Ctrl+I, a click on that line; user 2026-10-29).
+    SoundLead,
+    /// Only the L of the cover before (Ctrl+O, a click on that line).
+    SoundTail,
 }
 
 /// An M marker on the program axis.
@@ -32,10 +37,13 @@ pub struct MarkerPin {
     pub taken: bool,
     /// Its part that moves, while taken.
     pub taken_part: TakenPart,
-    /// While taken: where it is stored (drawn white, user 2026-10-22) and, its sound taken,
-    /// where its A2 sound's cut is going (drawn red).
+    /// While taken: where it is stored (drawn white, user 2026-10-22).
     pub origin: Option<u64>,
-    pub sound_at: Option<u64>,
+    /// Its A2 sound (user 2026-10-29: J and L together): where the sound of the cover before
+    /// ends (`sound_tail`, its L) and where the sound of the cover after starts (`sound_lead`,
+    /// its J); `None` for a side with no cover.
+    pub sound_tail: Option<u64>,
+    pub sound_lead: Option<u64>,
 }
 
 /// The program between two neighbouring M markers, `[start, end)`.
@@ -65,7 +73,8 @@ pub fn resolve(
             taken: false,
             taken_part: TakenPart::Whole,
             origin: None,
-            sound_at: None,
+            sound_tail: None,
+            sound_lead: None,
         })
         .collect::<Vec<_>>();
     pins.sort_by(|a, b| a.frame.cmp(&b.frame).then(a.marker_id.cmp(&b.marker_id)));

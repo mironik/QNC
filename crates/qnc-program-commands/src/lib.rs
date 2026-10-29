@@ -121,6 +121,11 @@ pub enum SegmentCommand {
         marker_id: String,
         frame: u64,
     },
+    /// A click on a side of the taken cut's A2 sound (user 2026-10-29): that side (the J of the
+    /// cover after or the L of the cover before, the nearer to `frame`) moves alone.
+    TakeCutEdge { marker_id: String, frame: u64 },
+    /// A drag of a side of the taken cut's A2 sound to `frame`.
+    DragCutEdge { marker_id: String, frame: u64 },
     /// Escape while a marker is edited.
     CancelMarkerEdit,
     /// Edit (user rule 2026-10-01): the segment opens in the source timeline with its
@@ -197,6 +202,8 @@ impl SegmentCommand {
             ("timeline_select_cover", Some(cover_id), Some(frame)) => Self::SelectCover { cover_id, frame },
             ("timeline_select_slot", Some(slot_id), Some(frame)) => Self::SelectSlot { slot_id, frame },
             ("timeline_drag_marker", Some(marker_id), Some(frame)) => Self::DragMarker { marker_id, frame },
+            ("timeline_take_cut_edge", Some(marker_id), Some(frame)) => Self::TakeCutEdge { marker_id, frame },
+            ("timeline_drag_cut_edge", Some(marker_id), Some(frame)) => Self::DragCutEdge { marker_id, frame },
             // The buttons of the segment panel (user 2026-10-18: buttons are system actions too).
             ("segment_select", Some(id), _) => Self::Select(id),
             ("segment_exclude", Some(id), _) => Self::Exclude(id),

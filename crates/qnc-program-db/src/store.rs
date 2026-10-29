@@ -236,6 +236,9 @@ impl Store {
             } => self.move_marker(marker_id, *program_frame),
             Operation::MoveMarkerPicture { marker_id, program_frame } => self.move_marker_picture(marker_id, *program_frame),
             Operation::SetCutSound { marker_id, offset } => self.set_cut_sound(marker_id, *offset),
+            Operation::SetCutSoundEdges { marker_id, tail_frames, lead_frames } => {
+                self.set_cut_sound_edges(marker_id, *tail_frames, *lead_frames)
+            }
             Operation::MoveSlot { slot_id, start_frame } => self.move_slot(slot_id, *start_frame),
             Operation::TrimSlot { slot_id, start, frames } => self.trim_slot(slot_id, *start, *frames),
             Operation::DeleteMarker { marker_id } => self.delete_marker(marker_id),

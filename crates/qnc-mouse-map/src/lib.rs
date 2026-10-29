@@ -61,6 +61,10 @@ pub enum Pointer {
     DragIn,
     DragOut,
     DragMarker,
+    /// A left click over A2 on a side of the taken cut's sound (user 2026-10-29).
+    ClickCutEdge,
+    /// A drag of a side of the taken cut's sound.
+    DragCutEdge,
     MiddleClick,
     WheelBack,
     WheelForward,
@@ -69,7 +73,7 @@ pub enum Pointer {
 }
 
 impl Pointer {
-    pub const ALL: [Pointer; 32] = [
+    pub const ALL: [Pointer; 34] = [
         Self::Click,
         Self::ClickHolding,
         Self::ClickStrip,
@@ -97,6 +101,8 @@ impl Pointer {
         Self::DragIn,
         Self::DragOut,
         Self::DragMarker,
+        Self::ClickCutEdge,
+        Self::DragCutEdge,
         Self::MiddleClick,
         Self::WheelBack,
         Self::WheelForward,
@@ -134,6 +140,8 @@ impl Pointer {
             Self::DragIn => "drag_in",
             Self::DragOut => "drag_out",
             Self::DragMarker => "drag_marker",
+            Self::ClickCutEdge => "click_cut_edge",
+            Self::DragCutEdge => "drag_cut_edge",
             Self::MiddleClick => "middle_click",
             Self::WheelBack => "wheel_back",
             Self::WheelForward => "wheel_forward",

@@ -526,6 +526,12 @@
     "timeline_drag_marker": {
       "label": "Povlacenje M markera misem"
     },
+    "timeline_take_cut_edge": {
+      "label": "Klik na J ili L tona reza (A2, uzet ton M markera): ta strana se pomice sama"
+    },
+    "timeline_drag_cut_edge": {
+      "label": "Povlacenje J ili L tona reza misem"
+    },
     "source_cut": {
       "label": "Rez (skare) na mjestu playheada na source timelineu: dva reza su IN i OUT, raniji IN, kasniji OUT"
     },

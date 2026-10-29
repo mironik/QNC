@@ -19,7 +19,7 @@ mod slot_move;
 mod slot_trim;
 mod overlap;
 mod cut_part;
-pub use cut_part::CutPart;
+pub use cut_part::{CutPart, CutSound, SoundEdge};
 pub use overlap::OverlapDraft;
 mod marker_edit;
 mod part_sound;

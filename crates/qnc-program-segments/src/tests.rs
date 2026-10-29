@@ -868,6 +868,38 @@ fn a_taken_marker_moves_whole_or_only_its_sound_or_only_its_picture() {
     assert!(segments.cut_sound_taken());
 }
 
+/// User 2026-10-29: the A2 sound of a cut has two sides, the J of the cover after and the L of
+/// the cover before; with the sound taken (Ctrl+2) a side is taken alone (a click on its line,
+/// as Ctrl+I/O), moved by the arrows or a drag, and both are written at once.
+#[test]
+fn the_j_and_the_l_of_a_cut_move_apart_and_are_written_together() {
+    let mut segments = component();
+    segments.stored_covers = vec![cover("c0", "S|m1", (0, 15)), cover("c1", "m1|m2", (15, 33))];
+    segments.refresh_view(String::new());
+    segments.apply(SegmentCommand::TakeMarker("m1".into()));
+    segments.set_playhead(Some(20));
+    segments.apply_action("wrap_zoom");
+    assert!(segments.take_cut_part(None, false, 1));
+    // The L alone: the sound before ends 3 frames after the cut.
+    assert!(segments.take_sound_edge(false));
+    for _ in 0..3 {
+        segments.apply_action("step_forward_frame");
+    }
+    // A click near the J's line (at the cut) takes the J; a drag puts its start 4 frames before.
+    assert!(segments.apply(SegmentCommand::TakeCutEdge { marker_id: "m1".into(), frame: 15 }));
+    assert!(segments.apply(SegmentCommand::DragCutEdge { marker_id: "m1".into(), frame: 11 }));
+    let draft = segments.cut_sound_draft().unwrap();
+    assert!(draft.contains(&("c0".to_string(), (0, 3))) && draft.contains(&("c1".to_string(), (4, 0))), "both sides: {draft:?}");
+    let marker = segments.view().markers.iter().find(|pin| pin.marker_id == "m1").cloned().unwrap();
+    assert_eq!((marker.sound_lead, marker.sound_tail), (Some(11), Some(18)), "both drawn where they are going");
+    assert_eq!(marker.taken_part, qnc_program_view::TakenPart::SoundLead);
+    // Ctrl+2 again: both sides move together, the overlap keeps its length.
+    assert!(segments.take_cut_part(None, false, 1));
+    segments.apply_action("step_forward_frame");
+    let draft = segments.cut_sound_draft().unwrap();
+    assert!(draft.contains(&("c0".to_string(), (0, 4))) && draft.contains(&("c1".to_string(), (3, 0))), "{draft:?}");
+}
+
 /// Locked (user 2026-10-21): Ctrl+Shift+J takes the picture J of the Ton segment under the
 /// Wrap playhead (not the first, not an Off); its length is free.
 #[test]

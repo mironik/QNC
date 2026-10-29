@@ -110,6 +110,9 @@ impl PanelFocus {
                 qnc_program_segments::SegmentCommand::PickChannel { lane, channel } => {
                     Some(Some(qnc_segments_keys::pick(lane, channel, (preview, wrap, segments))))
                 }
+                command @ (qnc_program_segments::SegmentCommand::TakeCutEdge { .. } | qnc_program_segments::SegmentCommand::DragCutEdge { .. }) => {
+                    Some(Some(qnc_segments_keys::cut_edge(command, (preview, wrap, segments))))
+                }
                 command => Some(Some(segments.apply(command))),
             };
         }

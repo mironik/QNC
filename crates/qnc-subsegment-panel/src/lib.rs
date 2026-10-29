@@ -66,7 +66,7 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
         // The taken edge is the one a drag drags (the mouse rule: only what is taken moves).
         .map(|((index, out, frame), id)| {
             let taken = view.trim.is_some_and(|(at, trim_out, _)| at == index && trim_out == out);
-            TimelineMarkerPin { id, frame, taken, locked: false, part: TimelineMarkerPart::Whole, origin: None, sound_at: None }
+            TimelineMarkerPin { id, frame, taken, locked: false, part: TimelineMarkerPart::Whole, origin: None, sound_tail: None, sound_lead: None }
         })
         .collect();
     // The edge being trimmed, as the trim playhead of a cover's edge.

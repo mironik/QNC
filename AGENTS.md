@@ -6962,3 +6962,25 @@ Nije izvedeno: Ton segment u Storyju iz SubSegmenta (Story nema scenarij, pa ni 
 Izmjena 2026-10-29 (korisnik: "izbaci iznad source timeline dio koji si dodao, nepotreban je"): SubSegment timeline vise
 nema redak naslova ("SubSegment: n parts, n frames" i Close) iznad sebe; source timeline vraca klik na klip u poolu
 (`qnc-subsegment-panel`; sifre `subsegment.title`, `subsegment.close` uklonjene iz rjecnika).
+Izvedeno 2026-10-29 (korisnik nakon audita: "gdje se izgubio J i L"; "da, napravi tako, ali dodaj i selekciju misom i
+povlacenje ili srednjim tockom misa"): nalaz: od 21. 10. rez tona M markera imao je samo jedan pomak (L pokrivalice prije
+ILI J pokrivalice poslije), pa J i L zajedno (preklapanje dvaju ambijenata) nije bilo moguce zadati, a operacija baze
+`SetCoverOverlap` ostala je bez pozivatelja. Sada ton reza ima dvije strane, samo u zoomu (pravilo 22. 10.): Ctrl+M pa
+Ctrl+2 uzima ton reza (obje strane: jedan rez tona, a kad postoje i J i L, preklapanje se mice cijelo), Ctrl+O samo L
+pokrivalice prije (gdje njezin ton zavrsava), Ctrl+I samo J pokrivalice poslije (gdje njezin ton pocinje), Ctrl+2 opet
+obje; lijevi klik na crvenu crtu strane na A2 uzima tu stranu, povlacenje je pomice, kotacic i strelice kao do sada;
+svaki korak se odmah cuje, Enter sprema obje strane u jednom koraku Undo, Esc odustaje. Na A2 su obje strane crvene
+(uzeta debela), spojene na vrhu A2; spremljeni rez s J i L ostaje vidljiv. `qnc-program-db` operacija `SetCutSoundEdges`
+(`set_cut_sound_edges`, `cut_edges`); `MoveMarkerPicture` cuva oba ruba tona na svom mjestu u prici (test promijenjen:
+nakon L 3 i pomaka slike 14 -> 18 pokrivalica poslije zadrzava pocetak tona na 14, J 4; prije J 1). `qnc-program-segments`
+`cut_part.rs` (`SoundEdge`, `CutSound`, `take_sound_edge`, `take_sound_edge_at`, `drag_sound_edge`, `cut_sound_frames`),
+`qnc-program-commands` (`TakeCutEdge`, `DragCutEdge`), `qnc-program-view` (`MarkerPin.sound_tail/sound_lead`,
+`TakenPart::SoundLead/SoundTail`), `qnc-timeline` (`TimelineMarkerPin.sound_tail/sound_lead` umjesto `sound_at`,
+`TimelineIntent::TakeCutEdge`, `take_cut_edge_drag`, `paint_sound_sides`; dok je ton uzet, povlacenje mice samo stranu
+tona, nikad sliku), `qnc-mouse-map` i `contracts/input/mouse.json` (`click_cut_edge` -> `timeline_take_cut_edge`,
+`drag_cut_edge` -> `timeline_drag_cut_edge`; mapa misa prosirena uz odluku korisnika), katalog akcija (bez tipki),
+`qnc-segments-keys` (`cut_edge`, Ctrl+I/O dok je ton uzet), `qnc-panel-focus`, `qnc-segment-panel`, rjecnik. Testovi
+`a_cut_has_the_j_of_the_cover_after_and_the_l_of_the_cover_before_together`,
+`the_j_and_the_l_of_a_cut_move_apart_and_are_written_together`, svi testovi dotaknutih kocki, conformance, release build.
+Uzivo nije provjereno. Nije izvedeno (sljedeci korak, korisnik: "ton moze biti A1 ili A2"): J i L tona na A1 (spoj dvaju
+segmenata), baza jos nema mjesta za njih.

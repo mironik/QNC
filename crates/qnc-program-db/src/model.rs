@@ -194,6 +194,10 @@ pub enum Operation {
     /// frames after the picture cut (an L of the cover before), negative before it (a J of the
     /// cover after). One UNDO step.
     SetCutSound { marker_id: String, offset: i64 },
+    /// Both sides of the A2 sound of an M marker's cut (user 2026-10-29: J and L together, an
+    /// overlap): `tail_frames` the L of the cover before, `lead_frames` the J of the cover
+    /// after, story frames. A side with no cover takes none. One UNDO step.
+    SetCutSoundEdges { marker_id: String, tail_frames: u32, lead_frames: u32 },
     /// Both markers of the slot move so it starts at `start_frame` (user 2026-10-10).
     MoveSlot { slot_id: String, start_frame: u64 },
     /// A slot longer or shorter by `frames` story frames at its start (`start`) or its
@@ -269,6 +273,7 @@ impl Operation {
                 | Self::MoveMarker { .. }
                 | Self::MoveMarkerPicture { .. }
                 | Self::SetCutSound { .. }
+                | Self::SetCutSoundEdges { .. }
                 | Self::MoveSlot { .. }
                 | Self::TrimSlot { .. }
                 | Self::DeleteMarker { .. }

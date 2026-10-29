@@ -13,10 +13,9 @@ impl ProgramSegments {
         view.markers = resolve(&view, &self.stored_markers, self.selected_marker.as_deref());
         view.alert = self.alert.clone();
         // A cut whose A2 sound is stored away from its picture (a J or an L) shows it always
-        // (user 2026-10-22: the moved red cut stays visible).
+        // (user 2026-10-22: the moved red cut stays visible); both its sides (2026-10-29).
         for pin in view.markers.iter_mut() {
-            let offset = self.cut_offset(&pin.marker_id);
-            pin.sound_at = (offset != 0).then(|| pin.frame.saturating_add_signed(offset));
+            (pin.sound_tail, pin.sound_lead) = self.cut_sound_frames(&pin.marker_id, pin.frame);
         }
         if let Some((marker_id, draft)) = &self.marker_edit {
             // The draft is drawn where the marker is going.
@@ -26,13 +25,18 @@ impl ProgramSegments {
                 .filter(|pin| &pin.marker_id == marker_id)
             {
                 pin.origin = Some(pin.frame);
-                pin.sound_at = self.cut_sound_frame().or(pin.sound_at);
+                // The picture alone moves: its sound stays where it is stored.
+                if self.cut_part != CutPart::Picture {
+                    (pin.sound_tail, pin.sound_lead) = self.cut_sound_frames(marker_id, *draft);
+                }
                 pin.frame = *draft;
                 pin.taken = true;
                 pin.taken_part = match self.cut_part {
                     CutPart::Whole => qnc_program_view::TakenPart::Whole,
                     CutPart::Picture => qnc_program_view::TakenPart::Picture,
-                    CutPart::Sound { .. } => qnc_program_view::TakenPart::Sound,
+                    CutPart::Sound { edge: crate::SoundEdge::Both, .. } => qnc_program_view::TakenPart::Sound,
+                    CutPart::Sound { edge: crate::SoundEdge::Lead, .. } => qnc_program_view::TakenPart::SoundLead,
+                    CutPart::Sound { edge: crate::SoundEdge::Tail, .. } => qnc_program_view::TakenPart::SoundTail,
                 };
             }
         }
@@ -109,7 +113,7 @@ impl ProgramSegments {
         view.source_edit_stills = self.source_stills();
         view.trim_frames = self.edit_moves().into_iter().map(|(_, new)| new).collect();
         view.trim_frames.extend(self.overlap.as_ref().map(overlap::OverlapEdit::frame));
-        view.trim_frames.extend(self.cut_sound_frame());
+        view.trim_frames.extend(self.cut_sound_trim_frames());
         view.a1_splits = self.picture_leads();
         qnc_program_view::mark_clip_edges(&mut view.edit_stills, |id| self.clip_frames.get(id).copied());
         self.lane_view(&mut view);

@@ -56,6 +56,9 @@ pub fn overlap(
 ) -> ControlFlow<Option<bool>> {
     let drafting = segments.overlap_taken() || segments.cut_sound_taken();
     let done = match action_id {
+        // With the cut's sound taken: Ctrl+I its J (the sound after starts), Ctrl+O its L (the
+        // sound before ends), user 2026-10-29; else the picture alone.
+        side @ ("select_mark_in" | "select_mark_out") if segments.cut_sound_taken() => segments.take_sound_edge(side == "select_mark_in"),
         "select_mark_in" | "select_mark_out" if segments.editing_marker() => segments.take_cut_part(None, true, 0),
         lane @ ("select_audio_a1" | "select_audio_a2") if segments.editing_marker() => {
             segments.take_cut_part(None, false, u8::from(lane == "select_audio_a2"))
@@ -66,6 +69,17 @@ pub fn overlap(
     };
     preview.hear_program_draft(overlap_draft(segments), None, wrap.playhead());
     ControlFlow::Break(Some(done))
+}
+
+/// A click or a drag on a side of the taken cut's A2 sound (user 2026-10-29): taken or moved,
+/// heard at once as the arrows are.
+pub fn cut_edge(
+    command: qnc_program_segments::SegmentCommand,
+    (preview, wrap, segments): (&mut SourcePreview, &mut WrapSession, &mut ProgramSegments),
+) -> bool {
+    let done = segments.apply(command);
+    preview.hear_program_draft(overlap_draft(segments), None, wrap.playhead());
+    done
 }
 
 /// The picture J or the cut's sound drafted on the Wrap row, as the program plays it before Enter.

@@ -46,6 +46,8 @@
       "right_click_a1": "select_audio_a1",
       "right_click_a2": "select_audio_a2",
       "drag_marker": "timeline_drag_marker",
+      "click_cut_edge": "timeline_take_cut_edge",
+      "drag_cut_edge": "timeline_drag_cut_edge",
       "middle_click": "add_marker",
       "wheel_back": "wheel_segments_back",
       "wheel_forward": "wheel_segments_forward",

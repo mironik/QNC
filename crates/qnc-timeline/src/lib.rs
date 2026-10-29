@@ -577,9 +577,35 @@ pub struct TimelineMarkerPin<'a> {
     /// sound's (A2) part (user 2026-10-22).
     pub part: TimelineMarkerPart,
     /// While taken: where it is stored, drawn white (user 2026-10-22: the original stays, the
-    /// red is what moves), and where its taken A2 sound's cut is going.
+    /// red is what moves).
     pub origin: Option<u64>,
-    pub sound_at: Option<u64>,
+    /// The two sides of its A2 sound (user 2026-10-29: J and L together): where the sound of
+    /// the cover before ends (its L) and where the sound of the cover after starts (its J);
+    /// `None` for a side with no cover. Away from `frame` they are drawn red on A2.
+    pub sound_tail: Option<u64>,
+    pub sound_lead: Option<u64>,
+}
+
+impl TimelineMarkerPin<'_> {
+    /// The sides of its A2 sound that exist.
+    fn sound_sides(&self) -> impl Iterator<Item = u64> + '_ {
+        self.sound_lead.into_iter().chain(self.sound_tail)
+    }
+
+    /// Whether its A2 sound is away from its picture (a J or an L).
+    fn sound_split(&self) -> bool {
+        self.sound_sides().any(|side| side != self.frame)
+    }
+
+    /// Where the moving part of it is while taken: the picture's cut, or the sound's sides that move.
+    fn moving_frames(&self) -> Vec<u64> {
+        match self.part {
+            TimelineMarkerPart::Whole | TimelineMarkerPart::Picture => vec![self.frame],
+            TimelineMarkerPart::Sound => self.sound_sides().collect(),
+            TimelineMarkerPart::SoundLead => self.sound_lead.into_iter().collect(),
+            TimelineMarkerPart::SoundTail => self.sound_tail.into_iter().collect(),
+        }
+    }
 }
 
 /// The part of a taken M marker that moves.
@@ -588,7 +614,18 @@ pub enum TimelineMarkerPart {
     #[default]
     Whole,
     Picture,
+    /// Its A2 sound, both sides.
     Sound,
+    /// Only the J of the cover after (user 2026-10-29).
+    SoundLead,
+    /// Only the L of the cover before.
+    SoundTail,
+}
+
+impl TimelineMarkerPart {
+    fn is_sound(self) -> bool {
+        matches!(self, Self::Sound | Self::SoundLead | Self::SoundTail)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -807,6 +844,9 @@ pub enum TimelineIntent {
     TakeMarkerSound { id: String },
     /// A second right click over the picture near the taken M marker: only its picture moves.
     TakeMarkerPicture { id: String },
+    /// A left click over A2 on a side of the taken marker's sound (user 2026-10-29): that side
+    /// (the nearer to `frame`) moves alone.
+    TakeCutEdge { id: String, frame: u64 },
     /// A cut (scissors) at the playhead of a source timeline: the middle mouse button, a
     /// touchpad's three-finger tap set to it, a two-finger tap on a touch screen (user
     /// 2026-10-18: two cuts mark IN and OUT, the earlier IN, the later OUT).
@@ -1223,9 +1263,7 @@ fn paint_trim_playheads(ui: &mut egui::Ui, outer: Rect, input: &TimelineInput<'_
     // the moving cut, user 2026-10-22).
     let red = |frame: u64| {
         input.layers.markers
-            && input.markers.iter().any(|marker| {
-                marker.taken && (match marker.part { TimelineMarkerPart::Sound => marker.sound_at.unwrap_or(marker.frame), _ => marker.frame }) == frame
-            })
+            && input.markers.iter().any(|marker| marker.taken && marker.moving_frames().contains(&frame))
     };
     for (frame, label) in input.trim_playheads {
         let x = x_for_local_frame(track, duration, *frame);
@@ -1244,7 +1282,11 @@ fn paint_trim_playheads(ui: &mut egui::Ui, outer: Rect, input: &TimelineInput<'_
     if input.layers.markers {
         let (range_start, duration) = (input.state.range_start(), input.state.duration_frames());
         for marker in input.markers.iter().filter(|marker| marker.taken) {
-            paint_taken_marker(ui, track, taken_x(track, range_start, duration, marker), marker.part, input);
+            if marker.part.is_sound() {
+                paint_sound_sides(ui, track, range_start, duration, marker, &marker.moving_frames(), input);
+            } else {
+                paint_taken_marker(ui, track, x_for_frame(track, range_start, duration, marker.frame), marker.part, input);
+            }
         }
     }
 }
@@ -1411,7 +1453,12 @@ fn paint_audio_band(ui: &mut egui::Ui, band: Rect, lane: AudioLane, peaks: &[f32
     match band_response.interact_pointer_pos().filter(|_| band_response.clicked() && input.state.can_cue()) {
         Some(pos) => {
             let frame = frame_for_x(track_rect, input.state.range_start(), input.state.duration_frames(), pos.x);
-            if holding(input) {
+            let edge = matches!(lane, AudioLane::A2)
+                .then(|| cut_edge_hit(track_rect, input.state.range_start(), input.state.duration_frames(), egui::pos2(pos.x, track_rect.bottom()), input))
+                .flatten();
+            if let Some(id) = edge {
+                TimelineIntent::TakeCutEdge { id: id.to_string(), frame }
+            } else if holding(input) {
                 TimelineIntent::Keep(Some(frame))
             } else if input.layers.markers && band_response.ctx.input(|i| i.modifiers.shift) {
                 TimelineIntent::AddMarkerAt(frame)
@@ -1548,6 +1595,15 @@ fn take_or_keep_intent(response: &egui::Response, track: Rect, input: &TimelineI
         if let (Some(rows), Some(pos)) = (zoom_strip_rows(track, input), response.interact_pointer_pos()) {
             if cover_hit(track, range_start, duration, pos, input.covers, rows).is_some() {
                 return Some(TimelineIntent::TakeSound { lane: AudioLane::A2, frame: frame_for_x(track, range_start, duration, pos.x) });
+            }
+        }
+    }
+    // A left click on a side of the taken cut's sound takes that side (user 2026-10-29); a drag
+    // there moves it (`track_marker_drag`).
+    if response.clicked() {
+        if let Some(pos) = response.interact_pointer_pos() {
+            if let Some(id) = cut_edge_hit(track, range_start, duration, pos, input) {
+                return Some(TimelineIntent::TakeCutEdge { id: id.to_string(), frame: frame_for_x(track, range_start, duration, pos.x) });
             }
         }
     }
@@ -2199,19 +2255,26 @@ fn paint_markers(
             if let Some(origin) = marker.origin.map(|frame| x_for_frame(track, range_start, duration, frame)) {
                 ui.painter().line_segment([egui::pos2(origin, top), egui::pos2(origin, track.bottom())], Stroke::new(1.5, input.theme.text));
             }
-            paint_taken_marker(ui, track, taken_x(track, range_start, duration, marker), marker.part, input);
+            if marker.part.is_sound() {
+                // Its sound taken: the picture stays, both sides of the sound on A2 (the
+                // moving one thick, user 2026-10-29: J and L together).
+                let bottom = track.bottom() - video_middle_insets(input).1;
+                ui.painter().line_segment([egui::pos2(x, top), egui::pos2(x, bottom)], Stroke::new(1.5, input.theme.text));
+                paint_sound_sides(ui, track, range_start, duration, marker, &marker.moving_frames(), input);
+            } else {
+                paint_taken_marker(ui, track, x, marker.part, input);
+            }
             continue;
         }
-        // A cut whose A2 sound is away from its picture (a J or an L): the line over the
-        // picture, the sound's cut red on A2 (user 2026-10-22).
-        let bottom = if marker.sound_at.is_some() { track.bottom() - video_middle_insets(input).1 } else { track.bottom() };
+        // A cut whose A2 sound is away from its picture (a J or an L, or both): the line over
+        // the picture, the sound's sides red on A2 (user 2026-10-22, 2026-10-29).
+        let split = marker.sound_split();
+        let bottom = if split { track.bottom() - video_middle_insets(input).1 } else { track.bottom() };
         // A split cut is red in both parts (user 2026-10-22); a whole one keeps its colour.
-        let (width, color) = if marker.sound_at.is_some() { (2.0, input.theme.marker_hover) } else { (width, color) };
+        let (width, color) = if split { (2.0, input.theme.marker_hover) } else { (width, color) };
         ui.painter().line_segment([egui::pos2(x, top), egui::pos2(x, bottom)], Stroke::new(width, color));
-        if let Some(sound) = marker.sound_at {
-            let sound = x_for_frame(track, range_start, duration, sound);
-            ui.painter().line_segment([egui::pos2(sound, bottom), egui::pos2(sound, track.bottom())], Stroke::new(2.0, input.theme.marker_hover));
-            ui.painter().line_segment([egui::pos2(x.min(sound), bottom), egui::pos2(x.max(sound), bottom)], Stroke::new(1.0, input.theme.marker_hover));
+        if split {
+            paint_sound_sides(ui, track, range_start, duration, marker, &[], input);
         }
         if !input.layers.audio_bands {
             ui.painter().text(
@@ -2239,27 +2302,47 @@ fn paint_a1_splits(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u
     }
 }
 
-/// Where the moving part of a taken marker is: its sound's cut when the sound is taken, else
-/// the marker's draft.
-fn taken_x(track: Rect, range_start: u64, duration: u64, marker: &TimelineMarkerPin<'_>) -> f32 {
-    let frame = match marker.part {
-        TimelineMarkerPart::Sound => marker.sound_at.unwrap_or(marker.frame),
-        _ => marker.frame,
-    };
-    x_for_frame(track, range_start, duration, frame)
+/// The sides of a cut's A2 sound on A2 (user 2026-10-29): the start of the sound after (its J)
+/// and the end of the sound before (its L), joined at the top of A2; the sides in `moving`
+/// are thick (they are taken), the others thin.
+fn paint_sound_sides(ui: &mut egui::Ui, track: Rect, range_start: u64, duration: u64, marker: &TimelineMarkerPin<'_>, moving: &[u64], input: &TimelineInput<'_>) {
+    let top = track.bottom() - video_middle_insets(input).1;
+    let x = |frame: u64| x_for_frame(track, range_start, duration, frame);
+    let picture = x(marker.frame);
+    let (mut left, mut right) = (picture, picture);
+    for side in marker.sound_sides() {
+        let at = x(side);
+        let width = if moving.contains(&side) { 3.0 } else { 2.0 };
+        ui.painter().line_segment([egui::pos2(at, top), egui::pos2(at, track.bottom())], Stroke::new(width, input.theme.marker_hover));
+        (left, right) = (left.min(at), right.max(at));
+    }
+    ui.painter().line_segment([egui::pos2(left, top), egui::pos2(right, top)], Stroke::new(1.0, input.theme.marker_hover));
 }
 
-/// A taken marker is red (user 2026-10-22): whole, or only the part that moves (its picture
-/// or its A2 sound); thicker than a trim playhead so it shows over one at the same frame.
+/// A taken marker is red (user 2026-10-22): whole, or only its picture; thicker than a trim
+/// playhead so it shows over one at the same frame. (Its sound: `paint_sound_sides`.)
 fn paint_taken_marker(ui: &mut egui::Ui, track: Rect, x: f32, part: TimelineMarkerPart, input: &TimelineInput<'_>) {
     let top = track.top() + slot_top(input);
     let sound_top = track.bottom() - video_middle_insets(input).1;
     let (from, to) = match part {
-        TimelineMarkerPart::Whole => (top, track.bottom()),
         TimelineMarkerPart::Picture => (top, sound_top),
-        TimelineMarkerPart::Sound => (sound_top, track.bottom()),
+        _ => (top, track.bottom()),
     };
     ui.painter().line_segment([egui::pos2(x, from), egui::pos2(x, to)], Stroke::new(3.0, input.theme.marker_hover));
+}
+
+/// The taken marker whose sound is taken, when `pos` is over A2 within reach of one of its
+/// sound's sides (user 2026-10-29: a click takes that side, a drag moves it).
+fn cut_edge_hit<'a>(track: Rect, range_start: u64, duration: u64, pos: egui::Pos2, input: &TimelineInput<'a>) -> Option<&'a str> {
+    if !input.layers.markers || pos.y < track.bottom() - video_middle_insets(input).1 - 2.0 {
+        return None;
+    }
+    input
+        .markers
+        .iter()
+        .find(|marker| marker.taken && marker.part.is_sound())
+        .filter(|marker| marker.sound_sides().any(|side| (pos.x - x_for_frame(track, range_start, duration, side)).abs() <= marker_reach::MARKER_REACH))
+        .map(|marker| marker.id)
 }
 
 fn paint_range_outline(
@@ -2351,7 +2434,16 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
     let active = egui::Id::new(MARKER_DRAG).with(response.id);
     if response.drag_started() {
         let press = ctx.input(|i| i.pointer.press_origin());
-        let hit = press.and_then(|pos| marker_to_drag(track, start, duration, pos, input.markers)).map(str::to_string);
+        // A taken marker whose sound is taken: a drag moves only a side of its sound (user
+        // 2026-10-29), never its picture.
+        let sound_taken = input.markers.iter().any(|marker| marker.taken && marker.part.is_sound());
+        let edge = press.and_then(|pos| cut_edge_hit(track, start, duration, pos, input)).map(str::to_string);
+        ctx.data_mut(|d| d.insert_temp(active.with("cut_edge"), edge.is_some()));
+        let hit = if sound_taken {
+            edge
+        } else {
+            press.and_then(|pos| marker_to_drag(track, start, duration, pos, input.markers)).map(str::to_string)
+        };
         // Every drag on a row with markers in the player log: which marker was nearest and
         // how far (live 2026-10-18: a marker drag that scrubbed instead could not be told).
         if qnc_dev_diagnostics::player_diagnostics_enabled() {
@@ -2371,7 +2463,9 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
         .filter(|_| response.dragged())
     {
         let frame = frame_for_x(track, start, duration, pos.x);
-        ctx.data_mut(|d| d.insert_temp(egui::Id::new(MARKER_DRAG), (id, frame)));
+        let edge = ctx.data(|d| d.get_temp::<bool>(active.with("cut_edge"))).unwrap_or(false);
+        let key = if edge { CUT_EDGE_DRAG } else { MARKER_DRAG };
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new(key), (id, frame)));
     }
     if response.drag_stopped() {
         ctx.data_mut(|d| d.remove::<String>(active));
@@ -2383,6 +2477,14 @@ fn track_marker_drag(response: &egui::Response, track: Rect, input: &TimelineInp
 /// that row (`None` when no marker is dragged). Read right after the row.
 pub fn take_marker_drag(ctx: &egui::Context) -> Option<(String, u64)> {
     ctx.data_mut(|d| d.remove_temp::<(String, u64)>(egui::Id::new(MARKER_DRAG)))
+}
+
+const CUT_EDGE_DRAG: &str = "qnc_timeline_cut_edge_drag";
+
+/// A side of a taken cut's A2 sound a drag moved during the last painted row (user
+/// 2026-10-29): the marker and the frame on that row.
+pub fn take_cut_edge_drag(ctx: &egui::Context) -> Option<(String, u64)> {
+    ctx.data_mut(|d| d.remove_temp::<(String, u64)>(egui::Id::new(CUT_EDGE_DRAG)))
 }
 
 fn video_intent_from_response(
@@ -2807,7 +2909,8 @@ mod tests {
             locked: false,
             part: TimelineMarkerPart::Whole,
             origin: None,
-            sound_at: None,
+            sound_tail: None,
+            sound_lead: None,
         }];
 
         // A right click off the strip takes the nearest marker, however far (user 2026-10-20).

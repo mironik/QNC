@@ -36,6 +36,7 @@ pub fn event(intent: &TimelineIntent, panel: &str, frame: &dyn Fn(u64) -> u64) -
         TimelineIntent::TakeAudioLane(lane) => (if a2(lane) { Pointer::RightClickA2 } else { Pointer::RightClickA1 }, None, None),
         TimelineIntent::TakeMarkerSound { id } => (Pointer::RightClickMarkerA2, None, Some(id)),
         TimelineIntent::TakeMarkerPicture { id } => (Pointer::RightClickTakenMarker, None, Some(id)),
+        TimelineIntent::TakeCutEdge { id, frame: at } => (Pointer::ClickCutEdge, Some(frame(*at)), Some(id)),
         TimelineIntent::TakeSound { lane, frame: at } => (if a2(lane) { Pointer::RightClickA2 } else { Pointer::RightClickA1 }, Some(frame(*at)), None),
         // IN or OUT dragged: the clip's own frame, never mapped.
         TimelineIntent::DragMark { in_mark, frame: at } => (if *in_mark { Pointer::DragIn } else { Pointer::DragOut }, Some(*at), None),
@@ -65,6 +66,11 @@ pub fn event(intent: &TimelineIntent, panel: &str, frame: &dyn Fn(u64) -> u64) -
 /// The M marker dragged on a row this frame, as the action of the mouse map (`drag_marker`)
 /// with the marker and the frame it is dragged to (`frame` maps the row's frame).
 pub fn take_marker_drag_event(ctx: &eframe::egui::Context, panel: &str, frame: &dyn Fn(u64) -> u64) -> Option<ActionEvent> {
+    // A side of the taken cut's sound dragged (user 2026-10-29).
+    if let Some((marker_id, at)) = crate::take_cut_edge_drag(ctx) {
+        let action = qnc_mouse_map::action(panel, Pointer::DragCutEdge)?;
+        return Some(ActionEvent::key(action).with_target(marker_id).with_value(frame(at)).at(panel));
+    }
     let (marker_id, at) = crate::take_marker_drag(ctx)?;
     let action = qnc_mouse_map::action(panel, Pointer::DragMarker)?;
     Some(ActionEvent::key(action).with_target(marker_id).with_value(frame(at)).at(panel))
