@@ -9,39 +9,12 @@ use qnc_wheel_jog::Wheel;
 pub const MODULE_ID: &str = "qnc.module.gesture-steps";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// What a gesture does over a panel. `Undo`: undo (forward) or redo (back) of the story, a step
-/// at a time (user 2026-10-29: "left-right for the markers, up-down for undo-redo").
+/// What a gesture does over a panel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Role {
     Jog,
     Level,
-    Undo,
     None,
-}
-
-/// One step of a gesture: the panel's wheel (or Ctrl+wheel), or undo (`redo`: redo).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Gesture {
-    Wheel(Wheel),
-    Undo { redo: bool },
-}
-
-impl Gesture {
-    /// The wheel step, `None` for an undo.
-    pub fn wheel(self) -> Option<Wheel> {
-        match self {
-            Self::Wheel(wheel) => Some(wheel),
-            Self::Undo { .. } => None,
-        }
-    }
-
-    /// The undo step (`true`: redo), `None` for a wheel.
-    pub fn undo(self) -> Option<bool> {
-        match self {
-            Self::Undo { redo } => Some(redo),
-            Self::Wheel(_) => None,
-        }
-    }
 }
 
 /// The role `key` of a device map.
@@ -49,9 +22,8 @@ pub fn role(map: &serde_json::Value, key: &str) -> Result<Role, String> {
     match map.get(key).and_then(serde_json::Value::as_str) {
         Some("jog") => Ok(Role::Jog),
         Some("level") => Ok(Role::Level),
-        Some("undo") => Ok(Role::Undo),
         Some("none") => Ok(Role::None),
-        other => Err(format!("{key} must be \"jog\", \"level\", \"undo\" or \"none\", not {other:?}")),
+        other => Err(format!("{key} must be \"jog\", \"level\" or \"none\", not {other:?}")),
     }
 }
 
@@ -79,8 +51,7 @@ pub fn read_map<T>(file: &str, device: &str, parse: impl FnOnce(&str) -> Result<
 pub struct Steps {
     jog: f32,
     level: f32,
-    undo: f32,
-    whole: [i32; 3],
+    whole: [i32; 2],
 }
 
 impl Steps {
@@ -89,7 +60,6 @@ impl Steps {
         let (rest, whole) = match role {
             Role::Jog => (&mut self.jog, &mut self.whole[0]),
             Role::Level => (&mut self.level, &mut self.whole[1]),
-            Role::Undo => (&mut self.undo, &mut self.whole[2]),
             Role::None => return,
         };
         *rest += steps;
@@ -98,20 +68,17 @@ impl Steps {
         *whole += done as i32;
     }
 
-    /// The next step to give, the jog first, then the level, then undo: one a frame.
-    pub fn next(&mut self) -> Option<Gesture> {
-        let index = (0..3).find(|index| self.whole[*index] != 0)?;
+    /// The next step to give, the jog first: one a frame.
+    pub fn next(&mut self) -> Option<Wheel> {
+        let (index, ctrl) = if self.whole[0] != 0 { (0, false) } else { (1, true) };
         let step = self.whole[index].signum();
         self.whole[index] -= step;
-        Some(match index {
-            2 => Gesture::Undo { redo: step < 0 },
-            index => Gesture::Wheel(Wheel { up: step > 0, ctrl: index == 1 }),
-        })
+        (step != 0).then_some(Wheel { up: step > 0, ctrl })
     }
 
     /// Whether whole steps wait for the next frames.
     pub fn waiting(&self) -> bool {
-        self.whole != [0, 0, 0]
+        self.whole != [0, 0]
     }
 }
 
@@ -127,11 +94,9 @@ mod tests {
         steps.add(Role::Jog, 1.5);
         steps.add(Role::Level, -1.0);
         steps.add(Role::None, 9.0);
-        assert_eq!(steps.next(), Some(Gesture::Wheel(Wheel { up: true, ctrl: false })));
-        assert_eq!(steps.next(), Some(Gesture::Wheel(Wheel { up: true, ctrl: false })));
-        steps.add(Role::Undo, -1.2);
-        assert_eq!(steps.next(), Some(Gesture::Wheel(Wheel { up: false, ctrl: true })), "then the level");
-        assert_eq!(steps.next(), Some(Gesture::Undo { redo: true }), "then undo: back is redo");
+        assert_eq!(steps.next(), Some(Wheel { up: true, ctrl: false }));
+        assert_eq!(steps.next(), Some(Wheel { up: true, ctrl: false }));
+        assert_eq!(steps.next(), Some(Wheel { up: false, ctrl: true }), "then the level");
         assert!(!steps.waiting());
         let map = serde_json::json!({ "pinch": "zoom" });
         assert!(role(&map, "pinch").is_err());

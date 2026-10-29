@@ -7062,15 +7062,3 @@ izabrana pokrivalica, izabrani marker, pokrivalica izabranog slota, izabrani seg
 "Redo sel." u traci panela Segmenti lijevo od Undo/Redo (ukljuceni kad je nesto izabrano). Testovi
 `undo_selected_takes_back_the_changes_of_one_object_whenever_they_were`, `undo_selected_takes_the_selected_object`,
 conformance. Nije izvedeno: undo/redo misem. Uzivo nije provjereno.
-Izvedeno 2026-10-29 (korisnik: "povlacenje lijevo-desno je za podesavanje markera, a gore-dolje za undo-redo, ako moze
-mis ili dva prsta na geste padu"): undo i redo u vremenu gestom. Mis: na Wrap retku povlacenje lijevom tipkom koje nakon
-10 px ide uglavnom gore ili dolje (|dy| > 2|dx|) nije scrub ni povlacenje markera, nego undo (gore) ili redo (dolje),
-jedan korak svakih 40 px (`qnc-timeline` `undo_drag.rs`, zastavica sloja `undo_drag`, `with_undo_drag` na Wrap redovima
-`qnc-segment-panel`; namjera `TimelineIntent::UndoStep`). Touchpad: dva prsta okomito su uloga `undo`
-(`contracts/input/touchpad.json` `swipe_vertical`, `lines_per_undo` 3, `points_per_undo` 120; prije `jog`), vodoravno
-ostaje jog. `qnc-gesture-steps` uloga `Undo` i korak `Gesture` (kotac ili undo); `qnc-touchpad` i `qnc-touch-gestures`
-vracaju `Gesture`. Mapa misa (`contracts/input/mouse.json`, prosirena uz odluku korisnika): `drag_up` -> `undo_object`,
-`drag_down` -> `redo_object` samo na panelu Segmenti (`qnc-mouse-map` `Pointer::DragUp/DragDown`); na source timelineu
-okomito povlacenje i dalje scrub, okomiti swipe ne radi nista. Undo izabranog ostaje Ctrl+Backspace i gumbi. Testovi
-`a_drag_mostly_up_or_down_is_undo_steps_one_every_forty_pixels`, touchpad, gesture-steps, mouse-map, conformance.
-Uzivo nije provjereno.

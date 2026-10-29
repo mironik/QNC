@@ -236,7 +236,7 @@ pub fn show(
 /// and A2 in the dark bands above and below the light middle (user 2026-10-15).
 /// With `compact` the light middle is narrow and shows no filmstrip (Ctrl+click on V).
 fn layers(compact: bool) -> TimelineLayerFlags {
-    TimelineLayerFlags::a1_v_a2().with_overlays().with_audio_bands().with_compact_video(compact).with_undo_drag()
+    TimelineLayerFlags::a1_v_a2().with_overlays().with_audio_bands().with_compact_video(compact)
 }
 
 /// One segment row: the program inside its window.

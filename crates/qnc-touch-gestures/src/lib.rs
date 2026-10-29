@@ -6,8 +6,7 @@
 //! and a drag a drag, as with the mouse. No form state, no database, no player.
 
 use eframe::egui::{self, Rect, Ui};
-use qnc_gesture_steps::{Gesture, Role, Steps};
-#[cfg(test)]
+use qnc_gesture_steps::{Role, Steps};
 use qnc_wheel_jog::Wheel;
 
 pub const MODULE_ID: &str = "qnc.module.touch-gestures";
@@ -68,7 +67,7 @@ fn add(map: &TouchMap, translation: egui::Vec2, zoom: f32, steps: &mut Steps) {
 
 /// A gesture of two or more fingers over `rect` this frame: one step of the panel's wheel
 /// (`ctrl`: Ctrl+wheel), the rest in the next frames, in order.
-pub fn take(ui: &Ui, rect: Rect, key: egui::Id) -> Option<Gesture> {
+pub fn take(ui: &Ui, rect: Rect, key: egui::Id) -> Option<Wheel> {
     let map = TouchMap::of_this_qnc()?;
     let ctx = ui.ctx();
     let gesture = ctx.multi_touch().filter(|touch| rect.contains(touch.center_pos));
@@ -145,7 +144,7 @@ mod tests {
         add(&map, egui::vec2(0.0, -100.0), 1.0, &mut steps);
         assert_eq!(steps.next(), None, "along does nothing in this map");
         add(&map, egui::Vec2::ZERO, 1.1 * 1.001, &mut steps);
-        assert_eq!(steps.next(), Some(Gesture::Wheel(Wheel { up: true, ctrl: true })));
+        assert_eq!(steps.next(), Some(Wheel { up: true, ctrl: true }));
         assert!(map.two_finger_tap_cuts);
         assert!(is_tap(0.2, 3.0, 1.0), "quick and in place: a cut");
         assert!(!is_tap(0.8, 3.0, 1.0), "held: no cut");

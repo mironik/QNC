@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "The mouse map of QNC (user rule 2026-10-20, locked): what the mouse does on a timeline is one catalog action of contracts/qnc-keyboard-shortcuts.json, the same rule as the keys. A left click places the playhead (on a cover's colour strip it selects the slot); while something is taken a left click keeps it first (as Enter) and then places the playhead. A right click is Ctrl+: it takes what it points at (the nearest IN or OUT, the slot on a colour strip, A1/A2); on a Wrap row over the picture the nearest M marker with only its picture moving (as Ctrl+M then Ctrl+I), over A2 the nearest marker with only its sound moving (as Ctrl+M then Ctrl+2), user 2026-10-21; the locked start and end markers are not taken. A drag moves only what is taken. Shift + left click adds (an M marker there, as Shift+M). The middle button is the cut. The wheel is the left/right arrows, Ctrl+wheel (or the wheel with the right button held) Ctrl+left/right. On a Wrap row a left-button drag across moves what is taken, a drag mostly up or down (or a two-finger swipe along on the touchpad) is undo (up) or redo (down) in time (user 2026-10-29). Pointer names are the timeline's (qnc-mouse-map); an action left out means the pointer does nothing on that panel.",
+  "description": "The mouse map of QNC (user rule 2026-10-20, locked): what the mouse does on a timeline is one catalog action of contracts/qnc-keyboard-shortcuts.json, the same rule as the keys. A left click places the playhead (on a cover's colour strip it selects the slot); while something is taken a left click keeps it first (as Enter) and then places the playhead. A right click is Ctrl+: it takes what it points at (the nearest IN or OUT, the slot on a colour strip, A1/A2); on a Wrap row over the picture the nearest M marker with only its picture moving (as Ctrl+M then Ctrl+I), over A2 the nearest marker with only its sound moving (as Ctrl+M then Ctrl+2), user 2026-10-21; the locked start and end markers are not taken. A drag moves only what is taken. Shift + left click adds (an M marker there, as Shift+M). The middle button is the cut. The wheel is the left/right arrows, Ctrl+wheel (or the wheel with the right button held) Ctrl+left/right. Pointer names are the timeline's (qnc-mouse-map); an action left out means the pointer does nothing on that panel.",
   "panels": {
     "source_timeline": {
       "click": "timeline_cue_frame",
@@ -52,9 +52,7 @@
       "wheel_back": "wheel_segments_back",
       "wheel_forward": "wheel_segments_forward",
       "ctrl_wheel_back": "wheel_segments_ctrl_back",
-      "ctrl_wheel_forward": "wheel_segments_ctrl_forward",
-      "drag_up": "undo_object",
-      "drag_down": "redo_object"
+      "ctrl_wheel_forward": "wheel_segments_ctrl_forward"
     }
   }
 }
