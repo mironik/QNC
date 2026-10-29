@@ -16,6 +16,6 @@
   "database_write_policy": "no_db_writes",
   "runtime_crate": "qnc-subsegment-panel",
   "input": "The SubSegment view of the script (its parts on its axis, the pause and join before each, the player's playhead) and the timeline theme.",
-  "output": "The SubSegment painted in place of the source timeline on the one qnc-timeline; a click as subsegment_cue, the pause and join buttons as subsegment_join_gap and subsegment_join_cut, Close as subsegment_close.",
+  "output": "The SubSegment painted in place of the source timeline on the one qnc-timeline; a click as subsegment_cue, the pause and join buttons as subsegment_join_gap and subsegment_join_cut; no title row above the timeline (a clip of the pool brings the source timeline back).",
   "specification": "User 2026-10-29: a SubSegment is put together in its own timeline, its sound cut or crossed at every join (AGENTS.md)."
 }

@@ -6959,3 +6959,6 @@ duljina, poster prvog klipa), klik ga otvara na mjestu source timelinea (`script
 (`qnc-pool-tabs` `LibraryTab::Subsegment`, `Contents.subsegments`), prazna poruka u ugovoru
 (`subsegment_empty_message`). C10 Story/MA ploca 94 -> 93. Testovi, conformance, release build. Uzivo nije provjereno.
 Nije izvedeno: Ton segment u Storyju iz SubSegmenta (Story nema scenarij, pa ni tab).
+Izmjena 2026-10-29 (korisnik: "izbaci iznad source timeline dio koji si dodao, nepotreban je"): SubSegment timeline vise
+nema redak naslova ("SubSegment: n parts, n frames" i Close) iznad sebe; source timeline vraca klik na klip u poolu
+(`qnc-subsegment-panel`; sifre `subsegment.title`, `subsegment.close` uklonjene iz rjecnika).

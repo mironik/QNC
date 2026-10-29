@@ -570,8 +570,6 @@
     "script.subsegment": "SubSegment",
     "script.pieces_length": "{n} parts",
     "script.open_subsegment": "Open SubSegment",
-    "subsegment.title": "SubSegment: {parts} parts, {frames} frames",
-    "subsegment.close": "Close",
     "subsegment.trimming": "TRIM",
     "subsegment.join": "pause {frames} fr",
     "subsegment.part": "{n}. {clip}",

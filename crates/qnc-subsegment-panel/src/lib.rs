@@ -7,7 +7,7 @@
 
 use eframe::egui::{self, RichText};
 use qnc_action_event::ActionEvent;
-use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SUBSEGMENT_CLOSE, SUBSEGMENT_CUE, TAKE_EDGE};
+use qnc_script::{SubsegmentView, DRAG_EDGE, JOIN_CUT, JOIN_GAP, PART_CHANNEL, PART_LEVEL, PART_MOVE, PART_OFF, PART_REMOVE, SUBSEGMENT_CUE, TAKE_EDGE};
 use qnc_timeline::{
     AudioLane, TimelineFocusPaint, TimelineInput, TimelineIntent, TimelineLayerFlags, TimelineMarkerPart, TimelineMarkerPin,
     TimelineMetrics, TimelinePicture, TimelineProjection, TimelineTheme, TimelineVirtualSpan,
@@ -38,13 +38,9 @@ pub fn or_body<'a>(
 pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> Option<ActionEvent> {
     let rect = ui.available_rect_before_wrap();
     ui.painter().rect_filled(rect, 0.0, theme.background);
+    // No title row above the timeline (user 2026-10-29: not needed); a clip of the pool brings
+    // the source timeline back.
     let mut answer = None;
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(qnc_ui_text::fill("subsegment.title", &[("parts", &view.parts.len().to_string()), ("frames", &view.total_frames.to_string())])).color(theme.text));
-        if ui.small_button(qnc_ui_text::text("subsegment.close")).clicked() {
-            answer = Some(ActionEvent::key(SUBSEGMENT_CLOSE));
-        }
-    });
     let duration = view.total_frames.max(1);
     let mut state = TimelineProjection::new(0, duration).with_cue_enabled(true);
     if let Some(frame) = view.playhead {
