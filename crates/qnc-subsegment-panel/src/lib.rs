@@ -137,7 +137,9 @@ pub fn show(ui: &mut egui::Ui, view: &SubsegmentView, theme: TimelineTheme) -> O
     };
     answer = answer.or(drag_event);
     let event = match intent {
-        TimelineIntent::CueFrame(frame) => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
+        // A click on a part's picture is a click on its row (user 2026-10-29: the filmstrip did
+        // not take the playhead): the parts are not chosen, the playhead goes there.
+        TimelineIntent::CueFrame(frame) | TimelineIntent::SelectVirtual { frame, .. } => Some(ActionEvent::key(SUBSEGMENT_CUE).with_target(frame.to_string())),
         // A right click on a join takes the IN of the part after it, as Ctrl+I.
         // A right click takes the IN or OUT nearest to where it was (user 2026-10-29: every IN
         // and OUT of every part); at a join the side clicked on decides.
