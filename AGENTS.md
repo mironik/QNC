@@ -6949,3 +6949,13 @@ nema pauzu ni spoj. Zadnji dio bloka se ne brise sam (poruka `db.script_last_pie
 `a_part_moves_past_its_neighbour_and_leaves_the_joins_stay_in_their_places`), `qnc-script` radnje `subsegment_part_move`,
 `subsegment_part_remove` (upis odmah, SubSegment svira ponovno, uzeti rub ili zvuk dijela se pusta), katalog akcija bez
 tipki, `qnc-subsegment-panel`, rjecnik. Testovi, conformance, release build. Uzivo nije provjereno.
+Popravak i dopuna 2026-10-29 (korisnik: "nastavi sa SubSegmentom kao virtualnim klipom u poolu"; "subsegment timeline ne
+prihvaca klik na filmstrip za postavljanje playholdera"): (1) klik na sliku dijela na SubSegment timelineu davao je izbor
+segmenta (`SelectVirtual`), koji panel nije citao; sada je playhead kao klik na redak (`qnc-subsegment-panel`). (2) MA Audio
+(grupa g) ima u poolu tabove All, SubClip i SubSegment (`contracts/ui/editorial.layout.json`, akcija kataloga
+`editorial_tab_subsegment` bez tipke). SubSegment je virtualni klip scenarija, ne nova tablica: tab pokazuje blokove
+izjave od vise dijelova (`qnc-script` `ScriptView::pool_cards`, `SubsegmentCard`: oznaka, prvi klip, broj dijelova,
+duljina, poster prvog klipa), klik ga otvara na mjestu source timelinea (`script_open`). Tab je siv bez SubSegmenta
+(`qnc-pool-tabs` `LibraryTab::Subsegment`, `Contents.subsegments`), prazna poruka u ugovoru
+(`subsegment_empty_message`). C10 Story/MA ploca 94 -> 93. Testovi, conformance, release build. Uzivo nije provjereno.
+Nije izvedeno: Ton segment u Storyju iz SubSegmenta (Story nema scenarij, pa ni tab).

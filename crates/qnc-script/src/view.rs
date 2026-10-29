@@ -27,6 +27,35 @@ impl BlockRow {
     pub fn is_clip(&self) -> bool {
         self.role == Some(Role::Clip)
     }
+
+    /// Whether it is a SubSegment: a clip block put together from several parts.
+    pub fn is_subsegment(&self) -> bool {
+        self.is_clip() && self.block.pieces.len() > 1
+    }
+}
+
+/// A SubSegment as a card of the pool, a virtual clip (user 2026-10-29): its block id, its mark
+/// with its first clip and number of parts, its length, and the poster of its first clip.
+pub struct SubsegmentCard<'a> {
+    pub id: String,
+    pub title: String,
+    pub seconds: f64,
+    pub clip: Option<&'a qnc_clip_row::ClipRow>,
+}
+
+impl qnc_clip_row::PoolItem for SubsegmentCard<'_> {
+    fn card_id(&self) -> &str {
+        &self.id
+    }
+    fn card_title(&self) -> &str {
+        &self.title
+    }
+    fn card_poster(&self) -> (Option<&str>, Option<&qnc_image_assets::RgbaImage>) {
+        self.clip.map_or((None, None), |clip| clip.card_poster())
+    }
+    fn card_seconds(&self) -> f64 {
+        self.seconds
+    }
 }
 
 /// What the script panel shows.
@@ -71,6 +100,26 @@ pub struct ScriptView {
 }
 
 impl ScriptView {
+    /// The SubSegments of the script as cards of the pool, in reading order; `clips` gives each
+    /// its first clip's poster.
+    pub fn pool_cards<'a>(&self, clips: &'a [qnc_clip_row::ClipRow]) -> Vec<SubsegmentCard<'a>> {
+        self.blocks
+            .iter()
+            .filter(|row| row.is_subsegment())
+            .map(|row| SubsegmentCard {
+                id: row.block.id.to_string(),
+                title: qnc_ui_text::fill("script.subsegment_card", &[("mark", &row.mark), ("clip", &row.block.clip_name), ("n", &row.block.pieces.len().to_string())]).into(),
+                seconds: row.seconds,
+                clip: clips.iter().find(|clip| clip.clip_id == row.block.clip_id),
+            })
+            .collect()
+    }
+
+    /// How many SubSegments the script has (the pool's SubSegment tab is grey without one).
+    pub fn subsegment_count(&self) -> usize {
+        self.blocks.iter().filter(|row| row.is_subsegment()).count()
+    }
+
     pub fn total_seconds(&self) -> f64 {
         self.read_seconds + self.clip_seconds
     }

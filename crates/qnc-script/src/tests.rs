@@ -73,6 +73,22 @@ fn part(clip: &str, from: u64, to: u64, gap: u64) -> Piece {
 }
 
 #[test]
+fn a_subsegment_is_a_card_of_the_pool_with_its_first_clips_poster() {
+    let profile = general_tv();
+    let mut several = Block::of_pieces("sot", vec![part("2002", 100, 150, 0), part("2679", 10, 60, 4)]);
+    several.id = 7;
+    let blocks = [sot("Rekao je."), several];
+    let view = ScriptView { blocks: rows(&blocks, Some(&profile), 2.5), profile: Some(profile), ..ScriptView::default() };
+    let clip = qnc_clip_row::ClipRow { clip_id: "2002".into(), name: "Mironik 2002".into(), thumb_uri: Some("qnc://poster".into()), ..Default::default() };
+    let clips = [clip];
+    let cards = view.pool_cards(&clips);
+    assert_eq!(view.subsegment_count(), 1, "a block of one range is no SubSegment");
+    assert_eq!((cards[0].id.as_str(), cards[0].seconds), ("7", 2.0));
+    assert!(cards[0].title.starts_with("SOT 2"), "{}", cards[0].title);
+    assert_eq!(qnc_clip_row::PoolItem::card_poster(&cards[0]).0, Some("qnc://poster"));
+}
+
+#[test]
 fn the_filmstrip_of_a_subsegment_lays_each_part_after_its_pause() {
     let pieces = vec![part("a", 100, 150, 0), part("b", 10, 60, 5)];
     let shown = subsegment_view(&Block::of_pieces("sot", pieces.clone()), None);

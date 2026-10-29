@@ -6,6 +6,7 @@ description = "QNC public piece: the script of a project's story (user 2026-10-2
 
 [dependencies]
 qnc-clip-row = { workspace = true }
+qnc-image-assets = { workspace = true }
 qnc-db-broker = { workspace = true }
 qnc-newsroom-sheet-db = { workspace = true }
 qnc-script-db = { workspace = true }

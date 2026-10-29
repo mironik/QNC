@@ -103,11 +103,11 @@ fn pool(ui: &mut Ui, contracts: &EditorialContracts, theme: &Theme, view: &Edito
         empty_message: cards.empty_message(view.library_tab, view.loading, &view.message),
         id_salt: "editorial_clip_grid",
     };
-    let clicked = if shot_tab {
-        let shots: Vec<_> = view.shorts.iter().filter(|shot| shot.b_roll == (view.library_tab == LibraryTab::Broll)).collect();
-        qnc_media_pool_panel::show(ui, theme, &spec, &now, &shots)
-    } else {
-        qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.focus.transcript.pool_clips(view.library_tab == LibraryTab::Transcript, &view.clips))
+    let clicked = match view.library_tab {
+        // A SubSegment is a virtual clip of the script (user 2026-10-29): a click opens it in place of the source timeline.
+        LibraryTab::Subsegment => return qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.focus.script.pool_cards(&view.clips).iter().collect::<Vec<_>>()).map(|(CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id))| EditorialIntent::Action(qnc_action_event::ActionEvent::key(qnc_script::OPEN).with_target(id))),
+        _ if shot_tab => qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.shorts.iter().filter(|shot| shot.b_roll == (view.library_tab == LibraryTab::Broll)).collect::<Vec<_>>()),
+        tab => qnc_media_pool_panel::show(ui, theme, &spec, &now, &view.focus.transcript.pool_clips(tab == LibraryTab::Transcript, &view.clips)),
     };
     Some(match clicked? { CardGridAction::ToggleSelection(id) if composition.ticks_several && !shot_tab => EditorialIntent::Action(qnc_action_event::ActionEvent::key(qnc_transcript::MARK).with_target(id)), CardGridAction::Activate(id) | CardGridAction::ToggleSelection(id) => if shot_tab { EditorialIntent::PreviewShort(id) } else { EditorialIntent::PreviewClip(id) } })
 }

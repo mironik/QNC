@@ -24,6 +24,7 @@ qnc-source-timeline = { workspace = true }
 qnc-theme-styles = { workspace = true }
 qnc-timeline = { workspace = true }
 qnc-transcript = { workspace = true }
+qnc-script = { workspace = true }
 qnc-transport-panel = { workspace = true }
 qnc-trim-overlay = { workspace = true }
 qnc-ui-kit = { workspace = true }
