@@ -6890,3 +6890,10 @@ filmstrip svakog dijela po njegovom IN/OUT-u, iza razmaka na svom mjestu, istom 
 klip bez filmstripa nema slike dok ga radnik ne napravi). `qnc-script` (`subsegment_pictures`, `SubsegmentView.pictures`;
 nacrt ruba pomice i slike), `qnc-subsegment-panel` (`TimelinePicture`). Test
 `the_filmstrip_of_a_subsegment_lays_each_part_after_its_pause`, conformance. Uzivo nije provjereno.
+Popravak 2026-10-29 (korisnik: "pogledaj log... ne kreira SubClip od transkodiranih klipova"; log: `short-save refused
+... Mironik 3452 is not imported`): u bazi aktivnog projekta klip je `imported` (procitano samo citanjem), ali AI Media
+Assist je katalog procitao prije nego je uvoz zavrsio (katalog forme se cita ponovno tek kad se povrsina aktivira), pa je
+redak poola ostao neuvezen i `qnc-short-save` je odbijao SubClip. Sada `qnc-short-save` ne odlucuje po retku poola: je li
+klip uvezen provjerava baza u istoj transakciji kao upis (`qnc-virtual-shots`, vec postojeca provjera). Test
+`nothing_is_written_without_a_clip_marks_and_a_database`. Nije izvedeno: oznaka stanja klipa u poolu AI Media Assista
+ostaje stara dok se povrsina ponovno ne aktivira.

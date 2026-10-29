@@ -60,9 +60,9 @@ impl ShortSave {
     ) -> Result<(), String> {
         let clip_id = chosen.ok_or_else(|| text("story.msg.pick_clip"))?;
         let clip = clips.iter().find(|clip| clip.clip_id == clip_id).ok_or_else(|| text("ingest.msg.clip_not_found"))?;
-        if !clip.imported {
-            return Err(qnc_ui_text::fill("story.msg.clip_not_imported", &[("clip", clip_id)]));
-        }
+        // Whether the clip is imported is the database's, read when the short is written
+        // (`qnc-virtual-shots`), not the pool row a form read earlier (live 2026-10-29: a clip
+        // imported after the pool was read could not become a SubClip).
         let (in_frame, out_frame) = marks.ok_or_else(|| text("story.msg.marks_not_confirmed"))?;
         let target = target.ok_or_else(|| text("story.msg.db_not_writable"))?.clone();
         let project_id = project_id.ok_or_else(|| text("story.msg.no_active_project"))?.to_string();
@@ -115,10 +115,11 @@ mod tests {
     }
 
     #[test]
-    fn nothing_is_written_without_an_imported_clip_marks_and_a_database() {
+    fn nothing_is_written_without_a_clip_marks_and_a_database() {
         let mut save = ShortSave::new();
         assert_eq!(save.start(None, &[], Some((0, 5)), None, Some("p")), Err(text("story.msg.pick_clip")));
-        assert_eq!(save.start(Some("c"), &[clip(false)], Some((0, 5)), None, Some("p")).unwrap_err(), qnc_ui_text::fill("story.msg.clip_not_imported", &[("clip", "c")]));
+        // A row read before the import does not refuse: the database decides when it writes.
+        assert_eq!(save.start(Some("c"), &[clip(false)], Some((0, 5)), None, Some("p")), Err(text("story.msg.db_not_writable")));
         assert_eq!(save.start(Some("c"), &[clip(true)], None, None, Some("p")), Err(text("story.msg.marks_not_confirmed")));
         assert_eq!(save.start(Some("c"), &[clip(true)], Some((0, 5)), None, Some("p")), Err(text("story.msg.db_not_writable")));
         assert!(save.poll().is_none(), "no write was started");
