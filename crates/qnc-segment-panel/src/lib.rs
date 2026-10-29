@@ -142,9 +142,19 @@ pub fn show(
             header(ui, segments, style);
             ui.add_space(8.0);
             if segments.is_empty() {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(ui.available_height() * 0.35);
-                    ui.label(RichText::new(qnc_ui_text::text("story.ui.no_segments")).color(style.muted));
+                // The bar (level meter, NORM) stays at the bottom without segments too (user
+                // 2026-10-29: the meter vanished in a story without segments).
+                let body = ui.available_rect_before_wrap().intersect(content_rect);
+                let bar_top = body.bottom() - PLAYLIST_BAR_H.min(body.height());
+                ui.scope_builder(egui::UiBuilder::new().max_rect(egui::Rect::from_min_max(body.left_top(), egui::pos2(body.right(), bar_top))), |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(ui.available_height() * 0.35);
+                        ui.label(RichText::new(qnc_ui_text::text("story.ui.no_segments")).color(style.muted));
+                    });
+                });
+                ui.scope_builder(egui::UiBuilder::new().max_rect(egui::Rect::from_min_max(egui::pos2(body.left(), bar_top), body.max)), |ui| {
+                    ui.separator();
+                    command = bar::show(ui, segments, timeline_theme, levels);
                 });
                 return;
             }

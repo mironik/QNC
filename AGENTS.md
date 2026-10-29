@@ -6917,3 +6917,7 @@ izlaza A1/A2 koju player mjeri na uredaju (`qnc-transport-panel` `show(.., level
 u Segmentima. Mjesto transporta sire je u oba ugovora rasporeda (`transport_width` 290 -> 380). Story/MA ploca predaje
 `preview.output_levels`, Ingest ploca razine iz `playback` (isti broj redaka). Testovi, conformance, release build. Uzivo
 nije provjereno.
+Popravak 2026-10-29 (korisnik: "vu-metar se nalazio na traci iznad source timelinea, pogledaj povijest"): povijest pokazuje
+jedno mjesto metra, traku panela Segmenti; panel bez segmenata (od 24. 9.) crtao je samo poruku i nije crtao traku, pa u
+prici bez segmenata metra i NORM nije bilo. Sada je traka na dnu panela i bez segmenata (`qnc-segment-panel`). Testovi,
+conformance, release build.
